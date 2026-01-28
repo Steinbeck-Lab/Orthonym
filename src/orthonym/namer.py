@@ -186,6 +186,13 @@ class Orthonym:
                     for match in features.functional_groups[features.principal_group]:
                         pg_atom_set.update(match)
 
+                # Get initial substituents for orientation criterion (d)
+                # This is needed BEFORE orientation to apply lowest-locant rule
+                initial_subs = self._find_substituents_by_atom(
+                    features.mol,
+                    features.principal_chain
+                )
+
                 # Orient chain using IUPAC 2013 criteria
                 features.principal_chain = orient_chain(
                     chain=features.principal_chain,
@@ -193,13 +200,13 @@ class Orthonym:
                     principal_group_atoms=pg_atom_set,
                     double_bonds=features.double_bonds,
                     triple_bonds=features.triple_bonds,
-                    substituent_positions=None,  # populated after orientation
+                    substituent_positions=initial_subs,
                 )
 
                 # Build atom-to-locant mapping from oriented chain
                 features.atom_to_locant = build_atom_to_locant(features.principal_chain)
 
-                # Get substituents attached to principal chain
+                # Get substituents with final locant-based positions
                 features.substituents = self._find_substituents(
                     features.mol,
                     features.principal_chain
@@ -236,9 +243,48 @@ class Orthonym:
         return triple_bonds
     
     def _find_substituents(self, mol, chain: List[int]) -> Dict[int, List[List[int]]]:
-        """Find substituents attached to the principal chain."""
+        """Find substituents attached to the principal chain (keyed by position)."""
         from .perception.chains import get_substituents
         return get_substituents(mol, chain)
+
+    def _find_substituents_by_atom(self, mol, chain: List[int]) -> Dict[int, List[List[int]]]:
+        """
+        Find substituents attached to the principal chain, keyed by atom index.
+
+        This is used for orient_chain() which expects substituent_positions
+        keyed by atom indices on the chain, not by position numbers.
+
+        Args:
+            mol: RDKit Mol object
+            chain: List of atom indices in the principal chain
+
+        Returns:
+            Dict mapping chain atom index to list of substituent atom lists
+        """
+        from .perception.chains import _bfs_substituent
+
+        chain_set = set(chain)
+        substituents = {}
+
+        for chain_idx in chain:
+            chain_atom = mol.GetAtomWithIdx(chain_idx)
+            position_subs = []
+
+            for neighbor in chain_atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+
+                # Skip atoms that are part of the main chain
+                if nbr_idx in chain_set:
+                    continue
+
+                # BFS to find full substituent
+                sub_atoms = _bfs_substituent(mol, nbr_idx, chain_set)
+                position_subs.append(sub_atoms)
+
+            if position_subs:
+                substituents[chain_idx] = position_subs
+
+        return substituents
 
 
 def name_compound(smiles: str, style: str = "pin") -> str:
