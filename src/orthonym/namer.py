@@ -62,6 +62,11 @@ class MolecularFeatures:
     polycyclic_name: Optional[str] = None  # Name of PAH parent (naphthalene, etc.)
     polycyclic_substituents: Dict[int, List[Dict]] = field(default_factory=dict)  # From get_polycyclic_substituents
 
+    # Heterocycle-specific information
+    heterocycle_info: Optional[Dict] = None  # From classify_heterocycle
+    oriented_heterocycle: Optional[List[int]] = None  # Ring atoms in IUPAC numbering order
+    heterocycle_atom_to_locant: Optional[Dict[int, int]] = None  # Atom idx -> locant mapping
+
     # Stereochemistry
     stereocenters: List[dict] = field(default_factory=list)
     double_bond_stereo: List[dict] = field(default_factory=list)
@@ -218,8 +223,22 @@ class Orthonym:
                     features.benzene_substituents = get_benzene_substituents(
                         features.mol, features.principal_ring
                     )
+                elif features.ring_type == 'heterocyclic':
+                    # Heterocyclic ring: classify and orient
+                    from .rules.heterocycles import (
+                        classify_heterocycle, orient_heterocycle
+                    )
+
+                    features.heterocycle_info = classify_heterocycle(
+                        features.mol, features.principal_ring
+                    )
+                    oriented, atom_to_locant = orient_heterocycle(
+                        features.mol, features.principal_ring
+                    )
+                    features.oriented_heterocycle = oriented
+                    features.heterocycle_atom_to_locant = atom_to_locant
                 else:
-                    # Non-benzene ring: detect substituents and orient
+                    # Non-benzene, non-heterocyclic ring: detect substituents and orient
                     from .rules.cycloalkanes import (
                         get_ring_substituents, get_ring_double_bonds,
                         orient_cycloalkane, orient_cycloalkene

@@ -85,6 +85,12 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     Returns:
         Complete IUPAC name string
     """
+    # Handle heterocyclic compounds FIRST
+    # Heterocycles include aromatic heterocycles (pyridine) and saturated (morpholine)
+    ring_type = getattr(features, 'ring_type', None)
+    if ring_type == 'heterocyclic':
+        return _assemble_heterocycle_name(features, style)
+
     # Handle benzene derivatives specially
     # Benzene naming generates the complete name directly, not fragments
     if getattr(features, 'is_benzene', False):
@@ -210,6 +216,32 @@ def _assemble_polycyclic_name(features: Any, style: str) -> str:
 
     # Generate systematic name with substituents
     return name_substituted_polycyclic(features.mol, pah_name, substituents)
+
+
+def _assemble_heterocycle_name(features: Any, style: str) -> str:
+    """
+    Assemble name for heterocyclic compounds.
+
+    For unsubstituted heterocycles, returns the parent name directly
+    (either retained name or HW systematic name).
+
+    For substituted heterocycles (Plan 03-04), adds prefixes with locants.
+
+    Args:
+        features: MolecularFeatures with ring_type='heterocyclic'
+        style: Naming style (only "pin" supported for now)
+
+    Returns:
+        Complete IUPAC name for the heterocycle
+    """
+    from ..rules.heterocycles import name_heterocycle
+
+    # Get the heterocycle parent name
+    parent_name = name_heterocycle(features.mol, features.principal_ring)
+
+    # For now, return parent name directly
+    # Substituted heterocycle naming will be implemented in Plan 03-04
+    return parent_name
 
 
 def _generate_chain_parent(features: Any) -> NameFragment:
