@@ -182,6 +182,36 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
 
 
+def _assemble_polycyclic_name(features: Any, style: str) -> str:
+    """
+    Assemble name for polycyclic aromatic hydrocarbons.
+
+    Polycyclic naming is handled specially because:
+    1. Substituent numbering is FIXED by IUPAC (not lowest locants)
+    2. Parent is a retained name (naphthalene, anthracene, etc.)
+    3. Multiple fused rings have standard numbering
+
+    Args:
+        features: MolecularFeatures with polycyclic_name set
+        style: Naming style (only "pin" supported for now)
+
+    Returns:
+        Complete IUPAC name for the polycyclic aromatic
+    """
+    from ..rules.polycyclics import name_substituted_polycyclic
+
+    pah_name = features.polycyclic_name
+    substituents = features.polycyclic_substituents
+
+    # If no substituents, return the PAH name
+    # (This should be caught by retained names, but handle here as fallback)
+    if not substituents:
+        return pah_name
+
+    # Generate systematic name with substituents
+    return name_substituted_polycyclic(features.mol, pah_name, substituents)
+
+
 def _generate_chain_parent(features: Any) -> NameFragment:
     """Generate parent name for acyclic chains.
 
