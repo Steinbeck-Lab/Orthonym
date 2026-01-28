@@ -261,26 +261,67 @@ def get_spiro_atoms(mol) -> Set[int]:
 def get_bridgehead_atoms(mol) -> Set[int]:
     """
     Find bridgehead atoms in bridged ring systems.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Set of atom indices that are bridgeheads
     """
     ri = mol.GetRingInfo()
     atom_ring_count = {}
-    
+
     for ring in ri.AtomRings():
         for atom_idx in ring:
             atom_ring_count[atom_idx] = atom_ring_count.get(atom_idx, 0) + 1
-    
+
     # Bridgehead atoms are in 2+ rings (but not spiro centers)
     spiro = get_spiro_atoms(mol)
     bridgeheads = set()
-    
+
     for atom_idx, count in atom_ring_count.items():
         if count >= 2 and atom_idx not in spiro:
             bridgeheads.add(atom_idx)
-    
+
     return bridgeheads
+
+
+def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
+    """
+    Classify a ring by its chemical type.
+
+    Classification order (check in this order):
+    1. Heterocyclic - contains non-carbon atoms
+    2. Aromatic - all atoms are aromatic (RDKit detection)
+    3. Cycloalkane - saturated, all carbon, no double bonds
+    4. Cycloalkene - unsaturated, all carbon, has double bonds but not aromatic
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Tuple of atom indices defining the ring
+
+    Returns:
+        Classification string: 'heterocyclic', 'aromatic', 'cycloalkane', or 'cycloalkene'
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
+        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        'cycloalkane'
+        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
+        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        'aromatic'
+    """
+    # Check heterocyclic first (highest priority)
+    if is_heterocyclic(mol, ring_atoms):
+        return 'heterocyclic'
+
+    # Check aromatic (carbocyclic)
+    if is_aromatic_ring(mol, ring_atoms):
+        return 'aromatic'
+
+    # Check saturated (cycloalkane)
+    if is_saturated_ring(mol, ring_atoms):
+        return 'cycloalkane'
+
+    # Must be cycloalkene (unsaturated carbocyclic, non-aromatic)
+    return 'cycloalkene'

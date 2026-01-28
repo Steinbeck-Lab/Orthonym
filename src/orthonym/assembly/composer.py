@@ -177,9 +177,67 @@ def _generate_chain_parent(features: Any) -> NameFragment:
 
 
 def _generate_ring_parent(features: Any) -> NameFragment:
-    """Generate parent name for cyclic compounds."""
-    # TODO: Implement ring naming (cycloalkanes, aromatics, heterocycles)
-    # For now, return placeholder
+    """
+    Generate parent name for cyclic compounds.
+
+    For cycloalkanes: "cyclo" + chain prefix + "an" (e.g., "cyclohexan")
+    The final 'e' is added during assembly if no suffix follows.
+
+    For other ring types, returns placeholder for now (to be implemented
+    in subsequent plans).
+
+    Args:
+        features: MolecularFeatures object with ring_type and principal_ring
+
+    Returns:
+        NameFragment with parent text and empty locants
+    """
+    ring_type = getattr(features, 'ring_type', None)
+    principal_ring = getattr(features, 'principal_ring', None)
+
+    if not principal_ring:
+        # Fallback: no ring identified
+        return NameFragment(text="cyclo", fragment_type="parent")
+
+    ring_size = len(principal_ring)
+
+    if ring_type == 'cycloalkane':
+        # Cycloalkane naming: cyclo + stem + an (e.g., cyclohexan)
+        # The stem comes from CHAIN_PREFIXES
+        if ring_size in CHAIN_PREFIXES:
+            stem = CHAIN_PREFIXES[ring_size]
+        else:
+            stem = _build_long_chain_prefix(ring_size)
+
+        # Return stem + "an" - the "e" will be added in assembly
+        # for saturated cycloalkanes with no suffix
+        return NameFragment(
+            text=f"cyclo{stem}",
+            locants=((), ()),  # No bond locants for saturated rings
+            fragment_type="parent"
+        )
+
+    elif ring_type == 'cycloalkene':
+        # TODO: Implement cycloalkene naming (Plan 02-02)
+        if ring_size in CHAIN_PREFIXES:
+            stem = CHAIN_PREFIXES[ring_size]
+        else:
+            stem = _build_long_chain_prefix(ring_size)
+        return NameFragment(
+            text=f"cyclo{stem}",
+            locants=((), ()),
+            fragment_type="parent"
+        )
+
+    elif ring_type == 'aromatic':
+        # TODO: Implement aromatic naming (Plan 02-04)
+        return NameFragment(text="cyclo", fragment_type="parent")
+
+    elif ring_type == 'heterocyclic':
+        # TODO: Implement heterocyclic naming (Phase 3)
+        return NameFragment(text="cyclo", fragment_type="parent")
+
+    # Unknown ring type, return placeholder
     return NameFragment(text="cyclo", fragment_type="parent")
 
 

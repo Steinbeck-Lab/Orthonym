@@ -16,7 +16,7 @@ from rdkit import Chem
 
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
-from .perception.rings import get_ring_systems, is_aromatic_ring
+from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring
 from .perception.stereo import assign_stereochemistry, get_stereocenters
 from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
@@ -27,30 +27,32 @@ from .data.retained_names import RETAINED_NAMES
 @dataclass
 class MolecularFeatures:
     """Container for perceived molecular features."""
-    
+
     mol: Any  # RDKit Mol object
     smiles: str = ""
     canonical_smiles: str = ""
-    
+
     # Functional group information
     functional_groups: Dict[str, List[tuple]] = field(default_factory=dict)
     principal_group: Optional[str] = None
     principal_group_atoms: List[tuple] = field(default_factory=list)
-    
+
     # Chain information
     principal_chain: List[int] = field(default_factory=list)
     atom_to_locant: Dict[int, int] = field(default_factory=dict)
     substituents: Dict[int, List[List[int]]] = field(default_factory=dict)
-    
+
     # Ring information
     ring_systems: List[set] = field(default_factory=list)
     is_cyclic: bool = False
     is_aromatic: bool = False
-    
+    ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
+    principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
+
     # Stereochemistry
     stereocenters: List[dict] = field(default_factory=list)
     double_bond_stereo: List[dict] = field(default_factory=list)
-    
+
     # Multiple bonds
     double_bonds: List[tuple] = field(default_factory=list)
     triple_bonds: List[tuple] = field(default_factory=list)
@@ -157,7 +159,7 @@ class Orthonym:
     def _classify(self, features: MolecularFeatures) -> None:
         """
         Apply IUPAC classification rules.
-        
+
         Determines:
         - Principal characteristic group (highest seniority)
         - Principal chain/ring (following IUPAC 2013 criteria)
@@ -170,7 +172,18 @@ class Orthonym:
         )
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
-        
+
+        # For cyclic molecules, identify principal ring and its type
+        if features.is_cyclic:
+            ring_info = get_ring_info(features.mol)
+            atom_rings = ring_info['atom_rings']
+
+            if atom_rings:
+                # For simple single-ring molecules, the ring IS the parent
+                # TODO: For multi-ring systems, apply selection criteria
+                features.principal_ring = atom_rings[0]
+                features.ring_type = classify_ring(features.mol, features.principal_ring)
+
         # Find principal chain (for acyclic molecules)
         if not features.is_cyclic:
             features.principal_chain = find_principal_chain(
