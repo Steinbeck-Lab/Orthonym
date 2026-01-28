@@ -157,10 +157,14 @@ def orient_chain(
             # result == 0 -> tie, continue to next criterion
 
     # --- Criterion (b): Lowest locants for multiple bonds (combined set) ---
-    multiple_bond_atoms = _get_bond_locant_atoms(chain, double_bonds + triple_bonds)
-    if multiple_bond_atoms:
-        fwd_locants = sorted(fwd_map[a] for a in multiple_bond_atoms)
-        rev_locants = sorted(rev_map[a] for a in multiple_bond_atoms)
+    # Must compute bond locant atoms separately for forward and reverse chains,
+    # since the "lower position" atom of each bond depends on chain direction
+    all_bonds = double_bonds + triple_bonds
+    fwd_bond_atoms = _get_bond_locant_atoms(forward, all_bonds)
+    rev_bond_atoms = _get_bond_locant_atoms(reverse, all_bonds)
+    if fwd_bond_atoms or rev_bond_atoms:
+        fwd_locants = sorted(fwd_map[a] for a in fwd_bond_atoms)
+        rev_locants = sorted(rev_map[a] for a in rev_bond_atoms)
         result = compare_locant_sets(fwd_locants, rev_locants)
         if result == -1:
             return forward
@@ -168,10 +172,11 @@ def orient_chain(
             return reverse
 
     # --- Criterion (c): Lowest locants for double bonds specifically ---
-    double_bond_atoms = _get_bond_locant_atoms(chain, double_bonds)
-    if double_bond_atoms:
-        fwd_locants = sorted(fwd_map[a] for a in double_bond_atoms)
-        rev_locants = sorted(rev_map[a] for a in double_bond_atoms)
+    fwd_double_atoms = _get_bond_locant_atoms(forward, double_bonds)
+    rev_double_atoms = _get_bond_locant_atoms(reverse, double_bonds)
+    if fwd_double_atoms or rev_double_atoms:
+        fwd_locants = sorted(fwd_map[a] for a in fwd_double_atoms)
+        rev_locants = sorted(rev_map[a] for a in rev_double_atoms)
         result = compare_locant_sets(fwd_locants, rev_locants)
         if result == -1:
             return forward
@@ -300,6 +305,39 @@ def _pick_locant_atom(
     # Pick highest score; on tie, preserve match-tuple order
     best = max(candidates, key=_hetero_score)
     return best
+
+
+def get_bond_locants(
+    chain: List[int],
+    bonds: List[Tuple[int, int]],
+    atom_to_locant: Dict[int, int],
+) -> List[int]:
+    """
+    Get locants for bonds (double or triple) within the chain.
+
+    For each bond (atom_a, atom_b), both atoms must be in the chain.
+    The locant is the LOWER of the two atom locants (per IUPAC convention,
+    a bond between positions i and i+1 is cited by locant i).
+
+    Args:
+        chain: Ordered list of atom indices in the principal chain.
+        bonds: List of (atom_idx_a, atom_idx_b) tuples for bonds.
+        atom_to_locant: Mapping from atom index to locant (1-indexed).
+
+    Returns:
+        Sorted list of locants for the bonds.
+
+    Examples:
+        >>> chain = [0, 1, 2, 3]
+        >>> bonds = [(1, 2)]  # bond between atoms 1 and 2
+        >>> atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4}
+        >>> get_bond_locants(chain, bonds, atom_to_locant)
+        [2]
+    """
+    bond_atoms = _get_bond_locant_atoms(chain, bonds)
+    locants = [atom_to_locant[atom_idx] for atom_idx in bond_atoms
+               if atom_idx in atom_to_locant]
+    return sorted(locants)
 
 
 # ---------------------------------------------------------------------------

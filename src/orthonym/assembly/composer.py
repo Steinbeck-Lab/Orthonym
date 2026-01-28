@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 from ..rules.seniority import get_suffix, get_prefix
-from ..rules.locants import get_functional_group_locants
+from ..rules.locants import get_functional_group_locants, get_bond_locants
 from .naming_utils import (
     format_suffix_with_locants,
     get_multiplier_prefix,
@@ -138,20 +138,40 @@ def _name_simple_molecule(features: Any) -> str:
 
 
 def _generate_chain_parent(features: Any) -> NameFragment:
-    """Generate parent name for acyclic chains."""
+    """Generate parent name for acyclic chains.
+
+    Returns a NameFragment where:
+    - text: stem + unsaturation_base (e.g., "but", "prop")
+    - locants: tuple of (double_bond_locants, triple_bond_locants)
+    """
     chain_length = len(features.principal_chain)
-    
-    # Get chain prefix
+
+    # Get chain prefix (stem)
     if chain_length in CHAIN_PREFIXES:
-        prefix = CHAIN_PREFIXES[chain_length]
+        stem = CHAIN_PREFIXES[chain_length]
     else:
-        prefix = _build_long_chain_prefix(chain_length)
-    
-    # Determine unsaturation
-    unsaturation = _get_unsaturation_suffix(features)
-    
+        stem = _build_long_chain_prefix(chain_length)
+
+    # Get bond locants if we have atom_to_locant mapping
+    double_locants = []
+    triple_locants = []
+    if features.atom_to_locant:
+        double_locants = get_bond_locants(
+            features.principal_chain,
+            features.double_bonds,
+            features.atom_to_locant
+        )
+        triple_locants = get_bond_locants(
+            features.principal_chain,
+            features.triple_bonds,
+            features.atom_to_locant
+        )
+
+    # Store stem as text, bond locants as locants tuple
+    # We'll use a nested tuple: ((double_locants), (triple_locants))
     return NameFragment(
-        text=f"{prefix}{unsaturation}",
+        text=stem,
+        locants=(tuple(double_locants), tuple(triple_locants)),
         fragment_type="parent"
     )
 
@@ -378,6 +398,10 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
     For functional group compounds, uses PIN-style infix locants:
     - propan-1-ol (not propanol or 1-propanol)
     - butan-2-one (not butanone or 2-butanone)
+
+    For unsaturated hydrocarbons, includes bond locants:
+    - but-1-ene (not butene or 1-butene)
+    - pent-1-en-4-yne (enyne)
     """
     stereo = ""
     prefixes = []
@@ -403,8 +427,14 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
     # between prefixes when one ends with a letter and the next starts with a digit
     prefix_str = _join_prefixes([f.text for f in prefixes])
 
-    # Get parent text
-    parent = parent_frag.text if parent_frag else ""
+    # Extract parent info: stem is in text, bond locants in locants
+    stem = parent_frag.text if parent_frag else ""
+    double_locants = []
+    triple_locants = []
+    if parent_frag and parent_frag.locants:
+        # locants is a tuple of (double_bond_locants, triple_bond_locants)
+        double_locants = list(parent_frag.locants[0]) if parent_frag.locants[0] else []
+        triple_locants = list(parent_frag.locants[1]) if len(parent_frag.locants) > 1 and parent_frag.locants[1] else []
 
     # Handle suffix attachment using PIN-style formatting
     if suffix_frag and suffix_frag.text:
@@ -415,22 +445,19 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
         count = len(suffix_locants)
         multiplier = get_multiplier_prefix(count, suffix_text) if count > 1 else ""
 
-        # Parse parent into stem and unsaturation
-        # Parent should be like "propan" (stem + "an") or "but" + "en" etc.
-        # For now, we know it's stem+unsaturation (e.g., "propan", "butan")
-        # We need to split into stem and unsaturation for format_suffix_with_locants
-        stem, unsaturation = _split_parent_stem(parent)
+        # Build unsaturation infix with locants for compounds with functional groups
+        unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
 
         name = format_suffix_with_locants(
             stem,
-            unsaturation,
+            unsaturation_infix,
             suffix_text,
             suffix_locants,
             multiplier
         )
     else:
-        # No suffix = hydrocarbon, add 'e' ending
-        name = f"{parent}e"
+        # No suffix = hydrocarbon, build name with unsaturation
+        name = _build_hydrocarbon_name(stem, double_locants, triple_locants)
 
     # Add prefixes
     if prefix_str:
@@ -441,6 +468,168 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
         name = f"{stereo}{name}"
 
     return name
+
+
+def _build_unsaturation_infix(
+    double_locants: List[int],
+    triple_locants: List[int]
+) -> str:
+    """
+    Build the unsaturation infix (e.g., 'an', '-1-en', '-1-en-4-yn').
+
+    This is used when there's a functional group suffix. The unsaturation
+    part is inserted between the stem and the suffix locants.
+
+    Args:
+        double_locants: Sorted list of locants for double bonds.
+        triple_locants: Sorted list of locants for triple bonds.
+
+    Returns:
+        Unsaturation infix string (may be empty for saturated).
+
+    Examples:
+        >>> _build_unsaturation_infix([], [])
+        'an'
+        >>> _build_unsaturation_infix([1], [])
+        '-1-en'
+        >>> _build_unsaturation_infix([1], [4])
+        '-1-en-4-yn'
+    """
+    num_double = len(double_locants)
+    num_triple = len(triple_locants)
+
+    if num_double == 0 and num_triple == 0:
+        return "an"  # Saturated
+
+    parts = []
+
+    # Double bonds
+    if num_double > 0:
+        double_str = ",".join(str(loc) for loc in double_locants)
+        if num_double == 1:
+            parts.append(f"-{double_str}-en")
+        else:
+            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            # For multiple double bonds, add 'a' connector: butadiene not butdiene
+            parts.append(f"a-{double_str}-{multiplier}en")
+
+    # Triple bonds
+    if num_triple > 0:
+        triple_str = ",".join(str(loc) for loc in triple_locants)
+        if num_triple == 1:
+            parts.append(f"-{triple_str}-yn")
+        else:
+            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            parts.append(f"-{triple_str}-{multiplier}yn")
+
+    # Special case: if only double bonds and parts starts with 'a-' for diene,
+    # we need to handle this differently for saturated stem
+    if parts:
+        result = "".join(parts)
+        # Clean up any double hyphens
+        while "--" in result:
+            result = result.replace("--", "-")
+        return result
+
+    return "an"
+
+
+def _build_hydrocarbon_name(
+    stem: str,
+    double_locants: List[int],
+    triple_locants: List[int]
+) -> str:
+    """
+    Build a complete hydrocarbon name (no functional group suffix).
+
+    This handles:
+    - Saturated: stem + 'ane' (butane)
+    - Alkenes: stem + '-locant-ene' (but-1-ene) or stem + 'ene' (ethene)
+    - Alkynes: stem + '-locant-yne' (but-1-yne) or stem + 'yne' (ethyne)
+    - Enynes: stem + '-double-en-triple-yne' (pent-1-en-4-yne)
+
+    For 2-carbon compounds (ethene, ethyne), locants are omitted since
+    there's only one possible position for the multiple bond.
+
+    Args:
+        stem: Chain prefix (e.g., 'but', 'pent').
+        double_locants: Sorted list of locants for double bonds.
+        triple_locants: Sorted list of locants for triple bonds.
+
+    Returns:
+        Complete hydrocarbon name.
+
+    Examples:
+        >>> _build_hydrocarbon_name("but", [], [])
+        'butane'
+        >>> _build_hydrocarbon_name("eth", [1], [])
+        'ethene'
+        >>> _build_hydrocarbon_name("but", [1], [])
+        'but-1-ene'
+        >>> _build_hydrocarbon_name("but", [2], [])
+        'but-2-ene'
+        >>> _build_hydrocarbon_name("pent", [1], [4])
+        'pent-1-en-4-yne'
+    """
+    num_double = len(double_locants)
+    num_triple = len(triple_locants)
+
+    if num_double == 0 and num_triple == 0:
+        # Saturated hydrocarbon
+        return f"{stem}ane"
+
+    # Check if this is a 2-carbon chain (ethene/ethyne) where locants are omitted
+    # The stem 'eth' indicates 2 carbons
+    is_two_carbon = stem == "eth"
+
+    parts = [stem]
+
+    # Double bonds
+    if num_double > 0:
+        if num_double == 1:
+            if is_two_carbon and num_triple == 0:
+                # ethene - no locant needed
+                parts.append("en")
+            else:
+                # Single double bond with locant: but-1-ene
+                double_str = ",".join(str(loc) for loc in double_locants)
+                parts.append(f"-{double_str}-en")
+        else:
+            # Multiple double bonds: buta-1,3-diene
+            # Add 'a' before locants for pronunciation
+            double_str = ",".join(str(loc) for loc in double_locants)
+            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            parts.append(f"a-{double_str}-{multiplier}en")
+
+    # Triple bonds
+    if num_triple > 0:
+        if num_triple == 1:
+            if is_two_carbon and num_double == 0:
+                # ethyne - no locant needed
+                parts.append("yn")
+            else:
+                # Single triple bond with locant
+                triple_str = ",".join(str(loc) for loc in triple_locants)
+                parts.append(f"-{triple_str}-yn")
+        else:
+            # Multiple triple bonds
+            triple_str = ",".join(str(loc) for loc in triple_locants)
+            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            # If there were also double bonds, we already have 'a', otherwise add it
+            if num_double == 0:
+                parts.append(f"a-{triple_str}-{multiplier}yn")
+            else:
+                parts.append(f"-{triple_str}-{multiplier}yn")
+
+    # Add final 'e'
+    result = "".join(parts) + "e"
+
+    # Clean up: handle edge cases
+    # 1. Double hyphens shouldn't happen but clean up just in case
+    while "--" in result:
+        result = result.replace("--", "-")
+
+    return result
 
 
 def _split_parent_stem(parent: str) -> tuple:
