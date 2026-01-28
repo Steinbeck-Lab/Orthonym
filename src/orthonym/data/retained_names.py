@@ -22,6 +22,10 @@ RETAINED_NAMES = {
     "c1ccccc1": "benzene",
     "Cc1ccccc1": "toluene",
     "CCc1ccccc1": "ethylbenzene",
+    "C=Cc1ccccc1": "styrene",  # ethenylbenzene
+    "CC(C)c1ccccc1": "cumene",  # isopropylbenzene
+    # NOTE: xylene isomers are NOT retained names in IUPAC 2013 PIN
+    # Use systematic: 1,2-dimethylbenzene, 1,3-dimethylbenzene, 1,4-dimethylbenzene
     "c1ccc2ccccc2c1": "naphthalene",
     "c1cc2ccc3cccc4ccc(c1)c2c34": "pyrene",
     "c1ccc2cc3ccccc3cc2c1": "anthracene",
