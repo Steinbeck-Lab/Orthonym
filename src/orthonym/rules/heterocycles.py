@@ -90,8 +90,10 @@ def classify_heterocycle(mol, ring_atoms) -> Dict:
             heteroatoms.append((idx, symbol))
 
     # Determine aromaticity and saturation
+    # Note: is_saturated_ring checks for explicit double bonds, but aromatic
+    # rings have delocalized bonding. If a ring is aromatic, it's NOT saturated.
     is_arom = is_aromatic_ring(mol, ring_atoms)
-    is_sat = is_saturated_ring(mol, ring_atoms)
+    is_sat = is_saturated_ring(mol, ring_atoms) and not is_arom
 
     # Find dominant (highest priority) heteroatom
     dominant = None

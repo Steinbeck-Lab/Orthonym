@@ -85,11 +85,16 @@ RETAINED_NAMES = {
     "c1cc[nH]c1": "pyrrole",
     "c1c[nH]cn1": "imidazole",
     "c1cnc[nH]1": "imidazole",
-    "c1cc[nH]n1": "pyrazole",
-    "c1cnco1": "oxazole",
-    "c1ccno1": "isoxazole",
-    "c1cncs1": "thiazole",
-    "c1ccsn1": "isothiazole",
+    "c1cn[nH]c1": "pyrazole",   # Canonical SMILES for pyrazole
+    "c1cc[nH]n1": "pyrazole",   # Alternate input form
+    "c1cocn1": "oxazole",       # Canonical SMILES for oxazole
+    "c1cnco1": "oxazole",       # Alternate input form
+    "c1cnoc1": "isoxazole",     # Canonical SMILES for isoxazole
+    "c1ccno1": "isoxazole",     # Alternate input form
+    "c1cscn1": "thiazole",      # Canonical SMILES for thiazole
+    "c1cncs1": "thiazole",      # Alternate input form
+    "c1cnsc1": "isothiazole",   # Canonical SMILES for isothiazole
+    "c1ccsn1": "isothiazole",   # Alternate input form
     "c1nnn[nH]1": "tetrazole",
     
     # === 6-MEMBERED AROMATIC HETEROCYCLES ===
