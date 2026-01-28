@@ -90,6 +90,12 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     if getattr(features, 'is_benzene', False):
         return _assemble_benzene_name(features, style)
 
+    # Handle polycyclic aromatics specially
+    # Polycyclics (naphthalene, anthracene, etc.) have their own naming rules
+    polycyclic_name = getattr(features, 'polycyclic_name', None)
+    if polycyclic_name:
+        return _assemble_polycyclic_name(features, style)
+
     # Handle simple cases
     if not features.principal_chain and not features.ring_systems:
         # Single atom or very simple molecule
@@ -222,6 +228,10 @@ def _generate_ring_parent(features: Any) -> NameFragment:
     For cycloalkanes: "cyclo" + chain prefix + "an" (e.g., "cyclohexan")
     The final 'e' is added during assembly if no suffix follows.
 
+    For cycloalkenes: "cyclo" + chain prefix + double bond info
+    - Mono-cycloalkenes: cyclo + stem + "en" (cyclohexene) - no locant
+    - Cycloalkadienes: cyclo + stem + "a" + locants + "dien" (cyclohexa-1,3-diene)
+
     For other ring types, returns placeholder for now (to be implemented
     in subsequent plans).
 
@@ -229,7 +239,7 @@ def _generate_ring_parent(features: Any) -> NameFragment:
         features: MolecularFeatures object with ring_type and principal_ring
 
     Returns:
-        NameFragment with parent text and empty locants
+        NameFragment with parent text and bond locants
     """
     ring_type = getattr(features, 'ring_type', None)
     principal_ring = getattr(features, 'principal_ring', None)
@@ -240,16 +250,14 @@ def _generate_ring_parent(features: Any) -> NameFragment:
 
     ring_size = len(principal_ring)
 
+    if ring_size in CHAIN_PREFIXES:
+        stem = CHAIN_PREFIXES[ring_size]
+    else:
+        stem = _build_long_chain_prefix(ring_size)
+
     if ring_type == 'cycloalkane':
         # Cycloalkane naming: cyclo + stem + an (e.g., cyclohexan)
-        # The stem comes from CHAIN_PREFIXES
-        if ring_size in CHAIN_PREFIXES:
-            stem = CHAIN_PREFIXES[ring_size]
-        else:
-            stem = _build_long_chain_prefix(ring_size)
-
-        # Return stem + "an" - the "e" will be added in assembly
-        # for saturated cycloalkanes with no suffix
+        # Return stem - the "ane" will be added in assembly
         return NameFragment(
             text=f"cyclo{stem}",
             locants=((), ()),  # No bond locants for saturated rings
@@ -257,14 +265,12 @@ def _generate_ring_parent(features: Any) -> NameFragment:
         )
 
     elif ring_type == 'cycloalkene':
-        # TODO: Implement cycloalkene naming (Plan 02-02)
-        if ring_size in CHAIN_PREFIXES:
-            stem = CHAIN_PREFIXES[ring_size]
-        else:
-            stem = _build_long_chain_prefix(ring_size)
+        # Get double bond locants from features
+        ring_double_bond_locants = getattr(features, 'ring_double_bond_locants', [])
+
         return NameFragment(
             text=f"cyclo{stem}",
-            locants=((), ()),
+            locants=(tuple(ring_double_bond_locants), ()),  # (double_bond_locants, triple_bond_locants)
             fragment_type="parent"
         )
 
@@ -365,16 +371,24 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for alkyl substituents and non-principal groups.
 
-    For alkane naming, this extracts alkyl substituents from features.substituents,
+    For alkane/cycloalkane naming, this extracts alkyl substituents from
+    features.substituents (for chains) or features.ring_substituents (for rings),
     groups them by name (methyl, ethyl, etc.), and formats with locants and
     multiplicative prefixes.
     """
     prefixes = []
 
-    # --- Handle alkyl substituents from features.substituents ---
+    # --- Handle alkyl substituents from features.substituents (chains) ---
     if features.substituents and features.mol:
         alkyl_prefixes = _generate_alkyl_prefixes(features)
         prefixes.extend(alkyl_prefixes)
+
+    # --- Handle ring substituents from features.ring_substituents ---
+    ring_substituents = getattr(features, 'ring_substituents', None)
+    oriented_ring = getattr(features, 'oriented_ring', None)
+    if ring_substituents and features.mol and oriented_ring:
+        ring_prefixes = _generate_ring_alkyl_prefixes(features)
+        prefixes.extend(ring_prefixes)
 
     # --- Handle non-principal functional groups as prefixes ---
     for fg_name, matches in features.functional_groups.items():
@@ -455,6 +469,102 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     for name, locants in substituent_groups.items():
         count = len(locants)
         formatted = format_substituent_prefix(name, sorted(locants), count)
+        prefixes.append(NameFragment(
+            text=formatted,
+            locants=tuple(sorted(locants)),
+            fragment_type="prefix"
+        ))
+
+    # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
+    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+
+    return prefixes
+
+
+def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
+    """
+    Generate prefix fragments for alkyl substituents on rings.
+
+    This function:
+    1. Iterates over features.ring_substituents (keyed by ring atom index)
+    2. Uses features.oriented_ring to determine locants
+    3. Counts carbon atoms in each substituent to determine name
+    4. Groups identical substituents with their locants
+    5. Formats each group with locants, multipliers
+    6. Sorts alphabetically by base substituent name
+
+    IUPAC rules for cycloalkane substituent locants:
+    - Monosubstituted cycloalkanes: locant 1 is implicit and omitted
+      (methylcyclohexane, not 1-methylcyclohexane)
+    - Polysubstituted cycloalkanes: all locants included
+      (1,2-dimethylcyclohexane)
+
+    Returns:
+        List of NameFragment objects for alkyl prefixes, sorted alphabetically
+    """
+    mol = features.mol
+    ring_substituents = features.ring_substituents
+    oriented_ring = features.oriented_ring
+
+    # Build atom-to-locant mapping from oriented ring
+    atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(oriented_ring)}
+
+    # Group substituents by name: {name: [locants]}
+    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+
+    for ring_atom_idx, sub_list in ring_substituents.items():
+        # Get locant for this ring position
+        locant = atom_to_locant.get(ring_atom_idx)
+        if locant is None:
+            continue
+
+        for sub_atoms in sub_list:
+            # Count only carbon atoms in the substituent
+            carbon_count = sum(
+                1 for idx in sub_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+
+            # Skip non-alkyl substituents (no carbons = functional group like -OH)
+            if carbon_count == 0:
+                continue
+
+            # Check if substituent has any heteroatoms (non-C, non-H)
+            has_heteroatom = any(
+                mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+                for idx in sub_atoms
+            )
+
+            # For Phase 2, skip mixed substituents (carbon + heteroatom)
+            # These are complex substituents handled in later phases
+            if has_heteroatom:
+                continue
+
+            # Get alkyl name from carbon count
+            try:
+                alkyl_name = get_alkyl_name(carbon_count)
+                substituent_groups[alkyl_name].append(locant)
+            except ValueError:
+                # Carbon count > 10, skip for now (complex substituent)
+                continue
+
+    # Count total number of substituents to determine if monosubstituted
+    total_substituents = sum(len(locs) for locs in substituent_groups.values())
+    is_monosubstituted = total_substituents == 1
+
+    # Build prefix fragments
+    prefixes = []
+    for name, locants in substituent_groups.items():
+        count = len(locants)
+
+        if is_monosubstituted:
+            # Monosubstituted: omit locant (it's always 1)
+            # Just the substituent name: "methyl" not "1-methyl"
+            formatted = name
+        else:
+            # Polysubstituted: include locants
+            formatted = format_substituent_prefix(name, sorted(locants), count)
+
         prefixes.append(NameFragment(
             text=formatted,
             locants=tuple(sorted(locants)),
@@ -640,16 +750,20 @@ def _build_hydrocarbon_name(
     Build a complete hydrocarbon name (no functional group suffix).
 
     This handles:
-    - Saturated: stem + 'ane' (butane)
-    - Alkenes: stem + '-locant-ene' (but-1-ene) or stem + 'ene' (ethene)
+    - Saturated: stem + 'ane' (butane, cyclohexane)
+    - Alkenes: stem + '-locant-ene' (but-1-ene) or stem + 'ene' (ethene, cyclohexene)
     - Alkynes: stem + '-locant-yne' (but-1-yne) or stem + 'yne' (ethyne)
     - Enynes: stem + '-double-en-triple-yne' (pent-1-en-4-yne)
+    - Cycloalkenes: stem + 'ene' for mono (cyclohexene), stem + 'a-locants-diene' for di
 
     For 2-carbon compounds (ethene, ethyne), locants are omitted since
     there's only one possible position for the multiple bond.
 
+    For mono-cycloalkenes (single double bond in ring), locants are omitted
+    per IUPAC convention (cyclohexene, not cyclohex-1-ene).
+
     Args:
-        stem: Chain prefix (e.g., 'but', 'pent').
+        stem: Chain prefix (e.g., 'but', 'pent', 'cyclohex').
         double_locants: Sorted list of locants for double bonds.
         triple_locants: Sorted list of locants for triple bonds.
 
@@ -667,9 +781,18 @@ def _build_hydrocarbon_name(
         'but-2-ene'
         >>> _build_hydrocarbon_name("pent", [1], [4])
         'pent-1-en-4-yne'
+        >>> _build_hydrocarbon_name("cyclohex", [], [])
+        'cyclohexane'
+        >>> _build_hydrocarbon_name("cyclohex", [1], [])
+        'cyclohexene'
+        >>> _build_hydrocarbon_name("cyclohex", [1, 3], [])
+        'cyclohexa-1,3-diene'
     """
     num_double = len(double_locants)
     num_triple = len(triple_locants)
+
+    # Check if this is a cyclic compound
+    is_cyclic = stem.startswith("cyclo")
 
     if num_double == 0 and num_triple == 0:
         # Saturated hydrocarbon
@@ -679,6 +802,10 @@ def _build_hydrocarbon_name(
     # The stem 'eth' indicates 2 carbons
     is_two_carbon = stem == "eth"
 
+    # For mono-cycloalkenes, locant is omitted (cyclohexene, not cyclohex-1-ene)
+    # This is IUPAC convention for simple mono-unsaturated cyclic compounds
+    omit_mono_cycloalkene_locant = is_cyclic and num_double == 1 and num_triple == 0
+
     parts = [stem]
 
     # Double bonds
@@ -687,12 +814,15 @@ def _build_hydrocarbon_name(
             if is_two_carbon and num_triple == 0:
                 # ethene - no locant needed
                 parts.append("en")
+            elif omit_mono_cycloalkene_locant:
+                # cyclohexene - no locant needed for mono-cycloalkene
+                parts.append("en")
             else:
                 # Single double bond with locant: but-1-ene
                 double_str = ",".join(str(loc) for loc in double_locants)
                 parts.append(f"-{double_str}-en")
         else:
-            # Multiple double bonds: buta-1,3-diene
+            # Multiple double bonds: buta-1,3-diene, cyclohexa-1,3-diene
             # Add 'a' before locants for pronunciation
             double_str = ",".join(str(loc) for loc in double_locants)
             multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))

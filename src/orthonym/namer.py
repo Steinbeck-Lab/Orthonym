@@ -48,11 +48,19 @@ class MolecularFeatures:
     is_aromatic: bool = False
     ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
     principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
+    oriented_ring: Optional[List[int]] = None  # Ring atoms reordered for naming
+    ring_substituents: Dict[int, List[List[int]]] = field(default_factory=dict)  # Substituents on ring
+    ring_double_bonds: List[tuple] = field(default_factory=list)  # Double bonds in ring
+    ring_double_bond_locants: List[int] = field(default_factory=list)  # Locants for ring double bonds
 
     # Benzene-specific information
     is_benzene: bool = False  # True if principal ring is benzene
     benzene_ring: Optional[tuple] = None  # Atom indices of the benzene ring
     benzene_substituents: Dict[int, List[Dict]] = field(default_factory=dict)  # From get_benzene_substituents
+
+    # Polycyclic aromatic information
+    polycyclic_name: Optional[str] = None  # Name of PAH parent (naphthalene, etc.)
+    polycyclic_substituents: Dict[int, List[Dict]] = field(default_factory=dict)  # From get_polycyclic_substituents
 
     # Stereochemistry
     stereocenters: List[dict] = field(default_factory=list)
@@ -180,6 +188,19 @@ class Orthonym:
 
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
+            # Check for polycyclic aromatics FIRST (naphthalene, anthracene, etc.)
+            # These take precedence over single-ring classification
+            from .rules.polycyclics import identify_polycyclic, get_polycyclic_substituents
+            pah_name = identify_polycyclic(features.mol)
+            if pah_name:
+                features.polycyclic_name = pah_name
+                features.polycyclic_substituents = get_polycyclic_substituents(
+                    features.mol, pah_name
+                )
+                # Set ring type for consistency
+                features.ring_type = 'aromatic'
+                return  # Skip other ring classification for PAHs
+
             ring_info = get_ring_info(features.mol)
             atom_rings = ring_info['atom_rings']
 
@@ -197,6 +218,47 @@ class Orthonym:
                     features.benzene_substituents = get_benzene_substituents(
                         features.mol, features.principal_ring
                     )
+                else:
+                    # Non-benzene ring: detect substituents and orient
+                    from .rules.cycloalkanes import (
+                        get_ring_substituents, get_ring_double_bonds,
+                        orient_cycloalkane, orient_cycloalkene
+                    )
+
+                    # Get ring substituents
+                    features.ring_substituents = get_ring_substituents(
+                        features.mol, features.principal_ring
+                    )
+
+                    # Get ring double bonds
+                    features.ring_double_bonds = get_ring_double_bonds(
+                        features.mol, features.principal_ring
+                    )
+
+                    # Orient the ring based on type
+                    if features.ring_type == 'cycloalkane':
+                        features.oriented_ring = orient_cycloalkane(
+                            features.mol,
+                            features.principal_ring,
+                            features.ring_substituents
+                        )
+                    elif features.ring_type == 'cycloalkene':
+                        features.oriented_ring = orient_cycloalkene(
+                            features.mol,
+                            features.principal_ring,
+                            features.ring_double_bonds,
+                            features.ring_substituents
+                        )
+                        # Calculate ring double bond locants
+                        if features.oriented_ring and features.ring_double_bonds:
+                            oriented = features.oriented_ring
+                            locants = []
+                            for a1, a2 in features.ring_double_bonds:
+                                pos1 = oriented.index(a1)
+                                pos2 = oriented.index(a2)
+                                # Lower position is the locant
+                                locants.append(min(pos1, pos2) + 1)
+                            features.ring_double_bond_locants = sorted(locants)
 
         # Find principal chain (for acyclic molecules)
         if not features.is_cyclic:
