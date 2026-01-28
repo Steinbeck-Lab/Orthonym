@@ -1,30 +1,46 @@
 """
-Heterocycle detection, classification, and ring numbering according to IUPAC 2013.
+Heterocycle detection, classification, ring numbering, and naming according to IUPAC 2013.
 
 Handles:
 - Heterocycle classification (ring size, aromaticity, heteroatom types)
 - Ring numbering starting at highest-priority heteroatom
 - Direction selection to minimize locants for other heteroatoms
 - First-point-of-difference rule for direction ties
+- Retained name lookup for common heterocycles
+- Hantzsch-Widman (HW) systematic name generation
 
 IUPAC 2013 Rules for heterocycle numbering:
 - Position 1 goes to highest-priority heteroatom (O > S > Se > Te > N > P > ...)
 - Numbering direction chosen to give lowest locants to other heteroatoms
 - First-point-of-difference comparison (not sum of locants)
 
+Naming priority:
+1. Check retained names FIRST (pyridine, furan, morpholine, etc.)
+2. Fall back to HW systematic naming if no retained name
+
 Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
 """
 
 from typing import Dict, List, Tuple, Optional, Set
+from collections import Counter
 
 from rdkit import Chem
 
-from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority
+from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority, get_hw_prefix
+from ..data.hw_stems import get_hw_stem
+from ..data.retained_names import get_retained_name
 from ..perception.rings import (
     get_ring_heteroatoms,
     is_aromatic_ring,
     is_saturated_ring,
 )
+
+
+# Simple multiplicative prefixes for HW naming
+SIMPLE_MULTIPLIERS = {
+    2: "di", 3: "tri", 4: "tetra", 5: "penta",
+    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
+}
 
 
 def classify_heterocycle(mol, ring_atoms) -> Dict:
@@ -325,3 +341,178 @@ def _compare_locant_sets(set_a: List[int], set_b: List[int]) -> int:
         return 1
 
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Heterocycle naming functions
+# ---------------------------------------------------------------------------
+
+
+def get_ring_canonical_smiles(mol, ring_atoms) -> str:
+    """
+    Extract a ring as canonical SMILES for retained name lookup.
+
+    Creates a new molecule containing only the ring atoms and their bonds,
+    then returns the canonical SMILES representation.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Iterable of atom indices defining the ring
+
+    Returns:
+        Canonical SMILES string for the ring
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> ring = mol.GetRingInfo().AtomRings()[0]
+        >>> get_ring_canonical_smiles(mol, ring)
+        'c1ccncc1'
+    """
+    ring_set = set(ring_atoms)
+
+    # Use MolFragmentToSmiles to extract just the ring
+    # This handles aromaticity correctly
+    ring_smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=list(ring_atoms))
+
+    # Canonicalize the SMILES
+    ring_mol = Chem.MolFromSmiles(ring_smiles)
+    if ring_mol:
+        return Chem.MolToSmiles(ring_mol, canonical=True)
+
+    return ring_smiles
+
+
+def build_hw_name(
+    heteroatoms: List[Tuple[int, str]],
+    ring_size: int,
+    is_saturated: bool,
+    is_aromatic: bool
+) -> str:
+    """
+    Build Hantzsch-Widman systematic name for a heterocycle.
+
+    Assembles a systematic HW name from heteroatom prefixes and ring stem:
+    1. Group heteroatoms by element
+    2. Order by IUPAC priority (O > S > N > ...)
+    3. Add multipliers and locants for multiple same heteroatoms
+    4. Get stem based on ring size and saturation
+    5. Apply 'a' elision (drop terminal 'a' before vowel stem)
+
+    Args:
+        heteroatoms: List of (locant, element) tuples for heteroatoms in numbered order
+        ring_size: Ring size (3-10)
+        is_saturated: True if fully saturated
+        is_aromatic: True if aromatic (overrides is_saturated for stem selection)
+
+    Returns:
+        HW systematic name (e.g., 'oxolane', '1,3-dioxolane', 'azine')
+
+    Examples:
+        >>> build_hw_name([(1, 'O')], 5, True, False)
+        'oxolane'
+        >>> build_hw_name([(1, 'O'), (3, 'O')], 5, True, False)
+        '1,3-dioxolane'
+        >>> build_hw_name([(1, 'N')], 6, False, True)
+        'azine'
+    """
+    if not heteroatoms:
+        return ""
+
+    # Group heteroatoms by element: {element: [locants]}
+    element_locants: Dict[str, List[int]] = {}
+    for locant, elem in heteroatoms:
+        if elem not in element_locants:
+            element_locants[elem] = []
+        element_locants[elem].append(locant)
+
+    # Build prefix parts, ordered by IUPAC priority
+    prefix_parts = []
+    elements_by_priority = sorted(
+        element_locants.keys(),
+        key=lambda e: HETEROATOM_PRIORITY.get(e, 999)
+    )
+
+    for elem in elements_by_priority:
+        hw_prefix = get_hw_prefix(elem)
+        if not hw_prefix:
+            continue
+
+        locants = sorted(element_locants[elem])
+        count = len(locants)
+
+        if count > 1:
+            # Multiple same heteroatoms: add locants and multiplier
+            locant_str = ','.join(str(loc) for loc in locants)
+            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
+        else:
+            # Single heteroatom: just the prefix
+            prefix_parts.append(hw_prefix)
+
+    prefix = ''.join(prefix_parts)
+
+    # Determine saturation for stem lookup
+    # Aromatic = unsaturated for HW naming purposes
+    saturated_for_stem = is_saturated and not is_aromatic
+
+    # Get the dominant heteroatom (highest priority) for stem selection
+    dominant_elem = elements_by_priority[0] if elements_by_priority else 'O'
+
+    # Get stem based on ring size, saturation, and dominant heteroatom
+    stem = get_hw_stem(ring_size, saturated_for_stem, dominant_elem)
+    if not stem:
+        stem = ""
+
+    # Apply 'a' elision: drop terminal 'a' before vowel stem
+    if prefix.endswith('a') and stem and stem[0] in 'aeiou':
+        prefix = prefix[:-1]
+
+    return prefix + stem
+
+
+def name_heterocycle(mol, ring_atoms) -> str:
+    """
+    Generate IUPAC name for a heterocyclic ring.
+
+    Naming priority:
+    1. Check retained names FIRST (pyridine, furan, morpholine, etc.)
+    2. Fall back to HW systematic naming if no retained name
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Iterable of atom indices defining the ring
+
+    Returns:
+        IUPAC name for the heterocycle
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> ring = mol.GetRingInfo().AtomRings()[0]
+        >>> name_heterocycle(mol, ring)
+        'pyridine'
+        >>> mol2 = Chem.MolFromSmiles('C1CO1')  # oxirane
+        >>> ring2 = mol2.GetRingInfo().AtomRings()[0]
+        >>> name_heterocycle(mol2, ring2)
+        'oxirane'
+    """
+    # Get ring canonical SMILES for retained name lookup
+    ring_smiles = get_ring_canonical_smiles(mol, ring_atoms)
+
+    # Check retained names FIRST
+    retained = get_retained_name(ring_smiles)
+    if retained:
+        return retained
+
+    # Fall back to HW systematic naming
+    info = classify_heterocycle(mol, ring_atoms)
+    oriented, _ = orient_heterocycle(mol, ring_atoms)
+
+    # Get heteroatom locants from oriented ring
+    heteroatom_locants = get_heteroatom_locants(oriented, mol)
+
+    return build_hw_name(
+        heteroatom_locants,
+        info['ring_size'],
+        info['is_saturated'],
+        info['is_aromatic']
+    )
