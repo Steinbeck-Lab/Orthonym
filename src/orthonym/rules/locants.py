@@ -199,25 +199,33 @@ def get_functional_group_locants(
     chain: List[int],
     fg_atom_tuples: List[Tuple[int, ...]],
     atom_to_locant: Dict[int, int],
+    mol=None,
 ) -> List[int]:
     """
     Resolve functional group SMARTS match atoms to chain locants.
 
-    Given FG match tuples from SMARTS pattern matching, find which atom in
-    each match lies on the principal chain and return its locant.
+    Given FG match tuples from SMARTS pattern matching, find the
+    locant-defining atom for each match on the principal chain.
 
-    Conventions:
-        - For alcohols: the carbon bearing -OH is the locant (not the oxygen)
-        - For ketones: the carbonyl carbon is the locant
-        - For acids/aldehydes: always locant 1 (terminal carbon)
-        - General rule: the first atom in the match tuple that is on the chain
-          is the locant-defining atom
+    The locant-defining atom is the carbon on the chain that bears the
+    functional group -- e.g. the carbonyl carbon for ketones, the carbon
+    bearing -OH for alcohols, the carboxyl carbon for acids.
+
+    When an RDKit mol is provided, the function selects the on-chain
+    carbon with the most bonds to heteroatoms (O, N, S, etc.) within the
+    match.  This correctly handles SMARTS patterns where a neighbor carbon
+    appears before the key carbon in the match tuple (e.g. the ketone
+    pattern ``[#6][CX3](=O)[#6]``).
+
+    Without a mol, falls back to picking the first on-chain atom.
 
     Args:
         chain: Ordered principal chain atom indices.
         fg_atom_tuples: List of atom index tuples from SMARTS matching.
                         Each tuple contains indices of atoms in one FG instance.
         atom_to_locant: Mapping from atom index to locant (from build_atom_to_locant).
+        mol: Optional RDKit Mol object.  When provided, used to score
+             candidate carbon atoms by their heteroatom connectivity.
 
     Returns:
         Sorted list of locants where the functional group attaches to the chain.
@@ -227,15 +235,71 @@ def get_functional_group_locants(
     locants = []
 
     for match_tuple in fg_atom_tuples:
-        # Find the first atom in the match that is on the principal chain.
-        # SMARTS patterns typically list the key carbon first (e.g., the
-        # carbonyl carbon for ketones, the carbon bearing OH for alcohols).
-        for atom_idx in match_tuple:
-            if atom_idx in chain_set and atom_idx in atom_to_locant:
-                locants.append(atom_to_locant[atom_idx])
-                break
+        best_idx = _pick_locant_atom(match_tuple, chain_set, mol)
+        if best_idx is not None and best_idx in atom_to_locant:
+            locants.append(atom_to_locant[best_idx])
 
     return sorted(locants)
+
+
+def _pick_locant_atom(
+    match_tuple: Tuple[int, ...],
+    chain_set: Set[int],
+    mol=None,
+) -> Optional[int]:
+    """
+    Pick the locant-defining atom from a SMARTS match tuple.
+
+    Strategy:
+        1. Collect all carbon atoms in the match that lie on the chain.
+        2. If *mol* is available, score each candidate by the number of
+           bonds it has to heteroatoms (non-C, non-H) within the same
+           match tuple.  The atom with the highest score is the
+           functional-group carbon.
+        3. On tie (or when mol is unavailable), return the first
+           candidate in match-tuple order.
+
+    Returns:
+        Atom index of the locant-defining atom, or ``None`` if no atom
+        in the match is on the chain.
+    """
+    if mol is None:
+        # Fallback: first atom on chain
+        for atom_idx in match_tuple:
+            if atom_idx in chain_set:
+                return atom_idx
+        return None
+
+    match_set = set(match_tuple)
+    candidates: List[int] = []
+    for atom_idx in match_tuple:
+        if atom_idx in chain_set:
+            atom = mol.GetAtomWithIdx(atom_idx)
+            if atom.GetAtomicNum() == 6:  # carbon
+                candidates.append(atom_idx)
+
+    if not candidates:
+        # No carbon on chain -- fall back to any atom on chain
+        for atom_idx in match_tuple:
+            if atom_idx in chain_set:
+                return atom_idx
+        return None
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Score: count bonds to non-carbon atoms within the match
+    def _hetero_score(idx: int) -> int:
+        atom = mol.GetAtomWithIdx(idx)
+        score = 0
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in match_set and nbr.GetAtomicNum() != 6:
+                score += 1
+        return score
+
+    # Pick highest score; on tie, preserve match-tuple order
+    best = max(candidates, key=_hetero_score)
+    return best
 
 
 # ---------------------------------------------------------------------------
