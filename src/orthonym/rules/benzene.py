@@ -303,10 +303,9 @@ def orient_benzene(
 
     IUPAC 2013 Rules:
     1. For monosubstituted: substituent position is 1
-    2. For polysubstituted: use first-point-of-difference
+    2. For polysubstituted: use first-point-of-difference for locants
     3. For identical substituents: minimize locant set
-    4. For different substituents: position 1 at alphabetically first
-       (only if it gives equivalent locant sets)
+    4. When locant sets are equal: position 1 goes to alphabetically first substituent
 
     Args:
         mol: RDKit Mol object
@@ -335,8 +334,8 @@ def orient_benzene(
         return _rotate_list(ring_list, start_pos)
 
     # Polysubstituted - try all starting positions and both directions
-    best_orientation = None
-    best_locants = None
+    # Collect all candidates with their locant sets and alphabetic scores
+    candidates = []
 
     for start_pos in range(n):
         for direction in [1, -1]:  # 1 = clockwise, -1 = counterclockwise
@@ -346,12 +345,41 @@ def orient_benzene(
             # Calculate locants for this orientation
             locants = _calculate_locants(oriented, substituents)
 
-            # Compare with best
-            if best_locants is None or _compare_locant_sets(locants, best_locants) < 0:
-                best_locants = locants
-                best_orientation = oriented
+            # Get the substituent at position 1 for alphabetical tie-breaking
+            pos1_atom = oriented[0]
+            pos1_sub_name = None
+            if pos1_atom in substituents and substituents[pos1_atom]:
+                pos1_sub_name = substituents[pos1_atom][0]['name']
 
-    return best_orientation
+            candidates.append((oriented, locants, pos1_sub_name))
+
+    # Find the best locant set
+    best_locants = None
+    for _, locants, _ in candidates:
+        if best_locants is None or _compare_locant_sets(locants, best_locants) < 0:
+            best_locants = locants
+
+    # Filter to only candidates with the best locant set
+    best_candidates = [
+        (oriented, pos1_sub) for oriented, locants, pos1_sub in candidates
+        if locants == best_locants
+    ]
+
+    # If multiple candidates with same locant set, pick one where alphabetically
+    # first substituent is at position 1
+    if len(best_candidates) == 1:
+        return best_candidates[0][0]
+
+    # Sort by alphabetical order of position 1 substituent
+    # None should sort last (no substituent at position 1)
+    def sort_key(item):
+        oriented, pos1_sub = item
+        if pos1_sub is None:
+            return 'zzzzz'  # Sort last
+        return alpha_sort_key(pos1_sub)
+
+    best_candidates.sort(key=sort_key)
+    return best_candidates[0][0]
 
 
 def _rotate_list(lst: List, start: int) -> List:
@@ -438,10 +466,11 @@ def name_substituted_benzene(
     Generate systematic name for substituted benzene.
 
     IUPAC 2013 PIN Rules:
-    - Use numeric locants (not ortho/meta/para)
+    - Use numeric locants (not ortho/meta/para) for polysubstituted
+    - Monosubstituted benzenes do NOT include locant (it's always 1)
     - Alphabetize substituent prefixes
     - Use multiplicative prefixes (di-, tri-) for repeated substituents
-    - Format: locants-substituent-benzene
+    - Format: locants-substituent-benzene (or just substituent-benzene for mono)
 
     Args:
         mol: RDKit Mol object
@@ -450,7 +479,7 @@ def name_substituted_benzene(
         substituents: Dict from get_benzene_substituents
 
     Returns:
-        IUPAC name string (e.g., "1,4-dimethylbenzene")
+        IUPAC name string (e.g., "chlorobenzene" or "1,4-dimethylbenzene")
     """
     # Build locant-to-substituent mapping
     # oriented_ring[0] = position 1, oriented_ring[1] = position 2, etc.
@@ -472,14 +501,25 @@ def name_substituted_benzene(
     for name in substituent_groups:
         substituent_groups[name].sort()
 
+    # Count total number of substituents
+    total_substituents = sum(len(locs) for locs in substituent_groups.values())
+
+    # For monosubstituted benzenes, omit the locant (it's always 1)
+    is_monosubstituted = total_substituents == 1
+
     # Build prefix strings, sorted alphabetically by substituent name
     prefixes = []
     for name in sorted(substituent_groups.keys(), key=alpha_sort_key):
         locants = substituent_groups[name]
         count = len(locants)
 
-        # Format prefix
-        prefix_str = format_substituent_prefix(name, locants, count)
+        if is_monosubstituted:
+            # Monosubstituted: just "chloro", "methyl", etc. - no locant
+            prefix_str = name
+        else:
+            # Polysubstituted: include locants
+            prefix_str = format_substituent_prefix(name, locants, count)
+
         prefixes.append(prefix_str)
 
     # Join prefixes with proper hyphenation

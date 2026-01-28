@@ -77,21 +77,26 @@ class NameFragment:
 def assemble_name(features: Any, style: str = "pin") -> str:
     """
     Assemble complete IUPAC name from molecular features.
-    
+
     Args:
         features: MolecularFeatures object with extracted features
         style: Naming style ("pin", "general", "cas")
-        
+
     Returns:
         Complete IUPAC name string
     """
+    # Handle benzene derivatives specially
+    # Benzene naming generates the complete name directly, not fragments
+    if getattr(features, 'is_benzene', False):
+        return _assemble_benzene_name(features, style)
+
     # Handle simple cases
     if not features.principal_chain and not features.ring_systems:
         # Single atom or very simple molecule
         return _name_simple_molecule(features)
-    
+
     fragments = []
-    
+
     # Generate parent name (chain or ring)
     if features.principal_chain:
         parent = _generate_chain_parent(features)
@@ -99,25 +104,25 @@ def assemble_name(features: Any, style: str = "pin") -> str:
         parent = _generate_ring_parent(features)
     else:
         parent = NameFragment(text="", fragment_type="parent")
-    
+
     fragments.append(parent)
-    
+
     # Generate suffix for principal group
     if features.principal_group:
         suffix = _generate_suffix(features)
         if suffix:
             fragments.append(suffix)
-    
+
     # Generate prefixes for substituents and non-principal groups
     prefixes = _generate_prefixes(features)
     fragments.extend(prefixes)
-    
+
     # Generate stereodescriptors
     if features.stereocenters:
         stereo = _generate_stereodescriptors(features)
         if stereo:
             fragments.append(stereo)
-    
+
     # Assemble in correct order
     return _assemble_fragments(fragments, style)
 
@@ -125,7 +130,7 @@ def assemble_name(features: Any, style: str = "pin") -> str:
 def _name_simple_molecule(features: Any) -> str:
     """Name very simple molecules (single atom, etc.)."""
     mol = features.mol
-    
+
     if mol.GetNumAtoms() == 1:
         atom = mol.GetAtomWithIdx(0)
         symbol = atom.GetSymbol()
@@ -133,8 +138,42 @@ def _name_simple_molecule(features: Any) -> str:
         if symbol == 'C':
             return "methane"  # CH4
         # Add more as needed
-    
+
     return "unknown"
+
+
+def _assemble_benzene_name(features: Any, style: str) -> str:
+    """
+    Assemble name for benzene derivatives.
+
+    Benzene naming is handled specially because:
+    1. Substituents are named relative to the ring, not a chain
+    2. Ring orientation determines locants (not chain direction)
+    3. The parent is always "benzene"
+
+    Args:
+        features: MolecularFeatures with is_benzene=True
+        style: Naming style (only "pin" supported for now)
+
+    Returns:
+        Complete IUPAC name for the benzene derivative
+    """
+    from ..rules.benzene import orient_benzene, name_substituted_benzene
+
+    mol = features.mol
+    ring_atoms = features.benzene_ring
+    substituents = features.benzene_substituents
+
+    # If no substituents, return "benzene" (should be caught by retained names,
+    # but handle here as fallback)
+    if not substituents:
+        return "benzene"
+
+    # Orient the ring for lowest locants
+    oriented_ring = orient_benzene(mol, ring_atoms, substituents)
+
+    # Generate systematic name
+    return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
 
 
 def _generate_chain_parent(features: Any) -> NameFragment:

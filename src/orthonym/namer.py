@@ -49,6 +49,11 @@ class MolecularFeatures:
     ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
     principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
 
+    # Benzene-specific information
+    is_benzene: bool = False  # True if principal ring is benzene
+    benzene_ring: Optional[tuple] = None  # Atom indices of the benzene ring
+    benzene_substituents: Dict[int, List[Dict]] = field(default_factory=dict)  # From get_benzene_substituents
+
     # Stereochemistry
     stereocenters: List[dict] = field(default_factory=list)
     double_bond_stereo: List[dict] = field(default_factory=list)
@@ -183,6 +188,15 @@ class Orthonym:
                 # TODO: For multi-ring systems, apply selection criteria
                 features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
+
+                # Check if this is a benzene ring
+                from .rules.benzene import is_benzene_ring, get_benzene_substituents
+                if is_benzene_ring(features.mol, features.principal_ring):
+                    features.is_benzene = True
+                    features.benzene_ring = features.principal_ring
+                    features.benzene_substituents = get_benzene_substituents(
+                        features.mol, features.principal_ring
+                    )
 
         # Find principal chain (for acyclic molecules)
         if not features.is_cyclic:
