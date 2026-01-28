@@ -245,31 +245,108 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
 
 
 def _generate_prefixes(features: Any) -> List[NameFragment]:
-    """Generate prefix fragments for substituents and non-principal groups."""
+    """
+    Generate prefix fragments for alkyl substituents and non-principal groups.
+
+    For alkane naming, this extracts alkyl substituents from features.substituents,
+    groups them by name (methyl, ethyl, etc.), and formats with locants and
+    multiplicative prefixes.
+    """
     prefixes = []
-    
-    # Get non-principal functional groups as prefixes
+
+    # --- Handle alkyl substituents from features.substituents ---
+    if features.substituents and features.mol:
+        alkyl_prefixes = _generate_alkyl_prefixes(features)
+        prefixes.extend(alkyl_prefixes)
+
+    # --- Handle non-principal functional groups as prefixes ---
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
             continue
-        
+
         prefix_text = get_prefix(fg_name)
         if prefix_text and matches:
             count = len(matches)
-            
+
             if count > 1:
                 # Add multiplier
                 multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
                 prefix_text = f"{multiplier}{prefix_text}"
-            
+
             prefixes.append(NameFragment(
                 text=prefix_text,
                 locants=(),  # TODO: Add locants
                 fragment_type="prefix"
             ))
-    
-    # TODO: Add substituent prefixes (alkyl groups from substituents dict)
-    
+
+    return prefixes
+
+
+def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
+    """
+    Generate prefix fragments for alkyl substituents.
+
+    This function:
+    1. Iterates over features.substituents (keyed by 1-indexed position/locant)
+    2. Counts carbon atoms in each substituent to determine name
+    3. Groups identical substituents with their locants
+    4. Formats each group with locants, multipliers
+    5. Sorts alphabetically by base substituent name
+
+    Returns:
+        List of NameFragment objects for alkyl prefixes, sorted alphabetically
+    """
+    mol = features.mol
+
+    # Group substituents by name: {name: [locants]}
+    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+
+    for position, sub_list in features.substituents.items():
+        # position is already a 1-indexed locant (from get_substituents)
+        for sub_atoms in sub_list:
+            # Count only carbon atoms in the substituent
+            carbon_count = sum(
+                1 for idx in sub_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+
+            # Skip non-alkyl substituents (no carbons = functional group like -OH)
+            if carbon_count == 0:
+                continue
+
+            # Check if substituent has any heteroatoms (non-C, non-H)
+            has_heteroatom = any(
+                mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+                for idx in sub_atoms
+            )
+
+            # For Phase 1, skip mixed substituents (carbon + heteroatom)
+            # These are complex substituents handled in later phases
+            if has_heteroatom:
+                continue
+
+            # Get alkyl name from carbon count
+            try:
+                alkyl_name = get_alkyl_name(carbon_count)
+                substituent_groups[alkyl_name].append(position)
+            except ValueError:
+                # Carbon count > 10, skip for now (complex substituent)
+                continue
+
+    # Build prefix fragments
+    prefixes = []
+    for name, locants in substituent_groups.items():
+        count = len(locants)
+        formatted = format_substituent_prefix(name, sorted(locants), count)
+        prefixes.append(NameFragment(
+            text=formatted,
+            locants=tuple(sorted(locants)),
+            fragment_type="prefix"
+        ))
+
+    # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
+    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+
     return prefixes
 
 
@@ -317,9 +394,14 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
         elif frag.fragment_type == "suffix":
             suffix_frag = frag
 
-    # Alphabetize prefixes (ignoring multiplicative prefixes)
-    prefixes.sort(key=_alpha_sort_key)
-    prefix_str = "".join(f.text for f in prefixes)
+    # Alkyl prefixes are already sorted by _generate_alkyl_prefixes.
+    # For non-alkyl prefixes added later, sort all together.
+    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+
+    # Concatenate prefixes with proper hyphenation
+    # IUPAC rule: hyphens separate locants from names, and are needed
+    # between prefixes when one ends with a letter and the next starts with a digit
+    prefix_str = _join_prefixes([f.text for f in prefixes])
 
     # Get parent text
     parent = parent_frag.text if parent_frag else ""
@@ -387,20 +469,49 @@ def _split_parent_stem(parent: str) -> tuple:
     return (parent, "")
 
 
-def _alpha_sort_key(fragment: NameFragment) -> str:
+# Note: alpha_sort_key is imported from naming_utils for IUPAC-compliant sorting.
+
+
+def _join_prefixes(prefix_texts: List[str]) -> str:
     """
-    Generate sort key for alphabetization.
-    
-    Ignores multiplicative prefixes (di-, tri-, bis-, tris-, etc.)
-    Includes structural prefixes (iso-, neo-, cyclo-)
+    Join multiple prefix strings with proper IUPAC hyphenation.
+
+    When concatenating prefixes like "3-ethyl" and "4-methyl", the result
+    should be "3-ethyl-4-methyl" (with hyphen between letter and digit).
+
+    Args:
+        prefix_texts: List of prefix strings (e.g., ["3-ethyl", "4-methyl"])
+
+    Returns:
+        Concatenated string with proper hyphenation
+
+    Examples:
+        >>> _join_prefixes(["3-ethyl", "4-methyl"])
+        '3-ethyl-4-methyl'
+        >>> _join_prefixes(["2,2-dimethyl"])
+        '2,2-dimethyl'
+        >>> _join_prefixes([])
+        ''
     """
-    text = fragment.text.lower()
-    
-    for prefix in IGNORE_FOR_ALPHA:
-        if text.startswith(prefix):
-            return text[len(prefix):]
-    
-    return text
+    if not prefix_texts:
+        return ""
+
+    if len(prefix_texts) == 1:
+        return prefix_texts[0]
+
+    # Join with hyphens where needed
+    result = prefix_texts[0]
+    for i in range(1, len(prefix_texts)):
+        current = prefix_texts[i]
+        # If result ends with letter and current starts with digit, add hyphen
+        if result and current:
+            last_char = result[-1]
+            first_char = current[0]
+            if last_char.isalpha() and first_char.isdigit():
+                result += "-"
+        result += current
+
+    return result
 
 
 def _build_long_chain_prefix(length: int) -> str:
