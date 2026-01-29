@@ -128,6 +128,10 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     if features.principal_group == 'nitrile' and features.is_cyclic:
         return _assemble_ring_nitrile_name(features, style)
 
+    # Handle amides (including N-substituted amides)
+    if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
+        return _assemble_amide_name(features, style)
+
     # Handle simple cases
     if not features.principal_chain and not features.ring_systems:
         # Single atom or very simple molecule
@@ -283,6 +287,37 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
 
     # No substituents - return parent name directly
     return parent_name
+
+
+def _assemble_amide_name(features: Any, style: str) -> str:
+    """
+    Assemble name for amide compounds with N-substitution handling.
+
+    Handles:
+    - Primary amides: acetamide, propanamide
+    - Secondary amides: N-methylacetamide
+    - Tertiary amides: N,N-dimethylformamide
+    - Ring-attached amides: cyclohexanecarboxamide
+
+    Args:
+        features: MolecularFeatures with amide principal group
+        style: Naming style (only "pin" supported for now)
+
+    Returns:
+        Complete IUPAC name for the amide
+    """
+    from ..rules.amides import name_amide
+
+    # Get amide atoms
+    amide_atoms = None
+    if features.principal_group_atoms:
+        amide_atoms = features.principal_group_atoms[0]
+
+    if amide_atoms:
+        return name_amide(features.mol, amide_atoms)
+
+    # Fallback
+    return "amide"
 
 
 def _assemble_ring_nitrile_name(features: Any, style: str) -> str:

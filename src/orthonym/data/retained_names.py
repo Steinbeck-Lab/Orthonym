@@ -140,6 +140,10 @@ RETAINED_NAMES = {
     "C1CCCCCC1": "cycloheptane",
     "C1CCCCCCC1": "cyclooctane",
     
+    # === AMIDES ===
+    "NC=O": "formamide",
+    "CC(=O)N": "acetamide",
+
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",

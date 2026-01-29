@@ -40,7 +40,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     "isocyanide": "[#6][NX2]#[CX1]",
     
     # === CARBONYLS ===
-    "aldehyde": "[CX3H1](=O)[#6,H]",
+    # Aldehyde: carbonyl with H and bonded to C (not N/O)
+    # [CX3H1](=O) matches the carbonyl, [#6] ensures attached to carbon
+    # This excludes amides where C is bonded to N
+    "aldehyde": "[CX3H1](=O)[#6]",
     "ketone": "[#6][CX3](=O)[#6]",
     "thioaldehyde": "[CX3H1](=S)",
     "thioketone": "[#6][CX3](=S)[#6]",
