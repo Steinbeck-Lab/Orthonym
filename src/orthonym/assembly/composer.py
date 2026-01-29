@@ -225,7 +225,9 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     For unsubstituted heterocycles, returns the parent name directly
     (either retained name or HW systematic name).
 
-    For substituted heterocycles (Plan 03-04), adds prefixes with locants.
+    For substituted heterocycles, adds prefixes with locants:
+    - N-substitution uses N-locant format (N-methyl, N,N-dimethyl)
+    - C-substitution uses numeric locants (2-methyl, 3-ethyl)
 
     Args:
         features: MolecularFeatures with ring_type='heterocyclic'
@@ -234,13 +236,26 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     Returns:
         Complete IUPAC name for the heterocycle
     """
-    from ..rules.heterocycles import name_heterocycle
+    from ..rules.heterocycles import name_heterocycle, name_substituted_heterocycle
 
     # Get the heterocycle parent name
     parent_name = name_heterocycle(features.mol, features.principal_ring)
 
-    # For now, return parent name directly
-    # Substituted heterocycle naming will be implemented in Plan 03-04
+    # Check for substituents
+    substituents = getattr(features, 'heterocycle_substituents', None)
+    atom_to_locant = getattr(features, 'heterocycle_atom_to_locant', None)
+
+    if substituents and atom_to_locant:
+        # Generate substituted name with N-locants and C-locants
+        return name_substituted_heterocycle(
+            features.mol,
+            features.principal_ring,
+            parent_name,
+            substituents,
+            atom_to_locant
+        )
+
+    # No substituents - return parent name directly
     return parent_name
 
 

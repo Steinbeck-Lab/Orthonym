@@ -66,6 +66,7 @@ class MolecularFeatures:
     heterocycle_info: Optional[Dict] = None  # From classify_heterocycle
     oriented_heterocycle: Optional[List[int]] = None  # Ring atoms in IUPAC numbering order
     heterocycle_atom_to_locant: Optional[Dict[int, int]] = None  # Atom idx -> locant mapping
+    heterocycle_substituents: Dict[int, List[Dict]] = field(default_factory=dict)  # From get_heterocycle_substituents
 
     # Stereochemistry
     stereocenters: List[dict] = field(default_factory=list)
@@ -224,19 +225,41 @@ class Orthonym:
                         features.mol, features.principal_ring
                     )
                 elif features.ring_type == 'heterocyclic':
-                    # Heterocyclic ring: classify and orient
+                    # Heterocyclic ring: classify, detect substituents, and orient
                     from .rules.heterocycles import (
-                        classify_heterocycle, orient_heterocycle
+                        classify_heterocycle,
+                        orient_heterocycle_with_substituents,
+                        get_heterocycle_substituents,
                     )
 
                     features.heterocycle_info = classify_heterocycle(
                         features.mol, features.principal_ring
                     )
-                    oriented, atom_to_locant = orient_heterocycle(
-                        features.mol, features.principal_ring
+
+                    # Detect substituent positions for proper orientation
+                    ring_set = set(features.principal_ring)
+                    sub_positions = set()
+                    for idx in features.principal_ring:
+                        atom = features.mol.GetAtomWithIdx(idx)
+                        for neighbor in atom.GetNeighbors():
+                            if neighbor.GetIdx() not in ring_set:
+                                sub_positions.add(idx)
+                                break
+
+                    # Orient considering substituents for lowest locants
+                    oriented, atom_to_locant = orient_heterocycle_with_substituents(
+                        features.mol, features.principal_ring, sub_positions
                     )
                     features.oriented_heterocycle = oriented
                     features.heterocycle_atom_to_locant = atom_to_locant
+
+                    # Get substituent details for naming
+                    features.heterocycle_substituents = get_heterocycle_substituents(
+                        features.mol,
+                        features.principal_ring,
+                        oriented,
+                        atom_to_locant
+                    )
                 else:
                     # Non-benzene, non-heterocyclic ring: detect substituents and orient
                     from .rules.cycloalkanes import (
