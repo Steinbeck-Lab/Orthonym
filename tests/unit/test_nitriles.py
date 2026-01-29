@@ -205,3 +205,24 @@ class TestNitrileAsPrefix:
         result = name_compound("N#CCC(=O)O")
         # Acid is principal group, nitrile becomes cyano- prefix
         assert "cyano" in result.lower() or "cyanoacetic" in result.lower()
+
+
+class TestNitrileAmideIntegration:
+    """Test compounds with both nitrile and amide or other groups."""
+
+    def test_cyanoacetamide(self):
+        """Compound with both nitrile and amide -> amide is principal."""
+        from src.orthonym import name_compound
+        # N#C-CH2-C(=O)NH2 - 2-cyanoacetamide
+        result = name_compound("NC(=O)CC#N")
+        # Amide is higher seniority than nitrile
+        assert "cyano" in result.lower() or "acetamide" in result.lower()
+
+    def test_aminoacetonitrile(self):
+        """Compound with amine and nitrile -> nitrile is principal."""
+        from src.orthonym import name_compound
+        # H2N-CH2-C#N
+        result = name_compound("NCC#N")
+        # Nitrile is higher seniority than amine
+        # Result should contain amino prefix or nitrile suffix
+        assert "nitrile" in result.lower() or "amino" in result.lower()

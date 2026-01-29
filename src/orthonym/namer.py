@@ -83,6 +83,10 @@ class MolecularFeatures:
     # Ester-specific information
     ester_match: Optional[tuple] = None  # SMARTS match for principal ester group
 
+    # Amide-specific information
+    amide_type: Optional[str] = None  # "primary", "secondary", or "tertiary"
+    n_substituents: List[Dict] = field(default_factory=list)  # N-substituents from get_n_substituents()
+
 
 class Orthonym:
     """
