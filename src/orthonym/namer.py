@@ -80,6 +80,9 @@ class MolecularFeatures:
     is_polyfunctional: bool = False  # True if molecule has 2+ distinct functional groups
     non_principal_groups: Dict[str, List[tuple]] = field(default_factory=dict)  # FGs other than principal
 
+    # Ester-specific information
+    ester_match: Optional[tuple] = None  # SMARTS match for principal ester group
+
 
 class Orthonym:
     """
@@ -195,6 +198,10 @@ class Orthonym:
         )
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
+
+        # Store ester match if principal group is ester
+        if pg_name == "ester" and pg_atoms:
+            features.ester_match = pg_atoms[0]  # First ester match
 
         # Detect polyfunctional compounds (multiple distinct FGs)
         from .rules.polyfunctional import detect_polyfunctional, get_non_principal_groups

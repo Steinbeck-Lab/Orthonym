@@ -62,6 +62,10 @@ IGNORE_FOR_ALPHA = {
 TERMINAL_GROUPS = {
     "carboxylic_acid",  # Always at chain end (locant 1)
     "aldehyde",         # Always at chain end (locant 1)
+    "nitrile",          # Always at chain end (locant 1)
+    "primary_amide",    # Always at chain end (locant 1)
+    "secondary_amide",  # Always at chain end (locant 1)
+    "tertiary_amide",   # Always at chain end (locant 1)
 }
 
 
@@ -92,6 +96,16 @@ def assemble_name(features: Any, style: str = "pin") -> str:
         if poly_name:
             return poly_name
         # If name_polyfunctional returns None, fall through to normal handling
+
+    # Handle esters (two-component naming: "alkyl alkanoate")
+    if features.principal_group == "ester":
+        ester_match = getattr(features, 'ester_match', None)
+        if ester_match:
+            from ..rules.esters import name_ester
+            ester_name = name_ester(features.mol, ester_match)
+            if ester_name:
+                return ester_name
+        # If name_ester returns None (lactone or complex), fall through
 
     # Handle heterocyclic compounds FIRST
     # Heterocycles include aromatic heterocycles (pyridine) and saturated (morpholine)
