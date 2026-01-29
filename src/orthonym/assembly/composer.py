@@ -124,6 +124,10 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     if polycyclic_name:
         return _assemble_polycyclic_name(features, style)
 
+    # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
+    if features.principal_group == 'nitrile' and features.is_cyclic:
+        return _assemble_ring_nitrile_name(features, style)
+
     # Handle simple cases
     if not features.principal_chain and not features.ring_systems:
         # Single atom or very simple molecule
@@ -279,6 +283,48 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
 
     # No substituents - return parent name directly
     return parent_name
+
+
+def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
+    """
+    Assemble name for ring-attached nitriles (use -carbonitrile suffix).
+
+    Ring-attached nitriles use the carbonitrile suffix, e.g.:
+    - cyclohexanecarbonitrile
+    - cyclopentanecarbonitrile
+
+    Args:
+        features: MolecularFeatures with principal_group='nitrile' and is_cyclic=True
+        style: Naming style (only "pin" supported for now)
+
+    Returns:
+        Complete IUPAC name for the ring nitrile
+    """
+    from ..rules.nitriles import name_nitrile
+
+    principal_ring = getattr(features, 'principal_ring', None)
+    if not principal_ring:
+        return "carbonitrile"
+
+    ring_size = len(principal_ring)
+
+    if ring_size in CHAIN_PREFIXES:
+        stem = CHAIN_PREFIXES[ring_size]
+    else:
+        stem = f"{ring_size}C"
+
+    parent_name = f"cyclo{stem}ane"
+
+    # Get nitrile atoms
+    nitrile_atoms = None
+    if features.principal_group_atoms:
+        nitrile_atoms = features.principal_group_atoms[0]
+
+    if nitrile_atoms:
+        return name_nitrile(features.mol, nitrile_atoms, parent_name=parent_name, is_ring=True)
+
+    # Fallback: just append carbonitrile
+    return f"{parent_name}carbonitrile"
 
 
 def _generate_chain_parent(features: Any) -> NameFragment:
