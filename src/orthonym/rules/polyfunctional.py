@@ -268,48 +268,98 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     return f"{locant_str}-{prefix_form}"
 
 
+def _find_fg_center_atom(mol, match: tuple, fg_name: str) -> Optional[int]:
+    """
+    Find the functional group CENTER atom in a SMARTS match.
+
+    Different FGs have different definitions of "center":
+    - Alcohols/thiols: The carbon attached to -OH/-SH (typically index 1 in SMARTS)
+    - Ketones: The carbonyl carbon (typically index 1 in SMARTS)
+    - Aldehydes: The aldehyde carbon (typically index 0 in SMARTS)
+
+    For most FGs, the center is the FIRST carbon in the match that is
+    directly bonded to a heteroatom that is ALSO in the match.
+
+    Args:
+        mol: RDKit Mol object
+        match: Tuple of atom indices from SMARTS match
+        fg_name: Name of the functional group
+
+    Returns:
+        Atom index of the FG center, or None if not found
+    """
+    match_set = set(match)
+
+    # For each carbon in match, check if it's bonded to a heteroatom in match
+    for atom_idx in match:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() != 'C':
+            continue
+
+        # Check if this carbon is bonded to a heteroatom that's also in the match
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in match_set and neighbor.GetSymbol() not in ('C', 'H'):
+                # This carbon is directly bonded to a heteroatom in the FG match
+                return atom_idx
+
+    # Fallback: return first carbon in match
+    for atom_idx in match:
+        if mol.GetAtomWithIdx(atom_idx).GetSymbol() == 'C':
+            return atom_idx
+
+    return None
+
+
 def get_non_principal_fg_locants(
     mol,
     fg_atoms: List[tuple],
     principal_chain: List[int],
-    atom_to_locant: Dict[int, int]
+    atom_to_locant: Dict[int, int],
+    fg_name: str = ""
 ) -> List[int]:
     """
     Get locants for non-principal functional groups.
 
-    For each FG match, find the atom that connects to the principal chain
-    and return its locant.
+    For each FG match, find the functional group CENTER atom (the carbon
+    bearing the heteroatom) on the principal chain and return its locant.
 
     Args:
         mol: RDKit Mol object
         fg_atoms: List of atom index tuples for each FG match
         principal_chain: Atom indices of the principal chain
         atom_to_locant: Mapping from atom index to locant
+        fg_name: Name of the functional group (for specialized handling)
 
     Returns:
         Sorted list of locants for the functional group positions
     """
     locants = []
-    chain_set = set(principal_chain)
 
     for match in fg_atoms:
-        # Find the atom in this match that's on the principal chain
-        # or attached to the principal chain
-        for atom_idx in match:
-            if atom_idx in atom_to_locant:
-                locants.append(atom_to_locant[atom_idx])
-                break
-            # Check if any neighbor is on the chain
-            atom = mol.GetAtomWithIdx(atom_idx)
-            for neighbor in atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx in atom_to_locant:
-                    # This FG is attached to the chain at nbr_idx
-                    locants.append(atom_to_locant[nbr_idx])
+        # Find the FG center atom
+        center_idx = _find_fg_center_atom(mol, match, fg_name)
+
+        if center_idx is not None and center_idx in atom_to_locant:
+            locants.append(atom_to_locant[center_idx])
+        else:
+            # Fallback: find any atom in match that's on chain
+            for atom_idx in match:
+                if atom_idx in atom_to_locant:
+                    locants.append(atom_to_locant[atom_idx])
                     break
             else:
-                continue
-            break
+                # Check if any atom's neighbor is on the chain
+                for atom_idx in match:
+                    atom = mol.GetAtomWithIdx(atom_idx)
+                    for neighbor in atom.GetNeighbors():
+                        nbr_idx = neighbor.GetIdx()
+                        if nbr_idx in atom_to_locant:
+                            locants.append(atom_to_locant[nbr_idx])
+                            break
+                    else:
+                        continue
+                    break
 
     return sorted(set(locants))
 
@@ -387,7 +437,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
         # Get locants for this FG
         locants = get_non_principal_fg_locants(
-            mol, matches, principal_chain, atom_to_locant
+            mol, matches, principal_chain, atom_to_locant, fg_name
         )
 
         # Format the prefix

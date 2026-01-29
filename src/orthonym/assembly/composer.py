@@ -500,14 +500,15 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
 
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
-    Generate prefix fragments for alkyl substituents.
+    Generate prefix fragments for alkyl substituents and alkoxy groups.
 
     This function:
     1. Iterates over features.substituents (keyed by 1-indexed position/locant)
     2. Counts carbon atoms in each substituent to determine name
-    3. Groups identical substituents with their locants
-    4. Formats each group with locants, multipliers
-    5. Sorts alphabetically by base substituent name
+    3. Detects ether groups (O bonded to 2 carbons) and names as alkoxy
+    4. Groups identical substituents with their locants
+    5. Formats each group with locants, multipliers
+    6. Sorts alphabetically by base substituent name
 
     Returns:
         List of NameFragment objects for alkyl prefixes, sorted alphabetically
@@ -536,9 +537,12 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 for idx in sub_atoms
             )
 
-            # For Phase 1, skip mixed substituents (carbon + heteroatom)
-            # These are complex substituents handled in later phases
             if has_heteroatom:
+                # Check for ether pattern: O bonded to 2 carbons
+                alkoxy_name = _check_for_alkoxy(mol, sub_atoms, features.principal_chain)
+                if alkoxy_name:
+                    substituent_groups[alkoxy_name].append(position)
+                # Skip other complex substituents for now
                 continue
 
             # Get alkyl name from carbon count
@@ -549,14 +553,29 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 # Carbon count > 10, skip for now (complex substituent)
                 continue
 
+    # Count total number of substituents for locant omission decision
+    total_substituents = sum(len(locs) for locs in substituent_groups.values())
+
+    # Check if this is a simple hydrocarbon (no functional group suffix)
+    # In that case, monosubstituted at position 1 omits the locant
+    is_simple_hydrocarbon = features.principal_group is None
+
     # Build prefix fragments
     prefixes = []
     for name, locants in substituent_groups.items():
         count = len(locants)
-        formatted = format_substituent_prefix(name, sorted(locants), count)
+        sorted_locants = sorted(locants)
+
+        # Omit locant for monosubstituted hydrocarbons at position 1
+        if is_simple_hydrocarbon and total_substituents == 1 and sorted_locants == [1]:
+            # Just the name, no locant: "methoxy" not "1-methoxy"
+            formatted = name
+        else:
+            formatted = format_substituent_prefix(name, sorted_locants, count)
+
         prefixes.append(NameFragment(
             text=formatted,
-            locants=tuple(sorted(locants)),
+            locants=tuple(sorted_locants),
             fragment_type="prefix"
         ))
 
@@ -564,6 +583,99 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     prefixes.sort(key=lambda f: alpha_sort_key(f.text))
 
     return prefixes
+
+
+def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
+    """
+    Check if a substituent is an alkoxy group (ether attached to chain).
+
+    An alkoxy group is: -O-alkyl where the O is bonded to the chain carbon
+    and to an alkyl group.
+
+    Args:
+        mol: RDKit Mol object
+        sub_atoms: Atom indices in the substituent
+        principal_chain: Atom indices of the principal chain
+
+    Returns:
+        Alkoxy name (e.g., "methoxy", "ethoxy") or None if not an alkoxy
+    """
+    chain_set = set(principal_chain)
+
+    # Find oxygen atom in the substituent
+    oxygen_idx = None
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'O':
+            # Check if it's bonded to exactly 2 atoms (typical ether O)
+            if atom.GetDegree() == 2:
+                oxygen_idx = idx
+                break
+
+    if oxygen_idx is None:
+        return None
+
+    oxygen = mol.GetAtomWithIdx(oxygen_idx)
+
+    # Find the alkyl carbon attached to oxygen (not on principal chain)
+    alkyl_start = None
+    for neighbor in oxygen.GetNeighbors():
+        nbr_idx = neighbor.GetIdx()
+        if nbr_idx not in chain_set and neighbor.GetSymbol() == 'C':
+            alkyl_start = nbr_idx
+            break
+
+    if alkyl_start is None:
+        return None
+
+    # Count carbons in the alkyl part (excluding the oxygen)
+    carbon_count = _count_alkyl_carbons(mol, alkyl_start, {oxygen_idx})
+
+    # Get alkoxy name
+    ALKOXY_NAMES = {
+        1: "methoxy",
+        2: "ethoxy",
+        3: "propoxy",
+        4: "butoxy",
+        5: "pentyloxy",
+        6: "hexyloxy",
+        7: "heptyloxy",
+        8: "octyloxy",
+        9: "nonyloxy",
+        10: "decyloxy",
+    }
+
+    if carbon_count in ALKOXY_NAMES:
+        return ALKOXY_NAMES[carbon_count]
+    elif carbon_count > 10:
+        return f"{carbon_count}Coxy"  # Fallback for large groups
+    return None
+
+
+def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
+    """Count carbon atoms in an alkyl group via BFS."""
+    from collections import deque
+
+    visited = set()
+    queue = deque([start_idx])
+    count = 0
+
+    while queue:
+        atom_idx = queue.popleft()
+        if atom_idx in visited or atom_idx in exclude:
+            continue
+        visited.add(atom_idx)
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() == 'C':
+            count += 1
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in exclude:
+                queue.append(nbr_idx)
+
+    return count
 
 
 def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
