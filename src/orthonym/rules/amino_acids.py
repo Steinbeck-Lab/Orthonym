@@ -41,12 +41,19 @@ def detect_amino_acid(mol) -> bool:
     return mol.HasSubstructMatch(pattern)
 
 
-def get_amino_acid_atoms(mol) -> Optional[Tuple[int, int, int, int]]:
+def get_amino_acid_atoms(mol) -> Optional[Tuple[int, int, int, int, int]]:
     """
     Get atom indices of alpha-amino acid core.
 
+    The SMARTS pattern [NX3;H2,H1][CX4][CX3](=O)[OX2H1] matches:
+    - N (amino nitrogen)
+    - alpha_C (alpha carbon attached to N)
+    - carbonyl_C (carboxylic acid carbon)
+    - carbonyl_O (=O oxygen)
+    - acid_O (OH oxygen)
+
     Returns:
-        Tuple of (N, alpha_C, carbonyl_C, O) atom indices, or None
+        Tuple of (N, alpha_C, carbonyl_C, carbonyl_O, acid_O) atom indices, or None
     """
     pattern = Chem.MolFromSmarts(ALPHA_AMINO_ACID_SMARTS)
     if pattern is None:
@@ -56,7 +63,7 @@ def get_amino_acid_atoms(mol) -> Optional[Tuple[int, int, int, int]]:
     if not matches:
         return None
 
-    # Return first match
+    # Return first match (5 atoms)
     return matches[0]
 
 
@@ -101,7 +108,8 @@ def _name_amino_acid_systematic(mol) -> str:
     if not aa_atoms:
         return None
 
-    n_atom, alpha_c, carbonyl_c, acid_o = aa_atoms
+    # Unpack 5 atoms: N, alpha_C, carbonyl_C, carbonyl_O (=O), acid_O (OH)
+    n_atom, alpha_c, carbonyl_c, carbonyl_o, acid_o = aa_atoms
 
     # Count carbons in the backbone (acid chain)
     # The acid chain starts at carbonyl carbon

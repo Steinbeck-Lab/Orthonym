@@ -40,8 +40,9 @@ STANDARD_AMINO_ACIDS: Dict[str, str] = {
 
     # Basic
     "NCCCCC(N)C(=O)O": "lysine",              # Lys
-    "NC(CCCNC(N)=N)C(=O)O": "arginine",       # Arg
+    "NC(CCCNC(N)=N)C(=O)O": "arginine",       # Arg (input form)
     "NC(=N)NCCCC(N)C(=O)O": "arginine",       # Arg - alternate
+    "N=C(N)NCCCC(N)C(=O)O": "arginine",       # Arg - canonical form
     "NC(Cc1cnc[nH]1)C(=O)O": "histidine",     # His
     "NC(Cc1c[nH]cn1)C(=O)O": "histidine",     # His - alternate
     "NC(Cc1[nH]cnc1)C(=O)O": "histidine",     # His - alternate 2

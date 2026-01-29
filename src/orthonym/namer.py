@@ -141,7 +141,13 @@ class Orthonym:
         # Check retained names first (benzene, methanol, etc.)
         if canonical_smiles in RETAINED_NAMES:
             return RETAINED_NAMES[canonical_smiles]
-        
+
+        # Check for amino acids (standard amino acids use trivial names)
+        from .rules.amino_acids import name_amino_acid
+        aa_name = name_amino_acid(mol, canonical_smiles)
+        if aa_name:
+            return aa_name
+
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
         
