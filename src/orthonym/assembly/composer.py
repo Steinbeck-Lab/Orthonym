@@ -85,6 +85,14 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     Returns:
         Complete IUPAC name string
     """
+    # Handle polyfunctional compounds (multiple distinct functional groups)
+    if getattr(features, 'is_polyfunctional', False):
+        from ..rules.polyfunctional import name_polyfunctional
+        poly_name = name_polyfunctional(features)
+        if poly_name:
+            return poly_name
+        # If name_polyfunctional returns None, fall through to normal handling
+
     # Handle heterocyclic compounds FIRST
     # Heterocycles include aromatic heterocycles (pyridine) and saturated (morpholine)
     ring_type = getattr(features, 'ring_type', None)

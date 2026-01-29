@@ -76,6 +76,10 @@ class MolecularFeatures:
     double_bonds: List[tuple] = field(default_factory=list)
     triple_bonds: List[tuple] = field(default_factory=list)
 
+    # Polyfunctional compound information
+    is_polyfunctional: bool = False  # True if molecule has 2+ distinct functional groups
+    non_principal_groups: Dict[str, List[tuple]] = field(default_factory=dict)  # FGs other than principal
+
 
 class Orthonym:
     """
@@ -191,6 +195,16 @@ class Orthonym:
         )
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
+
+        # Detect polyfunctional compounds (multiple distinct FGs)
+        from .rules.polyfunctional import detect_polyfunctional, get_non_principal_groups
+        features.is_polyfunctional = detect_polyfunctional(
+            features.mol, features.functional_groups
+        )
+        if features.is_polyfunctional:
+            features.non_principal_groups = get_non_principal_groups(
+                features.functional_groups, features.principal_group
+            )
 
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
