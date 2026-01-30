@@ -115,24 +115,32 @@ def find_true_bridgeheads(mol) -> Set[int]:
 
 def is_bicyclo_system(mol) -> bool:
     """
-    Check if a molecule is a simple bicyclo system.
+    Check if a molecule is a simple bicyclo (bridged) system.
 
     A bicyclo system has:
     - Exactly 2 true bridgehead atoms
     - No spiro centers
     - At least 2 rings
+    - Not an aromatic fused system (naphthalene, etc.)
+
+    Note: Aromatic fused systems like naphthalene are technically bicyclic
+    (bicyclo[4.4.0]decapentaene) but IUPAC prefers their retained names.
+    This function excludes aromatic fused systems.
 
     Args:
         mol: RDKit Mol object
 
     Returns:
-        True if molecule is a bicyclo system
+        True if molecule is a bicyclo system suitable for bicyclo[x.y.z] naming
 
     Examples:
         >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> is_bicyclo_system(mol)
         True
         >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
+        >>> is_bicyclo_system(mol)
+        False
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene (aromatic fused)
         >>> is_bicyclo_system(mol)
         False
     """
@@ -149,6 +157,18 @@ def is_bicyclo_system(mol) -> bool:
     # Must have exactly 2 true bridgeheads
     bridgeheads = find_true_bridgeheads(mol)
     if len(bridgeheads) != 2:
+        return False
+
+    # Check if this is an aromatic fused system (exclude these)
+    # Aromatic fused systems have aromatic bridgehead atoms
+    bh_list = list(bridgeheads)
+    bh1, bh2 = bh_list[0], bh_list[1]
+    atom1 = mol.GetAtomWithIdx(bh1)
+    atom2 = mol.GetAtomWithIdx(bh2)
+
+    if atom1.GetIsAromatic() and atom2.GetIsAromatic():
+        # Both bridgeheads are aromatic - this is an aromatic fused system
+        # Use retained names (naphthalene, etc.) instead of bicyclo naming
         return False
 
     return True
