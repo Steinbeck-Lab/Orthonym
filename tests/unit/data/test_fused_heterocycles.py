@@ -506,3 +506,197 @@ class TestSaturatedVariants:
         result = get_fused_heterocycle_name(mol)
         assert result is not None
         assert result[0] == 'chromane'
+
+
+class TestIUPACLocantMappings:
+    """Test IUPAC peripheral locant mappings for fused heterocycles."""
+
+    @pytest.mark.unit
+    def test_indole_locant_mapping(self):
+        """Verify indole IUPAC locant mapping is correct.
+
+        Indole IUPAC numbering:
+        - Position 1: N (with H)
+        - Positions 2,3: 5-ring carbons
+        - Position 3a: fusion atom
+        - Positions 4-7: benzene ring carbons
+        - Position 7a: fusion atom
+        """
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        indole_data = FUSED_HETEROCYCLE_DATA['c1ccc2[nH]ccc2c1']
+        locants = indole_data['iupac_locants']
+
+        # Verify N is at position 1
+        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
+        for idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'N':
+                assert locant == 1, f"N should be at position 1, got {locant}"
+
+        # Verify fusion atoms have 'a' suffix locants
+        fusion_locants = [loc for loc in locants.values() if isinstance(loc, str)]
+        assert '3a' in fusion_locants
+        assert '7a' in fusion_locants
+
+        # Verify 9 total positions mapped
+        assert len(locants) == 9
+
+    @pytest.mark.unit
+    def test_purine_locant_mapping(self):
+        """Verify purine IUPAC locant mapping is correct.
+
+        Purine IUPAC numbering (9H-purine):
+        - N1, C2, N3: pyrimidine nitrogens and carbon
+        - C4, C5: fusion carbons (shared)
+        - C6: pyrimidine carbon
+        - N7, C8, N9: imidazole atoms (N9 has H)
+        """
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        purine_data = FUSED_HETEROCYCLE_DATA['c1ncc2nc[nH]c2n1']
+        locants = purine_data['iupac_locants']
+
+        # Verify 9 total positions mapped
+        assert len(locants) == 9
+
+        # Check that position 9 exists (for N9-H)
+        assert 9 in locants.values()
+
+        # Verify N9 has H (the tautomer position)
+        assert purine_data['tautomer_locant'] == 9
+
+    @pytest.mark.unit
+    def test_quinoline_locant_mapping(self):
+        """Verify quinoline IUPAC locant mapping is correct.
+
+        Quinoline IUPAC numbering:
+        - Position 1: N
+        - Positions 2,3,4: pyridine ring
+        - Position 4a: fusion
+        - Positions 5,6,7,8: benzene ring
+        - Position 8a: fusion
+        """
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        quinoline_data = FUSED_HETEROCYCLE_DATA['c1ccc2ncccc2c1']
+        locants = quinoline_data['iupac_locants']
+
+        # Verify N is at position 1
+        mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')
+        for idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'N':
+                assert locant == 1, f"N should be at position 1, got {locant}"
+
+        # Verify fusion atoms have 'a' suffix locants
+        fusion_locants = [loc for loc in locants.values() if isinstance(loc, str)]
+        assert '4a' in fusion_locants
+        assert '8a' in fusion_locants
+
+        # Verify 10 total positions mapped
+        assert len(locants) == 10
+
+    @pytest.mark.unit
+    def test_substituted_indole_locant(self):
+        """5-methylindole substituent should be at IUPAC position 5."""
+        mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
+        result = match_fused_heterocycle_core(mol)
+        assert result is not None
+
+        name, mapping, core_smiles = result
+        assert name == '1H-indole'
+
+        # Find the methyl carbon and its attachment point
+        methyl_attached_to = None
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() == 'C' and atom.GetDegree() == 1:  # Methyl carbon
+                # Get the ring carbon it's attached to
+                neighbor = list(atom.GetNeighbors())[0]
+                methyl_attached_to = neighbor.GetIdx()
+                break
+
+        assert methyl_attached_to is not None
+        assert mapping[methyl_attached_to] == 5, (
+            f"Methyl should attach at IUPAC position 5, got {mapping[methyl_attached_to]}"
+        )
+
+    @pytest.mark.unit
+    def test_6_aminopurine_locant(self):
+        """6-aminopurine (adenine) amino group should be at IUPAC position 6."""
+        mol = Chem.MolFromSmiles('Nc1ncnc2[nH]cnc12')  # adenine
+        result = match_fused_heterocycle_core(mol)
+        assert result is not None
+
+        name, mapping, core_smiles = result
+        assert name == '9H-purine'
+
+        # Find the amino nitrogen and its attachment point
+        amino_attached_to = None
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() == 'N' and not atom.GetIsAromatic():  # Amino N
+                neighbor = list(atom.GetNeighbors())[0]
+                amino_attached_to = neighbor.GetIdx()
+                break
+
+        assert amino_attached_to is not None
+        assert mapping[amino_attached_to] == 6, (
+            f"Amino should attach at IUPAC position 6, got {mapping[amino_attached_to]}"
+        )
+
+    @pytest.mark.unit
+    def test_8_chloroquinoline_locant(self):
+        """8-chloroquinoline chloro group should be at IUPAC position 8."""
+        mol = Chem.MolFromSmiles('Clc1cccc2cccnc12')  # 8-chloroquinoline
+        result = match_fused_heterocycle_core(mol)
+        assert result is not None
+
+        name, mapping, core_smiles = result
+        assert name == 'quinoline'
+
+        # Find the chlorine and its attachment point
+        cl_attached_to = None
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() == 'Cl':
+                neighbor = list(atom.GetNeighbors())[0]
+                cl_attached_to = neighbor.GetIdx()
+                break
+
+        assert cl_attached_to is not None
+        assert mapping[cl_attached_to] == 8, (
+            f"Chloro should attach at IUPAC position 8, got {mapping[cl_attached_to]}"
+        )
+
+    @pytest.mark.unit
+    def test_all_entries_have_iupac_locants(self):
+        """All FUSED_HETEROCYCLE_DATA entries should have iupac_locants field."""
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        missing = []
+        for smiles, data in FUSED_HETEROCYCLE_DATA.items():
+            if 'iupac_locants' not in data:
+                missing.append(data['name'])
+
+        assert not missing, f"Missing iupac_locants for: {missing}"
+
+        # Verify count matches expected
+        assert len(FUSED_HETEROCYCLE_DATA) == 38, (
+            f"Expected 38 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
+        )
+
+    @pytest.mark.unit
+    def test_iupac_locants_mapping_size_matches_parent_atoms(self):
+        """Each iupac_locants mapping should have same size as parent_atoms."""
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        mismatches = []
+        for smiles, data in FUSED_HETEROCYCLE_DATA.items():
+            locants = data.get('iupac_locants', {})
+            parent_atoms = data['parent_atoms']
+
+            if len(locants) != parent_atoms:
+                mismatches.append(
+                    f"{data['name']}: locants={len(locants)}, parent_atoms={parent_atoms}"
+                )
+
+        assert not mismatches, f"Mapping size mismatches:\n" + "\n".join(mismatches)
