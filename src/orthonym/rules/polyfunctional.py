@@ -511,6 +511,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         prefix_str = _join_prefixes(all_prefixes)
         name = f"{prefix_str}{name}"
 
+    # Add stereodescriptors if present
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        if descriptors:
+            stereo_prefix = format_stereodescriptor_string(descriptors)
+            name = f"{stereo_prefix}{name}"
+
     return name
 
 
