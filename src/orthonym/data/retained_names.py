@@ -106,15 +106,16 @@ RETAINED_NAMES = {
     "c1ncncn1": "1,3,5-triazine",
     
     # === FUSED HETEROCYCLES ===
+    # IUPAC 2013 PIN includes tautomer locant (indicated hydrogen) where applicable
     "c1ccc2ncccc2c1": "quinoline",
     "c1ccc2cnccc2c1": "isoquinoline",
-    "c1ccc2[nH]ccc2c1": "indole",
-    "c1ccc2[nH]cnc2c1": "benzimidazole",
+    "c1ccc2[nH]ccc2c1": "1H-indole",  # 1H-indole is IUPAC 2013 PIN
+    "c1ccc2[nH]cnc2c1": "1H-benzimidazole",  # 1H-benzimidazole is IUPAC 2013 PIN
     "c1ccc2occc2c1": "benzofuran",
     "c1ccc2sccc2c1": "benzothiophene",
     "c1cnc2ccccc2n1": "quinazoline",
     "c1ccc2nccnc2c1": "quinoxaline",
-    "c1ncnc2[nH]cnc12": "purine",
+    "c1ncnc2[nH]cnc12": "7H-purine",  # 7H-purine is IUPAC 2013 PIN
     
     # === SATURATED HETEROCYCLES ===
     "C1CO1": "oxirane",

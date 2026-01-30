@@ -22,6 +22,11 @@ from .naming_utils import (
     get_alkyl_name,
 )
 
+# Complex ring system imports
+from ..rules.bicyclo import is_bicyclo_system, name_bicyclo_system
+from ..rules.spiro import is_spiro_system, name_spiro_system
+from ..rules.fused_rings import classify_fused_system, name_fused_heterocycle, name_ortho_fused_bicyclic
+
 
 # Chain length prefixes (IUPAC Blue Book)
 CHAIN_PREFIXES = {
@@ -123,6 +128,14 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     polycyclic_name = getattr(features, 'polycyclic_name', None)
     if polycyclic_name:
         return _assemble_polycyclic_name(features, style)
+
+    # Handle complex ring systems (bicyclo, spiro, fused)
+    # These take precedence over simple cycloalkane classification
+    if features.is_cyclic and _is_complex_ring_system(features.mol):
+        complex_name = _assemble_complex_ring_name(features.mol, features)
+        if complex_name:
+            return complex_name
+        # If complex ring naming fails, fall through to simpler handling
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
     if features.principal_group == 'nitrile' and features.is_cyclic:
@@ -246,6 +259,134 @@ def _assemble_polycyclic_name(features: Any, style: str) -> str:
 
     # Generate systematic name with substituents
     return name_substituted_polycyclic(features.mol, pah_name, substituents)
+
+
+def _is_complex_ring_system(mol) -> bool:
+    """
+    Check if a molecule contains a complex ring system (bicyclo, spiro, or fused).
+
+    Complex ring systems require special naming rules beyond simple cycloalkanes.
+    This function is used for early routing decision in assemble_name().
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule contains bicyclo, spiro, or non-trivial fused ring system
+
+    Note:
+        Simple monocyclic rings return False.
+        Aromatic fused systems (naphthalene, etc.) are handled by polycyclics module.
+    """
+    # Check bicyclo first (bridged bicyclic)
+    if is_bicyclo_system(mol):
+        return True
+
+    # Check spiro (two rings sharing one atom)
+    if is_spiro_system(mol):
+        return True
+
+    # Check fused rings (ortho-fused or ortho-peri-fused)
+    fused_type = classify_fused_system(mol)
+    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+        return True
+
+    return False
+
+
+def _classify_complex_ring(mol) -> str:
+    """
+    Classify a complex ring system by type.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Classification string:
+        - 'bicyclo': Bridged bicyclic system
+        - 'spiro': Spiro system (rings share one atom)
+        - 'ortho-fused': Ortho-fused system (rings share one edge)
+        - 'ortho-peri-fused': Complex fused system
+        - 'simple': Not a complex ring system
+    """
+    # Check in order of priority
+    if is_bicyclo_system(mol):
+        return 'bicyclo'
+
+    if is_spiro_system(mol):
+        return 'spiro'
+
+    fused_type = classify_fused_system(mol)
+    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+        return fused_type
+
+    return 'simple'
+
+
+def _assemble_complex_ring_name(mol, features) -> Optional[str]:
+    """
+    Assemble IUPAC name for a complex ring system.
+
+    Routes to appropriate naming function based on ring classification:
+    - Bicyclo: bicyclo[x.y.z]alkane format (e.g., bicyclo[2.2.1]heptane)
+    - Spiro: spiro[a.b]alkane format (e.g., spiro[4.5]decane)
+    - Fused: retained names or systematic fusion descriptors
+
+    Args:
+        mol: RDKit Mol object
+        features: MolecularFeatures object (for substituents, stereo, etc.)
+
+    Returns:
+        Complete IUPAC name, or None if naming fails
+
+    Note:
+        Substituent and stereodescriptor handling will be added in future.
+        Currently handles unsubstituted systems.
+    """
+    import logging
+
+    ring_type = _classify_complex_ring(mol)
+
+    try:
+        if ring_type == 'bicyclo':
+            # Bicyclo naming (norbornane, bicyclo[2.2.2]octane, etc.)
+            name = name_bicyclo_system(mol)
+            if name:
+                return name
+            logging.warning(f"Bicyclo naming failed for molecule")
+            return None
+
+        elif ring_type == 'spiro':
+            # Spiro naming (spiro[4.5]decane, etc.)
+            name = name_spiro_system(mol)
+            if name:
+                return name
+            logging.warning(f"Spiro naming failed for molecule")
+            return None
+
+        elif ring_type in ('ortho-fused', 'ortho-peri-fused'):
+            # Fused ring naming - try heterocycle first, then carbocyclic
+            # Heterocycles have retained names like indole, quinoline
+            name = name_fused_heterocycle(mol)
+            if name:
+                return name
+
+            # Try ortho-fused bicyclic (carbocyclic fallback)
+            name = name_ortho_fused_bicyclic(mol)
+            if name:
+                return name
+
+            logging.warning(f"Fused ring naming failed for {ring_type} system")
+            return None
+
+        else:
+            # Not a complex ring - shouldn't reach here
+            return None
+
+    except Exception as e:
+        # Graceful degradation - log and return None
+        logging.warning(f"Complex ring naming error: {e}")
+        return None
 
 
 def _assemble_heterocycle_name(features: Any, style: str) -> str:
