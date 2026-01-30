@@ -231,7 +231,7 @@ def name_fused_heterocycle(mol) -> Optional[str]:
 
 def get_fused_heterocycle_substituents(
     mol,
-    core_match: Dict[int, int]
+    core_match: Dict[int, Any]
 ) -> Dict:
     """
     Find substituents on a fused heterocycle core.
@@ -242,7 +242,7 @@ def get_fused_heterocycle_substituents(
 
     Args:
         mol: RDKit Mol object
-        core_match: Dict mapping mol atom indices to IUPAC locants in the core
+        core_match: Dict mapping mol atom indices to IUPAC locants (int or str like '3a')
 
     Returns:
         Dict with:
@@ -262,6 +262,8 @@ def get_fused_heterocycle_substituents(
     result = {
         'c_substituents': defaultdict(list),  # name -> list of locants
         'n_substituents': defaultdict(int),   # name -> count
+        'oxo_substituents': [],   # list of locants for =O (suffix: -one)
+        'amino_substituents': [], # list of locants for -NH2 (suffix: -amine)
         'other': [],  # For halogens, etc.
     }
 
@@ -292,15 +294,34 @@ def get_fused_heterocycle_substituents(
                 else:
                     # C-substitution
                     result['c_substituents'][sub_name].append(locant)
+            elif sub_type == 'oxo':
+                # Oxo group (=O) - use suffix form (-one)
+                result['oxo_substituents'].append(locant)
+            elif sub_type == 'functional' and sub_name == 'amino':
+                # Amino group (-NH2) - use suffix form (-amine)
+                result['amino_substituents'].append(locant)
             else:
                 # Halogen or other
                 sub_info['locant'] = locant
                 sub_info['is_on_nitrogen'] = is_nitrogen
                 result['other'].append(sub_info)
 
-    # Sort C-substituent locants
+    # Sort C-substituent locants (handle mixed int/str like 5, '3a', '7a')
+    def _locant_sort_key(loc):
+        """Sort key for IUPAC locants - handles int (5) and str ('3a')."""
+        if isinstance(loc, str):
+            # Parse '3a' -> (3, 'a'), '7a' -> (7, 'a')
+            if loc and loc[-1].isalpha():
+                return (int(loc[:-1]), loc[-1])
+            return (int(loc), '')
+        return (loc, '')
+
     for name in result['c_substituents']:
-        result['c_substituents'][name].sort()
+        result['c_substituents'][name].sort(key=_locant_sort_key)
+
+    # Sort oxo and amino locants
+    result['oxo_substituents'].sort(key=_locant_sort_key)
+    result['amino_substituents'].sort(key=_locant_sort_key)
 
     return dict(result)
 
@@ -342,11 +363,28 @@ def _identify_fused_substituent(
     if symbol == 'C':
         return _identify_alkyl_substituent(mol, start_idx, excluded)
 
-    # Oxygen groups (hydroxyl, etc.)
+    # Oxygen groups (oxo C=O, hydroxyl -OH)
     if symbol == 'O':
         h_count = start_atom.GetTotalNumHs()
-        neighbors = [n for n in start_atom.GetNeighbors() if n.GetIdx() not in excluded]
-        if h_count == 1 and len(neighbors) == 0:
+        neighbors_outside_core = [n for n in start_atom.GetNeighbors() if n.GetIdx() not in excluded]
+
+        # Check for oxo group (=O double-bonded to ring carbon)
+        if h_count == 0 and len(neighbors_outside_core) == 0:
+            # Oxo group: O with no H, double-bonded to core carbon
+            for bond in start_atom.GetBonds():
+                other_idx = bond.GetOtherAtomIdx(start_idx)
+                if other_idx in excluded:  # Bond to core atom
+                    other_atom = mol.GetAtomWithIdx(other_idx)
+                    if other_atom.GetSymbol() == 'C' and bond.GetBondTypeAsDouble() == 2.0:
+                        return {
+                            'name': 'oxo',
+                            'type': 'oxo',  # Special type for suffix handling
+                            'atoms': [start_idx],
+                            'bond_type': 'double'
+                        }
+
+        # Hydroxyl group (-OH)
+        if h_count == 1 and len(neighbors_outside_core) == 0:
             return {
                 'name': 'hydroxy',
                 'type': 'functional',
