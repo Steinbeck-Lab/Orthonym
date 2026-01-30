@@ -5,6 +5,8 @@ Handles identification and naming of common polycyclic aromatics:
 - naphthalene, anthracene, phenanthrene, pyrene
 - fluorene, acenaphthene, acenaphthylene, chrysene
 
+Also coordinates with fused_rings module for fused heterocyclic systems.
+
 IUPAC 2013 Rules (Blue Book Section P-25):
 - PAH numbering is FIXED by IUPAC standard
 - Use retained names as parent
@@ -14,6 +16,11 @@ IUPAC 2013 Rules (Blue Book Section P-25):
 Key difference from benzene:
 - Benzene substituent numbering uses lowest locants
 - PAH numbering is fixed to the standard IUPAC orientation
+
+Integration with fused_rings.py:
+- This module handles carbocyclic PAHs (naphthalene, anthracene, etc.)
+- fused_rings.py handles fused heterocycles (indole, quinoline, etc.)
+- This module can delegate to fused_rings for heterocyclic detection
 """
 
 from typing import Dict, List, Optional, Tuple, Set, Any
@@ -29,6 +36,12 @@ from ..assembly.naming_utils import (
     format_substituent_prefix,
     alpha_sort_key,
     get_multiplier_prefix,
+)
+from ..perception.rings import (
+    get_ring_info,
+    get_ring_systems,
+    is_aromatic_ring,
+    is_heterocyclic,
 )
 
 
@@ -643,3 +656,217 @@ def _join_pah_prefixes(prefixes: List[str]) -> str:
         result += current
 
     return result
+
+
+# ============================================================================
+# Fused Aromatic System Integration
+# ============================================================================
+
+
+def is_fused_aromatic_system(mol) -> bool:
+    """
+    Check if molecule contains a fused aromatic ring system.
+
+    A fused aromatic system has 2+ aromatic rings sharing edges.
+    This includes both carbocyclic PAHs and fused heterocycles.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if fused aromatic system detected
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> is_fused_aromatic_system(mol)
+        True
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
+        >>> is_fused_aromatic_system(mol)
+        True
+        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
+        >>> is_fused_aromatic_system(mol)
+        False
+    """
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    # Find aromatic rings
+    aromatic_rings = [ring for ring in atom_rings if is_aromatic_ring(mol, ring)]
+
+    if len(aromatic_rings) < 2:
+        return False
+
+    # Check if any pair of aromatic rings are fused (share 2+ atoms)
+    for i, ring1 in enumerate(aromatic_rings):
+        for j, ring2 in enumerate(aromatic_rings):
+            if i >= j:
+                continue
+            shared = set(ring1) & set(ring2)
+            if len(shared) >= 2:
+                return True
+
+    return False
+
+
+def get_fused_aromatic_core(mol) -> Optional[str]:
+    """
+    Identify if molecule contains a known fused aromatic core.
+
+    Checks both carbocyclic PAHs (naphthalene, anthracene) and
+    fused heterocycles (indole, quinoline).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Core name if found (e.g., 'naphthalene', '1H-indole'), None otherwise
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
+        >>> get_fused_aromatic_core(mol)
+        'naphthalene'
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
+        >>> get_fused_aromatic_core(mol)
+        '1H-indole'
+    """
+    # Import here to avoid circular dependency
+    from .fused_rings import name_fused_heterocycle
+
+    # Check fused heterocycles FIRST (they take priority)
+    heterocycle_name = name_fused_heterocycle(mol)
+    if heterocycle_name:
+        return heterocycle_name
+
+    # Check carbocyclic PAHs
+    pah_name = identify_polycyclic(mol)
+    if pah_name:
+        return pah_name
+
+    return None
+
+
+def name_substituted_fused_aromatic(
+    mol,
+    core_name: str,
+    atom_map: Optional[Dict[int, int]] = None
+) -> str:
+    """
+    Generate name for a substituted fused aromatic system.
+
+    Handles substituents on both PAHs and fused heterocycles with
+    consistent locant assignment using IUPAC numbering.
+
+    Args:
+        mol: RDKit Mol object
+        core_name: Base core name (e.g., 'naphthalene', '1H-indole')
+        atom_map: Optional pre-computed atom index to locant mapping
+
+    Returns:
+        Complete IUPAC name with substituent prefixes
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> name_substituted_fused_aromatic(mol, 'naphthalene')
+        '2-methylnaphthalene'
+    """
+    # Import here to avoid circular dependency
+    from .fused_rings import name_fused_heterocycle, match_fused_heterocycle_core
+    from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+    # Check if this is a fused heterocycle
+    # Look for tautomer locant patterns (1H-, 2H-, 9H-) in name
+    is_heterocycle = any(
+        core_name == data['name']
+        for data in FUSED_HETEROCYCLE_DATA.values()
+    )
+
+    if is_heterocycle:
+        # Delegate to fused_rings module for heterocycle naming
+        result = name_fused_heterocycle(mol)
+        if result:
+            return result
+        return core_name
+
+    # Handle carbocyclic PAH
+    pah_name = identify_polycyclic(mol)
+    if pah_name:
+        substituents = get_polycyclic_substituents(mol, pah_name)
+        return name_substituted_polycyclic(mol, pah_name, substituents)
+
+    return core_name
+
+
+def identify_fused_system(mol) -> Optional[Dict[str, Any]]:
+    """
+    Identify and classify a fused ring system.
+
+    Central coordinator for fused system identification. Returns
+    information about the type of fused system and its naming.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Dict with:
+        - 'type': 'carbocyclic' or 'heterocyclic'
+        - 'core_name': Base name of the fused system
+        - 'is_substituted': Whether molecule has substituents on core
+        - 'full_name': Complete IUPAC name
+        Or None if not a recognized fused system
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
+        >>> info = identify_fused_system(mol)
+        >>> info['type']
+        'carbocyclic'
+        >>> info['core_name']
+        'naphthalene'
+    """
+    # Import here to avoid circular dependency
+    from .fused_rings import (
+        name_fused_heterocycle,
+        classify_fused_system,
+        is_fused_heterocyclic_system,
+    )
+
+    if not is_fused_aromatic_system(mol):
+        return None
+
+    # Determine fusion type
+    fusion_type = classify_fused_system(mol)
+    if fusion_type == 'not-fused':
+        return None
+
+    # Check for fused heterocycle first
+    if is_fused_heterocyclic_system(mol):
+        heterocycle_name = name_fused_heterocycle(mol)
+        if heterocycle_name:
+            # Check if substituted
+            canonical = Chem.MolToSmiles(mol, canonical=True)
+            from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+            is_substituted = canonical not in FUSED_HETEROCYCLE_DATA
+
+            return {
+                'type': 'heterocyclic',
+                'core_name': heterocycle_name.split('-')[-1] if '-' in heterocycle_name else heterocycle_name,
+                'is_substituted': is_substituted,
+                'full_name': heterocycle_name,
+                'fusion_type': fusion_type,
+            }
+
+    # Check for carbocyclic PAH
+    pah_name = identify_polycyclic(mol)
+    if pah_name:
+        substituents = get_polycyclic_substituents(mol, pah_name)
+        is_substituted = bool(substituents)
+        full_name = name_substituted_polycyclic(mol, pah_name, substituents)
+
+        return {
+            'type': 'carbocyclic',
+            'core_name': pah_name,
+            'is_substituted': is_substituted,
+            'full_name': full_name,
+            'fusion_type': fusion_type,
+        }
+
+    return None
