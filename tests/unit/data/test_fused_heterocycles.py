@@ -167,7 +167,7 @@ class TestSubstructureMatching:
         mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        name, mapping = result
+        name, mapping, core_smiles = result
         assert name == '1H-indole'
         assert isinstance(mapping, dict)
         assert len(mapping) == 9  # 9 atoms in indole core
@@ -178,7 +178,7 @@ class TestSubstructureMatching:
         mol = Chem.MolFromSmiles('Clc1ccnc2ccccc12')
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        name, mapping = result
+        name, mapping, core_smiles = result
         assert name == 'quinoline'
         assert len(mapping) == 10  # 10 atoms in quinoline core
 
@@ -188,7 +188,7 @@ class TestSubstructureMatching:
         mol = Chem.MolFromSmiles('Cc1nc2ccccc2[nH]1')
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        name, mapping = result
+        name, mapping, core_smiles = result
         assert name == '1H-benzimidazole'
         assert len(mapping) == 9
 
@@ -198,26 +198,30 @@ class TestSubstructureMatching:
         mol = Chem.MolFromSmiles('Cc1ncnc2nc[nH]c12')
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        name, mapping = result
+        name, mapping, core_smiles = result
         assert name == '9H-purine'
         assert len(mapping) == 9
 
     @pytest.mark.unit
     def test_atom_mapping_is_valid(self):
-        """Atom mapping should contain valid atom indices."""
+        """Atom mapping should contain valid atom indices and locants."""
         mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        _, mapping = result
+        _, mapping, _ = result
 
         # All mapped indices should be valid atom indices in the molecule
         for atom_idx in mapping.keys():
             assert 0 <= atom_idx < mol.GetNumAtoms()
 
-        # All locants should be positive integers
+        # All locants should be positive integers or fusion locants like '3a'
         for locant in mapping.values():
-            assert isinstance(locant, int)
-            assert locant > 0
+            if isinstance(locant, int):
+                assert locant > 0
+            elif isinstance(locant, str):
+                # Fusion locants like '3a', '7a', '4a', '8a'
+                assert locant.endswith('a')
+                assert locant[:-1].isdigit()
 
 
 class TestNonMatches:
