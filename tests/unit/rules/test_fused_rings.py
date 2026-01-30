@@ -577,3 +577,89 @@ class TestOxoAminoFusedHeterocycles:
         assert 'purin-' in name.lower()
         # Should NOT have purine- before the locant
         assert 'purine-6' not in name.lower()
+
+
+# ============================================================================
+# Test substituent locant assignment (Plan 07-03)
+# ============================================================================
+
+class TestSubstituentLocantAssignment:
+    """Test that substituents get correct IUPAC locants (not match order).
+
+    These tests verify the fix from Plan 07-03 where substituent locants
+    are assigned using IUPAC peripheral numbering, not the arbitrary
+    SMARTS match order.
+    """
+
+    @pytest.mark.unit
+    def test_5_methylindole_locant(self):
+        """5-methylindole: methyl at position 5, not match-order position."""
+        mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert name == '5-methyl-1H-indole', f"Got: {name}"
+
+    @pytest.mark.unit
+    def test_3_methylindole_locant(self):
+        """3-methylindole: methyl at position 3 (on pyrrole ring)."""
+        mol = Chem.MolFromSmiles('Cc1c[nH]c2ccccc12')
+        name = name_fused_heterocycle(mol)
+        assert name == '3-methyl-1H-indole', f"Got: {name}"
+
+    @pytest.mark.unit
+    def test_n_methylindole_uses_n_locant(self):
+        """N-methylindole should use N, not position 1."""
+        mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')
+        name = name_fused_heterocycle(mol)
+        assert 'N-methyl' in name, f"Expected N-methyl, got: {name}"
+        assert '1-methyl' not in name, f"Should not have 1-methyl, got: {name}"
+
+    @pytest.mark.unit
+    def test_4_chloroquinoline_locant(self):
+        """4-chloroquinoline: chloro at position 4."""
+        mol = Chem.MolFromSmiles('Clc1ccnc2ccccc12')
+        name = name_fused_heterocycle(mol)
+        assert '4-chloro' in name, f"Expected 4-chloro, got: {name}"
+
+    @pytest.mark.unit
+    def test_2_methylquinoline_locant(self):
+        """2-methylquinoline: methyl at position 2 (next to N)."""
+        mol = Chem.MolFromSmiles('Cc1ccc2ccccc2n1')
+        name = name_fused_heterocycle(mol)
+        assert '2-methyl' in name, f"Expected 2-methyl, got: {name}"
+
+    @pytest.mark.unit
+    def test_6_methylquinoline_locant(self):
+        """6-methylquinoline: methyl at position 6 (benzene ring)."""
+        mol = Chem.MolFromSmiles('Cc1ccc2ncccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert '6-methyl' in name, f"Expected 6-methyl, got: {name}"
+
+    @pytest.mark.unit
+    def test_5_bromoindole_locant(self):
+        """5-bromoindole: bromo at position 5."""
+        mol = Chem.MolFromSmiles('Brc1ccc2[nH]ccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert '5-bromo' in name, f"Expected 5-bromo, got: {name}"
+
+    @pytest.mark.unit
+    def test_7_chloroindole_locant(self):
+        """7-chloroindole: chloro at position 7."""
+        mol = Chem.MolFromSmiles('c1cc(Cl)c2[nH]ccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert '7-chloro' in name, f"Expected 7-chloro, got: {name}"
+
+    @pytest.mark.unit
+    def test_4_methylbenzimidazole_locant(self):
+        """4-methylbenzimidazole: methyl at position 4."""
+        mol = Chem.MolFromSmiles('Cc1cccc2[nH]cnc12')
+        name = name_fused_heterocycle(mol)
+        # Check that it contains methyl and benzimidazole
+        assert 'methyl' in name, f"Expected methyl, got: {name}"
+        assert 'benzimidazole' in name, f"Expected benzimidazole, got: {name}"
+
+    @pytest.mark.unit
+    def test_8_chloroquinoline_locant(self):
+        """8-chloroquinoline: chloro at position 8."""
+        mol = Chem.MolFromSmiles('c1cc(Cl)c2ncccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert '8-chloro' in name, f"Expected 8-chloro, got: {name}"
