@@ -217,7 +217,7 @@ def name_fused_heterocycle(mol) -> Optional[str]:
     if core_result is None:
         return None
 
-    core_name, atom_mapping = core_result
+    core_name, atom_mapping, _core_smiles = core_result
 
     # Find substituents on the core
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)

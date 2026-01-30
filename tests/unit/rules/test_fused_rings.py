@@ -283,7 +283,7 @@ class TestGetFusedHeterocycleSubstituents:
         mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        core_name, atom_mapping = result
+        core_name, atom_mapping, _core_smiles = result
 
         subs = get_fused_heterocycle_substituents(mol, atom_mapping)
         assert 'c_substituents' in subs
@@ -296,7 +296,7 @@ class TestGetFusedHeterocycleSubstituents:
         mol = Chem.MolFromSmiles('Cn1ccc2ccccc12')  # N-methylindole
         result = match_fused_heterocycle_core(mol)
         assert result is not None
-        core_name, atom_mapping = result
+        core_name, atom_mapping, _core_smiles = result
 
         subs = get_fused_heterocycle_substituents(mol, atom_mapping)
         assert 'n_substituents' in subs
