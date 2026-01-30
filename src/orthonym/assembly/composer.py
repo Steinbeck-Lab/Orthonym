@@ -112,30 +112,32 @@ def assemble_name(features: Any, style: str = "pin") -> str:
                 return ester_name
         # If name_ester returns None (lactone or complex), fall through
 
-    # Handle heterocyclic compounds FIRST
-    # Heterocycles include aromatic heterocycles (pyridine) and saturated (morpholine)
-    ring_type = getattr(features, 'ring_type', None)
-    if ring_type == 'heterocyclic':
-        return _assemble_heterocycle_name(features, style)
-
-    # Handle benzene derivatives specially
-    # Benzene naming generates the complete name directly, not fragments
-    if getattr(features, 'is_benzene', False):
-        return _assemble_benzene_name(features, style)
-
-    # Handle polycyclic aromatics specially
-    # Polycyclics (naphthalene, anthracene, etc.) have their own naming rules
-    polycyclic_name = getattr(features, 'polycyclic_name', None)
-    if polycyclic_name:
-        return _assemble_polycyclic_name(features, style)
-
-    # Handle complex ring systems (bicyclo, spiro, fused)
-    # These take precedence over simple cycloalkane classification
+    # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
+    # These take precedence over simple heterocyclic/benzene classification
+    # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
+    # that would otherwise trigger early exit to wrong naming path
     if features.is_cyclic and _is_complex_ring_system(features.mol):
         complex_name = _assemble_complex_ring_name(features.mol, features)
         if complex_name:
             return complex_name
         # If complex ring naming fails, fall through to simpler handling
+
+    # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
+    # Check before benzene since substituted PAHs have benzene substructures
+    polycyclic_name = getattr(features, 'polycyclic_name', None)
+    if polycyclic_name:
+        return _assemble_polycyclic_name(features, style)
+
+    # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
+    # Only reached if not a complex fused system
+    ring_type = getattr(features, 'ring_type', None)
+    if ring_type == 'heterocyclic':
+        return _assemble_heterocycle_name(features, style)
+
+    # Handle benzene derivatives
+    # Only reached if not a fused system containing benzene
+    if getattr(features, 'is_benzene', False):
+        return _assemble_benzene_name(features, style)
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
     if features.principal_group == 'nitrile' and features.is_cyclic:

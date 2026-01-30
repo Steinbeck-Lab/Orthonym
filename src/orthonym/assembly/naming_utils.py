@@ -13,6 +13,7 @@ All functions are pure: they accept locants as integers (not atom indices).
 The mapping from atom indices to locants is handled elsewhere.
 """
 
+import re
 from typing import List
 
 
@@ -256,6 +257,11 @@ def alpha_sort_key(substituent_name: str) -> str:
         'butyl'
     """
     text = substituent_name.lower()
+
+    # Strip leading locants (digits and commas followed by hyphen)
+    # e.g., "3-methyl" -> "methyl", "2,2-dimethyl" -> "dimethyl"
+    # This handles formatted prefix strings that include locants
+    text = re.sub(r'^[\d,]+-', '', text)
 
     # Handle hyphenated detachable prefixes: sec- and tert-
     for prefix in ("sec-", "tert-"):
