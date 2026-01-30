@@ -410,6 +410,58 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
+    # AZAINDOLES (pyrrolopyridines) - kinase inhibitor scaffolds
+    # =========================================================================
+
+    # 1H-Pyrrolo[2,3-b]pyridine (7-azaindole)
+    # Common scaffold in kinase inhibitors (vemurafenib class)
+    # IUPAC numbering similar to indole: 1-2-3-3a-4-5-6-7-7a
+    # Canonical: c1cnc2[nH]ccc2c1
+    'c1cnc2[nH]ccc2c1': {
+        'name': '1H-pyrrolo[2,3-b]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'azaindole',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+
+    # 1H-Pyrrolo[3,2-b]pyridine (4-azaindole)
+    # Canonical: c1cc2cc[nH]c2cn1
+    'c1cc2cc[nH]c2cn1': {
+        'name': '1H-pyrrolo[3,2-b]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'azaindole',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 5, 2: '4a', 3: 2, 4: 3, 5: 1, 6: '7a', 7: 7, 8: 4},
+    },
+
+    # =========================================================================
+    # CHROMENES (benzopyrans) - flavonoid scaffolds
+    # =========================================================================
+
+    # 2H-Chromene (2H-1-benzopyran)
+    # Oxygen at position 1, indicated H at position 2
+    # Canonical: C1=Cc2ccccc2OC1
+    'C1=Cc2ccccc2OC1': {
+        'name': '2H-chromene',
+        'tautomer_locant': 2,
+        'ring_system': 'benzopyran',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 4, 1: 3, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
+    },
+
+    # 4H-Chromene (4H-1-benzopyran)
+    # Oxygen at position 1, indicated H at position 4
+    # Canonical: C1=COc2ccccc2C1
+    'C1=COc2ccccc2C1': {
+        'name': '4H-chromene',
+        'tautomer_locant': 4,
+        'ring_system': 'benzopyran',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4},
+    },
+
+    # =========================================================================
     # PURINES AND PTERIDINES (nucleobase-related)
     # =========================================================================
 
