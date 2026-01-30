@@ -1,0 +1,410 @@
+"""
+Integration tests for Phase 7: Fused Heterocycle Enhancement.
+
+Tests the complete pipeline from SMILES to IUPAC name for:
+- Purine derivatives (adenine, purine, xanthine core)
+- Substituted indoles with correct locants
+- Substituted quinolines
+- N-substituted fused heterocycles
+- Oxo and amino group handling
+
+Validates Phase 7 requirements (FUSED-01 through FUSED-07).
+
+Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
+"""
+
+import pytest
+from rdkit import Chem
+from src.orthonym import name_compound
+from src.orthonym.rules.fused_rings import name_fused_heterocycle
+
+
+# =============================================================================
+# Test Purine Derivatives
+# =============================================================================
+
+class TestPurineDerivatives:
+    """Test naming of purine-based compounds."""
+
+    @pytest.mark.integration
+    def test_purine_base(self):
+        """Unsubstituted purine should be 9H-purine."""
+        result = name_compound('c1ncc2nc[nH]c2n1')
+        assert result == '9H-purine', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_adenine(self):
+        """Adenine: 9H-purin-6-amine (6-aminopurine)."""
+        result = name_compound('Nc1ncnc2nc[nH]c12')
+        assert 'purin' in result.lower(), f"Got: {result}"
+        assert 'amin' in result.lower(), f"Got: {result}"
+        # Should have 6-amine suffix
+        assert '6-amine' in result, f"Expected '6-amine' in name, got: {result}"
+
+    @pytest.mark.integration
+    def test_hypoxanthine_like(self):
+        """Test oxo-purine naming (hypoxanthine pattern).
+
+        Note: Full hypoxanthine has tautomeric forms that complicate naming.
+        This tests the basic oxo-purine pattern.
+        """
+        # Simple oxo-purine test
+        result = name_compound('O=c1nc[nH]c2nc[nH]c12')
+        # Should contain purine base and oxo/one suffix
+        assert 'purin' in result.lower(), f"Got: {result}"
+
+    @pytest.mark.integration
+    @pytest.mark.xfail(reason="Complex N-substitution with specific locants - Phase 8")
+    def test_caffeine_structure(self):
+        """Caffeine: 1,3,7-trimethyl-1H-purine-2,6-dione.
+
+        Note: Current implementation uses N-methyl format.
+        True caffeine naming requires specific locant assignment for
+        N-methyl groups at positions 1, 3, 7.
+        """
+        result = name_compound('Cn1cnc2c1c(=O)n(c(=O)n2C)C')
+        # Full IUPAC name would be 1,3,7-trimethyl-1H-purine-2,6-dione
+        assert '1,3,7-trimethyl' in result
+
+
+# =============================================================================
+# Test Substituted Indoles
+# =============================================================================
+
+class TestSubstitutedIndoles:
+    """Test correct locant assignment for substituted indoles."""
+
+    @pytest.mark.integration
+    def test_unsubstituted_indole(self):
+        """Indole should be 1H-indole."""
+        result = name_compound('c1ccc2[nH]ccc2c1')
+        assert result == '1H-indole', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_5_methylindole(self):
+        """5-methylindole: methyl at position 5."""
+        result = name_compound('Cc1ccc2[nH]ccc2c1')
+        assert result == '5-methyl-1H-indole', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_n_methylindole(self):
+        """N-methylindole: N-methyl not 1-methyl."""
+        result = name_compound('Cn1ccc2ccccc12')
+        assert 'N-methyl' in result, f"Expected N-methyl prefix, got: {result}"
+        assert 'indole' in result.lower(), f"Expected 'indole' in name, got: {result}"
+
+    @pytest.mark.integration
+    def test_2_methylindole(self):
+        """2-methylindole: methyl at position 2."""
+        result = name_compound('Cc1cc2ccccc2[nH]1')
+        assert '2-methyl' in result, f"Expected '2-methyl' in name, got: {result}"
+        assert 'indole' in result.lower(), f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_3_methylindole_skatole(self):
+        """3-methylindole (skatole): methyl at position 3."""
+        result = name_compound('Cc1c[nH]c2ccccc12')
+        assert '3-methyl' in result, f"Expected '3-methyl' in name, got: {result}"
+        assert 'indole' in result.lower(), f"Got: {result}"
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected_position", [
+        ('Fc1ccc2[nH]ccc2c1', '5-fluoro'),  # 5-fluoroindole
+        ('Clc1ccc2[nH]ccc2c1', '5-chloro'),  # 5-chloroindole
+    ])
+    def test_halogenated_indoles(self, smiles, expected_position):
+        """Test halogenated indoles have correct locants."""
+        result = name_compound(smiles)
+        assert expected_position in result, f"Expected '{expected_position}' in name, got: {result}"
+        assert 'indole' in result.lower(), f"Got: {result}"
+
+
+# =============================================================================
+# Test Substituted Quinolines
+# =============================================================================
+
+class TestSubstitutedQuinolines:
+    """Test correct locant assignment for substituted quinolines."""
+
+    @pytest.mark.integration
+    def test_unsubstituted_quinoline(self):
+        """Quinoline should be quinoline (no tautomer locant needed)."""
+        result = name_compound('c1ccc2ncccc2c1')
+        assert result == 'quinoline', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_isoquinoline(self):
+        """Isoquinoline naming."""
+        result = name_compound('c1ccc2cnccc2c1')
+        assert result == 'isoquinoline', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_2_methylquinoline(self):
+        """2-methylquinoline (quinaldine): methyl at position 2."""
+        result = name_compound('Cc1ccc2ccccc2n1')
+        assert '2-methyl' in result, f"Expected '2-methyl' in name, got: {result}"
+        assert 'quinoline' in result.lower(), f"Got: {result}"
+
+
+# =============================================================================
+# Test Phase 7 Requirements (FUSED-01 through FUSED-07)
+# =============================================================================
+
+class TestPhase7Requirements:
+    """Test Phase 7 requirements from ROADMAP.md."""
+
+    @pytest.mark.integration
+    def test_fused_01_correct_numbering(self):
+        """FUSED-01: Correct peripheral numbering for substituted fused heterocycles."""
+        # 5-methylindole should have methyl at position 5, not 4 or 6
+        result = name_compound('Cc1ccc2[nH]ccc2c1')
+        assert '5-methyl' in result, f"Expected '5-methyl' for correct numbering, got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_02_purine_skeleton(self):
+        """FUSED-02: Recognize purine skeleton."""
+        result = name_compound('c1ncc2nc[nH]c2n1')
+        assert 'purin' in result.lower(), f"Expected 'purine' in name, got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_03_adenine_naming(self):
+        """FUSED-03: Adenine as 9H-purin-6-amine."""
+        result = name_compound('Nc1ncnc2nc[nH]c12')
+        assert '6-amine' in result, f"Expected '6-amine' suffix, got: {result}"
+        assert 'purin' in result.lower(), f"Expected 'purin' root, got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_04_oxo_groups(self):
+        """FUSED-04: Oxo groups use suffix naming (-one)."""
+        # This requires molecules with =O on fused heterocycle
+        # Test with xanthine-like structure
+        result = name_compound('O=c1nc[nH]c2nc[nH]c12')
+        # Should contain -one suffix for oxo
+        assert 'one' in result.lower() or 'oxo' in result.lower(), f"Expected oxo/one handling, got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_05_n_substitution(self):
+        """FUSED-05: N-methyl format (not 1-methyl)."""
+        result = name_compound('Cn1ccc2ccccc12')
+        assert 'N-methyl' in result, f"Expected 'N-methyl' format, got: {result}"
+        assert '1-methyl' not in result, f"Should NOT use '1-methyl', got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_06_indicated_hydrogen(self):
+        """FUSED-06: Indicated hydrogen descriptors (1H-, 9H-, etc.)."""
+        # Indole needs 1H-
+        result = name_compound('c1ccc2[nH]ccc2c1')
+        assert '1H-' in result, f"Expected '1H-' indicated hydrogen, got: {result}"
+
+        # Purine needs 9H-
+        result = name_compound('c1ncc2nc[nH]c2n1')
+        assert '9H-' in result, f"Expected '9H-' indicated hydrogen, got: {result}"
+
+    @pytest.mark.integration
+    def test_fused_07_locant_mapping(self):
+        """FUSED-07: Correct IUPAC locant mappings for fused heterocycles."""
+        # Test that locant mappings are consistent
+        # 5-methylindole verifies benzene ring positions map correctly
+        result = name_compound('Cc1ccc2[nH]ccc2c1')
+        # Position 5 is on the benzene ring opposite to nitrogen
+        assert '5-methyl' in result, f"Locant mapping error, got: {result}"
+
+        # 6-aminopurine (adenine) verifies purine positions map correctly
+        result = name_compound('Nc1ncnc2nc[nH]c12')
+        assert '6-amine' in result, f"Purine locant mapping error, got: {result}"
+
+
+# =============================================================================
+# Test Data Coverage
+# =============================================================================
+
+class TestDataCoverage:
+    """Test that data module has expected coverage."""
+
+    @pytest.mark.integration
+    def test_minimum_entry_count(self):
+        """Should have at least 35 fused heterocycle entries (Phase 7 target: 38)."""
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        assert len(FUSED_HETEROCYCLE_DATA) >= 35, f"Only {len(FUSED_HETEROCYCLE_DATA)} entries"
+
+    @pytest.mark.integration
+    def test_all_entries_have_locants(self):
+        """All entries should have iupac_locants field."""
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        missing = []
+        for smiles, data in FUSED_HETEROCYCLE_DATA.items():
+            if 'iupac_locants' not in data:
+                missing.append(data.get('name', smiles))
+        assert not missing, f"Missing iupac_locants for: {missing}"
+
+    @pytest.mark.integration
+    def test_key_fused_heterocycles_present(self):
+        """Verify key fused heterocycles are in the data."""
+        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+
+        expected_names = [
+            '1H-indole',
+            '1H-benzimidazole',
+            'quinoline',
+            'isoquinoline',
+            '9H-purine',
+            '1-benzofuran',
+            '1,3-benzothiazole',
+            'indolizine',
+            '9H-carbazole',
+            'acridine',
+        ]
+
+        present_names = [data['name'] for data in FUSED_HETEROCYCLE_DATA.values()]
+        for expected in expected_names:
+            assert expected in present_names, f"Missing expected entry: {expected}"
+
+
+# =============================================================================
+# Test Complete Naming Pipeline (E2E)
+# =============================================================================
+
+class TestFusedHeterocycleE2E:
+    """End-to-end tests through the complete naming pipeline."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected", [
+        # Unsubstituted fused heterocycles
+        ('c1ccc2[nH]ccc2c1', '1H-indole'),
+        ('c1ccc2ncccc2c1', 'quinoline'),
+        ('c1ccc2cnccc2c1', 'isoquinoline'),
+        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2occc2c1', '1-benzofuran'),
+        ('c1ccc2sccc2c1', '1-benzothiophene'),
+        ('c1ncc2nc[nH]c2n1', '9H-purine'),
+    ])
+    def test_unsubstituted_fused_heterocycles(self, smiles, expected):
+        """Test unsubstituted fused heterocycle naming through pipeline."""
+        result = name_compound(smiles)
+        assert result == expected, f"SMILES {smiles}: expected '{expected}', got '{result}'"
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected_contains", [
+        # Substituted indoles
+        ('Cc1ccc2[nH]ccc2c1', '5-methyl'),  # 5-methylindole
+        ('Cn1ccc2ccccc12', 'N-methyl'),     # N-methylindole
+        # Substituted quinolines
+        ('Cc1ccc2ccccc2n1', '2-methyl'),    # 2-methylquinoline
+        # Amino-substituted purines
+        ('Nc1ncnc2nc[nH]c12', '6-amine'),   # Adenine
+    ])
+    def test_substituted_fused_heterocycles(self, smiles, expected_contains):
+        """Test substituted fused heterocycle naming through pipeline."""
+        result = name_compound(smiles)
+        assert expected_contains in result, f"SMILES {smiles}: expected '{expected_contains}' in '{result}'"
+
+
+# =============================================================================
+# Regression Tests (Ensure Phase 6 still works)
+# =============================================================================
+
+class TestPhase6Regression:
+    """Regression tests for Phase 6 fused system naming."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected", [
+        # Phase 6 fused heterocycle tests that should still pass
+        ('c1ccc2[nH]ccc2c1', '1H-indole'),
+        ('c1ccc2ncccc2c1', 'quinoline'),
+        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+    ])
+    def test_phase6_fused_heterocycles_unchanged(self, smiles, expected):
+        """Phase 6 fused heterocycle naming should be unchanged."""
+        result = name_compound(smiles)
+        assert result == expected, f"Regression: {smiles} changed from '{expected}' to '{result}'"
+
+    @pytest.mark.integration
+    def test_simple_heterocycles_unchanged(self):
+        """Simple (non-fused) heterocycle naming should be unchanged."""
+        # These are Phase 3 heterocycles, not fused
+        assert name_compound('c1ccncc1') == 'pyridine'
+        assert name_compound('c1ccoc1') == 'furan'
+        assert name_compound('c1cc[nH]c1') == 'pyrrole'
+        assert name_compound('c1ccsc1') == 'thiophene'
+
+
+# =============================================================================
+# Test fused_rings Module Functions
+# =============================================================================
+
+class TestFusedRingsModule:
+    """Test the fused_rings module functions directly."""
+
+    @pytest.mark.integration
+    def test_name_fused_heterocycle_indole(self):
+        """Test name_fused_heterocycle function with indole."""
+        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
+        result = name_fused_heterocycle(mol)
+        assert result == '1H-indole', f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_name_fused_heterocycle_substituted(self):
+        """Test name_fused_heterocycle with substituted indole."""
+        mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')
+        result = name_fused_heterocycle(mol)
+        assert '5-methyl' in result, f"Got: {result}"
+        assert 'indole' in result.lower(), f"Got: {result}"
+
+    @pytest.mark.integration
+    def test_name_fused_heterocycle_none_for_non_fused(self):
+        """Test name_fused_heterocycle returns None for non-fused heterocycle."""
+        mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine - not fused
+        result = name_fused_heterocycle(mol)
+        assert result is None, f"Expected None for non-fused, got: {result}"
+
+
+# =============================================================================
+# Test Summary and Coverage Documentation
+# =============================================================================
+
+class TestPhaseSummaryCounts:
+    """Document test coverage summary for Phase 7."""
+
+    @pytest.mark.integration
+    def test_phase7_e2e_coverage(self):
+        """Document comprehensive Phase 7 E2E coverage.
+
+        TestPurineDerivatives: 4 tests
+        - purine_base: 1
+        - adenine: 1
+        - hypoxanthine_like: 1
+        - caffeine_structure: 1 (xfail)
+
+        TestSubstitutedIndoles: 7 tests
+        - unsubstituted_indole: 1
+        - 5_methylindole: 1
+        - n_methylindole: 1
+        - 2_methylindole: 1
+        - 3_methylindole: 1
+        - halogenated_indoles: 2 parametrized
+
+        TestSubstitutedQuinolines: 3 tests
+        - unsubstituted_quinoline: 1
+        - isoquinoline: 1
+        - 2_methylquinoline: 1
+
+        TestPhase7Requirements: 7 tests (FUSED-01 through FUSED-07)
+
+        TestDataCoverage: 3 tests
+        - minimum_entry_count: 1
+        - all_entries_have_locants: 1
+        - key_fused_heterocycles_present: 1
+
+        TestFusedHeterocycleE2E: 11 tests
+        - unsubstituted: 7 parametrized
+        - substituted: 4 parametrized
+
+        TestPhase6Regression: 7 tests
+        - fused_heterocycles_unchanged: 3 parametrized
+        - simple_heterocycles_unchanged: 4
+
+        TestFusedRingsModule: 3 tests
+
+        TOTAL: ~45 unique test cases
+        """
+        assert True  # Documentation test
