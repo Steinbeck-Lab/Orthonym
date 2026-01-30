@@ -2,8 +2,11 @@
 Polycyclic aromatic hydrocarbon (PAH) naming rules.
 
 Handles identification and naming of common polycyclic aromatics:
-- naphthalene, anthracene, phenanthrene, pyrene
-- fluorene, acenaphthene, acenaphthylene, chrysene
+- Bicyclic: naphthalene
+- Tricyclic: anthracene, phenanthrene, fluorene, acenaphthene, acenaphthylene
+- Tetracyclic: pyrene, chrysene, tetracene, triphenylene, benz[a]anthracene, benzo[c]phenanthrene
+- Pentacyclic: pentacene, perylene, benzo[a]pyrene
+- Hexacyclic+: coronene
 
 Also coordinates with fused_rings module for fused heterocyclic systems.
 
@@ -16,6 +19,10 @@ IUPAC 2013 Rules (Blue Book Section P-25):
 Key difference from benzene:
 - Benzene substituent numbering uses lowest locants
 - PAH numbering is fixed to the standard IUPAC orientation
+
+PAH Classification:
+- Ortho-fused: linear PAHs like naphthalene, anthracene, tetracene, pentacene
+- Peri-condensed: PAHs with interior atoms like pyrene, perylene, coronene
 
 Integration with fused_rings.py:
 - This module handles carbocyclic PAHs (naphthalene, anthracene, etc.)
@@ -31,6 +38,8 @@ from ..data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
     is_polycyclic_aromatic,
+    match_polycyclic_core,
+    get_pah_core_atoms,
 )
 from ..assembly.naming_utils import (
     format_substituent_prefix,
@@ -656,6 +665,164 @@ def _join_pah_prefixes(prefixes: List[str]) -> str:
         result += current
 
     return result
+
+
+def get_pah_substituent_locants(
+    mol,
+    core_match: Dict[int, int]
+) -> Dict[int, str]:
+    """
+    Find atoms not in the PAH core and map them to IUPAC locants.
+
+    For substituted PAHs, identifies substituent atoms and maps them
+    to their attachment point locants.
+
+    Args:
+        mol: RDKit Mol object
+        core_match: Dict mapping atom index to IUPAC locant (from match_polycyclic_core)
+
+    Returns:
+        Dict mapping IUPAC locant -> substituent name
+
+    Example:
+        >>> from rdkit import Chem
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')  # 2-methylnaphthalene
+        >>> from src.orthonym.data.polycyclic_data import match_polycyclic_core
+        >>> _, core_match = match_polycyclic_core(mol)
+        >>> get_pah_substituent_locants(mol, core_match)
+        {2: 'methyl'}
+    """
+    core_atoms = set(core_match.keys())
+    result = {}
+
+    for atom_idx in core_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        locant = core_match[atom_idx]
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in core_atoms:
+                # This is a substituent
+                sub_info = _identify_pah_substituent(mol, nbr_idx, core_atoms)
+                if sub_info:
+                    result[locant] = sub_info['name']
+
+    return result
+
+
+def is_peri_condensed(mol) -> bool:
+    """
+    Detect peri-condensed PAH systems.
+
+    Peri-condensed PAHs have interior atoms (not on the periphery) that are
+    shared by more than two rings. Examples include pyrene, perylene, and coronene.
+
+    In full IUPAC numbering, these interior atoms may have letter suffixes
+    (like 4a, 8a in naphthalene for fusion atoms, but more complex in peri systems).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if the molecule is a peri-condensed PAH
+
+    Examples:
+        >>> from rdkit import Chem
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> is_peri_condensed(mol)
+        False
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> is_peri_condensed(mol)
+        True
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61')  # coronene
+        >>> is_peri_condensed(mol)
+        True
+    """
+    # Peri-condensed PAHs have atoms shared by MORE than 2 rings
+    # Ortho-fused PAHs only have atoms shared by exactly 2 rings
+
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    if len(atom_rings) < 3:
+        return False  # Need at least 3 rings for peri-condensation
+
+    # Count how many rings each atom belongs to
+    atom_ring_count = defaultdict(int)
+    for ring in atom_rings:
+        for atom_idx in ring:
+            atom_ring_count[atom_idx] += 1
+
+    # Check for atoms in 3 or more rings (peri-condensation)
+    for count in atom_ring_count.values():
+        if count >= 3:
+            return True
+
+    return False
+
+
+def get_pah_type(mol) -> str:
+    """
+    Classify PAH as ortho-fused, peri-condensed, or not a PAH.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        'peri-condensed': PAH with interior atoms shared by 3+ rings
+        'ortho-fused': Linear PAH with only edge fusion
+        'not-pah': Not a polycyclic aromatic hydrocarbon
+
+    Examples:
+        >>> from rdkit import Chem
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
+        >>> get_pah_type(mol)
+        'ortho-fused'
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> get_pah_type(mol)
+        'peri-condensed'
+    """
+    pah_name = identify_polycyclic(mol)
+    if not pah_name:
+        return 'not-pah'
+
+    if is_peri_condensed(mol):
+        return 'peri-condensed'
+
+    return 'ortho-fused'
+
+
+def name_polycyclic(mol) -> Optional[str]:
+    """
+    Generate IUPAC name for a polycyclic aromatic hydrocarbon.
+
+    Main entry point for PAH naming. Handles both unsubstituted and
+    substituted PAHs including all extended systems.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        IUPAC name string if PAH identified, None otherwise
+
+    Examples:
+        >>> from rdkit import Chem
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
+        >>> name_polycyclic(mol)
+        'naphthalene'
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1')
+        >>> name_polycyclic(mol)
+        '2-methylnaphthalene'
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
+        >>> name_polycyclic(mol)
+        'pyrene'
+    """
+    pah_name = identify_polycyclic(mol)
+    if not pah_name:
+        return None
+
+    substituents = get_polycyclic_substituents(mol, pah_name)
+    return name_substituted_polycyclic(mol, pah_name, substituents)
 
 
 # ============================================================================
