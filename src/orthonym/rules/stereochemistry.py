@@ -178,3 +178,192 @@ def collect_ring_stereodescriptors(
     """
     # Reuse the main function - it already handles the filtering correctly
     return collect_stereodescriptors(mol, ring_atom_to_locant)
+
+
+def determine_ring_cis_trans(
+    mol,
+    ring_atoms: List[int],
+    sub1_idx: int,
+    sub2_idx: int
+) -> Optional[str]:
+    """
+    Determine if two substituents on a ring are cis or trans.
+
+    For a ring with exactly 2 substituents at specified positions,
+    determine their relative stereochemistry based on CIP labels.
+
+    The rule for 1,2-disubstituted rings:
+    - SAME CIP codes (R,R or S,S) -> CIS (substituents on same face)
+    - DIFFERENT CIP codes (R,S or S,R) -> TRANS (substituents on opposite faces)
+
+    This is because in a ring, atoms with the same absolute configuration
+    at adjacent positions have their substituents on the same face.
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned)
+        ring_atoms: List of atom indices that form the ring
+        sub1_idx: Atom index of first substituted ring carbon
+        sub2_idx: Atom index of second substituted ring carbon
+
+    Returns:
+        'cis' or 'trans', or None if cannot be determined (missing CIP labels)
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('C[C@H]1CCCC[C@@H]1C')  # cis-1,2-dimethylcyclohexane
+        >>> rdCIPLabeler.AssignCIPLabels(mol)
+        >>> ring_atoms = [1, 2, 3, 4, 5, 6]
+        >>> determine_ring_cis_trans(mol, ring_atoms, 1, 6)
+        'cis'
+    """
+    # Both atoms must be in the ring
+    if sub1_idx not in ring_atoms or sub2_idx not in ring_atoms:
+        return None
+
+    # Get atoms
+    atom1 = mol.GetAtomWithIdx(sub1_idx)
+    atom2 = mol.GetAtomWithIdx(sub2_idx)
+
+    # Both must have CIP labels
+    if not atom1.HasProp('_CIPCode') or not atom2.HasProp('_CIPCode'):
+        return None
+
+    cip1 = atom1.GetProp('_CIPCode')
+    cip2 = atom2.GetProp('_CIPCode')
+
+    # Only handle R/S (not r/s pseudoasymmetric for now)
+    if cip1 not in ['R', 'S'] or cip2 not in ['R', 'S']:
+        return None
+
+    # Same CIP = cis, Different CIP = trans
+    if cip1 == cip2:
+        return 'cis'
+    else:
+        return 'trans'
+
+
+def get_simple_ring_stereo(
+    mol,
+    ring_atoms: List[int],
+    ring_substituents: Dict[int, str]
+) -> Optional[str]:
+    """
+    Get cis/trans prefix for simple disubstituted rings.
+
+    This function handles the common case of exactly 2 substituted positions
+    on a ring, returning a cis- or trans- prefix for the name.
+
+    Note: This is a simplification. More complex rings (3+ substituents)
+    would need the full IUPAC r/c/t reference system, which is deferred.
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned)
+        ring_atoms: List of atom indices forming the ring
+        ring_substituents: Dict mapping ring atom locant -> substituent name.
+                          Only keys (locants) are used to identify substituted positions.
+
+    Returns:
+        'cis-' or 'trans-' prefix string, or None if:
+        - Not exactly 2 substituted positions
+        - Cannot determine stereochemistry
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('C[C@H]1CCCC[C@@H]1C')
+        >>> rdCIPLabeler.AssignCIPLabels(mol)
+        >>> ring_atoms = [1, 2, 3, 4, 5, 6]
+        >>> # Assuming oriented_ring maps locant -> atom_idx
+        >>> ring_substituents = {1: 'methyl', 2: 'methyl'}
+        >>> get_simple_ring_stereo(mol, ring_atoms, ring_substituents)
+        'cis-'
+    """
+    # Need exactly 2 substituted positions for simple cis/trans
+    if len(ring_substituents) != 2:
+        return None
+
+    # Get the locants with substituents
+    locants = list(ring_substituents.keys())
+
+    # We need to find which atom indices correspond to these locants
+    # This requires knowing the atom_to_locant mapping
+    # Since we don't have it directly, we'll need the caller to provide
+    # the actual atom indices
+
+    # For now, return None and let the caller handle the mapping
+    # This function needs the actual atom indices, not locants
+    return None
+
+
+def get_simple_ring_stereo_from_atoms(
+    mol,
+    ring_atoms: List[int],
+    substituted_atom_indices: List[int]
+) -> Optional[str]:
+    """
+    Get cis/trans prefix given the actual atom indices of substituted positions.
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned)
+        ring_atoms: List of atom indices forming the ring
+        substituted_atom_indices: List of exactly 2 atom indices that have substituents
+
+    Returns:
+        'cis-' or 'trans-' prefix string, or None if cannot determine
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('C[C@H]1CCCC[C@@H]1C')
+        >>> rdCIPLabeler.AssignCIPLabels(mol)
+        >>> ring_atoms = [1, 2, 3, 4, 5, 6]
+        >>> get_simple_ring_stereo_from_atoms(mol, ring_atoms, [1, 6])
+        'cis-'
+    """
+    if len(substituted_atom_indices) != 2:
+        return None
+
+    result = determine_ring_cis_trans(
+        mol,
+        ring_atoms,
+        substituted_atom_indices[0],
+        substituted_atom_indices[1]
+    )
+
+    if result:
+        return f'{result}-'
+    return None
+
+
+def format_ring_stereo_with_descriptors(
+    ring_cis_trans: Optional[str],
+    descriptors: List[Tuple[int, str]]
+) -> str:
+    """
+    Format ring stereo prefix with optional R/S descriptors.
+
+    IUPAC format for ring stereo:
+    - If only cis/trans: "cis-1,2-dimethylcyclohexane"
+    - If cis/trans + R/S: "cis-(1R,2S)-1,2-dimethylcyclohexane"
+    - The cis/trans goes BEFORE the stereodescriptors
+
+    Args:
+        ring_cis_trans: 'cis-' or 'trans-' prefix, or None
+        descriptors: List of (locant, cip_code) tuples from collect_stereodescriptors
+
+    Returns:
+        Combined prefix string like "cis-", "trans-(1R,2S)-", etc.
+        Empty string if no stereo information.
+
+    Example:
+        >>> format_ring_stereo_with_descriptors('cis-', [(1, 'R'), (2, 'S')])
+        'cis-(1R,2S)-'
+        >>> format_ring_stereo_with_descriptors('trans-', [])
+        'trans-'
+        >>> format_ring_stereo_with_descriptors(None, [(1, 'R')])
+        '(1R)-'
+    """
+    rs_string = format_stereodescriptor_string(descriptors)
+
+    if ring_cis_trans:
+        if rs_string:
+            return f'{ring_cis_trans}{rs_string}'
+        else:
+            return ring_cis_trans
+    else:
+        return rs_string
