@@ -471,14 +471,24 @@ def _assemble_fused_heterocycle_name(
     """
     Assemble the complete name for a substituted fused heterocycle.
 
+    Handles suffix-forming groups (oxo -> -one, amino -> -amine) as well as
+    prefix substituents. For IUPAC 2013 PIN style, functional groups like
+    amino and oxo use suffix naming when they are the principal characteristic
+    group.
+
     Args:
         mol: RDKit Mol object
-        core_name: Base name (e.g., '1H-indole')
+        core_name: Base name (e.g., '1H-indole', '9H-purine')
         substituents: Dict from get_fused_heterocycle_substituents
         atom_mapping: Dict mapping mol atom indices to IUPAC locants
 
     Returns:
         Complete IUPAC name string
+
+    Examples:
+        Adenine: '7H-purin-6-amine'
+        Hypoxanthine: '7H-purin-6-one'
+        Xanthine: '7H-purine-2,6-dione'
     """
     prefix_parts = []
 
@@ -512,7 +522,109 @@ def _assemble_fused_heterocycle_name(
     # Join prefixes
     prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
 
+    # Handle suffix-forming groups (oxo and amino)
+    # Build suffix from oxo (-one) and amino (-amine)
+    suffix_str = _build_fused_suffix(substituents, core_name)
+
+    if suffix_str:
+        # Apply suffix to core name with vowel elision
+        modified_core = _apply_suffix_to_core(core_name, suffix_str)
+        return f"{prefix_str}{modified_core}"
+
     return f"{prefix_str}{core_name}"
+
+
+def _build_fused_suffix(substituents: Dict, core_name: str) -> str:
+    """
+    Build suffix string for oxo (-one) and amino (-amine) groups.
+
+    For IUPAC 2013, when amino or oxo are present, they use suffix naming.
+    Amino takes precedence (higher seniority) over oxo for suffix position.
+
+    Args:
+        substituents: Dict with 'oxo_substituents' and 'amino_substituents'
+        core_name: Base name for context
+
+    Returns:
+        Suffix string like '-6-amine' or '-2,6-dione' or '' if no suffix groups
+    """
+    suffix_parts = []
+
+    # Amino has higher seniority than oxo in IUPAC
+    # When both present, amino is suffix, oxo becomes prefix
+    # For simplicity, handle amino as suffix first
+
+    amino_locants = substituents.get('amino_substituents', [])
+    oxo_locants = substituents.get('oxo_substituents', [])
+
+    if amino_locants:
+        # Amino suffix: -amine, -diamine, etc.
+        suffix_parts.append(_format_suffix('amine', amino_locants))
+
+    if oxo_locants:
+        # If amino is present, oxo should be prefix (handled elsewhere)
+        # If no amino, oxo is suffix: -one, -dione, etc.
+        if not amino_locants:
+            suffix_parts.append(_format_suffix('one', oxo_locants))
+        # Note: When amino is suffix, oxo should be "oxo" prefix
+        # This would require more complex logic; for now, just use suffix
+
+    return ''.join(suffix_parts)
+
+
+def _format_suffix(suffix_base: str, locants: List) -> str:
+    """
+    Format a suffix with locants and multiplier.
+
+    Args:
+        suffix_base: Base suffix ('amine', 'one')
+        locants: List of locants
+
+    Returns:
+        Formatted suffix like '-6-amine' or '-2,6-dione'
+    """
+    count = len(locants)
+    locant_str = ','.join(str(loc) for loc in locants)
+
+    if count == 1:
+        return f"-{locant_str}-{suffix_base}"
+    else:
+        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+        return f"-{locant_str}-{multiplier}{suffix_base}"
+
+
+def _apply_suffix_to_core(core_name: str, suffix: str) -> str:
+    """
+    Apply suffix to core name with vowel elision.
+
+    IUPAC rules require vowel elision when suffix begins with vowel
+    and parent name ends in 'e' (or other vowel).
+
+    Examples:
+        purine + -amine -> purin-6-amine (elide final 'e')
+        indole + -one -> indol-3-one (elide final 'e')
+
+    Args:
+        core_name: Base name like '9H-purine' or '1H-indole'
+        suffix: Suffix like '-6-amine' or '-3-one'
+
+    Returns:
+        Modified name with suffix applied
+    """
+    # Check if suffix starts with vowel (after the hyphen-locant-hyphen)
+    # Suffix is like '-6-amine', the actual suffix starts after the locant part
+    suffix_starts_with_vowel = False
+    for part in suffix.split('-'):
+        if part and part[0] in 'aeiou':
+            suffix_starts_with_vowel = True
+            break
+
+    # Check if core ends in 'e' (common case for elision)
+    if core_name.endswith('e') and suffix_starts_with_vowel:
+        # Elide the final 'e'
+        return core_name[:-1] + suffix
+
+    return core_name + suffix
 
 
 def _format_n_prefix(name: str, count: int) -> str:
