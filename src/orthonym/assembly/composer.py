@@ -159,8 +159,8 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     prefixes = _generate_prefixes(features)
     fragments.extend(prefixes)
 
-    # Generate stereodescriptors
-    if features.stereocenters:
+    # Generate stereodescriptors (for R/S stereocenters and E/Z double bonds)
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
         stereo = _generate_stereodescriptors(features)
         if stereo:
             fragments.append(stereo)
@@ -870,21 +870,58 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
 
 def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
-    """Generate stereodescriptor prefix."""
-    if not features.stereocenters:
+    """
+    Generate stereodescriptor prefix using correct IUPAC locants.
+
+    Uses the stereochemistry rules module to collect R/S and E/Z descriptors
+    based on the atom_to_locant mapping (from chain/ring orientation).
+
+    For different compound types:
+    - Acyclic: uses features.atom_to_locant (from principal chain orientation)
+    - Heterocycles: uses features.heterocycle_atom_to_locant
+    - Cycloalkanes/cycloalkenes: builds from features.oriented_ring
+
+    Args:
+        features: MolecularFeatures object with stereocenters and/or double_bond_stereo
+
+    Returns:
+        NameFragment with stereodescriptor prefix like "(2R)-" or "(2E,3R)-",
+        or None if no stereodescriptors.
+    """
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    # Need either stereocenters or double_bond_stereo
+    if not features.stereocenters and not getattr(features, 'double_bond_stereo', None):
         return None
-    
-    descriptors = []
-    for center in features.stereocenters:
-        # TODO: Calculate proper locant from chain/ring numbering
-        locant = center['idx'] + 1  # Placeholder: 1-indexed atom index
-        cip = center['cip']
-        descriptors.append(f"{locant}{cip}")
-    
+
+    mol = features.mol
+
+    # Determine which atom_to_locant mapping to use
+    # For acyclic: features.atom_to_locant (from chain orientation)
+    # For rings: features.heterocycle_atom_to_locant or build from oriented_ring
+    atom_to_locant = features.atom_to_locant
+
+    # For heterocycles, use ring-specific mapping
+    if getattr(features, 'heterocycle_atom_to_locant', None):
+        atom_to_locant = features.heterocycle_atom_to_locant
+    elif getattr(features, 'oriented_ring', None):
+        # Build mapping from oriented_ring for cycloalkanes/cycloalkenes
+        # oriented_ring is a list of atom indices in ring order starting at position 1
+        # This creates ring_atom_to_locant: {atom_idx: ring_locant} where locants are 1-indexed
+        atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(features.oriented_ring)}
+
+    if not atom_to_locant:
+        return None
+
+    # Collect stereodescriptors with proper locants
+    descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
     if not descriptors:
         return None
-    
-    text = f"({','.join(descriptors)})-"
+
+    # Format as "(2R,3S)-" etc
+    text = format_stereodescriptor_string(descriptors)
+
     return NameFragment(text=text, fragment_type="stereo")
 
 
