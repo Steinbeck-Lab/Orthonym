@@ -60,35 +60,47 @@ def get_stereocenters(mol) -> List[Dict]:
 def get_double_bond_stereo(mol) -> List[Dict]:
     """
     Get E/Z configuration of double bonds.
-    
+
+    Uses the _CIPCode property set by rdCIPLabeler as the primary source
+    (more reliable than BondStereo for complex molecules), with fallback
+    to BondStereo enum values.
+
     Args:
-        mol: RDKit Mol object (stereochemistry should be assigned)
-        
+        mol: RDKit Mol object (stereochemistry should be assigned via
+             rdCIPLabeler.AssignCIPLabels BEFORE calling this function)
+
     Returns:
         List of dicts with keys:
         - idx: bond index
         - stereo: 'E' or 'Z'
         - atoms: (begin_atom_idx, end_atom_idx)
     """
-    assign_stereochemistry(mol)
-    
     stereo_bonds = []
     for bond in mol.GetBonds():
         if bond.GetBondType() == Chem.BondType.DOUBLE:
-            stereo = bond.GetStereo()
-            if stereo == Chem.BondStereo.STEREOE:
+            stereo_label = None
+
+            # Primary: check _CIPCode property set by rdCIPLabeler
+            if bond.HasProp('_CIPCode'):
+                cip_code = bond.GetProp('_CIPCode')
+                if cip_code in ('E', 'Z'):
+                    stereo_label = cip_code
+
+            # Fallback: check BondStereo enum
+            if stereo_label is None:
+                bond_stereo = bond.GetStereo()
+                if bond_stereo == Chem.BondStereo.STEREOE:
+                    stereo_label = 'E'
+                elif bond_stereo == Chem.BondStereo.STEREOZ:
+                    stereo_label = 'Z'
+
+            if stereo_label:
                 stereo_bonds.append({
                     'idx': bond.GetIdx(),
-                    'stereo': 'E',
+                    'stereo': stereo_label,
                     'atoms': (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
                 })
-            elif stereo == Chem.BondStereo.STEREOZ:
-                stereo_bonds.append({
-                    'idx': bond.GetIdx(),
-                    'stereo': 'Z',
-                    'atoms': (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
-                })
-    
+
     return stereo_bonds
 
 

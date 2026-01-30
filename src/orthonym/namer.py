@@ -13,11 +13,12 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
 from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring
-from .perception.stereo import assign_stereochemistry, get_stereocenters
+from .perception.stereo import assign_stereochemistry, get_stereocenters, get_double_bond_stereo
 from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
 from .assembly.composer import assemble_name
@@ -185,11 +186,16 @@ class Orthonym:
         # Detect multiple bonds
         features.double_bonds = self._find_double_bonds(mol)
         features.triple_bonds = self._find_triple_bonds(mol)
-        
-        # Assign and extract stereochemistry
-        assign_stereochemistry(mol)
+
+        # Assign CIP stereochemistry labels BEFORE extracting stereo info
+        # rdCIPLabeler sets _CIPCode on atoms (R/S) and bonds (E/Z)
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # Extract stereochemistry (now depends on _CIPCode being set)
+        assign_stereochemistry(mol)  # Additional cleanup/assignment
         features.stereocenters = get_stereocenters(mol)
-        
+        features.double_bond_stereo = get_double_bond_stereo(mol)
+
         return features
     
     def _classify(self, features: MolecularFeatures) -> None:
