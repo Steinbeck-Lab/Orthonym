@@ -363,6 +363,53 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
+    # IMIDAZOPYRIDINES (pharmaceutical scaffolds)
+    # Common in drug molecules: zolpidem, alpidem class
+    # =========================================================================
+
+    # Imidazo[1,2-a]pyridine: N-bridgehead system (most common)
+    # IUPAC: 1(N)-2(C)-3(C)-4(N bridgehead)-5-6-7-8(pyridine)-8a(fusion)
+    # Canonical: c1ccn2ccnc2c1
+    'c1ccn2ccnc2c1': {
+        'name': 'imidazo[1,2-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
+    },
+
+    # Imidazo[1,5-a]pyridine: N-bridgehead system (different fusion)
+    # Canonical: c1ccn2cncc2c1
+    'c1ccn2cncc2c1': {
+        'name': 'imidazo[1,5-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
+    },
+
+    # 3H-Imidazo[4,5-b]pyridine: 3-deazapurine analog
+    # Has NH at position 3
+    # Canonical: c1cnc2[nH]cnc2c1
+    'c1cnc2[nH]cnc2c1': {
+        'name': '3H-imidazo[4,5-b]pyridine',
+        'tautomer_locant': 3,
+        'ring_system': 'imidazopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '7a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 4},
+    },
+
+    # 3H-Imidazo[4,5-c]pyridine: another 3-deazapurine analog
+    # Canonical: c1cc2nc[nH]cc-2n1
+    'c1cc2nc[nH]cc-2n1': {
+        'name': '3H-imidazo[4,5-c]pyridine',
+        'tautomer_locant': 3,
+        'ring_system': 'imidazopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
+    },
+
+    # =========================================================================
     # PURINES AND PTERIDINES (nucleobase-related)
     # =========================================================================
 
