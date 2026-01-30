@@ -461,3 +461,119 @@ class TestEdgeCases:
         mol = Chem.MolFromSmiles('c1ccc2nc3ccccc3nc2c1')  # phenazine
         name = name_fused_heterocycle(mol)
         assert name == 'phenazine'
+
+
+# ============================================================================
+# Test oxo (=O) and amino (-NH2) handling on fused heterocycles
+# ============================================================================
+
+class TestOxoAminoFusedHeterocycles:
+    """Tests for oxo (=O) and amino (-NH2) handling on fused heterocycles.
+
+    These tests verify the suffix-style naming for oxo (-one) and amino (-amine)
+    groups on fused heterocycles like purines.
+
+    IUPAC 2013 PIN style:
+    - Adenine: 7H-purin-6-amine (amino suffix)
+    - Hypoxanthine: 7H-purin-6-one (oxo suffix)
+    - Xanthine: 7H-purine-2,6-dione (multiple oxo)
+    """
+
+    @pytest.mark.unit
+    def test_adenine_naming(self):
+        """Adenine should be named containing 'purin' and 'amine'."""
+        mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
+        name = name_fused_heterocycle(mol)
+        assert name is not None
+        assert 'purin' in name.lower()
+        assert 'amin' in name.lower()
+
+    @pytest.mark.unit
+    def test_adenine_suffix_form(self):
+        """Adenine should use suffix form '-amine' not prefix 'amino'."""
+        mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
+        name = name_fused_heterocycle(mol)
+        assert name is not None
+        # Should be suffix form: purin-6-amine (not 6-amino-purine)
+        assert 'amine' in name.lower()
+        # Vowel elision: purine -> purin before -amine
+        assert 'purin-' in name.lower() or 'purin-6' in name.lower()
+
+    @pytest.mark.unit
+    def test_hypoxanthine_naming(self):
+        """Hypoxanthine should be named with -one suffix."""
+        mol = Chem.MolFromSmiles('O=c1[nH]cnc2nc[nH]c12')
+        name = name_fused_heterocycle(mol)
+        assert name is not None
+        assert 'purin' in name.lower()
+        assert 'one' in name.lower()
+
+    @pytest.mark.unit
+    def test_oxo_detection(self):
+        """Verify oxo group (C=O) is correctly identified."""
+        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+        # Hypoxanthine structure
+        mol = Chem.MolFromSmiles('O=c1[nH]cnc2nc[nH]c12')
+        # O is at index 0, core atoms are 1-9
+        core_atoms = {1, 2, 3, 4, 5, 6, 7, 8, 9}
+        result = _identify_fused_substituent(mol, 0, core_atoms)
+        assert result is not None
+        assert result['type'] == 'oxo'
+        assert result['name'] == 'oxo'
+
+    @pytest.mark.unit
+    def test_amino_detection(self):
+        """Verify amino group (-NH2) is correctly identified."""
+        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+        # Adenine structure
+        mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
+        # N(amino) is at index 0, core atoms are 1-9
+        core_atoms = {1, 2, 3, 4, 5, 6, 7, 8, 9}
+        result = _identify_fused_substituent(mol, 0, core_atoms)
+        assert result is not None
+        assert result['type'] == 'functional'
+        assert result['name'] == 'amino'
+
+    @pytest.mark.unit
+    def test_aminoindole_naming(self):
+        """Amino group on indole should be detected."""
+        # 5-aminoindole
+        mol = Chem.MolFromSmiles('Nc1ccc2[nH]ccc2c1')
+        name = name_fused_heterocycle(mol)
+        assert name is not None
+        # Should contain amino/amine
+        assert 'amin' in name.lower()
+        assert 'indol' in name.lower()
+
+    @pytest.mark.unit
+    def test_substituent_structure_has_oxo_amino_lists(self):
+        """get_fused_heterocycle_substituents should return oxo and amino lists."""
+        from src.orthonym.rules.fused_rings import get_fused_heterocycle_substituents
+        from src.orthonym.data.fused_heterocycles import match_fused_heterocycle_core
+
+        # Test with adenine
+        mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
+        result = match_fused_heterocycle_core(mol)
+        assert result is not None
+        core_name, atom_mapping, core_smiles = result
+        subs = get_fused_heterocycle_substituents(mol, atom_mapping)
+
+        # Check that the new keys exist
+        assert 'oxo_substituents' in subs
+        assert 'amino_substituents' in subs
+        assert isinstance(subs['oxo_substituents'], list)
+        assert isinstance(subs['amino_substituents'], list)
+
+        # Adenine should have amino at locant 6
+        assert len(subs['amino_substituents']) == 1
+        assert 6 in subs['amino_substituents']
+
+    @pytest.mark.unit
+    def test_vowel_elision_purine(self):
+        """Purine should undergo vowel elision: purine + amine -> purin-amine."""
+        mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
+        name = name_fused_heterocycle(mol)
+        # Should have elided 'e': purin- not purine-
+        assert 'purin-' in name.lower()
+        # Should NOT have purine- before the locant
+        assert 'purine-6' not in name.lower()
