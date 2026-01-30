@@ -679,9 +679,9 @@ class TestIUPACLocantMappings:
 
         assert not missing, f"Missing iupac_locants for: {missing}"
 
-        # Verify count matches expected
-        assert len(FUSED_HETEROCYCLE_DATA) == 38, (
-            f"Expected 38 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
+        # Verify minimum count (new entries may be added)
+        assert len(FUSED_HETEROCYCLE_DATA) >= 38, (
+            f"Expected at least 38 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
         )
 
     @pytest.mark.unit
