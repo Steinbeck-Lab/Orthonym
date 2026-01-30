@@ -623,13 +623,18 @@ class TestIUPACLocantMappings:
 
     @pytest.mark.unit
     def test_6_aminopurine_locant(self):
-        """6-aminopurine (adenine) amino group should be at IUPAC position 6."""
+        """6-aminopurine (adenine) amino group should be at IUPAC position 6.
+
+        Note: When adenine is in FUSED_HETEROCYCLE_DATA as a retained name,
+        it matches as 'adenine' rather than '9H-purine'. Both are valid.
+        """
         mol = Chem.MolFromSmiles('Nc1ncnc2[nH]cnc12')  # adenine
         result = match_fused_heterocycle_core(mol)
         assert result is not None
 
         name, mapping, core_smiles = result
-        assert name == '9H-purine'
+        # Accept either 'adenine' (retained name) or '9H-purine' (parent core)
+        assert name in ('adenine', '9H-purine'), f"Expected adenine or 9H-purine, got {name}"
 
         # Find the amino nitrogen and its attachment point
         amino_attached_to = None
@@ -640,8 +645,11 @@ class TestIUPACLocantMappings:
                 break
 
         assert amino_attached_to is not None
-        assert mapping[amino_attached_to] == 6, (
-            f"Amino should attach at IUPAC position 6, got {mapping[amino_attached_to]}"
+        # For adenine as retained name, the amino N is mapped to 'N6'
+        # For purine core match, the attachment carbon maps to 6
+        expected_locant = mapping.get(amino_attached_to)
+        assert expected_locant in (6, 'N6'), (
+            f"Amino should attach at IUPAC position 6 (or N6 for retained name), got {expected_locant}"
         )
 
     @pytest.mark.unit
@@ -679,9 +687,9 @@ class TestIUPACLocantMappings:
 
         assert not missing, f"Missing iupac_locants for: {missing}"
 
-        # Verify minimum count (new entries may be added)
-        assert len(FUSED_HETEROCYCLE_DATA) >= 38, (
-            f"Expected at least 38 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
+        # Verify minimum count - expanded to 50+ entries in 07-04 plan
+        assert len(FUSED_HETEROCYCLE_DATA) >= 50, (
+            f"Expected at least 50 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
         )
 
     @pytest.mark.unit

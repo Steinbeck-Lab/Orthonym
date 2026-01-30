@@ -488,6 +488,55 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
     },
 
+    # Adenine: 6-aminopurine (retained name for nucleobase)
+    # Canonical: Nc1ncnc2nc[nH]c12
+    # Note: 10 atoms including the amino group
+    'Nc1ncnc2nc[nH]c12': {
+        'name': 'adenine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 10,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'N6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
+    },
+
+    # Hypoxanthine: 6-oxopurine (retained name)
+    # Canonical: O=c1[nH]cnc2nc[nH]c12
+    # Note: 10 atoms including the oxo group
+    'O=c1[nH]cnc2nc[nH]c12': {
+        'name': 'hypoxanthine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 10,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
+    },
+
+    # =========================================================================
+    # MISCELLANEOUS PHARMACEUTICAL HETEROCYCLES
+    # =========================================================================
+
+    # Pyrazolo[1,5-a]pyrimidine: common kinase inhibitor scaffold
+    # N-bridgehead system (no NH)
+    # Canonical: c1cnc2ccnn2c1
+    'c1cnc2ccnn2c1': {
+        'name': 'pyrazolo[1,5-a]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 4},
+    },
+
+    # Thieno[2,3-b]pyridine: thiophene-pyridine fusion
+    # Canonical: c1cnc2sccc2c1
+    'c1cnc2sccc2c1': {
+        'name': 'thieno[2,3-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+
     # =========================================================================
     # PARTIALLY SATURATED (dihydro, tetrahydro) VARIANTS
     # Same numbering as aromatic parent, but some atoms are sp3
