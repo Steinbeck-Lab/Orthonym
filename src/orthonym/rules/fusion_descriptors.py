@@ -481,6 +481,270 @@ def _identify_ring_name(mol, ring_atoms: List[int]) -> str:
     return ''
 
 
+def identify_fusion_edges(
+    mol,
+    parent_atoms: List[int],
+    child_atoms: List[int]
+) -> List[Tuple[int, int]]:
+    """
+    Find which edges of parent ring are involved in fusion with child ring.
+
+    Identifies all edges (bonds) shared between the parent and child rings.
+    An edge is defined by two adjacent atoms that appear in both rings.
+
+    Args:
+        mol: RDKit Mol object
+        parent_atoms: List of atom indices in the parent ring (ordered)
+        child_atoms: List of atom indices in the child ring
+
+    Returns:
+        List of (edge_start, edge_end) atom index pairs for shared edges
+        Empty list if no shared edges found
+
+    Examples:
+        >>> # For benzene fused to anthracene at edge 'a' (atoms 0-1)
+        >>> identify_fusion_edges(mol, [0,1,2,3,4,5,6,7,8,9], [0,1,10,11,12,13])
+        [(0, 1)]
+    """
+    shared_edges = []
+    child_set = set(child_atoms)
+    parent_size = len(parent_atoms)
+
+    # Check each edge of the parent ring
+    for i in range(parent_size):
+        atom1 = parent_atoms[i]
+        atom2 = parent_atoms[(i + 1) % parent_size]
+
+        # If both atoms are in the child ring, this is a shared edge
+        if atom1 in child_set and atom2 in child_set:
+            # Verify they are bonded
+            bond = mol.GetBondBetweenAtoms(atom1, atom2)
+            if bond is not None:
+                shared_edges.append((atom1, atom2))
+
+    return shared_edges
+
+
+def edge_position_to_letter(parent_ring: List[int], edge: Tuple[int, int]) -> str:
+    """
+    Convert an edge position in a parent ring to its IUPAC letter designator.
+
+    Edge 'a' is between atoms at positions 0-1 (IUPAC atoms 1-2),
+    edge 'b' is between positions 1-2 (IUPAC atoms 2-3), etc.
+
+    Args:
+        parent_ring: List of atom indices in the parent ring (ordered)
+        edge: Tuple of (atom1, atom2) defining the edge
+
+    Returns:
+        Letter designator ('a', 'b', 'c', ...) or empty string if not found
+
+    Examples:
+        >>> edge_position_to_letter([0,1,2,3,4,5], (0, 1))
+        'a'
+        >>> edge_position_to_letter([0,1,2,3,4,5], (2, 3))
+        'c'
+    """
+    edge_idx = get_fusion_edge(parent_ring, edge[0], edge[1])
+    if edge_idx < 0 or edge_idx >= len(EDGE_LETTERS):
+        return ''
+    return EDGE_LETTERS[edge_idx]
+
+
+def handle_duplicate_edge_fusion(edge_letters: List[str]) -> List[str]:
+    """
+    Apply primed notation when same edge letter appears multiple times.
+
+    IUPAC uses primed notation (a', a'', b', etc.) when the same edge
+    letter is used for multiple fusion points. Letters are sorted
+    alphabetically with unprimed before primed variants.
+
+    Args:
+        edge_letters: List of edge letters (may have duplicates)
+
+    Returns:
+        List of letters with primes applied where needed, sorted canonically
+        Order: a, b, c, ... a', b', ... a'', b'', ...
+
+    Examples:
+        >>> handle_duplicate_edge_fusion(['a', 'c'])
+        ['a', 'c']
+        >>> handle_duplicate_edge_fusion(['a', 'a'])
+        ['a', "a'"]
+        >>> handle_duplicate_edge_fusion(['a', 'b', 'a'])
+        ['a', 'b', "a'"]
+        >>> handle_duplicate_edge_fusion(['a', 'a', 'a'])
+        ['a', "a'", "a''"]
+    """
+    if not edge_letters:
+        return []
+
+    # Count occurrences of each letter
+    from collections import Counter
+    letter_counts = Counter(edge_letters)
+
+    # Track how many times we've used each letter
+    letter_usage = {letter: 0 for letter in letter_counts}
+
+    result = []
+    for letter in edge_letters:
+        usage = letter_usage[letter]
+        if usage == 0:
+            result.append(letter)
+        else:
+            # Add primes for subsequent uses
+            primes = "'" * usage
+            result.append(f"{letter}{primes}")
+        letter_usage[letter] += 1
+
+    # Sort canonically: by base letter, then by number of primes
+    def sort_key(s):
+        base = s.rstrip("'")
+        prime_count = len(s) - len(base)
+        return (base, prime_count)
+
+    return sorted(result, key=sort_key)
+
+
+def format_complex_fusion(
+    child_locants: Optional[Tuple[int, int]],
+    parent_letter: Optional[str],
+    multi_component: Optional[List[str]] = None,
+    multi_edge: Optional[List[Tuple[Tuple[int, int], str]]] = None
+) -> str:
+    """
+    Format fusion descriptor for various complexity levels.
+
+    Handles three types of fusion descriptors:
+    1. Standard: [2,3-b] - single fusion with child locants and parent letter
+    2. Multi-component: [a,c] - multiple same-type rings fused to parent
+    3. Multi-edge: [1,2-a:4,5-b'] - complex fusions with multiple edges
+
+    Args:
+        child_locants: Tuple of (loc1, loc2) child ring locants, or None
+        parent_letter: Parent edge letter ('a', 'b', etc.), or None
+        multi_component: List of edge letters for multi-component fusion
+        multi_edge: List of ((loc1, loc2), letter) for multi-edge fusion
+
+    Returns:
+        Formatted fusion descriptor string
+
+    Examples:
+        >>> format_complex_fusion((2, 3), 'b')
+        '[2,3-b]'
+        >>> format_complex_fusion(None, None, multi_component=['a', 'c'])
+        '[a,c]'
+        >>> format_complex_fusion(None, None, multi_edge=[((1, 2), 'a'), ((4, 5), "b'")])
+        "[1,2-a:4,5-b']"
+    """
+    # Multi-component fusion: [a,c] format for dibenzo, dinaphtho, etc.
+    if multi_component is not None:
+        # Apply primed notation if needed and sort
+        processed = handle_duplicate_edge_fusion(multi_component)
+        return f"[{','.join(processed)}]"
+
+    # Multi-edge fusion: [1,2-a:4,5-b'] format
+    if multi_edge is not None:
+        parts = []
+        for (loc1, loc2), letter in multi_edge:
+            parts.append(f"{loc1},{loc2}-{letter}")
+        return f"[{':'.join(parts)}]"
+
+    # Standard fusion: [2,3-b] format
+    if child_locants is not None and parent_letter is not None:
+        loc1, loc2 = child_locants
+        return f"[{loc1},{loc2}-{parent_letter}]"
+
+    return ''
+
+
+def generate_multi_fusion_descriptor(
+    parent_ring_name: str,
+    fused_components: List[Tuple[str, List[int], Set[int]]]
+) -> str:
+    """
+    Generate fusion descriptor for multi-component fusions.
+
+    For compounds like dibenzo[a,c]anthracene where multiple rings of
+    the same type are fused to a parent ring.
+
+    Args:
+        parent_ring_name: Name of the parent ring (e.g., 'anthracene')
+        fused_components: List of (child_name, parent_ring_atoms, shared_atoms) tuples
+            where each tuple describes one fused component
+
+    Returns:
+        Multi-component descriptor like '[a,c]' for dibenzo
+        Returns empty string if descriptor cannot be generated
+
+    Examples:
+        >>> # dibenzo[a,c]anthracene: two benzene rings at edges a and c
+        >>> generate_multi_fusion_descriptor('anthracene', [
+        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {0, 1}),
+        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {4, 5})
+        ... ])
+        '[a,c]'
+    """
+    if not fused_components:
+        return ''
+
+    edge_letters = []
+
+    for child_name, parent_ring, shared_atoms in fused_components:
+        if len(shared_atoms) != 2:
+            continue
+
+        # Get the edge letter for this fusion
+        atoms_tuple = tuple(sorted(shared_atoms))
+        letter = get_fusion_letter(parent_ring, atoms_tuple)
+        if letter:
+            edge_letters.append(letter)
+
+    if not edge_letters:
+        return ''
+
+    return format_complex_fusion(None, None, multi_component=edge_letters)
+
+
+def build_multi_component_name(
+    parent_name: str,
+    child_name: str,
+    count: int,
+    descriptor: str
+) -> str:
+    """
+    Build name for multi-component fusion (dibenzo, dinaphtho, etc.).
+
+    Args:
+        parent_name: Name of parent ring (e.g., 'anthracene')
+        child_name: Name of fused ring type (e.g., 'benzene')
+        count: Number of fused rings of this type (2 for di-, 3 for tri-)
+        descriptor: Fusion descriptor (e.g., '[a,c]')
+
+    Returns:
+        Complete multi-component name like 'dibenzo[a,c]anthracene'
+
+    Examples:
+        >>> build_multi_component_name('anthracene', 'benzene', 2, '[a,c]')
+        'dibenzo[a,c]anthracene'
+        >>> build_multi_component_name('anthracene', 'naphthalene', 2, '[a,h]')
+        'dinaphtho[a,h]anthracene'
+    """
+    # Multiplicative prefixes for ring count
+    MULTIPLIERS = {
+        2: 'di',
+        3: 'tri',
+        4: 'tetra',
+        5: 'penta',
+        6: 'hexa',
+    }
+
+    prefix = get_fusion_prefix(child_name)
+    multiplier = MULTIPLIERS.get(count, '')
+
+    return f"{multiplier}{prefix}{descriptor}{parent_name}"
+
+
 def generate_systematic_name_for_fused_pair(
     mol,
     ring1: List[int],
@@ -525,3 +789,68 @@ def generate_systematic_name_for_fused_pair(
 
     # Build the systematic name
     return build_systematic_fusion_name(parent_name, child_name, descriptor)
+
+
+def generate_multi_fusion_name(
+    mol,
+    parent_ring: List[int],
+    parent_name: str,
+    fused_rings: List[Tuple[List[int], Set[int]]]
+) -> Optional[str]:
+    """
+    Generate systematic name for multiple rings fused to a parent.
+
+    Handles complex fusion scenarios like dibenzo[a,c]anthracene where
+    multiple rings of the same type are fused at different edges.
+
+    Args:
+        mol: RDKit Mol object
+        parent_ring: List of atom indices in the parent ring
+        parent_name: Name of the parent ring (e.g., 'anthracene')
+        fused_rings: List of (child_ring_atoms, shared_atoms) for each fusion
+
+    Returns:
+        Complete systematic fusion name, or None if cannot be generated
+
+    Examples:
+        >>> # For dibenzo[a,c]anthracene
+        >>> generate_multi_fusion_name(mol, anthracene_atoms, 'anthracene',
+        ...     [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
+        'dibenzo[a,c]anthracene'
+    """
+    if not fused_rings:
+        return None
+
+    # Group fused rings by type
+    from collections import defaultdict
+    rings_by_type: Dict[str, List[Tuple[List[int], Set[int]]]] = defaultdict(list)
+
+    for child_ring, shared in fused_rings:
+        child_name = _identify_ring_name(mol, child_ring)
+        if child_name:
+            rings_by_type[child_name].append((child_ring, shared))
+
+    # For now, handle single child type (e.g., all benzene)
+    if len(rings_by_type) == 1:
+        child_name = list(rings_by_type.keys())[0]
+        fusions = rings_by_type[child_name]
+
+        if len(fusions) == 1:
+            # Single fusion - use standard naming
+            child_ring, shared = fusions[0]
+            return generate_systematic_name_for_fused_pair(
+                mol, parent_ring, child_ring, shared
+            )
+        else:
+            # Multi-component fusion
+            components = []
+            for child_ring, shared in fusions:
+                components.append((child_name, parent_ring, shared))
+
+            descriptor = generate_multi_fusion_descriptor(parent_name, components)
+            if descriptor:
+                return build_multi_component_name(
+                    parent_name, child_name, len(fusions), descriptor
+                )
+
+    return None
