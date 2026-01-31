@@ -50,7 +50,7 @@ RETAINED_NAMES = {
     "OC(=O)CCC(=O)O": "succinic acid",
     "OC(=O)CCCC(=O)O": "glutaric acid",
     "OC(=O)CCCCC(=O)O": "adipic acid",
-    "OC(=O)c1ccccc1": "benzoic acid",
+    "O=C(O)c1ccccc1": "benzoic acid",  # Canonical SMILES (was OC(=O)c1ccccc1)
     "OC(=O)CC(O)(CC(=O)O)C(=O)O": "citric acid",
     
     # === ALDEHYDES ===
