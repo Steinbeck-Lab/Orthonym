@@ -891,8 +891,16 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
     features.substituents (for chains) or features.ring_substituents (for rings),
     groups them by name (methyl, ethyl, etc.), and formats with locants and
     multiplicative prefixes.
+
+    When chain_is_parent=True (ring-chain compounds where chain won parent selection),
+    rings become substituents and are named as prefixes (phenyl, cyclohexyl, etc.).
     """
     prefixes = []
+
+    # --- Handle ring-as-substituent prefixes when chain is parent ---
+    if getattr(features, 'chain_is_parent', False):
+        ring_sub_prefixes = _generate_ring_substituent_prefixes(features)
+        prefixes.extend(ring_sub_prefixes)
 
     # --- Handle alkyl substituents from features.substituents (chains) ---
     if features.substituents and features.mol:
@@ -929,6 +937,72 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
     return prefixes
 
 
+def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
+    """
+    Generate prefix fragments for rings that are substituents on a chain parent.
+
+    When parent selection determines chain is parent (chain_is_parent=True),
+    rings become substituents and need to be named as prefixes (phenyl, cyclohexyl, etc.).
+
+    This implements IUPAC P-61.5 ring-as-substituent naming:
+    - benzene -> phenyl
+    - cyclohexane -> cyclohexyl
+    - pyridine -> pyridyl
+    - etc.
+
+    Args:
+        features: MolecularFeatures with ring_substituents_as_groups populated
+
+    Returns:
+        List of NameFragment objects for ring substituent prefixes
+    """
+    from ..rules.ring_substituents import get_ring_substituent_name, get_ring_attachment_locant
+
+    prefixes = []
+    ring_groups = getattr(features, 'ring_substituents_as_groups', [])
+
+    if not ring_groups:
+        return prefixes
+
+    # Group ring substituents by name for multiplier handling
+    ring_sub_groups: Dict[str, List[int]] = defaultdict(list)
+
+    for ring_atoms in ring_groups:
+        # Get substituent name (phenyl, cyclohexyl, etc.)
+        sub_name = get_ring_substituent_name(features.mol, ring_atoms)
+
+        # Find which chain position the ring attaches to
+        try:
+            locant = get_ring_attachment_locant(
+                features.mol,
+                ring_atoms,
+                features.principal_chain,
+                features.atom_to_locant
+            )
+            ring_sub_groups[sub_name].append(locant)
+        except ValueError:
+            # If we can't find the attachment, skip this ring
+            continue
+
+    # Build prefix fragments
+    for name, locants in ring_sub_groups.items():
+        count = len(locants)
+        sorted_locants = sorted(locants)
+
+        formatted = format_substituent_prefix(name, sorted_locants, count)
+
+        prefixes.append(NameFragment(
+            text=formatted,
+            locants=tuple(sorted_locants),
+            fragment_type="prefix"
+        ))
+
+    # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
+    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+
+    return prefixes
+
+
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for alkyl substituents and alkoxy groups.
@@ -941,10 +1015,20 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     5. Formats each group with locants, multipliers
     6. Sorts alphabetically by base substituent name
 
+    Note: When chain_is_parent=True, ring substituents are handled separately
+    by _generate_ring_substituent_prefixes() and should be skipped here.
+
     Returns:
         List of NameFragment objects for alkyl prefixes, sorted alphabetically
     """
     mol = features.mol
+
+    # Collect ring atoms that should be skipped (handled by ring substituent prefixes)
+    ring_atoms_to_skip: set = set()
+    if getattr(features, 'chain_is_parent', False):
+        ring_groups = getattr(features, 'ring_substituents_as_groups', [])
+        for ring_atoms in ring_groups:
+            ring_atoms_to_skip.update(ring_atoms)
 
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
@@ -952,6 +1036,10 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     for position, sub_list in features.substituents.items():
         # position is already a 1-indexed locant (from get_substituents)
         for sub_atoms in sub_list:
+            # Skip substituents that are ring atoms (handled separately)
+            if ring_atoms_to_skip and set(sub_atoms) & ring_atoms_to_skip:
+                continue
+
             # Count only carbon atoms in the substituent
             carbon_count = sum(
                 1 for idx in sub_atoms
