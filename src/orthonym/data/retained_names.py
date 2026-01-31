@@ -152,8 +152,23 @@ RETAINED_NAMES = {
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",
-    "CS(C)=O": "dimethyl sulfoxide",
     "CN(C)C=O": "N,N-dimethylformamide",
+
+    # === SULFUR COMPOUNDS (Phase 10) ===
+    # Thiols
+    "CS": "methanethiol",
+    "CCS": "ethanethiol",
+    # Sulfides (thioethers)
+    "CSC": "dimethyl sulfide",
+    "CCSCC": "diethyl sulfide",
+    # Sulfoxides (canonical SMILES form)
+    "CS(C)=O": "dimethyl sulfoxide",  # DMSO
+    # Sulfones (canonical SMILES form)
+    "CS(C)(=O)=O": "dimethyl sulfone",
+    # Sulfonic acids
+    "CS(=O)(=O)O": "methanesulfonic acid",
+    "CCS(=O)(=O)O": "ethanesulfonic acid",
+    "c1ccccc1S(=O)(=O)O": "benzenesulfonic acid",
     
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",

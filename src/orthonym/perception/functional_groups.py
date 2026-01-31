@@ -77,6 +77,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     "vinyl_ether": "[OX2]([#6])[CX3]=[CX3]",
     "aromatic_ether": "[OX2]([#6])[cX3]",
     "thioether": "[SX2]([#6])[#6]",
+
+    # === SULFUR OXIDATION STATES (check more specific first) ===
+    # Sulfone: S with 2 =O and 2 C neighbors (R-SO2-R')
+    "sulfone": "[SX4](=[OX1])(=[OX1])([#6])[#6]",
+    # Sulfoxide: S with 1 =O and 2 C neighbors (R-SO-R')
+    "sulfoxide": "[SX3](=[OX1])([#6])[#6]",
     
     # === UNSATURATION ===
     "alkene": "[CX3]=[CX3]",

@@ -64,6 +64,11 @@ SENIORITY_ORDER = [
     "imine",
     "oxime",
     "hydrazone",
+
+    # Sulfur oxidation states (functional class naming, lower seniority than amines)
+    "sulfoxide",
+    "sulfone",
+    "thioether",  # Also called sulfide
 ]
 
 # Suffix forms for principal groups
@@ -134,6 +139,9 @@ PREFIX_FORMS = {
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,
+    # Sulfur oxidation states (functional class naming)
+    "sulfoxide": None,  # Named by functional class (dimethyl sulfoxide)
+    "sulfone": None,    # Named by functional class (dimethyl sulfone)
 }
 
 
