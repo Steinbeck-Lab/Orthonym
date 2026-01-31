@@ -227,6 +227,35 @@ def assemble_name(features: Any, style: str = "pin") -> str:
                 return ester_name
         # If name_ester returns None (lactone or complex), fall through
 
+    # Handle sulfur functional class compounds (sulfide, sulfoxide, sulfone)
+    # These use functional class naming, not suffix-based
+    if features.principal_group in ('sulfoxide', 'sulfone'):
+        from ..rules.sulfur import name_sulfoxide, name_sulfone
+        if features.principal_group == 'sulfoxide':
+            matches = features.functional_groups.get('sulfoxide', [])
+            if matches:
+                name = name_sulfoxide(features.mol, matches[0])
+                if name:
+                    return name
+        elif features.principal_group == 'sulfone':
+            matches = features.functional_groups.get('sulfone', [])
+            if matches:
+                name = name_sulfone(features.mol, matches[0])
+                if name:
+                    return name
+
+    # Handle thioethers (sulfides) - also use functional class
+    if features.principal_group == 'thioether':
+        from ..rules.sulfur import name_sulfide
+        # Find sulfur atom index
+        matches = features.functional_groups.get('thioether', [])
+        if matches:
+            # SMARTS match gives (S, C, C) - sulfur is first
+            sulfur_idx = matches[0][0]
+            name = name_sulfide(features.mol, sulfur_idx)
+            if name:
+                return name
+
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts

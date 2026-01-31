@@ -165,10 +165,10 @@ RETAINED_NAMES = {
     "CS(C)=O": "dimethyl sulfoxide",  # DMSO
     # Sulfones (canonical SMILES form)
     "CS(C)(=O)=O": "dimethyl sulfone",
-    # Sulfonic acids
+    # Sulfonic acids (canonical SMILES form)
     "CS(=O)(=O)O": "methanesulfonic acid",
     "CCS(=O)(=O)O": "ethanesulfonic acid",
-    "c1ccccc1S(=O)(=O)O": "benzenesulfonic acid",
+    "O=S(=O)(O)c1ccccc1": "benzenesulfonic acid",
     
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",
