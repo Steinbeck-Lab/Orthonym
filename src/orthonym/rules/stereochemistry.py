@@ -9,12 +9,18 @@ Key functions:
 - format_stereodescriptor_string: Format as "(2R,3S)-" prefix
 - get_double_bond_locant: Get lower locant for E/Z double bond
 
+Ring junction stereochemistry functions:
+- get_bridgehead_atoms: Find ring fusion stereocenter atoms
+- collect_ring_junction_stereo: Collect junction stereo with 'a' suffix locants
+- format_ring_junction_stereo: Format as "(4aR,8aS)-" or "(4ar,8ac)-"
+- determine_simple_cis_trans: Return "cis" or "trans" for simple bicyclics
+
 IMPORTANT: This module requires atom_to_locant mapping to be provided by the
 caller (computed during chain/ring classification). It does NOT fall back to
 atom indices as those are NOT valid IUPAC locants.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
@@ -367,3 +373,313 @@ def format_ring_stereo_with_descriptors(
             return ring_cis_trans
     else:
         return rs_string
+
+
+# =============================================================================
+# Ring Junction Stereochemistry Functions
+# =============================================================================
+
+def get_bridgehead_atoms(mol) -> List[int]:
+    """
+    Find atoms at ring fusion points (bridgehead atoms).
+
+    Bridgehead atoms are atoms that are shared by multiple rings. For fused
+    ring systems like decalin, these are the atoms at the junction where
+    rings meet.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        List of atom indices that are bridgehead atoms (in 2+ rings and sp3)
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
+        >>> bridgeheads = get_bridgehead_atoms(mol)
+        >>> len(bridgeheads)  # 2 bridgehead atoms
+        2
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene (aromatic)
+        >>> bridgeheads = get_bridgehead_atoms(mol)
+        >>> len(bridgeheads)  # 0 - sp2 atoms are not stereocenters
+        0
+    """
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    if len(atom_rings) < 2:
+        return []
+
+    # Count how many rings each atom belongs to
+    atom_ring_count: Dict[int, int] = {}
+    for ring in atom_rings:
+        for atom_idx in ring:
+            atom_ring_count[atom_idx] = atom_ring_count.get(atom_idx, 0) + 1
+
+    # Find atoms in 2+ rings that are sp3 (potential stereocenters)
+    bridgehead_atoms = []
+    for atom_idx, count in atom_ring_count.items():
+        if count >= 2:
+            atom = mol.GetAtomWithIdx(atom_idx)
+            # Check if sp3 (saturated) - these can be stereocenters
+            # Hybridization SP3 indicates tetrahedral geometry
+            hybridization = atom.GetHybridization()
+            if hybridization == Chem.HybridizationType.SP3:
+                bridgehead_atoms.append(atom_idx)
+
+    return sorted(bridgehead_atoms)
+
+
+def collect_ring_junction_stereo(
+    mol,
+    bridgehead_atoms: List[int],
+    atom_to_locant: Dict[int, Union[int, str]]
+) -> List[Tuple[str, str]]:
+    """
+    Collect stereodescriptors for ring junction (bridgehead) atoms.
+
+    Ring junction atoms in fused systems use 'a' suffix locants in IUPAC naming.
+    For example, in decahydronaphthalene, the junction atoms are 4a and 8a.
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned)
+        bridgehead_atoms: List of atom indices at ring junctions
+        atom_to_locant: Mapping from atom index to IUPAC locant (int or str)
+                       The locant should already include 'a' suffix if needed
+
+    Returns:
+        List of (locant_str, cip_code) tuples, sorted by locant.
+        Locant is string to handle 'a' suffix (e.g., '4a', '8a').
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')  # cis-decalin
+        >>> rdCIPLabeler.AssignCIPLabels(mol)
+        >>> bridgeheads = get_bridgehead_atoms(mol)
+        >>> atom_to_locant = {3: '4a', 8: '8a'}  # junction atoms with 'a' suffix
+        >>> stereo = collect_ring_junction_stereo(mol, bridgeheads, atom_to_locant)
+        >>> # Returns [('4a', 'S'), ('8a', 'S')] or similar
+    """
+    # Ensure CIP labels are assigned
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    descriptors: List[Tuple[str, str]] = []
+
+    for atom_idx in bridgehead_atoms:
+        if atom_idx not in atom_to_locant:
+            continue
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.HasProp('_CIPCode'):
+            locant = atom_to_locant[atom_idx]
+            # Convert to string if int, to handle both int and 'a' suffix locants
+            locant_str = str(locant)
+            cip_code = atom.GetProp('_CIPCode')
+            descriptors.append((locant_str, cip_code))
+
+    # Sort by locant (handle '4a', '8a' style locants)
+    def _junction_locant_sort_key(item: Tuple[str, str]) -> Tuple[int, str]:
+        """Sort key for junction locants like '4a', '8a'."""
+        locant_str = item[0]
+        if locant_str and locant_str[-1].isalpha():
+            return (int(locant_str[:-1]), locant_str[-1])
+        return (int(locant_str), '')
+
+    descriptors.sort(key=_junction_locant_sort_key)
+
+    return descriptors
+
+
+def format_ring_junction_stereo(
+    descriptors: List[Tuple[str, str]],
+    use_rct: bool = False
+) -> str:
+    """
+    Format ring junction stereodescriptors as IUPAC name prefix.
+
+    IUPAC 2013 provides two notations for ring junction stereo:
+    1. R/S notation (PIN style): "(4aR,8aS)-"
+    2. r/c/t notation (reference plane): "(4ar,8ac)-"
+
+    The r/c/t notation uses:
+    - r: reference stereocenter (first one)
+    - c: cis to reference (same CIP code)
+    - t: trans to reference (different CIP code)
+
+    Args:
+        descriptors: List of (locant_str, cip_code) tuples from collect_ring_junction_stereo
+        use_rct: If True, use r/c/t notation; if False (default), use R/S
+
+    Returns:
+        Formatted string like "(4aR,8aS)-" or "(4ar,8ac)-"
+        Returns empty string if no descriptors.
+
+    Examples:
+        >>> format_ring_junction_stereo([('4a', 'S'), ('8a', 'S')])
+        '(4aS,8aS)-'
+        >>> format_ring_junction_stereo([('4a', 'S'), ('8a', 'S')], use_rct=True)
+        '(4ar,8ac)-'
+        >>> format_ring_junction_stereo([('4a', 'R'), ('8a', 'S')], use_rct=True)
+        '(4ar,8at)-'
+    """
+    if not descriptors:
+        return ""
+
+    if use_rct:
+        # Convert to r/c/t notation
+        # First stereocenter is reference (r)
+        # Same CIP as reference = cis (c)
+        # Different CIP = trans (t)
+        rct_parts = []
+        ref_cip = None
+
+        for i, (locant, cip) in enumerate(descriptors):
+            if i == 0:
+                # First is reference
+                ref_cip = cip
+                rct_parts.append(f"{locant}r")
+            else:
+                # Compare to reference
+                if cip == ref_cip:
+                    rct_parts.append(f"{locant}c")  # cis
+                else:
+                    rct_parts.append(f"{locant}t")  # trans
+
+        return f"({','.join(rct_parts)})-"
+    else:
+        # Standard R/S notation
+        parts = [f"{locant}{cip}" for locant, cip in descriptors]
+        return f"({','.join(parts)})-"
+
+
+def determine_simple_cis_trans(
+    mol,
+    junction_atoms: List[int]
+) -> Optional[str]:
+    """
+    Determine cis/trans for simple bicyclic systems (decalin type).
+
+    For simple fused bicyclics with exactly 2 junction atoms:
+    - Same chiral tag (both CCW or both CW) = cis (both H on same face)
+    - Different chiral tags (one CCW, one CW) = trans (H on opposite faces)
+
+    Note: CIP codes (R/S) are NOT reliable for cis/trans determination in
+    symmetric fused systems like decalin, because the molecular symmetry
+    can cause both junction atoms to have the same CIP code even in trans.
+    Instead, we use the ChiralTag which reflects the actual tetrahedral
+    configuration.
+
+    Args:
+        mol: RDKit Mol object (stereochemistry should already be assigned)
+        junction_atoms: List of exactly 2 atom indices at ring junction
+
+    Returns:
+        'cis' or 'trans', or None if:
+        - Not exactly 2 junction atoms
+        - Missing stereochemistry on junction atoms
+
+    Examples:
+        >>> # cis-decalin: both [C@@H] = same ChiralTag = cis
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')
+        >>> bridgeheads = get_bridgehead_atoms(mol)
+        >>> determine_simple_cis_trans(mol, bridgeheads)
+        'cis'
+        >>> # trans-decalin: [C@@H]...[C@H] = different ChiralTag = trans
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@H]2C1')
+        >>> bridgeheads = get_bridgehead_atoms(mol)
+        >>> determine_simple_cis_trans(mol, bridgeheads)
+        'trans'
+    """
+    if len(junction_atoms) != 2:
+        return None
+
+    atom1 = mol.GetAtomWithIdx(junction_atoms[0])
+    atom2 = mol.GetAtomWithIdx(junction_atoms[1])
+
+    # Get chiral tags
+    tag1 = atom1.GetChiralTag()
+    tag2 = atom2.GetChiralTag()
+
+    # Both must have defined chirality
+    unspecified = Chem.ChiralType.CHI_UNSPECIFIED
+    if tag1 == unspecified or tag2 == unspecified:
+        return None
+
+    # Also reject CHI_OTHER which indicates unknown/invalid
+    other = Chem.ChiralType.CHI_OTHER
+    if tag1 == other or tag2 == other:
+        return None
+
+    # Compare chiral tags:
+    # CHI_TETRAHEDRAL_CW and CHI_TETRAHEDRAL_CCW are the common stereo tags
+    # Same tag = cis (both H on same face)
+    # Different tag = trans (H on opposite faces)
+    if tag1 == tag2:
+        return 'cis'
+    else:
+        return 'trans'
+
+
+def get_junction_locants_for_fused_system(
+    mol,
+    bridgehead_atoms: List[int],
+    ring_size_1: int,
+    ring_size_2: int
+) -> Dict[int, str]:
+    """
+    Generate IUPAC 'a' suffix locants for junction atoms in fused systems.
+
+    For ortho-fused bicyclics like decahydronaphthalene:
+    - Ring 1 (6-membered): positions 1-4, then 4a
+    - Ring 2 (6-membered): positions 4a-8, then 8a
+    - Junction atoms get 'a' suffix locants (4a, 8a)
+
+    This is a simplified implementation for common cases.
+
+    Args:
+        mol: RDKit Mol object
+        bridgehead_atoms: List of atom indices at ring junctions
+        ring_size_1: Size of first ring
+        ring_size_2: Size of second ring
+
+    Returns:
+        Dict mapping atom index to locant string (e.g., {3: '4a', 8: '8a'})
+
+    Note:
+        This is a simplified mapping. Full IUPAC numbering requires
+        consideration of ring system orientation and heteroatom positions.
+    """
+    # For 6,6-fused (decalin/naphthalene type):
+    # Total unique positions = ring1 + ring2 - 2 shared atoms
+    # Standard IUPAC: 4a and 8a for 6,6-fused
+    if ring_size_1 == 6 and ring_size_2 == 6 and len(bridgehead_atoms) == 2:
+        # Simple case: assign 4a and 8a
+        return {
+            bridgehead_atoms[0]: '4a',
+            bridgehead_atoms[1]: '8a'
+        }
+
+    # For 5,6-fused (indane type): 3a and 7a
+    if (ring_size_1 == 5 and ring_size_2 == 6) or (ring_size_1 == 6 and ring_size_2 == 5):
+        if len(bridgehead_atoms) == 2:
+            return {
+                bridgehead_atoms[0]: '3a',
+                bridgehead_atoms[1]: '7a'
+            }
+
+    # For 5,5-fused (azulene type): 3a and 8a typically
+    if ring_size_1 == 5 and ring_size_2 == 5 and len(bridgehead_atoms) == 2:
+        return {
+            bridgehead_atoms[0]: '3a',
+            bridgehead_atoms[1]: '5a'
+        }
+
+    # Generic fallback: use sequential 'a' suffix locants
+    result = {}
+    # Calculate locant based on position in combined ring system
+    # For generic case, use (ring_size_1 - 1)a pattern
+    if len(bridgehead_atoms) >= 1:
+        result[bridgehead_atoms[0]] = f'{ring_size_1 - 1}a'
+    if len(bridgehead_atoms) >= 2:
+        total_positions = ring_size_1 + ring_size_2 - 2
+        result[bridgehead_atoms[1]] = f'{total_positions}a'
+
+    return result
