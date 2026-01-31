@@ -88,6 +88,10 @@ class MolecularFeatures:
     amide_type: Optional[str] = None  # "primary", "secondary", or "tertiary"
     n_substituents: List[Dict] = field(default_factory=list)  # N-substituents from get_n_substituents()
 
+    # Ring-as-substituent information (when chain is parent per IUPAC P-44.1)
+    ring_substituents_as_groups: List[tuple] = field(default_factory=list)  # Rings that become substituents
+    chain_is_parent: bool = False  # True when parent selection chose chain over ring
+
 
 class Orthonym:
     """
@@ -230,6 +234,44 @@ class Orthonym:
                 features.functional_groups, features.principal_group
             )
 
+        # Parent selection for molecules with ring AND functionalized chain (IUPAC P-44.1)
+        # This must happen BEFORE ring classification to potentially redirect to chain naming
+        if features.is_cyclic and features.principal_group:
+            from .rules.parent_selection import select_parent
+
+            # Get ring atoms to exclude when finding chain
+            all_ring_atoms = set()
+            for ring in features.ring_systems:
+                all_ring_atoms.update(ring)
+
+            # Find potential principal chain (excluding ring atoms)
+            # IMPORTANT: namer.py does the chain finding, then passes result to select_parent()
+            potential_chain = find_principal_chain(
+                features.mol,
+                features.functional_groups,
+                features.principal_group,
+                exclude_atoms=all_ring_atoms
+            )
+
+            # Only do parent selection if we found a meaningful chain (>= 2 carbons)
+            if potential_chain and len(potential_chain) >= 2:
+                # Pass pre-computed chain to select_parent
+                selection = select_parent(
+                    mol=features.mol,
+                    ring_systems=features.ring_systems,
+                    principal_chain=potential_chain,
+                    principal_group=features.principal_group,
+                    principal_group_atoms=features.principal_group_atoms
+                )
+
+                if selection.parent_type == 'chain':
+                    # Chain wins - switch from ring naming to chain naming
+                    features.chain_is_parent = True
+                    features.is_cyclic = False  # Disable ring naming path
+                    features.principal_chain = selection.parent_atoms
+                    features.ring_substituents_as_groups = selection.substituent_rings
+                    # Continue with chain classification below (is_cyclic is now False)
+
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
             # Check for polycyclic aromatics FIRST (naphthalene, anthracene, etc.)
@@ -341,12 +383,15 @@ class Orthonym:
                             features.ring_double_bond_locants = sorted(locants)
 
         # Find principal chain (for acyclic molecules)
+        # Skip if chain was already set by parent selection (chain_is_parent = True)
         if not features.is_cyclic:
-            features.principal_chain = find_principal_chain(
-                features.mol,
-                features.functional_groups,
-                features.principal_group
-            )
+            if not features.chain_is_parent:
+                # Normal acyclic molecule - find principal chain
+                features.principal_chain = find_principal_chain(
+                    features.mol,
+                    features.functional_groups,
+                    features.principal_group
+                )
 
             if features.principal_chain:
                 # Collect principal group atom indices for orientation
