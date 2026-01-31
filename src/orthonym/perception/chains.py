@@ -9,98 +9,119 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 
-def find_all_carbon_chains(mol, min_length: int = 1) -> List[List[int]]:
+def find_all_carbon_chains(
+    mol,
+    min_length: int = 1,
+    exclude_atoms: Optional[Set[int]] = None
+) -> List[List[int]]:
     """
     Find all carbon chains in a molecule using DFS.
-    
+
     Args:
         mol: RDKit Mol object
         min_length: Minimum chain length to return
-        
+        exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
+
     Returns:
         List of lists, each inner list contains atom indices of a chain
     """
     chains = []
-    
+    exclude = exclude_atoms or set()
+
     def dfs(atom_idx: int, visited: Set[int], path: List[int]):
+        # Skip excluded atoms (e.g., ring atoms when finding chain through ring)
+        if atom_idx in exclude:
+            return
+
         atom = mol.GetAtomWithIdx(atom_idx)
-        
+
         # Only follow carbon atoms (not heteroatoms)
         if atom.GetSymbol() != 'C':
             return
-        
+
         visited.add(atom_idx)
         path.append(atom_idx)
-        
+
         # Record this path if it meets minimum length
         if len(path) >= min_length:
             chains.append(path.copy())
-        
+
         # Explore neighbors
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()
             if nbr_idx not in visited:
                 dfs(nbr_idx, visited, path)
-        
+
         # Backtrack
         path.pop()
         visited.discard(atom_idx)
-    
+
     # Start DFS from each carbon atom to find all possible chains
     for atom in mol.GetAtoms():
-        if atom.GetSymbol() == 'C':
+        if atom.GetSymbol() == 'C' and atom.GetIdx() not in exclude:
             dfs(atom.GetIdx(), set(), [])
-    
+
     return chains
 
 
-def find_longest_carbon_chain(mol) -> List[int]:
+def find_longest_carbon_chain(
+    mol,
+    exclude_atoms: Optional[Set[int]] = None
+) -> List[int]:
     """
     Find the longest continuous carbon chain.
-    
+
     Args:
         mol: RDKit Mol object
-        
+        exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
+
     Returns:
         List of atom indices forming the longest chain
     """
+    exclude = exclude_atoms or set()
+
     def dfs(atom_idx: int, visited: Set[int], path: List[int], results: List[List[int]]):
+        # Skip excluded atoms
+        if atom_idx in exclude:
+            return
+
         atom = mol.GetAtomWithIdx(atom_idx)
-        
+
         if atom.GetSymbol() != 'C':
             return
-        
+
         visited.add(atom_idx)
         path.append(atom_idx)
-        
+
         # Update longest if this path is longer
         if len(path) > len(results[0]):
             results[0] = path.copy()
-        
+
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()
             if nbr_idx not in visited:
                 dfs(nbr_idx, visited, path, results)
-        
+
         path.pop()
         visited.discard(atom_idx)
-    
+
     results = [[]]
     for atom in mol.GetAtoms():
-        if atom.GetSymbol() == 'C':
+        if atom.GetSymbol() == 'C' and atom.GetIdx() not in exclude:
             dfs(atom.GetIdx(), set(), [], results)
-    
+
     return results[0]
 
 
 def find_principal_chain(
     mol,
     functional_groups: Dict[str, List[tuple]],
-    principal_group: Optional[str] = None
+    principal_group: Optional[str] = None,
+    exclude_atoms: Optional[Set[int]] = None
 ) -> List[int]:
     """
     Find the principal chain following IUPAC 2013 rules.
-    
+
     Selection criteria (in order of priority):
     1. Contains principal characteristic group
     2. Maximum number of principal groups
@@ -111,16 +132,17 @@ def find_principal_chain(
     7. Lowest locants for multiple bonds
     8. Maximum substituents
     9. Lowest locants for substituents
-    
+
     Args:
         mol: RDKit Mol object
         functional_groups: Dict from detect_functional_groups()
         principal_group: Name of principal functional group (or None)
-        
+        exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
+
     Returns:
         List of atom indices forming the principal chain, in order
     """
-    chains = find_all_carbon_chains(mol, min_length=1)
+    chains = find_all_carbon_chains(mol, min_length=1, exclude_atoms=exclude_atoms)
     
     if not chains:
         return []
