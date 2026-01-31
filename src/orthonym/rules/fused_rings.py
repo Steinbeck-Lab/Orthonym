@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from ..data.fused_heterocycles import (
     get_fused_heterocycle_name,
@@ -37,6 +38,13 @@ from ..assembly.naming_utils import (
     get_alkyl_name,
     alpha_sort_key,
     get_multiplier_prefix,
+)
+from .stereochemistry import (
+    get_bridgehead_atoms,
+    collect_ring_junction_stereo,
+    format_ring_junction_stereo,
+    determine_simple_cis_trans,
+    get_junction_locants_for_fused_system,
 )
 
 
@@ -788,3 +796,171 @@ def is_fused_heterocyclic_system(mol) -> bool:
                 return True
 
     return False
+
+
+# =============================================================================
+# Ring Junction Stereochemistry Functions for Fused Systems
+# =============================================================================
+
+def get_fused_ring_sizes(mol) -> Tuple[int, int]:
+    """
+    Get the sizes of the two rings in a fused bicyclic system.
+
+    Args:
+        mol: RDKit Mol object with exactly 2 fused rings
+
+    Returns:
+        Tuple of (ring1_size, ring2_size), sorted largest first
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
+        >>> get_fused_ring_sizes(mol)
+        (6, 6)
+    """
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    if len(atom_rings) != 2:
+        return (0, 0)
+
+    size1 = len(atom_rings[0])
+    size2 = len(atom_rings[1])
+
+    return (max(size1, size2), min(size1, size2))
+
+
+def name_saturated_fused_bicyclic(mol, parent_name: str = "decahydronaphthalene") -> Optional[str]:
+    """
+    Generate IUPAC name for a saturated fused bicyclic with ring junction stereochemistry.
+
+    For saturated fused systems like decalin (decahydronaphthalene), the
+    stereochemistry at ring junction atoms (bridgeheads) must be specified.
+
+    IUPAC format: (4aR,8aS)-decahydronaphthalene
+    Alternative: cis-decalin or trans-decalin (for common cases)
+
+    Args:
+        mol: RDKit Mol object
+        parent_name: The parent name for the saturated system
+
+    Returns:
+        IUPAC name with stereodescriptor prefix, or None if cannot determine
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')  # cis-decalin
+        >>> name_saturated_fused_bicyclic(mol)
+        '(4as,8as)-decahydronaphthalene'
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@H]2C1')  # trans-decalin
+        >>> name_saturated_fused_bicyclic(mol)
+        '(4ar,8ar)-decahydronaphthalene'
+    """
+    if not is_fused_bicyclic(mol):
+        return None
+
+    # Assign CIP labels
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    # Find bridgehead atoms
+    bridgeheads = get_bridgehead_atoms(mol)
+
+    if len(bridgeheads) != 2:
+        # No stereochemistry to report
+        return parent_name
+
+    # Get ring sizes to determine proper locant scheme
+    ring_sizes = get_fused_ring_sizes(mol)
+
+    # Get junction locants (4a, 8a for 6,6-fused)
+    junction_locants = get_junction_locants_for_fused_system(
+        mol, bridgeheads, ring_sizes[0], ring_sizes[1]
+    )
+
+    # Collect stereodescriptors for junction atoms
+    stereo_descriptors = collect_ring_junction_stereo(mol, bridgeheads, junction_locants)
+
+    if not stereo_descriptors:
+        return parent_name
+
+    # Format the stereodescriptor prefix
+    stereo_prefix = format_ring_junction_stereo(stereo_descriptors)
+
+    return f"{stereo_prefix}{parent_name}"
+
+
+def get_ring_junction_stereo_prefix(mol) -> str:
+    """
+    Get the stereochemistry prefix for ring junction atoms in a fused system.
+
+    This is a utility function that can be used by other naming functions
+    to add ring junction stereochemistry to a name.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Stereodescriptor prefix like "(4aS,8aS)-" or "" if no stereo
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')
+        >>> get_ring_junction_stereo_prefix(mol)
+        '(4as,8as)-'
+    """
+    # Assign CIP labels
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    # Find bridgehead atoms
+    bridgeheads = get_bridgehead_atoms(mol)
+
+    if not bridgeheads:
+        return ""
+
+    # Get ring sizes
+    ring_sizes = get_fused_ring_sizes(mol)
+    if ring_sizes == (0, 0):
+        return ""
+
+    # Get junction locants
+    junction_locants = get_junction_locants_for_fused_system(
+        mol, bridgeheads, ring_sizes[0], ring_sizes[1]
+    )
+
+    # Collect stereodescriptors
+    stereo_descriptors = collect_ring_junction_stereo(mol, bridgeheads, junction_locants)
+
+    if not stereo_descriptors:
+        return ""
+
+    return format_ring_junction_stereo(stereo_descriptors)
+
+
+def get_simple_cis_trans_prefix(mol) -> str:
+    """
+    Get simple cis/trans prefix for bicyclic ring junction.
+
+    For simple bicyclic systems, returns "cis-" or "trans-" instead of
+    the full (4aR,8aS)- notation. This is a common simplification.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        "cis-" or "trans-" or "" if cannot determine
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')
+        >>> get_simple_cis_trans_prefix(mol)
+        'cis-'
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@H]2C1')
+        >>> get_simple_cis_trans_prefix(mol)
+        'trans-'
+    """
+    bridgeheads = get_bridgehead_atoms(mol)
+
+    if len(bridgeheads) != 2:
+        return ""
+
+    result = determine_simple_cis_trans(mol, bridgeheads)
+
+    if result:
+        return f"{result}-"
+    return ""
