@@ -171,6 +171,76 @@ RETAINED_NAMES = {
     "CC(C)CC(N)C(=O)O": "leucine",
     "CCC(C)C(N)C(=O)O": "isoleucine",
     "OC(=O)C(N)Cc1ccccc1": "phenylalanine",
+    "NC(Cc1c[nH]c2ccccc12)C(=O)O": "tryptophan",
+    "NC(Cc1ccc(O)cc1)C(=O)O": "tyrosine",
+    "CSCCC(N)C(=O)O": "methionine",
+    "NC(CS)C(=O)O": "cysteine",
+    "NC(CC(=O)O)C(=O)O": "aspartic acid",
+    "NC(CCC(=O)O)C(=O)O": "glutamic acid",
+    "NC(=O)CC(N)C(=O)O": "asparagine",
+    "NC(=O)CCC(N)C(=O)O": "glutamine",
+    "NCCCCC(N)C(=O)O": "lysine",
+    "N=C(N)NCCCC(N)C(=O)O": "arginine",
+    "NC(Cc1c[nH]cn1)C(=O)O": "histidine",
+    "O=C(O)C1CCCN1": "proline",
+    "NC(CO)C(=O)O": "serine",
+    "CC(O)C(N)C(=O)O": "threonine",
+
+    # === ADDITIONAL SATURATED HETEROCYCLES (Phase 8 expansion) ===
+    "C1COCCO1": "1,4-dioxane",
+    "C1CSCCO1": "thiomorpholine",
+    "C1CN2CCC1CC2": "quinuclidine",
+    "C1CCC2NCCCC2C1": "decahydroquinoline",
+    "C1CCN2CCCCC2C1": "decahydroisoquinoline",
+
+    # === FATTY ACIDS (Phase 8 expansion) ===
+    "CCCCC(=O)O": "pentanoic acid",
+    "CCCCCC(=O)O": "hexanoic acid",
+    "CCCCCCCC(=O)O": "octanoic acid",
+    "CCCCCCCCCC(=O)O": "decanoic acid",
+    "CCCCCCCCCCCC(=O)O": "dodecanoic acid",
+    "CCCCCCCCCCCCCC(=O)O": "tetradecanoic acid",
+    "CCCCCCCCCCCCCCCC(=O)O": "hexadecanoic acid",
+    "CCCCCCCCCCCCCCCCCC(=O)O": "octadecanoic acid",
+
+    # === BRANCHED CARBOXYLIC ACIDS (Phase 8 expansion) ===
+    "CC(C)C(=O)O": "isobutyric acid",
+    "CC(C)CC(=O)O": "isovaleric acid",
+    "CC(C)(C)C(=O)O": "pivalic acid",
+
+    # === UNSATURATED ACIDS (Phase 8 expansion) ===
+    "CC=CC(=O)O": "crotonic acid",
+    "CC=CC=CC(=O)O": "sorbic acid",
+
+    # === ALDEHYDES (Phase 8 expansion) ===
+    "CCCC=O": "butyraldehyde",
+    "CCCCC=O": "valeraldehyde",
+    "CC=CC=O": "crotonaldehyde",
+
+    # === KETONES (Phase 8 expansion) ===
+    "CC(=O)CC(C)(C)C": "pinacolone",
+    "CC(=O)C=C(C)C": "mesityl oxide",
+
+    # === DIOLS AND POLYOLS (Phase 8 expansion) ===
+    "OCCO": "ethylene glycol",
+    "CC(O)CO": "propylene glycol",
+    "OCCCO": "trimethylene glycol",
+    "OCCCCO": "butane-1,4-diol",
+
+    # === UNSATURATED ALCOHOLS (Phase 8 expansion) ===
+    "C=CCO": "allyl alcohol",
+    "C#CCO": "propargyl alcohol",
+
+    # === TERPENES (Phase 8 expansion) ===
+    "C=C(C)C1CC=C(C)CC1": "limonene",
+    "CC12CCC(CC1=O)C2(C)C": "camphor",
+
+    # === NAPHTHOLS AND BIPHENYLS (Phase 8 expansion) ===
+    "Oc1ccc2ccccc2c1": "2-naphthol",
+    "Oc1ccc(-c2ccccc2)cc1": "4-phenylphenol",
+
+    # === COMMON PHARMACEUTICALS (Phase 8 expansion) ===
+    "CC(=O)Oc1ccccc1C(=O)O": "aspirin",
 }
 
 
