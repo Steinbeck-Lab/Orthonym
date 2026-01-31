@@ -54,17 +54,17 @@ class TestPurineDerivatives:
         assert 'purin' in result.lower(), f"Got: {result}"
 
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="Complex N-substitution with specific locants - Phase 8")
     def test_caffeine_structure(self):
-        """Caffeine: 1,3,7-trimethyl-1H-purine-2,6-dione.
+        """Caffeine: 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione.
 
-        Note: Current implementation uses N-methyl format.
-        True caffeine naming requires specific locant assignment for
-        N-methyl groups at positions 1, 3, 7.
+        Caffeine naming uses numeric locants for N-substitution positions
+        (1,3,7-trimethyl) rather than N-methyl format, following IUPAC
+        rules for xanthine derivatives.
         """
         result = name_compound('Cn1cnc2c1c(=O)n(c(=O)n2C)C')
-        # Full IUPAC name would be 1,3,7-trimethyl-1H-purine-2,6-dione
-        assert '1,3,7-trimethyl' in result
+        # Full IUPAC name with dihydro prefix
+        expected = '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione'
+        assert result == expected, f"Expected '{expected}', got '{result}'"
 
 
 # =============================================================================
@@ -375,7 +375,7 @@ class TestPhaseSummaryCounts:
         - purine_base: 1
         - adenine: 1
         - hypoxanthine_like: 1
-        - caffeine_structure: 1 (xfail)
+        - caffeine_structure: 1 (resolved in Phase 8 plan 04)
 
         TestSubstitutedIndoles: 7 tests
         - unsubstituted_indole: 1
