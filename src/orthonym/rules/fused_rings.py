@@ -28,6 +28,11 @@ from ..data.fused_heterocycles import (
     match_fused_heterocycle_core,
     FUSED_HETEROCYCLE_DATA,
 )
+from ..data.xanthine_derivatives import (
+    identify_xanthine,
+    get_xanthine_name,
+    is_xanthine_derivative,
+)
 from ..perception.rings import (
     get_ring_info,
     get_ring_systems,
@@ -192,10 +197,12 @@ def name_fused_heterocycle(mol) -> Optional[str]:
     Generate IUPAC name for a fused heterocycle.
 
     Naming priority:
-    1. Check retained names FIRST (indole, quinoline, carbazole, etc.)
-    2. Add tautomer locant if present (1H-indole)
-    3. For substituted: find substituents and add prefixes
-    4. Handle N-substitution specially (N-methyl, not 1-methyl)
+    1. Check xanthine derivatives FIRST (caffeine, theophylline, etc.)
+       - These have specific N-position numbering (1,3,7-trimethyl format)
+    2. Check retained names (indole, quinoline, carbazole, etc.)
+    3. Add tautomer locant if present (1H-indole)
+    4. For substituted: find substituents and add prefixes
+    5. Handle N-substitution specially (N-methyl, not 1-methyl)
 
     Args:
         mol: RDKit Mol object
@@ -210,9 +217,19 @@ def name_fused_heterocycle(mol) -> Optional[str]:
         >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
         >>> name_fused_heterocycle(mol)
         '5-methyl-1H-indole'
+        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(c(=O)n2C)C')  # caffeine
+        >>> name_fused_heterocycle(mol)
+        '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione'
     """
     if mol is None:
         return None
+
+    # Check xanthine derivatives FIRST (caffeine, theophylline, etc.)
+    # These have specific N-position numbering that differs from standard
+    # heterocycle patterns (uses numeric locants like 1,3,7-trimethyl)
+    xanthine_name = get_xanthine_name(mol)
+    if xanthine_name:
+        return xanthine_name
 
     # First try exact match for unsubstituted fused heterocycle
     result = get_fused_heterocycle_name(mol)
