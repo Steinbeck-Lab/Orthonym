@@ -159,9 +159,17 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     if symbol == 'O':
         return _identify_oxygen_group(mol, start_idx, ring_atoms)
 
-    # Carbon-based groups (alkyl)
+    # Carbon-based groups (alkyl or functionalized chain)
     if symbol == 'C':
-        return _identify_alkyl_group(mol, start_idx, ring_atoms)
+        # Try simple alkyl first
+        alkyl_result = _identify_alkyl_group(mol, start_idx, ring_atoms)
+        if alkyl_result:
+            return alkyl_result
+
+        # Try functionalized chain (chains with FG like -CCCC(=O)O)
+        func_chain = _identify_functionalized_chain(mol, start_idx, ring_atoms)
+        if func_chain:
+            return func_chain
 
     return None
 
@@ -289,6 +297,131 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
     if carbon_count in ALKYL_NAMES:
         # TODO: Check for branching (isopropyl vs propyl, etc.)
         return ALKYL_NAMES[carbon_count]
+
+    return None
+
+
+def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
+    """
+    Identify a chain with functional group attached to benzene ring.
+
+    This handles cases like `-CCCC(=O)O` (butanoic acid chain) that the
+    simple alkyl detection misses because they contain heteroatoms.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Index of the first atom attached to the ring
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        Dict with 'name': 'functionalized_chain', 'atoms': [list of atom indices],
+        'chain_length': int, 'functional_group': str
+        Or None if not a functionalized chain
+    """
+    # BFS to find all atoms in the substituent
+    visited = {start_idx}
+    queue = [start_idx]
+    all_atoms = []
+    carbon_count = 0
+    has_heteroatom = False
+
+    while queue:
+        current_idx = queue.pop(0)
+        current_atom = mol.GetAtomWithIdx(current_idx)
+        all_atoms.append(current_idx)
+
+        symbol = current_atom.GetSymbol()
+        if symbol == 'C':
+            carbon_count += 1
+        elif symbol != 'H':
+            has_heteroatom = True
+
+        for neighbor in current_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in ring_atoms:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    # Only consider if there's a heteroatom (indicating functional group)
+    if not has_heteroatom:
+        return None
+
+    # Check for common functional groups
+    functional_group = _detect_chain_functional_group(mol, all_atoms)
+    if not functional_group:
+        return None
+
+    return {
+        'name': 'functionalized_chain',
+        'atoms': all_atoms,
+        'chain_length': carbon_count,
+        'functional_group': functional_group
+    }
+
+
+def _detect_chain_functional_group(mol, chain_atoms: List[int]) -> Optional[str]:
+    """
+    Detect what functional group is on a chain.
+
+    Checks for carboxylic acid, alcohol, and aldehyde patterns.
+
+    Args:
+        mol: RDKit Mol object
+        chain_atoms: List of atom indices in the chain
+
+    Returns:
+        Functional group name ('carboxylic_acid', 'alcohol', 'aldehyde') or None
+    """
+    chain_set = set(chain_atoms)
+
+    # Check for carboxylic acid pattern: C(=O)O with O having H
+    for idx in chain_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+
+        neighbors = list(atom.GetNeighbors())
+        o_double = None
+        o_single = None
+
+        for nbr in neighbors:
+            if nbr.GetSymbol() == 'O':
+                bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if bond.GetBondType() == Chem.BondType.DOUBLE:
+                    o_double = nbr
+                elif bond.GetBondType() == Chem.BondType.SINGLE:
+                    if nbr.GetTotalNumHs() >= 1:  # -OH
+                        o_single = nbr
+
+        if o_double and o_single:
+            return 'carboxylic_acid'
+
+    # Check for aldehyde pattern: C(=O)H (must check before alcohol)
+    for idx in chain_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'C' and atom.GetTotalNumHs() >= 1:
+            for nbr in atom.GetNeighbors():
+                if nbr.GetSymbol() == 'O':
+                    bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                    if bond.GetBondType() == Chem.BondType.DOUBLE:
+                        return 'aldehyde'
+
+    # Check for alcohol pattern: C-O-H
+    for idx in chain_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'O' and atom.GetTotalNumHs() >= 1:
+            # Check it's not part of carboxylic acid (already checked above)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetSymbol() == 'C':
+                    c_atom = nbr
+                    has_double_o = False
+                    for c_nbr in c_atom.GetNeighbors():
+                        if c_nbr.GetSymbol() == 'O' and c_nbr.GetIdx() != atom.GetIdx():
+                            bond = mol.GetBondBetweenAtoms(c_atom.GetIdx(), c_nbr.GetIdx())
+                            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                                has_double_o = True
+                    if not has_double_o:
+                        return 'alcohol'
 
     return None
 
