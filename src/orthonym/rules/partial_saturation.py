@@ -80,6 +80,9 @@ def detect_partial_saturation(
     if mol is None:
         return None
 
+    if aromatic_parent_smiles is None:
+        return None
+
     parent = Chem.MolFromSmiles(aromatic_parent_smiles)
     if parent is None:
         return None
