@@ -256,6 +256,55 @@ def assemble_name(features: Any, style: str = "pin") -> str:
             if name:
                 return name
 
+    # Handle phosphorus functional class compounds (phosphine oxide, phosphates, phosphines)
+    # These use functional class or substitutive naming, not suffix-based
+    if features.principal_group == 'phosphine_oxide':
+        from ..rules.phosphorus import name_phosphine_oxide
+        matches = features.functional_groups.get('phosphine_oxide', [])
+        if matches:
+            name = name_phosphine_oxide(features.mol, matches[0])
+            if name:
+                return name
+
+    # Handle phosphate esters
+    if features.principal_group in ('phosphate_triester', 'phosphate_diester', 'phosphate_monoester'):
+        from ..rules.phosphorus import name_phosphate_ester
+        fg_key = features.principal_group
+        matches = features.functional_groups.get(fg_key, [])
+        if matches:
+            # Find phosphorus atom index from SMARTS match
+            for idx in matches[0]:
+                atom = features.mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'P':
+                    name = name_phosphate_ester(features.mol, idx)
+                    if name:
+                        return name
+                    break
+
+    # Handle phosphines (tertiary, secondary, primary)
+    if features.principal_group in ('tertiary_phosphine', 'secondary_phosphine', 'primary_phosphine'):
+        from ..rules.phosphorus import name_phosphine
+        fg_key = features.principal_group
+        matches = features.functional_groups.get(fg_key, [])
+        if matches:
+            # Find phosphorus atom index
+            for idx in matches[0]:
+                atom = features.mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'P':
+                    name = name_phosphine(features.mol, idx)
+                    if name:
+                        return name
+                    break
+
+    # Handle phosphinic acid (suffix naming, but needs special assembly)
+    if features.principal_group == 'phosphinic_acid':
+        from ..rules.phosphorus import name_phosphinic_acid
+        matches = features.functional_groups.get('phosphinic_acid', [])
+        if matches:
+            name = name_phosphinic_acid(features.mol, matches[0])
+            if name:
+                return name
+
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
