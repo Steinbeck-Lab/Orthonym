@@ -27,6 +27,121 @@ from ..rules.bicyclo import is_bicyclo_system, name_bicyclo_system
 from ..rules.spiro import is_spiro_system, name_spiro_system
 from ..rules.fused_rings import classify_fused_system, name_fused_heterocycle, name_ortho_fused_bicyclic
 
+# Partial saturation imports for fused heterocycles
+from ..rules.partial_saturation import (
+    detect_partial_saturation,
+    format_saturation_prefix,
+    analyze_saturation_for_naming,
+)
+from ..data.partial_saturation_refs import get_aromatic_reference, get_reference_smiles
+
+
+def get_saturation_prefix_for_fused_ring(
+    mol,
+    aromatic_parent_name: Optional[str] = None,
+    atom_to_locant: Optional[Dict[int, Any]] = None
+) -> Optional[str]:
+    """
+    Generate saturation prefix for a fused ring system.
+
+    This is a helper function for the composer that handles the complete
+    workflow of detecting partial saturation and formatting the prefix.
+
+    IUPAC 2013 ordering for partially saturated fused heterocycles:
+    [substituents]-[saturation prefix]-[indicated H]-[parent]
+    Example: 5-methyl-2,3-dihydro-1H-indole
+
+    Args:
+        mol: RDKit Mol object
+        aromatic_parent_name: Name of the aromatic parent (e.g., 'quinoline')
+            If not provided, attempts to auto-detect from molecular structure.
+        atom_to_locant: Optional mapping from atom index to IUPAC locant.
+            If provided, generates locants in the prefix.
+
+    Returns:
+        Formatted saturation prefix string (e.g., '2,3-dihydro', '1,2,3,4-tetrahydro'),
+        or None if no saturation detected or parent not found.
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
+        >>> get_saturation_prefix_for_fused_ring(mol, 'quinoline')
+        '1,2,3,4-tetrahydro'  # if atom_to_locant provided
+    """
+    if mol is None:
+        return None
+
+    # Try to find aromatic parent if not provided
+    aromatic_smiles = None
+    if aromatic_parent_name:
+        aromatic_smiles = get_reference_smiles(aromatic_parent_name)
+    else:
+        # Auto-detect aromatic parent
+        ref_result = get_aromatic_reference(mol)
+        if ref_result:
+            _, aromatic_smiles = ref_result
+
+    if not aromatic_smiles:
+        return None
+
+    # Use analyze_saturation_for_naming if we have locant mapping
+    if atom_to_locant:
+        return analyze_saturation_for_naming(mol, aromatic_smiles, atom_to_locant)
+
+    # Otherwise, just detect saturation and return prefix without locants
+    result = detect_partial_saturation(mol, aromatic_smiles)
+    if result is None:
+        return None
+
+    return result['prefix']
+
+
+def assemble_fused_ring_with_saturation(
+    core_name: str,
+    saturation_prefix: Optional[str],
+    substituent_prefixes: Optional[str] = None,
+    indicated_h: Optional[str] = None
+) -> str:
+    """
+    Assemble a fused ring name with saturation prefix in correct IUPAC order.
+
+    IUPAC 2013 ordering rule for partially saturated fused heterocycles:
+    [substituents]-[saturation prefix]-[indicated H]-[parent]
+
+    Args:
+        core_name: Parent name (e.g., 'indole', 'quinoline')
+        saturation_prefix: Saturation prefix (e.g., '2,3-dihydro', 'tetrahydro')
+        substituent_prefixes: Optional substituent prefixes (e.g., '5-methyl')
+        indicated_h: Optional indicated hydrogen (e.g., '1H')
+
+    Returns:
+        Assembled IUPAC name
+
+    Examples:
+        >>> assemble_fused_ring_with_saturation('indole', '2,3-dihydro', None, '1H')
+        '2,3-dihydro-1H-indole'
+        >>> assemble_fused_ring_with_saturation('indole', '2,3-dihydro', '5-methyl', '1H')
+        '5-methyl-2,3-dihydro-1H-indole'
+    """
+    parts = []
+
+    # Add substituent prefixes (alphabetized, with locants)
+    if substituent_prefixes:
+        parts.append(substituent_prefixes)
+
+    # Add saturation prefix (comes after substituents, before indicated H)
+    if saturation_prefix:
+        parts.append(saturation_prefix)
+
+    # Add indicated hydrogen (e.g., 1H, 9H)
+    if indicated_h:
+        parts.append(indicated_h)
+
+    # Add parent name
+    parts.append(core_name)
+
+    # Join with hyphens
+    return '-'.join(parts)
+
 
 # Chain length prefixes (IUPAC Blue Book)
 CHAIN_PREFIXES = {
