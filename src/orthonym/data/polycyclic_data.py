@@ -424,3 +424,409 @@ def get_pah_substituent_positions(mol, pah_name: str) -> List[int]:
                 break
 
     return sorted(set(substituted_positions))
+
+
+# =============================================================================
+# Complex Fusion Data
+# Pre-computed fusion descriptors for known complex polycyclic systems
+# =============================================================================
+
+# Complex fusion data for multi-component and advanced fused systems
+# Key: canonical name
+# Value: dict with smiles, prefix, descriptor, parent, child, child_count
+COMPLEX_FUSION_DATA: Dict[str, Dict[str, Any]] = {
+    # Dibenzo compounds (two benzene rings fused to parent)
+    'dibenzo[a,c]anthracene': {
+        'smiles': 'c1ccc2c(c1)cc1ccc3cc4ccccc4cc3c1c2',
+        'prefix': 'dibenzo',
+        'descriptor': '[a,c]',
+        'parent': 'anthracene',
+        'child': 'benzene',
+        'child_count': 2,
+        'num_rings': 5,
+    },
+    'dibenzo[a,h]anthracene': {
+        'smiles': 'c1ccc2c(c1)ccc1cc3ccc4ccccc4c3cc12',
+        'prefix': 'dibenzo',
+        'descriptor': '[a,h]',
+        'parent': 'anthracene',
+        'child': 'benzene',
+        'child_count': 2,
+        'num_rings': 5,
+    },
+    'dibenzo[a,j]anthracene': {
+        'smiles': 'c1ccc2c(c1)c3ccc4ccccc4c3cc2c1ccccc1',
+        'prefix': 'dibenzo',
+        'descriptor': '[a,j]',
+        'parent': 'anthracene',
+        'child': 'benzene',
+        'child_count': 2,
+        'num_rings': 5,
+    },
+
+    # Naphtho compounds (naphthalene fused to heterocycle)
+    'naphtho[2,3-b]furan': {
+        'smiles': 'c1ccc2cc3occc3cc2c1',
+        'prefix': 'naphtho',
+        'descriptor': '[2,3-b]',
+        'parent': 'furan',
+        'child': 'naphthalene',
+        'child_count': 1,
+        'num_rings': 3,
+    },
+    'naphtho[1,2-b]furan': {
+        'smiles': 'c1ccc2c(c1)cc1ccoc1c2',
+        'prefix': 'naphtho',
+        'descriptor': '[1,2-b]',
+        'parent': 'furan',
+        'child': 'naphthalene',
+        'child_count': 1,
+        'num_rings': 3,
+    },
+    'naphtho[2,3-b]thiophene': {
+        'smiles': 'c1ccc2cc3sccc3cc2c1',
+        'prefix': 'naphtho',
+        'descriptor': '[2,3-b]',
+        'parent': 'thiophene',
+        'child': 'naphthalene',
+        'child_count': 1,
+        'num_rings': 3,
+    },
+    'naphtho[1,2-b]thiophene': {
+        'smiles': 'c1ccc2c(c1)cc1ccsc1c2',
+        'prefix': 'naphtho',
+        'descriptor': '[1,2-b]',
+        'parent': 'thiophene',
+        'child': 'naphthalene',
+        'child_count': 1,
+        'num_rings': 3,
+    },
+
+    # Pyrido compounds (pyridine fused to pyrimidine/other heterocycles)
+    'pyrido[2,3-d]pyrimidine': {
+        'smiles': 'c1cnc2nccnc2c1',
+        'prefix': 'pyrido',
+        'descriptor': '[2,3-d]',
+        'parent': 'pyrimidine',
+        'child': 'pyridine',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+    'pyrido[3,4-d]pyrimidine': {
+        'smiles': 'c1cnc2ncncc2c1',
+        'prefix': 'pyrido',
+        'descriptor': '[3,4-d]',
+        'parent': 'pyrimidine',
+        'child': 'pyridine',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+    'pyrido[4,3-d]pyrimidine': {
+        'smiles': 'c1cnc2cncnc2c1',
+        'prefix': 'pyrido',
+        'descriptor': '[4,3-d]',
+        'parent': 'pyrimidine',
+        'child': 'pyridine',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+
+    # Furo compounds
+    'furo[2,3-b]pyridine': {
+        'smiles': 'c1cc2ccoc2nc1',
+        'prefix': 'furo',
+        'descriptor': '[2,3-b]',
+        'parent': 'pyridine',
+        'child': 'furan',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+    'furo[3,2-b]pyridine': {
+        'smiles': 'c1cc2occc2nc1',
+        'prefix': 'furo',
+        'descriptor': '[3,2-b]',
+        'parent': 'pyridine',
+        'child': 'furan',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+
+    # Thieno compounds
+    'thieno[2,3-b]pyridine': {
+        'smiles': 'c1cc2ccsc2nc1',
+        'prefix': 'thieno',
+        'descriptor': '[2,3-b]',
+        'parent': 'pyridine',
+        'child': 'thiophene',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+    'thieno[3,2-b]pyridine': {
+        'smiles': 'c1cc2sccc2nc1',
+        'prefix': 'thieno',
+        'descriptor': '[3,2-b]',
+        'parent': 'pyridine',
+        'child': 'thiophene',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+
+    # Imidazo compounds
+    'imidazo[1,2-a]pyridine': {
+        'smiles': 'c1ccn2ccnc2c1',
+        'prefix': 'imidazo',
+        'descriptor': '[1,2-a]',
+        'parent': 'pyridine',
+        'child': 'imidazole',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+    'imidazo[4,5-b]pyridine': {
+        'smiles': 'c1cc2nc[nH]c2nc1',
+        'prefix': 'imidazo',
+        'descriptor': '[4,5-b]',
+        'parent': 'pyridine',
+        'child': 'imidazole',
+        'child_count': 1,
+        'num_rings': 2,
+    },
+}
+
+# Reverse lookup: canonical SMILES -> complex fusion name
+_COMPLEX_SMILES_TO_NAME: Dict[str, str] = {
+    data['smiles']: name
+    for name, data in COMPLEX_FUSION_DATA.items()
+}
+
+
+# Edge numbering data for common parent rings
+# Maps parent ring name to dict of edge positions (0-indexed) to letters
+# Edge 'a' is between IUPAC atoms 1-2, 'b' between 2-3, etc.
+PARENT_RING_EDGES: Dict[str, Dict[int, str]] = {
+    'naphthalene': {
+        # 10 atoms, 10 edges (some are fusion edges, not substituable)
+        # Edge labels based on IUPAC numbering
+        0: 'a',  # between atoms 1-2
+        1: 'b',  # between atoms 2-3
+        2: 'c',  # between atoms 3-4 (peri-fusion)
+        3: 'd',  # between atoms 4-4a
+        4: 'e',  # between atoms 4a-5
+        5: 'f',  # between atoms 5-6
+        6: 'g',  # between atoms 6-7
+        7: 'h',  # between atoms 7-8
+        8: 'i',  # between atoms 8-8a
+        9: 'j',  # between atoms 8a-1
+    },
+    'anthracene': {
+        # 14 atoms, 14 edges
+        0: 'a',   # between atoms 1-2
+        1: 'b',   # between atoms 2-3
+        2: 'c',   # between atoms 3-4
+        3: 'd',   # between atoms 4-4a
+        4: 'e',   # between atoms 4a-10
+        5: 'f',   # between atoms 10-10a
+        6: 'g',   # between atoms 10a-5
+        7: 'h',   # between atoms 5-6
+        8: 'i',   # between atoms 6-7
+        9: 'j',   # between atoms 7-8
+        10: 'k',  # between atoms 8-8a
+        11: 'l',  # between atoms 8a-9
+        12: 'm',  # between atoms 9-9a
+        13: 'n',  # between atoms 9a-1
+    },
+    'phenanthrene': {
+        # 14 atoms, 14 edges (angular arrangement)
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+        6: 'g',
+        7: 'h',
+        8: 'i',
+        9: 'j',
+        10: 'k',
+        11: 'l',
+        12: 'm',
+        13: 'n',
+    },
+    'benzene': {
+        # 6 atoms, 6 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+    },
+    'furan': {
+        # 5 atoms, 5 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+    },
+    'thiophene': {
+        # 5 atoms, 5 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+    },
+    'pyrrole': {
+        # 5 atoms, 5 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+    },
+    'pyridine': {
+        # 6 atoms, 6 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+    },
+    'pyrimidine': {
+        # 6 atoms, 6 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+        5: 'f',
+    },
+    'imidazole': {
+        # 5 atoms, 5 edges
+        0: 'a',
+        1: 'b',
+        2: 'c',
+        3: 'd',
+        4: 'e',
+    },
+}
+
+
+# Extended fusion prefixes (additions to existing FUSION_PREFIXES)
+EXTENDED_FUSION_PREFIXES: Dict[str, str] = {
+    # Additional prefixes not in main fusion_descriptors.py
+    'phenanthro': 'phenanthro',  # explicit form
+    'acenaphtho': 'acenaphtho',
+    'acenaphtheno': 'acenaphtheno',  # for acenaphthene
+    'fluoreno': 'fluoreno',
+    'chryseno': 'chryseno',
+    'triphenyleno': 'triphenyleno',
+    'peryleno': 'peryleno',
+    'coroneno': 'coroneno',
+    'pyrazolo': 'pyrazolo',
+    'isoxazolo': 'isoxazolo',
+    'isothiazolo': 'isothiazolo',
+    'oxazolo': 'oxazolo',
+    'thiazolo': 'thiazolo',
+    'triazolo': 'triazolo',
+    'tetrazolo': 'tetrazolo',
+    'pyrazino': 'pyrazino',
+    'pyridazino': 'pyridazino',
+    'triazino': 'triazino',
+}
+
+
+def get_complex_fusion_info(smiles: str) -> Optional[Tuple[str, str, str]]:
+    """
+    Look up pre-computed fusion descriptor for a known complex polycyclic.
+
+    Args:
+        smiles: SMILES string of the compound
+
+    Returns:
+        Tuple of (prefix, descriptor, parent) if found, None otherwise
+        Example: ('dibenzo', '[a,c]', 'anthracene')
+
+    Example:
+        >>> get_complex_fusion_info('c1ccc2c(c1)cc1ccc3cc4ccccc4cc3c1c2')
+        ('dibenzo', '[a,c]', 'anthracene')
+    """
+    # Try exact SMILES match first
+    name = _COMPLEX_SMILES_TO_NAME.get(smiles)
+    if name and name in COMPLEX_FUSION_DATA:
+        data = COMPLEX_FUSION_DATA[name]
+        return (data['prefix'], data['descriptor'], data['parent'])
+
+    # Canonicalize and try again
+    try:
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            canonical = Chem.MolToSmiles(mol)
+            name = _COMPLEX_SMILES_TO_NAME.get(canonical)
+            if name and name in COMPLEX_FUSION_DATA:
+                data = COMPLEX_FUSION_DATA[name]
+                return (data['prefix'], data['descriptor'], data['parent'])
+    except Exception:
+        pass
+
+    return None
+
+
+def get_complex_fusion_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """
+    Look up complex fusion data by name.
+
+    Args:
+        name: Full fusion name (e.g., 'dibenzo[a,c]anthracene')
+
+    Returns:
+        Dict with fusion data if found, None otherwise
+    """
+    return COMPLEX_FUSION_DATA.get(name)
+
+
+def get_edge_letter(ring_name: str, edge_index: int) -> str:
+    """
+    Get the IUPAC edge letter for a given edge index in a parent ring.
+
+    Args:
+        ring_name: Name of the parent ring (e.g., 'anthracene')
+        edge_index: 0-indexed edge position
+
+    Returns:
+        Edge letter ('a', 'b', etc.) or empty string if not found
+
+    Example:
+        >>> get_edge_letter('anthracene', 0)
+        'a'
+        >>> get_edge_letter('anthracene', 2)
+        'c'
+    """
+    if ring_name not in PARENT_RING_EDGES:
+        return ''
+
+    edges = PARENT_RING_EDGES[ring_name]
+    return edges.get(edge_index, '')
+
+
+def get_all_edge_letters(ring_name: str) -> List[str]:
+    """
+    Get all available edge letters for a parent ring.
+
+    Args:
+        ring_name: Name of the parent ring
+
+    Returns:
+        List of edge letters in order
+
+    Example:
+        >>> get_all_edge_letters('benzene')
+        ['a', 'b', 'c', 'd', 'e', 'f']
+    """
+    if ring_name not in PARENT_RING_EDGES:
+        return []
+
+    edges = PARENT_RING_EDGES[ring_name]
+    return [edges[i] for i in sorted(edges.keys())]
