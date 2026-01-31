@@ -16,6 +16,7 @@ SENIORITY_ORDER = [
     "sulfonic_acid",
     "sulfinic_acid",
     "phosphonic_acid",
+    "phosphinic_acid",
     
     # Acid derivatives
     "anhydride",
@@ -69,6 +70,15 @@ SENIORITY_ORDER = [
     "sulfoxide",
     "sulfone",
     "thioether",  # Also called sulfide
+
+    # Phosphorus compounds (functional class or substitutive naming)
+    "phosphine_oxide",
+    "phosphate_triester",
+    "phosphate_diester",
+    "phosphate_monoester",
+    "tertiary_phosphine",
+    "secondary_phosphine",
+    "primary_phosphine",
 ]
 
 # Suffix forms for principal groups
@@ -78,6 +88,7 @@ SUFFIX_FORMS = {
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     "phosphonic_acid": ("phosphonic acid", "phosphonic acid"),
+    "phosphinic_acid": ("phosphinic acid", "phosphinic acid"),
     "anhydride": ("oic anhydride", "carboxylic anhydride"),
     "ester": ("oate", "carboxylate"),
     "acid_chloride": ("oyl chloride", "carbonyl chloride"),
@@ -142,6 +153,17 @@ PREFIX_FORMS = {
     # Sulfur oxidation states (functional class naming)
     "sulfoxide": None,  # Named by functional class (dimethyl sulfoxide)
     "sulfone": None,    # Named by functional class (dimethyl sulfone)
+    # Phosphorus compounds
+    "phosphonic_acid": "phosphono",
+    "phosphinic_acid": "phosphino",
+    # Phosphine oxide and phosphates use functional class naming
+    "phosphine_oxide": None,
+    "phosphate_triester": None,
+    "phosphate_diester": None,
+    "phosphate_monoester": None,
+    "tertiary_phosphine": None,
+    "secondary_phosphine": None,
+    "primary_phosphine": None,
 }
 
 

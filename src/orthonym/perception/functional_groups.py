@@ -19,6 +19,8 @@ FUNCTIONAL_GROUP_SMARTS = {
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
     "sulfinic_acid": "[SX3](=O)[OX2H1]",
     "phosphonic_acid": "[PX4](=O)([OX2H1])[OX2H1]",
+    # Phosphinic acid: R2P(=O)(OH) - two C attached to P
+    "phosphinic_acid": "[PX4](=O)([OX2H1])([#6])[#6]",
     
     # === ACID DERIVATIVES ===
     "anhydride": "[CX3](=O)[OX2][CX3](=O)",
@@ -77,6 +79,18 @@ FUNCTIONAL_GROUP_SMARTS = {
     "vinyl_ether": "[OX2]([#6])[CX3]=[CX3]",
     "aromatic_ether": "[OX2]([#6])[cX3]",
     "thioether": "[SX2]([#6])[#6]",
+
+    # === PHOSPHORUS COMPOUNDS (check more specific first) ===
+    # Phosphate esters (C-O-P bonds, not C-P bonds) - check before phosphine oxide
+    "phosphate_triester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2][#6]",
+    "phosphate_diester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2H1]",
+    "phosphate_monoester": "[PX4](=O)([OX2][#6])([OX2H1])[OX2H1]",
+    # Phosphine oxide: R3P=O - three C attached to P(V)
+    "phosphine_oxide": "[PX4](=O)([#6])([#6])[#6]",
+    # Phosphines (P(III)) - check last as parent hydride
+    "tertiary_phosphine": "[PX3]([#6])([#6])[#6]",
+    "secondary_phosphine": "[PX3H1]([#6])[#6]",
+    "primary_phosphine": "[PX3H2][#6]",
 
     # === SULFUR OXIDATION STATES (check more specific first) ===
     # Sulfone: S with 2 =O and 2 C neighbors (R-SO2-R')

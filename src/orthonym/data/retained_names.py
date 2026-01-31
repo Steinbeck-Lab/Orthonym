@@ -169,6 +169,32 @@ RETAINED_NAMES = {
     "CS(=O)(=O)O": "methanesulfonic acid",
     "CCS(=O)(=O)O": "ethanesulfonic acid",
     "O=S(=O)(O)c1ccccc1": "benzenesulfonic acid",
+
+    # === PHOSPHORUS COMPOUNDS (Phase 11) ===
+    # Phosphines (use IUPAC 2013 "phosphane" not "phosphine")
+    "CP": "methylphosphane",
+    "CCP": "ethylphosphane",
+    "CP(C)C": "trimethylphosphane",
+    "CCP(CC)CC": "triethylphosphane",
+    "c1ccc(P(c2ccccc2)c2ccccc2)cc1": "triphenylphosphane",
+    # Phosphine oxides
+    "CP(C)(C)=O": "trimethylphosphane oxide",
+    "CCP(=O)(CC)CC": "triethylphosphane oxide",
+    "O=P(c1ccccc1)(c1ccccc1)c1ccccc1": "triphenylphosphane oxide",
+    # Phosphonic acids
+    "CP(=O)(O)O": "methanephosphonic acid",
+    "CCP(=O)(O)O": "ethanephosphonic acid",
+    "O=P(O)(O)c1ccccc1": "phenylphosphonic acid",
+    # Phosphinic acids
+    "CP(C)(=O)O": "dimethylphosphinic acid",
+    "CCP(=O)(O)CC": "diethylphosphinic acid",
+    # Phosphate esters (functional class naming)
+    "COP(=O)(O)O": "methyl phosphate",
+    "COP(=O)(O)OC": "dimethyl phosphate",
+    "COP(=O)(OC)OC": "trimethyl phosphate",
+    "CCOP(=O)(O)O": "ethyl phosphate",
+    "CCOP(=O)(O)OCC": "diethyl phosphate",
+    "CCOP(=O)(OCC)OCC": "triethyl phosphate",
     
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",
