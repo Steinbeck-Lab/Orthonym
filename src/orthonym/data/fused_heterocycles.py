@@ -636,63 +636,63 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # =========================================================================
 
     # Naphtho[1,2-b]furan
-    # Canonical: c1ccc2c(c1)ccc1occc12
+    # Canonical: c1ccc2c(c1)ccc1occc12 (13 atoms)
     'c1ccc2c(c1)ccc1occc12': {
         'name': 'naphtho[1,2-b]furan',
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '2a', 11: '8b', 12: 9},
     },
 
     # Naphtho[1,2-b]thiophene
-    # Canonical: c1ccc2c(c1)ccc1sccc12
+    # Canonical: c1ccc2c(c1)ccc1sccc12 (13 atoms)
     'c1ccc2c(c1)ccc1sccc12': {
         'name': 'naphtho[1,2-b]thiophene',
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '2a', 11: '8b', 12: 9},
     },
 
     # Naphtho[1,2-b]pyrrole
-    # Canonical: c1ccc2c(c1)ccc1[nH]ccc12
+    # Canonical: c1ccc2c(c1)ccc1[nH]ccc12 (13 atoms)
     'c1ccc2c(c1)ccc1[nH]ccc12': {
         'name': '1H-naphtho[1,2-b]pyrrole',
         'tautomer_locant': 1,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '2a', 11: '8b', 12: 9},
     },
 
     # Naphtho[2,3-b]furan
-    # Canonical: c1ccc2cc3occc3cc2c1
+    # Canonical: c1ccc2cc3occc3cc2c1 (13 atoms)
     'c1ccc2cc3occc3cc2c1': {
         'name': 'naphtho[2,3-b]furan',
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
     },
 
     # Naphtho[2,3-b]thiophene
-    # Canonical: c1ccc2cc3sccc3cc2c1
+    # Canonical: c1ccc2cc3sccc3cc2c1 (13 atoms)
     'c1ccc2cc3sccc3cc2c1': {
         'name': 'naphtho[2,3-b]thiophene',
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
     },
 
     # Naphtho[2,3-b]pyrrole
-    # Canonical: c1ccc2cc3[nH]ccc3cc2c1
+    # Canonical: c1ccc2cc3[nH]ccc3cc2c1 (13 atoms)
     'c1ccc2cc3[nH]ccc3cc2c1': {
         'name': '1H-naphtho[2,3-b]pyrrole',
         'tautomer_locant': 1,
         'ring_system': 'naphtho-fused',
-        'parent_atoms': 12,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+        'parent_atoms': 13,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
     },
 
     # =========================================================================

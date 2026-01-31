@@ -213,8 +213,7 @@ RETAINED_NAMES = {
     "CC=CC=CC(=O)O": "sorbic acid",
 
     # === ALDEHYDES (Phase 8 expansion) ===
-    "CCCC=O": "butyraldehyde",
-    "CCCCC=O": "valeraldehyde",
+    # Note: butanal/pentanal preferred over butyraldehyde/valeraldehyde for consistency
     "CC=CC=O": "crotonaldehyde",
 
     # === KETONES (Phase 8 expansion) ===
