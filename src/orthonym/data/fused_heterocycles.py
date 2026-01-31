@@ -606,6 +606,272 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 4, 6: 3, 7: 1, 8: 2, 9: 5},
     },
+
+    # =========================================================================
+    # ADDITIONAL BENZO-FUSED HETEROCYCLES (Phase 8 expansion)
+    # =========================================================================
+
+    # 2,1,3-Benzothiadiazole: benzo[c][1,2,5]thiadiazole
+    # Canonical: c1ccc2nsnc2c1
+    'c1ccc2nsnc2c1': {
+        'name': '2,1,3-benzothiadiazole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+
+    # 2,1,3-Benzoxadiazole (benzofurazan): benzo[c][1,2,5]oxadiazole
+    # Canonical: c1ccc2nonc2c1
+    'c1ccc2nonc2c1': {
+        'name': '2,1,3-benzoxadiazole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+
+    # =========================================================================
+    # NAPHTHO-FUSED HETEROCYCLES (Phase 8 expansion)
+    # =========================================================================
+
+    # Naphtho[1,2-b]furan
+    # Canonical: c1ccc2c(c1)ccc1occc12
+    'c1ccc2c(c1)ccc1occc12': {
+        'name': 'naphtho[1,2-b]furan',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+    },
+
+    # Naphtho[1,2-b]thiophene
+    # Canonical: c1ccc2c(c1)ccc1sccc12
+    'c1ccc2c(c1)ccc1sccc12': {
+        'name': 'naphtho[1,2-b]thiophene',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+    },
+
+    # Naphtho[1,2-b]pyrrole
+    # Canonical: c1ccc2c(c1)ccc1[nH]ccc12
+    'c1ccc2c(c1)ccc1[nH]ccc12': {
+        'name': '1H-naphtho[1,2-b]pyrrole',
+        'tautomer_locant': 1,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4b', 5: 4, 6: 3, 7: 2, 8: 1, 9: '2a', 10: '8b', 11: 5},
+    },
+
+    # Naphtho[2,3-b]furan
+    # Canonical: c1ccc2cc3occc3cc2c1
+    'c1ccc2cc3occc3cc2c1': {
+        'name': 'naphtho[2,3-b]furan',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+    },
+
+    # Naphtho[2,3-b]thiophene
+    # Canonical: c1ccc2cc3sccc3cc2c1
+    'c1ccc2cc3sccc3cc2c1': {
+        'name': 'naphtho[2,3-b]thiophene',
+        'tautomer_locant': None,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+    },
+
+    # Naphtho[2,3-b]pyrrole
+    # Canonical: c1ccc2cc3[nH]ccc3cc2c1
+    'c1ccc2cc3[nH]ccc3cc2c1': {
+        'name': '1H-naphtho[2,3-b]pyrrole',
+        'tautomer_locant': 1,
+        'ring_system': 'naphtho-fused',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: '3a', 10: '9b', 11: 6, 12: 5},
+    },
+
+    # =========================================================================
+    # PYRIDO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # Pyrido[2,3-d]pyrimidine
+    # Canonical: c1cnc2ncncc2c1
+    'c1cnc2ncncc2c1': {
+        'name': 'pyrido[2,3-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyrimidine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+    },
+
+    # Pyrido[3,4-b]pyridine (1,6-naphthyridine isomer)
+    # Canonical: c1cnc2cccnc2c1
+    'c1cnc2cccnc2c1': {
+        'name': 'pyrido[3,4-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'naphthyridine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 1},
+    },
+
+    # Pyrido[2,3-b]pyrazine
+    # Canonical: c1cnc2nccnc2c1
+    'c1cnc2nccnc2c1': {
+        'name': 'pyrido[2,3-b]pyrazine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyrazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+    },
+
+    # Pyrido[3,2-b]pyridine (1,7-naphthyridine isomer)
+    # Canonical: c1cc2ccncc2cn1
+    'c1cc2ccncc2cn1': {
+        'name': 'pyrido[3,2-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'naphthyridine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 2, 1: 3, 2: '4a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '8a', 8: 8, 9: 1},
+    },
+
+    # Pyrido[3,4-b]pyridazine
+    # Canonical: c1cnc2ccnnc2c1
+    'c1cnc2ccnnc2c1': {
+        'name': 'pyrido[3,4-b]pyridazine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyridazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 1},
+    },
+
+    # =========================================================================
+    # IMIDAZO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # Imidazo[1,2-b]pyridazine
+    # Canonical: c1cnc2nccn2c1
+    'c1cnc2nccn2c1': {
+        'name': 'imidazo[1,2-b]pyridazine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '8a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 7},
+    },
+
+    # Imidazo[4,5-d]pyrimidine (purine core without NH)
+    # Canonical: c1ncc2[nH]cnc2n1
+    'c1ncc2[nH]cnc2n1': {
+        'name': '1H-imidazo[4,5-d]pyrimidine',
+        'tautomer_locant': 1,
+        'ring_system': 'purine-related',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 1, 2: 6, 3: 5, 4: 7, 5: 8, 6: 9, 7: 4, 8: 3},
+    },
+
+    # 1H-Imidazo[4,5-c]pyridine
+    # Canonical: c1cnc2[nH]cnc2c1
+    'c1cnc2[nH]cnc2c1': {
+        'name': '1H-imidazo[4,5-c]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'imidazopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 1, 5: 2, 6: 3, 7: '7a', 8: 4},
+    },
+
+    # =========================================================================
+    # THIENO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # Thieno[3,2-b]pyridine
+    # Canonical: c1cnc2ccsc2c1
+    'c1cnc2ccsc2c1': {
+        'name': 'thieno[3,2-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+    },
+
+    # Thieno[2,3-d]pyrimidine
+    # Canonical: c1cnc2ncsc2c1
+    'c1cnc2ncsc2c1': {
+        'name': 'thieno[2,3-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyrimidine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+    },
+
+    # =========================================================================
+    # PYRROLO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # 1H-Pyrrolo[3,2-c]pyridine
+    # Canonical: c1cnc2cc[nH]c2c1
+    'c1cnc2cc[nH]c2c1': {
+        'name': '1H-pyrrolo[3,2-c]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'azaindole',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 1, 7: '7a', 8: 2},
+    },
+
+    # =========================================================================
+    # FURO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # Furo[3,2-b]pyridine
+    # Canonical: c1cnc2ccoc2c1
+    'c1cnc2ccoc2c1': {
+        'name': 'furo[3,2-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'furopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+    },
+
+    # Furo[2,3-b]pyridine
+    # Canonical: c1cnc2occc2c1
+    'c1cnc2occc2c1': {
+        'name': 'furo[2,3-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'furopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+
+    # =========================================================================
+    # OXAZOLO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # Oxazolo[4,5-b]pyridine
+    # Canonical: c1cnc2ocnc2c1
+    'c1cnc2ocnc2c1': {
+        'name': 'oxazolo[4,5-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'oxazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+    },
+
+    # =========================================================================
+    # TRIAZOLO-FUSED SYSTEMS (Phase 8 expansion)
+    # =========================================================================
+
+    # [1,2,4]Triazolo[1,5-a]pyridine
+    # Canonical: c1cnc2nncn2c1
+    'c1cnc2nncn2c1': {
+        'name': '[1,2,4]triazolo[1,5-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 4},
+    },
 }
 
 
