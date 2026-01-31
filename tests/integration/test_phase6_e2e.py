@@ -701,16 +701,16 @@ class TestValidationRequirements:
     @pytest.mark.integration
     def test_valid01_bulk_validation_infrastructure(self):
         """VALID-01: Bulk validation script exists."""
-        import os
-        script_path = "/Volumes/Data_Drive/Project/2026/Orthonym/Project/"
-        assert os.path.exists(script_path), "validate_bulk.py should exist"
+        from pathlib import Path
+        script_path = Path(__file__).parent.parent.parent / "scripts" / "validate_bulk.py"
+        assert script_path.exists(), f"validate_bulk.py should exist at {script_path}"
 
     @pytest.mark.integration
     def test_valid02_roundtrip_validation_infrastructure(self):
         """VALID-02: Round-trip validation script exists."""
-        import os
-        script_path = "/Volumes/Data_Drive/Project/2026/Orthonym/Project/"
-        assert os.path.exists(script_path), "validate_roundtrip.py should exist"
+        from pathlib import Path
+        script_path = Path(__file__).parent.parent.parent / "scripts" / "validate_roundtrip.py"
+        assert script_path.exists(), f"validate_roundtrip.py should exist at {script_path}"
 
     @pytest.mark.integration
     def test_valid03_edge_case_documentation(self):

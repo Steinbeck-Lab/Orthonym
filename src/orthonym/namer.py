@@ -138,16 +138,17 @@ class Orthonym:
         
         # Get canonical SMILES for consistent processing
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
-        
-        # Check retained names first (benzene, methanol, etc.)
-        if canonical_smiles in RETAINED_NAMES:
-            return RETAINED_NAMES[canonical_smiles]
 
-        # Check for amino acids (standard amino acids use trivial names)
-        from .rules.amino_acids import name_amino_acid
-        aa_name = name_amino_acid(mol, canonical_smiles)
-        if aa_name:
-            return aa_name
+        # Check retained names first (benzene, methanol, etc.) unless systematic style requested
+        if self.style != "systematic":
+            if canonical_smiles in RETAINED_NAMES:
+                return RETAINED_NAMES[canonical_smiles]
+
+            # Check for amino acids (standard amino acids use trivial names)
+            from .rules.amino_acids import name_amino_acid
+            aa_name = name_amino_acid(mol, canonical_smiles)
+            if aa_name:
+                return aa_name
 
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
@@ -458,14 +459,18 @@ class Orthonym:
 def name_compound(smiles: str, style: str = "pin") -> str:
     """
     Convenience function to generate IUPAC name from SMILES.
-    
+
     Args:
         smiles: SMILES string
-        style: Naming style ("pin", "general", "cas")
-        
+        style: Naming style
+            - "pin": Preferred IUPAC Names (default, uses retained names when available)
+            - "systematic": Always generate systematic name (bypass retained names)
+            - "general": General IUPAC (more flexible)
+            - "cas": CAS-style naming
+
     Returns:
         IUPAC systematic name
-        
+
     Example:
         >>> name_compound("CCO")
         'ethanol'
@@ -473,6 +478,10 @@ def name_compound(smiles: str, style: str = "pin") -> str:
         'acetic acid'
         >>> name_compound("c1ccccc1")
         'benzene'
+        >>> name_compound("C=CCO")
+        'allyl alcohol'
+        >>> name_compound("C=CCO", style="systematic")
+        'prop-2-en-1-ol'
     """
     namer = Orthonym(style=style)
     return namer.name(smiles)

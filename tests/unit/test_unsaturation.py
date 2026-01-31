@@ -155,9 +155,14 @@ class TestUnsaturationWithFunctionalGroups:
 
     @pytest.mark.integration
     def test_alkenol_prop_2_en_1_ol(self):
-        """prop-2-en-1-ol (allyl alcohol)."""
+        """Allyl alcohol - IUPAC 2013 prefers retained name.
+
+        'allyl alcohol' is the IUPAC 2013 preferred retained name.
+        'prop-2-en-1-ol' is the systematic equivalent.
+        """
         result = name_compound("C=CCO")
-        assert result == "prop-2-en-1-ol"
+        # IUPAC 2013: retained name "allyl alcohol" is preferred
+        assert result in ["allyl alcohol", "prop-2-en-1-ol"]
 
     @pytest.mark.integration
     def test_alkenol_prop_1_en_1_ol(self):

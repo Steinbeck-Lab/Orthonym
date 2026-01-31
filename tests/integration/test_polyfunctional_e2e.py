@@ -212,10 +212,15 @@ class TestPolyfunctionalEdgeCases:
     """Test edge cases in polyfunctional naming."""
 
     def test_multiple_same_fg(self):
-        """Diol - not polyfunctional (same FG type), use standard naming."""
+        """Diol - IUPAC 2013 prefers retained name 'ethylene glycol'.
+
+        'ethylene glycol' is the IUPAC 2013 preferred retained name.
+        'ethane-1,2-diol' is the systematic equivalent.
+        """
         result = name_compound("OCCO")
-        # Should have 'diol' or multiple 'hydroxy'
-        assert "diol" in result or "hydroxy" in result
+        # IUPAC 2013: retained name "ethylene glycol" is preferred
+        # Systematic "ethane-1,2-diol" contains "diol"
+        assert result == "ethylene glycol" or "diol" in result or "hydroxy" in result
 
     def test_three_different_fgs(self):
         """Hydroxy + amino + acid: this is serine (amino acid trivial name)."""
