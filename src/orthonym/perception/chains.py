@@ -308,11 +308,128 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: Set[int]) -> List[int]:
 def get_chain_atoms_with_locants(chain: List[int]) -> Dict[int, int]:
     """
     Create mapping from atom index to locant number.
-    
+
     Args:
         chain: Ordered list of atom indices
-        
+
     Returns:
         Dict mapping atom_idx -> locant (1-indexed)
     """
     return {atom_idx: locant for locant, atom_idx in enumerate(chain, 1)}
+
+
+def is_ring_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> bool:
+    """
+    Check if substituent atoms form a complete ring.
+
+    A substituent is considered a ring substituent if all atoms of at least
+    one ring in the molecule are contained within the substituent atoms
+    (excluding the parent structure atoms).
+
+    Args:
+        mol: RDKit Mol object
+        sub_atoms: Atom indices of the substituent
+        parent_atoms: Atoms of the parent structure (to exclude from consideration)
+
+    Returns:
+        True if the substituent contains a complete ring, False otherwise
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccccc1C')  # toluene
+        >>> # Phenyl atoms: 0-5, Methyl: 6
+        >>> is_ring_substituent(mol, [0, 1, 2, 3, 4, 5], {6})
+        True
+        >>> mol2 = Chem.MolFromSmiles('CCCCC')  # pentane
+        >>> is_ring_substituent(mol2, [0, 1, 2], set())
+        False
+    """
+    if not sub_atoms:
+        return False
+
+    sub_set = set(sub_atoms)
+    ri = mol.GetRingInfo()
+
+    # Check if any ring in the molecule is entirely within the substituent atoms
+    for ring in ri.AtomRings():
+        ring_set = set(ring)
+        # Ring must be entirely within sub_atoms (not overlapping with parent)
+        if ring_set.issubset(sub_set) and not ring_set.intersection(parent_atoms):
+            return True
+
+    return False
+
+
+def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> Dict:
+    """
+    Classify a substituent as ring or alkyl chain.
+
+    This function determines whether a substituent is a ring system (and if so,
+    what kind) or an alkyl chain. It's used to correctly name ring substituents
+    (phenyl, cyclohexyl, piperidinyl) instead of incorrectly counting carbons
+    (hexyl, pentyl).
+
+    Args:
+        mol: RDKit Mol object
+        sub_atoms: Atom indices of the substituent
+        parent_atoms: Atoms of the parent structure (to exclude)
+
+    Returns:
+        Dict with:
+        - 'type': 'ring' or 'alkyl'
+        - 'name': substituent name (e.g., 'phenyl', 'cyclohexyl', 'methyl')
+        - 'atoms': list of atom indices
+        - 'ring_atoms': tuple of ring atom indices (only if type='ring')
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccccc1CCC(=O)O')  # phenylpropanoic acid
+        >>> classify_substituent(mol, [0,1,2,3,4,5], {6,7,8,9,10})
+        {'type': 'ring', 'name': 'phenyl', 'atoms': [0,1,2,3,4,5], 'ring_atoms': (0,1,2,3,4,5)}
+    """
+    from ..rules.ring_substituents import get_ring_substituent_name, identify_ring_system
+
+    if not sub_atoms:
+        return {'type': 'alkyl', 'name': '', 'atoms': []}
+
+    sub_set = set(sub_atoms)
+    ri = mol.GetRingInfo()
+
+    # Check if substituent contains a complete ring
+    contained_ring = None
+    for ring in ri.AtomRings():
+        ring_set = set(ring)
+        # Ring must be entirely within sub_atoms (not overlapping with parent)
+        if ring_set.issubset(sub_set) and not ring_set.intersection(parent_atoms):
+            contained_ring = ring
+            break
+
+    if contained_ring:
+        # This is a ring substituent
+        # Get the ring substituent name (phenyl, cyclohexyl, piperidinyl, etc.)
+        ring_name = get_ring_substituent_name(mol, contained_ring)
+
+        return {
+            'type': 'ring',
+            'name': ring_name,
+            'atoms': sub_atoms,
+            'ring_atoms': contained_ring,
+        }
+
+    # Not a ring - count carbons for alkyl naming
+    carbon_count = sum(
+        1 for idx in sub_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    )
+
+    # Get alkyl name
+    from ..assembly.naming_utils import get_alkyl_name
+    try:
+        alkyl_name = get_alkyl_name(carbon_count)
+    except ValueError:
+        # Unsupported carbon count, return generic name
+        alkyl_name = f"{carbon_count}C-yl" if carbon_count > 0 else ""
+
+    return {
+        'type': 'alkyl',
+        'name': alkyl_name,
+        'atoms': sub_atoms,
+    }
