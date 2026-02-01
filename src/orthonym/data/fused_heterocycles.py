@@ -439,6 +439,36 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # CHROMENES (benzopyrans) - flavonoid scaffolds
     # =========================================================================
 
+    # Coumarin (2H-chromen-2-one) - lactone form of chromene
+    # IUPAC: 2H-1-benzopyran-2-one
+    # Numbering: O(1)-C(2)-C(3)-C(4)-C(4a)-C(5)-C(6)-C(7)-C(8)-C(8a)
+    # Canonical atom order (11 atoms including =O):
+    # idx 0: =O, idx 1: C2 (lactone), idx 2: C3, idx 3: C4, idx 4: C4a,
+    # idx 5: C5, idx 6: C6, idx 7: C7, idx 8: C8, idx 9: C8a, idx 10: O1
+    'O=c1ccc2ccccc2o1': {
+        'name': 'coumarin',
+        'systematic': '2H-chromen-2-one',
+        'tautomer_locant': 2,
+        'ring_system': 'benzo-6-membered-lactone',
+        'parent_atoms': 11,
+        'iupac_locants': {0: '=O', 1: 2, 2: 3, 3: 4, 4: '4a', 5: 5, 6: 6, 7: 7, 8: 8, 9: '8a', 10: 1},
+    },
+
+    # 2,3-Dihydro-1-benzofuran (coumaran)
+    # Saturated 5-membered ring fused to benzene
+    # Numbering: O(1)-C(2)-C(3)-C(3a)-C(4)-C(5)-C(6)-C(7)-C(7a)
+    # Canonical: c1ccc2c(c1)CCO2 (9 atoms)
+    # Canonical atom order: idx 0: C2, idx 1: C3, idx 2: C3a, idx 3: C4,
+    # idx 4: C5, idx 5: C6, idx 6: C7, idx 7: C7a, idx 8: O1
+    'c1ccc2c(c1)CCO2': {
+        'name': '2,3-dihydro-1-benzofuran',
+        'systematic': '2,3-dihydro-1-benzofuran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered-saturated',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
+    },
+
     # 2H-Chromene (2H-1-benzopyran)
     # Oxygen at position 1, indicated H at position 2
     # Canonical: C1=Cc2ccccc2OC1
