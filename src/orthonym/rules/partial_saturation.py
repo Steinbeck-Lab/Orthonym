@@ -498,6 +498,40 @@ def detect_carbocyclic_partial_saturation(
     if sp3_count == 0:
         return None
 
+    # For fully saturated systems (aromatic_count == 0), we need to distinguish:
+    # - Fused bicyclic systems (decalin = 2 fused 6-rings = perhydronaphthalene)
+    # - Simple large rings (cyclodecane = 1 ring with 10 atoms)
+    #
+    # Only fused systems should be named as perhydro-aromatics.
+    if aromatic_count == 0:
+        # Check if this is a fused ring system (multiple rings sharing atoms)
+        ri = mol.GetRingInfo()
+        atom_rings = ri.AtomRings()
+
+        # Count rings that overlap with fused_ring_atoms
+        rings_in_system = []
+        for ring in atom_rings:
+            ring_set = set(ring)
+            if ring_set & fused_ring_atoms:
+                rings_in_system.append(ring_set)
+
+        # If there's only 1 ring, it's a simple cycloalkane, not a fused system
+        if len(rings_in_system) <= 1:
+            return None
+
+        # Check if rings are actually fused (share atoms)
+        is_fused = False
+        for i, ring1 in enumerate(rings_in_system):
+            for j, ring2 in enumerate(rings_in_system):
+                if i < j and len(ring1 & ring2) >= 2:
+                    is_fused = True
+                    break
+            if is_fused:
+                break
+
+        if not is_fused:
+            return None
+
     # Identify parent based on ring system characteristics
     parent_name = None
     parent_smiles = None
