@@ -640,6 +640,8 @@ def get_heterocycle_substituents(
 
     For each ring atom that has neighbors not in the ring, identifies the
     substituent and tracks whether it's attached to a nitrogen (N-substitution).
+    Also classifies substituents as ring or alkyl to correctly name ring
+    substituents (piperidinyl, phenyl) instead of counting carbons (pentyl, hexyl).
 
     Args:
         mol: RDKit Mol object
@@ -656,6 +658,8 @@ def get_heterocycle_substituents(
                     'is_on_nitrogen': bool,  # True if attached to N
                     'carbon_count': int,  # Number of C atoms (for alkyl naming)
                     'connecting_atom': int,  # Ring atom the sub attaches to
+                    'is_ring': bool,  # True if substituent is a ring
+                    'ring_name': str,  # Ring substituent name (if is_ring)
                 }
             ]
         }
@@ -667,6 +671,8 @@ def get_heterocycle_substituents(
         >>> subs = get_heterocycle_substituents(mol, ring, oriented, atom_to_loc)
         >>> # N-methyl should be at locant 1 (N position) with is_on_nitrogen=True
     """
+    from ..perception.chains import classify_substituent
+
     ring_set = set(ring_atoms)
     substituents: Dict[int, List[Dict]] = {}
 
@@ -701,11 +707,18 @@ def get_heterocycle_substituents(
             if carbon_count == 0:
                 continue
 
+            # Classify substituent as ring or alkyl
+            classification = classify_substituent(mol, sub_atoms, ring_set)
+            is_ring = classification['type'] == 'ring'
+            ring_name = classification['name'] if is_ring else None
+
             sub_info = {
                 'atoms': sub_atoms,
                 'is_on_nitrogen': is_nitrogen,
                 'carbon_count': carbon_count,
                 'connecting_atom': ring_atom_idx,
+                'is_ring': is_ring,
+                'ring_name': ring_name,
             }
 
             if locant not in substituents:
@@ -760,6 +773,7 @@ def name_substituted_heterocycle(
 
     N-substituted groups use N-locant format (N-methyl, N,N-dimethyl).
     C-substituted groups use numeric locants (2-methyl, 3-ethyl).
+    Ring substituents use proper ring names (piperidinyl, phenyl) not carbon counts.
     All prefixes are sorted alphabetically (ignoring N-, numbers, multipliers).
 
     Args:
@@ -770,7 +784,8 @@ def name_substituted_heterocycle(
         atom_to_locant: Dict mapping atom_idx to locant (1-indexed)
 
     Returns:
-        Complete IUPAC name (e.g., 'N-methylpyrrolidine', '3-methylpyridine')
+        Complete IUPAC name (e.g., 'N-methylpyrrolidine', '3-methylpyridine',
+        '3-piperidinylpyridine')
 
     Examples:
         >>> mol = Chem.MolFromSmiles('CN1CCCC1')  # N-methylpyrrolidine
@@ -788,30 +803,38 @@ def name_substituted_heterocycle(
         return parent_name
 
     # Group substituents by name and N/C classification
-    # Key: (alkyl_name, is_on_nitrogen) -> list of locants
+    # Key: (substituent_name, is_on_nitrogen) -> list of locants
     n_groups: Dict[str, List[int]] = {}  # N-substituents: name -> locants
     c_groups: Dict[str, List[int]] = {}  # C-substituents: name -> locants
 
     for locant, sub_list in substituents.items():
         for sub_info in sub_list:
-            carbon_count = sub_info['carbon_count']
             is_on_n = sub_info['is_on_nitrogen']
 
-            # Get alkyl name
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-            except ValueError:
-                # Unsupported carbon count (> 10), skip
-                continue
+            # Check if this is a ring substituent
+            is_ring = sub_info.get('is_ring', False)
+            ring_name = sub_info.get('ring_name')
+
+            if is_ring and ring_name:
+                # Use ring substituent name (piperidinyl, phenyl, etc.)
+                sub_name = ring_name
+            else:
+                # Get alkyl name from carbon count
+                carbon_count = sub_info['carbon_count']
+                try:
+                    sub_name = get_alkyl_name(carbon_count)
+                except ValueError:
+                    # Unsupported carbon count (> 10), skip
+                    continue
 
             if is_on_n:
-                if alkyl_name not in n_groups:
-                    n_groups[alkyl_name] = []
-                n_groups[alkyl_name].append(locant)
+                if sub_name not in n_groups:
+                    n_groups[sub_name] = []
+                n_groups[sub_name].append(locant)
             else:
-                if alkyl_name not in c_groups:
-                    c_groups[alkyl_name] = []
-                c_groups[alkyl_name].append(locant)
+                if sub_name not in c_groups:
+                    c_groups[sub_name] = []
+                c_groups[sub_name].append(locant)
 
     # Build prefix parts
     prefix_parts = []
