@@ -386,7 +386,18 @@ def _identify_fused_substituent(
 
     # Carbon-based (alkyl) groups
     if symbol == 'C':
-        return _identify_alkyl_substituent(mol, start_idx, excluded)
+        # Try simple alkyl first
+        alkyl = _identify_alkyl_substituent(mol, start_idx, excluded)
+        if alkyl:
+            return alkyl
+
+        # Fallback: try functionalized chain (cyanomethyl, carboxymethyl, etc.)
+        # This handles chains with heteroatoms that _identify_alkyl_substituent rejects
+        func_chain = _identify_functionalized_substituent(mol, start_idx, excluded)
+        if func_chain:
+            return func_chain
+
+        return None
 
     # Oxygen groups (oxo C=O, hydroxyl -OH)
     if symbol == 'O':
@@ -485,6 +496,158 @@ def _identify_alkyl_substituent(
         }
     except ValueError:
         return None
+
+
+def _identify_functionalized_substituent(
+    mol,
+    start_idx: int,
+    excluded: Set[int]
+) -> Optional[Dict[str, Any]]:
+    """
+    Identify functionalized chain substituents like -CH2-C#N (cyanomethyl).
+
+    Unlike _identify_alkyl_substituent which rejects heteroatoms,
+    this function recognizes common functional groups at chain termini.
+
+    Handles:
+    - Nitrile (C#N): cyanomethyl, 2-cyanoethyl, etc.
+    - Carboxylic acid (COOH): carboxymethyl, 2-carboxyethyl, etc.
+    - Aldehyde (CHO): formylmethyl, etc.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Index of first atom (attached to ring)
+        excluded: Ring atom indices to exclude
+
+    Returns:
+        Dict with 'name', 'atoms', 'functional_group', 'type' or None
+
+    IUPAC Reference: P-64.4 (acetic acid derivatives as substituents),
+                     P-25.3 (naming fused ring substituents)
+    """
+    # BFS to collect substituent atoms
+    chain_atoms = []
+    visited = {start_idx}
+    queue = [start_idx]
+
+    while queue:
+        idx = queue.pop(0)
+        chain_atoms.append(idx)
+        atom = mol.GetAtomWithIdx(idx)
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in excluded:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    if not chain_atoms:
+        return None
+
+    # Count carbons in chain
+    carbon_count = sum(1 for idx in chain_atoms
+                       if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+
+    # Check for nitrile terminus (N with triple bond to C)
+    for idx in chain_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'N':
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in chain_atoms:
+                    bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
+                    if bond and bond.GetBondType() == Chem.BondType.TRIPLE:
+                        # Found nitrile: -C#N
+                        # carbon_count includes the nitrile carbon
+                        if carbon_count == 2:
+                            return {
+                                'name': 'cyanomethyl',
+                                'atoms': chain_atoms,
+                                'functional_group': 'nitrile',
+                                'type': 'functionalized'
+                            }
+                        elif carbon_count == 3:
+                            return {
+                                'name': '2-cyanoethyl',
+                                'atoms': chain_atoms,
+                                'functional_group': 'nitrile',
+                                'type': 'functionalized'
+                            }
+                        elif carbon_count == 4:
+                            return {
+                                'name': '3-cyanopropyl',
+                                'atoms': chain_atoms,
+                                'functional_group': 'nitrile',
+                                'type': 'functionalized'
+                            }
+                        # For longer chains, use generic pattern
+                        elif carbon_count > 4:
+                            return {
+                                'name': f'{carbon_count - 1}-cyano{get_alkyl_name(carbon_count - 1)}',
+                                'atoms': chain_atoms,
+                                'functional_group': 'nitrile',
+                                'type': 'functionalized'
+                            }
+
+    # Check for carboxylic acid terminus: C(=O)[OH] or C(=O)[O-]
+    acid_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1,OX1-]')
+    if acid_pattern:
+        matches = mol.GetSubstructMatches(acid_pattern)
+        for match in matches:
+            carboxyl_carbon = match[0]
+            if carboxyl_carbon in chain_atoms:
+                # Carbon count includes the carboxyl carbon
+                if carbon_count == 2:
+                    return {
+                        'name': 'carboxymethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'carboxylic_acid',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 3:
+                    return {
+                        'name': '2-carboxyethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'carboxylic_acid',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 4:
+                    return {
+                        'name': '3-carboxypropyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'carboxylic_acid',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count > 4:
+                    return {
+                        'name': f'{carbon_count - 1}-carboxy{get_alkyl_name(carbon_count - 1)}',
+                        'atoms': chain_atoms,
+                        'functional_group': 'carboxylic_acid',
+                        'type': 'functionalized'
+                    }
+
+    # Check for aldehyde terminus: [CH]=O
+    aldehyde_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    if aldehyde_pattern:
+        matches = mol.GetSubstructMatches(aldehyde_pattern)
+        for match in matches:
+            aldehyde_carbon = match[0]
+            if aldehyde_carbon in chain_atoms:
+                if carbon_count == 1:
+                    return {
+                        'name': 'formyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'aldehyde',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 2:
+                    return {
+                        'name': 'acetyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'aldehyde',
+                        'type': 'functionalized'
+                    }
+
+    return None
 
 
 def _assemble_fused_heterocycle_name(
