@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
+from .perception.ions import detect_species_type, get_ion_sites, get_radical_sites
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
 from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring
@@ -92,6 +93,12 @@ class MolecularFeatures:
     ring_substituents_as_groups: List[tuple] = field(default_factory=list)  # Rings that become substituents
     chain_is_parent: bool = False  # True when parent selection chose chain over ring
 
+    # Ion/radical species information
+    species_type: str = 'neutral'  # 'neutral', 'ion', 'zwitterion', 'salt', 'radical'
+    ion_sites: Dict[str, List[Dict]] = field(default_factory=dict)  # From get_ion_sites()
+    radical_sites: List[Dict] = field(default_factory=list)  # From get_radical_sites()
+    total_charge: int = 0  # Net formal charge of the molecule
+
 
 class Orthonym:
     """
@@ -125,13 +132,13 @@ class Orthonym:
     def name(self, smiles: str) -> str:
         """
         Generate IUPAC name from SMILES.
-        
+
         Args:
             smiles: SMILES string representing the molecule
-            
+
         Returns:
             IUPAC systematic name
-            
+
         Raises:
             ValueError: If SMILES is invalid
         """
@@ -139,10 +146,35 @@ class Orthonym:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             raise ValueError(f"Invalid SMILES: {smiles}")
-        
+
         # Get canonical SMILES for consistent processing
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
 
+        # EARLY SPECIES DETECTION - before retained names check
+        # This routes ionic/radical species to specialized naming paths
+        species_type = detect_species_type(mol)
+
+        # Route to specialized naming for ionic/radical species
+        if species_type == 'salt':
+            from .rules.salts import name_salt
+            return name_salt(mol, style=self.style)
+        elif species_type == 'radical':
+            from .rules.radicals import name_radical
+            return name_radical(mol, style=self.style)
+        elif species_type == 'zwitterion':
+            from .rules.salts import name_zwitterion
+            return name_zwitterion(mol, style=self.style)
+        elif species_type == 'ion':
+            # Single ion (cation or anion)
+            from .rules.ions import name_anion, name_cation
+
+            sites = get_ion_sites(mol)
+            if sites['cations'] and not sites['anions']:
+                return name_cation(mol, style=self.style)
+            elif sites['anions'] and not sites['cations']:
+                return name_anion(mol, style=self.style)
+
+        # Continue with normal neutral molecule naming
         # Check retained names first (benzene, methanol, etc.) unless systematic style requested
         if self.style != "systematic":
             if canonical_smiles in RETAINED_NAMES:
@@ -156,17 +188,17 @@ class Orthonym:
 
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
-        
+
         # Classify: determine naming strategy and principal group
         self._classify(features)
-        
+
         # Assemble: build final name from fragments
         return assemble_name(features, style=self.style)
     
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
         """
         Extract molecular features using RDKit.
-        
+
         This is the perception layer - converts structure to features.
         """
         features = MolecularFeatures(
@@ -174,20 +206,29 @@ class Orthonym:
             smiles=smiles,
             canonical_smiles=canonical_smiles
         )
-        
+
+        # Add species type detection for ionic/radical compounds
+        features.species_type = detect_species_type(mol)
+        features.total_charge = Chem.GetFormalCharge(mol)
+
+        if features.species_type in ('ion', 'zwitterion', 'salt'):
+            features.ion_sites = get_ion_sites(mol)
+        if features.species_type == 'radical':
+            features.radical_sites = get_radical_sites(mol)
+
         # Detect functional groups using SMARTS patterns
         features.functional_groups = detect_functional_groups(mol)
-        
+
         # Detect ring systems
         features.ring_systems = get_ring_systems(mol)
         features.is_cyclic = len(features.ring_systems) > 0
-        
+
         # Check aromaticity
         for ring_system in features.ring_systems:
             if is_aromatic_ring(mol, ring_system):
                 features.is_aromatic = True
                 break
-        
+
         # Detect multiple bonds
         features.double_bonds = self._find_double_bonds(mol)
         features.triple_bonds = self._find_triple_bonds(mol)

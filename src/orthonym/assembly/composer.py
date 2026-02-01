@@ -22,6 +22,9 @@ from .naming_utils import (
     get_alkyl_name,
 )
 
+# Ion/radical naming imports - deferred to avoid circular imports
+# These are imported inside functions that need them
+
 # Complex ring system imports
 from ..rules.bicyclo import is_bicyclo_system, name_bicyclo_system
 from ..rules.spiro import is_spiro_system, name_spiro_system
@@ -209,6 +212,11 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     Returns:
         Complete IUPAC name string
     """
+    # Check for ionic/radical species first - route to specialized assembly
+    species_type = getattr(features, 'species_type', 'neutral')
+    if species_type in ('salt', 'ion', 'zwitterion', 'radical'):
+        return assemble_ion_name(features, features.mol, style)
+
     # Handle polyfunctional compounds (multiple distinct functional groups)
     if getattr(features, 'is_polyfunctional', False):
         from ..rules.polyfunctional import name_polyfunctional
@@ -1697,12 +1705,61 @@ def _build_long_chain_prefix(length: int) -> str:
 def format_locants(locants: tuple) -> str:
     """
     Format a tuple of locants for name insertion.
-    
+
     Example: (2, 3) -> "2,3-"
     """
     if not locants:
         return ""
     return ",".join(str(l) for l in sorted(locants)) + "-"
+
+
+def assemble_ion_name(features: Any, mol, style: str = 'pin') -> str:
+    """
+    Assemble name for ionic or radical species.
+
+    Routes to appropriate naming function based on species_type.
+    This function is the entry point for the composer to handle
+    non-neutral molecules.
+
+    Args:
+        features: MolecularFeatures with species_type populated
+        mol: RDKit Mol object
+        style: 'pin' for preferred names
+
+    Returns:
+        IUPAC name for the ion/radical
+
+    Example:
+        >>> # For a salt:
+        >>> assemble_ion_name(features, mol)
+        'sodium acetate'
+        >>> # For a radical:
+        >>> assemble_ion_name(features, mol)
+        'methyl'
+    """
+    # Import naming functions here to avoid circular imports
+    from ..rules.ions import name_anion, name_cation
+    from ..rules.salts import name_salt, name_zwitterion
+    from ..rules.radicals import name_radical
+
+    species_type = features.species_type
+
+    if species_type == 'salt':
+        return name_salt(mol, style)
+    elif species_type == 'radical':
+        return name_radical(mol, style)
+    elif species_type == 'zwitterion':
+        return name_zwitterion(mol, style)
+    elif species_type == 'ion':
+        # Single ion - determine if cation or anion
+        ion_sites = getattr(features, 'ion_sites', {})
+        if ion_sites.get('cations') and not ion_sites.get('anions'):
+            return name_cation(mol, style)
+        elif ion_sites.get('anions') and not ion_sites.get('cations'):
+            return name_anion(mol, style)
+
+    # Fallback - should not reach here for valid ionic species
+    raise ValueError(f"Cannot assemble name for species_type: {species_type}")
 
 
 def get_multiplier(count: int, is_complex: bool = False) -> str:
