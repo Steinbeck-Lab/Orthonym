@@ -205,6 +205,15 @@ RETAINED_NAMES = {
     "N#N": "dinitrogen",
     "O=O": "dioxygen",
     
+    # === NITRILES - AROMATIC (Phase 14.6 BUG-2 fix) ===
+    "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per P-66.1.1.1
+
+    # === THIAZOLIDINES (Phase 14.6 BUG-6 fix) ===
+    # 1,3-thiazolidine: S at 1, N at 3 (not adjacent)
+    "C1CSCN1": "thiazolidine",
+    # 1,2-isothiazolidine: S at 1, N at 2 (adjacent)
+    "C1CNSC1": "isothiazolidine",
+
     # === AMINO ACIDS (common) ===
     "NCC(=O)O": "glycine",
     "CC(N)C(=O)O": "alanine",
