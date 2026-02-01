@@ -543,8 +543,7 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
         Complete IUPAC name, or None if naming fails
 
     Note:
-        Substituent and stereodescriptor handling will be added in future.
-        Currently handles unsubstituted systems.
+        Supports complete bicyclo naming with substituents, unsaturation, and stereo.
     """
     import logging
 
@@ -552,8 +551,8 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
 
     try:
         if ring_type == 'bicyclo':
-            # Bicyclo naming (norbornane, bicyclo[2.2.2]octane, etc.)
-            name = name_bicyclo_system(mol)
+            # Complete bicyclo naming with substituents, unsaturation, stereo
+            name = _assemble_complete_bicyclo_name(mol, features)
             if name:
                 return name
             logging.warning(f"Bicyclo naming failed for molecule")
@@ -590,6 +589,235 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
         # Graceful degradation - log and return None
         logging.warning(f"Complex ring naming error: {e}")
         return None
+
+
+def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
+    """
+    Assemble complete IUPAC name for a bicyclo system with substituents, unsaturation, and stereo.
+
+    IUPAC name order for bicyclo compounds:
+    (stereo)-locants-prefixes-bicyclo[x.y.z]parent-locants-unsaturation
+
+    Example: (1S,6R)-3,7,7-trimethylbicyclo[4.1.0]hept-3-ene
+
+    Args:
+        mol: RDKit Mol object
+        features: MolecularFeatures object
+
+    Returns:
+        Complete IUPAC name, or None if naming fails
+    """
+    from ..rules.bicyclo import get_complete_bicyclo_data, name_bicyclo_system
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    from rdkit.Chem import rdCIPLabeler
+
+    # Get complete bicyclo data
+    bicyclo_data = get_complete_bicyclo_data(mol)
+    if not bicyclo_data:
+        # Fall back to simple naming
+        return name_bicyclo_system(mol)
+
+    # If there's a retained name and no substituents or unsaturation, use it
+    retained_name = bicyclo_data.get('retained_name')
+    substituents = bicyclo_data.get('substituents', {})
+    unsaturation = bicyclo_data.get('unsaturation', {})
+    double_bonds = unsaturation.get('double_bonds', [])
+    triple_bonds = unsaturation.get('triple_bonds', [])
+
+    # Check if there are any modifiers (substituents or unsaturation)
+    has_substituents = bool(substituents)
+    has_unsaturation = bool(double_bonds) or bool(triple_bonds)
+
+    # For unsubstituted, saturated compounds with retained names, use the retained name
+    if retained_name and not has_substituents and not has_unsaturation:
+        return retained_name
+
+    # Get key data
+    descriptor = bicyclo_data.get('descriptor')
+    atom_to_locant = bicyclo_data.get('atom_to_locant', {})
+    carbon_count = bicyclo_data.get('carbon_count', 0)
+
+    # Get parent stem
+    parent_stem = _get_bicyclo_parent_stem(carbon_count)
+
+    # Build unsaturation suffix
+    unsat_suffix = _build_bicyclo_unsaturation_suffix(
+        unsaturation, atom_to_locant, parent_stem
+    )
+
+    # Build substituent prefix
+    sub_prefix = _build_bicyclo_substituent_prefix(mol, substituents, atom_to_locant)
+
+    # Collect stereodescriptors
+    stereo_prefix = ""
+    rdCIPLabeler.AssignCIPLabels(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
+    if stereo_descriptors:
+        stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+
+    # Assemble the name
+    # Format: (stereo)-substituent-prefix-descriptor-parent-unsaturation
+    parts = []
+
+    if stereo_prefix:
+        parts.append(stereo_prefix)
+
+    if sub_prefix:
+        parts.append(sub_prefix)
+
+    # Build the main name: bicyclo[x.y.z]parent-unsat
+    main_name = f"{descriptor}{unsat_suffix}"
+    parts.append(main_name)
+
+    # Join parts
+    name = "".join(parts)
+
+    return name
+
+
+def _get_bicyclo_parent_stem(carbon_count: int) -> str:
+    """Get the parent stem for a bicyclo system based on carbon count."""
+    stems = {
+        4: "but", 5: "pent", 6: "hex", 7: "hept", 8: "oct",
+        9: "non", 10: "dec", 11: "undec", 12: "dodec",
+    }
+    return stems.get(carbon_count, f"C{carbon_count}")
+
+
+def _build_bicyclo_unsaturation_suffix(
+    unsaturation: Dict,
+    atom_to_locant: Dict[int, int],
+    parent_stem: str
+) -> str:
+    """
+    Build parent name with unsaturation suffix for bicyclo.
+
+    Examples:
+        'hept' + no unsaturation -> 'heptane'
+        'hept' + double bond at 3 -> 'hept-3-ene'
+        'hept' + double bonds at 2,4 -> 'hepta-2,4-diene'
+
+    Args:
+        unsaturation: Dict with 'double_bonds' and 'triple_bonds' lists
+        atom_to_locant: Mapping from atom index to IUPAC locant
+        parent_stem: Parent stem (e.g., 'hept')
+
+    Returns:
+        Parent name with unsaturation suffix (e.g., 'heptane', 'hept-3-ene')
+    """
+    double_bonds = unsaturation.get('double_bonds', [])
+    triple_bonds = unsaturation.get('triple_bonds', [])
+
+    # Convert atom indices to locants and get the lower locant for each bond
+    double_locants = []
+    for bond in double_bonds:
+        idx1, idx2 = bond
+        loc1 = atom_to_locant.get(idx1, 0)
+        loc2 = atom_to_locant.get(idx2, 0)
+        double_locants.append(min(loc1, loc2))
+
+    triple_locants = []
+    for bond in triple_bonds:
+        idx1, idx2 = bond
+        loc1 = atom_to_locant.get(idx1, 0)
+        loc2 = atom_to_locant.get(idx2, 0)
+        triple_locants.append(min(loc1, loc2))
+
+    # Sort locants
+    double_locants.sort()
+    triple_locants.sort()
+
+    num_double = len(double_locants)
+    num_triple = len(triple_locants)
+
+    # Saturated case
+    if num_double == 0 and num_triple == 0:
+        return f"{parent_stem}ane"
+
+    parts = [parent_stem]
+
+    # Build unsaturation part
+    if num_double > 0:
+        double_str = ",".join(str(loc) for loc in double_locants)
+        if num_double == 1:
+            parts.append(f"-{double_str}-en")
+        else:
+            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            parts.append(f"a-{double_str}-{multiplier}en")
+
+    if num_triple > 0:
+        triple_str = ",".join(str(loc) for loc in triple_locants)
+        if num_triple == 1:
+            parts.append(f"-{triple_str}-yn")
+        else:
+            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            if num_double == 0:
+                parts.append(f"a-{triple_str}-{multiplier}yn")
+            else:
+                parts.append(f"-{triple_str}-{multiplier}yn")
+
+    # Add final 'e'
+    return "".join(parts) + "e"
+
+
+def _build_bicyclo_substituent_prefix(
+    mol,
+    substituents: Dict[int, List[Dict]],
+    atom_to_locant: Dict[int, int]
+) -> str:
+    """
+    Build substituent prefix string for bicyclo naming.
+
+    Groups substituents by name, adds locants and multipliers.
+
+    Args:
+        mol: RDKit Mol object
+        substituents: Dict from get_bicyclo_substituents
+        atom_to_locant: Mapping from atom index to IUPAC locant
+
+    Returns:
+        Formatted prefix string (e.g., '3,7,7-trimethyl-')
+    """
+    if not substituents:
+        return ""
+
+    # Group substituents by name
+    sub_groups: Dict[str, List[int]] = defaultdict(list)
+
+    for ring_atom_idx, sub_list in substituents.items():
+        locant = atom_to_locant.get(ring_atom_idx)
+        if locant is None:
+            continue
+
+        for sub_info in sub_list:
+            carbon_count = sub_info.get('carbon_count', 0)
+            if carbon_count == 0:
+                continue
+
+            # Get alkyl name
+            alkyl_name = get_alkyl_name(carbon_count)
+            sub_groups[alkyl_name].append(locant)
+
+    if not sub_groups:
+        return ""
+
+    # Build prefix fragments
+    prefixes = []
+    for name, locants in sub_groups.items():
+        count = len(locants)
+        sorted_locants = sorted(locants)
+
+        formatted = format_substituent_prefix(name, sorted_locants, count)
+        prefixes.append((name, formatted))
+
+    # Sort alphabetically by base name (ignoring multipliers)
+    prefixes.sort(key=lambda x: alpha_sort_key(x[1]))
+
+    # Join with hyphens
+    prefix_texts = [p[1] for p in prefixes]
+    result = _join_prefixes(prefix_texts)
+
+    return result
 
 
 def _assemble_heterocycle_name(features: Any, style: str) -> str:
