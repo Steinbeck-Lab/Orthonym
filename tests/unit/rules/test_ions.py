@@ -433,3 +433,207 @@ class TestMultipleCharges:
         mol = Chem.MolFromSmiles('O=C([O-])CC([O-])=O')
         name = name_anion(mol)
         assert name in ('malonate', 'propanedioate')
+
+
+class TestAromaticCarboxylateNaming:
+    """
+    Test aromatic carboxylate naming (BUG-1 and BUG-5 fixes).
+
+    Previously, aromatic carboxylates like 4-chlorobenzoate were incorrectly
+    named as "heptanoate" because the code counted all 7 carbons (benzene + COOH).
+    This test class verifies the fix.
+
+    IUPAC 2013 Reference: P-72.1.1 (anions from acids), P-14.6 (aromatic precedence)
+    """
+
+    def test_simple_benzoate(self):
+        """Unsubstituted benzoate should be named 'benzoate'."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
+        name = name_anion(mol)
+        assert name == 'benzoate'
+
+    def test_4_chlorobenzoate(self):
+        """
+        4-chlorobenzoate should NOT be named 'heptanoate'.
+
+        This was the canonical BUG-1 case: O=C([O-])c1ccc(Cl)cc1 returned
+        "heptanoate" by counting 7 carbons. Should return "4-chlorobenzoate".
+        """
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc(Cl)cc1')
+        name = name_anion(mol)
+        assert name == '4-chlorobenzoate', f"Expected '4-chlorobenzoate', got '{name}'"
+
+    def test_2_chlorobenzoate(self):
+        """2-chlorobenzoate should have the chloro at position 2."""
+        mol = Chem.MolFromSmiles('Clc1ccccc1C(=O)[O-]')
+        name = name_anion(mol)
+        assert name == '2-chlorobenzoate', f"Expected '2-chlorobenzoate', got '{name}'"
+
+    def test_3_chlorobenzoate(self):
+        """3-chlorobenzoate (meta) should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1cccc(Cl)c1')
+        name = name_anion(mol)
+        assert name == '3-chlorobenzoate', f"Expected '3-chlorobenzoate', got '{name}'"
+
+    def test_4_methylbenzoate(self):
+        """4-methylbenzoate (p-toluate) should be named with methyl prefix."""
+        mol = Chem.MolFromSmiles('Cc1ccc(C(=O)[O-])cc1')
+        name = name_anion(mol)
+        assert name == '4-methylbenzoate', f"Expected '4-methylbenzoate', got '{name}'"
+
+    def test_2_methylbenzoate(self):
+        """2-methylbenzoate (o-toluate) should be named correctly."""
+        mol = Chem.MolFromSmiles('Cc1ccccc1C(=O)[O-]')
+        name = name_anion(mol)
+        assert name == '2-methylbenzoate', f"Expected '2-methylbenzoate', got '{name}'"
+
+    def test_3_5_dimethylbenzoate(self):
+        """3,5-dimethylbenzoate should have both methyl groups named."""
+        mol = Chem.MolFromSmiles('Cc1cc(C)cc(C(=O)[O-])c1')
+        name = name_anion(mol)
+        assert name == '3,5-dimethylbenzoate', f"Expected '3,5-dimethylbenzoate', got '{name}'"
+
+    def test_4_fluorobenzoate(self):
+        """4-fluorobenzoate should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc(F)cc1')
+        name = name_anion(mol)
+        assert name == '4-fluorobenzoate', f"Expected '4-fluorobenzoate', got '{name}'"
+
+    def test_4_bromobenzoate(self):
+        """4-bromobenzoate should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc(Br)cc1')
+        name = name_anion(mol)
+        assert name == '4-bromobenzoate', f"Expected '4-bromobenzoate', got '{name}'"
+
+    def test_4_iodobenzoate(self):
+        """4-iodobenzoate should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc(I)cc1')
+        name = name_anion(mol)
+        assert name == '4-iodobenzoate', f"Expected '4-iodobenzoate', got '{name}'"
+
+    def test_2_4_dichlorobenzoate(self):
+        """2,4-dichlorobenzoate should have both chloro groups named."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc(Cl)cc1Cl')
+        name = name_anion(mol)
+        assert name == '2,4-dichlorobenzoate', f"Expected '2,4-dichlorobenzoate', got '{name}'"
+
+    def test_2_naphthoate(self):
+        """2-naphthoate (naphthalene-2-carboxylate) should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc2ccccc2c1')
+        name = name_anion(mol)
+        # Should be naphthoate-based, not "undecanoate" (11 carbons)
+        assert 'naphthoate' in name, f"Expected naphthoate-based name, got '{name}'"
+
+    def test_1_naphthoate(self):
+        """1-naphthoate (naphthalene-1-carboxylate) should be named correctly."""
+        mol = Chem.MolFromSmiles('O=C([O-])c1cccc2ccccc12')
+        name = name_anion(mol)
+        # Should be naphthoate-based
+        assert 'naphthoate' in name, f"Expected naphthoate-based name, got '{name}'"
+
+
+class TestAromaticCarboxylateRegressions:
+    """
+    Regression tests to ensure acyclic carboxylates still work.
+
+    The aromatic carboxylate fix must not break naming of simple
+    acyclic carboxylates like acetate, propanoate, etc.
+    """
+
+    def test_acetate_regression(self):
+        """Acetate should still be named 'acetate' (not affected by aromatic fix)."""
+        mol = Chem.MolFromSmiles('CC(=O)[O-]')
+        name = name_anion(mol)
+        assert name == 'acetate', f"Regression: expected 'acetate', got '{name}'"
+
+    def test_propanoate_regression(self):
+        """Propanoate should still be named 'propanoate'."""
+        mol = Chem.MolFromSmiles('CCC(=O)[O-]')
+        name = name_anion(mol)
+        assert name == 'propanoate', f"Regression: expected 'propanoate', got '{name}'"
+
+    def test_butanoate_regression(self):
+        """Butanoate should still be named 'butanoate'."""
+        mol = Chem.MolFromSmiles('CCCC(=O)[O-]')
+        name = name_anion(mol)
+        assert name == 'butanoate', f"Regression: expected 'butanoate', got '{name}'"
+
+    def test_formate_regression(self):
+        """Formate should still be named 'formate'."""
+        mol = Chem.MolFromSmiles('[O-]C=O')
+        name = name_anion(mol)
+        assert name == 'formate', f"Regression: expected 'formate', got '{name}'"
+
+    def test_pentanoate_regression(self):
+        """Pentanoate should still be named 'pentanoate'."""
+        mol = Chem.MolFromSmiles('CCCCC(=O)[O-]')
+        name = name_anion(mol)
+        assert name == 'pentanoate', f"Regression: expected 'pentanoate', got '{name}'"
+
+    def test_hexanoate_regression(self):
+        """Hexanoate should still be named 'hexanoate'."""
+        mol = Chem.MolFromSmiles('CCCCCC(=O)[O-]')
+        name = name_anion(mol)
+        assert name == 'hexanoate', f"Regression: expected 'hexanoate', got '{name}'"
+
+
+class TestAromaticCarboxylateHelpers:
+    """Test the helper functions for aromatic carboxylate detection."""
+
+    def test_find_carboxyl_carbon_acetate(self):
+        """_find_carboxyl_carbon should find the carboxyl C in acetate."""
+        from src.orthonym.rules.ions import _find_carboxyl_carbon
+        from src.orthonym.perception.ions import get_ion_sites
+
+        mol = Chem.MolFromSmiles('CC(=O)[O-]')
+        sites = get_ion_sites(mol)
+        carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
+        assert carboxyl_c is not None
+        # Verify it's a carbon with double-bonded oxygen
+        atom = mol.GetAtomWithIdx(carboxyl_c)
+        assert atom.GetSymbol() == 'C'
+
+    def test_find_carboxyl_carbon_benzoate(self):
+        """_find_carboxyl_carbon should find the carboxyl C in benzoate."""
+        from src.orthonym.rules.ions import _find_carboxyl_carbon
+        from src.orthonym.perception.ions import get_ion_sites
+
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
+        sites = get_ion_sites(mol)
+        carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
+        assert carboxyl_c is not None
+        atom = mol.GetAtomWithIdx(carboxyl_c)
+        assert atom.GetSymbol() == 'C'
+
+    def test_detect_aromatic_benzoate(self):
+        """_detect_aromatic_carboxylate should return 'benzoate' for benzene attachment."""
+        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from src.orthonym.perception.ions import get_ion_sites
+
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
+        sites = get_ion_sites(mol)
+        carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
+        aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_c)
+        assert aromatic_name == 'benzoate'
+
+    def test_detect_aromatic_naphthoate(self):
+        """_detect_aromatic_carboxylate should return 'naphthoate' for naphthalene attachment."""
+        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from src.orthonym.perception.ions import get_ion_sites
+
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccc2ccccc2c1')
+        sites = get_ion_sites(mol)
+        carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
+        aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_c)
+        assert aromatic_name == 'naphthoate'
+
+    def test_detect_aromatic_none_for_acyclic(self):
+        """_detect_aromatic_carboxylate should return None for acyclic carboxylates."""
+        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from src.orthonym.perception.ions import get_ion_sites
+
+        mol = Chem.MolFromSmiles('CC(=O)[O-]')
+        sites = get_ion_sites(mol)
+        carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
+        aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_c)
+        assert aromatic_name is None
