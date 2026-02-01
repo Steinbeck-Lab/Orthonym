@@ -430,3 +430,124 @@ class TestBenzeneEdgeCases:
         """1,2,3,4-tetramethylbenzene."""
         result = name_compound("Cc1c(C)c(C)c(C)cc1")
         assert "tetramethylbenzene" in result
+
+
+# =============================================================================
+# Test Benzonitrile Naming (BUG-2 Fix - Phase 14.6)
+# =============================================================================
+
+class TestBenzonitrileNaming:
+    """Tests for benzonitrile naming (BUG-2 fix).
+
+    IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per P-66.1.1.1
+    Substituents are numbered relative to the nitrile carbon (position 1).
+    """
+
+    @pytest.mark.unit
+    def test_simple_benzonitrile(self):
+        """c1ccccc1C#N -> benzonitrile"""
+        result = name_compound('c1ccccc1C#N')
+        assert result == 'benzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_benzonitrile_canonical_smiles(self):
+        """N#Cc1ccccc1 (canonical) -> benzonitrile"""
+        result = name_compound('N#Cc1ccccc1')
+        assert result == 'benzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_4_chlorobenzonitrile(self):
+        """Clc1ccc(C#N)cc1 (para) -> 4-chlorobenzonitrile"""
+        result = name_compound('Clc1ccc(C#N)cc1')
+        assert result == '4-chlorobenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_4_methylbenzonitrile(self):
+        """Cc1ccc(C#N)cc1 (para) -> 4-methylbenzonitrile"""
+        result = name_compound('Cc1ccc(C#N)cc1')
+        assert result == '4-methylbenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_2_chlorobenzonitrile(self):
+        """Clc1ccccc1C#N (ortho) -> 2-chlorobenzonitrile"""
+        result = name_compound('Clc1ccccc1C#N')
+        assert result == '2-chlorobenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_3_chlorobenzonitrile(self):
+        """Clc1cccc(C#N)c1 (meta) -> 3-chlorobenzonitrile"""
+        result = name_compound('Clc1cccc(C#N)c1')
+        assert result == '3-chlorobenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_2_methylbenzonitrile(self):
+        """Cc1ccccc1C#N (ortho methyl) -> 2-methylbenzonitrile"""
+        result = name_compound('Cc1ccccc1C#N')
+        assert result == '2-methylbenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_3_methylbenzonitrile(self):
+        """Cc1cccc(C#N)c1 (meta methyl) -> 3-methylbenzonitrile"""
+        result = name_compound('Cc1cccc(C#N)c1')
+        assert result == '3-methylbenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_4_bromobenzonitrile(self):
+        """Brc1ccc(C#N)cc1 (para bromo) -> 4-bromobenzonitrile"""
+        result = name_compound('Brc1ccc(C#N)cc1')
+        assert result == '4-bromobenzonitrile', f"Got {result}"
+
+    @pytest.mark.unit
+    def test_4_fluorobenzonitrile(self):
+        """Fc1ccc(C#N)cc1 (para fluoro) -> 4-fluorobenzonitrile"""
+        result = name_compound('Fc1ccc(C#N)cc1')
+        assert result == '4-fluorobenzonitrile', f"Got {result}"
+
+
+# =============================================================================
+# Test Nitrile Detection Functions
+# =============================================================================
+
+class TestNitrileDetection:
+    """Test nitrile detection helper functions."""
+
+    @pytest.mark.unit
+    def test_detect_benzene_nitrile_true(self):
+        """_detect_benzene_nitrile returns True for benzonitrile."""
+        from orthonym.rules.benzene import _detect_benzene_nitrile, get_benzene_ring
+        mol = Chem.MolFromSmiles('c1ccccc1C#N')
+        ring = get_benzene_ring(mol)
+        result = _detect_benzene_nitrile(mol, ring)
+        assert result['is_nitrile'] is True
+        assert len(result['nitrile_positions']) == 1
+
+    @pytest.mark.unit
+    def test_detect_benzene_nitrile_false_for_plain_benzene(self):
+        """_detect_benzene_nitrile returns False for plain benzene."""
+        from orthonym.rules.benzene import _detect_benzene_nitrile, get_benzene_ring
+        mol = Chem.MolFromSmiles('c1ccccc1')
+        ring = get_benzene_ring(mol)
+        result = _detect_benzene_nitrile(mol, ring)
+        assert result['is_nitrile'] is False
+        assert len(result['nitrile_positions']) == 0
+
+    @pytest.mark.unit
+    def test_detect_benzene_nitrile_false_for_toluene(self):
+        """_detect_benzene_nitrile returns False for toluene."""
+        from orthonym.rules.benzene import _detect_benzene_nitrile, get_benzene_ring
+        mol = Chem.MolFromSmiles('Cc1ccccc1')
+        ring = get_benzene_ring(mol)
+        result = _detect_benzene_nitrile(mol, ring)
+        assert result['is_nitrile'] is False
+
+    @pytest.mark.unit
+    def test_identify_nitrile_substituent(self):
+        """_identify_substituent detects nitrile as a substituent."""
+        from orthonym.rules.benzene import get_benzene_ring, get_benzene_substituents
+        mol = Chem.MolFromSmiles('c1ccccc1C#N')
+        ring = get_benzene_ring(mol)
+        subs = get_benzene_substituents(mol, ring)
+
+        # Check that nitrile was detected
+        sub_names = [s['name'] for s_list in subs.values() for s in s_list]
+        assert 'nitrile' in sub_names
