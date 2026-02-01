@@ -75,20 +75,123 @@ def detect_species_type(mol) -> str:
         return 'ion'
 
     # Check for zwitterion (net zero but has both + and - atoms)
-    has_positive_atom = False
-    has_negative_atom = False
+    # EXCLUDE functional groups with internal charges (nitro, azide, etc.)
+    # These are not true zwitterions in IUPAC nomenclature sense
+    if _has_true_zwitterion_character(mol):
+        return 'zwitterion'
+
+    return 'neutral'
+
+
+def _has_true_zwitterion_character(mol) -> bool:
+    """
+    Determine if a molecule has true zwitterionic character.
+
+    A true zwitterion has separated positive and negative sites that are
+    NOT part of a single functional group with internal charge distribution.
+
+    Excludes:
+    - Nitro groups: [N+](=O)[O-] - internal charge distribution
+    - Azide groups: [N-]=[N+]=[N-] - internal charge distribution
+    - N-oxides: [N+][O-] directly bonded - internal charge distribution
+    - Sulfonyl groups with charge separation
+
+    True zwitterions:
+    - Amino acid zwitterions: [NH3+] ... [COO-] separated by carbon(s)
+    - Betaines: [N+](C)(C)(C)....[O-] separated by carbons
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule has true zwitterionic character
+    """
+    if mol is None:
+        return False
+
+    # Collect positive and negative atoms
+    positive_atoms = []
+    negative_atoms = []
 
     for atom in mol.GetAtoms():
         charge = atom.GetFormalCharge()
         if charge > 0:
-            has_positive_atom = True
+            positive_atoms.append(atom)
         elif charge < 0:
-            has_negative_atom = True
+            negative_atoms.append(atom)
 
-    if has_positive_atom and has_negative_atom:
-        return 'zwitterion'
+    if not positive_atoms or not negative_atoms:
+        return False
 
-    return 'neutral'
+    # Check if ALL charge pairs are functional group internal charges
+    # If any charge pair is NOT directly bonded, it's a true zwitterion
+    for pos_atom in positive_atoms:
+        for neg_atom in negative_atoms:
+            # Check if directly bonded (functional group internal charge)
+            bond = mol.GetBondBetweenAtoms(pos_atom.GetIdx(), neg_atom.GetIdx())
+            if bond is None:
+                # Not directly bonded - could be true zwitterion
+                # Check for nitro group pattern: N+ bonded to O= and O-
+                if not _is_nitro_or_similar_group(mol, pos_atom, neg_atom):
+                    return True
+
+    return False
+
+
+def _is_nitro_or_similar_group(mol, pos_atom, neg_atom) -> bool:
+    """
+    Check if the + and - atoms are part of a nitro or similar functional group.
+
+    Nitro group: [N+](=O)[O-] where N+ is bonded to the O- through a shared C
+    or directly through a resonance structure.
+
+    Args:
+        mol: RDKit Mol object
+        pos_atom: Positively charged atom
+        neg_atom: Negatively charged atom
+
+    Returns:
+        True if atoms are part of a functional group with internal charges
+    """
+    pos_element = pos_atom.GetSymbol()
+    neg_element = neg_atom.GetSymbol()
+
+    # Nitro group: N+ bonded to O= and O-
+    # The N+ neighbors should include both the O- and an O=
+    if pos_element == 'N' and neg_element == 'O':
+        # Check if this N is bonded to both an O= and an O-
+        n_neighbors = list(pos_atom.GetNeighbors())
+        oxygen_neighbors = [n for n in n_neighbors if n.GetSymbol() == 'O']
+
+        if len(oxygen_neighbors) >= 2:
+            # N bonded to 2+ oxygens - likely nitro or nitroso
+            has_double_o = False
+            has_negative_o = False
+
+            for o_neighbor in oxygen_neighbors:
+                bond = mol.GetBondBetweenAtoms(pos_atom.GetIdx(), o_neighbor.GetIdx())
+                if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                    has_double_o = True
+                if o_neighbor.GetFormalCharge() < 0:
+                    has_negative_o = True
+
+            if has_double_o and has_negative_o:
+                return True
+
+    # N-oxide: N+ directly bonded to O-
+    if pos_element == 'N' and neg_element == 'O':
+        bond = mol.GetBondBetweenAtoms(pos_atom.GetIdx(), neg_atom.GetIdx())
+        if bond is not None:
+            return True  # Directly bonded N+-O- is N-oxide or similar
+
+    # Azide: [N-]=[N+]=[N-] pattern
+    if pos_element == 'N' and neg_element == 'N':
+        # Check if they're part of an azide chain
+        n_neighbors = [n for n in pos_atom.GetNeighbors() if n.GetSymbol() == 'N']
+        if len(n_neighbors) >= 2:
+            return True  # Likely azide
+
+    return False
 
 
 def get_ion_sites(mol) -> Dict[str, List[Dict[str, Any]]]:
