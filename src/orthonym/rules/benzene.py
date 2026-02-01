@@ -161,7 +161,12 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
 
     # Carbon-based groups (alkyl or functionalized chain)
     if symbol == 'C':
-        # Try simple alkyl first
+        # Check for nitrile C#N pattern FIRST (BUG-2 fix)
+        nitrile_result = _identify_nitrile_group(mol, start_idx, ring_atoms)
+        if nitrile_result:
+            return nitrile_result
+
+        # Try simple alkyl
         alkyl_result = _identify_alkyl_group(mol, start_idx, ring_atoms)
         if alkyl_result:
             return alkyl_result
@@ -172,6 +177,82 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             return func_chain
 
     return None
+
+
+def _identify_nitrile_group(mol, c_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
+    """
+    Identify nitrile (C#N) substituent attached to benzene.
+
+    The nitrile carbon is directly attached to the ring. We check if this carbon
+    has a triple bond to nitrogen and no other heavy atom neighbors (besides the ring).
+
+    Args:
+        mol: RDKit Mol object
+        c_idx: Index of the carbon atom attached to the ring
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        Dict with 'name': 'nitrile', 'type': 'functional', 'atoms': [...] or None
+    """
+    c_atom = mol.GetAtomWithIdx(c_idx)
+
+    # Check neighbors of the nitrile carbon
+    for neighbor in c_atom.GetNeighbors():
+        if neighbor.GetIdx() in ring_atoms:
+            continue
+
+        # Check for triple bond to nitrogen
+        bond = mol.GetBondBetweenAtoms(c_idx, neighbor.GetIdx())
+        if (neighbor.GetSymbol() == 'N' and
+                bond and bond.GetBondType() == Chem.BondType.TRIPLE):
+            # Verify the nitrogen has no other heavy atom neighbors (just the C#N)
+            n_atom = neighbor
+            n_heavy_neighbors = [n for n in n_atom.GetNeighbors()
+                                 if n.GetSymbol() != 'H' and n.GetIdx() != c_idx]
+            if not n_heavy_neighbors:
+                return {
+                    'name': 'nitrile',
+                    'type': 'functional',
+                    'atoms': [c_idx, neighbor.GetIdx()]
+                }
+
+    return None
+
+
+def _detect_benzene_nitrile(mol, ring_atoms: Tuple[int, ...]) -> Dict:
+    """
+    Detect if benzene ring has a nitrile substituent.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Tuple of atom indices in the benzene ring
+
+    Returns:
+        Dict with 'is_nitrile': bool, 'nitrile_positions': list of ring atom indices
+        that have nitrile attached
+    """
+    ring_set = set(ring_atoms)
+    nitrile_positions = []
+
+    for ring_idx in ring_atoms:
+        ring_atom = mol.GetAtomWithIdx(ring_idx)
+
+        for neighbor in ring_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in ring_set:
+                continue
+
+            # Check if this neighbor is a nitrile carbon
+            if neighbor.GetSymbol() == 'C':
+                result = _identify_nitrile_group(mol, nbr_idx, ring_set)
+                if result and result.get('name') == 'nitrile':
+                    nitrile_positions.append(ring_idx)
+                    break  # Only count once per ring position
+
+    return {
+        'is_nitrile': len(nitrile_positions) > 0,
+        'nitrile_positions': nitrile_positions
+    }
 
 
 def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
@@ -604,6 +685,7 @@ def name_substituted_benzene(
     - Alphabetize substituent prefixes
     - Use multiplicative prefixes (di-, tri-) for repeated substituents
     - Format: locants-substituent-benzene (or just substituent-benzene for mono)
+    - Special case: benzonitrile (C6H5CN) uses suffix-style naming per P-66.1.1.1
 
     Args:
         mol: RDKit Mol object
@@ -634,6 +716,29 @@ def name_substituted_benzene(
     for name in substituent_groups:
         substituent_groups[name].sort()
 
+    # Check for nitrile - special handling for benzonitrile naming (BUG-2 fix)
+    # IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per P-66.1.1.1
+    if 'nitrile' in substituent_groups:
+        nitrile_locants = substituent_groups['nitrile']
+        if len(nitrile_locants) == 1:
+            # Single nitrile: use benzonitrile as parent
+            # Remove nitrile from substituent groups since it becomes the parent
+            del substituent_groups['nitrile']
+
+            # Re-orient so nitrile is at position 1 for locant calculation
+            nitrile_locant = nitrile_locants[0]
+
+            # Other substituents become prefixes relative to benzonitrile
+            if not substituent_groups:
+                # Pure benzonitrile
+                return "benzonitrile"
+
+            # Build prefixes for other substituents
+            # Need to recalculate locants relative to nitrile at position 1
+            return _name_substituted_benzonitrile(
+                substituent_groups, nitrile_locant, atom_to_locant, oriented_ring
+            )
+
     # Count total number of substituents
     total_substituents = sum(len(locs) for locs in substituent_groups.values())
 
@@ -660,6 +765,89 @@ def name_substituted_benzene(
 
     # Build final name
     return f"{prefix_part}benzene"
+
+
+def _name_substituted_benzonitrile(
+    substituent_groups: Dict[str, List[int]],
+    nitrile_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int]
+) -> str:
+    """
+    Name a substituted benzonitrile.
+
+    IUPAC 2013: substituents are numbered relative to the nitrile position (position 1).
+    Example: 4-chlorobenzonitrile, 4-methylbenzonitrile
+
+    The nitrile carbon position becomes position 1 in the benzonitrile numbering.
+    For a 6-membered ring with nitrile at old position N:
+    - Position N becomes 1
+    - Other positions are renumbered going clockwise (or counterclockwise for lowest locants)
+
+    Args:
+        substituent_groups: Dict of substituent name -> list of locants (in original numbering)
+        nitrile_locant: The locant of the nitrile in the original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name string (e.g., "4-chlorobenzonitrile")
+    """
+    # Try both directions (clockwise and counterclockwise) and pick lowest locants
+    best_groups = None
+    best_locant_set = None
+
+    for direction in [1, -1]:
+        converted_groups: Dict[str, List[int]] = defaultdict(list)
+
+        for name, locants in substituent_groups.items():
+            for old_loc in locants:
+                # Calculate new position relative to nitrile at position 1
+                # direction = 1: clockwise numbering from nitrile
+                # direction = -1: counterclockwise numbering from nitrile
+                # Formula: new_pos = ((old_pos - nitrile_pos) * direction % 6) + 1
+                # This ensures nitrile_pos -> 1, and other positions follow in order
+                diff = (old_loc - nitrile_locant) * direction
+                new_loc = (diff % 6) + 1
+                if new_loc == 1:
+                    # Position 1 is reserved for nitrile; this shouldn't happen
+                    # for other substituents, but handle edge case
+                    new_loc = 7 - new_loc  # Map to position 6 (opposite direction)
+                converted_groups[name].append(new_loc)
+
+        # Sort locants within each group
+        for name in converted_groups:
+            converted_groups[name].sort()
+
+        # Calculate locant set for comparison
+        all_locants = sorted([loc for locs in converted_groups.values() for loc in locs])
+
+        if best_locant_set is None or all_locants < best_locant_set:
+            best_locant_set = all_locants
+            best_groups = dict(converted_groups)
+
+    # Build prefix strings
+    total_substituents = sum(len(locs) for locs in best_groups.values())
+    is_monosubstituted = total_substituents == 1
+
+    prefixes = []
+    for name in sorted(best_groups.keys(), key=alpha_sort_key):
+        locants = best_groups[name]
+        count = len(locants)
+
+        if is_monosubstituted:
+            # Single other substituent: include locant (e.g., "4-chloro")
+            prefix_str = f"{locants[0]}-{name}"
+        else:
+            # Multiple substituents
+            prefix_str = format_substituent_prefix(name, locants, count)
+
+        prefixes.append(prefix_str)
+
+    # Join prefixes
+    prefix_part = _join_benzene_prefixes(prefixes)
+
+    return f"{prefix_part}benzonitrile"
 
 
 def _join_benzene_prefixes(prefixes: List[str]) -> str:
