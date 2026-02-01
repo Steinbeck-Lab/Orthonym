@@ -409,3 +409,342 @@ def get_ring_saturation_level(
         return 'fully saturated'
     else:
         return 'partially saturated'
+
+
+# =============================================================================
+# Carbocyclic Partial Saturation (PAH systems)
+# =============================================================================
+
+
+def detect_carbocyclic_partial_saturation(
+    mol: Chem.Mol,
+    fused_ring_atoms: Set[int]
+) -> Optional[Dict[str, Any]]:
+    """
+    Detect partial saturation in carbocyclic fused systems.
+
+    This function identifies partially saturated polycyclic aromatic hydrocarbons
+    like tetrahydronaphthalene, dihydroanthracene, etc. It analyzes the fused
+    ring system to detect if it's a partially saturated version of a known
+    aromatic parent (naphthalene, anthracene, phenanthrene).
+
+    The detection works by:
+    1. Checking all ring atoms are carbons (pure carbocycle)
+    2. Counting aromatic vs sp3 atoms
+    3. Matching the ring system size and structure to known parents
+    4. Computing the saturation prefix based on sp3 count
+
+    IUPAC 2013 Blue Book P-31.1.1:
+    - tetrahydronaphthalene: 4 sp3 atoms = tetrahydro prefix
+    - dihydronaphthalene: 2 sp3 atoms = dihydro prefix
+    - decahydronaphthalene (decalin): all sp3 = perhydro or decahydro
+
+    Args:
+        mol: RDKit molecule
+        fused_ring_atoms: Set of atom indices in the fused ring system
+
+    Returns:
+        Dict with saturation info, or None if not a recognized partially
+        saturated carbocycle:
+        - 'parent_name': Name of aromatic parent ('naphthalene', etc.)
+        - 'parent_smiles': SMILES of aromatic parent
+        - 'prefix': Saturation prefix string ('tetrahydro', etc.)
+        - 'saturated_indices': List of atom indices that are sp3
+        - 'sp3_count': Number of sp3 atoms
+        - 'hydrogen_count': Number of added hydrogens (sp3_count * 2)
+        - 'is_perhydro': True if fully saturated
+        - 'atom_to_locant': Mapping from atom index to IUPAC locant (if available)
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> ri = mol.GetRingInfo()
+        >>> ring_atoms = set()
+        >>> for ring in ri.AtomRings():
+        ...     ring_atoms.update(ring)
+        >>> result = detect_carbocyclic_partial_saturation(mol, ring_atoms)
+        >>> result['prefix']
+        'tetrahydro'
+        >>> result['parent_name']
+        'naphthalene'
+    """
+    from ..data.partial_saturation_refs import get_reference_smiles
+
+    if mol is None or not fused_ring_atoms:
+        return None
+
+    # Check if all ring atoms are carbons (carbocyclic)
+    for idx in fused_ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            # Has heteroatom - not a pure carbocycle
+            return None
+
+    # Count sp3 and aromatic atoms in the fused ring system
+    sp3_indices = []
+    aromatic_indices = []
+
+    for idx in fused_ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetHybridization() == Chem.HybridizationType.SP3:
+            sp3_indices.append(idx)
+        elif atom.GetIsAromatic():
+            aromatic_indices.append(idx)
+
+    sp3_count = len(sp3_indices)
+    aromatic_count = len(aromatic_indices)
+    total_ring_atoms = len(fused_ring_atoms)
+
+    # No sp3 atoms = fully aromatic, not partially saturated
+    if sp3_count == 0:
+        return None
+
+    # Identify parent based on ring system characteristics
+    parent_name = None
+    parent_smiles = None
+    parent_aromatic_count = 0
+
+    # Naphthalene-type: 10 ring atoms total
+    if total_ring_atoms == 10:
+        parent_name = 'naphthalene'
+        parent_smiles = get_reference_smiles('naphthalene')
+        parent_aromatic_count = 10
+
+    # Anthracene/phenanthrene-type: 14 ring atoms total
+    elif total_ring_atoms == 14:
+        # Could be anthracene or phenanthrene - use anthracene as default
+        parent_name = 'anthracene'
+        parent_smiles = get_reference_smiles('anthracene')
+        parent_aromatic_count = 14
+
+    else:
+        # Unknown fused system size
+        return None
+
+    if parent_smiles is None:
+        return None
+
+    # Calculate hydrogen count
+    # In fused aromatic systems, each aromatic C has 1 H.
+    # When a C goes from sp2 (aromatic) to sp3 (saturated), it gains 1 H.
+    # So hydrogen_count = sp3_count (not sp3_count * 2).
+    # Example: tetrahydronaphthalene has 4 sp3 C = 4 extra H = tetrahydro
+    hydrogen_count = sp3_count
+
+    # Check for perhydro (fully saturated)
+    is_perhydro = sp3_count >= parent_aromatic_count
+
+    # Determine prefix
+    if is_perhydro:
+        prefix = 'perhydro'
+    else:
+        prefix = get_saturation_prefix(hydrogen_count)
+
+    if prefix is None:
+        return None
+
+    # Build atom-to-locant mapping for the fused system
+    # For naphthalene-type systems, use standard IUPAC numbering
+    atom_to_locant = _build_naphthalene_type_locants(mol, fused_ring_atoms, sp3_indices)
+
+    return {
+        'parent_name': parent_name,
+        'parent_smiles': parent_smiles,
+        'prefix': prefix,
+        'saturated_indices': sp3_indices,
+        'sp3_count': sp3_count,
+        'hydrogen_count': hydrogen_count,
+        'is_perhydro': is_perhydro,
+        'atom_to_locant': atom_to_locant,
+    }
+
+
+def _build_naphthalene_type_locants(
+    mol: Chem.Mol,
+    ring_atoms: Set[int],
+    sp3_indices: List[int]
+) -> Dict[int, int]:
+    """
+    Build IUPAC locant mapping for naphthalene-type fused systems.
+
+    For tetrahydronaphthalene, IUPAC numbering is:
+    - Positions 1-4: saturated ring (the sp3 atoms)
+    - Positions 4a, 5-8, 8a: aromatic ring
+
+    The numbering starts at the saturated portion (position 1) and goes around.
+    For standard tetrahydronaphthalene, the sp3 atoms are at positions 1,2,3,4.
+
+    Args:
+        mol: RDKit molecule
+        ring_atoms: Set of atom indices in the fused system
+        sp3_indices: List of sp3 atom indices
+
+    Returns:
+        Dict mapping atom index to IUPAC locant (1-indexed)
+    """
+    from collections import defaultdict
+
+    # Get ring info
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    # Find shared atoms (fusion atoms)
+    atom_ring_count = defaultdict(int)
+    for ring in atom_rings:
+        ring_set = set(ring)
+        if ring_set & ring_atoms:  # Ring overlaps with our fused system
+            for idx in ring:
+                if idx in ring_atoms:
+                    atom_ring_count[idx] += 1
+
+    fusion_atoms = {idx for idx, count in atom_ring_count.items() if count > 1}
+
+    # Find the two rings
+    saturated_ring = None
+    aromatic_ring = None
+
+    for ring in atom_rings:
+        ring_set = set(ring)
+        if not (ring_set & ring_atoms):
+            continue
+
+        # Check if this ring contains sp3 atoms
+        ring_sp3 = ring_set & set(sp3_indices)
+
+        if len(ring_sp3) >= 2:
+            saturated_ring = list(ring)
+        elif len(ring_sp3) == 0:
+            aromatic_ring = list(ring)
+
+    if not saturated_ring or not aromatic_ring:
+        # Fallback: simple sequential numbering
+        return {idx: i + 1 for i, idx in enumerate(sorted(ring_atoms))}
+
+    # Build ordered locants starting from saturated ring
+    # Position 1 is an sp3 carbon in the saturated ring, adjacent to a fusion atom
+    atom_to_locant = {}
+
+    # Find a starting atom: sp3 atom adjacent to fusion but not fusion itself
+    start_atom = None
+    for idx in saturated_ring:
+        if idx in fusion_atoms:
+            continue
+        if idx in sp3_indices:
+            atom = mol.GetAtomWithIdx(idx)
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in fusion_atoms:
+                    start_atom = idx
+                    break
+            if start_atom:
+                break
+
+    if start_atom is None and sp3_indices:
+        start_atom = sp3_indices[0]
+
+    if start_atom is None:
+        return {idx: i + 1 for i, idx in enumerate(sorted(ring_atoms))}
+
+    # Traverse the fused system in order
+    visited = set()
+    order = []
+
+    def traverse(current, target_ring):
+        """Traverse ring atoms in order."""
+        ring_set = set(target_ring)
+        queue = [current]
+        local_order = []
+
+        while queue:
+            idx = queue.pop(0)
+            if idx in visited:
+                continue
+            if idx not in ring_set and idx not in fusion_atoms:
+                continue
+
+            visited.add(idx)
+            local_order.append(idx)
+
+            atom = mol.GetAtomWithIdx(idx)
+            neighbors = []
+            for neighbor in atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+                if nbr_idx not in visited and nbr_idx in ring_atoms:
+                    neighbors.append(nbr_idx)
+
+            # Prefer atoms in same ring first, then fusion atoms
+            neighbors.sort(key=lambda x: (x not in ring_set, x in fusion_atoms))
+            queue.extend(neighbors)
+
+        return local_order
+
+    # Start with saturated ring
+    order = traverse(start_atom, saturated_ring)
+
+    # Continue with aromatic ring
+    for idx in fusion_atoms:
+        if idx not in visited:
+            atom = mol.GetAtomWithIdx(idx)
+            for neighbor in atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+                if nbr_idx in ring_atoms and nbr_idx not in visited:
+                    order.extend(traverse(nbr_idx, aromatic_ring))
+                    break
+
+    # Add any missed atoms
+    for idx in ring_atoms:
+        if idx not in visited:
+            visited.add(idx)
+            order.append(idx)
+
+    # Build locant mapping
+    for i, idx in enumerate(order):
+        atom_to_locant[idx] = i + 1
+
+    return atom_to_locant
+
+
+def is_tetrahydronaphthalene(mol: Chem.Mol, fused_ring_atoms: Set[int]) -> bool:
+    """
+    Check if fused system is tetrahydronaphthalene-type.
+
+    Tetrahydronaphthalene has:
+    - 10 ring atoms total
+    - 4 sp3 carbons (saturated ring)
+    - 6 aromatic carbons (benzene ring)
+    - All carbons (no heteroatoms)
+
+    Args:
+        mol: RDKit molecule
+        fused_ring_atoms: Set of atom indices in the fused ring system
+
+    Returns:
+        True if the system is tetrahydronaphthalene-type
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
+        >>> ri = mol.GetRingInfo()
+        >>> ring_atoms = set()
+        >>> for ring in ri.AtomRings():
+        ...     ring_atoms.update(ring)
+        >>> is_tetrahydronaphthalene(mol, ring_atoms)
+        True
+    """
+    if len(fused_ring_atoms) != 10:
+        return False
+
+    sp3_count = 0
+    aromatic_count = 0
+
+    for idx in fused_ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+
+        # Must be carbon
+        if atom.GetSymbol() != 'C':
+            return False
+
+        if atom.GetHybridization() == Chem.HybridizationType.SP3:
+            sp3_count += 1
+        elif atom.GetIsAromatic():
+            aromatic_count += 1
+
+    # Tetrahydronaphthalene: 4 sp3 + 6 aromatic
+    return sp3_count == 4 and aromatic_count == 6

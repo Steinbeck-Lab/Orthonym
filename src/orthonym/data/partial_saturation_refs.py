@@ -122,18 +122,21 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
         'smiles': 'c1ccc2ccccc2c1',
         'ring_atoms': 10,
         'description': 'bicyclic aromatic hydrocarbon',
+        'is_carbocycle': True,
     },
 
     'anthracene': {
         'smiles': 'c1ccc2cc3ccccc3cc2c1',
         'ring_atoms': 14,
         'description': 'tricyclic aromatic hydrocarbon',
+        'is_carbocycle': True,
     },
 
     'phenanthrene': {
         'smiles': 'c1ccc2c(c1)ccc1ccccc12',
         'ring_atoms': 14,
         'description': 'tricyclic angular aromatic hydrocarbon',
+        'is_carbocycle': True,
     },
 
     # =========================================================================
@@ -347,3 +350,67 @@ def get_reference_ring_atoms(name: str) -> int:
 def list_reference_names() -> list:
     """Return list of all available reference compound names."""
     return list(AROMATIC_REFERENCES.keys())
+
+
+def get_carbocyclic_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str]]:
+    """
+    Find carbocyclic aromatic parent structure for a molecule.
+
+    This is similar to get_aromatic_reference but only matches
+    carbocyclic systems (naphthalene, anthracene, phenanthrene).
+    Used for partial saturation detection in PAH systems.
+
+    Args:
+        mol: RDKit molecule object
+
+    Returns:
+        Tuple of (reference_name, reference_smiles) if a carbocyclic match found,
+        None otherwise.
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> get_carbocyclic_aromatic_reference(mol)
+        ('naphthalene', 'c1ccc2ccccc2c1')
+    """
+    if mol is None:
+        return None
+
+    best_match: Optional[Tuple[str, str, int]] = None
+
+    for name, ref_data in AROMATIC_REFERENCES.items():
+        # Only consider carbocyclic references
+        if not ref_data.get('is_carbocycle', False):
+            continue
+
+        ref_mol = _get_reference_mol(name)
+        if ref_mol is None:
+            continue
+
+        # Try substructure match
+        if mol.HasSubstructMatch(ref_mol):
+            ring_atoms = ref_data['ring_atoms']
+
+            # Keep the largest matching reference
+            if best_match is None or ring_atoms > best_match[2]:
+                best_match = (name, ref_data['smiles'], ring_atoms)
+
+    if best_match:
+        return (best_match[0], best_match[1])
+
+    return None
+
+
+def is_carbocyclic_reference(name: str) -> bool:
+    """
+    Check if a reference compound is a carbocycle.
+
+    Args:
+        name: Reference compound name
+
+    Returns:
+        True if the reference is a carbocyclic aromatic (no heteroatoms)
+    """
+    ref_data = AROMATIC_REFERENCES.get(name)
+    if ref_data:
+        return ref_data.get('is_carbocycle', False)
+    return False
