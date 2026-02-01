@@ -681,3 +681,129 @@ class TestSubstituentLocantAssignment:
         mol = Chem.MolFromSmiles('c1cc(Cl)c2ncccc2c1')
         name = name_fused_heterocycle(mol)
         assert '8-chloro' in name, f"Expected 8-chloro, got: {name}"
+
+
+# ============================================================================
+# Test functionalized substituent detection (BUG-3 fix)
+# ============================================================================
+
+class TestFunctionalizedSubstituents:
+    """Tests for functionalized substituent detection on fused rings (BUG-3 fix).
+
+    This tests the _identify_functionalized_substituent function and its
+    integration with the fused ring naming pipeline. BUG-3 was that
+    _identify_alkyl_substituent() rejected chains with heteroatoms,
+    causing functionalized chains (cyanomethyl, carboxymethyl) to be dropped.
+
+    IUPAC Reference: P-64.4 (acetic acid derivatives as substituents),
+    P-25.3 (naming fused ring substituents)
+    """
+
+    @pytest.mark.unit
+    def test_cyanomethyl_function_directly(self):
+        """Test _identify_functionalized_substituent detects nitrile chains."""
+        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+
+        # Simple nitrile: N#CC (acetonitrile without attachment)
+        mol = Chem.MolFromSmiles('N#CC')
+        # Start from C (index 1), exclude nothing
+        result = _identify_functionalized_substituent(mol, 1, set())
+        assert result is not None, "Should detect nitrile chain"
+        assert result['name'] == 'cyanomethyl'
+        assert result['functional_group'] == 'nitrile'
+        assert result['type'] == 'functionalized'
+
+    @pytest.mark.unit
+    def test_indole_acetonitrile_e2e(self):
+        """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'."""
+        from src.orthonym import name_compound
+
+        result = name_compound('N#CCc1c[nH]c2ccccc12')
+        assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
+        assert 'cyanomethyl' in result.lower() or 'acetonitrile' in result.lower(), \
+            f"Expected 'cyanomethyl' or 'acetonitrile' in name, got: {result}"
+
+    @pytest.mark.unit
+    def test_indole_acetonitrile_direct_fused_naming(self):
+        """Test name_fused_heterocycle directly returns correct name."""
+        mol = Chem.MolFromSmiles('N#CCc1c[nH]c2ccccc12')
+        result = name_fused_heterocycle(mol)
+        assert result is not None
+        assert 'cyanomethyl' in result.lower(), f"Expected 'cyanomethyl', got: {result}"
+        assert 'indole' in result.lower(), f"Expected 'indole', got: {result}"
+
+    @pytest.mark.unit
+    def test_indole_acetic_acid_e2e(self):
+        """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'."""
+        from src.orthonym import name_compound
+
+        result = name_compound('OC(=O)Cc1c[nH]c2ccccc12')
+        assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
+        assert 'carboxymethyl' in result.lower() or 'acetic' in result.lower(), \
+            f"Expected 'carboxymethyl' or 'acetic' in name, got: {result}"
+
+    @pytest.mark.unit
+    def test_indole_acetic_acid_direct_fused_naming(self):
+        """Test name_fused_heterocycle directly for indole-3-acetic acid."""
+        mol = Chem.MolFromSmiles('OC(=O)Cc1c[nH]c2ccccc12')
+        result = name_fused_heterocycle(mol)
+        assert result is not None
+        assert 'carboxymethyl' in result.lower(), f"Expected 'carboxymethyl', got: {result}"
+        assert 'indole' in result.lower(), f"Expected 'indole', got: {result}"
+
+    @pytest.mark.unit
+    def test_cyanoethyl_detection(self):
+        """Test detection of 2-cyanoethyl substituent (3 carbons)."""
+        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+
+        # Propionitrile: N#CCC
+        mol = Chem.MolFromSmiles('N#CCC')
+        result = _identify_functionalized_substituent(mol, 1, set())
+        assert result is not None
+        assert result['name'] == '2-cyanoethyl'
+        assert result['functional_group'] == 'nitrile'
+
+    @pytest.mark.unit
+    def test_carboxyethyl_detection(self):
+        """Test detection of 2-carboxyethyl substituent."""
+        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+
+        # Propanoic acid: OC(=O)CC (3 carbons)
+        mol = Chem.MolFromSmiles('OC(=O)CC')
+        # Start from the alpha carbon (index 2)
+        result = _identify_functionalized_substituent(mol, 2, set())
+        assert result is not None
+        assert result['name'] == '2-carboxyethyl'
+        assert result['functional_group'] == 'carboxylic_acid'
+
+    @pytest.mark.unit
+    def test_functionalized_fallback_in_identify_fused_substituent(self):
+        """Test that _identify_fused_substituent uses functionalized fallback."""
+        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+
+        # Build indole-3-acetonitrile
+        mol = Chem.MolFromSmiles('N#CCc1c[nH]c2ccccc12')
+        # Core atoms (indole ring): indices 3-11
+        core_atoms = {3, 4, 5, 6, 7, 8, 9, 10, 11}
+        # Start from the CH2 (index 2) connected to indole
+        result = _identify_fused_substituent(mol, 2, core_atoms)
+        assert result is not None, "Should detect functionalized substituent"
+        assert result['name'] == 'cyanomethyl', f"Expected 'cyanomethyl', got: {result}"
+
+    @pytest.mark.unit
+    def test_existing_alkyl_detection_unchanged(self):
+        """Verify regular alkyl detection still works (no regression)."""
+        mol = Chem.MolFromSmiles('Cc1c[nH]c2ccccc12')  # 3-methylindole
+        result = name_fused_heterocycle(mol)
+        assert result is not None
+        assert 'methyl' in result.lower(), f"Expected 'methyl', got: {result}"
+        assert 'indole' in result.lower(), f"Expected 'indole', got: {result}"
+
+    @pytest.mark.unit
+    def test_existing_halogen_detection_unchanged(self):
+        """Verify halogen detection still works (no regression)."""
+        mol = Chem.MolFromSmiles('Brc1c[nH]c2ccccc12')  # 3-bromoindole
+        result = name_fused_heterocycle(mol)
+        assert result is not None
+        assert 'bromo' in result.lower(), f"Expected 'bromo', got: {result}"
+        assert 'indole' in result.lower(), f"Expected 'indole', got: {result}"
