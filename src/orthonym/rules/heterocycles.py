@@ -775,6 +775,7 @@ def name_substituted_heterocycle(
     C-substituted groups use numeric locants (2-methyl, 3-ethyl).
     Ring substituents use proper ring names (piperidinyl, phenyl) not carbon counts.
     All prefixes are sorted alphabetically (ignoring N-, numbers, multipliers).
+    Stereochemistry descriptors (R/S) are added as a prefix if present.
 
     Args:
         mol: RDKit Mol object
@@ -785,7 +786,7 @@ def name_substituted_heterocycle(
 
     Returns:
         Complete IUPAC name (e.g., 'N-methylpyrrolidine', '3-methylpyridine',
-        '3-piperidinylpyridine')
+        '(2S)-N-methyl-2-propylpiperidine')
 
     Examples:
         >>> mol = Chem.MolFromSmiles('CN1CCCC1')  # N-methylpyrrolidine
@@ -798,8 +799,20 @@ def name_substituted_heterocycle(
         alpha_sort_key,
         get_multiplier_prefix,
     )
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    from rdkit.Chem import rdCIPLabeler
+
+    # Ensure CIP labels are assigned
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    # Collect stereodescriptors using the heterocycle locant mapping
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
     if not substituents:
+        # No substituents but may have stereo
+        if stereo_descriptors:
+            stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+            return f"{stereo_prefix}{parent_name}"
         return parent_name
 
     # Group substituents by name and N/C classification
@@ -867,6 +880,11 @@ def name_substituted_heterocycle(
             elif prefix_str[-1].isalpha() and prefix[0] == 'N':
                 prefix_str += "-"
             prefix_str += prefix
+
+    # Assemble with stereo prefix if present
+    if stereo_descriptors:
+        stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+        return f"{stereo_prefix}{prefix_str}{parent_name}"
 
     return f"{prefix_str}{parent_name}"
 
