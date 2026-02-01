@@ -493,8 +493,286 @@ def name_cation(mol, style: str = 'pin') -> str:
 
 # === SYSTEMATIC NAMING HELPERS ===
 
+def _find_carboxyl_carbon(mol, anion_site: Dict) -> Optional[int]:
+    """
+    Find the carbon atom of the carboxyl group from the anionic oxygen.
+
+    Args:
+        mol: RDKit Mol object
+        anion_site: Dictionary containing 'atom_idx' of the anionic oxygen
+
+    Returns:
+        Index of the carboxyl carbon, or None if not found
+    """
+    o_idx = anion_site['atom_idx']
+    o_atom = mol.GetAtomWithIdx(o_idx)
+
+    # Find the carbon attached to the anionic oxygen
+    for neighbor in o_atom.GetNeighbors():
+        if neighbor.GetSymbol() == 'C':
+            # Verify this is a carboxyl carbon (has C=O double bond to another oxygen)
+            for second_neighbor in neighbor.GetNeighbors():
+                if second_neighbor.GetIdx() != o_idx and second_neighbor.GetSymbol() == 'O':
+                    bond = mol.GetBondBetweenAtoms(neighbor.GetIdx(), second_neighbor.GetIdx())
+                    if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                        return neighbor.GetIdx()
+    return None
+
+
+def _detect_aromatic_carboxylate(mol, carboxyl_carbon_idx: int) -> Optional[str]:
+    """
+    Detect if a carboxylate is attached to an aromatic ring.
+
+    Args:
+        mol: RDKit Mol object
+        carboxyl_carbon_idx: Index of the carboxyl carbon
+
+    Returns:
+        'benzoate' for benzene-attached carboxylates,
+        'naphthoate' for naphthalene-attached carboxylates,
+        None for acyclic or other structures
+    """
+    carboxyl_carbon = mol.GetAtomWithIdx(carboxyl_carbon_idx)
+
+    # Check neighbors for aromatic carbon
+    for neighbor in carboxyl_carbon.GetNeighbors():
+        if neighbor.GetSymbol() == 'C' and neighbor.GetIsAromatic():
+            # Found aromatic carbon attached to carboxyl
+            # Determine ring type
+            ri = mol.GetRingInfo()
+            atom_rings = ri.AtomRings()
+
+            aromatic_neighbor_idx = neighbor.GetIdx()
+
+            # Find which ring(s) contain this aromatic carbon
+            for ring in atom_rings:
+                if aromatic_neighbor_idx in ring:
+                    ring_size = len(ring)
+                    # Check if all atoms in ring are aromatic carbons (carbocycle)
+                    all_aromatic_c = all(
+                        mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and
+                        mol.GetAtomWithIdx(idx).GetIsAromatic()
+                        for idx in ring
+                    )
+
+                    if ring_size == 6 and all_aromatic_c:
+                        # Check if this is part of naphthalene (fused bicyclic)
+                        if _is_naphthalene_system(mol, aromatic_neighbor_idx, atom_rings):
+                            return 'naphthoate'
+                        return 'benzoate'
+
+    return None
+
+
+def _is_naphthalene_system(mol, aromatic_idx: int, atom_rings) -> bool:
+    """
+    Check if an aromatic atom is part of a naphthalene (fused bicyclic) system.
+
+    Args:
+        mol: RDKit Mol object
+        aromatic_idx: Index of an aromatic atom
+        atom_rings: Ring information from RDKit
+
+    Returns:
+        True if part of a naphthalene system
+    """
+    # Find all 6-membered aromatic carbocyclic rings
+    aromatic_6_rings = []
+    for ring in atom_rings:
+        if len(ring) == 6:
+            all_aromatic_c = all(
+                mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and
+                mol.GetAtomWithIdx(idx).GetIsAromatic()
+                for idx in ring
+            )
+            if all_aromatic_c:
+                aromatic_6_rings.append(set(ring))
+
+    # Check if there are 2 fused 6-membered rings (sharing 2 atoms = naphthalene)
+    if len(aromatic_6_rings) >= 2:
+        for i, ring1 in enumerate(aromatic_6_rings):
+            for ring2 in aromatic_6_rings[i+1:]:
+                shared = ring1 & ring2
+                if len(shared) == 2:  # Two shared atoms = fused rings
+                    # Check if our aromatic atom is in either ring
+                    if aromatic_idx in ring1 or aromatic_idx in ring2:
+                        return True
+    return False
+
+
+def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, base_name: str) -> str:
+    """
+    Name an aromatic carboxylate with any substituents on the ring.
+
+    Args:
+        mol: RDKit Mol object
+        carboxyl_carbon_idx: Index of the carboxyl carbon
+        base_name: Base name ('benzoate' or 'naphthoate')
+
+    Returns:
+        Full name with substituent prefixes (e.g., '4-chlorobenzoate')
+    """
+    carboxyl_carbon = mol.GetAtomWithIdx(carboxyl_carbon_idx)
+
+    # Find the aromatic ring attached to carboxyl
+    aromatic_ring_atom = None
+    for neighbor in carboxyl_carbon.GetNeighbors():
+        if neighbor.GetSymbol() == 'C' and neighbor.GetIsAromatic():
+            aromatic_ring_atom = neighbor
+            break
+
+    if aromatic_ring_atom is None:
+        return base_name
+
+    # Get the benzene ring
+    ri = mol.GetRingInfo()
+    benzene_ring = None
+    for ring in ri.AtomRings():
+        if aromatic_ring_atom.GetIdx() in ring and len(ring) == 6:
+            # Check all atoms are aromatic carbons
+            all_aromatic_c = all(
+                mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and
+                mol.GetAtomWithIdx(idx).GetIsAromatic()
+                for idx in ring
+            )
+            if all_aromatic_c:
+                benzene_ring = ring
+                break
+
+    if benzene_ring is None:
+        return base_name
+
+    # Find substituents on the ring (excluding the carboxyl attachment point)
+    ring_set = set(benzene_ring)
+    carboxyl_attachment_idx = aromatic_ring_atom.GetIdx()
+
+    # Map substituent type to name
+    SUBSTITUENT_NAMES = {
+        'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo',
+        'N': 'amino', 'O': 'hydroxy'
+    }
+
+    # Alkyl group names by carbon count
+    ALKYL_NAMES = {
+        1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl',
+        5: 'pentyl', 6: 'hexyl'
+    }
+
+    # Collect substituents: {position: [(name, sort_key), ...]}
+    # Position 1 is the carboxyl attachment point
+    substituents_by_position = {}
+
+    # Orient ring: carboxyl attachment is position 1
+    # Need to find ring order and direction for lowest locants
+    ring_list = list(benzene_ring)
+
+    # Find index of carboxyl attachment in ring
+    carboxyl_pos = ring_list.index(carboxyl_attachment_idx)
+
+    # Try both directions and all starting positions to get lowest locants
+    best_orientation = None
+    best_locants = None
+
+    for direction in [1, -1]:
+        oriented = []
+        for i in range(6):
+            idx = (carboxyl_pos + i * direction) % 6
+            oriented.append(ring_list[idx])
+
+        # Collect substituents for this orientation
+        subs = {}
+        for pos, atom_idx in enumerate(oriented, start=1):
+            if pos == 1:
+                continue  # Skip carboxyl attachment position
+
+            ring_atom = mol.GetAtomWithIdx(atom_idx)
+            for neighbor in ring_atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+                if nbr_idx in ring_set:
+                    continue  # Skip ring atoms
+                if nbr_idx == carboxyl_carbon_idx:
+                    continue  # Skip carboxyl carbon
+
+                # Identify substituent
+                symbol = neighbor.GetSymbol()
+                if symbol in SUBSTITUENT_NAMES:
+                    sub_name = SUBSTITUENT_NAMES[symbol]
+                    if pos not in subs:
+                        subs[pos] = []
+                    subs[pos].append((sub_name, sub_name))  # (name, sort_key)
+                elif symbol == 'C' and not neighbor.GetIsAromatic():
+                    # Alkyl group - count carbons
+                    carbon_count = _count_alkyl_carbons(mol, nbr_idx, ring_set | {carboxyl_carbon_idx})
+                    if carbon_count in ALKYL_NAMES:
+                        sub_name = ALKYL_NAMES[carbon_count]
+                        if pos not in subs:
+                            subs[pos] = []
+                        subs[pos].append((sub_name, sub_name))
+
+        # Calculate locant set for this orientation
+        locants = sorted(subs.keys()) if subs else []
+
+        if best_locants is None or _compare_locant_lists(locants, best_locants) < 0:
+            best_locants = locants
+            best_orientation = subs
+
+    if not best_orientation:
+        return base_name
+
+    # Group substituents by name
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for pos, sub_list in best_orientation.items():
+        for sub_name, _ in sub_list:
+            grouped[sub_name].append(pos)
+
+    # Sort locants within each group
+    for name in grouped:
+        grouped[name].sort()
+
+    # Build prefix: alphabetically sorted, with multipliers
+    MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+
+    prefixes = []
+    for sub_name in sorted(grouped.keys()):
+        locants = grouped[sub_name]
+        count = len(locants)
+        multiplier = MULTIPLIERS.get(count, f'{count}-')
+
+        locant_str = ','.join(str(loc) for loc in locants)
+        prefix = f"{locant_str}-{multiplier}{sub_name}"
+        prefixes.append(prefix)
+
+    if not prefixes:
+        return base_name
+
+    prefix_str = ''.join(prefixes)
+    return f"{prefix_str}{base_name}"
+
+
+def _compare_locant_lists(a: list, b: list) -> int:
+    """Compare two locant lists by first-point-of-difference."""
+    for i in range(max(len(a), len(b))):
+        val_a = a[i] if i < len(a) else float('inf')
+        val_b = b[i] if i < len(b) else float('inf')
+        if val_a < val_b:
+            return -1
+        if val_a > val_b:
+            return 1
+    return 0
+
+
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     """Generate systematic name for carboxylate anion."""
+    # NEW: Check for aromatic parent FIRST
+    carboxyl_carbon = _find_carboxyl_carbon(mol, anion_site)
+    if carboxyl_carbon is not None:
+        aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_carbon)
+        if aromatic_name:
+            # Get substituents on the aromatic ring and add prefixes
+            return _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon, aromatic_name)
+
+    # EXISTING: Fall back to chain counting for acyclic
     # Count carbons to determine chain length
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
