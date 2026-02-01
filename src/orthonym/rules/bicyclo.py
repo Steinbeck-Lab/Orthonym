@@ -16,9 +16,10 @@ Examples:
 - Bicyclo[2.2.2]octane (bridges: 2, 2, 2; total: 8 carbons)
 """
 
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple, Dict
 from collections import deque
 from rdkit import Chem
+from rdkit.Chem import BondType
 
 from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms
 
@@ -412,3 +413,319 @@ def get_bicyclo_ring_atoms(mol) -> Optional[Set[int]]:
         ring_atoms.update(ring)
 
     return ring_atoms
+
+
+# ============================================================================
+# Bicyclo Numbering
+# ============================================================================
+
+def get_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
+    """
+    Generate IUPAC numbering for a bicyclo system.
+
+    IUPAC bicyclo numbering rules:
+    1. Start at one bridgehead atom (position 1)
+    2. Number along the longest bridge to the other bridgehead
+    3. Continue along the second longest bridge back toward position 1
+    4. Number the shortest bridge last (back to neighbors of position 1)
+
+    For bicyclo[2.2.1]heptane (norbornane):
+    - Bridgeheads are positions 1 and 4
+    - Longest bridge (2 atoms): 1 -> 2 -> 3 -> 4
+    - Second longest (2 atoms): 4 -> 5 -> 6 -> 1
+    - Shortest (1 atom): 1 -> 7 -> 4
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Dict mapping atom_idx -> IUPAC locant (1-indexed), or None if not bicyclo
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> numbering = get_bicyclo_numbering(mol)
+        >>> len(numbering)
+        7
+    """
+    if not is_bicyclo_system(mol):
+        return None
+
+    bridgeheads = list(find_true_bridgeheads(mol))
+    if len(bridgeheads) != 2:
+        return None
+
+    bh1, bh2 = bridgeheads[0], bridgeheads[1]
+
+    # Get all paths between bridgeheads
+    paths = find_bridge_paths(mol, bh1, bh2)
+    if len(paths) != 3:
+        return None
+
+    # Sort paths by length (longest first)
+    # Path length is the total path including bridgeheads
+    # Bridge length = path_length - 2
+    paths_sorted = sorted(paths, key=lambda p: len(p), reverse=True)
+
+    # Assign locants
+    atom_to_locant: Dict[int, int] = {}
+    current_locant = 1
+
+    # Position 1 is first bridgehead
+    atom_to_locant[bh1] = current_locant
+    current_locant += 1
+
+    # Number along longest bridge (excluding bridgeheads already numbered)
+    longest_path = paths_sorted[0]
+    # The path goes bh1 -> ... -> bh2
+    # Number the middle atoms (not bh1 at start)
+    for atom_idx in longest_path[1:-1]:  # exclude both bridgeheads
+        atom_to_locant[atom_idx] = current_locant
+        current_locant += 1
+
+    # The other bridgehead gets the next number
+    atom_to_locant[bh2] = current_locant
+    current_locant += 1
+
+    # Number along second longest bridge (excluding bridgeheads)
+    second_path = paths_sorted[1]
+    # This path also goes bh1 -> ... -> bh2, but we only number middle atoms
+    for atom_idx in second_path[1:-1]:  # exclude both bridgeheads
+        if atom_idx not in atom_to_locant:
+            atom_to_locant[atom_idx] = current_locant
+            current_locant += 1
+
+    # Number shortest bridge (excluding bridgeheads)
+    shortest_path = paths_sorted[2]
+    for atom_idx in shortest_path[1:-1]:  # exclude both bridgeheads
+        if atom_idx not in atom_to_locant:
+            atom_to_locant[atom_idx] = current_locant
+            current_locant += 1
+
+    return atom_to_locant
+
+
+# ============================================================================
+# Bicyclo Substituent Detection
+# ============================================================================
+
+def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]:
+    """
+    Find all substituents attached to a bicyclo ring system.
+
+    For each ring atom, finds atoms connected to it that are NOT part of the
+    ring system. Groups substituents by their attachment point.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the bicyclo ring
+
+    Returns:
+        Dict mapping ring_atom_idx -> list of substituent info dicts.
+        Each substituent dict contains:
+        - 'atoms': list of atom indices in substituent
+        - 'carbon_count': number of carbons in substituent
+        - 'attachment': ring atom index where substituent attaches
+        - 'first_atom': first atom of substituent (directly bonded to ring)
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2')  # methylnorbornane
+        >>> ring_atoms = get_bicyclo_ring_atoms(mol)
+        >>> subs = get_bicyclo_substituents(mol, ring_atoms)
+        >>> # Should find methyl substituent
+    """
+    substituents: Dict[int, List[Dict]] = {}
+
+    for ring_idx in ring_atoms:
+        ring_atom = mol.GetAtomWithIdx(ring_idx)
+        subs_for_atom = []
+
+        for neighbor in ring_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+
+            # Skip if neighbor is also in ring
+            if nbr_idx in ring_atoms:
+                continue
+
+            # This is a substituent - trace the entire substituent
+            sub_atoms = _trace_substituent(mol, nbr_idx, ring_atoms)
+
+            # Count carbons
+            carbon_count = sum(
+                1 for idx in sub_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+
+            sub_info = {
+                'atoms': sub_atoms,
+                'carbon_count': carbon_count,
+                'attachment': ring_idx,
+                'first_atom': nbr_idx,
+            }
+            subs_for_atom.append(sub_info)
+
+        if subs_for_atom:
+            substituents[ring_idx] = subs_for_atom
+
+    return substituents
+
+
+def _trace_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> List[int]:
+    """
+    Trace all atoms in a substituent using BFS.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Starting atom index (first atom of substituent)
+        ring_atoms: Set of ring atom indices to exclude
+
+    Returns:
+        List of atom indices in the substituent
+    """
+    visited = set()
+    queue = deque([start_idx])
+    result = []
+
+    while queue:
+        atom_idx = queue.popleft()
+
+        if atom_idx in visited or atom_idx in ring_atoms:
+            continue
+
+        visited.add(atom_idx)
+        result.append(atom_idx)
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in ring_atoms:
+                queue.append(nbr_idx)
+
+    return result
+
+
+# ============================================================================
+# Bicyclo Unsaturation Detection
+# ============================================================================
+
+def detect_bicyclo_unsaturation(mol, ring_atoms: Set[int]) -> Dict:
+    """
+    Detect double and triple bonds within a bicyclo ring system.
+
+    Scans all bonds between atoms in the ring and identifies multiple bonds.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the bicyclo ring
+
+    Returns:
+        Dict with:
+        - 'double_bonds': list of (atom_idx1, atom_idx2) tuples for double bonds
+        - 'triple_bonds': list of (atom_idx1, atom_idx2) tuples for triple bonds
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('C1=CC2CCC1C2')  # norbornene
+        >>> ring_atoms = get_bicyclo_ring_atoms(mol)
+        >>> unsat = detect_bicyclo_unsaturation(mol, ring_atoms)
+        >>> len(unsat['double_bonds'])
+        1
+    """
+    double_bonds: List[Tuple[int, int]] = []
+    triple_bonds: List[Tuple[int, int]] = []
+
+    for bond in mol.GetBonds():
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+
+        # Both atoms must be in ring
+        if begin_idx not in ring_atoms or end_idx not in ring_atoms:
+            continue
+
+        bond_type = bond.GetBondType()
+
+        if bond_type == BondType.DOUBLE:
+            # Store with lower index first for consistency
+            double_bonds.append((min(begin_idx, end_idx), max(begin_idx, end_idx)))
+        elif bond_type == BondType.TRIPLE:
+            triple_bonds.append((min(begin_idx, end_idx), max(begin_idx, end_idx)))
+
+    return {
+        'double_bonds': double_bonds,
+        'triple_bonds': triple_bonds,
+    }
+
+
+# ============================================================================
+# Complete Bicyclo Naming Data
+# ============================================================================
+
+def get_complete_bicyclo_data(mol) -> Optional[Dict]:
+    """
+    Generate complete bicyclo naming data including substituents and unsaturation.
+
+    This is the comprehensive data structure needed for full IUPAC naming.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Dict with all naming data, or None if not a bicyclo system:
+        - 'base_name': systematic base name (e.g., 'bicyclo[2.2.1]heptane')
+        - 'descriptor': bicyclo descriptor (e.g., 'bicyclo[2.2.1]')
+        - 'ring_atoms': set of ring atom indices
+        - 'atom_to_locant': dict mapping atom_idx -> IUPAC locant
+        - 'substituents': substituent data from get_bicyclo_substituents
+        - 'unsaturation': unsaturation data from detect_bicyclo_unsaturation
+        - 'bridgeheads': set of bridgehead atom indices
+        - 'retained_name': retained name if applicable, else None
+    """
+    if not is_bicyclo_system(mol):
+        return None
+
+    # Get ring atoms
+    ring_atoms = get_bicyclo_ring_atoms(mol)
+    if not ring_atoms:
+        return None
+
+    # Get numbering
+    atom_to_locant = get_bicyclo_numbering(mol)
+    if not atom_to_locant:
+        return None
+
+    # Get descriptor
+    descriptor = generate_bicyclo_descriptor(mol)
+
+    # Get substituents
+    substituents = get_bicyclo_substituents(mol, ring_atoms)
+
+    # Get unsaturation
+    unsaturation = detect_bicyclo_unsaturation(mol, ring_atoms)
+
+    # Get bridgeheads
+    bridgeheads = find_true_bridgeheads(mol)
+
+    # Count ring carbons for parent name
+    carbon_count = sum(
+        1 for idx in ring_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    )
+
+    # Check for retained name
+    from ..data.bicyclo_systems import get_retained_bicyclo_name
+    canonical = Chem.CanonSmiles(Chem.MolToSmiles(mol))
+    retained = get_retained_bicyclo_name(canonical)
+
+    # Build base name
+    parent_name = _get_alkane_name(carbon_count)
+    base_name = f"{descriptor}{parent_name}" if descriptor else parent_name
+
+    return {
+        'base_name': base_name,
+        'descriptor': descriptor,
+        'ring_atoms': ring_atoms,
+        'atom_to_locant': atom_to_locant,
+        'substituents': substituents,
+        'unsaturation': unsaturation,
+        'bridgeheads': bridgeheads,
+        'retained_name': retained,
+        'carbon_count': carbon_count,
+    }
