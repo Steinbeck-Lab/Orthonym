@@ -7,7 +7,7 @@ that have retained (trivial) names preferred over systematic names.
 For salts, the naming convention is: cation name + anion name
 Example: sodium acetate, potassium chloride
 
-Keys are canonical SMILES (ensure consistency with RDKit canonicalization).
+Keys are canonical SMILES (verified with RDKit canonicalization).
 """
 
 from typing import Optional
@@ -16,19 +16,20 @@ from rdkit import Chem
 
 # === ORGANIC ANIONS (carboxylates, alkoxides, etc.) ===
 # Named with -ate, -ide suffixes
+# All keys are in RDKit canonical SMILES form
 RETAINED_ANIONS = {
     # Carboxylate anions
-    'CC([O-])=O': 'acetate',
-    '[O-]C=O': 'formate',
-    'CCC([O-])=O': 'propanoate',
-    'CCCC([O-])=O': 'butanoate',
+    'CC(=O)[O-]': 'acetate',
+    'O=C[O-]': 'formate',
+    'CCC(=O)[O-]': 'propanoate',
+    'CCCC(=O)[O-]': 'butanoate',
     'O=C([O-])c1ccccc1': 'benzoate',
-    'O=C([O-])C([O-])=O': 'oxalate',
-    'O=C([O-])CC([O-])=O': 'malonate',
-    'O=C([O-])CCC([O-])=O': 'succinate',
+    'O=C([O-])C(=O)[O-]': 'oxalate',
+    'O=C([O-])CC(=O)[O-]': 'malonate',
+    'O=C([O-])CCC(=O)[O-]': 'succinate',
 
     # Alkoxide anions
-    '[CH3][O-]': 'methoxide',
+    'C[O-]': 'methoxide',
     'CC[O-]': 'ethoxide',
     'CC(C)[O-]': 'isopropoxide',
     'CC(C)(C)[O-]': 'tert-butoxide',
@@ -38,12 +39,13 @@ RETAINED_ANIONS = {
     '[CH3-]': 'methanide',
     '[c-]1ccccc1': 'phenide',  # Also called benzenide
 
-    # Other organic anions
-    'CC#[N-]': 'acetylide',  # Terminal alkynide
+    # Alkynide anions
+    '[C-]#C': 'ethynide',  # Terminal alkynide
 }
 
 # === ORGANIC CATIONS (ammonium, carbocations) ===
 # Named with -ium, -ylium suffixes
+# All keys are in RDKit canonical SMILES form
 RETAINED_CATIONS = {
     # Ammonium cations
     '[NH4+]': 'ammonium',
@@ -58,14 +60,14 @@ RETAINED_CATIONS = {
 
     # Carbocations (carbonium/carbenium ions)
     '[CH3+]': 'methylium',
-    'C[CH2+]': 'ethylium',
-    'CC[CH2+]': 'propylium',
-    'CC(C)[CH2+]': 'isobutylium',
-    'CC([CH3+])C': 'isopropylium',  # Secondary carbocation
-    'CC([CH2+])(C)C': 'tert-butylium',  # Tertiary carbocation
+    '[CH2+]C': 'ethylium',
+    '[CH2+]CC': 'propylium',
+    '[CH2+]C(C)C': 'isobutylium',
+    'C[C+](C)C': 'isopropylium',  # Secondary carbocation (tert-butyl cation)
+    '[CH2+]C(C)(C)C': 'neopentylium',  # Primary carbocation adjacent to tert-butyl
 
     # Aromatic cations
-    '[cH+]1ccccc1': 'phenylium',
+    '[C+]1=CC=CC=C1': 'phenylium',
 
     # Oxonium cations
     '[OH3+]': 'oxonium',
@@ -122,6 +124,7 @@ INORGANIC_CATIONS = {
 
 # === INORGANIC ANIONS (halides, hydroxide, etc.) ===
 # Used for naming salts
+# All keys are in RDKit canonical SMILES form
 INORGANIC_ANIONS = {
     # Halides
     '[F-]': 'fluoride',
@@ -135,26 +138,26 @@ INORGANIC_ANIONS = {
 
     # Chalcogenides
     '[S-2]': 'sulfide',
-    '[HS-]': 'hydrosulfide',
+    '[S-]': 'hydrosulfide',  # HS- as [S-] (H implicit)
     '[Se-2]': 'selenide',
 
     # Nitrogen anions
     '[N-3]': 'nitride',
     '[NH2-]': 'amide',  # Metal amides (not organic amides)
-    '[N3-]': 'azide',
+    '[N-]=[N+]=[N-]': 'azide',
 
     # Carbon anions
     '[C-4]': 'carbide',
-    '[CN-]': 'cyanide',
+    '[C-]#N': 'cyanide',
 
-    # Oxygen-containing anions
-    '[NO3-]': 'nitrate',
-    '[NO2-]': 'nitrite',
-    'O=S([O-])=O': 'sulfate',  # Note: simplified SMILES
-    '[O-]S([O-])=O': 'sulfite',
+    # Oxygen-containing anions (canonical forms)
+    'O=[N+]([O-])[O-]': 'nitrate',
+    'O=[N+][O-]': 'nitrite',
+    'O=[SH](=O)[O-]': 'sulfate',  # Note: RDKit canonical form
+    'O=S([O-])[O-]': 'sulfite',
     'O=P([O-])([O-])[O-]': 'phosphate',
-    '[O-]C([O-])=O': 'carbonate',
-    '[O-]Cl=O': 'chlorate',
+    'O=C([O-])[O-]': 'carbonate',
+    '[O-][Cl+][O-]': 'chlorate',  # RDKit canonical form
 }
 
 
