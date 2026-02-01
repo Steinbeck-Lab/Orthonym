@@ -329,6 +329,13 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     if polycyclic_name:
         return _assemble_polycyclic_name(features, style)
 
+    # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
+    # Check BEFORE benzene since they contain benzene substructure
+    if features.is_cyclic:
+        partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
+        if partial_sat_name:
+            return partial_sat_name
+
     # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
     # Only reached if not a complex fused system
     ring_type = getattr(features, 'ring_type', None)
@@ -462,6 +469,29 @@ def _assemble_polycyclic_name(features: Any, style: str) -> str:
 
     # Generate systematic name with substituents
     return name_substituted_polycyclic(features.mol, pah_name, substituents)
+
+
+def _try_partially_saturated_carbocycle(mol) -> Optional[str]:
+    """
+    Try to name a molecule as a partially saturated carbocycle.
+
+    Checks if the molecule is a partially saturated PAH (like tetrahydronaphthalene)
+    and returns the IUPAC name if so.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        IUPAC name if partially saturated carbocycle detected, None otherwise
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
+        >>> _try_partially_saturated_carbocycle(mol)
+        '1,2,3,4-tetrahydronaphthalene'
+    """
+    from ..rules.polycyclics import name_partially_saturated_carbocycle
+
+    return name_partially_saturated_carbocycle(mol)
 
 
 def _is_complex_ring_system(mol) -> bool:

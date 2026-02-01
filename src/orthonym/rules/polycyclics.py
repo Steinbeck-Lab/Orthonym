@@ -796,8 +796,15 @@ def name_polycyclic(mol) -> Optional[str]:
     """
     Generate IUPAC name for a polycyclic aromatic hydrocarbon.
 
-    Main entry point for PAH naming. Handles both unsubstituted and
-    substituted PAHs including all extended systems.
+    Main entry point for PAH naming. Handles:
+    1. Fully aromatic PAHs (naphthalene, anthracene, etc.)
+    2. Substituted PAHs (2-methylnaphthalene)
+    3. Partially saturated PAHs (tetrahydronaphthalene)
+
+    The routing order is:
+    1. Check for partially saturated carbocycles (tetrahydronaphthalene, etc.)
+    2. Check for fully aromatic PAHs
+    3. Return None if not a recognized PAH
 
     Args:
         mol: RDKit Mol object
@@ -816,13 +823,108 @@ def name_polycyclic(mol) -> Optional[str]:
         >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
         >>> name_polycyclic(mol)
         'pyrene'
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> name_polycyclic(mol)
+        '1,2,3,4-tetrahydronaphthalene'
     """
+    # Check for partially saturated carbocycles FIRST
+    partial_sat_name = name_partially_saturated_carbocycle(mol)
+    if partial_sat_name:
+        return partial_sat_name
+
+    # Then check fully aromatic PAHs
     pah_name = identify_polycyclic(mol)
     if not pah_name:
         return None
 
     substituents = get_polycyclic_substituents(mol, pah_name)
     return name_substituted_polycyclic(mol, pah_name, substituents)
+
+
+def name_partially_saturated_carbocycle(mol) -> Optional[str]:
+    """
+    Generate IUPAC name for a partially saturated carbocyclic fused system.
+
+    Handles compounds like tetrahydronaphthalene, dihydroanthracene, etc.
+    These are PAH systems with some ring atoms saturated (sp3).
+
+    IUPAC 2013 format: [locants]-[prefix][parent]
+    Example: 1,2,3,4-tetrahydronaphthalene
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        IUPAC name string if partially saturated carbocycle detected,
+        None otherwise.
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
+        >>> name_partially_saturated_carbocycle(mol)
+        '1,2,3,4-tetrahydronaphthalene'
+    """
+    from .partial_saturation import (
+        detect_carbocyclic_partial_saturation,
+        format_saturation_prefix,
+        get_saturation_locants,
+    )
+
+    if mol is None:
+        return None
+
+    # Get all ring atoms
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+
+    if len(ring_atoms) < 9:  # Need at least 9 atoms for fused bicyclic
+        return None
+
+    # Detect partial saturation
+    sat_info = detect_carbocyclic_partial_saturation(mol, ring_atoms)
+    if sat_info is None:
+        return None
+
+    # Build the name
+    return _assemble_partially_saturated_carbocycle_name(mol, sat_info)
+
+
+def _assemble_partially_saturated_carbocycle_name(
+    mol,
+    saturation_info: Dict[str, Any]
+) -> str:
+    """
+    Assemble IUPAC name for partially saturated carbocyclic system.
+
+    Format: [locants]-[prefix][parent]
+    Example: 1,2,3,4-tetrahydronaphthalene
+
+    Args:
+        mol: RDKit Mol object
+        saturation_info: Dict from detect_carbocyclic_partial_saturation
+
+    Returns:
+        Complete IUPAC name
+    """
+    from .partial_saturation import format_saturation_prefix, get_saturation_locants
+
+    parent_name = saturation_info['parent_name']
+    prefix = saturation_info['prefix']
+    saturated_indices = saturation_info['saturated_indices']
+    atom_to_locant = saturation_info.get('atom_to_locant', {})
+    is_perhydro = saturation_info['is_perhydro']
+
+    # Get locants for saturated positions
+    if is_perhydro:
+        # Perhydro doesn't need locants
+        formatted_prefix = 'perhydro'
+    else:
+        locants = get_saturation_locants(mol, saturated_indices, atom_to_locant)
+        formatted_prefix = format_saturation_prefix(prefix, locants)
+
+    # Assemble final name
+    return f"{formatted_prefix}{parent_name}"
 
 
 # ============================================================================
