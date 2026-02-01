@@ -1,0 +1,424 @@
+"""
+Salt and zwitterion naming rules per IUPAC 2013.
+
+Handles naming of:
+- Salts: Compositional nomenclature (cation + anion as separate words)
+- Zwitterions: Internal ion pairs with combined suffixes
+
+IUPAC 2013 References:
+- P-72: Anion nomenclature
+- P-73: Cation nomenclature
+- P-74: Zwitterion nomenclature
+
+Key naming patterns:
+- Salts: "cation anion" format (sodium acetate, ammonium chloride)
+- Zwitterions: base name with ionic suffixes (2-azaniumylacetate)
+- Multiple ions: alphabetized cations before alphabetized anions
+- Stoichiometry: multiplicative prefixes for repeated ions (diacetate)
+"""
+
+from typing import Dict, List, Optional, Any
+from collections import Counter
+from rdkit import Chem
+
+from ..perception.ions import parse_salt_fragments, get_ion_sites
+from .ions import name_anion, name_cation
+from ..data.ion_retained_names import INORGANIC_CATIONS, INORGANIC_ANIONS
+
+
+# === STOICHIOMETRIC PREFIXES ===
+
+STOICHIOMETRIC_PREFIXES = {
+    2: 'di',
+    3: 'tri',
+    4: 'tetra',
+    5: 'penta',
+    6: 'hexa',
+    7: 'hepta',
+    8: 'octa',
+    9: 'nona',
+    10: 'deca',
+}
+
+
+# === AMINO ACID ZWITTERION PATTERNS ===
+
+# SMARTS for alpha-amino acid zwitterion pattern
+ALPHA_AA_ZWITTERION = '[NX4+;H3][CX4][CX3](=[OX1])[OX1-]'
+
+
+# === RETAINED AMINO ACID NAMES ===
+
+# Map canonical SMILES of zwitterion form to trivial name
+RETAINED_AMINO_ACID_ZWITTERIONS = {
+    # Glycine zwitterion
+    '[NH3+]CC([O-])=O': 'glycine',
+    # Alanine zwitterion
+    'C[C@H]([NH3+])C([O-])=O': 'L-alanine',
+    'C[C@@H]([NH3+])C([O-])=O': 'D-alanine',
+    'CC([NH3+])C([O-])=O': 'alanine',
+    # Add more as needed
+}
+
+
+# === SALT NAMING ===
+
+def name_salt(mol, style: str = 'pin') -> str:
+    """
+    Name a salt using compositional nomenclature.
+
+    Format: cation_name + space + anion_name
+    Example: "sodium acetate", "ammonium chloride"
+
+    For multiple cations/anions, order alphabetically.
+    For stoichiometry > 1, use multiplier prefixes.
+
+    Args:
+        mol: RDKit Mol object (contains disconnected fragments)
+        style: 'pin' for preferred names
+
+    Returns:
+        Salt name as "cation anion" (separate words)
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('[Na+].[O-]C(C)=O')
+        >>> name_salt(mol)
+        'sodium acetate'
+    """
+    if mol is None:
+        return ''
+
+    frags = parse_salt_fragments(mol)
+
+    cation_names = []
+    anion_names = []
+
+    # Process cations
+    for cation_frag in frags['cations']:
+        frag_mol = cation_frag['mol']
+        smiles = cation_frag['smiles']
+
+        # Check inorganic cations first
+        if smiles in INORGANIC_CATIONS:
+            cation_names.append(INORGANIC_CATIONS[smiles])
+        else:
+            # Try organic cation naming
+            name = name_cation(frag_mol, style)
+            if name:
+                cation_names.append(name)
+            else:
+                cation_names.append('cation')
+
+    # Process anions
+    for anion_frag in frags['anions']:
+        frag_mol = anion_frag['mol']
+        smiles = anion_frag['smiles']
+
+        # Check inorganic anions first
+        if smiles in INORGANIC_ANIONS:
+            anion_names.append(INORGANIC_ANIONS[smiles])
+        else:
+            # Try organic anion naming
+            name = name_anion(frag_mol, style)
+            if name:
+                anion_names.append(name)
+            else:
+                anion_names.append('anion')
+
+    # Handle stoichiometry - count duplicates
+    cation_counts = Counter(cation_names)
+    anion_counts = Counter(anion_names)
+
+    # Format cation part with multipliers
+    formatted_cations = []
+    for name in sorted(cation_counts.keys()):
+        count = cation_counts[name]
+        formatted_cations.append(_apply_stoichiometric_prefix(name, count))
+
+    # Format anion part with multipliers
+    formatted_anions = []
+    for name in sorted(anion_counts.keys()):
+        count = anion_counts[name]
+        formatted_anions.append(_apply_stoichiometric_prefix(name, count))
+
+    # Combine: cations first, then anions
+    # Multiple cations/anions are separated by spaces
+    result_parts = formatted_cations + formatted_anions
+
+    return ' '.join(result_parts)
+
+
+def _apply_stoichiometric_prefix(name: str, count: int) -> str:
+    """
+    Apply di-, tri-, tetra- prefix for stoichiometry.
+
+    Args:
+        name: Base ion name
+        count: Number of occurrences
+
+    Returns:
+        Name with stoichiometric prefix if count > 1
+
+    Example:
+        >>> _apply_stoichiometric_prefix('acetate', 2)
+        'diacetate'
+        >>> _apply_stoichiometric_prefix('sodium', 1)
+        'sodium'
+    """
+    if count == 1:
+        return name
+
+    prefix = STOICHIOMETRIC_PREFIXES.get(count, str(count))
+    return f"{prefix}{name}"
+
+
+# === ZWITTERION NAMING ===
+
+def name_zwitterion(mol, style: str = 'pin') -> str:
+    """
+    Name a zwitterionic compound.
+
+    IUPAC P-74 rules:
+    - Anionic centers get lower locants (higher seniority)
+    - Cationic suffixes cited BEFORE anionic suffixes
+    - Format: base-name-cation_suffix-anion_suffix
+
+    Common zwitterions:
+    - Amino acid zwitterions: glycine = 2-ammonioacetate (PIN) or glycine (trivial)
+
+    Args:
+        mol: RDKit Mol object with internal positive and negative charges
+        style: 'pin' for preferred names
+
+    Returns:
+        Zwitterion IUPAC name
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
+        >>> name_zwitterion(mol)
+        '2-azaniumylacetate'
+    """
+    if mol is None:
+        return ''
+
+    # Check for retained amino acid names first (unless systematic requested)
+    if style != 'systematic':
+        canonical = Chem.MolToSmiles(mol, canonical=True)
+        if canonical in RETAINED_AMINO_ACID_ZWITTERIONS:
+            return RETAINED_AMINO_ACID_ZWITTERIONS[canonical]
+
+    # Check for amino acid zwitterion pattern
+    if _is_amino_acid_zwitterion(mol):
+        return _name_amino_acid_zwitterion(mol, style)
+
+    # General zwitterion naming
+    return _name_general_zwitterion(mol, style)
+
+
+def _is_amino_acid_zwitterion(mol) -> bool:
+    """
+    Check if molecule is amino acid zwitterion [NH3+]-C-[COO-].
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule matches alpha-amino acid zwitterion pattern
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
+        >>> _is_amino_acid_zwitterion(mol)
+        True
+    """
+    pattern = Chem.MolFromSmarts(ALPHA_AA_ZWITTERION)
+    if pattern is None:
+        return False
+
+    return mol.HasSubstructMatch(pattern)
+
+
+def _name_amino_acid_zwitterion(mol, style: str) -> str:
+    """
+    Name amino acid zwitterion (e.g., glycine zwitterion).
+
+    For systematic naming:
+    - 2-azaniumylacetate (glycine)
+    - 2-azaniumylpropanoate (alanine)
+
+    The -azaniumyl prefix denotes -NH3+ group.
+    The -ate suffix denotes -COO- group.
+
+    Args:
+        mol: RDKit Mol object
+        style: 'pin' for systematic, others may use trivial
+
+    Returns:
+        Systematic amino acid zwitterion name
+    """
+    # Count carbons for chain naming
+    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+
+    # Map chain length to carboxylate base name
+    CHAIN_TO_CARBOXYLATE = {
+        2: 'acetate',
+        3: 'propanoate',
+        4: 'butanoate',
+        5: 'pentanoate',
+        6: 'hexanoate',
+    }
+
+    base = CHAIN_TO_CARBOXYLATE.get(carbon_count, f'{carbon_count}C-anoate')
+
+    # Simple alpha amino acid: 2-azaniumyl-base
+    return f'2-azaniumyl{base}'
+
+
+def _name_general_zwitterion(mol, style: str) -> str:
+    """
+    Name a general zwitterion (not amino acid pattern).
+
+    For zwitterions with various functional groups, combines
+    the cationic and anionic descriptors.
+
+    Args:
+        mol: RDKit Mol object
+        style: Naming style
+
+    Returns:
+        Zwitterion name
+    """
+    sites = get_ion_sites(mol)
+
+    cation_sites = sites.get('cations', [])
+    anion_sites = sites.get('anions', [])
+
+    if not cation_sites or not anion_sites:
+        return 'zwitterion'
+
+    # Determine the type of cation and anion
+    cation_element = cation_sites[0]['element'] if cation_sites else ''
+    anion_element = anion_sites[0]['element'] if anion_sites else ''
+
+    # Build name based on ionic sites
+    # This is a simplified approach - full implementation would need
+    # to analyze the molecular skeleton and assign locants
+
+    # For now, return a descriptive name
+    if cation_element == 'N' and anion_element == 'O':
+        # Likely amino acid-like or betaine-like
+        return _infer_zwitterion_name(mol, cation_sites, anion_sites)
+
+    return 'zwitterion'
+
+
+def _infer_zwitterion_name(
+    mol,
+    cation_sites: List[Dict[str, Any]],
+    anion_sites: List[Dict[str, Any]]
+) -> str:
+    """
+    Infer zwitterion name from ion site positions.
+
+    Analyzes the molecular structure to determine appropriate naming.
+
+    Args:
+        mol: RDKit Mol object
+        cation_sites: List of cation site dictionaries
+        anion_sites: List of anion site dictionaries
+
+    Returns:
+        Inferred zwitterion name
+    """
+    # Count total atoms for structural inference
+    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+
+    # Check for common zwitterion patterns
+
+    # Betaine pattern: R3N+-CH2-COO-
+    betaine_pattern = Chem.MolFromSmarts('[NX4+](C)(C)(C)CC([O-])=O')
+    if betaine_pattern and mol.HasSubstructMatch(betaine_pattern):
+        return 'betaine'
+
+    # Carnitine-like: (CH3)3N+-CH2-CHOH-CH2-COO-
+    # This is more complex, skip for now
+
+    # Default: systematic name based on carbon count
+    if carbon_count <= 6:
+        CHAIN_TO_CARBOXYLATE = {
+            2: 'acetate',
+            3: 'propanoate',
+            4: 'butanoate',
+            5: 'pentanoate',
+            6: 'hexanoate',
+        }
+        base = CHAIN_TO_CARBOXYLATE.get(carbon_count, f'{carbon_count}C-oate')
+        return f'ammonium{base}'
+
+    return 'zwitterion'
+
+
+# === SALT DETECTION HELPERS ===
+
+def is_salt(mol) -> bool:
+    """
+    Check if a molecule is a salt (has separate cation and anion fragments).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule is a salt
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('[Na+].[Cl-]')
+        >>> is_salt(mol)
+        True
+    """
+    if mol is None:
+        return False
+
+    frags = parse_salt_fragments(mol)
+    return bool(frags['cations'] and frags['anions'])
+
+
+def is_zwitterion(mol) -> bool:
+    """
+    Check if a molecule is a zwitterion (internal + and - charges).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule is a zwitterion
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
+        >>> is_zwitterion(mol)
+        True
+    """
+    if mol is None:
+        return False
+
+    # Zwitterion: single fragment with both + and - charges that cancel
+    frags = Chem.GetMolFrags(mol, asMols=True)
+
+    if len(frags) != 1:
+        return False
+
+    # Check for both positive and negative atoms
+    has_positive = False
+    has_negative = False
+
+    for atom in mol.GetAtoms():
+        charge = atom.GetFormalCharge()
+        if charge > 0:
+            has_positive = True
+        elif charge < 0:
+            has_negative = True
+
+    if not (has_positive and has_negative):
+        return False
+
+    # Net charge should be zero
+    net_charge = Chem.GetFormalCharge(mol)
+    return net_charge == 0
