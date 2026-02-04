@@ -972,8 +972,11 @@ def is_polycyclic_system(mol) -> bool:
     with ring_count >= 3 (tricyclo+).
 
     Returns True for tricyclo and higher bridged systems.
-    Returns False for bicyclo (ring_count == 2), purely fused systems,
-    spiro systems, and monocyclic rings.
+    Returns False for:
+    - bicyclo (ring_count == 2)
+    - purely fused aromatic systems (naphthalene, perylene, coronene)
+    - spiro systems
+    - monocyclic rings
 
     This function is used by the composer for routing.
 
@@ -992,6 +995,15 @@ def is_polycyclic_system(mol) -> bool:
         ring_atoms.update(ring)
 
     if not ring_atoms:
+        return False
+
+    # Skip fully aromatic ring systems (PAHs like naphthalene, perylene, coronene)
+    # These should use retained names from fused_rings, not VB nomenclature
+    all_ring_aromatic = all(
+        mol.GetAtomWithIdx(idx).GetIsAromatic()
+        for idx in ring_atoms
+    )
+    if all_ring_aromatic:
         return False
 
     analyzer = VonBaeyerAnalyzer()

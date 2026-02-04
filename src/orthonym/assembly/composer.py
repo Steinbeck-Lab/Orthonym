@@ -30,6 +30,10 @@ from ..rules.bicyclo import is_bicyclo_system, name_bicyclo_system
 from ..rules.spiro import is_spiro_system, name_spiro_system
 from ..rules.fused_rings import classify_fused_system, name_fused_heterocycle, name_ortho_fused_bicyclic
 
+# Polycyclic system imports (Phase 16)
+from ..rules.polycyclic import name_polycyclic_complete, is_polycyclic_system
+from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
+
 # Partial saturation imports for fused heterocycles
 from ..rules.partial_saturation import (
     detect_partial_saturation,
@@ -528,7 +532,7 @@ def _try_partially_saturated_carbocycle(mol) -> Optional[str]:
 
 def _is_complex_ring_system(mol) -> bool:
     """
-    Check if a molecule contains a complex ring system (bicyclo, spiro, or fused).
+    Check if a molecule contains a complex ring system (bicyclo, spiro, fused, or polycyclic).
 
     Complex ring systems require special naming rules beyond simple cycloalkanes.
     This function is used for early routing decision in assemble_name().
@@ -537,23 +541,32 @@ def _is_complex_ring_system(mol) -> bool:
         mol: RDKit Mol object
 
     Returns:
-        True if molecule contains bicyclo, spiro, or non-trivial fused ring system
+        True if molecule contains bicyclo, spiro, fused, bridged-fused, or polycyclic-bridged system
 
     Note:
         Simple monocyclic rings return False.
-        Aromatic fused systems (naphthalene, etc.) are handled by polycyclics module.
+        This function just detects if ANY complex ring system exists;
+        the actual classification is done in _classify_complex_ring.
     """
-    # Check bicyclo first (bridged bicyclic)
+    # Check bridged-fused (fused core + additional bridges)
+    if detect_bridged_fused(mol):
+        return True
+
+    # Check bicyclo (bridged bicyclic with 2 rings)
     if is_bicyclo_system(mol):
         return True
 
-    # Check spiro (two rings sharing one atom)
-    if is_spiro_system(mol):
+    # Check polycyclic-bridged (tricyclo+ pure bridged systems)
+    if is_polycyclic_system(mol):
         return True
 
     # Check fused rings (ortho-fused or ortho-peri-fused)
     fused_type = classify_fused_system(mol)
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+        return True
+
+    # Check spiro (two rings sharing one atom)
+    if is_spiro_system(mol):
         return True
 
     return False
@@ -568,22 +581,54 @@ def _classify_complex_ring(mol) -> str:
 
     Returns:
         Classification string:
-        - 'bicyclo': Bridged bicyclic system
+        - 'bridged-fused': Mixed fused + bridged system (e.g., 1,4-methanonaphthalene)
+        - 'bicyclo': Bridged bicyclic system (e.g., norbornane)
+        - 'polycyclic-bridged': Higher polycyclic bridged system (tricyclo+, e.g., adamantane)
         - 'spiro': Spiro system (rings share one atom)
         - 'ortho-fused': Ortho-fused system (rings share one edge)
-        - 'ortho-peri-fused': Complex fused system
+        - 'ortho-peri-fused': Complex fused system (e.g., perylene, coronene)
         - 'simple': Not a complex ring system
+
+    Note:
+        Priority order is CRITICAL:
+        1. bridged-fused FIRST (should not fall through to bicyclo/polycyclic)
+        2. bicyclo (2-ring bridged)
+        3. polycyclic-bridged (tricyclo+ pure bridged - adamantane, cubane)
+           BEFORE fused because classify_fused_system incorrectly flags
+           bridged systems as "ortho-peri-fused"
+        4. fused (ortho-fused/ortho-peri-fused for PAHs)
+        5. spiro
+
+        The key insight: is_polycyclic_system() correctly identifies TRUE bridged
+        polycyclic systems (adamantane) vs fused systems (perylene), while
+        classify_fused_system() incorrectly flags adamantane as ortho-peri-fused.
+        So we check is_polycyclic_system BEFORE classify_fused_system.
     """
-    # Check in order of priority
+    # Check bridged-fused FIRST (fused core + bridges)
+    # Must come before bicyclo/polycyclic to avoid misclassification
+    if detect_bridged_fused(mol):
+        return 'bridged-fused'
+
+    # Check bicyclo (2-ring bridged)
     if is_bicyclo_system(mol):
         return 'bicyclo'
 
-    if is_spiro_system(mol):
-        return 'spiro'
+    # Check polycyclic-bridged (tricyclo+ bridged systems) BEFORE fused
+    # This is critical: is_polycyclic_system correctly distinguishes
+    # TRUE bridged systems (adamantane) from fused systems (perylene)
+    # using the _is_purely_fused() check internally
+    if is_polycyclic_system(mol):
+        return 'polycyclic-bridged'
 
+    # Check fused (ortho-fused or ortho-peri-fused)
+    # Only reaches here if NOT a bridged polycyclic
     fused_type = classify_fused_system(mol)
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
         return fused_type
+
+    # Check spiro
+    if is_spiro_system(mol):
+        return 'spiro'
 
     return 'simple'
 
@@ -593,7 +638,9 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
     Assemble IUPAC name for a complex ring system.
 
     Routes to appropriate naming function based on ring classification:
+    - Bridged-fused: FR-8 nomenclature (e.g., 1,4-methanonaphthalene)
     - Bicyclo: bicyclo[x.y.z]alkane format (e.g., bicyclo[2.2.1]heptane)
+    - Polycyclic-bridged: von Baeyer format (e.g., tricyclo[3.3.1.1^{3,7}]decane)
     - Spiro: spiro[a.b]alkane format (e.g., spiro[4.5]decane)
     - Fused: retained names or systematic fusion descriptors
 
@@ -605,19 +652,35 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
         Complete IUPAC name, or None if naming fails
 
     Note:
-        Supports complete bicyclo naming with substituents, unsaturation, and stereo.
+        Supports complete naming with substituents, unsaturation, and stereo for all types.
     """
     import logging
 
     ring_type = _classify_complex_ring(mol)
 
     try:
-        if ring_type == 'bicyclo':
+        if ring_type == 'bridged-fused':
+            # FR-8 nomenclature for bridged fused systems
+            name = name_bridged_fused_system(mol)
+            if name:
+                return name
+            logging.warning("Bridged-fused naming failed for molecule")
+            return None
+
+        elif ring_type == 'bicyclo':
             # Complete bicyclo naming with substituents, unsaturation, stereo
             name = _assemble_complete_bicyclo_name(mol, features)
             if name:
                 return name
-            logging.warning(f"Bicyclo naming failed for molecule")
+            logging.warning("Bicyclo naming failed for molecule")
+            return None
+
+        elif ring_type == 'polycyclic-bridged':
+            # Von Baeyer naming for tricyclo+ systems (e.g., adamantane)
+            name = name_polycyclic_complete(mol)
+            if name:
+                return name
+            logging.warning("Polycyclic-bridged naming failed for molecule")
             return None
 
         elif ring_type == 'spiro':
@@ -625,7 +688,7 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
             name = name_spiro_system(mol)
             if name:
                 return name
-            logging.warning(f"Spiro naming failed for molecule")
+            logging.warning("Spiro naming failed for molecule")
             return None
 
         elif ring_type in ('ortho-fused', 'ortho-peri-fused'):
