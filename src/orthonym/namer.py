@@ -175,6 +175,17 @@ class Orthonym:
                 return name_anion(mol, style=self.style)
 
         # Continue with normal neutral molecule naming
+
+        # NATURAL PRODUCT DETECTION
+        # Check before retained names because NP detection uses substructure matching
+        # while retained names use exact SMILES matching.
+        # Even with style="systematic", NP names are returned (IUPAC 2013 has no
+        # systematic PIN for natural products - see P-10).
+        from .rules.natural_products import name_natural_product
+        np_name = name_natural_product(mol)
+        if np_name is not None:
+            return np_name
+
         # Check retained names first (benzene, methanol, etc.) unless systematic style requested
         if self.style != "systematic":
             if canonical_smiles in RETAINED_NAMES:
