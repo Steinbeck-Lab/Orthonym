@@ -1018,6 +1018,78 @@ def is_polycyclic_system(mol) -> bool:
     return True
 
 
+# ============================================================================
+# Heteroatom Replacement Prefix (Placeholder for Plan 16-02)
+# ============================================================================
+
+# Heteroatom priority based on Hantzsch-Widman seniority
+HETEROATOM_PREFIXES = {
+    'O': ('oxa', 1),
+    'S': ('thia', 2),
+    'Se': ('selena', 3),
+    'N': ('aza', 4),
+    'P': ('phospha', 5),
+}
+
+
+def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms: Set[int]) -> str:
+    """
+    Generate 'a' replacement nomenclature prefix for ring heteroatoms.
+
+    Scans ring atoms for non-carbon elements and generates the appropriate
+    prefix string with locants (e.g., "7-oxa-" or "2,5-dioxa-7-aza-").
+
+    Args:
+        mol: RDKit Mol object
+        numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+        ring_atoms: Set of atom indices in the ring system
+
+    Returns:
+        Formatted prefix string (e.g., "7-oxa-") or empty string if no heteroatoms
+
+    Note:
+        This is a placeholder for Plan 16-02 implementation. Currently returns
+        empty string.
+    """
+    # Group heteroatoms by element type
+    heteroatoms: Dict[str, List[int]] = {}
+
+    for atom_idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        symbol = atom.GetSymbol()
+        if symbol != 'C' and symbol in HETEROATOM_PREFIXES:
+            if atom_idx in numbering:
+                locant = numbering[atom_idx]
+                if symbol not in heteroatoms:
+                    heteroatoms[symbol] = []
+                heteroatoms[symbol].append(locant)
+
+    if not heteroatoms:
+        return ""
+
+    # Sort elements by HW priority
+    sorted_elements = sorted(heteroatoms.keys(), key=lambda s: HETEROATOM_PREFIXES.get(s, (s, 99))[1])
+
+    # Simple multipliers
+    multipliers = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+
+    parts = []
+    for element in sorted_elements:
+        locants = sorted(heteroatoms[element])
+        prefix_name = HETEROATOM_PREFIXES[element][0]
+
+        locant_str = ','.join(str(loc) for loc in locants)
+        count = len(locants)
+
+        if count > 1:
+            mult = multipliers.get(count, str(count))
+            parts.append(f"{locant_str}-{mult}{prefix_name}")
+        else:
+            parts.append(f"{locant_str}-{prefix_name}")
+
+    return '-'.join(parts) + '-' if parts else ""
+
+
 def _is_purely_fused(mol, ring_atoms: Set[int], bridgeheads: Set[int]) -> bool:
     """
     Check if a ring system is purely fused (shared edges only, no bridges).
@@ -1060,3 +1132,580 @@ def _is_purely_fused(mol, ring_atoms: Set[int], bridgeheads: Set[int]) -> bool:
                     return False
 
     return True
+
+
+# ============================================================================
+# Polycyclic Lactone Detection (Plan 16-02)
+# ============================================================================
+
+def detect_polycyclic_lactone(mol, ring_system_atoms: Set[int]) -> Optional[Dict]:
+    """
+    Detect if a polycyclic system contains a lactone (cyclic ester).
+
+    A polycyclic lactone has:
+    - An ester group [-C(=O)-O-] where both the carbonyl carbon AND
+      the ester oxygen are part of the ring system
+    - The carbonyl oxygen (=O) is exocyclic (double-bonded to carbonyl C)
+
+    Args:
+        mol: RDKit Mol object
+        ring_system_atoms: Set of atom indices in the polycyclic ring system
+
+    Returns:
+        Dict with lactone info if found:
+            carbonyl_c: atom index of carbonyl carbon
+            ring_oxygen: atom index of ring (ester) oxygen
+            carbonyl_oxygen: atom index of exocyclic carbonyl oxygen
+        None if no polycyclic lactone found
+    """
+    if mol is None:
+        return None
+
+    # SMARTS for ester/lactone core: carbonyl carbon with =O and -O-
+    # [CX3](=O)[OX2] matches: match[0]=carbonyl C, match[1]=carbonyl O, match[2]=ester O
+    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2]")
+    matches = mol.GetSubstructMatches(pattern)
+
+    if not matches:
+        return None
+
+    for match in matches:
+        carbonyl_c = match[0]
+        carbonyl_o = match[1]  # The =O (exocyclic)
+        ester_o = match[2]     # The -O- (should be in ring)
+
+        # Check if BOTH carbonyl C AND ester O are in the ring system
+        if carbonyl_c in ring_system_atoms and ester_o in ring_system_atoms:
+            # Verify carbonyl O is NOT in the ring (exocyclic)
+            if carbonyl_o not in ring_system_atoms:
+                return {
+                    'carbonyl_c': carbonyl_c,
+                    'ring_oxygen': ester_o,
+                    'carbonyl_oxygen': carbonyl_o,
+                }
+
+    return None
+
+
+# ============================================================================
+# Polycyclic Heteroatom Naming (Plan 16-02)
+# ============================================================================
+
+def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
+    """
+    Generate IUPAC name for a polycyclic system containing ring heteroatoms.
+
+    Uses "a" replacement nomenclature for ring heteroatoms (oxa, aza, thia)
+    and pseudoketone naming for polycyclic lactones (oxa- prefix + -one suffix).
+
+    Format: "{hetero_prefix}bicyclo[descriptor]{parent_name}" or with -one suffix
+    Example: "7-oxabicyclo[2.2.1]heptane" or "3-oxabicyclo[3.2.1]octan-2-one"
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Complete IUPAC name with heteroatom prefixes, or None if not applicable
+    """
+    if mol is None:
+        return None
+
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+
+    if not ring_atoms:
+        return None
+
+    # Check if system has ring heteroatoms
+    has_ring_heteroatoms = False
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            has_ring_heteroatoms = True
+            break
+
+    if not has_ring_heteroatoms:
+        # No heteroatoms - use regular polycyclic naming
+        return generate_polycyclic_name(mol)
+
+    analyzer = VonBaeyerAnalyzer()
+
+    # Check ring count
+    ring_count = analyzer._get_ring_count(mol, ring_atoms)
+    if ring_count < 2:
+        return None
+
+    # Check for bridgeheads
+    bridgeheads = analyzer._find_all_bridgeheads(mol, ring_atoms)
+    if len(bridgeheads) < 2:
+        return None
+
+    # Analyze the system to get descriptor and numbering
+    desc = analyzer.analyze(mol, ring_atoms)
+
+    # Get heteroatom replacement prefix
+    hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
+
+    # Check for polycyclic lactone
+    lactone_info = detect_polycyclic_lactone(mol, ring_atoms)
+
+    # Build the base descriptor (bicyclo[...], tricyclo[...], etc.)
+    # The descriptor_string already includes the prefix like "bicyclo[2.2.1]"
+    descriptor = desc.descriptor_string
+
+    # Count total ring atoms for parent name
+    total_ring_atoms = len(ring_atoms)
+    parent_name = _get_alkane_name(total_ring_atoms)
+
+    # Handle lactone naming with -one suffix
+    suffix = ""
+    if lactone_info is not None:
+        # Get the carbonyl carbon's VB locant for the -one suffix
+        carbonyl_c = lactone_info['carbonyl_c']
+        carbonyl_locant = desc.numbering.get(carbonyl_c, 2)  # Default to 2 if not found
+
+        # Apply vowel elision: drop 'e' before '-one'
+        # heptane -> heptan-, octane -> octan-
+        if parent_name.endswith('e'):
+            parent_stem = parent_name[:-1]
+        else:
+            parent_stem = parent_name
+
+        suffix = f"-{carbonyl_locant}-one"
+        parent_name = parent_stem
+
+    # Assemble the complete name
+    # Format: {hetero_prefix}{descriptor}{parent_name}{suffix}
+    # Example: 7-oxa-bicyclo[2.2.1]heptane
+    # Example: 3-oxa-bicyclo[3.2.1]octan-2-one
+    name = f"{hetero_prefix}{descriptor}{parent_name}{suffix}"
+
+    return name
+
+
+def _has_ring_heteroatoms(mol, ring_atoms: Set[int]) -> bool:
+    """Check if the ring system contains any heteroatoms (non-carbon atoms)."""
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return True
+    return False
+
+
+# ============================================================================
+# Substituent Detection (Plan 16-03)
+# ============================================================================
+
+def get_polycyclic_substituents(
+    mol,
+    ring_atoms: Set[int],
+    numbering: Dict[int, int]
+) -> List[Dict]:
+    """
+    Detect substituents attached to a polycyclic ring system.
+
+    For each ring atom, checks neighbors not in ring_atoms. Traces each
+    substituent branch and determines its name using get_alkyl_name().
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the polycyclic ring system
+        numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+
+    Returns:
+        List of substituent info dicts, each containing:
+        - 'locant': VB locant where substituent attaches
+        - 'name': substituent name (e.g., 'methyl', 'ethyl')
+        - 'atom_indices': list of atom indices in the substituent
+
+    Note:
+        Skips exocyclic double bonds (=O, =S) as those are handled as suffixes.
+    """
+    from collections import deque
+    from ..assembly.naming_utils import get_alkyl_name
+
+    substituents = []
+
+    for ring_idx in ring_atoms:
+        if ring_idx not in numbering:
+            continue
+
+        ring_atom = mol.GetAtomWithIdx(ring_idx)
+        locant = numbering[ring_idx]
+
+        for neighbor in ring_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+
+            # Skip if neighbor is in ring
+            if nbr_idx in ring_atoms:
+                continue
+
+            # Check bond type - skip exocyclic double bonds (=O, =S for suffixes)
+            bond = mol.GetBondBetweenAtoms(ring_idx, nbr_idx)
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                # This is an exocyclic double bond, handle as suffix not substituent
+                continue
+
+            # Trace the substituent branch
+            sub_atoms = _trace_substituent_branch(mol, nbr_idx, ring_atoms)
+
+            # Count carbons to determine substituent name
+            carbon_count = sum(
+                1 for idx in sub_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+
+            if carbon_count > 0 and carbon_count <= 10:
+                try:
+                    name = get_alkyl_name(carbon_count)
+                except ValueError:
+                    name = f"C{carbon_count}H{2*carbon_count+1}"
+            elif carbon_count > 10:
+                name = f"C{carbon_count}H{2*carbon_count+1}"
+            else:
+                # Non-carbon substituent (like hydroxy, amino)
+                # For now, skip these as they're functional groups
+                continue
+
+            substituents.append({
+                'locant': locant,
+                'name': name,
+                'atom_indices': sub_atoms,
+            })
+
+    return substituents
+
+
+def _trace_substituent_branch(mol, start_idx: int, ring_atoms: Set[int]) -> List[int]:
+    """
+    Trace all atoms in a substituent branch using BFS.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Starting atom index (first atom of substituent)
+        ring_atoms: Set of ring atom indices to exclude
+
+    Returns:
+        List of atom indices in the substituent branch
+    """
+    from collections import deque
+
+    visited = set()
+    queue = deque([start_idx])
+    result = []
+
+    while queue:
+        atom_idx = queue.popleft()
+
+        if atom_idx in visited or atom_idx in ring_atoms:
+            continue
+
+        visited.add(atom_idx)
+        result.append(atom_idx)
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in ring_atoms:
+                queue.append(nbr_idx)
+
+    return result
+
+
+# ============================================================================
+# Unsaturation Detection (Plan 16-03)
+# ============================================================================
+
+def get_polycyclic_unsaturation(
+    mol,
+    ring_atoms: Set[int],
+    numbering: Dict[int, int]
+) -> Dict:
+    """
+    Detect double and triple bonds within a polycyclic ring system.
+
+    Scans all bonds where BOTH atoms are in ring_atoms and identifies
+    multiple bonds. Returns the lower VB locant for each bond.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the polycyclic ring system
+        numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+
+    Returns:
+        Dict with:
+        - 'double_bonds': list of locants for double bonds
+        - 'triple_bonds': list of locants for triple bonds
+    """
+    from rdkit.Chem import BondType
+
+    double_bonds = []
+    triple_bonds = []
+
+    for bond in mol.GetBonds():
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+
+        # Both atoms must be in ring
+        if begin_idx not in ring_atoms or end_idx not in ring_atoms:
+            continue
+
+        # Both atoms must have locants
+        if begin_idx not in numbering or end_idx not in numbering:
+            continue
+
+        bond_type = bond.GetBondType()
+
+        if bond_type == BondType.DOUBLE:
+            # Use lower locant
+            loc1 = numbering[begin_idx]
+            loc2 = numbering[end_idx]
+            double_bonds.append(min(loc1, loc2))
+        elif bond_type == BondType.TRIPLE:
+            loc1 = numbering[begin_idx]
+            loc2 = numbering[end_idx]
+            triple_bonds.append(min(loc1, loc2))
+
+    # Sort locants
+    double_bonds.sort()
+    triple_bonds.sort()
+
+    return {
+        'double_bonds': double_bonds,
+        'triple_bonds': triple_bonds,
+    }
+
+
+# ============================================================================
+# Stereochemistry (Plan 16-03)
+# ============================================================================
+
+def get_polycyclic_stereo(mol, numbering: Dict[int, int]) -> str:
+    """
+    Collect and format stereodescriptors for a polycyclic system.
+
+    Uses the VB numbering to generate IUPAC locants for R/S stereocenters.
+
+    Args:
+        mol: RDKit Mol object (stereochemistry should already be assigned)
+        numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+
+    Returns:
+        Formatted stereodescriptor string like "(1R,4S)-" or empty string
+        if no stereodescriptors found.
+    """
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    # Collect stereodescriptors using the VB numbering as atom_to_locant
+    descriptors = collect_stereodescriptors(mol, numbering)
+
+    # Format as IUPAC string
+    return format_stereodescriptor_string(descriptors)
+
+
+# ============================================================================
+# Complete Name Assembly (Plan 16-03)
+# ============================================================================
+
+def name_polycyclic_complete(mol) -> Optional[str]:
+    """
+    Generate the complete IUPAC name for a polycyclic bridged system.
+
+    This is the FINAL public API for polycyclic naming. It supersedes
+    generate_polycyclic_name() which only generates base names.
+
+    Produces complete names including:
+    - Stereodescriptors: "(1R,4S)-"
+    - Substituent prefixes: "3-methyl-"
+    - Heteroatom replacement: "7-oxa-" (when Plan 16-02 implemented)
+    - Descriptor: "bicyclo[2.2.1]"
+    - Parent name with unsaturation: "hept-2-ene"
+
+    Example output: "(1R,4S)-3-methyl-7-oxabicyclo[2.2.1]hept-2-ene"
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Complete IUPAC name, or None if not a polycyclic system
+    """
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+
+    if mol is None:
+        return None
+
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+
+    if not ring_atoms:
+        return None
+
+    analyzer = VonBaeyerAnalyzer()
+
+    # Check ring count
+    ring_count = analyzer._get_ring_count(mol, ring_atoms)
+    if ring_count < 2:
+        return None
+
+    # Check for bridgeheads
+    bridgeheads = analyzer._find_all_bridgeheads(mol, ring_atoms)
+    if len(bridgeheads) < 2:
+        return None
+
+    # Analyze the system
+    desc = analyzer.analyze(mol, ring_atoms)
+
+    # Count ring atoms for parent name
+    total_ring_atoms = len(ring_atoms)
+
+    # 1. Get stereodescriptors
+    stereo_prefix = get_polycyclic_stereo(mol, desc.numbering)
+
+    # 2. Get substituents
+    substituents = get_polycyclic_substituents(mol, ring_atoms, desc.numbering)
+
+    # 3. Get unsaturation
+    unsaturation = get_polycyclic_unsaturation(mol, ring_atoms, desc.numbering)
+
+    # 4. Get heteroatom replacement prefix
+    hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
+
+    # 5. Assemble substituent prefix
+    substituent_prefix = _assemble_substituent_prefix(substituents)
+
+    # 6. Build parent name with unsaturation suffix
+    parent_name = _build_parent_with_unsaturation(total_ring_atoms, unsaturation)
+
+    # 7. Assemble final name
+    # Order: (stereo)-substituents-heteroprefix-cycloprefix[descriptor]parent-suffix
+    name_parts = []
+
+    if stereo_prefix:
+        name_parts.append(stereo_prefix)
+
+    if substituent_prefix:
+        name_parts.append(substituent_prefix)
+
+    if hetero_prefix:
+        name_parts.append(hetero_prefix)
+
+    # Add descriptor and parent
+    name_parts.append(desc.descriptor_string)
+    name_parts.append(parent_name)
+
+    # Join - the stereo prefix ends with '-', substituent prefix ends with '-', etc.
+    name = ''.join(name_parts)
+
+    return name
+
+
+def _assemble_substituent_prefix(substituents: List[Dict]) -> str:
+    """
+    Assemble substituent prefix with proper IUPAC formatting.
+
+    Groups identical substituents, applies multipliers, and sorts alphabetically.
+
+    Args:
+        substituents: List of substituent dicts from get_polycyclic_substituents()
+
+    Returns:
+        Formatted prefix like "3-ethyl-2,4-dimethyl-" or empty string
+    """
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+
+    if not substituents:
+        return ""
+
+    # Group by name
+    grouped: Dict[str, List[int]] = {}
+    for sub in substituents:
+        name = sub['name']
+        locant = sub['locant']
+        if name not in grouped:
+            grouped[name] = []
+        grouped[name].append(locant)
+
+    # Sort locants within each group
+    for name in grouped:
+        grouped[name].sort()
+
+    # Sort groups alphabetically by substituent name
+    sorted_names = sorted(grouped.keys(), key=alpha_sort_key)
+
+    # Build prefix parts
+    parts = []
+    for name in sorted_names:
+        locants = grouped[name]
+        count = len(locants)
+        multiplier = get_multiplier_prefix(count, name)
+
+        locant_str = ','.join(str(loc) for loc in locants)
+        parts.append(f"{locant_str}-{multiplier}{name}")
+
+    return '-'.join(parts) + '-' if parts else ""
+
+
+def _build_parent_with_unsaturation(
+    total_atoms: int,
+    unsaturation: Dict
+) -> str:
+    """
+    Build the parent name with unsaturation suffixes and vowel elision.
+
+    Args:
+        total_atoms: Total ring atoms (for parent name base)
+        unsaturation: Dict with 'double_bonds' and 'triple_bonds' lists
+
+    Returns:
+        Parent name like "heptane", "hept-2-ene", "hepta-2,5-diene"
+    """
+    base_name = _get_alkane_name(total_atoms)
+
+    # Simple multipliers for unsaturation
+    unsat_multipliers = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+
+    double_bonds = unsaturation.get('double_bonds', [])
+    triple_bonds = unsaturation.get('triple_bonds', [])
+
+    if not double_bonds and not triple_bonds:
+        # Saturated - return plain alkane name
+        return base_name
+
+    # Build unsaturation suffix
+    # Remove 'ane' ending for unsaturated forms
+    stem = base_name[:-3] if base_name.endswith('ane') else base_name[:-1]
+
+    parts = []
+
+    if double_bonds:
+        count = len(double_bonds)
+        mult = unsat_multipliers.get(count, str(count))
+        locant_str = ','.join(str(loc) for loc in double_bonds)
+        if count > 1:
+            # Multiple double bonds: hepta-2,5-diene
+            parts.append(f"-{locant_str}-{mult}en")
+        else:
+            # Single double bond: hept-2-ene
+            parts.append(f"-{locant_str}-en")
+
+    if triple_bonds:
+        count = len(triple_bonds)
+        mult = unsat_multipliers.get(count, str(count))
+        locant_str = ','.join(str(loc) for loc in triple_bonds)
+        if count > 1:
+            parts.append(f"-{locant_str}-{mult}yn")
+        else:
+            parts.append(f"-{locant_str}-yn")
+
+    # Vowel elision: if multiple double bonds, add 'a' back to stem
+    if len(double_bonds) > 1 or (double_bonds and triple_bonds):
+        stem = stem + 'a'
+
+    # Combine
+    result = stem + ''.join(parts) + 'e'
+
+    return result

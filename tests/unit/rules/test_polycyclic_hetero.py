@@ -213,9 +213,9 @@ class TestDetectPolycyclicLactone:
     @pytest.mark.unit
     def test_bicyclic_lactone_detection(self):
         """Simple bicyclic lactone detection - ring O and C=O both in ring system."""
-        # 3-oxabicyclo[3.2.1]octan-2-one pattern
-        # A bicyclic lactone with ester in the ring
-        mol = Chem.MolFromSmiles('O=C1CCCC2COC12')
+        # Bicyclic lactone: C(=O)-O- where C and ester O are both in the ring
+        # The carbonyl O is exocyclic (double bonded)
+        mol = Chem.MolFromSmiles('O=C1OC2CCC1CC2')  # Valid bicyclic lactone
         assert mol is not None
 
         ri = mol.GetRingInfo()
