@@ -261,9 +261,10 @@ class Orthonym:
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
 
-        # Store ester match if principal group is ester
+        # Store ester match(es) if principal group is ester
         if pg_name == "ester" and pg_atoms:
-            features.ester_match = pg_atoms[0]  # First ester match
+            features.ester_match = pg_atoms[0]  # First ester match (backward compat)
+            features.all_ester_matches = pg_atoms  # All ester matches
 
         # Detect polyfunctional compounds (multiple distinct FGs)
         from .rules.polyfunctional import detect_polyfunctional, get_non_principal_groups

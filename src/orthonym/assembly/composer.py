@@ -217,6 +217,28 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     if species_type in ('salt', 'ion', 'zwitterion', 'radical'):
         return assemble_ion_name(features, features.mol, style)
 
+    # Handle monocyclic lactones BEFORE polyfunctional, esters, and heterocycles
+    # Lactones are cyclic esters that should be named as heterocyclic ketones
+    # (e.g., oxolan-2-one, not tetrahydrofuran or "alkyl alkanoate")
+    # Must come before polyfunctional because lactones trigger polyfunctional detection
+    from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
+    lactone_info = is_monocyclic_lactone(features.mol)
+    if lactone_info:
+        lactone_name = name_monocyclic_lactone(features.mol)
+        if lactone_name:
+            return lactone_name
+
+    # Handle ring-attached esters BEFORE polyfunctional handler
+    # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
+    # use acyloxy prefix naming on ring parent, not polyfunctional naming
+    if features.principal_group == "ester":
+        from ..rules.esters import detect_exocyclic_esters
+        exocyclic = detect_exocyclic_esters(features.mol)
+        if exocyclic:
+            ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
+            if ring_ester_name:
+                return ring_ester_name
+
     # Handle polyfunctional compounds (multiple distinct functional groups)
     if getattr(features, 'is_polyfunctional', False):
         from ..rules.polyfunctional import name_polyfunctional
@@ -226,10 +248,12 @@ def assemble_name(features: Any, style: str = "pin") -> str:
         # If name_polyfunctional returns None, fall through to normal handling
 
     # Handle esters (two-component naming: "alkyl alkanoate")
+    # Only reached for acyclic esters (ring-attached esters handled above)
     if features.principal_group == "ester":
         ester_match = getattr(features, 'ester_match', None)
         if ester_match:
             from ..rules.esters import name_ester
+            # Simple acyclic ester: use "alkyl alkanoate" naming
             ester_name = name_ester(features.mol, ester_match)
             if ester_name:
                 return ester_name
@@ -340,6 +364,14 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     # Only reached if not a complex fused system
     ring_type = getattr(features, 'ring_type', None)
     if ring_type == 'heterocyclic':
+        # Safety net: check if this heterocycle is actually a lactone
+        # (catches cases where lactone detection in ester routing was bypassed)
+        from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
+        lactone_info = is_monocyclic_lactone(features.mol)
+        if lactone_info:
+            lactone_name = name_monocyclic_lactone(features.mol)
+            if lactone_name:
+                return lactone_name
         return _assemble_heterocycle_name(features, style)
 
     # Handle benzene derivatives
@@ -619,6 +651,105 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
         # Graceful degradation - log and return None
         logging.warning(f"Complex ring naming error: {e}")
         return None
+
+
+def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[str]:
+    """
+    Assemble name for a ring parent with exocyclic ester substituents as acyloxy prefixes.
+
+    When a molecule has a ring (cyclohexane, benzene, etc.) with ester groups
+    attached to it, the ring is the parent and esters become acyloxy prefixes.
+
+    Examples:
+        CC(=O)OC1CCCCC1 -> acetyloxycyclohexane
+        CC(=O)Oc1ccccc1 -> acetyloxybenzene (phenyl acetate)
+
+    Args:
+        features: MolecularFeatures object
+        exocyclic_esters: List of dicts from detect_exocyclic_esters()
+
+    Returns:
+        IUPAC name, or None if naming fails
+    """
+    mol = features.mol
+    if not exocyclic_esters:
+        return None
+
+    # Determine ring parent name by finding the ring containing the attachment atom
+    ring_parent = None
+    attach_atom = exocyclic_esters[0]['ring_attach_atom_idx']
+
+    ring_info = mol.GetRingInfo()
+    atom_rings = ring_info.AtomRings()
+
+    for ring in atom_rings:
+        if attach_atom not in ring:
+            continue
+
+        ring_size = len(ring)
+        ring_set = set(ring)
+
+        # Check if it's an aromatic 6-membered all-carbon ring (benzene)
+        is_aromatic_6 = (
+            ring_size == 6 and
+            all(mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in ring) and
+            all(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring)
+        )
+        if is_aromatic_6:
+            ring_parent = "benzene"
+            break
+
+        # Check for heterocyclic ring
+        has_heteroatom = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+            for idx in ring
+        )
+        if has_heteroatom:
+            from ..rules.heterocycles import name_heterocycle
+            ring_parent = name_heterocycle(mol, tuple(ring))
+            break
+
+        # Carbocyclic ring
+        all_carbon = all(
+            mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            for idx in ring
+        )
+        if all_carbon and ring_size in CHAIN_PREFIXES:
+            stem = CHAIN_PREFIXES[ring_size]
+            ring_parent = f"cyclo{stem}ane"
+        break
+
+    if not ring_parent:
+        return None
+
+    # Build acyloxy prefix(es)
+    # Group by prefix name for multipliers
+    from collections import defaultdict as _dd
+    prefix_groups: Dict[str, List[int]] = _dd(list)
+
+    for ester_info in exocyclic_esters:
+        prefix = ester_info['acyloxy_prefix']
+        prefix_groups[prefix].append(ester_info['ring_attach_atom_idx'])
+
+    # Build prefix string
+    prefix_parts = []
+    for prefix_name, attach_atoms in sorted(prefix_groups.items()):
+        count = len(attach_atoms)
+        if count == 1:
+            # Monosubstituted: no locant needed
+            prefix_parts.append(prefix_name)
+        else:
+            # Multiple: add multiplier
+            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            prefix_parts.append(f"{multiplier}{prefix_name}")
+
+    # Sort alphabetically
+    prefix_parts.sort(key=lambda x: alpha_sort_key(x))
+
+    # Join prefixes
+    prefix_str = "".join(prefix_parts)
+
+    return f"{prefix_str}{ring_parent}"
 
 
 def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
