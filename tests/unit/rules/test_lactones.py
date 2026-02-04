@@ -160,8 +160,12 @@ class TestNameLactoneRing:
             name = name_lactone_ring(size)
             assert name is not None
             # Should NOT contain the unelided form
-            assert "ane-2-one" not in name, f"Size {size}: {name} should have vowel elision"
-            assert "ene-2-one" not in name, f"Size {size}: {name} should have vowel elision"
+            assert "ane-2-one" not in name, (
+                f"Size {size}: {name} should have vowel elision"
+            )
+            assert "ene-2-one" not in name, (
+                f"Size {size}: {name} should have vowel elision"
+            )
 
 
 # ===========================================================================
@@ -213,22 +217,30 @@ class TestNameMonocyclicLactone:
 class TestLactoneEdgeCases:
     """Edge cases and boundary conditions for lactone naming."""
 
-    def test_canonical_smiles_variations(self):
-        """Different SMILES representations of gamma-butyrolactone should work."""
+    def test_canonical_smiles_variations_gbl(self):
+        """Different SMILES for gamma-butyrolactone should all give oxolan-2-one."""
+        # These are valid alternate representations of the 5-membered lactone
         smiles_variants = [
             "O=C1CCCO1",
             "C1CC(=O)OC1",
-            "O=C1OCC1",  # reversed
         ]
         for smi in smiles_variants:
             mol = Chem.MolFromSmiles(smi)
-            if mol is not None:
-                # Should either be detected or not, but if detected, name correctly
-                info = is_monocyclic_lactone(mol)
-                if info is not None:
-                    name = name_monocyclic_lactone(mol)
-                    # All valid 5-membered lactone SMILES should give oxolan-2-one
-                    assert name == "oxolan-2-one", f"SMILES {smi} gave {name}"
+            assert mol is not None, f"Failed to parse SMILES: {smi}"
+            info = is_monocyclic_lactone(mol)
+            assert info is not None, f"SMILES {smi} not detected as lactone"
+            name = name_monocyclic_lactone(mol)
+            assert name == "oxolan-2-one", f"SMILES {smi} gave {name}"
+
+    def test_canonical_smiles_4_membered(self):
+        """O=C1OCC1 canonicalizes to a 4-membered lactone (beta-propiolactone)."""
+        mol = Chem.MolFromSmiles("O=C1OCC1")
+        if mol is not None:
+            info = is_monocyclic_lactone(mol)
+            if info is not None:
+                assert info["ring_size"] == 4
+                name = name_monocyclic_lactone(mol)
+                assert name == "oxetan-2-one"
 
     def test_carbonyl_oxygen_not_in_ring(self):
         """The exocyclic =O should not be counted as a ring atom."""
