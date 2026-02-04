@@ -264,3 +264,175 @@ def find_ester_match(mol) -> Optional[tuple]:
     if matches:
         return matches[0]
     return None
+
+
+# ============================================================================
+# Acyloxy Prefix Naming (IUPAC P-65.6.3.2.2)
+# ============================================================================
+#
+# When an ester is named as a substituent prefix (e.g., on a ring parent),
+# the R-CO-O- portion is named as an "acyloxy" group:
+#   acid name (drop "-ic") + "-yloxy"
+#
+# Examples:
+#   formic    -> formyloxy
+#   acetic    -> acetyloxy
+#   benzoic   -> benzoyloxy
+#   propanoic -> propanoyloxy
+
+# Explicit mapping for trivial acid names to acyloxy prefixes.
+# These are common acids whose acyloxy forms have established trivial stems.
+TRIVIAL_ACID_TO_ACYLOXY = {
+    "formic": "formyloxy",
+    "acetic": "acetyloxy",
+    "propionic": "propionyloxy",
+    "butyric": "butyryloxy",
+    "valeric": "valeryloxy",
+    "caproic": "caproyloxy",
+    "benzoic": "benzoyloxy",
+    "oxalic": "oxalyloxy",
+    "lactic": "lactyloxy",
+}
+
+
+def get_acyloxy_prefix(acid_name: str) -> str:
+    """
+    Convert an acid name to its acyloxy prefix form (IUPAC P-65.6.3.2.2).
+
+    Used when an ester group is named as a substituent prefix rather than
+    the principal characteristic group. The R-CO-O- portion becomes an
+    "acyloxy" prefix.
+
+    Conversion rule: drop "-ic" (or "-ic acid"), add "-yloxy".
+
+    Args:
+        acid_name: The acid name without "acid" suffix
+                   (e.g., "acetic", "propanoic", "benzoic")
+
+    Returns:
+        The acyloxy prefix (e.g., "acetyloxy", "propanoyloxy", "benzoyloxy")
+
+    Examples:
+        >>> get_acyloxy_prefix("acetic")
+        'acetyloxy'
+        >>> get_acyloxy_prefix("propanoic")
+        'propanoyloxy'
+        >>> get_acyloxy_prefix("benzoic")
+        'benzoyloxy'
+        >>> get_acyloxy_prefix("formic")
+        'formyloxy'
+    """
+    name = acid_name.lower().strip()
+
+    # Strip trailing " acid" if present
+    if name.endswith(" acid"):
+        name = name[:-5].strip()
+
+    # Check trivial acid lookup first
+    if name in TRIVIAL_ACID_TO_ACYLOXY:
+        return TRIVIAL_ACID_TO_ACYLOXY[name]
+
+    # Systematic conversion: drop "-ic", add "-yloxy"
+    # Works for both "-oic" (propanoic -> propanoyloxy) and "-ic" (generic)
+    if name.endswith("ic"):
+        return name[:-2] + "yloxy"
+
+    # Fallback: just append "yloxy"
+    return name + "yloxy"
+
+
+def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
+    """
+    Generate an acyloxy prefix name for an ester group.
+
+    Used when the ester is a substituent (not the principal characteristic
+    group). Extracts the acid fragment, determines its name, and converts
+    to the acyloxy prefix form.
+
+    Args:
+        mol: RDKit Mol object
+        ester_match: Tuple of atom indices from ester SMARTS match
+
+    Returns:
+        Acyloxy prefix string (e.g., "acetyloxy", "propanoyloxy"),
+        or None if the ester is a lactone or cannot be named.
+
+    Examples:
+        For methyl acetate (COC(C)=O), returns "acetyloxy"
+        For methyl propanoate (COC(=O)CC), returns "propanoyloxy"
+    """
+    # Lactones cannot be named as acyloxy prefixes
+    if is_lactone(mol, ester_match):
+        return None
+
+    # Parse into acid and alkyl fragments
+    acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_match)
+
+    if not acid_atoms:
+        return None
+
+    # Get the acid name from the fragment
+    acid_name = get_acid_fragment_name(mol, acid_atoms)
+
+    # Convert to acyloxy prefix
+    return get_acyloxy_prefix(acid_name)
+
+
+def detect_exocyclic_esters(mol) -> List[dict]:
+    """
+    Detect ester groups where the ester oxygen is bonded to a ring atom.
+
+    These are "exocyclic" esters: the ring is the parent structure and
+    the ester should be named as an acyloxy prefix on the ring.
+
+    For example, cyclohexyl acetate (CC(=O)OC1CCCCC1) has an ester oxygen
+    bonded to a cyclohexane ring carbon. The ester should be named as
+    "acetyloxy" prefix on cyclohexane.
+
+    Excludes lactones (cyclic esters where both the carbonyl C and alkyl C
+    are in the same ring).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        List of dicts, each containing:
+            - ester_match: tuple of atom indices from SMARTS match
+            - ring_attach_atom_idx: index of the ring atom bonded to ester O
+            - acyloxy_prefix: the acyloxy prefix string (e.g., "acetyloxy")
+
+    Examples:
+        For cyclohexyl acetate: returns [{"ester_match": (...),
+            "ring_attach_atom_idx": 3, "acyloxy_prefix": "acetyloxy"}]
+        For ethyl acetate: returns [] (no ring attachment)
+    """
+    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+    matches = mol.GetSubstructMatches(pattern)
+
+    results = []
+    for match in matches:
+        # Skip lactones
+        if is_lactone(mol, match):
+            continue
+
+        # match[2] is the ester oxygen, match[3] is the alkyl carbon
+        # Check if the alkyl carbon (position 3) is in a ring
+        alkyl_c_idx = match[3]
+        alkyl_c_atom = mol.GetAtomWithIdx(alkyl_c_idx)
+
+        if not alkyl_c_atom.IsInRing():
+            continue
+
+        # This is an exocyclic ester on a ring parent
+        # Get the acyloxy prefix
+        acyloxy = name_ester_as_prefix(mol, match)
+        if acyloxy is None:
+            continue
+
+        results.append({
+            "ester_match": match,
+            "ring_attach_atom_idx": alkyl_c_idx,
+            "acyloxy_prefix": acyloxy,
+        })
+
+    return results
