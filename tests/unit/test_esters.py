@@ -412,3 +412,196 @@ class TestEsterFindMatch:
         # Acetic acid is CC(=O)O which is actually [CX3](=O)[OX2H1]
         # So it shouldn't match the ester pattern
         assert match is None
+
+
+# ============================================================================
+# NEW: Acyloxy Prefix Tests (Phase 14.7, Plan 02)
+# ============================================================================
+
+
+class TestAcyloxyPrefixTrivial:
+    """Test acyloxy prefix generation from trivial acid names.
+
+    IUPAC P-65.6.3.2.2: When the ester is named as a substituent prefix,
+    the R-CO-O- portion is named as an 'acyloxy' group.
+    Conversion: acid name -> drop '-ic' -> add '-yloxy'
+    """
+
+    def test_formic_to_formyloxy(self):
+        """Formic acid -> formyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("formic") == "formyloxy"
+
+    def test_acetic_to_acetyloxy(self):
+        """Acetic acid -> acetyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("acetic") == "acetyloxy"
+
+    def test_benzoic_to_benzoyloxy(self):
+        """Benzoic acid -> benzoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("benzoic") == "benzoyloxy"
+
+    def test_propionic_to_propionyloxy(self):
+        """Propionic acid -> propionyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("propionic") == "propionyloxy"
+
+
+class TestAcyloxyPrefixSystematic:
+    """Test acyloxy prefix generation from systematic acid names."""
+
+    def test_propanoic_to_propanoyloxy(self):
+        """Propanoic acid -> propanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("propanoic") == "propanoyloxy"
+
+    def test_butanoic_to_butanoyloxy(self):
+        """Butanoic acid -> butanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("butanoic") == "butanoyloxy"
+
+    def test_pentanoic_to_pentanoyloxy(self):
+        """Pentanoic acid -> pentanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("pentanoic") == "pentanoyloxy"
+
+    def test_hexanoic_to_hexanoyloxy(self):
+        """Hexanoic acid -> hexanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("hexanoic") == "hexanoyloxy"
+
+    def test_ethanoic_to_ethanoyloxy(self):
+        """Ethanoic (systematic for acetic) -> ethanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("ethanoic") == "ethanoyloxy"
+
+    def test_methanoic_to_methanoyloxy(self):
+        """Methanoic (systematic for formic) -> methanoyloxy prefix."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("methanoic") == "methanoyloxy"
+
+
+class TestNameEsterAsPrefix:
+    """Test molecular-level ester-to-prefix conversion.
+
+    name_ester_as_prefix(mol, ester_match) should extract the acid fragment,
+    determine its name, and return the acyloxy prefix string.
+    """
+
+    def test_methyl_acetate_prefix_is_acetyloxy(self):
+        """Methyl acetate acid fragment -> acetyloxy prefix."""
+        from rdkit import Chem
+        from orthonym.rules.esters import name_ester_as_prefix
+
+        mol = Chem.MolFromSmiles("COC(C)=O")
+        pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "No ester match found"
+
+        result = name_ester_as_prefix(mol, matches[0])
+        assert result == "acetyloxy"
+
+    def test_methyl_formate_prefix_is_formyloxy(self):
+        """Methyl formate acid fragment -> formyloxy prefix."""
+        from rdkit import Chem
+        from orthonym.rules.esters import name_ester_as_prefix
+
+        mol = Chem.MolFromSmiles("COC=O")
+        pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "No ester match found"
+
+        result = name_ester_as_prefix(mol, matches[0])
+        assert result == "formyloxy"
+
+    def test_methyl_propanoate_prefix_is_propanoyloxy(self):
+        """Methyl propanoate acid fragment -> propanoyloxy prefix."""
+        from rdkit import Chem
+        from orthonym.rules.esters import name_ester_as_prefix
+
+        mol = Chem.MolFromSmiles("COC(=O)CC")
+        pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "No ester match found"
+
+        result = name_ester_as_prefix(mol, matches[0])
+        assert result == "propanoyloxy"
+
+    def test_lactone_returns_none(self):
+        """Lactones should return None from name_ester_as_prefix."""
+        from rdkit import Chem
+        from orthonym.rules.esters import name_ester_as_prefix
+
+        mol = Chem.MolFromSmiles("C1CC(=O)OC1")  # gamma-butyrolactone
+        pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "No ester match found"
+
+        result = name_ester_as_prefix(mol, matches[0])
+        assert result is None
+
+
+class TestDetectExocyclicEsters:
+    """Test detection of exocyclic esters (ester O attached to ring atom).
+
+    detect_exocyclic_esters(mol) should find all esters where the ester
+    oxygen is bonded to a ring carbon, indicating the ring is the parent
+    and the ester should be named as an acyloxy prefix.
+    """
+
+    def test_cyclohexyl_acetate_detected(self):
+        """Cyclohexyl acetate has an exocyclic ester on the ring."""
+        from rdkit import Chem
+        from orthonym.rules.esters import detect_exocyclic_esters
+
+        # cyclohexyl acetate: CC(=O)OC1CCCCC1
+        mol = Chem.MolFromSmiles("CC(=O)OC1CCCCC1")
+        results = detect_exocyclic_esters(mol)
+        assert len(results) >= 1
+        # Should have acyloxy prefix
+        assert results[0]["acyloxy_prefix"] == "acetyloxy"
+        # Ring attach atom should be in a ring
+        ring_idx = results[0]["ring_attach_atom_idx"]
+        assert mol.GetAtomWithIdx(ring_idx).IsInRing()
+
+    def test_phenyl_acetate_detected(self):
+        """Phenyl acetate has an exocyclic ester on phenyl ring."""
+        from rdkit import Chem
+        from orthonym.rules.esters import detect_exocyclic_esters
+
+        # phenyl acetate: CC(=O)Oc1ccccc1
+        mol = Chem.MolFromSmiles("CC(=O)Oc1ccccc1")
+        results = detect_exocyclic_esters(mol)
+        assert len(results) >= 1
+        assert results[0]["acyloxy_prefix"] == "acetyloxy"
+
+    def test_simple_ester_not_exocyclic(self):
+        """Simple acyclic esters have no exocyclic ester."""
+        from rdkit import Chem
+        from orthonym.rules.esters import detect_exocyclic_esters
+
+        mol = Chem.MolFromSmiles("CCOC(C)=O")  # ethyl acetate
+        results = detect_exocyclic_esters(mol)
+        assert len(results) == 0
+
+    def test_lactone_not_exocyclic(self):
+        """Lactones (cyclic esters) should not be reported as exocyclic."""
+        from rdkit import Chem
+        from orthonym.rules.esters import detect_exocyclic_esters
+
+        mol = Chem.MolFromSmiles("C1CC(=O)OC1")  # gamma-butyrolactone
+        results = detect_exocyclic_esters(mol)
+        # Lactones are cyclic, not exocyclic
+        assert len(results) == 0
+
+    def test_cyclohexyl_propanoate_detected(self):
+        """Cyclohexyl propanoate should give propanoyloxy prefix."""
+        from rdkit import Chem
+        from orthonym.rules.esters import detect_exocyclic_esters
+
+        # cyclohexyl propanoate: CCC(=O)OC1CCCCC1
+        mol = Chem.MolFromSmiles("CCC(=O)OC1CCCCC1")
+        results = detect_exocyclic_esters(mol)
+        assert len(results) >= 1
+        assert results[0]["acyloxy_prefix"] == "propanoyloxy"
