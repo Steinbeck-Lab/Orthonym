@@ -1698,6 +1698,11 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
             fg_count = len(fg_locants)
             locants = tuple(fg_locants)
 
+    # Final safety: reconcile multiplier count with actual locants
+    if locants:
+        from ..rules.locant_validation import reconcile_multiplier_count
+        fg_count = reconcile_multiplier_count(fg_count, list(locants))
+
     return NameFragment(
         text=suffix_text,
         locants=locants,
@@ -1768,6 +1773,11 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
 
             # Compute locants by mapping FG anchor atoms to chain positions
             fg_locants = _get_fg_locants(features, fg_name, matches)
+
+            # Reconcile multiplier count with actual locants found
+            if fg_locants:
+                from ..rules.locant_validation import reconcile_multiplier_count
+                count = reconcile_multiplier_count(count, fg_locants)
 
             if count > 1:
                 # Add multiplier

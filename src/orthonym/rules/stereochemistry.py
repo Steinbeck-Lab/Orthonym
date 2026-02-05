@@ -84,6 +84,14 @@ def collect_stereodescriptors(
     # Sort by locant ascending
     descriptors.sort(key=lambda x: x[0])
 
+    # Filter out stereo descriptors with invalid locants (locant 0 or > parent size)
+    if descriptors and atom_to_locant:
+        int_locants = [v for v in atom_to_locant.values() if isinstance(v, int)]
+        parent_size = max(int_locants) if int_locants else 0
+        if parent_size > 0:
+            from .locant_validation import validate_stereo_locants
+            descriptors = validate_stereo_locants(descriptors, parent_size)
+
     return descriptors
 
 
