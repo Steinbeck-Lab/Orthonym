@@ -255,3 +255,83 @@ class TestLactoneEdgeCases:
         assert info is not None
         # The carbonyl O (exocyclic) should not be in ring_atoms
         assert info["carbonyl_O_idx"] not in info["ring_atoms"]
+
+
+# ===========================================================================
+# Substituted lactone tests (Plan 15-07)
+# ===========================================================================
+
+class TestSubstitutedLactones:
+    """Tests for substituted lactones with correct ring sizes and substituent prefixes."""
+
+    def test_substituted_butyrolactone_methyl(self):
+        """3-Methyl-gamma-butyrolactone -> 3-methyloxolan-2-one."""
+        mol = Chem.MolFromSmiles("CC1CCOC1=O")
+        result = name_monocyclic_lactone(mol)
+        assert result == "3-methyloxolan-2-one", f"Got '{result}'"
+
+    def test_substituted_valerolactone_methyl(self):
+        """3-Methyl-delta-valerolactone -> 3-methyloxan-2-one.
+
+        Verifies correct 6-membered ring naming (oxan, not oxolan).
+        """
+        mol = Chem.MolFromSmiles("CC1CCCOC1=O")
+        result = name_monocyclic_lactone(mol)
+        assert result == "3-methyloxan-2-one", f"Got '{result}'"
+
+    def test_macrolide_11_membered(self):
+        """11-membered macrolide -> oxacycloundecan-2-one."""
+        mol = Chem.MolFromSmiles("O=C1CCCCCCCCCO1")
+        result = name_monocyclic_lactone(mol)
+        assert result == "oxacycloundecan-2-one", f"Got '{result}'"
+
+    def test_macrolide_13_membered(self):
+        """13-membered macrolide -> oxacyclotridecan-2-one."""
+        mol = Chem.MolFromSmiles("O=C1CCCCCCCCCCCO1")
+        result = name_monocyclic_lactone(mol)
+        assert result == "oxacyclotridecan-2-one", f"Got '{result}'"
+
+    def test_macrolide_15_membered(self):
+        """15-membered macrolide -> oxacyclopentadecan-2-one."""
+        mol = Chem.MolFromSmiles("O=C1CCCCCCCCCCCCCO1")
+        result = name_monocyclic_lactone(mol)
+        assert result == "oxacyclopentadecan-2-one", f"Got '{result}'"
+
+    def test_substituted_macrolide(self):
+        """Substituted 11-membered macrolide includes substituent prefix."""
+        mol = Chem.MolFromSmiles("O=C1CC(C)CCCCCCCO1")
+        result = name_monocyclic_lactone(mol)
+        assert "methyl" in result, f"Expected 'methyl' in '{result}'"
+        assert "oxacycloundecan-2-one" in result, f"Expected macrolide parent in '{result}'"
+
+    def test_amino_lactone(self):
+        """3-Amino-gamma-butyrolactone -> 3-aminooxolan-2-one."""
+        mol = Chem.MolFromSmiles("NC1CCOC1=O")
+        result = name_monocyclic_lactone(mol)
+        assert result == "3-aminooxolan-2-one", f"Got '{result}'"
+
+    def test_hydroxy_lactone(self):
+        """3-Hydroxy-gamma-butyrolactone -> 3-hydroxyoxolan-2-one."""
+        mol = Chem.MolFromSmiles("OC1CCOC1=O")
+        result = name_monocyclic_lactone(mol)
+        assert result == "3-hydroxyoxolan-2-one", f"Got '{result}'"
+
+    def test_chloro_lactone(self):
+        """3-Chloro-gamma-butyrolactone -> 3-chlorooxolan-2-one."""
+        mol = Chem.MolFromSmiles("ClC1CCOC1=O")
+        result = name_monocyclic_lactone(mol)
+        assert result == "3-chlorooxolan-2-one", f"Got '{result}'"
+
+    def test_6_membered_not_5_membered(self):
+        """6-membered lactone must return oxan-2-one, not oxolan-2-one.
+
+        This was a specific mismatch identified in UAT: 6-membered lactones
+        being incorrectly named as 5-membered.
+        """
+        mol = Chem.MolFromSmiles("O=C1CCCCO1")
+        info = is_monocyclic_lactone(mol)
+        assert info is not None
+        assert info["ring_size"] == 6, f"Expected ring_size 6, got {info['ring_size']}"
+        result = name_monocyclic_lactone(mol)
+        assert result == "oxan-2-one", f"Got '{result}' instead of 'oxan-2-one'"
+        assert "oxolan" not in result, "6-membered must not use 5-membered name"
