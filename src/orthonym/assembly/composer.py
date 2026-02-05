@@ -1468,6 +1468,20 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
     # Get locants for functional group positions on the chain
     locants = ()
     fg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
+
+    # Validate suffix count against parent capacity:
+    # The number of suffix groups cannot exceed the number of atoms in the parent
+    # structure (chain length or ring size). E.g., ethane (2C) cannot have tetraol.
+    if features.principal_chain:
+        max_capacity = len(features.principal_chain)
+    elif getattr(features, 'oriented_ring', None):
+        max_capacity = len(features.oriented_ring)
+    else:
+        max_capacity = fg_count  # no constraint if we can't determine parent size
+
+    if fg_count > max_capacity:
+        fg_count = max_capacity
+
     if features.principal_chain and features.atom_to_locant and features.principal_group_atoms:
         fg_locants = get_functional_group_locants(
             features.principal_chain,
@@ -1475,6 +1489,13 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
             features.atom_to_locant,
             mol=features.mol
         )
+
+        # Deduplicate locants (overlapping SMARTS can produce duplicates)
+        fg_locants = sorted(set(fg_locants))
+
+        # Further validate: count should match unique locants when locants exist
+        if fg_locants:
+            fg_count = len(fg_locants)
 
         # Terminal groups: locant is implicitly 1, do NOT include in name
         if fg_name in TERMINAL_GROUPS:

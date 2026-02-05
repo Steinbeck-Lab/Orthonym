@@ -627,12 +627,26 @@ def name_heterocycle(mol, ring_atoms) -> str:
             info['is_saturated']
         )
 
-    return build_hw_name(
+    hw_name = build_hw_name(
         heteroatom_locants,
         ring_size,
         info['is_saturated'],
         info['is_aromatic']
     )
+
+    # Post-process: replace OPSIN-incompatible HW names with IUPAC-preferred
+    # retained names. "oxine" (6-membered unsaturated O-ring) is not recognized
+    # by OPSIN; IUPAC 2013 prefers "2H-pyran" for the monocyclic system and
+    # "4H-pyran" for the 4H tautomer. Similarly, "azine" should be "pyridine".
+    _HW_TO_RETAINED = {
+        'oxine': '2H-pyran',
+        'azine': 'pyridine',
+        'thiine': '2H-thiopyran',
+    }
+    if hw_name in _HW_TO_RETAINED:
+        hw_name = _HW_TO_RETAINED[hw_name]
+
+    return hw_name
 
 
 def _build_replacement_name(

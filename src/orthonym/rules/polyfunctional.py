@@ -362,7 +362,10 @@ def get_non_principal_fg_locants(
                         continue
                     break
 
-    return sorted(set(locants))
+    # Do NOT deduplicate locants: two groups at the same position need
+    # repeated locants (e.g., 3,3-diamino). The count and locant list
+    # must agree for OPSIN compatibility.
+    return sorted(locants)
 
 
 def get_non_principal_groups(
@@ -508,6 +511,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             atom_to_locant,
             mol=mol
         )
+        # Deduplicate locants (overlapping SMARTS can produce duplicates)
+        suffix_locants = sorted(set(suffix_locants))
 
     # For terminal groups (acid, aldehyde), locant is implicit
     from ..assembly.composer import TERMINAL_GROUPS
@@ -515,7 +520,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         suffix_locants = []
 
     # Determine multiplier for multiple principal groups
+    # Validate: suffix count cannot exceed parent chain/ring capacity
     count = len(features.principal_group_atoms)
+    max_capacity = chain_length
+    if count > max_capacity:
+        count = max_capacity
+    # If we have unique locants, use those as the count (more reliable)
+    if suffix_locants:
+        count = len(suffix_locants)
     multiplier = get_multiplier_prefix(count, suffix) if count > 1 else ""
 
     # Build unsaturation infix

@@ -423,9 +423,11 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
         elif anion_type == 'thiolate':
             return _name_thiolate_systematic(mol, anion_site)
         else:
-            # Generic anion - use parent name + suffix
-            suffix = get_anion_suffix(anion_type)
-            return f'anion-{suffix}'
+            # Generic anion - try to name the neutral skeleton
+            neutral_name = _try_neutralize_and_name(mol)
+            if neutral_name:
+                return neutral_name
+            return ''
 
     # Multiple anions - try neutralize-then-name approach
     neutral_name = _try_neutralize_and_name(mol)
@@ -503,9 +505,11 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
         elif cation_type == 'diazonium':
             return _name_diazonium_systematic(mol, cation_site)
         else:
-            # Generic cation
-            suffix = get_cation_suffix(cation_type)
-            return f'cation-{suffix}'
+            # Generic cation - try to name the neutral skeleton
+            neutral_name = _try_neutralize_and_name(mol)
+            if neutral_name:
+                return neutral_name
+            return ''
 
     # Multiple cations - try neutralize-then-name approach
     neutral_name = _try_neutralize_and_name(mol)

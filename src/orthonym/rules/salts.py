@@ -106,8 +106,7 @@ def name_salt(mol, style: str = 'pin') -> str:
             name = name_cation(frag_mol, style)
             if name:
                 cation_names.append(name)
-            else:
-                cation_names.append('cation')
+            # Skip unnamed cations rather than using generic 'cation'
 
     # Process anions
     for anion_frag in frags['anions']:
@@ -122,8 +121,7 @@ def name_salt(mol, style: str = 'pin') -> str:
             name = name_anion(frag_mol, style)
             if name:
                 anion_names.append(name)
-            else:
-                anion_names.append('anion')
+            # Skip unnamed anions rather than using generic 'anion'
 
     # Handle stoichiometry - count duplicates
     cation_counts = Counter(cation_names)

@@ -45,34 +45,36 @@ def detect_species_type(mol) -> str:
     if mol is None:
         return 'neutral'
 
-    # Check for radicals first (highest priority)
-    for atom in mol.GetAtoms():
-        if atom.GetNumRadicalElectrons() > 0:
-            return 'radical'
-
-    # Get molecular fragments
-    frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
-
-    if len(frags) > 1:
-        # Multiple fragments - check if salt (opposite charges)
-        has_positive = False
-        has_negative = False
-
-        for frag in frags:
-            frag_charge = Chem.GetFormalCharge(frag)
-            if frag_charge > 0:
-                has_positive = True
-            elif frag_charge < 0:
-                has_negative = True
-
-        if has_positive and has_negative:
-            return 'salt'
-
-    # Single fragment or multi-fragment without opposite charges
+    # Gather charge/radical info in one pass
     net_charge = Chem.GetFormalCharge(mol)
+    has_any_charge = False
+    has_radical = False
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0:
+            has_any_charge = True
+        if atom.GetNumRadicalElectrons() > 0:
+            has_radical = True
 
-    if net_charge != 0:
-        return 'ion'
+    # If molecule has formal charges, prioritize ionic classification
+    # over radical detection. RDKit may assign radical electrons to
+    # certain charged heteroatoms (e.g., [SeH+] gets 2 radical electrons).
+    if has_any_charge:
+        # Get molecular fragments for salt detection
+        frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
+        if len(frags) > 1:
+            has_pos = any(Chem.GetFormalCharge(f) > 0 for f in frags)
+            has_neg = any(Chem.GetFormalCharge(f) < 0 for f in frags)
+            if has_pos and has_neg:
+                return 'salt'
+
+        if net_charge != 0:
+            return 'ion'
+
+        # Net charge is 0 but has charges -> possible zwitterion
+        # Fall through to zwitterion check below
+    elif has_radical:
+        # No charges at all, just radical electrons -> radical
+        return 'radical'
 
     # Check for zwitterion (net zero but has both + and - atoms)
     # EXCLUDE functional groups with internal charges (nitro, azide, etc.)
