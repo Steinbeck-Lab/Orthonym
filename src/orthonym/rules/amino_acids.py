@@ -8,6 +8,9 @@ For standard amino acids, trivial names are used.
 For non-standard, systematic naming applies:
 - Carboxylic acid is principal group
 - Amine becomes "amino" prefix
+
+Peptide guard: molecules with peptide bonds (-C(=O)-NH-) are NOT simple amino
+acids and must NOT be flattened to "2-aminoXXXanoic acid".
 """
 
 from typing import Optional, List, Tuple
@@ -21,6 +24,53 @@ from ..data.amino_acids import get_amino_acid_name, is_standard_amino_acid
 # [CX4] - sp3 carbon (alpha carbon)
 # [CX3](=O)[OX2H1] - carboxylic acid
 ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)[OX2H1]"
+
+# SMARTS for peptide bond (secondary amide linkage between amino acids)
+# [NX3;H1] - secondary amide nitrogen (NH, not NH2)
+# [CX3](=O) - carbonyl carbon
+# [CX4] - alpha carbon on the acid side
+# This detects -C(=O)-NH-CH- linkages typical of peptide bonds
+PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
+
+
+def count_peptide_bonds(mol) -> int:
+    """
+    Count the number of peptide bonds (-C(=O)-NH-CH-) in a molecule.
+
+    Peptide bonds link amino acid residues. A molecule with >= 1 peptide bond
+    is a peptide, not a simple amino acid.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Number of peptide bond matches found
+    """
+    pattern = Chem.MolFromSmarts(PEPTIDE_BOND_SMARTS)
+    if pattern is None:
+        return 0
+    matches = mol.GetSubstructMatches(pattern)
+    return len(matches)
+
+
+def is_peptide(mol) -> bool:
+    """
+    Check if molecule contains peptide bonds (is a di/tri/polypeptide).
+
+    A molecule with one or more -C(=O)-NH-CH- linkages is a peptide,
+    not a simple amino acid. Must also have the amino acid pattern
+    (terminal NH2 + COOH) to distinguish from random amides.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if molecule is a peptide (has amino acid pattern AND peptide bonds)
+    """
+    # Must have amino acid pattern AND peptide bonds
+    if not detect_amino_acid(mol):
+        return False
+    return count_peptide_bonds(mol) >= 1
 
 
 def detect_amino_acid(mol) -> bool:
@@ -74,15 +124,29 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     For standard amino acids, returns trivial name.
     For non-standard, returns systematic name.
 
+    Peptide guard: if the molecule contains peptide bonds (-C(=O)-NH-),
+    it is NOT a simple amino acid. Returns None so the molecule falls
+    through to the general naming pipeline (or returns None for
+    complex peptides beyond current scope).
+
     Args:
         mol: RDKit Mol object
         canonical_smiles: Canonical SMILES of the molecule
 
     Returns:
-        Amino acid name, or None if not an amino acid
+        Amino acid name, or None if not an amino acid or is a peptide
     """
     # Check if it's an amino acid at all
     if not detect_amino_acid(mol):
+        return None
+
+    # PEPTIDE GUARD: check for peptide bonds before naming as amino acid
+    # Molecules with peptide bonds are peptides, not simple amino acids
+    n_peptide_bonds = count_peptide_bonds(mol)
+    if n_peptide_bonds >= 1:
+        # This is a peptide (di-, tri-, or polypeptide)
+        # Return None to let it fall through to general naming pipeline
+        # For 2+ peptide bonds (tripeptide+), these are beyond current scope
         return None
 
     # Try trivial name lookup first
