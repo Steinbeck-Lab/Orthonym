@@ -23,7 +23,7 @@ from ..assembly.naming_utils import (
 )
 
 
-# Chain length prefixes for amide naming
+# Chain length prefixes for amide naming (trivial + systematic)
 CHAIN_PREFIXES = {
     1: "form",  # formamide (special for 1 carbon)
     2: "acet",  # acetamide (special for 2 carbons)
@@ -37,11 +37,9 @@ CHAIN_PREFIXES = {
     10: "decan",
 }
 
-# Standard stems for longer chains
-STEM_PREFIXES = {
-    1: "meth", 2: "eth", 3: "prop", 4: "but", 5: "pent",
-    6: "hex", 7: "hept", 8: "oct", 9: "non", 10: "dec",
-}
+# Standard stems - delegated to centralized chain_names module
+from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+STEM_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 21)}
 
 
 def get_amide_type(mol, amide_atoms: tuple) -> str:
@@ -346,10 +344,7 @@ def get_amide_parent_name(chain_length: int, is_ring: bool = False) -> str:
     """
     if is_ring:
         # Ring-attached amides: parent + carboxamide
-        if chain_length in STEM_PREFIXES:
-            stem = STEM_PREFIXES[chain_length]
-        else:
-            stem = f"{chain_length}C"
+        stem = _get_chain_prefix(chain_length)
         return f"cyclo{stem}anecarboxamide"
 
     # Chain amides
@@ -358,10 +353,7 @@ def get_amide_parent_name(chain_length: int, is_ring: bool = False) -> str:
     elif chain_length == 2:
         return "acetamide"
     else:
-        if chain_length in STEM_PREFIXES:
-            stem = STEM_PREFIXES[chain_length]
-        else:
-            stem = f"{chain_length}C"
+        stem = _get_chain_prefix(chain_length)
         return f"{stem}anamide"
 
 
@@ -410,10 +402,7 @@ def name_amide(mol, amide_atoms: tuple) -> str:
                             break
                     break
 
-        if ring_size in STEM_PREFIXES:
-            stem = STEM_PREFIXES[ring_size]
-        else:
-            stem = f"{ring_size}C"
+        stem = _get_chain_prefix(ring_size)
 
         parent_name = f"cyclo{stem}anecarboxamide"
 

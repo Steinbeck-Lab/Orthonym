@@ -23,14 +23,9 @@ from rdkit import Chem
 from ..perception.rings import get_spiro_atoms
 
 
-# Chain length prefixes for alkane parent names
-CHAIN_PREFIXES = {
-    1: "meth", 2: "eth", 3: "prop", 4: "but", 5: "pent",
-    6: "hex", 7: "hept", 8: "oct", 9: "non", 10: "dec",
-    11: "undec", 12: "dodec", 13: "tridec", 14: "tetradec",
-    15: "pentadec", 16: "hexadec", 17: "heptadec", 18: "octadec",
-    19: "nonadec", 20: "icos",
-}
+# Chain length prefixes - delegated to centralized chain_names module
+from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 21)}
 
 
 def is_spiro_system(mol) -> bool:
@@ -367,11 +362,7 @@ def _get_alkane_name(atom_count: int) -> str:
     Returns:
         Alkane parent name (e.g., "decane", "undecane")
     """
-    if atom_count in CHAIN_PREFIXES:
-        return f"{CHAIN_PREFIXES[atom_count]}ane"
-    else:
-        # For counts not in our table, use numerical fallback
-        return f"{atom_count}Cane"
+    return f"{_get_chain_prefix(atom_count)}ane"
 
 
 def name_spiro_system(mol) -> Optional[str]:

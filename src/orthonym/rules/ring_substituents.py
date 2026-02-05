@@ -13,11 +13,9 @@ Examples:
 
 from typing import Dict, List, Optional, Set, Tuple
 
-# Chain length prefixes for cycloalkyl names
-_CHAIN_PREFIXES = {
-    3: "prop", 4: "but", 5: "pent", 6: "hex", 7: "hept",
-    8: "oct", 9: "non", 10: "dec", 11: "undec", 12: "dodec",
-}
+# Chain length prefixes - delegated to centralized chain_names module
+from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+_CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(3, 21)}
 
 
 # IUPAC P-61.5: Standard substituent names for rings
@@ -184,9 +182,8 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
 
     # Fallback: generic cycloalkane for all-carbon saturated rings
     if not heteroatoms and not is_aromatic:
-        if ring_size in _CHAIN_PREFIXES:
-            prefix = _CHAIN_PREFIXES[ring_size]
-            return f'cyclo{prefix}ane'
+        prefix = _get_chain_prefix(ring_size)
+        return f'cyclo{prefix}ane'
 
     return None
 
@@ -216,11 +213,8 @@ def get_ring_substituent_name(
     if ring_name is None:
         # Unknown ring - generate generic cycloXyl name
         ring_size = len(ring_atoms)
-        if ring_size in _CHAIN_PREFIXES:
-            prefix = _CHAIN_PREFIXES[ring_size]
-            return f'cyclo{prefix}yl'
-        else:
-            return f'cyclo{ring_size}Cyl'
+        prefix = _get_chain_prefix(ring_size)
+        return f'cyclo{prefix}yl'
 
     # Check for position-specific name
     if ring_name in POSITION_SPECIFIC_RINGS and attachment_point is not None:
