@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
+from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 
 
 # Chain length prefixes for nitrile naming
@@ -121,10 +122,7 @@ def get_ring_parent_name(mol, ring_atoms: tuple) -> str:
     """
     ring_size = len(ring_atoms)
 
-    if ring_size in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[ring_size]
-    else:
-        stem = f"{ring_size}C"
+    stem = _get_chain_prefix(ring_size)
 
     return f"cyclo{stem}ane"
 
@@ -179,10 +177,7 @@ def name_nitrile(
             chain = get_nitrile_parent_chain(mol, nitrile_atoms)
             chain_length = len(chain)
 
-        if chain_length in CHAIN_PREFIXES:
-            stem = CHAIN_PREFIXES[chain_length]
-        else:
-            stem = f"{chain_length}C"
+        stem = _get_chain_prefix(chain_length)
 
         # stem + ane -> stem + anenitrile (e.g., propane -> propanenitrile)
         return f"{stem}anenitrile"
