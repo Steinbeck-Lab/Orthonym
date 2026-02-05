@@ -506,10 +506,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         stem, unsaturation, suffix, suffix_locants, multiplier
     )
 
-    # Add prefixes
+    # Add prefixes with proper hyphenation at boundary
     if all_prefixes:
         prefix_str = _join_prefixes(all_prefixes)
-        name = f"{prefix_str}{name}"
+        # Ensure hyphen between prefix ending with letter and name starting with digit
+        if prefix_str and name and prefix_str[-1].isalpha() and name[0].isdigit():
+            name = f"{prefix_str}-{name}"
+        else:
+            name = f"{prefix_str}{name}"
 
     # Add stereodescriptors if present
     if features.stereocenters or getattr(features, 'double_bond_stereo', None):

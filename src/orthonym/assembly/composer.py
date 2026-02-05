@@ -1879,9 +1879,9 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
         # No suffix = hydrocarbon, build name with unsaturation
         name = _build_hydrocarbon_name(stem, double_locants, triple_locants)
 
-    # Add prefixes
+    # Add prefixes with proper hyphenation at boundary
     if prefix_str:
-        name = f"{prefix_str}{name}"
+        name = _join_prefix_to_name(prefix_str, name)
 
     # Add stereodescriptors at the very start
     if stereo:
@@ -2143,10 +2143,36 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
     return result
 
 
+def _join_prefix_to_name(prefix_str: str, name: str) -> str:
+    """
+    Join a prefix string to a parent/suffix name with proper IUPAC hyphenation.
+
+    Ensures a hyphen is inserted when:
+    - The prefix ends with a letter and the name starts with a digit
+
+    This prevents broken names like 'pentabutyl1,4,7,10,13-pentaaza'
+    by inserting a hyphen: 'pentabutyl-1,4,7,10,13-pentaaza'.
+
+    Args:
+        prefix_str: The assembled prefix string (e.g., '3-ethyl-4-methyl')
+        name: The parent+suffix name (e.g., 'propan-1-ol')
+
+    Returns:
+        Properly hyphenated combined name
+    """
+    if not prefix_str or not name:
+        return prefix_str + name
+
+    if prefix_str[-1].isalpha() and name[0].isdigit():
+        return f"{prefix_str}-{name}"
+
+    return f"{prefix_str}{name}"
+
+
 def _build_long_chain_prefix(length: int) -> str:
     """
     Build prefix for chains longer than those in CHAIN_PREFIXES.
-    
+
     Uses IUPAC multiplicative system for very long chains.
     """
     # For now, just return the numerical form
