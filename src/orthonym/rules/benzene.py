@@ -395,9 +395,8 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
         ring_atoms: Set of ring atom indices
 
     Returns:
-        Dict with 'name': 'functionalized_chain', 'atoms': [list of atom indices],
-        'chain_length': int, 'functional_group': str
-        Or None if not a functionalized chain
+        Dict with 'name' (a proper substituent name), 'atoms', 'chain_length',
+        'functional_group', or None if not a functionalized chain or cannot be named.
     """
     # BFS to find all atoms in the substituent
     visited = {start_idx}
@@ -432,12 +431,90 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
     if not functional_group:
         return None
 
+    # Generate a proper substituent name based on FG type and chain length
+    sub_name = _name_functionalized_chain_substituent(carbon_count, functional_group)
+    if not sub_name:
+        # Cannot produce a valid name; return None so caller can handle gracefully
+        return None
+
     return {
-        'name': 'functionalized_chain',
+        'name': sub_name,
         'atoms': all_atoms,
         'chain_length': carbon_count,
         'functional_group': functional_group
     }
+
+
+# Mapping from chain length (carbons) to substituent prefix stem
+_CHAIN_SUB_STEMS = {
+    1: "methyl", 2: "ethyl", 3: "propyl", 4: "butyl", 5: "pentyl",
+    6: "hexyl", 7: "heptyl", 8: "octyl", 9: "nonyl", 10: "decyl",
+}
+
+# Mapping from functional group type to substituent prefix modifier
+# These convert a chain with FG into a proper IUPAC prefix substituent name
+_FG_SUB_PREFIX = {
+    'carboxylic_acid': {
+        # -C(=O)OH chain: named as "carboxylalkyl" (e.g., 2-carboxyethyl for -CH2CH2COOH)
+        # or simply use the acyl prefix approach
+        1: "carboxy",            # just -COOH
+        2: "carboxymethyl",      # -CH2COOH
+        3: "2-carboxyethyl",     # -CH2CH2COOH
+        4: "3-carboxypropyl",    # -(CH2)3COOH
+        5: "4-carboxybutyl",     # -(CH2)4COOH
+    },
+    'aldehyde': {
+        1: "formyl",             # -CHO
+        2: "oxoethyl",           # -CH2CHO (2-oxoethyl)
+        3: "oxopropyl",          # -(CH2)2CHO
+    },
+    'alcohol': {
+        1: "hydroxymethyl",      # -CH2OH
+        2: "hydroxyethyl",       # -CH2CH2OH (2-hydroxyethyl)
+        3: "hydroxypropyl",      # -(CH2)2CH2OH
+    },
+}
+
+
+def _name_functionalized_chain_substituent(carbon_count: int, functional_group: str) -> Optional[str]:
+    """
+    Generate a proper IUPAC substituent name for a functionalized chain.
+
+    Args:
+        carbon_count: Number of carbon atoms in the chain
+        functional_group: Type of functional group ('carboxylic_acid', 'aldehyde', 'alcohol')
+
+    Returns:
+        Substituent prefix name string, or None if cannot be named
+    """
+    # Try specific FG + chain length lookup
+    fg_map = _FG_SUB_PREFIX.get(functional_group, {})
+    if carbon_count in fg_map:
+        return fg_map[carbon_count]
+
+    # Fallback: generic naming based on FG type
+    if functional_group == 'carboxylic_acid' and carbon_count > 0:
+        if carbon_count == 1:
+            return "carboxy"
+        # For longer chains: (N-1)-carboxyalkyl
+        alkyl = _CHAIN_SUB_STEMS.get(carbon_count - 1)
+        if alkyl:
+            return f"carboxy{alkyl}"
+
+    if functional_group == 'alcohol' and carbon_count > 0:
+        alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
+        if alkyl:
+            return f"hydroxy{alkyl}"
+
+    if functional_group == 'aldehyde' and carbon_count > 0:
+        if carbon_count == 1:
+            return "formyl"
+        alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
+        if alkyl:
+            return f"oxo{alkyl}"
+
+    # Cannot name this chain
+    return None
 
 
 def _detect_chain_functional_group(mol, chain_atoms: List[int]) -> Optional[str]:

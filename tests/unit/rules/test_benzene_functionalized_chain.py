@@ -43,35 +43,38 @@ class TestIdentifyFunctionalizedChain:
     """Test _identify_functionalized_chain() function."""
 
     def test_carboxylic_acid_chain_detected(self):
-        """Detect butanoic acid chain on benzene."""
+        """Detect butanoic acid chain on benzene with proper substituent name."""
         mol, ring_atoms, chain_start = _get_benzene_ring_and_chain_start('c1ccc(CCCC(=O)O)cc1')
 
         result = _identify_functionalized_chain(mol, chain_start, ring_atoms)
 
         assert result is not None
-        assert result['name'] == 'functionalized_chain'
+        # Name should be a proper substituent, NOT the debug string 'functionalized_chain'
+        assert 'functionalized_chain' not in result['name']
         assert result['functional_group'] == 'carboxylic_acid'
         assert result['chain_length'] == 4  # 4 carbons in butanoic acid chain
 
     def test_alcohol_chain_detected(self):
-        """Detect propanol chain on benzene."""
+        """Detect propanol chain on benzene with proper substituent name."""
         mol, ring_atoms, chain_start = _get_benzene_ring_and_chain_start('c1ccc(CCCO)cc1')
 
         result = _identify_functionalized_chain(mol, chain_start, ring_atoms)
 
         assert result is not None
-        assert result['name'] == 'functionalized_chain'
+        # Name should be a proper substituent, NOT the debug string 'functionalized_chain'
+        assert 'functionalized_chain' not in result['name']
         assert result['functional_group'] == 'alcohol'
         assert result['chain_length'] == 3  # 3 carbons
 
     def test_aldehyde_chain_detected(self):
-        """Detect acetaldehyde chain on benzene (phenylacetaldehyde)."""
+        """Detect acetaldehyde chain on benzene (phenylacetaldehyde) with proper name."""
         mol, ring_atoms, chain_start = _get_benzene_ring_and_chain_start('c1ccc(CC=O)cc1')
 
         result = _identify_functionalized_chain(mol, chain_start, ring_atoms)
 
         assert result is not None
-        assert result['name'] == 'functionalized_chain'
+        # Name should be a proper substituent, NOT the debug string 'functionalized_chain'
+        assert 'functionalized_chain' not in result['name']
         assert result['functional_group'] == 'aldehyde'
         assert result['chain_length'] == 2  # 2 carbons
 
@@ -181,7 +184,8 @@ class TestBenzeneSubstituentsWithFunctionalizedChain:
         # Get the first (and only) substituent
         sub_list = list(subs.values())[0]
         sub = sub_list[0]
-        assert sub['name'] == 'functionalized_chain'
+        # Name should be a proper substituent, NOT the debug string 'functionalized_chain'
+        assert 'functionalized_chain' not in sub['name']
         assert sub['functional_group'] == 'carboxylic_acid'
 
     def test_phenylpropanol_substituent_detected(self):
