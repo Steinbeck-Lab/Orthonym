@@ -2247,7 +2247,9 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
     Pattern: nitrogen bonded to chain, also bonded to a carbonyl carbon C(=O),
     which in turn is bonded to an alkyl chain R.
 
-    Returns name like "hexacosenoylamino" for -NH-C(=O)-C25H51.
+    Returns name like "(hexacosenoylamino)" for -NH-C(=O)-C25H51.
+    Enclosing parens included for IUPAC compound substituent formatting.
+    OPSIN requires: 2-(pentanoylamino)pentanedioic acid.
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
@@ -2296,7 +2298,7 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                         all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                         if all_arom and all_c:
-                            return "phenylamino"
+                            return "(phenylamino)"
                 continue  # Skip non-phenyl ring substituents
 
             # Count carbons attached to N via C-C bonds only
@@ -2311,7 +2313,7 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
             if n_alkyl_carbons > 0:
                 try:
                     alkyl = get_alkyl_name(n_alkyl_carbons)
-                    return f"{alkyl}amino"
+                    return f"({alkyl}amino)"
                 except (ValueError, KeyError):
                     pass
             continue
@@ -2334,10 +2336,11 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         if acyl_carbons == 0:
             acyl_carbons = 1  # at minimum the carbonyl C
 
-        # Build acylamino name: prefixanoylamino (OPSIN-compatible format)
+        # Build acylamino name: (prefixanoylamino) with enclosing parens
+        # OPSIN requires: 2-(pentanoylamino)pentanedioic acid
         try:
             acyl_prefix = get_chain_prefix(acyl_carbons)
-            return f"{acyl_prefix}anoylamino"
+            return f"({acyl_prefix}anoylamino)"
         except (ValueError, KeyError):
             pass
 
@@ -2351,7 +2354,9 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
     Pattern: oxygen bonded to chain, also bonded to a carbonyl carbon C(=O),
     which is bonded to an alkyl chain R.
 
-    Returns name like "ethanoyloxy" for -O-C(=O)-CH3.
+    Returns name like "(ethanoyloxy)" for -O-C(=O)-CH3.
+    Enclosing parens included for IUPAC compound substituent formatting.
+    OPSIN requires: 2-(acetyloxy)benzoic acid.
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
@@ -2395,9 +2400,11 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
                 if acyl_carbons == 0:
                     acyl_carbons = 1
 
+                # Build acyloxy name: (prefixanoyloxy) with enclosing parens
+                # OPSIN requires: 2-(acetyloxy)benzoic acid
                 try:
                     acyl_prefix = get_chain_prefix(acyl_carbons)
-                    return f"{acyl_prefix}anoyloxy"
+                    return f"({acyl_prefix}anoyloxy)"
                 except (ValueError, KeyError):
                     pass
 
