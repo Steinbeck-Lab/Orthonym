@@ -1376,7 +1376,8 @@ def _has_ring_heteroatoms(mol, ring_atoms: Set[int]) -> bool:
 def get_polycyclic_substituents(
     mol,
     ring_atoms: Set[int],
-    numbering: Dict[int, int]
+    numbering: Dict[int, int],
+    exclude_atoms: Optional[Set[int]] = None
 ) -> List[Dict]:
     """
     Detect substituents attached to a polycyclic ring system.
@@ -1388,6 +1389,8 @@ def get_polycyclic_substituents(
         mol: RDKit Mol object
         ring_atoms: Set of atom indices in the polycyclic ring system
         numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+        exclude_atoms: Optional set of non-ring atom indices to skip
+                       (e.g., atoms that are part of functional groups)
 
     Returns:
         List of substituent info dicts, each containing:
@@ -1415,6 +1418,10 @@ def get_polycyclic_substituents(
 
             # Skip if neighbor is in ring
             if nbr_idx in ring_atoms:
+                continue
+
+            # Skip if neighbor is a known FG atom (e.g., COOH carbon, =O, -OH)
+            if exclude_atoms and nbr_idx in exclude_atoms:
                 continue
 
             # Check bond type - skip exocyclic double bonds (=O, =S for suffixes)
@@ -1581,10 +1588,224 @@ def get_polycyclic_stereo(mol, numbering: Dict[int, int]) -> str:
 
 
 # ============================================================================
+# Functional Group Detection on Ring System (Plan 16-09)
+# ============================================================================
+
+# FG seniority for determining principal group on polycyclic rings
+# Higher index = higher seniority
+_FG_SENIORITY = {
+    'alcohol': 1,
+    'ketone': 2,
+    'aldehyde': 3,
+    'carboxylic_acid': 4,
+}
+
+
+def _detect_ring_functional_groups(
+    mol,
+    ring_atoms: Set[int],
+    numbering: Dict[int, int]
+) -> Dict:
+    """
+    Detect functional groups on a polycyclic ring system.
+
+    Identifies:
+    - Exocyclic C=O on ring carbons (ketone -> suffix -one)
+    - -OH attached to ring carbons (alcohol -> suffix -ol or prefix hydroxy-)
+    - -COOH attached to ring carbons (carboxylic acid -> suffix -carboxylic acid)
+    - -CHO attached to ring carbons (aldehyde -> suffix -carbaldehyde or prefix formyl-)
+
+    Applies seniority rules: highest-seniority FG becomes suffix, rest become prefixes.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the polycyclic ring system
+        numbering: Dict mapping atom_idx -> VB locant (1-indexed)
+
+    Returns:
+        Dict with:
+        - 'suffix': dict with 'suffix', 'locants', 'type' or None
+        - 'prefixes': list of dicts with 'name' and 'locant'
+        - 'fg_atoms': set of non-ring atom indices that are part of FGs
+                      (used to exclude them from substituent detection)
+    """
+    # Collect all detected FGs with their info
+    detected_fgs = []  # list of dicts
+    fg_atoms = set()  # non-ring atoms that are part of functional groups
+
+    # --- 1. Detect exocyclic C=O on ring carbons (ketone) ---
+    ketone_locants = []
+    for atom_idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in ring_atoms:
+                continue
+            if neighbor.GetSymbol() != 'O':
+                continue
+            bond = mol.GetBondBetweenAtoms(atom_idx, nbr_idx)
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                # Check this O is NOT an ester oxygen (i.e., O has no other heavy atom neighbors)
+                o_heavy_neighbors = [
+                    n for n in neighbor.GetNeighbors()
+                    if n.GetIdx() != atom_idx
+                ]
+                if not o_heavy_neighbors:
+                    locant = numbering.get(atom_idx, 0)
+                    if locant > 0:
+                        ketone_locants.append(locant)
+                        fg_atoms.add(nbr_idx)  # Track the =O atom
+
+    if ketone_locants:
+        ketone_locants.sort()
+        detected_fgs.append({
+            'seniority': _FG_SENIORITY['ketone'],
+            'type': 'ketone',
+            'locants': ketone_locants,
+            'suffix': 'one',
+            'suffix_type': 'inline',
+            'prefix_name': 'oxo',
+        })
+
+    # --- 2. Detect -OH attached to ring carbons (alcohol) ---
+    alcohol_locants = []
+    for atom_idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in ring_atoms:
+                continue
+            if neighbor.GetSymbol() != 'O':
+                continue
+            bond = mol.GetBondBetweenAtoms(atom_idx, nbr_idx)
+            if bond and bond.GetBondTypeAsDouble() == 1.0:
+                # Single bond O not in ring - check if it's a hydroxyl (has H)
+                o_atom = neighbor
+                # Check: O with exactly 1 H (hydroxyl), not ester O-C
+                o_heavy_neighbors = [
+                    n for n in o_atom.GetNeighbors()
+                    if n.GetIdx() != atom_idx
+                ]
+                # If O has no other heavy neighbors, it's -OH (implicit H)
+                if not o_heavy_neighbors:
+                    locant = numbering.get(atom_idx, 0)
+                    if locant > 0:
+                        alcohol_locants.append(locant)
+                        fg_atoms.add(nbr_idx)  # Track the -OH oxygen
+
+    if alcohol_locants:
+        alcohol_locants.sort()
+        detected_fgs.append({
+            'seniority': _FG_SENIORITY['alcohol'],
+            'type': 'alcohol',
+            'locants': alcohol_locants,
+            'suffix': 'ol',
+            'suffix_type': 'inline',
+            'prefix_name': 'hydroxy',
+        })
+
+    # --- 3. Detect -COOH attached to ring carbons (carboxylic acid) ---
+    # Pattern: ring-C bonded to C(=O)(OH) where C is NOT in ring
+    carbox_locants = []
+    carbox_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    if carbox_pattern is not None:
+        matches = mol.GetSubstructMatches(carbox_pattern)
+        for match in matches:
+            c_idx = match[0]
+            if c_idx in ring_atoms:
+                continue  # Carbonyl C should NOT be in ring for -COOH suffix
+            # Check if this C is bonded to a ring atom
+            c_atom = mol.GetAtomWithIdx(c_idx)
+            for neighbor in c_atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+                if nbr_idx in ring_atoms and nbr_idx in numbering:
+                    locant = numbering[nbr_idx]
+                    if locant not in carbox_locants:
+                        carbox_locants.append(locant)
+                        # Track all COOH atoms (C, =O, -OH)
+                        fg_atoms.add(c_idx)
+                        fg_atoms.add(match[1])  # =O
+                        fg_atoms.add(match[2])  # -OH
+
+    if carbox_locants:
+        carbox_locants.sort()
+        detected_fgs.append({
+            'seniority': _FG_SENIORITY['carboxylic_acid'],
+            'type': 'carboxylic_acid',
+            'locants': carbox_locants,
+            'suffix': 'carboxylic acid',
+            'suffix_type': 'appended',
+            'prefix_name': 'carboxy',
+        })
+
+    # --- 4. Detect -CHO attached to ring carbons (aldehyde) ---
+    # Pattern: ring-C bonded to C(=O)H where C is NOT in ring
+    aldehyde_locants = []
+    aldehyde_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    if aldehyde_pattern is not None:
+        matches = mol.GetSubstructMatches(aldehyde_pattern)
+        for match in matches:
+            c_idx = match[0]
+            if c_idx in ring_atoms:
+                continue  # Aldehyde C should NOT be in ring
+            c_atom = mol.GetAtomWithIdx(c_idx)
+            for neighbor in c_atom.GetNeighbors():
+                nbr_idx = neighbor.GetIdx()
+                if nbr_idx in ring_atoms and nbr_idx in numbering:
+                    locant = numbering[nbr_idx]
+                    if locant not in aldehyde_locants:
+                        aldehyde_locants.append(locant)
+                        # Track all CHO atoms (C, =O)
+                        fg_atoms.add(c_idx)
+                        fg_atoms.add(match[1])  # =O
+
+    if aldehyde_locants:
+        aldehyde_locants.sort()
+        detected_fgs.append({
+            'seniority': _FG_SENIORITY['aldehyde'],
+            'type': 'aldehyde',
+            'locants': aldehyde_locants,
+            'suffix': 'carbaldehyde',
+            'suffix_type': 'appended',
+            'prefix_name': 'formyl',
+        })
+
+    # --- No FGs detected ---
+    if not detected_fgs:
+        return {'suffix': None, 'prefixes': [], 'fg_atoms': fg_atoms}
+
+    # --- Determine principal group (highest seniority) ---
+    detected_fgs.sort(key=lambda x: x['seniority'], reverse=True)
+    principal = detected_fgs[0]
+
+    # Build suffix info
+    suffix_info = {
+        'suffix': principal['suffix'],
+        'locants': principal['locants'],
+        'type': principal['suffix_type'],
+    }
+
+    # Build prefix list from non-principal FGs
+    prefixes = []
+    for fg in detected_fgs[1:]:
+        for loc in fg['locants']:
+            prefixes.append({
+                'name': fg['prefix_name'],
+                'locant': loc,
+            })
+
+    return {'suffix': suffix_info, 'prefixes': prefixes, 'fg_atoms': fg_atoms}
+
+
+# ============================================================================
 # Complete Name Assembly (Plan 16-03)
 # ============================================================================
 
-def name_polycyclic_complete(mol) -> Optional[str]:
+def name_polycyclic_complete(mol, features=None) -> Optional[str]:
     """
     Generate the complete IUPAC name for a polycyclic bridged system.
 
@@ -1594,14 +1815,18 @@ def name_polycyclic_complete(mol) -> Optional[str]:
     Produces complete names including:
     - Stereodescriptors: "(1R,4S)-"
     - Substituent prefixes: "3-methyl-"
+    - Functional group prefixes: "5-hydroxy-" (non-principal groups)
     - Heteroatom replacement: "7-oxa-" (when Plan 16-02 implemented)
     - Descriptor: "bicyclo[2.2.1]"
     - Parent name with unsaturation: "hept-2-ene"
+    - Functional group suffix: "-2-one", "-1-ol", "-carboxylic acid"
 
-    Example output: "(1R,4S)-3-methyl-7-oxabicyclo[2.2.1]hept-2-ene"
+    Example output: "(1R,4S)-5-hydroxy-3-methyl-7-oxabicyclo[2.2.1]heptan-2-one"
 
     Args:
         mol: RDKit Mol object
+        features: Optional MolecularFeatures object for functional group detection.
+                  If None, FG detection is performed directly via SMARTS.
 
     Returns:
         Complete IUPAC name, or None if not a polycyclic system
@@ -1640,22 +1865,32 @@ def name_polycyclic_complete(mol) -> Optional[str]:
     # 1. Get stereodescriptors
     stereo_prefix = get_polycyclic_stereo(mol, desc.numbering)
 
-    # 2. Get substituents
-    substituents = get_polycyclic_substituents(mol, ring_atoms, desc.numbering)
+    # 2. Detect functional groups FIRST (needed to exclude FG atoms from substituents)
+    fg_info = _detect_ring_functional_groups(mol, ring_atoms, desc.numbering)
+    fg_atoms = fg_info.get('fg_atoms', set())
 
-    # 3. Get unsaturation
+    # 3. Get substituents (excluding FG atoms like COOH carbons, =O oxygens)
+    substituents = get_polycyclic_substituents(
+        mol, ring_atoms, desc.numbering, exclude_atoms=fg_atoms
+    )
+
+    # 4. Get unsaturation
     unsaturation = get_polycyclic_unsaturation(mol, ring_atoms, desc.numbering)
 
-    # 4. Get heteroatom replacement prefix
+    # 5. Get heteroatom replacement prefix
     hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
 
-    # 5. Assemble substituent prefix
-    substituent_prefix = _assemble_substituent_prefix(substituents)
+    # 6. Assemble substituent prefix (alkyl + FG prefixes combined)
+    fg_prefixes = fg_info.get('prefixes', [])
+    substituent_prefix = _assemble_substituent_prefix(substituents, fg_prefixes)
 
-    # 6. Build parent name with unsaturation suffix
-    parent_name = _build_parent_with_unsaturation(total_ring_atoms, unsaturation)
+    # 7. Build parent name with unsaturation and FG suffix
+    fg_suffix_info = fg_info.get('suffix', None)
+    parent_name = _build_parent_with_unsaturation(
+        total_ring_atoms, unsaturation, fg_suffix=fg_suffix_info
+    )
 
-    # 7. Assemble final name
+    # 8. Assemble final name
     # Order: (stereo)-substituents-heteroprefix-cycloprefix[descriptor]parent-suffix
     name_parts = []
 
@@ -1678,31 +1913,47 @@ def name_polycyclic_complete(mol) -> Optional[str]:
     return name
 
 
-def _assemble_substituent_prefix(substituents: List[Dict]) -> str:
+def _assemble_substituent_prefix(
+    substituents: List[Dict],
+    fg_prefixes: Optional[List[Dict]] = None
+) -> str:
     """
     Assemble substituent prefix with proper IUPAC formatting.
 
     Groups identical substituents, applies multipliers, and sorts alphabetically.
+    Includes functional group prefixes (hydroxy-, oxo-, etc.) when present.
 
     Args:
         substituents: List of substituent dicts from get_polycyclic_substituents()
+        fg_prefixes: Optional list of FG prefix dicts with 'name' and 'locant' keys
 
     Returns:
-        Formatted prefix like "3-ethyl-2,4-dimethyl-" or empty string
+        Formatted prefix like "5-hydroxy-3-ethyl-2,4-dimethyl-" or empty string
     """
     from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
 
-    if not substituents:
+    if not substituents and not fg_prefixes:
         return ""
 
     # Group by name
     grouped: Dict[str, List[int]] = {}
+
+    # Add alkyl substituents
     for sub in substituents:
         name = sub['name']
         locant = sub['locant']
         if name not in grouped:
             grouped[name] = []
         grouped[name].append(locant)
+
+    # Add functional group prefixes
+    if fg_prefixes:
+        for fg in fg_prefixes:
+            name = fg['name']
+            locant = fg['locant']
+            if name not in grouped:
+                grouped[name] = []
+            grouped[name].append(locant)
 
     # Sort locants within each group
     for name in grouped:
@@ -1726,61 +1977,176 @@ def _assemble_substituent_prefix(substituents: List[Dict]) -> str:
 
 def _build_parent_with_unsaturation(
     total_atoms: int,
-    unsaturation: Dict
+    unsaturation: Dict,
+    fg_suffix: Optional[Dict] = None
 ) -> str:
     """
-    Build the parent name with unsaturation suffixes and vowel elision.
+    Build the parent name with unsaturation suffixes, vowel elision,
+    and optional functional group suffix.
 
     Args:
         total_atoms: Total ring atoms (for parent name base)
         unsaturation: Dict with 'double_bonds' and 'triple_bonds' lists
+        fg_suffix: Optional dict with FG suffix info:
+            'suffix': suffix string (e.g., 'one', 'ol', 'carboxylic acid')
+            'locants': list of VB locants
+            'type': 'inline' (modifies parent ending) or 'appended' (added after parent)
 
     Returns:
-        Parent name like "heptane", "hept-2-ene", "hepta-2,5-diene"
+        Parent name like "heptane", "hept-2-ene", "decan-2-one",
+        "decane-1-carboxylic acid"
     """
     base_name = _get_alkane_name(total_atoms)
 
     # Simple multipliers for unsaturation
     unsat_multipliers = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+    fg_multipliers = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
 
     double_bonds = unsaturation.get('double_bonds', [])
     triple_bonds = unsaturation.get('triple_bonds', [])
+    has_unsaturation = bool(double_bonds) or bool(triple_bonds)
 
-    if not double_bonds and not triple_bonds:
-        # Saturated - return plain alkane name
-        return base_name
+    # --- No FG suffix: existing behavior ---
+    if fg_suffix is None:
+        if not has_unsaturation:
+            return base_name
 
-    # Build unsaturation suffix
-    # Remove 'ane' ending for unsaturated forms
+        stem = base_name[:-3] if base_name.endswith('ane') else base_name[:-1]
+        parts = []
+
+        if double_bonds:
+            count = len(double_bonds)
+            mult = unsat_multipliers.get(count, str(count))
+            locant_str = ','.join(str(loc) for loc in double_bonds)
+            if count > 1:
+                parts.append(f"-{locant_str}-{mult}en")
+            else:
+                parts.append(f"-{locant_str}-en")
+
+        if triple_bonds:
+            count = len(triple_bonds)
+            mult = unsat_multipliers.get(count, str(count))
+            locant_str = ','.join(str(loc) for loc in triple_bonds)
+            if count > 1:
+                parts.append(f"-{locant_str}-{mult}yn")
+            else:
+                parts.append(f"-{locant_str}-yn")
+
+        if len(double_bonds) > 1 or (double_bonds and triple_bonds):
+            stem = stem + 'a'
+
+        result = stem + ''.join(parts) + 'e'
+        return result
+
+    # --- FG suffix present ---
+    suffix_text = fg_suffix['suffix']
+    suffix_locants = fg_suffix.get('locants', [])
+    suffix_type = fg_suffix.get('type', 'inline')
+
+    # For 'appended' type (carboxylic acid, carbaldehyde), the suffix is appended
+    # to the full parent name with a hyphen
+    if suffix_type == 'appended':
+        # Build base name with unsaturation first
+        if has_unsaturation:
+            stem = base_name[:-3] if base_name.endswith('ane') else base_name[:-1]
+            parts = []
+            if double_bonds:
+                count = len(double_bonds)
+                mult = unsat_multipliers.get(count, str(count))
+                locant_str = ','.join(str(loc) for loc in double_bonds)
+                if count > 1:
+                    parts.append(f"-{locant_str}-{mult}en")
+                else:
+                    parts.append(f"-{locant_str}-en")
+            if triple_bonds:
+                count = len(triple_bonds)
+                mult = unsat_multipliers.get(count, str(count))
+                locant_str = ','.join(str(loc) for loc in triple_bonds)
+                if count > 1:
+                    parts.append(f"-{locant_str}-{mult}yn")
+                else:
+                    parts.append(f"-{locant_str}-yn")
+            if len(double_bonds) > 1 or (double_bonds and triple_bonds):
+                stem = stem + 'a'
+            parent_base = stem + ''.join(parts) + 'e'
+        else:
+            parent_base = base_name
+
+        # Append suffix: "decane-1-carboxylic acid"
+        count = len(suffix_locants)
+        mult = fg_multipliers.get(count, str(count))
+        if suffix_locants:
+            locant_str = ','.join(str(loc) for loc in suffix_locants)
+            return f"{parent_base}-{locant_str}-{mult}{suffix_text}" if mult else f"{parent_base}-{locant_str}-{suffix_text}"
+        else:
+            return f"{parent_base}-{mult}{suffix_text}" if mult else f"{parent_base}-{suffix_text}"
+
+    # For 'inline' type (one, ol, amine), replace the terminal 'e' or 'ane'
+    # Examples: decane -> decan-2-one, decane -> decan-1-ol
+    # With unsaturation: dec-5-en-2-one
+
+    # Get the stem (remove 'ane' or 'e')
     stem = base_name[:-3] if base_name.endswith('ane') else base_name[:-1]
 
-    parts = []
-
+    # Build unsaturation part
+    unsat_parts = []
     if double_bonds:
         count = len(double_bonds)
         mult = unsat_multipliers.get(count, str(count))
         locant_str = ','.join(str(loc) for loc in double_bonds)
         if count > 1:
-            # Multiple double bonds: hepta-2,5-diene
-            parts.append(f"-{locant_str}-{mult}en")
+            unsat_parts.append(f"-{locant_str}-{mult}en")
         else:
-            # Single double bond: hept-2-ene
-            parts.append(f"-{locant_str}-en")
+            unsat_parts.append(f"-{locant_str}-en")
 
     if triple_bonds:
         count = len(triple_bonds)
         mult = unsat_multipliers.get(count, str(count))
         locant_str = ','.join(str(loc) for loc in triple_bonds)
         if count > 1:
-            parts.append(f"-{locant_str}-{mult}yn")
+            unsat_parts.append(f"-{locant_str}-{mult}yn")
         else:
-            parts.append(f"-{locant_str}-yn")
+            unsat_parts.append(f"-{locant_str}-yn")
 
-    # Vowel elision: if multiple double bonds, add 'a' back to stem
     if len(double_bonds) > 1 or (double_bonds and triple_bonds):
         stem = stem + 'a'
 
-    # Combine
-    result = stem + ''.join(parts) + 'e'
+    # Build suffix part with locants
+    fg_count = len(suffix_locants)
+    fg_mult = fg_multipliers.get(fg_count, str(fg_count))
+
+    if suffix_locants:
+        locant_str = ','.join(str(loc) for loc in suffix_locants)
+        if fg_mult:
+            suffix_part = f"-{locant_str}-{fg_mult}{suffix_text}"
+        else:
+            suffix_part = f"-{locant_str}-{suffix_text}"
+    else:
+        if fg_mult:
+            suffix_part = f"-{fg_mult}{suffix_text}"
+        else:
+            suffix_part = f"-{suffix_text}"
+
+    # Vowel elision: check if suffix starts with a vowel
+    # If so, drop trailing 'e' from unsaturation or 'an' stem
+    # e.g., decan + -2-one -> decan-2-one (not decane-2-one)
+    # but decan + -2-ol -> decan-2-ol (not decane-2-ol)
+    # The 'an' ending already has no 'e', so just add the suffix
+
+    if has_unsaturation:
+        # With unsaturation: stem + unsat_parts + suffix_part
+        # e.g., dec-5-en-2-one
+        result = stem + ''.join(unsat_parts) + suffix_part
+    else:
+        # Saturated: stem + 'an' + suffix_part
+        # Vowel elision: before vowel suffix, keep 'an' (decan-2-one)
+        # Before consonant suffix, add 'e' (decane-...)
+        # Common suffixes starting with vowel: one, ol, amine
+        # Common suffixes starting with consonant: thiol, thione
+        first_char_of_suffix = suffix_text[0] if suffix_text else ''
+        if first_char_of_suffix in ('a', 'e', 'i', 'o', 'u'):
+            result = stem + 'an' + suffix_part
+        else:
+            result = stem + 'ane' + suffix_part
 
     return result

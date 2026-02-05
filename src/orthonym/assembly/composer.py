@@ -677,7 +677,7 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
 
         elif ring_type == 'polycyclic-bridged':
             # Von Baeyer naming for tricyclo+ systems (e.g., adamantane)
-            name = name_polycyclic_complete(mol)
+            name = name_polycyclic_complete(mol, features)
             if name:
                 return name
             logging.warning("Polycyclic-bridged naming failed for molecule")
