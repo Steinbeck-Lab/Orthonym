@@ -33,8 +33,8 @@ class TestCOMPLEX01_Bicyclo_Hydrocarbons:
         ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
         # Bicyclo[3.2.1]octane
         ("C1CC2CCCC1C2", "bicyclo[3.2.1]octane"),
-        # Bicyclo[4.4.0]decane (decalin without retained name recognition)
-        ("C1CCC2CCCCC2C1", "bicyclo[4.4.0]decane"),
+        # Decalin - fused naming (zero-bridge routes to fused nomenclature)
+        ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
     ])
     def test_bicyclo_systematic_naming(self, smiles, expected):
         """Test systematic bicyclo naming with various bridge sizes."""
@@ -162,8 +162,8 @@ class TestCOMPLEX03_OrthoFused:
     @pytest.mark.parametrize("smiles,expected", [
         # Naphthalene - retained name
         ("c1ccc2ccccc2c1", "naphthalene"),
-        # Decalin (decahydronaphthalene) - uses bicyclo[4.4.0]decane systematic
-        ("C1CCC2CCCCC2C1", "bicyclo[4.4.0]decane"),
+        # Decalin (decahydronaphthalene) - fused nomenclature for zero-bridge system
+        ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
     ])
     def test_ortho_fused_retained_names(self, smiles, expected):
         """Test ortho-fused bicyclics with retained and systematic names."""

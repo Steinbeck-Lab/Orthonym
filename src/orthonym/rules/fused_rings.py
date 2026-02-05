@@ -1194,10 +1194,103 @@ def name_ortho_fused_bicyclic(mol) -> Optional[str]:
     if heterocycle_name:
         return heterocycle_name
 
-    # For carbocyclic ortho-fused systems, check polycyclic data
+    # For fully saturated carbocyclic ortho-fused systems (e.g., decalin),
+    # generate {saturation_prefix}{aromatic_parent} naming
+    saturated_name = _name_saturated_fused_carbocyclic(mol)
+    if saturated_name:
+        return saturated_name
+
+    # For other carbocyclic ortho-fused systems, check polycyclic data
     # (naphthalene, etc.) - this is handled by polycyclics module
     # Return None to indicate this module doesn't handle it
     return None
+
+
+# =============================================================================
+# Saturated Fused Carbocyclic Naming
+# =============================================================================
+
+# Map (smaller_ring, larger_ring) -> aromatic parent name
+_FUSED_CARBOCYCLIC_PARENTS = {
+    (5, 5): 'pentalene',
+    (5, 6): 'indene',
+    (5, 7): 'azulene',
+    (6, 6): 'naphthalene',
+    (6, 7): 'heptalene',
+}
+
+# Numeric prefix for hydrogen count
+_SATURATION_PREFIXES = {
+    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
+    6: 'hexa', 7: 'hepta', 8: 'octa', 9: 'nona',
+    10: 'deca', 11: 'undeca', 12: 'dodeca',
+}
+
+# Hydro count for each aromatic parent when fully saturated
+_PARENT_HYDRO_COUNTS = {
+    'pentalene': 8,
+    'indene': 8,
+    'azulene': 10,
+    'naphthalene': 10,
+    'heptalene': 10,
+}
+
+
+def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
+    """
+    Name a fully saturated fused carbocyclic system.
+
+    For systems like decalin (fully saturated naphthalene), generates
+    names like "decahydronaphthalene", "octahydropentalene", etc.
+
+    Only handles FULLY saturated (no aromatic atoms), carbocyclic-only systems.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Name like "decahydronaphthalene" or None if not applicable
+
+    IUPAC Reference: P-31.1.1 (Saturation prefixes)
+    """
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    if len(atom_rings) != 2:
+        return None
+
+    # Must not contain aromatic atoms (partially aromatic handled elsewhere)
+    for atom in mol.GetAtoms():
+        if atom.GetIsAromatic():
+            return None
+
+    # Must be carbocyclic only (no heteroatoms in ring)
+    ring_atoms = set()
+    for ring in atom_rings:
+        ring_atoms.update(ring)
+
+    for idx in ring_atoms:
+        if mol.GetAtomWithIdx(idx).GetSymbol() != 'C':
+            return None
+
+    # Get ring sizes (sorted smallest first for lookup)
+    size1 = len(atom_rings[0])
+    size2 = len(atom_rings[1])
+    ring_key = (min(size1, size2), max(size1, size2))
+
+    parent = _FUSED_CARBOCYCLIC_PARENTS.get(ring_key)
+    if parent is None:
+        return None
+
+    hydro_count = _PARENT_HYDRO_COUNTS.get(parent)
+    if hydro_count is None:
+        return None
+
+    prefix = _SATURATION_PREFIXES.get(hydro_count)
+    if prefix is None:
+        return None
+
+    return f"{prefix}hydro{parent}"
 
 
 def is_fused_aromatic_system(mol) -> bool:

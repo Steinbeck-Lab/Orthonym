@@ -124,10 +124,14 @@ def is_bicyclo_system(mol) -> bool:
     - No spiro centers
     - At least 2 rings
     - Not an aromatic fused system (naphthalene, etc.)
+    - Not a zero-bridge fused system (decalin, etc.)
 
     Note: Aromatic fused systems like naphthalene are technically bicyclic
     (bicyclo[4.4.0]decapentaene) but IUPAC prefers their retained names.
     This function excludes aromatic fused systems.
+
+    Systems with a zero-length bridge (bicyclo[x.y.0]) are edge-fused
+    and should use fused nomenclature (e.g., decahydronaphthalene).
 
     Args:
         mol: RDKit Mol object
@@ -143,6 +147,9 @@ def is_bicyclo_system(mol) -> bool:
         >>> is_bicyclo_system(mol)
         False
         >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene (aromatic fused)
+        >>> is_bicyclo_system(mol)
+        False
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin (zero-bridge fused)
         >>> is_bicyclo_system(mol)
         False
     """
@@ -194,6 +201,21 @@ def is_bicyclo_system(mol) -> bool:
         # Both bridgeheads are aromatic - this is an aromatic fused system
         # Use retained names (naphthalene, etc.) instead of bicyclo naming
         return False
+
+    # Check for zero-length bridge (fused system, not truly bridged).
+    # bicyclo[x.y.0] means the bridgeheads share a direct bond (edge-fused).
+    # These should use fused nomenclature (e.g., decahydronaphthalene)
+    # rather than bicyclo[x.y.0] naming -- BUT only when both rings are
+    # large enough (size >= 5) to have a known fused aromatic parent.
+    # Very small ring systems like bicyclo[1.1.0]butane (two fused
+    # cyclopropanes) have no fused parent name and keep the bicyclo format.
+    lengths = get_bridge_lengths(mol, bh1, bh2)
+    if lengths and min(lengths) == 0:
+        # Check ring sizes -- only route to fused if rings are >= 5
+        ri_rings = ri.AtomRings()
+        ring_sizes = sorted([len(r) for r in ri_rings])
+        if len(ring_sizes) >= 2 and ring_sizes[-2] >= 5:
+            return False
 
     return True
 
@@ -334,6 +356,18 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
     lengths = get_bridge_lengths(mol, bridgeheads[0], bridgeheads[1])
 
     if len(lengths) != 3:
+        return None
+
+    # Verify bridge sum + 2 = total ring atoms (IUPAC invariant).
+    # This catches invalid bridge calculations before generating bad names.
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+    from .polycyclic import _get_largest_connected_ring_component
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
+    bridge_sum = sum(lengths)
+    if bridge_sum + 2 != len(ring_atoms):
         return None
 
     return f"bicyclo[{lengths[0]}.{lengths[1]}.{lengths[2]}]"
