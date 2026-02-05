@@ -420,32 +420,32 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
 
         # Generate systematic name based on type
         if anion_type == 'carboxylate':
-            return _name_carboxylate_systematic(mol, anion_site)
+            result = _name_carboxylate_systematic(mol, anion_site)
         elif anion_type == 'alkoxide':
-            return _name_alkoxide_systematic(mol, anion_site, style)
+            result = _name_alkoxide_systematic(mol, anion_site, style)
         elif anion_type == 'phenolate':
-            return _name_phenolate_systematic(mol, anion_site)
+            result = _name_phenolate_systematic(mol, anion_site)
         elif anion_type == 'carbanion':
-            return _name_carbanion_systematic(mol, anion_site)
+            result = _name_carbanion_systematic(mol, anion_site)
         elif anion_type == 'thiolate':
-            return _name_thiolate_systematic(mol, anion_site)
+            result = _name_thiolate_systematic(mol, anion_site)
         else:
             # Generic anion - try to name the neutral skeleton
-            neutral_name = _try_neutralize_and_name(mol)
-            if neutral_name:
-                return neutral_name
-            return ''
+            result = _try_neutralize_and_name(mol)
+
+        return _validate_anion_name(mol, result)
 
     # Multiple anions - try neutralize-then-name approach
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
-        return neutral_name
+        return _validate_anion_name(mol, neutral_name)
 
     # Fallback: name first anion site only
     anion_site = anions[0]
     anion_type = classify_anion(mol, anion_site)
     if anion_type == 'carboxylate':
-        return _name_carboxylate_systematic(mol, anion_site)
+        result = _name_carboxylate_systematic(mol, anion_site)
+        return _validate_anion_name(mol, result)
     return ''
 
 
@@ -511,31 +511,101 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
 
         # Generate systematic name based on type
         if cation_type == 'aminium':
-            return _name_aminium_systematic(mol, cation_site)
+            result = _name_aminium_systematic(mol, cation_site)
         elif cation_type == 'ylium':
-            return _name_carbenium_systematic(mol, cation_site)
+            result = _name_carbenium_systematic(mol, cation_site)
         elif cation_type == 'onium':
-            return _name_onium_systematic(mol, cation_site)
+            result = _name_onium_systematic(mol, cation_site)
         elif cation_type == 'diazonium':
-            return _name_diazonium_systematic(mol, cation_site)
+            result = _name_diazonium_systematic(mol, cation_site)
         else:
             # Generic cation - try to name the neutral skeleton
-            neutral_name = _try_neutralize_and_name(mol)
-            if neutral_name:
-                return neutral_name
-            return ''
+            result = _try_neutralize_and_name(mol)
+
+        return _validate_cation_name(mol, result)
 
     # Multiple cations - try neutralize-then-name approach
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
-        return neutral_name
+        return _validate_cation_name(mol, neutral_name)
 
     # Fallback: name first cation site only
     cation_site = cations[0]
     cation_type = classify_cation(mol, cation_site)
     if cation_type == 'aminium':
-        return _name_aminium_systematic(mol, cation_site)
+        result = _name_aminium_systematic(mol, cation_site)
+        return _validate_cation_name(mol, result)
     return ''
+
+
+# === NAME VALIDATION GUARDS ===
+
+def _validate_anion_name(mol, result: str) -> str:
+    """Validate an anion name and guard against misapplied suffixes.
+
+    Guards against:
+    - 'oic acid' suffix on a molecule without a carboxylic acid group
+    - 'methylidene' appearing in an ion name (radical name leaking)
+
+    Args:
+        mol: RDKit Mol object
+        result: The proposed anion name
+
+    Returns:
+        The validated name, or empty string if invalid.
+    """
+    if not result:
+        return ''
+
+    # Guard: 'oic acid' suffix on non-acid molecule
+    if 'oic acid' in result:
+        from rdkit.Chem import MolFromSmarts
+        acid_pattern = MolFromSmarts('[CX3](=O)[OX2H1]')
+        if acid_pattern and not mol.HasSubstructMatch(acid_pattern):
+            # Molecule doesn't actually have a carboxylic acid - suffix is wrong
+            return ''
+
+    # Guard: methylidene false positive (radical name leaking into ion naming)
+    if 'methylidene' in result:
+        return ''
+
+    return result
+
+
+def _validate_cation_name(mol, result: str) -> str:
+    """Validate a cation name and guard against misapplied suffixes.
+
+    Guards against:
+    - 'aminium' suffix on a molecule without an amine group
+    - 'methylidene' appearing in a cation name (radical name leaking)
+
+    Args:
+        mol: RDKit Mol object
+        result: The proposed cation name
+
+    Returns:
+        The validated name, or empty string if invalid.
+    """
+    if not result:
+        return ''
+
+    # Guard: 'aminium' suffix on non-amine molecule
+    if 'aminium' in result:
+        from rdkit.Chem import MolFromSmarts
+        # Match protonated or neutral amines: NH3+, NH2+R, NH+R2, N+R3, NH2, NHR, NR2
+        amine_pattern = MolFromSmarts('[NX4;H1,H2,H3,H0]')
+        has_protonated_amine = mol.HasSubstructMatch(amine_pattern) if amine_pattern else False
+        neutral_amine = MolFromSmarts('[NX3;H1,H2,H3]')
+        has_neutral_amine = mol.HasSubstructMatch(neutral_amine) if neutral_amine else False
+        if not has_protonated_amine and not has_neutral_amine:
+            # Molecule doesn't actually have an amine group - suffix is wrong
+            return ''
+
+    # Guard: methylidene false positive (radical name leaking into cation naming)
+    if 'methylidene' in result:
+        return ''
+
+    return result
 
 
 # === NEUTRALIZATION HELPER ===

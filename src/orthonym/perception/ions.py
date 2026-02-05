@@ -68,7 +68,35 @@ def detect_species_type(mol) -> str:
                 return 'salt'
 
         if net_charge != 0:
-            return 'ion'
+            species_type = 'ion'
+
+            # Guard: large organic molecules with a single minor charge on a
+            # heteroatom (protonated amine, quaternary N, etc.) are better
+            # served by the normal perceive/classify/assemble pipeline than
+            # by the ion naming path.  Ion naming is designed for small
+            # standalone ions (ammonium, acetate, methylium) not for
+            # "dodecylamine + H+" or "phenylhexylamine + H+".
+            #
+            # Keep carboxylates and alkoxides as ions because they have
+            # dedicated retained-name tables (acetate, benzoate, etc.).
+            heavy_atom_count = mol.GetNumHeavyAtoms()
+            charge_sites = [a for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
+            total_abs_charge = sum(abs(a.GetFormalCharge()) for a in charge_sites)
+
+            from rdkit.Chem import MolFromSmarts
+            carboxylate_pat = MolFromSmarts('[O-]C=O')
+            alkoxide_pat = MolFromSmarts('[O-]')
+            has_carboxylate = mol.HasSubstructMatch(carboxylate_pat) if carboxylate_pat else False
+            has_alkoxide = mol.HasSubstructMatch(alkoxide_pat) if alkoxide_pat else False
+
+            if (heavy_atom_count > 10
+                    and total_abs_charge <= 1
+                    and len(charge_sites) <= 1
+                    and not has_carboxylate
+                    and not has_alkoxide):
+                species_type = 'neutral'
+
+            return species_type
 
         # Net charge is 0 but has charges -> possible zwitterion
         # Fall through to zwitterion check below
