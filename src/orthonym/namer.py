@@ -165,14 +165,24 @@ class Orthonym:
             from .rules.salts import name_zwitterion
             return name_zwitterion(mol, style=self.style)
         elif species_type == 'ion':
-            # Single ion (cation or anion)
+            # Single-component ion: check retained names first, then fall through
             from .rules.ions import name_anion, name_cation
 
             sites = get_ion_sites(mol)
-            if sites['cations'] and not sites['anions']:
-                return name_cation(mol, style=self.style)
-            elif sites['anions'] and not sites['cations']:
-                return name_anion(mol, style=self.style)
+
+            # Check retained ion names first (acetate, benzoate, etc.)
+            if sites['anions'] and not sites['cations']:
+                result = name_anion(mol, style=self.style, retained_only=True)
+                if result:
+                    return result
+            elif sites['cations'] and not sites['anions']:
+                result = name_cation(mol, style=self.style, retained_only=True)
+                if result:
+                    return result
+
+            # No retained ion name found -- fall through to normal pipeline.
+            # The perceive/classify/assemble pipeline will handle the ion
+            # with aspect-based composition in composer.py.
 
         # Continue with normal neutral molecule naming
 

@@ -358,7 +358,7 @@ def get_cation_suffix(cation_type: str) -> str:
 
 # === MAIN NAMING FUNCTIONS ===
 
-def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
+def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = False) -> str:
     """
     Generate IUPAC name for an anionic molecule.
 
@@ -373,10 +373,13 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
         mol: RDKit Mol object (must have negative charge)
         style: Naming style ('pin', 'systematic', 'common')
         _depth: Internal recursion depth guard (do not set manually)
+        retained_only: If True, only check retained names and return None
+            if no retained name found (used for namer.py fall-through).
 
     Returns:
         Anion name (e.g., 'acetate', 'methoxide', 'phenolate'),
-        or empty string if naming fails
+        or empty string if naming fails.
+        When retained_only=True, returns None if no retained name found.
 
     Example:
         >>> mol = Chem.MolFromSmiles('CC(=O)[O-]')
@@ -384,11 +387,11 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
         'acetate'
     """
     if mol is None:
-        return ''
+        return '' if not retained_only else None
 
     # Guard against infinite recursion
     if _depth > 2:
-        return ''
+        return '' if not retained_only else None
 
     # Get canonical SMILES for lookup
     canonical = Chem.MolToSmiles(mol, canonical=True)
@@ -398,6 +401,10 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
         retained = get_anion_name(canonical)
         if retained:
             return retained
+
+    # If only checking retained names, return None to signal fall-through
+    if retained_only:
+        return None
 
     # Get anion sites
     sites = get_ion_sites(mol)
@@ -442,7 +449,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
     return ''
 
 
-def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
+def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = False) -> str:
     """
     Generate IUPAC name for a cationic molecule.
 
@@ -457,10 +464,13 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
         mol: RDKit Mol object (must have positive charge)
         style: Naming style ('pin', 'systematic', 'common')
         _depth: Internal recursion depth guard (do not set manually)
+        retained_only: If True, only check retained names and return None
+            if no retained name found (used for namer.py fall-through).
 
     Returns:
         Cation name (e.g., 'ammonium', 'methylammonium', 'methylium'),
-        or empty string if naming fails
+        or empty string if naming fails.
+        When retained_only=True, returns None if no retained name found.
 
     Example:
         >>> mol = Chem.MolFromSmiles('[NH4+]')
@@ -468,11 +478,11 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
         'ammonium'
     """
     if mol is None:
-        return ''
+        return '' if not retained_only else None
 
     # Guard against infinite recursion
     if _depth > 2:
-        return ''
+        return '' if not retained_only else None
 
     # Get canonical SMILES for lookup
     canonical = Chem.MolToSmiles(mol, canonical=True)
@@ -482,6 +492,10 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
         retained = get_cation_name(canonical)
         if retained:
             return retained
+
+    # If only checking retained names, return None to signal fall-through
+    if retained_only:
+        return None
 
     # Get cation sites
     sites = get_ion_sites(mol)
