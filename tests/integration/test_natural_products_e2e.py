@@ -95,11 +95,12 @@ class TestSteroidE2E:
 
     @pytest.mark.integration
     def test_cholesterol_no_stereo(self):
-        """Cholesterol SMILES without stereochemistry should still match a steroid scaffold."""
+        """Cholesterol SMILES without stereochemistry should get decorated steroid name."""
         smiles = "CC(C)CCCC(C)C1CCC2C3CC=C4CC(O)CCC4(C)C3CCC12C"
         result = name_compound(smiles)
-        # Without stereo, exact derivative lookup fails but scaffold match returns cholestane
-        assert result == "cholestane", f"Expected 'cholestane' for non-stereo cholesterol, got '{result}'"
+        # Without stereo, exact derivative lookup fails but scaffold match + decoration
+        # enumeration gives the systematic steroid name with -OH and -ene
+        assert result == "cholest-5-en-3-ol", f"Expected 'cholest-5-en-3-ol', got '{result}'"
 
     @pytest.mark.integration
     def test_androstane_without_stereo(self):
