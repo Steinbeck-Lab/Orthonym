@@ -776,22 +776,15 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     # Count carbons to determine chain length
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    # Map chain length to name prefix
-    CHAIN_PREFIXES = {
-        1: 'form', 2: 'acet', 3: 'propano', 4: 'butano',
-        5: 'pentano', 6: 'hexano', 7: 'heptano', 8: 'octano',
-        9: 'nonano', 10: 'decano'
-    }
-
-    prefix = CHAIN_PREFIXES.get(carbon_count, f'{carbon_count}C-')
-
     # Special cases for common names
     if carbon_count == 1:
         return 'formate'
     elif carbon_count == 2:
         return 'acetate'
     else:
-        return prefix + 'ate'
+        # Use centralized chain naming for systematic names
+        from ..data.chain_names import get_anoate_name
+        return get_anoate_name(carbon_count)
 
 
 def _name_alkoxide_systematic(mol, anion_site: Dict, style: str) -> str:
@@ -799,13 +792,8 @@ def _name_alkoxide_systematic(mol, anion_site: Dict, style: str) -> str:
     # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    CHAIN_NAMES = {
-        1: 'methan', 2: 'ethan', 3: 'propan', 4: 'butan',
-        5: 'pentan', 6: 'hexan', 7: 'heptan', 8: 'octan',
-        9: 'nonan', 10: 'decan'
-    }
-
-    base = CHAIN_NAMES.get(carbon_count, f'{carbon_count}C-')
+    from ..data.chain_names import get_chain_prefix as _gcp
+    base = _gcp(carbon_count) + 'an'
 
     if style == 'pin':
         return base + 'olate'
@@ -827,12 +815,8 @@ def _name_carbanion_systematic(mol, anion_site: Dict) -> str:
     # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    CHAIN_NAMES = {
-        1: 'methan', 2: 'ethan', 3: 'propan', 4: 'butan',
-        5: 'pentan', 6: 'hexan', 7: 'heptan', 8: 'octan'
-    }
-
-    base = CHAIN_NAMES.get(carbon_count, f'{carbon_count}C-')
+    from ..data.chain_names import get_chain_prefix as _gcp
+    base = _gcp(carbon_count) + 'an'
     return base + 'ide'
 
 
@@ -841,11 +825,8 @@ def _name_thiolate_systematic(mol, anion_site: Dict) -> str:
     # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    CHAIN_NAMES = {
-        1: 'methane', 2: 'ethane', 3: 'propane', 4: 'butane'
-    }
-
-    base = CHAIN_NAMES.get(carbon_count, f'{carbon_count}C-')
+    from ..data.chain_names import get_chain_name
+    base = get_chain_name(carbon_count)
     return base + 'thiolate'
 
 
@@ -861,16 +842,16 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     elif len(carbon_neighbors) == 1:
         # Count carbons in substituent
         carbon_count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
-        ALKYL_NAMES = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl'}
-        alkyl = ALKYL_NAMES.get(carbon_count, f'{carbon_count}C-')
+        from ..data.chain_names import get_alkyl_name as _gal
+        alkyl = _gal(carbon_count)
         return alkyl + 'ammonium'
     elif len(carbon_neighbors) == 4:
         # Quaternary: tetra-alkyl-ammonium
+        from ..data.chain_names import get_alkyl_name as _gal
         alkyl_names = []
         for neighbor in carbon_neighbors:
             count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {cation_site['atom_idx']})
-            ALKYL_NAMES = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl'}
-            alkyl_names.append(ALKYL_NAMES.get(count, f'{count}C-'))
+            alkyl_names.append(_gal(count))
 
         # Check if all same
         if len(set(alkyl_names)) == 1:
@@ -889,7 +870,11 @@ def _name_carbenium_systematic(mol, cation_site: Dict) -> str:
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
     NAMES = {1: 'methylium', 2: 'ethylium', 3: 'propylium', 4: 'butylium'}
-    return NAMES.get(carbon_count, f'{carbon_count}C-ylium')
+    if carbon_count in NAMES:
+        return NAMES[carbon_count]
+    # Use centralized chain naming for longer chains
+    from ..data.chain_names import get_chain_prefix
+    return get_chain_prefix(carbon_count) + 'ylium'
 
 
 def _name_onium_systematic(mol, cation_site: Dict) -> str:

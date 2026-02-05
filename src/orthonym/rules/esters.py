@@ -20,7 +20,7 @@ from rdkit import Chem
 
 from ..data.trivial_acids import get_acylate_name
 from ..assembly.naming_utils import get_alkyl_name
-from ..assembly.composer import CHAIN_PREFIXES
+from ..data.chain_names import get_chain_prefix, get_alkyl_name as _chain_alkyl_name, get_acid_stem
 
 
 def parse_ester_fragments(mol, ester_match: tuple) -> Tuple[List[int], List[int]]:
@@ -132,11 +132,8 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     elif carbon_count == 2:
         return "acetic"  # Trivial name preferred
 
-    # Systematic for others
-    if carbon_count in CHAIN_PREFIXES:
-        return CHAIN_PREFIXES[carbon_count] + "anoic"
-
-    return f"{carbon_count}Canoic"
+    # Systematic for others - use centralized chain naming
+    return get_acid_stem(carbon_count)
 
 
 def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
@@ -163,9 +160,9 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
         return ""
 
     try:
-        return get_alkyl_name(carbon_count)
+        return _chain_alkyl_name(carbon_count)
     except ValueError:
-        # Complex or long alkyl group
+        # Fallback for edge cases
         return f"{carbon_count}C-yl"
 
 

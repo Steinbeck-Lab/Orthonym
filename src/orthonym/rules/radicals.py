@@ -43,19 +43,9 @@ RADICAL_TYPE_NAMES = {
 
 
 # === CHAIN PREFIXES ===
-
-CHAIN_PREFIXES = {
-    1: 'meth',
-    2: 'eth',
-    3: 'prop',
-    4: 'but',
-    5: 'pent',
-    6: 'hex',
-    7: 'hept',
-    8: 'oct',
-    9: 'non',
-    10: 'dec',
-}
+# Delegated to centralized chain_names module
+from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 11)}
 
 # Retained radical names (canonical SMILES -> name)
 # These are looked up first before systematic naming
@@ -280,7 +270,7 @@ def name_alkyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     if carbon_count == 0:
         carbon_count = 1  # Fallback for edge cases
 
-    prefix = CHAIN_PREFIXES.get(carbon_count, f'{carbon_count}C-')
+    prefix = _get_chain_prefix(carbon_count)
     suffix = get_radical_suffix(n_electrons)
 
     return prefix + suffix
@@ -333,7 +323,9 @@ def name_acyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         if neighbor.GetIsAromatic():
             return 'benzoyl'
 
-    return ACYL_NAMES.get(carbon_count, f'{carbon_count}C-oyl')
+    if carbon_count in ACYL_NAMES:
+        return ACYL_NAMES[carbon_count]
+    return _get_chain_prefix(carbon_count) + 'anoyl'
 
 
 def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
@@ -378,7 +370,9 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
                 6: 'hexoxyl',
             }
 
-            return ALKOXY_NAMES.get(carbon_count, f'{carbon_count}C-oxyl')
+            if carbon_count in ALKOXY_NAMES:
+                return ALKOXY_NAMES[carbon_count]
+            return _get_chain_prefix(carbon_count) + 'oxyl'
 
     return 'oxyl'
 
@@ -408,7 +402,7 @@ def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     if carbon_count == 0:
         carbon_count = 1
 
-    prefix = CHAIN_PREFIXES.get(carbon_count, f'{carbon_count}C-')
+    prefix = _get_chain_prefix(carbon_count)
 
     return prefix + 'ylidene'
 
@@ -438,7 +432,7 @@ def name_trivalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     if carbon_count == 0:
         carbon_count = 1
 
-    prefix = CHAIN_PREFIXES.get(carbon_count, f'{carbon_count}C-')
+    prefix = _get_chain_prefix(carbon_count)
 
     return prefix + 'ylidyne'
 

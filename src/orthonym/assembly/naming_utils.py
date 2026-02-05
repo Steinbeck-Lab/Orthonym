@@ -39,22 +39,23 @@ def get_alkyl_name(carbon_count: int) -> str:
     """Get alkyl substituent name for a given carbon count.
 
     Returns 'methyl' for 1, 'ethyl' for 2, ..., 'decyl' for 10.
+    For carbon counts > 10, delegates to the centralized chain_names module
+    which supports up to 999 carbons using IUPAC compositional naming.
 
     Args:
-        carbon_count: Number of carbons in the alkyl chain (1-10).
+        carbon_count: Number of carbons in the alkyl chain (1-999).
 
     Returns:
         Alkyl substituent name string.
 
     Raises:
-        ValueError: If carbon_count is not in supported range (1-10).
+        ValueError: If carbon_count is outside supported range.
     """
-    if carbon_count not in ALKYL_NAMES:
-        raise ValueError(
-            f"Unsupported carbon count {carbon_count}. "
-            f"Supported range: 1-10."
-        )
-    return ALKYL_NAMES[carbon_count]
+    if carbon_count in ALKYL_NAMES:
+        return ALKYL_NAMES[carbon_count]
+    # Delegate to centralized module for chains > 10
+    from ..data.chain_names import get_alkyl_name as _get_alkyl_name
+    return _get_alkyl_name(carbon_count)
 
 
 # ============================================================================

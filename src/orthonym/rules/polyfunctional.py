@@ -454,13 +454,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     all_prefixes.sort(key=alpha_sort_key)
 
     # --- Build the name ---
-    from ..assembly.composer import CHAIN_PREFIXES
+    from ..data.chain_names import get_chain_prefix
 
     chain_length = len(principal_chain)
-    if chain_length in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[chain_length]
-    else:
-        stem = f"{chain_length}C"  # Fallback
+    stem = get_chain_prefix(chain_length)
 
     # Get suffix for principal group
     from .seniority import get_suffix

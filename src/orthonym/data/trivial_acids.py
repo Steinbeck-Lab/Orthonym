@@ -103,9 +103,6 @@ def get_systematic_acylate(chain_length: int) -> str:
     if chain_length in CHAIN_TO_ACYLATE:
         return CHAIN_TO_ACYLATE[chain_length]
 
-    # For longer chains, generate programmatically
-    from ..assembly.composer import CHAIN_PREFIXES
-    if chain_length in CHAIN_PREFIXES:
-        return CHAIN_PREFIXES[chain_length] + "anoate"
-
-    return f"{chain_length}Canoate"  # Fallback
+    # For longer chains, use centralized chain naming
+    from .chain_names import get_anoate_name
+    return get_anoate_name(chain_length)

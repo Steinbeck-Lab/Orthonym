@@ -1756,7 +1756,7 @@ def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> 
     if carbon_count in ALKOXY_NAMES:
         return ALKOXY_NAMES[carbon_count]
     elif carbon_count > 10:
-        return f"{carbon_count}Coxy"  # Fallback for large groups
+        return get_chain_prefix(carbon_count) + "yloxy"
     return None
 
 

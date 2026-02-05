@@ -421,9 +421,9 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
     )
 
     # Get alkyl name
-    from ..assembly.naming_utils import get_alkyl_name
+    from ..data.chain_names import get_alkyl_name as _chain_alkyl_name
     try:
-        alkyl_name = get_alkyl_name(carbon_count)
+        alkyl_name = _chain_alkyl_name(carbon_count)
     except ValueError:
         # Unsupported carbon count, return generic name
         alkyl_name = f"{carbon_count}C-yl" if carbon_count > 0 else ""

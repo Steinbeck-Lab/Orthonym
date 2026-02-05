@@ -315,13 +315,9 @@ def get_spiro_substituents(
                 # This is a substituent
                 # For now, just count carbons for simple alkyl naming
                 carbon_count = _count_substituent_carbons(mol, nbr_idx, spiro_atoms)
-                if carbon_count > 0 and carbon_count <= 10:
-                    ALKYL_NAMES = {
-                        1: "methyl", 2: "ethyl", 3: "propyl", 4: "butyl",
-                        5: "pentyl", 6: "hexyl", 7: "heptyl", 8: "octyl",
-                        9: "nonyl", 10: "decyl",
-                    }
-                    substituents[locant] = ALKYL_NAMES.get(carbon_count, f"{carbon_count}C")
+                if carbon_count > 0:
+                    from ..data.chain_names import get_alkyl_name as _gal
+                    substituents[locant] = _gal(carbon_count)
 
     return substituents
 

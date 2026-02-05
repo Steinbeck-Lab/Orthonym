@@ -267,7 +267,11 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         6: 'hexanoate',
     }
 
-    base = CHAIN_TO_CARBOXYLATE.get(carbon_count, f'{carbon_count}C-anoate')
+    if carbon_count in CHAIN_TO_CARBOXYLATE:
+        base = CHAIN_TO_CARBOXYLATE[carbon_count]
+    else:
+        from ..data.chain_names import get_anoate_name
+        base = get_anoate_name(carbon_count)
 
     # Simple alpha amino acid: 2-azaniumyl-base
     return f'2-azaniumyl{base}'
@@ -351,7 +355,11 @@ def _infer_zwitterion_name(
             5: 'pentanoate',
             6: 'hexanoate',
         }
-        base = CHAIN_TO_CARBOXYLATE.get(carbon_count, f'{carbon_count}C-oate')
+        if carbon_count in CHAIN_TO_CARBOXYLATE:
+            base = CHAIN_TO_CARBOXYLATE[carbon_count]
+        else:
+            from ..data.chain_names import get_anoate_name
+            base = get_anoate_name(carbon_count)
         return f'ammonium{base}'
 
     return 'zwitterion'

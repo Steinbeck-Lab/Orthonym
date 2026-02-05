@@ -101,7 +101,7 @@ def _name_amino_acid_systematic(mol) -> str:
     Uses: "amino" prefix + acid name
     Example: 2-aminopropanoic acid (systematic for alanine)
     """
-    from ..assembly.composer import CHAIN_PREFIXES
+    from ..data.chain_names import get_chain_prefix
 
     # Get amino acid core atoms
     aa_atoms = get_amino_acid_atoms(mol)
@@ -118,11 +118,8 @@ def _name_amino_acid_systematic(mol) -> str:
     # Simple approach: count total carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    # Get stem from carbon count
-    if carbon_count in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[carbon_count]
-    else:
-        stem = f"{carbon_count}C"
+    # Get stem from carbon count using centralized module
+    stem = get_chain_prefix(carbon_count)
 
     # For alpha-amino acids, the amino group is at position 2
     # (position 1 is the acid carbon)
