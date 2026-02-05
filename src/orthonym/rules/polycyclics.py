@@ -467,9 +467,13 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             'atoms': [start_idx]
         }
 
-    # Carbon-based groups (alkyl)
+    # Carbon-based groups (alkyl or functionalized chain)
     if symbol == 'C':
-        return _identify_pah_alkyl_group(mol, start_idx, core_atoms)
+        alkyl = _identify_pah_alkyl_group(mol, start_idx, core_atoms)
+        if alkyl:
+            return alkyl
+        # Try functionalized chain (hydroxymethyl, carboxymethyl, etc.)
+        return _identify_pah_functionalized_chain(mol, start_idx, core_atoms)
 
     # Nitrogen groups
     if symbol == 'N':
@@ -620,6 +624,56 @@ def _identify_pah_oxygen_group(mol, o_idx: int, core_atoms: Set[int]) -> Optiona
             alkoxy_name = alkoxy_names.get(carbon_count)
             if alkoxy_name:
                 return {'name': alkoxy_name, 'atoms': [o_idx] + alkyl_atoms}
+
+    return None
+
+
+def _identify_pah_functionalized_chain(
+    mol, start_idx: int, core_atoms: Set[int]
+) -> Optional[Dict]:
+    """
+    Identify functionalized chain substituent on PAH (hydroxymethyl, etc.).
+
+    Handles carbon chains with terminal functional groups that are not
+    simple alkyl groups. Called when _identify_pah_alkyl_group returns None
+    due to heteroatom presence.
+    """
+    # BFS to collect chain atoms
+    visited = {start_idx}
+    queue = [start_idx]
+    chain_atoms = []
+    carbon_count = 0
+
+    while queue:
+        idx = queue.pop(0)
+        chain_atoms.append(idx)
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'C':
+            carbon_count += 1
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in core_atoms:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    if not chain_atoms or carbon_count == 0:
+        return None
+
+    # Check for hydroxyl terminus (-CH2OH, -CH2CH2OH)
+    hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
+    if hydroxyl_pattern:
+        matches = mol.GetSubstructMatches(hydroxyl_pattern)
+        for match in matches:
+            if match[0] in chain_atoms:
+                hydroxyl_names = {
+                    1: 'hydroxymethyl',
+                    2: '2-hydroxyethyl',
+                    3: '3-hydroxypropyl',
+                }
+                name = hydroxyl_names.get(carbon_count)
+                if name:
+                    return {'name': name, 'atoms': chain_atoms}
 
     return None
 

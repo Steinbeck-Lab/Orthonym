@@ -762,6 +762,36 @@ def _identify_functionalized_substituent(
                         'type': 'functionalized'
                     }
 
+    # Check for hydroxyl terminus: -CH2-OH or -CH(-OH)-
+    # Handles hydroxymethyl (-CH2OH), 2-hydroxyethyl (-CH2CH2OH), etc.
+    hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
+    if hydroxyl_pattern:
+        matches = mol.GetSubstructMatches(hydroxyl_pattern)
+        for match in matches:
+            o_idx = match[0]
+            if o_idx in chain_atoms:
+                if carbon_count == 1:
+                    return {
+                        'name': 'hydroxymethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'alcohol',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 2:
+                    return {
+                        'name': '2-hydroxyethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'alcohol',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 3:
+                    return {
+                        'name': '3-hydroxypropyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'alcohol',
+                        'type': 'functionalized'
+                    }
+
     return None
 
 
