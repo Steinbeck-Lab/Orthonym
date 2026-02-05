@@ -459,3 +459,83 @@ class TestPolycyclicFunctionalGroups:
         """Camphor retained name not broken by FG changes."""
         result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
         assert result.lower() == 'camphor', f"Expected camphor, got: {result}"
+
+
+class TestOPSINCompatibleVBFormat:
+    """Regression tests ensuring VB descriptors use OPSIN-parseable format.
+
+    OPSIN expects secondary bridge locants as inline superscripts written
+    directly after the bridge length: e.g. '13,7' (not '^{3,7}' or '^3,7').
+
+    This class guards against regression back to the old LaTeX-style format.
+    """
+
+    def test_adamantane_opsin_format(self):
+        """Adamantane: tricyclo[3.3.1.13,7]decane - OPSIN-compatible."""
+        result = name_compound('C1C2CC3CC1CC(C2)C3')
+        assert 'tricyclo[3.3.1.13,7]decane' in result, \
+            f"Expected OPSIN-compatible tricyclo[3.3.1.13,7]decane, got: {result}"
+        # Must NOT contain old LaTeX-style notation
+        assert '^{' not in result, \
+            f"Found old ^{{}} notation in: {result}"
+        assert '^' not in result, \
+            f"Found caret in VB descriptor: {result}"
+
+    def test_cubane_opsin_format(self):
+        """Cubane: pentacyclo descriptor with zero-length bridges, OPSIN-compatible."""
+        result = name_compound('C12C3C4C1C5C3C4C25')
+        assert 'pentacyclo[' in result, f"Expected pentacyclo, got: {result}"
+        assert 'octane' in result.lower(), f"Expected octane, got: {result}"
+        # Must NOT contain old LaTeX-style notation
+        assert '^{' not in result, \
+            f"Found old ^{{}} notation in cubane: {result}"
+        assert '^' not in result, \
+            f"Found caret in cubane VB descriptor: {result}"
+        # Must contain zero-length bridge entries (0 followed by digits)
+        import re
+        zero_bridges = re.findall(r'0\d+,\d+', result)
+        assert len(zero_bridges) >= 1, \
+            f"Expected zero-length bridge entries in cubane descriptor: {result}"
+
+    def test_norbornane_no_secondary_bridges(self):
+        """Norbornane (bicyclo[2.2.1]heptane) has no secondary bridges - format unchanged."""
+        result = name_compound('C1CC2CCC1C2')
+        # Norbornane has no secondary bridges, so no superscript locants at all
+        assert 'bicyclo[2.2.1]' in result.lower() or 'norbornane' in result.lower(), \
+            f"Expected bicyclo[2.2.1]heptane or norbornane, got: {result}"
+        # No locant superscripts should appear (no secondary bridges)
+        assert '^{' not in result, f"Found unexpected ^{{}} in norbornane: {result}"
+
+    def test_no_caret_brace_in_any_polycyclic(self):
+        """No generated polycyclic name should contain '^{' (old format guard)."""
+        test_smiles = [
+            'C1C2CC3CC1CC(C2)C3',     # Adamantane (tricyclo)
+            'C12C3C4C1C5C3C4C25',     # Cubane (pentacyclo)
+            'C1CC2CCC1CC2',           # Bicyclo[2.2.2]octane (bicyclo, no secondary)
+            'C1CC2CCC1C2',            # Norbornane (bicyclo, no secondary)
+        ]
+        for smi in test_smiles:
+            result = name_compound(smi)
+            assert '^{' not in result, \
+                f"Old VB format '^{{}}' found for SMILES {smi}: {result}"
+
+    def test_simple_tricyclo_one_secondary_bridge(self):
+        """Tricyclo system with exactly one secondary bridge uses OPSIN format."""
+        # Adamantane has exactly one secondary bridge of length 1
+        from rdkit import Chem
+        from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+        mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
+        ri = mol.GetRingInfo()
+        ring_atoms = set()
+        for ring in ri.AtomRings():
+            ring_atoms.update(ring)
+        analyzer = VonBaeyerAnalyzer()
+        desc = analyzer.analyze(mol, ring_atoms)
+        # Verify one secondary bridge
+        secondary = [b for b in desc.bridge_info_list if b.is_secondary]
+        assert len(secondary) == 1, f"Expected 1 secondary bridge, got {len(secondary)}"
+        # Descriptor must use OPSIN format
+        assert '13,7' in desc.descriptor_string, \
+            f"Expected inline locants '13,7' in {desc.descriptor_string}"
+        assert '^' not in desc.descriptor_string, \
+            f"Found caret in descriptor: {desc.descriptor_string}"
