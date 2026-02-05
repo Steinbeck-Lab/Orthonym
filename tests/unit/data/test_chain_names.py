@@ -287,3 +287,62 @@ class TestEdgeCases:
         for n in range(1, 201):
             name = get_anoate_name(n)
             assert name.endswith("anoate"), f"n={n}: {name} doesn't end in 'anoate'"
+
+
+# ============================================================================
+# Regression: No NC- placeholders
+# ============================================================================
+
+@pytest.mark.unit
+class TestNoNCPlaceholders:
+    """Regression test: no {N}C-yl, {N}C-ate, etc. placeholder patterns."""
+
+    def test_no_nc_pattern_in_chain_prefixes(self):
+        """Chain prefix output for 1-200 should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1, 201):
+            prefix = get_chain_prefix(n)
+            assert not nc_pattern.search(prefix), (
+                f"n={n}: prefix '{prefix}' contains NC placeholder"
+            )
+
+    def test_no_nc_pattern_in_alkyl_names(self):
+        """Alkyl names for 1-200 should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1, 201):
+            name = get_alkyl_name(n)
+            assert not nc_pattern.search(name), (
+                f"n={n}: alkyl name '{name}' contains NC placeholder"
+            )
+
+    def test_no_nc_pattern_in_acid_names(self):
+        """Acid names for 1-200 should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1, 201):
+            name = get_acid_name(n)
+            assert not nc_pattern.search(name), (
+                f"n={n}: acid name '{name}' contains NC placeholder"
+            )
+
+    def test_no_nc_pattern_in_anoate_names(self):
+        """Anoate names for 1-200 should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1, 201):
+            name = get_anoate_name(n)
+            assert not nc_pattern.search(name), (
+                f"n={n}: anoate name '{name}' contains NC placeholder"
+            )
+
+    def test_no_nc_pattern_in_chain_names(self):
+        """Full chain names for 1-200 should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1, 201):
+            name = get_chain_name(n)
+            assert not nc_pattern.search(name), (
+                f"n={n}: chain name '{name}' contains NC placeholder"
+            )
