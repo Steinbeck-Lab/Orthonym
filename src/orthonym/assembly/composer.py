@@ -284,16 +284,19 @@ def assemble_name(features: Any, style: str = "pin") -> str:
                     return name
 
     # Handle thioethers (sulfides) - also use functional class
+    # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
     if features.principal_group == 'thioether':
-        from ..rules.sulfur import name_sulfide
-        # Find sulfur atom index
-        matches = features.functional_groups.get('thioether', [])
-        if matches:
-            # SMARTS match gives (S, C, C) - sulfur is first
-            sulfur_idx = matches[0][0]
-            name = name_sulfide(features.mol, sulfur_idx)
-            if name:
-                return name
+        ring_type = getattr(features, 'ring_type', None)
+        if ring_type != 'heterocyclic':
+            from ..rules.sulfur import name_sulfide
+            # Find sulfur atom index
+            matches = features.functional_groups.get('thioether', [])
+            if matches:
+                # SMARTS match gives (S, C, C) - sulfur is first
+                sulfur_idx = matches[0][0]
+                name = name_sulfide(features.mol, sulfur_idx)
+                if name:
+                    return name
 
     # Handle phosphorus functional class compounds (phosphine oxide, phosphates, phosphines)
     # These use functional class or substitutive naming, not suffix-based

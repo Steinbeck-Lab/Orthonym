@@ -1018,12 +1018,23 @@ def name_substituted_heterocycle(
                 prefix_str += "-"
             prefix_str += prefix
 
+    # Join prefix to parent name with correct hyphenation
+    # When parent starts with digit (e.g., "1,4-dithiane"), need hyphen after prefix
+    # When parent starts with letter (e.g., "pyridine"), no extra hyphen needed
+    if prefix_str and parent_name:
+        if parent_name[0].isdigit() and prefix_str[-1].isalpha():
+            combined = f"{prefix_str}-{parent_name}"
+        else:
+            combined = f"{prefix_str}{parent_name}"
+    else:
+        combined = f"{prefix_str}{parent_name}"
+
     # Assemble with stereo prefix if present
     if stereo_descriptors:
         stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
-        return f"{stereo_prefix}{prefix_str}{parent_name}"
+        return f"{stereo_prefix}{combined}"
 
-    return f"{prefix_str}{parent_name}"
+    return combined
 
 
 def _format_n_substituent(name: str, count: int) -> str:
