@@ -42,7 +42,7 @@ def norbornane():
 
 @pytest.fixture
 def adamantane():
-    """Tricyclo[3.3.1.1^3,7]decane - diamond lattice fragment."""
+    """Tricyclo[3.3.1.13,7]decane - diamond lattice fragment."""
     return Chem.MolFromSmiles("C1C2CC3CC1CC(C2)C3")
 
 
@@ -329,8 +329,8 @@ class TestZeroLengthBridges:
     def test_cubane_descriptor_format(self):
         """Cubane descriptor must contain 'pentacyclo[' and zero-length bridge entries.
 
-        The format should include 0^{...} entries for zero-length secondary bridges
-        with locant superscripts.
+        The OPSIN-compatible format uses inline superscript locants:
+        0locant_low,locant_high (e.g., 02,6 for zero-length bridge between 2 and 6).
         """
         mol = Chem.MolFromSmiles("C12C3C4C1C5C3C4C25")
         ring_atoms = _get_ring_atoms(mol)
@@ -343,10 +343,10 @@ class TestZeroLengthBridges:
             f"Expected pentacyclo prefix, got: {desc.descriptor_string}"
         )
 
-        # Must contain zero-length bridge entries with superscript locants
-        # Format: 0^{locant_low,locant_high}
+        # Must contain zero-length bridge entries with inline superscript locants
+        # OPSIN-compatible format: 0locant_low,locant_high
         import re
-        zero_bridge_pattern = r"0\^\{\d+,\d+\}"
+        zero_bridge_pattern = r"0\d+,\d+"
         matches = re.findall(zero_bridge_pattern, desc.descriptor_string)
         assert len(matches) == 3, (
             f"Expected 3 zero-length bridge entries in descriptor, found {len(matches)}: "
@@ -371,7 +371,7 @@ class TestZeroLengthBridges:
 
     @pytest.mark.unit
     def test_adamantane_unchanged(self):
-        """Adamantane must still produce tricyclo[3.3.1.1^{3,7}]decane.
+        """Adamantane must still produce tricyclo[3.3.1.13,7]decane.
 
         Regression guard: zero-length bridge detection must not alter systems
         that already had correct secondary bridge detection via unassigned atoms.
@@ -380,8 +380,8 @@ class TestZeroLengthBridges:
 
         name = generate_polycyclic_name(mol)
         assert name is not None
-        assert "tricyclo[3.3.1.1^{3,7}]" in name, (
-            f"Expected tricyclo[3.3.1.1^{{3,7}}] in adamantane name, got: {name}"
+        assert "tricyclo[3.3.1.13,7]" in name, (
+            f"Expected tricyclo[3.3.1.13,7] in adamantane name, got: {name}"
         )
         assert name.endswith("decane"), (
             f"Expected name to end with 'decane', got: {name}"

@@ -28,7 +28,7 @@ class TestVonBaeyerE2E:
             f"Expected norbornane or bicyclo[2.2.1]heptane, got: {result}"
 
     def test_adamantane_tricyclo(self):
-        """Adamantane: tricyclo[3.3.1.1^{3,7}]decane."""
+        """Adamantane: tricyclo[3.3.1.13,7]decane."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
         assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
         assert 'decane' in result.lower(), f"Expected decane, got: {result}"
@@ -50,7 +50,7 @@ class TestVonBaeyerE2E:
 
     def test_cubane_pentacyclo(self):
         """Cubane: pentacyclo system."""
-        # Cubane = pentacyclo[4.2.0.0^{2,5}.0^{3,8}.0^{4,7}]octane
+        # Cubane = pentacyclo[4.2.0.02,5.03,8.04,7]octane
         result = name_compound('C12C3C4C1C5C3C4C25')
         assert 'pentacyclo' in result.lower(), f"Expected pentacyclo for cubane, got: {result}"
         assert 'octane' in result.lower(), f"Expected octane for cubane, got: {result}"
@@ -291,11 +291,11 @@ class TestDescriptorFormats:
         assert 'bicyclo[2.2.2]' in result.lower(), f"Expected bicyclo[2.2.2], got: {result}"
 
     def test_tricyclo_secondary_bridge_locants(self):
-        """Tricyclo with superscript locants for secondary bridges."""
+        """Tricyclo with inline superscript locants for secondary bridges (OPSIN-compatible)."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')  # adamantane
-        # Should have ^{3,7} or similar notation for secondary bridge
-        assert '^{' in result or '3,7' in result, \
-            f"Expected superscript locants in {result}"
+        # OPSIN-compatible format: inline locants after bridge length (e.g., 13,7)
+        assert '13,7' in result, \
+            f"Expected OPSIN-compatible inline locants '13,7' in {result}"
 
 
 class TestEdgeCases:
