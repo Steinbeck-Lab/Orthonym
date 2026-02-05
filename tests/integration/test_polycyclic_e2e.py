@@ -401,3 +401,61 @@ class TestClassificationFixes:
         assert mol is not None, "Failed to parse pentacyclic SMILES"
         assert is_polycyclic_system(mol) is True, \
             "Pentacyclic lactone must be recognized as polycyclic system"
+
+
+class TestPolycyclicFunctionalGroups:
+    """Tests for functional group detection and naming on polycyclic ring systems (Plan 16-09).
+
+    Validates that:
+    - Exocyclic C=O on ring carbons produces -one suffix
+    - -OH on ring carbons produces -ol suffix or hydroxy- prefix
+    - Seniority determines which FG is suffix vs prefix
+    - Retained names (camphor, norbornane) are not broken
+    - Non-FG polycyclic naming remains unchanged
+    """
+
+    def test_oxatricyclo_lactone_has_one_suffix(self):
+        """Oxatricyclo lactone: oxa prefix + one suffix for C=O on ring carbon."""
+        result = name_compound('O=C1OC2CC3CC1CC(O)(C3)C2')
+        assert 'oxa' in result.lower(), f"Expected oxa prefix, got: {result}"
+        assert 'on' in result.lower(), f"Expected -one suffix (as 'on' in name), got: {result}"
+
+    def test_oxatricyclo_lactone_has_hydroxy_prefix(self):
+        """Oxatricyclo lactone with OH: hydroxy prefix present for -OH group."""
+        result = name_compound('O=C1OC2CC3CC1CC(O)(C3)C2')
+        assert 'hydroxy' in result.lower(), f"Expected hydroxy prefix, got: {result}"
+
+    def test_simple_oxatricyclo_lactone_has_one_suffix(self):
+        """Simple oxatricyclo lactone: oxa prefix and -one suffix."""
+        result = name_compound('O=C1OC2CC3CC(C2)CC1C3')
+        assert 'oxa' in result.lower(), f"Expected oxa prefix, got: {result}"
+        assert 'on' in result.lower(), f"Expected -one suffix (as 'on' in name), got: {result}"
+
+    def test_tricyclo_ketone(self):
+        """Tricyclo ketone (adamantanone): -one suffix on ring C=O."""
+        result = name_compound('O=C1C2CC3CC1CC(C2)C3')
+        assert 'on' in result.lower(), f"Expected -one suffix, got: {result}"
+        assert 'tricyclo' in result.lower(), f"Expected tricyclo descriptor, got: {result}"
+
+    def test_tricyclo_alcohol(self):
+        """Tricyclo alcohol (1-adamantanol): -ol suffix on ring -OH."""
+        result = name_compound('OC1C2CC3CC1CC(C2)C3')
+        assert 'ol' in result.lower(), f"Expected -ol suffix, got: {result}"
+        assert 'tricyclo' in result.lower(), f"Expected tricyclo descriptor, got: {result}"
+
+    def test_polycyclic_no_fg_unchanged(self):
+        """Adamantane without FGs: name unchanged (regression guard)."""
+        result = name_compound('C1C2CC3CC1CC(C2)C3')
+        assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
+        assert 'decane' in result.lower(), f"Expected decane, got: {result}"
+        assert '3.3.1.1' in result, f"Expected 3.3.1.1 descriptor, got: {result}"
+
+    def test_norbornane_retained_name_preserved(self):
+        """Norbornane retained name not broken by FG changes."""
+        result = name_compound('C1CC2CC1CC2')
+        assert 'norbornane' in result.lower(), f"Expected norbornane, got: {result}"
+
+    def test_camphor_retained_name_preserved(self):
+        """Camphor retained name not broken by FG changes."""
+        result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
+        assert result.lower() == 'camphor', f"Expected camphor, got: {result}"
