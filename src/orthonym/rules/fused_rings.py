@@ -325,6 +325,13 @@ def get_fused_heterocycle_substituents(
             elif sub_type == 'functional' and sub_name == 'amino':
                 # Amino group (-NH2) - use suffix form (-amine)
                 result['amino_substituents'].append(locant)
+            elif sub_type == 'functional':
+                # Other functional groups (nitro, hydroxy, methylamino, etc.)
+                # These are prefix substituents on the ring
+                result['c_substituents'][sub_name].append(locant)
+            elif sub_type == 'functionalized':
+                # Functionalized chain substituents (cyanomethyl, etc.)
+                result['c_substituents'][sub_name].append(locant)
             else:
                 # Halogen or other
                 sub_info['locant'] = locant
@@ -427,10 +434,23 @@ def _identify_fused_substituent(
                 'atoms': [start_idx]
             }
 
-    # Nitrogen groups (amino, etc.)
+    # Nitrogen groups (amino, nitro, N-alkyl amino, etc.)
     if symbol == 'N':
         h_count = start_atom.GetTotalNumHs()
         neighbors = [n for n in start_atom.GetNeighbors() if n.GetIdx() not in excluded]
+
+        # Nitro group: N+ with 2 oxygen neighbors
+        if start_atom.GetFormalCharge() == 1:
+            o_count = sum(1 for n in neighbors if n.GetSymbol() == 'O')
+            if o_count == 2:
+                atoms = [start_idx] + [n.GetIdx() for n in neighbors if n.GetSymbol() == 'O']
+                return {
+                    'name': 'nitro',
+                    'type': 'functional',
+                    'atoms': atoms
+                }
+
+        # Simple amino (-NH2)
         if h_count == 2 and len(neighbors) == 0:
             return {
                 'name': 'amino',
@@ -438,7 +458,102 @@ def _identify_fused_substituent(
                 'atoms': [start_idx]
             }
 
+        # N-monoalkyl amino (-NHR) -> (alkylamino) prefix
+        if h_count == 1 and len(neighbors) == 1:
+            nbr = neighbors[0]
+            if nbr.GetSymbol() == 'C':
+                # BFS to find alkyl group size
+                alkyl_atoms = _bfs_alkyl_from(mol, nbr.GetIdx(), excluded | {start_idx})
+                if alkyl_atoms is not None:
+                    carbon_count = sum(1 for idx in alkyl_atoms
+                                       if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+                    try:
+                        alkyl_name = get_alkyl_name(carbon_count)
+                        return {
+                            'name': f'{alkyl_name}amino',
+                            'type': 'functional',
+                            'atoms': [start_idx] + alkyl_atoms
+                        }
+                    except (ValueError, KeyError):
+                        pass
+
+        # N,N-dialkyl amino (-NR2) -> (dialkylamino) prefix
+        if h_count == 0 and len(neighbors) == 2:
+            c_neighbors = [n for n in neighbors if n.GetSymbol() == 'C']
+            if len(c_neighbors) == 2:
+                alkyl_names = []
+                all_sub_atoms = [start_idx]
+                for cn in c_neighbors:
+                    alkyl_atoms = _bfs_alkyl_from(mol, cn.GetIdx(), excluded | {start_idx})
+                    if alkyl_atoms is None:
+                        break
+                    carbon_count = sum(1 for idx in alkyl_atoms
+                                       if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+                    try:
+                        alkyl_names.append(get_alkyl_name(carbon_count))
+                        all_sub_atoms.extend(alkyl_atoms)
+                    except (ValueError, KeyError):
+                        break
+                else:
+                    # Both alkyl groups identified
+                    alkyl_names.sort()
+                    if alkyl_names[0] == alkyl_names[1]:
+                        from ..assembly.naming_utils import get_multiplier_prefix as _get_mp
+                        mp = _get_mp(2)
+                        prefix_name = f'{mp}{alkyl_names[0]}amino'
+                    else:
+                        prefix_name = f'{alkyl_names[0]}({alkyl_names[1]}amino)'
+                    return {
+                        'name': prefix_name,
+                        'type': 'functional',
+                        'atoms': all_sub_atoms
+                    }
+
+    # Sulfur groups
+    if symbol == 'S':
+        h_count = start_atom.GetTotalNumHs()
+        neighbors = [n for n in start_atom.GetNeighbors() if n.GetIdx() not in excluded]
+        if h_count == 1 and len(neighbors) == 0:
+            return {
+                'name': 'sulfanyl',
+                'type': 'functional',
+                'atoms': [start_idx]
+            }
+
     return None
+
+
+def _bfs_alkyl_from(mol, start_idx: int, excluded: Set[int]) -> Optional[List[int]]:
+    """
+    BFS to collect a pure alkyl substituent (only C and H atoms).
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Starting atom index
+        excluded: Set of atom indices to exclude
+
+    Returns:
+        List of atom indices if pure alkyl, None if contains heteroatoms
+    """
+    visited = {start_idx}
+    queue = [start_idx]
+    all_atoms = []
+
+    while queue:
+        current_idx = queue.pop(0)
+        current_atom = mol.GetAtomWithIdx(current_idx)
+        all_atoms.append(current_idx)
+
+        if current_atom.GetSymbol() not in ('C', 'H'):
+            return None  # Not pure alkyl
+
+        for neighbor in current_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in excluded:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    return all_atoms if all_atoms else None
 
 
 def _identify_alkyl_substituent(
