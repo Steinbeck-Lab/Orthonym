@@ -1405,7 +1405,125 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                 fragment_type="prefix"
             ))
 
+    # --- Merge duplicate prefix names ---
+    # If the same base prefix name appears multiple times (from different sources),
+    # merge them into a single entry with combined count and appropriate multiplier.
+    # This prevents stacking like "dihydroxyhydroxy" -> should be "trihydroxy".
+    prefixes = _merge_duplicate_prefixes(prefixes)
+
     return prefixes
+
+
+def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment]:
+    """
+    Merge duplicate prefix names into single entries with combined locants and multipliers.
+
+    This prevents stacking like 'dihydroxyhydroxy' (from two sources each detecting hydroxy)
+    by combining them into 'trihydroxy' with merged locants.
+
+    The merge works by:
+    1. Extracting the base name from each prefix (stripping locants and multipliers)
+    2. Grouping by base name
+    3. Combining locants and recalculating multiplier
+
+    Args:
+        prefixes: List of NameFragment prefix objects
+
+    Returns:
+        Deduplicated list of NameFragment prefix objects
+    """
+    import re
+
+    if len(prefixes) <= 1:
+        return prefixes
+
+    # Extract base name from formatted prefix text
+    # Examples: "2-hydroxy" -> "hydroxy", "3,4-dihydroxy" -> "hydroxy",
+    #           "methyl" -> "methyl", "2,2-dimethyl" -> "methyl"
+    def _extract_base_name(text: str) -> str:
+        """Strip locants and multipliers to get the base substituent name."""
+        # Strip leading locants (digits, commas, hyphens at start)
+        stripped = re.sub(r'^[\d,]+-', '', text)
+        # Strip multiplicative prefix
+        for mult in sorted(SIMPLE_MULTIPLIERS.values(), key=len, reverse=True):
+            if stripped.startswith(mult):
+                remainder = stripped[len(mult):]
+                if remainder:
+                    return remainder
+        for mult in sorted(COMPLEX_MULTIPLIERS.values(), key=len, reverse=True):
+            if stripped.startswith(mult):
+                remainder = stripped[len(mult):]
+                # Complex multipliers have parenthesized names: tetrakis(methyl) -> methyl
+                if remainder.startswith('(') and ')' in remainder:
+                    return remainder[1:remainder.index(')')]
+                if remainder:
+                    return remainder
+        return stripped
+
+    # Group by base name
+    groups: Dict[str, List[NameFragment]] = defaultdict(list)
+    for prefix in prefixes:
+        base = _extract_base_name(prefix.text)
+        groups[base].append(prefix)
+
+    # Rebuild prefixes, merging duplicates
+    merged = []
+    for base_name, group in groups.items():
+        if len(group) == 1:
+            # No duplicates, keep as-is
+            merged.append(group[0])
+            continue
+
+        # Merge: combine all locants and recalculate count
+        all_locants = []
+        for frag in group:
+            all_locants.extend(frag.locants)
+        all_locants = tuple(sorted(set(all_locants)))
+
+        # Calculate total count from all sources
+        # Count = number of locants if we have them, otherwise sum of individual counts
+        total_count = len(all_locants) if all_locants else sum(
+            # Estimate count from multiplier in text
+            _count_from_prefix(frag.text, base_name) for frag in group
+        )
+
+        if total_count <= 0:
+            total_count = len(group)  # Fallback: one per fragment
+
+        # Rebuild the formatted prefix
+        if total_count > 1:
+            multiplier = SIMPLE_MULTIPLIERS.get(total_count, str(total_count))
+            if all_locants:
+                locant_str = ",".join(str(l) for l in all_locants)
+                text = f"{locant_str}-{multiplier}{base_name}"
+            else:
+                text = f"{multiplier}{base_name}"
+        else:
+            if all_locants:
+                locant_str = ",".join(str(l) for l in all_locants)
+                text = f"{locant_str}-{base_name}"
+            else:
+                text = base_name
+
+        merged.append(NameFragment(
+            text=text,
+            locants=all_locants,
+            fragment_type="prefix"
+        ))
+
+    return merged
+
+
+def _count_from_prefix(text: str, base_name: str) -> int:
+    """Estimate the count from a formatted prefix string."""
+    import re
+    # Strip locants
+    stripped = re.sub(r'^[\d,]+-', '', text)
+    # Check for multiplier before base name
+    for count, mult in sorted(SIMPLE_MULTIPLIERS.items(), key=lambda x: len(x[1]), reverse=True):
+        if stripped.startswith(mult) and stripped[len(mult):] == base_name:
+            return count
+    return 1
 
 
 def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:

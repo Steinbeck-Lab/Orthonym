@@ -153,3 +153,45 @@ class TestNoCycloane:
         assert 'cycloane' not in result.text, (
             f"Generated 'cycloane' from invalid ring: {result.text}"
         )
+
+
+# ============================================================================
+# Bug 5: Substituent stacking without locants (deduplication)
+# ============================================================================
+
+class TestSubstituentMerging:
+    """Verify duplicate substituent prefixes from different sources are merged."""
+
+    def test_merge_duplicate_hydroxy(self):
+        """Two hydroxy prefixes from different sources merge into dihydroxy."""
+        from orthonym.assembly.composer import _merge_duplicate_prefixes, NameFragment
+        prefixes = [
+            NameFragment(text="hydroxy", locants=(), fragment_type="prefix"),
+            NameFragment(text="hydroxy", locants=(), fragment_type="prefix"),
+        ]
+        merged = _merge_duplicate_prefixes(prefixes)
+        assert len(merged) == 1
+        assert "dihydroxy" in merged[0].text
+
+    def test_merge_with_locants(self):
+        """Prefixes with locants are combined and locants merged."""
+        from orthonym.assembly.composer import _merge_duplicate_prefixes, NameFragment
+        prefixes = [
+            NameFragment(text="3-hydroxy", locants=(3,), fragment_type="prefix"),
+            NameFragment(text="5-hydroxy", locants=(5,), fragment_type="prefix"),
+        ]
+        merged = _merge_duplicate_prefixes(prefixes)
+        assert len(merged) == 1
+        assert "dihydroxy" in merged[0].text
+        assert 3 in merged[0].locants
+        assert 5 in merged[0].locants
+
+    def test_no_merge_different_names(self):
+        """Different substituent names should not be merged."""
+        from orthonym.assembly.composer import _merge_duplicate_prefixes, NameFragment
+        prefixes = [
+            NameFragment(text="hydroxy", locants=(), fragment_type="prefix"),
+            NameFragment(text="methyl", locants=(), fragment_type="prefix"),
+        ]
+        merged = _merge_duplicate_prefixes(prefixes)
+        assert len(merged) == 2
