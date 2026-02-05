@@ -582,7 +582,8 @@ def name_heterocycle(mol, ring_atoms) -> str:
 
     Naming priority:
     1. Check retained names FIRST (pyridine, furan, morpholine, etc.)
-    2. Fall back to HW systematic naming if no retained name
+    2. For rings 3-10: Hantzsch-Widman systematic naming
+    3. For rings > 10: replacement ("a") nomenclature on cycloalkane parent
 
     Args:
         mol: RDKit Mol object
@@ -609,19 +610,101 @@ def name_heterocycle(mol, ring_atoms) -> str:
     if retained:
         return retained
 
-    # Fall back to HW systematic naming
+    # Fall back to systematic naming
     info = classify_heterocycle(mol, ring_atoms)
     oriented, _ = orient_heterocycle(mol, ring_atoms)
 
     # Get heteroatom locants from oriented ring
     heteroatom_locants = get_heteroatom_locants(oriented, mol)
 
+    ring_size = info['ring_size']
+
+    # For rings > 10: use replacement nomenclature (cycloXXXane parent)
+    if ring_size > 10:
+        return _build_replacement_name(
+            heteroatom_locants,
+            ring_size,
+            info['is_saturated']
+        )
+
     return build_hw_name(
         heteroatom_locants,
-        info['ring_size'],
+        ring_size,
         info['is_saturated'],
         info['is_aromatic']
     )
+
+
+def _build_replacement_name(
+    heteroatoms: List[Tuple[int, str]],
+    ring_size: int,
+    is_saturated: bool
+) -> str:
+    """
+    Build replacement ("a") nomenclature name for macrocyclic heterocycles.
+
+    For rings larger than 10 atoms, IUPAC uses "a" nomenclature:
+    replacement prefixes (oxa, aza, thia) + cycloalkane parent name.
+
+    Example: 1,4,7,10-tetraoxacyclododecane (12-crown-4)
+
+    Args:
+        heteroatoms: List of (locant, element) tuples
+        ring_size: Number of atoms in the ring (> 10)
+        is_saturated: True if fully saturated
+
+    Returns:
+        IUPAC replacement name (e.g., '1,4,7,10-tetraoxacyclododecane')
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    if not heteroatoms:
+        # No heteroatoms: just cycloalkane (shouldn't reach here)
+        prefix = get_chain_prefix(ring_size)
+        return f"cyclo{prefix}ane"
+
+    # Build replacement prefix (same logic as HW prefix builder)
+    element_locants: Dict[str, List[int]] = {}
+    for locant, elem in heteroatoms:
+        if elem not in element_locants:
+            element_locants[elem] = []
+        element_locants[elem].append(locant)
+
+    # Order by IUPAC priority (O > S > N > ...)
+    elements_by_priority = sorted(
+        element_locants.keys(),
+        key=lambda e: HETEROATOM_PRIORITY.get(e, 999)
+    )
+
+    prefix_parts = []
+    for elem in elements_by_priority:
+        hw_prefix = get_hw_prefix(elem)
+        if not hw_prefix:
+            continue
+
+        locants = sorted(element_locants[elem])
+        count = len(locants)
+
+        locant_str = ','.join(str(loc) for loc in locants)
+        if count > 1:
+            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
+        else:
+            prefix_parts.append(f"{locant_str}-{hw_prefix}")
+
+    replacement_prefix = ''.join(prefix_parts)
+
+    # Build parent ring name
+    chain_prefix = get_chain_prefix(ring_size)
+    if is_saturated:
+        parent = f"cyclo{chain_prefix}ane"
+    else:
+        parent = f"cyclo{chain_prefix}ene"
+
+    # Apply 'a' elision: drop terminal 'a' before 'cyclo' (which starts with 'c')
+    # No elision needed since 'cyclo' starts with consonant
+
+    return f"{replacement_prefix}{parent}"
 
 
 # ---------------------------------------------------------------------------
