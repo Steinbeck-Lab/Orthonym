@@ -4,9 +4,12 @@ Provides pre-canonicalized SMILES for natural product scaffolds (for
 substructure matching) and exact derivative names (for direct lookup).
 All SMILES keys are already in RDKit canonical form -- no runtime
 canonicalization is needed.
+
+Also provides IUPAC atom numbering maps for steroid scaffolds, enabling
+decoration enumeration (hydroxy, ketone, unsaturation) on scaffold atoms.
 """
 
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -161,3 +164,114 @@ def get_scaffold_patterns() -> dict:
         Dict mapping canonical SMILES to compiled RDKit Mol objects.
     """
     return _SCAFFOLD_PATTERNS
+
+
+# ---------------------------------------------------------------------------
+# 5. IUPAC atom numbering maps for steroid scaffolds
+# ---------------------------------------------------------------------------
+# Each map: query atom index (position in scaffold SMILES) -> IUPAC locant.
+# When a molecule is matched against a scaffold, matched_atoms[query_pos] gives
+# the target molecule's atom index. Combined with the numbering map, this gives:
+#   iupac_locant = NUMBERING_MAP[query_pos]
+#   target_atom  = matched_atoms[query_pos]
+#
+# Numbering follows IUPAC 2013 steroid conventions:
+#   Ring A: 1-5,10    Ring B: 5-10    Ring C: 8,9,11-14    Ring D: 13-17
+#   C-18: angular methyl on C-13
+#   C-19: angular methyl on C-10
+#   C-20+: side chain
+
+STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
+    # Gonane (17 carbons, no angular methyls)
+    "C1CC[C@H]2C(C1)CC[C@H]1[C@@H]3CCC[C@H]3CC[C@@H]12": {
+        0: 3, 1: 2, 2: 1, 3: 10, 4: 5, 5: 4,
+        6: 6, 7: 7, 8: 8, 9: 14, 10: 15,
+        11: 16, 12: 17, 13: 13, 14: 12, 15: 11, 16: 9,
+    },
+
+    # Androstane (19 carbons: gonane + C-18, C-19 angular methyls)
+    "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@]3(C)[C@H]1CC2": {
+        0: 18, 1: 13, 2: 17, 3: 16, 4: 15, 5: 14,
+        6: 8, 7: 7, 8: 6, 9: 5,
+        10: 4, 11: 3, 12: 2, 13: 1,
+        14: 10, 15: 19, 16: 9, 17: 11, 18: 12,
+    },
+
+    # Estrane (18 carbons: gonane + C-18, no C-19)
+    "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@@H]3[C@H]1CC2": {
+        0: 18, 1: 13, 2: 17, 3: 16, 4: 15, 5: 14,
+        6: 8, 7: 7, 8: 6, 9: 5,
+        10: 4, 11: 3, 12: 2, 13: 1,
+        14: 10, 15: 9, 16: 12, 17: 11,
+    },
+
+    # Pregnane (21 carbons: androstane + C-20, C-21 side chain)
+    "CC[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": {
+        0: 21, 1: 20, 2: 17, 3: 16, 4: 15, 5: 14,
+        6: 8, 7: 7, 8: 6, 9: 5,
+        10: 4, 11: 3, 12: 2, 13: 1,
+        14: 10, 15: 19, 16: 9, 17: 11, 18: 12,
+        19: 13, 20: 18,
+    },
+
+    # Cholane (24 carbons: C-20 to C-24 side chain)
+    "CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": {
+        0: 24, 1: 23, 2: 22, 3: 20, 4: 21, 5: 17,
+        6: 16, 7: 15, 8: 14, 9: 8,
+        10: 7, 11: 6, 12: 5, 13: 4, 14: 3, 15: 2, 16: 1,
+        17: 10, 18: 19, 19: 9, 20: 12, 21: 11,
+        22: 13, 23: 18,
+    },
+
+    # Cholestane (27 carbons: C-20 to C-27 side chain)
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": {
+        0: 26, 1: 25, 2: 27, 3: 24, 4: 23, 5: 22,
+        6: 20, 7: 21, 8: 17, 9: 16, 10: 15, 11: 14,
+        12: 8, 13: 7, 14: 6, 15: 5, 16: 4, 17: 3,
+        18: 2, 19: 1, 20: 10, 21: 19, 22: 9, 23: 11,
+        24: 12, 25: 13, 26: 18,
+    },
+
+    # Ergostane (28 carbons: cholestane + extra C-28 methyl at C-24)
+    "CC(C)[C@@H](C)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": {
+        0: 26, 1: 25, 2: 27, 3: 24, 4: 28, 5: 23, 6: 22,
+        7: 20, 8: 21, 9: 17, 10: 16, 11: 15, 12: 14,
+        13: 8, 14: 7, 15: 6, 16: 5,
+        17: 4, 18: 3, 19: 2, 20: 1,
+        21: 10, 22: 19, 23: 9, 24: 12, 25: 11,
+        26: 13, 27: 18,
+    },
+
+    # Campestane (28 carbons: same topology as ergostane, different stereo at C-24)
+    "CC(C)[C@H](C)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": {
+        0: 26, 1: 25, 2: 27, 3: 24, 4: 28, 5: 23, 6: 22,
+        7: 20, 8: 21, 9: 17, 10: 16, 11: 15, 12: 14,
+        13: 8, 14: 7, 15: 6, 16: 5,
+        17: 4, 18: 3, 19: 2, 20: 1,
+        21: 10, 22: 19, 23: 9, 24: 12, 25: 11,
+        26: 13, 27: 18,
+    },
+
+    # Stigmastane (29 carbons: cholestane + ethyl at C-24)
+    "CC[C@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C": {
+        0: 29, 1: 28, 2: 24, 3: 23, 4: 22, 5: 20, 6: 21,
+        7: 17, 8: 16, 9: 15, 10: 14,
+        11: 8, 12: 7, 13: 6, 14: 5,
+        15: 4, 16: 3, 17: 2, 18: 1,
+        19: 10, 20: 19, 21: 9, 22: 12, 23: 11,
+        24: 13, 25: 18,
+        26: 25, 27: 26, 28: 27,
+    },
+}
+
+
+def get_steroid_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
+    """Get IUPAC numbering map for a steroid scaffold.
+
+    Args:
+        scaffold_smiles: Canonical SMILES of the scaffold.
+
+    Returns:
+        Dict mapping query atom index to IUPAC locant, or None if not found.
+    """
+    return STEROID_NUMBERING_MAPS.get(scaffold_smiles)
