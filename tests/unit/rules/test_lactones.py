@@ -143,9 +143,15 @@ class TestNameLactoneRing:
         assert name_lactone_ring(7) == "oxepan-2-one"
 
     def test_unsupported_ring_size_returns_none(self):
-        """Ring sizes outside 4-7 return None (3-membered and 8+ uncommon)."""
+        """Ring sizes < 3 or > 50 return None."""
         assert name_lactone_ring(2) is None
-        assert name_lactone_ring(11) is None
+        assert name_lactone_ring(51) is None
+
+    def test_macrolide_ring_sizes(self):
+        """Ring sizes 11+ use oxacyclo replacement nomenclature."""
+        assert name_lactone_ring(11) == "oxacycloundecan-2-one"
+        assert name_lactone_ring(13) == "oxacyclotridecan-2-one"
+        assert name_lactone_ring(15) == "oxacyclopentadecan-2-one"
 
     def test_3_membered_ring(self):
         """3-membered lactone (oxiran-2-one) should work if requested."""

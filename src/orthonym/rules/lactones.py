@@ -8,27 +8,24 @@ carbonyl is expressed as a -one suffix at position 2.
 Naming algorithm:
 1. Detect lactone: ring contains -C(=O)-O- where both C and ester O are
    in the same ring, and the exocyclic O is a double-bonded carbonyl.
-2. Determine ring size (3-10 membered supported).
-3. Get the saturated heterocyclic parent name for the ring with one O:
-   - 3-membered: oxirane
-   - 4-membered: oxetane
-   - 5-membered: oxolane
-   - 6-membered: oxane
-   - 7-membered: oxepane
-4. Apply vowel elision (remove terminal 'e' before '-one').
-5. Return "{parent_stem}-2-one" (carbonyl always at position 2, adjacent
-   to ring O at position 1).
+2. Determine ring size.
+3. For ring size 3-10: Get the Hantzsch-Widman heterocyclic parent name:
+   - 3: oxirane, 4: oxetane, 5: oxolane, 6: oxane, 7: oxepane, etc.
+4. For ring size 11+: Use replacement nomenclature with chain prefix:
+   - 11: oxacycloundecan, 13: oxacyclotridecan, 15: oxacyclopentadecan
+5. Apply vowel elision and append '-2-one'.
 
-Reference: IUPAC 2013 Blue Book, P-25.5.2 (Lactones)
+Reference: IUPAC 2013 Blue Book, P-25.5.2 (Lactones), P-31.1.3 (Replacement)
 
 Examples:
-    O=C1CCO1    (beta-propiolactone)    -> oxetan-2-one
-    O=C1CCCO1   (gamma-butyrolactone)   -> oxolan-2-one
-    O=C1CCCCO1  (delta-valerolactone)   -> oxan-2-one
-    O=C1CCCCCO1 (epsilon-caprolactone)  -> oxepan-2-one
+    O=C1CCO1      (beta-propiolactone)    -> oxetan-2-one
+    O=C1CCCO1     (gamma-butyrolactone)   -> oxolan-2-one
+    O=C1CCCCO1    (delta-valerolactone)   -> oxan-2-one
+    O=C1CCCCCO1   (epsilon-caprolactone)  -> oxepan-2-one
+    O=C1CCCCCCCCCO1 (10-membered lactone) -> oxacycloundecan-2-one
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from rdkit import Chem
 
@@ -121,19 +118,22 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
 # Lactone ring naming
 # ---------------------------------------------------------------------------
 
-# Supported ring sizes for monocyclic lactone naming
-_SUPPORTED_RING_SIZES = frozenset(range(3, 11))
+# Ring sizes supported via Hantzsch-Widman naming
+_HW_RING_SIZES = frozenset(range(3, 11))
+
+# Maximum ring size for macrolide lactone naming
+_MAX_MACROLIDE_SIZE = 50
 
 
 def name_lactone_ring(ring_size: int) -> Optional[str]:
     """
     Get the IUPAC name for a monocyclic lactone of a given ring size.
 
-    Builds the heterocyclic parent name for a saturated ring with one O,
-    then applies vowel elision and appends '-2-one'.
+    For ring sizes 3-10: uses Hantzsch-Widman heterocyclic parent naming.
+    For ring sizes 11+: uses replacement nomenclature (oxacyclo{prefix}an-2-one).
 
     Args:
-        ring_size: Number of atoms in the lactone ring (3-10 supported).
+        ring_size: Number of atoms in the lactone ring (3-50 supported).
 
     Returns:
         IUPAC name string (e.g., 'oxolan-2-one'), or None if ring size
@@ -148,30 +148,52 @@ def name_lactone_ring(ring_size: int) -> Optional[str]:
         'oxan-2-one'
         >>> name_lactone_ring(7)
         'oxepan-2-one'
+        >>> name_lactone_ring(11)
+        'oxacycloundecan-2-one'
+        >>> name_lactone_ring(13)
+        'oxacyclotridecan-2-one'
     """
-    if ring_size not in _SUPPORTED_RING_SIZES:
+    if ring_size < 3:
         return None
 
-    # Get the saturated heterocyclic parent name for a ring with one O
-    # build_hw_name expects heteroatoms as (locant, element) tuples
-    parent_name = build_hw_name(
-        heteroatoms=[(1, "O")],
-        ring_size=ring_size,
-        is_saturated=True,
-        is_aromatic=False,
-    )
+    # Hantzsch-Widman naming for ring sizes 3-10
+    if ring_size in _HW_RING_SIZES:
+        parent_name = build_hw_name(
+            heteroatoms=[(1, "O")],
+            ring_size=ring_size,
+            is_saturated=True,
+            is_aromatic=False,
+        )
 
-    if not parent_name:
+        if not parent_name:
+            return None
+
+        # Apply vowel elision: remove terminal 'e' before '-one'
+        if parent_name.endswith("e"):
+            stem = parent_name[:-1]
+        else:
+            stem = parent_name
+
+        return f"{stem}-2-one"
+
+    # Macrolide naming for ring sizes 11+
+    # Uses replacement nomenclature: oxacyclo{chain_prefix}an-2-one
+    if ring_size > _MAX_MACROLIDE_SIZE:
         return None
 
-    # Apply vowel elision: remove terminal 'e' before '-one'
-    # oxetane -> oxetan, oxolane -> oxolan, oxane -> oxan, oxepane -> oxepan
-    if parent_name.endswith("e"):
-        stem = parent_name[:-1]
-    else:
-        stem = parent_name
+    from ..data.chain_names import get_chain_prefix
 
-    return f"{stem}-2-one"
+    try:
+        # The chain prefix corresponds to the total ring size
+        # (since one O replaces one C, the ring name uses the total count)
+        chain_prefix = get_chain_prefix(ring_size)
+    except ValueError:
+        return None
+
+    # Build: oxacyclo + {prefix} + an-2-one
+    # The chain prefix already provides the stem (e.g., "undec" for 11)
+    # Combine: "oxacyclo" + prefix + "an-2-one"
+    return f"oxacyclo{chain_prefix}an-2-one"
 
 
 # ---------------------------------------------------------------------------
