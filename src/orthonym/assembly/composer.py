@@ -191,20 +191,150 @@ class NameFragment:
     count: int = 1  # Number of instances (for multiplier when locants are omitted)
 
 
-def assemble_name(features: Any, style: str = "pin") -> str:
+def _get_parent_atom_count(features) -> int:
+    """Get the atom count of the parent structure for locant validation.
+
+    Returns the number of atoms in the principal chain or oriented ring,
+    used by locant validation to filter out-of-range locants.
+
+    Args:
+        features: MolecularFeatures object.
+
+    Returns:
+        Number of atoms in the parent, or 100 as safe fallback.
+    """
+    principal_chain = getattr(features, 'principal_chain', None)
+    if principal_chain:
+        return len(principal_chain)
+    oriented_ring = getattr(features, 'oriented_ring', None)
+    if oriented_ring:
+        return len(oriented_ring)
+    oriented_het = getattr(features, 'oriented_heterocycle', None)
+    if oriented_het:
+        return len(oriented_het)
+    principal_ring = getattr(features, 'principal_ring', None)
+    if principal_ring:
+        return len(principal_ring)
+    return 100  # Safe fallback: don't filter anything
+
+
+def _try_ion_aspect_composition(features, style='pin'):
+    """Try to name a single-component ion by composing parent + ion modification.
+
+    For ions that don't have a retained name, this function:
+    1. Resolves the parent structure using resolvers.py
+    2. Gets the neutral name by temporarily setting species_type to 'neutral'
+    3. Applies ion suffix modification (e.g., -ol -> -olate, -ane -> -ide)
+
+    This preserves the parent ring/chain identity in the ion name rather than
+    using the simpler systematic fallback (e.g., "propanolate" not "propoxide").
+
+    IMPORTANT: This function is conservative -- if composition doesn't produce
+    a clean suffix swap, it returns None and falls back to the existing ion
+    naming path (name_anion/name_cation) which handles all edge cases.
+
+    Args:
+        features: MolecularFeatures with species_type == 'ion'.
+        style: Naming style.
+
+    Returns:
+        Composed ion name string, or None if composition fails (triggers fallback).
+    """
+    from .resolvers import resolve_parent, resolve_suffix, apply_ion_suffix_modification
+
+    mol = getattr(features, 'mol', None)
+    if mol is None or mol.GetNumAtoms() < 2:
+        return None
+
+    has_carbon = any(a.GetSymbol() == 'C' for a in mol.GetAtoms())
+    if not has_carbon:
+        return None
+
+    parent_info = resolve_parent(features, mol)
+    if not parent_info or parent_info.parent_type == "unknown":
+        return None
+
+    # Only attempt aspect composition for chain-based parents with a recognized
+    # principal group that has a known ion suffix transformation.
+    # Ring-based ions (phenolate, indolate) are more reliably handled by the
+    # existing name_anion/name_cation pathway which neutralizes and renames.
+    fg_name = getattr(features, 'principal_group', None)
+    if parent_info.parent_type != 'chain':
+        return None  # Let fallback handle ring-based ions
+
+    # Require a recognized principal group for aspect composition.
+    # Without one, FG detection failed (charged atoms don't match neutral SMARTS),
+    # and the existing name_anion/name_cation pathway handles this correctly
+    # by neutralizing the molecule before naming.
+    if not fg_name:
+        return None
+
+    # Resolve suffix to check if ion modification would apply
+    suffix_info = resolve_suffix(features, parent_info)
+    modified_suffix = apply_ion_suffix_modification(suffix_info, features)
+
+    # Only proceed if we have a clear suffix transformation
+    if not modified_suffix or modified_suffix.text == suffix_info.text:
+        return None  # No transformation available, fall back
+
+    # Get the neutral name using recursion guard
+    original_species_type = features.species_type
+    features.species_type = 'neutral'
+    try:
+        neutral_name = assemble_name(features, style, _composing_ion=True)
+    finally:
+        features.species_type = original_species_type
+
+    if not neutral_name or neutral_name == 'unknown':
+        return None
+
+    # Try to swap the suffix in the neutral name
+    if suffix_info.text and neutral_name.endswith(suffix_info.text.lstrip('-')):
+        old_suffix = suffix_info.text.lstrip('-')
+        new_suffix = modified_suffix.text.lstrip('-')
+        return neutral_name[:-len(old_suffix)] + new_suffix
+    elif not suffix_info.text:
+        # No neutral suffix (bare hydrocarbon) -- append ion suffix
+        new_suffix = modified_suffix.text.lstrip('-')
+        if neutral_name.endswith('e'):
+            return neutral_name[:-1] + new_suffix
+        return neutral_name + new_suffix
+
+    # Suffix swap didn't match, fall back
+    return None
+
+
+def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = False) -> str:
     """
     Assemble complete IUPAC name from molecular features.
 
     Args:
         features: MolecularFeatures object with extracted features
         style: Naming style ("pin", "general", "cas")
+        _composing_ion: Internal recursion guard. When True, ion aspect
+            composition is skipped to prevent infinite loops. Do not
+            set manually -- it is used by _try_ion_aspect_composition().
 
     Returns:
         Complete IUPAC name string
     """
     # Check for ionic/radical species first - route to specialized assembly
     species_type = getattr(features, 'species_type', 'neutral')
-    if species_type in ('salt', 'ion', 'zwitterion', 'radical'):
+
+    # Salt, zwitterion: functional class naming (truly different naming structure)
+    if species_type in ('salt', 'zwitterion'):
+        return assemble_ion_name(features, features.mol, style)
+
+    # Radical: also uses specialized naming
+    if species_type == 'radical':
+        return assemble_ion_name(features, features.mol, style)
+
+    # Single-component ion: try aspect-based composition first
+    if species_type == 'ion' and not _composing_ion:
+        composed_name = _try_ion_aspect_composition(features, style)
+        if composed_name:
+            return composed_name
+        # Fallback to existing ion naming if composition fails
         return assemble_ion_name(features, features.mol, style)
 
     # Handle monocyclic lactones BEFORE polyfunctional, esters, and heterocycles
@@ -406,9 +536,23 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     fragments.append(parent)
 
     # Generate suffix for principal group
+    suffix = None
     if features.principal_group:
         suffix = _generate_suffix(features)
         if suffix:
+            # Validate suffix locants against parent capacity
+            parent_size = _get_parent_atom_count(features)
+            from ..rules.locant_validation import validate_suffix_locants
+            validated_locants, validated_count = validate_suffix_locants(
+                list(suffix.locants), parent_size, suffix.count
+            )
+            if validated_locants != list(suffix.locants) or validated_count != suffix.count:
+                suffix = NameFragment(
+                    text=suffix.text,
+                    locants=tuple(validated_locants),
+                    fragment_type="suffix",
+                    count=validated_count,
+                )
             fragments.append(suffix)
 
     # Generate prefixes for substituents and non-principal groups
@@ -1503,6 +1647,55 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
             locants = ()
         else:
             # For non-terminal groups (alcohol, ketone), include locants
+            locants = tuple(fg_locants)
+
+    elif (not features.principal_chain
+          and getattr(features, 'oriented_ring', None)
+          and features.principal_group_atoms
+          and fg_name not in TERMINAL_GROUPS):
+        # Ring compounds: build idx_to_locant from oriented_ring and compute
+        # suffix locants.  This mirrors the logic in _get_fg_locants() but
+        # uses get_functional_group_locants for consistency.
+        oriented_ring = features.oriented_ring
+        ring_idx_to_locant = {
+            atom_idx: pos + 1
+            for pos, atom_idx in enumerate(oriented_ring)
+        }
+        # Map FG atoms to ring locants
+        fg_locants = []
+        mol = features.mol
+        for match in features.principal_group_atoms:
+            found = False
+            for atom_idx in match:
+                if atom_idx in ring_idx_to_locant:
+                    # Prefer the carbon atom bonded to a heteroatom for the locant
+                    atom = mol.GetAtomWithIdx(atom_idx)
+                    if atom.GetSymbol() == 'C':
+                        fg_locants.append(ring_idx_to_locant[atom_idx])
+                        found = True
+                        break
+            if not found:
+                # Fallback: any atom in match on the ring
+                for atom_idx in match:
+                    if atom_idx in ring_idx_to_locant:
+                        fg_locants.append(ring_idx_to_locant[atom_idx])
+                        found = True
+                        break
+            if not found:
+                # Try neighbors
+                for atom_idx in match:
+                    atom = mol.GetAtomWithIdx(atom_idx)
+                    for nbr in atom.GetNeighbors():
+                        if nbr.GetIdx() in ring_idx_to_locant:
+                            fg_locants.append(ring_idx_to_locant[nbr.GetIdx()])
+                            found = True
+                            break
+                    if found:
+                        break
+
+        fg_locants = sorted(set(fg_locants))
+        if fg_locants:
+            fg_count = len(fg_locants)
             locants = tuple(fg_locants)
 
     return NameFragment(
@@ -2757,6 +2950,57 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
     return NameFragment(text=text, fragment_type="stereo")
 
 
+def _estimate_parent_size_from_name(parent_name: str) -> int:
+    """Estimate the number of atoms in the parent from its name.
+
+    Used by collision detection to determine if a locant exceeds the parent
+    structure capacity.  Returns a conservative estimate; unknown parents
+    default to 100 (effectively disabling capacity validation).
+
+    Args:
+        parent_name: The parent fragment text (e.g., 'cyclohex', 'benz', 'prop').
+
+    Returns:
+        Estimated atom count in the parent structure.
+    """
+    lower = parent_name.lower()
+
+    # Common ring systems with fixed sizes
+    _RING_SIZES = {
+        'benzene': 6, 'phenyl': 6, 'benz': 6,
+        'cycloprop': 3, 'cyclobut': 4, 'cyclopent': 5,
+        'cyclohex': 6, 'cyclohept': 7, 'cycloocta': 8,
+        'cyclonon': 9, 'cyclodec': 10,
+        'naphthal': 10, 'naphthyl': 10,
+        'indol': 9, 'indene': 9,
+        'quinol': 10, 'isoquinol': 10,
+        'pyrid': 6, 'pyrimid': 6, 'pyrazin': 6,
+        'pyrrol': 5, 'furan': 5, 'thiophen': 5,
+        'imidazol': 5, 'pyrazol': 5, 'oxazol': 5,
+        'thiazol': 5, 'triazin': 6,
+    }
+    for key, size in _RING_SIZES.items():
+        if key in lower:
+            return size
+
+    # Try chain prefix matching using FIRST_20 from chain_names
+    from ..data.chain_names import FIRST_20
+    # Check longest prefixes first to avoid partial matches
+    for length in sorted(FIRST_20.keys(), reverse=True):
+        prefix = FIRST_20[length]
+        if prefix in lower:
+            return length
+
+    # Safe fallback: return large value to disable capacity validation
+    # for unknown parent structures.
+    import logging
+    logging.getLogger(__name__).debug(
+        "Unknown parent '%s' -- skipping locant capacity validation (fallback=100)",
+        parent_name,
+    )
+    return 100
+
+
 def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
     """
     Assemble fragments into final name string.
@@ -2785,6 +3029,69 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
             parent_frag = frag
         elif frag.fragment_type == "suffix":
             suffix_frag = frag
+
+    # ----------------------------------------------------------------
+    # Detect suffix-prefix locant collisions on ring systems.
+    # A collision occurs when a suffix locant (e.g., ketone at position 3)
+    # and a prefix locant (e.g., methyl at position 3) share the same
+    # numeric value.  OPSIN interprets this as both groups on the same
+    # carbon, producing an unphysical valency.
+    # Resolution: remove the colliding prefix locant (suffix has priority
+    # per IUPAC P-14.7).  Only applies to ring parents.
+    # ----------------------------------------------------------------
+    if suffix_frag and suffix_frag.locants and prefixes:
+        # Determine if parent is a ring (collision only matters for rings)
+        parent_text = parent_frag.text if parent_frag else ""
+        is_ring_parent = any(
+            kw in parent_text.lower()
+            for kw in ('cyclo', 'benz', 'pyrid', 'pyrrol', 'furan',
+                       'thiophen', 'imidazol', 'naphthal', 'indol',
+                       'quinol', 'pyrimid', 'pyrazin', 'oxazol',
+                       'thiazol', 'triazol', 'morpholin', 'piperidin',
+                       'pyrrolidin', 'aziridin', 'oxiran', 'thiiran',
+                       'oxetan', 'azetidin', 'thietan')
+        )
+        if is_ring_parent:
+            from ..rules.locant_validation import detect_locant_collisions
+
+            suffix_locants_list = list(suffix_frag.locants)
+            prefix_locant_groups = [
+                list(p.locants) for p in prefixes if p.locants
+            ]
+            parent_size = _estimate_parent_size_from_name(parent_text)
+
+            if suffix_locants_list and prefix_locant_groups:
+                collisions = detect_locant_collisions(
+                    suffix_locants_list,
+                    prefix_locant_groups,
+                    parent_type="ring",
+                    parent_size=parent_size,
+                )
+                if collisions:
+                    import logging
+                    _log = logging.getLogger(__name__)
+                    collision_set = set(loc for _, loc in collisions)
+                    adjusted = []
+                    for pf in prefixes:
+                        if pf.locants:
+                            new_locants = tuple(
+                                l for l in pf.locants if l not in collision_set
+                            )
+                            if new_locants != pf.locants:
+                                _log.debug(
+                                    "Collision resolved: removed prefix locant(s) %s "
+                                    "for '%s' (suffix has priority per IUPAC P-14.7)",
+                                    set(pf.locants) - set(new_locants),
+                                    pf.text,
+                                )
+                                pf = NameFragment(
+                                    text=pf.text,
+                                    locants=new_locants,
+                                    fragment_type=pf.fragment_type,
+                                    count=len(new_locants) if new_locants else pf.count,
+                                )
+                        adjusted.append(pf)
+                    prefixes = adjusted
 
     # Alkyl prefixes are already sorted by _generate_alkyl_prefixes.
     # For non-alkyl prefixes added later, sort all together.
