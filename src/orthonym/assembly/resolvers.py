@@ -529,7 +529,8 @@ def _get_complex_ring_label(mol: Any, features: Any, is_fused_het: bool) -> str:
         from ..data.fused_heterocycles import match_fused_heterocycle_core
         core_match = match_fused_heterocycle_core(mol)
         if core_match is not None:
-            return core_match.get('name', 'fused_heterocycle')
+            # Returns (core_name, atom_mapping, core_smiles) tuple
+            return core_match[0]  # core_name, e.g., "1H-indole"
         return 'fused_heterocycle'
 
     # Classify the ring system type
