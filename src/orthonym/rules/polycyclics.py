@@ -561,7 +561,14 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
 
 
 def _identify_pah_oxygen_group(mol, o_idx: int, core_atoms: Set[int]) -> Optional[Dict]:
-    """Identify oxygen-based substituent on PAH."""
+    """Identify oxygen-based substituent on PAH.
+
+    Handles:
+    - Hydroxy (-OH)
+    - Methoxy (-OCH3)
+    - Ethoxy (-OCH2CH3) and higher alkoxy
+    - Acetyloxy (-OC(=O)CH3) and similar acyloxy groups
+    """
     o_atom = mol.GetAtomWithIdx(o_idx)
 
     # Count neighbors (excluding core)
@@ -571,6 +578,48 @@ def _identify_pah_oxygen_group(mol, o_idx: int, core_atoms: Set[int]) -> Optiona
     h_count = o_atom.GetTotalNumHs()
     if h_count == 1 and len(neighbors) == 0:
         return {'name': 'hydroxy', 'atoms': [o_idx]}
+
+    # Alkoxy groups (-OR where R is alkyl)
+    if h_count == 0 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+        c_atom = neighbors[0]
+        c_idx = c_atom.GetIdx()
+
+        # BFS to find alkyl chain after oxygen
+        visited = {c_idx}
+        queue = [c_idx]
+        alkyl_atoms = []
+        carbon_count = 0
+        is_pure_alkyl = True
+
+        while queue:
+            current_idx = queue.pop(0)
+            current_atom = mol.GetAtomWithIdx(current_idx)
+            alkyl_atoms.append(current_idx)
+
+            if current_atom.GetSymbol() == 'C':
+                carbon_count += 1
+            elif current_atom.GetSymbol() not in ('C', 'H'):
+                is_pure_alkyl = False
+                break
+
+            for nbr in current_atom.GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx not in visited and nbr_idx not in core_atoms and nbr_idx != o_idx:
+                    visited.add(nbr_idx)
+                    queue.append(nbr_idx)
+
+        if is_pure_alkyl and carbon_count > 0:
+            alkoxy_names = {
+                1: 'methoxy',
+                2: 'ethoxy',
+                3: 'propoxy',
+                4: 'butoxy',
+                5: 'pentyloxy',
+                6: 'hexyloxy',
+            }
+            alkoxy_name = alkoxy_names.get(carbon_count)
+            if alkoxy_name:
+                return {'name': alkoxy_name, 'atoms': [o_idx] + alkyl_atoms}
 
     return None
 

@@ -832,9 +832,40 @@ def _assemble_fused_heterocycle_name(
     if suffix_str:
         # Apply suffix to core name with vowel elision
         modified_core = _apply_suffix_to_core(core_name, suffix_str)
-        return f"{prefix_str}{modified_core}"
+        return _join_prefix_to_parent(prefix_str, modified_core)
 
-    return f"{prefix_str}{core_name}"
+    return _join_prefix_to_parent(prefix_str, core_name)
+
+
+def _join_prefix_to_parent(prefix_str: str, parent_name: str) -> str:
+    """
+    Join substituent prefix string to parent name with correct hyphenation.
+
+    IUPAC 2013 rules:
+    - Hyphen between prefix and parent when parent starts with a digit:
+      "7-nitro-1H-indazole" (1H starts with digit)
+    - No hyphen when parent starts with a letter:
+      "2-methylquinoline" (quinoline starts with letter)
+    - Prefix already ends with hyphen from _join_fused_prefixes
+
+    Args:
+        prefix_str: Prefix string (e.g., "2-methyl-", "7-nitro-")
+        parent_name: Parent ring name (e.g., "quinoline", "1H-indazole")
+
+    Returns:
+        Combined name with correct hyphenation
+    """
+    if not prefix_str:
+        return parent_name
+
+    # If parent starts with a letter, remove trailing hyphen from prefix
+    # e.g., "2-methyl-" + "quinoline" -> "2-methylquinoline"
+    if parent_name and parent_name[0].isalpha():
+        return prefix_str.rstrip('-') + parent_name
+
+    # If parent starts with a digit, keep the hyphen
+    # e.g., "7-nitro-" + "1H-indazole" -> "7-nitro-1H-indazole"
+    return prefix_str + parent_name
 
 
 def _build_fused_suffix(substituents: Dict, core_name: str) -> str:
