@@ -944,10 +944,15 @@ class VonBaeyerAnalyzer:
         """
         Build the von Baeyer descriptor string.
 
-        Format:
+        Format (OPSIN-compatible):
         - bicyclo[a.b.c] (no secondary bridges)
-        - tricyclo[a.b.c.d^{e,f}] (one secondary bridge with locants)
-        - tetracyclo[a.b.c.d^{e,f}.g^{h,i}] (two secondary bridges)
+        - tricyclo[a.b.c.d e,f] (one secondary bridge with superscript locants)
+        - tetracyclo[a.b.c.d e,f.g h,i] (two secondary bridges)
+
+        Secondary bridge locants are written inline after the bridge length
+        as superscripts. In ASCII text the OPSIN-compatible format is:
+        bridge_length followed directly by locant_low,locant_high
+        e.g. "13,7" means bridge of length 1 with locants 3 and 7.
 
         Args:
             ring_count: Number of independent rings
@@ -956,22 +961,25 @@ class VonBaeyerAnalyzer:
             numbering: Atom index -> VB locant mapping
 
         Returns:
-            Descriptor string like "tricyclo[3.3.1.1^{3,7}]"
+            Descriptor string like "tricyclo[3.3.1.13,7]"
         """
         prefix = CYCLO_PREFIXES.get(ring_count, f"{ring_count}cyclo")
 
         # Primary bridge lengths (sorted descending)
         parts = [str(l) for l in sorted(primary_lengths, reverse=True)]
 
-        # Secondary bridges with superscript locants
+        # Secondary bridges with inline superscript locants (OPSIN-compatible)
         for bridge in secondary_bridges:
             ep1 = bridge.start_bh
             ep2 = bridge.end_bh
-            loc1 = numbering.get(ep1, 0)
-            loc2 = numbering.get(ep2, 0)
+            loc1 = numbering.get(ep1)
+            loc2 = numbering.get(ep2)
+            # Skip bridges with unmapped atoms (invalid locants)
+            if loc1 is None or loc2 is None or loc1 == 0 or loc2 == 0:
+                continue
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
-            parts.append(f"{bridge.length}^{{{locant_low},{locant_high}}}")
+            parts.append(f"{bridge.length}{locant_low},{locant_high}")
 
         return f"{prefix}[{'.'.join(parts)}]"
 
@@ -984,7 +992,7 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     """
     Generate the base IUPAC name for a polycyclic bridged system.
 
-    Returns "prefix[descriptor]parentname" (e.g., "tricyclo[3.3.1.1^{3,7}]decane").
+    Returns "prefix[descriptor]parentname" (e.g., "tricyclo[3.3.1.13,7]decane").
     Only base name -- no substituents, unsaturation, or stereo.
 
     This function is an internal helper that will be called by
