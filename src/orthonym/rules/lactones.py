@@ -180,26 +180,191 @@ def name_lactone_ring(ring_size: int) -> Optional[str]:
 
 def name_monocyclic_lactone(mol) -> Optional[str]:
     """
-    Generate the IUPAC name for a monocyclic lactone.
+    Generate the IUPAC name for a monocyclic lactone, including substituents.
 
     Detects whether the molecule is a monocyclic lactone and returns
     its name using heterocyclic replacement nomenclature with -one suffix.
+    Substituents on the ring are included as prefixes with locants.
 
     Args:
         mol: RDKit Mol object (or None).
 
     Returns:
-        IUPAC name string (e.g., 'oxolan-2-one'), or None if the
-        molecule is not a monocyclic lactone.
+        IUPAC name string (e.g., 'oxolan-2-one', '3-aminooxolan-2-one'),
+        or None if the molecule is not a monocyclic lactone.
 
     Examples:
         >>> from rdkit import Chem
         >>> mol = Chem.MolFromSmiles('O=C1CCCO1')
         >>> name_monocyclic_lactone(mol)
         'oxolan-2-one'
+        >>> mol = Chem.MolFromSmiles('NC1CCOC1=O')
+        >>> name_monocyclic_lactone(mol)
+        '3-aminooxolan-2-one'
     """
     info = is_monocyclic_lactone(mol)
     if info is None:
         return None
 
-    return name_lactone_ring(info["ring_size"])
+    parent_name = name_lactone_ring(info["ring_size"])
+    if parent_name is None:
+        return None
+
+    # Detect substituents on the lactone ring
+    ring_atoms = info["ring_atoms"]
+    ester_o_idx = info["ester_O_idx"]
+    carbonyl_idx = info["carbonyl_idx"]
+    carbonyl_o_idx = info["carbonyl_O_idx"]
+
+    # Build IUPAC locant mapping for lactone ring
+    # Numbering: O atom = 1, carbonyl C = 2, then continue around ring
+    ring_list = list(ring_atoms)
+    ring_set = set(ring_list)
+
+    # Find oxygen position in ring and reorder so O is first
+    try:
+        o_pos = ring_list.index(ester_o_idx)
+    except ValueError:
+        return parent_name
+
+    # Reorder ring starting from O, going toward carbonyl C
+    ordered = ring_list[o_pos:] + ring_list[:o_pos]
+
+    # Check direction: next atom should be carbonyl C
+    if len(ordered) > 1 and ordered[1] != carbonyl_idx:
+        # Reverse direction (keep O first)
+        ordered = [ordered[0]] + ordered[1:][::-1]
+
+    # Build atom-to-locant mapping (1-indexed)
+    atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
+
+    # Find exocyclic substituents (excluding carbonyl O which is the =O of the lactone)
+    excluded = ring_set | {carbonyl_o_idx}
+    substituents = _detect_lactone_substituents(mol, ordered, atom_to_locant, excluded)
+
+    if not substituents:
+        return parent_name
+
+    # Build prefix string
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for sub_name, locant in substituents:
+        groups[sub_name].append(locant)
+
+    # Sort locants within each group
+    for name in groups:
+        groups[name].sort()
+
+    # Build prefix parts, sorted alphabetically
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix, format_substituent_prefix
+    prefix_parts = []
+    for name in sorted(groups.keys(), key=alpha_sort_key):
+        locants = groups[name]
+        count = len(locants)
+        prefix_str = format_substituent_prefix(name, locants, count)
+        prefix_parts.append(prefix_str)
+
+    if not prefix_parts:
+        return parent_name
+
+    # Join multiple prefix parts with hyphens, then attach to parent
+    prefix = '-'.join(prefix_parts)
+    return f"{prefix}{parent_name}"
+
+
+def _detect_lactone_substituents(mol, ordered_ring, atom_to_locant, excluded):
+    """
+    Detect substituents on a lactone ring.
+
+    Args:
+        mol: RDKit Mol object
+        ordered_ring: List of atom indices in IUPAC numbering order
+        atom_to_locant: Dict mapping atom index to IUPAC locant
+        excluded: Set of atom indices to exclude (ring + carbonyl O)
+
+    Returns:
+        List of (substituent_name, locant) tuples
+    """
+    substituents = []
+
+    for ring_atom_idx in ordered_ring:
+        ring_atom = mol.GetAtomWithIdx(ring_atom_idx)
+        locant = atom_to_locant[ring_atom_idx]
+
+        for neighbor in ring_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in excluded:
+                continue
+
+            sub_name = _identify_lactone_substituent(mol, nbr_idx, excluded)
+            if sub_name:
+                substituents.append((sub_name, locant))
+
+    return substituents
+
+
+def _identify_lactone_substituent(mol, start_idx, excluded):
+    """
+    Identify a substituent on a lactone ring by its starting atom.
+
+    Returns:
+        Substituent prefix name (e.g., 'amino', 'methyl', 'hydroxy') or None
+    """
+    atom = mol.GetAtomWithIdx(start_idx)
+    symbol = atom.GetSymbol()
+
+    # Halogens
+    halogen_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    if symbol in halogen_map:
+        return halogen_map[symbol]
+
+    # Nitrogen: amino (-NH2), nitro, etc.
+    if symbol == 'N':
+        h_count = atom.GetTotalNumHs()
+        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
+        if h_count == 2 and len(neighbors) == 0:
+            return 'amino'
+        if atom.GetFormalCharge() == 1:
+            o_count = sum(1 for n in neighbors if n.GetSymbol() == 'O')
+            if o_count == 2:
+                return 'nitro'
+
+    # Oxygen: hydroxy
+    if symbol == 'O':
+        h_count = atom.GetTotalNumHs()
+        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
+        if h_count == 1 and len(neighbors) == 0:
+            return 'hydroxy'
+
+    # Carbon: alkyl groups
+    if symbol == 'C':
+        # BFS for pure alkyl
+        visited = {start_idx}
+        queue = [start_idx]
+        all_atoms = []
+        carbon_count = 0
+        is_pure_alkyl = True
+
+        while queue:
+            idx = queue.pop(0)
+            a = mol.GetAtomWithIdx(idx)
+            all_atoms.append(idx)
+            if a.GetSymbol() == 'C':
+                carbon_count += 1
+            elif a.GetSymbol() != 'H':
+                is_pure_alkyl = False
+
+            for nbr in a.GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx not in visited and nbr_idx not in excluded:
+                    visited.add(nbr_idx)
+                    queue.append(nbr_idx)
+
+        if is_pure_alkyl and carbon_count > 0:
+            from ..assembly.naming_utils import get_alkyl_name
+            try:
+                return get_alkyl_name(carbon_count)
+            except (ValueError, KeyError):
+                pass
+
+    return None
