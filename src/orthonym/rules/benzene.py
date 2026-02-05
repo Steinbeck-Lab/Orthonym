@@ -256,7 +256,7 @@ def _detect_benzene_nitrile(mol, ring_atoms: Tuple[int, ...]) -> Dict:
 
 
 def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
-    """Identify nitrogen-based substituent (amino, nitro, etc.)."""
+    """Identify nitrogen-based substituent (amino, nitro, N-alkylamino, etc.)."""
     n_atom = mol.GetAtomWithIdx(n_idx)
 
     # Count neighbors (excluding ring)
@@ -270,12 +270,93 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
             atoms = [n_idx] + [n.GetIdx() for n in neighbors if n.GetSymbol() == 'O']
             return {'name': 'nitro', 'atoms': atoms}
 
-    # Simple amino (-NH2)
     h_count = n_atom.GetTotalNumHs()
+
+    # Simple amino (-NH2)
     if h_count == 2 and len(neighbors) == 0:
         return {'name': 'amino', 'atoms': [n_idx]}
 
+    # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
+    if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+        alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, neighbors[0].GetIdx(), ring_atoms | {n_idx})
+        if alkyl_atoms is not None and carbon_count > 0:
+            alkyl_name = ALKYL_NAMES.get(carbon_count)
+            if alkyl_name:
+                return {
+                    'name': f'{alkyl_name}amino',
+                    'atoms': [n_idx] + alkyl_atoms
+                }
+
+    # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
+    if h_count == 0 and len(neighbors) == 2:
+        c_neighbors = [n for n in neighbors if n.GetSymbol() == 'C']
+        if len(c_neighbors) == 2:
+            alkyl_names_list = []
+            all_sub_atoms = [n_idx]
+            for cn in c_neighbors:
+                alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, cn.GetIdx(), ring_atoms | {n_idx})
+                if alkyl_atoms is None or carbon_count == 0:
+                    break
+                aname = ALKYL_NAMES.get(carbon_count)
+                if not aname:
+                    break
+                alkyl_names_list.append(aname)
+                all_sub_atoms.extend(alkyl_atoms)
+            else:
+                # Both identified
+                alkyl_names_list.sort()
+                if alkyl_names_list[0] == alkyl_names_list[1]:
+                    from ..assembly.naming_utils import get_multiplier_prefix
+                    mp = get_multiplier_prefix(2, alkyl_names_list[0])
+                    prefix_name = f'{mp}{alkyl_names_list[0]}amino'
+                else:
+                    prefix_name = f'{alkyl_names_list[0]}({alkyl_names_list[1]}amino)'
+                return {
+                    'name': prefix_name,
+                    'atoms': all_sub_atoms
+                }
+
+    # Nitroso (-NO)
+    if h_count == 0 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'O':
+        bond = mol.GetBondBetweenAtoms(n_idx, neighbors[0].GetIdx())
+        if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+            return {
+                'name': 'nitroso',
+                'atoms': [n_idx, neighbors[0].GetIdx()]
+            }
+
     return None
+
+
+def _collect_pure_alkyl(mol, start_idx: int, excluded: Set[int]):
+    """
+    BFS to collect a pure alkyl group (only C/H atoms).
+
+    Returns:
+        Tuple of (list of atom indices, carbon_count) or (None, 0) if not pure alkyl.
+    """
+    visited = {start_idx}
+    queue = [start_idx]
+    all_atoms = []
+    carbon_count = 0
+
+    while queue:
+        current_idx = queue.pop(0)
+        current_atom = mol.GetAtomWithIdx(current_idx)
+        all_atoms.append(current_idx)
+
+        if current_atom.GetSymbol() == 'C':
+            carbon_count += 1
+        elif current_atom.GetSymbol() != 'H':
+            return None, 0  # Not pure alkyl
+
+        for neighbor in current_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in excluded:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    return all_atoms, carbon_count
 
 
 def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:

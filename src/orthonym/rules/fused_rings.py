@@ -499,7 +499,7 @@ def _identify_fused_substituent(
                     alkyl_names.sort()
                     if alkyl_names[0] == alkyl_names[1]:
                         from ..assembly.naming_utils import get_multiplier_prefix as _get_mp
-                        mp = _get_mp(2)
+                        mp = _get_mp(2, alkyl_names[0])
                         prefix_name = f'{mp}{alkyl_names[0]}amino'
                     else:
                         prefix_name = f'{alkyl_names[0]}({alkyl_names[1]}amino)'
