@@ -345,3 +345,59 @@ class TestPeryleneNaming:
         """Naphthalene retained name not broken by perylene addition."""
         result = name_compound('c1ccc2ccccc2c1')
         assert result.lower() == 'naphthalene', f"Expected naphthalene, got: {result}"
+
+
+class TestClassificationFixes:
+    """Regression tests for ring system classification fix (Plan 16-06).
+
+    Ensures pentacyclic/tricyclo+ systems are not misclassified as bicyclo,
+    while preserving correct bicyclo classification for true bicyclic systems.
+    """
+
+    def test_pentacyclic_not_classified_as_bicyclo(self):
+        """Pentacyclic lactone must NOT be classified as bicyclo."""
+        from rdkit import Chem
+        from src.orthonym.rules.bicyclo import is_bicyclo_system
+        mol = Chem.MolFromSmiles(
+            'C=C1C[C@]23C[C@@]1(O)CC[C@H]2[C@@]12CC[C@H](O)'
+            '[C@@](C)(C(=O)O1)[C@H]2[C@@H]3C(=O)O'
+        )
+        assert mol is not None, "Failed to parse pentacyclic SMILES"
+        assert is_bicyclo_system(mol) is False, \
+            "Pentacyclic lactone must NOT be classified as bicyclo"
+
+    def test_cubane_not_classified_as_bicyclo(self):
+        """Cubane must NOT be classified as bicyclo."""
+        from rdkit import Chem
+        from src.orthonym.rules.bicyclo import is_bicyclo_system
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C3C4C25')
+        assert mol is not None, "Failed to parse cubane SMILES"
+        assert is_bicyclo_system(mol) is False, \
+            "Cubane (pentacyclo) must NOT be classified as bicyclo"
+
+    def test_norbornane_still_bicyclo(self):
+        """Norbornane must still be classified as bicyclo (regression guard)."""
+        from rdkit import Chem
+        from src.orthonym.rules.bicyclo import is_bicyclo_system
+        mol = Chem.MolFromSmiles('C1CC2CC1CC2')
+        assert mol is not None, "Failed to parse norbornane SMILES"
+        assert is_bicyclo_system(mol) is True, \
+            "Norbornane must still be classified as bicyclo"
+
+    def test_camphor_still_bicyclo(self):
+        """Camphor must still be named 'camphor' via retained names (regression guard)."""
+        result = name_compound('CC1(C)C2CCC1(C)C(=O)C2')
+        assert result.lower() == 'camphor', \
+            f"Expected camphor, got: {result}"
+
+    def test_pentacyclic_reaches_polycyclic_path(self):
+        """Pentacyclic lactone must be recognized by is_polycyclic_system()."""
+        from rdkit import Chem
+        from src.orthonym.rules.polycyclic import is_polycyclic_system
+        mol = Chem.MolFromSmiles(
+            'C=C1C[C@]23C[C@@]1(O)CC[C@H]2[C@@]12CC[C@H](O)'
+            '[C@@](C)(C(=O)O1)[C@H]2[C@@H]3C(=O)O'
+        )
+        assert mol is not None, "Failed to parse pentacyclic SMILES"
+        assert is_polycyclic_system(mol) is True, \
+            "Pentacyclic lactone must be recognized as polycyclic system"
