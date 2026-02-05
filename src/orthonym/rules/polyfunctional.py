@@ -542,6 +542,46 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     )
     unsaturation = _build_unsaturation_infix(double_locants, triple_locants)
 
+    # Detect suffix-prefix locant collisions (safety net for ring parents)
+    if suffix_locants and all_prefixes:
+        import re as _re
+        from .locant_validation import detect_locant_collisions
+
+        # Extract prefix locants from formatted prefix strings
+        prefix_locant_groups = []
+        for ptext in all_prefixes:
+            match = _re.match(r'^([\d,]+)-', ptext)
+            if match:
+                try:
+                    locs = [int(x) for x in match.group(1).split(',')]
+                    prefix_locant_groups.append(locs)
+                except ValueError:
+                    pass
+
+        is_ring = getattr(features, 'is_cyclic', False)
+        if prefix_locant_groups:
+            collisions = detect_locant_collisions(
+                suffix_locants,
+                prefix_locant_groups,
+                parent_type="ring" if is_ring else "chain",
+            )
+            if collisions:
+                collision_set = set(loc for _, loc in collisions)
+                # Remove colliding prefix locants from affected prefix strings
+                cleaned = []
+                for ptext in all_prefixes:
+                    match = _re.match(r'^([\d,]+)-(.+)$', ptext)
+                    if match:
+                        locs = [int(x) for x in match.group(1).split(',') if int(x) not in collision_set]
+                        name_part = match.group(2)
+                        if locs:
+                            cleaned.append(f"{','.join(str(l) for l in locs)}-{name_part}")
+                        else:
+                            cleaned.append(name_part)
+                    else:
+                        cleaned.append(ptext)
+                all_prefixes = cleaned
+
     # Assemble the name
     name = format_suffix_with_locants(
         stem, unsaturation, suffix, suffix_locants, multiplier
