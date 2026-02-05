@@ -151,6 +151,22 @@ def is_bicyclo_system(mol) -> bool:
     if ri.NumRings() < 2:
         return False
 
+    # Ring count guard: reject tricyclo+ systems (cycle_rank >= 3)
+    # Uses cycle_rank = ring_bonds - ring_atoms + 1, which is always reliable
+    # regardless of SSSR issues. This prevents complex polycyclic systems
+    # from being misclassified as bicyclo (find_true_bridgeheads undercounts
+    # bridgeheads for such systems).
+    ring_atoms_set = set()
+    for ring in ri.AtomRings():
+        ring_atoms_set.update(ring)
+    ring_bond_count = 0
+    for bond in mol.GetBonds():
+        if bond.GetBeginAtomIdx() in ring_atoms_set and bond.GetEndAtomIdx() in ring_atoms_set:
+            ring_bond_count += 1
+    cycle_rank = ring_bond_count - len(ring_atoms_set) + 1
+    if cycle_rank >= 3:
+        return False
+
     # Must not be spiro
     if get_spiro_atoms(mol):
         return False
