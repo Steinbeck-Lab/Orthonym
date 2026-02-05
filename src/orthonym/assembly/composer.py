@@ -2985,10 +2985,10 @@ def _estimate_parent_size_from_name(parent_name: str) -> int:
 
     # Try chain prefix matching using FIRST_20 from chain_names
     from ..data.chain_names import FIRST_20
-    # Check longest prefixes first to avoid partial matches
+    # Check longest prefixes first to avoid partial matches (e.g., "eth" in "meth")
     for length in sorted(FIRST_20.keys(), reverse=True):
         prefix = FIRST_20[length]
-        if prefix in lower:
+        if lower.startswith(prefix) or lower == prefix:
             return length
 
     # Safe fallback: return large value to disable capacity validation
