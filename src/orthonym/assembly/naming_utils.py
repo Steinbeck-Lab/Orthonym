@@ -259,10 +259,19 @@ def alpha_sort_key(substituent_name: str) -> str:
     """
     text = substituent_name.lower()
 
+    # Strip enclosing parentheses if present
+    # e.g., "(N,N-dimethylamino)" -> "N,N-dimethylamino"
+    if text.startswith('(') and text.endswith(')'):
+        text = text[1:-1]
+
     # Strip leading locants (digits and commas followed by hyphen)
     # e.g., "3-methyl" -> "methyl", "2,2-dimethyl" -> "dimethyl"
     # This handles formatted prefix strings that include locants
     text = re.sub(r'^[\d,]+-', '', text)
+
+    # Strip N-locant prefixes (N- or N,N-) for alphabetization
+    # e.g., "N,N-dimethylamino" -> "dimethylamino" -> "amino" (after multi-prefix strip)
+    text = re.sub(r'^[nN],?[nN]?-', '', text)
 
     # Handle hyphenated detachable prefixes: sec- and tert-
     for prefix in ("sec-", "tert-"):

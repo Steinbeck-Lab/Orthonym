@@ -277,17 +277,20 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
         return {'name': 'amino', 'atoms': [n_idx]}
 
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
+    # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
         alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, neighbors[0].GetIdx(), ring_atoms | {n_idx})
         if alkyl_atoms is not None and carbon_count > 0:
             alkyl_name = ALKYL_NAMES.get(carbon_count)
             if alkyl_name:
                 return {
-                    'name': f'{alkyl_name}amino',
-                    'atoms': [n_idx] + alkyl_atoms
+                    'name': f'(N-{alkyl_name}amino)',
+                    'atoms': [n_idx] + alkyl_atoms,
+                    'is_complex': True,
                 }
 
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
+    # IUPAC 2013: (N,N-dialkylamino) (e.g., (N,N-dimethylamino))
     if h_count == 0 and len(neighbors) == 2:
         c_neighbors = [n for n in neighbors if n.GetSymbol() == 'C']
         if len(c_neighbors) == 2:
@@ -303,17 +306,18 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
             else:
-                # Both identified
+                # Both identified - build name with N,N- locants
                 alkyl_names_list.sort()
                 if alkyl_names_list[0] == alkyl_names_list[1]:
                     from ..assembly.naming_utils import get_multiplier_prefix
                     mp = get_multiplier_prefix(2, alkyl_names_list[0])
-                    prefix_name = f'{mp}{alkyl_names_list[0]}amino'
+                    prefix_name = f'(N,N-{mp}{alkyl_names_list[0]}amino)'
                 else:
-                    prefix_name = f'{alkyl_names_list[0]}({alkyl_names_list[1]}amino)'
+                    prefix_name = f'(N-{alkyl_names_list[0]}-N-{alkyl_names_list[1]}amino)'
                 return {
                     'name': prefix_name,
-                    'atoms': all_sub_atoms
+                    'atoms': all_sub_atoms,
+                    'is_complex': True,
                 }
 
     # Nitroso (-NO)
@@ -911,7 +915,12 @@ def name_substituted_benzene(
 
         if is_monosubstituted:
             # Monosubstituted: just "chloro", "methyl", etc. - no locant
-            prefix_str = name
+            # Strip outer parentheses for monosubstituted complex names
+            # e.g., "(N-methylamino)" -> "N-methylamino" for "N-methylaminobenzene"
+            if name.startswith('(') and name.endswith(')'):
+                prefix_str = name[1:-1]
+            else:
+                prefix_str = name
         else:
             # Polysubstituted: include locants
             prefix_str = format_substituent_prefix(name, locants, count)
@@ -1036,7 +1045,9 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
             last_char = result[-1]
             first_char = current[0]
 
-            if last_char.isalpha() and first_char.isdigit():
+            # Hyphen needed between alpha/paren and digit
+            # e.g., "1-(N,N-dimethylamino)" + "4-amino" needs hyphen after ")"
+            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
                 result += "-"
 
         result += current
