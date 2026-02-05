@@ -720,93 +720,156 @@ class VonBaeyerAnalyzer:
         # Atoms not yet assigned to main ring or main bridge
         unassigned = ring_atoms - assigned
 
-        if not unassigned:
-            return []
-
         secondary_bridges = []
 
-        # Find bridges formed by unassigned atoms
-        # Each bridge connects two assigned (numbered) atoms through unassigned atoms
-        # Use BFS/DFS to find connected components among unassigned atoms
-        # and determine their bridge endpoints
+        # --- Phase 1: Find bridges through unassigned atoms ---
+        if unassigned:
+            # Find bridges formed by unassigned atoms
+            # Each bridge connects two assigned (numbered) atoms through unassigned atoms
+            # Use BFS/DFS to find connected components among unassigned atoms
+            # and determine their bridge endpoints
 
-        # Build adjacency for ring atoms
-        adj = {}
-        for idx in ring_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            adj[idx] = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms]
+            # Build adjacency for ring atoms
+            adj = {}
+            for idx in ring_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                adj[idx] = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms]
 
-        # Find connected components among unassigned atoms
-        remaining_unassigned = set(unassigned)
+            # Find connected components among unassigned atoms
+            remaining_unassigned = set(unassigned)
 
-        while remaining_unassigned:
-            # BFS from an unassigned atom to find its connected component
-            start = next(iter(remaining_unassigned))
-            component = set()
-            queue = [start]
-            while queue:
-                current = queue.pop(0)
-                if current in component:
-                    continue
-                component.add(current)
-                for nbr in adj.get(current, []):
-                    if nbr in remaining_unassigned and nbr not in component:
-                        queue.append(nbr)
+            while remaining_unassigned:
+                # BFS from an unassigned atom to find its connected component
+                start = next(iter(remaining_unassigned))
+                component = set()
+                queue = [start]
+                while queue:
+                    current = queue.pop(0)
+                    if current in component:
+                        continue
+                    component.add(current)
+                    for nbr in adj.get(current, []):
+                        if nbr in remaining_unassigned and nbr not in component:
+                            queue.append(nbr)
 
-            remaining_unassigned -= component
+                remaining_unassigned -= component
 
-            # Find endpoints: assigned atoms adjacent to this component
-            endpoints = set()
-            for atom_idx in component:
-                for nbr in adj.get(atom_idx, []):
-                    if nbr in assigned:
-                        endpoints.add(nbr)
+                # Find endpoints: assigned atoms adjacent to this component
+                endpoints = set()
+                for atom_idx in component:
+                    for nbr in adj.get(atom_idx, []):
+                        if nbr in assigned:
+                            endpoints.add(nbr)
 
-            if len(endpoints) >= 2:
-                # This component forms a bridge between endpoints
-                ep_list = sorted(endpoints)
-                # For a simple bridge with 2 endpoints:
-                ep1, ep2 = ep_list[0], ep_list[1]
+                if len(endpoints) >= 2:
+                    # This component forms a bridge between endpoints
+                    ep_list = sorted(endpoints)
+                    # For a simple bridge with 2 endpoints:
+                    ep1, ep2 = ep_list[0], ep_list[1]
 
-                # Find the path through this component between endpoints
-                component_plus_endpoints = component | {ep1, ep2}
-                path = find_longest_path(mol, ep1, ep2, component_plus_endpoints)
+                    # Find the path through this component between endpoints
+                    component_plus_endpoints = component | {ep1, ep2}
+                    path = find_longest_path(mol, ep1, ep2, component_plus_endpoints)
 
-                if path and len(path) >= 2:
-                    bridge_atoms = path[1:-1]
+                    if path and len(path) >= 2:
+                        bridge_atoms = path[1:-1]
+                        bridge = BridgeInfo(
+                            atoms=bridge_atoms,
+                            length=len(bridge_atoms),
+                            start_bh=ep1,
+                            end_bh=ep2,
+                            is_secondary=True,
+                        )
+                        secondary_bridges.append(bridge)
+                    else:
+                        # Zero-length bridge (direct connection between endpoints)
+                        bridge = BridgeInfo(
+                            atoms=[],
+                            length=0,
+                            start_bh=ep1,
+                            end_bh=ep2,
+                            is_secondary=True,
+                        )
+                        secondary_bridges.append(bridge)
+                elif len(endpoints) == 1:
+                    # This shouldn't happen in a proper polycyclic system,
+                    # but handle it as a zero-length anomaly
+                    ep = list(endpoints)[0]
                     bridge = BridgeInfo(
-                        atoms=bridge_atoms,
-                        length=len(bridge_atoms),
-                        start_bh=ep1,
-                        end_bh=ep2,
+                        atoms=list(component),
+                        length=len(component),
+                        start_bh=ep,
+                        end_bh=ep,
                         is_secondary=True,
                     )
                     secondary_bridges.append(bridge)
-                else:
-                    # Zero-length bridge (direct connection between endpoints)
-                    bridge = BridgeInfo(
-                        atoms=[],
-                        length=0,
-                        start_bh=ep1,
-                        end_bh=ep2,
-                        is_secondary=True,
-                    )
-                    secondary_bridges.append(bridge)
-            elif len(endpoints) == 1:
-                # This shouldn't happen in a proper polycyclic system,
-                # but handle it as a zero-length anomaly
-                ep = list(endpoints)[0]
+
+        # --- Phase 2: Detect zero-length secondary bridges ---
+        # When all ring atoms are already assigned (e.g., cubane), unassigned is
+        # empty but additional zero-length bridges may exist as direct bonds
+        # between already-numbered atoms that are NOT edges of the main ring
+        # or main bridge. These represent additional ring closures.
+
+        # Compute edges already accounted for (main ring + main bridge)
+        main_ring_edges = set()
+        for i in range(len(main_ring)):
+            a = main_ring[i]
+            b = main_ring[(i + 1) % len(main_ring)]
+            main_ring_edges.add((min(a, b), max(a, b)))
+
+        main_bridge_edges = set()
+        if main_bridge and main_bridge.atoms:
+            full_bridge = [bh_pair[0]] + main_bridge.atoms + [bh_pair[1]]
+            for i in range(len(full_bridge) - 1):
+                a = full_bridge[i]
+                b = full_bridge[i + 1]
+                main_bridge_edges.add((min(a, b), max(a, b)))
+        elif main_bridge:
+            # Zero-atom main bridge = direct bond between bridgeheads
+            a, b = bh_pair
+            main_bridge_edges.add((min(a, b), max(a, b)))
+
+        accounted_edges = main_ring_edges | main_bridge_edges
+
+        # Also add edges from bridges found via unassigned atoms (Phase 1)
+        for bridge in secondary_bridges:
+            full_sb = [bridge.start_bh] + bridge.atoms + [bridge.end_bh]
+            for i in range(len(full_sb) - 1):
+                a = full_sb[i]
+                b = full_sb[i + 1]
+                accounted_edges.add((min(a, b), max(a, b)))
+
+        # Compute how many more secondary bridges are needed
+        # IUPAC VB: ring_count rings require (ring_count + 1) total bridge lengths
+        # in the descriptor. The first 3 are primary (branch1, branch2, main_bridge).
+        # Secondary bridges needed = ring_count - 2.
+        ring_count = self._get_ring_count(mol, ring_atoms)
+        needed_more = (ring_count - 2) - len(secondary_bridges)
+
+        if needed_more > 0:
+            # Find bonds between ring atoms that are not accounted for
+            zero_length_candidates = []
+            for bond in mol.GetBonds():
+                a_idx = bond.GetBeginAtomIdx()
+                b_idx = bond.GetEndAtomIdx()
+                if a_idx in ring_atoms and b_idx in ring_atoms:
+                    edge = (min(a_idx, b_idx), max(a_idx, b_idx))
+                    if edge not in accounted_edges:
+                        zero_length_candidates.append(edge)
+                        accounted_edges.add(edge)  # Don't double count
+
+            # Add zero-length bridges for unaccounted ring bonds
+            for a_idx, b_idx in zero_length_candidates[:needed_more]:
                 bridge = BridgeInfo(
-                    atoms=list(component),
-                    length=len(component),
-                    start_bh=ep,
-                    end_bh=ep,
+                    atoms=[],
+                    length=0,
+                    start_bh=a_idx,
+                    end_bh=b_idx,
                     is_secondary=True,
                 )
                 secondary_bridges.append(bridge)
 
         # Sort: independent before dependent, then by length descending
-        # For now, all found bridges are independent (endpoints on assigned atoms)
         secondary_bridges.sort(key=lambda b: -b.length)
 
         return secondary_bridges
