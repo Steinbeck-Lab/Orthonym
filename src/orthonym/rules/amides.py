@@ -132,8 +132,9 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
         sub_atoms = _bfs_substituent(mol, nbr_idx, {nitrogen_idx, carbonyl_carbon_idx})
         carbon_count = sum(1 for idx in sub_atoms if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
 
-        if carbon_count in ALKYL_NAMES:
-            sub_name = ALKYL_NAMES[carbon_count]
+        # Check if substituent is aromatic ring-based
+        sub_name = _name_n_substituent(mol, sub_atoms, carbon_count)
+        if sub_name:
             substituents.append({
                 "atoms": sub_atoms,
                 "name": sub_name,
@@ -141,6 +142,40 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
             })
 
     return substituents
+
+
+def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optional[str]:
+    """Name an N-substituent, handling aromatic rings and alkyl chains."""
+    sub_set = set(sub_atoms)
+
+    # Check for aromatic ring in substituent
+    ring_info = mol.GetRingInfo()
+    for ring in ring_info.AtomRings():
+        if not all(r in sub_set for r in ring):
+            continue
+        if len(ring) == 6:
+            all_aromatic = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+            all_carbon = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+            if all_aromatic and all_carbon:
+                # Phenyl-based substituent
+                non_ring_carbons = sum(
+                    1 for idx in sub_atoms
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and idx not in set(ring)
+                )
+                if non_ring_carbons == 0:
+                    return "phenyl"
+                elif non_ring_carbons == 1:
+                    return "benzyl"
+                elif non_ring_carbons == 2:
+                    return "2-phenylethyl"
+
+    # Fall back to alkyl name
+    if carbon_count > 0:
+        try:
+            return get_alkyl_name(carbon_count)
+        except (ValueError, KeyError):
+            return None
+    return None
 
 
 def _bfs_substituent(mol, start_idx: int, exclude: set) -> List[int]:

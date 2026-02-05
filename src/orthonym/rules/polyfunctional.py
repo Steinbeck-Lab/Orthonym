@@ -9,6 +9,7 @@ Handles naming of compounds with multiple functional groups:
 Based on IUPAC 2013 Blue Book P-41 to P-43.
 """
 
+from collections import defaultdict
 from typing import Optional, List, Dict, Tuple, Any, Set
 
 from ..assembly.naming_utils import (
@@ -424,9 +425,33 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     all_prefixes = []
 
     # --- Generate FG prefixes from non-principal groups ---
+    chain_set = set(principal_chain)
+    ring_fg_groups = defaultdict(list)  # FGs on ring atoms, for ring substituent naming
+
     for fg_name, matches in non_principal.items():
         if not matches:
             continue
+
+        # When chain is parent, separate FGs on ring from FGs on chain
+        if getattr(features, 'chain_is_parent', False):
+            ring_atom_set = set()
+            for rg in getattr(features, 'ring_substituents_as_groups', []):
+                ring_atom_set.update(rg)
+
+            chain_matches = []
+            for match in matches:
+                # Check if this FG's center atom is on the chain
+                center = _find_fg_center_atom(mol, match, fg_name)
+                if center is not None and center in chain_set and center not in ring_atom_set:
+                    chain_matches.append(match)
+                elif any(a in chain_set and a not in ring_atom_set for a in match):
+                    chain_matches.append(match)
+                else:
+                    # FG is on a ring - track for ring substituent naming
+                    ring_fg_groups[fg_name].append(match)
+            matches = chain_matches
+            if not matches:
+                continue
 
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(
@@ -444,6 +469,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         count = len(matches)
         formatted = format_fg_prefix(prefix_form, locants, count)
         all_prefixes.append(formatted)
+
+    # --- Generate ring substituent prefixes (when chain is parent) ---
+    if getattr(features, 'chain_is_parent', False):
+        from ..assembly.composer import _generate_ring_substituent_prefixes
+        ring_prefixes = _generate_ring_substituent_prefixes(features)
+        for ring_prefix in ring_prefixes:
+            all_prefixes.append(ring_prefix.text)
 
     # --- Generate alkyl substituent prefixes ---
     if features.substituents:
@@ -554,6 +586,20 @@ def _generate_alkyl_prefixes_for_polyfunctional(features: Any) -> List[str]:
             )
 
             if has_heteroatom:
+                from ..assembly.composer import (
+                    _check_for_acylamino,
+                    _check_for_acyloxy,
+                    _name_heteroatom_substituent,
+                )
+                # NOTE: Do NOT check alkoxy here - ethers are already handled
+                # by the FG prefix system in name_polyfunctional
+                het_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
+                if not het_name:
+                    het_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
+                if not het_name:
+                    het_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
+                if het_name:
+                    substituent_groups[het_name].append(position)
                 continue
 
             try:
@@ -596,7 +642,13 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            if last_char.isalpha() and first_char.isdigit():
+            # Insert hyphen between letter/paren and digit
+            # e.g., "amino" + "4-methyl" → "amino-4-methyl"
+            # e.g., "(ethanoyl)amino" + "4-methyl" → "(ethanoyl)amino-4-methyl"
+            if first_char.isdigit() and (last_char.isalpha() or last_char == ')'):
+                result += "-"
+            # Also between ')' and letter for clarity
+            elif last_char == ')' and first_char.isalpha():
                 result += "-"
         result += current
 

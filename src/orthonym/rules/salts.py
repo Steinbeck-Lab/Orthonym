@@ -435,23 +435,27 @@ def _infer_zwitterion_name(
     if betaine_pattern and mol.HasSubstructMatch(betaine_pattern):
         return 'betaine'
 
-    # Default: systematic name based on carbon count (small molecules)
-    if carbon_count <= 6:
-        CHAIN_TO_CARBOXYLATE = {
-            2: 'acetate',
-            3: 'propanoate',
-            4: 'butanoate',
-            5: 'pentanoate',
-            6: 'hexanoate',
-        }
-        if carbon_count in CHAIN_TO_CARBOXYLATE:
-            base = CHAIN_TO_CARBOXYLATE[carbon_count]
-        else:
-            from ..data.chain_names import get_anoate_name
-            base = get_anoate_name(carbon_count)
-        return f'ammonium{base}'
+    # For N+/O- zwitterions, best approach is to neutralize and name
+    # as the parent amino compound (IUPAC recommendation for amino acids)
+    neutral_name = _name_as_neutral(mol, 'pin')
+    if neutral_name:
+        return neutral_name
 
-    # For larger molecules, return empty string to trigger neutral fallback
+    # Fallback: systematic ammonium + carboxylate (with space!)
+    if carbon_count > 0:
+        from ..data.chain_names import get_anoate_name
+        CHAIN_TO_CARBOXYLATE = {
+            2: 'acetate', 3: 'propanoate', 4: 'butanoate',
+            5: 'pentanoate', 6: 'hexanoate',
+        }
+        base = CHAIN_TO_CARBOXYLATE.get(carbon_count)
+        if not base:
+            try:
+                base = get_anoate_name(carbon_count)
+            except ValueError:
+                return ''
+        return f'ammonium {base}'
+
     return ''
 
 

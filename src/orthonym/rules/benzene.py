@@ -282,6 +282,12 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
         alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, neighbors[0].GetIdx(), ring_atoms | {n_idx})
         if alkyl_atoms is not None and carbon_count > 0:
             alkyl_name = ALKYL_NAMES.get(carbon_count)
+            if not alkyl_name:
+                from ..data.chain_names import get_alkyl_name as _chain_alkyl
+                try:
+                    alkyl_name = _chain_alkyl(carbon_count)
+                except (ValueError, KeyError):
+                    alkyl_name = None
             if alkyl_name:
                 return {
                     'name': f'(N-{alkyl_name}amino)',
@@ -464,7 +470,12 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
         # TODO: Check for branching (isopropyl vs propyl, etc.)
         return ALKYL_NAMES[carbon_count]
 
-    return None
+    # Delegate to centralized chain_names for > 10 carbons
+    from ..data.chain_names import get_alkyl_name as _chain_alkyl
+    try:
+        return _chain_alkyl(carbon_count)
+    except (ValueError, KeyError):
+        return None
 
 
 def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:

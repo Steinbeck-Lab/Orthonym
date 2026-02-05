@@ -294,23 +294,91 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     Get the alkyl name from the alkyl fragment.
 
     For simple chains, returns methyl, ethyl, propyl, etc.
-    For branched alkyl groups, may need more complex naming.
+    When the alkyl fragment contains a ring, tries to name it properly
+    (e.g., "phenyl" for benzene, "cyclohexyl" for cyclohexane).
 
     Args:
         mol: RDKit Mol object
         alkyl_atoms: Atom indices of the alkyl fragment
 
     Returns:
-        Alkyl name (e.g., "methyl", "ethyl")
+        Alkyl name (e.g., "methyl", "ethyl", "phenyl")
     """
-    # Count carbons
-    carbon_count = sum(
-        1 for idx in alkyl_atoms
+    alkyl_set = set(alkyl_atoms)
+
+    # Check if alkyl fragment contains a ring
+    has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in alkyl_atoms)
+
+    if has_ring:
+        # Try to name the ring-containing alkyl fragment
+        # Common case: phenyl (benzene ring)
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            ring_in_fragment = all(r in alkyl_set for r in ring)
+            if not ring_in_fragment:
+                continue
+            if len(ring) == 6:
+                all_aromatic = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+                all_carbon = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+                if all_aromatic and all_carbon:
+                    # Count chain carbons outside the ring
+                    chain_carbons = sum(
+                        1 for idx in alkyl_atoms
+                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and idx not in set(ring)
+                    )
+                    if chain_carbons == 0:
+                        return "phenyl"
+                    # e.g., benzyl = phenyl + CH2
+                    if chain_carbons == 1:
+                        return "benzyl"
+                    if chain_carbons == 2:
+                        return "2-phenylethyl"
+                    # For longer chains: name as n-phenylalkyl
+                    try:
+                        chain_name = _chain_alkyl_name(chain_carbons)
+                        return f"{chain_carbons}-phenyl{chain_name}"
+                    except ValueError:
+                        pass
+
+        # Fallback: try naming the full fragment as a simple ring substituent
+        # Count only non-ring carbons if ring naming is too complex
+        pass
+
+    # Simple alkyl chain (no ring)
+    carbon_atoms = [
+        idx for idx in alkyl_atoms
         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-    )
+    ]
+    carbon_count = len(carbon_atoms)
 
     if carbon_count == 0:
         return ""
+
+    # Detect branching: find the attachment point (C bonded to ester O)
+    # and check if it's a branching carbon
+    if carbon_count >= 3:
+        for idx in carbon_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            # Find carbon bonded to ester oxygen (not in alkyl set)
+            bonded_to_o = any(
+                nbr.GetSymbol() == 'O' and nbr.GetIdx() not in alkyl_set
+                for nbr in atom.GetNeighbors()
+            )
+            if bonded_to_o:
+                # Count carbon neighbors (branches)
+                c_nbrs = sum(
+                    1 for nbr in atom.GetNeighbors()
+                    if nbr.GetSymbol() == 'C' and nbr.GetIdx() in alkyl_set
+                )
+                if c_nbrs >= 2:
+                    # Branched at attachment point
+                    if carbon_count == 3 and c_nbrs == 2:
+                        return "propan-2-yl"
+                    elif carbon_count == 4 and c_nbrs == 3:
+                        return "2-methylpropan-2-yl"
+                    elif carbon_count == 4 and c_nbrs == 2:
+                        return "butan-2-yl"
+                break
 
     try:
         return _chain_alkyl_name(carbon_count)

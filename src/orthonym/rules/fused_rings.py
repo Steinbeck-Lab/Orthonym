@@ -289,6 +289,7 @@ def get_fused_heterocycle_substituents(
         'n_substituents': defaultdict(int),   # name -> count
         'oxo_substituents': [],   # list of locants for =O (suffix: -one)
         'amino_substituents': [], # list of locants for -NH2 (suffix: -amine)
+        'suffix_groups': defaultdict(list),   # suffix_name -> list of locants (carboxylic acid, etc.)
         'other': [],  # For halogens, etc.
     }
 
@@ -329,6 +330,10 @@ def get_fused_heterocycle_substituents(
                 # Other functional groups (nitro, hydroxy, methylamino, etc.)
                 # These are prefix substituents on the ring
                 result['c_substituents'][sub_name].append(locant)
+            elif sub_type == 'suffix':
+                # Suffix-forming groups directly on ring (carboxylic acid, carbaldehyde, etc.)
+                suffix_name = sub_info.get('suffix_name', sub_name)
+                result['suffix_groups'][suffix_name].append(locant)
             elif sub_type == 'functionalized':
                 # Functionalized chain substituents (cyanomethyl, etc.)
                 result['c_substituents'][sub_name].append(locant)
@@ -354,6 +359,10 @@ def get_fused_heterocycle_substituents(
     # Sort oxo and amino locants
     result['oxo_substituents'].sort(key=_locant_sort_key)
     result['amino_substituents'].sort(key=_locant_sort_key)
+
+    # Sort suffix group locants
+    for name in result['suffix_groups']:
+        result['suffix_groups'][name].sort(key=_locant_sort_key)
 
     return dict(result)
 
@@ -433,6 +442,40 @@ def _identify_fused_substituent(
                 'type': 'functional',
                 'atoms': [start_idx]
             }
+
+        # Alkoxy group (-OR): O with no H and one carbon neighbor outside core
+        if h_count == 0 and len(neighbors_outside_core) == 1:
+            nbr = neighbors_outside_core[0]
+            if nbr.GetSymbol() == 'C':
+                # Check bond to core is single (not oxo)
+                is_single = True
+                for bond in start_atom.GetBonds():
+                    other_idx = bond.GetOtherAtomIdx(start_idx)
+                    if other_idx in excluded and bond.GetBondTypeAsDouble() == 2.0:
+                        is_single = False
+                        break
+                if is_single:
+                    alkyl_atoms = _bfs_alkyl_from(mol, nbr.GetIdx(), excluded | {start_idx})
+                    if alkyl_atoms is not None:
+                        carbon_count = sum(1 for idx in alkyl_atoms
+                                           if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+                        # Alkoxy uses alkane stem + oxy: methoxy, ethoxy, propoxy
+                        _ALKOXY = {
+                            1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
+                            4: 'butoxy', 5: 'pentyloxy', 6: 'hexyloxy',
+                        }
+                        alkoxy_name = _ALKOXY.get(carbon_count)
+                        if alkoxy_name is None:
+                            try:
+                                alkoxy_name = f'{get_alkyl_name(carbon_count)}oxy'
+                            except (ValueError, KeyError):
+                                alkoxy_name = None
+                        if alkoxy_name:
+                            return {
+                                'name': alkoxy_name,
+                                'type': 'functional',
+                                'atoms': [start_idx] + alkyl_atoms
+                            }
 
     # Nitrogen groups (amino, nitro, N-alkyl amino, etc.)
     if symbol == 'N':
@@ -519,6 +562,29 @@ def _identify_fused_substituent(
                 'type': 'functional',
                 'atoms': [start_idx]
             }
+        # Alkylthio group (-SR)
+        if h_count == 0 and len(neighbors) == 1:
+            nbr = neighbors[0]
+            if nbr.GetSymbol() == 'C':
+                alkyl_atoms = _bfs_alkyl_from(mol, nbr.GetIdx(), excluded | {start_idx})
+                if alkyl_atoms is not None:
+                    carbon_count = sum(1 for idx in alkyl_atoms
+                                       if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+                    _ALKYLTHIO = {
+                        1: 'methylsulfanyl', 2: 'ethylsulfanyl', 3: 'propylsulfanyl',
+                    }
+                    thio_name = _ALKYLTHIO.get(carbon_count)
+                    if thio_name is None:
+                        try:
+                            thio_name = f'{get_alkyl_name(carbon_count)}sulfanyl'
+                        except (ValueError, KeyError):
+                            thio_name = None
+                    if thio_name:
+                        return {
+                            'name': thio_name,
+                            'type': 'functional',
+                            'atoms': [start_idx] + alkyl_atoms
+                        }
 
     return None
 
@@ -711,7 +777,16 @@ def _identify_functionalized_substituent(
             carboxyl_carbon = match[0]
             if carboxyl_carbon in chain_atoms:
                 # Carbon count includes the carboxyl carbon
-                if carbon_count == 2:
+                if carbon_count == 1:
+                    # COOH directly on ring → suffix-type "carboxylic acid"
+                    return {
+                        'name': 'carboxylic acid',
+                        'atoms': chain_atoms,
+                        'functional_group': 'carboxylic_acid',
+                        'type': 'suffix',
+                        'suffix_name': 'carboxylic acid',
+                    }
+                elif carbon_count == 2:
                     return {
                         'name': 'carboxymethyl',
                         'atoms': chain_atoms,
@@ -748,11 +823,13 @@ def _identify_functionalized_substituent(
             aldehyde_carbon = match[0]
             if aldehyde_carbon in chain_atoms:
                 if carbon_count == 1:
+                    # CHO directly on ring → suffix-type "carbaldehyde"
                     return {
-                        'name': 'formyl',
+                        'name': 'carbaldehyde',
                         'atoms': chain_atoms,
                         'functional_group': 'aldehyde',
-                        'type': 'functionalized'
+                        'type': 'suffix',
+                        'suffix_name': 'carbaldehyde',
                     }
                 elif carbon_count == 2:
                     return {
@@ -855,8 +932,63 @@ def _assemble_fused_heterocycle_name(
     # Join prefixes
     prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
 
-    # Handle suffix-forming groups (oxo and amino)
-    # Build suffix from oxo (-one) and amino (-amine)
+    # Handle suffix-forming groups
+    # Priority: carboxylic acid > carbaldehyde > amine > one (IUPAC seniority)
+    suffix_groups = substituents.get('suffix_groups', {})
+
+    if suffix_groups:
+        # Detachable suffixes (carboxylic acid, carbaldehyde, etc.)
+        # These append to the ring name: quinoline-2-carboxylic acid
+        _SUFFIX_PRIORITY = ['carboxylic acid', 'carbaldehyde', 'carboxamide', 'carbonitrile']
+        _SUFFIX_TO_PREFIX = {
+            'carboxylic acid': 'carboxy',
+            'carbaldehyde': 'formyl',
+            'carboxamide': 'carbamoyl',
+            'carbonitrile': 'cyano',
+        }
+
+        chosen_suffix = None
+        chosen_locants = []
+        for suf in _SUFFIX_PRIORITY:
+            if suf in suffix_groups:
+                chosen_suffix = suf
+                chosen_locants = suffix_groups[suf]
+                break
+        if not chosen_suffix:
+            chosen_suffix = next(iter(suffix_groups))
+            chosen_locants = suffix_groups[chosen_suffix]
+
+        count = len(chosen_locants)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count)) if count > 1 else ""
+        locant_str = ",".join(str(loc) for loc in chosen_locants)
+        suffix_part = f"-{locant_str}-{multiplier}{chosen_suffix}"
+
+        # Remaining suffix groups become prefixes
+        for suf_name, suf_locants in suffix_groups.items():
+            if suf_name == chosen_suffix:
+                continue
+            prefix_name = _SUFFIX_TO_PREFIX.get(suf_name, suf_name)
+            loc_str = ",".join(str(loc) for loc in sorted(suf_locants))
+            n = len(suf_locants)
+            if n == 1:
+                extra_prefix = f"{loc_str}-{prefix_name}-"
+            else:
+                mult = SIMPLE_MULTIPLIERS.get(n, str(n))
+                extra_prefix = f"{loc_str}-{mult}{prefix_name}-"
+            prefix_parts.append((extra_prefix, prefix_name))
+
+        # Re-sort and re-join prefixes
+        prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
+        prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
+
+        # Also handle oxo/amino as additional suffixes or prefixes
+        oxo_amino_suffix = _build_fused_suffix(substituents, core_name)
+        if oxo_amino_suffix:
+            modified_core = _apply_suffix_to_core(core_name, oxo_amino_suffix)
+            return _join_prefix_to_parent(prefix_str, modified_core) + suffix_part.lstrip('-')
+        return _join_prefix_to_parent(prefix_str, core_name) + suffix_part
+
+    # Handle suffix-forming groups (oxo and amino only, no detachable suffixes)
     suffix_str = _build_fused_suffix(substituents, core_name)
 
     if suffix_str:

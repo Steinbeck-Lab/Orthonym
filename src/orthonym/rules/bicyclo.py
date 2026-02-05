@@ -48,7 +48,8 @@ def _get_alkane_name(carbon_count: int) -> str:
     """Get the alkane parent name for a carbon count."""
     if carbon_count in _ALKANE_NAMES:
         return _ALKANE_NAMES[carbon_count]
-    return f"C{carbon_count}H{2*carbon_count+2}"  # Fallback for large systems
+    from ..data.chain_names import get_chain_name
+    return get_chain_name(carbon_count)
 
 
 # ============================================================================
@@ -159,9 +160,15 @@ def is_bicyclo_system(mol) -> bool:
     ring_atoms_set = set()
     for ring in ri.AtomRings():
         ring_atoms_set.update(ring)
+
+    # Filter to largest connected ring component to avoid inflated cycle rank
+    # from disconnected ring systems (e.g., bicycle + sugar rings)
+    from .polycyclic import _get_largest_connected_ring_component
+    ring_atoms_set = _get_largest_connected_ring_component(mol, ring_atoms_set)
+
     ring_bond_count = 0
     for bond in mol.GetBonds():
-        if bond.GetBeginAtomIdx() in ring_atoms_set and bond.GetEndAtomIdx() in ring_atoms_set:
+        if bond.IsInRing() and bond.GetBeginAtomIdx() in ring_atoms_set and bond.GetEndAtomIdx() in ring_atoms_set:
             ring_bond_count += 1
     cycle_rank = ring_bond_count - len(ring_atoms_set) + 1
     if cycle_rank >= 3:
@@ -378,6 +385,11 @@ def name_bicyclo_system(mol) -> Optional[str]:
     for ring in ri.AtomRings():
         ring_atoms.update(ring)
 
+    # Filter to largest connected ring component to avoid counting
+    # atoms from disconnected ring systems (e.g., sugar rings)
+    from .polycyclic import _get_largest_connected_ring_component
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
+
     # Count only carbon atoms in ring
     carbon_count = sum(
         1 for idx in ring_atoms
@@ -427,6 +439,10 @@ def get_bicyclo_ring_atoms(mol) -> Optional[Set[int]]:
     ring_atoms = set()
     for ring in ri.AtomRings():
         ring_atoms.update(ring)
+
+    # Filter to largest connected ring component
+    from .polycyclic import _get_largest_connected_ring_component
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
 
     return ring_atoms
 

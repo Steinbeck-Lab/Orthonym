@@ -164,6 +164,9 @@ def _name_amino_acid_systematic(mol) -> str:
 
     Uses: "amino" prefix + acid name
     Example: 2-aminopropanoic acid (systematic for alanine)
+
+    For amino acids with multiple amino groups (e.g., lysine),
+    returns None to let the general pipeline handle it.
     """
     from ..data.chain_names import get_chain_prefix
 
@@ -172,14 +175,14 @@ def _name_amino_acid_systematic(mol) -> str:
     if not aa_atoms:
         return None
 
-    # Unpack 5 atoms: N, alpha_C, carbonyl_C, carbonyl_O (=O), acid_O (OH)
-    n_atom, alpha_c, carbonyl_c, carbonyl_o, acid_o = aa_atoms
+    # Count primary amine groups - if more than one, let general pipeline handle
+    amine_pattern = Chem.MolFromSmarts('[NX3;H2;!$([NX3][CX3]=O)]')
+    if amine_pattern:
+        amine_matches = mol.GetSubstructMatches(amine_pattern)
+        if len(amine_matches) > 1:
+            return None  # Multiple amines - use general naming pipeline
 
     # Count carbons in the backbone (acid chain)
-    # The acid chain starts at carbonyl carbon
-    # For alpha-amino acids, alpha-C is position 2
-
-    # Simple approach: count total carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
     # Get stem from carbon count using centralized module

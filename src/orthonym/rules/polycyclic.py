@@ -61,9 +61,9 @@ def _get_alkane_name(carbon_count: int) -> str:
     """Get the alkane parent name for a given carbon count."""
     if carbon_count in _ALKANE_NAMES:
         return _ALKANE_NAMES[carbon_count]
-    if carbon_count > 40:
-        return f"{carbon_count}ane"
-    return f"C{carbon_count}ane"
+    # Delegate to centralized chain names for any size
+    from ..data.chain_names import get_chain_name
+    return get_chain_name(carbon_count)
 
 
 # ============================================================================
@@ -946,13 +946,12 @@ class VonBaeyerAnalyzer:
 
         Format (OPSIN-compatible):
         - bicyclo[a.b.c] (no secondary bridges)
-        - tricyclo[a.b.c.d e,f] (one secondary bridge with superscript locants)
-        - tetracyclo[a.b.c.d e,f.g h,i] (two secondary bridges)
+        - tricyclo[a.b.c.d(e,f)] (one secondary bridge with locants in parentheses)
+        - tetracyclo[a.b.c.d(e,f).g(h,i)] (two secondary bridges)
 
-        Secondary bridge locants are written inline after the bridge length
-        as superscripts. In ASCII text the OPSIN-compatible format is:
-        bridge_length followed directly by locant_low,locant_high
-        e.g. "13,7" means bridge of length 1 with locants 3 and 7.
+        Secondary bridge locants are written in parentheses after the bridge
+        length for unambiguous parsing. OPSIN accepts this format.
+        e.g. "1(3,7)" means bridge of length 1 with locants 3 and 7.
 
         Args:
             ring_count: Number of independent rings
@@ -979,9 +978,73 @@ class VonBaeyerAnalyzer:
                 continue
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
-            parts.append(f"{bridge.length}{locant_low},{locant_high}")
+            parts.append(f"{bridge.length}({locant_low},{locant_high})")
 
         return f"{prefix}[{'.'.join(parts)}]"
+
+
+# ============================================================================
+# Ring Connectivity Helpers
+# ============================================================================
+
+def _get_largest_connected_ring_component(mol, ring_atoms: Set[int]) -> Set[int]:
+    """
+    Find the largest connected component of ring atoms connected by ring bonds.
+
+    In molecules with multiple disconnected ring systems (e.g., a piperazine
+    connected by a chain to a fused purine), this returns only the largest
+    ring subsystem. This prevents the VB analyzer from treating disconnected
+    ring systems as a single bridged polycyclic.
+
+    Two ring atoms are "connected" if the bond between them is itself part
+    of a ring (IsInRing() == True). Bonds between ring atoms that are NOT
+    ring bonds (e.g., the biaryl bond in biphenyl) do not connect components.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of all ring atom indices
+
+    Returns:
+        The largest connected component (set of atom indices).
+        Returns the original set if all atoms are in one component.
+    """
+    if not ring_atoms:
+        return ring_atoms
+
+    # Build adjacency list using only ring bonds
+    from collections import deque
+    adj = {idx: [] for idx in ring_atoms}
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        for bond in atom.GetBonds():
+            nbr_idx = bond.GetOtherAtomIdx(idx)
+            if nbr_idx in ring_atoms and bond.IsInRing():
+                adj[idx].append(nbr_idx)
+
+    # BFS to find connected components
+    visited = set()
+    components = []
+    for start in ring_atoms:
+        if start in visited:
+            continue
+        component = set()
+        queue = deque([start])
+        while queue:
+            node = queue.popleft()
+            if node in visited:
+                continue
+            visited.add(node)
+            component.add(node)
+            for nbr in adj[node]:
+                if nbr not in visited:
+                    queue.append(nbr)
+        components.append(component)
+
+    if len(components) <= 1:
+        return ring_atoms
+
+    # Return the largest component
+    return max(components, key=len)
 
 
 # ============================================================================
@@ -1014,6 +1077,9 @@ def generate_polycyclic_name(mol) -> Optional[str]:
 
     if not ring_atoms:
         return None
+
+    # Filter to largest connected ring component
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
 
     analyzer = VonBaeyerAnalyzer()
 
@@ -1067,6 +1133,11 @@ def is_polycyclic_system(mol) -> bool:
 
     if not ring_atoms:
         return False
+
+    # Filter to largest connected ring component (via ring bonds only).
+    # This prevents disconnected ring systems (e.g., piperazine + purine
+    # connected by a chain) from being treated as one VB system.
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
 
     # Skip fully aromatic ring systems (PAHs like naphthalene, perylene, coronene)
     # These should use retained names from fused_rings, not VB nomenclature
@@ -1153,8 +1224,8 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
     # Sort elements by HW priority
     sorted_elements = sorted(heteroatoms.keys(), key=lambda s: HETEROATOM_PREFIXES.get(s, (s, 99))[1])
 
-    # Simple multipliers
-    multipliers = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+    # Use shared multipliers from naming_utils
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 
     parts = []
     for element in sorted_elements:
@@ -1165,7 +1236,7 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         count = len(locants)
 
         if count > 1:
-            mult = multipliers.get(count, str(count))
+            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
             parts.append(f"{locant_str}-{mult}{prefix_name}")
         else:
             parts.append(f"{locant_str}-{prefix_name}")
@@ -1447,13 +1518,11 @@ def get_polycyclic_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            if carbon_count > 0 and carbon_count <= 10:
+            if carbon_count > 0:
                 try:
                     name = get_alkyl_name(carbon_count)
-                except ValueError:
+                except (ValueError, KeyError):
                     name = f"C{carbon_count}H{2*carbon_count+1}"
-            elif carbon_count > 10:
-                name = f"C{carbon_count}H{2*carbon_count+1}"
             else:
                 # Non-carbon substituent (like hydroxy, amino)
                 # For now, skip these as they're functional groups
@@ -1852,6 +1921,10 @@ def name_polycyclic_complete(mol, features=None) -> Optional[str]:
     if not ring_atoms:
         return None
 
+    # Filter to largest connected ring component (via ring bonds only).
+    # Prevents disconnected ring systems from inflating atom counts.
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
+
     analyzer = VonBaeyerAnalyzer()
 
     # Check ring count
@@ -2006,9 +2079,12 @@ def _build_parent_with_unsaturation(
     """
     base_name = _get_alkane_name(total_atoms)
 
-    # Simple multipliers for unsaturation
-    unsat_multipliers = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
-    fg_multipliers = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+    # Multipliers for unsaturation and functional group counts
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    _mult = {1: ''}
+    _mult.update(SIMPLE_MULTIPLIERS)
+    unsat_multipliers = _mult
+    fg_multipliers = _mult
 
     double_bonds = unsaturation.get('double_bonds', [])
     triple_bonds = unsaturation.get('triple_bonds', [])

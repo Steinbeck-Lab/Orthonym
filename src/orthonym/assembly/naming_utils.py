@@ -73,6 +73,16 @@ SIMPLE_MULTIPLIERS = {
     8: "octa",
     9: "nona",
     10: "deca",
+    11: "undeca",
+    12: "dodeca",
+    13: "trideca",
+    14: "tetradeca",
+    15: "pentadeca",
+    16: "hexadeca",
+    17: "heptadeca",
+    18: "octadeca",
+    19: "nonadeca",
+    20: "icosa",
 }
 
 # Complex multiplicative prefixes (for substituents with locants/hyphens)
@@ -86,6 +96,16 @@ COMPLEX_MULTIPLIERS = {
     8: "octakis",
     9: "nonakis",
     10: "decakis",
+    11: "undecakis",
+    12: "dodecakis",
+    13: "tridecakis",
+    14: "tetradecakis",
+    15: "pentadecakis",
+    16: "hexadecakis",
+    17: "heptadecakis",
+    18: "octadecakis",
+    19: "nonadecakis",
+    20: "icosakis",
 }
 
 
@@ -413,6 +433,11 @@ def format_suffix_with_locants(
             # locants follow directly
             return f"{base}-{locant_str}-{suffix}"
     else:
-        # No locants: just combine base and suffix with elision
+        # No locants: combine base and suffix with elision
         # e.g., 'pentanoic acid', 'propanal'
+        if suffix_multiplier:
+            # Multiple terminal groups without locants (e.g., diacids):
+            # 'butanedioic acid', 'pentanedioic acid'
+            full_suffix = suffix_multiplier + suffix
+            return apply_vowel_elision(base + "e", full_suffix)
         return apply_vowel_elision(base + "e", suffix)

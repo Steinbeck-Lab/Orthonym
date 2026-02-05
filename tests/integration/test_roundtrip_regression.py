@@ -67,15 +67,15 @@ ROUNDTRIP_VERIFIED = [
     # Polycyclic (von Baeyer)
     (
         "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.14,8]tridec-11-en-5-ol",
+        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.1(4,8)]tridec-11-en-5-ol",
     ),
     (
         "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.11,13.04,9.014,16]heptadecan-6,7-diol",
+        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.1(1,13).0(4,9).0(14,16)]heptadecan-6,7-diol",
     ),
     (
         "CC1(C)CCC2(C(=O)O)CCC3(C)C(=CCC4C5(C)CC(O)C(=O)C(C)(C)C5CCC43C)C2C1",
-        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.015,20.02,11.05,10]docos-13-ene-20-carboxylic acid",
+        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.0(15,20).0(2,11).0(5,10)]docos-13-ene-20-carboxylic acid",
     ),
 
     # Steroid (natural product)

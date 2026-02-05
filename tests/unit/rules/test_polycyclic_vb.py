@@ -32,7 +32,7 @@ def norbornane():
 
 @pytest.fixture
 def adamantane():
-    """Adamantane: tricyclo[3.3.1.13,7]decane"""
+    """Adamantane: tricyclo[3.3.1.1(3,7)]decane"""
     return Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
 
 
@@ -264,12 +264,12 @@ class TestDescriptorFormatting:
 
     @pytest.mark.unit
     def test_adamantane_descriptor(self, adamantane, analyzer):
-        """Adamantane descriptor: tricyclo[3.3.1.13,7]."""
+        """Adamantane descriptor: tricyclo[3.3.1.1(3,7)]."""
         ring_atoms = _get_ring_atoms(adamantane)
         desc = analyzer.analyze(adamantane, ring_atoms)
         # The inline superscript locants for secondary bridges (OPSIN-compatible)
-        assert desc.descriptor_string == "tricyclo[3.3.1.13,7]", (
-            f"Expected 'tricyclo[3.3.1.13,7]', got '{desc.descriptor_string}'"
+        assert desc.descriptor_string == "tricyclo[3.3.1.1(3,7)]", (
+            f"Expected 'tricyclo[3.3.1.1(3,7)]', got '{desc.descriptor_string}'"
         )
 
     @pytest.mark.unit
@@ -350,10 +350,10 @@ class TestFullNameGeneration:
 
     @pytest.mark.unit
     def test_adamantane_full_name(self, adamantane):
-        """Adamantane -> tricyclo[3.3.1.13,7]decane."""
+        """Adamantane -> tricyclo[3.3.1.1(3,7)]decane."""
         name = generate_polycyclic_name(adamantane)
-        assert name == "tricyclo[3.3.1.13,7]decane", (
-            f"Expected 'tricyclo[3.3.1.13,7]decane', got '{name}'"
+        assert name == "tricyclo[3.3.1.1(3,7)]decane", (
+            f"Expected 'tricyclo[3.3.1.1(3,7)]decane', got '{name}'"
         )
 
     @pytest.mark.unit

@@ -792,6 +792,10 @@ def get_heterocycle_substituents(
                 if hetero_sub_name is None:
                     continue  # Truly empty (just implicit H)
 
+            # Check for suffix-type functional groups (-COOH, -CHO, -CONH2, -CN)
+            # These should be expressed as suffixes, not prefix substituents
+            suffix_info = _identify_suffix_fg(mol, nbr_idx, sub_atoms, ring_set)
+
             # Classify substituent as ring or alkyl
             classification = classify_substituent(mol, sub_atoms, ring_set)
             is_ring = classification['type'] == 'ring'
@@ -807,12 +811,60 @@ def get_heterocycle_substituents(
             }
             if hetero_sub_name:
                 sub_info['hetero_name'] = hetero_sub_name
+            if suffix_info:
+                sub_info['is_suffix'] = True
+                sub_info['suffix_name'] = suffix_info['suffix_name']
 
             if locant not in substituents:
                 substituents[locant] = []
             substituents[locant].append(sub_info)
 
     return substituents
+
+
+def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Dict]:
+    """
+    Identify suffix-type functional groups attached to ring.
+
+    Checks if the substituent starting at start_idx is a functional group
+    that should be expressed as a suffix on the ring parent name.
+
+    Returns:
+        Dict with 'suffix_name' if FG found, None otherwise
+    """
+    start_atom = mol.GetAtomWithIdx(start_idx)
+    if start_atom.GetSymbol() != 'C':
+        return None
+
+    # Check for carboxylic acid: C(=O)(OH)
+    acid_pat = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    if acid_pat:
+        for match in mol.GetSubstructMatches(acid_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carboxylic acid'}
+
+    # Check for aldehyde: C(=O)H attached to ring
+    ald_pat = Chem.MolFromSmarts('[CX3H1](=O)')
+    if ald_pat:
+        for match in mol.GetSubstructMatches(ald_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carbaldehyde'}
+
+    # Check for primary amide: C(=O)(NH2)
+    amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
+    if amide_pat:
+        for match in mol.GetSubstructMatches(amide_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carboxamide'}
+
+    # Check for nitrile: C#N
+    nitrile_pat = Chem.MolFromSmarts('[CX2]#[NX1]')
+    if nitrile_pat:
+        for match in mol.GetSubstructMatches(nitrile_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carbonitrile'}
+
+    return None
 
 
 def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
@@ -949,12 +1001,27 @@ def name_substituted_heterocycle(
             return f"{stereo_prefix}{parent_name}"
         return parent_name
 
-    # Group substituents by name and N/C classification
-    # Key: (substituent_name, is_on_nitrogen) -> list of locants
+    # Separate suffix-type FGs from prefix substituents
+    suffix_fg: Dict[str, List[int]] = {}  # suffix_name -> [locants]
+    prefix_substituents: Dict[int, List[Dict]] = {}
+
+    for locant, sub_list in substituents.items():
+        for sub_info in sub_list:
+            if sub_info.get('is_suffix'):
+                sname = sub_info['suffix_name']
+                if sname not in suffix_fg:
+                    suffix_fg[sname] = []
+                suffix_fg[sname].append(locant)
+            else:
+                if locant not in prefix_substituents:
+                    prefix_substituents[locant] = []
+                prefix_substituents[locant].append(sub_info)
+
+    # Group prefix substituents by name and N/C classification
     n_groups: Dict[str, List[int]] = {}  # N-substituents: name -> locants
     c_groups: Dict[str, List[int]] = {}  # C-substituents: name -> locants
 
-    for locant, sub_list in substituents.items():
+    for locant, sub_list in prefix_substituents.items():
         for sub_info in sub_list:
             is_on_n = sub_info['is_on_nitrogen']
 
@@ -1028,6 +1095,45 @@ def name_substituted_heterocycle(
             combined = f"{prefix_str}{parent_name}"
     else:
         combined = f"{prefix_str}{parent_name}"
+
+    # Add suffix-type functional groups
+    if suffix_fg:
+        # Pick highest-priority suffix
+        _SUFFIX_PRIORITY = [
+            'carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde',
+        ]
+        chosen_suffix = None
+        chosen_locants = []
+        for suf in _SUFFIX_PRIORITY:
+            if suf in suffix_fg:
+                chosen_suffix = suf
+                chosen_locants = sorted(suffix_fg[suf])
+                break
+        if not chosen_suffix:
+            chosen_suffix = next(iter(suffix_fg))
+            chosen_locants = sorted(suffix_fg[chosen_suffix])
+
+        count = len(chosen_locants)
+        multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
+        locant_str = ",".join(str(loc) for loc in chosen_locants)
+        combined = f"{combined}-{locant_str}-{multiplier}{chosen_suffix}"
+
+        # Remaining suffix FGs become prefixes (carboxy, formyl, etc.)
+        _SUFFIX_TO_PREFIX = {
+            'carboxylic acid': 'carboxy',
+            'carbaldehyde': 'formyl',
+            'carboxamide': 'carbamoyl',
+            'carbonitrile': 'cyano',
+        }
+        for suf_name, suf_locants in suffix_fg.items():
+            if suf_name == chosen_suffix:
+                continue
+            prefix_name = _SUFFIX_TO_PREFIX.get(suf_name, suf_name)
+            prefix = _format_c_substituent(prefix_name, sorted(suf_locants), len(suf_locants))
+            if prefix_str:
+                prefix_str = f"{prefix}-{prefix_str}" if prefix_str[0].isdigit() else f"{prefix}{prefix_str}"
+            else:
+                combined = f"{prefix}{combined}"
 
     # Assemble with stereo prefix if present
     if stereo_descriptors:

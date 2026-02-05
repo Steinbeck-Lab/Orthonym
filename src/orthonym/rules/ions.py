@@ -755,10 +755,8 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
     }
 
     # Alkyl group names by carbon count
-    ALKYL_NAMES = {
-        1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl',
-        5: 'pentyl', 6: 'hexyl'
-    }
+    from ..assembly.naming_utils import get_alkyl_name as _get_alkyl_name
+    ALKYL_NAMES = {i: _get_alkyl_name(i) for i in range(1, 11)}
 
     # Collect substituents: {position: [(name, sort_key), ...]}
     # Position 1 is the carboxyl attachment point
@@ -865,34 +863,178 @@ def _compare_locant_lists(a: list, b: list) -> int:
 
 
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
-    """Generate systematic name for carboxylate anion."""
+    """Generate systematic name for carboxylate anion.
+
+    Strategy: Neutralize the carboxylate ([O-] -> OH) to form the parent
+    carboxylic acid, name it with the full naming pipeline (which handles
+    substituents, stereo, unsaturation), then convert '-oic acid' to '-oate'.
+    This ensures all substituents are properly detected and included.
+    """
     # NEW: Check for aromatic parent FIRST
     carboxyl_carbon = _find_carboxyl_carbon(mol, anion_site)
     if carboxyl_carbon is not None:
         aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_carbon)
         if aromatic_name:
-            # Get substituents on the aromatic ring and add prefixes
             return _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon, aromatic_name)
 
-    # EXISTING: Fall back to chain counting for acyclic
-    # Count carbons to determine chain length
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    # Try neutralize-then-name approach for full substituent detection
+    acid_name = _neutralize_carboxylate_to_acid(mol, anion_site)
+    if acid_name:
+        oate_name = _acid_to_oate(acid_name)
+        if oate_name:
+            return oate_name
 
-    # Special cases for common names
+    # Fallback: simple chain naming (no substituent detection)
+    chain, double_bond_locs = _find_carboxylate_chain(mol, anion_site)
+    carbon_count = len(chain) if chain else sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'C')
+
     if carbon_count == 1:
         return 'formate'
-    elif carbon_count == 2:
+    elif carbon_count == 2 and not double_bond_locs:
         return 'acetate'
+
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    prefix = get_chain_prefix(carbon_count)
+
+    if double_bond_locs:
+        n_double = len(double_bond_locs)
+        loc_str = ",".join(str(loc) for loc in sorted(double_bond_locs))
+        if n_double == 1:
+            return f"{prefix}-{loc_str}-enoate"
+        else:
+            mult = SIMPLE_MULTIPLIERS.get(n_double, str(n_double))
+            return f"{prefix}a-{loc_str}-{mult}enoate"
     else:
-        # Use centralized chain naming for systematic names
-        from ..data.chain_names import get_anoate_name
-        return get_anoate_name(carbon_count)
+        return prefix + "anoate"
+
+
+def _neutralize_carboxylate_to_acid(mol, anion_site: Dict) -> str:
+    """Neutralize carboxylate [O-] to OH and name as carboxylic acid.
+
+    Returns the acid name or empty string on failure.
+    """
+    try:
+        rw = Chem.RWMol(mol)
+        o_idx = anion_site['atom_idx']
+        o_atom = rw.GetAtomWithIdx(o_idx)
+        o_atom.SetFormalCharge(0)
+        o_atom.SetNumExplicitHs(o_atom.GetNumExplicitHs() + 1)
+
+        try:
+            Chem.SanitizeMol(rw)
+        except Exception:
+            return ''
+
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+        if not neutral_smiles:
+            return ''
+
+        from ..namer import Orthonym
+        namer = Orthonym(style='pin')
+        acid_name = namer.name(neutral_smiles)
+        if acid_name and ('oic acid' in acid_name or 'ic acid' in acid_name):
+            return acid_name
+    except (RecursionError, ValueError, RuntimeError):
+        pass
+    return ''
+
+
+def _acid_to_oate(acid_name: str) -> str:
+    """Convert a carboxylic acid name to its carboxylate (-oate) form.
+
+    Handles:
+    - 'X-oic acid' -> 'X-oate'
+    - 'Xanoic acid' -> 'Xanoate'
+    - Retained names: 'acetic acid' -> 'acetate', 'formic acid' -> 'formate'
+    """
+    if not acid_name:
+        return ''
+
+    # Retained acid -> retained oate
+    retained_map = {
+        'formic acid': 'formate',
+        'acetic acid': 'acetate',
+        'propionic acid': 'propanoate',
+        'butyric acid': 'butanoate',
+        'valeric acid': 'pentanoate',
+        'isovaleric acid': '3-methylbutanoate',
+    }
+    if acid_name in retained_map:
+        return retained_map[acid_name]
+
+    # Standard conversion: '-oic acid' -> '-oate'
+    if acid_name.endswith('oic acid'):
+        return acid_name[:-len('oic acid')] + 'oate'
+    # '-ic acid' (benzoic acid -> benzoate)
+    if acid_name.endswith('ic acid'):
+        return acid_name[:-len('ic acid')] + 'ate'
+    return ''
+
+
+def _find_carboxylate_chain(mol, anion_site: Dict):
+    """Find the longest carbon chain from the carboxylate group.
+
+    Returns (chain_atoms, double_bond_locants) where chain_atoms is a list
+    of atom indices starting from the carboxylate carbon, and double_bond_locants
+    is a list of IUPAC locants for C=C double bonds along the chain.
+    """
+    anion_idx = anion_site['atom_idx']
+    atom = mol.GetAtomWithIdx(anion_idx)
+
+    # Find the carboxyl carbon (C attached to charged O)
+    carboxyl_c = None
+    for nbr in atom.GetNeighbors():
+        if nbr.GetSymbol() == 'C':
+            carboxyl_c = nbr.GetIdx()
+            break
+    if carboxyl_c is None:
+        return None, []
+
+    # BFS to find longest carbon chain from carboxyl C
+    # Exclude the carboxylate oxygens from traversal
+    carboxylate_os = set()
+    for nbr in mol.GetAtomWithIdx(carboxyl_c).GetNeighbors():
+        if nbr.GetSymbol() == 'O':
+            carboxylate_os.add(nbr.GetIdx())
+
+    def _longest_chain(start_idx, visited):
+        """DFS to find longest carbon chain."""
+        best = [start_idx]
+        a = mol.GetAtomWithIdx(start_idx)
+        for nbr in a.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in visited or nidx in carboxylate_os:
+                continue
+            if nbr.GetSymbol() != 'C':
+                continue
+            visited.add(nidx)
+            sub = _longest_chain(nidx, visited)
+            candidate = [start_idx] + sub
+            if len(candidate) > len(best):
+                best = candidate
+            visited.discard(nidx)
+        return best
+
+    chain = _longest_chain(carboxyl_c, {carboxyl_c})
+
+    # Find double bonds along the chain and their locants
+    double_bond_locs = []
+    for i in range(len(chain) - 1):
+        bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if bond and bond.GetBondTypeAsDouble() == 2.0:
+            double_bond_locs.append(i + 1)  # 1-indexed: C1 is carboxylate carbon
+
+    return chain, double_bond_locs
 
 
 def _name_alkoxide_systematic(mol, anion_site: Dict, style: str) -> str:
     """Generate systematic name for alkoxide anion."""
     # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+
+    if carbon_count < 1:
+        return ''  # No carbon chain - inorganic anion, not an alkoxide
 
     from ..data.chain_names import get_chain_prefix as _gcp
     base = _gcp(carbon_count) + 'an'
@@ -914,8 +1056,9 @@ def _name_phenolate_systematic(mol, anion_site: Dict) -> str:
 
 def _name_carbanion_systematic(mol, anion_site: Dict) -> str:
     """Generate systematic name for carbanion."""
-    # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    if carbon_count < 1:
+        return ''
 
     from ..data.chain_names import get_chain_prefix as _gcp
     base = _gcp(carbon_count) + 'an'
@@ -924,8 +1067,9 @@ def _name_carbanion_systematic(mol, anion_site: Dict) -> str:
 
 def _name_thiolate_systematic(mol, anion_site: Dict) -> str:
     """Generate systematic name for thiolate anion."""
-    # Count carbons
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    if carbon_count < 1:
+        return ''
 
     from ..data.chain_names import get_chain_name
     base = get_chain_name(carbon_count)
@@ -934,6 +1078,7 @@ def _name_thiolate_systematic(mol, anion_site: Dict) -> str:
 
 def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     """Generate systematic name for aminium cation."""
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     # Count carbons attached to nitrogen
     atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
     carbon_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == 'C']
@@ -941,29 +1086,30 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     if len(carbon_neighbors) == 0:
         # NH4+ -> ammonium
         return 'ammonium'
-    elif len(carbon_neighbors) == 1:
+
+    from ..data.chain_names import get_alkyl_name as _gal
+
+    if len(carbon_neighbors) == 1:
         # Count carbons in substituent
         carbon_count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
-        from ..data.chain_names import get_alkyl_name as _gal
         alkyl = _gal(carbon_count)
         return alkyl + 'ammonium'
-    elif len(carbon_neighbors) == 4:
-        # Quaternary: tetra-alkyl-ammonium
-        from ..data.chain_names import get_alkyl_name as _gal
-        alkyl_names = []
-        for neighbor in carbon_neighbors:
-            count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {cation_site['atom_idx']})
-            alkyl_names.append(_gal(count))
 
-        # Check if all same
-        if len(set(alkyl_names)) == 1:
-            return 'tetra' + alkyl_names[0] + 'ammonium'
-        else:
-            # Sort alphabetically
-            alkyl_names.sort()
-            return ''.join(alkyl_names) + 'ammonium'
+    # 2, 3, or 4 carbon neighbors
+    alkyl_names = []
+    for neighbor in carbon_neighbors:
+        count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {cation_site['atom_idx']})
+        alkyl_names.append(_gal(count))
+
+    # Check if all same
+    if len(set(alkyl_names)) == 1:
+        n = len(alkyl_names)
+        mult = SIMPLE_MULTIPLIERS.get(n, str(n))
+        return mult + alkyl_names[0] + 'ammonium'
     else:
-        return 'aminium'
+        # Sort alphabetically and concatenate
+        alkyl_names.sort()
+        return ''.join(alkyl_names) + 'ammonium'
 
 
 def _name_carbenium_systematic(mol, cation_site: Dict) -> str:
@@ -1001,8 +1147,11 @@ def _name_onium_systematic(mol, cation_site: Dict) -> str:
         return base
     elif len(carbon_neighbors) == 1:
         count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
-        ALKYL_NAMES = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl'}
-        alkyl = ALKYL_NAMES.get(count, '')
+        from ..assembly.naming_utils import get_alkyl_name as _gname
+        try:
+            alkyl = _gname(count)
+        except (ValueError, KeyError):
+            alkyl = ''
         return alkyl + base
     else:
         # Multiple substituents

@@ -20,6 +20,8 @@ from .naming_utils import (
     format_substituent_prefix,
     alpha_sort_key,
     get_alkyl_name,
+    SIMPLE_MULTIPLIERS,
+    COMPLEX_MULTIPLIERS,
 )
 from ..data.chain_names import get_chain_prefix
 
@@ -164,26 +166,8 @@ CHAIN_PREFIXES = {
     90: "nonacont", 100: "hect",
 }
 
-# Simple multiplicative prefixes (for simple substituent names)
-SIMPLE_MULTIPLIERS = {
-    2: "di", 3: "tri", 4: "tetra", 5: "penta",
-    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
-    11: "undeca", 12: "dodeca",
-}
-
-# Complex multiplicative prefixes (for substituents with locants/hyphens)
-COMPLEX_MULTIPLIERS = {
-    2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis",
-    6: "hexakis", 7: "heptakis", 8: "octakis", 9: "nonakis", 10: "decakis",
-}
-
 # Prefixes to IGNORE for alphabetization
-IGNORE_FOR_ALPHA = {
-    "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "nona", "deca",
-    "undeca", "dodeca",
-    "bis", "tris", "tetrakis", "pentakis", "hexakis", "heptakis",
-    "octakis", "nonakis", "decakis",
-}
+IGNORE_FOR_ALPHA = set(SIMPLE_MULTIPLIERS.values()) | set(COMPLEX_MULTIPLIERS.values())
 
 # Terminal functional groups that NEVER include locants in the name
 # These are always at position 1 by definition (chain numbered from terminal group)
@@ -204,6 +188,7 @@ class NameFragment:
     locants: tuple = ()
     priority: int = 0
     fragment_type: str = "prefix"  # prefix, parent, suffix, stereo
+    count: int = 1  # Number of instances (for multiplier when locants are omitted)
 
 
 def assemble_name(features: Any, style: str = "pin") -> str:
@@ -396,6 +381,12 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     # Handle amides (including N-substituted amides)
     if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
         return _assemble_amide_name(features, style)
+
+    # Handle secondary/tertiary amines: add N-alkyl prefixes
+    if features.principal_group in ('secondary_amine', 'tertiary_amine'):
+        amine_name = _assemble_amine_name(features, style)
+        if amine_name:
+            return amine_name
 
     # Handle simple cases
     if not features.principal_chain and not features.ring_systems:
@@ -915,7 +906,10 @@ def _get_bicyclo_parent_stem(carbon_count: int) -> str:
         4: "but", 5: "pent", 6: "hex", 7: "hept", 8: "oct",
         9: "non", 10: "dec", 11: "undec", 12: "dodec",
     }
-    return stems.get(carbon_count, f"C{carbon_count}")
+    if carbon_count in stems:
+        return stems[carbon_count]
+    from ..data.chain_names import get_chain_prefix
+    return get_chain_prefix(carbon_count)
 
 
 def _build_bicyclo_unsaturation_suffix(
@@ -1120,10 +1114,147 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         amide_atoms = features.principal_group_atoms[0]
 
     if amide_atoms:
-        return name_amide(features.mol, amide_atoms)
+        base_name = name_amide(features.mol, amide_atoms)
+        if base_name:
+            # Add non-principal group prefixes (halogens, hydroxy, etc.)
+            prefixes = _generate_prefixes(features)
+            if prefixes:
+                prefix_parts = []
+                for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
+                    if p.locants:
+                        loc_str = ",".join(str(l) for l in p.locants)
+                        prefix_parts.append(f"{loc_str}-{p.text}")
+                    else:
+                        prefix_parts.append(p.text)
+                if prefix_parts:
+                    prefix_str = "-".join(prefix_parts)
+                    return f"{prefix_str}{base_name}"
+            return base_name
 
     # Fallback
     return "amide"
+
+
+def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
+    """
+    Assemble name for secondary/tertiary amines with N-alkyl prefixes.
+
+    For secondary amines: N-alkyl + parent amine (N-ethylethanamine)
+    For tertiary amines: N,N-dialkyl + parent amine (N,N-dimethylethanamine)
+
+    Returns None if unable to assemble (falls through to general naming).
+    """
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms:
+        return None
+
+    match = pg_atoms[0]
+    # Find nitrogen atom in the match
+    n_idx = None
+    for idx in match:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'N':
+            n_idx = idx
+            break
+    if n_idx is None:
+        return None
+
+    nitrogen = mol.GetAtomWithIdx(n_idx)
+    chain_set = set(features.principal_chain) if features.principal_chain else set()
+
+    # Find N-substituents: carbon neighbors of N that are NOT on the principal chain
+    from collections import deque
+    n_subs = []
+    for nbr in nitrogen.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in chain_set:
+            continue
+        if nbr.GetSymbol() == 'H':
+            continue
+        # BFS to get the substituent fragment
+        visited = set()
+        queue = deque([nbr_idx])
+        frag = []
+        while queue:
+            a = queue.popleft()
+            if a in visited or a == n_idx:
+                continue
+            visited.add(a)
+            frag.append(a)
+            for nn in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nn.GetIdx() not in visited and nn.GetIdx() != n_idx:
+                    queue.append(nn.GetIdx())
+        if frag:
+            cc = sum(1 for i in frag if mol.GetAtomWithIdx(i).GetSymbol() == 'C')
+            # Check for aromatic rings
+            has_phenyl = False
+            ring_info = mol.GetRingInfo()
+            for ring in ring_info.AtomRings():
+                if all(r in set(frag) for r in ring) and len(ring) == 6:
+                    if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
+                           mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
+                        non_ring = cc - 6
+                        if non_ring == 0:
+                            n_subs.append("phenyl")
+                            has_phenyl = True
+                            break
+            if not has_phenyl and cc > 0:
+                try:
+                    n_subs.append(get_alkyl_name(cc))
+                except (ValueError, KeyError):
+                    pass
+
+    if not n_subs:
+        return None  # No N-substituents found, use general path
+
+    # Build N-prefix (same logic as amide N-substitution)
+    from collections import Counter
+    sub_counts = Counter(n_subs)
+    n_prefix_parts = []
+    for name in sorted(sub_counts.keys()):
+        count = sub_counts[name]
+        if count == 1:
+            n_prefix_parts.append(f"N-{name}")
+        else:
+            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
+            n_prefix_parts.append(f"N,{'N,' * (count - 1)}{mult}{name}")
+
+    n_prefix = "-".join(n_prefix_parts)
+
+    # Get base amine name from the general assembly
+    # Build name using standard fragments
+    fragments = []
+    if features.principal_chain:
+        parent = _generate_chain_parent(features)
+    elif features.ring_systems:
+        parent = _generate_ring_parent(features)
+    else:
+        return None
+
+    fragments.append(parent)
+
+    if features.principal_group:
+        suffix = _generate_suffix(features)
+        if suffix:
+            fragments.append(suffix)
+
+    # Generate non-N prefixes (halogens, hydroxy, etc.)
+    other_prefixes = _generate_prefixes(features)
+    fragments.extend(other_prefixes)
+
+    # Generate stereodescriptors
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        stereo = _generate_stereodescriptors(features)
+        if stereo:
+            fragments.append(stereo)
+
+    base_name = _assemble_fragments(fragments, style)
+
+    # Prepend N-prefix
+    if base_name:
+        return f"{n_prefix}{base_name}"
+
+    return None
 
 
 def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
@@ -1336,6 +1467,7 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
 
     # Get locants for functional group positions on the chain
     locants = ()
+    fg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
     if features.principal_chain and features.atom_to_locant and features.principal_group_atoms:
         fg_locants = get_functional_group_locants(
             features.principal_chain,
@@ -1355,7 +1487,8 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
     return NameFragment(
         text=suffix_text,
         locants=locants,
-        fragment_type="suffix"
+        fragment_type="suffix",
+        count=fg_count,
     )
 
 
@@ -1391,22 +1524,57 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         prefixes.extend(ring_prefixes)
 
     # --- Handle non-principal functional groups as prefixes ---
+    # When chain_is_parent, skip FGs on ring atoms (already in ring substituent name)
+    ring_atom_set = set()
+    if getattr(features, 'chain_is_parent', False):
+        for rg in getattr(features, 'ring_substituents_as_groups', []):
+            ring_atom_set.update(rg)
+
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
             continue
 
+        # Filter out FGs on ring atoms when chain is parent
+        if ring_atom_set:
+            filtered = []
+            for match in matches:
+                # Skip FG if its carbon anchor is on a ring substituent
+                # Check: is any carbon in the match a ring atom?
+                on_ring = any(
+                    a in ring_atom_set for a in match
+                    if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+                )
+                if not on_ring:
+                    filtered.append(match)
+            matches = filtered
+
         prefix_text = get_prefix(fg_name)
         if prefix_text and matches:
             count = len(matches)
+
+            # Compute locants by mapping FG anchor atoms to chain positions
+            fg_locants = _get_fg_locants(features, fg_name, matches)
 
             if count > 1:
                 # Add multiplier
                 multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
                 prefix_text = f"{multiplier}{prefix_text}"
 
+            # Omit locants when they are trivially unambiguous:
+            # - Chain length 1 (methane derivatives): only position 1 exists
+            # - Single FG at position 1 on a chain with no principal group
+            chain = getattr(features, 'principal_chain', [])
+            chain_len = len(chain)
+            omit_locants = False
+            if chain_len == 1:
+                omit_locants = True
+            elif (chain_len > 0 and features.principal_group is None
+                  and count == 1 and fg_locants == [1]):
+                omit_locants = True
+
             prefixes.append(NameFragment(
                 text=prefix_text,
-                locants=(),  # TODO: Add locants
+                locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
                 fragment_type="prefix"
             ))
 
@@ -1417,6 +1585,58 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
     prefixes = _merge_duplicate_prefixes(prefixes)
 
     return prefixes
+
+
+def _get_fg_locants(features, fg_name: str, matches: list) -> list:
+    """Map FG match atom indices to IUPAC chain or ring locants.
+
+    For each FG match, finds the anchor atom (the carbon the FG is attached to,
+    or the heteroatom itself for groups like fluoro/hydroxy) and maps it to
+    the corresponding position in the principal chain or ring.
+
+    Returns:
+        List of integer locants (1-indexed), one per match.
+    """
+    chain = getattr(features, 'principal_chain', [])
+    oriented_ring = getattr(features, 'oriented_ring', None)
+    mol = features.mol
+
+    if not chain and not oriented_ring:
+        return []
+
+    # Build atom_idx -> locant map
+    idx_to_locant = {}
+    if chain:
+        for pos, atom_idx in enumerate(chain):
+            idx_to_locant[atom_idx] = pos + 1  # 1-indexed
+    elif oriented_ring:
+        for pos, atom_idx in enumerate(oriented_ring):
+            idx_to_locant[atom_idx] = pos + 1
+
+    locants = []
+    for match in matches:
+        # Find the anchor atom in the chain/ring
+        # For halogens, amino, hydroxy: match is (heteroatom, carbon_anchor) or similar
+        # Try each atom in the match to find one in the chain
+        found = False
+        for atom_idx in match:
+            if atom_idx in idx_to_locant:
+                locants.append(idx_to_locant[atom_idx])
+                found = True
+                break
+        if not found:
+            # Try neighbors of match atoms
+            for atom_idx in match:
+                atom = mol.GetAtomWithIdx(atom_idx)
+                for nbr in atom.GetNeighbors():
+                    if nbr.GetIdx() in idx_to_locant:
+                        locants.append(idx_to_locant[nbr.GetIdx()])
+                        found = True
+                        break
+                if found:
+                    break
+
+    return locants
 
 
 def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment]:
@@ -1561,9 +1781,12 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     # Group ring substituents by name for multiplier handling
     ring_sub_groups: Dict[str, List[int]] = defaultdict(list)
 
+    chain_set = set(features.principal_chain)
+
     for ring_atoms in ring_groups:
-        # Get substituent name (phenyl, cyclohexyl, etc.)
-        sub_name = get_ring_substituent_name(features.mol, ring_atoms)
+        ring_atom_set = set(ring_atoms)
+        # Get base substituent name (phenyl, cyclohexyl, etc.)
+        base_name = get_ring_substituent_name(features.mol, ring_atoms)
 
         # Find which chain position the ring attaches to
         try:
@@ -1573,10 +1796,15 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 features.principal_chain,
                 features.atom_to_locant
             )
-            ring_sub_groups[sub_name].append(locant)
         except ValueError:
-            # If we can't find the attachment, skip this ring
             continue
+
+        # Detect substituents on the ring itself
+        sub_name = _build_substituted_ring_name(
+            features.mol, ring_atoms, chain_set, base_name
+        )
+
+        ring_sub_groups[sub_name].append(locant)
 
     # Build prefix fragments
     for name, locants in ring_sub_groups.items():
@@ -1595,6 +1823,213 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     prefixes.sort(key=lambda f: alpha_sort_key(f.text))
 
     return prefixes
+
+
+def _build_substituted_ring_name(
+    mol, ring_atoms, chain_set: set, base_name: str
+) -> str:
+    """
+    Build ring substituent name including substituents on the ring.
+
+    For example, a benzene ring with two OH groups becomes
+    "(3,4-dihydroxyphenyl)" instead of just "phenyl".
+
+    Only handles common cases: halogens, hydroxy, methoxy, amino, alkyl
+    on benzene-like rings. Falls back to bare base_name otherwise.
+    """
+    from rdkit import Chem
+
+    ring_atom_set = set(ring_atoms)
+
+    # Find attachment point (ring atom bonded to chain atom)
+    attachment_idx = None
+    for ra in ring_atoms:
+        atom = mol.GetAtomWithIdx(ra)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in chain_set:
+                attachment_idx = ra
+                break
+        if attachment_idx is not None:
+            break
+
+    if attachment_idx is None:
+        return base_name
+
+    # Only handle 6-membered carbocyclic rings (benzene-like) for now
+    if len(ring_atoms) != 6:
+        return base_name
+    # Check it's all carbons
+    if not all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms):
+        return base_name
+
+    # Try both numbering directions and pick lowest locant set
+    numberings = _number_ring_from_attachment(mol, ring_atoms, attachment_idx)
+    if numberings is None:
+        return base_name
+
+    # If single numbering returned (dict), wrap in list
+    if isinstance(numberings, dict):
+        numberings = [numberings]
+
+    best_sub_groups = None
+    best_locant_set = None
+
+    for ring_order in numberings:
+        if len(ring_order) != 6:
+            continue
+        sub_groups = _detect_ring_substituents(
+            mol, ring_order, ring_atom_set, chain_set
+        )
+        if not sub_groups:
+            continue
+        # Collect all locants for comparison
+        all_locs = sorted(loc for locs in sub_groups.values() for loc in locs)
+        if best_locant_set is None or all_locs < best_locant_set:
+            best_locant_set = all_locs
+            best_sub_groups = sub_groups
+
+    if not best_sub_groups:
+        # No substituents on ring, or couldn't detect - check if any exist
+        # Try with first numbering just to detect
+        for ring_order in (numberings if isinstance(numberings, list) else [numberings]):
+            subs = _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set)
+            if not subs:
+                return base_name
+        return base_name
+
+    sub_groups = best_sub_groups
+
+    # Build prefix string for ring substituents
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    prefix_parts = []
+    for name in sorted(sub_groups.keys(), key=alpha_sort_key):
+        locs = sorted(sub_groups[name])
+        count = len(locs)
+        loc_str = ','.join(str(l) for l in locs)
+        if count == 1:
+            prefix_parts.append(f'{loc_str}-{name}')
+        else:
+            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
+            prefix_parts.append(f'{loc_str}-{mult}{name}')
+
+    ring_prefix = '-'.join(prefix_parts)
+    # Wrap in parentheses: (3,4-dihydroxyphenyl)
+    return f'({ring_prefix}{base_name})'
+
+
+def _number_ring_from_attachment(mol, ring_atoms, attachment_idx):
+    """Number ring atoms starting from attachment point.
+
+    Returns list of both CW and CCW numberings for locant comparison.
+    """
+    ring_set = set(ring_atoms)
+
+    # Get the two neighbors of attachment in the ring
+    attachment_atom = mol.GetAtomWithIdx(attachment_idx)
+    ring_nbrs = [n.GetIdx() for n in attachment_atom.GetNeighbors()
+                 if n.GetIdx() in ring_set]
+
+    if len(ring_nbrs) < 2:
+        return None
+
+    candidates = []
+    for start_nbr in ring_nbrs:
+        numbering = {1: attachment_idx}
+        visited = {attachment_idx}
+        current = start_nbr
+        pos = 2
+
+        while pos <= len(ring_atoms):
+            numbering[pos] = current
+            visited.add(current)
+            pos += 1
+            atom = mol.GetAtomWithIdx(current)
+            next_atom = None
+            for nbr in atom.GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in ring_set and ni not in visited:
+                    next_atom = ni
+                    break
+            if next_atom is None:
+                break
+            current = next_atom
+
+        if len(numbering) == len(ring_atoms):
+            candidates.append(numbering)
+
+    return candidates if candidates else None
+
+
+def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
+    """Detect substituents on ring atoms and return {prefix_name: [locants]}."""
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy'}
+
+    sub_groups = defaultdict(list)
+    for ring_pos, atom_idx in ring_order.items():
+        if ring_pos == 1:
+            continue  # Skip attachment point
+        atom = mol.GetAtomWithIdx(atom_idx)
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in ring_atom_set or ni in chain_set:
+                continue
+            sym = nbr.GetSymbol()
+            if sym in _HALOGEN_PREFIX:
+                sub_groups[_HALOGEN_PREFIX[sym]].append(ring_pos)
+            elif sym == 'O':
+                h_count = nbr.GetTotalNumHs()
+                o_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != atom_idx]
+                if h_count == 1 and len(o_nbrs) == 0:
+                    sub_groups['hydroxy'].append(ring_pos)
+                elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
+                    c_count = _count_pure_alkyl(mol, o_nbrs[0].GetIdx(), ring_atom_set | {ni})
+                    if c_count and c_count in _ALKOXY:
+                        sub_groups[_ALKOXY[c_count]].append(ring_pos)
+                    elif c_count:
+                        from ..data.chain_names import get_alkyl_name as _gal
+                        try:
+                            sub_groups[f'{_gal(c_count)}oxy'].append(ring_pos)
+                        except (ValueError, KeyError):
+                            pass
+            elif sym == 'N':
+                h_count = nbr.GetTotalNumHs()
+                n_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != atom_idx]
+                if h_count == 2 and len(n_nbrs) == 0:
+                    sub_groups['amino'].append(ring_pos)
+            elif sym == 'C':
+                bond = mol.GetBondBetweenAtoms(atom_idx, ni)
+                if bond and bond.GetBondTypeAsDouble() == 1.0:
+                    c_count = _count_pure_alkyl(mol, ni, ring_atom_set)
+                    if c_count:
+                        from ..data.chain_names import get_alkyl_name as _gal
+                        try:
+                            sub_groups[_gal(c_count)].append(ring_pos)
+                        except (ValueError, KeyError):
+                            pass
+
+    return dict(sub_groups) if sub_groups else None
+
+
+def _count_pure_alkyl(mol, start_idx, excluded):
+    """Count carbons in a pure alkyl chain from start_idx."""
+    visited = {start_idx}
+    queue = [start_idx]
+    carbon_count = 0
+
+    while queue:
+        idx = queue.pop(0)
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None  # Not pure alkyl
+        carbon_count += 1
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in visited and ni not in excluded:
+                visited.add(ni)
+                queue.append(ni)
+
+    return carbon_count if carbon_count > 0 else None
 
 
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
@@ -1627,12 +2062,29 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
 
+    # Collect atoms that belong to principal group (amide/amine N-substituents
+    # are handled by specialized naming functions, not here)
+    pg_atom_set = set()
+    if features.principal_group_atoms:
+        for match in features.principal_group_atoms:
+            pg_atom_set.update(match)
+
     for position, sub_list in features.substituents.items():
         # position is already a 1-indexed locant (from get_substituents)
         for sub_atoms in sub_list:
             # Skip substituents that are ring atoms (handled separately)
             if ring_atoms_to_skip and set(sub_atoms) & ring_atoms_to_skip:
                 continue
+
+            # Skip substituents containing the principal group nitrogen
+            # (amide N-substituents are handled by _assemble_amide_name,
+            #  amine N-substituents by _assemble_amine_name)
+            if features.principal_group in (
+                'primary_amide', 'secondary_amide', 'tertiary_amide',
+                'secondary_amine', 'tertiary_amine',
+            ):
+                if set(sub_atoms) & pg_atom_set:
+                    continue
 
             # Count only carbon atoms in the substituent
             carbon_count = sum(
@@ -1655,7 +2107,27 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 alkoxy_name = _check_for_alkoxy(mol, sub_atoms, features.principal_chain)
                 if alkoxy_name:
                     substituent_groups[alkoxy_name].append(position)
-                # Skip other complex substituents for now
+                    continue
+
+                # Check for acylamino pattern: -NH-C(=O)-R
+                acylamino_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
+                if acylamino_name:
+                    substituent_groups[acylamino_name].append(position)
+                    continue
+
+                # Check for acyloxy pattern: -O-C(=O)-R
+                acyloxy_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
+                if acyloxy_name:
+                    substituent_groups[acyloxy_name].append(position)
+                    continue
+
+                # General fallback for other heteroatom substituents
+                hetero_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
+                if hetero_name:
+                    substituent_groups[hetero_name].append(position)
+                    continue
+
+                # Truly unnameable substituent - skip
                 continue
 
             # Get alkyl name from carbon count
@@ -1683,12 +2155,15 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         if is_simple_hydrocarbon and total_substituents == 1 and sorted_locants == [1]:
             # Just the name, no locant: "methoxy" not "1-methoxy"
             formatted = name
+            # Use empty locants so _assemble_fragments won't re-add "1-"
+            emit_locants = ()
         else:
             formatted = format_substituent_prefix(name, sorted_locants, count)
+            emit_locants = tuple(sorted_locants)
 
         prefixes.append(NameFragment(
             text=formatted,
-            locants=tuple(sorted_locants),
+            locants=emit_locants,
             fragment_type="prefix"
         ))
 
@@ -1765,8 +2240,282 @@ def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> 
     return None
 
 
+def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
+    """
+    Check if a substituent is an acylamino group: -NH-C(=O)-R or -N(R)-C(=O)-R.
+
+    Pattern: nitrogen bonded to chain, also bonded to a carbonyl carbon C(=O),
+    which in turn is bonded to an alkyl chain R.
+
+    Returns name like "(hexacosanoyl)amino" for -NH-C(=O)-C25H51.
+    """
+    chain_set = set(principal_chain)
+    sub_set = set(sub_atoms)
+
+    # Find nitrogen atoms in the substituent
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'N':
+            continue
+
+        # Check if N is bonded to a chain atom
+        bonded_to_chain = any(
+            nbr.GetIdx() in chain_set for nbr in atom.GetNeighbors()
+        )
+        if not bonded_to_chain:
+            continue
+
+        # Look for carbonyl carbon bonded to this N (C(=O) in sub)
+        carbonyl_c = None
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx not in sub_set or nbr.GetSymbol() != 'C':
+                continue
+            # Check if this C has a double-bonded O
+            for nbr2 in nbr.GetNeighbors():
+                if nbr2.GetSymbol() == 'O' and nbr2.GetIdx() in sub_set:
+                    bond = mol.GetBondBetweenAtoms(nbr_idx, nbr2.GetIdx())
+                    if bond and bond.GetBondTypeAsDouble() == 2.0:
+                        carbonyl_c = nbr_idx
+                        break
+            if carbonyl_c is not None:
+                break
+
+        if carbonyl_c is None:
+            # No carbonyl - could be a simple alkylamino
+            # Check for ring in substituent first
+            ring_info = mol.GetRingInfo()
+            sub_has_ring = any(
+                ring_info.NumAtomRings(a) > 0 for a in sub_atoms
+                if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+            )
+            if sub_has_ring:
+                # Check for phenyl
+                for ring in ring_info.AtomRings():
+                    if all(r in sub_set for r in ring) and len(ring) == 6:
+                        all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+                        all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+                        if all_arom and all_c:
+                            return "(phenylamino)"
+                continue  # Skip non-phenyl ring substituents
+
+            # Count carbons attached to N via C-C bonds only
+            n_alkyl_carbons = 0
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in chain_set:
+                    continue
+                if nbr.GetSymbol() == 'C':
+                    n_alkyl_carbons += _count_carbon_chain(
+                        mol, nbr.GetIdx(), chain_set | {idx}
+                    )
+            if n_alkyl_carbons > 0:
+                try:
+                    alkyl = get_alkyl_name(n_alkyl_carbons)
+                    return f"({alkyl}amino)"
+                except (ValueError, KeyError):
+                    pass
+            continue
+
+        # Found carbonyl: count carbons in the acyl chain (including carbonyl C)
+        carbonyl_o = None
+        for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors():
+            if nbr.GetSymbol() == 'O' and nbr.GetIdx() in sub_set:
+                bond = mol.GetBondBetweenAtoms(carbonyl_c, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() == 2.0:
+                    carbonyl_o = nbr.GetIdx()
+                    break
+
+        # Count carbons from carbonyl C through C-C bonds only
+        # (don't traverse through N to reach other peptide fragments)
+        exclude = chain_set | {idx}  # exclude chain and the N
+        if carbonyl_o is not None:
+            exclude.add(carbonyl_o)  # exclude the C=O oxygen
+        acyl_carbons = _count_carbon_chain(mol, carbonyl_c, exclude)
+        if acyl_carbons == 0:
+            acyl_carbons = 1  # at minimum the carbonyl C
+
+        # Build acylamino name: (prefix-anoyl)amino
+        try:
+            acyl_prefix = get_chain_prefix(acyl_carbons)
+            return f"({acyl_prefix}anoyl)amino"
+        except (ValueError, KeyError):
+            pass
+
+    return None
+
+
+def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
+    """
+    Check if a substituent is an acyloxy group: -O-C(=O)-R.
+
+    Pattern: oxygen bonded to chain, also bonded to a carbonyl carbon C(=O),
+    which is bonded to an alkyl chain R.
+
+    Returns name like "(ethanoyl)oxy" for -O-C(=O)-CH3.
+    """
+    chain_set = set(principal_chain)
+    sub_set = set(sub_atoms)
+
+    # Find oxygen atom bonded to chain
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'O' or atom.GetDegree() != 2:
+            continue
+
+        bonded_to_chain = any(
+            nbr.GetIdx() in chain_set for nbr in atom.GetNeighbors()
+        )
+        if not bonded_to_chain:
+            continue
+
+        # Look for carbonyl carbon bonded to this O
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx not in sub_set or nbr.GetSymbol() != 'C':
+                continue
+            # Check if this C has another double-bonded O
+            has_carbonyl = False
+            carbonyl_o = None
+            for nbr2 in nbr.GetNeighbors():
+                if nbr2.GetIdx() == idx:
+                    continue
+                if nbr2.GetSymbol() == 'O':
+                    bond = mol.GetBondBetweenAtoms(nbr_idx, nbr2.GetIdx())
+                    if bond and bond.GetBondTypeAsDouble() == 2.0:
+                        has_carbonyl = True
+                        carbonyl_o = nbr2.GetIdx()
+                        break
+
+            if has_carbonyl:
+                # Count carbons in acyl chain via C-C bonds only
+                exclude = chain_set | {idx}
+                if carbonyl_o is not None:
+                    exclude.add(carbonyl_o)
+                acyl_carbons = _count_carbon_chain(mol, nbr_idx, exclude)
+                if acyl_carbons == 0:
+                    acyl_carbons = 1
+
+                try:
+                    acyl_prefix = get_chain_prefix(acyl_carbons)
+                    return f"({acyl_prefix}anoyl)oxy"
+                except (ValueError, KeyError):
+                    pass
+
+    return None
+
+
+def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
+    """
+    Fallback naming for heteroatom-containing substituents that aren't
+    alkoxy, acylamino, or acyloxy.
+
+    Handles: simple amino alkyl chains, hydroxyalkyl, etc.
+    """
+    chain_set = set(principal_chain)
+    sub_set = set(sub_atoms)
+
+    # Identify the atom bonded to the chain (the attachment point)
+    attach_atom = None
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in chain_set:
+                attach_atom = idx
+                break
+        if attach_atom is not None:
+            break
+
+    if attach_atom is None:
+        return None
+
+    atom = mol.GetAtomWithIdx(attach_atom)
+    symbol = atom.GetSymbol()
+
+    # If attachment is through N (amino substituent)
+    if symbol == 'N':
+        # Check if any atoms reachable from N (excluding chain) are in a ring
+        ring_info = mol.GetRingInfo()
+        sub_has_ring = any(
+            ring_info.NumAtomRings(idx) > 0
+            for idx in sub_atoms
+            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+        )
+        if sub_has_ring:
+            # Substituent has a ring - check for phenyl/benzene
+            for ring in ring_info.AtomRings():
+                if all(r in sub_set for r in ring) and len(ring) == 6:
+                    all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+                    all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+                    if all_arom and all_c:
+                        return "(phenylamino)"
+            # Non-phenyl ring: skip (complex, would need recursive naming)
+            return None
+
+        # Count carbons reachable from N via C-C bonds only
+        carbon_count = 0
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in chain_set:
+                continue
+            if nbr.GetSymbol() == 'C':
+                carbon_count += _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
+
+        if carbon_count == 0:
+            return "amino"
+        try:
+            alkyl = get_alkyl_name(carbon_count)
+            return f"({alkyl}amino)"
+        except (ValueError, KeyError):
+            return "amino"
+
+    # If attachment is through O but not alkoxy or acyloxy
+    # (could be plain hydroxyl on carbon substituent)
+    if symbol == 'O':
+        return None  # handled by FG prefixes
+
+    # If attachment is through C with heteroatoms deeper in the chain
+    if symbol == 'C':
+        # Check if substituent contains a ring - skip complex ring naming
+        ring_info = mol.GetRingInfo()
+        sub_has_ring = any(
+            ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
+        )
+        if sub_has_ring:
+            return None  # Complex ring substituent - needs specialized naming
+
+        # Count carbons via C-C bonds only (don't traverse through heteroatoms)
+        total_carbons = _count_carbon_chain(mol, attach_atom, chain_set)
+        if total_carbons > 0:
+            # Check what heteroatoms are present
+            heteroatoms = set()
+            for i in sub_atoms:
+                sym = mol.GetAtomWithIdx(i).GetSymbol()
+                if sym not in ('C', 'H'):
+                    heteroatoms.add(sym)
+
+            # For C-chain with OH: name as hydroxyalkyl
+            if heteroatoms == {'O'}:
+                # Check if the O is -OH (not C=O or ether)
+                for i in sub_atoms:
+                    a = mol.GetAtomWithIdx(i)
+                    if a.GetSymbol() == 'O' and a.GetDegree() == 1:
+                        try:
+                            alkyl = get_alkyl_name(total_carbons)
+                            return f"(hydroxy{alkyl})"
+                        except (ValueError, KeyError):
+                            pass
+
+            # For simple case: just name as alkyl (ignoring heteroatoms)
+            # This is imperfect but better than dropping entirely
+            try:
+                return get_alkyl_name(total_carbons)
+            except (ValueError, KeyError):
+                pass
+
+    return None
+
+
 def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
-    """Count carbon atoms in an alkyl group via BFS."""
+    """Count carbon atoms in an alkyl group via BFS (traverses all atom types)."""
     from collections import deque
 
     visited = set()
@@ -1787,6 +2536,40 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
             nbr_idx = neighbor.GetIdx()
             if nbr_idx not in visited and nbr_idx not in exclude:
                 queue.append(nbr_idx)
+
+    return count
+
+
+def _count_carbon_chain(mol, start_idx: int, exclude: set) -> int:
+    """Count carbons reachable only through C-C bonds (no heteroatom traversal).
+
+    Unlike _count_alkyl_carbons, this stops at heteroatoms. Used for naming
+    acyl chains where we don't want to cross amide/ester bonds.
+    """
+    from collections import deque
+
+    visited = set()
+    queue = deque([start_idx])
+    count = 0
+
+    while queue:
+        atom_idx = queue.popleft()
+        if atom_idx in visited or atom_idx in exclude:
+            continue
+        visited.add(atom_idx)
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() != 'C':
+            continue  # Don't count or traverse through non-carbon atoms
+
+        count += 1
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in exclude:
+                # Only traverse to other carbon atoms
+                if neighbor.GetSymbol() == 'C':
+                    queue.append(nbr_idx)
 
     return count
 
@@ -1871,13 +2654,16 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
             # Monosubstituted: omit locant (it's always 1)
             # Just the substituent name: "methyl" not "1-methyl"
             formatted = name
+            # Use empty locants so _assemble_fragments won't re-add "1-"
+            emit_locants = ()
         else:
             # Polysubstituted: include locants
             formatted = format_substituent_prefix(name, sorted(locants), count)
+            emit_locants = tuple(sorted(locants))
 
         prefixes.append(NameFragment(
             text=formatted,
-            locants=tuple(sorted(locants)),
+            locants=emit_locants,
             fragment_type="prefix"
         ))
 
@@ -1976,10 +2762,22 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
     # For non-alkyl prefixes added later, sort all together.
     prefixes.sort(key=lambda f: alpha_sort_key(f.text))
 
-    # Concatenate prefixes with proper hyphenation
+    # Build prefix strings with locants
     # IUPAC rule: hyphens separate locants from names, and are needed
     # between prefixes when one ends with a letter and the next starts with a digit
-    prefix_str = _join_prefixes([f.text for f in prefixes])
+    # NOTE: Some prefixes already have locants baked in (ring substituent prefixes
+    # like "4-phenyl"). Only add locants to those that don't already have them.
+    import re
+    prefix_texts = []
+    for f in prefixes:
+        text = f.text
+        already_has_locant = bool(re.match(r'^\d', text))
+        if f.locants and not already_has_locant:
+            loc_str = ",".join(str(l) for l in f.locants)
+            prefix_texts.append(f"{loc_str}-{text}")
+        else:
+            prefix_texts.append(text)
+    prefix_str = _join_prefixes(prefix_texts)
 
     # Extract parent info: stem is in text, bond locants in locants
     stem = parent_frag.text if parent_frag else ""
@@ -1996,7 +2794,9 @@ def _assemble_fragments(fragments: List[NameFragment], style: str) -> str:
         suffix_locants = list(suffix_frag.locants) if suffix_frag.locants else []
 
         # Determine multiplier for multiple functional groups
-        count = len(suffix_locants)
+        # Use suffix_frag.count (set by _generate_suffix) which includes terminal
+        # groups like diacids where locants are omitted but multiplier is needed
+        count = max(len(suffix_locants), getattr(suffix_frag, 'count', 1))
         multiplier = get_multiplier_prefix(count, suffix_text) if count > 1 else ""
 
         # Build unsaturation infix with locants for compounds with functional groups

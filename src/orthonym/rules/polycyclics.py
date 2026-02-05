@@ -632,11 +632,19 @@ def _identify_pah_functionalized_chain(
     mol, start_idx: int, core_atoms: Set[int]
 ) -> Optional[Dict]:
     """
-    Identify functionalized chain substituent on PAH (hydroxymethyl, etc.).
+    Identify functionalized chain substituent on PAH.
 
     Handles carbon chains with terminal functional groups that are not
     simple alkyl groups. Called when _identify_pah_alkyl_group returns None
     due to heteroatom presence.
+
+    Recognizes functional groups that should be expressed as suffixes:
+    - -COOH → 'carboxylic acid' (suffix)
+    - -CHO → 'carbaldehyde' (suffix)
+    - -CONH2 → 'carboxamide' (suffix)
+    - -CN → 'carbonitrile' (suffix)
+    And prefix-only substituents:
+    - -CH2OH → 'hydroxymethyl'
     """
     # BFS to collect chain atoms
     visited = {start_idx}
@@ -660,20 +668,70 @@ def _identify_pah_functionalized_chain(
     if not chain_atoms or carbon_count == 0:
         return None
 
-    # Check for hydroxyl terminus (-CH2OH, -CH2CH2OH)
-    hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
-    if hydroxyl_pattern:
-        matches = mol.GetSubstructMatches(hydroxyl_pattern)
+    chain_set = set(chain_atoms)
+
+    # Check for carboxylic acid (-COOH): C(=O)(OH) where C is start_idx
+    acid_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    if acid_pattern:
+        matches = mol.GetSubstructMatches(acid_pattern)
         for match in matches:
-            if match[0] in chain_atoms:
-                hydroxyl_names = {
-                    1: 'hydroxymethyl',
-                    2: '2-hydroxyethyl',
-                    3: '3-hydroxypropyl',
-                }
-                name = hydroxyl_names.get(carbon_count)
-                if name:
-                    return {'name': name, 'atoms': chain_atoms}
+            if match[0] == start_idx:
+                return {'name': 'carboxylic acid', 'atoms': chain_atoms,
+                        'is_suffix': True, 'suffix_type': 'carboxylic_acid'}
+
+    # Check for aldehyde (-CHO): C(=O)H where C is start_idx
+    # CX3H1 because C is bonded to ring, O (double), and H
+    ald_pattern = Chem.MolFromSmarts('[CX3H1](=O)')
+    if ald_pattern:
+        matches = mol.GetSubstructMatches(ald_pattern)
+        for match in matches:
+            if match[0] == start_idx:
+                return {'name': 'carbaldehyde', 'atoms': chain_atoms,
+                        'is_suffix': True, 'suffix_type': 'aldehyde'}
+
+    # Check for amide (-CONH2): C(=O)(NH2)
+    amide_pattern = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
+    if amide_pattern:
+        matches = mol.GetSubstructMatches(amide_pattern)
+        for match in matches:
+            if match[0] == start_idx:
+                return {'name': 'carboxamide', 'atoms': chain_atoms,
+                        'is_suffix': True, 'suffix_type': 'primary_amide'}
+
+    # Check for nitrile (-C≡N)
+    nitrile_pattern = Chem.MolFromSmarts('[CX2]#[NX1]')
+    if nitrile_pattern:
+        matches = mol.GetSubstructMatches(nitrile_pattern)
+        for match in matches:
+            if match[0] == start_idx:
+                return {'name': 'carbonitrile', 'atoms': chain_atoms,
+                        'is_suffix': True, 'suffix_type': 'nitrile'}
+
+    # Check for hydroxyl terminus (-CH2OH, -CH2CH2OH) - must NOT have C=O
+    # This distinguishes -CH2OH (hydroxymethyl) from -COOH (carboxylic acid)
+    carbonyl_on_start = False
+    start_atom = mol.GetAtomWithIdx(start_idx)
+    for nbr in start_atom.GetNeighbors():
+        if nbr.GetSymbol() == 'O' and nbr.GetIdx() not in core_atoms:
+            bond = mol.GetBondBetweenAtoms(start_idx, nbr.GetIdx())
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                carbonyl_on_start = True
+                break
+
+    if not carbonyl_on_start:
+        hydroxyl_pattern = Chem.MolFromSmarts('[OX2H1]')
+        if hydroxyl_pattern:
+            matches = mol.GetSubstructMatches(hydroxyl_pattern)
+            for match in matches:
+                if match[0] in chain_set:
+                    hydroxyl_names = {
+                        1: 'hydroxymethyl',
+                        2: '2-hydroxyethyl',
+                        3: '3-hydroxypropyl',
+                    }
+                    name = hydroxyl_names.get(carbon_count)
+                    if name:
+                        return {'name': name, 'atoms': chain_atoms}
 
     return None
 
@@ -699,33 +757,32 @@ def name_substituted_polycyclic(
     - Alphabetize substituent prefixes
     - Use multiplicative prefixes (di-, tri-) for repeated substituents
     - Format: locants-substituent-parent
+    - Functional groups as suffixes: parent-locant-suffix (e.g., naphthalene-2-carboxylic acid)
     """
     if not substituents:
         return pah_name
 
-    # Group substituents by name
-    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    # Separate suffix-type FGs from prefix-type substituents
+    suffix_groups: Dict[str, List[int]] = defaultdict(list)  # suffix_name -> [locants]
+    prefix_substituent_groups: Dict[str, List[int]] = defaultdict(list)
 
     for position, sub_list in substituents.items():
         for sub_info in sub_list:
-            name = sub_info['name']
-            substituent_groups[name].append(position)
+            if sub_info.get('is_suffix'):
+                suffix_groups[sub_info['name']].append(position)
+            else:
+                prefix_substituent_groups[sub_info['name']].append(position)
 
     # Sort locants within each group
-    for name in substituent_groups:
-        substituent_groups[name].sort()
-
-    # Count total substituents
-    total_substituents = sum(len(locs) for locs in substituent_groups.values())
-
-    # For monosubstituted PAHs, we still include the locant (unlike benzene)
-    # because PAH positions are not equivalent
-    is_monosubstituted = total_substituents == 1
+    for name in prefix_substituent_groups:
+        prefix_substituent_groups[name].sort()
+    for name in suffix_groups:
+        suffix_groups[name].sort()
 
     # Build prefix strings, sorted alphabetically by substituent name
     prefixes = []
-    for name in sorted(substituent_groups.keys(), key=alpha_sort_key):
-        locants = substituent_groups[name]
+    for name in sorted(prefix_substituent_groups.keys(), key=alpha_sort_key):
+        locants = prefix_substituent_groups[name]
         count = len(locants)
         prefix_str = format_substituent_prefix(name, locants, count)
         prefixes.append(prefix_str)
@@ -733,7 +790,53 @@ def name_substituted_polycyclic(
     # Join prefixes with proper hyphenation
     prefix_part = _join_pah_prefixes(prefixes)
 
-    # Build final name
+    # Handle suffix-type functional groups
+    if suffix_groups:
+        # Pick the highest-priority suffix (carboxylic acid > aldehyde > amide, etc.)
+        _SUFFIX_PRIORITY = [
+            'carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde',
+        ]
+        chosen_suffix = None
+        chosen_locants = []
+        for suf in _SUFFIX_PRIORITY:
+            if suf in suffix_groups:
+                chosen_suffix = suf
+                chosen_locants = suffix_groups[suf]
+                break
+        if not chosen_suffix:
+            # Fallback: pick first
+            chosen_suffix = next(iter(suffix_groups))
+            chosen_locants = suffix_groups[chosen_suffix]
+
+        # Build suffix with locant(s)
+        from ..assembly.naming_utils import get_multiplier_prefix
+        count = len(chosen_locants)
+        multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
+        locant_str = ",".join(str(loc) for loc in chosen_locants)
+
+        # Assemble: prefix-part + parent-locant-suffix
+        # e.g., "naphthalene-2-carboxylic acid", "3-chloronaphthalene-2-carbaldehyde"
+        suffix_part = f"-{locant_str}-{multiplier}{chosen_suffix}"
+
+        # Any remaining suffix groups become prefixes (carboxy, formyl, etc.)
+        from ..rules.seniority import PREFIX_FORMS
+        _SUFFIX_TO_PREFIX = {
+            'carboxylic acid': 'carboxy',
+            'carbaldehyde': 'formyl',
+            'carboxamide': 'carbamoyl',
+            'carbonitrile': 'cyano',
+        }
+        for suf_name, suf_locants in suffix_groups.items():
+            if suf_name == chosen_suffix:
+                continue
+            prefix_name = _SUFFIX_TO_PREFIX.get(suf_name, suf_name)
+            prefix_str = format_substituent_prefix(prefix_name, sorted(suf_locants), len(suf_locants))
+            prefixes.append(prefix_str)
+            prefix_part = _join_pah_prefixes(sorted(prefixes, key=lambda s: alpha_sort_key(s.lstrip('0123456789,-'))))
+
+        return f"{prefix_part}{pah_name}{suffix_part}"
+
+    # Build final name (prefix-only, no suffix FGs)
     return f"{prefix_part}{pah_name}"
 
 
