@@ -277,19 +277,106 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
     return f'2-azaniumyl{base}'
 
 
+# === ZWITTERION NEUTRALIZATION HELPERS ===
+
+
+def _neutralize_zwitterion(mol):
+    """
+    Neutralize a zwitterion by removing internal charges.
+
+    Handles:
+    - Protonated amines ([NH3+] -> NH2): reduce explicit H by charge
+    - Quaternary ammonium ([N+](C)(C)(C)C): skip (can't neutralize without
+      breaking a bond - not chemically meaningful as neutral)
+    - Deprotonated acids ([COO-] -> COOH): increase explicit H by abs(charge)
+
+    Args:
+        mol: RDKit Mol object with internal charges
+
+    Returns:
+        Neutralized RDKit Mol object, or None on failure
+    """
+    try:
+        rw = Chem.RWMol(mol)
+        for atom in rw.GetAtoms():
+            charge = atom.GetFormalCharge()
+            if charge > 0:
+                cur_h = atom.GetNumExplicitHs()
+                total_h = atom.GetTotalNumHs()
+                if total_h >= charge:
+                    # Protonated: remove H to compensate
+                    atom.SetFormalCharge(0)
+                    atom.SetNumExplicitHs(max(0, cur_h - charge))
+                else:
+                    # Quaternary (no H to remove): just drop charge
+                    # This may create an invalid valence; will be caught by sanitize
+                    atom.SetFormalCharge(0)
+                    atom.SetNoImplicit(True)
+            elif charge < 0:
+                atom.SetFormalCharge(0)
+                cur_h = atom.GetNumExplicitHs()
+                atom.SetNumExplicitHs(cur_h + abs(charge))
+
+        Chem.SanitizeMol(rw)
+        return rw.GetMol()
+    except Exception:
+        return None
+
+
+def _name_as_neutral(mol, style: str) -> str:
+    """
+    Try to name a zwitterion by neutralizing it first.
+
+    Strips all internal charges, names the neutral form using the
+    standard naming pipeline. This is an acceptable approximation
+    per IUPAC for complex zwitterions.
+
+    Args:
+        mol: RDKit Mol with zwitterionic charges
+        style: Naming style
+
+    Returns:
+        Name of the neutral form, or empty string on failure
+    """
+    neutral = _neutralize_zwitterion(mol)
+    if neutral is None:
+        return ''
+
+    try:
+        neutral_smiles = Chem.MolToSmiles(neutral, canonical=True)
+        if not neutral_smiles:
+            return ''
+
+        from ..namer import Orthonym
+        namer = Orthonym(style=style)
+        neutral_name = namer.name(neutral_smiles)
+        # Guard: never return 'zwitterion' from the neutral naming path
+        if neutral_name and neutral_name != 'zwitterion':
+            return neutral_name
+    except (RecursionError, ValueError, RuntimeError):
+        pass
+
+    return ''
+
+
+# === GENERAL ZWITTERION NAMING ===
+
+
 def _name_general_zwitterion(mol, style: str) -> str:
     """
     Name a general zwitterion (not amino acid pattern).
 
     For zwitterions with various functional groups, combines
-    the cationic and anionic descriptors.
+    the cationic and anionic descriptors. Falls back to naming
+    the neutralized form if specific pattern matching fails.
 
     Args:
         mol: RDKit Mol object
         style: Naming style
 
     Returns:
-        Zwitterion name
+        Zwitterion name, or empty string if naming fails.
+        Never returns the literal 'zwitterion'.
     """
     sites = get_ion_sites(mol)
 
@@ -297,22 +384,27 @@ def _name_general_zwitterion(mol, style: str) -> str:
     anion_sites = sites.get('anions', [])
 
     if not cation_sites or not anion_sites:
-        return 'zwitterion'
+        # No ionic sites found - cannot name as zwitterion
+        return ''
 
     # Determine the type of cation and anion
     cation_element = cation_sites[0]['element'] if cation_sites else ''
     anion_element = anion_sites[0]['element'] if anion_sites else ''
 
     # Build name based on ionic sites
-    # This is a simplified approach - full implementation would need
-    # to analyze the molecular skeleton and assign locants
-
-    # For now, return a descriptive name
     if cation_element == 'N' and anion_element == 'O':
         # Likely amino acid-like or betaine-like
-        return _infer_zwitterion_name(mol, cation_sites, anion_sites)
+        result = _infer_zwitterion_name(mol, cation_sites, anion_sites)
+        if result:
+            return result
 
-    return 'zwitterion'
+    # Fallback: neutralize and name the skeleton
+    neutral_name = _name_as_neutral(mol, style)
+    if neutral_name:
+        return neutral_name
+
+    # Honest failure instead of placeholder literal
+    return ''
 
 
 def _infer_zwitterion_name(
@@ -331,7 +423,7 @@ def _infer_zwitterion_name(
         anion_sites: List of anion site dictionaries
 
     Returns:
-        Inferred zwitterion name
+        Inferred zwitterion name, or empty string on failure.
     """
     # Count total atoms for structural inference
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
@@ -343,10 +435,7 @@ def _infer_zwitterion_name(
     if betaine_pattern and mol.HasSubstructMatch(betaine_pattern):
         return 'betaine'
 
-    # Carnitine-like: (CH3)3N+-CH2-CHOH-CH2-COO-
-    # This is more complex, skip for now
-
-    # Default: systematic name based on carbon count
+    # Default: systematic name based on carbon count (small molecules)
     if carbon_count <= 6:
         CHAIN_TO_CARBOXYLATE = {
             2: 'acetate',
@@ -362,7 +451,8 @@ def _infer_zwitterion_name(
             base = get_anoate_name(carbon_count)
         return f'ammonium{base}'
 
-    return 'zwitterion'
+    # For larger molecules, return empty string to trigger neutral fallback
+    return ''
 
 
 # === SALT DETECTION HELPERS ===
