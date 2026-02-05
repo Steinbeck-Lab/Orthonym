@@ -48,7 +48,7 @@ HW_STEMS: Dict[int, Dict[str, str]] = {
         'n_saturated': 'olidine',    # e.g., pyrrolidine (aza-olidine)
     },
     6: {
-        'unsaturated': 'ine',        # e.g., oxine (pyran), azine (pyridine)
+        'unsaturated': 'ine',        # e.g., azine (pyridine); oxine overridden by retained "2H-pyran"
         'saturated_os': 'ane',       # For O, S, Se, Te, Bi, Hg: oxane, thiane
         'saturated_n': 'inane',      # For N, Si, Ge, Sn, Pb, B, P: azinane
     },

@@ -119,6 +119,14 @@ RETAINED_NAMES = {
     "c1ccc2nccnc2c1": "quinoxaline",
     "c1ncnc2[nH]cnc12": "7H-purine",  # 7H-purine is IUPAC 2013 PIN
     
+    # === UNSATURATED 6-MEMBERED O-HETEROCYCLES (pyrans) ===
+    # IUPAC 2013 prefers "2H-pyran" / "4H-pyran" over HW systematic "oxine"
+    # OPSIN does not recognize "oxine"; these retained names ensure compatibility
+    "C1=CCOC=C1": "2H-pyran",            # 2H-pyran (two C=C bonds)
+    "C1=COC=CC1": "4H-pyran",            # 4H-pyran (two C=C bonds)
+    "C1=COCCC1": "3,4-dihydro-2H-pyran", # dihydropyran (one C=C bond)
+    "C1=CCOCC1": "3,6-dihydro-2H-pyran", # dihydropyran (one C=C bond)
+
     # === SATURATED HETEROCYCLES ===
     "C1CO1": "oxirane",
     "C1CN1": "aziridine",
