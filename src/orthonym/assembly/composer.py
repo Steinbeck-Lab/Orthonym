@@ -236,10 +236,12 @@ def assemble_name(features: Any, style: str = "pin") -> str:
     # Handle ring-attached esters BEFORE polyfunctional handler
     # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
     # use acyloxy prefix naming on ring parent, not polyfunctional naming
+    # BUT: skip for polycyclic/complex ring systems -- those need the complex
+    # ring naming path which handles substituents (including esters) properly
     if features.principal_group == "ester":
         from ..rules.esters import detect_exocyclic_esters
         exocyclic = detect_exocyclic_esters(features.mol)
-        if exocyclic:
+        if exocyclic and not _is_complex_ring_system(features.mol):
             ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
             if ring_ester_name:
                 return ring_ester_name
