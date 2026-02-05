@@ -21,6 +21,7 @@ from .naming_utils import (
     alpha_sort_key,
     get_alkyl_name,
 )
+from ..data.chain_names import get_chain_prefix
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -777,9 +778,13 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
             mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             for idx in ring
         )
-        if all_carbon and ring_size in CHAIN_PREFIXES:
-            stem = CHAIN_PREFIXES[ring_size]
-            ring_parent = f"cyclo{stem}ane"
+        if all_carbon:
+            try:
+                stem = get_chain_prefix(ring_size)
+                if stem:
+                    ring_parent = f"cyclo{stem}ane"
+            except (ValueError, KeyError):
+                pass  # ring_parent stays None
         break
 
     if not ring_parent:
@@ -1139,10 +1144,13 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
 
     ring_size = len(principal_ring)
 
-    if ring_size in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[ring_size]
-    else:
-        stem = f"{ring_size}C"
+    try:
+        stem = get_chain_prefix(ring_size)
+    except (ValueError, KeyError):
+        return "carbonitrile"  # Fallback for invalid ring size
+
+    if not stem:
+        return "carbonitrile"  # Guard against empty stem producing 'cycloane'
 
     parent_name = f"cyclo{stem}ane"
 
@@ -1168,10 +1176,7 @@ def _generate_chain_parent(features: Any) -> NameFragment:
     chain_length = len(features.principal_chain)
 
     # Get chain prefix (stem)
-    if chain_length in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[chain_length]
-    else:
-        stem = _build_long_chain_prefix(chain_length)
+    stem = get_chain_prefix(chain_length)
 
     # Get bond locants if we have atom_to_locant mapping
     double_locants = []
@@ -1226,10 +1231,16 @@ def _generate_ring_parent(features: Any) -> NameFragment:
 
     ring_size = len(principal_ring)
 
-    if ring_size in CHAIN_PREFIXES:
-        stem = CHAIN_PREFIXES[ring_size]
-    else:
-        stem = _build_long_chain_prefix(ring_size)
+    # Guard: ring_size must produce a valid stem; otherwise return None-safe placeholder
+    try:
+        stem = get_chain_prefix(ring_size)
+    except (ValueError, KeyError):
+        # Invalid ring size (0, negative, etc.) -- return safe placeholder
+        return NameFragment(text="cyclo", fragment_type="parent")
+
+    # Guard: stem must be non-empty to avoid generating 'cycloane'
+    if not stem:
+        return NameFragment(text="cyclo", fragment_type="parent")
 
     if ring_type == 'cycloalkane':
         # Cycloalkane naming: cyclo + stem + an (e.g., cyclohexan)
@@ -2173,11 +2184,10 @@ def _build_long_chain_prefix(length: int) -> str:
     """
     Build prefix for chains longer than those in CHAIN_PREFIXES.
 
-    Uses IUPAC multiplicative system for very long chains.
+    Delegates to centralized chain_names module.
+    Kept for backward compatibility.
     """
-    # For now, just return the numerical form
-    # TODO: Implement proper long-chain naming (triacontane, etc.)
-    return f"{length}C"
+    return get_chain_prefix(length)
 
 
 def format_locants(locants: tuple) -> str:

@@ -134,3 +134,22 @@ class TestNoCycloane:
             name = f"cyclo{stem}ane"
             assert name != "cycloane", f"Ring size {size} produced cycloane"
             assert len(stem) > 0, f"Empty stem for ring size {size}"
+
+    def test_generate_ring_parent_guard(self):
+        """_generate_ring_parent returns safe placeholder for invalid ring, not 'cycloane'."""
+        from orthonym.assembly.composer import _generate_ring_parent
+        from dataclasses import dataclass
+        from typing import Optional
+
+        # Create a minimal mock features with empty principal_ring
+        @dataclass
+        class MockFeatures:
+            ring_type: str = 'cycloalkane'
+            principal_ring: Optional[tuple] = None
+
+        features = MockFeatures(principal_ring=None)
+        result = _generate_ring_parent(features)
+        # Should return 'cyclo' placeholder, not 'cycloane'
+        assert 'cycloane' not in result.text, (
+            f"Generated 'cycloane' from invalid ring: {result.text}"
+        )

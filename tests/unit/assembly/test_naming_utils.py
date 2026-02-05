@@ -55,23 +55,25 @@ class TestAlkylNames:
 
     def test_unsupported_zero_raises_error(self):
         """Carbon count 0 is invalid."""
-        with pytest.raises(ValueError, match="Unsupported carbon count 0"):
+        with pytest.raises(ValueError):
             get_alkyl_name(0)
 
-    def test_unsupported_11_raises_error(self):
-        """Carbon count 11 is beyond supported range."""
-        with pytest.raises(ValueError, match="Unsupported carbon count 11"):
-            get_alkyl_name(11)
+    def test_supported_11_now_works(self):
+        """Carbon count 11 is now supported via centralized chain_names module."""
+        name = get_alkyl_name(11)
+        assert name == "undecyl"
 
     def test_unsupported_negative_raises_error(self):
         """Negative carbon count is invalid."""
         with pytest.raises(ValueError):
             get_alkyl_name(-1)
 
-    def test_unsupported_large_raises_error(self):
-        """Very large carbon count is invalid."""
-        with pytest.raises(ValueError):
-            get_alkyl_name(100)
+    def test_large_count_now_works(self):
+        """Large carbon count (100) is now supported via centralized chain_names module."""
+        name = get_alkyl_name(100)
+        assert isinstance(name, str)
+        assert len(name) > 0
+        assert name.endswith("yl")
 
 
 # ============================================================================
