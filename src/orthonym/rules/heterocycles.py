@@ -701,11 +701,13 @@ def get_heterocycle_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # Skip if no carbons (likely just H atoms, handled implicitly)
-            # But for heterocycles, lone H on N is implicit - we're looking
-            # for actual substituents like methyl, ethyl, etc.
+            # Detect non-carbon functional substituents (amino, hydroxy, nitro, etc.)
+            hetero_sub_name = None
             if carbon_count == 0:
-                continue
+                # Check for functional groups that have no carbons
+                hetero_sub_name = _identify_hetero_substituent(mol, sub_atoms, ring_set)
+                if hetero_sub_name is None:
+                    continue  # Truly empty (just implicit H)
 
             # Classify substituent as ring or alkyl
             classification = classify_substituent(mol, sub_atoms, ring_set)
@@ -720,12 +722,61 @@ def get_heterocycle_substituents(
                 'is_ring': is_ring,
                 'ring_name': ring_name,
             }
+            if hetero_sub_name:
+                sub_info['hetero_name'] = hetero_sub_name
 
             if locant not in substituents:
                 substituents[locant] = []
             substituents[locant].append(sub_info)
 
     return substituents
+
+
+def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
+    """
+    Identify a non-carbon functional substituent (amino, hydroxy, nitro, etc.).
+
+    Args:
+        mol: RDKit Mol object
+        sub_atoms: List of atom indices in the substituent
+        ring_set: Set of ring atom indices
+
+    Returns:
+        Substituent prefix name or None if not recognized
+    """
+    if not sub_atoms:
+        return None
+
+    first_atom = mol.GetAtomWithIdx(sub_atoms[0])
+    symbol = first_atom.GetSymbol()
+    h_count = first_atom.GetTotalNumHs()
+
+    # Amino (-NH2)
+    if symbol == 'N' and h_count == 2:
+        return 'amino'
+
+    # Hydroxy (-OH)
+    if symbol == 'O' and h_count == 1:
+        return 'hydroxy'
+
+    # Nitro (-NO2)
+    if symbol == 'N' and first_atom.GetFormalCharge() == 1:
+        o_count = sum(1 for idx in sub_atoms if mol.GetAtomWithIdx(idx).GetSymbol() == 'O')
+        if o_count == 2:
+            return 'nitro'
+
+    # Sulfanyl (-SH)
+    if symbol == 'S' and h_count == 1:
+        return 'sulfanyl'
+
+    # Oxo (=O) - check if double-bonded to ring carbon
+    if symbol == 'O' and h_count == 0 and len(sub_atoms) == 1:
+        for bond in first_atom.GetBonds():
+            other_idx = bond.GetOtherAtomIdx(sub_atoms[0])
+            if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
+                return 'oxo'
+
+    return None
 
 
 def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
@@ -831,6 +882,9 @@ def name_substituted_heterocycle(
             if is_ring and ring_name:
                 # Use ring substituent name (piperidinyl, phenyl, etc.)
                 sub_name = ring_name
+            elif 'hetero_name' in sub_info:
+                # Non-carbon functional substituent (amino, hydroxy, etc.)
+                sub_name = sub_info['hetero_name']
             else:
                 # Get alkyl name from carbon count
                 carbon_count = sub_info['carbon_count']
