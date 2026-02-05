@@ -2333,7 +2333,7 @@ def assemble_ion_name(features: Any, mol, style: str = 'pin') -> str:
         style: 'pin' for preferred names
 
     Returns:
-        IUPAC name for the ion/radical
+        IUPAC name for the ion/radical, or empty string on failure
 
     Example:
         >>> # For a salt:
@@ -2350,22 +2350,30 @@ def assemble_ion_name(features: Any, mol, style: str = 'pin') -> str:
 
     species_type = features.species_type
 
-    if species_type == 'salt':
-        return name_salt(mol, style)
-    elif species_type == 'radical':
-        return name_radical(mol, style)
-    elif species_type == 'zwitterion':
-        return name_zwitterion(mol, style)
-    elif species_type == 'ion':
-        # Single ion - determine if cation or anion
-        ion_sites = getattr(features, 'ion_sites', {})
-        if ion_sites.get('cations') and not ion_sites.get('anions'):
-            return name_cation(mol, style)
-        elif ion_sites.get('anions') and not ion_sites.get('cations'):
-            return name_anion(mol, style)
+    try:
+        if species_type == 'salt':
+            return name_salt(mol, style)
+        elif species_type == 'radical':
+            return name_radical(mol, style)
+        elif species_type == 'zwitterion':
+            result = name_zwitterion(mol, style)
+            # Guard: never return the literal 'zwitterion'
+            if result and result != 'zwitterion':
+                return result
+            return ''
+        elif species_type == 'ion':
+            # Single ion - determine if cation or anion
+            ion_sites = getattr(features, 'ion_sites', {})
+            if ion_sites.get('cations') and not ion_sites.get('anions'):
+                return name_cation(mol, style)
+            elif ion_sites.get('anions') and not ion_sites.get('cations'):
+                return name_anion(mol, style)
+    except RecursionError:
+        # Safety net: if recursion still occurs, return empty string
+        return ''
 
-    # Fallback - should not reach here for valid ionic species
-    raise ValueError(f"Cannot assemble name for species_type: {species_type}")
+    # Fallback for unrecognized species
+    return ''
 
 
 def get_multiplier(count: int, is_complex: bool = False) -> str:

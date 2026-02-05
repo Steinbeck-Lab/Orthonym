@@ -156,7 +156,10 @@ INORGANIC_ANIONS = {
     'O=[SH](=O)[O-]': 'sulfate',  # Note: RDKit canonical form
     'O=S([O-])[O-]': 'sulfite',
     'O=P([O-])([O-])[O-]': 'phosphate',
+    'O=P([O-])([O-])O': 'hydrogen phosphate',
+    'O=P([O-])(O)O': 'dihydrogen phosphate',
     'O=C([O-])[O-]': 'carbonate',
+    'O=C([O-])O': 'hydrogen carbonate',
     '[O-][Cl+][O-]': 'chlorate',  # RDKit canonical form
 }
 

@@ -358,7 +358,7 @@ def get_cation_suffix(cation_type: str) -> str:
 
 # === MAIN NAMING FUNCTIONS ===
 
-def name_anion(mol, style: str = 'pin') -> str:
+def name_anion(mol, style: str = 'pin', _depth: int = 0) -> str:
     """
     Generate IUPAC name for an anionic molecule.
 
@@ -372,9 +372,11 @@ def name_anion(mol, style: str = 'pin') -> str:
     Args:
         mol: RDKit Mol object (must have negative charge)
         style: Naming style ('pin', 'systematic', 'common')
+        _depth: Internal recursion depth guard (do not set manually)
 
     Returns:
-        Anion name (e.g., 'acetate', 'methoxide', 'phenolate')
+        Anion name (e.g., 'acetate', 'methoxide', 'phenolate'),
+        or empty string if naming fails
 
     Example:
         >>> mol = Chem.MolFromSmiles('CC(=O)[O-]')
@@ -382,6 +384,10 @@ def name_anion(mol, style: str = 'pin') -> str:
         'acetate'
     """
     if mol is None:
+        return ''
+
+    # Guard against infinite recursion
+    if _depth > 2:
         return ''
 
     # Get canonical SMILES for lookup
@@ -421,12 +427,20 @@ def name_anion(mol, style: str = 'pin') -> str:
             suffix = get_anion_suffix(anion_type)
             return f'anion-{suffix}'
 
-    # Multiple anions - more complex naming
-    # For now, return first anion name
-    return name_anion(mol, style)
+    # Multiple anions - try neutralize-then-name approach
+    neutral_name = _try_neutralize_and_name(mol)
+    if neutral_name:
+        return neutral_name
+
+    # Fallback: name first anion site only
+    anion_site = anions[0]
+    anion_type = classify_anion(mol, anion_site)
+    if anion_type == 'carboxylate':
+        return _name_carboxylate_systematic(mol, anion_site)
+    return ''
 
 
-def name_cation(mol, style: str = 'pin') -> str:
+def name_cation(mol, style: str = 'pin', _depth: int = 0) -> str:
     """
     Generate IUPAC name for a cationic molecule.
 
@@ -440,9 +454,11 @@ def name_cation(mol, style: str = 'pin') -> str:
     Args:
         mol: RDKit Mol object (must have positive charge)
         style: Naming style ('pin', 'systematic', 'common')
+        _depth: Internal recursion depth guard (do not set manually)
 
     Returns:
-        Cation name (e.g., 'ammonium', 'methylammonium', 'methylium')
+        Cation name (e.g., 'ammonium', 'methylammonium', 'methylium'),
+        or empty string if naming fails
 
     Example:
         >>> mol = Chem.MolFromSmiles('[NH4+]')
@@ -450,6 +466,10 @@ def name_cation(mol, style: str = 'pin') -> str:
         'ammonium'
     """
     if mol is None:
+        return ''
+
+    # Guard against infinite recursion
+    if _depth > 2:
         return ''
 
     # Get canonical SMILES for lookup
@@ -487,8 +507,90 @@ def name_cation(mol, style: str = 'pin') -> str:
             suffix = get_cation_suffix(cation_type)
             return f'cation-{suffix}'
 
-    # Multiple cations - more complex naming
-    return name_cation(mol, style)
+    # Multiple cations - try neutralize-then-name approach
+    neutral_name = _try_neutralize_and_name(mol)
+    if neutral_name:
+        return neutral_name
+
+    # Fallback: name first cation site only
+    cation_site = cations[0]
+    cation_type = classify_cation(mol, cation_site)
+    if cation_type == 'aminium':
+        return _name_aminium_systematic(mol, cation_site)
+    return ''
+
+
+# === NEUTRALIZATION HELPER ===
+
+# Metallic elements that are out of scope for organic naming
+_INORGANIC_ELEMENTS = frozenset({
+    'Li', 'Be', 'Na', 'Mg', 'Al', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn',
+    'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo',
+    'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Cs', 'Ba', 'La', 'Hf', 'Ta',
+    'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi',
+})
+
+
+def _has_metal(mol) -> bool:
+    """Check if molecule contains metallic/inorganic elements."""
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() in _INORGANIC_ELEMENTS:
+            return True
+    return False
+
+
+def _try_neutralize_and_name(mol) -> str:
+    """
+    Neutralize a multi-charged ion and name the organic skeleton.
+
+    For multi-charged species, strips all formal charges and names the
+    resulting neutral molecule using the standard pipeline.
+
+    Returns:
+        Name of the neutralized skeleton, or empty string on failure.
+    """
+    if mol is None:
+        return ''
+
+    # Bail on inorganic/metallic species (out of scope)
+    if _has_metal(mol):
+        return ''
+
+    try:
+        rw = Chem.RWMol(mol)
+        for atom in rw.GetAtoms():
+            charge = atom.GetFormalCharge()
+            if charge != 0:
+                atom.SetFormalCharge(0)
+                # Adjust hydrogen count to compensate
+                if charge > 0:
+                    # Cation: had extra H from protonation, remove them
+                    cur_h = atom.GetNumExplicitHs()
+                    atom.SetNumExplicitHs(max(0, cur_h - charge))
+                elif charge < 0:
+                    # Anion: was deprotonated, add H back
+                    cur_h = atom.GetNumExplicitHs()
+                    atom.SetNumExplicitHs(cur_h + abs(charge))
+
+        try:
+            Chem.SanitizeMol(rw)
+        except Exception:
+            return ''
+
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+        if not neutral_smiles:
+            return ''
+
+        # Use namer to name the neutral form (deferred import to avoid circular)
+        from ..namer import Orthonym
+        namer = Orthonym(style='pin')
+        neutral_name = namer.name(neutral_smiles)
+        if neutral_name:
+            return neutral_name
+    except (RecursionError, ValueError, RuntimeError):
+        pass
+
+    return ''
 
 
 # === SYSTEMATIC NAMING HELPERS ===

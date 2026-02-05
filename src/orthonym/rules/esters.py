@@ -100,6 +100,152 @@ def _bfs_fragment(mol, start_atom: int, exclude_atom: int) -> List[int]:
     return list(visited)
 
 
+def acid_fragment_has_ring(mol, acid_atoms: List[int]) -> bool:
+    """
+    Check if the acid fragment of an ester contains ring atoms.
+
+    When the acid portion contains a ring (e.g., benzoate, indole-carboxylate),
+    simple carbon-counting is wrong -- the ring atoms must not be linearized.
+
+    Args:
+        mol: RDKit Mol object
+        acid_atoms: Atom indices of the acid fragment
+
+    Returns:
+        True if any acid atom is in a ring
+    """
+    for idx in acid_atoms:
+        if mol.GetAtomWithIdx(idx).IsInRing():
+            return True
+    return False
+
+
+def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
+    """
+    Name the acid portion of an ester when it contains a ring.
+
+    Handles cases like:
+    - Benzene + COOH -> "benzoic" (trivial)
+    - Ring + COOH -> "[ring-name]carboxylic" (systematic)
+
+    Args:
+        mol: RDKit Mol object
+        acid_atoms: Atom indices of the acid fragment
+
+    Returns:
+        Acid name stem (e.g., "benzoic"), or None if cannot determine
+    """
+    acid_set = set(acid_atoms)
+    ring_info = mol.GetRingInfo()
+
+    # Find ring atoms within the acid fragment
+    ring_atoms_in_acid = set()
+    for ring in ring_info.AtomRings():
+        ring_set = set(ring)
+        if ring_set.issubset(acid_set):
+            ring_atoms_in_acid.update(ring_set)
+
+    if not ring_atoms_in_acid:
+        return None
+
+    # Count how many complete rings are in the acid fragment
+    rings_in_acid = []
+    for ring in ring_info.AtomRings():
+        if set(ring).issubset(acid_set):
+            rings_in_acid.append(ring)
+
+    n_rings = len(rings_in_acid)
+
+    # Single ring: try simple naming (benzene -> benzoic, cycloalkane -> carboxylic)
+    if n_rings == 1:
+        ring = rings_in_acid[0]
+        if len(ring) == 6:
+            all_carbon = all(
+                mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in ring
+            )
+            all_aromatic = all(
+                mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring
+            )
+            if all_carbon and all_aromatic:
+                return "benzoic"
+
+        # Check for heterocyclic single ring
+        has_heteroatom = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+            for idx in ring
+        )
+        if has_heteroatom:
+            from ..rules.heterocycles import classify_heterocycle
+            het_info = classify_heterocycle(mol, tuple(ring))
+            if het_info and het_info.get('name'):
+                return f"{het_info['name']}-carboxylic"
+
+        # Simple carbocyclic ring + COOH
+        all_carbon = all(
+            mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in ring
+        )
+        if all_carbon:
+            ring_size = len(ring)
+            stem = get_chain_prefix(ring_size)
+            if stem:
+                return f"cyclo{stem}anecarboxylic"
+
+    # For fused/complex ring systems with COOH, try to get the ring system name
+    # and append "-carboxylic"
+    # Build a sub-molecule from just the ring atoms to identify
+    from ..data.retained_names import RETAINED_NAMES
+    from ..rules.polycyclics import identify_polycyclic
+
+    # Try identifying as a polycyclic aromatic
+    # Create sub-mol from acid fragment
+    try:
+        atom_map = {}
+        rw = Chem.RWMol()
+        for i, idx in enumerate(sorted(acid_set)):
+            atom = mol.GetAtomWithIdx(idx)
+            new_idx = rw.AddAtom(atom)
+            atom_map[idx] = new_idx
+
+        for bond in mol.GetBonds():
+            a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a1 in atom_map and a2 in atom_map:
+                rw.AddBond(atom_map[a1], atom_map[a2], bond.GetBondType())
+
+        sub_mol = rw.GetMol()
+
+        # Check retained names for the ring system
+        sub_smiles = Chem.MolToSmiles(sub_mol, canonical=True)
+        if sub_smiles in RETAINED_NAMES:
+            ring_name = RETAINED_NAMES[sub_smiles]
+            # If it ends in "-carboxylic acid", extract the stem
+            if "carboxylic acid" in ring_name:
+                return ring_name.replace(" acid", "").strip()
+
+        # Try polycyclic identification on the sub-mol
+        pah_name = identify_polycyclic(sub_mol)
+        if pah_name:
+            return f"{pah_name}carboxylic"
+
+        # For heterocyclic rings, try heterocycle naming
+        from ..rules.heterocycles import classify_heterocycle
+        for ring in ring_info.AtomRings():
+            ring_set = set(ring)
+            if ring_set.issubset(acid_set):
+                has_heteroatom = any(
+                    mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+                    for idx in ring
+                )
+                if has_heteroatom:
+                    het_info = classify_heterocycle(mol, tuple(ring))
+                    if het_info and het_info.get('name'):
+                        return f"{het_info['name']}-carboxylic"
+    except Exception:
+        pass
+
+    # Fallback: cannot name ring acid
+    return None
+
+
 def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     """
     Get the acid name from the acid fragment.
@@ -112,8 +258,15 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
         acid_atoms: Atom indices of the acid fragment
 
     Returns:
-        Acid stem name (e.g., "acetic", "propanoic")
+        Acid stem name (e.g., "acetic", "propanoic", "benzoic")
     """
+    # Check if acid fragment contains ring atoms
+    if acid_fragment_has_ring(mol, acid_atoms):
+        ring_name = get_ring_acid_name(mol, acid_atoms)
+        if ring_name:
+            return ring_name
+        # If ring naming fails, fall through to carbon-count (imperfect but safe)
+
     # Count carbons in acid fragment
     carbon_count = sum(
         1 for idx in acid_atoms
@@ -214,12 +367,16 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
 
     Format: "alkyl alkanoate" (e.g., "methyl acetate", "ethyl propanoate")
 
+    For ring-containing acid portions (e.g., methyl benzoate), the ring acid
+    naming is used to produce correct names like "methyl benzoate" instead of
+    incorrectly linearizing ring atoms ("methyl heptanoate").
+
     Args:
         mol: RDKit Mol object
         ester_match: Tuple from ester SMARTS match
 
     Returns:
-        Ester name string, or None if cannot be named (e.g., lactone)
+        Ester name string, or None if cannot be named (e.g., lactone, complex ring)
     """
     # Check for lactone (cyclic ester) - handle differently
     if is_lactone(mol, ester_match):
@@ -231,6 +388,14 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
 
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
+
+    # Guard: if acid portion contains a ring but ring naming fails,
+    # return None to let complex ring naming handle it
+    if acid_fragment_has_ring(mol, acid_atoms):
+        ring_acid_name = get_ring_acid_name(mol, acid_atoms)
+        if ring_acid_name is None:
+            # Complex ring acid (fused heterocycle etc.) - defer to complex naming
+            return None
 
     # Get acid name and convert to acylate
     acid_name = get_acid_fragment_name(mol, acid_atoms)
