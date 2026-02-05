@@ -321,3 +321,27 @@ class TestEdgeCases:
         """Simple chain: not captured by polycyclic."""
         result = name_compound('CCCC')
         assert result.lower() == 'butane', f"Expected butane, got: {result}"
+
+
+class TestPeryleneNaming:
+    """Tests for perylene retained name lookup (Plan 16-07 gap closure)."""
+
+    def test_perylene_returns_retained_name(self):
+        """Perylene SMILES returns 'perylene' via retained name lookup."""
+        result = name_compound('c1cc2cccc3c4cccc5cccc(c(c1)c23)c54')
+        assert result.lower() == 'perylene', f"Expected perylene, got: {result}"
+
+    def test_pyrene_still_works(self):
+        """Pyrene retained name not broken by perylene addition."""
+        result = name_compound('c1cc2ccc3cccc4ccc(c1)c2c34')
+        assert result.lower() == 'pyrene', f"Expected pyrene, got: {result}"
+
+    def test_coronene_still_works(self):
+        """Coronene retained name not broken by perylene addition."""
+        result = name_compound('c1cc2ccc3ccc4ccc5ccc6ccc1c7c2c3c4c5c67')
+        assert result.lower() == 'coronene', f"Expected coronene, got: {result}"
+
+    def test_naphthalene_still_works(self):
+        """Naphthalene retained name not broken by perylene addition."""
+        result = name_compound('c1ccc2ccccc2c1')
+        assert result.lower() == 'naphthalene', f"Expected naphthalene, got: {result}"

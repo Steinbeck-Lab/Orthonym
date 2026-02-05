@@ -34,7 +34,9 @@ RETAINED_NAMES = {
     "c1cc2c3c(cccc3c1)CC2": "acenaphthene",  # Has two sp3 carbons
     "C1=Cc2cccc3cccc1c23": "acenaphthylene",  # Fully aromatic
     "c1ccc2c(c1)ccc1c3ccccc3ccc21": "chrysene",
-    
+    "c1cc2cccc3c4cccc5cccc(c(c1)c23)c54": "perylene",
+    "c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1": "pentacene",
+
     # === SIMPLE ALCOHOLS ===
     "CO": "methanol",
     "CCO": "ethanol",
