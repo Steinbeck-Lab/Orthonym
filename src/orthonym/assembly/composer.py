@@ -339,6 +339,32 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if hydrazone_name:
             return hydrazone_name
 
+    # Handle N-oxides - functional class naming: "pyridine 1-oxide"
+    # Must detect early because N-oxides have internal charges that could
+    # confuse other routing (they are classified as 'neutral' by ions.py)
+    n_oxide_name = _try_name_n_oxide(features)
+    if n_oxide_name:
+        return n_oxide_name
+
+    # Handle isocyanates - functional class: "methyl isocyanate"
+    if features.functional_groups.get('isocyanate'):
+        iso_name = _name_isocyanate(features)
+        if iso_name:
+            return iso_name
+
+    # Handle isothiocyanates - functional class: "methyl isothiocyanate"
+    if features.functional_groups.get('isothiocyanate'):
+        isothio_name = _name_isothiocyanate(features)
+        if isothio_name:
+            return isothio_name
+
+    # Handle carbamates - functional class: "ethyl carbamate"
+    # Must detect BEFORE generic ester to prevent N loss
+    if features.functional_groups.get('carbamate'):
+        carb_name = _name_carbamate(features)
+        if carb_name:
+            return carb_name
+
     # Handle acid halides BEFORE polyfunctional and ester handlers
     # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
     # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
@@ -682,6 +708,450 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
         return None
 
     return f"{parent_name} {fg_type}"
+
+
+# ============================================================================
+# N-oxide naming (functional class: "pyridine 1-oxide", "trimethylamine N-oxide")
+# ============================================================================
+
+# Recursion guard for N-oxide naming (prevents infinite loop when naming base compound)
+import threading as _threading
+_n_oxide_guard = _threading.local()
+
+
+def _try_name_n_oxide(features: Any) -> Optional[str]:
+    """Try to name molecule as an N-oxide using functional class naming.
+
+    Aromatic N-oxides: "pyridine 1-oxide", "4-methylpyridine 1-oxide"
+    Aliphatic N-oxides: "trimethylamine N-oxide"
+
+    The approach:
+    1. Detect N-oxide pattern (aromatic [n+][O-] or aliphatic [NX4+]([C])([C])([C])[O-])
+    2. Create a modified molecule with O- removed and N+ neutralized
+    3. Name the base compound recursively via name_compound()
+    4. Append oxide suffix
+
+    Returns:
+        Functional class name, or None if not an N-oxide.
+    """
+    # Recursion guard: if we're already naming a base compound, skip
+    if getattr(_n_oxide_guard, 'active', False):
+        return None
+
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+
+    mol = features.mol
+
+    # Check for aromatic N-oxide: [n+][O-]
+    aromatic_pat = Chem.MolFromSmarts('[n+][O-]')
+    aliphatic_pat = Chem.MolFromSmarts('[NX4+]([#6])([#6])([#6])[O-]')
+
+    aromatic_matches = mol.GetSubstructMatches(aromatic_pat) if aromatic_pat else ()
+    aliphatic_matches = mol.GetSubstructMatches(aliphatic_pat) if aliphatic_pat else ()
+
+    if not aromatic_matches and not aliphatic_matches:
+        return None
+
+    if aromatic_matches:
+        return _name_aromatic_n_oxide(mol, aromatic_matches)
+    else:
+        return _name_aliphatic_n_oxide(mol, aliphatic_matches)
+
+
+def _name_aromatic_n_oxide(mol, matches) -> Optional[str]:
+    """Name aromatic N-oxide: e.g., 'pyridine 1-oxide'.
+
+    Strategy: remove O- atom, neutralize N+, name the base heterocycle,
+    then append '{locant}-oxide'.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+
+    # Use the first N-oxide match
+    n_idx, o_idx = matches[0]  # [n+] index, [O-] index
+
+    # Build modified molecule: remove O-, neutralize N+
+    rw = RWMol(mol)
+
+    # Set N formal charge to 0
+    rw.GetAtomWithIdx(n_idx).SetFormalCharge(0)
+
+    # Remove O- atom (remove bond first, then atom)
+    rw.RemoveBond(n_idx, o_idx)
+
+    # Need to remove the O atom. But removing an atom shifts indices of atoms
+    # with higher indices. Since we only remove one atom, just remove it.
+    rw.RemoveAtom(o_idx)
+
+    try:
+        modified_mol = rw.GetMol()
+        Chem.SanitizeMol(modified_mol)
+        modified_smiles = Chem.MolToSmiles(modified_mol, canonical=True)
+    except Exception:
+        return None
+
+    # Name the base compound recursively
+    from ..namer import name_compound
+    _n_oxide_guard.active = True
+    try:
+        base_name = name_compound(modified_smiles)
+    except Exception:
+        return None
+    finally:
+        _n_oxide_guard.active = False
+
+    if not base_name:
+        return None
+
+    # For heterocycles, the N is typically at position 1
+    # IUPAC format: "pyridine 1-oxide"
+    return f"{base_name} 1-oxide"
+
+
+def _name_aliphatic_n_oxide(mol, matches) -> Optional[str]:
+    """Name aliphatic N-oxide: e.g., 'trimethylamine N-oxide'.
+
+    Strategy: remove O- atom, change N from +1 to 0 charge,
+    name the neutral amine, then append ' N-oxide'.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+
+    # Match is (N, C, C, C, O) from SMARTS [NX4+]([#6])([#6])([#6])[O-]
+    n_idx = matches[0][0]
+    o_idx = matches[0][4]  # The O- atom
+
+    # Build modified molecule
+    rw = RWMol(mol)
+
+    # Neutralize N
+    rw.GetAtomWithIdx(n_idx).SetFormalCharge(0)
+
+    # Remove O- bond and atom
+    rw.RemoveBond(n_idx, o_idx)
+    rw.RemoveAtom(o_idx)
+
+    try:
+        modified_mol = rw.GetMol()
+        Chem.SanitizeMol(modified_mol)
+        modified_smiles = Chem.MolToSmiles(modified_mol, canonical=True)
+    except Exception:
+        return None
+
+    # Name the base amine recursively
+    from ..namer import name_compound
+    _n_oxide_guard.active = True
+    try:
+        base_name = name_compound(modified_smiles)
+    except Exception:
+        return None
+    finally:
+        _n_oxide_guard.active = False
+
+    if not base_name:
+        return None
+
+    return f"{base_name} N-oxide"
+
+
+# ============================================================================
+# Isocyanate / Isothiocyanate naming (functional class)
+# ============================================================================
+
+def _name_isocyanate(features: Any) -> Optional[str]:
+    """Name isocyanate as 'R isocyanate' (functional class naming).
+
+    Pattern: R-N=C=O
+    SMARTS match gives (R_carbon, N, C, O)
+
+    Returns:
+        Functional class name like 'methyl isocyanate', or None.
+    """
+    return _name_iso_x_cyanate(features, 'isocyanate', 'isocyanate')
+
+
+def _name_isothiocyanate(features: Any) -> Optional[str]:
+    """Name isothiocyanate as 'R isothiocyanate' (functional class naming).
+
+    Pattern: R-N=C=S
+    SMARTS match gives (R_carbon, N, C, S)
+
+    Returns:
+        Functional class name like 'methyl isothiocyanate', or None.
+    """
+    return _name_iso_x_cyanate(features, 'isothiocyanate', 'isothiocyanate')
+
+
+def _name_iso_x_cyanate(features: Any, fg_key: str, suffix_word: str) -> Optional[str]:
+    """Common implementation for isocyanate and isothiocyanate naming.
+
+    SMARTS: [#6][NX2]=[CX2]=[OX1] or [#6][NX2]=[CX2]=[SX1]
+    Match tuple: (R_carbon, N, C, O/S)
+
+    Strategy: find the R group attached to N (the first atom in SMARTS match),
+    name it, return 'R isocyanate' or 'R isothiocyanate'.
+    """
+    from rdkit import Chem
+
+    mol = features.mol
+    matches = features.functional_groups.get(fg_key, [])
+    if not matches:
+        return None
+
+    # SMARTS gives (R_atom, N, C=cumulated, O/S)
+    match = matches[0]
+    r_atom_idx = match[0]  # The atom bonded to N (the R group start)
+    n_idx = match[1]       # Nitrogen
+
+    # Name the R group
+    r_name = _name_r_group(mol, r_atom_idx, exclude_atoms={n_idx, match[2], match[3]})
+    if not r_name:
+        return None
+
+    return f"{r_name} {suffix_word}"
+
+
+def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
+    """Name an R group (substituent fragment) starting from start_idx.
+
+    For simple alkyl chains: methyl, ethyl, propyl, butyl, ...
+    For branched alkyls: isopropyl, tert-butyl, sec-butyl, isobutyl
+    For phenyl: phenyl
+    For benzyl: benzyl (if CH2-phenyl)
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Starting atom index of the R group
+        exclude_atoms: Atom indices to exclude (the functional group itself)
+
+    Returns:
+        R group name, or None if unable to name.
+    """
+    from rdkit import Chem
+    from collections import deque
+
+    # BFS to find all atoms in the R fragment
+    visited = set()
+    queue = deque([start_idx])
+    frag_atoms = []
+
+    while queue:
+        idx = queue.popleft()
+        if idx in visited or idx in exclude_atoms:
+            continue
+        visited.add(idx)
+        frag_atoms.append(idx)
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in visited and nidx not in exclude_atoms:
+                queue.append(nidx)
+
+    if not frag_atoms:
+        return None
+
+    # Check for aromatic ring (phenyl)
+    ring_info = mol.GetRingInfo()
+    frag_set = set(frag_atoms)
+    for ring in ring_info.AtomRings():
+        ring_set = set(ring)
+        if ring_set.issubset(frag_set) and len(ring) == 6:
+            if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
+                   mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
+                # Has a benzene ring
+                non_ring_carbons = sum(
+                    1 for i in frag_atoms
+                    if i not in ring_set and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                )
+                if non_ring_carbons == 0:
+                    return "phenyl"
+                elif non_ring_carbons == 1:
+                    return "benzyl"
+
+    # Count carbons and check branching for alkyl name
+    carbon_atoms = [i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
+    carbon_count = len(carbon_atoms)
+
+    if carbon_count == 0:
+        return None
+
+    # Check for branched alkyl patterns using the attachment point
+    # The start_idx is the atom directly connected to the FG
+    start_atom = mol.GetAtomWithIdx(start_idx)
+    if start_atom.GetSymbol() == 'C':
+        # Count carbon neighbors within the fragment
+        c_neighbors_in_frag = [
+            nbr.GetIdx() for nbr in start_atom.GetNeighbors()
+            if nbr.GetIdx() in frag_set and nbr.GetSymbol() == 'C'
+        ]
+
+        if carbon_count == 3:
+            # 3 carbons: could be isopropyl (CH(CH3)2) or propyl (CH2CH2CH3)
+            if len(c_neighbors_in_frag) == 2:
+                # Branched at attachment point: isopropyl
+                return "isopropyl"
+
+        elif carbon_count == 4:
+            if len(c_neighbors_in_frag) == 3:
+                # 3 branches at attachment point: tert-butyl
+                return "tert-butyl"
+            elif len(c_neighbors_in_frag) == 2:
+                # Check for isobutyl (CH2-CH(CH3)2) vs sec-butyl (CH(CH3)(CH2CH3))
+                # sec-butyl: attachment carbon has 1 methyl + 1 ethyl branch
+                branch_sizes = []
+                for nb_idx in c_neighbors_in_frag:
+                    # Count carbons in this sub-branch
+                    sub_visited = {start_idx}
+                    sub_queue = deque([nb_idx])
+                    sub_count = 0
+                    while sub_queue:
+                        a = sub_queue.popleft()
+                        if a in sub_visited or a not in frag_set:
+                            continue
+                        sub_visited.add(a)
+                        if mol.GetAtomWithIdx(a).GetSymbol() == 'C':
+                            sub_count += 1
+                        for nn in mol.GetAtomWithIdx(a).GetNeighbors():
+                            if nn.GetIdx() not in sub_visited and nn.GetIdx() in frag_set:
+                                sub_queue.append(nn.GetIdx())
+                    branch_sizes.append(sub_count)
+
+                branch_sizes.sort()
+                if branch_sizes == [1, 2]:
+                    return "sec-butyl"
+            elif len(c_neighbors_in_frag) == 1:
+                # Linear attachment but could be isobutyl
+                # Check if there's branching further down
+                next_c = c_neighbors_in_frag[0]
+                next_atom = mol.GetAtomWithIdx(next_c)
+                next_c_nbrs = [
+                    nbr.GetIdx() for nbr in next_atom.GetNeighbors()
+                    if nbr.GetIdx() in frag_set and nbr.GetIdx() != start_idx
+                    and nbr.GetSymbol() == 'C'
+                ]
+                if len(next_c_nbrs) == 2:
+                    return "isobutyl"
+
+    # Default: linear alkyl name
+    try:
+        return get_alkyl_name(carbon_count)
+    except (ValueError, KeyError):
+        return None
+
+
+# ============================================================================
+# Carbamate naming (functional class: "ethyl carbamate")
+# ============================================================================
+
+def _name_carbamate(features: Any) -> Optional[str]:
+    """Name carbamate as 'alkyl [N-substituted]carbamate' (functional class naming).
+
+    Pattern: N-C(=O)-O-R
+    SMARTS match: [NX3][CX3](=O)[OX2][#6] gives (N, C, O=, O-R, R)
+    But we need the atoms at specific positions.
+
+    Unsubstituted: "ethyl carbamate" (NH2 on N)
+    N-monosubstituted: "ethyl N-methylcarbamate"
+    N,N-disubstituted: "methyl N,N-dimethylcarbamate"
+
+    Returns:
+        Functional class name, or None.
+    """
+    from rdkit import Chem
+    from collections import Counter
+
+    mol = features.mol
+    matches = features.functional_groups.get('carbamate', [])
+    if not matches:
+        return None
+
+    # SMARTS: [NX3][CX3](=O)[OX2][#6]
+    # Match gives (N, C_carbonyl, O_carbonyl, O_ether, R_atom)
+    # But note: SMARTS [NX3][CX3](=O)[OX2][#6] has 5 atoms in pattern...
+    # Actually, the SMARTS has mapped atoms: N(0), C(1), O=(implicit in =O), O(2 in [OX2]), C(3 in [#6])
+    # Let's verify the actual match structure
+    match = matches[0]
+
+    # The SMARTS "[NX3][CX3](=O)[OX2][#6]" matches:
+    # atom 0: N (the nitrogen)
+    # atom 1: C (the carbonyl carbon)
+    # atom 2: O (the carbonyl oxygen, from =O)
+    # atom 3: O (the ether oxygen, from [OX2])
+    # atom 4: C/# (the R group first atom, from [#6])
+    # Wait, this depends on the SMARTS encoding. Let me check the actual match length.
+
+    if len(match) < 4:
+        return None
+
+    n_idx = match[0]   # Nitrogen
+    c_idx = match[1]   # Carbonyl carbon
+
+    # Find the ether oxygen bonded to C (not the =O)
+    c_atom = mol.GetAtomWithIdx(c_idx)
+    o_ether_idx = None
+    r_start_idx = None
+
+    for nbr in c_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == n_idx:
+            continue
+        if nbr.GetSymbol() == 'O':
+            bond = mol.GetBondBetweenAtoms(c_idx, nidx)
+            if bond and bond.GetBondType() == Chem.BondType.SINGLE:
+                o_ether_idx = nidx
+                # Find R attached to ether O
+                for o_nbr in nbr.GetNeighbors():
+                    if o_nbr.GetIdx() != c_idx:
+                        r_start_idx = o_nbr.GetIdx()
+                break
+
+    if o_ether_idx is None or r_start_idx is None:
+        return None
+
+    # Exclude set: all carbamate core atoms
+    carbamate_core = {n_idx, c_idx, o_ether_idx}
+    # Also find and exclude the =O
+    for nbr in c_atom.GetNeighbors():
+        if nbr.GetSymbol() == 'O' and nbr.GetIdx() != o_ether_idx:
+            carbamate_core.add(nbr.GetIdx())
+
+    # Name the R group (on ether oxygen)
+    r_name = _name_r_group(mol, r_start_idx, exclude_atoms=carbamate_core)
+    if not r_name:
+        return None
+
+    # Check N-substitution
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    n_subs = []
+    for nbr in n_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx:
+            continue
+        if nbr.GetSymbol() == 'H':
+            continue
+        # Only count carbon-based substituents (not H)
+        if nbr.GetAtomicNum() > 1:
+            sub_name = _name_r_group(mol, nidx, exclude_atoms=carbamate_core)
+            if sub_name:
+                n_subs.append(sub_name)
+
+    if not n_subs:
+        # Unsubstituted: "ethyl carbamate"
+        return f"{r_name} carbamate"
+
+    # Build N-substitution prefix
+    sub_counts = Counter(n_subs)
+    n_prefix_parts = []
+    for name in sorted(sub_counts.keys()):
+        count = sub_counts[name]
+        if count == 1:
+            n_prefix_parts.append(f"N-{name}")
+        else:
+            mult = get_multiplier_prefix(count)
+            n_prefix_parts.append(f"N,N-{mult}{name}")
+
+    n_prefix = ",".join(n_prefix_parts)
+    return f"{r_name} {n_prefix}carbamate"
 
 
 def _name_simple_molecule(features: Any) -> str:
