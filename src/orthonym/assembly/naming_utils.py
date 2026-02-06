@@ -172,9 +172,25 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
         return ""
 
     if is_complex_substituent(substituent_name):
-        return COMPLEX_MULTIPLIERS.get(count, str(count))
+        if count in COMPLEX_MULTIPLIERS:
+            return COMPLEX_MULTIPLIERS[count]
+        # For counts > 20, build compositional multiplier using chain_names
+        from ..data.chain_names import get_chain_prefix
+        prefix = get_chain_prefix(count)
+        # Complex multipliers use "-akis" suffix (e.g., "henicosakis")
+        if not prefix.endswith("a"):
+            prefix += "a"
+        return prefix + "kis"
     else:
-        return SIMPLE_MULTIPLIERS.get(count, str(count))
+        if count in SIMPLE_MULTIPLIERS:
+            return SIMPLE_MULTIPLIERS[count]
+        # For counts > 20, build compositional multiplier using chain_names
+        from ..data.chain_names import get_chain_prefix
+        prefix = get_chain_prefix(count)
+        # Simple multipliers use trailing 'a' (e.g., "henicosa", "docosa")
+        if not prefix.endswith("a"):
+            prefix += "a"
+        return prefix
 
 
 # ============================================================================

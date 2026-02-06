@@ -293,3 +293,50 @@ class TestFunctionalGroupNamingIntegration:
         assert "-2-" in name_compound("CC(O)C")  # propan-2-ol
         # Ketone always non-terminal
         assert "-2-" in name_compound("CCC(C)=O")  # butan-2-one
+
+
+# ============================================================================
+# Multiplier Prefix Tests (Simple and Complex, including >20)
+# ============================================================================
+
+class TestMultiplierPrefix:
+    """Test get_multiplier_prefix for all count ranges including >20."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("count,name,expected", [
+        # Regression: standard simple multipliers
+        (1, "fluoro", ""),
+        (2, "fluoro", "di"),
+        (3, "fluoro", "tri"),
+        (4, "fluoro", "tetra"),
+        (5, "fluoro", "penta"),
+        (10, "fluoro", "deca"),
+        (15, "fluoro", "pentadeca"),
+        (20, "fluoro", "icosa"),
+        # New: simple multipliers >20
+        (21, "fluoro", "henicosa"),
+        (22, "fluoro", "docosa"),
+        (25, "fluoro", "pentacosa"),
+        (30, "fluoro", "triaconta"),
+    ])
+    def test_simple_multiplier_prefix(self, count, name, expected):
+        """Simple multiplier prefixes (di/tri/tetra/henicosa/docosa/...)."""
+        from orthonym.assembly.naming_utils import get_multiplier_prefix
+        assert get_multiplier_prefix(count, name) == expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("count,name,expected", [
+        # Regression: standard complex multipliers
+        (2, "1-methylethyl", "bis"),
+        (3, "1-methylethyl", "tris"),
+        (4, "1-methylethyl", "tetrakis"),
+        (10, "1-methylethyl", "decakis"),
+        (20, "1-methylethyl", "icosakis"),
+        # New: complex multipliers >20
+        (21, "1-methylethyl", "henicosakis"),
+        (22, "1-methylethyl", "docosakis"),
+    ])
+    def test_complex_multiplier_prefix(self, count, name, expected):
+        """Complex multiplier prefixes (bis/tris/tetrakis/henicosakis/...)."""
+        from orthonym.assembly.naming_utils import get_multiplier_prefix
+        assert get_multiplier_prefix(count, name) == expected
