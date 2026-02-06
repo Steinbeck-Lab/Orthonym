@@ -327,6 +327,25 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # Fallback to existing ion naming if composition fails
         return assemble_ion_name(features, features.mol, style)
 
+    # Handle acid halides BEFORE polyfunctional and ester handlers
+    # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
+    # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
+    if features.principal_group in ('acid_chloride', 'acid_bromide', 'acid_fluoride'):
+        from ..rules.acid_halides import name_acid_halide
+        halide_name = name_acid_halide(features)
+        if halide_name:
+            return halide_name
+
+    # Handle anhydrides BEFORE lactone, polyfunctional, and ester handlers
+    # Anhydrides use functional class naming: "ethanoic anhydride" (two-word)
+    # Must come before lactone because cyclic anhydrides (O=C1CCC(=O)O1) would
+    # otherwise be misidentified as lactones
+    if features.principal_group == 'anhydride':
+        from ..rules.anhydrides import name_anhydride
+        anhydride_name = name_anhydride(features)
+        if anhydride_name:
+            return anhydride_name
+
     # Handle monocyclic lactones BEFORE polyfunctional, esters, and heterocycles
     # Lactones are cyclic esters that should be named as heterocyclic ketones
     # (e.g., oxolan-2-one, not tetrahydrofuran or "alkyl alkanoate")

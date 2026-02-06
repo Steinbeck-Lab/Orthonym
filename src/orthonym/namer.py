@@ -240,6 +240,10 @@ class Orthonym:
         # Detect functional groups using SMARTS patterns
         features.functional_groups = detect_functional_groups(mol)
 
+        # Filter consumed atoms to prevent double-counting
+        # (e.g., acid halide Cl should not also appear as "chloro" prefix)
+        features.functional_groups = _filter_consumed_fg_atoms(features.functional_groups)
+
         # Detect ring systems
         features.ring_systems = get_ring_systems(mol)
         features.is_cyclic = len(features.ring_systems) > 0
@@ -579,6 +583,66 @@ class Orthonym:
                 substituents[chain_idx] = position_subs
 
         return substituents
+
+
+def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
+    """Filter out functional group matches whose atoms are consumed by higher-priority groups.
+
+    This prevents double-counting. For example, the Cl in an acid chloride
+    (-C(=O)Cl) matches both the acid_chloride SMARTS and the chloro SMARTS.
+    Without filtering, the Cl would appear as both "oyl chloride" (suffix) and
+    "chloro" (prefix), producing incorrect names like "1-chloroethanoyl chloride"
+    instead of "acetyl chloride".
+
+    Rules:
+        1. Acid halides consume halogens: remove chloro/bromo/fluoro matches
+           where the halogen atom is part of an acid halide group.
+        2. Anhydrides consume esters: remove ester matches where atoms overlap
+           with an anhydride group.
+
+    Args:
+        functional_groups: Dict from detect_functional_groups().
+
+    Returns:
+        Filtered copy of functional_groups with consumed matches removed.
+    """
+    from .rules.acid_halides import get_acid_halide_consumed_atoms
+    from .rules.anhydrides import get_anhydride_consumed_atoms
+
+    fg = dict(functional_groups)  # shallow copy
+
+    # --- Rule 1: Acid halides consume halogens ---
+    halide_consumed = get_acid_halide_consumed_atoms(fg)
+    if halide_consumed:
+        for halogen_key in ("chloro", "bromo", "fluoro"):
+            if halogen_key in fg:
+                filtered = []
+                for match in fg[halogen_key]:
+                    # match = (halogen_idx, C_idx) from SMARTS [X][#6]
+                    halogen_atom = match[0]
+                    if halogen_atom not in halide_consumed:
+                        filtered.append(match)
+                if filtered:
+                    fg[halogen_key] = filtered
+                else:
+                    del fg[halogen_key]
+
+    # --- Rule 2: Anhydrides consume esters ---
+    anhydride_consumed = get_anhydride_consumed_atoms(fg)
+    if anhydride_consumed:
+        if "ester" in fg:
+            filtered = []
+            for match in fg["ester"]:
+                match_set = set(match)
+                # If ANY atom in the ester match overlaps with anhydride, remove it
+                if not match_set & anhydride_consumed:
+                    filtered.append(match)
+            if filtered:
+                fg["ester"] = filtered
+            else:
+                del fg["ester"]
+
+    return fg
 
 
 def name_compound(smiles: str, style: str = "pin") -> str:
