@@ -36,6 +36,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     "tertiary_amide": "[CX3](=O)[NX3]([#6])[#6]",
     "hydrazide": "[CX3](=O)[NX3][NX3]",
     "imide": "[CX3](=O)[NX3][CX3](=O)",
+
+    # === SULFONAMIDES ===
+    "primary_sulfonamide": "[SX4](=O)(=O)[NX3H2]",
+    "secondary_sulfonamide": "[SX4](=O)(=O)[NX3H1][#6]",
+    "tertiary_sulfonamide": "[SX4](=O)(=O)[NX3]([#6])[#6]",
     
     # === NITRILES ===
     "nitrile": "[CX2]#[NX1]",

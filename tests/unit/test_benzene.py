@@ -548,6 +548,6 @@ class TestNitrileDetection:
         ring = get_benzene_ring(mol)
         subs = get_benzene_substituents(mol, ring)
 
-        # Check that nitrile was detected
+        # Check that nitrile was detected (suffix FG detection returns 'carbonitrile')
         sub_names = [s['name'] for s_list in subs.values() for s in s_list]
-        assert 'nitrile' in sub_names
+        assert 'carbonitrile' in sub_names or 'nitrile' in sub_names

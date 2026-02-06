@@ -6,12 +6,15 @@ Handles:
 - Polysubstituted benzenes with numeric locants (1,4-dimethylbenzene)
 - Benzene ring orientation for lowest locants
 - Alphabetical ordering of substituents
+- Suffix functional groups on benzene (carboxylic acid, amide, sulfonamide, etc.)
 
 IUPAC 2013 PIN Rules:
 - Numeric locants are REQUIRED (not ortho/meta/para)
 - Toluene is retained ONLY for unsubstituted methylbenzene
 - Substituted methylbenzene uses "methylbenzene" (not "toluene")
 - Position 1 assigned to give lowest locants via first-point-of-difference
+- Ring-attached principal groups use suffix form (P-65.1.2)
+- benzamide = retained name for C6H5CONH2 (P-66.1.1.1)
 """
 
 from typing import Dict, List, Tuple, Optional, Set
@@ -37,6 +40,29 @@ SUBSTITUENT_PREFIXES = {
     "I": "iodo",
     # Common groups - these are detected by the get_benzene_substituents function
     # based on the substituent structure
+}
+
+# Priority order for suffix functional groups on benzene
+# Highest priority first (carboxylic acid > sulfonamide > amide > nitrile > aldehyde)
+_SUFFIX_PRIORITY = [
+    'carboxylic acid',
+    'sulfonic acid',
+    'sulfonamide',
+    'carbonyl chloride',
+    'carboxamide',
+    'carbonitrile',
+    'carbaldehyde',
+]
+
+# Prefix forms for suffix FGs when they are NOT the principal group
+_SUFFIX_TO_PREFIX = {
+    'carboxylic acid': 'carboxy',
+    'sulfonic acid': 'sulfo',
+    'sulfonamide': 'sulfamoyl',
+    'carbonyl chloride': 'chlorocarbonyl',
+    'carboxamide': 'carbamoyl',
+    'carbonitrile': 'cyano',
+    'carbaldehyde': 'formyl',
 }
 
 
@@ -116,6 +142,213 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
     return dict(substituents)
 
 
+def _bfs_substituent_atoms(mol, start_idx: int, ring_atoms: Set[int]) -> List[int]:
+    """
+    BFS to collect all atom indices in a substituent starting from start_idx.
+
+    Does not constrain to pure alkyl -- collects all atoms outside ring_atoms.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Index of the first atom in the substituent
+        ring_atoms: Set of ring atom indices to exclude
+
+    Returns:
+        List of all atom indices in the substituent (including start_idx)
+    """
+    visited = {start_idx}
+    queue = [start_idx]
+    all_atoms = []
+
+    while queue:
+        current_idx = queue.pop(0)
+        all_atoms.append(current_idx)
+
+        current_atom = mol.GetAtomWithIdx(current_idx)
+        for neighbor in current_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in ring_atoms:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    return all_atoms
+
+
+def _identify_suffix_fg_on_benzene(
+    mol, start_idx: int, sub_atoms: List[int], ring_atoms: Set[int]
+) -> Optional[Dict]:
+    """
+    Identify suffix-type functional groups attached to benzene ring.
+
+    Checks if the substituent starting at start_idx is a functional group
+    that should be expressed as a suffix on the benzene parent name.
+
+    Handles both C-based FGs (carboxylic acid, amide, aldehyde, nitrile, acid chloride)
+    and S-based FGs (sulfonamide, sulfonic acid).
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Index of the atom directly attached to ring
+        sub_atoms: All atom indices in the substituent
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        Dict with 'name', 'suffix_name', 'is_suffix', 'atoms', and optionally
+        'n_substituents' for N-substituted amides; or None if not a suffix FG.
+    """
+    start_atom = mol.GetAtomWithIdx(start_idx)
+    symbol = start_atom.GetSymbol()
+
+    # Carbon-based suffix FGs
+    if symbol == 'C':
+        # Carboxylic acid: C(=O)(OH) -- check before amide!
+        acid_pat = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+        if acid_pat:
+            for match in mol.GetSubstructMatches(acid_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carboxylic acid', 'suffix_name': 'carboxylic acid',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+        # Primary amide: C(=O)(NH2)
+        amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
+        if amide_pat:
+            for match in mol.GetSubstructMatches(amide_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+        # Secondary amide: C(=O)(NHR)
+        sec_amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]')
+        if sec_amide_pat:
+            for match in mol.GetSubstructMatches(sec_amide_pat):
+                if match[0] == start_idx:
+                    # Detect N-alkyl substituents
+                    n_subs = _detect_n_substituents(mol, match, ring_atoms)
+                    return {
+                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                        'n_substituents': n_subs,
+                    }
+
+        # Tertiary amide: C(=O)(NR2)
+        tert_amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]')
+        if tert_amide_pat:
+            for match in mol.GetSubstructMatches(tert_amide_pat):
+                if match[0] == start_idx:
+                    n_subs = _detect_n_substituents(mol, match, ring_atoms)
+                    return {
+                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                        'n_substituents': n_subs,
+                    }
+
+        # Aldehyde: C(=O)H
+        ald_pat = Chem.MolFromSmarts('[CX3H1](=O)')
+        if ald_pat:
+            for match in mol.GetSubstructMatches(ald_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carbaldehyde', 'suffix_name': 'carbaldehyde',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+        # Nitrile: C#N (keep existing benzonitrile path for single nitrile)
+        nitrile_pat = Chem.MolFromSmarts('[CX2]#[NX1]')
+        if nitrile_pat:
+            for match in mol.GetSubstructMatches(nitrile_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carbonitrile', 'suffix_name': 'carbonitrile',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+        # Acid chloride: C(=O)Cl
+        acid_cl_pat = Chem.MolFromSmarts('[CX3](=O)[Cl]')
+        if acid_cl_pat:
+            for match in mol.GetSubstructMatches(acid_cl_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carbonyl chloride', 'suffix_name': 'carbonyl chloride',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+    # Sulfur-based suffix FGs
+    if symbol == 'S':
+        # Sulfonamide: S(=O)(=O)(NH2)
+        sulfonamide_pat = Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]')
+        if sulfonamide_pat:
+            for match in mol.GetSubstructMatches(sulfonamide_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+        # Sulfonic acid: S(=O)(=O)(OH)
+        sulfonic_pat = Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]')
+        if sulfonic_pat:
+            for match in mol.GetSubstructMatches(sulfonic_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'sulfonic acid', 'suffix_name': 'sulfonic acid',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
+    return None
+
+
+def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[int]) -> List[str]:
+    """
+    Detect N-alkyl substituents on an amide nitrogen.
+
+    Args:
+        mol: RDKit Mol object
+        amide_match: SMARTS match tuple (C, O/N indices depending on pattern)
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        List of alkyl names attached to nitrogen (e.g., ['methyl'] or ['methyl', 'methyl'])
+    """
+    # Find the nitrogen atom in the amide
+    c_idx = amide_match[0]
+    c_atom = mol.GetAtomWithIdx(c_idx)
+
+    n_atom = None
+    for nbr in c_atom.GetNeighbors():
+        if nbr.GetSymbol() == 'N' and nbr.GetIdx() not in ring_atoms:
+            n_atom = nbr
+            break
+
+    if n_atom is None:
+        return []
+
+    n_idx = n_atom.GetIdx()
+    alkyl_names = []
+
+    for nbr in n_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx == c_idx or nbr_idx in ring_atoms:
+            continue
+        if nbr.GetSymbol() == 'C':
+            # Collect alkyl chain
+            alkyl_atoms, carbon_count = _collect_pure_alkyl(
+                mol, nbr_idx, ring_atoms | {n_idx, c_idx}
+            )
+            if alkyl_atoms is not None and carbon_count > 0:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                    alkyl_names.append(alkyl_name)
+                except (ValueError, KeyError):
+                    pass
+
+    alkyl_names.sort()
+    return alkyl_names
+
+
 def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
@@ -138,6 +371,13 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             'atoms': [start_idx]
         }
 
+    # For C and S atoms, check suffix FGs first
+    if symbol in ('C', 'S'):
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        suffix_fg = _identify_suffix_fg_on_benzene(mol, start_idx, sub_atoms, ring_atoms)
+        if suffix_fg:
+            return suffix_fg
+
     # Nitrogen-based groups
     if symbol == 'N':
         return _identify_nitrogen_group(mol, start_idx, ring_atoms)
@@ -146,7 +386,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     if symbol == 'O':
         return _identify_oxygen_group(mol, start_idx, ring_atoms)
 
-    # Carbon-based groups (alkyl or functionalized chain)
+    # Carbon-based groups (alkyl or functionalized chain) - fallback for non-suffix C
     if symbol == 'C':
         # Check for nitrile C#N pattern FIRST (BUG-2 fix)
         nitrile_result = _identify_nitrile_group(mol, start_idx, ring_atoms)
@@ -839,6 +1079,7 @@ def name_substituted_benzene(
     - Use multiplicative prefixes (di-, tri-) for repeated substituents
     - Format: locants-substituent-benzene (or just substituent-benzene for mono)
     - Special case: benzonitrile (C6H5CN) uses suffix-style naming per P-66.1.1.1
+    - Ring-attached principal groups use suffix form (P-65.1.2)
 
     Args:
         mol: RDKit Mol object
@@ -853,55 +1094,74 @@ def name_substituted_benzene(
     # oriented_ring[0] = position 1, oriented_ring[1] = position 2, etc.
     atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(oriented_ring)}
 
-    # Group substituents by name
-    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    # Separate suffix-type FGs from prefix-type substituents
+    suffix_groups: Dict[str, List[int]] = defaultdict(list)
+    prefix_groups: Dict[str, List[int]] = defaultdict(list)
+    # Track N-substituents for amides keyed by suffix_name
+    n_substituents_map: Dict[str, List[str]] = {}
 
     for atom_idx in oriented_ring:
         if atom_idx not in substituents:
             continue
 
         for sub_info in substituents[atom_idx]:
-            name = sub_info['name']
             locant = atom_to_locant[atom_idx]
-            substituent_groups[name].append(locant)
+            if sub_info.get('is_suffix'):
+                suffix_groups[sub_info['suffix_name']].append(locant)
+                # Track N-substituents if present
+                if 'n_substituents' in sub_info and sub_info['n_substituents']:
+                    n_substituents_map[sub_info['suffix_name']] = sub_info['n_substituents']
+            else:
+                prefix_groups[sub_info['name']].append(locant)
 
     # Sort locants within each group
-    for name in substituent_groups:
-        substituent_groups[name].sort()
+    for name in suffix_groups:
+        suffix_groups[name].sort()
+    for name in prefix_groups:
+        prefix_groups[name].sort()
+
+    # If suffix groups exist, use suffix naming path
+    if suffix_groups:
+        return _assemble_benzene_with_suffix(
+            mol, suffix_groups, prefix_groups, n_substituents_map,
+            atom_to_locant, oriented_ring
+        )
+
+    # === PREFIX-ONLY PATH (existing logic) ===
 
     # Check for nitrile - special handling for benzonitrile naming (BUG-2 fix)
     # IUPAC 2013 PIN: benzonitrile (not cyanobenzene) per P-66.1.1.1
-    if 'nitrile' in substituent_groups:
-        nitrile_locants = substituent_groups['nitrile']
+    if 'nitrile' in prefix_groups:
+        nitrile_locants = prefix_groups['nitrile']
         if len(nitrile_locants) == 1:
             # Single nitrile: use benzonitrile as parent
             # Remove nitrile from substituent groups since it becomes the parent
-            del substituent_groups['nitrile']
+            del prefix_groups['nitrile']
 
             # Re-orient so nitrile is at position 1 for locant calculation
             nitrile_locant = nitrile_locants[0]
 
             # Other substituents become prefixes relative to benzonitrile
-            if not substituent_groups:
+            if not prefix_groups:
                 # Pure benzonitrile
                 return "benzonitrile"
 
             # Build prefixes for other substituents
             # Need to recalculate locants relative to nitrile at position 1
             return _name_substituted_benzonitrile(
-                substituent_groups, nitrile_locant, atom_to_locant, oriented_ring
+                prefix_groups, nitrile_locant, atom_to_locant, oriented_ring
             )
 
     # Count total number of substituents
-    total_substituents = sum(len(locs) for locs in substituent_groups.values())
+    total_substituents = sum(len(locs) for locs in prefix_groups.values())
 
     # For monosubstituted benzenes, omit the locant (it's always 1)
     is_monosubstituted = total_substituents == 1
 
     # Build prefix strings, sorted alphabetically by substituent name
     prefixes = []
-    for name in sorted(substituent_groups.keys(), key=alpha_sort_key):
-        locants = substituent_groups[name]
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+        locants = prefix_groups[name]
         count = len(locants)
 
         if is_monosubstituted:
@@ -923,6 +1183,350 @@ def name_substituted_benzene(
 
     # Build final name
     return f"{prefix_part}benzene"
+
+
+def _assemble_benzene_with_suffix(
+    mol,
+    suffix_groups: Dict[str, List[int]],
+    prefix_groups: Dict[str, List[int]],
+    n_substituents_map: Dict[str, List[str]],
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Assemble benzene name with suffix functional groups.
+
+    Picks the highest-priority suffix FG, builds locants + multiplier + suffix,
+    then adds remaining FGs as prefixes.
+
+    Args:
+        mol: RDKit Mol object
+        suffix_groups: Dict of suffix_name -> list of locants
+        prefix_groups: Dict of prefix_name -> list of locants
+        n_substituents_map: Dict of suffix_name -> list of N-alkyl names
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name string with suffix FG
+    """
+    # Pick highest-priority suffix
+    chosen_suffix = None
+    for sfx in _SUFFIX_PRIORITY:
+        if sfx in suffix_groups:
+            chosen_suffix = sfx
+            break
+
+    if chosen_suffix is None:
+        # Shouldn't happen, but fallback to first suffix
+        chosen_suffix = next(iter(suffix_groups))
+
+    chosen_locants = suffix_groups[chosen_suffix]
+    chosen_count = len(chosen_locants)
+
+    # Single carbonitrile: delegate to existing benzonitrile path
+    # (which uses the retained name "benzonitrile" and proper renumbering)
+    if chosen_suffix == 'carbonitrile' and chosen_count == 1:
+        # Convert suffix+prefix groups back to prefix-only for benzonitrile path
+        nitrile_locant = chosen_locants[0]
+        all_prefix = dict(prefix_groups)
+        # Add any other suffix FGs as prefixes
+        for sfx_name, sfx_locants in suffix_groups.items():
+            if sfx_name == 'carbonitrile':
+                continue
+            prefix_form = _SUFFIX_TO_PREFIX.get(sfx_name, sfx_name)
+            if prefix_form:
+                all_prefix[prefix_form] = sfx_locants
+        if not all_prefix:
+            return "benzonitrile"
+        return _name_substituted_benzonitrile(
+            all_prefix, nitrile_locant, atom_to_locant, oriented_ring
+        )
+
+    # Remaining suffix FGs become prefixes
+    remaining_prefix_groups = dict(prefix_groups)
+    for sfx_name, sfx_locants in suffix_groups.items():
+        if sfx_name == chosen_suffix:
+            continue
+        # Convert to prefix form
+        prefix_form = _SUFFIX_TO_PREFIX.get(sfx_name, sfx_name)
+        if prefix_form:
+            remaining_prefix_groups[prefix_form] = sfx_locants
+
+    # Check for special "benzoic acid" retained base name:
+    # Single carboxylic acid -> "benzoic acid" base (P-65.1.2.1)
+    if chosen_suffix == 'carboxylic acid' and chosen_count == 1:
+        return _name_substituted_benzoic_acid(
+            remaining_prefix_groups, chosen_locants[0],
+            atom_to_locant, oriented_ring
+        )
+
+    # Check for benzamide-based naming:
+    # Single carboxamide -> use "benzamide" as retained base
+    if chosen_suffix == 'carboxamide' and chosen_count == 1:
+        n_subs = n_substituents_map.get('carboxamide', [])
+        return _name_substituted_benzamide(
+            remaining_prefix_groups, chosen_locants[0],
+            atom_to_locant, oriented_ring, n_subs
+        )
+
+    # Check for benzenesulfonamide-based naming:
+    # Single sulfonamide -> "benzenesulfonamide"
+    if chosen_suffix == 'sulfonamide' and chosen_count == 1:
+        return _name_substituted_benzenesulfonamide(
+            remaining_prefix_groups, chosen_locants[0],
+            atom_to_locant, oriented_ring
+        )
+
+    # General suffix assembly for multi-suffix or non-retained cases
+    # Build suffix part: benzene-{locants}-{multiplier}{suffix}
+    multiplier = get_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
+    locant_str = ",".join(str(loc) for loc in chosen_locants)
+
+    # Build prefix part from remaining groups
+    prefix_part = _build_prefix_string(remaining_prefix_groups)
+
+    # Assemble: {prefix}benzene-{locants}-{multiplier}{suffix}
+    if chosen_count > 1:
+        return f"{prefix_part}benzene-{locant_str}-{multiplier}{chosen_suffix}"
+    else:
+        # Monosubstituted: benzene{suffix} (no locant, no hyphen)
+        return f"{prefix_part}benzene{chosen_suffix}"
+
+
+def _name_substituted_benzoic_acid(
+    prefix_groups: Dict[str, List[int]],
+    acid_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Name substituted benzoic acid derivatives.
+
+    Uses "benzoic acid" as the retained base name. Position 1 is the
+    carboxylic acid position. Other substituents get locants relative to it.
+
+    Args:
+        prefix_groups: Dict of prefix name -> locants (non-acid substituents)
+        acid_locant: Locant of the carboxylic acid in original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name like "2-hydroxybenzoic acid"
+    """
+    if not prefix_groups:
+        return "benzoic acid"
+
+    # Renumber relative to acid position (acid = position 1)
+    renumbered_groups = _renumber_relative_to(prefix_groups, acid_locant)
+
+    # Build prefixes
+    prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+
+    return f"{prefix_part}benzoic acid"
+
+
+def _name_substituted_benzamide(
+    prefix_groups: Dict[str, List[int]],
+    amide_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+    n_substituents: List[str],
+) -> str:
+    """
+    Name substituted benzamide derivatives.
+
+    Uses "benzamide" as the retained base name. Position 1 is the
+    carboxamide position. Other substituents get locants relative to it.
+
+    Args:
+        prefix_groups: Non-amide substituent groups
+        amide_locant: Locant of the amide in original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+        n_substituents: List of N-alkyl names (e.g., ['methyl'] for N-methylbenzamide)
+
+    Returns:
+        IUPAC name like "4-methylbenzamide" or "N-methylbenzamide"
+    """
+    # Build N-substituent prefix part
+    n_prefix = ""
+    if n_substituents:
+        if len(n_substituents) == 1:
+            n_prefix = f"N-{n_substituents[0]}"
+        elif len(n_substituents) == 2 and n_substituents[0] == n_substituents[1]:
+            mp = get_multiplier_prefix(2, n_substituents[0])
+            n_prefix = f"N,N-{mp}{n_substituents[0]}"
+        else:
+            # Different N-substituents
+            parts = [f"N-{name}" for name in n_substituents]
+            n_prefix = "-".join(parts)
+
+    if not prefix_groups and not n_prefix:
+        return "benzamide"
+
+    # Renumber relative to amide position (amide = position 1)
+    renumbered_groups = _renumber_relative_to(prefix_groups, amide_locant)
+
+    # Build ring-substituent prefixes
+    ring_prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+
+    # Combine N-prefix and ring-prefix
+    if n_prefix and ring_prefix_part:
+        return f"{n_prefix}-{ring_prefix_part}benzamide"
+    elif n_prefix:
+        return f"{n_prefix}benzamide"
+    else:
+        return f"{ring_prefix_part}benzamide"
+
+
+def _name_substituted_benzenesulfonamide(
+    prefix_groups: Dict[str, List[int]],
+    sulfonamide_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Name substituted benzenesulfonamide derivatives.
+
+    Uses "benzenesulfonamide" as the base name. Position 1 is the
+    sulfonamide position.
+
+    Args:
+        prefix_groups: Non-sulfonamide substituent groups
+        sulfonamide_locant: Locant of the sulfonamide in original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name like "4-methylbenzenesulfonamide"
+    """
+    if not prefix_groups:
+        return "benzenesulfonamide"
+
+    # Renumber relative to sulfonamide position
+    renumbered_groups = _renumber_relative_to(prefix_groups, sulfonamide_locant)
+
+    # Build prefixes
+    prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+
+    return f"{prefix_part}benzenesulfonamide"
+
+
+def _renumber_relative_to(
+    groups: Dict[str, List[int]],
+    reference_locant: int,
+) -> Dict[str, List[int]]:
+    """
+    Renumber substituent locants relative to a reference position.
+
+    The reference position becomes position 1. Tries both clockwise and
+    counterclockwise numbering and picks the one giving lowest locants.
+
+    Args:
+        groups: Dict of name -> list of locants in original numbering
+        reference_locant: The locant that should become position 1
+
+    Returns:
+        Dict of name -> list of renumbered locants
+    """
+    best_groups = None
+    best_locant_set = None
+
+    for direction in [1, -1]:
+        converted: Dict[str, List[int]] = defaultdict(list)
+
+        for name, locants in groups.items():
+            for old_loc in locants:
+                diff = (old_loc - reference_locant) * direction
+                new_loc = (diff % 6) + 1
+                if new_loc == 1:
+                    # Position 1 is reserved for the principal group
+                    new_loc = 6
+                converted[name].append(new_loc)
+
+        # Sort locants within each group
+        for name in converted:
+            converted[name].sort()
+
+        # Calculate overall locant set for comparison
+        all_locants = sorted([loc for locs in converted.values() for loc in locs])
+
+        if best_locant_set is None or all_locants < best_locant_set:
+            best_locant_set = all_locants
+            best_groups = dict(converted)
+
+    return best_groups if best_groups else {}
+
+
+def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
+    """
+    Build prefix part string from prefix groups.
+
+    For groups where locants are all 1 and single, omits locants.
+    Handles monosubstituted (no locant needed).
+
+    Args:
+        prefix_groups: Dict of prefix name -> list of locants
+
+    Returns:
+        Prefix string to prepend to parent name
+    """
+    if not prefix_groups:
+        return ""
+
+    total = sum(len(locs) for locs in prefix_groups.values())
+    is_mono = total == 1
+
+    prefixes = []
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+        locants = prefix_groups[name]
+        count = len(locants)
+
+        if is_mono:
+            if name.startswith('(') and name.endswith(')'):
+                prefix_str = name[1:-1]
+            else:
+                prefix_str = name
+        else:
+            prefix_str = format_substituent_prefix(name, locants, count)
+
+        prefixes.append(prefix_str)
+
+    return _join_benzene_prefixes(prefixes)
+
+
+def _build_prefix_string_with_locants(
+    prefix_groups: Dict[str, List[int]],
+    mono_needs_locant: bool = True,
+) -> str:
+    """
+    Build prefix string where locants are always included (for substituted retained names).
+
+    For "4-methylbenzamide", the locant 4 is needed even for mono-substitution.
+
+    Args:
+        prefix_groups: Dict of prefix name -> list of locants
+        mono_needs_locant: If True, even single substituents include locant
+
+    Returns:
+        Prefix string like "4-methyl" or "2-hydroxy"
+    """
+    if not prefix_groups:
+        return ""
+
+    prefixes = []
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+        locants = prefix_groups[name]
+        count = len(locants)
+
+        prefix_str = format_substituent_prefix(name, locants, count)
+        prefixes.append(prefix_str)
+
+    result = _join_benzene_prefixes(prefixes)
+
+    return result
 
 
 def _name_substituted_benzonitrile(

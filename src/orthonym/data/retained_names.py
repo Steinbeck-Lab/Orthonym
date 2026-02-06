@@ -218,6 +218,9 @@ RETAINED_NAMES = {
     # === NITRILES - AROMATIC (Phase 14.6 BUG-2 fix) ===
     "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per P-66.1.1.1
 
+    # === AMIDES - AROMATIC (Phase 20 suffix FG fix) ===
+    "NC(=O)c1ccccc1": "benzamide",  # C6H5CONH2 - PIN per P-66.1.1.1
+
     # === THIAZOLIDINES (Phase 14.6 BUG-6 fix) ===
     # 1,3-thiazolidine: S at 1, N at 3 (not adjacent)
     "C1CSCN1": "thiazolidine",
