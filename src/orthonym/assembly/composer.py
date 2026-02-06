@@ -165,6 +165,9 @@ TERMINAL_GROUPS = {
     "primary_amide",    # Always at chain end (locant 1)
     "secondary_amide",  # Always at chain end (locant 1)
     "tertiary_amide",   # Always at chain end (locant 1)
+    "acid_chloride",    # Always at chain end (locant 1)
+    "acid_bromide",     # Always at chain end (locant 1)
+    "acid_fluoride",    # Always at chain end (locant 1)
 }
 
 
@@ -496,8 +499,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         return _assemble_ring_nitrile_name(features, style)
 
     # Handle amides (including N-substituted amides)
+    # Multi-amide compounds (diamide, triamide) fall through to normal suffix path
+    # so that the multiplier prefix (di-, tri-) is correctly applied.
     if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
-        return _assemble_amide_name(features, style)
+        pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
+        if pg_count == 1:
+            return _assemble_amide_name(features, style)
 
     # Handle secondary/tertiary amines: add N-alkyl prefixes
     if features.principal_group in ('secondary_amine', 'tertiary_amine'):

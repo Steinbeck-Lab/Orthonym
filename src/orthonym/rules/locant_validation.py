@@ -50,6 +50,11 @@ def validate_suffix_locants(
         ([2, 4], 2)
     """
     filtered = [loc for loc in locants if 0 < loc <= parent_size]
+    # When locants list is empty (terminal groups like diacids, dialdehydes),
+    # preserve the original count. Only adjust count when we actually
+    # had locants to filter.
+    if not locants:
+        return filtered, count
     return filtered, len(filtered)
 
 
