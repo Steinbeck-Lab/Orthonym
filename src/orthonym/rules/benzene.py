@@ -19,6 +19,7 @@ from collections import defaultdict
 from rdkit import Chem
 
 from ..assembly.naming_utils import (
+    get_alkyl_name,
     get_multiplier_prefix,
     format_substituent_prefix,
     alpha_sort_key,
@@ -36,20 +37,6 @@ SUBSTITUENT_PREFIXES = {
     "I": "iodo",
     # Common groups - these are detected by the get_benzene_substituents function
     # based on the substituent structure
-}
-
-# Alkyl group names (by carbon count)
-ALKYL_NAMES = {
-    1: "methyl",
-    2: "ethyl",
-    3: "propyl",
-    4: "butyl",
-    5: "pentyl",
-    6: "hexyl",
-    7: "heptyl",
-    8: "octyl",
-    9: "nonyl",
-    10: "decyl",
 }
 
 
@@ -281,13 +268,10 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
         alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, neighbors[0].GetIdx(), ring_atoms | {n_idx})
         if alkyl_atoms is not None and carbon_count > 0:
-            alkyl_name = ALKYL_NAMES.get(carbon_count)
-            if not alkyl_name:
-                from ..data.chain_names import get_alkyl_name as _chain_alkyl
-                try:
-                    alkyl_name = _chain_alkyl(carbon_count)
-                except (ValueError, KeyError):
-                    alkyl_name = None
+            try:
+                alkyl_name = get_alkyl_name(carbon_count)
+            except (ValueError, KeyError):
+                alkyl_name = None
             if alkyl_name:
                 return {
                     'name': f'(N-{alkyl_name}amino)',
@@ -306,8 +290,9 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, cn.GetIdx(), ring_atoms | {n_idx})
                 if alkyl_atoms is None or carbon_count == 0:
                     break
-                aname = ALKYL_NAMES.get(carbon_count)
-                if not aname:
+                try:
+                    aname = get_alkyl_name(carbon_count)
+                except (ValueError, KeyError):
                     break
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
@@ -466,14 +451,9 @@ def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]
     For now, handles simple linear alkyls. Branched alkyls will be
     implemented in later phases.
     """
-    if carbon_count in ALKYL_NAMES:
-        # TODO: Check for branching (isopropyl vs propyl, etc.)
-        return ALKYL_NAMES[carbon_count]
-
-    # Delegate to centralized chain_names for > 10 carbons
-    from ..data.chain_names import get_alkyl_name as _chain_alkyl
+    # TODO: Check for branching (isopropyl vs propyl, etc.)
     try:
-        return _chain_alkyl(carbon_count)
+        return get_alkyl_name(carbon_count)
     except (ValueError, KeyError):
         return None
 

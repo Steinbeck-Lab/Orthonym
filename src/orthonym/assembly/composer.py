@@ -153,19 +153,6 @@ def assemble_fused_ring_with_saturation(
     return '-'.join(parts)
 
 
-# Chain length prefixes (IUPAC Blue Book)
-CHAIN_PREFIXES = {
-    1: "meth", 2: "eth", 3: "prop", 4: "but", 5: "pent",
-    6: "hex", 7: "hept", 8: "oct", 9: "non", 10: "dec",
-    11: "undec", 12: "dodec", 13: "tridec", 14: "tetradec",
-    15: "pentadec", 16: "hexadec", 17: "heptadec", 18: "octadec",
-    19: "nonadec", 20: "icos", 21: "henicos", 22: "docos",
-    23: "tricos", 24: "tetracos", 25: "pentacos",
-    30: "triacont", 40: "tetracont", 50: "pentacont",
-    60: "hexacont", 70: "heptacont", 80: "octacont",
-    90: "nonacont", 100: "hect",
-}
-
 # Prefixes to IGNORE for alphabetization
 IGNORE_FOR_ALPHA = set(SIMPLE_MULTIPLIERS.values()) | set(COMPLEX_MULTIPLIERS.values())
 
@@ -3450,7 +3437,7 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
 
 def _build_long_chain_prefix(length: int) -> str:
     """
-    Build prefix for chains longer than those in CHAIN_PREFIXES.
+    Build prefix for long chains.
 
     Delegates to centralized chain_names module.
     Kept for backward compatibility.

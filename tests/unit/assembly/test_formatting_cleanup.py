@@ -127,10 +127,9 @@ class TestNoCycloane:
 
     def test_ring_parent_with_known_sizes(self):
         """Common ring sizes produce correct names."""
-        from orthonym.assembly.composer import CHAIN_PREFIXES
+        from orthonym.data.chain_names import get_chain_prefix
         for size in [3, 4, 5, 6, 7, 8]:
-            assert size in CHAIN_PREFIXES, f"Ring size {size} missing from CHAIN_PREFIXES"
-            stem = CHAIN_PREFIXES[size]
+            stem = get_chain_prefix(size)
             name = f"cyclo{stem}ane"
             assert name != "cycloane", f"Ring size {size} produced cycloane"
             assert len(stem) > 0, f"Empty stem for ring size {size}"

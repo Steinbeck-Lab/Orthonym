@@ -18,12 +18,6 @@ from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 
 
-# Chain length prefixes for nitrile naming
-CHAIN_PREFIXES = {
-    1: "meth", 2: "eth", 3: "prop", 4: "but", 5: "pent",
-    6: "hex", 7: "hept", 8: "oct", 9: "non", 10: "dec",
-}
-
 
 def is_ring_attached_nitrile(mol, nitrile_atoms: tuple) -> bool:
     """

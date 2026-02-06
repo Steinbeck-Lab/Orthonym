@@ -45,7 +45,6 @@ RADICAL_TYPE_NAMES = {
 # === CHAIN PREFIXES ===
 # Delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
-CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 11)}
 
 # Retained radical names (canonical SMILES -> name)
 # These are looked up first before systematic naming

@@ -21,7 +21,6 @@ from src.orthonym.rules.radicals import (
     name_aryl_radical,
     RADICAL_SUFFIXES,
     RADICAL_TYPE_NAMES,
-    CHAIN_PREFIXES,
     RETAINED_RADICALS,
 )
 from src.orthonym.perception.ions import get_radical_sites
@@ -86,13 +85,14 @@ class TestRadicalConstants:
         assert RADICAL_TYPE_NAMES[2] == 'divalent'
         assert RADICAL_TYPE_NAMES[3] == 'trivalent'
 
-    def test_chain_prefixes_defined(self):
-        """Chain prefixes for C1-C10."""
-        assert CHAIN_PREFIXES[1] == 'meth'
-        assert CHAIN_PREFIXES[2] == 'eth'
-        assert CHAIN_PREFIXES[3] == 'prop'
-        assert CHAIN_PREFIXES[4] == 'but'
-        assert CHAIN_PREFIXES[10] == 'dec'
+    def test_chain_prefixes_available(self):
+        """Chain prefixes accessible via centralized chain_names module."""
+        from src.orthonym.data.chain_names import get_chain_prefix
+        assert get_chain_prefix(1) == 'meth'
+        assert get_chain_prefix(2) == 'eth'
+        assert get_chain_prefix(3) == 'prop'
+        assert get_chain_prefix(4) == 'but'
+        assert get_chain_prefix(10) == 'dec'
 
     def test_retained_radicals_has_common_entries(self):
         """Retained radical names lookup exists."""

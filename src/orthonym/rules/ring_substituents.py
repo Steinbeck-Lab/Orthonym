@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Set, Tuple
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
-_CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(3, 21)}
 
 
 # IUPAC P-61.5: Standard substituent names for rings

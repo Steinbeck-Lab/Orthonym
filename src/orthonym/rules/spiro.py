@@ -25,7 +25,6 @@ from ..perception.rings import get_spiro_atoms
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
-CHAIN_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 21)}
 
 
 def is_spiro_system(mol) -> bool:

@@ -23,20 +23,6 @@ from ..assembly.naming_utils import (
 )
 
 
-# Chain length prefixes for amide naming (trivial + systematic)
-CHAIN_PREFIXES = {
-    1: "form",  # formamide (special for 1 carbon)
-    2: "acet",  # acetamide (special for 2 carbons)
-    3: "propan",
-    4: "butan",
-    5: "pentan",
-    6: "hexan",
-    7: "heptan",
-    8: "octan",
-    9: "nonan",
-    10: "decan",
-}
-
 # Standard stems - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 STEM_PREFIXES = {i: _get_chain_prefix(i) for i in range(1, 21)}

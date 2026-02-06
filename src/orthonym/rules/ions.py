@@ -19,6 +19,7 @@ Key naming patterns:
 from typing import Dict, List, Optional, Any
 from rdkit import Chem
 
+from ..assembly.naming_utils import get_alkyl_name
 from ..data.ion_retained_names import get_anion_name, get_cation_name
 from ..perception.ions import get_ion_sites
 
@@ -842,10 +843,6 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
         'N': 'amino', 'O': 'hydroxy'
     }
 
-    # Alkyl group names by carbon count
-    from ..assembly.naming_utils import get_alkyl_name as _get_alkyl_name
-    ALKYL_NAMES = {i: _get_alkyl_name(i) for i in range(1, 11)}
-
     # Collect substituents: {position: [(name, sort_key), ...]}
     # Position 1 is the carboxyl attachment point
     substituents_by_position = {}
@@ -891,8 +888,11 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
                 elif symbol == 'C' and not neighbor.GetIsAromatic():
                     # Alkyl group - count carbons
                     carbon_count = _count_alkyl_carbons(mol, nbr_idx, ring_set | {carboxyl_carbon_idx})
-                    if carbon_count in ALKYL_NAMES:
-                        sub_name = ALKYL_NAMES[carbon_count]
+                    try:
+                        sub_name = get_alkyl_name(carbon_count)
+                    except (ValueError, KeyError):
+                        sub_name = None
+                    if sub_name:
                         if pos not in subs:
                             subs[pos] = []
                         subs[pos].append((sub_name, sub_name))
