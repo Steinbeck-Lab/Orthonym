@@ -182,13 +182,13 @@ def _resolve_fg_collisions(results):
     Collision rules:
     - urea atoms should NOT also be detected as primary_amide/secondary_amide/tertiary_amide
     - guanidine atoms should NOT also be detected as imine
-    - carbamate atoms should NOT also be detected as ester or primary_amide
+    - carbamate atoms should NOT also be detected as ester or amide (primary/secondary/tertiary)
     - isocyanate/isothiocyanate atoms should NOT also be detected as nitrile or primary_amide
     """
     for fg_specific, fg_generic_list in [
         ('urea', ['primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('guanidine', ['imine']),
-        ('carbamate', ['ester', 'primary_amide']),
+        ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),
         ('isothiocyanate', ['nitrile', 'primary_amide']),
     ]:

@@ -347,20 +347,28 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         return n_oxide_name
 
     # Handle isocyanates - functional class: "methyl isocyanate"
-    if features.functional_groups.get('isocyanate'):
+    # Only when isocyanate is the sole FG (principal_group is None because
+    # isocyanate is not in SENIORITY_ORDER). When another FG is principal,
+    # isocyanate becomes prefix "isocyanato" via the polyfunctional handler.
+    if (features.functional_groups.get('isocyanate')
+            and features.principal_group is None):
         iso_name = _name_isocyanate(features)
         if iso_name:
             return iso_name
 
     # Handle isothiocyanates - functional class: "methyl isothiocyanate"
-    if features.functional_groups.get('isothiocyanate'):
+    # Same gating as isocyanate above.
+    if (features.functional_groups.get('isothiocyanate')
+            and features.principal_group is None):
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
             return isothio_name
 
     # Handle carbamates - functional class: "ethyl carbamate"
-    # Must detect BEFORE generic ester to prevent N loss
-    if features.functional_groups.get('carbamate'):
+    # Must detect BEFORE generic ester to prevent N loss.
+    # Only when carbamate is the primary FG (no higher-seniority principal group).
+    if (features.functional_groups.get('carbamate')
+            and features.principal_group is None):
         carb_name = _name_carbamate(features)
         if carb_name:
             return carb_name
