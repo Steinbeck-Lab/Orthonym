@@ -534,6 +534,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if name:
                 return name
 
+    # Handle boronic acids - functional class: "methylboronic acid", "phenylboronic acid"
+    if features.principal_group == 'boronic_acid':
+        boronic_name = _name_boronic_acid(features)
+        if boronic_name:
+            return boronic_name
+
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
@@ -1062,6 +1068,54 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
         return get_alkyl_name(carbon_count)
     except (ValueError, KeyError):
         return None
+
+
+# ============================================================================
+# Boronic acid naming (functional class: "methylboronic acid")
+# ============================================================================
+
+def _name_boronic_acid(features: Any) -> Optional[str]:
+    """Name boronic acid as 'Rboronic acid' (functional class naming).
+
+    Pattern: R-B(OH)2
+    SMARTS match: [#6][BX3]([OX2H])([OX2H]) gives (C, B, O, O)
+
+    Simple cases: "methylboronic acid", "phenylboronic acid"
+    Complex R: "(4-methylphenyl)boronic acid"
+
+    Returns:
+        Functional class name, or None.
+    """
+    from rdkit import Chem
+
+    mol = features.mol
+    matches = features.functional_groups.get('boronic_acid', [])
+    if not matches:
+        return None
+
+    match = matches[0]
+    # SMARTS: [#6][BX3]([OX2H])([OX2H])
+    # match[0] = C attached to B, match[1] = B, match[2] = O, match[3] = O
+    r_atom_idx = match[0]
+    b_idx = match[1]
+    o1_idx = match[2]
+    o2_idx = match[3]
+
+    # Name the R group
+    r_name = _name_r_group(mol, r_atom_idx, exclude_atoms={b_idx, o1_idx, o2_idx})
+    if not r_name:
+        return None
+
+    # Check if R name needs parentheses (contains locants/hyphens/spaces)
+    # Simple names like "methyl", "phenyl" don't need parens
+    # Complex names like "4-methylphenyl" do
+    needs_parens = any(c in r_name for c in '-,') and r_name not in (
+        'tert-butyl', 'sec-butyl'
+    )
+
+    if needs_parens:
+        return f"({r_name})boronic acid"
+    return f"{r_name}boronic acid"
 
 
 # ============================================================================
