@@ -276,6 +276,16 @@ def _identify_suffix_fg_on_benzene(
                         'is_suffix': True, 'atoms': sub_atoms,
                     }
 
+        # Thiocarboxylic S-acid: C(=O)(SH)
+        thio_acid_pat = Chem.MolFromSmarts('[CX3](=O)[SX2H1]')
+        if thio_acid_pat:
+            for match in mol.GetSubstructMatches(thio_acid_pat):
+                if match[0] == start_idx:
+                    return {
+                        'name': 'carbothioic S-acid', 'suffix_name': 'carbothioic S-acid',
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
     # Sulfur-based suffix FGs
     if symbol == 'S':
         # Sulfonamide: S(=O)(=O)(NH2)
@@ -386,6 +396,10 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     if symbol == 'O':
         return _identify_oxygen_group(mol, start_idx, ring_atoms)
 
+    # Sulfur-based groups (non-suffix fallback)
+    if symbol == 'S':
+        return _identify_sulfur_group(mol, start_idx, ring_atoms)
+
     # Carbon-based groups (alkyl or functionalized chain) - fallback for non-suffix C
     if symbol == 'C':
         # Check for nitrile C#N pattern FIRST (BUG-2 fix)
@@ -402,6 +416,13 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         func_chain = _identify_functionalized_chain(mol, start_idx, ring_atoms)
         if func_chain:
             return func_chain
+
+        # Fallback: collect all atoms and produce a generic substituent name
+        # Handles haloalkyl groups like CF3 (trifluoromethyl)
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        generic = _identify_generic_carbon_substituent(mol, start_idx, sub_atoms, ring_atoms)
+        if generic:
+            return generic
 
     return None
 
@@ -595,7 +616,7 @@ def _collect_pure_alkyl(mol, start_idx: int, excluded: Set[int]):
 
 
 def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
-    """Identify oxygen-based substituent (hydroxy, methoxy, etc.)."""
+    """Identify oxygen-based substituent (hydroxy, methoxy, alkoxy, hydroperoxy, etc.)."""
     o_atom = mol.GetAtomWithIdx(o_idx)
 
     # Count neighbors (excluding ring)
@@ -606,14 +627,150 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
     if h_count == 1 and len(neighbors) == 0:
         return {'name': 'hydroxy', 'atoms': [o_idx]}
 
-    # Methoxy (-OCH3)
+    if len(neighbors) == 1:
+        nbr = neighbors[0]
+        nbr_symbol = nbr.GetSymbol()
+
+        # Hydroperoxy (-O-OH): oxygen connected to another oxygen with H
+        if nbr_symbol == 'O' and nbr.GetTotalNumHs() >= 1:
+            return {'name': 'hydroperoxy', 'atoms': [o_idx, nbr.GetIdx()]}
+
+        # Alkoxy (-O-C...): methoxy, ethoxy, propoxy, etc.
+        if nbr_symbol == 'C':
+            c_atom = nbr
+            # Collect the alkyl part
+            alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, c_atom.GetIdx(), ring_atoms | {o_idx})
+            if alkyl_atoms is not None and carbon_count > 0:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                    # methyl -> methoxy, ethyl -> ethoxy, propyl -> propoxy, etc.
+                    if alkyl_name.endswith('yl'):
+                        oxy_name = alkyl_name[:-2] + 'oxy'
+                    else:
+                        oxy_name = alkyl_name + 'oxy'
+                    return {'name': oxy_name, 'atoms': [o_idx] + alkyl_atoms}
+                except (ValueError, KeyError):
+                    pass
+
+        # Fallback for any O with a non-ring neighbor (e.g., O-N in nitrate esters)
+        # Collect all atoms and name generically as "oxy" substituent
+        sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
+        if len(sub_atoms) > 1:
+            # For O-N(=O)=O: (nitrooxy) per IUPAC
+            if nbr_symbol == 'N':
+                n_atom = nbr
+                o_neighbors_of_n = [
+                    nb for nb in n_atom.GetNeighbors()
+                    if nb.GetSymbol() == 'O' and nb.GetIdx() != o_idx
+                ]
+                if len(o_neighbors_of_n) >= 2:
+                    return {'name': '(nitrooxy)', 'atoms': sub_atoms, 'is_complex': True}
+            return {'name': 'oxy', 'atoms': sub_atoms}
+
+    return None
+
+
+def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
+    """
+    Identify sulfur-based substituent (thiol/sulfanyl, thioether, etc.).
+
+    Args:
+        mol: RDKit Mol object
+        s_idx: Index of the sulfur atom attached to the ring
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        Dict with 'name' and 'atoms', or None if unknown
+    """
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    neighbors = [n for n in s_atom.GetNeighbors() if n.GetIdx() not in ring_atoms]
+    h_count = s_atom.GetTotalNumHs()
+
+    # Simple thiol (-SH): IUPAC prefix = "sulfanyl"
+    if h_count >= 1 and len(neighbors) == 0:
+        return {'name': 'sulfanyl', 'atoms': [s_idx]}
+
+    # Thioether (-S-R): named as alkylsulfanyl (methylsulfanyl, etc.)
     if len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
-        c_atom = neighbors[0]
-        # Check if it's methyl (3 hydrogens, no other heavy atoms)
-        if c_atom.GetTotalNumHs() == 3:
-            c_neighbors = [n for n in c_atom.GetNeighbors() if n.GetIdx() != o_idx]
-            if not c_neighbors:
-                return {'name': 'methoxy', 'atoms': [o_idx, c_atom.GetIdx()]}
+        alkyl_atoms, carbon_count = _collect_pure_alkyl(
+            mol, neighbors[0].GetIdx(), ring_atoms | {s_idx}
+        )
+        if alkyl_atoms is not None and carbon_count > 0:
+            try:
+                alkyl_name = get_alkyl_name(carbon_count)
+                return {
+                    'name': f'{alkyl_name}sulfanyl',
+                    'atoms': [s_idx] + alkyl_atoms,
+                }
+            except (ValueError, KeyError):
+                pass
+
+    # Disulfanyl (-S-SH) or dithio linkages
+    if len(neighbors) == 1 and neighbors[0].GetSymbol() == 'S':
+        other_s = neighbors[0]
+        if other_s.GetTotalNumHs() >= 1:
+            return {'name': 'disulfanyl', 'atoms': [s_idx, other_s.GetIdx()]}
+
+    # Generic fallback for other S-based substituents
+    sub_atoms = _bfs_substituent_atoms(mol, s_idx, ring_atoms)
+    if sub_atoms:
+        return {'name': 'sulfanyl', 'atoms': sub_atoms}
+
+    return None
+
+
+def _identify_generic_carbon_substituent(
+    mol, start_idx: int, sub_atoms: List[int], ring_atoms: Set[int]
+) -> Optional[Dict]:
+    """
+    Fallback identification for carbon-based substituents that are not
+    simple alkyl or known functionalized chains.
+
+    Handles haloalkyl groups (trifluoromethyl, dichloromethyl, etc.)
+    and other mixed-atom carbon substituents.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Index of the carbon attached to the ring
+        sub_atoms: All atom indices in the substituent
+        ring_atoms: Set of ring atom indices
+
+    Returns:
+        Dict with 'name' and 'atoms', or None
+    """
+    start_atom = mol.GetAtomWithIdx(start_idx)
+
+    # Count halogens and carbons
+    halogen_counts = {'F': 0, 'Cl': 0, 'Br': 0, 'I': 0}
+    carbon_count = 0
+    other_count = 0
+
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        if sym == 'C':
+            carbon_count += 1
+        elif sym in halogen_counts:
+            halogen_counts[sym] += 1
+        elif sym != 'H':
+            other_count += 1
+
+    # Pure haloalkyl: only C and halogens (no other heteroatoms)
+    if other_count == 0 and any(halogen_counts.values()):
+        total_halogens = sum(halogen_counts.values())
+
+        if carbon_count == 1:
+            # Single C with halogens: trifluoromethyl, dichloromethyl, etc.
+            halogen_parts = []
+            halogen_prefix_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+            for hal in ['Br', 'Cl', 'F', 'I']:  # alphabetical by prefix
+                count = halogen_counts[hal]
+                if count > 0:
+                    mp = get_multiplier_prefix(count, halogen_prefix_map[hal]) if count > 1 else ''
+                    halogen_parts.append(f'{mp}{halogen_prefix_map[hal]}')
+
+            name = '(' + ''.join(halogen_parts) + 'methyl)'
+            return {'name': name, 'atoms': sub_atoms, 'is_complex': True}
 
     return None
 
