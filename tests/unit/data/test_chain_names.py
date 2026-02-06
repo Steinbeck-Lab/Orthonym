@@ -1,9 +1,9 @@
 """
 Tests for centralized IUPAC chain naming module.
 
-Validates chain prefix generation for chains from 1 to 999 carbons,
+Validates chain prefix generation for chains from 1 to 9999 carbons,
 covering standard prefixes (1-20), compositional naming (21+),
-and derived forms (alkyl, acid, anoate).
+thousands prefixes (1000+), and derived forms (alkyl, acid, anoate).
 """
 
 import pytest
@@ -117,6 +117,83 @@ class TestCompositionalPrefixes:
     ])
     def test_hundreds_compositional(self, n, expected):
         assert get_chain_prefix(n) == expected
+
+
+# ============================================================================
+# Thousands prefixes (1000+)
+# ============================================================================
+
+@pytest.mark.unit
+class TestThousandsPrefixes:
+    """Test IUPAC thousands-range compositional naming (1000-9999)."""
+
+    @pytest.mark.parametrize("n,expected", [
+        # Pure thousands
+        (1000, "kili"),
+        (2000, "dili"),
+        (3000, "trili"),
+        (4000, "tetrali"),
+        (5000, "pentali"),
+        (6000, "hexali"),
+        (7000, "heptali"),
+        (8000, "octali"),
+        (9000, "nonali"),
+        # Thousands + units (1-9)
+        (1001, "henakili"),
+        (1002, "doakili"),
+        (1005, "pentakili"),
+        (1009, "nonakili"),
+        # Thousands + teens (10-19)
+        (1010, "decakili"),
+        (1011, "undecakili"),
+        (1015, "pentadecakili"),
+        # Thousands + twenties
+        (1020, "cosakili"),
+        (1021, "henicosakili"),
+        # Thousands + hundreds
+        (1100, "hectakili"),
+        (1200, "dictakili"),
+        (1500, "pentactakili"),
+        # Thousands + hundreds + composition
+        (1132, "dotriacontahectakili"),
+        # Multi-thousands + composition
+        (2500, "pentactadili"),
+        (3100, "hectatrili"),
+        # Complex compositions
+        (5555, "pentapentacontapentactapentali"),
+        (9999, "nonanonacontanonactanonali"),
+    ])
+    def test_thousands_prefix(self, n, expected):
+        assert get_chain_prefix(n) == expected
+
+    def test_thousands_chain_name(self):
+        assert get_chain_name(1000) == "kiliane"
+
+    def test_thousands_alkyl_name(self):
+        assert get_alkyl_name(1000) == "kiliyl"
+
+    def test_thousands_acid_name(self):
+        assert get_acid_name(1000) == "kilianoic acid"
+
+    def test_thousands_anoate_name(self):
+        assert get_anoate_name(1000) == "kilianoate"
+
+    def test_all_prefixes_1000_to_1200_are_strings(self):
+        """Every prefix from 1000 to 1200 should be a non-empty string."""
+        for n in range(1000, 1201):
+            prefix = get_chain_prefix(n)
+            assert isinstance(prefix, str), f"n={n}: not a string"
+            assert len(prefix) > 0, f"n={n}: empty string"
+
+    def test_no_nc_pattern_in_thousands(self):
+        """Thousands-range prefixes should never contain digit+C pattern."""
+        import re
+        nc_pattern = re.compile(r'\d+C')
+        for n in range(1000, 1201):
+            prefix = get_chain_prefix(n)
+            assert not nc_pattern.search(prefix), (
+                f"n={n}: prefix '{prefix}' contains NC placeholder"
+            )
 
 
 # ============================================================================
@@ -244,16 +321,22 @@ class TestEdgeCases:
         with pytest.raises(ValueError):
             get_chain_prefix(-1)
 
-    def test_1000_raises_value_error(self):
-        with pytest.raises(ValueError):
-            get_chain_prefix(1000)
+    def test_10000_raises_value_error(self):
+        with pytest.raises(ValueError, match="1-9999"):
+            get_chain_prefix(10000)
 
     def test_min_value(self):
         assert get_chain_prefix(1) == "meth"
 
-    def test_max_value(self):
-        """999 is the maximum supported chain length."""
+    def test_max_value_999(self):
+        """999 is within supported range."""
         prefix = get_chain_prefix(999)
+        assert isinstance(prefix, str)
+        assert len(prefix) > 0
+
+    def test_max_value_9999(self):
+        """9999 is the maximum supported chain length."""
+        prefix = get_chain_prefix(9999)
         assert isinstance(prefix, str)
         assert len(prefix) > 0
 

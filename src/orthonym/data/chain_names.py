@@ -2,25 +2,29 @@
 Centralized IUPAC chain naming module.
 
 Provides authoritative chain prefix generation for all carbon chain lengths
-from 1 to 999, following IUPAC 2013 Blue Book nomenclature rules.
+from 1 to 9999, following IUPAC 2013 Blue Book nomenclature rules.
 
 IUPAC Long Chain Naming System:
 - 1-20: Individual retained prefixes (meth, eth, prop, ... icos)
-- 21+: Compositional system using units + tens + hundreds
+- 21+: Compositional system using units + tens + hundreds + thousands
   - Units (1-9): hen, do, tri, tetra, penta, hexa, hepta, octa, nona
   - Tens (20-90): cos, triacont, tetracont, pentacont, hexacont, heptacont,
                    octacont, nonacont
   - Hundreds (100-900): hect, dict, trict, tetract, pentact, hexact, heptact,
                          octact, nonact
-  - Assembly: units + tens + hundreds (right-to-left composition)
+  - Thousands (1000-9000): kili, dili, trili, tetrali, pentali, hexali,
+                            heptali, octali, nonali
+  - Assembly: units + tens + hundreds + thousands (right-to-left composition)
 
 Special linking rules:
 - 21: hen + i + cos = "henicos" (linking 'i' before "cos" after "hen")
 - 30+: ones + tens-prefix (e.g., dotriacont, tripentacont)
 - 100+: (ones+tens) + "a" + hundreds (linking 'a' before hundreds)
+- 1000+: (sub-thousand) + "a" + thousands (linking 'a' before thousands)
 
 References:
     IUPAC 2013 Blue Book, Table A6.1 (Numerical terms used in nomenclature)
+    IUPAC 2013 Blue Book, P-14.2.1.2 (Thousands digit prefixes)
 
 Examples:
     >>> get_chain_prefix(1)
@@ -33,6 +37,10 @@ Examples:
     'hect'
     >>> get_chain_prefix(132)
     'dotriacontahect'
+    >>> get_chain_prefix(1000)
+    'kili'
+    >>> get_chain_prefix(1001)
+    'henakili'
 """
 
 
@@ -73,6 +81,13 @@ HUNDREDS = {
     6: "hexact", 7: "heptact", 8: "octact", 9: "nonact",
 }
 
+# Thousands digit (1-9) -> thousands prefix
+# Source: IUPAC 2013 Blue Book Table 1.4 (P-14.2.1.2)
+THOUSANDS = {
+    1: "kili", 2: "dili", 3: "trili", 4: "tetrali", 5: "pentali",
+    6: "hexali", 7: "heptali", 8: "octali", 9: "nonali",
+}
+
 
 # ============================================================================
 # Public API
@@ -81,16 +96,16 @@ HUNDREDS = {
 def get_chain_prefix(n: int) -> str:
     """Get IUPAC chain prefix for n carbons.
 
-    Supports chain lengths from 1 to 999.
+    Supports chain lengths from 1 to 9999.
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         IUPAC chain prefix string (e.g., 'meth', 'eth', 'henicos', 'dotriacont').
 
     Raises:
-        ValueError: If n is outside supported range (1-999).
+        ValueError: If n is outside supported range (1-9999).
 
     Examples:
         >>> get_chain_prefix(1)
@@ -115,17 +130,65 @@ def get_chain_prefix(n: int) -> str:
         'hect'
         >>> get_chain_prefix(132)
         'dotriacontahect'
+        >>> get_chain_prefix(1000)
+        'kili'
+        >>> get_chain_prefix(1001)
+        'henakili'
     """
-    if n < 1 or n > 999:
+    if n < 1 or n > 9999:
         raise ValueError(
-            f"Chain length {n} outside supported range (1-999)."
+            f"Chain length {n} outside supported range (1-9999)."
         )
 
     # Direct lookup for 1-20
     if n <= 20:
         return FIRST_20[n]
 
-    # Compositional naming for 21+
+    # Thousands decomposition
+    thousands = n // 1000
+    remainder = n % 1000
+
+    if thousands == 0:
+        # 21-999: use compositional sub-thousand builder
+        return _build_prefix_21_to_999(n)
+
+    if remainder == 0:
+        # Pure thousands: 1000, 2000, ...
+        return THOUSANDS[thousands]
+
+    # Build sub-thousand part using compositional units (not retained names)
+    # For 1-9: use UNITS (hen, do, tri, ...) - same as hundreds context
+    # For 10-20: use compositional sub-hundred system
+    # For 21-999: use full compositional builder
+    if remainder <= 9:
+        sub_thousand = UNITS[remainder]
+    elif remainder <= 20:
+        tens = remainder // 10
+        ones = remainder % 10
+        sub_thousand = _build_sub_hundred(ones, tens)
+    else:
+        sub_thousand = _build_prefix_21_to_999(remainder)
+
+    thousands_prefix = THOUSANDS[thousands]
+    # Linking vowel 'a' between sub-thousand and thousands prefix
+    if sub_thousand.endswith("a"):
+        return sub_thousand + thousands_prefix
+    else:
+        return sub_thousand + "a" + thousands_prefix
+
+
+def _build_prefix_21_to_999(n: int) -> str:
+    """Build chain prefix for 21-999 using compositional rules.
+
+    Decomposes the number into hundreds, tens, and ones digits,
+    then assembles the prefix using IUPAC linking rules.
+
+    Args:
+        n: Number in range 21-999.
+
+    Returns:
+        Compositional chain prefix string.
+    """
     hundreds = n // 100
     tens = (n % 100) // 10
     ones = n % 10
@@ -206,7 +269,7 @@ def get_chain_name(n: int) -> str:
     """Get full IUPAC chain name (alkane) for n carbons.
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         Full alkane name (e.g., 'methane', 'ethane', 'henicosane').
@@ -229,7 +292,7 @@ def get_alkyl_name(n: int) -> str:
     Uses the standard '-yl' suffix appended to the chain prefix.
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         Alkyl substituent name (e.g., 'methyl', 'ethyl', 'henicosyl').
@@ -252,7 +315,7 @@ def get_acid_name(n: int) -> str:
     """Get IUPAC carboxylic acid name for n carbons (including COOH carbon).
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         Acid name (e.g., 'methanoic acid', 'ethanoic acid', 'henicosanoic acid').
@@ -275,7 +338,7 @@ def get_acid_stem(n: int) -> str:
     Used when just the stem is needed without ' acid'.
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         Acid stem (e.g., 'methanoic', 'ethanoic', 'octacosanoic').
@@ -294,7 +357,7 @@ def get_anoate_name(n: int) -> str:
     """Get IUPAC ester suffix (anoate form) for n carbons.
 
     Args:
-        n: Number of carbon atoms (1-999).
+        n: Number of carbon atoms (1-9999).
 
     Returns:
         Anoate name (e.g., 'methanoate', 'ethanoate', 'icosanoate').
