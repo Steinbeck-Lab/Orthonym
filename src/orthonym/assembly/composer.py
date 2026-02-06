@@ -327,6 +327,18 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # Fallback to existing ion naming if composition fails
         return assemble_ion_name(features, features.mol, style)
 
+    # Handle oximes - functional class naming: "propan-2-one oxime"
+    if features.principal_group == 'oxime':
+        oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
+        if oxime_name:
+            return oxime_name
+
+    # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
+    if features.principal_group == 'hydrazone':
+        hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
+        if hydrazone_name:
+            return hydrazone_name
+
     # Handle acid halides BEFORE polyfunctional and ester handlers
     # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
     # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
@@ -580,6 +592,96 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     # Assemble in correct order
     return _assemble_fragments(fragments, style)
+
+
+def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
+    """Name oximes and hydrazones using functional class naming.
+
+    Converts the =N-OH (oxime) or =N-NH2 (hydrazone) back to =O (parent
+    carbonyl), names the carbonyl via name_compound(), and appends the
+    functional class suffix (" oxime" or " hydrazone").
+
+    Args:
+        features: MolecularFeatures object with principal_group == fg_type
+        fg_type: Either 'oxime' or 'hydrazone'
+
+    Returns:
+        Functional class name like "propan-2-one oxime", or None on failure.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+
+    mol = features.mol
+    matches = features.functional_groups.get(fg_type, [])
+    if not matches:
+        return None
+
+    # Take first match: SMARTS "[CX3]=[NX2][OX2H]" for oxime gives (C, N, O)
+    # SMARTS "[CX3]=[NX2][NX3]" for hydrazone gives (C, N, N)
+    match = matches[0]
+    c_idx = match[0]   # The carbon (C=N)
+    n_idx = match[1]   # The nitrogen (=N-)
+    tail_idx = match[2]  # OH (oxime) or NH2 (hydrazone)
+
+    # Build modified molecule: replace =N-X with =O
+    rw = RWMol(mol)
+
+    # We need to be careful about atom indices shifting after removal.
+    # Strategy: remove the tail atom and the N atom, then add =O to the carbon.
+
+    # First, find the bond from N to C
+    bond_cn = rw.GetBondBetweenAtoms(c_idx, n_idx)
+    if bond_cn is None:
+        return None
+
+    # Remove all bonds from N
+    # Get neighbors of N (beyond C and tail)
+    n_atom = rw.GetAtomWithIdx(n_idx)
+    n_neighbors = [nbr.GetIdx() for nbr in n_atom.GetNeighbors()]
+
+    # For hydrazone, tail N might have H atoms only (implicit), so just
+    # removing the N and tail atoms plus adding O should work.
+    # For oxime, tail is O-H.
+
+    # Simpler approach: edit SMILES string
+    # Convert to SMILES, substitute the FG pattern
+    try:
+        # Strategy: Use RWMol to replace atoms
+        # 1. Remove bond N-tail
+        rw.RemoveBond(n_idx, tail_idx)
+        # 2. Remove bond C-N (the double bond)
+        rw.RemoveBond(c_idx, n_idx)
+        # 3. Add oxygen atom
+        o_idx = rw.AddAtom(Chem.Atom(8))  # oxygen
+        # 4. Add C=O bond
+        rw.AddBond(c_idx, o_idx, Chem.BondType.DOUBLE)
+
+        # Now remove orphaned atoms (N and tail) - must remove higher index first
+        atoms_to_remove = sorted([n_idx, tail_idx], reverse=True)
+
+        # But if hydrazone tail N has hydrogens attached as explicit atoms, remove those too
+        # Actually, for simple cases implicit H should be fine. Let's just remove the two atoms.
+        for aidx in atoms_to_remove:
+            rw.RemoveAtom(aidx)
+
+        # Sanitize
+        modified_mol = rw.GetMol()
+        Chem.SanitizeMol(modified_mol)
+        modified_smiles = Chem.MolToSmiles(modified_mol, canonical=True)
+    except Exception:
+        return None
+
+    # Name the parent carbonyl by recursion
+    from ..namer import name_compound
+    try:
+        parent_name = name_compound(modified_smiles)
+    except Exception:
+        return None
+
+    if not parent_name:
+        return None
+
+    return f"{parent_name} {fg_type}"
 
 
 def _name_simple_molecule(features: Any) -> str:
