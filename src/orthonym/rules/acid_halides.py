@@ -190,7 +190,7 @@ def _name_diacid_halide(chain_length: int, halide_word: str, num_groups: int) ->
         IUPAC name string.
     """
     prefix = get_chain_prefix(chain_length)
-    multiplier = get_multiplier_prefix(num_groups)
+    multiplier = get_multiplier_prefix(num_groups, halide_word)
     # pentane -> pentanedioyl (diacid form)
     return f"{prefix}anedioyl {multiplier}{halide_word}"
 
