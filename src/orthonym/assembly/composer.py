@@ -373,6 +373,23 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if carb_name:
             return carb_name
 
+    # Handle urea compounds - retained name with N-substitution
+    # "urea", "N-methylurea", "N,N-dimethylurea", "N,N'-dimethylurea"
+    # Must detect BEFORE polyfunctional handler to prevent garbled output
+    if (features.functional_groups.get('urea')
+            and features.principal_group is None):
+        urea_name = _try_name_urea(features)
+        if urea_name:
+            return urea_name
+
+    # Handle guanidine compounds - retained name with N-substitution
+    # "guanidine", "N-methylguanidine", "N,N-dimethylguanidine"
+    if (features.functional_groups.get('guanidine')
+            and features.principal_group is None):
+        guanidine_name = _try_name_guanidine(features)
+        if guanidine_name:
+            return guanidine_name
+
     # Handle acid halides BEFORE polyfunctional and ester handlers
     # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
     # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
@@ -1160,6 +1177,241 @@ def _name_carbamate(features: Any) -> Optional[str]:
 
     n_prefix = ",".join(n_prefix_parts)
     return f"{r_name} {n_prefix}carbamate"
+
+
+def _try_name_urea(features: Any) -> Optional[str]:
+    """Name urea derivatives as retained name with N-substitution.
+
+    Pattern: N1-C(=O)-N2
+    SMARTS match: [NX3][CX3](=O)[NX3] gives (N1, C, O, N2)
+
+    Unsubstituted: "urea"
+    N-monosubstituted: "N-methylurea"
+    N,N-disubstituted (same N): "N,N-dimethylurea"
+    N,N'-disubstituted (different N): "N,N'-dimethylurea"
+
+    Returns:
+        Retained name with N-substitution prefix, or None.
+    """
+    from rdkit import Chem
+    from collections import Counter
+
+    mol = features.mol
+    matches = features.functional_groups.get('urea', [])
+    if not matches:
+        return None
+
+    match = matches[0]
+    if len(match) < 4:
+        return None
+
+    n1_idx = match[0]   # First nitrogen
+    c_idx = match[1]    # Carbonyl carbon
+    # match[2] = carbonyl oxygen
+    n2_idx = match[3]   # Second nitrogen
+
+    # Core atoms to exclude from R group naming
+    c_atom = mol.GetAtomWithIdx(c_idx)
+    urea_core = {n1_idx, c_idx, n2_idx}
+    # Add carbonyl oxygen
+    for nbr in c_atom.GetNeighbors():
+        if nbr.GetSymbol() == 'O':
+            urea_core.add(nbr.GetIdx())
+
+    # Collect substituents on N1
+    n1_subs = []
+    n1_atom = mol.GetAtomWithIdx(n1_idx)
+    for nbr in n1_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=urea_core)
+        if sub_name:
+            n1_subs.append(sub_name)
+
+    # Collect substituents on N2
+    n2_subs = []
+    n2_atom = mol.GetAtomWithIdx(n2_idx)
+    for nbr in n2_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=urea_core)
+        if sub_name:
+            n2_subs.append(sub_name)
+
+    # No substituents: plain "urea"
+    if not n1_subs and not n2_subs:
+        return "urea"
+
+    # Build N-substitution prefix with N/N' locants
+    # When only one N is substituted, it always gets unprimed "N"
+    # When both Ns are substituted, they get "N" and "N'"
+    # Ensure the more-substituted (or alphabetically first) N gets unprimed "N"
+    if n1_subs and not n2_subs:
+        # Only N1 substituted -> assign N1 as "N"
+        first_subs, second_subs = n1_subs, n2_subs
+    elif n2_subs and not n1_subs:
+        # Only N2 substituted -> assign N2 as "N"
+        first_subs, second_subs = n2_subs, n1_subs
+    else:
+        # Both substituted -> N1 as "N", N2 as "N'"
+        first_subs, second_subs = n1_subs, n2_subs
+
+    tagged_subs = []  # list of (locant, sub_name) pairs
+    for s in first_subs:
+        tagged_subs.append(("N", s))
+    for s in second_subs:
+        tagged_subs.append(("N'", s))
+
+    return _build_n_substituted_name(tagged_subs, "urea")
+
+
+def _try_name_guanidine(features: Any) -> Optional[str]:
+    """Name guanidine derivatives as retained name with N-substitution.
+
+    Pattern: N1-C(=N3)-N2  (three nitrogen atoms)
+    SMARTS match: [NX3][CX3](=[NX2])[NX3] gives (N_single1, C, N_double, N_single2)
+
+    Unsubstituted: "guanidine"
+    N-monosubstituted: "N-methylguanidine"
+    N,N-disubstituted (same N): "N,N-dimethylguanidine"
+
+    The =NH nitrogen gets unprimed N locant.
+    The two -NH2 nitrogens get N' and N'' locants.
+
+    Returns:
+        Retained name with N-substitution prefix, or None.
+    """
+    from rdkit import Chem
+    from collections import Counter
+
+    mol = features.mol
+    matches = features.functional_groups.get('guanidine', [])
+    if not matches:
+        return None
+
+    match = matches[0]
+    if len(match) < 4:
+        return None
+
+    # SMARTS: [NX3][CX3](=[NX2])[NX3]
+    # match[0] = N_single1 (single-bonded nitrogen)
+    # match[1] = C_central
+    # match[2] = N_double (double-bonded =NH nitrogen)
+    # match[3] = N_single2 (single-bonded nitrogen)
+    n_single1_idx = match[0]
+    c_idx = match[1]
+    n_double_idx = match[2]
+    n_single2_idx = match[3]
+
+    # Core atoms: all three nitrogens and the central carbon
+    guanidine_core = {n_single1_idx, c_idx, n_double_idx, n_single2_idx}
+
+    # Collect substituents on the =NH nitrogen (N_double -> "N" locant)
+    n_double_subs = []
+    n_double_atom = mol.GetAtomWithIdx(n_double_idx)
+    for nbr in n_double_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
+        if sub_name:
+            n_double_subs.append(sub_name)
+
+    # Collect substituents on N_single1 (-> "N'" locant)
+    n_single1_subs = []
+    n_single1_atom = mol.GetAtomWithIdx(n_single1_idx)
+    for nbr in n_single1_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
+        if sub_name:
+            n_single1_subs.append(sub_name)
+
+    # Collect substituents on N_single2 (-> "N''" locant)
+    n_single2_subs = []
+    n_single2_atom = mol.GetAtomWithIdx(n_single2_idx)
+    for nbr in n_single2_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
+        if sub_name:
+            n_single2_subs.append(sub_name)
+
+    # No substituents: plain "guanidine"
+    if not n_double_subs and not n_single1_subs and not n_single2_subs:
+        return "guanidine"
+
+    # Build N-substitution prefix
+    # Collect all substituted nitrogens with their substituents
+    # For guanidine: use N, N', N'' to distinguish the three nitrogens
+    # But for mono-substitution, just use "N" (no primes needed)
+    substituted_nitrogens = []
+    if n_single1_subs:
+        substituted_nitrogens.append(n_single1_subs)
+    if n_single2_subs:
+        substituted_nitrogens.append(n_single2_subs)
+    if n_double_subs:
+        substituted_nitrogens.append(n_double_subs)
+
+    if len(substituted_nitrogens) == 1:
+        # Only one nitrogen is substituted -> all get unprimed "N"
+        tagged_subs = [("N", s) for s in substituted_nitrogens[0]]
+    else:
+        # Multiple nitrogens substituted -> assign N, N', N''
+        locant_labels = ["N", "N'", "N''"]
+        tagged_subs = []
+        for i, subs in enumerate(substituted_nitrogens):
+            label = locant_labels[i] if i < len(locant_labels) else f"N{''.join(['`'] * i)}"
+            for s in subs:
+                tagged_subs.append((label, s))
+
+    return _build_n_substituted_name(tagged_subs, "guanidine")
+
+
+def _build_n_substituted_name(tagged_subs: list, base_name: str) -> str:
+    """Build a name like 'N-methyl{base}' or 'N,N'-dimethyl{base}' from tagged substituents.
+
+    Args:
+        tagged_subs: list of (locant, sub_name) pairs, e.g. [("N", "methyl"), ("N'", "ethyl")]
+        base_name: The retained name, e.g. "urea" or "guanidine"
+
+    Returns:
+        Complete name with N-substitution prefix.
+    """
+    from collections import Counter
+
+    if not tagged_subs:
+        return base_name
+
+    # Group by substituent name to apply multipliers
+    # e.g., [("N", "methyl"), ("N'", "methyl")] -> "N,N'-dimethylurea"
+    # e.g., [("N", "methyl"), ("N'", "ethyl")] -> "N-ethyl-N'-methylurea" (alphabetical)
+
+    # Build mapping: sub_name -> list of locants
+    sub_locants = {}
+    for locant, name in tagged_subs:
+        if name not in sub_locants:
+            sub_locants[name] = []
+        sub_locants[name].append(locant)
+
+    # Build prefix parts, sorted alphabetically by substituent name
+    prefix_parts = []
+    for name in sorted(sub_locants.keys()):
+        locants = sub_locants[name]
+        count = len(locants)
+        locant_str = ",".join(locants)
+        if count == 1:
+            prefix_parts.append(f"{locant_str}-{name}")
+        else:
+            mult = get_multiplier_prefix(count, name)
+            prefix_parts.append(f"{locant_str}-{mult}{name}")
+
+    prefix = "-".join(prefix_parts)
+    return f"{prefix}{base_name}"
 
 
 def _name_simple_molecule(features: Any) -> str:
