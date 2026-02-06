@@ -42,6 +42,26 @@ FUNCTIONAL_GROUP_SMARTS = {
     "secondary_sulfonamide": "[SX4](=O)(=O)[NX3H1][#6]",
     "tertiary_sulfonamide": "[SX4](=O)(=O)[NX3]([#6])[#6]",
     
+    # === CARBAMATES (must check before esters -- N-C(=O)-O is more specific) ===
+    "carbamate": "[NX3][CX3](=O)[OX2][#6]",
+
+    # === UREA (must check before amides -- N-C(=O)-N is more specific) ===
+    "urea": "[NX3][CX3](=O)[NX3]",
+
+    # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
+    "guanidine": "[NX3][CX3](=[NX2])[NX3]",
+
+    # === ISOCYANATES/ISOTHIOCYANATES (cumulated double bonds) ===
+    "isocyanate": "[#6][NX2]=[CX2]=[OX1]",
+    "isothiocyanate": "[#6][NX2]=[CX2]=[SX1]",
+
+    # === N-OXIDES ===
+    "n_oxide_aromatic": "[n+][O-]",
+    "n_oxide_aliphatic": "[NX4+]([#6])([#6])([#6])[O-]",
+
+    # === BORONIC ACIDS ===
+    "boronic_acid": "[#6][BX3]([OX2H])([OX2H])",
+
     # === NITRILES ===
     "nitrile": "[CX2]#[NX1]",
     "isocyanide": "[#6][NX2]#[CX1]",
@@ -150,7 +170,45 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
         for match in matches:
             results[fg_name].append(match)
     
+    # Post-processing: remove generic FG matches that overlap with more-specific FGs
+    results = _resolve_fg_collisions(results)
+
     return dict(results)
+
+
+def _resolve_fg_collisions(results):
+    """Remove generic FG matches that overlap with more-specific FGs.
+
+    Collision rules:
+    - urea atoms should NOT also be detected as primary_amide/secondary_amide/tertiary_amide
+    - guanidine atoms should NOT also be detected as imine
+    - carbamate atoms should NOT also be detected as ester or primary_amide
+    - isocyanate/isothiocyanate atoms should NOT also be detected as nitrile or primary_amide
+    """
+    for fg_specific, fg_generic_list in [
+        ('urea', ['primary_amide', 'secondary_amide', 'tertiary_amide']),
+        ('guanidine', ['imine']),
+        ('carbamate', ['ester', 'primary_amide']),
+        ('isocyanate', ['nitrile', 'primary_amide']),
+        ('isothiocyanate', ['nitrile', 'primary_amide']),
+    ]:
+        if fg_specific in results:
+            specific_atoms = set()
+            for match in results[fg_specific]:
+                specific_atoms.update(match)
+
+            for fg_generic in fg_generic_list:
+                if fg_generic in results:
+                    # Remove generic matches where ANY atom overlaps with specific
+                    results[fg_generic] = [
+                        m for m in results[fg_generic]
+                        if not any(atom in specific_atoms for atom in m)
+                    ]
+                    # Clean up empty lists
+                    if not results[fg_generic]:
+                        del results[fg_generic]
+
+    return results
 
 
 def has_functional_group(mol, fg_name: str) -> bool:

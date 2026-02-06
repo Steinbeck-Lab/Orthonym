@@ -17,7 +17,8 @@ SENIORITY_ORDER = [
     "sulfinic_acid",
     "phosphonic_acid",
     "phosphinic_acid",
-    
+    "boronic_acid",    # P-68.3 boron acid
+
     # Acid derivatives
     "anhydride",
     "ester",
@@ -121,6 +122,9 @@ SUFFIX_FORMS = {
     "tertiary_amine": ("amine", "amine"),
     "aromatic_amine": ("amine", "amine"),
     "imine": ("imine", "imine"),
+    "oxime": ("oxime", "oxime"),           # functional class suffix
+    "hydrazone": ("hydrazone", "hydrazone"),  # functional class suffix
+    "boronic_acid": ("boronic acid", "boronic acid"),  # retained acid form
 }
 
 # Prefix forms for non-principal groups
@@ -144,6 +148,15 @@ PREFIX_FORMS = {
     "aromatic_amine": "amino",
     "imine": "imino",
     "oxime": "hydroxyimino",
+    "hydrazone": "hydrazinylidene",
+    "isocyanate": "isocyanato",
+    "isothiocyanate": "isothiocyanato",
+    "urea": "carbamoylamino",
+    "guanidine": "guanidino",
+    "carbamate": None,                  # functional class only
+    "boronic_acid": "dihydroxyboranyl",
+    "n_oxide_aromatic": None,           # functional class only
+    "n_oxide_aliphatic": None,          # functional class only
     "primary_sulfonamide": "sulfamoyl",
     "secondary_sulfonamide": "sulfamoyl",
     "tertiary_sulfonamide": "sulfamoyl",

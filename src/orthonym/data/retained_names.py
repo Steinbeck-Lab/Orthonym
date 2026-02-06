@@ -206,6 +206,10 @@ RETAINED_NAMES = {
     "CCOP(=O)(O)OCC": "diethyl phosphate",
     "CCOP(=O)(OCC)OCC": "triethyl phosphate",
     
+    # === RETAINED NITROGEN COMPOUNDS ===
+    "NC(N)=O": "urea",
+    "N=C(N)N": "guanidine",
+
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",
     "N": "ammonia",
