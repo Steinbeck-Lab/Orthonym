@@ -289,7 +289,7 @@ def generate_tricyclo_descriptor(mol) -> Optional[str]:
         # Find secondary bridge locants
         sec_locants = _find_secondary_bridge_locants(mol, skeleton, bridgeheads, numbering)
         if sec_locants:
-            loc_str = f"{secondary_bridge_len}({sec_locants[0]},{sec_locants[1]})"
+            loc_str = f"{secondary_bridge_len}{sec_locants[0]},{sec_locants[1]}"
         else:
             loc_str = str(secondary_bridge_len)
     else:

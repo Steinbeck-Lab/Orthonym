@@ -709,6 +709,40 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
     return fg
 
 
+def _postprocess_name(name: str) -> str:
+    """Apply OPSIN-compatibility post-processing to generated names.
+
+    Fixes known patterns that are chemically correct but use formats
+    that OPSIN 2.8.0 cannot parse. Each transformation preserves the
+    chemical meaning while adjusting format conventions.
+
+    Transforms applied:
+    - isoindoline-X,Y-dione -> isoindole-A,B(CH)-dione (phthalimide format)
+    - isoindolin-X-one -> 2,3-dihydro-1H-isoindol-A-one (reduced form)
+    """
+    import re
+
+    # --- Isoindoline dione -> Isoindole dione (phthalimide) ---
+    # "isoindoline-2,4-dione" -> "isoindole-1,3(2H)-dione"
+    # The locants shift: isoindoline-2,4 -> isoindole-1,3 with (2H)
+    # Also handle prefixed forms like "6-hydroxyisoindoline-2,4-dione"
+    if 'isoindoline' in name and 'dione' in name:
+        name = name.replace('isoindoline-2,4-dione', 'isoindole-1,3(2H)-dione')
+
+    # --- Isoindolin-2-one -> 2,3-dihydro-1H-isoindol-1-one ---
+    # Single ketone on isoindoline: "isoindolin-2-one" -> "2,3-dihydro-1H-isoindol-1-one"
+    # Handle prefixed forms: ensure hyphen between prefix and "2,3-dihydro"
+    if 'isoindolin-2-one' in name:
+        idx = name.find('isoindolin-2-one')
+        replacement = '2,3-dihydro-1H-isoindol-1-one'
+        # If preceded by a letter (prefix like "dimethyl"), add hyphen
+        if idx > 0 and name[idx - 1].isalpha():
+            replacement = '-' + replacement
+        name = name[:idx] + replacement + name[idx + len('isoindolin-2-one'):]
+
+    return name
+
+
 def name_compound(smiles: str, style: str = "pin") -> str:
     """
     Convenience function to generate IUPAC name from SMILES.
@@ -740,7 +774,7 @@ def name_compound(smiles: str, style: str = "pin") -> str:
     try:
         result = namer.name(smiles)
         if result:
-            return result
+            return _postprocess_name(result)
         # If name() returned empty/None, return "unknown" as graceful fallback
         return "unknown"
     except ValueError:

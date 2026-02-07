@@ -968,6 +968,8 @@ class VonBaeyerAnalyzer:
         parts = [str(l) for l in sorted(primary_lengths, reverse=True)]
 
         # Secondary bridges with inline superscript locants (OPSIN-compatible)
+        # OPSIN format: bridge_length + locants WITHOUT parentheses
+        # e.g., "03,7" not "0(3,7)" -- the locants are superscripted in print
         for bridge in secondary_bridges:
             ep1 = bridge.start_bh
             ep2 = bridge.end_bh
@@ -978,7 +980,7 @@ class VonBaeyerAnalyzer:
                 continue
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
-            parts.append(f"{bridge.length}({locant_low},{locant_high})")
+            parts.append(f"{bridge.length}{locant_low},{locant_high}")
 
         return f"{prefix}[{'.'.join(parts)}]"
 

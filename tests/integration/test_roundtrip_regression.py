@@ -74,15 +74,15 @@ ROUNDTRIP_VERIFIED = [
     # Polycyclic (von Baeyer)
     (
         "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.1(4,8)]tridec-11-en-5-ol",
+        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.14,8]tridec-11-en-5-ol",
     ),
     (
         "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.1(1,13).0(4,9).0(14,16)]heptadecan-6,7-diol",
+        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.11,13.04,9.014,16]heptadecan-6,7-diol",
     ),
     (
         "CC1(C)CCC2(C(=O)O)CCC3(C)C(=CCC4C5(C)CC(O)C(=O)C(C)(C)C5CCC43C)C2C1",
-        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.0(15,20).0(2,11).0(5,10)]docos-13-ene-20-carboxylic acid",
+        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.015,20.02,11.05,10]docos-13-ene-20-carboxylic acid",
     ),
 
     # Steroid (natural product)
@@ -747,3 +747,74 @@ class TestPhase24ParseFixesRoundTrip:
         assert mol is not None, (
             f"OPSIN returned invalid SMILES '{opsin_smiles}' for '{name}'"
         )
+
+
+# ---------------------------------------------------------------------------
+# Section 7: Phase 24 Plan 04 improvements (Task 1 parse + Task 2 round-trip)
+# VB format fix, isoindoline format, anilino prefix
+# ---------------------------------------------------------------------------
+
+PHASE24_RT_IMPROVEMENTS = [
+    # VB format: secondary bridge locants without parentheses (OPSIN-compatible)
+    # tricyclo[3.3.1.13,7] instead of tricyclo[3.3.1.1(3,7)]
+    (
+        "C1C2CC3CC1CC(C2)C3",
+        "tricyclo[3.3.1.13,7]decane",
+        "vb-superscript-locants-adamantane",
+    ),
+    # Isoindoline -> isoindole format (phthalimide)
+    (
+        "Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1",
+        "isoindole-1,3(2H)-dione",
+        "isoindole-dione-format",
+    ),
+    # Isoindoline -> isoindole with prefix
+    (
+        "O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1",
+        "6-hydroxyisoindole-1,3(2H)-dione",
+        "isoindole-hydroxy-dione-format",
+    ),
+    # VB pentacyclo format with superscript locants
+    (
+        "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
+        "5,5,9,14-tetramethyl-15-oxa-pentacyclo[8.6.0.11,13.04,9.014,16]heptadecan-6,7-diol",
+        "vb-pentacyclo-superscript",
+    ),
+    # VB tricyclo format with dioxa + stereo
+    (
+        "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
+        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.14,8]tridec-11-en-5-ol",
+        "vb-tricyclo-dioxa-stereo",
+    ),
+]
+
+
+class TestPhase24RTImprovements:
+    """Phase 24 Plan 04 regression tests.
+
+    Covers:
+    - VB secondary bridge locant format (superscript, no parens)
+    - Isoindoline -> isoindole dione format (OPSIN-compatible)
+    """
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize(
+        "smiles,expected_name,test_id",
+        PHASE24_RT_IMPROVEMENTS,
+        ids=[t[2] for t in PHASE24_RT_IMPROVEMENTS],
+    )
+    def test_rt_improvements(self, smiles, expected_name, test_id):
+        """Verify Phase 24 Plan 04 fixes never regress."""
+        name = name_compound(smiles)
+        assert isinstance(name, str), (
+            f"Expected string for {test_id}, got {type(name)}"
+        )
+        assert len(name) > 0, (
+            f"Empty name for {test_id}: {smiles}"
+        )
+        if expected_name is not None:
+            assert name == expected_name, (
+                f"REGRESSION ({test_id}): {smiles}\n"
+                f"  Expected: {expected_name}\n"
+                f"  Got:      {name}"
+            )

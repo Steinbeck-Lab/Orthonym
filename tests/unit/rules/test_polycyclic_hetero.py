@@ -458,7 +458,7 @@ class TestVBIntegration:
     def test_tricyclo_with_heteroatom(self):
         """Tricyclo system with heteroatom should work correctly."""
         # Adamantane with one oxygen: 2-oxaadamantane
-        # tricyclo[3.3.1.1(3,7)]decane with O
+        # tricyclo[3.3.1.13,7]decane with O
         mol = Chem.MolFromSmiles('O1C2CC3CC1CC(C2)C3')
         assert mol is not None
 
