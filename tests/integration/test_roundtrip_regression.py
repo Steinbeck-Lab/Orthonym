@@ -788,6 +788,71 @@ PHASE24_RT_IMPROVEMENTS = [
     ),
 ]
 
+# ---------------------------------------------------------------------------
+# Section 8: Phase 24 Plan 04 Task 2 -- round-trip analysis regression tests
+# Guard key exact RT matches and document anilino fix, stereo-only mismatches
+# ---------------------------------------------------------------------------
+
+PHASE24_RT_ANALYSIS = [
+    # --- Anilino prefix (phenylamino -> anilino) ---
+    (
+        "CC(=O)Nc1ccccc1",
+        "N-phenylacetamide",
+        "anilino-acetamide",
+    ),
+    # --- Key exact RT matches that must stay matching ---
+    (
+        "SS",
+        "disulfane",
+        "disulfane-rt-match",
+    ),
+    (
+        "O=CC1=CC(O)C(O)C(O)C1O",
+        "3,4,5,6-tetrahydroxycyclohex-1-enecarbaldehyde",
+        "cyclohexenecarbaldehyde-rt-match",
+    ),
+    (
+        "O=C1C=CCCC1",
+        "cyclohex-1-en-2-one",
+        "cyclohexenone-rt-match",
+    ),
+    # --- Carboxylate ion naming (neutralize-then-name) ---
+    (
+        "O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]",
+        "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioic acid",
+        "glucarate-neutralization",
+    ),
+    # --- Steroid naming (no stereo in unspecified steroids) ---
+    (
+        "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
+        "androstan-3,17-diol",
+        "steroid-androstanediol",
+    ),
+    # --- Peptide naming (exact RT match) ---
+    (
+        "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
+        "L-leucyl-L-serylglycine",
+        "peptide-leu-ser-gly",
+    ),
+    (
+        "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
+        "L-aspartyl-L-seryl-L-serine",
+        "peptide-asp-ser-ser",
+    ),
+    # --- Fatty acid naming (exact RT match pattern) ---
+    (
+        "CCCCCCCC/C=C\\CCCCCCCC(=O)O",
+        "(9Z)-octadec-9-enoic acid",
+        "fatty-acid-oleic-z",
+    ),
+    # --- Cyclohexenone OPSIN-compatible format ---
+    (
+        "O=C1C=C[C@H](O)[C@@H](O)[C@@H]1O",
+        "(3S,4R,5S)-3,4,5-trihydroxycyclohex-1-en-1-one",
+        "trihydroxycyclohexenone-opsin",
+    ),
+]
+
 
 class TestPhase24RTImprovements:
     """Phase 24 Plan 04 regression tests.
@@ -818,3 +883,33 @@ class TestPhase24RTImprovements:
                 f"  Expected: {expected_name}\n"
                 f"  Got:      {name}"
             )
+
+
+class TestPhase24RTAnalysis:
+    """Phase 24 Plan 04 Task 2 -- round-trip analysis regression tests.
+
+    Guards key exact RT match compounds, anilino prefix fix,
+    carboxylate neutralization, steroid naming, peptide naming,
+    and cyclohexenone OPSIN-compatible format.
+    """
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize(
+        "smiles,expected_name,test_id",
+        [(s, n, t) for s, n, t in PHASE24_RT_ANALYSIS if n is not None],
+        ids=[t for _, n, t in PHASE24_RT_ANALYSIS if n is not None],
+    )
+    def test_rt_analysis(self, smiles, expected_name, test_id):
+        """Verify Phase 24 RT analysis-derived naming never regresses."""
+        name = name_compound(smiles)
+        assert isinstance(name, str), (
+            f"Expected string for {test_id}, got {type(name)}"
+        )
+        assert len(name) > 0, (
+            f"Empty name for {test_id}: {smiles}"
+        )
+        assert name == expected_name, (
+            f"REGRESSION ({test_id}): {smiles}\n"
+            f"  Expected: {expected_name}\n"
+            f"  Got:      {name}"
+        )
