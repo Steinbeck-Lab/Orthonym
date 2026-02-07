@@ -226,6 +226,14 @@ class Orthonym:
             if aa_name:
                 return aa_name
 
+        # Skeletal replacement nomenclature (IUPAC P-15.4)
+        # Detect chains where heteroatoms are embedded in the backbone (C-O-C, C-N-C, C-S-C)
+        # Must come BEFORE perception to override substitutive naming (ether/amine prefix)
+        from .rules.skeletal_replacement import try_skeletal_replacement_name
+        skel_name = try_skeletal_replacement_name(mol)
+        if skel_name:
+            return skel_name
+
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
 

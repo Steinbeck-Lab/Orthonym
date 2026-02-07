@@ -125,12 +125,12 @@ class TestSulfurAdditionalCompounds:
     """Additional E2E tests for sulfur compounds."""
 
     def test_dipropyl_sulfide(self):
-        """CCCSCCC -> dipropyl sulfide"""
-        assert name_compound("CCCSCCC") == "dipropyl sulfide"
+        """CCCSCCC -> 4-thiaheptane (IUPAC P-15.4 replacement nomenclature)"""
+        assert name_compound("CCCSCCC") == "4-thiaheptane"
 
     def test_dibutyl_sulfide(self):
-        """CCCCSCCCC -> dibutyl sulfide"""
-        assert name_compound("CCCCSCCCC") == "dibutyl sulfide"
+        """CCCCSCCCC -> 5-thianonane (IUPAC P-15.4 replacement nomenclature)"""
+        assert name_compound("CCCCSCCCC") == "5-thianonane"
 
     def test_dipropyl_sulfoxide(self):
         """CCCS(=O)CCC -> dipropyl sulfoxide"""
@@ -141,8 +141,8 @@ class TestSulfurAdditionalCompounds:
         assert name_compound("CCCS(=O)(=O)CCC") == "dipropyl sulfone"
 
     def test_butyl_methyl_sulfide(self):
-        """CCCCSC -> butyl methyl sulfide"""
-        assert name_compound("CCCCSC") == "butyl methyl sulfide"
+        """CCCCSC -> 2-thiahexane (IUPAC P-15.4 replacement nomenclature)"""
+        assert name_compound("CCCCSC") == "2-thiahexane"
 
     def test_butyl_methyl_sulfoxide(self):
         """CCCCS(=O)C -> butyl methyl sulfoxide"""

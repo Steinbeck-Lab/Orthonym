@@ -62,6 +62,8 @@ _PRIORITY_FG_SMARTS = [
     '[C]#[N]',             # Nitrile
     '[NX3][CX3](=[NX1])',  # Amidine
     '[SX2H]',              # Thiol
+    '[NX2]=[CX2]=[OX1]',  # Isocyanate (N=C=O)
+    '[NX2]=[CX2]=[SX1]',  # Isothiocyanate (N=C=S)
 ]
 
 # Pre-compile the SMARTS patterns
@@ -139,9 +141,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     if len(embedded_heteroatoms) == 0:
         return None
 
-    # For single heteroatom: only apply if chain is long enough (>= 5)
-    # Short chains like COC (3 atoms) use substitutive naming (methoxymethane)
-    if len(embedded_heteroatoms) == 1 and len(backbone) < 5:
+    # For single heteroatom: only apply if chain is long enough (>= 6)
+    # Short/moderate chains (COC=3, COCC=4, CCOCC=5) use substitutive naming
+    # (methoxymethane, ethoxyethane, etc.). Replacement names preferred for
+    # longer chains where substitutive names become awkward.
+    if len(embedded_heteroatoms) == 1 and len(backbone) < 6:
         return None
 
     # ----------------------------------------------------------------
