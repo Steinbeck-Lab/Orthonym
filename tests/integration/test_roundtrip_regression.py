@@ -62,7 +62,7 @@ ROUNDTRIP_VERIFIED = [
 
     # Aromatic compounds
     ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
-    ("OCc1ccc(O)cc1", "1-hydroxy-4-hydroxymethylbenzene"),
+    ("OCc1ccc(O)cc1", "1-hydroxy-4-(hydroxymethyl)benzene"),
     ("CN(C)c1ccc(N)cc1", "1-amino-4-(N,N-dimethylamino)benzene"),
 
     # Fused aromatic
@@ -463,3 +463,97 @@ class TestPhase22NPEsterRoundTrip:
             f"  input:  {canonical_input}\n"
             f"  output: {canonical_output}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Section 5: Phase 24 Wave 2 regression tests (Groups C, D, E, F)
+# Naming crash fixes, stereo format, macrocyclic, misc format
+# ---------------------------------------------------------------------------
+
+PHASE24_WAVE2_FIXES = [
+    # Group C: Naming crash fixes
+    # C1: Ring assembly get_multiplier_prefix() TypeError fix
+    (
+        "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1",
+        None,  # Just verify no crash, name is complex
+        "ring-assembly-multiplier-fix",
+    ),
+    # C2: Dicarboxylate anion -> neutralize-then-name
+    (
+        "O=C([O-])CC=CC(=O)C(=O)[O-]",
+        "2-oxohex-3-enedioic acid",
+        "dicarboxylate-neutralize",
+    ),
+    # C3: Dicarboxylate anion with stereo -> neutralize-then-name
+    (
+        "O=C([O-])C(=O)C[C@H](O)C(=O)[O-]",
+        "(2S)-2-hydroxy-4-oxopentanedioic acid",
+        "dicarboxylate-stereo-neutralize",
+    ),
+
+    # Group D: Stereodescriptor format fixes
+    # D1: Uppercase R/S for pseudoasymmetric centers (was lowercase s)
+    (
+        "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1",
+        "(1S,4S,7R)-1,7-dimethyl-4-propylcyclodecane",
+        "stereo-uppercase-pseudoasymmetric",
+    ),
+
+    # Group E: Retained name fixes
+    # E1: SS -> disulfane
+    (
+        "SS",
+        "disulfane",
+        "disulfane-retained",
+    ),
+
+    # Group F: Misc format fixes
+    # F1: Steroid ester prefix hyphen fix (was "3-hydroxy7-oxo", now "3-hydroxy-7-oxo")
+    (
+        "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
+        "3-hydroxy-7-oxoergost-9,24-dien-11-yl acetate",
+        "steroid-prefix-hyphen",
+    ),
+    # F2: Single anion naming preserved (pentanoate must not regress)
+    (
+        "CCCCC(=O)[O-]",
+        "pentanoate",
+        "single-anion-no-regression",
+    ),
+    # F3: Error handling - complex compound returns name, not crash
+    (
+        "[I][Hg-2]([I])([I])[I]",
+        "unknown",
+        "inorganic-graceful-fallback",
+    ),
+]
+
+
+class TestPhase24Wave2Fixes:
+    """Phase 24 Wave 2 regression tests.
+
+    Covers fixes for naming crashes (Group C), stereo format (Group D),
+    retained names (Group E), and misc format issues (Group F).
+    """
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize(
+        "smiles,expected_name,test_id",
+        PHASE24_WAVE2_FIXES,
+        ids=[t[2] for t in PHASE24_WAVE2_FIXES],
+    )
+    def test_wave2_fixes(self, smiles, expected_name, test_id):
+        """Verify Phase 24 Wave 2 fixes never regress."""
+        name = name_compound(smiles)
+        assert isinstance(name, str), (
+            f"Expected string for {test_id}, got {type(name)}"
+        )
+        assert len(name) > 0, (
+            f"Empty name for {test_id}: {smiles}"
+        )
+        if expected_name is not None:
+            assert name == expected_name, (
+                f"REGRESSION ({test_id}): {smiles}\n"
+                f"  Expected: {expected_name}\n"
+                f"  Got:      {name}"
+            )

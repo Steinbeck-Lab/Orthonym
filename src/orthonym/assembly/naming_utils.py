@@ -109,6 +109,84 @@ COMPLEX_MULTIPLIERS = {
 }
 
 
+def needs_brackets(name: str) -> bool:
+    """Determine if a substituent name is a compound substituent needing parentheses.
+
+    Per IUPAC P-14.5.2, compound substituents (those that contain locants,
+    hyphens, or functional group prefixes fused with alkyl names) must be
+    enclosed in parentheses when used as prefixes on ring parents.
+
+    Simple substituents (single-word names like methyl, chloro, hydroxy)
+    do NOT need parentheses.
+
+    Already-bracketed names (starting with '(' or '[') are left alone.
+
+    Args:
+        name: The substituent name (e.g., 'methyl', 'hydroxymethyl',
+              '2-methylpropyl', '(N,N-dimethylamino)').
+
+    Returns:
+        True if the substituent needs enclosing parentheses, False otherwise.
+
+    Examples:
+        >>> needs_brackets("methyl")
+        False
+        >>> needs_brackets("chloro")
+        False
+        >>> needs_brackets("hydroxy")
+        False
+        >>> needs_brackets("hydroxymethyl")
+        True
+        >>> needs_brackets("carboxymethyl")
+        True
+        >>> needs_brackets("aminoethyl")
+        True
+        >>> needs_brackets("2-methylpropyl")
+        True
+        >>> needs_brackets("(N,N-dimethylamino)")
+        False
+        >>> needs_brackets("methoxy")
+        False
+    """
+    if not name:
+        return False
+
+    # Already wrapped in parentheses or square brackets -- skip
+    if (name.startswith('(') and name.endswith(')')) or \
+       (name.startswith('[') and name.endswith(']')):
+        return False
+
+    # Contains a digit (has locants): definitely compound
+    if any(ch.isdigit() for ch in name):
+        return True
+
+    # Contains a hyphen (compound substituent): definitely compound
+    if '-' in name:
+        return True
+
+    # Functional group prefixes fused with alkyl names are compound substituents.
+    # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
+    # But NOT: methoxy, ethoxy (these are simple ether prefixes, single concept)
+    # And NOT: methylsulfanyl (single substituent concept)
+    _COMPOUND_FG_PREFIXES = (
+        'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
+        'nitro', 'mercapto', 'sulfanyl', 'phospho',
+    )
+    _ALKYL_ROOTS = (
+        'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
+        'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
+    )
+    name_lower = name.lower()
+    for fg in _COMPOUND_FG_PREFIXES:
+        if name_lower.startswith(fg):
+            remainder = name_lower[len(fg):]
+            # Check if the remainder is an alkyl root
+            for alkyl in _ALKYL_ROOTS:
+                if remainder == alkyl:
+                    return True
+    return False
+
+
 def is_complex_substituent(name: str) -> bool:
     """Determine if a substituent name is complex.
 

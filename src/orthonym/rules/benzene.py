@@ -652,8 +652,99 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 except (ValueError, KeyError):
                     pass
 
-        # Fallback for any O with a non-ring neighbor (e.g., O-N in nitrate esters)
-        # Collect all atoms and name generically as "oxy" substituent
+        # Alkoxy fallback for O-C where C is not pure alkyl
+        # (aromatic carbon, sugar ring carbon, carbonyl carbon, etc.)
+        if nbr_symbol == 'C':
+            c_atom = nbr
+            sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
+
+            # Case 1: O -> aromatic C in benzene ring -> "phenoxy"
+            if c_atom.GetIsAromatic() and c_atom.IsInRing():
+                ring_info = mol.GetRingInfo()
+                for ring in ring_info.AtomRings():
+                    if c_atom.GetIdx() in ring and len(ring) == 6:
+                        all_arom_c = all(
+                            mol.GetAtomWithIdx(r).GetIsAromatic() and
+                            mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                            for r in ring
+                        )
+                        if all_arom_c:
+                            return {'name': 'phenoxy', 'atoms': sub_atoms}
+
+            # Case 2: O -> C(=O)R -> acyloxy group (ester linkage on benzene)
+            for cn in c_atom.GetNeighbors():
+                if cn.GetIdx() == o_idx:
+                    continue
+                if cn.GetSymbol() == 'O':
+                    bond = mol.GetBondBetweenAtoms(c_atom.GetIdx(), cn.GetIdx())
+                    if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                        # This is an ester: -O-C(=O)-R (acyloxy)
+                        # Count carbons in the acyl chain (including the carbonyl C)
+                        acyl_excluded = ring_atoms | {o_idx, cn.GetIdx()}
+                        acyl_atoms_list, acyl_c = _collect_pure_alkyl(
+                            mol, c_atom.GetIdx(), acyl_excluded
+                        )
+                        if acyl_atoms_list is not None and acyl_c > 0:
+                            from ..data.chain_names import get_chain_prefix
+                            try:
+                                acyl_prefix = get_chain_prefix(acyl_c)
+                                acyloxy_name = f"({acyl_prefix}anoyloxy)"
+                                return {
+                                    'name': acyloxy_name,
+                                    'atoms': sub_atoms,
+                                    'is_complex': True,
+                                }
+                            except (ValueError, KeyError):
+                                pass
+                        break
+
+            # Case 3: O -> non-aromatic ring C (glycoside/sugar etc.)
+            if c_atom.IsInRing():
+                ring_info = mol.GetRingInfo()
+                for ring in ring_info.AtomRings():
+                    if c_atom.GetIdx() in ring:
+                        ring_size = len(ring)
+                        # 5- or 6-membered ring with O in ring -> likely glycoside
+                        ring_has_o = any(
+                            mol.GetAtomWithIdx(r).GetSymbol() == 'O'
+                            for r in ring
+                        )
+                        if ring_has_o and ring_size in (5, 6):
+                            glyco_prefix = "pentosyloxy" if ring_size == 5 else "hexosyloxy"
+                            return {
+                                'name': f'({glyco_prefix})',
+                                'atoms': sub_atoms,
+                                'is_complex': True,
+                            }
+                        break
+
+            # Case 4: O-C that's not pure alkyl but not ring/aromatic
+            # Try to count total carbons and make a best-effort alkoxy name
+            all_sub = _bfs_substituent_atoms(mol, nbr.GetIdx(), ring_atoms | {o_idx})
+            total_c = sum(
+                1 for a in all_sub
+                if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+            )
+            if total_c > 0:
+                try:
+                    alkyl_name = get_alkyl_name(total_c)
+                    if alkyl_name.endswith('yl'):
+                        oxy_name = alkyl_name[:-2] + 'oxy'
+                    else:
+                        oxy_name = alkyl_name + 'oxy'
+                    return {'name': oxy_name, 'atoms': [o_idx] + all_sub}
+                except (ValueError, KeyError):
+                    from ..data.chain_names import get_chain_prefix
+                    try:
+                        cp = get_chain_prefix(total_c)
+                        return {'name': cp + 'yloxy', 'atoms': [o_idx] + all_sub}
+                    except (ValueError, KeyError):
+                        pass
+
+            # True last resort -- bare 'oxy' (should be rare now)
+            return {'name': 'oxy', 'atoms': sub_atoms}
+
+        # Fallback for non-C neighbors (e.g., O-N in nitrate esters)
         sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
         if len(sub_atoms) > 1:
             # For O-N(=O)=O: (nitrooxy) per IUPAC
@@ -910,11 +1001,19 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
         # Cannot produce a valid name; return None so caller can handle gracefully
         return None
 
+    # Wrap compound substituent names in parentheses per IUPAC P-14.5.2
+    # e.g., "hydroxymethyl" -> "(hydroxymethyl)", "carboxymethyl" -> "(carboxymethyl)"
+    from ..assembly.naming_utils import needs_brackets
+    is_compound = needs_brackets(sub_name)
+    if is_compound and not (sub_name.startswith('(') and sub_name.endswith(')')):
+        sub_name = f'({sub_name})'
+
     return {
         'name': sub_name,
         'atoms': all_atoms,
         'chain_length': carbon_count,
-        'functional_group': functional_group
+        'functional_group': functional_group,
+        'is_complex': is_compound,
     }
 
 
