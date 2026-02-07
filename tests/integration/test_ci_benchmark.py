@@ -33,12 +33,12 @@ CI_BENCHMARK = [
     (
         "CCCCN(C)C(=O)CCCCCCCCCC[C@@H]1Cc2cc(O)ccc2[C@H]2CC[C@]3(C)"
         "[C@@H](O)CC[C@H]3[C@H]12",
-        "estran-3,17-diol",
+        "(7R,8R,9S,13S,14S,17S)-estran-3,17-diol",
     ),
     (
         "C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)"
         "CC[C@]4(C)C3=CC[C@]12C",
-        "15,24-dihydroxychol-7,9-dien-3,24-dione",
+        "(10S,13R,14R,15S,17R,20R)-15,24-dihydroxychol-7,9-dien-3,24-dione",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
@@ -304,7 +304,7 @@ CI_BENCHMARK = [
     (
         "C=C1[C@@H](O)CC[C@]2(C)C3=C(CC[C@@H]12)[C@]1(O)[C@@H](O)"
         "C[C@H]([C@H](C)CC[C@H](CC)C(C)C)[C@@]1(C)C[C@@H]3O",
-        "stigmast-8-en-3,12,14,15-tetraol",
+        "(3S,5R,10S,12S,13R,14S,15S,17R,20R,24S)-stigmast-8-en-3,12,14,15-tetraol",
     ),
     ("Nc1[nH]c(=S)ncc1F", "4-amino-1,3-diazine"),
     (
@@ -372,7 +372,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC"
         "[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
-        "6,21-dihydroxycholest-8,24-dien-3,16,21-trione",
+        "(5R,6S,10S,13R,14R,17R,20R)-6,21-dihydroxycholest-8,24-dien-3,16,21-trione",
     ),
     (
         "CC(C)(O)/C=C/c1cc(O)ccc1O",

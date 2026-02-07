@@ -24,6 +24,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from ..data.natural_products import (
     NATURAL_PRODUCT_DERIVATIVES,
@@ -76,12 +77,14 @@ def name_natural_product(mol) -> Optional[str]:
                 mol, set(scaffold_info["matched_atoms"]), numbering
             )
             if unsaturation["ene"] or unsaturation["yne"]:
+                stereo_prefix = _collect_np_stereo(mol, numbering)
                 return _assemble_np_name(
                     scaffold_info["scaffold_stem"],
                     scaffold_info["scaffold_name"],
                     hydroxyls=[],
                     ketones=[],
                     unsaturation=unsaturation,
+                    stereo_prefix=stereo_prefix,
                 )
         return scaffold_info["scaffold_name"]
 
@@ -135,6 +138,9 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
 
     matched_set = set(scaffold_info["matched_atoms"])
 
+    # Collect stereodescriptors from the scaffold numbering
+    stereo_prefix = _collect_np_stereo(mol, numbering)
+
     # 0. Find ester decorations first (they consume atoms that would otherwise
     #    be counted as hydroxyls or ketones)
     esters = _find_ester_decorations(mol, scaffold_info, numbering)
@@ -157,7 +163,7 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     if esters:
         return _assemble_np_ester_name(
             scaffold_stem, scaffold_name, hydroxyls, ketones,
-            unsaturation, esters,
+            unsaturation, esters, stereo_prefix=stereo_prefix,
         )
 
     # If no decorations found, return bare scaffold name
@@ -165,7 +171,10 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
         return scaffold_name
 
     # 5. Assemble the decorated name (substitutive format)
-    return _assemble_np_name(scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation)
+    return _assemble_np_name(
+        scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
+        stereo_prefix=stereo_prefix,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +205,29 @@ def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
             target_to_iupac[target_idx] = numbering_map[query_pos]
 
     return target_to_iupac
+
+
+def _collect_np_stereo(mol, numbering: Dict[int, int]) -> str:
+    """Collect stereodescriptors for a natural product using IUPAC locants.
+
+    Uses RDKit CIP labeling and the scaffold numbering map to produce
+    a stereodescriptor prefix like "(5R,8S,9S,10R,13S,14S)-".
+
+    Args:
+        mol: RDKit Mol object with stereocenters.
+        numbering: Dict mapping atom index -> IUPAC locant.
+
+    Returns:
+        Stereo prefix string (e.g., "(5R,8S)-") or empty string if
+        no stereocenters have defined CIP labels.
+    """
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    rdCIPLabeler.AssignCIPLabels(mol)
+    descriptors = collect_stereodescriptors(mol, numbering)
+    if descriptors:
+        return format_stereodescriptor_string(descriptors)
+    return ""
 
 
 def _find_hydroxyls(
@@ -325,11 +357,12 @@ def _assemble_np_name(
     hydroxyls: List[int],
     ketones: List[int],
     unsaturation: Dict[str, List[int]],
+    stereo_prefix: str = "",
 ) -> str:
     """Assemble a decorated natural product name.
 
-    Format: {prefix}{stem}{unsaturation_suffix}{ketone_suffix}
-    Example: "3-hydroxycholest-4-en-17-one"
+    Format: {stereo_prefix}{prefix}{stem}{unsaturation_suffix}{ketone_suffix}
+    Example: "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol"
 
     Args:
         stem: Scaffold stem (e.g., "cholest", "androst").
@@ -337,6 +370,7 @@ def _assemble_np_name(
         hydroxyls: Sorted IUPAC locants of -OH groups.
         ketones: Sorted IUPAC locants of =O groups.
         unsaturation: Dict with 'ene' and 'yne' locant lists.
+        stereo_prefix: Stereodescriptor prefix (e.g., "(5R,8S)-") or "".
 
     Returns:
         Assembled IUPAC-style natural product name.
@@ -393,7 +427,7 @@ def _assemble_np_name(
     # For NP names: hydroxyl is always prefix, ketone always suffix
     # If neither ketone nor hydroxyl, and no unsaturation -> bare scaffold name
     if not prefix and not ketone_suffix and not ene_locs and not yne_locs:
-        return scaffold_name
+        return stereo_prefix + scaffold_name
 
     # If only hydroxyls and no ketone -> use -ol suffix instead of prefix
     if hydroxyls and not ketones:
@@ -403,7 +437,7 @@ def _assemble_np_name(
         ol_suffix = f"-{locant_str}-{multiplier}ol"
         # stem + unsaturation + -ol
         # e.g., "cholest-5-en-3-ol" for cholesterol-type
-        return f"{stem}{unsat_suffix}{ol_suffix}"
+        return f"{stereo_prefix}{stem}{unsat_suffix}{ol_suffix}"
 
     # General case: prefix + stem + unsaturation + ketone
     # e.g., "17-hydroxyandr-4-en-3-one" for testosterone-type
@@ -411,12 +445,12 @@ def _assemble_np_name(
         # Saturated: prefix + stem + "an" + ketone
         # e.g., "androstane-3,17-dione" -> but with 'e' before suffix
         if ketone_suffix:
-            return f"{prefix}{stem}{unsat_suffix}e{ketone_suffix}"
+            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e{ketone_suffix}"
         else:
-            return f"{prefix}{stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
     else:
         # Unsaturated: prefix + stem + unsaturation + ketone
-        return f"{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+        return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
 
 
 def _find_ester_decorations(
@@ -559,11 +593,12 @@ def _assemble_np_ester_name(
     ketones: List[int],
     unsaturation: Dict[str, List[int]],
     esters: List[Dict],
+    stereo_prefix: str = "",
 ) -> str:
     """Assemble a functional class ester name for a natural product.
 
-    Format: {prefix}{stem}{unsaturation}-{locant}-yl {acylate}
-    Example: "3-oxoandrost-4-en-17-yl acetate"
+    Format: {stereo_prefix}{prefix}{stem}{unsaturation}-{locant}-yl {acylate}
+    Example: "(5R,8S)-3-oxoandrost-4-en-17-yl acetate"
 
     In functional class format (IUPAC P-65.6):
     - Ketone groups become "oxo" prefixes (not "-one" suffix)
@@ -580,6 +615,7 @@ def _assemble_np_ester_name(
         ketones: Sorted IUPAC locants of =O groups.
         unsaturation: Dict with 'ene' and 'yne' locant lists.
         esters: List of ester dicts with 'locant' and 'acylate' keys.
+        stereo_prefix: Stereodescriptor prefix (e.g., "(5R,8S)-") or "".
 
     Returns:
         Functional class ester name string.
@@ -655,10 +691,10 @@ def _assemble_np_ester_name(
             # Different acylates: list them
             acylate_word = " ".join(acylate_names)
 
-    # --- Assemble: prefix + stem + unsaturation + yl + space + acylate ---
+    # --- Assemble: stereo_prefix + prefix + stem + unsaturation + yl + space + acylate ---
     if unsat_suffix == "an":
-        parent = f"{prefix}{stem}{unsat_suffix}e{yl_suffix}"
+        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e{yl_suffix}"
     else:
-        parent = f"{prefix}{stem}{unsat_suffix}{yl_suffix}"
+        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{yl_suffix}"
 
     return f"{parent} {acylate_word}"

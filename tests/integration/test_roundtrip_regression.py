@@ -85,10 +85,10 @@ ROUNDTRIP_VERIFIED = [
         "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.015,20.02,11.05,10]docos-13-ene-20-carboxylic acid",
     ),
 
-    # Steroid (natural product)
+    # Steroid (natural product, with stereodescriptors)
     (
         "CC(C)C(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4=CCCC[C@]4(C)[C@H]3CC[C@]12C",
-        "cholest-4-en-24-one",
+        "(8S,9S,10R,13R,14S,17R,20R)-cholest-4-en-24-one",
     ),
 ]
 
@@ -319,7 +319,7 @@ PHASE22_MULTIPLICATIVE_ROUNDTRIP = [
 PHASE22_NP_ESTER_PARSE = [
     (
         "CC(=O)O[C@H]1CC[C@@H]2[C@@]1(C)CC[C@H]1[C@@H]2CCC2=CC(=O)CC[C@@]12C",
-        "3-oxoandrost-4-en-17-yl acetate",
+        "(8S,9S,10S,13R,14S,17S)-3-oxoandrost-4-en-17-yl acetate",
     ),
 ]
 
@@ -511,7 +511,7 @@ PHASE24_WAVE2_FIXES = [
     # F1: Steroid ester prefix hyphen fix (was "3-hydroxy7-oxo", now "3-hydroxy-7-oxo")
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
-        "3-hydroxy-7-oxoergost-9,24-dien-11-yl acetate",
+        "(3S,4S,5R,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-7-oxoergost-9,24-dien-11-yl acetate",
         "steroid-prefix-hyphen",
     ),
     # F2: Single anion naming preserved (pentanoate must not regress)
@@ -822,10 +822,10 @@ PHASE24_RT_ANALYSIS = [
         "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioic acid",
         "glucarate-neutralization",
     ),
-    # --- Steroid naming (no stereo in unspecified steroids) ---
+    # --- Steroid naming (with stereodescriptors for defined stereocenters) ---
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "androstan-3,17-diol",
+        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
         "steroid-androstanediol",
     ),
     # --- Peptide naming (exact RT match) ---

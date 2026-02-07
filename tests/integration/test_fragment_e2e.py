@@ -104,7 +104,7 @@ class TestNPEsterE2E:
         result = name_compound(
             "CC(=O)O[C@H]1CC[C@@H]2[C@@]1(C)CC[C@H]1[C@@H]2CCC2=CC(=O)CC[C@@]12C"
         )
-        assert result == "3-oxoandrost-4-en-17-yl acetate"
+        assert result == "(8S,9S,10S,13R,14S,17S)-3-oxoandrost-4-en-17-yl acetate"
 
     @pytest.mark.integration
     def test_bare_testosterone_no_regression(self):
