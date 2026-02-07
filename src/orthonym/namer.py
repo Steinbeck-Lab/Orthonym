@@ -55,6 +55,9 @@ class MolecularFeatures:
     ring_double_bonds: List[tuple] = field(default_factory=list)  # Double bonds in ring
     ring_double_bond_locants: List[int] = field(default_factory=list)  # Locants for ring double bonds
 
+    # Ring assembly information (biphenyl, bipyridine, etc.)
+    ring_assembly_info: Optional[Dict] = None
+
     # Benzene-specific information
     is_benzene: bool = False  # True if principal ring is benzene
     benzene_ring: Optional[tuple] = None  # Atom indices of the benzene ring
@@ -385,6 +388,16 @@ class Orthonym:
 
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
+            # Check for ring assemblies FIRST (identical disconnected ring systems)
+            # Must come before fused/polycyclic classification because ring assemblies
+            # have 2+ separate ring systems that would otherwise be misrouted
+            if len(features.ring_systems) >= 2:
+                from .rules.ring_assemblies import detect_ring_assembly
+                assembly_info = detect_ring_assembly(features.mol, features.ring_systems)
+                if assembly_info:
+                    features.ring_assembly_info = assembly_info
+                    return  # Skip other ring classification for assemblies
+
             # Check for polycyclic aromatics FIRST (naphthalene, anthracene, etc.)
             # These take precedence over single-ring classification
             from .rules.polycyclics import identify_polycyclic, get_polycyclic_substituents

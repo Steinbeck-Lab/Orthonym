@@ -76,22 +76,36 @@ def _find_inter_system_bonds(
         rdchem.BondType.AROMATIC,
     }
 
-    # Build atom -> system index map
-    atom_to_system = {}
+    # Build atom -> set of system indices (an atom can be in multiple systems
+    # for spiro compounds where the spiro center is shared)
+    atom_to_systems: Dict[int, Set[int]] = {}
     for sys_idx, system in enumerate(ring_systems):
         for atom_idx in system:
-            atom_to_system[atom_idx] = sys_idx
+            if atom_idx not in atom_to_systems:
+                atom_to_systems[atom_idx] = set()
+            atom_to_systems[atom_idx].add(sys_idx)
+
+    # Atoms in multiple systems (spiro centers) -- skip bonds involving these
+    shared_atoms = {idx for idx, systems in atom_to_systems.items() if len(systems) > 1}
 
     for bond in mol.GetBonds():
         a1 = bond.GetBeginAtomIdx()
         a2 = bond.GetEndAtomIdx()
 
+        # Skip bonds involving spiro/shared atoms
+        if a1 in shared_atoms or a2 in shared_atoms:
+            continue
+
         # Both atoms must be in ring systems, but different ones
-        if a1 in atom_to_system and a2 in atom_to_system:
-            s1 = atom_to_system[a1]
-            s2 = atom_to_system[a2]
-            if s1 != s2 and bond.GetBondType() in acceptable_types:
-                connections.append((a1, a2, s1, s2))
+        if a1 in atom_to_systems and a2 in atom_to_systems:
+            systems1 = atom_to_systems[a1]
+            systems2 = atom_to_systems[a2]
+            # Each should be in exactly one system for a true assembly bond
+            if len(systems1) == 1 and len(systems2) == 1:
+                s1 = next(iter(systems1))
+                s2 = next(iter(systems2))
+                if s1 != s2 and bond.GetBondType() in acceptable_types:
+                    connections.append((a1, a2, s1, s2))
 
     return connections
 

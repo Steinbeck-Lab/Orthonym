@@ -550,6 +550,15 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if boronic_name:
             return boronic_name
 
+    # Handle ring assemblies (biphenyl, bipyridine) BEFORE complex ring systems
+    # Ring assemblies are separate identical ring systems connected by single bonds
+    assembly_info = getattr(features, 'ring_assembly_info', None)
+    if assembly_info:
+        from ..rules.ring_assemblies import name_ring_assembly
+        assembly_name = name_ring_assembly(features.mol, assembly_info, features)
+        if assembly_name:
+            return assembly_name
+
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
