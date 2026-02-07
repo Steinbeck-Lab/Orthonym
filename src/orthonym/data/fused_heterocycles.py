@@ -1028,8 +1028,15 @@ def match_fused_heterocycle_core(
     iupac_locants = data.get('iupac_locants')
 
     if iupac_locants is None:
-        # Fallback to old behavior if iupac_locants not defined
-        atom_mapping = {atom_idx: locant + 1 for locant, atom_idx in enumerate(match_atoms)}
+        # All entries should have iupac_locants -- if this triggers, the entry
+        # is incomplete and must be fixed. Return None to avoid incorrect numbering.
+        import warnings
+        warnings.warn(
+            f"Fused heterocycle '{name}' (core: {core_smiles}) missing iupac_locants mapping. "
+            f"This entry must be completed in FUSED_HETEROCYCLE_DATA.",
+            stacklevel=2,
+        )
+        return None
     else:
         # Use pre-computed IUPAC locants
         # match_atoms[pattern_idx] = mol_atom_idx
@@ -1091,3 +1098,23 @@ def get_ring_system_type(mol: Chem.Mol) -> Optional[str]:
     if data:
         return data['ring_system']
     return None
+
+
+def _validate_all_entries() -> bool:
+    """Verify all FUSED_HETEROCYCLE_DATA entries have complete iupac_locants.
+
+    This is intended to be called from tests, not at import time, to avoid
+    import overhead. Returns True if all entries are valid.
+    """
+    missing = []
+    for smiles, data in FUSED_HETEROCYCLE_DATA.items():
+        locants = data.get('iupac_locants')
+        if locants is None or (isinstance(locants, dict) and len(locants) == 0):
+            missing.append(data.get('name', smiles))
+    if missing:
+        import warnings
+        warnings.warn(
+            f"FUSED_HETEROCYCLE_DATA entries missing iupac_locants: {missing}",
+            stacklevel=2,
+        )
+    return len(missing) == 0
