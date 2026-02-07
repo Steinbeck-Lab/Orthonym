@@ -1245,7 +1245,7 @@ def _name_carbamate(features: Any) -> Optional[str]:
         if count == 1:
             n_prefix_parts.append(f"N-{name}")
         else:
-            mult = get_multiplier_prefix(count)
+            mult = get_multiplier_prefix(count, name)
             n_prefix_parts.append(f"N,N-{mult}{name}")
 
     n_prefix = ",".join(n_prefix_parts)

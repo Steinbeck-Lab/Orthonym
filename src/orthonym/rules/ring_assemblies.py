@@ -597,6 +597,27 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
                 prefix = get_chain_prefix(n_carbons)
                 return f"{prefix}yl"
 
+    # Check for alkoxy groups (O + alkyl chain)
+    if sub_atoms:
+        first_atom = mol.GetAtomWithIdx(attachment_atom)
+        if first_atom.GetSymbol() == 'O' and attachment_atom in sub_atoms:
+            other_atoms = [i for i in sub_atoms if i != attachment_atom]
+            carbon_count = sum(
+                1 for i in other_atoms
+                if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+            )
+            all_simple = all(
+                mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+                for i in other_atoms
+            )
+            if all_simple and carbon_count > 0:
+                _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
+                           4: 'butoxy', 5: 'pentyloxy'}
+                if carbon_count in _ALKOXY:
+                    return _ALKOXY[carbon_count]
+                prefix = get_chain_prefix(carbon_count)
+                return f"{prefix}oxy"
+
     # Fallback: use fragment naming
     return "substituent"
 
