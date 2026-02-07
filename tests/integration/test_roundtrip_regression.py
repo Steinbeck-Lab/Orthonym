@@ -557,3 +557,193 @@ class TestPhase24Wave2Fixes:
                 f"  Expected: {expected_name}\n"
                 f"  Got:      {name}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Section 6: Phase 24 Parse Fixes (plan 24-02)
+# Compound substituent parenthesization (Group A) + bare oxy elimination (Group B)
+# ---------------------------------------------------------------------------
+
+PHASE24_PARSE_FIXES = [
+    # Group A: Compound substituent parenthesization per IUPAC P-14.5.2
+    # A1: hydroxymethyl on polysubstituted benzene gets parentheses
+    (
+        "OCc1ccc(O)cc1",
+        "1-hydroxy-4-(hydroxymethyl)benzene",
+        "bracket-hydroxymethyl-benzene",
+    ),
+    # A2: hydroxymethyl + chloro on benzene
+    (
+        "OCc1ccc(Cl)cc1",
+        "1-chloro-4-(hydroxymethyl)benzene",
+        "bracket-chloro-hydroxymethyl",
+    ),
+    # A3: Retained name carboxymethyl on indole (from existing roundtrip)
+    (
+        "OC(=O)Cc1c[nH]c2ccc(Cl)cc12",
+        "3-carboxymethyl-5-chloro-1H-indole",
+        "bracket-carboxymethyl-indole",
+    ),
+
+    # Group B: Bare oxy prefix elimination
+    # B1: Biphenyl ether -> phenoxy (was bare "oxy")
+    (
+        "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
+        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+        "oxy-biphenyl-ether-phenoxy",
+    ),
+    # B2: Glycoside on benzene -> hexosyloxy (was bare "oxy")
+    (
+        "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
+        "1-(hexosyloxy)-2-hydroxy-4-methylbenzene",
+        "oxy-glycoside-hexosyloxy",
+    ),
+    # B3: Galloyl ester chain -> tetradecoxy (was bare "oxy")
+    (
+        "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
+        "3-tetradecoxy-4,5-dihydroxybenzoic acid",
+        "oxy-galloyl-ester-tetradecoxy",
+    ),
+    # B4: Complex ether chain -> decoxy (was bare "oxy")
+    (
+        "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
+        "1-decoxy-3-fluorobenzene",
+        "oxy-complex-ether-decoxy",
+    ),
+    # B5: Sugar glycoside on benzene -> hexosyloxy (was bare "oxybenzene")
+    (
+        "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
+        "hexosyloxybenzene",
+        "oxy-glycoside-benzene",
+    ),
+    # B6: Fused ring system -> phenoxy (was bare "oxy")
+    (
+        "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
+        "2-(hydroxyoctyl)-1,5-dimethoxy-3-phenoxybenzene",
+        "oxy-fused-ring-phenoxy",
+    ),
+    # B7: Dimethyl benzene with glycoside (was bare "oxy")
+    (
+        "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
+        "5-(hexosyloxy)-1-hydroxy-2,3-dimethylbenzene",
+        "oxy-dimethyl-benzene-hexosyloxy",
+    ),
+
+    # Additional stability checks
+    # S1: Simple methoxy stays unchanged (no over-bracketing)
+    (
+        "COc1ccccc1",
+        "methoxybenzene",
+        "stability-methoxy-no-brackets",
+    ),
+    # S2: acetyloxybenzene stays correct
+    (
+        "CC(=O)Oc1ccccc1",
+        "acetyloxybenzene",
+        "stability-acetyloxy-unchanged",
+    ),
+]
+
+
+class TestPhase24ParseFixes:
+    """Phase 24 parse fix regression tests (plan 24-02).
+
+    Covers:
+    - Group A: Compound substituent parenthesization per IUPAC P-14.5.2
+    - Group B: Bare oxy prefix elimination (phenoxy, hexosyloxy, alkoxy)
+    - Stability: Verify simple substituents not over-bracketed
+    """
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize(
+        "smiles,expected_name,test_id",
+        PHASE24_PARSE_FIXES,
+        ids=[t[2] for t in PHASE24_PARSE_FIXES],
+    )
+    def test_parse_fixes(self, smiles, expected_name, test_id):
+        """Verify Phase 24 parse fixes never regress."""
+        name = name_compound(smiles)
+        assert isinstance(name, str), (
+            f"Expected string for {test_id}, got {type(name)}"
+        )
+        assert len(name) > 0, (
+            f"Empty name for {test_id}: {smiles}"
+        )
+        assert name == expected_name, (
+            f"REGRESSION ({test_id}): {smiles}\n"
+            f"  Expected: {expected_name}\n"
+            f"  Got:      {name}"
+        )
+
+
+# OPSIN round-trip entries for Phase 24 parse fixes
+# These names were verified to be OPSIN-parseable
+PHASE24_PARSE_FIXES_ROUNDTRIP = [
+    # RT1: (hydroxymethyl) with parentheses parses in OPSIN
+    (
+        "OCc1ccc(O)cc1",
+        "1-hydroxy-4-(hydroxymethyl)benzene",
+        "rt-hydroxymethyl-brackets",
+    ),
+    # RT2: phenoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
+    (
+        "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
+        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+        "rt-phenoxy-biphenyl-ether",
+    ),
+    # RT3: tetradecoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
+    (
+        "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
+        "3-tetradecoxy-4,5-dihydroxybenzoic acid",
+        "rt-tetradecoxy-galloyl",
+    ),
+    # RT4: decoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
+    (
+        "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
+        "1-decoxy-3-fluorobenzene",
+        "rt-decoxy-complex-ether",
+    ),
+    # RT5: chloro + hydroxymethyl with brackets parses in OPSIN
+    (
+        "OCc1ccc(Cl)cc1",
+        "1-chloro-4-(hydroxymethyl)benzene",
+        "rt-chloro-hydroxymethyl",
+    ),
+]
+
+
+@pytest.mark.skipif(
+    not OPSIN_AVAILABLE,
+    reason="Java or OPSIN JAR not available for round-trip tests",
+)
+class TestPhase24ParseFixesRoundTrip:
+    """OPSIN round-trip tests for Phase 24 parse fixes.
+
+    Validates that names generated after the compound substituent
+    parenthesization and bare oxy elimination fixes are parseable
+    by OPSIN. These names previously failed OPSIN parsing.
+    """
+
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize(
+        "smiles,expected_name,test_id",
+        PHASE24_PARSE_FIXES_ROUNDTRIP,
+        ids=[t[2] for t in PHASE24_PARSE_FIXES_ROUNDTRIP],
+    )
+    def test_parse_fix_opsin_parses(self, smiles, expected_name, test_id):
+        """Fixed names must be parseable by OPSIN."""
+        name = name_compound(smiles)
+        assert name == expected_name, (
+            f"Name mismatch for {test_id}: expected '{expected_name}', got '{name}'"
+        )
+
+        opsin_smiles = _opsin_parse(name)
+        assert opsin_smiles, (
+            f"OPSIN could not parse '{name}' (from {smiles}, test {test_id})"
+        )
+
+        # Verify OPSIN returned valid SMILES
+        mol = Chem.MolFromSmiles(opsin_smiles)
+        assert mol is not None, (
+            f"OPSIN returned invalid SMILES '{opsin_smiles}' for '{name}'"
+        )

@@ -603,7 +603,8 @@ def _assemble_np_ester_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}oxo")
 
-    prefix = "".join(prefix_parts)
+    # Join multiple prefix parts with hyphen: "3-hydroxy" + "7-oxo" -> "3-hydroxy-7-oxo"
+    prefix = "-".join(prefix_parts)
 
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
