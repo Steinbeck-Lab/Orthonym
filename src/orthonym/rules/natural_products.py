@@ -8,7 +8,7 @@ Algorithm:
 1. Exact derivative lookup (O(1) dict lookup by canonical SMILES)
 2. Scaffold substructure match via perception module
 3. Return scaffold name for bare scaffolds
-4. For decorated scaffolds (steroid class): enumerate -OH, =O, C=C
+4. For decorated scaffolds (steroid class): enumerate -OH, =O, C=C, esters
    and assemble a systematic name using the scaffold stem
 5. Return None for non-natural-product molecules
 
@@ -17,6 +17,7 @@ Decoration enumeration (steroids):
 - Ketone groups    -> suffix "-one" with locant
 - Double bonds     -> suffix "-ene" with locant
 - Triple bonds     -> suffix "-yne" with locant
+- Ester groups     -> functional class format: parent-yl acylate (IUPAC P-65.6)
 """
 
 from collections import defaultdict
@@ -99,8 +100,9 @@ def name_natural_product(mol) -> Optional[str]:
 def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     """Name a natural product with decorations on the scaffold.
 
-    For steroids: enumerates hydroxyl, ketone, and unsaturation decorations,
-    assembles a systematic name like "3-hydroxycholest-4-en-17-one".
+    For steroids: enumerates hydroxyl, ketone, unsaturation, and ester
+    decorations, assembles a systematic name like "3-hydroxycholest-4-en-17-one"
+    or functional class format "3-oxoandrost-4-en-17-yl acetate" for esters.
 
     For non-steroid scaffolds or when numbering is unavailable, falls back
     to returning just the scaffold name.
@@ -133,20 +135,36 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
 
     matched_set = set(scaffold_info["matched_atoms"])
 
+    # 0. Find ester decorations first (they consume atoms that would otherwise
+    #    be counted as hydroxyls or ketones)
+    esters = _find_ester_decorations(mol, scaffold_info, numbering)
+    ester_consumed_atoms = set()
+    for e in esters:
+        ester_consumed_atoms.update(e["all_atoms"])
+
     # 1. Find hydroxyl groups (exocyclic -OH on scaffold atoms)
-    hydroxyls = _find_hydroxyls(mol, scaffold_info, numbering)
+    hydroxyls = _find_hydroxyls(mol, scaffold_info, numbering,
+                                exclude_atoms=ester_consumed_atoms)
 
     # 2. Find ketone groups (exocyclic =O on scaffold atoms)
-    ketones = _find_ketones(mol, scaffold_info, numbering)
+    ketones = _find_ketones(mol, scaffold_info, numbering,
+                            exclude_atoms=ester_consumed_atoms)
 
     # 3. Find unsaturation within the scaffold (C=C, C#C)
     unsaturation = _find_scaffold_unsaturation(mol, matched_set, numbering)
+
+    # 4. If esters found, use functional class format (IUPAC P-65.6)
+    if esters:
+        return _assemble_np_ester_name(
+            scaffold_stem, scaffold_name, hydroxyls, ketones,
+            unsaturation, esters,
+        )
 
     # If no decorations found, return bare scaffold name
     if not hydroxyls and not ketones and not unsaturation["ene"] and not unsaturation["yne"]:
         return scaffold_name
 
-    # 4. Assemble the decorated name
+    # 5. Assemble the decorated name (substitutive format)
     return _assemble_np_name(scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation)
 
 
@@ -181,19 +199,30 @@ def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
 
 
 def _find_hydroxyls(
-    mol, scaffold_info: Dict, numbering: Dict[int, int]
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
 ) -> List[int]:
     """Find hydroxyl groups (-OH) attached to scaffold atoms.
 
     Returns a sorted list of IUPAC locants where -OH groups are found.
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product().
+        numbering: Target atom index to IUPAC locant mapping.
+        exclude_atoms: Set of atom indices consumed by esters (skip these).
     """
     hydroxyls = []
-    matched_set = set(scaffold_info["matched_atoms"])
+    exclude = exclude_atoms or set()
 
     subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
     for sub in subs:
         attach = sub["attachment_atom"]
         if attach not in numbering:
+            continue
+
+        # Skip atoms consumed by ester detection
+        if sub["first_atom"] in exclude:
             continue
 
         # Single-atom substituent that is oxygen with 1 H -> hydroxyl
@@ -211,19 +240,30 @@ def _find_hydroxyls(
 
 
 def _find_ketones(
-    mol, scaffold_info: Dict, numbering: Dict[int, int]
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
 ) -> List[int]:
     """Find ketone groups (=O) on scaffold atoms.
 
     Returns a sorted list of IUPAC locants where C=O groups are found.
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product().
+        numbering: Target atom index to IUPAC locant mapping.
+        exclude_atoms: Set of atom indices consumed by esters (skip these).
     """
     ketones = []
-    matched_set = set(scaffold_info["matched_atoms"])
+    exclude = exclude_atoms or set()
 
     subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
     for sub in subs:
         attach = sub["attachment_atom"]
         if attach not in numbering:
+            continue
+
+        # Skip atoms consumed by ester detection
+        if sub["first_atom"] in exclude:
             continue
 
         # Single-atom substituent that is doubly-bonded oxygen -> ketone
@@ -377,3 +417,247 @@ def _assemble_np_name(
     else:
         # Unsaturated: prefix + stem + unsaturation + ketone
         return f"{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+
+
+def _find_ester_decorations(
+    mol, scaffold_info: Dict, numbering: Dict[int, int]
+) -> List[Dict]:
+    """Find ester groups (-O-C(=O)-R) attached to scaffold atoms.
+
+    Detects esters where:
+    - The ester oxygen is single-bonded to a scaffold carbon
+    - The ester oxygen has 0 hydrogens (distinguishes from -OH)
+    - The ester oxygen is bonded to a carbonyl carbon (C=O)
+
+    For each ester found, identifies the acid fragment and gets its name.
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product().
+        numbering: Target atom index to IUPAC locant mapping.
+
+    Returns:
+        List of dicts with keys:
+            - locant: int (IUPAC locant on scaffold where ester attaches)
+            - acylate: str (acylate name, e.g., "acetate", "propanoate")
+            - all_atoms: set (all atom indices consumed by this ester group)
+    """
+    from ..data.trivial_acids import get_systematic_acylate
+
+    esters = []
+    matched_set = set(scaffold_info["matched_atoms"])
+
+    subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+    for sub in subs:
+        attach = sub["attachment_atom"]
+        if attach not in numbering:
+            continue
+
+        # Ester starts with oxygen single-bonded to scaffold, no H
+        first_idx = sub["first_atom"]
+        first_atom = mol.GetAtomWithIdx(first_idx)
+        if first_atom.GetAtomicNum() != 8:
+            continue
+
+        bond = mol.GetBondBetweenAtoms(attach, first_idx)
+        if not bond or bond.GetBondType() != Chem.BondType.SINGLE:
+            continue
+
+        if first_atom.GetTotalNumHs() > 0:
+            continue  # This is a hydroxyl, not an ester oxygen
+
+        # Check that the ester oxygen connects to a carbonyl carbon
+        carbonyl_idx = None
+        for nbr in first_atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx == attach:
+                continue  # Skip back to scaffold
+            if nbr.GetAtomicNum() == 6:
+                # Check for C=O (carbonyl)
+                for nbr2 in nbr.GetNeighbors():
+                    if nbr2.GetIdx() == first_idx:
+                        continue
+                    if nbr2.GetAtomicNum() == 8:
+                        bond2 = mol.GetBondBetweenAtoms(nbr_idx, nbr2.GetIdx())
+                        if bond2 and bond2.GetBondType() == Chem.BondType.DOUBLE:
+                            carbonyl_idx = nbr_idx
+                            break
+            if carbonyl_idx is not None:
+                break
+
+        if carbonyl_idx is None:
+            continue  # Not an ester (no C=O found after oxygen)
+
+        # Count carbon atoms in the acid fragment
+        # The acid fragment = carbonyl carbon + everything bonded to it
+        # (except the ester oxygen back to scaffold)
+        acid_carbons = _count_acid_fragment_carbons(
+            mol, carbonyl_idx, first_idx, matched_set
+        )
+
+        # Get acylate name based on acid fragment size
+        acylate_name = get_systematic_acylate(acid_carbons)
+
+        # For C2 acid (acetic acid), use the common name "acetate"
+        if acid_carbons == 2:
+            acylate_name = "acetate"
+        elif acid_carbons == 1:
+            acylate_name = "formate"
+
+        # Collect all atoms in this ester group (for exclusion from other detection)
+        all_ester_atoms = set(sub["substituent_atoms"])
+
+        esters.append({
+            "locant": numbering[attach],
+            "acylate": acylate_name,
+            "all_atoms": all_ester_atoms,
+        })
+
+    return sorted(esters, key=lambda e: e["locant"])
+
+
+def _count_acid_fragment_carbons(
+    mol, carbonyl_idx: int, ester_oxy_idx: int, scaffold_atoms: set
+) -> int:
+    """Count carbon atoms in the acid fragment of an ester.
+
+    BFS from the carbonyl carbon, excluding the ester oxygen path back to
+    the scaffold. Counts only carbon atoms.
+
+    Args:
+        mol: RDKit Mol object.
+        carbonyl_idx: Atom index of the carbonyl carbon.
+        ester_oxy_idx: Atom index of the ester oxygen (excluded from BFS).
+        scaffold_atoms: Set of scaffold atom indices (excluded from BFS).
+
+    Returns:
+        Number of carbon atoms in the acid fragment (including the carbonyl C).
+    """
+    visited = {carbonyl_idx, ester_oxy_idx}
+    visited.update(scaffold_atoms)
+    queue = [carbonyl_idx]
+    carbon_count = 0
+
+    while queue:
+        current = queue.pop(0)
+        atom = mol.GetAtomWithIdx(current)
+        if atom.GetAtomicNum() == 6:
+            carbon_count += 1
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx not in visited:
+                visited.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    return carbon_count
+
+
+def _assemble_np_ester_name(
+    stem: str,
+    scaffold_name: str,
+    hydroxyls: List[int],
+    ketones: List[int],
+    unsaturation: Dict[str, List[int]],
+    esters: List[Dict],
+) -> str:
+    """Assemble a functional class ester name for a natural product.
+
+    Format: {prefix}{stem}{unsaturation}-{locant}-yl {acylate}
+    Example: "3-oxoandrost-4-en-17-yl acetate"
+
+    In functional class format (IUPAC P-65.6):
+    - Ketone groups become "oxo" prefixes (not "-one" suffix)
+    - Hydroxyl groups become "hydroxy" prefixes
+    - The scaffold ends with "-yl" at the ester attachment locant
+    - The acylate name follows as a separate word
+
+    For multiple esters: "parent-diyl diacetate" format.
+
+    Args:
+        stem: Scaffold stem (e.g., "androst").
+        scaffold_name: Full scaffold name for fallback.
+        hydroxyls: Sorted IUPAC locants of -OH groups.
+        ketones: Sorted IUPAC locants of =O groups.
+        unsaturation: Dict with 'ene' and 'yne' locant lists.
+        esters: List of ester dicts with 'locant' and 'acylate' keys.
+
+    Returns:
+        Functional class ester name string.
+    """
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    # --- Build prefix (all non-ester decorations become prefixes) ---
+    prefix_parts = []
+
+    # Hydroxyl groups -> "hydroxy" prefix
+    if hydroxyls:
+        locant_str = ",".join(str(loc) for loc in hydroxyls)
+        count = len(hydroxyls)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
+
+    # Ketone groups -> "oxo" prefix (NOT "-one" suffix in functional class format)
+    if ketones:
+        locant_str = ",".join(str(loc) for loc in ketones)
+        count = len(ketones)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_parts.append(f"{locant_str}-{multiplier}oxo")
+
+    prefix = "".join(prefix_parts)
+
+    # --- Build unsaturation suffix ---
+    ene_locs = unsaturation.get("ene", [])
+    yne_locs = unsaturation.get("yne", [])
+
+    unsat_suffix = ""
+    if ene_locs or yne_locs:
+        parts = []
+        if ene_locs:
+            ene_locant_str = ",".join(str(loc) for loc in ene_locs)
+            ene_count = len(ene_locs)
+            if ene_count == 1:
+                parts.append(f"-{ene_locant_str}-en")
+            else:
+                ene_multi = SIMPLE_MULTIPLIERS.get(ene_count, str(ene_count))
+                parts.append(f"-{ene_locant_str}-{ene_multi}en")
+        if yne_locs:
+            yne_locant_str = ",".join(str(loc) for loc in yne_locs)
+            yne_count = len(yne_locs)
+            if yne_count == 1:
+                parts.append(f"-{yne_locant_str}-yn")
+            else:
+                yne_multi = SIMPLE_MULTIPLIERS.get(yne_count, str(yne_count))
+                parts.append(f"-{yne_locant_str}-{yne_multi}yn")
+        unsat_suffix = "".join(parts)
+    else:
+        unsat_suffix = "an"
+
+    # --- Build yl suffix and acylate word ---
+    ester_locants = [e["locant"] for e in esters]
+    acylate_names = [e["acylate"] for e in esters]
+
+    if len(esters) == 1:
+        # Single ester: stem-unsaturation-locant-yl acylate
+        yl_suffix = f"-{ester_locants[0]}-yl"
+        acylate_word = acylate_names[0]
+    else:
+        # Multiple esters: stem-unsaturation-locant,locant-diyl diacylate
+        locant_str = ",".join(str(loc) for loc in ester_locants)
+        count = len(esters)
+        yl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
+        yl_suffix = f"-{locant_str}-{yl_multi}yl"
+        # Check if all acylates are the same
+        if len(set(acylate_names)) == 1:
+            acyl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
+            acylate_word = f"{acyl_multi}{acylate_names[0]}"
+        else:
+            # Different acylates: list them
+            acylate_word = " ".join(acylate_names)
+
+    # --- Assemble: prefix + stem + unsaturation + yl + space + acylate ---
+    if unsat_suffix == "an":
+        parent = f"{prefix}{stem}{unsat_suffix}e{yl_suffix}"
+    else:
+        parent = f"{prefix}{stem}{unsat_suffix}{yl_suffix}"
+
+    return f"{parent} {acylate_word}"
