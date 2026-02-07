@@ -186,6 +186,15 @@ class Orthonym:
 
         # Continue with normal neutral molecule naming
 
+        # MULTIPLICATIVE NOMENCLATURE (IUPAC P-51.3)
+        # Detect symmetric molecules with bridge atoms linking identical parent
+        # structures (e.g., 4,4'-methylenedianiline). Must come before NP detection
+        # and retained names to catch these before half the molecule is dropped.
+        from .rules.multiplicative import name_multiplicative
+        mult_name = name_multiplicative(mol)
+        if mult_name is not None:
+            return mult_name
+
         # NATURAL PRODUCT DETECTION
         # Check before retained names because NP detection uses substructure matching
         # while retained names use exact SMILES matching.
