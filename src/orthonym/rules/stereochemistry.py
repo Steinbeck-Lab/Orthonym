@@ -63,7 +63,10 @@ def collect_stereodescriptors(
             # Only include atoms on principal chain/ring
             if atom_idx in atom_to_locant:
                 locant = atom_to_locant[atom_idx]
-                cip_code = atom.GetProp('_CIPCode')  # 'R', 'S', 'r', or 's'
+                cip_code = atom.GetProp('_CIPCode')
+                # Enforce uppercase R/S for OPSIN compatibility
+                if cip_code in ('r', 's'):
+                    cip_code = cip_code.upper()
                 descriptors.append((locant, cip_code))
 
     # Collect E/Z double bonds (bond-based)

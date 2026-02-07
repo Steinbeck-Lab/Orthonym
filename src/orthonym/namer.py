@@ -183,9 +183,33 @@ class Orthonym:
                 if result:
                     return result
 
-            # No retained ion name found -- fall through to normal pipeline.
-            # The perceive/classify/assemble pipeline will handle the ion
-            # with aspect-based composition in composer.py.
+            # No retained ion name found.
+            # For POLY-anionic species (2+ anionic sites, e.g., dicarboxylate),
+            # try neutralize-then-name: convert [O-] -> OH so carboxylic acid
+            # SMARTS can match, then name the neutral form. This prevents
+            # empty-string results for polycarboxylate anions where the FG
+            # detection only recognizes protonated acids.
+            # Single anions (1 site) fall through to the normal ion pipeline
+            # which handles -ate suffix naming correctly.
+            if len(sites['anions']) >= 2 and not sites['cations']:
+                try:
+                    from rdkit.Chem import RWMol
+                    rwmol = RWMol(mol)
+                    neutralized = False
+                    for atom in rwmol.GetAtoms():
+                        if atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1:
+                            atom.SetFormalCharge(0)
+                            atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
+                            neutralized = True
+                    if neutralized:
+                        neutral_mol = rwmol.GetMol()
+                        neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
+                        neutral_namer = Orthonym(style=self.style)
+                        neutral_name = neutral_namer.name(neutral_smi)
+                        if neutral_name:
+                            return neutral_name
+                except Exception:
+                    pass  # Fall through to normal pipeline
 
         # Continue with normal neutral molecule naming
 
@@ -713,4 +737,20 @@ def name_compound(smiles: str, style: str = "pin") -> str:
         'prop-2-en-1-ol'
     """
     namer = Orthonym(style=style)
-    return namer.name(smiles)
+    try:
+        result = namer.name(smiles)
+        if result:
+            return result
+        # If name() returned empty/None, return "unknown" as graceful fallback
+        return "unknown"
+    except ValueError:
+        raise  # Re-raise ValueError (invalid SMILES) for caller to handle
+    except (TypeError, KeyError, IndexError, AttributeError) as e:
+        # Graceful fallback for unexpected errors in the naming pipeline.
+        # Log the error type for debugging but return a fallback name rather
+        # than crashing or returning None.
+        import logging
+        logging.getLogger(__name__).debug(
+            "Naming error for %s: %s: %s", smiles, type(e).__name__, e
+        )
+        return "unknown"

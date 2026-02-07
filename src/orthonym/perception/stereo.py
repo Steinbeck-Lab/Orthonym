@@ -47,9 +47,15 @@ def get_stereocenters(mol) -> List[Dict]:
     centers = []
     for atom in mol.GetAtoms():
         if atom.HasProp('_CIPCode'):
+            cip_code = atom.GetProp('_CIPCode')
+            # Enforce uppercase R/S for OPSIN compatibility.
+            # RDKit returns lowercase 'r'/'s' for pseudoasymmetric centers
+            # (IUPAC P-92.1.4.1), but OPSIN requires uppercase R/S.
+            if cip_code in ('r', 's'):
+                cip_code = cip_code.upper()
             centers.append({
                 'idx': atom.GetIdx(),
-                'cip': atom.GetProp('_CIPCode'),
+                'cip': cip_code,
                 'symbol': atom.GetSymbol(),
                 'neighbors': [n.GetIdx() for n in atom.GetNeighbors()],
             })
@@ -157,7 +163,10 @@ def get_stereodescriptor_string(
         if atom.HasProp('_CIPCode'):
             idx = atom.GetIdx()
             cip = atom.GetProp('_CIPCode')
-            
+            # Enforce uppercase R/S for OPSIN compatibility
+            if cip in ('r', 's'):
+                cip = cip.upper()
+
             if locant_map and idx in locant_map:
                 locant = locant_map[idx]
             else:

@@ -165,6 +165,8 @@ RETAINED_NAMES = {
     "CN(C)C=O": "N,N-dimethylformamide",
 
     # === SULFUR COMPOUNDS (Phase 10) ===
+    # Disulfane (S-S bond, no carbon)
+    "SS": "disulfane",
     # Thiols
     "CS": "methanethiol",
     "CCS": "ethanethiol",

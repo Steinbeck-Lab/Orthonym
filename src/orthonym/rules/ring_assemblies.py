@@ -708,7 +708,7 @@ def name_ring_assembly(
         n = len(locants)
         locant_str = ",".join(str(l) for l in locants)
         if n > 1:
-            mult = get_multiplier_prefix(n)
+            mult = get_multiplier_prefix(n, name)
             prefix_parts.append(f"{locant_str}-{mult}{name}")
         else:
             prefix_parts.append(f"{locant_str}-{name}")
