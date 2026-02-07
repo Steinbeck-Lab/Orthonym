@@ -3125,15 +3125,33 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
                 if h_count == 1 and len(o_nbrs) == 0:
                     sub_groups['hydroxy'].append(ring_pos)
                 elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
-                    c_count = _count_pure_alkyl(mol, o_nbrs[0].GetIdx(), ring_atom_set | {ni})
-                    if c_count and c_count in _ALKOXY:
-                        sub_groups[_ALKOXY[c_count]].append(ring_pos)
-                    elif c_count:
-                        from ..data.chain_names import get_alkyl_name as _gal
-                        try:
-                            sub_groups[f'{_gal(c_count)}oxy'].append(ring_pos)
-                        except (ValueError, KeyError):
-                            pass
+                    c_start = o_nbrs[0].GetIdx()
+                    c_start_atom = mol.GetAtomWithIdx(c_start)
+
+                    # Aryloxy: O -> aromatic C -> "phenoxy"
+                    if c_start_atom.GetIsAromatic():
+                        sub_groups['phenoxy'].append(ring_pos)
+                    else:
+                        # Check for benzyloxy: O -> CH2 -> aromatic
+                        benz_nbrs = [n for n in c_start_atom.GetNeighbors()
+                                     if n.GetIdx() != ni and n.GetIsAromatic()]
+                        non_h_non_arom = [n for n in c_start_atom.GetNeighbors()
+                                          if n.GetIdx() != ni
+                                          and not n.GetIsAromatic()
+                                          and n.GetSymbol() != 'H']
+                        if benz_nbrs and not non_h_non_arom and c_start_atom.GetTotalNumHs() >= 1:
+                            sub_groups['benzyloxy'].append(ring_pos)
+                        else:
+                            # Original pure alkyl path
+                            c_count = _count_pure_alkyl(mol, c_start, ring_atom_set | {ni})
+                            if c_count and c_count in _ALKOXY:
+                                sub_groups[_ALKOXY[c_count]].append(ring_pos)
+                            elif c_count:
+                                from ..data.chain_names import get_alkyl_name as _gal
+                                try:
+                                    sub_groups[f'{_gal(c_count)}oxy'].append(ring_pos)
+                                except (ValueError, KeyError):
+                                    pass
             elif sym == 'N':
                 h_count = nbr.GetTotalNumHs()
                 n_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != atom_idx]
@@ -3357,6 +3375,34 @@ def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> 
 
     if alkyl_start is None:
         return None
+
+    # Check if the ether fragment is aromatic (phenoxy, naphthyloxy, benzyloxy)
+    alkyl_atom = mol.GetAtomWithIdx(alkyl_start)
+
+    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
+    if alkyl_atom.GetIsAromatic():
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if alkyl_start in ring and len(ring) == 6:
+                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
+                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                       for r in ring):
+                    return "phenoxy"
+        # Fallback for other aromatic ethers (e.g., naphthyloxy)
+        return "phenoxy"
+
+    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
+    if (not alkyl_atom.GetIsAromatic()
+            and alkyl_atom.GetSymbol() == 'C'
+            and alkyl_atom.GetTotalNumHs() >= 1):
+        arom_nbrs = [n for n in alkyl_atom.GetNeighbors()
+                     if n.GetIdx() != oxygen_idx and n.GetIsAromatic()]
+        non_h_non_arom = [n for n in alkyl_atom.GetNeighbors()
+                          if n.GetIdx() != oxygen_idx
+                          and not n.GetIsAromatic()
+                          and n.GetSymbol() != 'H']
+        if arom_nbrs and not non_h_non_arom:
+            return "benzyloxy"
 
     # Count carbons in the alkyl part (excluding the oxygen)
     carbon_count = _count_alkyl_carbons(mol, alkyl_start, {oxygen_idx})

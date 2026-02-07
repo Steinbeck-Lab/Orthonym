@@ -710,9 +710,12 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             for r in ring
                         )
                         if ring_has_o and ring_size in (5, 6):
-                            glyco_prefix = "pentosyloxy" if ring_size == 5 else "hexosyloxy"
+                            # Use systematic heterocyclic names:
+                            # 5-membered with O = oxolane (tetrahydrofuran)
+                            # 6-membered with O = oxane (tetrahydropyran)
+                            glyco_prefix = "(oxolan-2-yl)oxy" if ring_size == 5 else "(oxan-2-yl)oxy"
                             return {
-                                'name': f'({glyco_prefix})',
+                                'name': glyco_prefix,
                                 'atoms': sub_atoms,
                                 'is_complex': True,
                             }

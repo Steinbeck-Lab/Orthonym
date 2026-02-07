@@ -176,6 +176,34 @@ def _get_alkoxy_prefix(
         frag2_size = _count_fragment_atoms(mol, carbon2_idx, {oxygen_idx})
         sub_carbon = carbon1_idx if frag1_size <= frag2_size else carbon2_idx
 
+    # Check if the substituent is aromatic (phenoxy, benzyloxy)
+    sub_atom = mol.GetAtomWithIdx(sub_carbon)
+
+    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
+    if sub_atom.GetIsAromatic():
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if sub_carbon in ring and len(ring) == 6:
+                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
+                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                       for r in ring):
+                    return "phenoxy"
+        # Fallback for other aromatic ethers
+        return "phenoxy"
+
+    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
+    if (not sub_atom.GetIsAromatic()
+            and sub_atom.GetSymbol() == 'C'
+            and sub_atom.GetTotalNumHs() >= 1):
+        arom_nbrs = [n for n in sub_atom.GetNeighbors()
+                     if n.GetIdx() != oxygen_idx and n.GetIsAromatic()]
+        non_h_non_arom = [n for n in sub_atom.GetNeighbors()
+                          if n.GetIdx() != oxygen_idx
+                          and not n.GetIsAromatic()
+                          and n.GetSymbol() != 'H']
+        if arom_nbrs and not non_h_non_arom:
+            return "benzyloxy"
+
     # Count carbons in the substituent fragment
     carbon_count = _count_fragment_atoms(mol, sub_carbon, {oxygen_idx}, carbons_only=True)
 
