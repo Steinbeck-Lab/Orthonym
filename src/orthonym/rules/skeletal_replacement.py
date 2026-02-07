@@ -80,7 +80,10 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     Returns an IUPAC replacement name if the molecule is an acyclic chain
     with embedded heteroatoms suitable for replacement naming. Returns None
     if the molecule does not qualify (cyclic, has priority functional groups,
-    too few heteroatoms, terminal functional groups, etc.).
+    too few heteroatoms, etc.).
+
+    Supports terminal alcohol (-OH) suffix integration:
+        OCCOCCOCC -> 3,6-dioxaoctan-1-ol
 
     Args:
         mol: RDKit molecule object (already parsed from SMILES).
@@ -106,11 +109,19 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             return None
 
     # ----------------------------------------------------------------
-    # Gate 3: No terminal functional groups (OH, NH2, SH, COOH)
-    # These should use substitutive naming with functional suffixes.
+    # Gate 3: Check terminal functional groups
+    # Terminal OH is allowed (suffix integration). Other terminal FGs
+    # (NH2, SH) cause fallback to substitutive naming.
     # ----------------------------------------------------------------
-    if _has_terminal_functional_group(mol):
+    terminal_oh_info = _detect_terminal_oh(mol)
+    has_other_terminal_fg = _has_terminal_functional_group(mol, exclude_oh=True)
+
+    if has_other_terminal_fg:
         return None
+
+    # If terminal OH detected, check that it's only OH (no NH2/SH combo)
+    # and that there are still enough embedded heteroatoms for replacement naming
+    has_terminal_oh = terminal_oh_info is not None
 
     # ----------------------------------------------------------------
     # Find the longest chain backbone including heteroatoms
@@ -120,12 +131,31 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
+    # For terminal OH: strip the OH oxygen from the backbone.
+    # The terminal O-H is NOT a chain atom -- it's a functional suffix.
+    # The chain consists only of C and embedded heteroatoms.
+    # OCCOCCOCC backbone: O-C-C-O-C-C-O-C-C -> strip terminal O
+    #   -> chain = C-C-O-C-C-O-C-C (8 atoms = octane)
+    # ----------------------------------------------------------------
+    if has_terminal_oh:
+        oh_idx = terminal_oh_info['oh_idx']
+        if backbone[0] == oh_idx:
+            backbone = backbone[1:]
+        elif backbone[-1] == oh_idx:
+            backbone = backbone[:-1]
+        # After stripping, verify backbone is still valid
+        if backbone is None or len(backbone) < 3:
+            return None
+
+    # ----------------------------------------------------------------
     # Gate 4: All heavy atoms must be on the backbone (no substituents)
     # Branched molecules with substituents off the replacement chain
-    # require prefix integration (Plan 23-05). For now, only handle
-    # unbranched replacement chains.
+    # are not handled. Only unbranched replacement chains.
+    # For terminal OH: the OH oxygen is excluded from backbone count,
+    # so add 1 to expected atom count.
     # ----------------------------------------------------------------
-    if len(backbone) != mol.GetNumAtoms():
+    expected_atoms = len(backbone) + (1 if has_terminal_oh else 0)
+    if expected_atoms != mol.GetNumAtoms():
         return None
 
     # ----------------------------------------------------------------
@@ -149,9 +179,15 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
-    # Number the chain to give lowest locants to heteroatoms
+    # Number the chain: for -ol suffix, the OH end gets locant 1.
+    # For plain replacement chains, give lowest locants to heteroatoms.
     # ----------------------------------------------------------------
-    backbone = _orient_for_lowest_locants(backbone, mol)
+    if has_terminal_oh:
+        backbone = _orient_oh_end_first(
+            backbone, mol, terminal_oh_info['carbon_idx']
+        )
+    else:
+        backbone = _orient_for_lowest_locants(backbone, mol)
 
     # Rebuild heteroatom positions after reorientation
     heteroatom_positions = []
@@ -166,12 +202,64 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
+    # Determine suffix info for terminal OH
+    # ----------------------------------------------------------------
+    suffix = None
+    if has_terminal_oh:
+        # The OH-bearing carbon should be at position 0 (locant 1) after orient
+        suffix = ('ol', 1)
+
+    # ----------------------------------------------------------------
     # Build the replacement name
     # ----------------------------------------------------------------
-    return _build_replacement_name(len(backbone), heteroatom_positions)
+    return _build_replacement_name(len(backbone), heteroatom_positions, suffix=suffix)
 
 
-def _has_terminal_functional_group(mol: Chem.Mol) -> bool:
+def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
+    """Detect a terminal alcohol (-OH) suitable for replacement name suffix.
+
+    A terminal OH is an oxygen with 1 H, bonded to exactly 1 heavy neighbor
+    (a carbon), where that carbon is at the end of the chain (degree <= 2
+    in the heavy-atom graph, meaning it has at most one other heavy neighbor).
+
+    Args:
+        mol: RDKit molecule object.
+
+    Returns:
+        Dict with 'oh_idx' (oxygen atom index) and 'carbon_idx' (bearing
+        carbon index), or None if no suitable terminal OH found.
+    """
+    terminal_ohs = []
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'O':
+            continue
+        if atom.GetTotalNumHs() < 1:
+            continue
+        heavy_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() != 'H']
+        if len(heavy_neighbors) != 1:
+            continue
+        carbon = heavy_neighbors[0]
+        if carbon.GetSymbol() != 'C':
+            continue
+        # Check that the carbon is a chain terminal (degree 1 or 2 in heavy graph)
+        carbon_heavy_nbrs = [n for n in carbon.GetNeighbors() if n.GetSymbol() != 'H']
+        # The carbon should have at most 2 heavy neighbors: the OH oxygen + one chain atom
+        if len(carbon_heavy_nbrs) <= 2:
+            terminal_ohs.append({
+                'oh_idx': atom.GetIdx(),
+                'carbon_idx': carbon.GetIdx(),
+            })
+
+    # Only support single terminal OH for now
+    if len(terminal_ohs) == 1:
+        return terminal_ohs[0]
+
+    return None
+
+
+def _has_terminal_functional_group(
+    mol: Chem.Mol, exclude_oh: bool = False
+) -> bool:
     """Check if molecule has terminal functional groups (OH, NH2, SH, etc.).
 
     Terminal means an atom at degree 1 (or H-bearing heteroatom at chain end)
@@ -179,6 +267,7 @@ def _has_terminal_functional_group(mol: Chem.Mol) -> bool:
 
     Args:
         mol: RDKit molecule object.
+        exclude_oh: If True, ignore terminal OH groups (for suffix integration).
 
     Returns:
         True if terminal functional groups are present.
@@ -198,7 +287,8 @@ def _has_terminal_functional_group(mol: Chem.Mol) -> bool:
         heavy_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() != 'H']
 
         if symbol == 'O' and num_h >= 1:
-            # Terminal OH (alcohol)
+            if exclude_oh:
+                continue  # Skip OH when checking for non-OH terminal FGs
             return True
         if symbol == 'N' and num_h >= 2 and len(heavy_neighbors) <= 1:
             # Terminal NH2 (primary amine at chain end)
@@ -338,6 +428,35 @@ def _find_path_bfs(
     return None
 
 
+def _orient_oh_end_first(
+    backbone: List[int], mol: Chem.Mol, carbon_idx: int
+) -> List[int]:
+    """Orient backbone so the carbon bearing the terminal OH gets locant 1.
+
+    For replacement chains with terminal -ol suffix, the principal group
+    (OH) must receive the lowest possible locant per IUPAC P-14.7.
+
+    The OH oxygen has already been stripped from the backbone. This function
+    ensures the carbon that was bonded to the OH is at position 0 (locant 1).
+
+    Args:
+        backbone: List of atom indices forming the backbone (OH oxygen excluded).
+        mol: RDKit molecule object.
+        carbon_idx: Atom index of the carbon bearing the -OH group.
+
+    Returns:
+        Reoriented backbone list with OH-bearing carbon at position 0.
+    """
+    if backbone[0] == carbon_idx:
+        return backbone
+    elif backbone[-1] == carbon_idx:
+        return list(reversed(backbone))
+    else:
+        # Carbon not at either end -- shouldn't happen for unbranched chain
+        # Fall back to lowest heteroatom locants
+        return _orient_for_lowest_locants(backbone, mol)
+
+
 def _orient_for_lowest_locants(
     backbone: List[int], mol: Chem.Mol
 ) -> List[int]:
@@ -393,6 +512,7 @@ def _get_heteroatom_locants(backbone: List[int], mol: Chem.Mol) -> List[int]:
 def _build_replacement_name(
     chain_length: int,
     heteroatom_positions: List[Tuple[int, str]],
+    suffix: Optional[Tuple[str, int]] = None,
 ) -> str:
     """Build the skeletal replacement name from chain length and heteroatom info.
 
@@ -403,6 +523,8 @@ def _build_replacement_name(
     Args:
         chain_length: Total number of atoms in the backbone.
         heteroatom_positions: List of (locant, element_symbol) tuples.
+        suffix: Optional (suffix_name, locant) tuple for terminal FG,
+                e.g., ('ol', 1) for terminal alcohol.
 
     Returns:
         Complete replacement name string.
@@ -442,6 +564,22 @@ def _build_replacement_name(
 
         parts.append(f'{locant_str}-{multiplier}{term}')
 
-    # Join parts with hyphens, then append chain prefix + "ane"
+    # Join parts with hyphens
     replacement_prefix = '-'.join(parts)
-    return f'{replacement_prefix}{chain_prefix}ane'
+
+    if suffix is not None:
+        # Build name with functional group suffix
+        # e.g., "3,6-dioxaoctan-1-ol"
+        suffix_name, suffix_locant = suffix
+        # Vowel elision: remove terminal 'e' before suffix starting with vowel
+        # "octane" -> "octan" before "-1-ol"
+        stem = f'{chain_prefix}an'
+        if suffix_name.startswith(('a', 'e', 'i', 'o', 'u', 'y')):
+            # "an" already drops the 'e' from "ane"
+            pass
+        else:
+            stem = f'{chain_prefix}ane'
+        return f'{replacement_prefix}{stem}-{suffix_locant}-{suffix_name}'
+    else:
+        # Plain replacement name: "3,6-dioxaoctane"
+        return f'{replacement_prefix}{chain_prefix}ane'
