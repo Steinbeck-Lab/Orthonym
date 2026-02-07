@@ -220,7 +220,11 @@ RETAINED_NAMES = {
     "O=S=O": "sulfur dioxide",
     "N#N": "dinitrogen",
     "O=O": "dioxygen",
-    
+
+    # === INORGANIC ACIDS (Phase 25 fix) ===
+    "O=[N+]([O-])O": "nitric acid",
+    "O=[N+]([O-])OO": "peroxynitric acid",
+
     # === NITRILES - AROMATIC (Phase 14.6 BUG-2 fix) ===
     "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per P-66.1.1.1
 
