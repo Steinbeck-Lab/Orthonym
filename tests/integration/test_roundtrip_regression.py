@@ -592,11 +592,11 @@ PHASE24_PARSE_FIXES = [
         "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
         "oxy-biphenyl-ether-phenoxy",
     ),
-    # B2: Glycoside on benzene -> hexosyloxy (was bare "oxy")
+    # B2: Glycoside on benzene -> (oxan-2-yl)oxy (was hexosyloxy, originally bare "oxy")
     (
         "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-        "1-(hexosyloxy)-2-hydroxy-4-methylbenzene",
-        "oxy-glycoside-hexosyloxy",
+        "1-(oxan-2-yl)oxy-2-hydroxy-4-methylbenzene",
+        "oxy-glycoside-oxanyloxy",
     ),
     # B3: Galloyl ester chain -> tetradecoxy (was bare "oxy")
     (
@@ -610,10 +610,10 @@ PHASE24_PARSE_FIXES = [
         "1-decoxy-3-fluorobenzene",
         "oxy-complex-ether-decoxy",
     ),
-    # B5: Sugar glycoside on benzene -> hexosyloxy (was bare "oxybenzene")
+    # B5: Sugar glycoside on benzene -> (oxan-2-yl)oxy (was hexosyloxy)
     (
         "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-        "hexosyloxybenzene",
+        "(oxan-2-yl)oxybenzene",
         "oxy-glycoside-benzene",
     ),
     # B6: Fused ring system -> phenoxy (was bare "oxy")
@@ -622,11 +622,11 @@ PHASE24_PARSE_FIXES = [
         "2-(hydroxyoctyl)-1,5-dimethoxy-3-phenoxybenzene",
         "oxy-fused-ring-phenoxy",
     ),
-    # B7: Dimethyl benzene with glycoside (was bare "oxy")
+    # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy (was hexosyloxy)
     (
         "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-        "5-(hexosyloxy)-1-hydroxy-2,3-dimethylbenzene",
-        "oxy-dimethyl-benzene-hexosyloxy",
+        "5-(oxan-2-yl)oxy-1-hydroxy-2,3-dimethylbenzene",
+        "oxy-dimethyl-benzene-oxanyloxy",
     ),
 
     # Additional stability checks
@@ -650,7 +650,7 @@ class TestPhase24ParseFixes:
 
     Covers:
     - Group A: Compound substituent parenthesization per IUPAC P-14.5.2
-    - Group B: Bare oxy prefix elimination (phenoxy, hexosyloxy, alkoxy)
+    - Group B: Bare oxy prefix elimination (phenoxy, (oxan-2-yl)oxy, alkoxy)
     - Stability: Verify simple substituents not over-bracketed
     """
 

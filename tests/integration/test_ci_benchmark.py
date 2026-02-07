@@ -477,7 +477,7 @@ CI_BENCHMARK = [
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",
-        "hexosyloxybenzene",
+        "(oxan-2-yl)oxybenzene",
     ),
 ]
 
