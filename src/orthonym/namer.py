@@ -196,6 +196,16 @@ class Orthonym:
         if np_name is not None:
             return np_name
 
+        # PEPTIDE DETECTION
+        # Check before retained names and amino acids to prevent peptides from
+        # being flattened to single amino acid names. Must come after NP detection.
+        from .rules.amino_acids import is_peptide as _is_peptide
+        if _is_peptide(mol):
+            from .rules.peptides import name_peptide
+            peptide_name = name_peptide(mol)
+            if peptide_name:
+                return peptide_name
+
         # Check retained names first (benzene, methanol, etc.) unless systematic style requested
         if self.style != "systematic":
             if canonical_smiles in RETAINED_NAMES:
