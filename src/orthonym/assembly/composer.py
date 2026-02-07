@@ -420,6 +420,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if lactone_name:
             return lactone_name
 
+    # Handle monocyclic lactams BEFORE polyfunctional and amide handlers
+    # Lactams are cyclic amides named as heterocyclic ketones (parallel to lactones)
+    # e.g., azetidin-2-one, pyrrolidin-2-one, piperidin-2-one
+    from ..rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
+    lactam_info = is_monocyclic_lactam(features.mol)
+    if lactam_info:
+        lactam_name = name_monocyclic_lactam(features.mol)
+        if lactam_name:
+            return lactam_name
+
     # Handle ring-attached esters BEFORE polyfunctional handler
     # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
     # use acyloxy prefix naming on ring parent, not polyfunctional naming
