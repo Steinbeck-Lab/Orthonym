@@ -1699,7 +1699,7 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
     Routes to appropriate naming function based on ring classification:
     - Bridged-fused: FR-8 nomenclature (e.g., 1,4-methanonaphthalene)
     - Bicyclo: bicyclo[x.y.z]alkane format (e.g., bicyclo[2.2.1]heptane)
-    - Polycyclic-bridged: von Baeyer format (e.g., tricyclo[3.3.1.13,7]decane)
+    - Polycyclic-bridged: von Baeyer format (e.g., tricyclo[3.3.1.1(3,7)]decane)
     - Spiro: spiro[a.b]alkane format (e.g., spiro[4.5]decane)
     - Fused: retained names or systematic fusion descriptors
 

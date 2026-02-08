@@ -1064,7 +1064,7 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     """
     Generate the base IUPAC name for a polycyclic bridged system.
 
-    Returns "prefix[descriptor]parentname" (e.g., "tricyclo[3.3.1.13,7]decane").
+    Returns "prefix[descriptor]parentname" (e.g., "tricyclo[3.3.1.1(3,7)]decane").
     Only base name -- no substituents, unsaturation, or stereo.
 
     This function is an internal helper that will be called by

@@ -28,7 +28,7 @@ class TestVonBaeyerE2E:
             f"Expected norbornane or bicyclo[2.2.1]heptane, got: {result}"
 
     def test_adamantane_tricyclo(self):
-        """Adamantane: tricyclo[3.3.1.13,7]decane."""
+        """Adamantane: tricyclo[3.3.1.1(3,7)]decane."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
         assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
         assert 'decane' in result.lower(), f"Expected decane, got: {result}"
@@ -50,7 +50,7 @@ class TestVonBaeyerE2E:
 
     def test_cubane_pentacyclo(self):
         """Cubane: pentacyclo system."""
-        # Cubane = pentacyclo[4.2.0.02,5.03,8.04,7]octane
+        # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane
         result = name_compound('C12C3C4C1C5C3C4C25')
         assert 'pentacyclo' in result.lower(), f"Expected pentacyclo for cubane, got: {result}"
         assert 'octane' in result.lower(), f"Expected octane for cubane, got: {result}"
@@ -291,12 +291,12 @@ class TestDescriptorFormats:
         assert 'bicyclo[2.2.2]' in result.lower(), f"Expected bicyclo[2.2.2], got: {result}"
 
     def test_tricyclo_secondary_bridge_locants(self):
-        """Tricyclo with superscript locants for secondary bridges (OPSIN-compatible)."""
+        """Tricyclo with parenthesized locants for secondary bridges (OPSIN-compatible)."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')  # adamantane
-        # OPSIN-compatible format: superscript locants after bridge length (e.g., 13,7)
-        # No parentheses around secondary bridge locants
-        assert '13,7' in result or '17,3' in result, \
-            f"Expected OPSIN-compatible superscript locants '13,7' in {result}"
+        # OPSIN-compatible format: parenthesized locants after bridge length (e.g., 1(3,7))
+        # Unambiguous for multi-digit locants
+        assert '1(3,7)' in result or '1(7,3)' in result, \
+            f"Expected parenthesized locants '1(3,7)' in {result}"
 
 
 class TestEdgeCases:
@@ -465,23 +465,21 @@ class TestPolycyclicFunctionalGroups:
 class TestOPSINCompatibleVBFormat:
     """Regression tests ensuring VB descriptors use OPSIN-parseable format.
 
-    OPSIN accepts secondary bridge locants in superscript format:
-    e.g. '13,7' (bridge length followed directly by locants, no parentheses).
-    This is the standard IUPAC notation where locants are superscripted in print.
+    OPSIN accepts secondary bridge locants in parenthesized format:
+    e.g. '1(3,7)' (bridge length followed by parenthesized locants).
+    This is unambiguous for multi-digit locants and OPSIN-compatible.
 
     This class guards against regression back to old format.
     """
 
     def test_adamantane_opsin_format(self):
-        """Adamantane: tricyclo[3.3.1.13,7]decane - OPSIN-compatible."""
+        """Adamantane: tricyclo[3.3.1.1(3,7)]decane - OPSIN-compatible."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert '13,7' in result or '17,3' in result, \
-            f"Expected OPSIN-compatible superscript locants '13,7' in: {result}"
-        # Must NOT contain old LaTeX-style or parenthesized notation
+        assert '1(3,7)' in result or '1(7,3)' in result, \
+            f"Expected parenthesized locants '1(3,7)' in: {result}"
+        # Must NOT contain old LaTeX-style notation
         assert '^{' not in result, \
             f"Found old ^{{}} notation in: {result}"
-        assert '(' not in result.split(']')[0] if ']' in result else True, \
-            f"Found parenthesized locants in VB descriptor: {result}"
 
     def test_cubane_opsin_format(self):
         """Cubane: pentacyclo descriptor with zero-length bridges, OPSIN-compatible."""
@@ -491,11 +489,11 @@ class TestOPSINCompatibleVBFormat:
         # Must NOT contain old LaTeX-style notation
         assert '^{' not in result, \
             f"Found old ^{{}} notation in cubane: {result}"
-        # Must contain zero-length bridge entries with superscript locants (no parens)
+        # Must contain zero-length bridge entries with parenthesized locants
         import re
-        zero_bridges = re.findall(r'0\d+,\d+', result)
+        zero_bridges = re.findall(r'0\(\d+,\d+\)', result)
         assert len(zero_bridges) >= 1, \
-            f"Expected zero-length bridge entries in cubane descriptor: {result}"
+            f"Expected zero-length bridge entries with parenthesized locants in cubane descriptor: {result}"
 
     def test_norbornane_no_secondary_bridges(self):
         """Norbornane (bicyclo[2.2.1]heptane) has no secondary bridges - format unchanged."""
@@ -534,10 +532,10 @@ class TestOPSINCompatibleVBFormat:
         # Verify one secondary bridge
         secondary = [b for b in desc.bridge_info_list if b.is_secondary]
         assert len(secondary) == 1, f"Expected 1 secondary bridge, got {len(secondary)}"
-        # Descriptor must use superscript OPSIN format (no parentheses)
-        assert '3,7' in desc.descriptor_string or '7,3' in desc.descriptor_string, \
-            f"Expected superscript locants in {desc.descriptor_string}"
-        assert '(' not in desc.descriptor_string, \
-            f"Found parentheses in descriptor: {desc.descriptor_string}"
+        # Descriptor must use parenthesized OPSIN format
+        assert '(3,7)' in desc.descriptor_string or '(7,3)' in desc.descriptor_string, \
+            f"Expected parenthesized locants in {desc.descriptor_string}"
+        assert '(' in desc.descriptor_string, \
+            f"Expected parenthesized format: {desc.descriptor_string}"
         assert '^' not in desc.descriptor_string, \
             f"Found caret in descriptor: {desc.descriptor_string}"

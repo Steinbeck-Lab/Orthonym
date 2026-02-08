@@ -90,7 +90,7 @@ CI_BENCHMARK = [
         "C[C@@H](O)CN2C(=O)[C@H]([C@@H](C)O)NC1=O",
         "(1S,4S,5R,7S,10S,14R,16S,19S,22S,27S)-7-hexadecyl-4,10-diethyl"
         "-5,14,27-trihydroxy-19-octyl-22-propyl-3,9,12,18,21,24-hexaaza"
-        "-tricyclo[22.3.0.012,16]heptacosan-2,8,11,17,20,23-hexaone",
+        "-tricyclo[22.3.0.0(12,16)]heptacosan-2,8,11,17,20,23-hexaone",
     ),
     ("O=[C]O[O-]", "methanolate"),
     (
@@ -141,8 +141,8 @@ CI_BENCHMARK = [
     ),
     (
         "O=c1c2c(O)cccc2oc2c3c(cc(O)c12)OC1OCCC31",
-        "11,15-dihydroxy-6,8,20-trioxa-pentacyclo[10.8.0.02,9.03,7"
-        ".014,19]icosan-13-one",
+        "11,15-dihydroxy-6,8,20-trioxa-pentacyclo[10.8.0.0(2,9).0(3,7)"
+        ".0(14,19)]icosan-13-one",
     ),
     (
         "CC1=C\\C=C\\C(C)=C\\C[C@H](C)NC(=O)/C(CC(C)C)=C/C(C)=C"
@@ -182,7 +182,7 @@ CI_BENCHMARK = [
         "C=C[C@@H]1C(=C)CC[C@H]2[C@H]1C[C@H]1OC(=O)[C@@]3(C)"
         "[C@H](O)CC[C@@]2(C)[C@@]13O",
         "(1R,3R,4S,8S,9R,12R,13S,16S)-4-ethyl-12,16-dihydroxy-9,13"
-        "-dimethyl-15-oxa-tetracyclo[7.6.1.03,8.013,16]hexadecan-14-one",
+        "-dimethyl-15-oxa-tetracyclo[7.6.1.0(3,8).0(13,16)]hexadecan-14-one",
     ),
     (
         "C=C1C(=O)OC2/C=C(/CO)C(=O)/C=C\\C(C)(O)CC(OC(=O)/C(C)=C/C)C12",
@@ -252,7 +252,7 @@ CI_BENCHMARK = [
         "COc1cc(OC)c2c(O)c3c(c(-c4c5cc(OC)cc(OC)c5c(O)c5c(=O)cc(C)"
         "oc45)c2c1)O[C@](C)(O)CC3=O",
         "(6S)-9-hexadecyl-2,6-dihydroxy-6,12,14-trimethyl-7-oxa"
-        "-tricyclo[8.4.0.03,8]tetradecan-4-one",
+        "-tricyclo[8.4.0.0(3,8)]tetradecan-4-one",
     ),
     (
         "OC[C@H]1O[C@H](OC[C@H]2O[C@H](OC[C@H]3O[C@H](O)[C@H](O)"
@@ -293,13 +293,13 @@ CI_BENCHMARK = [
         "CN1C(=O)[C@]23SSS[C@@]1(CO)C(=O)N2[C@H]1Nc2ccccc2"
         "[C@@]1(c1c[nH]c2ccccc12)[C@@H]3O",
         "(1R,4S,8S,9S,10R)-9-hydroxy-4,19-dimethyl-10-octyl-5,6,7"
-        "-trithia-2,17,19-triaza-pentacyclo[8.7.0.24,8.02,8.011,16]"
+        "-trithia-2,17,19-triaza-pentacyclo[8.7.0.2(4,8).0(2,8).0(11,16)]"
         "nonadecan-3,18-dione",
     ),
     (
         "C[C@H](O)/C=C1\\C[C@H](O)[C@]23C[C@H]2C(C)(C)O[C@]3(O)C1=O",
         "(1S,2S,6S,9R)-2,6-dihydroxy-8,8-dimethyl-7-oxa-tricyclo"
-        "[4.4.0.01,9]decan-5-one",
+        "[4.4.0.0(1,9)]decan-5-one",
     ),
     (
         "C=C1[C@@H](O)CC[C@]2(C)C3=C(CC[C@@H]12)[C@]1(O)[C@@H](O)"
@@ -366,7 +366,7 @@ CI_BENCHMARK = [
         "C(OC)C(C)(O)C3OC)CC[C@H]12",
         "(1S,7S,9R,12R,17R,20S,21R,22S,25R)-21-docosyl-9-ethyl-26"
         "-hydroxy-1,12,18-trimethyl-22-nonyl-2,5-dioxo-3,6-dioxa"
-        "-pentacyclo[15.8.0.14,7.020,25.07,12]hexacosa-4,10,18"
+        "-pentacyclo[15.8.0.1(4,7).0(20,25).0(7,12)]hexacosa-4,10,18"
         "-triene-10-carboxylic acid",
     ),
     (
@@ -426,7 +426,7 @@ CI_BENCHMARK = [
     (
         "CC(C)C1=C[C@@]23CC[C@H]4C(C)(C)CCC[C@]4(C(=O)O2)C3=CC1=O",
         "(1R,4S,9R)-5,5-dimethyl-13-propyl-15-oxa-tetracyclo"
-        "[8.4.0.21,9.04,9]hexadeca-10,13-dien-12,16-dione",
+        "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,16-dione",
     ),
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"
@@ -436,7 +436,7 @@ CI_BENCHMARK = [
     (
         "CC(=O)CCC1=C(C)C[C@@]2(CC1=O)C(=O)[C@@H]1C[C@@](O)(CO1)C2=O",
         "(1S,3R,5R)-9-butyl-5-hydroxy-10-methyl-7-oxa-tricyclo"
-        "[3.2.1.53,3]tridec-9-en-2,4,13-trione",
+        "[3.2.1.5(3,3)]tridec-9-en-2,4,13-trione",
     ),
     (
         "CCCCCCCCCCCCC1=C(OC(C)=O)C(=O)c2ccccc2C1=O",
