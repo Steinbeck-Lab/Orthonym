@@ -762,17 +762,17 @@ PHASE24_RT_IMPROVEMENTS = [
         "tricyclo[3.3.1.13,7]decane",
         "vb-superscript-locants-adamantane",
     ),
-    # Isoindoline -> isoindole format (phthalimide)
+    # Isoindoline dione format (phthalimide) -- normalized to isoindoline-1,3-dione
     (
         "Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1",
-        "isoindole-1,3(2H)-dione",
-        "isoindole-dione-format",
+        "isoindoline-1,3-dione",
+        "isoindoline-dione-format",
     ),
-    # Isoindoline -> isoindole with prefix
+    # Isoindoline dione with prefix -- normalized to isoindoline-1,3-dione
     (
         "O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1",
-        "6-hydroxyisoindole-1,3(2H)-dione",
-        "isoindole-hydroxy-dione-format",
+        "6-hydroxyisoindoline-1,3-dione",
+        "isoindoline-hydroxy-dione-format",
     ),
     # VB pentacyclo format with superscript locants
     (

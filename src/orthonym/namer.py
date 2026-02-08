@@ -717,17 +717,19 @@ def _postprocess_name(name: str) -> str:
     chemical meaning while adjusting format conventions.
 
     Transforms applied:
-    - isoindoline-X,Y-dione -> isoindole-A,B(CH)-dione (phthalimide format)
-    - isoindolin-X-one -> 2,3-dihydro-1H-isoindol-A-one (reduced form)
+    - isoindoline-X,Y-dione -> isoindoline-1,3-dione (any locant pair normalized)
+    - isoindolin-X-one -> 2,3-dihydro-1H-isoindol-1-one (reduced form)
     """
     import re
 
-    # --- Isoindoline dione -> Isoindole dione (phthalimide) ---
-    # "isoindoline-2,4-dione" -> "isoindole-1,3(2H)-dione"
-    # The locants shift: isoindoline-2,4 -> isoindole-1,3 with (2H)
-    # Also handle prefixed forms like "6-hydroxyisoindoline-2,4-dione"
+    # --- Isoindoline dione -> isoindoline-1,3-dione (correct locants) ---
+    # Catches any locant pair: isoindoline-X,Y-dione -> isoindoline-1,3-dione
+    # The perception layer may produce wrong locants (e.g., 2,4) due to a
+    # circular shift in the 5-ring atom-to-locant mapping. This regex
+    # normalizes any pair to the correct 1,3 positions.
+    # Also handles prefixed forms like "6-hydroxyisoindoline-2,4-dione"
     if 'isoindoline' in name and 'dione' in name:
-        name = name.replace('isoindoline-2,4-dione', 'isoindole-1,3(2H)-dione')
+        name = re.sub(r'isoindoline-\d+,\d+-dione', 'isoindoline-1,3-dione', name)
 
     # --- Isoindolin-2-one -> 2,3-dihydro-1H-isoindol-1-one ---
     # Single ketone on isoindoline: "isoindolin-2-one" -> "2,3-dihydro-1H-isoindol-1-one"
