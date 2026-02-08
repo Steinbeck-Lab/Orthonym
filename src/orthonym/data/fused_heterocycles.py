@@ -586,12 +586,13 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # Isoindoline: 1,3-dihydro-2H-isoindole
     # Same numbering as isoindole
     # Canonical: c1ccc2c(c1)CNC2
+    # Pattern atoms: 0-5 = benzo ring, 6 = C(pos 1), 7 = N(pos 2), 8 = C(pos 3)
     'c1ccc2c(c1)CNC2': {
         'name': 'isoindoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 1, 6: 2, 7: 3, 8: 4},
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 1, 7: 2, 8: 3},
     },
 
     # 1,2,3,4-Tetrahydroquinoline

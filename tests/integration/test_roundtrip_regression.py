@@ -859,7 +859,7 @@ class TestPhase24RTImprovements:
 
     Covers:
     - VB secondary bridge locant format (superscript, no parens)
-    - Isoindoline -> isoindole dione format (OPSIN-compatible)
+    - Isoindoline-1,3-dione locants (correct from source via fused_heterocycles.py)
     """
 
     @pytest.mark.integration
