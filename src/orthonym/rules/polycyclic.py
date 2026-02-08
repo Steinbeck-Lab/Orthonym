@@ -18,10 +18,13 @@ Key algorithm:
 Reference: IUPAC 2013 Blue Book P-23, VB-1 through VB-9.
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 from itertools import combinations
 from rdkit import Chem
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -960,16 +963,16 @@ class VonBaeyerAnalyzer:
             numbering: Atom index -> VB locant mapping
 
         Returns:
-            Descriptor string like "tricyclo[3.3.1.13,7]"
+            Descriptor string like "tricyclo[3.3.1.1(3,7)]"
         """
         prefix = CYCLO_PREFIXES.get(ring_count, f"{ring_count}cyclo")
 
         # Primary bridge lengths (sorted descending)
         parts = [str(l) for l in sorted(primary_lengths, reverse=True)]
 
-        # Secondary bridges with inline superscript locants (OPSIN-compatible)
-        # OPSIN format: bridge_length + locants WITHOUT parentheses
-        # e.g., "03,7" not "0(3,7)" -- the locants are superscripted in print
+        # Secondary bridges with parenthesized locants (OPSIN-compatible)
+        # Format: bridge_length(locant_low,locant_high)
+        # e.g., "0(3,7)", "1(3,7)" -- unambiguous for multi-digit locants
         for bridge in secondary_bridges:
             ep1 = bridge.start_bh
             ep2 = bridge.end_bh
@@ -977,10 +980,14 @@ class VonBaeyerAnalyzer:
             loc2 = numbering.get(ep2)
             # Skip bridges with unmapped atoms (invalid locants)
             if loc1 is None or loc2 is None or loc1 == 0 or loc2 == 0:
+                logger.warning(
+                    "Secondary bridge endpoint not in numbering dict: "
+                    "ep1=%s(loc=%s), ep2=%s(loc=%s)", ep1, loc1, ep2, loc2
+                )
                 continue
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
-            parts.append(f"{bridge.length}{locant_low},{locant_high}")
+            parts.append(f"{bridge.length}({locant_low},{locant_high})")
 
         return f"{prefix}[{'.'.join(parts)}]"
 
