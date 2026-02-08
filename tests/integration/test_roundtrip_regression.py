@@ -794,11 +794,11 @@ PHASE24_RT_IMPROVEMENTS = [
 # ---------------------------------------------------------------------------
 
 PHASE24_RT_ANALYSIS = [
-    # --- Anilino prefix (phenylamino -> anilino) ---
+    # --- Phenylamino prefix (systematic, was anilino before P29) ---
     (
         "CC(=O)Nc1ccccc1",
         "N-phenylacetamide",
-        "anilino-acetamide",
+        "phenylamino-acetamide",
     ),
     # --- Key exact RT matches that must stay matching ---
     (

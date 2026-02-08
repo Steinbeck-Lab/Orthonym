@@ -3486,7 +3486,7 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                         all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                         if all_arom and all_c:
-                            return "(anilino)"
+                            return "(phenylamino)"
                 continue  # Skip non-phenyl ring substituents
 
             # Count carbons attached to N via C-C bonds only
@@ -3642,7 +3642,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                     all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                     if all_arom and all_c:
-                        return "(anilino)"
+                        return "(phenylamino)"
             # Non-phenyl ring: skip (complex, would need recursive naming)
             return None
 
