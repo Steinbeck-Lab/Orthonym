@@ -377,13 +377,16 @@ def _assemble_np_name(
     """
     from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 
-    # --- Build prefix (hydroxy groups) ---
-    prefix = ""
+    # --- Build prefix (hydroxy groups) using prefix_parts list pattern ---
+    prefix_parts = []
     if hydroxyls:
         locant_str = ",".join(str(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-        prefix = f"{locant_str}-{multiplier}hydroxy"
+        prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
+
+    # Join multiple prefix parts with hyphen: "3-hydroxy-7-oxo" not "3-hydroxy7-oxo"
+    prefix = "-".join(prefix_parts)
 
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
@@ -586,6 +589,30 @@ def _count_acid_fragment_carbons(
     return carbon_count
 
 
+def _acylate_to_acyloxy(acylate: str) -> str:
+    """Convert an acylate name to acyloxy prefix form.
+
+    Transforms the ester suffix (-ate) to the corresponding acyloxy prefix
+    (-yloxy) for use in substitutive naming of mixed-acid esters.
+
+    Examples:
+        "acetate"    -> "acetyloxy"
+        "propanoate" -> "propanoyloxy"
+        "benzoate"   -> "benzoyloxy"
+        "formate"    -> "formyloxy"
+
+    Args:
+        acylate: Acylate name (e.g., "acetate", "propanoate").
+
+    Returns:
+        Acyloxy prefix name.
+    """
+    if acylate.endswith("ate"):
+        return acylate[:-3] + "yloxy"
+    # Fallback (shouldn't happen for valid acylate names)
+    return acylate + "yloxy"
+
+
 def _assemble_np_ester_name(
     stem: str,
     scaffold_name: str,
@@ -677,19 +704,36 @@ def _assemble_np_ester_name(
         # Single ester: stem-unsaturation-locant-yl acylate
         yl_suffix = f"-{ester_locants[0]}-yl"
         acylate_word = acylate_names[0]
-    else:
-        # Multiple esters: stem-unsaturation-locant,locant-diyl diacylate
+    elif len(set(acylate_names)) == 1:
+        # Multiple esters with same acid: stem-unsaturation-locant,locant-diyl diacylate
         locant_str = ",".join(str(loc) for loc in ester_locants)
         count = len(esters)
         yl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
         yl_suffix = f"-{locant_str}-{yl_multi}yl"
-        # Check if all acylates are the same
-        if len(set(acylate_names)) == 1:
-            acyl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
-            acylate_word = f"{acyl_multi}{acylate_names[0]}"
+        acyl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
+        acylate_word = f"{acyl_multi}{acylate_names[0]}"
+    else:
+        # Multiple esters with DIFFERENT acids: use acyloxy prefix format
+        # OPSIN rejects "diyl acid1 acid2" but accepts "(acyloxy)" prefix format
+        # e.g., "3-(acetyloxy)-17-(propanoyloxy)androstane"
+        acyloxy_parts = []
+        for ester in esters:
+            acyloxy = _acylate_to_acyloxy(ester["acylate"])
+            acyloxy_parts.append(f"{ester['locant']}-({acyloxy})")
+
+        # Sort alphabetically by acyloxy name for IUPAC ordering
+        acyloxy_parts.sort(key=lambda p: p.split("(")[1])
+
+        # Build acyloxy prefix string
+        acyloxy_prefix = "-".join(acyloxy_parts)
+
+        # Combine: all prefixes + acyloxy + stem + unsaturation + "e"
+        all_prefix = "-".join(p for p in [prefix, acyloxy_prefix] if p)
+
+        if unsat_suffix == "an":
+            return f"{stereo_prefix}{all_prefix}{stem}{unsat_suffix}e"
         else:
-            # Different acylates: list them
-            acylate_word = " ".join(acylate_names)
+            return f"{stereo_prefix}{all_prefix}{stem}{unsat_suffix}e"
 
     # --- Assemble: stereo_prefix + prefix + stem + unsaturation + yl + space + acylate ---
     if unsat_suffix == "an":
