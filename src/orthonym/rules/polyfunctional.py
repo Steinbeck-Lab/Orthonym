@@ -496,8 +496,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             mol, matches, principal_chain, atom_to_locant, fg_name
         )
 
-        # Format the prefix
+        # Reconcile count with locants: if we found fewer locants than
+        # matches, some FG instances are off-chain (inside substituent branches)
+        # and should not inflate the multiplier. Use locant count as truth.
         count = len(matches)
+        if locants:
+            count = len(locants)
+
+        # Format the prefix
         formatted = format_fg_prefix(prefix_form, locants, count)
         all_prefixes.append(formatted)
 

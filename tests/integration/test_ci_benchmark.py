@@ -63,7 +63,7 @@ CI_BENCHMARK = [
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C@@H](CCCCN)"
         "C(=O)O",
-        "(2S)-2-(pentanoylamino)-6-diaminoguanidinohexanoic acid",
+        "(2S)-2-(pentanoylamino)-6-aminoguanidinohexanoic acid",
     ),
     (
         "NC(=O)[C@H](CCC/N=C(/N)CF)NC(=O)c1ccccc1",

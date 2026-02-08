@@ -3699,6 +3699,22 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                         except (ValueError, KeyError):
                             pass
 
+            # For C-chain with NH2: name as (aminoalkyl)
+            # e.g., -CH2CH2NH2 -> (2-aminoethyl)
+            if 'N' in heteroatoms:
+                # Check for terminal primary amine (-NH2) on the chain
+                for i in sub_atoms:
+                    a = mol.GetAtomWithIdx(i)
+                    if (a.GetSymbol() == 'N' and a.GetDegree() == 1
+                            and a.GetTotalNumHs() == 2):
+                        try:
+                            alkyl = get_alkyl_name(total_carbons)
+                            # Locant for amino on sub-chain: N is at terminal
+                            # position = total_carbons (farthest from attachment)
+                            return f"({total_carbons}-amino{alkyl})"
+                        except (ValueError, KeyError):
+                            pass
+
             # For simple case: just name as alkyl (ignoring heteroatoms)
             # This is imperfect but better than dropping entirely
             try:
