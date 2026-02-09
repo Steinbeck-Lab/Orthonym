@@ -222,7 +222,7 @@ CI_BENCHMARK = [
         "O=C([O-])[C@@](O)(CO)C(=O)CO",
         "(2R)-2-(hydroxymethyl)-2,4-dihydroxy-2-hydroxy-3-oxobutanoate",
     ),
-    ("CCC1CC=C(N2CCCC2)C1=O", "ethylcyclopent-1-en-4-one"),
+    ("CCC1CC=C(N2CCCC2)C1=O", "ethylcyclopent-2-en-1-one"),
     (
         "Oc1ccc(CC2(O)Oc3cc(O)cc(O)c3C2O)cc1",
         "3,6,7,7a-tetrahydroxy-2,3-dihydro-1-benzofuran",
@@ -416,7 +416,7 @@ CI_BENCHMARK = [
     ("O=C1N=C([O-])c2ccccc21.[K+]", "potassium octanolate"),
     (
         "CC1=C(O)C(=O)C([C@@]2(C)CCCC2(C)C)=C(O)C1=O",
-        "5-dihydroxy-1-methyl-4-octylcyclohexa-1,4-diene-1,2-dione",
+        "2,5-dihydroxy-6-methyl-3-octylcyclohexa-2,5-diene-1,4-dione",
     ),
     (
         "CC(=O)N(O)CCCCNC(=O)[C@H](COC(=O)c1cccc(O)c1O)NC(=O)"

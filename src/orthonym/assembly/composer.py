@@ -2632,14 +2632,33 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
         mol = features.mol
         for match in features.principal_group_atoms:
             found = False
+            match_set = set(match)
+            ring_set_local = set(ring_idx_to_locant.keys())
+            # First pass: prefer a ring C bonded to a non-ring atom in
+            # the same FG match (the characteristic heteroatom, e.g.,
+            # the C in C=O for ketone, C in C-OH for alcohol).
             for atom_idx in match:
                 if atom_idx in ring_idx_to_locant:
-                    # Prefer the carbon atom bonded to a heteroatom for the locant
                     atom = mol.GetAtomWithIdx(atom_idx)
                     if atom.GetSymbol() == 'C':
-                        fg_locants.append(ring_idx_to_locant[atom_idx])
-                        found = True
-                        break
+                        # Check if bonded to a non-ring FG atom
+                        has_fg_hetero = any(
+                            nbr.GetIdx() in match_set and nbr.GetIdx() not in ring_set_local
+                            for nbr in atom.GetNeighbors()
+                        )
+                        if has_fg_hetero:
+                            fg_locants.append(ring_idx_to_locant[atom_idx])
+                            found = True
+                            break
+            if not found:
+                # Second pass: any ring C in the match
+                for atom_idx in match:
+                    if atom_idx in ring_idx_to_locant:
+                        atom = mol.GetAtomWithIdx(atom_idx)
+                        if atom.GetSymbol() == 'C':
+                            fg_locants.append(ring_idx_to_locant[atom_idx])
+                            found = True
+                            break
             if not found:
                 # Fallback: any atom in match on the ring
                 for atom_idx in match:

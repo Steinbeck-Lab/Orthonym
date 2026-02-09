@@ -18,20 +18,8 @@ from typing import Dict, List, Tuple, Optional, Set
 from collections import defaultdict
 from rdkit import Chem
 
-from ..assembly.naming_utils import alpha_sort_key
+from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name as _canonical_get_alkyl_name
 
-
-# Cycloalkyl substituent names (when ring is substituent, not parent)
-CYCLOALKYL_NAMES = {
-    3: "cyclopropyl",
-    4: "cyclobutyl",
-    5: "cyclopentyl",
-    6: "cyclohexyl",
-    7: "cycloheptyl",
-    8: "cyclooctyl",
-    9: "cyclononyl",
-    10: "cyclodecyl",
-}
 
 
 def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, int]]:
@@ -216,24 +204,30 @@ def orient_cycloalkene(
     mol,
     ring_atoms: Tuple[int, ...],
     double_bond_atoms: List[Tuple[int, int]],
-    substituent_positions: Optional[Dict[int, List[List[int]]]] = None
+    substituent_positions: Optional[Dict[int, List[List[int]]]] = None,
+    principal_group_atoms: Optional[Set[int]] = None
 ) -> List[int]:
     """
-    Orient a cycloalkene ring so double bond is at C1-C2.
+    Orient a cycloalkene ring for IUPAC naming.
 
-    IUPAC rules:
-    - Double bond is numbered 1,2 (C1-C2)
-    - Direction is chosen to give lowest locants to other substituents
-    - For mono-cycloalkenes, the locant is omitted in the name
+    IUPAC 2013 rules (P-31.1.3.4):
+    - When a principal characteristic group is on the ring, it receives
+      the lowest possible locant (ideally 1).
+    - Double bond locant is secondary to principal group locant.
+    - When no principal group is on the ring, double bond is at C1-C2.
+    - Direction is chosen to give lowest locants to other substituents.
+    - For mono-cycloalkenes, the locant is omitted in the name.
 
     Args:
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices in the ring
         double_bond_atoms: List of (atom1, atom2) tuples for double bonds
         substituent_positions: Optional dict mapping ring atom index to substituent lists
+        principal_group_atoms: Optional set of ring atom indices bearing the principal
+            characteristic group (e.g., C bearing =O for ketone)
 
     Returns:
-        List of ring atom indices reordered so double bond is at positions 1-2
+        List of ring atom indices reordered for IUPAC naming
     """
     ring_list = list(ring_atoms)
     n = len(ring_list)
@@ -242,14 +236,55 @@ def orient_cycloalkene(
         # No double bonds - just return as-is (shouldn't happen for cycloalkene)
         return ring_list
 
+    # Get substituent atom indices
+    sub_atom_indices = set(substituent_positions.keys()) if substituent_positions else set()
+
+    # --- Path A: Principal group on ring -> PG gets lowest locant ---
+    if principal_group_atoms:
+        candidates = []
+
+        for start_idx in range(n):
+            for direction in [1, -1]:
+                oriented = _build_oriented_ring(ring_list, start_idx, direction)
+
+                # Calculate principal group locants
+                pg_locants = sorted(
+                    oriented.index(atom) + 1
+                    for atom in principal_group_atoms
+                    if atom in oriented
+                )
+
+                # Calculate double bond locants
+                db_locants = []
+                for a1, a2 in double_bond_atoms:
+                    if a1 in oriented and a2 in oriented:
+                        pos1 = oriented.index(a1)
+                        pos2 = oriented.index(a2)
+                        db_locants.append(min(pos1, pos2) + 1)
+                db_locants.sort()
+
+                # Calculate substituent locants
+                sub_locants = sorted(
+                    i + 1 for i, atom in enumerate(oriented)
+                    if atom in sub_atom_indices
+                )
+
+                candidates.append((oriented, pg_locants, db_locants, sub_locants))
+
+        # Sort: lowest PG locants, then lowest DB locants, then lowest sub locants
+        def sort_key(item):
+            _, pg, db, sub = item
+            return (pg, db, sub)
+
+        candidates.sort(key=sort_key)
+        return candidates[0][0]
+
+    # --- Path B: No principal group on ring -> double bond at C1-C2 ---
     # Get positions of double bond atoms in the ring
     db_atoms_set = set()
     for a1, a2 in double_bond_atoms:
         db_atoms_set.add(a1)
         db_atoms_set.add(a2)
-
-    # Get substituent atom indices
-    sub_atom_indices = set(substituent_positions.keys()) if substituent_positions else set()
 
     # Try all orientations where a double bond starts at position 1
     candidates = []
@@ -261,7 +296,6 @@ def orient_cycloalkene(
             other_atom = db_a2 if start_atom == db_a1 else db_a1
 
             start_pos = ring_list.index(start_atom)
-            other_pos = ring_list.index(other_atom)
 
             # Determine direction: other_atom should be at position 2 (index 1)
             # Check both directions
@@ -430,20 +464,15 @@ def _compare_locant_sets(a: List[int], b: List[int]) -> int:
 
 
 def _get_alkyl_name(carbon_count: int) -> Optional[str]:
-    """Get alkyl substituent name from carbon count."""
-    alkyl_names = {
-        1: "methyl",
-        2: "ethyl",
-        3: "propyl",
-        4: "butyl",
-        5: "pentyl",
-        6: "hexyl",
-        7: "heptyl",
-        8: "octyl",
-        9: "nonyl",
-        10: "decyl",
-    }
-    return alkyl_names.get(carbon_count)
+    """Get alkyl substituent name from carbon count.
+
+    Delegates to the canonical get_alkyl_name() in naming_utils.
+    Returns None for invalid or unknown counts.
+    """
+    try:
+        return _canonical_get_alkyl_name(carbon_count)
+    except (ValueError, KeyError):
+        return None
 
 
 def get_substituent_name(mol, sub_atoms: List[int]) -> Optional[str]:

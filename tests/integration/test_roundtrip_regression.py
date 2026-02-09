@@ -813,7 +813,7 @@ PHASE24_RT_ANALYSIS = [
     ),
     (
         "O=C1C=CCCC1",
-        "cyclohex-1-en-2-one",
+        "cyclohex-2-en-1-one",
         "cyclohexenone-rt-match",
     ),
     # --- Carboxylate ion naming (neutralize-then-name) ---
@@ -848,7 +848,7 @@ PHASE24_RT_ANALYSIS = [
     # --- Cyclohexenone OPSIN-compatible format ---
     (
         "O=C1C=C[C@H](O)[C@@H](O)[C@@H]1O",
-        "(3S,4R,5S)-3,4,5-trihydroxycyclohex-1-en-1-one",
+        "(4S,5R,6S)-4,5,6-trihydroxycyclohex-2-en-1-one",
         "trihydroxycyclohexenone-opsin",
     ),
 ]
