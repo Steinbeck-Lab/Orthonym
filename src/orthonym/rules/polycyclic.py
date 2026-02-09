@@ -41,6 +41,16 @@ CYCLO_PREFIXES = {
     8: "octacyclo",
     9: "nonacyclo",
     10: "decacyclo",
+    11: "undecacyclo",
+    12: "dodecacyclo",
+    13: "tridecacyclo",
+    14: "tetradecacyclo",
+    15: "pentadecacyclo",
+    16: "hexadecacyclo",
+    17: "heptadecacyclo",
+    18: "octadecacyclo",
+    19: "nonadecacyclo",
+    20: "icosacyclo",
 }
 
 _ALKANE_NAMES = {

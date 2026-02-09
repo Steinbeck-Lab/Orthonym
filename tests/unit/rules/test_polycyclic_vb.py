@@ -485,6 +485,68 @@ class TestEdgeCases:
 
 
 # ============================================================================
+# CYCLO_PREFIXES High Ring Count Tests
+# ============================================================================
+
+class TestCycloPrefixesExtended:
+    """Test CYCLO_PREFIXES dict covers ring counts up to 20."""
+
+    @pytest.mark.unit
+    def test_tridecacyclo_prefix(self):
+        """Ring count 13 should give 'tridecacyclo'."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[13] == "tridecacyclo"
+
+    @pytest.mark.unit
+    def test_undecacyclo_prefix(self):
+        """Ring count 11 should give 'undecacyclo'."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[11] == "undecacyclo"
+
+    @pytest.mark.unit
+    def test_dodecacyclo_prefix(self):
+        """Ring count 12 should give 'dodecacyclo'."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[12] == "dodecacyclo"
+
+    @pytest.mark.unit
+    def test_icosacyclo_prefix(self):
+        """Ring count 20 should give 'icosacyclo'."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[20] == "icosacyclo"
+
+    @pytest.mark.unit
+    def test_bicyclo_unchanged(self):
+        """Ring count 2 should still give 'bicyclo' (no regression)."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[2] == "bicyclo"
+
+    @pytest.mark.unit
+    def test_tetracyclo_unchanged(self):
+        """Ring count 4 should still give 'tetracyclo' (no regression)."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert CYCLO_PREFIXES[4] == "tetracyclo"
+
+    @pytest.mark.unit
+    def test_all_entries_from_2_to_20(self):
+        """All ring counts from 2 to 20 should be present in CYCLO_PREFIXES."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        for i in range(2, 21):
+            assert i in CYCLO_PREFIXES, f"Missing ring count {i}"
+            assert CYCLO_PREFIXES[i].endswith("cyclo"), (
+                f"CYCLO_PREFIXES[{i}] = '{CYCLO_PREFIXES[i]}' does not end with 'cyclo'"
+            )
+
+    @pytest.mark.unit
+    def test_fallback_for_ring_count_above_20(self):
+        """Ring count > 20 falls back to numeric prefix."""
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        assert 25 not in CYCLO_PREFIXES
+        fallback = CYCLO_PREFIXES.get(25, f"{25}cyclo")
+        assert fallback == "25cyclo"
+
+
+# ============================================================================
 # Helper functions (not part of the module under test)
 # ============================================================================
 
