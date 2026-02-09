@@ -2130,7 +2130,19 @@ def _build_bicyclo_substituent_prefix(
         for sub_info in sub_list:
             carbon_count = sub_info.get('carbon_count', 0)
             if carbon_count == 0:
-                continue
+                # Name non-carbon substituents directly (halogens, hydroxy, amino)
+                first_atom = sub_info.get('first_atom')
+                if first_atom is not None:
+                    atom = mol.GetAtomWithIdx(first_atom)
+                    symbol = atom.GetSymbol()
+                    halogen_names = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+                    if symbol in halogen_names:
+                        sub_groups[halogen_names[symbol]].append(locant)
+                    elif symbol == 'O' and atom.GetTotalNumHs() >= 1:
+                        sub_groups['hydroxy'].append(locant)
+                    elif symbol == 'N' and atom.GetTotalNumHs() >= 2:
+                        sub_groups['amino'].append(locant)
+                continue  # Still skip alkyl naming path
 
             # Get alkyl name
             alkyl_name = get_alkyl_name(carbon_count)
@@ -3919,9 +3931,12 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 # Carbon count > 10, skip for now (complex substituent)
                 continue
 
-    # Count total number of substituents to determine if monosubstituted
-    total_substituents = sum(len(locs) for locs in substituent_groups.values())
-    is_monosubstituted = total_substituents == 1
+    # Count ALL ring substituents (alkyl + FG), not just the ones we named
+    # This prevents monosubstituted=True when there's 1 alkyl + 1 halogen
+    total_all_substituents = sum(
+        len(sub_list) for sub_list in ring_substituents.values()
+    )
+    is_monosubstituted = total_all_substituents == 1
 
     # Build prefix fragments
     prefixes = []

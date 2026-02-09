@@ -207,6 +207,12 @@ def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
 
                 # Skip fusion carbons (non-integer positions like 4.5, 8.5)
                 if position is None or not isinstance(position, int):
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "PAH substituent at atom %d on %s mapped to position=%s (skipped)",
+                        atom_idx, pah_name, position
+                    )
                     continue
 
                 # Only include if it's an allowed substituent position
