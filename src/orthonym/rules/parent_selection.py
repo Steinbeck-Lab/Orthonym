@@ -214,8 +214,49 @@ def select_parent(
         )
 
     if pg_on_ring and pg_on_chain:
-        # Principal group is on both - need to compare
-        # Count PG occurrences on each
+        # Special handling for esters when PG is on both ring and chain.
+        # For esters, the acyl (C=O) side determines the parent:
+        #   - If acyl C is bonded to ring -> ring is acid parent
+        #     (e.g., methyl benzoate: ring provides "benzoate")
+        #   - If acyl C is bonded to chain -> chain is acid parent
+        #     (e.g., phenyl butanoate: chain provides "butanoate")
+        # When multiple esters exist, count acyl-on-ring vs acyl-on-chain.
+        if principal_group == "ester":
+            acyl_ring_count = 0
+            acyl_chain_count = 0
+            for pg_atoms in principal_group_atoms:
+                if not pg_atoms or len(pg_atoms) < 1:
+                    continue
+                acyl_c = pg_atoms[0]  # carbonyl C
+                atom = mol.GetAtomWithIdx(acyl_c)
+                acyl_on_ring = acyl_c in all_ring_atoms
+                if not acyl_on_ring:
+                    for nbr in atom.GetNeighbors():
+                        if nbr.GetIdx() in all_ring_atoms:
+                            acyl_on_ring = True
+                            break
+                if acyl_on_ring:
+                    acyl_ring_count += 1
+                else:
+                    acyl_chain_count += 1
+            # Decide based on which side has more acyl groups
+            if acyl_ring_count > acyl_chain_count:
+                return ParentSelectionResult(
+                    parent_type='ring',
+                    parent_atoms=list(sorted(all_ring_atoms)),
+                    substituent_rings=[],
+                    reasoning=f"Ester acyl on ring ({acyl_ring_count}) > chain ({acyl_chain_count}) - ring is parent"
+                )
+            elif acyl_chain_count > acyl_ring_count:
+                return ParentSelectionResult(
+                    parent_type='chain',
+                    parent_atoms=principal_chain,
+                    substituent_rings=substituent_ring_tuples,
+                    reasoning=f"Ester acyl on chain ({acyl_chain_count}) > ring ({acyl_ring_count}) - chain is parent"
+                )
+            # Tie: fall through to general count-based comparison below
+
+        # General case: Principal group is on both - compare by count
         pg_count_on_ring = _count_pg_on_ring(mol, all_ring_atoms, principal_group_atoms)
         pg_count_on_chain = _count_pg_on_chain(mol, principal_chain, principal_group_atoms)
 
