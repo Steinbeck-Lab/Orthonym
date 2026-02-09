@@ -702,6 +702,19 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
     n_idx = match[1]   # The nitrogen (=N-)
     tail_idx = match[2]  # OH (oxime) or NH2 (hydrazone)
 
+    # Capture C=N E/Z stereo BEFORE modifying the molecule
+    from rdkit.Chem import rdCIPLabeler
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    cn_stereo_tag = None
+    cn_bond = mol.GetBondBetweenAtoms(c_idx, n_idx)
+    if cn_bond is not None:
+        stereo = cn_bond.GetStereo()
+        if stereo != Chem.BondStereo.STEREONONE:
+            # Use _CIPCode property (set by AssignCIPLabels) for E/Z
+            if cn_bond.HasProp('_CIPCode'):
+                cn_stereo_tag = cn_bond.GetProp('_CIPCode')  # 'E' or 'Z'
+
     # Build modified molecule: replace =N-X with =O
     rw = RWMol(mol)
 
@@ -759,6 +772,32 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
 
     if not parent_name:
         return None
+
+    # Merge C=N stereo descriptor into the parent name if captured
+    if cn_stereo_tag and parent_name:
+        import re
+        # Find the ketone locant from the parent name (e.g., "3-one" -> locant "3")
+        one_match = re.search(r'(\d+)-on', parent_name)
+        if one_match:
+            cn_locant = one_match.group(1)
+            cn_desc = f"{cn_locant}{cn_stereo_tag}"
+
+            # If parent already has a stereo prefix like (6E), merge
+            stereo_match = re.match(r'\(([^)]+)\)-(.*)', parent_name)
+            if stereo_match:
+                existing_stereo = stereo_match.group(1)
+                rest = stereo_match.group(2)
+                all_descs = existing_stereo.split(',')
+                all_descs.append(cn_desc)
+                # Sort by leading locant number
+                all_descs.sort(
+                    key=lambda d: int(re.match(r'(\d+)', d).group(1))
+                    if re.match(r'(\d+)', d) else 999
+                )
+                parent_name = f"({','.join(all_descs)})-{rest}"
+            else:
+                # No existing stereo prefix -- add one
+                parent_name = f"({cn_desc})-{parent_name}"
 
     return f"{parent_name} {fg_type}"
 

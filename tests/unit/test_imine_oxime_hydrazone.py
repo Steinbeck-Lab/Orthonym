@@ -63,6 +63,35 @@ class TestOximeFunctionalClassNaming:
         assert len(parts[0]) > 0
 
 
+class TestOximeEZStereoPreservation:
+    """Test that C=N E/Z stereodescriptor is preserved in oxime names."""
+
+    def test_oxime_with_cn_stereo(self):
+        """Oxime with C=N stereo should include both C=N and C=C stereo descriptors."""
+        result = name_compound("C=C/C(C)=C/CC(C)(C)/C(=N\\O)C(C)C")
+        assert "oxime" in result
+        assert "Z" in result, f"Expected Z descriptor in '{result}'"
+        assert "E" in result, f"Expected E descriptor in '{result}'"
+        # Should have both 3Z and 6E
+        assert "3Z" in result, f"Expected 3Z in '{result}'"
+        assert "6E" in result, f"Expected 6E in '{result}'"
+
+    def test_simple_oxime_no_spurious_stereo(self):
+        """Simple oxime without C=N stereo should NOT get stereo added."""
+        result = name_compound("CC(=NO)C")
+        assert "oxime" in result
+        # Should NOT contain E or Z
+        assert "E" not in result, f"Unexpected E in simple oxime '{result}'"
+        assert "Z" not in result, f"Unexpected Z in simple oxime '{result}'"
+
+    def test_aldehyde_oxime_no_spurious_stereo(self):
+        """Aldehyde oxime without stereo should not get stereo added."""
+        result = name_compound("CC=NO")
+        assert "oxime" in result
+        assert "E" not in result
+        assert "Z" not in result
+
+
 class TestHydrazoneFunctionalClassNaming:
     """Hydrazone uses functional class naming: '[parent carbonyl name] hydrazone'."""
 
