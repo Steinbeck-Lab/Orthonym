@@ -605,3 +605,56 @@ class TestDetectExocyclicEsters:
         results = detect_exocyclic_esters(mol)
         assert len(results) >= 1
         assert results[0]["acyloxy_prefix"] == "propanoyloxy"
+
+
+# ============================================================================
+# Acyloxy Prefix for -carboxylic acids (FMT-01/FMT-02 fix)
+# ============================================================================
+
+
+class TestAcyloxyPrefixCarboxylic:
+    """Test acyloxy prefix for ring -carboxylic acids.
+
+    FMT-01/FMT-02: cyclopentanecarboxylic/cyclohexanecarboxylic acids
+    must produce -carbonyloxy, NOT -carboxylyloxy (the ylyloxy bug).
+    """
+
+    def test_cyclopentanecarboxylic_to_carbonyloxy(self):
+        """Cyclopentanecarboxylic acid -> cyclopentanecarbonyloxy."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        result = get_acyloxy_prefix("cyclopentanecarboxylic acid")
+        assert result == "cyclopentanecarbonyloxy"
+
+    def test_cyclohexanecarboxylic_to_carbonyloxy(self):
+        """Cyclohexanecarboxylic acid -> cyclohexanecarbonyloxy."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        result = get_acyloxy_prefix("cyclohexanecarboxylic acid")
+        assert result == "cyclohexanecarbonyloxy"
+
+    def test_cyclopropanecarboxylic_to_carbonyloxy(self):
+        """Cyclopropanecarboxylic -> cyclopropanecarbonyloxy."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        result = get_acyloxy_prefix("cyclopropanecarboxylic")
+        assert result == "cyclopropanecarbonyloxy"
+
+    def test_no_ylyloxy_in_cyclopentane(self):
+        """Verify no ylyloxy concatenation bug."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        result = get_acyloxy_prefix("cyclopentanecarboxylic acid")
+        assert "ylyloxy" not in result
+
+    def test_no_ylyloxy_in_cyclohexane(self):
+        """Verify no ylyloxy concatenation bug."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        result = get_acyloxy_prefix("cyclohexanecarboxylic acid")
+        assert "ylyloxy" not in result
+
+    def test_propanoic_still_works(self):
+        """Generic -ic rule still works for non-carboxylic acids."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("propanoic acid") == "propanoyloxy"
+
+    def test_benzoic_trivial_still_works(self):
+        """Trivial lookup still works for benzoic acid."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+        assert get_acyloxy_prefix("benzoic acid") == "benzoyloxy"

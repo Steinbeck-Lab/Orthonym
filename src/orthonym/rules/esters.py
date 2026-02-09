@@ -562,6 +562,11 @@ def get_acyloxy_prefix(acid_name: str) -> str:
     if name in TRIVIAL_ACID_TO_ACYLOXY:
         return TRIVIAL_ACID_TO_ACYLOXY[name]
 
+    # Handle -carboxylic acids (ring acids like cyclopentanecarboxylic, cyclohexanecarboxylic)
+    # carboxylic -> carbonyloxy (not carboxylyloxy from the generic -ic rule)
+    if name.endswith("carboxylic"):
+        return name[:-len("carboxylic")] + "carbonyloxy"
+
     # Systematic conversion: drop "-ic", add "-yloxy"
     # Works for both "-oic" (propanoic -> propanoyloxy) and "-ic" (generic)
     if name.endswith("ic"):
