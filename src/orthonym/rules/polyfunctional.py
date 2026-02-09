@@ -761,8 +761,27 @@ def _generate_alkyl_prefixes_for_polyfunctional(
     mol = features.mol
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
 
+    # Collect ring atoms that should be skipped (handled by ring substituent prefixes)
+    ring_atoms_to_skip: set = set()
+    if getattr(features, 'chain_is_parent', False):
+        ring_groups = getattr(features, 'ring_substituents_as_groups', [])
+        for ring_atoms in ring_groups:
+            ring_atoms_to_skip.update(ring_atoms)
+
     for position, sub_list in features.substituents.items():
         for sub_atoms in sub_list:
+            # Skip substituents whose carbon atoms are entirely within ring atoms
+            # (these are handled by _generate_ring_substituent_prefixes).
+            # Substituents that extend beyond the ring (large branches containing
+            # a ring) should NOT be skipped -- only the ring-only substituents.
+            if ring_atoms_to_skip:
+                sub_carbons = {
+                    idx for idx in sub_atoms
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                }
+                if sub_carbons and sub_carbons <= ring_atoms_to_skip:
+                    continue
+
             # Count only carbon atoms
             carbon_count = sum(
                 1 for idx in sub_atoms
