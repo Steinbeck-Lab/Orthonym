@@ -263,7 +263,7 @@ CI_BENCHMARK = [
     ),
     (
         "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O",
-        "L-phenylalanyl-D-cysteinyl-D-cysteine",
+        "L-phenylalanyl-L-cysteinyl-L-cysteine",
     ),
     (
         "COc1cc(OC)c2c(c1CC=C(C)C)O[C@H](c1ccccc1)CC2",
