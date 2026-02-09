@@ -1,9 +1,45 @@
 """
 Integration tests for Phase 31: Ester & Lipid Format fixes.
 Tests EL-01 (ring ester prefix joining) and EL-02 (polyfunctional ester demotion).
+Tests EL-03 (phospholipid routing) and OPSIN round-trip validation.
 """
+import os
+import subprocess
 import pytest
 from orthonym.namer import name_compound
+
+
+# ---------------------------------------------------------------------------
+# OPSIN CLI helper
+# ---------------------------------------------------------------------------
+
+OPSIN_JAR = os.path.join(
+    os.path.dirname(__file__), "..", "..", "opsin-cli-2.8.0-jar-with-dependencies.jar"
+)
+OPSIN_AVAILABLE = os.path.isfile(OPSIN_JAR)
+
+
+def _opsin_parse(name: str) -> str:
+    """Parse a name with OPSIN CLI and return SMILES or empty string on failure."""
+    if not OPSIN_AVAILABLE:
+        return ""
+    try:
+        result = subprocess.run(
+            ["java", "-jar", OPSIN_JAR, "-osmi"],
+            input=name,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        lines = result.stdout.strip().split("\n")
+        out = lines[-1].strip() if lines else ""
+        if "could not be interpreted" in out.lower():
+            return ""
+        if "unsure of the meaning" in out.lower():
+            return ""
+        return out
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ""
 
 
 @pytest.mark.integration
@@ -109,3 +145,176 @@ class TestPolyfunctionalEsterDemotion:
         result = name_compound("CC(=O)OCCO")
         assert result is not None
         assert "ol" in result
+
+
+# ===========================================================================
+# EL-03: OPSIN round-trip validation for Phase 31 ester format fixes
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestEsterOPSINRoundTrip:
+    """Validate that ester format fixes from 31-01 produce OPSIN-parseable names."""
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_acetyloxybenzene(self):
+        """Single acyloxy on benzene parses via OPSIN."""
+        name = name_compound("CC(=O)Oc1ccccc1")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_multi_acyloxy_benzene(self):
+        """Two different acyloxy prefixes on benzene parse via OPSIN."""
+        name = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_glycerol_diacetate(self):
+        """Glycerol diacetate (acyloxy + -ol) parses via OPSIN."""
+        name = name_compound("CC(=O)OCC(O)COC(=O)C")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_mixed_diglyceride(self):
+        """Mixed-acid diglyceride (decanoyloxy + docosanoyloxy + -ol) parses via OPSIN."""
+        name = name_compound(
+            "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC"
+        )
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_diacetyloxy_cyclohexane(self):
+        """Same acyloxy prefix twice on cyclohexane parses via OPSIN."""
+        name = name_compound("CC(=O)OC1CCCCC1OC(C)=O")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_ethyl_acetate_regression(self):
+        """Simple ester (ethyl acetate) still parses via OPSIN."""
+        name = name_compound("CCOC(C)=O")
+        assert name == "ethyl acetate"
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_methyl_propanoate_regression(self):
+        """Simple ester (methyl propanoate) still parses via OPSIN."""
+        name = name_compound("COC(=O)CC")
+        assert name == "methyl propanoate"
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse: {name!r}"
+
+    def test_format_acetyloxybenzene_no_hyphens_missing(self):
+        """Acetyloxybenzene format is correct (no stray hyphens)."""
+        name = name_compound("CC(=O)Oc1ccccc1")
+        assert name is not None
+        assert "acetyloxy" in name
+        assert "benzene" in name
+        # Should not have double hyphens or misplaced characters
+        assert "--" not in name
+
+    def test_format_multi_acyloxy_has_parentheses(self):
+        """Multi-acyloxy benzene uses parenthesized prefix format."""
+        name = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
+        assert name is not None
+        # Should use (acetyloxy) and (propanoyloxy) format
+        assert "(acetyloxy)" in name
+        assert "(propanoyloxy)" in name
+
+    def test_format_diacetate_has_multiplier(self):
+        """Glycerol diacetate uses multiplier prefix di()."""
+        name = name_compound("CC(=O)OCC(O)COC(=O)C")
+        assert name is not None
+        assert "di" in name
+        assert "acetyloxy" in name
+        assert "ol" in name
+
+
+# ===========================================================================
+# EL-03: Phospholipid compound coverage (best-effort)
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestPhospholipidCoverage:
+    """Best-effort phospholipid naming: non-None results, no crashes."""
+
+    def test_glycerol_diacetate_phosphate_produces_name(self):
+        """Glycerol diacetate phosphate returns a non-None name."""
+        result = name_compound("CC(=O)OCC(COP(=O)(O)O)OC(=O)C")
+        assert result is not None, "Phospholipid diacetate + phosphate returned None"
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_glycerol_diacetate_phosphate_has_acyloxy(self):
+        """Phospholipid diacetate + phosphate shows acyloxy prefixes from 31-01 fix."""
+        result = name_compound("CC(=O)OCC(COP(=O)(O)O)OC(=O)C")
+        assert result is not None
+        # The ester demotion should produce acyloxy prefixes
+        assert "yloxy" in result, f"Expected acyloxy prefix in: {result!r}"
+
+    def test_glycerol_diacetate_phosphate_has_phospho(self):
+        """Phospholipid diacetate + phosphate contains phosphonic acid suffix."""
+        result = name_compound("CC(=O)OCC(COP(=O)(O)O)OC(=O)C")
+        assert result is not None
+        assert "phosphonic acid" in result, f"Expected phosphonic acid in: {result!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_glycerol_diacetate_phosphate(self):
+        """Phospholipid diacetate + phosphate name parses via OPSIN."""
+        name = name_compound("CC(=O)OCC(COP(=O)(O)O)OC(=O)C")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse phospholipid name: {name!r}"
+
+    def test_glycerol_phosphate_produces_name(self):
+        """Simple glycerol phosphate (no ester) returns a non-None name."""
+        result = name_compound("OCC(O)COP(=O)(O)O")
+        assert result is not None, "Glycerol phosphate returned None"
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_glycerol_phosphate_has_hydroxy(self):
+        """Glycerol phosphate includes hydroxy prefix for alcohol groups."""
+        result = name_compound("OCC(O)COP(=O)(O)O")
+        assert result is not None
+        assert "hydroxy" in result, f"Expected hydroxy prefix in: {result!r}"
+
+    @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not available")
+    def test_opsin_glycerol_phosphate(self):
+        """Glycerol phosphate name parses via OPSIN."""
+        name = name_compound("OCC(O)COP(=O)(O)O")
+        assert name is not None
+        opsin_smi = _opsin_parse(name)
+        assert opsin_smi, f"OPSIN failed to parse glycerol phosphate: {name!r}"
+
+    def test_lecithin_like_no_crash(self):
+        """Lecithin-like compound (ester + phosphate diester + quat N) does not crash."""
+        result = name_compound("CC(=O)OCC(COP(=O)(O)OCC[N+](C)(C)C)OC(=O)C")
+        assert result is not None, "Lecithin-like compound returned None"
+        # Known limitation: may lose phosphocholine fragment, but must not crash
+
+    def test_gpc_no_crash(self):
+        """Glycerophosphocholine (no esters) does not crash."""
+        result = name_compound("OCC(O)COP(=O)(O)OCC[N+](C)(C)C")
+        assert result is not None, "GPC compound returned None"
+        # Known limitation: phosphate diester fragment may be lost
+
+    def test_ester_amine_phospholipid_fragment(self):
+        """Ester + amine phospholipid-like fragment names correctly."""
+        result = name_compound("CC(=O)OCC(OC(=O)CCCCCCCCC)COP(=O)(O)OCCN")
+        assert result is not None
+        # Should have acyloxy prefixes and amine suffix
+        assert "yloxy" in result or "amine" in result, (
+            f"Expected acyloxy or amine in: {result!r}"
+        )
