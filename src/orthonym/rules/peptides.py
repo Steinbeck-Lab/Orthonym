@@ -344,6 +344,12 @@ def _identify_residues(
     return result
 
 
+# Amino acids where L-configuration = R (CIP), not S.
+# CIP priority inversion: sulfur (Z=16) or selenium (Z=34) in side chain
+# outranks oxygen (Z=8) in COOH, reversing the normal L=S mapping.
+_CIP_INVERTED_AMINO_ACIDS = {"cysteine", "cystine", "selenocysteine"}
+
+
 def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     """
     Get L-/D- stereo prefix for an amino acid residue.
@@ -352,6 +358,9 @@ def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     - S configuration at alpha-carbon -> "L-"
     - R configuration at alpha-carbon -> "D-"
     - No stereocenter (glycine) -> ""
+
+    Exception: Cysteine family (sulfur/selenium side chain) has inverted
+    CIP priorities, so L = R and D = S.
     """
     if aa_name == "glycine":
         return ""  # Glycine is achiral
@@ -375,10 +384,19 @@ def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     alpha_atom = mol.GetAtomWithIdx(alpha_c_idx)
 
     cip = alpha_atom.GetPropsAsDict().get('_CIPCode', '')
-    if cip == 'S':
-        return "L-"
-    elif cip == 'R':
-        return "D-"
+
+    # Cysteine family: L = R, D = S (sulfur/selenium outranks oxygen in CIP)
+    if aa_name.lower() in _CIP_INVERTED_AMINO_ACIDS:
+        if cip == 'R':
+            return "L-"
+        elif cip == 'S':
+            return "D-"
+    else:
+        # Standard amino acids: L = S, D = R
+        if cip == 'S':
+            return "L-"
+        elif cip == 'R':
+            return "D-"
     return ""
 
 

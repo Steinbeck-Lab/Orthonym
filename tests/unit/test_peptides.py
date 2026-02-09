@@ -139,3 +139,57 @@ class TestStereoMapping:
         result = name_compound("NCC(=O)NCC(=O)O")
         assert not result.startswith("L-")
         assert not result.startswith("D-")
+
+
+# ── Cysteine L/D inversion (FMT-04a) ────────────────────────────────
+
+@pytest.mark.unit
+class TestCysteineStereoInversion:
+    """Test that cysteine CIP inversion is handled correctly.
+
+    FMT-04a: Cysteine has sulfur (Z=16) in its side chain which
+    outranks oxygen (Z=8) in COOH, inverting CIP priorities.
+    Result: L-cysteine = R (CIP), D-cysteine = S (CIP).
+    """
+
+    def test_l_cysteine_gets_l_prefix(self):
+        """L-cysteine (R configuration) should get L- prefix."""
+        # L-cysteine: N[C@@H](CS)C(=O)O -- R configuration at alpha carbon
+        result = name_compound("N[C@@H](CS)C(=O)NCC(=O)O")
+        assert "L-cysteine" in result or "L-cysteyl" in result or "L-cysteinyl" in result, \
+            f"Expected L-cysteine prefix, got: {result}"
+
+    def test_d_cysteine_gets_d_prefix(self):
+        """D-cysteine (S configuration) should get D- prefix."""
+        # D-cysteine: N[C@H](CS)C(=O)O -- S configuration at alpha carbon
+        result = name_compound("N[C@H](CS)C(=O)NCC(=O)O")
+        assert "D-cysteine" in result or "D-cysteyl" in result or "D-cysteinyl" in result, \
+            f"Expected D-cysteine prefix, got: {result}"
+
+    def test_l_alanine_still_correct(self):
+        """L-alanine (S configuration) should still get L- prefix (not inverted)."""
+        result = name_compound("N[C@@H](C)C(=O)O")
+        # Single amino acid, not a peptide - but if in peptide context:
+        result_peptide = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
+        assert result_peptide.startswith("L-alanyl"), \
+            f"Expected L-alanyl start, got: {result_peptide}"
+
+    def test_benchmark_peptide_with_l_cysteine_1(self):
+        """Benchmark peptide 1: Lys-Thr-Cys should have L-cysteine at C-terminal."""
+        smiles = "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O"
+        result = name_compound(smiles)
+        assert result is not None, "Should produce a name"
+        assert "L-cysteine" in result, \
+            f"Expected L-cysteine in name, got: {result}"
+        assert "D-cysteine" not in result, \
+            f"Should NOT contain D-cysteine, got: {result}"
+
+    def test_benchmark_peptide_with_l_cysteine_2(self):
+        """Benchmark peptide 2: Gln-Lys-Cys should have L-cysteine at C-terminal."""
+        smiles = "NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](CS)C(=O)O"
+        result = name_compound(smiles)
+        assert result is not None, "Should produce a name"
+        assert "L-cysteine" in result, \
+            f"Expected L-cysteine in name, got: {result}"
+        assert "D-cysteine" not in result, \
+            f"Should NOT contain D-cysteine, got: {result}"
