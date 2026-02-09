@@ -706,7 +706,7 @@ def _build_replacement_name(
         else:
             prefix_parts.append(f"{locant_str}-{hw_prefix}")
 
-    replacement_prefix = ''.join(prefix_parts)
+    replacement_prefix = '-'.join(prefix_parts)
 
     # Build parent ring name
     chain_prefix = get_chain_prefix(ring_size)
