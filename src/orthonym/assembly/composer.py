@@ -8,9 +8,12 @@ Assembly order:
 4. Locanted suffix (principal group)
 """
 
+import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 from ..rules.seniority import get_suffix, get_prefix
 from ..rules.locants import get_functional_group_locants, get_bond_locants
@@ -2746,6 +2749,16 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         for rg in getattr(features, 'ring_substituents_as_groups', []):
             ring_atom_set.update(rg)
 
+    # BUG-B: Collect all substituent branch atom indices.
+    # FG matches located entirely on a branch are handled by substituent naming,
+    # so we skip them here to avoid double-counting (e.g., standalone "hydroxy"
+    # when the branch is already named "(hydroxymethyl)").
+    branch_atoms = set()
+    if features.substituents:
+        for _pos, sub_list in features.substituents.items():
+            for sub_atoms in sub_list:
+                branch_atoms.update(sub_atoms)
+
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
             continue
@@ -2763,6 +2776,36 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                 if not on_ring:
                     filtered.append(match)
             matches = filtered
+
+        # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
+        # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
+        # Only for simple FGs handled by _name_heteroatom_substituent().
+        _BRANCH_HANDLED_FGS = {
+            'primary_alcohol', 'secondary_alcohol', 'primary_amine',
+            'fluoro', 'chloro', 'bromo', 'iodo',
+        }
+        if branch_atoms and fg_name in _BRANCH_HANDLED_FGS:
+            filtered_branch = []
+            for match in matches:
+                if not all(a in branch_atoms for a in match):
+                    filtered_branch.append(match)
+                    continue
+                # Check if FG is on a small branch with carbons
+                on_small_branch = False
+                for _pos, sub_list in features.substituents.items():
+                    for sub_atoms in sub_list:
+                        sub_set = set(sub_atoms)
+                        if all(a in sub_set for a in match):
+                            c_count = sum(1 for a in sub_atoms
+                                          if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C')
+                            if 1 <= c_count <= 3:
+                                on_small_branch = True
+                                break
+                    if on_small_branch:
+                        break
+                if not on_small_branch:
+                    filtered_branch.append(match)
+            matches = filtered_branch
 
         prefix_text = get_prefix(fg_name)
         if prefix_text and matches:
@@ -3366,7 +3409,18 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     substituent_groups[hetero_name].append(position)
                     continue
 
-                # Truly unnameable substituent - skip
+                # BUG-F: Log warning for unrecognized heteroatom substituent
+                # and attempt a generic fallback using carbon count
+                logger.warning(
+                    "Unrecognized heteroatom substituent at position %d: atoms=%s",
+                    position, sub_atoms
+                )
+                if carbon_count > 0:
+                    try:
+                        fallback_name = get_alkyl_name(carbon_count)
+                        substituent_groups[fallback_name].append(position)
+                    except ValueError:
+                        pass
                 continue
 
             # Get alkyl name from carbon count
@@ -3761,12 +3815,80 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
         if total_carbons > 0:
             # Check what heteroatoms are present
             heteroatoms = set()
+            halogen_counts = {'F': 0, 'Cl': 0, 'Br': 0, 'I': 0}
+            other_hetero = 0
             for i in sub_atoms:
                 sym = mol.GetAtomWithIdx(i).GetSymbol()
                 if sym not in ('C', 'H'):
                     heteroatoms.add(sym)
+                    if sym in halogen_counts:
+                        halogen_counts[sym] += 1
+                    else:
+                        other_hetero += 1
 
-            # For C-chain with OH: name as hydroxyalkyl
+            # BUG-A: Haloalkyl naming (check FIRST, before hydroxy/amino)
+            # Pure haloalkyl: only C and halogens, no other heteroatoms
+            if other_hetero == 0 and any(halogen_counts.values()):
+                halogen_prefix_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+                if total_carbons == 1:
+                    # Single-carbon haloalkyl: trifluoromethyl, dichloromethyl, etc.
+                    halogen_parts = []
+                    for hal in ['Br', 'Cl', 'F', 'I']:  # alphabetical by prefix
+                        cnt = halogen_counts[hal]
+                        if cnt > 0:
+                            mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
+                            halogen_parts.append(f'{mp}{halogen_prefix_map[hal]}')
+                    return '(' + ''.join(halogen_parts) + 'methyl)'
+                elif total_carbons <= 3:
+                    # Multi-carbon haloalkyl (2-3 carbons): (2-fluoroethyl), etc.
+                    # Find halogen positions via BFS distance from attachment point
+                    from collections import deque
+                    distances = {}
+                    bfs_queue = deque([(attach_atom, 0)])
+                    bfs_visited = set()
+                    while bfs_queue:
+                        curr, dist = bfs_queue.popleft()
+                        if curr in bfs_visited or curr in chain_set:
+                            continue
+                        bfs_visited.add(curr)
+                        curr_atom = mol.GetAtomWithIdx(curr)
+                        curr_sym = curr_atom.GetSymbol()
+                        if curr_sym in halogen_counts and halogen_counts[curr_sym] > 0:
+                            distances[curr] = dist
+                        for nbr in curr_atom.GetNeighbors():
+                            if nbr.GetIdx() not in bfs_visited and nbr.GetIdx() not in chain_set:
+                                bfs_queue.append((nbr.GetIdx(), dist + 1))
+
+                    try:
+                        alkyl = get_alkyl_name(total_carbons)
+                    except (ValueError, KeyError):
+                        alkyl = None
+
+                    if alkyl:
+                        # Group halogens by position on the sub-chain
+                        # For single halogen type at single position: (2-fluoroethyl)
+                        # For halogens all on terminal C: (2,2,2-trifluoroethyl)
+                        hal_positions = {}  # {halogen_symbol: [sub_locants]}
+                        for h_idx, dist in distances.items():
+                            h_sym = mol.GetAtomWithIdx(h_idx).GetSymbol()
+                            sub_locant = dist  # distance from attachment = sub-chain locant
+                            if h_sym not in hal_positions:
+                                hal_positions[h_sym] = []
+                            hal_positions[h_sym].append(sub_locant)
+
+                        halogen_parts = []
+                        for hal in ['Br', 'Cl', 'F', 'I']:
+                            if hal not in hal_positions:
+                                continue
+                            locs = sorted(hal_positions[hal])
+                            cnt = len(locs)
+                            mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
+                            loc_str = ','.join(str(l) for l in locs)
+                            halogen_parts.append(f'{loc_str}-{mp}{halogen_prefix_map[hal]}')
+
+                        return '(' + ''.join(halogen_parts) + alkyl + ')'
+
+            # BUG-D: For C-chain with OH: name as hydroxyalkyl
             if heteroatoms == {'O'}:
                 # Check if the O is -OH (not C=O or ether)
                 for i in sub_atoms:
@@ -3774,12 +3896,15 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     if a.GetSymbol() == 'O' and a.GetDegree() == 1:
                         try:
                             alkyl = get_alkyl_name(total_carbons)
-                            return f"(hydroxy{alkyl})"
+                            if total_carbons == 1:
+                                return f"(hydroxy{alkyl})"
+                            else:
+                                return f"({total_carbons}-hydroxy{alkyl})"
                         except (ValueError, KeyError):
                             pass
 
-            # For C-chain with NH2: name as (aminoalkyl)
-            # e.g., -CH2CH2NH2 -> (2-aminoethyl)
+            # BUG-C: For C-chain with NH2: name as (aminoalkyl)
+            # e.g., -CH2NH2 -> (aminomethyl), -CH2CH2NH2 -> (2-aminoethyl)
             if 'N' in heteroatoms:
                 # Check for terminal primary amine (-NH2) on the chain
                 for i in sub_atoms:
@@ -3788,9 +3913,12 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                             and a.GetTotalNumHs() == 2):
                         try:
                             alkyl = get_alkyl_name(total_carbons)
-                            # Locant for amino on sub-chain: N is at terminal
-                            # position = total_carbons (farthest from attachment)
-                            return f"({total_carbons}-amino{alkyl})"
+                            if total_carbons == 1:
+                                return f"(amino{alkyl})"
+                            else:
+                                # Locant for amino on sub-chain: N is at terminal
+                                # position = total_carbons (farthest from attachment)
+                                return f"({total_carbons}-amino{alkyl})"
                         except (ValueError, KeyError):
                             pass
 

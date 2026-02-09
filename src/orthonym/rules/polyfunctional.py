@@ -513,6 +513,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     chain_set = set(principal_chain)
     ring_fg_groups = defaultdict(list)  # FGs on ring atoms, for ring substituent naming
 
+    # Collect substituent branch atoms for FG-on-branch filtering (BUG-B).
+    # FGs located entirely on a substituent branch are already named by the
+    # substituent naming path (e.g., hydroxymethyl), so skip them here.
+    _branch_atoms = set()
+    if features.substituents:
+        for _pos, sub_list in features.substituents.items():
+            for sub_atoms in sub_list:
+                _branch_atoms.update(sub_atoms)
+
     for fg_name, matches in non_principal.items():
         if not matches:
             continue
@@ -535,6 +544,42 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     # FG is on a ring - track for ring substituent naming
                     ring_fg_groups[fg_name].append(match)
             matches = chain_matches
+            if not matches:
+                continue
+
+        # BUG-B: Skip simple FG matches located entirely on a *small* substituent
+        # branch (<=3 carbons) that gets named as a compound substituent by
+        # _name_heteroatom_substituent() (e.g., hydroxymethyl, aminomethyl).
+        # Only applies to simple FGs: alcohol, amine, halogens.
+        # Long branches or complex FGs are NOT handled by substituent naming.
+        _BRANCH_HANDLED_FGS = {
+            'primary_alcohol', 'secondary_alcohol', 'primary_amine',
+            'fluoro', 'chloro', 'bromo', 'iodo',
+        }
+        if _branch_atoms and fg_name in _BRANCH_HANDLED_FGS:
+            filtered_matches = []
+            for match in matches:
+                if not all(a in _branch_atoms for a in match):
+                    filtered_matches.append(match)
+                    continue
+                # Check if this FG is on a small branch with carbons
+                # (i.e., a branch where _name_heteroatom_substituent handles the FG)
+                on_small_branch = False
+                for _pos, sub_list in features.substituents.items():
+                    for sub_atoms in sub_list:
+                        sub_set = set(sub_atoms)
+                        if all(a in sub_set for a in match):
+                            # This branch contains the entire FG match
+                            c_count = sum(1 for a in sub_atoms
+                                          if mol.GetAtomWithIdx(a).GetSymbol() == 'C')
+                            if 1 <= c_count <= 3:
+                                on_small_branch = True
+                                break
+                    if on_small_branch:
+                        break
+                if not on_small_branch:
+                    filtered_matches.append(match)
+            matches = filtered_matches
             if not matches:
                 continue
 

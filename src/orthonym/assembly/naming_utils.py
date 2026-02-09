@@ -171,6 +171,9 @@ def needs_brackets(name: str) -> bool:
     _COMPOUND_FG_PREFIXES = (
         'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
         'nitro', 'mercapto', 'sulfanyl', 'phospho',
+        'fluoro', 'chloro', 'bromo', 'iodo',
+        'difluoro', 'trifluoro', 'dichloro', 'trichloro',
+        'dibromo', 'tribromo',
     )
     _ALKYL_ROOTS = (
         'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',

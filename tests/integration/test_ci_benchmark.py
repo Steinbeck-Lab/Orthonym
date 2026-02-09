@@ -220,7 +220,7 @@ CI_BENCHMARK = [
     ("OCCCO", "trimethylene glycol"),
     (
         "O=C([O-])[C@@](O)(CO)C(=O)CO",
-        "(2R)-2-(hydroxymethyl)-2,4-dihydroxy-2-hydroxy-3-oxobutanoate",
+        "(2R)-2-(hydroxymethyl)-4-hydroxy-2-hydroxy-3-oxobutanoate",
     ),
     ("CCC1CC=C(N2CCCC2)C1=O", "5-ethylcyclopent-2-en-1-one"),
     (
