@@ -137,7 +137,7 @@ CI_BENCHMARK = [
     ),
     (
         "Nc1ncn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1",
-        "6-amino-N-tetrahydrofuryl-2-oxo-1,3,5-triazine",
+        "6-amino-2-oxo-N-oxolanyl-1,3,5-triazine",
     ),
     (
         "O=c1c2c(O)cccc2oc2c3c(cc(O)c12)OC1OCCC31",
