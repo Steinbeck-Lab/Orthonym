@@ -431,7 +431,7 @@ CI_BENCHMARK = [
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"
         "[C@H](O)[C@H]2O)C[C@](O)(CO)CC1=NCC(=O)O",
-        "2-aminoicosanoic acid",
+        "(2S,3R)-3-hexyloxybutanedioic acid",
     ),
     (
         "CC(=O)CCC1=C(C)C[C@@]2(CC1=O)C(=O)[C@@H]1C[C@@](O)(CO1)C2=O",

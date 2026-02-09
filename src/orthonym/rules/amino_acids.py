@@ -182,7 +182,15 @@ def _name_amino_acid_systematic(mol) -> str:
         if len(amine_matches) > 1:
             return None  # Multiple amines - use general naming pipeline
 
-    # Count carbons in the backbone (acid chain)
+    # If the molecule has rings, the simple carbon-count approach would
+    # include ring carbons in the chain length (e.g., tyrosine would give
+    # "2-aminononanoic acid" instead of falling through to the general
+    # pipeline which correctly uses parent selection with ring-atom exclusion).
+    ri = mol.GetRingInfo()
+    if ri.NumRings() > 0:
+        return None  # Let general pipeline handle ring-containing amino acids
+
+    # Count carbons in the backbone (acid chain) -- safe for acyclic molecules
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
     # Get stem from carbon count using centralized module

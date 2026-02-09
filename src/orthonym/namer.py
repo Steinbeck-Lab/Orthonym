@@ -564,10 +564,16 @@ class Orthonym:
         if not features.is_cyclic:
             if not features.chain_is_parent:
                 # Normal acyclic molecule - find principal chain
+                # Guard: exclude ring atoms even in "acyclic" path (defensive)
+                _ring_exclude = set()
+                ri = features.mol.GetRingInfo()
+                for ring in ri.AtomRings():
+                    _ring_exclude.update(ring)
                 features.principal_chain = find_principal_chain(
                     features.mol,
                     features.functional_groups,
-                    features.principal_group
+                    features.principal_group,
+                    exclude_atoms=_ring_exclude if _ring_exclude else None
                 )
 
             if features.principal_chain:
