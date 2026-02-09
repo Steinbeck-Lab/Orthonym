@@ -42,7 +42,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
-        "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)-2-hydroxypropane-1,3-dioate",
+        "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
     ),
     ("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O", "benzoic acid"),
     (
@@ -350,7 +350,7 @@ CI_BENCHMARK = [
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@@H](O)COP(=O)(O)"
         "OC1C(O)C(O)C(O)[C@@H](O)C1O",
-        "(8Z,11Z,14Z)-icosa-8,11,14-trien-1-oate",
+        "(8Z,11Z,14Z)-(icosanoyloxy)icosa-8,11,14-trienehexaol",
     ),
     (
         "CCCCCCCC(O)CC(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CCC(=O)O)"
@@ -384,7 +384,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCC=CCC=CCCCCCCCC(=O)OCC(O)COP(=O)(O)OCCN",
-        "aminohydroxyoctadeca-9,12-dien-1-oate",
+        "amino(octadecanoyloxy)octadeca-9,12-dienol",
     ),
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
@@ -394,7 +394,7 @@ CI_BENCHMARK = [
     (
         "CC[C@H](C)C=C(C)C=CC1=CC2=C(Cl)C(=O)[C@@](C)(OC(C)=O)"
         "C(=O)C2=CN1C(CC(C)C)C(=O)OC",
-        "2-cyclodecyl-4-methylpentan-1-oate",
+        "(acetyloxy)(heptacosanoyloxy)-2-cyclodecyl-4-methylpentanedione",
     ),
     (
         "COc1ccc2c(c1OC)C(Cc1ccc(O)cc1)[N+](C)(C)CC2",
@@ -440,7 +440,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCCCCCCCCC1=C(OC(C)=O)C(=O)c2ccccc2C1=O",
-        "1-docosyloxyethan-1-oate",
+        "(acetyloxy)-1-docosyloxyethanedione",
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O",

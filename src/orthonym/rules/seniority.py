@@ -171,6 +171,8 @@ PREFIX_FORMS = {
     "nitro": "nitro",
     "nitroso": "nitroso",
     "azido": "azido",
+    # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
+    "ester": None,  # Esters use acyloxy prefix (handled specially in polyfunctional.py)
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,

@@ -1857,24 +1857,72 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
         prefix = ester_info['acyloxy_prefix']
         prefix_groups[prefix].append(ester_info['ring_attach_atom_idx'])
 
-    # Build prefix string
+    # Determine total number of ester substituents on the ring
+    total_esters = sum(len(v) for v in prefix_groups.values())
+
+    # Compute ring locants for attachment atoms when multiple esters present
+    ring_atom_to_locant: Dict[int, int] = {}
+    if total_esters > 1:
+        # Find the ring containing the attachment atoms and compute numbering
+        ring_atoms = None
+        for r in ring_info.AtomRings():
+            if attach_atom in r:
+                ring_atoms = r
+                break
+        if ring_atoms:
+            # Collect all attachment atom indices
+            all_attach = []
+            for ester_info in exocyclic_esters:
+                all_attach.append(ester_info['ring_attach_atom_idx'])
+            # Use _number_ring_from_attachment for IUPAC-optimal numbering
+            # Try all attachment atoms as position 1, pick lowest locant set
+            best_mapping = None
+            best_locants = None
+            for start_idx in all_attach:
+                candidates = _number_ring_from_attachment(mol, ring_atoms, start_idx)
+                if not candidates:
+                    continue
+                for numbering in candidates:
+                    # numbering is {locant: atom_idx}, invert it
+                    inv = {v: k for k, v in numbering.items()}
+                    locant_set = sorted(inv.get(a, 999) for a in all_attach)
+                    if best_locants is None or locant_set < best_locants:
+                        best_locants = locant_set
+                        best_mapping = inv
+            if best_mapping:
+                ring_atom_to_locant = best_mapping
+
+    # Build prefix parts with locants
     prefix_parts = []
-    for prefix_name, attach_atoms in sorted(prefix_groups.items()):
-        count = len(attach_atoms)
-        if count == 1:
-            # Monosubstituted: no locant needed
+    for prefix_name, attach_atoms_list in sorted(prefix_groups.items()):
+        count = len(attach_atoms_list)
+        if total_esters == 1:
+            # Single ester on ring: no locant needed
             prefix_parts.append(prefix_name)
+        elif count == 1:
+            # One instance of this prefix but multiple esters total: need locant
+            locant = ring_atom_to_locant.get(attach_atoms_list[0], 1)
+            prefix_parts.append(f"{locant}-({prefix_name})")
         else:
-            # Multiple: add multiplier
-            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-            prefix_parts.append(f"{multiplier}{prefix_name}")
+            # Multiple instances of same prefix: locants + bis/tris multiplier
+            locants = sorted(ring_atom_to_locant.get(a, 1) for a in attach_atoms_list)
+            locant_str = ",".join(str(loc) for loc in locants)
+            # Acyloxy names are complex (contain "yloxy"), use bis/tris
+            multiplier = get_multiplier_prefix(count, prefix_name)
+            prefix_parts.append(f"{locant_str}-{multiplier}({prefix_name})")
 
     # Sort alphabetically
     prefix_parts.sort(key=lambda x: alpha_sort_key(x))
 
-    # Join prefixes
-    prefix_str = "".join(prefix_parts)
+    # Join prefixes with hyphens
+    prefix_str = "-".join(prefix_parts)
 
+    # Ensure hyphen before ring parent when prefix ends with letter/paren
+    if prefix_str and ring_parent:
+        if prefix_str[-1] == ')' or prefix_str[-1].isalpha():
+            return f"{prefix_str}{ring_parent}"
+        else:
+            return f"{prefix_str}{ring_parent}"
     return f"{prefix_str}{ring_parent}"
 
 

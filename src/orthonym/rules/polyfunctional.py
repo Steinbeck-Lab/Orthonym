@@ -452,8 +452,62 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if not principal_chain or not atom_to_locant:
         return None
 
+    # --- EL-02: Ester demotion in polyfunctional context ---
+    # When ester is the principal group in a polyfunctional compound, it should
+    # NOT use "-oate" suffix. Instead, demote esters to acyloxy prefixes and
+    # re-select the next-highest seniority group as the principal group.
+    ester_acyloxy_prefixes = []
+    _esters_demoted = False
+    if principal_group == "ester":
+        from ..rules.esters import name_ester_as_prefix
+        ester_matches = features.functional_groups.get("ester", [])
+        for match in ester_matches:
+            acyloxy = name_ester_as_prefix(mol, match)
+            if acyloxy:
+                # Find the alkyl carbon (last in match) on the principal chain
+                alkyl_c = match[-1] if len(match) >= 4 else match[3] if len(match) > 3 else None
+                locant = atom_to_locant.get(alkyl_c) if alkyl_c is not None else None
+                ester_acyloxy_prefixes.append((acyloxy, locant))
+
+        if ester_acyloxy_prefixes:
+            _esters_demoted = True
+
+        # Re-select principal group excluding esters
+        filtered_fgs = {k: v for k, v in features.functional_groups.items() if k != "ester"}
+        new_principal, new_atoms = get_principal_group(mol, filtered_fgs)
+        if new_principal:
+            principal_group = new_principal
+            features.principal_group_atoms = new_atoms
+            # Update non_principal to exclude the new principal group
+            non_principal = {k: v for k, v in filtered_fgs.items()
+                            if k != new_principal and k not in ("alkene", "alkyne")}
+
     # Collect all prefixes (FG prefixes + alkyl substituents)
     all_prefixes = []
+
+    # Add ester acyloxy prefixes if esters were demoted
+    if ester_acyloxy_prefixes:
+        # Group identical acyloxy prefixes for multipliers
+        from collections import Counter as _Ctr
+        acyloxy_groups: Dict[str, List] = defaultdict(list)
+        for acyloxy_name, locant in ester_acyloxy_prefixes:
+            acyloxy_groups[acyloxy_name].append(locant)
+
+        for acyloxy_name, locants in sorted(acyloxy_groups.items()):
+            valid_locants = sorted(loc for loc in locants if loc is not None)
+            count = len(locants)
+            if count > 1 and valid_locants:
+                locant_str = ",".join(str(loc) for loc in valid_locants)
+                multiplier = get_multiplier_prefix(count, acyloxy_name)
+                all_prefixes.append(f"{locant_str}-{multiplier}({acyloxy_name})")
+            elif valid_locants:
+                all_prefixes.append(f"{valid_locants[0]}-({acyloxy_name})")
+            else:
+                if count > 1:
+                    multiplier = get_multiplier_prefix(count, acyloxy_name)
+                    all_prefixes.append(f"{multiplier}({acyloxy_name})")
+                else:
+                    all_prefixes.append(f"({acyloxy_name})")
 
     # --- Generate FG prefixes from non-principal groups ---
     chain_set = set(principal_chain)
@@ -516,7 +570,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
     # --- Generate alkyl substituent prefixes ---
     if features.substituents:
-        alkyl_prefixes = _generate_alkyl_prefixes_for_polyfunctional(features)
+        alkyl_prefixes = _generate_alkyl_prefixes_for_polyfunctional(
+            features, skip_acyloxy=_esters_demoted
+        )
         all_prefixes.extend(alkyl_prefixes)
 
     # Sort all prefixes alphabetically
@@ -641,12 +697,19 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     return name
 
 
-def _generate_alkyl_prefixes_for_polyfunctional(features: Any) -> List[str]:
+def _generate_alkyl_prefixes_for_polyfunctional(
+    features: Any, skip_acyloxy: bool = False
+) -> List[str]:
     """
     Generate alkyl substituent prefixes for polyfunctional compounds.
 
     Similar to _generate_alkyl_prefixes in composer.py but returns
     just the formatted strings for combination with FG prefixes.
+
+    Args:
+        features: MolecularFeatures object
+        skip_acyloxy: If True, skip acyloxy detection (esters already handled
+                      by ester demotion in name_polyfunctional)
     """
     from collections import defaultdict
 
@@ -680,7 +743,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(features: Any) -> List[str]:
                 # NOTE: Do NOT check alkoxy here - ethers are already handled
                 # by the FG prefix system in name_polyfunctional
                 het_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
-                if not het_name:
+                if not het_name and not skip_acyloxy:
                     het_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
                 if not het_name:
                     het_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
