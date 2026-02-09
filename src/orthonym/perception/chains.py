@@ -168,28 +168,112 @@ def find_principal_chain(
                     triple_bonds += 1
         
         return double_bonds, triple_bonds
-    
+
+    exclude = exclude_atoms or set()
+
+    def _compute_fg_locant_score(chain: List[int]) -> tuple:
+        """Criterion 6 (P-44.4h): Lowest locants for principal group."""
+        chain_set = set(chain)
+        on_chain = fg_atoms & chain_set
+        if not on_chain:
+            return (0,)
+        # Try both orientations, take better one
+        fwd = sorted(chain.index(a) for a in on_chain)
+        rev = sorted(len(chain) - 1 - chain.index(a) for a in on_chain)
+        fwd_score = (1,) + tuple(-p for p in fwd)
+        rev_score = (1,) + tuple(-p for p in rev)
+        return max(fwd_score, rev_score)
+
+    def _compute_bond_locant_score(chain: List[int]) -> tuple:
+        """Criterion 7 (P-44.4j): Lowest locants for multiple bonds."""
+        positions = []
+        for i in range(len(chain) - 1):
+            bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+            if bond:
+                bt = bond.GetBondType()
+                if bt == Chem.BondType.DOUBLE or bt == Chem.BondType.TRIPLE:
+                    positions.append(i)
+        if not positions:
+            return (0,)
+        # Try both orientations
+        fwd = sorted(positions)
+        rev = sorted(len(chain) - 2 - p for p in positions)
+        fwd_score = (1,) + tuple(-p for p in fwd)
+        rev_score = (1,) + tuple(-p for p in rev)
+        return max(fwd_score, rev_score)
+
+    def _count_substituents(chain: List[int]) -> int:
+        """Criterion 8: Maximum number of substituents on chain."""
+        chain_set = set(chain)
+        count = 0
+        for atom_idx in chain:
+            atom = mol.GetAtomWithIdx(atom_idx)
+            for nbr in atom.GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx not in chain_set and nbr_idx not in exclude:
+                    if nbr.GetSymbol() != 'H':
+                        count += 1
+        return count
+
+    def _compute_sub_locant_score(chain: List[int]) -> tuple:
+        """Criterion 9: Lowest locants for substituents."""
+        chain_set = set(chain)
+        positions = []
+        for i, atom_idx in enumerate(chain):
+            atom = mol.GetAtomWithIdx(atom_idx)
+            has_sub = False
+            for nbr in atom.GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx not in chain_set and nbr_idx not in exclude:
+                    if nbr.GetSymbol() != 'H':
+                        has_sub = True
+                        break
+            if has_sub:
+                positions.append(i)
+        if not positions:
+            return ()
+        # Try both orientations
+        fwd = sorted(positions)
+        rev = sorted(len(chain) - 1 - p for p in positions)
+        fwd_score = tuple(-p for p in fwd)
+        rev_score = tuple(-p for p in rev)
+        return max(fwd_score, rev_score)
+
     def chain_score(chain: List[int]) -> tuple:
         """
         Calculate selection score for a chain.
-        Returns tuple for comparison (higher = better).
+        Returns 9-element tuple for comparison (higher = better).
+        Implements all IUPAC 2013 P-44 criteria.
         """
         chain_set = set(chain)
-        
+
         # Criterion 1: Contains principal group
         contains_fg = 1 if (fg_atoms & chain_set) else 0
-        
+
         # Criterion 2: Count of principal groups in chain
         fg_count = len(fg_atoms & chain_set)
-        
+
         # Criterion 3: Chain length (IUPAC 2013 prioritizes length!)
         length = len(chain)
-        
+
         # Criterion 4 & 5: Count multiple bonds
         double_bonds, triple_bonds = count_bonds_in_chain(chain)
         multiple_bonds = double_bonds + triple_bonds
-        
-        return (contains_fg, fg_count, length, multiple_bonds, double_bonds)
+
+        # Criterion 6: Lowest locants for principal group
+        fg_locants_score = _compute_fg_locant_score(chain)
+
+        # Criterion 7: Lowest locants for multiple bonds
+        bond_locants_score = _compute_bond_locant_score(chain)
+
+        # Criterion 8: Maximum substituents
+        sub_count = _count_substituents(chain)
+
+        # Criterion 9: Lowest locants for substituents
+        sub_locants_score = _compute_sub_locant_score(chain)
+
+        return (contains_fg, fg_count, length, multiple_bonds, double_bonds,
+                fg_locants_score, bond_locants_score, sub_count, sub_locants_score)
     
     # Find chain with highest score
     best_chain = max(chains, key=chain_score)
