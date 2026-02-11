@@ -1050,13 +1050,29 @@ def name_substituted_heterocycle(
                 # Non-carbon functional substituent (amino, hydroxy, etc.)
                 sub_name = sub_info['hetero_name']
             else:
-                # Get alkyl name from carbon count
+                # Get alkyl name from carbon count, with recursive naming for branched subs
                 carbon_count = sub_info['carbon_count']
-                try:
-                    sub_name = get_alkyl_name(carbon_count)
-                except ValueError:
-                    # Unsupported carbon count (> 10), skip
-                    continue
+                sub_atoms = sub_info.get('atoms', [])
+                sub_name = None
+                # Only try recursive naming for pure alkyl subs (all C/H atoms)
+                if sub_atoms and len(sub_atoms) > 1:
+                    all_c_h = all(
+                        mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+                        for i in sub_atoms
+                    )
+                    if all_c_h:
+                        from ..assembly.substituent_naming import name_substituent_fragment
+                        attach_idx = sub_atoms[0]
+                        ring_set_local = set(ring_atoms) if ring_atoms else set()
+                        sub_name = name_substituent_fragment(
+                            mol, sub_atoms, attach_idx, list(ring_set_local)
+                        )
+                if sub_name is None:
+                    try:
+                        sub_name = get_alkyl_name(carbon_count)
+                    except ValueError:
+                        # Unsupported carbon count (> 10), skip
+                        continue
 
             if is_on_n:
                 if sub_name not in n_groups:
@@ -1093,9 +1109,10 @@ def name_substituted_heterocycle(
             prefix_str = prefix
         else:
             # Add hyphen between prefixes if needed
-            if prefix_str[-1].isalpha() and prefix[0].isdigit():
+            last_ch = prefix_str[-1]
+            if (last_ch.isalpha() or last_ch == ')') and prefix[0].isdigit():
                 prefix_str += "-"
-            elif prefix_str[-1].isalpha() and prefix[0] == 'N':
+            elif (last_ch.isalpha() or last_ch == ')') and prefix[0] == 'N':
                 prefix_str += "-"
             prefix_str += prefix
 
@@ -1103,7 +1120,8 @@ def name_substituted_heterocycle(
     # When parent starts with digit (e.g., "1,4-dithiane"), need hyphen after prefix
     # When parent starts with letter (e.g., "pyridine"), no extra hyphen needed
     if prefix_str and parent_name:
-        if parent_name[0].isdigit() and prefix_str[-1].isalpha():
+        last_ch = prefix_str[-1]
+        if parent_name[0].isdigit() and (last_ch.isalpha() or last_ch == ')'):
             combined = f"{prefix_str}-{parent_name}"
         else:
             combined = f"{prefix_str}{parent_name}"
@@ -1179,13 +1197,21 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
 
     Single: 3-methyl
     Multiple same: 2,4-dimethyl
+
+    Per IUPAC P-14.5.2, compound substituent names are parenthesized.
     """
     locant_str = ",".join(str(loc) for loc in locants)
+    # Wrap compound names in parentheses to prevent locant ambiguity
+    display_name = name
+    if not name.startswith('('):
+        from ..assembly.naming_utils import is_complex_substituent
+        if is_complex_substituent(name):
+            display_name = f'({name})'
     if count == 1:
-        return f"{locant_str}-{name}"
+        return f"{locant_str}-{display_name}"
     else:
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{locant_str}-{multiplier}{name}"
+        return f"{locant_str}-{multiplier}{display_name}"
 
 
 def get_saturation_prefix(

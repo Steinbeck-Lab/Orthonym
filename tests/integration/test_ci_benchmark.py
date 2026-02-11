@@ -53,7 +53,7 @@ CI_BENCHMARK = [
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"
         "(C)C)c(O)c1O",
-        "1,2-dihydroxy-5-methyl-3-octylbenzene",
+        "1,2-dihydroxy-5-methyl-3-(1,2,2-trimethylcyclopentyl)benzene",
     ),
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
@@ -168,7 +168,7 @@ CI_BENCHMARK = [
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
-        "(2E)-3-(4-chlorophenyl)1-phenylprop-2-en-1-one",
+        "(2E)-3-(4-chlorophenyl)-1-phenylprop-2-en-1-one",
     ),
     (
         "CN(C)CCC=C1c2ccccc2COc2ccccc21",
@@ -234,7 +234,7 @@ CI_BENCHMARK = [
     ),
     (
         "C[NH2+][C@@H](C)[C@@H](O)c1ccccc1",
-        "(1S,2S)-2-(methylamino)1-phenylpropan-1-ol",
+        "(1S,2S)-2-(methylamino)-1-phenylpropan-1-ol",
     ),
     ("CSCCSC", "2,5-dithiahexane"),
     (
@@ -267,7 +267,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc(OC)c2c(c1CC=C(C)C)O[C@H](c1ccccc1)CC2",
-        "1-hexyl-4,7-dimethoxy-8-pentylchromane",
+        "4,7-dimethoxy-8-(2-methylbut-2-enyl)-1-phenylchromane",
     ),
     (
         "CN=C(N)NCCC/C=C/CCC[C@H](C)[C@H]1OC(=O)/C(C)=C\\C=C/"
@@ -329,7 +329,7 @@ CI_BENCHMARK = [
     ),
     (
         "C=C/C(C)=C/[C@]1(C)SC(=O)C(CC)=C1O",
-        "(5S)-3-ethyl-4-hydroxy-5-methyl-2-oxo-5-pentylthiole",
+        "(5S)-3-ethyl-4-hydroxy-5-methyl-5-(2-methylbuta-1,3-dienyl)-2-oxothiole",
     ),
     (
         "N[C@H](C=O)Cc1cnc[nH]1",
@@ -389,7 +389,7 @@ CI_BENCHMARK = [
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
         "c(O)c1CC=C(C)C",
-        "1-17-carboxyheptadecyl-7-hydroxychroman-3-one",
+        "1-(17-carboxyheptadecyl)-7-hydroxychroman-3-one",
     ),
     (
         "CC[C@H](C)C=C(C)C=CC1=CC2=C(Cl)C(=O)[C@@](C)(OC(C)=O)"
@@ -416,7 +416,7 @@ CI_BENCHMARK = [
     ("O=C1N=C([O-])c2ccccc21.[K+]", "potassium octanolate"),
     (
         "CC1=C(O)C(=O)C([C@@]2(C)CCCC2(C)C)=C(O)C1=O",
-        "2,5-dihydroxy-6-methyl-3-octylcyclohexa-2,5-diene-1,4-dione",
+        "3-(1,2,2-trimethylcyclopentyl)-2,5-dihydroxy-6-methylcyclohexa-2,5-diene-1,4-dione",
     ),
     (
         "CC(=O)N(O)CCCCNC(=O)[C@H](COC(=O)c1cccc(O)c1O)NC(=O)"
@@ -425,7 +425,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC(C)C1=C[C@@]23CC[C@H]4C(C)(C)CCC[C@]4(C(=O)O2)C3=CC1=O",
-        "(1R,4S,9R)-5,5-dimethyl-13-propyl-15-oxa-tetracyclo"
+        "(1R,4S,9R)-13-isopropyl-5,5-dimethyl-15-oxa-tetracyclo"
         "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,16-dione",
     ),
     (
@@ -473,7 +473,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
         "cc3O)C=C(C)CC2c2ccc(OC3OC(C(=O)O)C(O)C(O)C3O)cc2O)c1O",
-        "1,3-dihydroxy-2-pentylbenzene",
+        "1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",

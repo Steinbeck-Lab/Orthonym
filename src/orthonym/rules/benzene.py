@@ -349,11 +349,17 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[in
                 mol, nbr_idx, ring_atoms | {n_idx, c_idx}
             )
             if alkyl_atoms is not None and carbon_count > 0:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                    alkyl_names.append(alkyl_name)
-                except (ValueError, KeyError):
-                    pass
+                from ..assembly.substituent_naming import name_substituent_fragment
+                rec_name = name_substituent_fragment(
+                    mol, alkyl_atoms, nbr_idx, list(ring_atoms | {n_idx, c_idx})
+                )
+                if rec_name:
+                    alkyl_names.append(rec_name)
+                else:
+                    try:
+                        alkyl_names.append(get_alkyl_name(carbon_count))
+                    except (ValueError, KeyError):
+                        pass
 
     alkyl_names.sort()
     return alkyl_names
@@ -529,10 +535,15 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
         alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, neighbors[0].GetIdx(), ring_atoms | {n_idx})
         if alkyl_atoms is not None and carbon_count > 0:
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-            except (ValueError, KeyError):
-                alkyl_name = None
+            from ..assembly.substituent_naming import name_substituent_fragment
+            alkyl_name = name_substituent_fragment(
+                mol, alkyl_atoms, neighbors[0].GetIdx(), list(ring_atoms | {n_idx})
+            )
+            if alkyl_name is None:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                except (ValueError, KeyError):
+                    alkyl_name = None
             if alkyl_name:
                 return {
                     'name': f'(N-{alkyl_name}amino)',
@@ -551,10 +562,15 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, cn.GetIdx(), ring_atoms | {n_idx})
                 if alkyl_atoms is None or carbon_count == 0:
                     break
-                try:
-                    aname = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    break
+                from ..assembly.substituent_naming import name_substituent_fragment
+                aname = name_substituent_fragment(
+                    mol, alkyl_atoms, cn.GetIdx(), list(ring_atoms | {n_idx})
+                )
+                if aname is None:
+                    try:
+                        aname = get_alkyl_name(carbon_count)
+                    except (ValueError, KeyError):
+                        break
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
             else:
@@ -641,16 +657,22 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
             # Collect the alkyl part
             alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, c_atom.GetIdx(), ring_atoms | {o_idx})
             if alkyl_atoms is not None and carbon_count > 0:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
+                from ..assembly.substituent_naming import name_substituent_fragment
+                alkyl_name = name_substituent_fragment(
+                    mol, alkyl_atoms, c_atom.GetIdx(), list(ring_atoms | {o_idx})
+                )
+                if alkyl_name is None:
+                    try:
+                        alkyl_name = get_alkyl_name(carbon_count)
+                    except (ValueError, KeyError):
+                        alkyl_name = None
+                if alkyl_name:
                     # methyl -> methoxy, ethyl -> ethoxy, propyl -> propoxy, etc.
                     if alkyl_name.endswith('yl'):
                         oxy_name = alkyl_name[:-2] + 'oxy'
                     else:
                         oxy_name = alkyl_name + 'oxy'
                     return {'name': oxy_name, 'atoms': [o_idx] + alkyl_atoms}
-                except (ValueError, KeyError):
-                    pass
 
         # Alkoxy fallback for O-C where C is not pure alkyl
         # (aromatic carbon, sugar ring carbon, carbonyl carbon, etc.)
@@ -790,14 +812,20 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
             mol, neighbors[0].GetIdx(), ring_atoms | {s_idx}
         )
         if alkyl_atoms is not None and carbon_count > 0:
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
+            from ..assembly.substituent_naming import name_substituent_fragment
+            alkyl_name = name_substituent_fragment(
+                mol, alkyl_atoms, neighbors[0].GetIdx(), list(ring_atoms | {s_idx})
+            )
+            if alkyl_name is None:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                except (ValueError, KeyError):
+                    alkyl_name = None
+            if alkyl_name:
                 return {
                     'name': f'{alkyl_name}sulfanyl',
                     'atoms': [s_idx] + alkyl_atoms,
                 }
-            except (ValueError, KeyError):
-                pass
 
     # Disulfanyl (-S-SH) or dithio linkages
     if len(neighbors) == 1 and neighbors[0].GetSymbol() == 'S':
@@ -911,7 +939,7 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             return None
 
     # Check for branched alkyl (isopropyl, tert-butyl, etc.)
-    name = _get_alkyl_name(mol, start_idx, carbon_count, ring_atoms)
+    name = _get_alkyl_name(mol, start_idx, carbon_count, ring_atoms, sub_atoms=all_atoms)
     if name:
         return {'name': name, 'atoms': all_atoms}
 
@@ -935,14 +963,33 @@ def _is_vinyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> bool:
     return False
 
 
-def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int]) -> Optional[str]:
+def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int],
+                    sub_atoms: list = None) -> Optional[str]:
     """
     Get the name for an alkyl substituent.
 
-    For now, handles simple linear alkyls. Branched alkyls will be
-    implemented in later phases.
+    Uses name_substituent_fragment() for branched/complex substituents,
+    falls back to get_alkyl_name(carbon_count) for linear alkyls.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: First carbon of the substituent (bonded to ring)
+        carbon_count: Number of carbons in the substituent
+        ring_atoms: Set of ring atom indices
+        sub_atoms: Optional list of all atom indices in the substituent
     """
-    # TODO: Check for branching (isopropyl vs propyl, etc.)
+    from ..assembly.substituent_naming import name_substituent_fragment
+
+    # If we have atom context, try name_substituent_fragment (handles retained
+    # names like sec-butyl/isopropyl and branched substituents)
+    if sub_atoms is not None and len(sub_atoms) > 0:
+        recursive_name = name_substituent_fragment(
+            mol, sub_atoms, start_idx, list(ring_atoms)
+        )
+        if recursive_name:
+            return recursive_name
+
+    # Fallback: simple carbon-count naming
     try:
         return get_alkyl_name(carbon_count)
     except (ValueError, KeyError):

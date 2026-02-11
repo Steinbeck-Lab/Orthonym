@@ -495,7 +495,7 @@ PHASE24_WAVE2_FIXES = [
     # D1: Uppercase R/S for pseudoasymmetric centers (was lowercase s)
     (
         "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1",
-        "(1S,4S,7R)-1,7-dimethyl-4-propylcyclodecane",
+        "(1S,4S,7R)-4-isopropyl-1,7-dimethylcyclodecane",
         "stereo-uppercase-pseudoasymmetric",
     ),
 

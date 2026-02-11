@@ -591,6 +591,14 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
             1 for i in sub_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
         )
         if n_carbons > 0:
+            # Try recursive naming (handles retained names + branched subs)
+            if len(sub_atoms) > 1:
+                from ..assembly.substituent_naming import name_substituent_fragment
+                rec_name = name_substituent_fragment(
+                    mol, sub_atoms, sub_atoms[0], []
+                )
+                if rec_name:
+                    return rec_name
             try:
                 return get_alkyl_name(n_carbons)
             except (ValueError, KeyError):

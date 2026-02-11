@@ -1538,10 +1538,22 @@ def get_polycyclic_substituents(
             )
 
             if carbon_count > 0:
-                try:
-                    name = get_alkyl_name(carbon_count)
-                except (ValueError, KeyError):
-                    name = f"C{carbon_count}H{2*carbon_count+1}"
+                name = None
+                # Try recursive naming for branched pure-alkyl subs
+                all_c_h = all(
+                    mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+                    for i in sub_atoms
+                )
+                if all_c_h and len(sub_atoms) > 1:
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    name = name_substituent_fragment(
+                        mol, sub_atoms, nbr_idx, list(ring_atoms)
+                    )
+                if name is None:
+                    try:
+                        name = get_alkyl_name(carbon_count)
+                    except (ValueError, KeyError):
+                        name = f"C{carbon_count}H{2*carbon_count+1}"
             else:
                 # Non-carbon substituent (like hydroxy, amino)
                 # For now, skip these as they're functional groups

@@ -3322,13 +3322,24 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
             elif sym == 'C':
                 bond = mol.GetBondBetweenAtoms(atom_idx, ni)
                 if bond and bond.GetBondTypeAsDouble() == 1.0:
-                    c_count = _count_pure_alkyl(mol, ni, ring_atom_set)
-                    if c_count:
-                        from ..data.chain_names import get_alkyl_name as _gal
-                        try:
-                            sub_groups[_gal(c_count)].append(ring_pos)
-                        except (ValueError, KeyError):
-                            pass
+                    alkyl_atoms = _collect_pure_alkyl_atoms(mol, ni, ring_atom_set)
+                    if alkyl_atoms:
+                        c_count = len(alkyl_atoms)
+                        sub_name = None
+                        # Try recursive naming (handles retained names + branched)
+                        if c_count > 0:
+                            from .substituent_naming import name_substituent_fragment
+                            sub_name = name_substituent_fragment(
+                                mol, alkyl_atoms, ni, list(ring_atom_set)
+                            )
+                        if sub_name is None:
+                            from ..data.chain_names import get_alkyl_name as _gal
+                            try:
+                                sub_name = _gal(c_count)
+                            except (ValueError, KeyError):
+                                pass
+                        if sub_name:
+                            sub_groups[sub_name].append(ring_pos)
 
     return dict(sub_groups) if sub_groups else None
 
@@ -3352,6 +3363,30 @@ def _count_pure_alkyl(mol, start_idx, excluded):
                 queue.append(ni)
 
     return carbon_count if carbon_count > 0 else None
+
+
+def _collect_pure_alkyl_atoms(mol, start_idx, excluded):
+    """Collect atom indices of a pure alkyl chain from start_idx.
+
+    Returns list of carbon atom indices, or None if non-carbon encountered.
+    """
+    visited = {start_idx}
+    queue = [start_idx]
+    atoms = []
+
+    while queue:
+        idx = queue.pop(0)
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None  # Not pure alkyl
+        atoms.append(idx)
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in visited and ni not in excluded:
+                visited.add(ni)
+                queue.append(ni)
+
+    return atoms if atoms else None
 
 
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
@@ -4116,13 +4151,22 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
             if has_heteroatom:
                 continue
 
-            # Get alkyl name from carbon count
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-                substituent_groups[alkyl_name].append(locant)
-            except ValueError:
-                # Carbon count > 10, skip for now (complex substituent)
-                continue
+            # Get alkyl name -- try name_substituent_fragment for retained/branched
+            alkyl_name = None
+            if len(sub_atoms) > 0:
+                from .substituent_naming import name_substituent_fragment
+                ring_atom_set_local = set(oriented_ring) if oriented_ring else set()
+                attach_idx = sub_atoms[0]
+                alkyl_name = name_substituent_fragment(
+                    mol, sub_atoms, attach_idx, list(ring_atom_set_local)
+                )
+            if alkyl_name is None:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                except ValueError:
+                    # Carbon count > 10, skip for now (complex substituent)
+                    continue
+            substituent_groups[alkyl_name].append(locant)
 
     # Count ALL ring substituents (alkyl + FG), not just the ones we named
     # This prevents monosubstituted=True when there's 1 alkyl + 1 halogen
@@ -4670,7 +4714,9 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            if last_char.isalpha() and first_char.isdigit():
+            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
+                result += "-"
+            elif (last_char.isalpha() or last_char == ')') and first_char == 'N':
                 result += "-"
         result += current
 

@@ -164,13 +164,24 @@ def orient_cycloalkane(
             pos1_atom = oriented[0]
             pos1_sub_name = None
             if pos1_atom in substituent_positions and substituent_positions[pos1_atom]:
-                # Get substituent name (by carbon count for alkyl)
+                # Get substituent name (by carbon count for alkyl, recursive for branched)
                 sub_atoms = substituent_positions[pos1_atom][0]
                 carbon_count = sum(
                     1 for idx in sub_atoms
                     if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
                 )
-                pos1_sub_name = _get_alkyl_name(carbon_count)
+                # Try recursive naming for branched subs
+                all_c_h = all(
+                    mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+                    for i in sub_atoms
+                )
+                if all_c_h and len(sub_atoms) > 1:
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    pos1_sub_name = name_substituent_fragment(
+                        mol, sub_atoms, sub_atoms[0], list(ring_atoms)
+                    )
+                if pos1_sub_name is None:
+                    pos1_sub_name = _get_alkyl_name(carbon_count)
 
             candidates.append((oriented, locants, pos1_sub_name))
 
@@ -475,16 +486,17 @@ def _get_alkyl_name(carbon_count: int) -> Optional[str]:
         return None
 
 
-def get_substituent_name(mol, sub_atoms: List[int]) -> Optional[str]:
+def get_substituent_name(mol, sub_atoms: List[int], ring_atoms: set = None) -> Optional[str]:
     """
     Get the name of a substituent from its atom list.
 
     Args:
         mol: RDKit Mol object
         sub_atoms: List of atom indices in the substituent
+        ring_atoms: Optional set of ring atom indices (for recursive naming)
 
     Returns:
-        Substituent name (e.g., 'methyl', 'ethyl') or None
+        Substituent name (e.g., 'methyl', 'ethyl', 'isopropyl') or None
     """
     # Count carbons
     carbon_count = sum(
@@ -501,5 +513,15 @@ def get_substituent_name(mol, sub_atoms: List[int]) -> Optional[str]:
     if has_heteroatom:
         # Complex substituent - handle in later phases
         return None
+
+    # Try recursive naming (handles retained names like isopropyl + branched subs)
+    if len(sub_atoms) > 1 and ring_atoms is not None:
+        from ..assembly.substituent_naming import name_substituent_fragment
+        attach_idx = sub_atoms[0]
+        rec_name = name_substituent_fragment(
+            mol, sub_atoms, attach_idx, list(ring_atoms)
+        )
+        if rec_name:
+            return rec_name
 
     return _get_alkyl_name(carbon_count)

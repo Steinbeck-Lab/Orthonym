@@ -466,10 +466,20 @@ def _identify_fused_substituent(
                         }
                         alkoxy_name = _ALKOXY.get(carbon_count)
                         if alkoxy_name is None:
-                            try:
-                                alkoxy_name = f'{get_alkyl_name(carbon_count)}oxy'
-                            except (ValueError, KeyError):
-                                alkoxy_name = None
+                            from ..assembly.substituent_naming import name_substituent_fragment
+                            rec_name = name_substituent_fragment(
+                                mol, alkyl_atoms, nbr.GetIdx(), list(excluded | {start_idx})
+                            )
+                            if rec_name:
+                                if rec_name.endswith('yl'):
+                                    alkoxy_name = rec_name[:-2] + 'oxy'
+                                else:
+                                    alkoxy_name = f'{rec_name}oxy'
+                            if alkoxy_name is None:
+                                try:
+                                    alkoxy_name = f'{get_alkyl_name(carbon_count)}oxy'
+                                except (ValueError, KeyError):
+                                    alkoxy_name = None
                         if alkoxy_name:
                             return {
                                 'name': alkoxy_name,
@@ -510,15 +520,21 @@ def _identify_fused_substituent(
                 if alkyl_atoms is not None:
                     carbon_count = sum(1 for idx in alkyl_atoms
                                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
-                    try:
-                        alkyl_name = get_alkyl_name(carbon_count)
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    alkyl_name = name_substituent_fragment(
+                        mol, alkyl_atoms, nbr.GetIdx(), list(excluded | {start_idx})
+                    )
+                    if alkyl_name is None:
+                        try:
+                            alkyl_name = get_alkyl_name(carbon_count)
+                        except (ValueError, KeyError):
+                            alkyl_name = None
+                    if alkyl_name:
                         return {
                             'name': f'{alkyl_name}amino',
                             'type': 'functional',
                             'atoms': [start_idx] + alkyl_atoms
                         }
-                    except (ValueError, KeyError):
-                        pass
 
         # N,N-dialkyl amino (-NR2) -> (dialkylamino) prefix
         if h_count == 0 and len(neighbors) == 2:
@@ -532,11 +548,17 @@ def _identify_fused_substituent(
                         break
                     carbon_count = sum(1 for idx in alkyl_atoms
                                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
-                    try:
-                        alkyl_names.append(get_alkyl_name(carbon_count))
-                        all_sub_atoms.extend(alkyl_atoms)
-                    except (ValueError, KeyError):
-                        break
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    aname = name_substituent_fragment(
+                        mol, alkyl_atoms, cn.GetIdx(), list(excluded | {start_idx})
+                    )
+                    if aname is None:
+                        try:
+                            aname = get_alkyl_name(carbon_count)
+                        except (ValueError, KeyError):
+                            break
+                    alkyl_names.append(aname)
+                    all_sub_atoms.extend(alkyl_atoms)
                 else:
                     # Both alkyl groups identified
                     alkyl_names.sort()
@@ -575,10 +597,17 @@ def _identify_fused_substituent(
                     }
                     thio_name = _ALKYLTHIO.get(carbon_count)
                     if thio_name is None:
-                        try:
-                            thio_name = f'{get_alkyl_name(carbon_count)}sulfanyl'
-                        except (ValueError, KeyError):
-                            thio_name = None
+                        from ..assembly.substituent_naming import name_substituent_fragment
+                        rec_name = name_substituent_fragment(
+                            mol, alkyl_atoms, nbr.GetIdx(), list(excluded | {start_idx})
+                        )
+                        if rec_name:
+                            thio_name = f'{rec_name}sulfanyl'
+                        if thio_name is None:
+                            try:
+                                thio_name = f'{get_alkyl_name(carbon_count)}sulfanyl'
+                            except (ValueError, KeyError):
+                                thio_name = None
                     if thio_name:
                         return {
                             'name': thio_name,
@@ -667,7 +696,18 @@ def _identify_alkyl_substituent(
     if carbon_count == 0:
         return None
 
-    # Get alkyl name
+    # Get alkyl name -- try name_substituent_fragment (handles retained + branched)
+    from ..assembly.substituent_naming import name_substituent_fragment
+    recursive_name = name_substituent_fragment(
+        mol, all_atoms, start_idx, list(excluded)
+    )
+    if recursive_name:
+        return {
+            'name': recursive_name,
+            'type': 'alkyl',
+            'atoms': all_atoms
+        }
+
     try:
         alkyl_name = get_alkyl_name(carbon_count)
         return {
@@ -1134,13 +1174,24 @@ def _format_n_prefix(name: str, count: int) -> str:
 
 
 def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
-    """Format a C-substituent prefix with numeric locants."""
+    """Format a C-substituent prefix with numeric locants.
+
+    Per IUPAC P-14.5.2, compound substituent names containing locants
+    are enclosed in parentheses to prevent ambiguity.
+    """
     locant_str = ",".join(str(loc) for loc in locants)
+    # Wrap compound names (those containing digits or hyphens) in parentheses
+    # to prevent locant ambiguity (e.g., 8-(2-methylpropyl) not 8-2-methylpropyl)
+    display_name = name
+    if not name.startswith('('):
+        from ..assembly.naming_utils import is_complex_substituent
+        if is_complex_substituent(name):
+            display_name = f'({name})'
     if count == 1:
-        return f"{locant_str}-{name}-"
+        return f"{locant_str}-{display_name}-"
     else:
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{locant_str}-{multiplier}{name}-"
+        return f"{locant_str}-{multiplier}{display_name}-"
 
 
 def _join_fused_prefixes(prefixes: List[str]) -> str:
@@ -1157,9 +1208,9 @@ def _join_fused_prefixes(prefixes: List[str]) -> str:
             # Check if hyphen needed between prefixes
             last_char = result[-1]
             first_char = p[0]
-            if last_char.isalpha() and first_char.isdigit():
+            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
                 result += "-"
-            elif last_char.isalpha() and first_char == 'N':
+            elif (last_char.isalpha() or last_char == ')') and first_char == 'N':
                 result += "-"
         result += p
 
