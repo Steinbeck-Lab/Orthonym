@@ -261,6 +261,17 @@ class Orthonym:
         if skel_name:
             return skel_name
 
+        # DECOMPOSITION ENGINE (v4.0 Phase 39)
+        # For complex molecules with ester/amide/glycosidic bonds that the
+        # existing single-pass pipeline cannot name completely, try cleaving
+        # at functional bonds and naming fragments individually.
+        # Quality gate inside try_decompose() ensures this only activates
+        # when the existing pipeline would produce a poor result.
+        from .decomposition import try_decompose
+        decomposed_name = try_decompose(mol, style=self.style)
+        if decomposed_name is not None:
+            return decomposed_name
+
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
 

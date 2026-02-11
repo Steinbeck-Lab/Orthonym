@@ -44,7 +44,7 @@ CI_BENCHMARK = [
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
         "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
     ),
-    ("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O", "benzoic acid"),
+    ("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O", "8-methylnonyl benzene-1,2-dicarboxylate"),
     (
         "O=C(O)c1ccccc1-c1c2ccc(=O)c([As]3SCCS3)c-2oc2c([As]3SCCS3)"
         "c(O)ccc12",
@@ -96,7 +96,7 @@ CI_BENCHMARK = [
     (
         "C=C1[C@@H](O)O[C@H]2[C@H]1C[C@@H](OC(C)=O)[C@]13C(=O)O"
         "[C@H]4C[C@](C)(O)[C@H]([C@H]41)[C@@]31C=C(C)[C@]2(O)O1",
-        "icosyl acetate",
+        "(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,20S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,19-trioxa-hexacyclo[10.6.0.1(9,12).1(1,16).0(4,8).0(13,20)]icos-10-en-18-one acetate",
     ),
     (
         "CC(C)=CCC/C(C)=C/CC/C(C)=C/CC/C(C)=C\\CC/C(C)=C\\CC/C(C)=C"
@@ -206,7 +206,7 @@ CI_BENCHMARK = [
         "O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H]"
         "(O[C@H]3O[C@H](CO)[C@H](O)[C@H](O)[C@H]3O)[C@H]2O)"
         "[C@@H]1O",
-        "ethanamide",
+        "N-acetyl(2R,3R,4R,5S,6R)-3-amino-2,5-ditetrahydropyranyl-4-hydroxy-6-methyltetrahydropyran",
     ),
     (
         "O=C([O-])[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
@@ -275,7 +275,7 @@ CI_BENCHMARK = [
         "[C@H](O)C[C@@]2(O)O[C@H](C[C@H](O)C[C@H](OC(=O)CC(=O)O)"
         "C[C@@H](O)C[C@H](O)/C(C)=C\\C=C/[C@H]1C)C[C@@H](O)"
         "[C@@H]2O",
-        "propanoic acid",
+        "(2R,4R,6R,8R,10S,11Z,13Z,15R,16R,19Z,21Z,23S,24R,26S,27R,28S,31R,32R,34R)-16-dodecyl-4,6,8,10,24,26,28,32,34-nonahydroxy-11,15,19,23,27,31-hexamethyl-18-oxo-2,34-dipropyl-1,17-dioxacyclotetratriacontene propanedioate",
     ),
     (
         "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O",
@@ -317,7 +317,7 @@ CI_BENCHMARK = [
         "[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)"
         "[C@H](O)[C@H](O)[C@H]4O)[C@H]3NC(C)=O)[C@H]2O)"
         "[C@@H](CO)O[C@H]1O",
-        "ethanediamide",
+        "N-acetylethanamide",
     ),
     (
         "CN1CCCN=C1/C=C/c1cccs1",
@@ -453,7 +453,7 @@ CI_BENCHMARK = [
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
         "[C@@H](N)Cc2c[nH]cn2)[C@H]1O",
-        "adenine",
+        "adenine (2S)-2-amino-3-imidazolylpropanoate",
     ),
     (
         "NC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](N)C[C@@H]2N)"
