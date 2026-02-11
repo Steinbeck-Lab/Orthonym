@@ -124,10 +124,10 @@ class TestFormatSubstituentPrefix:
         result = format_substituent_prefix("1-methylethyl", [2, 4, 7], 3)
         assert result == "2,4,7-tris(1-methylethyl)"
 
-    def test_complex_single_no_parentheses(self):
-        """Single complex substituent - no parentheses needed (count=1)."""
+    def test_complex_single_with_parentheses(self):
+        """Single complex substituent with numeric locants gets parentheses (IUPAC P-14.5.2)."""
         result = format_substituent_prefix("1-methylethyl", [4], 1)
-        assert result == "4-1-methylethyl"
+        assert result == "4-(1-methylethyl)"
 
     def test_tetra_substituent(self):
         """Tetra- prefix for four simple substituents."""

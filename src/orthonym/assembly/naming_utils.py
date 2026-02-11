@@ -190,6 +190,70 @@ def needs_brackets(name: str) -> bool:
     return False
 
 
+# ============================================================================
+# IUPAC Enclosing Marks (P-16.3.3)
+# ============================================================================
+
+
+def get_bracket_depth(name: str) -> int:
+    """Determine the current bracket nesting depth of a name.
+
+    Returns 0 if no brackets, 1 if contains (), 2 if contains [], etc.
+    Used to determine what enclosing marks to use at the next level.
+
+    Args:
+        name: A substituent or compound name.
+
+    Returns:
+        Integer nesting depth (0-3).
+
+    Examples:
+        >>> get_bracket_depth("methyl")
+        0
+        >>> get_bracket_depth("2-methylpropyl")
+        0
+        >>> get_bracket_depth("(2-methylpropyl)")
+        1
+        >>> get_bracket_depth("2-[(1-methylethyl)]propyl")
+        2
+    """
+    if '{' in name:
+        return 3
+    if '[' in name:
+        return 2
+    if '(' in name:
+        return 1
+    return 0
+
+
+def apply_enclosing_marks(name: str, depth: int = 0) -> str:
+    """Apply IUPAC P-16.3.3 enclosing marks at the correct nesting depth.
+
+    Nesting order: ( ) -> [ ] -> { } -> ( ) again
+    Depth 0: parentheses
+    Depth 1: square brackets (name already contains parentheses)
+    Depth 2: braces (name already contains brackets)
+
+    Args:
+        name: The compound substituent name (without outer brackets).
+        depth: Nesting depth (0 = outermost).
+
+    Returns:
+        Name enclosed in the appropriate bracket type.
+
+    Examples:
+        >>> apply_enclosing_marks("2-methylpropyl", 0)
+        '(2-methylpropyl)'
+        >>> apply_enclosing_marks("2-methylpropyl", 1)
+        '[2-methylpropyl]'
+        >>> apply_enclosing_marks("2-methylpropyl", 2)
+        '{2-methylpropyl}'
+    """
+    MARKS = [('(', ')'), ('[', ']'), ('{', '}')]
+    open_mark, close_mark = MARKS[depth % 3]
+    return f"{open_mark}{name}{close_mark}"
+
+
 def is_complex_substituent(name: str) -> bool:
     """Determine if a substituent name is complex.
 
@@ -310,9 +374,18 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # Get the multiplier prefix
     multiplier = get_multiplier_prefix(count, name)
 
-    # Complex substituents get parentheses around the name
+    # Complex substituents get parentheses around the name.
+    # Per IUPAC P-14.5.2, compound substituent names containing numeric locants
+    # need enclosing marks to avoid ambiguity:
+    # - count > 1: always wrap for bis/tris multiplier (e.g., "3,5-bis(2-methylpropyl)")
+    # - count == 1: wrap if name has bare digits at the start (e.g., "3-(2-methylpropyl)")
+    #   but NOT for names that already have their own parenthesization (e.g., "(oxan-2-yl)oxy")
+    #   and NOT for names that are just hyphenated (e.g., "3-sec-butyl" is fine)
     complex = is_complex_substituent(name)
-    if complex and count > 1:
+    # Name needs wrapping if it has numeric locants that aren't already parenthesized.
+    # A name starting with '(' already has its own internal structure.
+    needs_wrap = complex and not name.startswith('(') and not name.startswith('[')
+    if needs_wrap:
         formatted_name = f"({name})"
     else:
         formatted_name = name

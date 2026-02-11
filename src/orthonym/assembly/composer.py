@@ -27,6 +27,7 @@ from .naming_utils import (
     COMPLEX_MULTIPLIERS,
 )
 from ..data.chain_names import get_chain_prefix
+from .substituent_naming import name_substituent_fragment, _is_linear_alkyl
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -3455,20 +3456,45 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     position, sub_atoms
                 )
                 if carbon_count > 0:
-                    try:
-                        fallback_name = get_alkyl_name(carbon_count)
-                        substituent_groups[fallback_name].append(position)
-                    except ValueError:
-                        pass
+                    attach_idx = sub_atoms[0] if sub_atoms else None
+                    if attach_idx is not None:
+                        fallback_name = name_substituent_fragment(
+                            mol, sub_atoms, attach_idx, features.principal_chain or []
+                        )
+                        if fallback_name:
+                            substituent_groups[fallback_name].append(position)
+                        else:
+                            try:
+                                fallback_name = get_alkyl_name(carbon_count)
+                                substituent_groups[fallback_name].append(position)
+                            except ValueError:
+                                pass
                 continue
 
-            # Get alkyl name from carbon count
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-                substituent_groups[alkyl_name].append(position)
-            except ValueError:
-                # Carbon count > 10, skip for now (complex substituent)
-                continue
+            # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)
+            if _is_linear_alkyl(mol, sub_atoms):
+                # Fast path: simple linear alkyl
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                    substituent_groups[alkyl_name].append(position)
+                except ValueError:
+                    continue
+            else:
+                # Complex substituent: use recursive naming
+                attach_idx = sub_atoms[0] if sub_atoms else None
+                if attach_idx is not None:
+                    complex_name = name_substituent_fragment(
+                        mol, sub_atoms, attach_idx, features.principal_chain or []
+                    )
+                    if complex_name:
+                        substituent_groups[complex_name].append(position)
+                    else:
+                        # Fallback to carbon-count based naming
+                        try:
+                            alkyl_name = get_alkyl_name(carbon_count)
+                            substituent_groups[alkyl_name].append(position)
+                        except ValueError:
+                            continue
 
     # Count total number of substituents for locant omission decision
     total_substituents = sum(len(locs) for locs in substituent_groups.values())
