@@ -79,9 +79,9 @@ class TestDepthLimit:
     def teardown_method(self):
         _fragment_guard.depth = 0
 
-    def test_max_naming_depth_is_three(self):
-        """MAX_NAMING_DEPTH should be 3."""
-        assert MAX_NAMING_DEPTH == 3
+    def test_max_naming_depth_is_five(self):
+        """MAX_NAMING_DEPTH should be 5 (increased for decomposition engine)."""
+        assert MAX_NAMING_DEPTH == 5
 
     def test_depth_limit_returns_none(self):
         """At MAX_NAMING_DEPTH, name_fragment_recursively returns None immediately."""

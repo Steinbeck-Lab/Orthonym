@@ -4,11 +4,13 @@ Provides thread-safe recursion depth tracking to prevent infinite loops
 when fragment naming calls name_compound() recursively. Uses
 threading.local() pattern established by _n_oxide_guard in composer.py.
 
-Max depth = 3 levels:
+Max depth = 5 levels:
   Level 0: Initial molecule (normal naming)
-  Level 1: Fragment naming (e.g., peptide residue, ester acid fragment)
-  Level 2: Sub-fragment (e.g., named substituent on a fragment)
-  Level 3: STOP -- return None as graceful fallback
+  Level 1: Decomposition fragment (e.g., ester acid/alkyl fragment)
+  Level 2: Sub-fragment from recursive decomposition
+  Level 3: Substituent naming within a fragment
+  Level 4: Deep nesting (phospholipids, complex multi-fragment)
+  Level 5: STOP -- return None as graceful fallback
 
 Usage:
     from orthonym.assembly.fragment_naming import name_fragment_recursively
@@ -25,7 +27,7 @@ from typing import Optional
 
 _fragment_guard = _threading.local()
 
-MAX_NAMING_DEPTH = 3
+MAX_NAMING_DEPTH = 5
 
 
 def get_naming_depth() -> int:
