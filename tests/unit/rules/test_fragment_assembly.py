@@ -275,13 +275,7 @@ class TestAmineToPrefix:
 # ============================================================================
 
 class TestGlycosideAssembly:
-    """Tests for glycoside fragment assembly (basic concatenation)."""
-
-    def test_basic_glycoside(self):
-        result = assemble_fragment_name(
-            "glycosidic", {"sugar": "glucopyranose", "aglycone": "methanol"}
-        )
-        assert result == "glucopyranose methanol"
+    """Tests for glycoside fragment assembly with sugar prefix support."""
 
     def test_glycoside_missing_sugar(self):
         result = assemble_fragment_name(
@@ -294,6 +288,34 @@ class TestGlycosideAssembly:
             "glycosidic", {"sugar": "glucopyranose"}
         )
         assert result is None
+
+    def test_glycoside_with_acid_alkyl_keys(self):
+        """Assembler accepts 'acid'/'alkyl' key convention from engine."""
+        result = assemble_fragment_name(
+            "glycosidic",
+            {"acid": "beta-D-glucopyranosyloxy", "alkyl": "phenol"},
+        )
+        assert result is not None
+        assert "glucopyranosyloxy" in result
+        assert "phenol" in result
+
+    def test_glycoside_with_sugar_aglycone_keys(self):
+        """Assembler accepts 'sugar'/'aglycone' key convention."""
+        result = assemble_fragment_name(
+            "glycosidic",
+            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "phenol"},
+        )
+        assert result is not None
+        assert "glucopyranosyloxy" in result
+        assert "phenol" in result
+
+    def test_glycoside_produces_parenthesized_prefix(self):
+        """Glycoside assembly produces '(prefix)aglycone' format."""
+        result = assemble_fragment_name(
+            "glycosidic",
+            {"acid": "beta-D-glucopyranosyloxy", "alkyl": "phenol"},
+        )
+        assert "(beta-D-glucopyranosyloxy)" in result
 
 
 # ============================================================================
