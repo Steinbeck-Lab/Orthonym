@@ -455,6 +455,19 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             return poly_name
         # If name_polyfunctional returns None, fall through to normal handling
 
+    # Handle multi-ester compounds (dicarboxylic acid diesters)
+    # Must come BEFORE single-ester naming so 2-ester diacids are caught
+    if features.principal_group == "ester":
+        all_esters = getattr(features, 'all_ester_matches', None)
+        if all_esters and len(all_esters) >= 2 and not getattr(features, 'is_polyfunctional', False):
+            from ..rules.esters import classify_multi_ester, name_dicarboxylic_diester
+            ester_type = classify_multi_ester(features.mol, all_esters)
+            if ester_type == "dicarboxylic_diester":
+                diester_name = name_dicarboxylic_diester(features.mol, all_esters)
+                if diester_name:
+                    return diester_name
+            # polyol_polyester handled in plan 41-02
+
     # Handle esters (two-component naming: "alkyl alkanoate")
     # Only reached for acyclic esters (ring-attached esters handled above)
     if features.principal_group == "ester":
@@ -3883,9 +3896,13 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
 
                 # Build acyloxy name: (prefixanoyloxy) with enclosing parens
                 # OPSIN requires: 2-(acetyloxy)benzoic acid
+                # Check trivial acid name first, then fall back to systematic
+                from ..data.chain_names import get_acid_stem
+                from ..rules.esters import get_acyloxy_prefix as _get_acyloxy
                 try:
-                    acyl_prefix = get_chain_prefix(acyl_carbons)
-                    return f"({acyl_prefix}anoyloxy)"
+                    acid_stem = get_acid_stem(acyl_carbons)
+                    acyloxy = _get_acyloxy(acid_stem)
+                    return f"({acyloxy})"
                 except (ValueError, KeyError):
                     pass
 
