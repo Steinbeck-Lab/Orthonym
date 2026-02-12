@@ -20,6 +20,19 @@ from rdkit.Chem import RWMol
 
 
 # ---------------------------------------------------------------------------
+# Saturation/modification prefixes that must not be preceded by "di"
+# ---------------------------------------------------------------------------
+# When a parent name starts with one of these prefixes, multiplicative naming
+# would produce unparseable concatenation (e.g., "ditetrahydropyran").
+# In such cases, fall through to substitutive naming instead.
+
+SATURATION_PREFIXES = [
+    'tetrahydro', 'dihydro', 'hexahydro', 'perhydro', 'octahydro',
+    'decahydro', 'dodecahydro',
+]
+
+
+# ---------------------------------------------------------------------------
 # Bridge definitions: atom pattern -> IUPAC bridge name
 # ---------------------------------------------------------------------------
 
@@ -131,8 +144,12 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # Get locant of bridge attachment point in the parent
         locant = _get_bridge_locant(mol, idx, nbr_indices[0], ring_atoms)
 
-        # Assemble multiplicative name
-        return _assemble_multiplicative_name(locant, bridge_name, parent_name)
+        # Assemble multiplicative name (returns None for prefix-derived parents)
+        result = _assemble_multiplicative_name(locant, bridge_name, parent_name)
+        if result is not None:
+            return result
+        # Saturation-prefix parent: skip multiplicative, let caller fall through
+        continue
 
     return None
 
@@ -197,7 +214,12 @@ def _try_two_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # Get locant
         locant = _get_bridge_locant(mol, idx1, ring_conn_1, ring_atoms)
 
-        return _assemble_multiplicative_name(locant, bridge_name, parent_name)
+        # Assemble multiplicative name (returns None for prefix-derived parents)
+        result = _assemble_multiplicative_name(locant, bridge_name, parent_name)
+        if result is not None:
+            return result
+        # Saturation-prefix parent: skip multiplicative, let caller fall through
+        continue
 
     return None
 
@@ -434,7 +456,7 @@ def _find_principal_group_atom_in_ring(
 
 def _assemble_multiplicative_name(
     locant: int, bridge_name: str, parent_name: str
-) -> str:
+) -> Optional[str]:
     """Assemble the final multiplicative name.
 
     Format: [locant],[locant']-[bridge]di[parent]
@@ -443,14 +465,29 @@ def _assemble_multiplicative_name(
     For acid names with spaces (like "benzoic acid"), the 'di' prefix
     goes before the base name: 4,4'-oxydibenzoic acid
 
+    If the parent name starts with a saturation/modification prefix
+    (e.g., "tetrahydro", "dihydro"), returns None to signal that
+    multiplicative naming would produce an unparseable concatenation
+    (e.g., "ditetrahydropyran") and the caller should fall through
+    to substitutive naming.
+
     Args:
         locant: IUPAC locant of the bridge attachment point.
         bridge_name: Name of the bridge group (e.g., "methylene", "oxy").
         parent_name: IUPAC name of one parent unit (e.g., "aniline", "benzoic acid").
 
     Returns:
-        Complete multiplicative name.
+        Complete multiplicative name, or None if the parent name has a
+        saturation prefix that would produce unparseable "di+prefix" output.
     """
+    # Check for saturation/modification prefixes in the parent name
+    # that would produce unparseable "di+prefix" concatenation
+    parent_lower = parent_name.lower()
+    if any(parent_lower.startswith(p) for p in SATURATION_PREFIXES):
+        # "di" + "tetrahydropyran" -> "ditetrahydropyran" is unparseable
+        # Return None to fall through to substitutive naming
+        return None
+
     # Build locant pair: e.g., "4,4'"
     locant_str = f"{locant},{locant}'"
 
