@@ -84,3 +84,53 @@ def test_regression_glycerol_diacetate():
     result = name_compound("CC(=O)OCC(O)COC(=O)C")
     assert "ol" in result, f"Expected 'ol' in result, got: {result}"
     assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
+
+
+# ============================================================================
+# Polyol polyester tests (NEW - should initially FAIL)
+# ============================================================================
+
+class TestPolyolPolyester:
+    """Tests for fully-esterified polyol naming (triacetin, triglycerides)."""
+
+    @pytest.mark.integration
+    def test_triacetin(self):
+        """Triacetin: glycerol triacetate -- 3 acetyloxy groups on propane backbone."""
+        result = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
+        assert result is not None, "Got None"
+        # Should contain acyloxy prefix (acetyloxy or ethanoyloxy)
+        has_acyloxy = "acetyloxy" in result or "ethanoyloxy" in result
+        assert has_acyloxy, f"Expected 'acetyloxy' or 'ethanoyloxy' in result, got: {result}"
+        # Should contain propane parent
+        assert "propane" in result, f"Expected 'propane' in result, got: {result}"
+        # Should have tri multiplier for 3 identical groups
+        assert "tri" in result, f"Expected 'tri' in result, got: {result}"
+
+    @pytest.mark.integration
+    def test_glycerol_tripropanoate(self):
+        """Glycerol tripropanoate: 3 propanoyloxy groups on propane backbone."""
+        result = name_compound("CCC(=O)OCC(COC(=O)CC)OC(=O)CC")
+        assert result is not None, "Got None"
+        assert "propanoyloxy" in result, f"Expected 'propanoyloxy' in result, got: {result}"
+        assert "propane" in result, f"Expected 'propane' in result, got: {result}"
+
+    @pytest.mark.integration
+    def test_glycerol_diacetate_mono_propanoate(self):
+        """Mixed-acid triester: 2 acetyl + 1 propanoyl on glycerol backbone."""
+        result = name_compound("CC(=O)OCC(COC(=O)CC)OC(C)=O")
+        assert result is not None, "Got None"
+        assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
+        assert "propanoyloxy" in result, f"Expected 'propanoyloxy' in result, got: {result}"
+
+    @pytest.mark.integration
+    def test_regression_glycerol_diacetate_polyol(self):
+        """Glycerol diacetate with free -OH: must still use polyfunctional path."""
+        result = name_compound("CC(=O)OCC(O)COC(=O)C")
+        assert "ol" in result, f"Expected 'ol' in result, got: {result}"
+        assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
+
+    @pytest.mark.integration
+    def test_regression_dimethyl_malonate_unaffected(self):
+        """Dicarboxylic diester from 41-01: must still produce correct name."""
+        result = name_compound("COC(=O)CC(=O)OC")
+        assert result == "dimethyl propanedioate", f"Got: {result}"
