@@ -460,13 +460,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == "ester":
         all_esters = getattr(features, 'all_ester_matches', None)
         if all_esters and len(all_esters) >= 2 and not getattr(features, 'is_polyfunctional', False):
-            from ..rules.esters import classify_multi_ester, name_dicarboxylic_diester
+            from ..rules.esters import classify_multi_ester, name_dicarboxylic_diester, name_polyol_polyester
             ester_type = classify_multi_ester(features.mol, all_esters)
             if ester_type == "dicarboxylic_diester":
                 diester_name = name_dicarboxylic_diester(features.mol, all_esters)
                 if diester_name:
                     return diester_name
-            # polyol_polyester handled in plan 41-02
+            elif ester_type == "polyol_polyester":
+                polyol_name = name_polyol_polyester(features.mol, all_esters)
+                if polyol_name:
+                    return polyol_name
 
     # Handle esters (two-component naming: "alkyl alkanoate")
     # Only reached for acyclic esters (ring-attached esters handled above)

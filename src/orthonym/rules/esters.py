@@ -784,7 +784,30 @@ def classify_multi_ester(mol, ester_matches: list) -> str:
         if _carbons_connected(mol, c1, c2, ester_oxygens):
             return "dicarboxylic_diester"
 
-    # For now, other multi-ester patterns are "independent"
+    # Polyol polyester detection: multiple ester oxygens connect to a shared
+    # alcohol backbone (e.g., triacetin = glycerol triacetate).
+    # For each ester match, the alkyl_c (match[3]) is a backbone carbon.
+    # If all backbone carbons are connected via C-C bonds -> polyol polyester.
+    backbone_carbons = []
+    ester_oxygens = set()
+    carbonyl_carbons = set()
+    for match in ester_matches:
+        ester_oxygens.add(match[2])  # ester oxygen (-O-)
+        carbonyl_carbons.add(match[0])  # carbonyl carbon
+        backbone_carbons.append(match[3])  # alkyl carbon (backbone side)
+
+    # All backbone carbons must be connected via carbon-only paths
+    # excluding ester oxygens and carbonyl carbons
+    exclude = ester_oxygens | carbonyl_carbons
+    if len(backbone_carbons) >= 2:
+        all_connected = True
+        for i in range(1, len(backbone_carbons)):
+            if not _carbons_connected(mol, backbone_carbons[0], backbone_carbons[i], exclude):
+                all_connected = False
+                break
+        if all_connected:
+            return "polyol_polyester"
+
     return "independent"
 
 
@@ -941,3 +964,242 @@ def _get_dioate_name(backbone_length: int) -> str:
     # Systematic: get_chain_prefix(N) + "anedioate"
     prefix = get_chain_prefix(backbone_length)
     return f"{prefix}anedioate"
+
+
+# ============================================================================
+# Polyol Polyester Naming (IUPAC P-65.6.3.2.2)
+# ============================================================================
+#
+# Fully-esterified polyols (triacetin, triglycerides) are named using
+# acyloxy prefixes on the polyol backbone:
+#   "locants-multiplier(acyloxy)parent"
+#
+# Examples:
+#   triacetin -> "1,2,3-tri(acetyloxy)propane"
+#   mixed triester -> "1,3-di(acetyloxy)-2-(propanoyloxy)propane"
+
+
+def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
+    """
+    Name a fully-esterified polyol compound using acyloxy prefixes.
+
+    Identifies the polyol backbone, determines acyloxy prefixes for each
+    ester group, and assembles the name with locants and multipliers.
+
+    Args:
+        mol: RDKit Mol object
+        ester_matches: List of ester SMARTS match tuples
+                       (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
+
+    Returns:
+        Name string (e.g., "1,2,3-tri(acetyloxy)propane"), or None on failure.
+    """
+    from ..assembly.naming_utils import get_multiplier_prefix
+
+    if len(ester_matches) < 2:
+        return None
+
+    # Collect structural data from each ester match
+    ester_oxygens = set()
+    carbonyl_carbons = set()
+    for match in ester_matches:
+        ester_oxygens.add(match[2])
+        carbonyl_carbons.add(match[0])
+
+    # Find backbone: BFS from backbone carbons through C-C bonds only,
+    # excluding ester oxygens and carbonyl carbons
+    exclude = ester_oxygens | carbonyl_carbons
+    backbone_start_atoms = [match[3] for match in ester_matches]  # alkyl_c per ester
+
+    # BFS to find full backbone
+    backbone = _find_polyol_backbone(mol, backbone_start_atoms, exclude)
+    if backbone is None or len(backbone) < 2:
+        return None
+
+    # Order backbone as a linear chain (find two endpoints with degree 1 within backbone)
+    ordered = _order_backbone_chain(mol, backbone, exclude)
+    if ordered is None:
+        return None
+
+    backbone_length = len(ordered)
+    parent_prefix = get_chain_prefix(backbone_length)
+    if not parent_prefix:
+        return None
+    parent_name = parent_prefix + "ane"
+
+    # Map backbone atom index -> 1-based locant
+    locant_map = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
+
+    # For each ester, get the acyloxy prefix and the attachment locant
+    ester_info = []  # list of (locant, acyloxy_prefix)
+    for match in ester_matches:
+        carbonyl_c = match[0]
+        ester_o = match[2]
+        alkyl_c = match[3]  # backbone attachment point
+
+        # Get acid fragment for this ester
+        acid_atoms = _bfs_fragment(mol, carbonyl_c, exclude_atom=ester_o)
+        acid_name = get_acid_fragment_name(mol, acid_atoms)
+        acyloxy = get_acyloxy_prefix(acid_name)
+
+        # Get locant for attachment
+        locant = locant_map.get(alkyl_c)
+        if locant is None:
+            return None
+        ester_info.append((locant, acyloxy))
+
+    # Group by acyloxy prefix
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for locant, acyloxy in ester_info:
+        groups[acyloxy].append(locant)
+
+    # Sort groups alphabetically by acyloxy prefix name
+    sorted_groups = sorted(groups.items(), key=lambda x: x[0])
+
+    # Build prefix parts
+    parts = []
+    for acyloxy, locants in sorted_groups:
+        locants.sort()
+        locant_str = ",".join(str(loc) for loc in locants)
+        count = len(locants)
+        multiplier = get_multiplier_prefix(count, acyloxy)
+        # Acyloxy prefixes always get parentheses when used with multipliers
+        # or when they contain internal structure
+        if count > 1:
+            parts.append(f"{locant_str}-{multiplier}({acyloxy})")
+        else:
+            parts.append(f"{locant_str}-({acyloxy})")
+
+    # Check if we can simplify by trying lowest locants numbering
+    # Try reverse numbering and pick whichever gives lower first-point-of-difference
+    reverse_locant_map = {atom_idx: backbone_length - i
+                          for i, atom_idx in enumerate(ordered)}
+    reverse_info = []
+    for match in ester_matches:
+        alkyl_c = match[3]
+        locant = reverse_locant_map.get(alkyl_c)
+        if locant is None:
+            break
+        # Reuse same acyloxy prefix
+        acid_atoms = _bfs_fragment(mol, match[0], exclude_atom=match[2])
+        acid_name = get_acid_fragment_name(mol, acid_atoms)
+        acyloxy = get_acyloxy_prefix(acid_name)
+        reverse_info.append((locant, acyloxy))
+
+    if len(reverse_info) == len(ester_info):
+        # Compare locant sets for first-point-of-difference
+        forward_locants = sorted(loc for loc, _ in ester_info)
+        reverse_locants = sorted(loc for loc, _ in reverse_info)
+        if reverse_locants < forward_locants:
+            # Use reverse numbering
+            groups_rev = defaultdict(list)
+            for locant, acyloxy in reverse_info:
+                groups_rev[acyloxy].append(locant)
+
+            sorted_groups_rev = sorted(groups_rev.items(), key=lambda x: x[0])
+            parts = []
+            for acyloxy, locants in sorted_groups_rev:
+                locants.sort()
+                locant_str = ",".join(str(loc) for loc in locants)
+                count = len(locants)
+                multiplier = get_multiplier_prefix(count, acyloxy)
+                if count > 1:
+                    parts.append(f"{locant_str}-{multiplier}({acyloxy})")
+                else:
+                    parts.append(f"{locant_str}-({acyloxy})")
+
+    # Assemble: join parts with hyphens, append parent name
+    prefix_str = "-".join(parts)
+    return f"{prefix_str}{parent_name}"
+
+
+def _find_polyol_backbone(mol, start_atoms: list, exclude: set) -> Optional[set]:
+    """
+    BFS from backbone start atoms through C-C bonds to find the full backbone.
+
+    Args:
+        mol: RDKit Mol object
+        start_atoms: List of atom indices that are known backbone carbons
+        exclude: Set of atom indices to exclude (ester oxygens, carbonyl carbons)
+
+    Returns:
+        Set of backbone atom indices, or None if not all start atoms connected.
+    """
+    if not start_atoms:
+        return None
+
+    visited = set()
+    queue = list(start_atoms)
+    visited.update(start_atoms)
+
+    while queue:
+        current = queue.pop(0)
+        atom = mol.GetAtomWithIdx(current)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in visited or nbr_idx in exclude:
+                continue
+            if neighbor.GetSymbol() != 'C':
+                continue
+            visited.add(nbr_idx)
+            queue.append(nbr_idx)
+
+    # Verify all start atoms are in the connected set
+    for sa in start_atoms:
+        if sa not in visited:
+            return None
+
+    return visited
+
+
+def _order_backbone_chain(mol, backbone: set, exclude: set) -> Optional[list]:
+    """
+    Order backbone atoms as a linear chain from one end to the other.
+
+    Finds endpoint atoms (those with only 1 backbone neighbor) and
+    traverses from one endpoint to the other.
+
+    Args:
+        mol: RDKit Mol object
+        backbone: Set of backbone atom indices
+        exclude: Set of atom indices to exclude from neighbor counting
+
+    Returns:
+        Ordered list of backbone atom indices, or None if not a linear chain.
+    """
+    # Build adjacency within backbone
+    adj = {idx: [] for idx in backbone}
+    for idx in backbone:
+        atom = mol.GetAtomWithIdx(idx)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in backbone:
+                adj[idx].append(nbr_idx)
+
+    # Find endpoints (degree 1 in backbone)
+    endpoints = [idx for idx in backbone if len(adj[idx]) == 1]
+    if len(endpoints) < 2:
+        # Not a linear chain (could be cyclic backbone or single atom)
+        if len(backbone) == 1:
+            return list(backbone)
+        return None
+
+    # Traverse from first endpoint
+    ordered = []
+    visited = set()
+    current = endpoints[0]
+    while current is not None:
+        ordered.append(current)
+        visited.add(current)
+        next_atom = None
+        for nbr in adj[current]:
+            if nbr not in visited:
+                next_atom = nbr
+                break
+        current = next_atom
+
+    if len(ordered) != len(backbone):
+        return None  # Not a simple linear chain
+
+    return ordered
