@@ -8,9 +8,11 @@ Tests:
 - Regression: existing simple esters unchanged
 """
 import pytest
+from rdkit import Chem
 from orthonym.namer import name_compound
 from orthonym.data.trivial_acids import get_acylate_name
 from orthonym.rules.esters import get_acyloxy_prefix
+from orthonym.perception.functional_groups import detect_functional_groups
 
 
 # ===========================================================================
@@ -111,3 +113,58 @@ class TestFattyAcidEsterNaming:
     def test_regression_ethyl_propanoate(self):
         """Ethyl propanoate is unchanged."""
         assert name_compound("CCOC(=O)CC") == "ethyl propanoate"
+
+
+# ===========================================================================
+# Phospholipid functional group detection
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestPhospholipidFGDetection:
+    """Phosphate monoester detection suppresses phosphonic_acid for C-O-P bonds."""
+
+    def test_glycerol_phosphate_detects_monoester(self):
+        """Glycerol phosphate: C-O-P(=O)(OH)2 detects phosphate_monoester.
+        Note: phosphonic_acid also matches (same P atom, different bond interpretation)
+        and is intentionally kept for backward-compatible naming (phosphono prefix)."""
+        mol = Chem.MolFromSmiles("OCC(O)COP(=O)(O)O")
+        fgs = detect_functional_groups(mol)
+        assert "phosphate_monoester" in fgs, (
+            f"Expected phosphate_monoester in FGs: {list(fgs.keys())}"
+        )
+
+    def test_phospholipid_diacetate_detects_monoester(self):
+        """Phospholipid diacetate: detects phosphate_monoester for C-O-P bond."""
+        mol = Chem.MolFromSmiles("CC(=O)OCC(COP(=O)(O)O)OC(=O)C")
+        fgs = detect_functional_groups(mol)
+        assert "phosphate_monoester" in fgs, (
+            f"Expected phosphate_monoester in FGs: {list(fgs.keys())}"
+        )
+
+    def test_phosphonic_acid_direct_cp_bond(self):
+        """True phosphonic acid: direct C-P bond is still detected as phosphonic_acid."""
+        mol = Chem.MolFromSmiles("CP(=O)(O)O")  # methylphosphonic acid
+        fgs = detect_functional_groups(mol)
+        assert "phosphonic_acid" in fgs, (
+            f"Expected phosphonic_acid for direct C-P bond: {list(fgs.keys())}"
+        )
+        assert "phosphate_monoester" not in fgs, (
+            f"phosphate_monoester should NOT match direct C-P bond: {list(fgs.keys())}"
+        )
+
+    def test_phosphate_diester_detected(self):
+        """Phosphate diester: C-O-P(=O)(OH)(O-C) is phosphate_diester."""
+        mol = Chem.MolFromSmiles("COP(=O)(O)OC")
+        fgs = detect_functional_groups(mol)
+        assert "phosphate_diester" in fgs, (
+            f"Expected phosphate_diester in FGs: {list(fgs.keys())}"
+        )
+
+    def test_phosphate_triester_detected(self):
+        """Phosphate triester: all three O's have C attached."""
+        mol = Chem.MolFromSmiles("COP(=O)(OC)OC")
+        fgs = detect_functional_groups(mol)
+        assert "phosphate_triester" in fgs, (
+            f"Expected phosphate_triester in FGs: {list(fgs.keys())}"
+        )

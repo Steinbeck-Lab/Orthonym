@@ -208,6 +208,29 @@ def _resolve_fg_collisions(results):
                     if not results[fg_generic]:
                         del results[fg_generic]
 
+    # Phosphate specificity: more-specific phosphate esters suppress
+    # less-specific phosphate esters for the same P atom.
+    # NOTE: phosphonic_acid is NOT suppressed -- it remains as principal group
+    # candidate for molecules with C-O-P(=O)(OH)2 because the naming pipeline
+    # uses its "phosphono" prefix. Full phosphate principal group naming is
+    # deferred to a future phase.
+    _phosphate_suppress = [
+        ('phosphate_triester', ['phosphate_diester', 'phosphate_monoester']),
+        ('phosphate_diester', ['phosphate_monoester']),
+    ]
+    for fg_specific, fg_generic_list in _phosphate_suppress:
+        if fg_specific in results:
+            # Collect P atom indices from specific matches (P is always first atom in SMARTS)
+            specific_p_atoms = {m[0] for m in results[fg_specific]}
+            for fg_generic in fg_generic_list:
+                if fg_generic in results:
+                    results[fg_generic] = [
+                        m for m in results[fg_generic]
+                        if m[0] not in specific_p_atoms
+                    ]
+                    if not results[fg_generic]:
+                        del results[fg_generic]
+
     return results
 
 

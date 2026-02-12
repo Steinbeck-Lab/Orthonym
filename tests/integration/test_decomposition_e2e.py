@@ -219,9 +219,9 @@ class TestPipelineIntegrity:
         assert name_compound("CCCCOC(=O)c1ccccc1") == "butyl benzoate"
 
     @pytest.mark.integration
-    def test_methyl_hexadecanoate_unchanged(self):
-        """Long-chain ester that the existing pipeline names correctly."""
-        assert name_compound("CCCCCCCCCCCCCCCC(=O)OC") == "methyl hexadecanoate"
+    def test_methyl_palmitate_unchanged(self):
+        """Long-chain ester that the existing pipeline names correctly (trivial name)."""
+        assert name_compound("CCCCCCCCCCCCCCCC(=O)OC") == "methyl palmitate"
 
     @pytest.mark.integration
     def test_propyl_butanoate_unchanged(self):

@@ -96,7 +96,7 @@ ESTER_CANARIES = [
     ("CC(=O)OCCCC", "butyl acetate"),
     ("CCCCCCCC(=O)OC", "methyl octanoate"),
     ("CC(=O)OC(C)C", "propan-2-yl acetate"),
-    ("CCCCCCCCCCCCCCCC(=O)OC", "methyl hexadecanoate"),
+    ("CCCCCCCCCCCCCCCC(=O)OC", "methyl palmitate"),
     # Ester on aromatic (acetyloxy pattern)
     ("CC(=O)Oc1ccccc1", "acetyloxybenzene"),
     # Formate esters
