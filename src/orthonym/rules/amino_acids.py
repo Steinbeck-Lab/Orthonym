@@ -32,6 +32,17 @@ ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)[OX2H1]"
 # This detects -C(=O)-NH-CH- linkages typical of peptide bonds
 PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
 
+# SMARTS patterns for additional functional groups (PEP-02 bailout)
+# These detect FGs beyond amino + acid that _name_amino_acid_systematic
+# cannot handle. When found, we bail out to the general polyfunctional pipeline.
+_EXTRA_FG_SMARTS = [
+    '[OX2H1;!$([OX2H1]C=O)]',  # Hydroxy OH (not in COOH)
+    '[SX2H1]',                   # Thiol SH
+    '[F,Cl,Br,I]',               # Halogen
+    '[N+](=O)[O-]',              # Nitro
+    '[CX3;!$([CX3](=O)[OX2H1]);!$([CX3](=O)[NX3])](=O)',  # Ketone C=O (excludes acid and amide C=O)
+]
+
 
 def count_peptide_bonds(mol) -> int:
     """
@@ -117,6 +128,29 @@ def get_amino_acid_atoms(mol) -> Optional[Tuple[int, int, int, int, int]]:
     return matches[0]
 
 
+def _has_extra_functional_groups(mol) -> bool:
+    """
+    Check if molecule has functional groups beyond amino + carboxylic acid.
+
+    PEP-02: When additional FGs are detected (hydroxy, thiol, halogen, nitro,
+    ketone), _name_amino_acid_systematic should bail out and let the general
+    polyfunctional pipeline handle the molecule, since it correctly handles
+    multi-FG chains with proper prefix ordering, locant assignment, and
+    alphabetization.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        True if extra functional groups found
+    """
+    for smarts in _EXTRA_FG_SMARTS:
+        pat = Chem.MolFromSmarts(smarts)
+        if pat is not None and mol.HasSubstructMatch(pat):
+            return True
+    return False
+
+
 def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     """
     Generate name for an amino acid.
@@ -167,6 +201,10 @@ def _name_amino_acid_systematic(mol) -> str:
 
     For amino acids with multiple amino groups (e.g., lysine),
     returns None to let the general pipeline handle it.
+
+    PEP-02: Also bails out when additional functional groups are detected
+    (hydroxy, thiol, halogen, nitro, ketone) since the general polyfunctional
+    pipeline handles multi-FG chains correctly.
     """
     from ..data.chain_names import get_chain_prefix
 
@@ -189,6 +227,12 @@ def _name_amino_acid_systematic(mol) -> str:
     ri = mol.GetRingInfo()
     if ri.NumRings() > 0:
         return None  # Let general pipeline handle ring-containing amino acids
+
+    # PEP-02: Check for additional functional groups beyond amino and acid.
+    # If present, bail out to general polyfunctional pipeline which handles
+    # multi-FG chains correctly with proper prefix ordering and locants.
+    if _has_extra_functional_groups(mol):
+        return None
 
     # Count carbons in the backbone (acid chain) -- safe for acyclic molecules
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
