@@ -3739,7 +3739,7 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                     pass
             continue
 
-        # Found carbonyl: count carbons in the acyl chain (including carbonyl C)
+        # Found carbonyl: identify the C=O oxygen
         carbonyl_o = None
         for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors():
             if nbr.GetSymbol() == 'O' and nbr.GetIdx() in sub_set:
@@ -3747,6 +3747,66 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 if bond and bond.GetBondTypeAsDouble() == 2.0:
                     carbonyl_o = nbr.GetIdx()
                     break
+
+        # PEP-04 fix: Check if carbonyl_c is directly bonded to a ring
+        # carbon. This detects aromatic acyl groups (benzoyl, naphthoyl)
+        # and cycloalkane-carbonyl groups (cyclopentanecarbonyl) where
+        # _count_carbon_chain() would incorrectly linearize ring C-C bonds.
+        _ri = mol.GetRingInfo()
+        _has_ring_neighbor = False
+        for _cn in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors():
+            if (_cn.GetSymbol() == 'C' and _cn.GetIdx() in sub_set
+                    and _cn.GetIdx() != idx
+                    and _ri.NumAtomRings(_cn.GetIdx()) > 0):
+                _has_ring_neighbor = True
+                break
+
+        if _has_ring_neighbor:
+            # Ring directly on carbonyl: extract acyl fragment as acid
+            # SMILES, name it, convert to acyl prefix.
+            from collections import deque as _dq
+            _exc = chain_set | {idx}
+            if carbonyl_o is not None:
+                _exc.add(carbonyl_o)
+            _ccs = set()
+            _qq = _dq([carbonyl_c])
+            while _qq:
+                _aa = _qq.popleft()
+                if _aa in _ccs or _aa in _exc:
+                    continue
+                _at = mol.GetAtomWithIdx(_aa)
+                if _at.GetSymbol() != 'C':
+                    continue
+                _ccs.add(_aa)
+                for _nb in _at.GetNeighbors():
+                    _ni = _nb.GetIdx()
+                    if (_ni not in _ccs and _ni not in _exc
+                            and _nb.GetSymbol() == 'C'):
+                        _qq.append(_ni)
+            _af = _ccs.copy()
+            if carbonyl_o is not None:
+                _af.add(carbonyl_o)
+            try:
+                from rdkit import Chem as _Ch
+                _rw = _Ch.RWMol(mol)
+                _oh = _rw.AddAtom(_Ch.Atom(8))
+                _rw.AddBond(carbonyl_c, _oh, _Ch.BondType.SINGLE)
+                _hh = _rw.AddAtom(_Ch.Atom(1))
+                _rw.AddBond(_oh, _hh, _Ch.BondType.SINGLE)
+                _fa = sorted(_af | {_oh, _hh})
+                _fs = _Ch.MolFragmentToSmiles(_rw, _fa, canonical=True)
+                if _fs:
+                    from ..namer import name_compound as _ncf
+                    _an = _ncf(_fs)
+                    if _an:
+                        from ..decomposition.fragment_assembly import (
+                            _acid_to_acyl,
+                        )
+                        _ac = _acid_to_acyl(_an)
+                        if _ac:
+                            return f"({_ac}amino)"
+            except Exception:
+                pass  # Fall through to linear chain logic
 
         # Count carbons from carbonyl C through C-C bonds only
         # (don't traverse through N to reach other peptide fragments)

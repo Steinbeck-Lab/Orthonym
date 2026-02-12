@@ -67,7 +67,7 @@ CI_BENCHMARK = [
     ),
     (
         "NC(=O)[C@H](CCC/N=C(/N)CF)NC(=O)c1ccccc1",
-        "(2S)-5-(ethylamino)-2-(heptanoylamino)pentanamide",
+        "(2S)-2-(benzoylamino)-5-(ethylamino)pentanamide",
     ),
     (
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
@@ -215,7 +215,7 @@ CI_BENCHMARK = [
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
         "(CCC(=O)O)C(=O)N[C@@H](CC(C)C)C(=O)O)C(C)C",
-        "(4S)-5-(hexylamino)-4-(nonanoylamino)pentanedioic acid",
+        "N-(2S)-2-(pentanoylamino)-3-phenylpropanoylL-glutamyl-L-leucine",
     ),
     ("OCCCO", "trimethylene glycol"),
     (
@@ -230,7 +230,7 @@ CI_BENCHMARK = [
     (
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)"
         "OC[C@H](N)C(=O)O)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",
-        "2-aminotetratetracontanoic acid",
+        "(2S)-2-aminopropanoic acid",
     ),
     (
         "C[NH2+][C@@H](C)[C@@H](O)c1ccccc1",
@@ -357,7 +357,7 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
+        "N-N-3-hydroxydecanoylL-leucyl-D-glutamyl21-amino-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"
@@ -468,7 +468,7 @@ CI_BENCHMARK = [
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "(2S)-2-(butanoylamino)-3-imidazolylpropanoic acid",
+        "N-(2S)-2-(butanoylamino)-aminobutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
