@@ -270,3 +270,106 @@ class TestDecompositionNameQuality:
         name = name_compound(smi)
         has_amide = "amid" in name.lower() or "N-" in name or "acetyl" in name.lower()
         assert has_amide, f"Amide name should reference amide bond: {name}"
+
+
+# ---------------------------------------------------------------------------
+# Section 5: Decomposition assembly bug fixes (Phase 44-02)
+# ---------------------------------------------------------------------------
+
+class TestDecompositionAssemblyFixes:
+    """Verify that assembly bug fixes produce improved names.
+
+    Covers three bug categories:
+    1. Missing hyphens at component boundaries (letter-digit, letter-uppercase, paren-digit)
+    2. Double-suffix concatenation (e.g., 'propanoateate')
+    3. Duplicate descriptor concatenation (e.g., 'hydroxyhydroxy')
+    """
+
+    @pytest.mark.integration
+    def test_no_carbonyl_uppercase_without_hyphen(self):
+        """Carbonyl followed by uppercase letter should have hyphen separator."""
+        # N-(2S)-pyrrolidine-2-carbonyl-L-alanyl-L-alanine
+        result = name_compound("C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O")
+        assert result is not None
+        # Should not have carbonylL (letter-uppercase without hyphen)
+        assert "carbonylL" not in result, (
+            f"Missing hyphen after carbonyl before uppercase: {result}"
+        )
+        # The correct form should have a hyphen
+        if "carbonyl" in result and "L-" in result:
+            idx = result.index("carbonyl") + len("carbonyl")
+            if idx < len(result):
+                assert result[idx] == '-', (
+                    f"Expected hyphen after 'carbonyl': {result}"
+                )
+
+    @pytest.mark.integration
+    def test_no_double_ate_suffix(self):
+        """Names should not contain 'ateate' double suffix."""
+        from orthonym.decomposition.fragment_assembly import _acid_to_ate
+        # Direct unit check: passing already-converted name
+        assert _acid_to_ate("propanoate") == "propanoate"
+        assert _acid_to_ate("acetate") == "acetate"
+        assert _acid_to_ate("benzoate") == "benzoate"
+        # And acids still convert properly
+        assert _acid_to_ate("propanoic acid") == "propanoate"
+        assert _acid_to_ate("acetic acid") == "acetate"
+
+    @pytest.mark.integration
+    def test_no_hydroxyhydroxy_in_peptide(self):
+        """Names should not contain 'hydroxyhydroxy' duplicated descriptor."""
+        result = name_compound(
+            "CCCCCC/C=C\\CC(=O)N[C@@H](CO)[C@@H](O)"
+            "CC(=O)N[C@H](CC1=CNC2=CC=CC=C21)[C@H](CC(C)C)O"
+        )
+        if result:
+            assert "hydroxyhydroxy" not in result, (
+                f"Duplicate descriptor found: {result}"
+            )
+
+    @pytest.mark.integration
+    def test_glycoside_paren_digit_has_hyphen(self):
+        """Glycoside names with ')' followed by digit should have hyphen."""
+        from orthonym.decomposition.fragment_assembly import _join_components
+        # Verify the helper handles this correctly
+        result = _join_components(
+            "(beta-D-glucopyranosyloxy)", "5,6-dibutyl-cyclopentane"
+        )
+        assert result == "(beta-D-glucopyranosyloxy)-5,6-dibutyl-cyclopentane"
+
+    @pytest.mark.integration
+    def test_glycoside_paren_letter_no_extra_hyphen(self):
+        """Glycoside names with ')' followed by lowercase letter need no hyphen."""
+        from orthonym.decomposition.fragment_assembly import _join_components
+        result = _join_components("(beta-D-glucopyranosyloxy)", "phenol")
+        assert result == "(beta-D-glucopyranosyloxy)phenol"
+
+    @pytest.mark.integration
+    def test_amide_acyl_digit_boundary_gets_hyphen(self):
+        """Amide assembly: acyl prefix + digit-starting amine gets hyphen."""
+        from orthonym.decomposition.fragment_assembly import _join_components
+        assert _join_components("carbonyl", "2-aminopentanoic acid") == \
+            "carbonyl-2-aminopentanoic acid"
+        assert _join_components("carbonyl", "N-5-methyl") == \
+            "carbonyl-N-5-methyl"
+
+    @pytest.mark.integration
+    def test_no_double_amide_suffix(self):
+        """Names should not contain 'amideamide' double suffix."""
+        from orthonym.decomposition.fragment_assembly import _acid_to_amide
+        assert _acid_to_amide("propanamide") == "propanamide"
+        assert _acid_to_amide("acetamide") == "acetamide"
+        # And acids still convert properly
+        assert _acid_to_amide("propanoic acid") == "propanamide"
+
+    @pytest.mark.integration
+    def test_second_peptide_no_hydroxyhydroxy(self):
+        """Second known compound with hydroxyhydroxy -- verify fixed."""
+        result = name_compound(
+            "CCCCCCCCCC(=O)N[C@@H](CO)[C@@H](O)"
+            "CC(=O)N[C@@H](CC1=CNC2=CC=CC=C21)[C@H](CC(C)C)O"
+        )
+        if result:
+            assert "hydroxyhydroxy" not in result, (
+                f"Duplicate descriptor found: {result}"
+            )
