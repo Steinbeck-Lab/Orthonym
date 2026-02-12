@@ -47,8 +47,8 @@ class TestGlycosideNaming:
     @pytest.mark.parametrize("smiles,expected_fragment", [
         # B2
         ("Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1", "(oxan-2-yl)oxy"),
-        # B5
-        ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "(oxan-2-yl)oxy"),
+        # B5: non-stereo rhamnose matches sugar lookup -> retained name
+        ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "rhamnopyranosyloxy"),
         # B7
         (
             "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]"
@@ -57,7 +57,7 @@ class TestGlycosideNaming:
         ),
     ])
     def test_systematic_glycoside_name(self, smiles, expected_fragment):
-        """Glycoside compounds must use systematic (oxan-2-yl)oxy naming."""
+        """Glycoside compounds must use systematic or retained sugar naming."""
         name = name_compound(smiles)
         assert expected_fragment in name, (
             f"Expected '{expected_fragment}' in name, got: {name}"
@@ -143,11 +143,11 @@ class TestBGroupRegression:
             "1-decoxy-3-fluorobenzene",
             "B4-decoxy",
         ),
-        # B5: Sugar glycoside -> (oxan-2-yl)oxy
+        # B5: Sugar glycoside -> rhamnopyranosyloxy (retained sugar name)
         (
             "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-            "(oxan-2-yl)oxybenzene",
-            "B5-oxanyloxy",
+            "(rhamnopyranosyloxy)hydroxybenzene",
+            "B5-glycosyloxy",
         ),
         # B6: Fused ring system -> phenoxy
         (

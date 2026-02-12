@@ -610,10 +610,10 @@ PHASE24_PARSE_FIXES = [
         "1-decoxy-3-fluorobenzene",
         "oxy-complex-ether-decoxy",
     ),
-    # B5: Sugar glycoside on benzene -> (oxan-2-yl)oxy (was hexosyloxy)
+    # B5: Sugar glycoside on benzene -> rhamnopyranosyloxy (was hexosyloxy, then oxan-2-yl)
     (
         "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-        "(oxan-2-yl)oxybenzene",
+        "(rhamnopyranosyloxy)hydroxybenzene",
         "oxy-glycoside-benzene",
     ),
     # B6: Fused ring system -> phenoxy (was bare "oxy")

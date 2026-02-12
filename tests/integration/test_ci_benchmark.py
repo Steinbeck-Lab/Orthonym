@@ -72,7 +72,7 @@ CI_BENCHMARK = [
     (
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
         "C(O)C3)C(O)C(O)C1O",
-        "2,4-dihydroxychromane",
+        "(glucopyranosyloxy)(glucopyranosyloxy)2,4,7-trihydroxychromane",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCCCN)C(=O)O",
@@ -389,7 +389,7 @@ CI_BENCHMARK = [
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
         "c(O)c1CC=C(C)C",
-        "1-(17-carboxyheptadecyl)-7-hydroxychroman-3-one",
+        "(glucuronopyranosyloxy)7-hydroxychroman-3-one",
     ),
     (
         "CC[C@H](C)C=C(C)C=CC1=CC2=C(Cl)C(=O)[C@@](C)(OC(C)=O)"
@@ -431,7 +431,7 @@ CI_BENCHMARK = [
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"
         "[C@H](O)[C@H]2O)C[C@](O)(CO)CC1=NCC(=O)O",
-        "(2S,3R)-3-hexyloxybutanedioic acid",
+        "(beta-D-galactopyranosyloxy)(2S,3R)-3-hydroxybutanedioic acid",
     ),
     (
         "CC(=O)CCC1=C(C)C[C@@]2(CC1=O)C(=O)[C@@H]1C[C@@](O)(CO1)C2=O",
@@ -473,7 +473,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
         "cc3O)C=C(C)CC2c2ccc(OC3OC(C(=O)O)C(O)C(O)C3O)cc2O)c1O",
-        "1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
+        "(glucuronopyranosyloxy)1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",

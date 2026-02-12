@@ -86,6 +86,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             # amide carbonyls, the name is partial -- reject it
             if amide_refs < distinct_amide_carbonyls:
                 return False
+
     except Exception:
         pass  # If bond detection fails, don't block on it
 
@@ -242,7 +243,25 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     existing_name = name_fragment_recursively(existing_smiles)
 
     # Step 3: Quality gate -- only decompose if existing name is poor
-    if existing_name and _name_quality_is_acceptable(existing_name, mol):
+    quality_ok = existing_name and _name_quality_is_acceptable(existing_name, mol)
+
+    # Step 3b: Glycoside bypass -- if a glycosidic bond leads to a known sugar,
+    # decomposition will produce a better name (retained sugar name vs systematic
+    # oxane/tetrahydropyran). Only bypass when sugar lookup would succeed.
+    glycoside_bypass = False
+    if quality_ok:
+        glycosidic_bonds = [b for b in bonds if b.get("type") == "glycosidic"]
+        if glycosidic_bonds:
+            from .fragment_capping import cleave_and_cap as _probe_cleave
+            probe_bond = _select_best_bond(mol, glycosidic_bonds)
+            probe_frags = _probe_cleave(mol, [probe_bond], acid_side_oh=True)
+            if probe_frags:
+                for pf in probe_frags:
+                    if pf["side"] == "acid" and _name_sugar_fragment(pf["smiles"]):
+                        glycoside_bypass = True
+                        break
+
+    if quality_ok and not glycoside_bypass:
         return None  # Existing name is good enough
 
     # Step 4: Choose ONE bond to cleave (the most significant one)
