@@ -10,6 +10,7 @@ from rdkit import Chem
 
 from orthonym.decomposition.engine import (
     _name_quality_is_acceptable,
+    _name_sugar_fragment,
     _select_best_bond,
     try_decompose,
 )
@@ -307,4 +308,54 @@ class TestDecompositionForCompoundClasses:
         """Ketones don't have cleavable ester/amide bonds."""
         mol = _mol("CC(=O)C")  # acetone
         result = try_decompose(mol)
+        assert result is None
+
+
+# ============================================================================
+# Sugar fragment intercept tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestSugarFragmentIntercept:
+    """Test _name_sugar_fragment() sugar lookup intercept."""
+
+    def test_name_sugar_fragment_glucose(self):
+        """Beta-D-glucose canonical SMILES returns glycosyloxy prefix."""
+        result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+        assert result == "beta-D-glucopyranosyloxy"
+
+    def test_name_sugar_fragment_unknown(self):
+        """Non-sugar SMILES returns None."""
+        result = _name_sugar_fragment("CCCC")
+        assert result is None
+
+    def test_name_sugar_fragment_galactose_alpha(self):
+        """Alpha-D-galactose returns correct glycosyloxy prefix."""
+        result = _name_sugar_fragment("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O")
+        assert result == "alpha-D-galactopyranosyloxy"
+
+    def test_name_sugar_fragment_galactose_beta(self):
+        """Beta-D-galactose returns correct glycosyloxy prefix."""
+        result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O")
+        assert result == "beta-D-galactopyranosyloxy"
+
+    def test_name_sugar_fragment_rhamnose_alpha(self):
+        """Alpha-L-rhamnose returns correct glycosyloxy prefix."""
+        result = _name_sugar_fragment("C[C@@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@H]1O")
+        assert result == "alpha-L-rhamnopyranosyloxy"
+
+    def test_name_sugar_fragment_mannose_beta(self):
+        """Beta-D-mannose returns correct glycosyloxy prefix."""
+        result = _name_sugar_fragment("OC[C@H]1O[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O")
+        assert result == "beta-D-mannopyranosyloxy"
+
+    def test_name_sugar_fragment_ethanol(self):
+        """Ethanol is not a sugar -- returns None."""
+        result = _name_sugar_fragment("CCO")
+        assert result is None
+
+    def test_name_sugar_fragment_benzene(self):
+        """Benzene is not a sugar -- returns None."""
+        result = _name_sugar_fragment("c1ccccc1")
         assert result is None

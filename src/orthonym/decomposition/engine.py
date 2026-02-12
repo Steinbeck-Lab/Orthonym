@@ -105,6 +105,28 @@ _BOND_TYPE_PRIORITY = {
 }
 
 
+def _name_sugar_fragment(smiles: str) -> Optional[str]:
+    """Try to name a fragment as a sugar using the retained names lookup.
+
+    If the fragment's canonical SMILES matches a known sugar, returns
+    the glycosyloxy prefix (e.g., "beta-D-glucopyranosyloxy").
+    Returns None if not a recognized sugar.
+
+    Args:
+        smiles: Canonical SMILES of the sugar fragment.
+
+    Returns:
+        Glycosyloxy prefix string, or None if not a known sugar.
+    """
+    from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
+
+    sugar_info = lookup_sugar(smiles)
+    if sugar_info:
+        anomer, config, base_name = sugar_info
+        return sugar_to_glycosyloxy_prefix(anomer, config, base_name)
+    return None
+
+
 def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
     """Select the single best bond to cleave.
 
@@ -238,10 +260,19 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         if frag_mol and frag_mol.GetNumHeavyAtoms() >= parent_heavy:
             return None  # Fragment not smaller -- abort
 
-    # Step 7: Name each fragment recursively
+    # Step 7: Name each fragment recursively (with sugar intercept for glycosidic bonds)
     fragment_names = {}
     for frag in fragments:
-        frag_name = name_fragment_recursively(frag["smiles"])
+        frag_name = None
+
+        # Sugar intercept: for glycosidic bonds, try sugar lookup on acid-side fragment
+        if best_bond["type"] == "glycosidic" and frag["side"] == "acid":
+            frag_name = _name_sugar_fragment(frag["smiles"])
+
+        # Fall through to recursive naming if sugar lookup failed or non-sugar fragment
+        if not frag_name:
+            frag_name = name_fragment_recursively(frag["smiles"])
+
         if not frag_name or frag_name == "unknown":
             return None  # Cannot name a fragment -- abort
         fragment_names[frag["side"]] = frag_name
