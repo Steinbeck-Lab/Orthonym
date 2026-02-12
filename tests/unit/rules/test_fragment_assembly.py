@@ -22,6 +22,7 @@ from orthonym.decomposition.fragment_assembly import (
     _acid_to_acyl,
     _alcohol_to_alkyl,
     _amine_to_prefix,
+    _join_components,
 )
 
 
@@ -355,3 +356,165 @@ class TestEdgeCases:
         assert result is not None
         assert "ethyl" in result
         assert "carbamate" in result
+
+
+# ============================================================================
+# Component joining helper tests
+# ============================================================================
+
+class TestJoinComponents:
+    """Tests for _join_components() hyphenation helper."""
+
+    def test_letter_digit_boundary(self):
+        assert _join_components("carbonyl", "2-amino") == "carbonyl-2-amino"
+
+    def test_letter_uppercase_boundary(self):
+        assert _join_components("carbonyl", "L-alanyl") == "carbonyl-L-alanyl"
+
+    def test_letter_uppercase_n_sub(self):
+        assert _join_components("carbonyl", "N-5-methyl") == "carbonyl-N-5-methyl"
+
+    def test_paren_digit_boundary(self):
+        assert _join_components("(glucopyranosyloxy)", "5,6-dibutyl") == "(glucopyranosyloxy)-5,6-dibutyl"
+
+    def test_paren_uppercase_boundary(self):
+        assert _join_components("(glucopyranosyloxy)", "N-methyl") == "(glucopyranosyloxy)-N-methyl"
+
+    def test_no_hyphen_letter_letter(self):
+        assert _join_components("methyl", "acetamide") == "methylacetamide"
+
+    def test_no_hyphen_digit_letter(self):
+        assert _join_components("propan-1", "ol") == "propan-1ol"
+
+    def test_empty_left(self):
+        assert _join_components("", "acetamide") == "acetamide"
+
+    def test_empty_right(self):
+        assert _join_components("carbonyl", "") == "carbonyl"
+
+    def test_both_empty(self):
+        assert _join_components("", "") == ""
+
+    def test_none_left(self):
+        assert _join_components(None, "acetamide") == "acetamide"
+
+    def test_none_right(self):
+        assert _join_components("carbonyl", None) == "carbonyl"
+
+    def test_hyphen_ending_no_extra_hyphen(self):
+        """If left already ends with hyphen, don't add another."""
+        assert _join_components("N-", "methyl") == "N-methyl"
+
+    def test_digit_ending_no_hyphen(self):
+        """If left ends with digit, no hyphen needed before letter."""
+        assert _join_components("propan-1-", "ol") == "propan-1-ol"
+
+
+# ============================================================================
+# Double-suffix guard tests
+# ============================================================================
+
+class TestDoubleSuffixGuardAte:
+    """Tests for double-suffix prevention in _acid_to_ate()."""
+
+    def test_already_ate_returns_unchanged(self):
+        assert _acid_to_ate("propanoate") == "propanoate"
+
+    def test_already_acetate_returns_unchanged(self):
+        assert _acid_to_ate("acetate") == "acetate"
+
+    def test_already_benzoate_returns_unchanged(self):
+        assert _acid_to_ate("benzoate") == "benzoate"
+
+    def test_already_formate_returns_unchanged(self):
+        assert _acid_to_ate("formate") == "formate"
+
+    def test_already_hexanoate_returns_unchanged(self):
+        assert _acid_to_ate("hexanoate") == "hexanoate"
+
+    def test_acid_still_converts(self):
+        assert _acid_to_ate("propanoic acid") == "propanoate"
+
+    def test_acetic_acid_still_converts(self):
+        assert _acid_to_ate("acetic acid") == "acetate"
+
+    def test_carboxylic_acid_still_converts(self):
+        assert _acid_to_ate("cyclohexanecarboxylic acid") == "cyclohexanecarboxylate"
+
+
+class TestDoubleSuffixGuardAmide:
+    """Tests for double-suffix prevention in _acid_to_amide()."""
+
+    def test_already_amide_returns_unchanged(self):
+        assert _acid_to_amide("propanamide") == "propanamide"
+
+    def test_already_acetamide_returns_unchanged(self):
+        assert _acid_to_amide("acetamide") == "acetamide"
+
+    def test_already_benzamide_returns_unchanged(self):
+        assert _acid_to_amide("benzamide") == "benzamide"
+
+    def test_already_formamide_returns_unchanged(self):
+        assert _acid_to_amide("formamide") == "formamide"
+
+    def test_acid_still_converts(self):
+        assert _acid_to_amide("propanoic acid") == "propanamide"
+
+    def test_acetic_acid_still_converts(self):
+        assert _acid_to_amide("acetic acid") == "acetamide"
+
+    def test_carboxylic_acid_still_converts(self):
+        assert _acid_to_amide("cyclohexanecarboxylic acid") == "cyclohexanecarboxamide"
+
+
+# ============================================================================
+# Amide assembly with hyphenation tests
+# ============================================================================
+
+class TestAmideAssemblyHyphenation:
+    """Tests that amide assembly uses proper hyphenation at boundaries."""
+
+    def test_acyl_digit_boundary_gets_hyphen(self):
+        """When acyl prefix ends with letter and amine starts with digit."""
+        result = assemble_fragment_name(
+            "amide",
+            {"acid": "cyclohexanecarboxylic acid", "amine": "2-aminopentanoic acid"},
+        )
+        # If result is not None, verify no letter-digit boundary without hyphen
+        if result and "carbonyl" in result:
+            idx = result.index("carbonyl") + len("carbonyl")
+            if idx < len(result) and result[idx].isdigit():
+                assert result[idx - 1] == '-', f"Missing hyphen in: {result}"
+
+    def test_simple_amide_still_works(self):
+        """Simple amides should be unaffected by hyphenation changes."""
+        result = assemble_fragment_name(
+            "amide", {"acid": "acetic acid", "amine": "methylamine"}
+        )
+        assert result == "N-methylacetamide"
+
+
+# ============================================================================
+# Glycoside assembly with hyphenation tests
+# ============================================================================
+
+class TestGlycosideAssemblyHyphenation:
+    """Tests that glycoside assembly uses proper hyphenation."""
+
+    def test_paren_digit_gets_hyphen(self):
+        """When aglycone starts with digit, hyphen after closing paren."""
+        result = assemble_fragment_name(
+            "glycosidic",
+            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "5,6-dibutylphenol"},
+        )
+        assert result is not None
+        assert ")-5" in result, f"Expected hyphen after paren: {result}"
+
+    def test_paren_letter_no_hyphen(self):
+        """When aglycone starts with lowercase letter, no extra hyphen."""
+        result = assemble_fragment_name(
+            "glycosidic",
+            {"sugar": "beta-D-glucopyranosyloxy", "aglycone": "phenol"},
+        )
+        assert result is not None
+        assert "(beta-D-glucopyranosyloxy)phenol" == result

@@ -72,7 +72,7 @@ CI_BENCHMARK = [
     (
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
         "C(O)C3)C(O)C(O)C1O",
-        "(glucopyranosyloxy)(glucopyranosyloxy)2,4,7-trihydroxychromane",
+        "(glucopyranosyloxy)(glucopyranosyloxy)-2,4,7-trihydroxychromane",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCCCN)C(=O)O",
@@ -215,7 +215,7 @@ CI_BENCHMARK = [
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
         "(CCC(=O)O)C(=O)N[C@@H](CC(C)C)C(=O)O)C(C)C",
-        "N-(2S)-2-(pentanoylamino)-3-phenylpropanoylL-glutamyl-L-leucine",
+        "N-(2S)-2-(pentanoylamino)-3-phenylpropanoyl-L-glutamyl-L-leucine",
     ),
     ("OCCCO", "trimethylene glycol"),
     (
@@ -357,7 +357,7 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "N-N-3-hydroxydecanoylL-leucyl-D-glutamyl21-amino-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
+        "N-N-3-hydroxydecanoyl-L-leucyl-D-glutamyl-21-amino-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"
@@ -389,7 +389,7 @@ CI_BENCHMARK = [
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
         "c(O)c1CC=C(C)C",
-        "(glucuronopyranosyloxy)7-hydroxychroman-3-one",
+        "(glucuronopyranosyloxy)-7-hydroxychroman-3-one",
     ),
     (
         "CC[C@H](C)C=C(C)C=CC1=CC2=C(Cl)C(=O)[C@@](C)(OC(C)=O)"
@@ -473,7 +473,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
         "cc3O)C=C(C)CC2c2ccc(OC3OC(C(=O)O)C(O)C(O)C3O)cc2O)c1O",
-        "(glucuronopyranosyloxy)1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
+        "(glucuronopyranosyloxy)-1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",

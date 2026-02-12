@@ -21,6 +21,41 @@ from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
 
 
 # ============================================================================
+# Component joining helper
+# ============================================================================
+
+def _join_components(left: str, right: str) -> str:
+    """Join two name components with IUPAC-compliant hyphenation.
+
+    Inserts a hyphen when:
+    - Left ends with letter/')' and right starts with digit
+    - Left ends with letter/')' and right starts with uppercase letter
+      (N-substitution, L/D/R/S stereodescriptors)
+
+    This matches the logic in composer.py _join_prefix_to_name().
+
+    Args:
+        left: Left name component.
+        right: Right name component.
+
+    Returns:
+        Combined string with proper hyphenation.
+    """
+    if not left or not right:
+        return (left or "") + (right or "")
+
+    last = left[-1]
+    first = right[0]
+
+    if (last.isalpha() or last == ')') and first.isdigit():
+        return f"{left}-{right}"
+    if (last.isalpha() or last == ')') and first.isupper():
+        return f"{left}-{right}"
+
+    return f"{left}{right}"
+
+
+# ============================================================================
 # Trivial acid conversions that don't follow simple suffix rules
 # ============================================================================
 
@@ -180,13 +215,13 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
         # "N-methylacetamide", "N-ethylpropanamide"
         amide_name = _acid_to_amide(acid_name)
         if amide_name:
-            return f"N-{amine_prefix}{amide_name}"
+            return f"N-{_join_components(amine_prefix, amide_name)}"
 
     # Complex amine: use acyl prefix pattern
     # "N-acetylcyclohexanamine"
     acyl_prefix = _acid_to_acyl(acid_name)
     if acyl_prefix and amine_name:
-        return f"N-{acyl_prefix}{amine_name}"
+        return f"N-{_join_components(acyl_prefix, amine_name)}"
 
     return None
 
@@ -225,8 +260,8 @@ def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[
         # Fallback: use as-is (may be a systematic or retained name)
         sugar_prefix = sugar_name
 
-    # Assemble as "(prefix)aglycone"
-    return f"({sugar_prefix}){aglycone_name}"
+    # Assemble as "(prefix)aglycone" with proper hyphenation
+    return _join_components(f"({sugar_prefix})", aglycone_name)
 
 
 def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[str]:
@@ -287,6 +322,10 @@ def _acid_to_ate(acid_name: str) -> str:
     """
     name = acid_name.strip()
 
+    # Guard: if already in -ate form, don't convert again
+    if name.endswith("ate") and " acid" not in name:
+        return name
+
     # Handle "carboxylic acid" -> "carboxylate"
     if name.endswith("carboxylic acid"):
         return name[:-len("carboxylic acid")] + "carboxylate"
@@ -336,6 +375,10 @@ def _acid_to_amide(acid_name: str) -> str:
         'cyclohexanecarboxamide'
     """
     name = acid_name.strip()
+
+    # Guard: if already in -amide form, don't convert again
+    if name.endswith("amide") and " acid" not in name:
+        return name
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_AMIDE:
