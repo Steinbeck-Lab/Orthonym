@@ -274,16 +274,43 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     )
 
     # Check for common trivial acids by structure
-    # For now, use systematic naming based on carbon count
     # 1 carbon = formic (methanoic)
     # 2 carbons = acetic (ethanoic)
-    # 3 carbons = propanoic
-    # etc.
-
     if carbon_count == 1:
         return "formic"  # Trivial name preferred
     elif carbon_count == 2:
         return "acetic"  # Trivial name preferred
+
+    # Saturated fatty acid trivial names by carbon count
+    # Only for simple saturated chains (no rings, no double bonds other than C=O)
+    FATTY_ACID_TRIVIAL_BY_CARBON = {
+        12: "lauric",
+        14: "myristic",
+        16: "palmitic",
+        18: "stearic",
+        20: "arachidic",
+    }
+
+    if carbon_count in FATTY_ACID_TRIVIAL_BY_CARBON:
+        # Verify it's a simple saturated chain: no rings, no C=C double bonds
+        has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in acid_atoms)
+        has_cc_double_bond = False
+        if not has_ring:
+            for idx in acid_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() != 'C':
+                    continue
+                for bond in atom.GetBonds():
+                    nbr = bond.GetOtherAtom(atom)
+                    if (nbr.GetIdx() in set(acid_atoms)
+                            and nbr.GetSymbol() == 'C'
+                            and bond.GetBondTypeAsDouble() == 2.0):
+                        has_cc_double_bond = True
+                        break
+                if has_cc_double_bond:
+                    break
+        if not has_ring and not has_cc_double_bond:
+            return FATTY_ACID_TRIVIAL_BY_CARBON[carbon_count]
 
     # Systematic for others - use centralized chain naming
     return get_acid_stem(carbon_count)
@@ -522,6 +549,22 @@ TRIVIAL_ACID_TO_ACYLOXY = {
     "benzoic": "benzoyloxy",
     "oxalic": "oxalyloxy",
     "lactic": "lactyloxy",
+    # Fatty acids (common long-chain acids with retained names)
+    "lauric": "lauroyloxy",          # C12:0
+    "myristic": "myristoyloxy",      # C14:0
+    "palmitic": "palmitoyloxy",      # C16:0
+    "stearic": "stearoyloxy",        # C18:0
+    "oleic": "oleoyloxy",            # C18:1
+    "linoleic": "linoleoyloxy",      # C18:2
+    "arachidic": "arachidoyloxy",    # C20:0
+    "arachidonic": "arachidonoyloxy", # C20:4
+    # Systematic names for saturated fatty acids (ensures decomposition path
+    # also uses trivial acyloxy forms)
+    "dodecanoic": "lauroyloxy",      # C12:0 systematic
+    "tetradecanoic": "myristoyloxy", # C14:0 systematic
+    "hexadecanoic": "palmitoyloxy",  # C16:0 systematic
+    "octadecanoic": "stearoyloxy",   # C18:0 systematic
+    "icosanoic": "arachidoyloxy",    # C20:0 systematic
 }
 
 
@@ -671,3 +714,230 @@ def detect_exocyclic_esters(mol) -> List[dict]:
         })
 
     return results
+
+
+# ============================================================================
+# Multi-ester Detection and Naming (IUPAC P-65.6.3.3)
+# ============================================================================
+#
+# Dicarboxylic acid diesters: two ester groups sharing a diacid backbone.
+# Named as "[multiplier]alkyl [parent]anedioate".
+#   e.g., COC(=O)CC(=O)OC -> "dimethyl propanedioate"
+#
+# Trivial diacid names used where available:
+#   oxalic -> oxalate, malonic -> malonate, succinic -> succinate, etc.
+# Otherwise systematic: get_chain_prefix(N) + "anedioate"
+
+
+# Trivial diacid name -> trivial diacid ester suffix (dioate form)
+TRIVIAL_DIACID_TO_DIOATE = {
+    "oxalic": "oxalate",
+    "malonic": "malonate",
+    "succinic": "succinate",
+    "glutaric": "glutarate",
+    "adipic": "adipate",
+    "phthalic": "phthalate",
+    "fumaric": "fumarate",
+    "maleic": "maleate",
+}
+
+# Backbone carbon count -> trivial diacid acid name
+# Only use trivial names when IUPAC prefers them.
+# Oxalic (2C) is the standard case; longer chains use systematic names
+# per IUPAC 2013 preference for "propanedioate" over "malonate", etc.
+BACKBONE_LENGTH_TO_TRIVIAL = {
+    2: "oxalic",
+}
+
+
+def classify_multi_ester(mol, ester_matches: list) -> str:
+    """
+    Classify a multi-ester compound by its structural pattern.
+
+    Args:
+        mol: RDKit Mol object
+        ester_matches: List of ester SMARTS match tuples
+                       (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
+
+    Returns:
+        Classification string:
+        - "single": only one ester match
+        - "dicarboxylic_diester": two esters sharing a diacid backbone
+        - "polyol_polyester": multiple esters on a polyol (handled in plan 41-02)
+        - "independent": multiple esters with no shared backbone
+    """
+    if len(ester_matches) < 2:
+        return "single"
+
+    if len(ester_matches) == 2:
+        # Check if the two carbonyl carbons are connected via C-C bonds
+        # (i.e., they share a dicarboxylic acid backbone)
+        c1 = ester_matches[0][0]  # carbonyl carbon of first ester
+        c2 = ester_matches[1][0]  # carbonyl carbon of second ester
+
+        # Collect ester oxygen indices to exclude from BFS
+        ester_oxygens = set()
+        for match in ester_matches:
+            ester_oxygens.add(match[2])  # ester oxygen (-O-)
+
+        # BFS from c1 to c2, only following C-C bonds, excluding ester oxygens
+        if _carbons_connected(mol, c1, c2, ester_oxygens):
+            return "dicarboxylic_diester"
+
+    # For now, other multi-ester patterns are "independent"
+    return "independent"
+
+
+def _carbons_connected(mol, start: int, target: int, exclude_atoms: set) -> bool:
+    """
+    Check if two atoms are connected via a path of carbon atoms only.
+
+    BFS from start to target, only traversing C-C single/double bonds,
+    excluding specified atoms (ester oxygens).
+
+    Args:
+        mol: RDKit Mol object
+        start: Starting atom index
+        target: Target atom index
+        exclude_atoms: Set of atom indices to exclude from traversal
+
+    Returns:
+        True if start and target are connected via carbon-only path
+    """
+    visited = {start}
+    queue = [start]
+
+    while queue:
+        current = queue.pop(0)
+        if current == target:
+            return True
+
+        atom = mol.GetAtomWithIdx(current)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in visited or nbr_idx in exclude_atoms:
+                continue
+            # Only follow carbon atoms
+            if neighbor.GetSymbol() != 'C':
+                continue
+            visited.add(nbr_idx)
+            queue.append(nbr_idx)
+
+    return False
+
+
+def _find_backbone_carbons(mol, c1: int, c2: int, ester_oxygens: set) -> Optional[List[int]]:
+    """
+    Find the shortest carbon-only path between two carbonyl carbons.
+
+    Uses BFS to find the backbone of a dicarboxylic acid diester.
+    The backbone includes both carbonyl carbons.
+
+    Args:
+        mol: RDKit Mol object
+        c1: First carbonyl carbon index
+        c2: Second carbonyl carbon index
+        ester_oxygens: Set of ester oxygen indices to exclude
+
+    Returns:
+        List of atom indices forming the backbone path (c1 to c2),
+        or None if no carbon-only path exists.
+    """
+    # BFS for shortest path
+    visited = {c1}
+    queue = [(c1, [c1])]
+
+    while queue:
+        current, path = queue.pop(0)
+        if current == c2:
+            return path
+
+        atom = mol.GetAtomWithIdx(current)
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in visited or nbr_idx in ester_oxygens:
+                continue
+            if neighbor.GetSymbol() != 'C':
+                continue
+            visited.add(nbr_idx)
+            queue.append((nbr_idx, path + [nbr_idx]))
+
+    return None
+
+
+def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
+    """
+    Name a dicarboxylic acid diester compound.
+
+    Produces names in the format "[multiplier]alkyl [parent]anedioate".
+    If the two alkyl groups differ, they are listed in alphabetical order.
+
+    Args:
+        mol: RDKit Mol object
+        ester_matches: List of exactly 2 ester SMARTS match tuples
+
+    Returns:
+        Name string (e.g., "dimethyl propanedioate"), or None on failure.
+    """
+    if len(ester_matches) != 2:
+        return None
+
+    # Collect ester oxygens
+    ester_oxygens = set()
+    for match in ester_matches:
+        ester_oxygens.add(match[2])
+
+    # Get alkyl names for each ester
+    alkyl_names = []
+    for match in ester_matches:
+        _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, match)
+        if not alkyl_atoms:
+            return None
+        alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+        if not alkyl_name:
+            return None
+        alkyl_names.append(alkyl_name)
+
+    # Find backbone between the two carbonyl carbons
+    c1 = ester_matches[0][0]
+    c2 = ester_matches[1][0]
+    backbone = _find_backbone_carbons(mol, c1, c2, ester_oxygens)
+    if backbone is None:
+        return None
+
+    backbone_length = len(backbone)
+
+    # Get the dioate name
+    dioate_name = _get_dioate_name(backbone_length)
+
+    # Assemble the name
+    if alkyl_names[0] == alkyl_names[1]:
+        # Same alkyl groups: use multiplier
+        return f"di{alkyl_names[0]} {dioate_name}"
+    else:
+        # Different alkyl groups: alphabetical order
+        sorted_names = sorted(alkyl_names)
+        return f"{sorted_names[0]} {sorted_names[1]} {dioate_name}"
+
+
+def _get_dioate_name(backbone_length: int) -> str:
+    """
+    Get the dioate suffix name for a dicarboxylic acid ester.
+
+    Checks trivial diacid names first, then falls back to systematic.
+
+    Args:
+        backbone_length: Number of carbons in the diacid backbone
+                         (including both carbonyl carbons)
+
+    Returns:
+        Dioate name (e.g., "oxalate", "propanedioate", "hexanedioate")
+    """
+    # Check for trivial diacid name
+    trivial_acid = BACKBONE_LENGTH_TO_TRIVIAL.get(backbone_length)
+    if trivial_acid and trivial_acid in TRIVIAL_DIACID_TO_DIOATE:
+        return TRIVIAL_DIACID_TO_DIOATE[trivial_acid]
+
+    # Systematic: get_chain_prefix(N) + "anedioate"
+    prefix = get_chain_prefix(backbone_length)
+    return f"{prefix}anedioate"

@@ -34,6 +34,22 @@ TRIVIAL_ACID_TO_ACYLATE = {
     "malic": "malate",
     "fumaric": "fumarate",
     "maleic": "maleate",
+    # Fatty acids (common long-chain acids with retained names)
+    "lauric": "laurate",          # C12:0
+    "myristic": "myristate",      # C14:0
+    "palmitic": "palmitate",      # C16:0
+    "stearic": "stearate",        # C18:0
+    "oleic": "oleate",            # C18:1
+    "linoleic": "linoleate",      # C18:2
+    "arachidic": "arachidate",    # C20:0
+    "arachidonic": "arachidonate", # C20:4
+    # Systematic names for saturated fatty acids (ensures decomposition engine
+    # also uses trivial acylate forms when it encounters systematic acid names)
+    "dodecanoic": "laurate",      # C12:0 systematic
+    "tetradecanoic": "myristate", # C14:0 systematic
+    "hexadecanoic": "palmitate",  # C16:0 systematic
+    "octadecanoic": "stearate",   # C18:0 systematic
+    "icosanoic": "arachidate",    # C20:0 systematic
 }
 
 # Chain length to systematic acylate form
