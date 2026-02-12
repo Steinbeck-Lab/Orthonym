@@ -10,6 +10,7 @@ names correctly are left alone. Only molecules with poor names (unknown,
 suspiciously short, etc.) are decomposed.
 """
 
+import re
 from typing import Dict, List, Optional
 
 from rdkit import Chem
@@ -56,6 +57,37 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         has_hyphens = "-" in name
         if not has_digits and not has_hyphens:
             return False
+
+    # Multi-amide under-naming detection (PEP-01)
+    # If molecule has multiple DISTINCT amide carbonyls but the name only
+    # references one, the name is partial and decomposition should be attempted.
+    # We count distinct carbonyl C atoms (acid_atom) rather than raw amide
+    # bond count so that ureas (NC(=O)N -- one carbonyl, two C-N bonds)
+    # are NOT falsely flagged as multi-amide.
+    from .bond_cleavage import find_cleavable_bonds
+
+    try:
+        bonds = find_cleavable_bonds(mol)
+        amide_bonds = [b for b in bonds if b.get("type") == "amide"]
+        # Distinct carbonyl carbons involved in amide bonds
+        distinct_amide_carbonyls = len(
+            set(b["acid_atom"] for b in amide_bonds)
+        )
+
+        if distinct_amide_carbonyls >= 2:
+            # Count how many amide-related patterns the name captures.
+            # Each named amide bond should produce "amino", "amido",
+            # "amide", "acetamid", "formamid", or similar.
+            amide_refs = len(re.findall(
+                r'amino|amido|amide|acetamid|formamid',
+                name, re.IGNORECASE,
+            ))
+            # If the name captures fewer amide references than distinct
+            # amide carbonyls, the name is partial -- reject it
+            if amide_refs < distinct_amide_carbonyls:
+                return False
+    except Exception:
+        pass  # If bond detection fails, don't block on it
 
     return True
 
