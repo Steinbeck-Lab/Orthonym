@@ -17,6 +17,7 @@ Each assembler handles name transformations:
 from typing import Dict, Optional
 
 from ..data.trivial_acids import get_acylate_name, TRIVIAL_ACID_TO_ACYLATE
+from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
 
 
 # ============================================================================
@@ -191,25 +192,41 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
 
 
 def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble glycoside name (basic concatenation).
+    """Assemble glycoside name using sugar prefix + aglycone parent.
 
-    Full glycoside naming is Phase 42's responsibility.
-    This provides the assembly framework.
+    Accepts both key conventions from the decomposition engine:
+    - Engine convention: {"acid": sugar_name, "alkyl": aglycone_name}
+    - Explicit convention: {"sugar": sugar_name, "aglycone": aglycone_name}
+
+    The sugar name should ideally already be a glycosyloxy prefix
+    (e.g., "beta-D-glucopyranosyloxy"). If it already ends in "oxy",
+    it's used as-is. Otherwise, basic concatenation is used as fallback.
+
+    Output format: "(glycosyloxy-prefix)aglycone-name"
 
     Args:
-        fragment_names: {"sugar": sugar_name, "aglycone": aglycone_name}
+        fragment_names: Fragment name dict with sugar/aglycone info.
         style: Naming style.
 
     Returns:
-        Basic glycoside name, or None.
+        Glycoside name like "(beta-D-glucopyranosyloxy)phenol", or None.
     """
-    sugar_name = fragment_names.get("sugar")
-    aglycone_name = fragment_names.get("aglycone")
+    # Accept both key conventions
+    sugar_name = fragment_names.get("sugar") or fragment_names.get("acid")
+    aglycone_name = fragment_names.get("aglycone") or fragment_names.get("alkyl")
 
     if not sugar_name or not aglycone_name:
         return None
 
-    return f"{sugar_name} {aglycone_name}"
+    # If sugar_name already ends in "oxy" (glycosyloxy prefix), use as-is
+    if sugar_name.endswith("oxy"):
+        sugar_prefix = sugar_name
+    else:
+        # Fallback: use as-is (may be a systematic or retained name)
+        sugar_prefix = sugar_name
+
+    # Assemble as "(prefix)aglycone"
+    return f"({sugar_prefix}){aglycone_name}"
 
 
 def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[str]:
