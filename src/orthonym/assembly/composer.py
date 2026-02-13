@@ -3543,25 +3543,33 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     substituent_groups[acyloxy_name].append(position)
                     continue
 
-                # General fallback: use the unified substituent enumerator
-                # instead of the old _name_heteroatom_substituent which silently
-                # dropped thioethers, azido, sulfoxides, etc.
-                from .substituent_enumerator import SubstituentInfo
-                from .naming_utils import needs_brackets
-                chain_set = set(features.principal_chain) if features.principal_chain else set()
-                frag_info = SubstituentInfo(
-                    frag_mol=None,
-                    locant=position,
-                    attach_mol_idx=features.principal_chain[position - 1] if features.principal_chain and position <= len(features.principal_chain) else sub_atoms[0],
-                    frag_atoms=frozenset(sub_atoms),
-                )
-                enum_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
-                if enum_name:
-                    # Wrap compound substituent names in brackets if needed
-                    # (the old _name_heteroatom_substituent returned names pre-bracketed)
-                    if needs_brackets(enum_name):
-                        enum_name = f"({enum_name})"
-                    substituent_groups[enum_name].append(position)
+                # Try the established heteroatom naming for known patterns
+                hetero_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
+                if hetero_name:
+                    substituent_groups[hetero_name].append(position)
+                    continue
+
+                # Enumerator fallback for simple non-ring branches only
+                # (thioethers, azido, sulfoxides, etc. that the old function skips).
+                # Ring-containing branches are complex and have specialized paths.
+                ring_info = mol.GetRingInfo()
+                sub_has_ring = any(ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms)
+                if not sub_has_ring:
+                    from .substituent_enumerator import SubstituentInfo
+                    from .naming_utils import needs_brackets
+                    chain_set = set(features.principal_chain) if features.principal_chain else set()
+                    frag_info = SubstituentInfo(
+                        frag_mol=None,
+                        locant=position,
+                        attach_mol_idx=features.principal_chain[position - 1] if features.principal_chain and position <= len(features.principal_chain) else sub_atoms[0],
+                        frag_atoms=frozenset(sub_atoms),
+                    )
+                    enum_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
+                    if enum_name:
+                        # Wrap compound substituent names in brackets if needed
+                        if needs_brackets(enum_name):
+                            enum_name = f"({enum_name})"
+                        substituent_groups[enum_name].append(position)
                 continue
 
             # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)

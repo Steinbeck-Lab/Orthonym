@@ -164,7 +164,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC(=O)N[C@@H](CSCCC(=O)C(=O)O)C(=O)O",
-        "2-oxobutanedioic acid",
+        "2-oxo-4-propylsulfanylbutanedioic acid",
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
@@ -463,7 +463,7 @@ CI_BENCHMARK = [
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CO)NC(=O)[C@@H](N)CCCCN)C(=O)O",
-        "(2S)-2-(propanoylamino)-diaminohydroxybutanoic acid",
+        "(2S)-2-(propanoylamino)-diaminohydroxy-4-methylsulfanylbutanoic acid",
     ),
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"

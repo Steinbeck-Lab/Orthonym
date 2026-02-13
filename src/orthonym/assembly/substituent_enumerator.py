@@ -655,7 +655,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     """Name a compound substituent (carbon + heteroatoms).
 
     Handles haloalkyl (trifluoromethyl), hydroxyalkyl, aminoalkyl,
-    alkoxy, and other compound types.
+    alkoxy, sulfanylalkyl, and other compound types.
 
     Args:
         mol: RDKit Mol of full molecule.
@@ -674,11 +674,27 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     if attach_idx is None and frag_atoms:
         attach_idx = frag_atoms[0]
 
+    # Special case: S-attached branches (thioether substituents)
+    # -S-R -> "alkylsulfanyl" (e.g., methylsulfanyl, ethylsulfanyl)
+    if attach_idx is not None:
+        attach_atom = mol.GetAtomWithIdx(attach_idx)
+        if attach_atom.GetSymbol() == 'S' and attach_atom.GetTotalNumHs() == 0:
+            name = _name_sulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms)
+            if name:
+                return name
+
     # Delegate to existing naming infrastructure
     parent_list = list(parent_atoms) if parent_atoms else []
     name = name_substituent_fragment(mol, frag_atoms, attach_idx, parent_list)
     if name:
-        return name
+        # Reject garbled names from S/P-attached branches where
+        # name_substituent_fragment doesn't handle the root heteroatom
+        if attach_idx is not None:
+            attach_sym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
+            if attach_sym in ('S', 'P') and 'thiyl' in name:
+                pass  # fall through to warning
+            else:
+                return name
 
     # If naming infrastructure couldn't handle it, log warning
     frag_smiles = _get_frag_smiles(mol, frag_atoms)
@@ -687,6 +703,71 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
         frag_info.locant, frag_smiles
     )
     return None
+
+
+def _name_sulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """Name a sulfanyl-attached branch: -S-R -> alkylsulfanyl.
+
+    For simple -S-alkyl branches, produces IUPAC substitutive prefix names:
+    -S-CH3 -> methylsulfanyl
+    -S-C2H5 -> ethylsulfanyl
+
+    Args:
+        mol: RDKit Mol.
+        frag_atoms: List of atom indices in the fragment.
+        attach_idx: Atom index of the S attachment atom.
+        parent_atoms: Set of parent atom indices.
+
+    Returns:
+        Sulfanyl prefix name, or None if not a simple case.
+    """
+    frag_set = set(frag_atoms)
+    s_atom = mol.GetAtomWithIdx(attach_idx)
+
+    # Collect carbon atoms bonded to S (excluding parent)
+    alkyl_atoms = []
+    for nbr in s_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms:
+            continue
+        if nbr_idx in frag_set and nbr.GetSymbol() == 'C':
+            # BFS from this C to collect all connected carbons in fragment
+            visited = set()
+            stack = [nbr_idx]
+            while stack:
+                idx = stack.pop()
+                if idx in visited or idx == attach_idx:
+                    continue
+                if idx not in frag_set:
+                    continue
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'C':
+                    visited.add(idx)
+                    for n in atom.GetNeighbors():
+                        if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
+                            stack.append(n.GetIdx())
+            alkyl_atoms.extend(visited)
+
+    if not alkyl_atoms:
+        return None
+
+    # Check for non-C non-H atoms in the alkyl portion
+    has_hetero_in_alkyl = any(
+        mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+        for idx in alkyl_atoms
+    )
+    if has_hetero_in_alkyl:
+        return None  # Complex case, defer
+
+    carbon_count = len(alkyl_atoms)
+    if carbon_count == 0:
+        return None
+
+    try:
+        alkyl_name = get_alkyl_name(carbon_count)
+        return f"{alkyl_name}sulfanyl"
+    except (ValueError, KeyError):
+        return None
 
 
 def _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms):

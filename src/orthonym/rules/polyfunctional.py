@@ -811,6 +811,38 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                     het_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
                 if not het_name:
                     het_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
+                if not het_name:
+                    # Enumerator fallback for simple non-ring, non-ether branches.
+                    # Ethers (O-attached) are handled by the FG prefix system.
+                    ring_info = mol.GetRingInfo()
+                    sub_has_ring = any(ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms)
+                    # Find attachment atom
+                    _attach = None
+                    _chain_set_tmp = set(features.principal_chain) if features.principal_chain else set()
+                    for _si in sub_atoms:
+                        for _nb in mol.GetAtomWithIdx(_si).GetNeighbors():
+                            if _nb.GetIdx() in _chain_set_tmp:
+                                _attach = _si
+                                break
+                        if _attach is not None:
+                            break
+                    _attach_sym = mol.GetAtomWithIdx(_attach).GetSymbol() if _attach is not None else ''
+                    if not sub_has_ring and _attach_sym != 'O':
+                        from ..assembly.substituent_enumerator import (
+                            SubstituentInfo,
+                            classify_and_name_fragment,
+                        )
+                        from ..assembly.naming_utils import needs_brackets
+                        chain_set = set(features.principal_chain) if features.principal_chain else set()
+                        frag_info = SubstituentInfo(
+                            frag_mol=None,
+                            locant=position,
+                            attach_mol_idx=features.principal_chain[position - 1] if features.principal_chain and position <= len(features.principal_chain) else sub_atoms[0],
+                            frag_atoms=frozenset(sub_atoms),
+                        )
+                        het_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
+                        if het_name and needs_brackets(het_name):
+                            het_name = f"({het_name})"
                 if het_name:
                     substituent_groups[het_name].append(position)
                 continue
