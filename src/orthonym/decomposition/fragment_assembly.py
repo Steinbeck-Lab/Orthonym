@@ -14,7 +14,9 @@ Each assembler handles name transformations:
 - alcohol name -> alkyl prefix form
 """
 
-from typing import Dict, Optional
+import re as _re
+from collections import Counter as _Counter
+from typing import Dict, List, Optional
 
 from ..data.trivial_acids import get_acylate_name, TRIVIAL_ACID_TO_ACYLATE
 from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
@@ -170,6 +172,177 @@ def assemble_fragment_name(
 
 
 # ============================================================================
+# N-substituent grouping (IUPAC P-16.3.4)
+# ============================================================================
+
+def _group_n_substituents(name: str) -> str:
+    """Group repeated N-prefix patterns in a decomposition-produced name.
+
+    Detects patterns like "N-acetyl-N-acetyltetrahydropyranamine" and
+    collapses them to "N,N-diacetyltetrahydropyranamine" using IUPAC
+    P-16.3.4 multiplicative prefixes (di/tri for simple substituents,
+    bis/tris for complex ones).
+
+    This operates WITHIN the decomposition assembly pipeline, not as a
+    postprocessor on the final output.
+
+    Args:
+        name: A decomposition-produced name that may contain repeated
+              N-prefix segments.
+
+    Returns:
+        The name with repeated N-prefixes grouped, or the original
+        name if no grouping is needed.
+
+    Examples:
+        >>> _group_n_substituents("N-acetyl-N-acetylpiperidine")
+        'N,N-diacetylpiperidine'
+        >>> _group_n_substituents("N-formyl-N-acetyl-N-acetylpiperidine")
+        'N-acetyl-N,N-diformylpiperidine'  # sorted alphabetically
+        >>> _group_n_substituents("N-methylacetamide")
+        'N-methylacetamide'
+    """
+    # Extract all N-prefix segments from the beginning of the name.
+    # Pattern: "N-{substituent_name}" repeated, followed by the parent name.
+    # Each N-substituent is "N-" + a lowercase name that runs until the
+    # next "N-" or until the parent starts (no more "N-" prefixes).
+
+    # Find all N-prefix segments using regex.
+    # Matches: "N-acetyl", "N-formyl", "N-(2-methylpropyl)", etc.
+    # The segment content is everything after "N-" until the next "-N-" boundary
+    # or until the parent compound starts.
+    segments: List[str] = []
+    remainder = name
+
+    while remainder.startswith("N-"):
+        # Skip the "N-" prefix
+        rest = remainder[2:]
+
+        # Find where this N-substituent ends. It ends at the next "-N-"
+        # that signals another N-substituent, OR where the parent starts.
+        # Handle parenthesized segments: "(2-methylpropyl)" contains "N" but
+        # it's inside parens so not an N-prefix boundary.
+        next_n_pos = -1
+        paren_depth = 0
+        bracket_depth = 0
+        for i, ch in enumerate(rest):
+            if ch == '(':
+                paren_depth += 1
+            elif ch == ')':
+                paren_depth -= 1
+            elif ch == '[':
+                bracket_depth += 1
+            elif ch == ']':
+                bracket_depth -= 1
+            elif (ch == 'N' and paren_depth == 0 and bracket_depth == 0
+                    and i > 0 and rest[i - 1] == '-'
+                    and i + 1 < len(rest) and rest[i + 1] == '-'):
+                # Found "-N-" boundary at position i-1 in rest
+                next_n_pos = i - 1
+                break
+
+        if next_n_pos >= 0:
+            # Extract this segment (without trailing hyphen)
+            seg = rest[:next_n_pos]
+            segments.append(seg)
+            remainder = rest[next_n_pos + 1:]  # skip the hyphen, start at "N-..."
+        else:
+            # No more N-prefixes; rest is "substituent + parent"
+            # We need to separate the substituent from the parent.
+            # The substituent is the text that, when combined with "N-",
+            # makes a valid N-prefix. For simple cases like "acetylpiperidine",
+            # the boundary is where the substituent ends and parent begins.
+            # For now, take everything as the last segment + parent.
+            segments.append(rest)
+            remainder = ""
+            break
+
+    if len(segments) < 2:
+        # Only 0 or 1 N-prefix segments -- no grouping needed
+        return name
+
+    # The last segment contains both the final substituent AND the parent.
+    # We need to split it. The substituent is the part that matches the
+    # pattern of the other segments (ends with a known acyl suffix like "yl",
+    # "oyl", "amido" etc., followed by the parent compound name).
+    # Since we're in the decomposition pipeline, the substituent is always
+    # an acyl group (ends in "yl") or a simple prefix fused with the parent.
+
+    # Strategy: collect all segments. The last segment has the substituent
+    # fused with the parent (e.g., "acetylpiperidine"). We need to detect
+    # where the acyl prefix ends and the parent begins.
+    # For safety, just keep the last segment as-is if we can't split it.
+
+    # Count identical substituents
+    # First, try to identify the acyl name in each segment.
+    # Segments 0..n-2 are standalone substituent names (e.g., "acetyl").
+    # The last segment is "substituent + parent" (e.g., "acetylpiperidine").
+
+    # Check if we can split the last segment by matching earlier segments.
+    last_seg = segments[-1]
+    standalone_segs = segments[:-1]
+
+    # Try to find a matching prefix in the last segment
+    parent_name = ""
+    last_sub = last_seg
+    for seg in standalone_segs:
+        if last_seg.startswith(seg):
+            last_sub = seg
+            parent_name = last_seg[len(seg):]
+            break
+
+    if not parent_name:
+        # Try generic acyl suffix detection: the substituent ends at "yl"
+        # followed by the parent compound start
+        yl_pos = last_seg.find("yl")
+        while yl_pos >= 0:
+            candidate_sub = last_seg[:yl_pos + 2]
+            candidate_parent = last_seg[yl_pos + 2:]
+            if candidate_parent and candidate_parent[0].islower():
+                last_sub = candidate_sub
+                parent_name = candidate_parent
+                break
+            yl_pos = last_seg.find("yl", yl_pos + 1)
+
+    if not parent_name:
+        # Could not separate last segment; return original name unchanged
+        return name
+
+    # Now we have all substituent names and the parent
+    all_subs = standalone_segs + [last_sub]
+
+    # Count occurrences
+    counts = _Counter(all_subs)
+
+    # Build grouped N-prefix parts, sorted alphabetically by substituent name
+    parts: List[str] = []
+    for sub_name in sorted(counts.keys()):
+        count = counts[sub_name]
+        n_locants = ",".join(["N"] * count)
+        if count == 1:
+            parts.append(f"{n_locants}-{sub_name}")
+        else:
+            # Use lazy import for get_multiplier_prefix to avoid circular imports
+            from ..assembly.naming_utils import is_complex_substituent
+
+            if is_complex_substituent(sub_name):
+                # Complex: use bis/tris/tetrakis with parentheses
+                _COMPLEX_MULT = {2: "bis", 3: "tris", 4: "tetrakis",
+                                 5: "pentakis"}
+                mult = _COMPLEX_MULT.get(count, f"{count}kis")
+                parts.append(f"{n_locants}-{mult}({sub_name})")
+            else:
+                # Simple: use di/tri/tetra without parentheses
+                _SIMPLE_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+                mult = _SIMPLE_MULT.get(count, str(count))
+                parts.append(f"{n_locants}-{mult}{sub_name}")
+
+    # Join parts with hyphens, then append parent
+    prefix = "-".join(parts)
+    return _join_components(prefix, parent_name)
+
+
+# ============================================================================
 # Bond-type-specific assemblers
 # ============================================================================
 
@@ -204,6 +377,10 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
     For simple amines, uses amide suffix: "N-methylacetamide".
     For complex amines, uses acyl prefix: "N-acetylcyclohexanamine".
 
+    After assembly, passes the result through _group_n_substituents() to
+    collapse any repeated N-prefix patterns (e.g., "N-acetyl-N-acetyl..."
+    becomes "N,N-diacetyl...") per IUPAC P-16.3.4.
+
     Args:
         fragment_names: {"acid": acid_name, "amine": amine_name}
         style: Naming style.
@@ -217,6 +394,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if not acid_name or not amine_name:
         return None
 
+    result = None
+
     # Get amine prefix (simple substituent name)
     amine_prefix = _amine_to_prefix(amine_name)
 
@@ -225,15 +404,26 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
         # "N-methylacetamide", "N-ethylpropanamide"
         amide_name = _acid_to_amide(acid_name)
         if amide_name:
-            return f"N-{_join_components(amine_prefix, amide_name)}"
+            result = f"N-{_join_components(amine_prefix, amide_name)}"
 
-    # Complex amine: use acyl prefix pattern
-    # "N-acetylcyclohexanamine"
-    acyl_prefix = _acid_to_acyl(acid_name)
-    if acyl_prefix and amine_name:
-        return f"N-{_join_components(acyl_prefix, amine_name)}"
+    if result is None:
+        # Complex amine: use acyl prefix pattern
+        # "N-acetylcyclohexanamine"
+        acyl_prefix = _acid_to_acyl(acid_name)
+        if acyl_prefix and amine_name:
+            result = f"N-{_join_components(acyl_prefix, amine_name)}"
 
-    return None
+    if result is None:
+        return None
+
+    # Group repeated N-prefix patterns (IUPAC P-16.3.4)
+    # This handles cases where recursive fragment naming already produced
+    # an "N-acetyl..." prefix, and our assembly adds another "N-acetyl",
+    # resulting in "N-acetyl-N-acetyl..." which should be "N,N-diacetyl...".
+    if result.count("N-") >= 2:
+        result = _group_n_substituents(result)
+
+    return result
 
 
 def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[str]:
