@@ -1,0 +1,345 @@
+"""
+Golden canary regression tests for the 75 compounds that round-trip correctly.
+
+These compounds matched on InChI round-trip (Orthonym name -> OPSIN parse -> InChI
+comparison) as of the Phase 44 baseline (v4.0+). They form a regression safety net:
+any naming change that breaks one of these tests must be investigated before merging.
+
+If a test fails, first check whether the NEW name is also valid IUPAC nomenclature
+(it might be an equally correct alternative). Only revert if the new name is wrong.
+
+These tests run as part of the normal test suite (no @pytest.mark.slow) so that
+regressions are caught immediately during development.
+
+Generated from: 
+Criterion: detailed_results where inchi_match == True
+"""
+
+import pytest
+
+from orthonym import name_compound
+
+
+# ---------------------------------------------------------------------------
+# 75 golden canary compounds: (SMILES, expected_name)
+# ---------------------------------------------------------------------------
+
+CANARY_COMPOUNDS = [
+    (
+        "COc1cc(CC(=O)C(=O)c2c(O)cc(O)c(OC)c2O)cc(OC)c1O",
+        "1-(2,4,6-trihydroxy-3-methoxyphenyl)-3-(4-hydroxy-3,5-dimethoxyphenyl)propane-1,2-dione",
+    ),
+    (
+        "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",
+        "(5E,7E)-5-nitrotetradeca-5,7-dienoic acid",
+    ),
+    (
+        "Cc1ccc(C(=O)O)s1",
+        "2-methylthiophene-5-carboxylic acid",
+    ),
+    (
+        "COC(/C=C/c1ccccc1)[C@@H](C)C(OC)[C@@H](C)/C=C/C(C)=C/C(N)=O",
+        "(2E,4E,6S,8R,10E)-7,9-dimethoxy-3,6,8-trimethyl-11-phenylundeca-2,4,10-trienamide",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\C[C@@H](O)CC(=O)O",
+        "(3R,5Z,8Z,11Z,14Z)-3-hydroxyicosa-5,8,11,14-tetraenoic acid",
+    ),
+    (
+        "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O",
+        "2-(acetyloxy)-4-hydroxyheptadec-16-yn-1-ol",
+    ),
+    (
+        "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O",
+        "L-lysyl-L-threonyl-L-cysteine",
+    ),
+    (
+        "SS",
+        "disulfane",
+    ),
+    (
+        "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
+        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
+    ),
+    (
+        "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
+        "L-leucyl-L-serylglycine",
+    ),
+    (
+        "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O",
+        "L-tryptophyl-L-tyrosyl-L-serine",
+    ),
+    (
+        "CC1=CC[C@]23O[C@@]2(C)CC[C@@H]2[C@H](OC(=O)[C@H]2C)[C@@H]13",
+        "(1R,3S,6S,7S,10S,11R)-3,7,12-trimethyl-2,9-dioxa-tetracyclo[9.3.0.0(6,10).0(1,3)]tetradec-12-en-8-one",
+    ),
+    (
+        "C=CC(=O)CCCC",
+        "hept-1-en-3-one",
+    ),
+    (
+        "N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)N1CCC[C@@H]1C(=O)O",
+        "N-L-seryl-L-serineyl(2R)-pyrrolidine-2-carboxylic acid",
+    ),
+    (
+        "C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",
+        "L-seryl-L-alanyl-L-tyrosine",
+    ),
+    (
+        "CCCCCCCCCCC(C)C(=O)O",
+        "2-methyldodecanoic acid",
+    ),
+    (
+        "N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CCC(=O)O)C(=O)O",
+        "L-aspartyl-L-tryptophyl-L-glutamic acid",
+    ),
+    (
+        "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",
+        "(10E,15Z)-9,12,13-trihydroxyoctadeca-10,15-dienoic acid",
+    ),
+    (
+        "CC1=CC(=O)CC(C)(C)C1",
+        "3,5,5-trimethylcyclohex-2-en-1-one",
+    ),
+    (
+        "O=CC1=CC(O)C(O)C(O)C1O",
+        "3,4,5,6-tetrahydroxycyclohex-1-enecarbaldehyde",
+    ),
+    (
+        "COc1cc(C=CC(=O)O)cc(O)c1O",
+        "3-(4,5-dihydroxy-3-methoxyphenyl)prop-2-enoic acid",
+    ),
+    (
+        "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
+        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(18,20).0(12,16)]icosa-2,8-dien-6,10,13-trione",
+    ),
+    (
+        "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",
+        "(1S,2E,7S,8E,12R,15S,16S,17S)-7-hydroxy-15-isobutyl-3,17,18-trimethyl-11-oxa-14-aza-tricyclo[10.7.0.0(12,16)]nonadeca-2,8,18-trien-10,13-dione",
+    ),
+    (
+        "O=C(O)/C(Cl)=C\\C(=O)C(Cl)C(=O)O",
+        "(2E)-2,5-dichloro-4-oxohex-2-enedioic acid",
+    ),
+    (
+        "CCCN(C=O)CCC",
+        "N,N-dipropylformamide",
+    ),
+    (
+        "CCCCCCCC/C=C/CCCCCCCC=O",
+        "(9E)-octadec-9-enal",
+    ),
+    (
+        "CCCc1nc(C)c(C)nc1C",
+        "2,3,6-trimethyl-5-propylpyrazine",
+    ),
+    (
+        "Cc1ccc(O)cc1C",
+        "4-hydroxy-1,2-dimethylbenzene",
+    ),
+    (
+        "C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)O",
+        "L-aspartyl-L-alanyl-L-lysine",
+    ),
+    (
+        "O=C(O)CCC(=O)c1ccc(F)cc1",
+        "4-(4-fluorophenyl)-4-oxobutanoic acid",
+    ),
+    (
+        "CCC/C=C\\C#CC/C=C\\CCCCCCCC(=O)O",
+        "(9Z,14Z)-octadeca-9,14-dien-12-ynoic acid",
+    ),
+    (
+        "O=P([O-])([O-])[O-].[Mg+2].[NH4+]",
+        "ammonium magnesium phosphate",
+    ),
+    (
+        "CCCCCCCCCCCCCCCCCCCCCC(=O)OCC",
+        "ethyl docosanoate",
+    ),
+    (
+        "CC(=O)[C@H](O)c1ccccc1",
+        "(1R)-1-hydroxy-1-phenylpropan-2-one",
+    ),
+    (
+        "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O",
+        "L-glutamyl-L-glutamyl-L-isoleucine",
+    ),
+    (
+        "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
+        "L-aspartyl-L-seryl-L-serine",
+    ),
+    (
+        "N[C@@H](Cc1ccc(Br)cc1)C(=O)O",
+        "(2S)-3-(4-bromophenyl)-2-aminopropanoic acid",
+    ),
+    (
+        "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCCCCCCCCCCCCC(=O)[O-]",
+        "(19Z,22Z,25Z,28Z,31Z)-tetratriaconta-19,22,25,28,31-pentaenoate",
+    ),
+    (
+        "CC1(C)C[C@H](O)[C@]23CC[C@@H](O)[C@](C)(CC[C@@H]12)C3",
+        "(1S,4R,5R,8S,11S)-5,9,9-trimethyl-tricyclo[6.3.0.1(1,5)]dodecan-4,11-diol",
+    ),
+    (
+        "CCCCCCCCCc1cc(=O)c2ccccc2n1C",
+        "N-methyl-2-nonylquinolin-4-one",
+    ),
+    (
+        "CC(C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CC(=O)O)C(=O)O",
+        "L-valyl-L-tyrosyl-L-aspartic acid",
+    ),
+    (
+        "C=C[C@@H](O)CCCCC",
+        "(3S)-oct-1-en-3-ol",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCC(=O)[O-]",
+        "(6Z,9Z,12Z)-octadeca-6,9,12-trienoate",
+    ),
+    (
+        "NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](CS)C(=O)O",
+        "L-glutaminyl-L-lysyl-L-cysteine",
+    ),
+    (
+        "Oc1ccnc2ccccc12",
+        "4-hydroxyquinoline",
+    ),
+    (
+        "CCCCCCC#CCCCCCC(=O)O",
+        "tetradec-7-ynoic acid",
+    ),
+    (
+        "CCCCCCCCCCCCOCCO",
+        "3-oxapentadecan-1-ol",
+    ),
+    (
+        "C[C@H]1C(=O)O[C@@H]2CCN3CC=C(COC(=O)[C@](C)(O)[C@]1(C)O)[C@H]23",
+        "(1R,4R,5R,6R,16R)-5,6-dihydroxy-4,5,6-trimethyl-2,8-dioxa-13-aza-tricyclo[8.5.1.0(13,16)]hexadec-10-en-3,7-dione",
+    ),
+    (
+        "CCCCCCC/C=C\\CCCCCCC(=O)O",
+        "(8Z)-hexadec-8-enoic acid",
+    ),
+    (
+        "NC(=O)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",
+        "L-asparaginyl-L-aspartyl-L-aspartic acid",
+    ),
+    (
+        "CC/C=C(\\C)CC/C=C(\\C)CCC=C(C)C",
+        "(6E,10E)-2,6,10-trimethyltrideca-2,6,10-triene",
+    ),
+    (
+        "O=C(O)c1ccc[nH]1",
+        "pyrrole-2-carboxylic acid",
+    ),
+    (
+        "O=C(O)C(O)c1ccc(O)cc1O",
+        "2-(2,4-dihydroxyphenyl)-2-hydroxyethanoic acid",
+    ),
+    (
+        "OC[C@H](O)c1ccccc1",
+        "(2R)-2-hydroxy-2-phenylethan-1-ol",
+    ),
+    (
+        "O=[N+]([O-])OO",
+        "peroxynitric acid",
+    ),
+    (
+        "CCCCCCCCCCCCCCCC(=O)OC(CCCCC)CCCCCCCCCCCC(=O)[O-]",
+        "13-(palmitoyloxy)octadecanoate",
+    ),
+    (
+        "CC(C)CCCCCCCCCCCCCCCCCCCCCCCCC(=O)O",
+        "26-methylheptacosanoic acid",
+    ),
+    (
+        "C=C/C(C)=C/CC(C)(C)/C(=N\\O)C(C)C",
+        "(3Z,6E)-2,4,4,7-tetramethylnona-6,8-dien-3-one oxime",
+    ),
+    (
+        "CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)C(=O)O",
+        "(2S)-2-(octadecanoylamino)-3-hydroxypropanoic acid",
+    ),
+    (
+        "CCCC(O)CC(O)C(O)C/C=C/CCCCCCCC(=O)O",
+        "(9E)-12,13,15-trihydroxyoctadec-9-enoic acid",
+    ),
+    (
+        "O=C(O)[C@@H]1OC(O)[C@H](O)[C@@H](O)[C@H]1O",
+        "(2R,3R,4S,5R)-3,4,5,6-tetrahydroxytetrahydropyran-2-carboxylic acid",
+    ),
+    (
+        "CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
+        "L-valyl-L-isoleucyl-L-threonine",
+    ),
+    (
+        "COc1cccc(C(=O)O)c1O",
+        "2-hydroxy-3-methoxybenzoic acid",
+    ),
+    (
+        "CCCCCCC/C=C\\CCCCCCCC(=O)[O-]",
+        "(9Z)-heptadec-9-enoate",
+    ),
+    (
+        "CC(C)C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CC(N)=O)C(=O)O",
+        "L-leucyl-L-histidyl-L-asparagine",
+    ),
+    (
+        "C/C(C=O)=C\\CC/C(C)=C/C=O",
+        "(2E,6E)-2,6-dimethylocta-2,6-dienedial",
+    ),
+    (
+        "CCCCC/C=C\\C=C\\C=C/CCCCCCC(=O)O",
+        "(8Z,10E,12Z)-octadeca-8,10,12-trienoic acid",
+    ),
+    (
+        "CC1=C(O)C(=O)[C@]2(O)C[C@H]3C[C@](C)(C(=O)O)C[C@H]3[C@]12C",
+        "(1S,3R,5S,7R,8R)-1,10-dihydroxy-5,8,9-trimethyl-11-oxo-tricyclo[6.3.0.0(3,7)]undec-9-ene-5-carboxylic acid",
+    ),
+    (
+        "CCCCCCCCC(C)CC(C)C",
+        "2,4-dimethyldodecane",
+    ),
+    (
+        "O=C(O)C[C@H](O)CCCCCCO",
+        "(3R)-9-hydroxy-3-hydroxynonanoic acid",
+    ),
+    (
+        "COc1c(-c2ccccc2)c2ccc(O)cc2[nH]c1=O",
+        "7-hydroxy-3-methoxy-4-phenylquinolin-2-one",
+    ),
+    (
+        "CCCCCCCC/C=C\\CCCCCCO",
+        "(7Z)-hexadec-7-en-1-ol",
+    ),
+    (
+        "C/C=C\\CCCCC(=O)O",
+        "(6Z)-oct-6-enoic acid",
+    ),
+    (
+        "C/C=C(\\C)CCC=C(C)C",
+        "(6E)-2,6-dimethylocta-2,6-diene",
+    ),
+    (
+        "N[C@H](Cc1ccc(O)cc1)C(=O)O",
+        "(2R)-3-(4-hydroxyphenyl)-2-aminopropanoic acid",
+    ),
+]
+
+# Build test IDs from expected names (first 40 chars, sanitized for pytest)
+_CANARY_IDS = [
+    name[:40].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
+    for _, name in CANARY_COMPOUNDS
+]
+
+
+@pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
+def test_canary_rt75(smiles, expected_name):
+    """Golden canary test: verify round-trip-matching compound still names correctly."""
+    result = name_compound(smiles)
+    assert result == expected_name, (
+        f"CANARY REGRESSION: {smiles}\n"
+        f"  Expected: {expected_name}\n"
+        f"  Got: {result}"
+    )
