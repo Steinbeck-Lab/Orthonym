@@ -191,15 +191,16 @@ class TestHydroxyalkylLocant:
 # ---------------------------------------------------------------------------
 
 class TestGenericFallback:
-    """Unrecognized heteroatom substituents produce a name, not silent drop."""
+    """Heteroatom substituents produce a name with the substituent present."""
 
     @pytest.mark.integration
     def test_thiol_branch_produces_name(self):
-        """CCCC(CS)CC(=O)O -> name_compound returns a non-empty string."""
+        """CCCC(CS)CC(=O)O -> name includes sulfanyl substituent."""
         name = name_compound('CCCC(CS)CC(=O)O')
         assert name and len(name) > 0, "Expected non-empty name for thiol branch compound"
-        # The branch should still be present (at least as a methyl fallback)
         assert 'hexanoic acid' in name, f"Expected 'hexanoic acid' base in '{name}'"
+        # Phase 48: sulfanyl substituent is now present (was previously dropped)
+        assert 'sulfanyl' in name, f"Expected 'sulfanyl' in '{name}'"
 
     @pytest.mark.integration
     def test_thiol_branch_not_crashing(self):
@@ -207,3 +208,10 @@ class TestGenericFallback:
         # Thioether on branch
         result = name_compound('CCCC(CS)CC(=O)O')
         assert result is not None and isinstance(result, str)
+
+    @pytest.mark.integration
+    def test_thioether_branch_has_sulfanyl(self):
+        """CCCC(SC)CC(=O)O -> name includes methylsulfanyl substituent."""
+        name = name_compound('CCCC(SC)CC(=O)O')
+        assert 'sulfanyl' in name, f"Expected 'sulfanyl' in '{name}'"
+        assert 'hexanoic acid' in name, f"Expected 'hexanoic acid' base in '{name}'"
