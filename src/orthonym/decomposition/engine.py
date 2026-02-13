@@ -29,7 +29,9 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     Criteria for UNACCEPTABLE names:
     - None, empty, or "unknown"
     - Suspiciously short for a complex molecule (heavy_atoms > 15,
-      name shorter than heavy_atoms // 3)
+      name shorter than heavy_atoms // 2)
+    - Inadequate char/atom ratio for very large molecules (heavy_atoms > 25,
+      ratio < 0.45)
     - No digits and no hyphens for a large molecule (heavy_atoms > 20),
       which suggests only a retained name for one fragment was returned
 
@@ -47,7 +49,12 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     heavy_atoms = mol.GetNumHeavyAtoms()
 
     # Suspiciously short name for a complex molecule
-    if heavy_atoms > 15 and len(name) < heavy_atoms // 3:
+    if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
+        return False
+
+    # For very large molecules, an adequate name should have at least
+    # 0.45 characters per heavy atom (locants, prefixes, parent name)
+    if heavy_atoms > 25 and len(name) / heavy_atoms < 0.45:
         return False
 
     # Large molecule with no digits and no hyphens: likely just a retained

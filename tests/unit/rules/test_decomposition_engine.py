@@ -82,9 +82,16 @@ class TestNameQualityGate:
         assert _name_quality_is_acceptable("benzene", mol) is True
 
     def test_name_with_hyphens_for_large_molecule(self):
-        """A name with hyphens for a large molecule is acceptable."""
+        """A name with hyphens for a large molecule is acceptable (if long enough)."""
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCC")  # 22 heavy atoms
-        assert _name_quality_is_acceptable("do-co-sane", large_mol) is True
+        # Name must be >= heavy_atoms // 2 = 11 chars to pass length gate
+        assert _name_quality_is_acceptable("2-methylicosane", large_mol) is True
+
+    def test_short_name_with_hyphens_rejected(self):
+        """A short name with hyphens is still rejected by the tightened gate."""
+        large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCC")  # 22 heavy atoms
+        # 10 chars < 22 // 2 = 11 -> rejected despite hyphens
+        assert _name_quality_is_acceptable("do-co-sane", large_mol) is False
 
     def test_name_with_digits_for_large_molecule(self):
         """A name with digits for a large molecule is acceptable."""

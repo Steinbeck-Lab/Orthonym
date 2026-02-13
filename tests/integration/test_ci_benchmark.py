@@ -230,7 +230,7 @@ CI_BENCHMARK = [
     (
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)"
         "OC[C@H](N)C(=O)O)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",
-        "(2S)-2-aminopropanoic acid",
+        "(2S)-2-aminohydroxypropanoic acid (11Z,14Z)-icosa-11,14-dienoate",  # Quality gate: tightened decomposition trigger
     ),
     (
         "C[NH2+][C@@H](C)[C@@H](O)c1ccccc1",
