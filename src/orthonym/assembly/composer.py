@@ -28,6 +28,11 @@ from .naming_utils import (
 )
 from ..data.chain_names import get_chain_prefix
 from .substituent_naming import name_substituent_fragment, _is_linear_alkyl
+from .substituent_enumerator import (
+    extract_ring_substituents,
+    classify_and_name_fragment,
+    collect_substituent_atom_set,
+)
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -2832,6 +2837,14 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         for _pos, sub_list in features.substituents.items():
             for sub_atoms in sub_list:
                 branch_atoms.update(sub_atoms)
+    # Also collect ring substituent branch atoms -- the enumerator now names
+    # compound substituents (trifluoromethyl, etc.) on rings, so their FG atoms
+    # should not be double-counted as standalone FG prefixes.
+    ring_substituents = getattr(features, 'ring_substituents', None)
+    if ring_substituents:
+        for _ring_idx, sub_list in ring_substituents.items():
+            for sub_atoms in sub_list:
+                branch_atoms.update(sub_atoms)
 
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
@@ -2853,10 +2866,12 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
 
         # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
         # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
-        # Only for simple FGs handled by _name_heteroatom_substituent().
+        # Covers all FG types the unified enumerator now handles as branch components.
         _BRANCH_HANDLED_FGS = {
             'primary_alcohol', 'secondary_alcohol', 'primary_amine',
             'fluoro', 'chloro', 'bromo', 'iodo',
+            'thiol', 'thioether', 'nitro', 'azido',
+            'secondary_amine', 'tertiary_amine',
         }
         if branch_atoms and fg_name in _BRANCH_HANDLED_FGS:
             filtered_branch = []
@@ -2865,18 +2880,34 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                     filtered_branch.append(match)
                     continue
                 # Check if FG is on a small branch with carbons
+                # Search both chain substituents and ring substituents
                 on_small_branch = False
-                for _pos, sub_list in features.substituents.items():
-                    for sub_atoms in sub_list:
-                        sub_set = set(sub_atoms)
-                        if all(a in sub_set for a in match):
-                            c_count = sum(1 for a in sub_atoms
-                                          if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C')
-                            if 1 <= c_count <= 3:
-                                on_small_branch = True
-                                break
-                    if on_small_branch:
-                        break
+                # Chain substituents
+                if features.substituents:
+                    for _pos, sub_list in features.substituents.items():
+                        for sub_atoms in sub_list:
+                            sub_set = set(sub_atoms)
+                            if all(a in sub_set for a in match):
+                                c_count = sum(1 for a in sub_atoms
+                                              if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C')
+                                if 1 <= c_count <= 3:
+                                    on_small_branch = True
+                                    break
+                        if on_small_branch:
+                            break
+                # Ring substituents (for enumerator-handled compound substituents)
+                if not on_small_branch and ring_substituents:
+                    for _ring_idx, sub_list in ring_substituents.items():
+                        for sub_atoms in sub_list:
+                            sub_set = set(sub_atoms)
+                            if all(a in sub_set for a in match):
+                                c_count = sum(1 for a in sub_atoms
+                                              if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C')
+                                if 1 <= c_count <= 3:
+                                    on_small_branch = True
+                                    break
+                        if on_small_branch:
+                            break
                 if not on_small_branch:
                     filtered_branch.append(match)
             matches = filtered_branch
@@ -3512,32 +3543,25 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     substituent_groups[acyloxy_name].append(position)
                     continue
 
-                # General fallback for other heteroatom substituents
-                hetero_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
-                if hetero_name:
-                    substituent_groups[hetero_name].append(position)
-                    continue
-
-                # BUG-F: Log warning for unrecognized heteroatom substituent
-                # and attempt a generic fallback using carbon count
-                logger.warning(
-                    "Unrecognized heteroatom substituent at position %d: atoms=%s",
-                    position, sub_atoms
+                # General fallback: use the unified substituent enumerator
+                # instead of the old _name_heteroatom_substituent which silently
+                # dropped thioethers, azido, sulfoxides, etc.
+                from .substituent_enumerator import SubstituentInfo
+                from .naming_utils import needs_brackets
+                chain_set = set(features.principal_chain) if features.principal_chain else set()
+                frag_info = SubstituentInfo(
+                    frag_mol=None,
+                    locant=position,
+                    attach_mol_idx=features.principal_chain[position - 1] if features.principal_chain and position <= len(features.principal_chain) else sub_atoms[0],
+                    frag_atoms=frozenset(sub_atoms),
                 )
-                if carbon_count > 0:
-                    attach_idx = sub_atoms[0] if sub_atoms else None
-                    if attach_idx is not None:
-                        fallback_name = name_substituent_fragment(
-                            mol, sub_atoms, attach_idx, features.principal_chain or []
-                        )
-                        if fallback_name:
-                            substituent_groups[fallback_name].append(position)
-                        else:
-                            try:
-                                fallback_name = get_alkyl_name(carbon_count)
-                                substituent_groups[fallback_name].append(position)
-                            except ValueError:
-                                pass
+                enum_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
+                if enum_name:
+                    # Wrap compound substituent names in brackets if needed
+                    # (the old _name_heteroatom_substituent returned names pre-bracketed)
+                    if needs_brackets(enum_name):
+                        enum_name = f"({enum_name})"
+                    substituent_groups[enum_name].append(position)
                 continue
 
             # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)
@@ -4192,15 +4216,11 @@ def _count_carbon_chain(mol, start_idx: int, exclude: set) -> int:
 
 def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
-    Generate prefix fragments for alkyl substituents on rings.
+    Generate prefix fragments for ALL substituents on rings (alkyl, heteroatom, compound).
 
-    This function:
-    1. Iterates over features.ring_substituents (keyed by ring atom index)
-    2. Uses features.oriented_ring to determine locants
-    3. Counts carbon atoms in each substituent to determine name
-    4. Groups identical substituents with their locants
-    5. Formats each group with locants, multipliers
-    6. Sorts alphabetically by base substituent name
+    Uses the unified substituent enumerator (ReplaceCore-based) to extract and
+    name every non-hydrogen substituent on the ring parent. This replaces the
+    old path that silently dropped heteroatom-containing substituents.
 
     IUPAC rules for cycloalkane substituent locants:
     - Monosubstituted cycloalkanes: locant 1 is implicit and omitted
@@ -4209,62 +4229,50 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
       (1,2-dimethylcyclohexane)
 
     Returns:
-        List of NameFragment objects for alkyl prefixes, sorted alphabetically
+        List of NameFragment objects for ring substituent prefixes, sorted alphabetically
     """
     mol = features.mol
     ring_substituents = features.ring_substituents
     oriented_ring = features.oriented_ring
 
-    # Build atom-to-locant mapping from oriented ring
-    atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(oriented_ring)}
+    # Use the unified enumerator to extract all substituent fragments
+    ring_atoms_tuple = tuple(oriented_ring)
+    sub_infos = extract_ring_substituents(mol, ring_atoms_tuple, oriented_ring)
+
+    # Collect principal group atoms to skip substituents overlapping with them
+    pg_atom_set = set()
+    if features.principal_group_atoms:
+        for match in features.principal_group_atoms:
+            pg_atom_set.update(match)
 
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    ring_set = set(oriented_ring)
 
-    for ring_atom_idx, sub_list in ring_substituents.items():
-        # Get locant for this ring position
-        locant = atom_to_locant.get(ring_atom_idx)
-        if locant is None:
+    for sub_info in sub_infos:
+        # Skip substituents whose atoms overlap with the principal group
+        # (e.g., =O when ketone is the principal group -- handled as suffix)
+        if pg_atom_set and sub_info.frag_atoms & pg_atom_set:
             continue
 
-        for sub_atoms in sub_list:
-            # Count only carbon atoms in the substituent
-            carbon_count = sum(
-                1 for idx in sub_atoms
-                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-            )
+        # Check if this is a pure FG-only substituent (no carbon atoms)
+        # FG-only substituents (halogens, -OH, -NH2, =O as non-principal)
+        # are handled by _generate_prefixes via the FG prefix loop
+        has_carbon = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            for idx in sub_info.frag_atoms
+        )
+        if not has_carbon:
+            # FG-only: skip here, _generate_prefixes handles these
+            continue
 
-            # Skip non-alkyl substituents (no carbons = functional group like -OH)
-            if carbon_count == 0:
-                continue
-
-            # Check if substituent has any heteroatoms (non-C, non-H)
-            has_heteroatom = any(
-                mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
-                for idx in sub_atoms
-            )
-
-            # For Phase 2, skip mixed substituents (carbon + heteroatom)
-            # These are complex substituents handled in later phases
-            if has_heteroatom:
-                continue
-
-            # Get alkyl name -- try name_substituent_fragment for retained/branched
-            alkyl_name = None
-            if len(sub_atoms) > 0:
-                from .substituent_naming import name_substituent_fragment
-                ring_atom_set_local = set(oriented_ring) if oriented_ring else set()
-                attach_idx = sub_atoms[0]
-                alkyl_name = name_substituent_fragment(
-                    mol, sub_atoms, attach_idx, list(ring_atom_set_local)
-                )
-            if alkyl_name is None:
-                try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                except ValueError:
-                    # Carbon count > 10, skip for now (complex substituent)
-                    continue
-            substituent_groups[alkyl_name].append(locant)
+        # Classify and name via the unified pipeline
+        name = classify_and_name_fragment(mol, sub_info, ring_set, features)
+        if name is None:
+            # Unnameable substituent: logged as WARNING by classify_and_name_fragment
+            # Molecule will fall back to decomposition via coverage gate
+            continue
+        substituent_groups[name].append(sub_info.locant)
 
     # Count ALL ring substituents (alkyl + FG), not just the ones we named
     # This prevents monosubstituted=True when there's 1 alkyl + 1 halogen

@@ -128,6 +128,13 @@ def extract_ring_substituents(mol, ring_atoms, oriented_ring):
     if not subfgs:
         return []
 
+    # Pre-compute per-branch atom sets for geminal substituent disambiguation
+    # Key: ring_atom_idx -> list of frozensets (one per separate branch from that atom)
+    branch_map = _compute_branch_map(mol, ring_set)
+
+    # Track which branches have been claimed (for geminal disambiguation)
+    claimed_branches = set()  # set of (attach_idx, branch_id) tuples
+
     results = []
     for frag in subfgs:
         # Find the dummy atom(s) to determine attachment point
@@ -144,8 +151,10 @@ def extract_ring_substituents(mol, ring_atoms, oriented_ring):
                     )
 
                     # Collect original mol atom indices for this fragment
-                    frag_atoms = _collect_frag_original_atoms(
-                        mol, ring_set, mol_atom_idx
+                    # Use per-branch disambiguation for geminal substituents
+                    frag_atoms = _collect_frag_atoms_for_fragment(
+                        mol, ring_set, mol_atom_idx, frag,
+                        branch_map, claimed_branches
                     )
 
                     if locant is not None:
@@ -176,8 +185,131 @@ def _get_locant_from_oriented_ring(mol_atom_idx, oriented_ring):
     return None
 
 
+def _compute_branch_map(mol, ring_set):
+    """Compute per-branch atom sets for each ring atom.
+
+    For geminal substituents (two substituents on the same ring atom), each
+    separate branch needs its own atom set. This function BFS-es from each
+    individual non-ring neighbor of each ring atom to produce separate sets.
+
+    Args:
+        mol: RDKit Mol object.
+        ring_set: Set of ring atom indices.
+
+    Returns:
+        Dict mapping ring_atom_idx -> list of frozensets (one per branch).
+    """
+    branch_map = {}
+    for ring_idx in ring_set:
+        branches = []
+        ring_atom = mol.GetAtomWithIdx(ring_idx)
+        for nbr in ring_atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in ring_set:
+                continue
+            # BFS from this specific neighbor to collect its branch
+            visited = set()
+            stack = [nbr_idx]
+            while stack:
+                idx = stack.pop()
+                if idx in visited or idx in ring_set:
+                    continue
+                visited.add(idx)
+                for nbr2 in mol.GetAtomWithIdx(idx).GetNeighbors():
+                    nbr2_idx = nbr2.GetIdx()
+                    if nbr2_idx not in visited and nbr2_idx not in ring_set:
+                        stack.append(nbr2_idx)
+            if visited:
+                branches.append(frozenset(visited))
+        if branches:
+            branch_map[ring_idx] = branches
+    return branch_map
+
+
+def _collect_frag_atoms_for_fragment(mol, ring_set, attach_ring_idx, frag_mol,
+                                      branch_map, claimed_branches):
+    """Collect original mol atom indices for a specific fragment.
+
+    Handles geminal substituents by matching frag_mol composition against
+    individual branches from branch_map, and tracking which branches have
+    already been claimed.
+
+    Args:
+        mol: RDKit Mol object.
+        ring_set: Set of ring atom indices.
+        attach_ring_idx: Ring atom index the fragment is attached to.
+        frag_mol: RDKit Mol of the isolated fragment.
+        branch_map: Dict from _compute_branch_map.
+        claimed_branches: Mutable set of (attach_idx, branch_idx) tuples already used.
+
+    Returns:
+        Frozenset of original mol atom indices.
+    """
+    branches = branch_map.get(attach_ring_idx, [])
+
+    if len(branches) <= 1:
+        # Single substituent at this position -- use all non-ring neighbors
+        return branches[0] if branches else frozenset()
+
+    # Multiple branches (geminal): match fragment composition to find the right one
+    # Count non-dummy heavy atoms in frag_mol
+    frag_heavy = _count_frag_heavy_atoms(frag_mol)
+
+    for branch_idx, branch_atoms in enumerate(branches):
+        key = (attach_ring_idx, branch_idx)
+        if key in claimed_branches:
+            continue
+
+        # Count heavy atoms in this branch from original mol
+        branch_heavy = {}
+        for idx in branch_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            anum = atom.GetAtomicNum()
+            if anum != 1:  # skip hydrogen
+                sym = atom.GetSymbol()
+                branch_heavy[sym] = branch_heavy.get(sym, 0) + 1
+
+        if branch_heavy == frag_heavy:
+            claimed_branches.add(key)
+            return branch_atoms
+
+    # Fallback: if no exact match, claim the first unclaimed branch
+    for branch_idx, branch_atoms in enumerate(branches):
+        key = (attach_ring_idx, branch_idx)
+        if key not in claimed_branches:
+            claimed_branches.add(key)
+            return branch_atoms
+
+    # Last resort: return union of all branches (shouldn't happen)
+    all_atoms = set()
+    for b in branches:
+        all_atoms.update(b)
+    return frozenset(all_atoms)
+
+
+def _count_frag_heavy_atoms(frag_mol):
+    """Count non-dummy, non-H atoms in a fragment mol by element symbol.
+
+    Returns:
+        Dict of {symbol: count} for heavy atoms in the fragment.
+    """
+    counts = {}
+    if frag_mol is None:
+        return counts
+    for atom in frag_mol.GetAtoms():
+        anum = atom.GetAtomicNum()
+        if anum == 0 or anum == 1:
+            continue
+        sym = atom.GetSymbol()
+        counts[sym] = counts.get(sym, 0) + 1
+    return counts
+
+
 def _collect_frag_original_atoms(mol, ring_set, attach_ring_idx):
     """BFS from a ring atom to collect all non-ring substituent atoms.
+
+    Note: This collects ALL substituent atoms from the ring atom. For geminal
+    substituents, use _collect_frag_atoms_for_fragment instead.
 
     Args:
         mol: RDKit Mol object.

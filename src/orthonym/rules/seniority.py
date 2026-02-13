@@ -134,6 +134,7 @@ PREFIX_FORMS = {
     "sulfinic_acid": "sulfino",
     "aldehyde": "oxo",  # or "formyl" for terminal
     "ketone": "oxo",
+    "thioketone": "sulfanylidene",  # P-63.1.5: =S as non-principal prefix
     "primary_alcohol": "hydroxy",
     "secondary_alcohol": "hydroxy",
     "tertiary_alcohol": "hydroxy",
