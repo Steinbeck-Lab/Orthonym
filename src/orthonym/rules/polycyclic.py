@@ -1115,8 +1115,9 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
 
-    # Count ring atoms for parent name
-    total_ring_atoms = len(ring_atoms)
+    # Use total_atoms from VB analysis (sum(bridge_lengths) + 2) rather than
+    # len(ring_atoms), which may miss non-ring atoms in the VB framework.
+    total_ring_atoms = desc.total_atoms
     parent_name = _get_alkane_name(total_ring_atoms)
 
     return f"{desc.descriptor_string}{parent_name}"
@@ -1531,11 +1532,37 @@ def get_polycyclic_substituents(
             # Trace the substituent branch
             sub_atoms = _trace_substituent_branch(mol, nbr_idx, ring_atoms)
 
-            # Count carbons to determine substituent name
+            # Count carbons and check for heteroatoms in the substituent
             carbon_count = sum(
                 1 for idx in sub_atoms
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
+
+            # Check for alkoxy substituent: starts with O, followed by alkyl
+            # e.g., -O-CH3 (methoxy), -O-C2H5 (ethoxy)
+            first_atom = mol.GetAtomWithIdx(nbr_idx)
+            if (first_atom.GetSymbol() == 'O'
+                    and carbon_count > 0
+                    and len(sub_atoms) >= 2):
+                # Check if the O is bonded to only C and the ring atom
+                # (single bond to ring, single bond to alkyl)
+                o_c_neighbors = [
+                    n for n in first_atom.GetNeighbors()
+                    if n.GetIdx() in set(sub_atoms) and n.GetSymbol() == 'C'
+                ]
+                if o_c_neighbors:
+                    _ALKOXY_NAMES = {
+                        1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
+                        4: 'butoxy', 5: 'pentyloxy', 6: 'hexyloxy',
+                    }
+                    alkoxy_name = _ALKOXY_NAMES.get(carbon_count)
+                    if alkoxy_name:
+                        substituents.append({
+                            'locant': locant,
+                            'name': alkoxy_name,
+                            'atom_indices': sub_atoms,
+                        })
+                        continue
 
             if carbon_count > 0:
                 name = None
@@ -1971,8 +1998,9 @@ def name_polycyclic_complete(mol, features=None) -> Optional[str]:
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
 
-    # Count ring atoms for parent name
-    total_ring_atoms = len(ring_atoms)
+    # Use total_atoms from VB analysis (sum(bridge_lengths) + 2) rather than
+    # len(ring_atoms), which may miss non-ring atoms in the VB framework.
+    total_ring_atoms = desc.total_atoms
 
     # 1. Get stereodescriptors
     stereo_prefix = get_polycyclic_stereo(mol, desc.numbering)

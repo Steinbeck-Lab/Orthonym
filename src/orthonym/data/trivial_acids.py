@@ -41,6 +41,7 @@ TRIVIAL_ACID_TO_ACYLATE = {
     "stearic": "stearate",        # C18:0
     "oleic": "oleate",            # C18:1
     "linoleic": "linoleate",      # C18:2
+    "linolenic": "linolenate",    # C18:3
     "arachidic": "arachidate",    # C20:0
     "arachidonic": "arachidonate", # C20:4
     # Systematic names for saturated fatty acids (ensures decomposition engine

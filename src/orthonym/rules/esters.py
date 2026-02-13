@@ -281,39 +281,224 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     elif carbon_count == 2:
         return "acetic"  # Trivial name preferred
 
-    # Saturated fatty acid trivial names by carbon count
-    # Only for simple saturated chains (no rings, no double bonds other than C=O)
-    FATTY_ACID_TRIVIAL_BY_CARBON = {
-        12: "lauric",
-        14: "myristic",
-        16: "palmitic",
-        18: "stearic",
-        20: "arachidic",
+    # Detect C=C double bonds and rings in the acid fragment
+    acid_atoms_set = set(acid_atoms)
+    has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in acid_atoms)
+    cc_double_bond_count = 0
+    if not has_ring:
+        seen_bonds = set()
+        for idx in acid_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            for bond in atom.GetBonds():
+                nbr = bond.GetOtherAtom(atom)
+                if (nbr.GetIdx() in acid_atoms_set
+                        and nbr.GetSymbol() == 'C'
+                        and bond.GetBondTypeAsDouble() == 2.0
+                        and bond.GetIdx() not in seen_bonds):
+                    seen_bonds.add(bond.GetIdx())
+                    cc_double_bond_count += 1
+    has_cc_double_bond = cc_double_bond_count > 0
+
+    # Fatty acid trivial names by (carbon_count, double_bond_count)
+    # Saturated (0 double bonds)
+    FATTY_ACID_TRIVIAL_BY_STRUCTURE = {
+        (12, 0): "lauric",
+        (14, 0): "myristic",
+        (16, 0): "palmitic",
+        (18, 0): "stearic",
+        (18, 1): "oleic",           # C18:1
+        (18, 2): "linoleic",        # C18:2
+        (18, 3): "linolenic",       # C18:3
+        (20, 0): "arachidic",
+        (20, 4): "arachidonic",     # C20:4
     }
 
-    if carbon_count in FATTY_ACID_TRIVIAL_BY_CARBON:
-        # Verify it's a simple saturated chain: no rings, no C=C double bonds
-        has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in acid_atoms)
-        has_cc_double_bond = False
-        if not has_ring:
-            for idx in acid_atoms:
-                atom = mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() != 'C':
-                    continue
-                for bond in atom.GetBonds():
-                    nbr = bond.GetOtherAtom(atom)
-                    if (nbr.GetIdx() in set(acid_atoms)
-                            and nbr.GetSymbol() == 'C'
-                            and bond.GetBondTypeAsDouble() == 2.0):
-                        has_cc_double_bond = True
-                        break
-                if has_cc_double_bond:
-                    break
-        if not has_ring and not has_cc_double_bond:
-            return FATTY_ACID_TRIVIAL_BY_CARBON[carbon_count]
+    if not has_ring:
+        key = (carbon_count, cc_double_bond_count)
+        if key in FATTY_ACID_TRIVIAL_BY_STRUCTURE:
+            return FATTY_ACID_TRIVIAL_BY_STRUCTURE[key]
+
+    # For unsaturated acids not matching a known trivial name, extract the
+    # fragment and name it via the naming pipeline to get the full systematic
+    # name including double bond positions (e.g., "octadeca-9,12-dienoic").
+    # This prevents unsaturated acids from being named with saturated stems.
+    if has_cc_double_bond and not has_ring:
+        acid_name = _name_acid_fragment_with_unsaturation(mol, acid_atoms)
+        if acid_name:
+            return acid_name
 
     # Systematic for others - use centralized chain naming
     return get_acid_stem(carbon_count)
+
+
+def _name_acid_fragment_with_unsaturation(mol, acid_atoms: List[int]) -> Optional[str]:
+    """Extract an unsaturated acid fragment and name it via the pipeline.
+
+    Builds an isolated molecule from the acid fragment atoms, caps the
+    carbonyl carbon with -OH to form a carboxylic acid, and uses the
+    naming pipeline to get the full systematic name including double bond
+    positions (e.g., "octadeca-9,12-dienoic").
+
+    Args:
+        mol: RDKit Mol object (the full molecule).
+        acid_atoms: Atom indices of the acid fragment (R-C(=O) without the
+                    ester oxygen).
+
+    Returns:
+        Acid stem name with unsaturation info (e.g., "octadeca-9,12-dienoic"),
+        or None if extraction/naming fails.
+    """
+    acid_atoms_set = set(acid_atoms)
+
+    # Find the carbonyl carbon: the C with a double-bond to O
+    carbonyl_c = None
+    for idx in acid_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if (nbr.GetSymbol() == 'O'
+                    and bond.GetBondTypeAsDouble() == 2.0
+                    and nbr.GetIdx() in acid_atoms_set):
+                carbonyl_c = idx
+                break
+        if carbonyl_c is not None:
+            break
+
+    if carbonyl_c is None:
+        return None
+
+    # Build isolated fragment molecule
+    atom_map = {}
+    frag_mol = Chem.RWMol()
+    for idx in sorted(acid_atoms):
+        new_idx = frag_mol.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+        atom_map[idx] = new_idx
+
+    # Add bonds between fragment atoms, preserving bond types (single, double)
+    for idx in acid_atoms:
+        for bond in mol.GetAtomWithIdx(idx).GetBonds():
+            nbr_idx = bond.GetOtherAtomIdx(idx)
+            if nbr_idx in acid_atoms_set and nbr_idx > idx:
+                frag_mol.AddBond(atom_map[idx], atom_map[nbr_idx], bond.GetBondType())
+
+    # Cap the carbonyl carbon with -OH to form the carboxylic acid
+    oh_idx = frag_mol.AddAtom(Chem.Atom(8))  # oxygen
+    frag_mol.AddBond(atom_map[carbonyl_c], oh_idx, Chem.BondType.SINGLE)
+
+    try:
+        Chem.SanitizeMol(frag_mol)
+        frag_smi = Chem.MolToSmiles(frag_mol)
+    except Exception:
+        return None
+
+    # Name via the pipeline
+    from ..assembly.fragment_naming import name_fragment_recursively
+    full_name = name_fragment_recursively(frag_smi)
+    if not full_name or full_name == "unknown":
+        return None
+
+    # Extract the acid stem: strip " acid" suffix and any leading stereo descriptors
+    # e.g., "(9Z,12Z)-octadeca-9,12-dienoic acid" -> "octadeca-9,12-dienoic"
+    # We keep the descriptors since get_acyloxy_prefix handles the -oic -> -oyloxy conversion
+    stem = full_name.strip()
+    if stem.endswith(" acid"):
+        stem = stem[:-5].strip()
+
+    # Validate: stem should end in "-oic" or "-ic" for acid conversion to work
+    if stem.endswith("oic") or stem.endswith("ic"):
+        return stem
+
+    return None
+
+
+def _name_alkyl_fragment_with_unsaturation(
+    mol, alkyl_atoms: List[int], alkyl_set: set
+) -> Optional[str]:
+    """Extract an unsaturated alkyl fragment and name it via the pipeline.
+
+    Builds an isolated molecule from the alkyl fragment atoms, caps the
+    attachment carbon with -OH to form an alcohol, names it, then converts
+    the alcohol name to the alkyl form.
+
+    Args:
+        mol: RDKit Mol object (the full molecule).
+        alkyl_atoms: Atom indices of the alkyl fragment.
+        alkyl_set: Set of alkyl atom indices (for fast membership check).
+
+    Returns:
+        Alkyl name with unsaturation (e.g., "pentadec-10-en-1-yl"),
+        or None if extraction/naming fails.
+    """
+    import re
+
+    # Find the attachment carbon: the C bonded to the ester oxygen (not in alkyl set)
+    attach_c = None
+    for idx in alkyl_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for nbr in atom.GetNeighbors():
+            if nbr.GetSymbol() == 'O' and nbr.GetIdx() not in alkyl_set:
+                attach_c = idx
+                break
+        if attach_c is not None:
+            break
+
+    if attach_c is None:
+        return None
+
+    # Build isolated fragment molecule
+    atom_map = {}
+    frag_mol = Chem.RWMol()
+    for idx in sorted(alkyl_atoms):
+        new_idx = frag_mol.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+        atom_map[idx] = new_idx
+
+    # Add bonds between fragment atoms, preserving bond types
+    for idx in alkyl_atoms:
+        for bond in mol.GetAtomWithIdx(idx).GetBonds():
+            nbr_idx = bond.GetOtherAtomIdx(idx)
+            if nbr_idx in alkyl_set and nbr_idx > idx:
+                frag_mol.AddBond(atom_map[idx], atom_map[nbr_idx], bond.GetBondType())
+
+    # Cap the attachment carbon with -OH to form an alcohol
+    oh_idx = frag_mol.AddAtom(Chem.Atom(8))  # oxygen
+    frag_mol.AddBond(atom_map[attach_c], oh_idx, Chem.BondType.SINGLE)
+
+    try:
+        Chem.SanitizeMol(frag_mol)
+        frag_smi = Chem.MolToSmiles(frag_mol)
+    except Exception:
+        return None
+
+    # Name via the pipeline
+    from ..assembly.fragment_naming import name_fragment_recursively
+    full_name = name_fragment_recursively(frag_smi)
+    if not full_name or full_name == "unknown":
+        return None
+
+    # Convert alcohol name to alkyl form:
+    # "pentadec-10-en-1-ol" -> "pentadec-10-en-1-yl"
+    # "(10Z)-pentadec-10-en-1-ol" -> "(10Z)-pentadec-10-en-1-yl"
+    name = full_name.strip()
+
+    # Strip trailing "-ol" and replace with "-yl"
+    # Handle patterns like: "propan-1-ol" -> "propyl", "pentadec-10-en-1-ol" -> "pentadec-10-en-1-yl"
+    if name.endswith("-ol"):
+        # e.g., "pentadec-10-en-1-ol" -> "pentadec-10-en-1-yl"
+        return name[:-2] + "yl"
+    elif name.endswith("ol"):
+        # e.g., "methanol" -> "methyl" (via -an-ol -> -yl)
+        base = name[:-2]
+        if base.endswith("an"):
+            return base[:-2] + "yl"
+        return base + "yl"
+
+    return None
 
 
 def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
@@ -380,6 +565,30 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
 
     if carbon_count == 0:
         return ""
+
+    # Detect C=C double bonds in the alkyl fragment
+    has_cc_double_bond = False
+    seen_bonds = set()
+    for idx in alkyl_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if (nbr.GetIdx() in alkyl_set
+                    and nbr.GetSymbol() == 'C'
+                    and bond.GetBondTypeAsDouble() == 2.0
+                    and bond.GetIdx() not in seen_bonds):
+                seen_bonds.add(bond.GetIdx())
+                has_cc_double_bond = True
+
+    # For unsaturated alkyl chains, extract the fragment and name it via the
+    # pipeline to get the full name including double bond positions, then
+    # convert the alcohol name to the alkyl form.
+    if has_cc_double_bond and not has_ring:
+        alkyl_name = _name_alkyl_fragment_with_unsaturation(mol, alkyl_atoms, alkyl_set)
+        if alkyl_name:
+            return alkyl_name
 
     # Detect branching: find the attachment point (C bonded to ester O)
     # and check if it's a branching carbon
@@ -556,6 +765,7 @@ TRIVIAL_ACID_TO_ACYLOXY = {
     "stearic": "stearoyloxy",        # C18:0
     "oleic": "oleoyloxy",            # C18:1
     "linoleic": "linoleoyloxy",      # C18:2
+    "linolenic": "linolenoyloxy",    # C18:3
     "arachidic": "arachidoyloxy",    # C20:0
     "arachidonic": "arachidonoyloxy", # C20:4
     # Systematic names for saturated fatty acids (ensures decomposition path

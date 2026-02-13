@@ -251,7 +251,7 @@ CI_BENCHMARK = [
     (
         "COc1cc(OC)c2c(O)c3c(c(-c4c5cc(OC)cc(OC)c5c(O)c5c(=O)cc(C)"
         "oc45)c2c1)O[C@](C)(O)CC3=O",
-        "(6S)-9-hexadecyl-2,6-dihydroxy-6,12,14-trimethyl-7-oxa"
+        "(6S)-9-hexadecyl-2,6-dihydroxy-12,14-dimethoxy-6-methyl-7-oxa"
         "-tricyclo[8.4.0.0(3,8)]tetradecan-4-one",
     ),
     (
@@ -350,7 +350,7 @@ CI_BENCHMARK = [
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@@H](O)COP(=O)(O)"
         "OC1C(O)C(O)C(O)[C@@H](O)C1O",
-        "(8Z,11Z,14Z)-(arachidoyloxy)icosa-8,11,14-trienehexaol",
+        "(8Z,11Z,14Z)-(icosa-8,11,14-trienoyloxy)icosa-8,11,14-trienehexaol",
     ),
     (
         "CCCCCCCC(O)CC(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CCC(=O)O)"
@@ -384,7 +384,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCC=CCC=CCCCCCCCC(=O)OCC(O)COP(=O)(O)OCCN",
-        "amino(stearoyloxy)octadeca-9,12-dienol",
+        "amino(linoleoyloxy)octadeca-9,12-dienol",
     ),
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
