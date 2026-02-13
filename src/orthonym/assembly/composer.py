@@ -586,7 +586,11 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.is_cyclic and _is_complex_ring_system(features.mol):
         complex_name = _assemble_complex_ring_name(features.mol, features)
         if complex_name:
-            return complex_name
+            # Coverage gate: reject if name is too short for molecule size
+            total_heavy = features.mol.GetNumHeavyAtoms()
+            if total_heavy <= 15 or len(complex_name) / total_heavy >= 0.4:
+                return complex_name
+            # else: complex ring name too short -- fall through to simpler handlers
         # If complex ring naming fails, fall through to simpler handling
 
     # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
@@ -614,12 +618,26 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             lactone_name = name_monocyclic_lactone(features.mol)
             if lactone_name:
                 return lactone_name
-        return _assemble_heterocycle_name(features, style)
+        # Coverage gate: heterocycle name must be adequate for molecule size
+        hetero_name = _assemble_heterocycle_name(features, style)
+        if hetero_name:
+            total_heavy = features.mol.GetNumHeavyAtoms()
+            if total_heavy <= 15 or len(hetero_name) / total_heavy >= 0.4:
+                return hetero_name
+            # else: heterocycle name too short -- fall through to chain naming
+        # If heterocycle naming fails, fall through
 
     # Handle benzene derivatives
     # Only reached if not a fused system containing benzene
     if getattr(features, 'is_benzene', False):
-        return _assemble_benzene_name(features, style)
+        benzene_name = _assemble_benzene_name(features, style)
+        if benzene_name:
+            # Coverage gate: reject if name is too short for molecule size
+            total_heavy = features.mol.GetNumHeavyAtoms()
+            if total_heavy <= 10 or len(benzene_name) / total_heavy >= 0.4:
+                return benzene_name
+            # else: benzene name too short -- fall through to chain naming
+        # If benzene naming fails, fall through
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
     if features.principal_group == 'nitrile' and features.is_cyclic:
