@@ -366,11 +366,12 @@ class TestImpactMeasurement:
         print(f"\n  Chain silent drops fixed: {chain_pass}/8")
         for d in chain_details:
             print(d)
-        print(f"\n  Canary: {canary_pass}/75")
+        canary_total = len(CANARY_COMPOUNDS)
+        print(f"\n  Canary: {canary_pass}/{canary_total}")
         print("=" * 70)
 
         # The test passes -- this is a measurement, not a strict gate
         # But we assert minimum thresholds based on what Plans 01-02 should fix
         assert ring_pass >= 15, f"Ring substituents: {ring_pass}/20, expected >= 15"
         assert chain_pass >= 6, f"Chain silent drops: {chain_pass}/8, expected >= 6"
-        assert canary_pass == 75, f"Canary regressions: {75 - canary_pass} failures"
+        assert canary_pass == canary_total, f"Canary regressions: {canary_total - canary_pass} failures"

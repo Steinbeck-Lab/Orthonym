@@ -1,9 +1,11 @@
 """
-Golden canary regression tests for the 75 compounds that round-trip correctly.
+Golden canary regression tests for compounds that round-trip correctly.
 
 These compounds matched on InChI round-trip (Orthonym name -> OPSIN parse -> InChI
-comparison) as of the Phase 44 baseline (v4.0+). They form a regression safety net:
-any naming change that breaks one of these tests must be investigated before merging.
+comparison) as of the Phase 44 baseline (v4.0+), extended in Phase 49 with 10 new
+compound classes (acetals, disulfides, cyclic imides, thiocarboxylic acids, carbamic
+acid). They form a regression safety net: any naming change that breaks one of these
+tests must be investigated before merging.
 
 If a test fails, first check whether the NEW name is also valid IUPAC nomenclature
 (it might be an equally correct alternative). Only revert if the new name is wrong.
@@ -11,8 +13,8 @@ If a test fails, first check whether the NEW name is also valid IUPAC nomenclatu
 These tests run as part of the normal test suite (no @pytest.mark.slow) so that
 regressions are caught immediately during development.
 
-Generated from: 
-Criterion: detailed_results where inchi_match == True
+Original 75: 
+Phase 49 additions: 10 compounds from missing compound classes (CLS-01 to CLS-05)
 """
 
 import pytest
@@ -21,7 +23,8 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 75 golden canary compounds: (SMILES, expected_name)
+# 85 golden canary compounds: (SMILES, expected_name)
+# Original 75 from Phase 44 + 10 from Phase 49 (missing compound classes)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -325,6 +328,52 @@ CANARY_COMPOUNDS = [
         "N[C@H](Cc1ccc(O)cc1)C(=O)O",
         "(2R)-3-(4-hydroxyphenyl)-2-aminopropanoic acid",
     ),
+    # --- Phase 49: Missing Compound Classes (CLS-01 to CLS-05) ---
+    # CLS-01: Acetals
+    (
+        "C1OCCO1",
+        "1,3-dioxolane",
+    ),
+    (
+        "COC(C)OC",
+        "1,1-dimethoxyethane",
+    ),
+    # CLS-02: Disulfides
+    (
+        "CSSC",
+        "2,3-dithiabutane",
+    ),
+    (
+        "CCSSSCC",
+        "3,4,5-trithiaheptane",
+    ),
+    # CLS-03: Cyclic Imides
+    (
+        "O=C1CCC(=O)N1",
+        "succinimide",
+    ),
+    (
+        "O=C1NC(=O)c2ccccc21",
+        "isoindoline-1,3-dione",
+    ),
+    # CLS-04: Thiocarboxylic Acids
+    (
+        "CC(=O)S",
+        "ethanethioic S-acid",
+    ),
+    (
+        "CC(=S)S",
+        "ethanedithioic acid",
+    ),
+    # CLS-05: Carbamic Acid
+    (
+        "NC(=O)O",
+        "carbamic acid",
+    ),
+    (
+        "CN(C)C(=O)O",
+        "N,N-dimethylcarbamic acid",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -335,7 +384,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt75(smiles, expected_name):
+def test_canary_rt85(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
