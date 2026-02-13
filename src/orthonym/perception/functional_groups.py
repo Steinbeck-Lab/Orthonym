@@ -16,6 +16,10 @@ from rdkit import Chem
 FUNCTIONAL_GROUP_SMARTS = {
     # === ACIDS (highest priority) ===
     "carboxylic_acid": "[CX3](=O)[OX2H1]",
+    # Thiocarboxylic acids (IUPAC P-65.3) -- rank just below carboxylic acid
+    "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
+    "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
+    "dithioic_acid": "[CX3](=S)[SX2H1]",    # R-C(=S)-SH -> dithioic acid
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
     "sulfinic_acid": "[SX3](=O)[OX2H1]",
     "phosphonic_acid": "[PX4](=O)([OX2H1])[OX2H1]",
@@ -191,6 +195,13 @@ def _resolve_fg_collisions(results):
         ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),
         ('isothiocyanate', ['nitrile', 'primary_amide']),
+        # Thiocarboxylic acids: SH in C(=O)SH or C(=S)SH must NOT match thiol
+        # C(=O)SH must NOT match thioester either (C(=O)S is substructure of both)
+        ('thioic_S_acid', ['thiol', 'thioester']),
+        ('dithioic_acid', ['thiol', 'thioketone']),
+        # C(=S)OH should not collide with carboxylic_acid (different SMARTS: =S vs =O)
+        # but suppress thioketone matches on the C=S carbon
+        ('thioic_O_acid', ['thioketone']),
     ]:
         if fg_specific in results:
             specific_atoms = set()

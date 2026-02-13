@@ -177,6 +177,9 @@ TERMINAL_GROUPS = {
     "acid_chloride",    # Always at chain end (locant 1)
     "acid_bromide",     # Always at chain end (locant 1)
     "acid_fluoride",    # Always at chain end (locant 1)
+    "thioic_S_acid",    # Always at chain end (locant 1)
+    "thioic_O_acid",    # Always at chain end (locant 1)
+    "dithioic_acid",    # Always at chain end (locant 1)
 }
 
 

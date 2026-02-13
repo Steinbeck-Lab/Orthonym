@@ -13,6 +13,10 @@ from typing import Optional, Tuple, List, Dict
 SENIORITY_ORDER = [
     # Acids (highest priority)
     "carboxylic_acid",
+    # Thiocarboxylic acids (IUPAC P-65.3) -- just below carboxylic acid
+    "thioic_S_acid",
+    "thioic_O_acid",
+    "dithioic_acid",
     "sulfonic_acid",
     "sulfinic_acid",
     "phosphonic_acid",
@@ -89,6 +93,9 @@ SENIORITY_ORDER = [
 # Format: (chain_terminal_suffix, ring_attached_suffix)
 SUFFIX_FORMS = {
     "carboxylic_acid": ("oic acid", "carboxylic acid"),
+    "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
+    "thioic_O_acid": ("thioic O-acid", "carbothioic O-acid"),
+    "dithioic_acid": ("dithioic acid", "carbodithioic acid"),
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     "phosphonic_acid": ("phosphonic acid", "phosphonic acid"),
@@ -130,6 +137,9 @@ SUFFIX_FORMS = {
 # Prefix forms for non-principal groups
 PREFIX_FORMS = {
     "carboxylic_acid": "carboxy",
+    "thioic_S_acid": None,   # Rare as prefix; functional class naming
+    "thioic_O_acid": None,   # Rare as prefix; functional class naming
+    "dithioic_acid": None,   # Rare as prefix; functional class naming
     "sulfonic_acid": "sulfo",
     "sulfinic_acid": "sulfino",
     "aldehyde": "oxo",  # or "formyl" for terminal
