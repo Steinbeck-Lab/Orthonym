@@ -1,0 +1,622 @@
+"""Unified substituent enumeration module with ReplaceCore-based extraction.
+
+Provides a single enumeration path for all substituents on both ring and chain
+parent structures. Replaces the previously fragmented three-path system that
+caused silent drops, double-counting, and wrong locants.
+
+Architecture:
+  - Ring parents: ReplaceCore(mol, core_from_ring_atoms) -> fragment mols
+  - Chain parents: Branch-point enumeration from features.substituents dict
+  - All fragments: classify -> name via existing naming infrastructure
+
+Public API:
+  - extract_ring_substituents(mol, ring_atoms, oriented_ring)
+  - extract_chain_substituents(mol, principal_chain, substituents_dict)
+  - classify_and_name_fragment(mol, frag_info, parent_atoms, features=None)
+  - collect_substituent_atom_set(substituent_infos)
+
+References:
+    IUPAC 2013 P-31.1 (detachable prefixes)
+    IUPAC 2013 P-44 (parent selection determines what's a substituent)
+"""
+
+import logging
+from collections import namedtuple
+from typing import List, Optional, Set, Dict
+
+from rdkit import Chem
+from rdkit.Chem import RWMol
+
+from .naming_utils import get_alkyl_name
+from .substituent_naming import name_substituent_fragment
+from ..rules.seniority import get_prefix
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Data Types
+# ============================================================================
+
+SubstituentInfo = namedtuple(
+    'SubstituentInfo',
+    ['frag_mol', 'locant', 'attach_mol_idx', 'frag_atoms']
+)
+"""
+Represents a single substituent on a parent structure.
+
+Fields:
+    frag_mol: RDKit Mol of the isolated fragment (with dummy atom at attachment),
+              or None for chain-parent substituents where fragment is inline.
+    locant: IUPAC locant (1-indexed integer) on the parent.
+    attach_mol_idx: Original mol atom index of the attachment point on parent.
+    frag_atoms: Set of original mol atom indices belonging to this substituent.
+"""
+
+
+# ============================================================================
+# Halogen Name Map (for fg_only classification)
+# ============================================================================
+
+_HALOGEN_MAP = {
+    'F': 'fluoro',
+    'Cl': 'chloro',
+    'Br': 'bromo',
+    'I': 'iodo',
+}
+
+
+# ============================================================================
+# Ring Substituent Extraction (ReplaceCore-based)
+# ============================================================================
+
+
+def extract_ring_substituents(mol, ring_atoms, oriented_ring):
+    """Extract all substituent fragments from a ring parent using ReplaceCore.
+
+    Builds a core mol from ring_atoms, calls ReplaceCore to extract all
+    non-ring fragments as separate mol objects with isotope-labeled dummy
+    atoms indicating attachment points.
+
+    Args:
+        mol: RDKit Mol object.
+        ring_atoms: Tuple or list of ring atom indices (from principal_ring).
+        oriented_ring: List of ring atom indices in IUPAC numbering order.
+
+    Returns:
+        List of SubstituentInfo namedtuples, one per substituent fragment.
+        Empty list if ring has no substituents.
+    """
+    ring_set = set(ring_atoms)
+
+    # Build core mol from ring atoms
+    core = RWMol()
+    idx_map = {}  # original mol idx -> core mol idx
+    for atom_idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        new_idx = core.AddAtom(Chem.Atom(atom.GetAtomicNum()))
+        # Preserve aromaticity for correct matching
+        core.GetAtomWithIdx(new_idx).SetIsAromatic(atom.GetIsAromatic())
+        idx_map[atom_idx] = new_idx
+
+    # Copy bonds between ring atoms
+    added_bonds = set()
+    for atom_idx in ring_atoms:
+        for bond in mol.GetAtomWithIdx(atom_idx).GetBonds():
+            begin = bond.GetBeginAtomIdx()
+            end = bond.GetEndAtomIdx()
+            if begin in ring_set and end in ring_set:
+                bond_key = (min(begin, end), max(begin, end))
+                if bond_key not in added_bonds:
+                    core.AddBond(
+                        idx_map[begin], idx_map[end], bond.GetBondType()
+                    )
+                    added_bonds.add(bond_key)
+
+    core_mol = core.GetMol()
+
+    # Match tuple maps core atom index -> original mol atom index
+    match = tuple(ring_atoms)
+
+    # ReplaceCore: removes core, returns fragments with isotope-labeled dummies
+    frags = Chem.ReplaceCore(mol, core_mol, match, labelByIndex=True)
+    if frags is None:
+        return []
+
+    # Split into individual fragment mols
+    subfgs = Chem.GetMolFrags(frags, asMols=True, sanitizeFrags=False)
+    if not subfgs:
+        return []
+
+    results = []
+    for frag in subfgs:
+        # Find the dummy atom(s) to determine attachment point
+        for atom in frag.GetAtoms():
+            if atom.GetAtomicNum() == 0:  # dummy atom
+                # CRITICAL: isotope 0 is valid (maps to match position 0)
+                core_pos = atom.GetIsotope()
+                if core_pos < len(match):
+                    mol_atom_idx = match[core_pos]
+
+                    # Map to IUPAC locant via oriented_ring
+                    locant = _get_locant_from_oriented_ring(
+                        mol_atom_idx, oriented_ring
+                    )
+
+                    # Collect original mol atom indices for this fragment
+                    frag_atoms = _collect_frag_original_atoms(
+                        mol, ring_set, mol_atom_idx
+                    )
+
+                    if locant is not None:
+                        results.append(SubstituentInfo(
+                            frag_mol=frag,
+                            locant=locant,
+                            attach_mol_idx=mol_atom_idx,
+                            frag_atoms=frag_atoms,
+                        ))
+                break  # only process first dummy atom per fragment
+
+    return results
+
+
+def _get_locant_from_oriented_ring(mol_atom_idx, oriented_ring):
+    """Map a mol atom index to its IUPAC locant via oriented_ring.
+
+    Args:
+        mol_atom_idx: Atom index in the original mol.
+        oriented_ring: List of atom indices in IUPAC numbering order.
+
+    Returns:
+        1-indexed IUPAC locant, or None if not found.
+    """
+    for pos, ring_atom in enumerate(oriented_ring):
+        if ring_atom == mol_atom_idx:
+            return pos + 1
+    return None
+
+
+def _collect_frag_original_atoms(mol, ring_set, attach_ring_idx):
+    """BFS from a ring atom to collect all non-ring substituent atoms.
+
+    Args:
+        mol: RDKit Mol object.
+        ring_set: Set of ring atom indices.
+        attach_ring_idx: Ring atom index that the substituent is attached to.
+
+    Returns:
+        Frozenset of original mol atom indices belonging to the substituent.
+    """
+    visited = set()
+    stack = []
+
+    # Start from neighbors of the ring atom that are NOT in the ring
+    ring_atom = mol.GetAtomWithIdx(attach_ring_idx)
+    for nbr in ring_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx not in ring_set:
+            stack.append(nbr_idx)
+
+    while stack:
+        idx = stack.pop()
+        if idx in visited or idx in ring_set:
+            continue
+        visited.add(idx)
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in ring_set:
+                stack.append(nbr_idx)
+
+    return frozenset(visited)
+
+
+# ============================================================================
+# Chain Substituent Extraction
+# ============================================================================
+
+
+def extract_chain_substituents(mol, principal_chain, substituents_dict):
+    """Convert a substituents dict to a list of SubstituentInfo namedtuples.
+
+    Takes the existing features.substituents dict (position -> list of
+    atom index lists) and wraps each entry as a SubstituentInfo for
+    unified downstream processing.
+
+    Args:
+        mol: RDKit Mol object.
+        principal_chain: List of atom indices in the principal chain.
+        substituents_dict: Dict mapping chain position (1-indexed) to list
+            of substituent atom index lists.
+
+    Returns:
+        List of SubstituentInfo namedtuples.
+    """
+    if not substituents_dict:
+        return []
+
+    chain_set = set(principal_chain)
+    results = []
+
+    for position, sub_atom_lists in substituents_dict.items():
+        for sub_atoms in sub_atom_lists:
+            if not sub_atoms:
+                continue
+
+            # The first atom in sub_atoms is the one bonded to the chain
+            attach_idx = sub_atoms[0] if isinstance(sub_atoms, (list, tuple)) else sub_atoms
+
+            # Compute the actual atom index on the chain that this attaches to
+            # position is 1-indexed into principal_chain
+            if isinstance(position, int) and 1 <= position <= len(principal_chain):
+                chain_atom_idx = principal_chain[position - 1]
+            else:
+                chain_atom_idx = attach_idx
+
+            frag_atoms = frozenset(sub_atoms) if isinstance(sub_atoms, (list, tuple)) else frozenset([sub_atoms])
+
+            results.append(SubstituentInfo(
+                frag_mol=None,  # Chain substituents use atom indices, not frag mols
+                locant=position,
+                attach_mol_idx=chain_atom_idx,
+                frag_atoms=frag_atoms,
+            ))
+
+    return results
+
+
+# ============================================================================
+# Fragment Classification and Naming
+# ============================================================================
+
+
+def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
+    """Classify a substituent fragment and produce its IUPAC prefix name.
+
+    Routes each fragment to the appropriate naming function based on its
+    composition:
+      - fg_only: No carbon atoms (halogens, -OH, -NH2, -NO2, etc.)
+      - pure_alkyl: Only carbon atoms (methyl, ethyl, etc.)
+      - compound: Carbon + heteroatoms (trifluoromethyl, hydroxymethyl, etc.)
+
+    Args:
+        mol: RDKit Mol object of the full molecule.
+        frag_info: SubstituentInfo namedtuple for this substituent.
+        parent_atoms: Set of atom indices in the parent structure.
+        features: Optional features object (for additional context).
+
+    Returns:
+        IUPAC prefix name string (e.g., "methyl", "hydroxy", "trifluoromethyl"),
+        or None if naming fails (with WARNING logged).
+    """
+    frag_mol = frag_info.frag_mol
+    frag_atoms = frag_info.frag_atoms
+
+    # Classify the fragment by composition
+    category = _classify_fragment(mol, frag_mol, frag_atoms)
+
+    if category == 'fg_only':
+        return _name_fg_only(mol, frag_mol, frag_atoms)
+    elif category == 'pure_alkyl':
+        return _name_pure_alkyl(mol, frag_info, parent_atoms)
+    elif category == 'compound':
+        return _name_compound_substituent(mol, frag_info, parent_atoms)
+    else:
+        # Unknown -- log warning, never silently drop
+        _frag_smiles = _get_frag_smiles(mol, frag_atoms)
+        logger.warning(
+            "Unrecognized substituent fragment at locant %s: %s",
+            frag_info.locant, _frag_smiles
+        )
+        return None
+
+
+def _classify_fragment(mol, frag_mol, frag_atoms):
+    """Classify a fragment as fg_only, pure_alkyl, compound, or unknown.
+
+    Uses the fragment mol if available (ring parent), otherwise uses
+    original mol atom indices.
+
+    Args:
+        mol: RDKit Mol of the full molecule.
+        frag_mol: RDKit Mol of the isolated fragment (may be None).
+        frag_atoms: Set/frozenset of original mol atom indices.
+
+    Returns:
+        String category: 'fg_only', 'pure_alkyl', 'compound', or 'unknown'.
+    """
+    carbons = 0
+    heteroatoms = 0
+
+    if frag_mol is not None:
+        # Use fragment mol (from ReplaceCore)
+        for atom in frag_mol.GetAtoms():
+            anum = atom.GetAtomicNum()
+            if anum == 0:
+                continue  # skip dummy atom
+            if anum == 6:
+                carbons += 1
+            elif anum != 1:
+                heteroatoms += 1
+    else:
+        # Use original mol indices
+        for idx in frag_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            anum = atom.GetAtomicNum()
+            if anum == 6:
+                carbons += 1
+            elif anum != 1:
+                heteroatoms += 1
+
+    if carbons == 0 and heteroatoms > 0:
+        return 'fg_only'
+    elif carbons > 0 and heteroatoms == 0:
+        return 'pure_alkyl'
+    elif carbons > 0 and heteroatoms > 0:
+        return 'compound'
+    else:
+        return 'unknown'
+
+
+def _name_fg_only(mol, frag_mol, frag_atoms):
+    """Name a fragment that is a pure functional group (no carbon).
+
+    Checks halogens by symbol, then common FG patterns.
+
+    Args:
+        mol: RDKit Mol of full molecule.
+        frag_mol: RDKit Mol of isolated fragment (may be None).
+        frag_atoms: Set of original mol atom indices.
+
+    Returns:
+        IUPAC prefix name string, or None if unrecognized.
+    """
+    # Collect non-dummy, non-hydrogen atoms
+    if frag_mol is not None:
+        atoms_info = []
+        for atom in frag_mol.GetAtoms():
+            if atom.GetAtomicNum() == 0:
+                continue  # skip dummy
+            atoms_info.append({
+                'symbol': atom.GetSymbol(),
+                'atomic_num': atom.GetAtomicNum(),
+                'total_hs': atom.GetTotalNumHs(),
+                'num_bonds': atom.GetDegree(),
+            })
+    else:
+        atoms_info = []
+        for idx in frag_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetAtomicNum() == 1:
+                continue
+            atoms_info.append({
+                'symbol': atom.GetSymbol(),
+                'atomic_num': atom.GetAtomicNum(),
+                'total_hs': atom.GetTotalNumHs(),
+                'num_bonds': atom.GetDegree(),
+            })
+
+    if len(atoms_info) == 0:
+        return None
+
+    # Single atom cases
+    if len(atoms_info) == 1:
+        ai = atoms_info[0]
+        sym = ai['symbol']
+
+        # Halogens
+        if sym in _HALOGEN_MAP:
+            return _HALOGEN_MAP[sym]
+
+        # -OH (oxygen with 1 H)
+        if sym == 'O' and ai['total_hs'] >= 1:
+            return 'hydroxy'
+
+        # =O (oxo -- oxygen with no H, double bonded)
+        if sym == 'O' and ai['total_hs'] == 0:
+            return 'oxo'
+
+        # -NH2 (nitrogen with 2 H)
+        if sym == 'N' and ai['total_hs'] >= 2:
+            return 'amino'
+
+        # =NH (imino -- nitrogen with 1 H)
+        if sym == 'N' and ai['total_hs'] == 1:
+            return 'imino'
+
+        # -SH (sulfanyl)
+        if sym == 'S' and ai['total_hs'] >= 1:
+            return 'sulfanyl'
+
+        # =S (sulfanylidene)
+        if sym == 'S' and ai['total_hs'] == 0:
+            return 'sulfanylidene'
+
+    # Multi-atom FG-only patterns
+    if len(atoms_info) >= 2:
+        symbols = sorted(ai['symbol'] for ai in atoms_info)
+
+        # -NO2 (nitro): N + 2O
+        if symbols == ['N', 'O', 'O']:
+            return 'nitro'
+
+        # -N3 (azido): 3 N atoms
+        if symbols == ['N', 'N', 'N']:
+            return 'azido'
+
+    # Try seniority.get_prefix as fallback
+    # For FG-only fragments on ring parents, try SMARTS matching
+    if frag_mol is not None:
+        from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+        for fg_name, smarts_str in FUNCTIONAL_GROUP_SMARTS.items():
+            pattern = Chem.MolFromSmarts(smarts_str)
+            if pattern and frag_mol.HasSubstructMatch(pattern):
+                prefix = get_prefix(fg_name)
+                if prefix:
+                    return prefix
+
+    # Last resort for single-atom halogens on original mol
+    for idx in frag_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        if sym in _HALOGEN_MAP:
+            return _HALOGEN_MAP[sym]
+        if sym == 'O' and atom.GetTotalNumHs() >= 1:
+            return 'hydroxy'
+        if sym == 'O' and atom.GetTotalNumHs() == 0:
+            return 'oxo'
+        if sym == 'N' and atom.GetTotalNumHs() >= 2:
+            return 'amino'
+        if sym == 'S' and atom.GetTotalNumHs() >= 1:
+            return 'sulfanyl'
+
+    logger.warning(
+        "Could not name fg_only fragment with atoms: %s",
+        [ai['symbol'] for ai in atoms_info]
+    )
+    return None
+
+
+def _name_pure_alkyl(mol, frag_info, parent_atoms):
+    """Name a pure alkyl substituent (carbon-only).
+
+    Uses name_substituent_fragment for retained names (isopropyl, etc.)
+    and recursive naming, with get_alkyl_name as fallback.
+
+    Args:
+        mol: RDKit Mol of full molecule.
+        frag_info: SubstituentInfo namedtuple.
+        parent_atoms: Set of parent atom indices.
+
+    Returns:
+        Alkyl prefix name string, or None.
+    """
+    frag_atoms = list(frag_info.frag_atoms)
+    if not frag_atoms:
+        return None
+
+    # Find the attachment atom within the fragment
+    attach_idx = _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms)
+    if attach_idx is None and frag_atoms:
+        attach_idx = frag_atoms[0]
+
+    # Delegate to existing naming infrastructure
+    parent_list = list(parent_atoms) if parent_atoms else []
+    name = name_substituent_fragment(mol, frag_atoms, attach_idx, parent_list)
+    if name:
+        return name
+
+    # Fallback: count carbons
+    carbon_count = sum(
+        1 for idx in frag_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    )
+    if carbon_count > 0:
+        try:
+            return get_alkyl_name(carbon_count)
+        except (ValueError, KeyError):
+            pass
+
+    return None
+
+
+def _name_compound_substituent(mol, frag_info, parent_atoms):
+    """Name a compound substituent (carbon + heteroatoms).
+
+    Handles haloalkyl (trifluoromethyl), hydroxyalkyl, aminoalkyl,
+    alkoxy, and other compound types.
+
+    Args:
+        mol: RDKit Mol of full molecule.
+        frag_info: SubstituentInfo namedtuple.
+        parent_atoms: Set of parent atom indices.
+
+    Returns:
+        Compound prefix name string, or None.
+    """
+    frag_atoms = list(frag_info.frag_atoms)
+    if not frag_atoms:
+        return None
+
+    # Find the attachment atom
+    attach_idx = _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms)
+    if attach_idx is None and frag_atoms:
+        attach_idx = frag_atoms[0]
+
+    # Delegate to existing naming infrastructure
+    parent_list = list(parent_atoms) if parent_atoms else []
+    name = name_substituent_fragment(mol, frag_atoms, attach_idx, parent_list)
+    if name:
+        return name
+
+    # If naming infrastructure couldn't handle it, log warning
+    frag_smiles = _get_frag_smiles(mol, frag_atoms)
+    logger.warning(
+        "Could not name compound substituent at locant %s: %s",
+        frag_info.locant, frag_smiles
+    )
+    return None
+
+
+def _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms):
+    """Find the fragment atom that is bonded to the parent structure.
+
+    Args:
+        mol: RDKit Mol.
+        frag_atoms: List of atom indices in the fragment.
+        parent_atoms: Set of atom indices in the parent.
+
+    Returns:
+        Atom index of the attachment atom, or None.
+    """
+    frag_set = set(frag_atoms)
+    for idx in frag_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in parent_atoms:
+                return idx
+    return None
+
+
+def _get_frag_smiles(mol, frag_atoms):
+    """Get SMILES for a fragment defined by atom indices.
+
+    Args:
+        mol: RDKit Mol.
+        frag_atoms: Collection of atom indices.
+
+    Returns:
+        SMILES string, or "unknown" if extraction fails.
+    """
+    try:
+        atoms = list(frag_atoms)
+        if atoms:
+            smi = Chem.MolFragmentToSmiles(mol, atomsToUse=atoms)
+            return smi if smi else "unknown"
+    except Exception:
+        pass
+    return "unknown"
+
+
+# ============================================================================
+# Atom Set Collection (for deduplication)
+# ============================================================================
+
+
+def collect_substituent_atom_set(substituent_infos):
+    """Collect the union of all substituent atom indices.
+
+    Used by callers to prevent double-counting: FGs whose atoms are
+    entirely within a named branch should be skipped in standalone
+    FG prefix generation.
+
+    Args:
+        substituent_infos: List of SubstituentInfo namedtuples.
+
+    Returns:
+        Frozenset of all original mol atom indices covered by substituents.
+    """
+    all_atoms = set()
+    for info in substituent_infos:
+        if info.frag_atoms:
+            all_atoms.update(info.frag_atoms)
+    return frozenset(all_atoms)
