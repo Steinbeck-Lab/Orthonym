@@ -7,14 +7,22 @@ and a chain as the parent structure in organic compound naming.
 Key rule (P-44.1): "The principal characteristic group cited as suffix
 must be attached to the principal chain or ring system."
 
+Key rule (P-52.2.8): "When the ring and the chain contain the same number
+of skeletal atoms in the ring or chain, the ring system is always preferred
+as the principal chain."
+
 This means:
 - If -COOH is on the chain, chain MUST be parent
 - If -COOH is directly on the ring, ring MUST be parent
 - For hydrocarbons (no FG), rings have seniority over chains (P-44.1.2.2)
+- When FG count is tied, ring always wins (P-52.2.8)
+- When multiple ring systems exist, the most senior one is the parent (P-44.2)
 """
 
 from dataclasses import dataclass
 from typing import List, Optional, Set, Tuple
+
+from .ring_selection import ring_system_score
 
 
 @dataclass
@@ -206,10 +214,15 @@ def select_parent(
 
     if pg_on_ring and not pg_on_chain:
         # Principal group is on ring only - ring is parent
+        # Select best ring system if multiple exist (P-44.2)
+        best_ring, other_rings = _select_best_ring_system(
+            mol, ring_systems, principal_group_atoms
+        )
+        other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
         return ParentSelectionResult(
             parent_type='ring',
-            parent_atoms=list(sorted(all_ring_atoms)),
-            substituent_rings=[],
+            parent_atoms=list(sorted(best_ring)),
+            substituent_rings=other_ring_tuples,
             reasoning=f"Principal group ({principal_group}) is on ring only"
         )
 
@@ -261,6 +274,47 @@ def select_parent(
         pg_count_on_chain = _count_pg_on_chain(mol, principal_chain, principal_group_atoms)
 
         if pg_count_on_chain > pg_count_on_ring:
+            # Enhancement 4 (P-52.2.8): When chain is very short (< 3 atoms)
+            # but the ring is large (5+ atoms), prefer ring even when chain
+            # has more FGs -- the short chain is essentially a substituent.
+            # Only override if FG is NOT exclusively on chain (already handled
+            # above by the pg_on_chain and not pg_on_ring branch).
+            if len(principal_chain) < 3 and len(all_ring_atoms) >= 5:
+                best_ring, other_rings = _select_best_ring_system(
+                    mol, ring_systems, principal_group_atoms
+                )
+                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+                return ParentSelectionResult(
+                    parent_type='ring',
+                    parent_atoms=list(sorted(best_ring)),
+                    substituent_rings=other_ring_tuples,
+                    reasoning=f"P-52.2.8 short chain ({len(principal_chain)} atoms) vs large ring ({len(all_ring_atoms)} atoms) - ring preferred"
+                )
+
+            # Enhancement 3 (P-44.1 step 2): Senior atom consideration.
+            # If the ring contains nitrogen and the chain does not, and the
+            # FG count difference is only 1, the ring's senior atom provides
+            # additional signal favoring ring as parent. This is a tiebreaker
+            # supplement when counts are close.
+            if (pg_count_on_chain - pg_count_on_ring == 1
+                    and _ring_system_has_nitrogen(mol, all_ring_atoms)):
+                # Check if chain has nitrogen
+                chain_has_n = any(
+                    mol.GetAtomWithIdx(idx).GetAtomicNum() == 7
+                    for idx in principal_chain
+                )
+                if not chain_has_n:
+                    best_ring, other_rings = _select_best_ring_system(
+                        mol, ring_systems, principal_group_atoms
+                    )
+                    other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+                    return ParentSelectionResult(
+                        parent_type='ring',
+                        parent_atoms=list(sorted(best_ring)),
+                        substituent_rings=other_ring_tuples,
+                        reasoning=f"P-44.1 senior atom: N-containing ring preferred over chain ({pg_count_on_chain} vs {pg_count_on_ring} {principal_group})"
+                    )
+
             return ParentSelectionResult(
                 parent_type='chain',
                 parent_atoms=principal_chain,
@@ -268,12 +322,19 @@ def select_parent(
                 reasoning=f"More {principal_group} groups on chain ({pg_count_on_chain}) than ring ({pg_count_on_ring})"
             )
         else:
-            # Ring wins on tie or if more on ring
+            # P-52.2.8: Ring is always preferred when FG count is equal or
+            # more on ring. "When the ring and the chain contain the same
+            # number of skeletal atoms in the ring or chain, the ring system
+            # is always preferred." This extends to FG count tie-breaking.
+            best_ring, other_rings = _select_best_ring_system(
+                mol, ring_systems, principal_group_atoms
+            )
+            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
             return ParentSelectionResult(
                 parent_type='ring',
-                parent_atoms=list(sorted(all_ring_atoms)),
-                substituent_rings=[],
-                reasoning=f"Ring wins: {pg_count_on_ring} {principal_group} on ring vs {pg_count_on_chain} on chain"
+                parent_atoms=list(sorted(best_ring)),
+                substituent_rings=other_ring_tuples,
+                reasoning=f"P-52.2.8 ring wins: {pg_count_on_ring} {principal_group} on ring vs {pg_count_on_chain} on chain"
             )
 
     # Neither on ring nor chain (shouldn't happen in well-formed molecules)
@@ -325,3 +386,77 @@ def _count_pg_on_chain(
                 count += 1
                 break
     return count
+
+
+def _select_best_ring_system(
+    mol,
+    ring_systems: List[set],
+    principal_group_atoms: Optional[List[tuple]] = None
+) -> Tuple[set, List[set]]:
+    """Select the most senior ring system from multiple candidates.
+
+    When a molecule has disconnected ring systems (e.g., pyridine + cyclohexane),
+    only the most senior ring system should be the parent. Others become
+    substituents.
+
+    Uses ring_system_score() from ring_selection.py (P-44.2) to compare.
+    Tiebreaker: prefer the ring system with more principal group attachment points.
+
+    Args:
+        mol: RDKit Mol object
+        ring_systems: List of sets of atom indices for each ring system
+        principal_group_atoms: Optional list of FG atom tuples for tiebreaking
+
+    Returns:
+        Tuple of (best_ring_system_atoms, other_ring_systems)
+    """
+    if len(ring_systems) <= 1:
+        return (ring_systems[0] if ring_systems else set(), [])
+
+    # Score each ring system via P-44.2 criteria
+    scored = []
+    for i, system in enumerate(ring_systems):
+        score = ring_system_score(mol, system)
+
+        # Tiebreaker: count principal group attachment points on this ring system
+        pg_attachments = 0
+        if principal_group_atoms:
+            for pg_atoms in principal_group_atoms:
+                if not pg_atoms:
+                    continue
+                attachment = pg_atoms[0]
+                atom = mol.GetAtomWithIdx(attachment)
+                for neighbor in atom.GetNeighbors():
+                    if neighbor.GetIdx() in system:
+                        pg_attachments += 1
+                        break
+
+        # Append negative pg_attachments so min() prefers more attachments
+        scored.append((score, -pg_attachments, i))
+
+    scored.sort()
+    best_idx = scored[0][2]
+
+    best_system = ring_systems[best_idx]
+    other_systems = [ring_systems[i] for i in range(len(ring_systems)) if i != best_idx]
+
+    return (best_system, other_systems)
+
+
+def _ring_system_has_nitrogen(mol, ring_atoms: Set[int]) -> bool:
+    """Check if any atom in the ring system is nitrogen.
+
+    Used for P-44.1 step 2 senior atom tiebreaking: a ring containing
+    nitrogen is preferred over one without (and over a chain without).
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Set of atom indices in the ring system
+
+    Returns:
+        True if ring system contains at least one nitrogen atom
+    """
+    for idx in ring_atoms:
+        if mol.GetAtomWithIdx(idx).GetAtomicNum() == 7:  # Nitrogen
+            return True
+    return False
