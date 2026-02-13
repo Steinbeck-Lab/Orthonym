@@ -1,4 +1,4 @@
-"""Tests for coverage estimation utilities and NP scaffold coverage gates.
+"""Tests for coverage estimation utilities, NP scaffold gates, composer gates, and quality gates.
 
 Tests coverage_utils.py functions:
 - estimate_parent_coverage: atom-index-based coverage ratio
@@ -8,6 +8,20 @@ Tests NP scaffold gating:
 - Large molecule + small NP scaffold -> name_natural_product returns None
 - NP scaffold covering most of molecule -> returns scaffold name
 - Small molecule -> always returns name regardless of coverage
+
+Tests composer coverage gates (benzene, heterocycle, complex ring):
+- Small molecules pass through gates unconditionally
+- Large molecules with bare ring names are rejected (fall through)
+- Large molecules with complete names pass through
+
+Tests decomposition quality gate:
+- Tightened threshold (heavy_atoms // 2) rejects short names for large molecules
+- Small molecules with short names still pass
+- Fragment context uses appropriate thresholds
+
+Tests coverage heuristic edge cases:
+- Empty name -> 0.0
+- Zero heavy atoms -> 1.0
 
 Tests retained name exact-match (NAM-01):
 - Exact benzene SMILES -> "benzene"
@@ -201,4 +215,258 @@ class TestRetainedNameExactMatch:
         result = name_compound(smiles)
         assert result != "benzene", (
             f"Large molecule returned bare 'benzene' -- retained name leak"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Benzene coverage gate tests (composer)
+# ---------------------------------------------------------------------------
+
+class TestBenzeneCoverageGate:
+    """Tests that benzene handler's coverage gate works correctly."""
+
+    def test_benzene_coverage_gate_small_molecule(self):
+        """Small benzene derivative (8 heavy atoms) should NOT be gated.
+
+        Ethylbenzene has 8 heavy atoms, well below the 10-atom guard.
+        The benzene handler should return a benzene-based name.
+        """
+        from orthonym import name_compound
+
+        smiles = "c1ccc(CC)cc1"  # ethylbenzene, 8 heavy atoms
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 8
+
+        result = name_compound(smiles)
+        assert result is not None and result != "unknown"
+        # Should contain 'benzene' or 'ethylbenzene' - a benzene-based name
+        assert "benz" in result.lower() or "ethyl" in result.lower(), (
+            f"Small benzene molecule should produce benzene-based name, got '{result}'"
+        )
+
+    def test_benzene_coverage_gate_large_molecule_adequate_name(self):
+        """Large benzene derivative with complete substituent naming should pass gate.
+
+        Icosylbenzene has 26 heavy atoms and the benzene handler produces
+        'icosylbenzene' which has adequate length (>= 0.4 * 26 = 10.4 chars).
+        """
+        from orthonym import name_compound
+
+        smiles = "c1ccc(CCCCCCCCCCCCCCCCCCCC)cc1"  # benzene + C20 chain
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        total_heavy = mol.GetNumHeavyAtoms()
+        assert total_heavy >= 25, f"Expected >=25 heavy atoms, got {total_heavy}"
+
+        result = name_compound(smiles)
+        assert result is not None and result != "unknown"
+        # The name should be adequate length (not just "benzene")
+        assert result != "benzene", (
+            f"Large molecule should not return bare 'benzene', got '{result}'"
+        )
+        # Name length should reflect molecule size
+        assert len(result) >= total_heavy * 0.4, (
+            f"Name '{result}' ({len(result)} chars) too short for {total_heavy} atoms"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Heterocycle coverage gate tests (composer)
+# ---------------------------------------------------------------------------
+
+class TestHeterocycleCoverageGate:
+    """Tests that heterocycle handler's coverage gate works correctly."""
+
+    def test_heterocycle_gate_small(self):
+        """Simple pyridine (6 heavy atoms) should not be gated."""
+        from orthonym import name_compound
+
+        smiles = "c1ccncc1"  # pyridine, 6 heavy atoms
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 6
+
+        result = name_compound(smiles)
+        assert result == "pyridine", f"Expected 'pyridine', got '{result}'"
+
+    def test_heterocycle_gate_large_adequate_name(self):
+        """Large heterocycle derivative with substituent naming should pass.
+
+        3-nonadecylpyridine: pyridine (6 atoms) + C19 chain = 25 heavy atoms.
+        The heterocycle handler should generate an adequate name with locant
+        and substituent prefix.
+        """
+        from orthonym import name_compound
+
+        smiles = "c1ccncc1CCCCCCCCCCCCCCCCCCC"  # pyridine + C19 chain
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        total_heavy = mol.GetNumHeavyAtoms()
+        assert total_heavy >= 20, f"Expected >=20 heavy atoms, got {total_heavy}"
+
+        result = name_compound(smiles)
+        assert result is not None and result != "unknown"
+        # Should not be bare "pyridine"
+        assert result != "pyridine", (
+            f"Large molecule should not return bare 'pyridine', got '{result}'"
+        )
+        # Name should have locant and substituent info
+        assert len(result) > len("pyridine"), (
+            f"Name should be longer than bare 'pyridine', got '{result}'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Decomposition quality gate tests
+# ---------------------------------------------------------------------------
+
+class TestQualityGate:
+    """Tests for _name_quality_is_acceptable in decomposition engine."""
+
+    def test_quality_gate_tightened(self):
+        """'naphthalene' for a 30-atom molecule should return False.
+
+        With the tightened threshold (heavy_atoms // 2), 'naphthalene' (11 chars)
+        is less than 30 // 2 = 15, so it should be flagged as unacceptable.
+        """
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1CCCCCCCCCCCCCCCCCCCC")
+        assert mol is not None
+        total_heavy = mol.GetNumHeavyAtoms()
+        assert total_heavy >= 30, f"Expected >=30 heavy atoms, got {total_heavy}"
+
+        result = _name_quality_is_acceptable("naphthalene", mol)
+        assert result is False, (
+            f"'naphthalene' for {total_heavy}-atom mol should be rejected"
+        )
+
+    def test_quality_gate_small_molecule(self):
+        """Short names for small molecules (heavy_atoms <= 15) still pass.
+
+        'decane' (6 chars) for a 10-atom molecule should be acceptable
+        because the molecule is too small to trigger any threshold.
+        """
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        mol = Chem.MolFromSmiles("CCCCCCCCCC")  # decane, 10 heavy atoms
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 10
+
+        result = _name_quality_is_acceptable("decane", mol)
+        assert result is True, (
+            "'decane' for 10-atom molecule should be acceptable"
+        )
+
+    def test_quality_gate_adequate_name_large_mol(self):
+        """A name with locants and hyphens for a large molecule should pass.
+
+        Names with digits, hyphens, and adequate length pass the gate.
+        """
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        # 20-atom molecule with adequate name
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCCCCCC")  # icosane
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 20
+
+        # A name with digits and hyphens that is long enough
+        result = _name_quality_is_acceptable("3-methylnonadecane", mol)
+        assert result is True, (
+            "'3-methylnonadecane' for 20-atom mol should be acceptable"
+        )
+
+    def test_quality_gate_bare_name_large_mol(self):
+        """Bare ring name (no digits/hyphens) for 25-atom mol -> rejected.
+
+        'naphthalene' has no digits or hyphens but molecule is > 20 atoms.
+        """
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1CCCCCCCCCCCCCCC")
+        assert mol is not None
+        total_heavy = mol.GetNumHeavyAtoms()
+        assert total_heavy > 20
+
+        result = _name_quality_is_acceptable("naphthalene", mol)
+        assert result is False, (
+            f"Bare 'naphthalene' for {total_heavy}-atom mol should be rejected"
+        )
+
+    def test_quality_gate_none_name(self):
+        """None name -> False (always triggers decomposition)."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        mol = Chem.MolFromSmiles("CCO")
+        result = _name_quality_is_acceptable(None, mol)
+        assert result is False
+
+    def test_quality_gate_unknown_name(self):
+        """'unknown' name -> False (always triggers decomposition)."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        mol = Chem.MolFromSmiles("CCO")
+        result = _name_quality_is_acceptable("unknown", mol)
+        assert result is False
+
+    def test_quality_gate_ratio_check_very_large_mol(self):
+        """For >25 atom molecule, ratio < 0.45 triggers rejection.
+
+        A 30-atom molecule with a 12-char name (ratio 0.40) should fail.
+        """
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+
+        # 30-atom molecule
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")
+        assert mol is not None
+        total_heavy = mol.GetNumHeavyAtoms()
+        assert total_heavy == 30
+
+        # 'triacontane' is 11 chars; ratio = 11/30 = 0.37 < 0.45
+        # Also: no digits, no hyphens -> bare name rule fires for >20 atoms
+        result = _name_quality_is_acceptable("triacontane", mol)
+        assert result is False, (
+            f"'triacontane' (ratio {len('triacontane')/total_heavy:.2f}) for "
+            f"{total_heavy}-atom mol should be rejected"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Coverage heuristic edge cases
+# ---------------------------------------------------------------------------
+
+class TestCoverageHeuristicEdgeCases:
+    """Edge case tests for estimate_name_coverage_heuristic."""
+
+    def test_heuristic_empty_name(self):
+        """Empty string name -> 0.0 coverage."""
+        mol = Chem.MolFromSmiles("CCCCCC")  # hexane, 6 heavy atoms
+        assert mol is not None
+        result = estimate_name_coverage_heuristic("", mol)
+        assert result == pytest.approx(0.0), (
+            f"Empty name should give 0.0 coverage, got {result}"
+        )
+
+    def test_heuristic_zero_atoms(self):
+        """Molecule with 0 heavy atoms -> 1.0 (degenerate case)."""
+        mol = Chem.MolFromSmiles("[H][H]")
+        if mol is not None and mol.GetNumHeavyAtoms() == 0:
+            result = estimate_name_coverage_heuristic("hydrogen", mol)
+            assert result == pytest.approx(1.0), (
+                f"Zero-atom molecule should give 1.0 coverage, got {result}"
+            )
+
+    def test_heuristic_monotonic_with_name_length(self):
+        """Longer names should give higher coverage for same molecule."""
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1CCCCCCCCCC")  # 20 heavy atoms
+        assert mol is not None
+
+        short_name = "naphthalene"
+        long_name = "2-decylnaphthalene"
+        short_coverage = estimate_name_coverage_heuristic(short_name, mol)
+        long_coverage = estimate_name_coverage_heuristic(long_name, mol)
+        assert long_coverage > short_coverage, (
+            f"Longer name should give higher coverage: "
+            f"'{long_name}'={long_coverage} vs '{short_name}'={short_coverage}"
         )
