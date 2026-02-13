@@ -25,6 +25,7 @@ from collections import deque
 from typing import List, Optional, Set
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from .naming_utils import get_alkyl_name
 from .fragment_naming import name_fragment_recursively
@@ -399,6 +400,75 @@ def _check_retained_substituent(
 
 
 # ============================================================================
+# Substituent CIP Stereo Descriptor
+# ============================================================================
+
+
+def _add_substituent_stereo(mol, sub_atoms, name):
+    """Add CIP stereodescriptors to a substituent name if stereocenters exist.
+
+    When a substituent contains one or more stereocenters with defined CIP
+    labels (R/S), the descriptor is prepended: e.g. "sec-butyl" becomes
+    "(R)-sec-butyl", "1-methylpropyl" becomes "(1R)-1-methylpropyl".
+
+    For a single stereocenter the format is "(R)-name" or "(S)-name".
+    For multiple stereocenters the format uses locants: "(1R,2S)-name".
+
+    This is a systemic fix: any substituent on any parent (chain, ring,
+    heterocycle) that has a stereocenter gets the descriptor.
+
+    Args:
+        mol: RDKit Mol object (CIP labels must already be assigned).
+        sub_atoms: Atom indices of the substituent fragment.
+        name: The substituent name without stereo (e.g., "sec-butyl").
+
+    Returns:
+        Name with stereo prefix if stereocenters found, otherwise unchanged.
+    """
+    if not sub_atoms or not name:
+        return name
+
+    # Ensure CIP labels are assigned
+    try:
+        rdCIPLabeler.AssignCIPLabels(mol)
+    except Exception:
+        return name
+
+    # Collect CIP-labeled atoms within the substituent
+    stereo_atoms = []
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.HasProp('_CIPCode'):
+            cip = atom.GetProp('_CIPCode')
+            # Enforce uppercase for OPSIN compatibility
+            if cip in ('r', 's'):
+                cip = cip.upper()
+            stereo_atoms.append((idx, cip))
+
+    if not stereo_atoms:
+        return name
+
+    if len(stereo_atoms) == 1:
+        # Single stereocenter: just (R) or (S), no locant needed
+        _, cip = stereo_atoms[0]
+        return f"({cip})-{name}"
+
+    # Multiple stereocenters: need locants within the substituent.
+    # Use a simplified numbering: sort by atom index and assign 1-based.
+    sorted_atoms = sorted(sub_atoms)
+    idx_to_internal = {idx: pos + 1 for pos, idx in enumerate(sorted_atoms)}
+
+    descs = []
+    for atom_idx, cip in stereo_atoms:
+        locant = idx_to_internal.get(atom_idx, 0)
+        descs.append((locant, cip))
+    descs.sort(key=lambda x: x[0])
+
+    desc_str = ",".join(f"{loc}{cip}" for loc, cip in descs)
+    return f"({desc_str})-{name}"
+
+
+# ============================================================================
 # Main Entry Point
 # ============================================================================
 
@@ -438,7 +508,7 @@ def name_substituent_fragment(
     # alkyl fast path, which cannot distinguish e.g. propyl from isopropyl.
     retained = _check_retained_substituent(mol, sub_atoms, attach_idx)
     if retained:
-        return retained
+        return _add_substituent_stereo(mol, sub_atoms, retained)
 
     # Step 2: Fast path -- linear alkyl (no branching, no heteroatoms)
     if _is_linear_alkyl(mol, sub_atoms):

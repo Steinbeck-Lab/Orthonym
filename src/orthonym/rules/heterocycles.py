@@ -1103,6 +1103,8 @@ def name_substituted_heterocycle(
     prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
 
     # Join prefixes
+    # Closing brackets ], ), } all act as word boundaries needing hyphens
+    _CLOSING_MARKS = (')', ']', '}')
     prefix_str = ""
     for i, (prefix, _) in enumerate(prefix_parts):
         if i == 0:
@@ -1110,9 +1112,9 @@ def name_substituted_heterocycle(
         else:
             # Add hyphen between prefixes if needed
             last_ch = prefix_str[-1]
-            if (last_ch.isalpha() or last_ch == ')') and prefix[0].isdigit():
+            if (last_ch.isalpha() or last_ch in _CLOSING_MARKS) and prefix[0].isdigit():
                 prefix_str += "-"
-            elif (last_ch.isalpha() or last_ch == ')') and prefix[0] == 'N':
+            elif (last_ch.isalpha() or last_ch in _CLOSING_MARKS) and prefix[0] == 'N':
                 prefix_str += "-"
             prefix_str += prefix
 
@@ -1121,7 +1123,7 @@ def name_substituted_heterocycle(
     # When parent starts with letter (e.g., "pyridine"), no extra hyphen needed
     if prefix_str and parent_name:
         last_ch = prefix_str[-1]
-        if parent_name[0].isdigit() and (last_ch.isalpha() or last_ch == ')'):
+        if parent_name[0].isdigit() and (last_ch.isalpha() or last_ch in _CLOSING_MARKS):
             combined = f"{prefix_str}-{parent_name}"
         else:
             combined = f"{prefix_str}{parent_name}"
@@ -1199,12 +1201,18 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     Multiple same: 2,4-dimethyl
 
     Per IUPAC P-14.5.2, compound substituent names are parenthesized.
+    Per IUPAC P-16.3.3, enclosing marks nest: (...), [...], {...}.
+    Names already containing parentheses use square brackets.
     """
     locant_str = ",".join(str(loc) for loc in locants)
-    # Wrap compound names in parentheses to prevent locant ambiguity
+    # Wrap compound names in enclosing marks to prevent locant ambiguity
     display_name = name
-    if not name.startswith('('):
-        from ..assembly.naming_utils import is_complex_substituent
+    from ..assembly.naming_utils import is_complex_substituent, _has_stereo_prefix
+    if _has_stereo_prefix(name):
+        # Name has CIP stereo prefix like "(R)-sec-butyl":
+        # use square brackets per IUPAC P-16.3.3
+        display_name = f'[{name}]'
+    elif not name.startswith('('):
         if is_complex_substituent(name):
             display_name = f'({name})'
     if count == 1:

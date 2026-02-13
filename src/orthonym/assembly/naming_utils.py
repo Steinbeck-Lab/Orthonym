@@ -342,6 +342,22 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
 # Substituent Prefix Formatting
 # ============================================================================
 
+
+def _has_stereo_prefix(name: str) -> bool:
+    """Check if a substituent name starts with a CIP stereo descriptor prefix.
+
+    Detects patterns like "(R)-", "(S)-", "(1R)-", "(2S,3R)-" at the start.
+    This distinguishes stereo-prefixed names from compound substituent names
+    that happen to start with parentheses (e.g., "(2-methylphenyl)").
+
+    A stereo prefix is: '(' + optional digits/comma + single letter R/S/E/Z + ')' + '-'
+    """
+    if not name.startswith('('):
+        return False
+    # Match: (R)-, (S)-, (1R)-, (2S,3R)- etc.
+    return bool(re.match(r'^\((?:\d+[RSEZ],)*\d*[RSEZ]\)-', name))
+
+
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 
@@ -382,10 +398,12 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     #   but NOT for names that already have their own parenthesization (e.g., "(oxan-2-yl)oxy")
     #   and NOT for names that are just hyphenated (e.g., "3-sec-butyl" is fine)
     complex = is_complex_substituent(name)
-    # Name needs wrapping if it has numeric locants that aren't already parenthesized.
-    # A name starting with '(' already has its own internal structure.
-    needs_wrap = complex and not name.startswith('(') and not name.startswith('[')
-    if needs_wrap:
+    if _has_stereo_prefix(name):
+        # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
+        # use square brackets per IUPAC P-16.3.3 nesting rules
+        formatted_name = f"[{name}]"
+    elif complex and not name.startswith('(') and not name.startswith('['):
+        # Complex name without existing enclosing marks: wrap in parentheses
         formatted_name = f"({name})"
     else:
         formatted_name = name
