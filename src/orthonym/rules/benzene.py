@@ -766,10 +766,22 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     except (ValueError, KeyError):
                         pass
 
-            # True last resort -- bare 'oxy' (should be rare now)
+            # Last resort for O-C where all naming attempts failed.
+            # If total_c > 0, use get_chain_prefix to build a systematic name.
+            # Bare 'oxy' only for total_c == 0 (no carbon atoms, e.g. O-O or O-N
+            # that somehow reached here -- normally handled by earlier branches).
+            if total_c > 0:
+                from ..data.chain_names import get_chain_prefix
+                try:
+                    cp = get_chain_prefix(total_c)
+                    return {'name': cp + 'yloxy', 'atoms': [o_idx] + all_sub}
+                except (ValueError, KeyError):
+                    pass
+            # total_c == 0: genuinely no carbon in substituent (O-O/O-N cases
+            # normally handled by hydroperoxy/nitrooxy above)
             return {'name': 'oxy', 'atoms': sub_atoms}
 
-        # Fallback for non-C neighbors (e.g., O-N in nitrate esters)
+        # Fallback for non-C neighbors (e.g., O-N in nitrate esters, O-S, O-P)
         sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
         if len(sub_atoms) > 1:
             # For O-N(=O)=O: (nitrooxy) per IUPAC
@@ -781,6 +793,35 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 ]
                 if len(o_neighbors_of_n) >= 2:
                     return {'name': '(nitrooxy)', 'atoms': sub_atoms, 'is_complex': True}
+                # O-N without multiple O on N: rare N-oxide-like linkage.
+                # No standard IUPAC prefix; keep 'oxy' as fallback.
+                return {'name': 'oxy', 'atoms': sub_atoms}
+
+            # O-S neighbors: sulfanyloxy / sulfinyloxy / sulfonyloxy
+            if nbr_symbol == 'S':
+                s_atom = nbr
+                # Check oxidation state of sulfur (count =O bonds)
+                s_double_o = sum(
+                    1 for nb in s_atom.GetNeighbors()
+                    if nb.GetSymbol() == 'O' and nb.GetIdx() != o_idx
+                    and mol.GetBondBetweenAtoms(s_atom.GetIdx(), nb.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
+                )
+                if s_double_o == 0:
+                    # -O-S- : sulfanyloxy (IUPAC P-63.6)
+                    return {'name': 'sulfanyloxy', 'atoms': sub_atoms}
+                elif s_double_o == 1:
+                    # -O-S(=O)- : sulfinyloxy
+                    return {'name': 'sulfinyloxy', 'atoms': sub_atoms}
+                elif s_double_o >= 2:
+                    # -O-S(=O)(=O)- : sulfonyloxy
+                    return {'name': 'sulfonyloxy', 'atoms': sub_atoms}
+
+            # O-P neighbors: phosphonooxy (IUPAC P-67.1.3)
+            if nbr_symbol == 'P':
+                return {'name': 'phosphonooxy', 'atoms': sub_atoms}
+
+            # Other non-C neighbors: keep bare 'oxy' as last resort
+            # (genuinely unresolvable non-C linkages)
             return {'name': 'oxy', 'atoms': sub_atoms}
 
     return None
