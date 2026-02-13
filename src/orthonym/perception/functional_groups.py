@@ -20,6 +20,8 @@ FUNCTIONAL_GROUP_SMARTS = {
     "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
     "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
     "dithioic_acid": "[CX3](=S)[SX2H1]",    # R-C(=S)-SH -> dithioic acid
+    # Carbamic acid (IUPAC P-65.2.3): N-C(=O)-OH (free acid, not ester)
+    "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
     "sulfinic_acid": "[SX3](=O)[OX2H1]",
     "phosphonic_acid": "[PX4](=O)([OX2H1])[OX2H1]",
@@ -195,6 +197,8 @@ def _resolve_fg_collisions(results):
         ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),
         ('isothiocyanate', ['nitrile', 'primary_amide']),
+        # Carbamic acid: N-C(=O)-OH must NOT also match carboxylic_acid or amide
+        ('carbamic_acid', ['carboxylic_acid', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         # Thiocarboxylic acids: SH in C(=O)SH or C(=S)SH must NOT match thiol
         # C(=O)SH must NOT match thioester either (C(=O)S is substructure of both)
         ('thioic_S_acid', ['thiol', 'thioester']),

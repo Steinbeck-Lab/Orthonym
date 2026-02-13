@@ -17,6 +17,8 @@ SENIORITY_ORDER = [
     "thioic_S_acid",
     "thioic_O_acid",
     "dithioic_acid",
+    # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
+    "carbamic_acid",
     "sulfonic_acid",
     "sulfinic_acid",
     "phosphonic_acid",
@@ -96,6 +98,7 @@ SUFFIX_FORMS = {
     "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
     "thioic_O_acid": ("thioic O-acid", "carbothioic O-acid"),
     "dithioic_acid": ("dithioic acid", "carbodithioic acid"),
+    "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     "phosphonic_acid": ("phosphonic acid", "phosphonic acid"),
@@ -140,6 +143,7 @@ PREFIX_FORMS = {
     "thioic_S_acid": None,   # Rare as prefix; functional class naming
     "thioic_O_acid": None,   # Rare as prefix; functional class naming
     "dithioic_acid": None,   # Rare as prefix; functional class naming
+    "carbamic_acid": "carbamoyloxy",  # When not principal group
     "sulfonic_acid": "sulfo",
     "sulfinic_acid": "sulfino",
     "aldehyde": "oxo",  # or "formyl" for terminal

@@ -180,6 +180,7 @@ TERMINAL_GROUPS = {
     "thioic_S_acid",    # Always at chain end (locant 1)
     "thioic_O_acid",    # Always at chain end (locant 1)
     "dithioic_acid",    # Always at chain end (locant 1)
+    "carbamic_acid",    # Retained name, terminal (locant 1)
 }
 
 
@@ -375,6 +376,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
             return isothio_name
+
+    # Handle carbamic acid - retained name with N-substitution (IUPAC P-65.2.3)
+    # N-C(=O)-OH -> "carbamic acid", "N-methylcarbamic acid", etc.
+    if features.principal_group == 'carbamic_acid':
+        carbamic_name = _name_carbamic_acid(features)
+        if carbamic_name:
+            return carbamic_name
 
     # Handle carbamates - functional class: "ethyl carbamate"
     # Must detect BEFORE generic ester to prevent N loss.
@@ -1220,6 +1228,69 @@ def _name_boronic_acid(features: Any) -> Optional[str]:
     if needs_parens:
         return f"({r_name})boronic acid"
     return f"{r_name}boronic acid"
+
+
+# ============================================================================
+# Carbamic acid naming (IUPAC P-65.2.3: retained name with N-substitution)
+# ============================================================================
+
+def _name_carbamic_acid(features: Any) -> Optional[str]:
+    """Name carbamic acid as '[N-substituted]carbamic acid' (retained name).
+
+    Pattern: N-C(=O)-OH (free acid, not ester)
+    SMARTS match: [NX3][CX3](=O)[OX2H1] gives (N, C, O=, OH)
+
+    Unsubstituted: "carbamic acid" (H2N-COOH)
+    N-monosubstituted: "N-methylcarbamic acid" (CH3-NH-COOH)
+    N,N-disubstituted: "N,N-dimethylcarbamic acid" ((CH3)2N-COOH)
+    Mixed: "N-ethyl-N-methylcarbamic acid"
+
+    Returns:
+        Retained name with N-substitution prefix, or None.
+    """
+    from collections import Counter
+
+    mol = features.mol
+    matches = features.functional_groups.get('carbamic_acid', [])
+    if not matches:
+        return None
+
+    match = matches[0]
+    # SMARTS: [NX3][CX3](=O)[OX2H1]
+    # match[0] = N (nitrogen)
+    # match[1] = C (carbonyl carbon)
+    # match[2] = O (carbonyl oxygen, =O)
+    # match[3] = O (hydroxyl oxygen, -OH)
+    if len(match) < 4:
+        return None
+
+    n_idx = match[0]   # Nitrogen
+    c_idx = match[1]   # Carbonyl carbon
+
+    # Core atoms to exclude from R group naming
+    carbamic_core = set(match)  # N, C, O=, OH
+
+    # Check N-substituents
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    n_subs = []
+    for nbr in n_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == c_idx:
+            continue
+        if nbr.GetAtomicNum() <= 1:
+            continue
+        # Carbon-based substituent on nitrogen
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=carbamic_core)
+        if sub_name:
+            n_subs.append(sub_name)
+
+    if not n_subs:
+        # Unsubstituted: "carbamic acid"
+        return "carbamic acid"
+
+    # Build N-substitution prefix using _build_n_substituted_name
+    tagged_subs = [("N", s) for s in n_subs]
+    return _build_n_substituted_name(tagged_subs, "carbamic acid")
 
 
 # ============================================================================
