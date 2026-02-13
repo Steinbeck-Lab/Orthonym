@@ -117,8 +117,15 @@ def lookup_name_pubchem(
         if resp.status_code == 200:
             data = resp.json()
             props = data["PropertyTable"]["Properties"][0]
+            # PubChem returns the key as "SMILES" (not "IsomericSMILES")
+            # when IsomericSMILES is requested in the property list.
+            # Try both key names for robustness.
+            smiles = (
+                props.get("IsomericSMILES", "")
+                or props.get("SMILES", "")
+            )
             result = {
-                "smiles": props.get("IsomericSMILES", ""),
+                "smiles": smiles,
                 "inchi": props.get("InChI", ""),
             }
             cache[name] = result

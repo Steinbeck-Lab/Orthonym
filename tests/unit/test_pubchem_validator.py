@@ -158,6 +158,30 @@ class TestLookupNamePubchem:
 
     @patch("orthonym.validation.pubchem_validator.requests.get")
     @patch("orthonym.validation.pubchem_validator.time.sleep")
+    def test_api_call_with_smiles_key_fallback(self, mock_sleep, mock_get):
+        """lookup_name_pubchem handles PubChem returning 'SMILES' instead of 'IsomericSMILES'."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "PropertyTable": {
+                "Properties": [
+                    {
+                        "SMILES": "CCO",
+                        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+                    }
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+
+        cache = {}
+        result = lookup_name_pubchem("ethanol", cache)
+
+        assert result is not None
+        assert result["smiles"] == "CCO"
+
+    @patch("orthonym.validation.pubchem_validator.requests.get")
+    @patch("orthonym.validation.pubchem_validator.time.sleep")
     def test_404_caches_none(self, mock_sleep, mock_get):
         """lookup_name_pubchem caches None for 404 responses."""
         mock_response = MagicMock()
