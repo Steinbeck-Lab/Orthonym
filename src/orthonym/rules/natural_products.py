@@ -86,6 +86,12 @@ def name_natural_product(mol) -> Optional[str]:
                     unsaturation=unsaturation,
                     stereo_prefix=stereo_prefix,
                 )
+        # Coverage gate: reject bare scaffold if it covers too little
+        total_heavy = mol.GetNumHeavyAtoms()
+        if total_heavy > 10:
+            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
+            if scaffold_coverage < 0.60:
+                return None  # Fall through to systematic naming
         return scaffold_info["scaffold_name"]
 
     # Step 5: Check if non-scaffold atoms are only hydrogens
@@ -94,6 +100,12 @@ def name_natural_product(mol) -> Optional[str]:
         for idx in non_scaffold
     )
     if all_h:
+        # Coverage gate: reject bare scaffold if it covers too little
+        total_heavy = mol.GetNumHeavyAtoms()
+        if total_heavy > 10:
+            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
+            if scaffold_coverage < 0.60:
+                return None  # Fall through to systematic naming
         return scaffold_info["scaffold_name"]
 
     # Step 6: Scaffold with substituents -- enumerate decorations
@@ -129,11 +141,23 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
 
     # Only enumerate decorations for steroids with IUPAC numbering maps
     if scaffold_class != "steroid":
+        # Coverage gate: non-steroid scaffolds must cover enough of the molecule
+        total_heavy = mol.GetNumHeavyAtoms()
+        if total_heavy > 10:
+            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
+            if scaffold_coverage < 0.50:
+                return None  # Fall through to systematic naming
         return scaffold_name
 
     # Build target atom index -> IUPAC locant mapping
     numbering = _build_target_to_iupac(scaffold_info)
     if numbering is None:
+        # Coverage gate: steroid without numbering
+        total_heavy = mol.GetNumHeavyAtoms()
+        if total_heavy > 10:
+            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
+            if scaffold_coverage < 0.40:
+                return None  # Steroid scaffold too small for this molecule
         return scaffold_name
 
     matched_set = set(scaffold_info["matched_atoms"])
