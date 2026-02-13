@@ -95,6 +95,15 @@ _TRIVIAL_ALCOHOL_TO_ALKYL = {
     "cyclohexanol": "cyclohexyl",
 }
 
+# Alcohol/parent -> alkoxy prefix (retained alkoxy names per IUPAC P-63.2.3.1)
+_RETAINED_ALKOXY = {
+    "methanol": "methoxy",
+    "ethanol": "ethoxy",
+    "propan-1-ol": "propoxy",
+    "butan-1-ol": "butoxy",
+    "phenol": "phenoxy",
+}
+
 # Amine -> prefix form for amide N-substitution
 _TRIVIAL_AMINE_TO_PREFIX = {
     "methanamine": "methyl",
@@ -150,6 +159,7 @@ def assemble_fragment_name(
         "amide": _assemble_amide,
         "glycosidic": _assemble_glycoside,
         "carbamate": _assemble_carbamate,
+        "ether": _assemble_ether,
     }
 
     assembler = assemblers.get(bond_type)
@@ -292,6 +302,71 @@ def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[
             return f"{alkyl_prefix} {amine_prefix}carbamate"
 
     return f"{alkyl_prefix} carbamate"
+
+
+def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble ether name as 'alkoxy + parent' (IUPAC P-63.2.3).
+
+    The smaller fragment (alkyl side, which retains the ether oxygen as an
+    alcohol) is converted to an alkoxy prefix. The larger fragment (acid side)
+    is the parent compound.
+
+    Args:
+        fragment_names: {"acid": parent_name, "alkyl": alkyl_name}
+            where alkyl_name is an alcohol (the ether O stayed with it).
+        style: Naming style.
+
+    Returns:
+        Ether name like "methoxybenzene", or None.
+    """
+    parent_name = fragment_names.get("acid")
+    alkyl_name = fragment_names.get("alkyl")
+
+    if not parent_name or not alkyl_name:
+        return None
+
+    alkoxy = _alcohol_to_alkoxy(alkyl_name)
+    if not alkoxy:
+        return None
+
+    return _join_components(alkoxy, parent_name)
+
+
+def _alcohol_to_alkoxy(name: str) -> Optional[str]:
+    """Convert an alcohol or fragment name to its alkoxy form.
+
+    Uses retained alkoxy names first (IUPAC P-63.2.3.1), then falls back
+    to converting via _alcohol_to_alkyl() + replacing -yl with -oxy.
+
+    Args:
+        name: Alcohol or fragment name (e.g., "methanol", "ethanol",
+              "propan-1-ol").
+
+    Returns:
+        Alkoxy prefix (e.g., "methoxy", "ethoxy", "propoxy"), or None.
+
+    Examples:
+        >>> _alcohol_to_alkoxy("methanol")
+        'methoxy'
+        >>> _alcohol_to_alkoxy("ethanol")
+        'ethoxy'
+        >>> _alcohol_to_alkoxy("propan-1-ol")
+        'propoxy'
+        >>> _alcohol_to_alkoxy("phenol")
+        'phenoxy'
+    """
+    stripped = name.strip().lower()
+
+    # Check retained alkoxy lookup first
+    if stripped in _RETAINED_ALKOXY:
+        return _RETAINED_ALKOXY[stripped]
+
+    # Fallback: convert alcohol -> alkyl -> alkoxy
+    alkyl = _alcohol_to_alkyl(name)
+    if alkyl and alkyl.endswith("yl"):
+        return alkyl[:-2] + "oxy"
+
+    return None
 
 
 # ============================================================================

@@ -110,6 +110,7 @@ _BOND_TYPE_PRIORITY = {
     "amide": 2,
     "glycosidic": 3,
     "carbamate": 4,
+    "ether": 5,
 }
 
 
@@ -213,7 +214,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     """Attempt decomposition of a molecule into named fragments.
 
     This is the main entry point for the decomposition engine. It:
-    1. Finds cleavable bonds (ester, amide, glycosidic, carbamate)
+    1. Finds cleavable bonds (ester, amide, glycosidic, carbamate, ether)
     2. Checks if the existing pipeline name is acceptable (quality gate)
     3. Selects the best bond to cleave
     4. Cleaves and caps the fragments
@@ -275,7 +276,10 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     best_bond = _select_best_bond(mol, bonds)
 
     # Step 5: Cleave and cap
-    fragments = cleave_and_cap(mol, [best_bond], acid_side_oh=True)
+    # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
+    # while the alkyl side naturally keeps the ether oxygen as an alcohol.
+    acid_oh = best_bond["type"] != "ether"
+    fragments = cleave_and_cap(mol, [best_bond], acid_side_oh=acid_oh)
     if not fragments or len(fragments) < 2:
         return None
 

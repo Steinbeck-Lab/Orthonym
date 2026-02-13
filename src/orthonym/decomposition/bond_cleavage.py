@@ -1,11 +1,13 @@
 """
 Bond cleavage detection for decomposition engine.
 
-Identifies ester, amide, and glycosidic bonds suitable for cleavage,
-with guards to exclude cyclic variants (lactones, lactams) and
-overlapping patterns (carbamates, ureas).
+Identifies ester, amide, glycosidic, carbamate, and ether bonds
+suitable for cleavage, with guards to exclude cyclic variants
+(lactones, lactams, epoxides) and overlapping patterns (carbamates,
+ureas, skeletal replacement chains).
 """
 
+from collections import deque
 from typing import Dict, List, Set, Tuple
 
 from rdkit import Chem
@@ -27,6 +29,13 @@ _CARBAMATE_SMARTS = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
 # Glycosidic: ring-C(-O-ring)-O-C  -- anomeric C-O bond to non-ring
 _GLYCOSIDIC_SMARTS = Chem.MolFromSmarts("[CX4;R]([OX2;R])[OX2;!R][#6]")
 
+# Ether: C-O-C where O is divalent, NOT in a ring, and neither C is a
+# carbonyl carbon or anomeric center. Excludes esters, glycosidic bonds,
+# epoxides, tetrahydropyran-type ring ethers.
+_ETHER_SMARTS = Chem.MolFromSmarts(
+    "[#6;!$(C=O);!$(C([OX2;R])[OX2;!R])]-[OX2;!R]-[#6;!$(C=O)]"
+)
+
 
 def _atoms_in_same_ring(mol, atom1: int, atom2: int) -> bool:
     """Check if two atoms share a ring membership."""
@@ -37,24 +46,80 @@ def _atoms_in_same_ring(mol, atom1: int, atom2: int) -> bool:
     return False
 
 
+def _is_skeletal_ether(mol, o_idx: int) -> bool:
+    """Check if an ether oxygen is part of a skeletal replacement chain.
+
+    Returns True if either neighbor of the oxygen has another non-ring
+    heteroatom (O, N, S) neighbor (excluding the oxygen itself), indicating
+    a polyether or oxa-chain that should use skeletal replacement naming
+    rather than ether bond cleavage.
+
+    Args:
+        mol: RDKit Mol object.
+        o_idx: Atom index of the ether oxygen.
+
+    Returns:
+        True if the oxygen is part of a skeletal replacement chain.
+    """
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    for nbr in o_atom.GetNeighbors():
+        for nbr2 in nbr.GetNeighbors():
+            if (nbr2.GetIdx() != o_idx
+                    and nbr2.GetSymbol() in ('O', 'N', 'S')
+                    and not nbr2.IsInRing()):
+                return True
+    return False
+
+
+def _bfs_heavy_atoms(mol, start: int, excluded: Set[int]) -> Set[int]:
+    """BFS from start atom, skipping excluded atoms, collecting heavy atoms.
+
+    Args:
+        mol: RDKit Mol object.
+        start: Starting atom index.
+        excluded: Set of atom indices to not cross through.
+
+    Returns:
+        Set of heavy atom indices reachable from start.
+    """
+    visited: Set[int] = set()
+    queue = deque([start])
+    while queue:
+        curr = queue.popleft()
+        if curr in visited or curr in excluded:
+            continue
+        visited.add(curr)
+        atom = mol.GetAtomWithIdx(curr)
+        for nbr in atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in visited and nidx not in excluded:
+                queue.append(nidx)
+    # Filter to heavy atoms only (exclude H, atomic num > 1)
+    return {idx for idx in visited
+            if mol.GetAtomWithIdx(idx).GetAtomicNum() > 1}
+
+
 def find_cleavable_bonds(mol) -> List[Dict]:
     """Find cleavable bonds in a molecule.
 
-    Detects ester C-O, amide C-N, and glycosidic C-O-C bonds,
-    excluding lactones, lactams, carbamates, and ureas.
+    Detects ester C-O, amide C-N, glycosidic C-O-C, and ether C-O-C bonds,
+    excluding lactones, lactams, carbamates, ureas, epoxides, and
+    skeletal replacement chains.
 
     The detection order matters:
     1. Carbamates are detected first to mark overlapping carbonyl C atoms.
     2. Esters are detected, skipping any carbonyl C already in a carbamate.
     3. Amides are detected, skipping any carbonyl C already in a carbamate.
     4. Glycosidic bonds are detected independently.
+    5. Ether bonds are detected with 5 guards (ring, ester-exclusion,
+       glycosidic-exclusion, skeletal-replacement, minimum-fragment-size).
 
     Args:
         mol: RDKit Mol object
 
     Returns:
         List of dicts with keys: bond_idx, type, match, acid_atom,
-        alkyl_atom (for esters) or amine_atom (for amides).
+        alkyl_atom (for esters/ethers) or amine_atom (for amides).
     """
     cleavable: List[Dict] = []
     seen_bond_indices: Set[int] = set()
@@ -158,6 +223,63 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "type": "glycosidic",
                     "acid_atom": anomeric_c,
                     "alkyl_atom": aglycone_c,
+                    "match": match,
+                })
+
+    # --- Step 5: Detect ether bonds (C-O-C, not ester/glycosidic/ring) ---
+    if _ETHER_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_ETHER_SMARTS):
+            carbon1 = match[0]
+            oxygen = match[1]
+            carbon2 = match[2]
+
+            # Ring guard: skip if either carbon and the oxygen are in the
+            # same ring (epoxides, oxetane, tetrahydropyran, etc.)
+            if _atoms_in_same_ring(mol, carbon1, oxygen):
+                continue
+            if _atoms_in_same_ring(mol, carbon2, oxygen):
+                continue
+
+            # Skeletal replacement guard: skip if the oxygen is part of a
+            # chain with multiple heteroatoms (oxa-naming applies instead)
+            if _is_skeletal_ether(mol, oxygen):
+                continue
+
+            # Determine cleavage bond: bond between the larger-side carbon
+            # and the ether oxygen. The oxygen stays with the smaller fragment,
+            # producing an alcohol that converts to an alkoxy prefix.
+            # Use BFS to count heavy atoms on each side (excluding the oxygen).
+            side1 = _bfs_heavy_atoms(mol, carbon1, excluded={oxygen})
+            side2 = _bfs_heavy_atoms(mol, carbon2, excluded={oxygen})
+
+            # Minimum fragment size guard: skip if either side < 5 heavy atoms
+            if len(side1) < 5 or len(side2) < 5:
+                continue
+
+            # Assign roles: larger side = acid_atom (parent), smaller = alkyl
+            if len(side1) > len(side2):
+                acid_atom = carbon1
+                alkyl_atom = carbon2
+            elif len(side2) > len(side1):
+                acid_atom = carbon2
+                alkyl_atom = carbon1
+            else:
+                # Equal size: use lower atom index as acid_atom
+                acid_atom = min(carbon1, carbon2)
+                alkyl_atom = max(carbon1, carbon2)
+
+            # Cleavage bond = bond between larger-side carbon and oxygen
+            # This way oxygen stays with the smaller fragment (alkyl side)
+            bond = mol.GetBondBetweenAtoms(acid_atom, oxygen)
+
+            # Already-seen guard
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "ether",
+                    "acid_atom": acid_atom,
+                    "alkyl_atom": alkyl_atom,
                     "match": match,
                 })
 
