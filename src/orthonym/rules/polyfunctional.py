@@ -132,7 +132,7 @@ def _get_alkoxy_prefix(
     mol,
     ether_atoms: tuple,
     principal_chain: List[int]
-) -> str:
+) -> Optional[str]:
     """
     Determine the alkoxy prefix for an ether.
 
@@ -146,11 +146,12 @@ def _get_alkoxy_prefix(
         principal_chain: Atom indices of the principal chain
 
     Returns:
-        Alkoxy prefix (e.g., "methoxy", "ethoxy")
+        Alkoxy prefix (e.g., "methoxy", "ethoxy"), or None if naming fails.
+        Never returns the literal string "alkoxy" (not valid IUPAC).
     """
     # ether_atoms from SMARTS "[OX2]([CX4])[CX4]" = (O, C1, C2)
     if len(ether_atoms) < 3:
-        return "alkoxy"  # Fallback
+        return None  # Defensive guard: let caller skip this ether
 
     oxygen_idx = ether_atoms[0]
     carbon1_idx = ether_atoms[1]
@@ -218,8 +219,14 @@ def _get_alkoxy_prefix(
             if alkyl.endswith("yl"):
                 return alkyl[:-2] + "yloxy"
             return alkyl + "oxy"
-        except ValueError:
-            return "alkoxy"  # Fallback for very large groups
+        except (ValueError, KeyError):
+            # get_alkyl_name failed; try get_chain_prefix for arbitrary counts
+            try:
+                from ..data.chain_names import get_chain_prefix
+                prefix = get_chain_prefix(carbon_count)
+                return f"{prefix}yloxy"
+            except (ValueError, KeyError):
+                return None  # Not "alkoxy" -- let caller handle absence
 
 
 def _count_fragment_atoms(
