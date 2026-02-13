@@ -50,6 +50,7 @@ class MolecularFeatures:
     is_aromatic: bool = False
     ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
     principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
+    senior_ring_system: Optional[tuple] = None  # P-44.2 most senior ring system (atom indices)
     oriented_ring: Optional[List[int]] = None  # Ring atoms reordered for naming
     ring_substituents: Dict[int, List[List[int]]] = field(default_factory=dict)  # Substituents on ring
     ring_double_bonds: List[tuple] = field(default_factory=list)  # Double bonds in ring
@@ -450,8 +451,18 @@ class Orthonym:
             atom_rings = ring_info['atom_rings']
 
             if atom_rings:
-                # For simple single-ring molecules, the ring IS the parent
-                # TODO: For multi-ring systems, apply selection criteria
+                # Select the most senior ring system per IUPAC P-44.2
+                # and store it for downstream use (e.g., ring-vs-chain
+                # comparison in the composer). The monocyclic dispatch
+                # path below uses atom_rings[0] which preserves SSSR
+                # cyclic traversal order needed by orientation functions.
+                # Complex multi-ring (fused/bridged) systems are handled
+                # by _classify_complex_ring() in the composer.
+                from .rules.ring_selection import select_principal_ring_system
+                principal = select_principal_ring_system(
+                    features.mol, features.ring_systems
+                )
+                features.senior_ring_system = principal if principal else atom_rings[0]
                 features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
 
