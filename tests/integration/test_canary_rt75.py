@@ -15,6 +15,7 @@ regressions are caught immediately during development.
 
 Original 75: 
 Phase 49 additions: 10 compounds from missing compound classes (CLS-01 to CLS-05)
+Phase 50 additions: 3 compounds from decomposition format fixes (ether/alkoxy)
 """
 
 import pytest
@@ -23,8 +24,8 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 85 golden canary compounds: (SMILES, expected_name)
-# Original 75 from Phase 44 + 10 from Phase 49 (missing compound classes)
+# 88 golden canary compounds: (SMILES, expected_name)
+# Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -374,6 +375,21 @@ CANARY_COMPOUNDS = [
         "CN(C)C(=O)O",
         "N,N-dimethylcarbamic acid",
     ),
+    # --- Phase 50: Decomposition Format Fixes (DEC-01/DEC-02) ---
+    # Alkoxy naming on benzene (DEC-02: bare oxy elimination)
+    (
+        "c1ccc(OC)cc1",
+        "methoxybenzene",
+    ),
+    (
+        "c1ccc(OCC)cc1",
+        "ethoxybenzene",
+    ),
+    # Ring ether guard (DEC-01: tetrahydropyran not decomposed)
+    (
+        "C1CCOCC1",
+        "tetrahydropyran",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -384,7 +400,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt85(smiles, expected_name):
+def test_canary_rt88(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
