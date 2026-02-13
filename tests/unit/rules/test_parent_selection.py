@@ -13,10 +13,13 @@ from orthonym.rules.parent_selection import (
     select_parent,
     is_principal_group_on_chain,
     is_principal_group_on_ring,
+    _select_best_ring_system,
+    _ring_system_has_nitrogen,
 )
 from orthonym.perception.rings import get_ring_systems
 from orthonym.perception.functional_groups import detect_functional_groups
 from orthonym.rules.seniority import get_principal_group
+from orthonym.rules.ring_selection import ring_system_score
 
 
 class TestIsPrincipalGroupOnChain:
@@ -321,3 +324,206 @@ class TestEdgeCases:
         )
 
         assert result.parent_type == 'chain', "2-carbon chain with FG -> chain is parent"
+
+
+@pytest.mark.unit
+class TestEnhancedParentSelection:
+    """Tests for P-52.2.8, multi-ring seniority, and enhanced tiebreakers."""
+
+    def test_p52_2_8_ring_preferred_on_tie(self):
+        """P-52.2.8: When FG count is tied on ring and chain, ring wins.
+
+        Uses cyclohexanone with a chain ketone -- 1 ketone on ring, 1 on chain.
+        Ring should win per P-52.2.8 tie-breaking.
+        """
+        # O=C1CCCCC1CCC(=O)CC -- cyclohexanone + chain ketone
+        smiles = 'O=C1CCCCC1CCC(=O)CC'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        # Chain atoms: everything not in ring
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        chain = [i for i in range(mol.GetNumAtoms())
+                 if i not in all_ring]
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'ring', (
+            "P-52.2.8: Ring should win when FG count is tied"
+        )
+        assert 'P-52.2.8' in result.reasoning, (
+            "Reasoning should cite P-52.2.8 rule"
+        )
+
+    def test_multi_ring_system_selects_senior(self):
+        """Multi-ring: pyridine (heterocyclic) should be selected over cyclohexane.
+
+        Uses c1ccncc1CCC1CCCCC1 -- pyridine-propyl-cyclohexane.
+        Pyridine is more senior per P-44.2 (heterocyclic, contains N).
+        """
+        smiles = 'c1ccncc1CCC1CCCCC1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+
+        assert len(ring_systems) == 2, "Should have 2 ring systems"
+
+        best, others = _select_best_ring_system(mol, ring_systems)
+
+        # The best ring should be the pyridine (contains nitrogen)
+        assert _ring_system_has_nitrogen(mol, best), (
+            "Best ring system should be pyridine (contains N)"
+        )
+        assert len(others) == 1, "Should have 1 other ring system"
+
+        # The other ring should be cyclohexane (no nitrogen)
+        assert not _ring_system_has_nitrogen(mol, others[0]), (
+            "Other ring should be cyclohexane (no N)"
+        )
+
+        # Verify scoring: pyridine should have lower (more senior) score
+        pyridine_score = ring_system_score(mol, best)
+        cyclohex_score = ring_system_score(mol, others[0])
+        assert pyridine_score < cyclohex_score, (
+            "Pyridine score should be lower (more senior) than cyclohexane"
+        )
+
+    def test_short_chain_prefers_ring(self):
+        """Short chain (1 carbon) with 6-membered ring -> ring is parent.
+
+        OCC1CCCCC1 (hydroxymethylcyclohexane): OH on 1-carbon chain.
+        Ring should win because chain is just a substituent.
+        """
+        smiles = 'OCC1CCCCC1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        # Single carbon chain
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        chain_c = [i for i in range(mol.GetNumAtoms())
+                   if i not in all_ring and mol.GetAtomWithIdx(i).GetAtomicNum() == 6]
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain_c,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'ring', (
+            "Single carbon chain should favor ring as parent"
+        )
+
+    def test_long_chain_with_fg_prefers_chain(self):
+        """Long chain with COOH on chain terminus -> chain is parent.
+
+        c1ccc(CCCCCCCC(=O)O)cc1 (8-phenyloctanoic acid): COOH exclusively
+        on 8-atom chain. Chain must be parent per P-44.1.
+        """
+        smiles = 'c1ccc(CCCCCCCC(=O)O)cc1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        # Chain: all non-ring atoms that are carbon
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        chain = [i for i in range(mol.GetNumAtoms())
+                 if i not in all_ring and mol.GetAtomWithIdx(i).GetAtomicNum() == 6]
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'chain', (
+            "Long chain with FG should be parent"
+        )
+        assert len(result.substituent_rings) >= 1, (
+            "Ring should become substituent"
+        )
+
+    def test_nitrogen_ring_senior_atom_preference(self):
+        """Ring system with nitrogen is preferred per P-44.1 senior atom.
+
+        Tests _ring_system_has_nitrogen() and _select_best_ring_system()
+        when comparing N-containing ring vs carbocyclic ring.
+        """
+        # Pyridine + cyclohexane
+        smiles = 'c1ccncc1CCC1CCCCC1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+
+        # Identify which ring system has nitrogen
+        n_ring_idx = None
+        c_ring_idx = None
+        for i, system in enumerate(ring_systems):
+            if _ring_system_has_nitrogen(mol, system):
+                n_ring_idx = i
+            else:
+                c_ring_idx = i
+
+        assert n_ring_idx is not None, "Should find N-containing ring"
+        assert c_ring_idx is not None, "Should find carbocyclic ring"
+
+        # _select_best_ring_system should prefer the N-containing ring
+        best, _ = _select_best_ring_system(mol, ring_systems)
+        assert _ring_system_has_nitrogen(mol, best), (
+            "P-44.1 senior atom: N-containing ring should be preferred"
+        )
+
+    def test_select_best_ring_system_single(self):
+        """With only one ring system, it should be returned directly."""
+        smiles = 'C1CCCCC1'  # cyclohexane
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+
+        assert len(ring_systems) == 1
+        best, others = _select_best_ring_system(mol, ring_systems)
+        assert best == ring_systems[0]
+        assert others == []
+
+    def test_p52_2_8_documented_in_reasoning(self):
+        """P-52.2.8 should be referenced in the reasoning string for tie cases."""
+        # Use a molecule where FG is on both ring and chain with equal count
+        smiles = 'O=C1CCCCC1CCC(=O)CC'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        chain = [i for i in range(mol.GetNumAtoms())
+                 if i not in all_ring]
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'ring'
+        assert 'P-52.2.8' in result.reasoning
