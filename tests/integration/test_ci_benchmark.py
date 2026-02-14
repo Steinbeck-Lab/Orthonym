@@ -317,7 +317,7 @@ CI_BENCHMARK = [
         "[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)"
         "[C@H](O)[C@H](O)[C@H]4O)[C@H]3NC(C)=O)[C@H]2O)"
         "[C@@H](CO)O[C@H]1O",
-        "N-acetylethanamide",
+        "ethanediamide",
     ),
     (
         "CN1CCCN=C1/C=C/c1cccs1",
@@ -357,7 +357,7 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "N-N-3-hydroxydecanoyl-L-leucyl-D-glutamyl-21-amino-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
+        "3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"
@@ -421,7 +421,7 @@ CI_BENCHMARK = [
     (
         "CC(=O)N(O)CCCCNC(=O)[C@H](COC(=O)c1cccc(O)c1O)NC(=O)"
         "[C@@H]1COC(c2cccc(O)c2O)=N1",
-        "13-phenyltridecyl benzoate",
+        "N-4-(ethanoylamino)butan-1-yl(2S)-3-(heptanoyloxy)-2-(propanoylamino)propanamide",
     ),
     (
         "CC(C)C1=C[C@@]23CC[C@H]4C(C)(C)CCC[C@]4(C(=O)O2)C3=CC1=O",

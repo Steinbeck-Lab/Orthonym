@@ -21,6 +21,7 @@ from rdkit import Chem
 # ---------------------------------------------------------------------------
 
 MAX_CLEAVABLE_BONDS = 8  # Skip decomposition if more than this many bonds
+MAX_BOND_RETRY_ATTEMPTS = 3  # Max bonds to try when multi-bond retry is active
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +222,65 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
 
 
 # ---------------------------------------------------------------------------
+# Single-bond decomposition helper
+# ---------------------------------------------------------------------------
+
+def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[str]:
+    """Attempt decomposition using a single bond.
+
+    Extracted from try_decompose() Steps 4-8. Contains the full
+    cleave-cap-name-assemble pipeline for one bond.
+
+    Args:
+        mol: RDKit Mol object to decompose.
+        bond: Bond info dict from find_cleavable_bonds().
+        style: Naming style ("pin" for preferred IUPAC names).
+
+    Returns:
+        Assembled multi-component IUPAC name, or None if decomposition
+        fails at any step (capping, size guard, fragment naming, assembly).
+    """
+    from .fragment_capping import cleave_and_cap
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from .fragment_assembly import assemble_fragment_name
+
+    # Cleave and cap
+    # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
+    # while the alkyl side naturally keeps the ether oxygen as an alcohol.
+    acid_oh = bond["type"] != "ether"
+    fragments = cleave_and_cap(mol, [bond], acid_side_oh=acid_oh)
+    if not fragments or len(fragments) < 2:
+        return None
+
+    # Size guard -- each fragment must be strictly smaller than parent
+    parent_heavy = mol.GetNumHeavyAtoms()
+    for frag in fragments:
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        if frag_mol and frag_mol.GetNumHeavyAtoms() >= parent_heavy:
+            return None  # Fragment not smaller -- abort
+
+    # Name each fragment recursively (with sugar intercept for glycosidic bonds)
+    fragment_names = {}
+    for frag in fragments:
+        frag_name = None
+
+        # Sugar intercept: for glycosidic bonds, try sugar lookup on acid-side fragment
+        if bond["type"] == "glycosidic" and frag["side"] == "acid":
+            frag_name = _name_sugar_fragment(frag["smiles"])
+
+        # Fall through to recursive naming if sugar lookup failed or non-sugar fragment
+        if not frag_name:
+            frag_name = name_fragment_recursively(frag["smiles"])
+
+        if not frag_name or frag_name == "unknown":
+            return None  # Cannot name a fragment -- abort
+        fragment_names[frag["side"]] = frag_name
+
+    # Assemble (delegate to fragment_assembly module)
+    return assemble_fragment_name(bond["type"], fragment_names, style=style)
+
+
+# ---------------------------------------------------------------------------
 # Main decomposition entry point
 # ---------------------------------------------------------------------------
 
@@ -250,7 +310,6 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         to the existing naming pipeline.
     """
     from .bond_cleavage import find_cleavable_bonds
-    from .fragment_capping import cleave_and_cap
 
     # Step 1: Find cleavable bonds
     bonds = find_cleavable_bonds(mol)
@@ -293,38 +352,27 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # Step 4: Choose ONE bond to cleave (the most significant one)
     best_bond = _select_best_bond(mol, bonds)
 
-    # Step 5: Cleave and cap
-    # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
-    # while the alkyl side naturally keeps the ether oxygen as an alcohol.
-    acid_oh = best_bond["type"] != "ether"
-    fragments = cleave_and_cap(mol, [best_bond], acid_side_oh=acid_oh)
-    if not fragments or len(fragments) < 2:
-        return None
+    # Steps 4-8: Single-bond attempt via helper
+    single_result = _try_single_bond_decompose(mol, best_bond, style)
 
-    # Step 6: Size guard -- each fragment must be strictly smaller than parent
-    parent_heavy = mol.GetNumHeavyAtoms()
-    for frag in fragments:
-        frag_mol = Chem.MolFromSmiles(frag["smiles"])
-        if frag_mol and frag_mol.GetNumHeavyAtoms() >= parent_heavy:
-            return None  # Fragment not smaller -- abort
+    # DECP-05: single-bond path returns result directly (backward compat)
+    if len(bonds) == 1:
+        return single_result
 
-    # Step 7: Name each fragment recursively (with sugar intercept for glycosidic bonds)
-    fragment_names = {}
-    for frag in fragments:
-        frag_name = None
+    # If single-bond result is adequate, return it
+    if single_result and _name_quality_is_acceptable(single_result, mol):
+        return single_result
 
-        # Sugar intercept: for glycosidic bonds, try sugar lookup on acid-side fragment
-        if best_bond["type"] == "glycosidic" and frag["side"] == "acid":
-            frag_name = _name_sugar_fragment(frag["smiles"])
+    # MULTI-BOND RETRY (DECP-01): try alternative bonds
+    tried_indices = {best_bond["bond_idx"]}
+    for bond in bonds:
+        if bond["bond_idx"] in tried_indices:
+            continue
+        if len(tried_indices) >= MAX_BOND_RETRY_ATTEMPTS:
+            break
+        tried_indices.add(bond["bond_idx"])
+        alt_result = _try_single_bond_decompose(mol, bond, style)
+        if alt_result and _name_quality_is_acceptable(alt_result, mol):
+            return alt_result
 
-        # Fall through to recursive naming if sugar lookup failed or non-sugar fragment
-        if not frag_name:
-            frag_name = name_fragment_recursively(frag["smiles"])
-
-        if not frag_name or frag_name == "unknown":
-            return None  # Cannot name a fragment -- abort
-        fragment_names[frag["side"]] = frag_name
-
-    # Step 8: Assemble (delegate to fragment_assembly module)
-    from .fragment_assembly import assemble_fragment_name
-    return assemble_fragment_name(best_bond["type"], fragment_names, style=style)
+    return single_result  # Best effort fallback
