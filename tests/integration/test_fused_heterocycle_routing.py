@@ -10,6 +10,7 @@ Requirements tested:
 - PRNT-02: Phenothiazine named as '10H-phenothiazine' (not sulfide)
 - PRNT-03: Phenoxazine named as '10H-phenoxazine' (not tricyclo[...])
 - PRNT-04: Thianthrene named as 'thianthrene' (not sulfide)
+- Phase 57 Plan 02: Canary regression tests for all 7 tricyclic + 4 bicyclic compounds
 """
 
 import pytest
@@ -160,4 +161,48 @@ class TestThioetherGuardDoesNotAffectRealSulfides:
         result = name_compound('CCSCC')
         assert 'sulfide' in result, (
             f"Diethyl sulfide lost sulfide naming: got '{result}'"
+        )
+
+
+# =============================================================================
+# Canary compound tests (Phase 57 Plan 02)
+# =============================================================================
+
+
+class TestPhase57CanaryCompounds:
+    """Canary-level regression guards for all 7 tricyclic fused heterocycles."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected_name", [
+        ('c1ccc2c(c1)Cc1ccccc1O2', '9H-xanthene'),
+        ('c1ccc2c(c1)Nc1ccccc1S2', '10H-phenothiazine'),
+        ('c1ccc2c(c1)Nc1ccccc1O2', '10H-phenoxazine'),
+        ('c1ccc2c(c1)Sc1ccccc1S2', 'thianthrene'),
+        ('c1ccc2c(c1)[nH]c1ccccc12', '9H-carbazole'),
+        ('c1ccc2nc3ccccc3cc2c1', 'acridine'),
+        ('c1ccc2nc3ccccc3nc2c1', 'phenazine'),
+    ])
+    def test_tricyclic_fused_heterocycle(self, smiles, expected_name):
+        """All 7 tricyclic fused heterocycles must produce correct retained names."""
+        result = name_compound(smiles)
+        assert result == expected_name, (
+            f"Canary failed for {expected_name}: got '{result}'"
+        )
+
+
+class TestBicyclicFusedHeterocyclesUnchanged:
+    """Verify bicyclic fused compounds still name correctly after Phase 57 changes."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected_name", [
+        ('c1ccc2[nH]ccc2c1', '1H-indole'),
+        ('c1ccc2ncccc2c1', 'quinoline'),
+        ('c1ccc2cnccc2c1', 'isoquinoline'),
+        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+    ])
+    def test_bicyclic_fused_heterocycle(self, smiles, expected_name):
+        """Bicyclic fused heterocycles must not be affected by tricyclic routing guards."""
+        result = name_compound(smiles)
+        assert result == expected_name, (
+            f"Bicyclic regression for {expected_name}: got '{result}'"
         )
