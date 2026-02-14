@@ -10,7 +10,9 @@ from src.orthonym.rules.phosphorus import (
     name_phosphinic_acid,
     name_phosphate_ester,
     get_phosphorus_prefix,
+    get_phosphanyl_prefix,
     _count_alkyl_carbons,
+    _characterize_substituent,
 )
 
 
@@ -319,3 +321,252 @@ class TestPhosphorusEdgeCases:
         # Has P=O but C bonded through O, not directly
         # So name_phosphine_oxide should return None
         assert result is None
+
+
+class TestArylDetection:
+    """Tests for _characterize_substituent() aryl vs alkyl detection."""
+
+    def test_phenyl_detected(self):
+        """Aromatic 6-C ring attached to P should be detected as phenyl."""
+        mol = Chem.MolFromSmiles("c1ccccc1P")
+        # Find P index
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        # Get the C neighbor of P
+        p_atom = mol.GetAtomWithIdx(p_idx)
+        c_neighbor = [n for n in p_atom.GetNeighbors() if n.GetSymbol() == 'C'][0]
+        result = _characterize_substituent(mol, c_neighbor.GetIdx(), {p_idx})
+        assert result == ("aryl", "phenyl")
+
+    def test_methyl_still_alkyl(self):
+        """Single non-aromatic carbon should be detected as methyl."""
+        mol = Chem.MolFromSmiles("CP")
+        result = _characterize_substituent(mol, 0, {1})
+        assert result == ("alkyl", "methyl")
+
+    def test_ethyl_still_alkyl(self):
+        """Two-carbon chain should be detected as ethyl."""
+        mol = Chem.MolFromSmiles("CCP")
+        result = _characterize_substituent(mol, 0, {2})
+        assert result == ("alkyl", "ethyl")
+
+    def test_naphthyl_detected(self):
+        """Naphthalene system attached to P should be detected as naphthyl."""
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1P")
+        # Find P index
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        p_atom = mol.GetAtomWithIdx(p_idx)
+        c_neighbor = [n for n in p_atom.GetNeighbors() if n.GetSymbol() == 'C'][0]
+        result = _characterize_substituent(mol, c_neighbor.GetIdx(), {p_idx})
+        assert result == ("aryl", "naphthyl")
+
+    def test_hexyl_not_confused_with_phenyl(self):
+        """6 linear carbons should be hexyl, not phenyl."""
+        mol = Chem.MolFromSmiles("CCCCCCP")
+        # Find P index
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        p_atom = mol.GetAtomWithIdx(p_idx)
+        c_neighbor = [n for n in p_atom.GetNeighbors() if n.GetSymbol() == 'C'][0]
+        result = _characterize_substituent(mol, c_neighbor.GetIdx(), {p_idx})
+        assert result == ("alkyl", "hexyl")
+
+    def test_propyl_alkyl(self):
+        """Three-carbon chain should be propyl."""
+        mol = Chem.MolFromSmiles("CCCP")
+        result = _characterize_substituent(mol, 0, {3})
+        assert result == ("alkyl", "propyl")
+
+    def test_butyl_alkyl(self):
+        """Four-carbon chain should be butyl."""
+        mol = Chem.MolFromSmiles("CCCCP")
+        result = _characterize_substituent(mol, 0, {4})
+        assert result == ("alkyl", "butyl")
+
+
+class TestArylPhosphineNaming:
+    """Tests for name_phosphine with aryl substituents."""
+
+    def test_triphenylphosphane(self):
+        """PPh3 -> triphenylphosphane"""
+        mol = Chem.MolFromSmiles("c1ccccc1P(c2ccccc2)c3ccccc3")
+        # Find P index
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = name_phosphine(mol, p_idx)
+        assert result == "triphenylphosphane"
+
+    def test_diphenylmethylphosphane(self):
+        """MePPh2 -> diphenylmethylphosphane (alphabetical: methyl after diphenyl -- but ignoring di)"""
+        mol = Chem.MolFromSmiles("CP(c1ccccc1)c2ccccc2")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = name_phosphine(mol, p_idx)
+        # Alphabetical order ignoring "di": methyl < phenyl, so methyl first
+        # But _build_substituent_string sorts unique names: methyl, phenyl
+        # methyl comes before phenyl -> "methyldiphenylphosphane"
+        # Wait: IUPAC says ignore di/tri for alphabetization.
+        # "methyl" vs "phenyl": m < p, so methyl first.
+        assert "methyl" in result
+        assert "phenyl" in result
+        assert result == "methyldiphenylphosphane"
+
+    def test_phenylphosphane(self):
+        """PhPH2 -> phenylphosphane (primary phosphine with phenyl)"""
+        mol = Chem.MolFromSmiles("c1ccccc1[PH2]")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = name_phosphine(mol, p_idx)
+        assert result == "phenylphosphane"
+
+    def test_diphenylphosphane(self):
+        """Ph2PH -> diphenylphosphane (secondary phosphine with two phenyl)"""
+        mol = Chem.MolFromSmiles("c1ccccc1[PH]c2ccccc2")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = name_phosphine(mol, p_idx)
+        assert result == "diphenylphosphane"
+
+    def test_ethyldiphenylphosphane(self):
+        """EtPPh2 -> ethyldiphenylphosphane"""
+        mol = Chem.MolFromSmiles("CCP(c1ccccc1)c2ccccc2")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = name_phosphine(mol, p_idx)
+        assert result == "ethyldiphenylphosphane"
+
+
+class TestArylPhosphineOxideNaming:
+    """Tests for name_phosphine_oxide with aryl substituents."""
+
+    def test_triphenylphosphane_oxide(self):
+        """O=PPh3 -> triphenylphosphane oxide"""
+        mol = Chem.MolFromSmiles("O=P(c1ccccc1)(c2ccccc2)c3ccccc3")
+        result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
+        assert result == "triphenylphosphane oxide"
+
+    def test_diphenylmethylphosphane_oxide(self):
+        """O=P(Me)Ph2 -> methyldiphenylphosphane oxide"""
+        mol = Chem.MolFromSmiles("O=P(C)(c1ccccc1)c2ccccc2")
+        result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
+        assert "methyl" in result
+        assert "phenyl" in result
+        assert "phosphane oxide" in result
+        assert result == "methyldiphenylphosphane oxide"
+
+    def test_ethyldiphenylphosphane_oxide(self):
+        """O=P(Et)Ph2 -> ethyldiphenylphosphane oxide"""
+        mol = Chem.MolFromSmiles("O=P(CC)(c1ccccc1)c2ccccc2")
+        result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
+        assert result == "ethyldiphenylphosphane oxide"
+
+
+class TestArylPhosphinicAcid:
+    """Tests for name_phosphinic_acid with aryl substituents."""
+
+    def test_diphenylphosphinic_acid(self):
+        """Ph2P(O)(OH) -> diphenylphosphinic acid"""
+        mol = Chem.MolFromSmiles("O=P(O)(c1ccccc1)c2ccccc2")
+        result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
+        assert result == "diphenylphosphinic acid"
+
+    def test_methylphenylphosphinic_acid(self):
+        """MePhP(O)(OH) -> methylphenylphosphinic acid (alphabetical)"""
+        mol = Chem.MolFromSmiles("O=P(O)(C)c1ccccc1")
+        result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
+        assert result == "methylphenylphosphinic acid"
+
+    def test_ethylphenylphosphinic_acid(self):
+        """EtPhP(O)(OH) -> ethylphenylphosphinic acid"""
+        mol = Chem.MolFromSmiles("O=P(O)(CC)c1ccccc1")
+        result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
+        assert result == "ethylphenylphosphinic acid"
+
+
+class TestPhosphanylPrefix:
+    """Tests for get_phosphanyl_prefix()."""
+
+    def test_diphenylphosphanyl(self):
+        """P with 2 phenyl -> diphenylphosphanyl"""
+        mol = Chem.MolFromSmiles("c1ccccc1[PH]c2ccccc2")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "diphenylphosphanyl"
+
+    def test_dimethylphosphanyl(self):
+        """P with 2 methyl -> dimethylphosphanyl"""
+        mol = Chem.MolFromSmiles("CPC")
+        p_idx = 1
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "dimethylphosphanyl"
+
+    def test_triphenylphosphanyl(self):
+        """P with 3 phenyl -> triphenylphosphanyl"""
+        mol = Chem.MolFromSmiles("c1ccccc1P(c2ccccc2)c3ccccc3")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "triphenylphosphanyl"
+
+    def test_methylphosphanyl(self):
+        """P with 1 methyl -> methylphosphanyl"""
+        mol = Chem.MolFromSmiles("CP")
+        p_idx = 1
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "methylphosphanyl"
+
+    def test_bare_phosphanyl(self):
+        """P with no C substituents -> phosphanyl"""
+        mol = Chem.MolFromSmiles("[PH3]")
+        result = get_phosphanyl_prefix(mol, 0)
+        assert result == "phosphanyl"
+
+    def test_ethylphosphanyl(self):
+        """P with 1 ethyl -> ethylphosphanyl"""
+        mol = Chem.MolFromSmiles("CCP")
+        p_idx = 2
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "ethylphosphanyl"
+
+    def test_methyldiphenylphosphanyl(self):
+        """P with 1 methyl + 2 phenyl -> methyldiphenylphosphanyl"""
+        mol = Chem.MolFromSmiles("CP(c1ccccc1)c2ccccc2")
+        p_idx = None
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                p_idx = i
+                break
+        result = get_phosphanyl_prefix(mol, p_idx)
+        assert result == "methyldiphenylphosphanyl"
