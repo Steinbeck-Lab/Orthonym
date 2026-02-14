@@ -561,7 +561,31 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.phosphorus import name_phosphine
         fg_key = features.principal_group
         matches = features.functional_groups.get(fg_key, [])
-        if matches:
+
+        # When molecule is a benzene derivative with P on the ring alongside
+        # other substituents (or multiple P atoms), prefer benzene-as-parent naming.
+        # The P will be expressed as a phosphanyl prefix on benzene.
+        _skip_for_benzene = False
+        if getattr(features, 'is_benzene', False) and matches:
+            if len(matches) > 1:
+                # Multiple phosphine groups -> ring should be parent
+                _skip_for_benzene = True
+            else:
+                # Single phosphine -- check if any benzene ring atom has
+                # non-P, non-ring substituent neighbors
+                _bz_ring = getattr(features, 'benzene_ring', None)
+                if _bz_ring:
+                    _bz_set = set(_bz_ring)
+                    for _ra in _bz_ring:
+                        _ra_atom = features.mol.GetAtomWithIdx(_ra)
+                        for _nbr in _ra_atom.GetNeighbors():
+                            if _nbr.GetIdx() not in _bz_set and _nbr.GetSymbol() != 'P':
+                                _skip_for_benzene = True
+                                break
+                        if _skip_for_benzene:
+                            break
+
+        if not _skip_for_benzene and matches:
             # Find phosphorus atom index
             for idx in matches[0]:
                 atom = features.mol.GetAtomWithIdx(idx)
@@ -3343,7 +3367,7 @@ def _build_substituted_ring_name(
     sub_groups = best_sub_groups
 
     # Build prefix string for ring substituents
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
     prefix_parts = []
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         locs = sorted(sub_groups[name])
@@ -3352,8 +3376,11 @@ def _build_substituted_ring_name(
         if count == 1:
             prefix_parts.append(f'{loc_str}-{name}')
         else:
-            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
-            prefix_parts.append(f'{loc_str}-{mult}{name}')
+            mult = get_multiplier_prefix(count, name)
+            if is_complex_substituent(name):
+                prefix_parts.append(f'{loc_str}-{mult}({name})')
+            else:
+                prefix_parts.append(f'{loc_str}-{mult}{name}')
 
     ring_prefix = '-'.join(prefix_parts)
     # Wrap in parentheses: (3,4-dihydroxyphenyl)
@@ -3458,6 +3485,13 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
                 n_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != atom_idx]
                 if h_count == 2 and len(n_nbrs) == 0:
                     sub_groups['amino'].append(ring_pos)
+            elif sym == 'P':
+                # Phosphanyl prefix: detect P with aryl/alkyl substituents
+                # Exclude ring atoms so the attachment carbon isn't counted
+                from ..rules.phosphorus import get_phosphanyl_prefix
+                prefix = get_phosphanyl_prefix(mol, ni, exclude_atoms=ring_atom_set)
+                if prefix:
+                    sub_groups[prefix].append(ring_pos)
             elif sym == 'C':
                 bond = mol.GetBondBetweenAtoms(atom_idx, ni)
                 if bond and bond.GetBondTypeAsDouble() == 1.0:

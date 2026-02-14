@@ -378,12 +378,13 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
     return None
 
 
-def get_phosphanyl_prefix(mol, phosphorus_idx: int) -> Optional[str]:
+def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -> Optional[str]:
     """
     Generate IUPAC P-68 phosphanyl prefix string.
 
     Used when phosphorus is a substituent on a parent chain/ring.
-    Characterizes all C/c neighbors of P and builds the prefix.
+    Characterizes C/c neighbors of P (excluding parent attachment atoms)
+    and builds the prefix.
 
     Examples:
         -PPh2 -> "diphenylphosphanyl"
@@ -394,14 +395,20 @@ def get_phosphanyl_prefix(mol, phosphorus_idx: int) -> Optional[str]:
     Args:
         mol: RDKit Mol object
         phosphorus_idx: Index of phosphorus atom
+        exclude_atoms: Optional set of atom indices to exclude from substituent
+            counting (typically the parent ring/chain atoms that P is bonded to).
 
     Returns:
         Prefix string like "diphenylphosphanyl", or None if no valid substituents
     """
+    if exclude_atoms is None:
+        exclude_atoms = set()
+
     phosphorus = mol.GetAtomWithIdx(phosphorus_idx)
 
-    # Get carbon neighbors
-    neighbors = [n for n in phosphorus.GetNeighbors() if n.GetSymbol() == 'C']
+    # Get carbon neighbors, excluding parent attachment atoms
+    neighbors = [n for n in phosphorus.GetNeighbors()
+                 if n.GetSymbol() == 'C' and n.GetIdx() not in exclude_atoms]
 
     if len(neighbors) == 0:
         return "phosphanyl"  # Bare -PH2

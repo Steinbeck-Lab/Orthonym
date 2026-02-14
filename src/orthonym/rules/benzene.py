@@ -406,6 +406,16 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     if symbol == 'S':
         return _identify_sulfur_group(mol, start_idx, ring_atoms)
 
+    # Phosphorus-based groups: generate phosphanyl prefix (IUPAC P-68)
+    if symbol == 'P':
+        from ..rules.phosphorus import get_phosphanyl_prefix
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        # Exclude parent ring atoms from P's substituent count so the
+        # attachment carbon is not counted (e.g., PPh2 on benzene -> diphenylphosphanyl)
+        prefix = get_phosphanyl_prefix(mol, start_idx, exclude_atoms=ring_atoms)
+        if prefix:
+            return {'name': prefix, 'atoms': sub_atoms}
+
     # Carbon-based groups (alkyl or functionalized chain) - fallback for non-suffix C
     if symbol == 'C':
         # Check for nitrile C#N pattern FIRST (BUG-2 fix)

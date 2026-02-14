@@ -258,9 +258,13 @@ def is_complex_substituent(name: str) -> bool:
     """Determine if a substituent name is complex.
 
     A substituent is considered complex if its name contains digits,
-    hyphens, or is enclosed in parentheses. Complex substituents
-    require bis/tris/tetrakis multipliers instead of di/tri/tetra,
-    and are enclosed in parentheses in the final name.
+    hyphens, is enclosed in parentheses, or contains embedded substituent
+    multiplier prefixes (e.g., diphenyl, trimethyl within a compound name).
+    Complex substituents require bis/tris/tetrakis multipliers instead of
+    di/tri/tetra, and are enclosed in parentheses in the final name.
+
+    Note: Modification prefixes like "tetrahydro-" or "dihydro-" are NOT
+    multipliers and do NOT make a name complex.
 
     Args:
         name: The substituent name (e.g., 'methyl', '1-methylethyl').
@@ -277,12 +281,27 @@ def is_complex_substituent(name: str) -> bool:
         True
         >>> is_complex_substituent("2-propyl")
         True
+        >>> is_complex_substituent("diphenylphosphanyl")
+        True
+        >>> is_complex_substituent("tetrahydropyranyl")
+        False
     """
     # Check for digits (indicates locants within the substituent name)
     if any(ch.isdigit() for ch in name):
         return True
     # Check for hyphens (indicates compound substituent)
     if "-" in name:
+        return True
+    # Check for embedded multiplier + substituent name patterns (IUPAC P-14.5.2)
+    # E.g., "diphenylphosphanyl" has "diphenyl" = multiplied substituent.
+    # Must NOT match modification prefixes like "tetrahydro", "dihydro".
+    import re
+    _MULT_SUBSTITUENT_RE = re.compile(
+        r'^(?:di|tri|tetra|penta|hexa)'
+        r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
+        r'phenyl|naphthyl|cyclopentyl|cyclohexyl|benzyl|vinyl|allyl)'
+    )
+    if _MULT_SUBSTITUENT_RE.match(name):
         return True
     return False
 
