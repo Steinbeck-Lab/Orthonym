@@ -54,12 +54,11 @@ class TestPhosphineNaming:
         assert result == "ethylmethylphosphane"
 
     def test_dimethylethylphosphane(self):
-        """CCP(C)C -> dimethylethylphosphane (asymmetric tertiary)"""
+        """CCP(C)C -> ethyldimethylphosphane (asymmetric tertiary, with multiplier)"""
         mol = Chem.MolFromSmiles("CCP(C)C")
         result = name_phosphine(mol, 2)
-        # Alphabetical: ethyl + methyl + methyl -> sorted names joined
-        # Two are same (methyl), should be "ethylmethylmethylphosphane"
-        assert result == "ethylmethylmethylphosphane"
+        # Alphabetical: ethyl + dimethyl (multiplier for identical groups)
+        assert result == "ethyldimethylphosphane"
 
     def test_parent_phosphane(self):
         """Pure phosphane (PH3)"""
@@ -93,9 +92,9 @@ class TestPhosphineOxideNaming:
         """CCP(C)(C)=O -> asymmetric phosphine oxide"""
         mol = Chem.MolFromSmiles("CCP(C)(C)=O")
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
-        # Two methyl + one ethyl: ethylmethylmethylphosphane oxide
+        # Two methyl + one ethyl: ethyldimethylphosphane oxide (with multiplier)
         assert "phosphane oxide" in result
-        assert result == "ethylmethylmethylphosphane oxide"
+        assert result == "ethyldimethylphosphane oxide"
 
 
 class TestPhosphonicAcidNaming:
@@ -247,11 +246,11 @@ class TestPhosphorusPrefix:
         """Phosphinic acid prefix is 'phosphino'."""
         assert get_phosphorus_prefix("phosphinic_acid") == "phosphino"
 
-    def test_phosphine_no_prefix(self):
-        """Phosphines use substitutive naming, no prefix."""
-        assert get_phosphorus_prefix("tertiary_phosphine") is None
-        assert get_phosphorus_prefix("secondary_phosphine") is None
-        assert get_phosphorus_prefix("primary_phosphine") is None
+    def test_phosphine_phosphanyl_prefix(self):
+        """Phosphines use phosphanyl prefix when P is a substituent."""
+        assert get_phosphorus_prefix("tertiary_phosphine") == "phosphanyl"
+        assert get_phosphorus_prefix("secondary_phosphine") == "phosphanyl"
+        assert get_phosphorus_prefix("primary_phosphine") == "phosphanyl"
 
     def test_phosphine_oxide_no_prefix(self):
         """Phosphine oxides use functional class naming, no prefix."""
