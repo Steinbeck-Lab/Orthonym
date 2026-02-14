@@ -280,7 +280,23 @@ class Orthonym:
         self._classify(features)
 
         # Assemble: build final name from fragments
-        return assemble_name(features, style=self.style)
+        assembled = assemble_name(features, style=self.style)
+
+        # Final quality gate: if composer produced a garbled name
+        # (e.g., "cycloanedicarboxamide" for a multi-amide molecule),
+        # fall back to the fragment naming result. Only triggers for
+        # names containing known garbled tokens to avoid performance
+        # overhead on normal molecules.
+        if assembled and mol.GetNumHeavyAtoms() > 15:
+            _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
+            assembled_lower = assembled.lower()
+            if any(tok in assembled_lower for tok in _GARBLED_TOKENS):
+                from .assembly.fragment_naming import name_fragment_recursively
+                frag_name = name_fragment_recursively(canonical_smiles)
+                if frag_name and frag_name != assembled:
+                    return frag_name
+
+        return assembled
     
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
         """

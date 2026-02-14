@@ -140,6 +140,39 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     return True
 
 
+def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
+    """Check if decomposition produced a worse name than the existing pipeline.
+
+    Returns True if existing_name should be preferred over decomp_name.
+    This prevents decomposition from replacing an acceptable (if incomplete)
+    name with a garbled or malformed one.
+
+    Args:
+        decomp_name: The decomposition result name.
+        existing_name: The existing pipeline name (from name_fragment_recursively).
+        mol: RDKit Mol object for the molecule.
+
+    Returns:
+        True if existing_name is better (decomposition is worse).
+    """
+    # Garbled token detection: names containing fragments that indicate
+    # malformed assembly (e.g., "anedicarboxamide", "aneyl", "cycloane")
+    garbled_patterns = [
+        'anedicarboxamide', 'aneyl', 'unknown', 'cycloane',
+        'acidyl',   # "phosphonic acidyl" etc. -- malformed decomposition assembly
+    ]
+    for pattern in garbled_patterns:
+        if pattern in decomp_name.lower() and pattern not in existing_name.lower():
+            return True
+
+    # Bracket mismatch: more open than close or vice versa
+    for open_ch, close_ch in [('(', ')'), ('[', ']'), ('{', '}')]:
+        if decomp_name.count(open_ch) != decomp_name.count(close_ch):
+            return True
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Bond selection
 # ---------------------------------------------------------------------------
@@ -380,8 +413,14 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # Steps 4-8: Single-bond attempt via helper
     single_result = _try_single_bond_decompose(mol, best_bond, style)
 
-    # DECP-05: single-bond path returns result directly (backward compat)
+    # DECP-05: single-bond path returns result directly (backward compat).
+    # Quality comparison: if decomposition produced a worse name than the
+    # existing pipeline (garbled tokens, bracket mismatches), prefer the
+    # existing name to avoid replacing a parseable name with garbage.
     if len(bonds) == 1:
+        if single_result and existing_name:
+            if _decomposition_is_worse(single_result, existing_name, mol):
+                return existing_name
         return single_result
 
     # If single-bond result is adequate, return it
@@ -399,5 +438,12 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         alt_result = _try_single_bond_decompose(mol, bond, style)
         if alt_result and _name_quality_is_acceptable(alt_result, mol):
             return alt_result
+
+    # Compare decomposition result against existing pipeline name:
+    # if decomposition produced a worse name (garbled, bracket-mismatched,
+    # or containing malformed tokens), fall back to existing pipeline name.
+    if single_result and existing_name:
+        if _decomposition_is_worse(single_result, existing_name, mol):
+            return None  # Let existing pipeline name be used
 
     return single_result  # Best effort fallback
