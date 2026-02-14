@@ -17,6 +17,13 @@ from rdkit import Chem
 
 
 # ---------------------------------------------------------------------------
+# Performance guard
+# ---------------------------------------------------------------------------
+
+MAX_CLEAVABLE_BONDS = 8  # Skip decomposition if more than this many bonds
+
+
+# ---------------------------------------------------------------------------
 # Quality gate
 # ---------------------------------------------------------------------------
 
@@ -96,6 +103,13 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
 
     except Exception:
         pass  # If bond detection fails, don't block on it
+
+    # Detect half-decomposition artifacts: consecutive duplicate words
+    # e.g., "palmitate palmitate" indicates same fragment named twice
+    words = name.split()
+    for i in range(len(words) - 1):
+        if words[i] == words[i + 1] and len(words[i]) > 3:
+            return False
 
     return True
 
@@ -242,6 +256,10 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     bonds = find_cleavable_bonds(mol)
     if not bonds:
         return None  # No cleavable bonds, fall through
+
+    # Step 1b: Performance guard -- skip if too many cleavable bonds
+    if len(bonds) > MAX_CLEAVABLE_BONDS:
+        return None  # Performance guard: too complex for decomposition
 
     # Step 2: Try existing pipeline first (via name_fragment_recursively
     # to respect the depth guard)
