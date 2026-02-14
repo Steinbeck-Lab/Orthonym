@@ -2395,9 +2395,16 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     """
     Assemble name for amide compounds with N-substitution handling.
 
+    For chain amides, uses the general assembly fragment pipeline
+    (_generate_chain_parent, _generate_suffix, _generate_stereodescriptors)
+    to correctly produce unsaturated names with E/Z stereodescriptors.
+
+    For ring-attached amides, delegates to rules.amides.name_amide()
+    which handles the -carboxamide suffix convention.
+
     Handles:
-    - Primary amides: acetamide, propanamide
-    - Secondary amides: N-methylacetamide
+    - Primary amides: acetamide, propanamide, (9Z)-octadec-9-enamide
+    - Secondary amides: N-methylacetamide, N-methyl(9Z)-octadec-9-enamide
     - Tertiary amides: N,N-dimethylformamide
     - Ring-attached amides: cyclohexanecarboxamide
 
@@ -2408,15 +2415,50 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     Returns:
         Complete IUPAC name for the amide
     """
-    from ..rules.amides import name_amide
+    from ..rules.amides import (
+        name_amide, is_ring_attached_amide, get_amide_type,
+        get_n_substituents, format_n_substitution,
+    )
 
-    # Get amide atoms
+    mol = features.mol
     amide_atoms = None
     if features.principal_group_atoms:
         amide_atoms = features.principal_group_atoms[0]
 
-    if amide_atoms:
-        base_name = name_amide(features.mol, amide_atoms)
+    if not amide_atoms:
+        return "amide"
+
+    # Ring-attached amides use -carboxamide suffix via name_amide()
+    # (ring systems rarely have E/Z issues; existing path is correct)
+    if is_ring_attached_amide(mol, amide_atoms):
+        base_name = name_amide(mol, amide_atoms)
+        if base_name:
+            # Add non-principal group prefixes (halogens, hydroxy, etc.)
+            prefixes = _generate_prefixes(features)
+            if prefixes:
+                prefix_parts = []
+                for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
+                    if p.locants:
+                        loc_str = ",".join(str(l) for l in p.locants)
+                        prefix_parts.append(f"{loc_str}-{p.text}")
+                    else:
+                        prefix_parts.append(p.text)
+                if prefix_parts:
+                    prefix_str = "-".join(prefix_parts)
+                    return f"{prefix_str}{base_name}"
+            return base_name
+        return "amide"
+
+    # Chain amides: use general assembly fragments when the chain has unsaturation
+    # or E/Z stereo that name_amide() cannot handle. For saturated chains, use
+    # name_amide() which handles retained names (formamide, acetamide) and correctly
+    # identifies the acyl chain length independent of N-substituent chains.
+    has_chain_unsaturation = bool(
+        getattr(features, 'double_bonds', None) or
+        getattr(features, 'triple_bonds', None)
+    )
+    if not has_chain_unsaturation:
+        base_name = name_amide(mol, amide_atoms)
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             prefixes = _generate_prefixes(features)
@@ -2433,8 +2475,60 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     return f"{prefix_str}{base_name}"
             return base_name
 
-    # Fallback
-    return "amide"
+    # Unsaturated chain amides: use general assembly fragments for correct stereo + unsaturation
+    fragments = []
+
+    # Generate parent name (chain stem with unsaturation markers)
+    if features.principal_chain:
+        parent = _generate_chain_parent(features)
+    else:
+        # Unexpected for chain amide, but fallback gracefully
+        base_name = name_amide(mol, amide_atoms)
+        return base_name if base_name else "amide"
+
+    fragments.append(parent)
+
+    # Generate suffix for amide group
+    if features.principal_group:
+        suffix = _generate_suffix(features)
+        if suffix:
+            # Validate suffix locants against parent capacity
+            parent_size = _get_parent_atom_count(features)
+            from ..rules.locant_validation import validate_suffix_locants
+            validated_locants, validated_count = validate_suffix_locants(
+                list(suffix.locants), parent_size, suffix.count
+            )
+            if validated_locants != list(suffix.locants) or validated_count != suffix.count:
+                suffix = NameFragment(
+                    text=suffix.text,
+                    locants=tuple(validated_locants),
+                    fragment_type="suffix",
+                    count=validated_count,
+                )
+            fragments.append(suffix)
+
+    # Generate non-principal group prefixes (halogens, hydroxy, etc.)
+    prefixes = _generate_prefixes(features)
+    fragments.extend(prefixes)
+
+    # Generate stereodescriptors (R/S stereocenters and E/Z double bonds)
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        stereo = _generate_stereodescriptors(features)
+        if stereo:
+            fragments.append(stereo)
+
+    # Assemble base name with correct IUPAC ordering
+    base_name = _assemble_fragments(fragments, style)
+
+    # Handle N-substitution for secondary/tertiary amides
+    amide_type = get_amide_type(mol, amide_atoms)
+    if amide_type in ("secondary", "tertiary"):
+        n_subs = get_n_substituents(mol, amide_atoms)
+        n_prefix = format_n_substitution(n_subs)
+        if n_prefix:
+            return f"{n_prefix}{base_name}"
+
+    return base_name
 
 
 def _assemble_amine_name(features: Any, style: str) -> Optional[str]:

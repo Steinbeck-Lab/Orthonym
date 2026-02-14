@@ -154,6 +154,7 @@ RETAINED_NAMES = {
     # === AMIDES ===
     "NC=O": "formamide",
     "CC(=O)N": "acetamide",
+    "CC(N)=O": "acetamide",  # canonical form of CC(=O)N
 
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
