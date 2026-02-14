@@ -240,9 +240,9 @@ class TestRecursionDepth:
     def teardown_method(self):
         _fragment_guard.depth = 0
 
-    def test_max_naming_depth_is_five(self):
-        """MAX_NAMING_DEPTH should be 5 for decomposition engine support."""
-        assert MAX_NAMING_DEPTH == 5
+    def test_max_naming_depth_is_seven(self):
+        """MAX_NAMING_DEPTH should be 7 for deep iterative decomposition support."""
+        assert MAX_NAMING_DEPTH == 7
 
     def test_depth_4_still_names(self):
         """At naming depth 4 (near limit), fragment naming still works."""
@@ -251,9 +251,16 @@ class TestRecursionDepth:
         assert result is not None
         assert result == "methane"
 
-    def test_depth_5_returns_none(self):
-        """At naming depth 5 (limit), name_fragment_recursively returns None."""
-        _fragment_guard.depth = 5
+    def test_depth_6_still_names(self):
+        """At naming depth 6 (one below limit), fragment naming still works."""
+        _fragment_guard.depth = 6
+        result = name_fragment_recursively("C")  # methane
+        assert result is not None
+        assert result == "methane"
+
+    def test_depth_7_returns_none(self):
+        """At naming depth 7 (limit), name_fragment_recursively returns None."""
+        _fragment_guard.depth = 7
         result = name_fragment_recursively("CCO")
         assert result is None
 

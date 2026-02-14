@@ -9,6 +9,7 @@ Tests all pure naming utility functions:
 - Multiplier prefix selection
 - Vowel elision
 - Suffix with locants formatting (PIN style)
+- Enclosing marks depth cycling (P-16.3.3)
 """
 
 import pytest
@@ -22,6 +23,8 @@ from orthonym.assembly.naming_utils import (
     get_multiplier_prefix,
     apply_vowel_elision,
     format_suffix_with_locants,
+    apply_enclosing_marks,
+    get_bracket_depth,
 )
 
 
@@ -453,3 +456,45 @@ class TestFormatSuffixWithLocants:
         """propan + empty + al with no locant -> propanal."""
         result = format_suffix_with_locants("propan", "", "al", [])
         assert result == "propanal"
+
+
+# ============================================================================
+# TestEnclosingMarksDepthCycling
+# ============================================================================
+
+@pytest.mark.unit
+class TestEnclosingMarksDepthCycling:
+    """Tests for IUPAC P-16.3.3 enclosing marks cycling through all 7 depths."""
+
+    @pytest.mark.parametrize("depth,expected", [
+        (0, "(x)"),
+        (1, "[x]"),
+        (2, "{x}"),
+        (3, "(x)"),
+        (4, "[x]"),
+        (5, "{x}"),
+        (6, "(x)"),
+    ])
+    def test_enclosing_marks_depth_0_through_6(self, depth, expected):
+        """Enclosing marks cycle () -> [] -> {} -> () at each depth level."""
+        assert apply_enclosing_marks("x", depth) == expected
+
+    def test_enclosing_marks_preserves_content(self):
+        """Content inside enclosing marks is preserved at all depth levels."""
+        content = "2-(methylamino)ethyl"
+        for depth in range(7):
+            result = apply_enclosing_marks(content, depth)
+            # Content must appear unchanged inside the marks
+            assert content in result
+            # Result is exactly open_mark + content + close_mark
+            assert result[1:-1] == content
+
+    @pytest.mark.parametrize("name,expected_depth", [
+        ("methyl", 0),
+        ("(2-methylpropyl)", 1),
+        ("[2-(methylamino)ethyl]", 2),
+        ("{complex}", 3),
+    ])
+    def test_bracket_depth_detects_all_types(self, name, expected_depth):
+        """get_bracket_depth correctly identifies nesting depth from bracket type."""
+        assert get_bracket_depth(name) == expected_depth

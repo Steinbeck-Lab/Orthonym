@@ -79,9 +79,9 @@ class TestDepthLimit:
     def teardown_method(self):
         _fragment_guard.depth = 0
 
-    def test_max_naming_depth_is_five(self):
-        """MAX_NAMING_DEPTH should be 5 (increased for decomposition engine)."""
-        assert MAX_NAMING_DEPTH == 5
+    def test_max_naming_depth_is_seven(self):
+        """MAX_NAMING_DEPTH should be 7 (increased for deep iterative decomposition)."""
+        assert MAX_NAMING_DEPTH == 7
 
     def test_depth_limit_returns_none(self):
         """At MAX_NAMING_DEPTH, name_fragment_recursively returns None immediately."""
@@ -96,8 +96,22 @@ class TestDepthLimit:
         assert result is None
         assert get_naming_depth() == 10  # Unchanged since we never entered
 
+    def test_depth_six_still_works(self):
+        """At depth 6 (one below limit of 7), naming should still succeed."""
+        _fragment_guard.depth = 6
+        result = name_fragment_recursively("C")  # methane -- simple, fast
+        assert result is not None
+        assert get_naming_depth() == 6  # Depth restored
+
+    def test_depth_seven_returns_none(self):
+        """At depth 7 (the limit), name_fragment_recursively returns None."""
+        _fragment_guard.depth = 7
+        result = name_fragment_recursively("CCO")
+        assert result is None  # At limit, returns None
+        assert get_naming_depth() == 7  # Unchanged since we never entered
+
     def test_depth_one_below_limit_still_works(self):
-        """At MAX_NAMING_DEPTH - 1, naming should still work."""
+        """At MAX_NAMING_DEPTH - 1 (depth 6), naming should still work."""
         _fragment_guard.depth = MAX_NAMING_DEPTH - 1
         result = name_fragment_recursively("C")  # methane
         assert result is not None
