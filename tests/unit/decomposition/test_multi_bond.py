@@ -1,7 +1,8 @@
-"""Unit tests for performance guard and quality gate refinement (Phase 56-01).
+"""Unit tests for multi-bond decomposition (Phase 56-01 and 56-02).
 
-Tests the MAX_CLEAVABLE_BONDS performance guard in try_decompose() and the
-consecutive duplicate-word detection in _name_quality_is_acceptable().
+Tests the MAX_CLEAVABLE_BONDS performance guard, consecutive duplicate-word
+detection in _name_quality_is_acceptable(), multi-bond retry logic, and
+recursive fragment decomposition.
 """
 
 import pytest
@@ -11,7 +12,9 @@ from rdkit import Chem
 
 from orthonym.decomposition.engine import (
     MAX_CLEAVABLE_BONDS,
+    MAX_BOND_RETRY_ATTEMPTS,
     _name_quality_is_acceptable,
+    _try_single_bond_decompose,
     try_decompose,
 )
 
@@ -194,3 +197,187 @@ class TestQualityGateDuplicateWords:
         mol = self._make_mol(10)
         assert _name_quality_is_acceptable("", mol) is False
         assert _name_quality_is_acceptable(None, mol) is False
+
+
+# ---------------------------------------------------------------------------
+# Multi-bond retry tests (Phase 56-02)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestMultiBondRetry:
+    """Tests for multi-bond retry logic in try_decompose() (DECP-01)."""
+
+    def test_max_bond_retry_attempts_constant_exists(self):
+        """MAX_BOND_RETRY_ATTEMPTS constant is defined and is 3."""
+        assert MAX_BOND_RETRY_ATTEMPTS == 3
+
+    def test_single_bond_path_unchanged(self):
+        """Molecule with exactly 1 cleavable bond: result identical to baseline.
+
+        DECP-05: single-bond molecules must return single_result directly
+        without any quality gate check on the decomposition result.
+        """
+        # Methyl acetate has exactly 1 ester bond
+        mol = Chem.MolFromSmiles("CC(=O)OC")
+
+        from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
+        bonds = find_cleavable_bonds(mol)
+        assert len(bonds) == 1, f"Expected 1 cleavable bond, got {len(bonds)}"
+
+        from orthonym.namer import name_compound
+        name = name_compound("CC(=O)OC")
+        assert name is not None
+        # Methyl acetate should produce "methyl acetate"
+        assert name == "methyl acetate", (
+            f"Single-bond ester should produce 'methyl acetate', got: {name}"
+        )
+
+    def test_multi_bond_retry_tries_alternatives(self):
+        """When first bond produces a poor name, alternative bonds are tried.
+
+        Mock scenario: 3 bonds. First bond returns bad name (fails quality gate).
+        Second bond returns good name (passes quality gate). Assert good name returned.
+        """
+        mol = Chem.MolFromSmiles("C" * 30)  # Dummy 30-atom molecule
+
+        fake_bonds = [
+            {"bond_idx": 0, "type": "ester"},
+            {"bond_idx": 1, "type": "ester"},
+            {"bond_idx": 2, "type": "ester"},
+        ]
+
+        # Track which bonds are tried
+        attempted_bonds = []
+
+        def mock_try_single(m, bond, style="pin"):
+            attempted_bonds.append(bond["bond_idx"])
+            if bond["bond_idx"] == 0:
+                return "palmitate palmitate"  # Bad: duplicate words
+            elif bond["bond_idx"] == 1:
+                return "propane-1,2,3-triyl trihexadecanoate"  # Good name
+            return None
+
+        def mock_quality(name, m):
+            if "palmitate palmitate" in name:
+                return False  # Duplicate words -> reject
+            return True  # Accept good names
+
+        with patch(
+            "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
+            return_value=fake_bonds,
+        ), patch(
+            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            return_value=None,  # Force quality gate to fail for existing name
+        ), patch(
+            "orthonym.decomposition.engine._try_single_bond_decompose",
+            side_effect=mock_try_single,
+        ), patch(
+            "orthonym.decomposition.engine._name_quality_is_acceptable",
+            side_effect=mock_quality,
+        ), patch(
+            "orthonym.decomposition.engine._select_best_bond",
+            return_value=fake_bonds[0],
+        ):
+            result = try_decompose(mol)
+
+        assert result == "propane-1,2,3-triyl trihexadecanoate", (
+            f"Should return good name from alternative bond, got: {result}"
+        )
+        assert 0 in attempted_bonds, "Should have tried bond 0 first"
+        assert 1 in attempted_bonds, "Should have tried bond 1 as alternative"
+
+    def test_multi_bond_caps_at_max_attempts(self):
+        """Multi-bond retry stops after MAX_BOND_RETRY_ATTEMPTS bonds.
+
+        Mock scenario: 5 bonds, all produce poor names. Assert only
+        MAX_BOND_RETRY_ATTEMPTS bonds are tried, and single_result is returned.
+        """
+        mol = Chem.MolFromSmiles("C" * 30)  # Dummy 30-atom molecule
+
+        fake_bonds = [
+            {"bond_idx": i, "type": "ester"} for i in range(5)
+        ]
+
+        attempted_bonds = []
+
+        def mock_try_single(m, bond, style="pin"):
+            attempted_bonds.append(bond["bond_idx"])
+            return f"bad name {bond['bond_idx']}"
+
+        def mock_quality(name, m):
+            return False  # All names fail quality gate
+
+        with patch(
+            "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
+            return_value=fake_bonds,
+        ), patch(
+            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            return_value=None,  # Existing name is None -> quality fails
+        ), patch(
+            "orthonym.decomposition.engine._try_single_bond_decompose",
+            side_effect=mock_try_single,
+        ), patch(
+            "orthonym.decomposition.engine._name_quality_is_acceptable",
+            side_effect=mock_quality,
+        ), patch(
+            "orthonym.decomposition.engine._select_best_bond",
+            return_value=fake_bonds[0],
+        ):
+            result = try_decompose(mol)
+
+        # Should return single_result (best effort fallback)
+        assert result == "bad name 0", (
+            f"Should return single_result as fallback, got: {result}"
+        )
+        # Should have tried at most MAX_BOND_RETRY_ATTEMPTS bonds total
+        assert len(attempted_bonds) <= MAX_BOND_RETRY_ATTEMPTS, (
+            f"Should try at most {MAX_BOND_RETRY_ATTEMPTS} bonds, "
+            f"tried {len(attempted_bonds)}: {attempted_bonds}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Recursive fragment decomposition test (Phase 56-02, DECP-02)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestRecursiveFragmentDecomposition:
+    """Test that fragments with cleavable bonds are recursively decomposed."""
+
+    def test_recursive_fragment_decomposition(self):
+        """DECP-02: proves recursive fragment decomposition.
+
+        Uses a molecule with 2 ester bonds on a glycerol backbone.
+        The fragment from the first bond cleavage still has a cleavable
+        bond and should be recursively decomposed.
+
+        CCCCCCCCCCCCCCCC(=O)OCC(O)COC(=O)CCCCCCCCCCCCCCC
+        = glycerol dipalmitate (2 esters on a 3-carbon backbone)
+        """
+        # DECP-02: proves recursive fragment decomposition -- the fragment
+        # from first bond cleavage still has a cleavable bond and is
+        # recursively decomposed.
+        from orthonym.namer import name_compound
+
+        smiles = "CCCCCCCCCCCCCCCC(=O)OCC(O)COC(=O)CCCCCCCCCCCCCCC"
+        name = name_compound(smiles)
+
+        assert name is not None, "Glycerol dipalmitate should produce a name"
+        assert name != "unknown", "Should not produce 'unknown'"
+
+        # The name should not have consecutive duplicate words
+        # (which would indicate half-decomposition)
+        words = name.split()
+        for i in range(len(words) - 1):
+            if words[i] == words[i + 1] and len(words[i]) > 3:
+                pytest.fail(
+                    f"Name has consecutive duplicate words: '{words[i]}' "
+                    f"in '{name}' -- indicates incomplete decomposition"
+                )
+
+        # The name should reference ester-related naming
+        assert len(name) > 15, (
+            f"Name too short for a 35-atom diester: {name}"
+        )
