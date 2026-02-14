@@ -788,8 +788,10 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 except (ValueError, KeyError):
                     pass
             # total_c == 0: genuinely no carbon in substituent (O-O/O-N cases
-            # normally handled by hydroperoxy/nitrooxy above)
-            return {'name': 'oxy', 'atoms': sub_atoms}
+            # normally handled by hydroperoxy/nitrooxy above).
+            # Return None rather than bare 'oxy' -- OPSIN cannot parse standalone
+            # 'oxy' and the caller skips None substituents gracefully.
+            return None
 
         # Fallback for non-C neighbors (e.g., O-N in nitrate esters, O-S, O-P)
         sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
@@ -804,8 +806,9 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                 if len(o_neighbors_of_n) >= 2:
                     return {'name': '(nitrooxy)', 'atoms': sub_atoms, 'is_complex': True}
                 # O-N without multiple O on N: rare N-oxide-like linkage.
-                # No standard IUPAC prefix; keep 'oxy' as fallback.
-                return {'name': 'oxy', 'atoms': sub_atoms}
+                # No standard IUPAC prefix; return None to avoid bare 'oxy'
+                # which OPSIN cannot parse. Caller skips None gracefully.
+                return None
 
             # O-S neighbors: sulfanyloxy / sulfinyloxy / sulfonyloxy
             if nbr_symbol == 'S':
@@ -830,9 +833,9 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
             if nbr_symbol == 'P':
                 return {'name': 'phosphonooxy', 'atoms': sub_atoms}
 
-            # Other non-C neighbors: keep bare 'oxy' as last resort
-            # (genuinely unresolvable non-C linkages)
-            return {'name': 'oxy', 'atoms': sub_atoms}
+            # Other non-C neighbors: return None to avoid bare 'oxy'
+            # which OPSIN cannot parse. Caller skips None gracefully.
+            return None
 
     return None
 
