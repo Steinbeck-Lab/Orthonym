@@ -521,15 +521,20 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == 'thioether':
         ring_type = getattr(features, 'ring_type', None)
         if ring_type != 'heterocyclic':
-            from ..rules.sulfur import name_sulfide
-            # Find sulfur atom index
-            matches = features.functional_groups.get('thioether', [])
-            if matches:
-                # SMARTS match gives (S, C, C) - sulfur is first
-                sulfur_idx = matches[0][0]
-                name = name_sulfide(features.mol, sulfur_idx)
-                if name:
-                    return name
+            # Guard: skip known fused heterocycles (phenothiazine, thianthrene)
+            # These contain S atoms that match thioether SMARTS but should use
+            # their retained fused heterocycle names, not functional class sulfide naming.
+            from ..data.fused_heterocycles import match_fused_heterocycle_core
+            if match_fused_heterocycle_core(features.mol) is None:
+                from ..rules.sulfur import name_sulfide
+                # Find sulfur atom index
+                matches = features.functional_groups.get('thioether', [])
+                if matches:
+                    # SMARTS match gives (S, C, C) - sulfur is first
+                    sulfur_idx = matches[0][0]
+                    name = name_sulfide(features.mol, sulfur_idx)
+                    if name:
+                        return name
 
     # Handle phosphorus functional class compounds (phosphine oxide, phosphates, phosphines)
     # These use functional class or substitutive naming, not suffix-based
@@ -1851,6 +1856,29 @@ def _classify_complex_ring(mol) -> str:
     # Check bicyclo (2-ring bridged)
     if is_bicyclo_system(mol):
         return 'bicyclo'
+
+    # Check known fused heterocycles BEFORE polycyclic-bridged check.
+    # Prevents tricyclic fused heterocycles (xanthene, phenothiazine,
+    # phenoxazine, thianthrene) from being misclassified as VB polycyclics.
+    # These have non-aromatic ring atoms (O, S, N in central ring) which
+    # causes is_polycyclic_system() to return True, but they are ortho-fused
+    # systems with IUPAC retained names.
+    # Guard: only divert if the molecule's ring system IS the matched core
+    # (ring_atoms <= parent_atoms + 2), not a larger polycyclic containing it.
+    from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
+    core_match = match_fused_heterocycle_core(mol)
+    if core_match is not None:
+        core_smiles = core_match[2]
+        core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
+        parent_atoms = core_data.get('parent_atoms', 0)
+        ri = mol.GetRingInfo()
+        ring_atoms = set()
+        for r in ri.AtomRings():
+            ring_atoms.update(r)
+        if len(ring_atoms) <= parent_atoms + 2:
+            fused_type = classify_fused_system(mol)
+            if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+                return fused_type
 
     # Check polycyclic-bridged (tricyclo+ bridged systems) BEFORE fused
     # This is critical: is_polycyclic_system correctly distinguishes
