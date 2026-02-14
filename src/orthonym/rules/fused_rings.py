@@ -530,6 +530,13 @@ def _identify_fused_substituent(
                         except (ValueError, KeyError):
                             alkyl_name = None
                     if alkyl_name:
+                        # OPSIN treats "anilino" as a simple substituent
+                        if alkyl_name == 'phenyl':
+                            return {
+                                'name': 'anilino',
+                                'type': 'functional',
+                                'atoms': [start_idx] + alkyl_atoms
+                            }
                         return {
                             'name': f'{alkyl_name}amino',
                             'type': 'functional',

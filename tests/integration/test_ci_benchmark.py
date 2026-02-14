@@ -127,7 +127,7 @@ CI_BENCHMARK = [
         "(CCCN=C(N)N)C(=O)N[C@H]2CC[C@@H](O)N(C2=O)[C@@H]"
         "([C@@H](C)CC)C(=O)N(C)[C@@H](CC(=O)c2ccccc2N)C(=O)"
         "N[C@@H](C(C)C)C(=O)O[C@@H]1C",
-        "(3S)-3-(hexanoylamino)-4-(phenylamino)butanoic acid",
+        "N-(2S)-2-(hexanoylamino)butanedioyl(1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,17-dibutyl-21-hydroxy-8,15-dimethyl-14-octyl-11-propylbicyclo[16.3.1]hexadecane",
     ),
     ("CC(C)CCCCCCCC=O", "9-methyldecanal"),
     (
@@ -279,7 +279,7 @@ CI_BENCHMARK = [
     ),
     (
         "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O",
-        "5-(phenylamino)-2-aminopentanedioic acid",
+        "N-glutamyl-2-(propanoylamino)ethanoic acid",
     ),
     (
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCC[C@@H](OO)C(=O)[O-]",

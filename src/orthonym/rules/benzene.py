@@ -555,6 +555,13 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 except (ValueError, KeyError):
                     alkyl_name = None
             if alkyl_name:
+                # OPSIN treats "anilino" as a simple substituent
+                if alkyl_name == 'phenyl':
+                    return {
+                        'name': 'anilino',
+                        'atoms': [n_idx] + alkyl_atoms,
+                        'is_complex': False,
+                    }
                 return {
                     'name': f'(N-{alkyl_name}amino)',
                     'atoms': [n_idx] + alkyl_atoms,
