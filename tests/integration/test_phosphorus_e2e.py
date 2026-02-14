@@ -159,3 +159,74 @@ class TestPhosphorusRequirements:
     def test_phosph_06_methyl_phosphate(self):
         """PHOSPH-06: name_compound('COP(=O)(O)O') returns 'methyl phosphate'"""
         assert name_compound("COP(=O)(O)O") == "methyl phosphate"
+
+
+class TestPhosphanylPrefix:
+    """E2E tests for phosphanyl prefix naming (PHOS-01, PHOS-02)."""
+
+    def test_diphenylphosphanyl_on_benzene(self):
+        """Triphenylphosphane is a retained name (PHOS-01)."""
+        result = name_compound("c1ccc(P(c2ccccc2)c3ccccc3)cc1")
+        assert result == "triphenylphosphane"
+
+    def test_diphenylphosphanyl_on_substituted_ring(self):
+        """PPh2 on methylbenzene produces diphenylphosphanyl prefix (PHOS-01)."""
+        result = name_compound("Cc1ccc(P(c2ccccc2)c3ccccc3)cc1")
+        assert "diphenylphosphanyl" in result
+
+    def test_phenyl_not_counted_as_alkyl(self):
+        """Phenyl groups on P should not be counted as hexyl (PHOS-02 regression)."""
+        result = name_compound("c1ccc(P(c2ccccc2)c3ccccc3)cc1")
+        assert "hexyl" not in result
+
+
+class TestBisPhosphanyl:
+    """E2E tests for bis/tris multiplied phosphanyl groups (PHOS-03)."""
+
+    def test_bis_diphenylphosphanyl_benzene(self):
+        """Two identical PPh2 groups on benzene use bis() multiplier (PHOS-03)."""
+        result = name_compound(
+            "c1ccc(P(c2ccccc2)c3ccccc3)c(P(c4ccccc4)c5ccccc5)c1"
+        )
+        assert "bis(diphenylphosphanyl)" in result
+
+
+class TestPhosphorusOnComplexSubstrate:
+    """E2E tests for phosphorus on complex substrates (PHOS-04, PHOS-05)."""
+
+    def test_phosphonate_still_correct(self):
+        """Phosphonic acid naming unaffected (PHOS-04)."""
+        assert name_compound("CP(=O)(O)O") == "methanephosphonic acid"
+
+    def test_phenylphosphonic_acid(self):
+        """Phenylphosphonic acid (PHOS-04)."""
+        assert name_compound("c1ccccc1P(=O)(O)O") == "phenylphosphonic acid"
+
+    def test_diphenylphosphinic_acid_e2e(self):
+        """Diphenylphosphinic acid via e2e (PHOS-04)."""
+        assert name_compound("O=P(O)(c1ccccc1)c2ccccc2") == "diphenylphosphinic acid"
+
+    def test_phosphate_ester_not_disrupted(self):
+        """Phosphate ester naming not disrupted (PHOS-05 routing safety)."""
+        assert name_compound("COP(=O)(O)O") == "methyl phosphate"
+
+    def test_phosphine_oxide_not_disrupted(self):
+        """Phosphine oxide naming not disrupted (PHOS-05 routing safety)."""
+        assert name_compound("CP(C)(C)=O") == "trimethylphosphane oxide"
+
+
+class TestCanaryRegression:
+    """Verify zero regression on canary compounds for Phase 52."""
+
+    def test_canary_no_regression(self):
+        """All 88 canary compounds should still pass after phosphanyl changes."""
+        import subprocess
+        result = subprocess.run(
+            ["python3", "-m", "pytest",
+             "tests/integration/test_canary_rt75.py", "-x", "-q"],
+            capture_output=True, text=True, timeout=120,
+            cwd="/home/kohulan/OpenSTOUT/Orthonym"
+        )
+        assert result.returncode == 0, (
+            f"Canary regression detected:\n{result.stdout}\n{result.stderr}"
+        )
