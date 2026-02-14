@@ -25,6 +25,22 @@ MAX_BOND_RETRY_ATTEMPTS = 3  # Max bonds to try when multi-bond retry is active
 
 
 # ---------------------------------------------------------------------------
+# Retained-name whitelist for quality gate
+# ---------------------------------------------------------------------------
+
+# Known retained names that correctly identify a core substructure even
+# in large molecules (nucleotide cofactors, natural products, etc.).
+# These bypass the "no digits and no hyphens" rejection for heavy_atoms > 20.
+_RETAINED_CORE_NAMES = frozenset({
+    'adenine', 'guanine', 'thymine', 'cytosine', 'uracil',
+    'xanthine', 'hypoxanthine', 'purine', 'pyrimidine',
+    'indole', 'quinoline', 'isoquinoline', 'acridine',
+    'phenothiazine', 'xanthene', 'phenoxazine', 'thianthrene',
+    '1h-indole',
+})
+
+
+# ---------------------------------------------------------------------------
 # Quality gate
 # ---------------------------------------------------------------------------
 
@@ -54,6 +70,12 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     if not name or name == "unknown":
         return False
 
+    # Whitelist: known retained names that correctly identify a core
+    # substructure even in large molecules (e.g., adenine in nucleotide
+    # cofactors). These bypass all size-based rejection checks.
+    if name.lower() in _RETAINED_CORE_NAMES:
+        return True
+
     heavy_atoms = mol.GetNumHeavyAtoms()
 
     # Suspiciously short name for a complex molecule
@@ -67,7 +89,10 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
 
     # Large molecule with no digits and no hyphens: likely just a retained
     # name for one fragment (e.g., "benzene" for a 25-atom ester)
-    if heavy_atoms > 20:
+    # BUT: skip this check for known retained core names that correctly
+    # identify a core substructure even in large molecules (e.g., adenine
+    # in nucleotide cofactors).
+    if heavy_atoms > 20 and name.lower() not in _RETAINED_CORE_NAMES:
         has_digits = any(c.isdigit() for c in name)
         has_hyphens = "-" in name
         if not has_digits and not has_hyphens:

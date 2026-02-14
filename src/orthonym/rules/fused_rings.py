@@ -968,7 +968,10 @@ def _assemble_fused_heterocycle_name(
         other_groups[name].append(locant)
 
     for name, locants in other_groups.items():
-        locants.sort()
+        # Ensure all locants are strings for consistent sorting
+        # (some may be int, others str like '3a')
+        locants = [str(l) for l in locants]
+        locants.sort(key=lambda x: (len(x), x))
         count = len(locants)
         prefix = _format_c_prefix(name, locants, count)
         prefix_parts.append((prefix, name))

@@ -180,17 +180,24 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         else:
             return "carboxy"
 
-    # ---- Locanted alcohol: -an-N-ol or -N-ol ----
+    # ---- Locanted alcohol: -N-ol ----
+    # Matches saturated (-an-N-ol), unsaturated (-en-N-ol, -yn-N-ol),
+    # and bare (-N-ol) patterns.
     # e.g., "propan-2-ol" -> "2-hydroxypropyl"
-    m_ol = re.search(r'an?-(\d+)-ol$', name)
+    # e.g., "3-methylbut-2-en-1-ol" -> "1-hydroxy-3-methylbut-2-en-1-yl"
+    m_ol = re.search(r'-(\d+)-ol$', name)
     if m_ol:
         locant = m_ol.group(1)
-        # Get the stem (everything before the suffix match)
-        stem_end = m_ol.start()
-        stem = name[:stem_end]
-        # Remove trailing hyphen if present
-        stem = stem.rstrip('-')
-        return f"{locant}-hydroxy{stem}yl"
+        # Get the stem (everything before "-N-ol")
+        stem = name[:m_ol.start()]
+        # Convert saturated suffix to yl: -an -> -yl (propan -> propyl)
+        # Keep unsaturation: -en stays as -en, -yn stays as -yn
+        if stem.endswith('an'):
+            stem = stem[:-2]  # propan -> prop
+        # Insert hyphen between hydroxy and stem when stem starts with a
+        # digit (e.g., "3-methylbut-2-en") to avoid "hydroxy3-methylbut"
+        sep = "-" if stem and stem[0].isdigit() else ""
+        return f"{locant}-hydroxy{sep}{stem}yl"
 
     # ---- Unlocanted alcohol: ends in -ol (e.g., "ethanol", "methanol") ----
     if name.endswith('ol') and not name.endswith('diol'):

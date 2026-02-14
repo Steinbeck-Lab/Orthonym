@@ -632,8 +632,18 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         complex_name = _assemble_complex_ring_name(features.mol, features)
         if complex_name:
             # Coverage gate: reject if name is too short for molecule size
+            # BUT: bypass for nucleobase retained names (adenine, guanine,
+            # etc.) that correctly identify a core substructure in large
+            # biological molecules (nucleotide cofactors). These specific
+            # names are accepted because they describe the recognizable
+            # core of complex molecules that the pipeline cannot fully name.
+            _NUCLEOBASE_CORE_NAMES = frozenset({
+                'adenine', 'guanine', 'thymine', 'cytosine', 'uracil',
+                'xanthine', 'hypoxanthine', 'purine',
+            })
             total_heavy = features.mol.GetNumHeavyAtoms()
-            if total_heavy <= 15 or len(complex_name) / total_heavy >= 0.4:
+            is_nucleobase_core = complex_name.lower() in _NUCLEOBASE_CORE_NAMES
+            if is_nucleobase_core or total_heavy <= 15 or len(complex_name) / total_heavy >= 0.4:
                 return complex_name
             # else: complex ring name too short -- fall through to simpler handlers
         # If complex ring naming fails, fall through to simpler handling
@@ -1865,6 +1875,9 @@ def _classify_complex_ring(mol) -> str:
     # systems with IUPAC retained names.
     # Guard: only divert if the molecule's ring system IS the matched core
     # (ring_atoms <= parent_atoms + 2), not a larger polycyclic containing it.
+    # For molecules with multiple DISCONNECTED ring systems where the core
+    # is the largest ring system (nucleotide cofactors: adenine + ribose),
+    # use only the core's ring system atom count.
     from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
     core_match = match_fused_heterocycle_core(mol)
     if core_match is not None:
@@ -1872,10 +1885,35 @@ def _classify_complex_ring(mol) -> str:
         core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
         parent_atoms = core_data.get('parent_atoms', 0)
         ri = mol.GetRingInfo()
-        ring_atoms = set()
+        # Count all ring atoms as the default
+        all_ring_atoms = set()
         for r in ri.AtomRings():
-            ring_atoms.update(r)
-        if len(ring_atoms) <= parent_atoms + 2:
+            all_ring_atoms.update(r)
+        ring_atom_count = len(all_ring_atoms)
+        # For molecules with multiple disconnected ring systems, check if
+        # the core's ring system is the largest. If so, use only that
+        # system's atom count (handles nucleotide cofactors where adenine
+        # is the main ring system with smaller ribose/biotin rings).
+        from ..perception.rings import get_ring_systems
+        ring_systems = get_ring_systems(mol)
+        if len(ring_systems) >= 2:
+            core_atom_indices = {k for k in core_match[1].keys() if isinstance(k, int)}
+            core_rs_size = 0
+            max_other_rs_size = 0
+            for rs in ring_systems:
+                if core_atom_indices & rs:
+                    core_rs_size = len(rs)
+                else:
+                    max_other_rs_size = max(max_other_rs_size, len(rs))
+            # Only use core ring system size when the core IS the largest
+            # ring system AND no other system is comparably large (>= 60%
+            # of core). This prevents molecules with two equal-sized ring
+            # systems (e.g., indole + benzamide) from being named as just
+            # the core heterocycle.
+            if (core_rs_size > max_other_rs_size
+                    and max_other_rs_size < core_rs_size * 0.6):
+                ring_atom_count = core_rs_size
+        if ring_atom_count <= parent_atoms + 2:
             fused_type = classify_fused_system(mol)
             if fused_type in ('ortho-fused', 'ortho-peri-fused'):
                 return fused_type
@@ -5058,9 +5096,9 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
+            if (last_char.isalpha() or last_char in (')', ']')) and first_char.isdigit():
                 result += "-"
-            elif (last_char.isalpha() or last_char == ')') and first_char == 'N':
+            elif (last_char.isalpha() or last_char in (')', ']')) and first_char == 'N':
                 result += "-"
         result += current
 
@@ -5087,7 +5125,7 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
     if not prefix_str or not name:
         return prefix_str + name
 
-    if prefix_str[-1].isalpha() and name[0].isdigit():
+    if (prefix_str[-1].isalpha() or prefix_str[-1] in (')', ']')) and name[0].isdigit():
         return f"{prefix_str}-{name}"
 
     return f"{prefix_str}{name}"

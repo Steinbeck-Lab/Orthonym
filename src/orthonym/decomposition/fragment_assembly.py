@@ -49,9 +49,9 @@ def _join_components(left: str, right: str) -> str:
     last = left[-1]
     first = right[0]
 
-    if (last.isalpha() or last == ')') and first.isdigit():
+    if (last.isalpha() or last in (')', ']')) and first.isdigit():
         return f"{left}-{right}"
-    if (last.isalpha() or last == ')') and first.isupper():
+    if (last.isalpha() or last in (')', ']')) and first.isupper():
         return f"{left}-{right}"
 
     return f"{left}{right}"

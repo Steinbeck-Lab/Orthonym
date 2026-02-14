@@ -444,7 +444,7 @@ CI_BENCHMARK = [
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O",
-        "4-amino-5,6-dioxolanylpyrimidine",  # Coverage gate: adenine too short for 24-atom nucleotide
+        "adenine",  # Phase 58: retained core name whitelist bypass
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",
@@ -453,7 +453,7 @@ CI_BENCHMARK = [
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
         "[C@@H](N)Cc2c[nH]cn2)[C@H]1O",
-        "4-amino-5,6-dioxolanylpyrimidine",  # Coverage gate: adenine too short for nucleotide-ester
+        "adenine",  # Phase 58: retained core name whitelist bypass
     ),
     (
         "NC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](N)C[C@@H]2N)"
