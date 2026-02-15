@@ -118,10 +118,16 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             # Count how many amide-related patterns the name captures.
             # Each named amide bond should produce "amino", "amido",
             # "amide", "acetamid", "formamid", or similar.
-            amide_refs = len(re.findall(
-                r'amino|amido|amide|acetamid|formamid',
+            # Multiplier prefixes (di-, tri-, tetra-) before amide tokens
+            # indicate multiple groups, so count them accordingly.
+            _MULT_MAP = {'di': 2, 'tri': 3, 'tetra': 4, 'penta': 5}
+            amide_refs = 0
+            for m in re.finditer(
+                r'(di|tri|tetra|penta)?(amino|amido|amide|acetamid|formamid)',
                 name, re.IGNORECASE,
-            ))
+            ):
+                prefix = m.group(1)
+                amide_refs += _MULT_MAP.get(prefix.lower(), 1) if prefix else 1
             # If the name captures fewer amide references than distinct
             # amide carbonyls, the name is partial -- reject it
             if amide_refs < distinct_amide_carbonyls:
@@ -136,6 +142,21 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     for i in range(len(words) - 1):
         if words[i] == words[i + 1] and len(words[i]) > 3:
             return False
+
+    # Detect garbled decomposition names with duplicated parent-like tokens.
+    # E.g., "(ethanamide)-1-(...tetrahydropyranyl)ethanamide" has "ethanamide"
+    # twice, indicating the assembly merged fragments incorrectly.
+    # Substituent-like tokens (ending in -oxy, -yl, -amino, -ido) can
+    # legitimately repeat (di-glucopyranosyloxy, dimethyl, etc.).
+    _PARENT_SUFFIXES = ('amide', 'amine', 'anol', 'anone', 'anediol',
+                        'anedione', 'anoic', 'anoate')
+    _dup_words = re.findall(r'[a-z]{6,}', name.lower())
+    if _dup_words:
+        from collections import Counter as _DupCtr
+        _dup_counts = _DupCtr(_dup_words)
+        for _dw, _dcnt in _dup_counts.items():
+            if _dcnt >= 2 and any(_dw.endswith(sfx) for sfx in _PARENT_SUFFIXES):
+                return False
 
     return True
 
@@ -169,6 +190,20 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
     for open_ch, close_ch in [('(', ')'), ('[', ']'), ('{', '}')]:
         if decomp_name.count(open_ch) != decomp_name.count(close_ch):
             return True
+
+    # Duplicate parent-like tokens: if the decomposed name has the same
+    # parent suffix name appearing more than once (e.g., "ethanamide...ethanamide"),
+    # the assembly is likely garbled. Only flag parent-like tokens (amide, amine, etc.),
+    # not substituent prefixes that can legitimately repeat.
+    _PARENT_SFXS = ('amide', 'amine', 'anol', 'anone', 'anediol',
+                    'anedione', 'anoic', 'anoate')
+    _dwords = re.findall(r'[a-z]{6,}', decomp_name.lower())
+    if _dwords:
+        from collections import Counter as _DCtr
+        _dcounts = _DCtr(_dwords)
+        for _dw, _dcnt in _dcounts.items():
+            if _dcnt >= 2 and any(_dw.endswith(sfx) for sfx in _PARENT_SFXS):
+                return True
 
     return False
 

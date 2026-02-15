@@ -3897,10 +3897,42 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                             enum_name = f"({enum_name})"
                         substituent_groups[enum_name].append(position)
                 else:
-                    logger.warning(
-                        "DROP-04 substituent_skip: reason=ring_heteroatom_branch position=%d",
-                        position,
-                    )
+                    # Ring+heteroatom branch: try recursive naming
+                    # Guard: only for moderately-sized substituents (<=25 atoms).
+                    if len(sub_atoms) <= 25:
+                        from .naming_utils import needs_brackets
+                        # Find attachment point: substituent atom bonded to parent chain
+                        attach_idx = sub_atoms[0]
+                        parent_set = set(features.principal_chain or [])
+                        for idx in sub_atoms:
+                            atom_obj = mol.GetAtomWithIdx(idx)
+                            for nbr in atom_obj.GetNeighbors():
+                                if nbr.GetIdx() in parent_set:
+                                    attach_idx = idx
+                                    break
+                        ring_het_name = name_substituent_fragment(
+                            mol, sub_atoms, attach_idx, features.principal_chain or []
+                        )
+                        # Validate: reject if fragment naming linearized a ring
+                        if ring_het_name and not any(tok in ring_het_name.lower() for tok in
+                                ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
+                                 'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
+                                 'oxan', 'oxol', 'azetidin', 'aziridin')):
+                            ring_het_name = None
+                        if ring_het_name:
+                            if needs_brackets(ring_het_name):
+                                ring_het_name = f"({ring_het_name})"
+                            substituent_groups[ring_het_name].append(position)
+                        else:
+                            logger.warning(
+                                "DROP-04 substituent_skip: reason=ring_heteroatom_branch_still_unnameable position=%d",
+                                position,
+                            )
+                    else:
+                        logger.warning(
+                            "DROP-04 substituent_skip: reason=ring_heteroatom_branch_too_large position=%d atoms=%d",
+                            position, len(sub_atoms),
+                        )
                 continue
 
             # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)
@@ -4373,9 +4405,29 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                     if all_arom and all_c:
                         return "anilino"
-            # Non-phenyl ring: skip (complex, would need recursive naming)
+            # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
+            # Guard: only for moderately-sized substituents (<=25 atoms).
+            if len(sub_atoms) <= 25:
+                from .substituent_naming import name_substituent_fragment
+                from .naming_utils import needs_brackets
+                sub_name = name_substituent_fragment(
+                    mol, list(sub_set), attach_atom, list(chain_set)
+                )
+                # Validate: reject if fragment naming linearized a ring
+                # (produces long-chain names like "nonyl" for ring fragments).
+                # The name should contain "cyclo" or ring-system tokens.
+                if sub_name and not any(tok in sub_name.lower() for tok in
+                        ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
+                         'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
+                         'oxan', 'oxol', 'azetidin', 'aziridin')):
+                    # Likely linearized a ring -- reject
+                    sub_name = None
+                if sub_name:
+                    if needs_brackets(sub_name):
+                        sub_name = f"({sub_name})"
+                    return sub_name
             logger.warning(
-                "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring",
+                "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
             )
             return None
 
@@ -4408,10 +4460,28 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
             ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
         )
         if sub_has_ring:
+            # Ring-containing C-branch: try recursive naming
+            # Guard: only for moderately-sized substituents (<=25 atoms).
+            if len(sub_atoms) <= 25:
+                from .substituent_naming import name_substituent_fragment
+                from .naming_utils import needs_brackets
+                sub_name = name_substituent_fragment(
+                    mol, list(sub_set), attach_atom, list(chain_set)
+                )
+                # Validate: reject if fragment naming linearized a ring
+                if sub_name and not any(tok in sub_name.lower() for tok in
+                        ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
+                         'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
+                         'oxan', 'oxol', 'azetidin', 'aziridin')):
+                    sub_name = None
+                if sub_name:
+                    if needs_brackets(sub_name):
+                        sub_name = f"({sub_name})"
+                    return sub_name
             logger.warning(
-                "DROP-19 substituent_skip: reason=c_branch_ring_sub",
+                "DROP-19 substituent_skip: reason=c_branch_ring_sub_still_unnameable",
             )
-            return None  # Complex ring substituent - needs specialized naming
+            return None
 
         # Count carbons via C-C bonds only (don't traverse through heteroatoms)
         total_carbons = _count_carbon_chain(mol, attach_atom, chain_set)

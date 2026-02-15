@@ -784,16 +784,25 @@ def _generate_alkyl_prefixes_for_polyfunctional(
 
     for position, sub_list in features.substituents.items():
         for sub_atoms in sub_list:
-            # Skip substituents whose carbon atoms are entirely within ring atoms
-            # (these are handled by _generate_ring_substituent_prefixes).
-            # Substituents that extend beyond the ring (large branches containing
-            # a ring) should NOT be skipped -- only the ring-only substituents.
+            # Skip substituents whose ring atoms are handled by
+            # _generate_ring_substituent_prefixes (ring + its own substituents).
+            # A substituent is a "ring substituent" if its attachment atom
+            # (the atom bonded to the principal chain) is IN the ring.
+            # Substituents that contain rings deeper in the branch (e.g.,
+            # benzoylamino where N attaches to chain) are NOT skipped.
             if ring_atoms_to_skip:
-                sub_carbons = {
-                    idx for idx in sub_atoms
-                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                }
-                if sub_carbons and sub_carbons <= ring_atoms_to_skip:
+                _chain_set_local = set(features.principal_chain) if features.principal_chain else set()
+                _attach_in_ring = False
+                for _si in sub_atoms:
+                    if _si in ring_atoms_to_skip:
+                        _sa = mol.GetAtomWithIdx(_si)
+                        for _nb in _sa.GetNeighbors():
+                            if _nb.GetIdx() in _chain_set_local:
+                                _attach_in_ring = True
+                                break
+                    if _attach_in_ring:
+                        break
+                if _attach_in_ring:
                     continue
 
             # Count only carbon atoms
