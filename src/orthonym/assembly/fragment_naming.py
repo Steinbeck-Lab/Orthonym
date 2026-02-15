@@ -24,8 +24,11 @@ Usage:
         ...
 """
 
+import logging
 import threading as _threading
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 _fragment_guard = _threading.local()
 
@@ -63,6 +66,10 @@ def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) ->
     """
     depth = get_naming_depth()
     if depth >= max_depth:
+        logger.warning(
+            "DROP-13 substituent_skip: reason=depth_limit_reached depth=%d max=%d smiles=%s",
+            depth, max_depth, smiles[:60],
+        )
         return None  # Graceful fallback at depth limit
 
     _fragment_guard.depth = depth + 1
@@ -70,7 +77,11 @@ def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) ->
         from ..namer import name_compound
         result = name_compound(smiles)
         return result if result else None
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "DROP-14 substituent_skip: reason=fragment_naming_exception depth=%d smiles=%s error=%s",
+            depth, smiles[:60], e,
+        )
         return None
     finally:
         _fragment_guard.depth = depth  # Restore previous depth

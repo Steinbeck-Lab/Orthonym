@@ -126,7 +126,11 @@ def _extract_fragment_smiles(
             return None
 
         return frag_smi
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "DROP-15 substituent_skip: reason=extract_exception atom_count=%d error=%s",
+            len(sub_atoms), e,
+        )
         return None
 
 
@@ -543,6 +547,10 @@ def name_substituent_fragment(
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):
                 pass
+        logger.warning(
+            "DROP-11 substituent_skip: reason=smiles_extraction_failure atom_count=%d",
+            len(sub_atoms),
+        )
         return None
 
     # Step 4: Recursive naming via name_fragment_recursively()
@@ -558,6 +566,10 @@ def name_substituent_fragment(
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):
                 pass
+        logger.warning(
+            "DROP-12 substituent_skip: reason=recursion_depth_fallback frag_smiles=%s",
+            frag_smiles[:60],
+        )
         return None
 
     # Step 5: Convert parent name to prefix form

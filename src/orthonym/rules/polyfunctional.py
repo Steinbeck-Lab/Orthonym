@@ -9,8 +9,11 @@ Handles naming of compounds with multiple functional groups:
 Based on IUPAC 2013 Blue Book P-41 to P-43.
 """
 
+import logging
 from collections import defaultdict
 from typing import Optional, List, Dict, Tuple, Any, Set
+
+logger = logging.getLogger(__name__)
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
@@ -595,6 +598,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             fg_name, mol, matches[0], principal_chain
         )
         if not prefix_form:
+            logger.warning(
+                "DROP-23 substituent_skip: reason=no_fg_prefix_form fg_name=%s",
+                fg_name,
+            )
             continue
 
         # Get locants for this FG

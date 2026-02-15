@@ -3,17 +3,20 @@ Main IUPAC nomenclature generator.
 
 Architecture:
     SMILES → Perception → Classification → Assembly → IUPAC Name
-    
+
 This is the inverse of OPSIN's pipeline:
     OPSIN:     Name → Tokenize → Parse → Build Structure
     Orthonym: Structure → Perceive → Classify → Assemble Name
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
+
+logger = logging.getLogger(__name__)
 
 from .perception.ions import detect_species_type, get_ion_sites, get_radical_sites
 from .perception.functional_groups import detect_functional_groups
@@ -646,7 +649,26 @@ class Orthonym:
                     features.mol,
                     features.principal_chain
                 )
-    
+
+        # INST-05: Naming decision trace
+        if logger.isEnabledFor(logging.DEBUG):
+            parent_type = 'chain' if getattr(features, 'chain_is_parent', False) else 'ring'
+            parent_atoms = (features.principal_chain if parent_type == 'chain'
+                            else features.principal_ring or [])
+            sub_count = (sum(len(v) for v in features.substituents.values())
+                         if features.substituents else 0)
+            logger.debug(
+                "NAMING_DECISION: smiles=%s parent_type=%s parent_size=%d "
+                "principal_group=%s fg_count=%d sub_count=%d is_cyclic=%s",
+                features.canonical_smiles,
+                parent_type,
+                len(parent_atoms) if parent_atoms else 0,
+                features.principal_group,
+                len(features.functional_groups),
+                sub_count,
+                features.is_cyclic,
+            )
+
     def _find_double_bonds(self, mol) -> List[tuple]:
         """Find all C=C double bonds."""
         double_bonds = []
@@ -823,8 +845,7 @@ def name_compound(smiles: str, style: str = "pin") -> str:
         # Graceful fallback for unexpected errors in the naming pipeline.
         # Log the error type for debugging but return a fallback name rather
         # than crashing or returning None.
-        import logging
-        logging.getLogger(__name__).debug(
+        logger.debug(
             "Naming error for %s: %s: %s", smiles, type(e).__name__, e
         )
         return "unknown"

@@ -321,6 +321,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     Returns:
         Complete IUPAC name string
     """
+    # INST: Assembly dispatch trace
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "ASSEMBLY_DISPATCH: smiles=%s species=%s cyclic=%s pg=%s",
+            getattr(features, 'canonical_smiles', ''),
+            getattr(features, 'species_type', 'neutral'),
+            getattr(features, 'is_cyclic', False),
+            getattr(features, 'principal_group', None),
+        )
+
     # Check for ionic/radical species first - route to specialized assembly
     species_type = getattr(features, 'species_type', 'neutral')
 
@@ -470,6 +480,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if poly_name:
             return poly_name
         # If name_polyfunctional returns None, fall through to normal handling
+        logger.warning(
+            "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
+        )
 
     # Handle multi-ester compounds (dicarboxylic acid diesters)
     # Must come BEFORE single-ester naming so 2-ester diacids are caught
@@ -646,6 +659,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if is_nucleobase_core or total_heavy <= 15 or len(complex_name) / total_heavy >= 0.4:
                 return complex_name
             # else: complex ring name too short -- fall through to simpler handlers
+            logger.warning(
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
+                "complex_ring", len(complex_name) / max(total_heavy, 1),
+            )
         # If complex ring naming fails, fall through to simpler handling
 
     # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
@@ -680,6 +697,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if total_heavy <= 15 or len(hetero_name) / total_heavy >= 0.4:
                 return hetero_name
             # else: heterocycle name too short -- fall through to chain naming
+            logger.warning(
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
+                "heterocycle", len(hetero_name) / max(total_heavy, 1),
+            )
         # If heterocycle naming fails, fall through
 
     # Handle benzene derivatives
@@ -692,6 +713,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if total_heavy <= 10 or len(benzene_name) / total_heavy >= 0.4:
                 return benzene_name
             # else: benzene name too short -- fall through to chain naming
+            logger.warning(
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
+                "benzene", len(benzene_name) / max(total_heavy, 1),
+            )
         # If benzene naming fails, fall through
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
@@ -2664,7 +2689,10 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                 try:
                     n_subs.append(get_alkyl_name(cc))
                 except (ValueError, KeyError):
-                    pass
+                    logger.warning(
+                        "DROP-25 substituent_skip: reason=amine_nsub_valueerror carbon_count=%d",
+                        cc,
+                    )
 
     if not n_subs:
         return None  # No N-substituents found, use general path
@@ -3168,7 +3196,13 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                             break
                 if not on_small_branch:
                     filtered_branch.append(match)
+            original_count = len(matches)
             matches = filtered_branch
+            if not matches:
+                logger.warning(
+                    "DROP-17 substituent_skip: reason=bug_b_overfilter fg_name=%s original_count=%d",
+                    fg_name, original_count,
+                )
 
         prefix_text = get_prefix(fg_name)
         if prefix_text and matches:
@@ -3204,6 +3238,11 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                 locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
                 fragment_type="prefix"
             ))
+        elif not prefix_text and matches:
+            logger.warning(
+                "DROP-16 substituent_skip: reason=no_fg_prefix_form fg_name=%s match_count=%d",
+                fg_name, len(matches),
+            )
 
     # --- Merge duplicate prefix names ---
     # If the same base prefix name appears multiple times (from different sources),
@@ -3764,6 +3803,10 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         for sub_atoms in sub_list:
             # Skip substituents that are ring atoms (handled separately)
             if ring_atoms_to_skip and set(sub_atoms) & ring_atoms_to_skip:
+                logger.warning(
+                    "DROP-02 substituent_skip: reason=ring_overlap position=%d",
+                    position,
+                )
                 continue
 
             # Skip substituents containing the principal group nitrogen
@@ -3774,6 +3817,10 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 'secondary_amine', 'tertiary_amine',
             ):
                 if set(sub_atoms) & pg_atom_set:
+                    logger.warning(
+                        "DROP-03 substituent_skip: reason=pg_branch_overlap position=%d pg=%s",
+                        position, features.principal_group,
+                    )
                     continue
 
             # Count only carbon atoms in the substituent
@@ -3784,6 +3831,10 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
             # Skip non-alkyl substituents (no carbons = functional group like -OH)
             if carbon_count == 0:
+                logger.warning(
+                    "DROP-01 substituent_skip: reason=zero_carbon position=%d parent_type=chain",
+                    position,
+                )
                 continue
 
             # Check if substituent has any heteroatoms (non-C, non-H)
@@ -3838,6 +3889,11 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                         if needs_brackets(enum_name):
                             enum_name = f"({enum_name})"
                         substituent_groups[enum_name].append(position)
+                else:
+                    logger.warning(
+                        "DROP-04 substituent_skip: reason=ring_heteroatom_branch position=%d",
+                        position,
+                    )
                 continue
 
             # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)
@@ -3847,6 +3903,10 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     alkyl_name = get_alkyl_name(carbon_count)
                     substituent_groups[alkyl_name].append(position)
                 except ValueError:
+                    logger.warning(
+                        "DROP-05 substituent_skip: reason=alkyl_name_valueerror carbon_count=%d position=%d",
+                        carbon_count, position,
+                    )
                     continue
             else:
                 # Complex substituent: use recursive naming
@@ -3863,7 +3923,22 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                             alkyl_name = get_alkyl_name(carbon_count)
                             substituent_groups[alkyl_name].append(position)
                         except ValueError:
+                            logger.warning(
+                                "DROP-06 substituent_skip: reason=recursive_and_fallback_failure position=%d carbon_count=%d",
+                                position, carbon_count,
+                            )
                             continue
+
+    # INST-01: Atom coverage audit
+    if logger.isEnabledFor(logging.DEBUG):
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        parent_count = len(features.principal_chain or [])
+        named_count = sum(len(locs) for locs in substituent_groups.values()) if substituent_groups else 0
+        coverage = (parent_count + named_count) / max(total_heavy, 1)
+        logger.debug(
+            "ATOM_COVERAGE: smiles=%s total_heavy=%d parent=%d named_subs=%d coverage=%.2f",
+            features.canonical_smiles, total_heavy, parent_count, named_count, coverage,
+        )
 
     # Count total number of substituents for locant omission decision
     total_substituents = sum(len(locs) for locs in substituent_groups.values())
@@ -4275,6 +4350,9 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     if all_arom and all_c:
                         return "anilino"
             # Non-phenyl ring: skip (complex, would need recursive naming)
+            logger.warning(
+                "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring",
+            )
             return None
 
         # Count carbons reachable from N via C-C bonds only
@@ -4306,6 +4384,9 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
             ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
         )
         if sub_has_ring:
+            logger.warning(
+                "DROP-19 substituent_skip: reason=c_branch_ring_sub",
+            )
             return None  # Complex ring substituent - needs specialized naming
 
         # Count carbons via C-C bonds only (don't traverse through heteroatoms)
@@ -4540,6 +4621,10 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
         )
         if not has_carbon:
             # FG-only: skip here, _generate_prefixes handles these
+            logger.warning(
+                "DROP-07 substituent_skip: reason=fg_only_ring_sub locant=%d",
+                sub_info.locant,
+            )
             continue
 
         # Classify and name via the unified pipeline
@@ -4547,6 +4632,10 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
         if name is None:
             # Unnameable substituent: logged as WARNING by classify_and_name_fragment
             # Molecule will fall back to decomposition via coverage gate
+            logger.warning(
+                "DROP-08 substituent_skip: reason=unnameable_ring_fragment locant=%d",
+                sub_info.locant,
+            )
             continue
         substituent_groups[name].append(sub_info.locant)
 

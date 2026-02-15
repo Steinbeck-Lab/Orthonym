@@ -21,8 +21,11 @@ Naming priority:
 Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
 """
 
+import logging
 from typing import Dict, List, Tuple, Optional, Set
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 
 from rdkit import Chem
 
@@ -1072,6 +1075,10 @@ def name_substituted_heterocycle(
                         sub_name = get_alkyl_name(carbon_count)
                     except ValueError:
                         # Unsupported carbon count (> 10), skip
+                        logger.warning(
+                            "DROP-24 substituent_skip: reason=large_sub_valueerror carbon_count=%d",
+                            carbon_count,
+                        )
                         continue
 
             if is_on_n:
