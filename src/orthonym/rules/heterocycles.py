@@ -1057,7 +1057,7 @@ def name_substituted_heterocycle(
                 carbon_count = sub_info['carbon_count']
                 sub_atoms = sub_info.get('atoms', [])
                 sub_name = None
-                # Only try recursive naming for pure alkyl subs (all C/H atoms)
+                # Pure C/H substituents: try recursive naming first (handles branching)
                 if sub_atoms and len(sub_atoms) > 1:
                     all_c_h = all(
                         mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
@@ -1074,12 +1074,21 @@ def name_substituted_heterocycle(
                     try:
                         sub_name = get_alkyl_name(carbon_count)
                     except ValueError:
-                        # Unsupported carbon count (> 10), skip
-                        logger.warning(
-                            "DROP-24 substituent_skip: reason=large_sub_valueerror carbon_count=%d",
-                            carbon_count,
-                        )
-                        continue
+                        # Carbon count too large for simple alkyl name;
+                        # try recursive naming as fallback (including heteroatom subs)
+                        if sub_atoms and len(sub_atoms) > 1:
+                            from ..assembly.substituent_naming import name_substituent_fragment
+                            attach_idx = sub_atoms[0]
+                            ring_set_local = set(ring_atoms) if ring_atoms else set()
+                            sub_name = name_substituent_fragment(
+                                mol, sub_atoms, attach_idx, list(ring_set_local)
+                            )
+                        if sub_name is None:
+                            logger.warning(
+                                "DROP-24 substituent_skip: reason=large_sub_still_unnameable carbon_count=%d",
+                                carbon_count,
+                            )
+                            continue
 
             if is_on_n:
                 if sub_name not in n_groups:
