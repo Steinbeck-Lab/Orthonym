@@ -2689,10 +2689,17 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                 try:
                     n_subs.append(get_alkyl_name(cc))
                 except (ValueError, KeyError):
-                    logger.warning(
-                        "DROP-25 substituent_skip: reason=amine_nsub_valueerror carbon_count=%d",
-                        cc,
+                    # Try recursive naming for complex N-substituents
+                    sub_name = name_substituent_fragment(
+                        mol, frag, frag[0], list(chain_set)
                     )
+                    if sub_name:
+                        n_subs.append(sub_name)
+                    else:
+                        logger.warning(
+                            "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
+                            cc,
+                        )
 
     if not n_subs:
         return None  # No N-substituents found, use general path
@@ -3903,10 +3910,27 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     alkyl_name = get_alkyl_name(carbon_count)
                     substituent_groups[alkyl_name].append(position)
                 except ValueError:
-                    logger.warning(
-                        "DROP-05 substituent_skip: reason=alkyl_name_valueerror carbon_count=%d position=%d",
-                        carbon_count, position,
+                    # Try recursive naming for large linear alkyls
+                    from .naming_utils import needs_brackets
+                    attach_idx = sub_atoms[0]
+                    for idx in sub_atoms:
+                        atom_obj = mol.GetAtomWithIdx(idx)
+                        for nbr in atom_obj.GetNeighbors():
+                            if nbr.GetIdx() in set(features.principal_chain or []):
+                                attach_idx = idx
+                                break
+                    fallback_name = name_substituent_fragment(
+                        mol, sub_atoms, attach_idx, features.principal_chain or []
                     )
+                    if fallback_name:
+                        if needs_brackets(fallback_name):
+                            fallback_name = f"({fallback_name})"
+                        substituent_groups[fallback_name].append(position)
+                    else:
+                        logger.warning(
+                            "DROP-05 substituent_skip: reason=alkyl_name_valueerror_still_unnameable carbon_count=%d position=%d",
+                            carbon_count, position,
+                        )
                     continue
             else:
                 # Complex substituent: use recursive naming
