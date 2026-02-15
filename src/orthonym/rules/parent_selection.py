@@ -19,10 +19,15 @@ This means:
 - When multiple ring systems exist, the most senior one is the parent (P-44.2)
 """
 
+import logging
 from dataclasses import dataclass
 from typing import List, Optional, Set, Tuple
 
+from rdkit import Chem
+
 from .ring_selection import ring_system_score
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -133,6 +138,28 @@ def is_principal_group_on_chain(
                 return True
 
     return False
+
+
+def _count_multiple_bonds(mol, atom_set: Set[int]) -> int:
+    """Count double + triple bonds where both atoms are in atom_set.
+
+    Used by P-44.1 audit logging to compare multiple-bond counts
+    between chain and ring candidates.
+
+    Args:
+        mol: RDKit Mol object
+        atom_set: Set of atom indices to consider
+
+    Returns:
+        Number of double or triple bonds within atom_set
+    """
+    count = 0
+    for bond in mol.GetBonds():
+        if bond.GetBeginAtomIdx() in atom_set and bond.GetEndAtomIdx() in atom_set:
+            bt = bond.GetBondType()
+            if bt == Chem.BondType.DOUBLE or bt == Chem.BondType.TRIPLE:
+                count += 1
+    return count
 
 
 def select_parent(
@@ -315,6 +342,21 @@ def select_parent(
                         reasoning=f"P-44.1 senior atom: N-containing ring preferred over chain ({pg_count_on_chain} vs {pg_count_on_ring} {principal_group})"
                     )
 
+            # INST-03/INST-04: Audit chain-length and multiple-bond data
+            # when chain wins by PG count (behavior unchanged)
+            if logger.isEnabledFor(logging.DEBUG):
+                chain_set = set(principal_chain)
+                chain_mult = _count_multiple_bonds(mol, chain_set)
+                ring_mult = _count_multiple_bonds(mol, all_ring_atoms)
+                logger.debug(
+                    "P44_AUDIT: chain_wins_pg_count chain_pg=%d ring_pg=%d "
+                    "chain_len=%d ring_size=%d "
+                    "chain_mult=%d ring_mult=%d",
+                    pg_count_on_chain, pg_count_on_ring,
+                    len(principal_chain), len(all_ring_atoms),
+                    chain_mult, ring_mult,
+                )
+
             return ParentSelectionResult(
                 parent_type='chain',
                 parent_atoms=principal_chain,
@@ -326,6 +368,29 @@ def select_parent(
             # more on ring. "When the ring and the chain contain the same
             # number of skeletal atoms in the ring or chain, the ring system
             # is always preferred." This extends to FG count tie-breaking.
+
+            # INST-03/INST-04: Audit what P-44.1 chain-length and
+            # multiple-bond criteria WOULD produce (behavior unchanged,
+            # ring still wins)
+            if pg_count_on_ring == pg_count_on_chain:
+                if logger.isEnabledFor(logging.DEBUG):
+                    chain_set = set(principal_chain)
+                    chain_len = len(principal_chain)
+                    ring_size = len(all_ring_atoms)
+                    chain_mult_bonds = _count_multiple_bonds(mol, chain_set)
+                    ring_mult_bonds = _count_multiple_bonds(mol, all_ring_atoms)
+                    logger.debug(
+                        "P44_AUDIT: pg_tied=%d chain_len=%d ring_size=%d "
+                        "chain_would_win_length=%s "
+                        "chain_mult_bonds=%d ring_mult_bonds=%d "
+                        "chain_would_win_bonds=%s "
+                        "decision=ring_default reason=P-52.2.8_blanket",
+                        pg_count_on_ring, chain_len, ring_size,
+                        chain_len > ring_size,
+                        chain_mult_bonds, ring_mult_bonds,
+                        chain_mult_bonds > ring_mult_bonds,
+                    )
+
             best_ring, other_rings = _select_best_ring_system(
                 mol, ring_systems, principal_group_atoms
             )
