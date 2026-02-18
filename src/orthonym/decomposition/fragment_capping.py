@@ -8,7 +8,7 @@ valid molecule fragments for recursive naming.
 from typing import Dict, List, Set
 
 from rdkit import Chem
-from rdkit.Chem import RWMol
+from rdkit.Chem import RWMol, rdCIPLabeler
 
 
 def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> List[Dict]:
@@ -159,6 +159,16 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
                              Chem.SanitizeFlags.SANITIZE_KEKULIZE)
 
         clean = Chem.RemoveHs(rwm)
+
+        # Re-assign CIP labels on the fragment after capping.
+        # CIP depends on the substituent tree, which changes when a bond
+        # is cleaved and capped. Re-assignment ensures fragment CIP labels
+        # reflect the fragment's actual context, not the pre-cleavage parent.
+        # This is defensive: the recursive naming path also re-assigns CIP,
+        # but doing it here ensures SMILES encodes correct stereo even if
+        # fragments are used outside the recursive naming pipeline.
+        rdCIPLabeler.AssignCIPLabels(clean)
+
         smiles = Chem.MolToSmiles(clean)
 
         results.append({
