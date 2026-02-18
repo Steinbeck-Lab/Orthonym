@@ -752,6 +752,70 @@ class TestP441Cascade:
             f"Reasoning should cite P-52.2.8. Got: {result.reasoning}"
         )
 
+    def test_pg_proximity_direct_over_adjacent(self):
+        """PRNT-05: Ring system where PG atom is directly IN the ring should
+        score higher than a ring with no PG attachment.
+
+        Molecule: cyclohexanone + cyclohexane connected by propyl chain.
+        O=C1CCCCC1CCC1CCCCC1
+        Ring 0 (cyclohexanone): ketone C is IN the ring -> weight 2
+        Ring 1 (cyclohexane): no PG connection -> weight 0
+        Both rings are identical 6-membered carbocycles with the same
+        ring_system_score, so PG proximity is the sole tiebreaker.
+        """
+        smiles = 'O=C1CCCCC1CCC1CCCCC1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+
+        assert len(ring_systems) == 2, f"Expected 2 ring systems, got {len(ring_systems)}"
+
+        # Verify precondition: both rings have identical ring_system_score
+        scores = [ring_system_score(mol, r) for r in ring_systems]
+        assert scores[0] == scores[1], (
+            f"Precondition: ring scores must tie for PG proximity to be the tiebreaker. "
+            f"Got {scores[0]} vs {scores[1]}"
+        )
+
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        best, others = _select_best_ring_system(mol, ring_systems, pg_atoms)
+
+        # The ring with the ketone C directly IN it should be preferred.
+        # Verify by checking: the best ring system contains an atom that
+        # is the first atom of some PG match (direct-in-ring pattern).
+        direct_pg_in_best = False
+        for pg in pg_atoms:
+            if pg and pg[0] in best:
+                direct_pg_in_best = True
+                break
+
+        assert direct_pg_in_best, (
+            "PRNT-05: Ring with PG atom directly IN ring should be selected as best. "
+            f"Best ring atoms: {sorted(best)}, PG attachment atoms: {[p[0] for p in pg_atoms if p]}"
+        )
+        assert len(others) == 1, "Should have 1 other ring system"
+
+    def test_pg_proximity_single_ring_unchanged(self):
+        """Single-ring molecule should be returned directly without PG scoring.
+
+        O=C1CCCCC1 (cyclohexanone): only 1 ring system -> _select_best_ring_system
+        returns it immediately via the len(ring_systems) <= 1 early return.
+        """
+        smiles = 'O=C1CCCCC1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+
+        assert len(ring_systems) == 1, "Cyclohexanone should have 1 ring system"
+
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        best, others = _select_best_ring_system(mol, ring_systems, pg_atoms)
+
+        assert best == ring_systems[0], "Single ring should be returned as-is"
+        assert others == [], "No other ring systems for single-ring molecule"
+
     def test_ring_wins_by_pg_count_unchanged(self):
         """When ring has strictly more PGs than chain, ring wins (unchanged behavior).
 

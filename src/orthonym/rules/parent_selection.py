@@ -517,12 +517,20 @@ def _select_best_ring_system(
         score = ring_system_score(mol, system)
 
         # Tiebreaker: count principal group attachment points on this ring system
+        # Weight 2 for PG atom directly IN the ring (e.g., ring ketone C=O where C is in ring)
+        # Weight 1 for PG atom bonded TO a ring atom (e.g., -COOH where C(=O) is bonded to ring C)
+        # This ensures direct-on-ring PG wins over adjacent-to-ring PG (PRNT-05)
         pg_attachments = 0
         if principal_group_atoms:
             for pg_atoms in principal_group_atoms:
                 if not pg_atoms:
                     continue
                 attachment = pg_atoms[0]
+                # Direct: PG atom itself is a ring atom (e.g., ring ketone C=O where C is in ring)
+                if attachment in system:
+                    pg_attachments += 2
+                    continue
+                # Adjacent: PG atom bonded to a ring atom (e.g., -COOH where C(=O) is bonded to ring C)
                 atom = mol.GetAtomWithIdx(attachment)
                 for neighbor in atom.GetNeighbors():
                     if neighbor.GetIdx() in system:
