@@ -849,9 +849,12 @@ def name_compound(smiles: str, style: str = "pin") -> str:
     try:
         result = namer.name(smiles)
         if result:
+            # Check if result contains 'unknown' as a component (partial failure)
+            if 'unknown' in result.lower():
+                return _descriptive_fallback(smiles)
             return result
-        # If name() returned empty/None, return "unknown" as graceful fallback
-        return "unknown"
+        # If name() returned empty/None, generate descriptive fallback
+        return _descriptive_fallback(smiles)
     except ValueError:
         raise  # Re-raise ValueError (invalid SMILES) for caller to handle
     except (TypeError, KeyError, IndexError, AttributeError) as e:
@@ -861,4 +864,76 @@ def name_compound(smiles: str, style: str = "pin") -> str:
         logger.debug(
             "Naming error for %s: %s: %s", smiles, type(e).__name__, e
         )
+        return _descriptive_fallback(smiles)
+
+
+# Metals and inorganic elements (not C, H, N, O, S, P, Se, halogens)
+_ORGANIC_ELEMENTS = {
+    'C', 'H', 'N', 'O', 'S', 'P', 'Se', 'F', 'Cl', 'Br', 'I', 'B', 'Si',
+}
+
+# Metal element -> name mapping for descriptive messages
+_METAL_NAMES = {
+    'Li': 'lithium', 'Na': 'sodium', 'K': 'potassium', 'Rb': 'rubidium',
+    'Cs': 'cesium', 'Be': 'beryllium', 'Mg': 'magnesium', 'Ca': 'calcium',
+    'Sr': 'strontium', 'Ba': 'barium', 'Al': 'aluminium', 'Ga': 'gallium',
+    'In': 'indium', 'Tl': 'thallium', 'Sn': 'tin', 'Pb': 'lead',
+    'Bi': 'bismuth', 'Ti': 'titanium', 'V': 'vanadium', 'Cr': 'chromium',
+    'Mn': 'manganese', 'Fe': 'iron', 'Co': 'cobalt', 'Ni': 'nickel',
+    'Cu': 'copper', 'Zn': 'zinc', 'Zr': 'zirconium', 'Mo': 'molybdenum',
+    'Ru': 'ruthenium', 'Rh': 'rhodium', 'Pd': 'palladium', 'Ag': 'silver',
+    'Cd': 'cadmium', 'W': 'tungsten', 'Re': 'rhenium', 'Os': 'osmium',
+    'Ir': 'iridium', 'Pt': 'platinum', 'Au': 'gold', 'Hg': 'mercury',
+    'Sb': 'antimony', 'Te': 'tellurium', 'Yb': 'ytterbium', 'La': 'lanthanum',
+    'Ce': 'cerium', 'Nd': 'neodymium', 'Sm': 'samarium', 'Eu': 'europium',
+    'Gd': 'gadolinium', 'Tb': 'terbium', 'Dy': 'dysprosium', 'Ho': 'holmium',
+    'Er': 'erbium', 'Tm': 'thulium', 'Lu': 'lutetium', 'Sc': 'scandium',
+    'Y': 'yttrium',
+}
+
+
+def _descriptive_fallback(smiles: str) -> str:
+    """Generate a descriptive fallback message instead of bare 'unknown'.
+
+    For inorganic/metallic compounds, returns a descriptive message like
+    'gold compound (not supported)'. For organic molecules that failed
+    naming, returns 'unknown organic compound'.
+
+    Args:
+        smiles: The SMILES string that could not be named.
+
+    Returns:
+        A descriptive string (never bare 'unknown').
+    """
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None or mol.GetNumAtoms() == 0:
+            return "unknown"
+
+        # Check for wildcard atoms (*)
+        has_wildcard = any(a.GetAtomicNum() == 0 for a in mol.GetAtoms())
+        if has_wildcard:
+            return "compound with wildcard atoms (not supported)"
+
+        # Check for non-organic elements
+        elements = set(a.GetSymbol() for a in mol.GetAtoms())
+        non_organic = elements - _ORGANIC_ELEMENTS
+
+        if non_organic:
+            # Find the most prominent metal/inorganic element
+            metal_name = None
+            for elem in non_organic:
+                if elem in _METAL_NAMES:
+                    metal_name = _METAL_NAMES[elem]
+                    break
+
+            if metal_name:
+                return f"{metal_name} compound (not supported)"
+            else:
+                # Non-organic but unknown element
+                return "inorganic compound (not supported)"
+
+        # Organic compound that failed naming
+        return "unknown organic compound"
+    except Exception:
         return "unknown"

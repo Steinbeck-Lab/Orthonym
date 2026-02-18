@@ -523,7 +523,7 @@ PHASE24_WAVE2_FIXES = [
     # F3: Error handling - complex compound returns name, not crash
     (
         "[I][Hg-2]([I])([I])[I]",
-        "unknown",
+        "mercury compound (not supported)",  # Descriptive fallback for inorganic
         "inorganic-graceful-fallback",
     ),
 ]
