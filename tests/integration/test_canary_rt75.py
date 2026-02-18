@@ -24,8 +24,9 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 88 golden canary compounds: (SMILES, expected_name)
+# 132 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
+# + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -390,6 +391,185 @@ CANARY_COMPOUNDS = [
         "C1CCOCC1",
         "tetrahydropyran",
     ),
+    # --- Phase 62: Small Molecule Accuracy Sprint (44 compounds) ---
+    # Wave 1-3 fixes: parent selection, substituent detection, E/Z ester fragments,
+    # isochromane/chromane locant corrections
+    (
+        "O=CO",
+        "formic acid",
+    ),
+    (
+        "OC(=O)/C=C/c1ccccc1",
+        "(2E)-3-phenylprop-2-enoic acid",
+    ),
+    (
+        r"C(=N\O)c1ccccc1",
+        "benzaldehyde oxime",
+    ),
+    (
+        "CC(C)=CC=O",
+        "3-methylbut-2-enal",
+    ),
+    (
+        r"CC(=O)/C=C(\C)C",
+        "mesityl oxide",
+    ),
+    (
+        "C=CC/C=C/CCC(=O)OC",
+        "methyl (4E)-octa-4,7-dienoate",
+    ),
+    (
+        "CCCCC=O",
+        "pentanal",
+    ),
+    (
+        "CCCCCCCCCC=O",
+        "decanal",
+    ),
+    (
+        "CC(=O)OC1CCCCC1",
+        "acetyloxycyclohexane",
+    ),
+    (
+        "OCC(O)CO",
+        "glycerol",
+    ),
+    (
+        "c1cc(-c2ccco2)oc1",
+        "2,2'-bifuran",
+    ),
+    (
+        "OC(=O)c1ccc(O)c(O)c1",
+        "3,4-dihydroxybenzoic acid",
+    ),
+    (
+        "CC(=O)OCC(COC(C)=O)OC(C)=O",
+        "1,2,3-tri(acetyloxy)propane",
+    ),
+    (
+        r"O=C(O)CCCC/C=C\CCCCCCCCCC",
+        "(6Z)-heptadec-6-enoic acid",
+    ),
+    (
+        "CC(C)Cc1cccc(CC(C)C)c1O",
+        "2-hydroxy-1,3-diisobutylbenzene",
+    ),
+    (
+        "CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1",
+        "cyclohexyl arachidate",
+    ),
+    (
+        "CC(N)=O",
+        "acetamide",
+    ),
+    (
+        "COc1ccc(OC)c(OC)c1",
+        "1,2,4-trimethoxybenzene",
+    ),
+    (
+        r"O=C(O)/C=C\C(=O)O",
+        "(2Z)-but-2-enedioic acid",
+    ),
+    (
+        "O=C(O)c1c(O)cc(O)cc1O",
+        "2,4,6-trihydroxybenzoic acid",
+    ),
+    (
+        "NC(=O)c1cccc(O)c1",
+        "3-hydroxybenzamide",
+    ),
+    (
+        "CC(=O)O",
+        "acetic acid",
+    ),
+    (
+        "CC1(C)CC(=O)c2c(O)cc(O)cc2O1",
+        "5,7-dihydroxy-2,2-dimethylchroman-4-one",
+    ),
+    (
+        "O=C(O)CC(=O)CC(=O)O",
+        "3-oxopentanedioic acid",
+    ),
+    (
+        "CC1OC(O)C(O)C(O)C1O",
+        "3,4,5,6-tetrahydroxy-2-methyltetrahydropyran",
+    ),
+    (
+        r"CCC/C=C\C/C=C\CCCCCCCC(=O)O",
+        "(9Z,12Z)-hexadeca-9,12-dienoic acid",
+    ),
+    (
+        r"CCCCC/C=C\CCCCCCCC(=O)O",
+        "(9Z)-pentadec-9-enoic acid",
+    ),
+    (
+        "CCCCCCCCCCCCCCCCC(=O)O",
+        "heptadecanoic acid",
+    ),
+    (
+        r"CCCCCCCC/C=C\CCCCCCCC(=O)O",
+        "(9Z)-octadec-9-enoic acid",
+    ),
+    (
+        "O=C(O)CCC(=O)O",
+        "butanedioic acid",
+    ),
+    (
+        "CC(C)(O)CC(=O)O",
+        "3-hydroxy-3-methylbutanoic acid",
+    ),
+    (
+        "OC(=O)CC(O)=O",
+        "propanedioic acid",
+    ),
+    (
+        r"CCCC/C=C\CCCCCCCCCOC(C)=O",
+        "(10Z)-pentadec-10-en-1-yl acetate",
+    ),
+    (
+        "O=C(O)CCO",
+        "3-hydroxypropanoic acid",
+    ),
+    (
+        r"CCCCC/C=C\C/C=C\C/C=C\C/C=C\CCCC(=O)O",
+        "(5Z,8Z,11Z,14Z)-icosa-5,8,11,14-tetraenoic acid",
+    ),
+    (
+        "CC(C)(C)c1ccc(CC(=O)O)cc1",
+        "2-(4-(tert-butyl)phenyl)ethanoic acid",
+    ),
+    (
+        r"CCCCC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O",
+        "(9Z,12Z,15Z)-henicosa-9,12,15-trienoic acid",
+    ),
+    (
+        r"CCCCCCCC/C=C\CCCCCCCC(=O)OC",
+        "methyl (9Z)-octadec-9-enoate",
+    ),
+    (
+        r"CCCCCC/C=C\C/C=C\CCCCC(=O)OC",
+        "methyl (6Z,9Z)-hexadeca-6,9-dienoate",
+    ),
+    (
+        "O=C(O)/C=C/c1ccc(O)cc1",
+        "(2E)-3-(4-hydroxyphenyl)prop-2-enoic acid",
+    ),
+    (
+        "OC(=O)c1ccc(O)cc1",
+        "4-hydroxybenzoic acid",
+    ),
+    (
+        "CC(O)C(=O)O",
+        "2-hydroxypropanoic acid",
+    ),
+    (
+        "O=C(O)c1cc(O)c(O)c(O)c1",
+        "3,4,5-trihydroxybenzoic acid",
+    ),
+    (
+        "OCC(O)C(O)C(O)C(O)CO",
+        "2,3,4,5-tetrahydroxyhexane-1,6-diol",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -400,7 +580,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt88(smiles, expected_name):
+def test_canary_rt132(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
