@@ -333,13 +333,67 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     return get_acid_stem(carbon_count)
 
 
+def _extract_fragment_smiles(mol, keep_atoms: set, cap_atom_idx: int,
+                             cap_element: int = 8) -> Optional[str]:
+    """Extract a fragment from *mol* preserving stereochemistry.
+
+    Works by copying the whole molecule, removing all bonds that cross
+    the fragment boundary, extracting the desired fragment, and capping
+    the attachment point.  Because we copy the molecule rather than
+    building from scratch, all E/Z and R/S stereochemistry is preserved.
+
+    Args:
+        mol: Source RDKit Mol.
+        keep_atoms: Set of atom indices to keep in the fragment.
+        cap_atom_idx: Atom index in *keep_atoms* to cap with a new atom.
+        cap_element: Atomic number for the capping atom (8 = oxygen).
+
+    Returns:
+        SMILES of the capped fragment, or None on failure.
+    """
+    rw = Chem.RWMol(mol)
+
+    # Collect bonds that cross the fragment boundary
+    bonds_to_remove = []
+    for bond in rw.GetBonds():
+        a = bond.GetBeginAtomIdx()
+        b = bond.GetEndAtomIdx()
+        if (a in keep_atoms) != (b in keep_atoms):
+            bonds_to_remove.append((a, b))
+
+    # Remove crossing bonds
+    for a, b in bonds_to_remove:
+        rw.RemoveBond(a, b)
+
+    # Add capping atom (e.g. -OH on carbonyl to make acid)
+    cap_idx = rw.AddAtom(Chem.Atom(cap_element))
+    rw.AddBond(cap_atom_idx, cap_idx, Chem.BondType.SINGLE)
+
+    try:
+        Chem.SanitizeMol(rw)
+        # Get fragments with atom-index mapping so we can identify which
+        # fragment contains the cap_atom_idx
+        frag_atom_lists = Chem.GetMolFrags(rw.GetMol())
+        frags = Chem.GetMolFrags(
+            rw.GetMol(), asMols=True, sanitizeFrags=True
+        )
+        # Find the fragment whose atom mapping includes cap_atom_idx
+        for frag_atoms, frag_mol in zip(frag_atom_lists, frags):
+            if cap_atom_idx in frag_atoms:
+                return Chem.MolToSmiles(frag_mol)
+    except Exception:
+        pass
+
+    return None
+
+
 def _name_acid_fragment_with_unsaturation(mol, acid_atoms: List[int]) -> Optional[str]:
     """Extract an unsaturated acid fragment and name it via the pipeline.
 
-    Builds an isolated molecule from the acid fragment atoms, caps the
-    carbonyl carbon with -OH to form a carboxylic acid, and uses the
-    naming pipeline to get the full systematic name including double bond
-    positions (e.g., "octadeca-9,12-dienoic").
+    Uses RWMol bond-removal to extract the fragment, preserving E/Z
+    stereochemistry.  Caps the carbonyl carbon with -OH to form a
+    carboxylic acid, then names it to get the full systematic name
+    including double bond positions (e.g., "(4E)-octa-4,7-dienoic").
 
     Args:
         mol: RDKit Mol object (the full molecule).
@@ -347,7 +401,7 @@ def _name_acid_fragment_with_unsaturation(mol, acid_atoms: List[int]) -> Optiona
                     ester oxygen).
 
     Returns:
-        Acid stem name with unsaturation info (e.g., "octadeca-9,12-dienoic"),
+        Acid stem name with unsaturation info (e.g., "(4E)-octa-4,7-dienoic"),
         or None if extraction/naming fails.
     """
     acid_atoms_set = set(acid_atoms)
@@ -371,28 +425,8 @@ def _name_acid_fragment_with_unsaturation(mol, acid_atoms: List[int]) -> Optiona
     if carbonyl_c is None:
         return None
 
-    # Build isolated fragment molecule
-    atom_map = {}
-    frag_mol = Chem.RWMol()
-    for idx in sorted(acid_atoms):
-        new_idx = frag_mol.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
-        atom_map[idx] = new_idx
-
-    # Add bonds between fragment atoms, preserving bond types (single, double)
-    for idx in acid_atoms:
-        for bond in mol.GetAtomWithIdx(idx).GetBonds():
-            nbr_idx = bond.GetOtherAtomIdx(idx)
-            if nbr_idx in acid_atoms_set and nbr_idx > idx:
-                frag_mol.AddBond(atom_map[idx], atom_map[nbr_idx], bond.GetBondType())
-
-    # Cap the carbonyl carbon with -OH to form the carboxylic acid
-    oh_idx = frag_mol.AddAtom(Chem.Atom(8))  # oxygen
-    frag_mol.AddBond(atom_map[carbonyl_c], oh_idx, Chem.BondType.SINGLE)
-
-    try:
-        Chem.SanitizeMol(frag_mol)
-        frag_smi = Chem.MolToSmiles(frag_mol)
-    except Exception:
+    frag_smi = _extract_fragment_smiles(mol, acid_atoms_set, carbonyl_c)
+    if not frag_smi:
         return None
 
     # Name via the pipeline
@@ -420,9 +454,9 @@ def _name_alkyl_fragment_with_unsaturation(
 ) -> Optional[str]:
     """Extract an unsaturated alkyl fragment and name it via the pipeline.
 
-    Builds an isolated molecule from the alkyl fragment atoms, caps the
-    attachment carbon with -OH to form an alcohol, names it, then converts
-    the alcohol name to the alkyl form.
+    Uses RWMol bond-removal to extract the fragment, preserving E/Z
+    stereochemistry.  Caps the attachment carbon with -OH to form an
+    alcohol, names it, then converts the alcohol name to the alkyl form.
 
     Args:
         mol: RDKit Mol object (the full molecule).
@@ -430,11 +464,9 @@ def _name_alkyl_fragment_with_unsaturation(
         alkyl_set: Set of alkyl atom indices (for fast membership check).
 
     Returns:
-        Alkyl name with unsaturation (e.g., "pentadec-10-en-1-yl"),
+        Alkyl name with unsaturation (e.g., "(10Z)-pentadec-10-en-1-yl"),
         or None if extraction/naming fails.
     """
-    import re
-
     # Find the attachment carbon: the C bonded to the ester oxygen (not in alkyl set)
     attach_c = None
     for idx in alkyl_atoms:
@@ -451,28 +483,8 @@ def _name_alkyl_fragment_with_unsaturation(
     if attach_c is None:
         return None
 
-    # Build isolated fragment molecule
-    atom_map = {}
-    frag_mol = Chem.RWMol()
-    for idx in sorted(alkyl_atoms):
-        new_idx = frag_mol.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
-        atom_map[idx] = new_idx
-
-    # Add bonds between fragment atoms, preserving bond types
-    for idx in alkyl_atoms:
-        for bond in mol.GetAtomWithIdx(idx).GetBonds():
-            nbr_idx = bond.GetOtherAtomIdx(idx)
-            if nbr_idx in alkyl_set and nbr_idx > idx:
-                frag_mol.AddBond(atom_map[idx], atom_map[nbr_idx], bond.GetBondType())
-
-    # Cap the attachment carbon with -OH to form an alcohol
-    oh_idx = frag_mol.AddAtom(Chem.Atom(8))  # oxygen
-    frag_mol.AddBond(atom_map[attach_c], oh_idx, Chem.BondType.SINGLE)
-
-    try:
-        Chem.SanitizeMol(frag_mol)
-        frag_smi = Chem.MolToSmiles(frag_mol)
-    except Exception:
+    frag_smi = _extract_fragment_smiles(mol, alkyl_set, attach_c)
+    if not frag_smi:
         return None
 
     # Name via the pipeline

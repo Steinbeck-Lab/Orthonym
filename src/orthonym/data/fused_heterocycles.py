@@ -596,25 +596,25 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # 1,2,3,4-Tetrahydroquinoline
-    # Same numbering as quinoline
+    # Same numbering as quinoline: N at position 1
     # Canonical: c1ccc2c(c1)CCCN2
     'c1ccc2c(c1)CCCN2': {
         'name': '1,2,3,4-tetrahydroquinoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: 5},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
 
     # 1,2,3,4-Tetrahydroisoquinoline
-    # Same numbering as isoquinoline
+    # Same numbering as isoquinoline: N at position 2
     # Canonical: c1ccc2c(c1)CCNC2
     'c1ccc2c(c1)CCNC2': {
         'name': '1,2,3,4-tetrahydroisoquinoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: 5},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
 
     # Chromane: 3,4-dihydro-2H-chromene
@@ -625,7 +625,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 4, 6: 3, 7: 2, 8: 1, 9: 5},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
 
     # Isochromane: 3,4-dihydro-1H-isochromene
@@ -635,7 +635,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 4, 6: 3, 7: 1, 8: 2, 9: 5},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
 
     # =========================================================================

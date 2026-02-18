@@ -72,7 +72,7 @@ CI_BENCHMARK = [
     (
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
         "C(O)C3)C(O)C(O)C1O",
-        "(glucopyranosyloxy)(glucopyranosyloxy)-2,4,7-trihydroxychromane",
+        "(glucopyranosyloxy)(glucopyranosyloxy)-3,5,7-trihydroxychromane",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCCCN)C(=O)O",
@@ -267,7 +267,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc(OC)c2c(c1CC=C(C)C)O[C@H](c1ccccc1)CC2",
-        "4,7-dimethoxy-8-(2-methylbut-2-enyl)-1-phenylchromane",
+        "5,7-dimethoxy-8-(2-methylbut-2-enyl)-2-phenylchromane",
     ),
     (
         "CN=C(N)NCCC/C=C/CCC[C@H](C)[C@H]1OC(=O)/C(C)=C\\C=C/"
@@ -350,7 +350,7 @@ CI_BENCHMARK = [
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@@H](O)COP(=O)(O)"
         "OC1C(O)C(O)C(O)[C@@H](O)C1O",
-        "(8Z,11Z,14Z)-(icosa-8,11,14-trienoyloxy)icosa-8,11,14-trienehexaol",
+        "(8Z,11Z,14Z)-((8z,11z,14z)-icosa-8,11,14-trienoyloxy)icosa-8,11,14-trienehexaol",
     ),
     (
         "CCCCCCCC(O)CC(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CCC(=O)O)"
@@ -389,7 +389,7 @@ CI_BENCHMARK = [
     (
         "COc1cc(OC2OC(C(=O)O)C(O)C(O)C2O)c(C2CC(=O)c3ccc(O)cc3O2)"
         "c(O)c1CC=C(C)C",
-        "(glucuronopyranosyloxy)-7-hydroxychroman-3-one",
+        "(glucuronopyranosyloxy)-7-hydroxychroman-4-one",
     ),
     (
         "CC[C@H](C)C=C(C)C=CC1=CC2=C(Cl)C(=O)[C@@](C)(OC(C)=O)"

@@ -32,7 +32,7 @@ LIPID_SATURATION_FIXES = [
     pytest.param(
         r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)"
         r"COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "2-(icosa-11,14-dienoyloxy)-1,3-di(linoleoyloxy)propane",
+        "2-((11z,14z)-icosa-11,14-dienoyloxy)-1,3-di(linoleoyloxy)propane",
         id="lipid-C9-triglyceride-mixed",
     ),
     pytest.param(
@@ -44,7 +44,7 @@ LIPID_SATURATION_FIXES = [
     pytest.param(
         r"CCCC/C=C\CCCCCCCC(=O)O[C@H](COC(=O)CCC/C=C\C/C=C\C/C=C\CCCCCCCC)"
         r"COC(=O)CCCCCCCCC/C=C\CCCCCC",
-        "1-(icosa-5,8,11-trienoyloxy)-3-(oleoyloxy)-2-(tetradec-9-enoyloxy)propane",
+        "1-((5z,8z,11z)-icosa-5,8,11-trienoyloxy)-2-((9z)-tetradec-9-enoyloxy)-3-(oleoyloxy)propane",
         id="lipid-C17-triglyceride-mixed-2",
     ),
     pytest.param(
@@ -113,7 +113,7 @@ VB_COUNTING_FIXES = [
 MACROCYCLIC_ESTER_FIXES = [
     pytest.param(
         r"CCCC/C=C\CCCCCCCCCOC(C)=O",
-        "pentadec-10-en-1-yl acetate",
+        "(10Z)-pentadec-10-en-1-yl acetate",
         id="macro-C19-pentadecenyl-acetate",
     ),
 ]
