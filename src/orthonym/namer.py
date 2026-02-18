@@ -198,6 +198,7 @@ class Orthonym:
             if len(sites['anions']) >= 2 and not sites['cations']:
                 try:
                     from rdkit.Chem import RWMol
+                    from .rules.ions import classify_anion, _acid_name_to_carboxylate
                     rwmol = RWMol(mol)
                     neutralized = False
                     for atom in rwmol.GetAtoms():
@@ -211,6 +212,18 @@ class Orthonym:
                         neutral_namer = Orthonym(style=self.style)
                         neutral_name = neutral_namer.name(neutral_smi)
                         if neutral_name:
+                            # IUPAC P-72.2.1: Convert acid suffix to carboxylate
+                            # for deprotonated carboxylate sites
+                            carboxylate_count = sum(
+                                1 for a in sites['anions']
+                                if classify_anion(mol, a) == 'carboxylate'
+                            )
+                            if carboxylate_count > 0:
+                                anion_name = _acid_name_to_carboxylate(
+                                    neutral_name, carboxylate_count
+                                )
+                                if anion_name:
+                                    return anion_name
                             return neutral_name
                 except Exception:
                     pass  # Fall through to normal pipeline

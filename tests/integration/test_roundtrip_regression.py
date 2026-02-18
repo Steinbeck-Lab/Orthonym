@@ -481,13 +481,13 @@ PHASE24_WAVE2_FIXES = [
     # C2: Dicarboxylate anion -> neutralize-then-name
     (
         "O=C([O-])CC=CC(=O)C(=O)[O-]",
-        "2-oxohex-3-enedioic acid",
+        "2-oxohex-3-enedioate",  # P-72.2.1: deprotonated [O-] -> -oate
         "dicarboxylate-neutralize",
     ),
     # C3: Dicarboxylate anion with stereo -> neutralize-then-name
     (
         "O=C([O-])C(=O)C[C@H](O)C(=O)[O-]",
-        "(2S)-2-hydroxy-4-oxopentanedioic acid",
+        "(2S)-2-hydroxy-4-oxopentanedioate",  # P-72.2.1: deprotonated [O-] -> -oate
         "dicarboxylate-stereo-neutralize",
     ),
 
@@ -819,7 +819,7 @@ PHASE24_RT_ANALYSIS = [
     # --- Carboxylate ion naming (neutralize-then-name) ---
     (
         "O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]",
-        "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioic acid",
+        "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate",  # P-72.2.1: [O-] -> -oate
         "glucarate-neutralization",
     ),
     # --- Steroid naming (with stereodescriptors for defined stereocenters) ---

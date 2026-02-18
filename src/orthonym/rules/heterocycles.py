@@ -558,7 +558,18 @@ def build_hw_name(
             # Single heteroatom: just the prefix
             prefix_parts.append(hw_prefix)
 
-    prefix = ''.join(prefix_parts)
+    # Join prefix parts with 'a' elision between them:
+    # IUPAC rule: terminal 'a' of a prefix is elided before another vowel-starting
+    # prefix (e.g., oxa + aza -> oxaza, not oxaaza)
+    if prefix_parts:
+        prefix = prefix_parts[0]
+        for part in prefix_parts[1:]:
+            if prefix.endswith('a') and part and part[0] in 'aeiou':
+                prefix = prefix[:-1] + part
+            else:
+                prefix += part
+    else:
+        prefix = ""
 
     # Determine saturation for stem lookup
     # Aromatic = unsaturated for HW naming purposes

@@ -439,6 +439,15 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     # Multiple anions - try neutralize-then-name approach
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
+        # Convert acid suffixes to carboxylate suffixes for deprotonated
+        # carboxylate sites (IUPAC P-72.2.1: -oic acid -> -oate)
+        carboxylate_count = sum(
+            1 for a in anions if classify_anion(mol, a) == 'carboxylate'
+        )
+        if carboxylate_count > 0:
+            anion_name = _acid_name_to_carboxylate(neutral_name, carboxylate_count)
+            if anion_name:
+                return _validate_anion_name(mol, anion_name)
         return _validate_anion_name(mol, neutral_name)
 
     # Fallback: name first anion site only
@@ -1060,6 +1069,37 @@ def _acid_to_oate(acid_name: str) -> str:
     return ''
 
 
+def _acid_name_to_carboxylate(acid_name: str, carboxylate_count: int) -> str:
+    """Convert acid name to carboxylate form for deprotonated carboxylates.
+
+    Handles mono- and poly-carboxylates:
+    - 'pentanedioic acid' (2 COO-) -> 'pentanedioate'
+    - 'hexanedioic acid' (2 COO-) -> 'hexanedioate'
+    - 'propanoic acid' (1 COO-) -> 'propanoate'
+    - 'glutamic acid' -> 'glutamate' (retained)
+
+    IUPAC P-72.2.1: Replace '-ic acid' with '-ate' for full deprotonation.
+    """
+    if not acid_name:
+        return ''
+
+    # Use _acid_to_oate for simple cases (includes retained name mapping)
+    result = _acid_to_oate(acid_name)
+    if result:
+        return result
+
+    # Handle 'carboxylic acid' suffix (polyfunctional: -dicarboxylic acid etc.)
+    if acid_name.endswith('carboxylic acid'):
+        return acid_name[:-len('carboxylic acid')] + 'carboxylate'
+
+    # Handle retained diacid names ending in 'ic acid'
+    # e.g., "glutamic acid" -> "glutamate", "succinic acid" -> "succinate"
+    if acid_name.endswith('ic acid'):
+        return acid_name[:-len('ic acid')] + 'ate'
+
+    return ''
+
+
 def _find_carboxylate_chain(mol, anion_site: Dict):
     """Find the longest carbon chain from the carboxylate group.
 
@@ -1165,9 +1205,16 @@ def _name_thiolate_systematic(mol, anion_site: Dict) -> str:
 
 
 def _name_aminium_systematic(mol, cation_site: Dict) -> str:
-    """Generate systematic name for aminium cation."""
+    """Generate systematic name for aminium cation.
+
+    IUPAC P-73.1.2: Protonated amines use '-aminium' suffix.
+    - NH4+ -> 'ammonium' (retained)
+    - R-NH3+ -> neutralize to R-NH2, name as amine, convert amine -> aminium
+    - R2NH2+ -> neutralize, name, convert
+    - R3NH+ -> neutralize, name, convert
+    - R4N+ -> quaternary, use azanium naming
+    """
     from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-    # Count carbons attached to nitrogen
     atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
     carbon_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == 'C']
 
@@ -1175,29 +1222,57 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
         # NH4+ -> ammonium
         return 'ammonium'
 
+    # Strategy: neutralize N+ to N, name the neutral amine, then convert
+    # amine -> aminium (IUPAC P-73.1.2)
+    try:
+        rw = Chem.RWMol(mol)
+        n_atom = rw.GetAtomWithIdx(cation_site['atom_idx'])
+        n_atom.SetFormalCharge(0)
+        # Remove one H (deprotonation)
+        cur_h = n_atom.GetNumExplicitHs()
+        if cur_h > 0:
+            n_atom.SetNumExplicitHs(cur_h - 1)
+        else:
+            # Implicit H - let sanitization handle
+            pass
+        try:
+            Chem.SanitizeMol(rw)
+        except Exception:
+            pass
+
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+        if neutral_smiles:
+            from ..namer import Orthonym
+            namer = Orthonym(style='pin')
+            amine_name = namer.name(neutral_smiles)
+            if amine_name:
+                # Convert amine suffix to aminium
+                aminium_name = name_aminium_cation(amine_name)
+                if aminium_name:
+                    return aminium_name
+    except (RecursionError, ValueError, RuntimeError):
+        pass
+
+    # Fallback: old approach using simple alkyl counting
     from ..data.chain_names import get_alkyl_name as _gal
 
     if len(carbon_neighbors) == 1:
-        # Count carbons in substituent
         carbon_count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
         alkyl = _gal(carbon_count)
-        return alkyl + 'ammonium'
+        return alkyl + 'aminium'
 
-    # 2, 3, or 4 carbon neighbors
     alkyl_names = []
     for neighbor in carbon_neighbors:
         count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {cation_site['atom_idx']})
         alkyl_names.append(_gal(count))
 
-    # Check if all same
     if len(set(alkyl_names)) == 1:
         n = len(alkyl_names)
         mult = SIMPLE_MULTIPLIERS.get(n, str(n))
-        return mult + alkyl_names[0] + 'ammonium'
+        return mult + alkyl_names[0] + 'aminium'
     else:
-        # Sort alphabetically and concatenate
         alkyl_names.sort()
-        return ''.join(alkyl_names) + 'ammonium'
+        return ''.join(alkyl_names) + 'aminium'
 
 
 def _name_carbenium_systematic(mol, cation_site: Dict) -> str:

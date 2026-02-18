@@ -1694,6 +1694,40 @@ def _name_substituted_benzoic_acid(
     return f"{prefix_part}benzoic acid"
 
 
+def _name_substituted_phenol(
+    prefix_groups: Dict[str, List[int]],
+    ol_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Name substituted phenol derivatives.
+
+    Uses "phenol" as the retained base name per IUPAC P-63.1.1.1.
+    Position 1 is the hydroxyl position. Other substituents get locants
+    relative to it.
+
+    Args:
+        prefix_groups: Dict of prefix name -> locants (non-OH substituents)
+        ol_locant: Locant of the hydroxyl in original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name like "2-methylphenol" or "4-chlorophenol"
+    """
+    if not prefix_groups:
+        return "phenol"
+
+    # Renumber relative to OH position (OH = position 1)
+    renumbered_groups = _renumber_relative_to(prefix_groups, ol_locant)
+
+    # Build prefixes
+    prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+
+    return f"{prefix_part}phenol"
+
+
 def _name_substituted_benzamide(
     prefix_groups: Dict[str, List[int]],
     amide_locant: int,

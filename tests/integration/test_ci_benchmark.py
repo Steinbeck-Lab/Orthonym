@@ -210,7 +210,7 @@ CI_BENCHMARK = [
     ),
     (
         "O=C([O-])[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
-        "(2R,3R)-2,3-dihydroxyphosphonobutanoic acid",
+        "(2R,3R)-2,3-dihydroxyphosphonobutanoate",  # P-72.2.1: [O-] carboxylate -> -oate
     ),
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"

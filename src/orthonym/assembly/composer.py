@@ -2686,20 +2686,55 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                             has_phenyl = True
                             break
             if not has_phenyl and cc > 0:
-                try:
-                    n_subs.append(get_alkyl_name(cc))
-                except (ValueError, KeyError):
-                    # Try recursive naming for complex N-substituents
+                # Check if substituent is branched (any carbon with 3+ heavy
+                # atom neighbors = branching point). Branched groups need
+                # recursive naming for correct IUPAC 2013 names
+                # (e.g., propan-2-yl not propyl for isopropyl).
+                is_branched = False
+                frag_set = set(frag) | {n_idx}  # include parent N
+                for fi in frag:
+                    fatom = mol.GetAtomWithIdx(fi)
+                    if fatom.GetSymbol() == 'C':
+                        # Count ALL heavy neighbors (including back to N)
+                        heavy_nbrs = sum(
+                            1 for nn in fatom.GetNeighbors()
+                            if nn.GetSymbol() != 'H'
+                        )
+                        if heavy_nbrs >= 3:
+                            is_branched = True
+                            break
+
+                if is_branched:
+                    # Branched: use recursive naming for correct IUPAC name
                     sub_name = name_substituent_fragment(
-                        mol, frag, frag[0], list(chain_set)
+                        mol, frag, frag[0], list(chain_set) + [n_idx]
                     )
                     if sub_name:
                         n_subs.append(sub_name)
                     else:
-                        logger.warning(
-                            "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
-                            cc,
+                        # Fallback to simple count
+                        try:
+                            n_subs.append(get_alkyl_name(cc))
+                        except (ValueError, KeyError):
+                            logger.warning(
+                                "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
+                                cc,
+                            )
+                else:
+                    try:
+                        n_subs.append(get_alkyl_name(cc))
+                    except (ValueError, KeyError):
+                        # Try recursive naming for complex N-substituents
+                        sub_name = name_substituent_fragment(
+                            mol, frag, frag[0], list(chain_set)
                         )
+                        if sub_name:
+                            n_subs.append(sub_name)
+                        else:
+                            logger.warning(
+                                "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
+                                cc,
+                            )
 
     if not n_subs:
         return None  # No N-substituents found, use general path
