@@ -713,6 +713,10 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
             # Complex ring acid (fused heterocycle etc.) - defer to complex naming
             return None
 
+    # Ensure CIP labels are assigned on the whole molecule for stereo collection
+    from rdkit.Chem import rdCIPLabeler
+    rdCIPLabeler.AssignCIPLabels(mol)
+
     # Get acid name and convert to acylate
     acid_name = get_acid_fragment_name(mol, acid_atoms)
     acylate_name = get_acylate_name(acid_name)
@@ -723,8 +727,93 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not alkyl_name:
         return None
 
+    # Collect R/S stereodescriptors for atoms in the acid fragment.
+    # Skip if the acid name already contains stereo (e.g., from the unsaturation
+    # path which produces names like "(4E)-octa-4,7-dienoic").
+    from .stereochemistry import format_stereodescriptor_string
+    acid_stereo = []
+    if not (acylate_name.startswith('(') and ')' in acylate_name):
+        acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match)
+        # Only keep R/S descriptors (E/Z is handled by the unsaturation path)
+        acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in ('R', 'S')]
+
     # Combine: "alkyl acylate"
-    return f"{alkyl_name} {acylate_name}"
+    name = f"{alkyl_name} {acylate_name}"
+
+    # Prepend R/S stereo prefix to the acylate portion
+    if acid_stereo:
+        stereo_prefix = format_stereodescriptor_string(acid_stereo)
+        name = f"{alkyl_name} {stereo_prefix}{acylate_name}"
+
+    return name
+
+
+def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
+                                   ester_match: tuple) -> list:
+    """Collect R/S stereodescriptors for the acid fragment of an ester.
+
+    Builds an atom_to_locant mapping for the acid chain (carbonyl C = 1,
+    then chain outward) and collects R/S descriptors for stereocenters
+    within the acid fragment.
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned).
+        acid_atoms: Atom indices of the acid fragment.
+        ester_match: Ester SMARTS match tuple.
+
+    Returns:
+        List of (locant, cip_code) tuples for acid fragment stereocenters.
+    """
+    from .stereochemistry import collect_stereodescriptors
+
+    acid_set = set(acid_atoms)
+
+    # Find the carbonyl carbon (C with =O in acid fragment)
+    carbonyl_c = None
+    carbonyl_o_idx = None
+    for idx in acid_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if (nbr.GetSymbol() == 'O'
+                    and bond.GetBondTypeAsDouble() == 2.0
+                    and nbr.GetIdx() in acid_set):
+                carbonyl_c = idx
+                carbonyl_o_idx = nbr.GetIdx()
+                break
+        if carbonyl_c is not None:
+            break
+
+    if carbonyl_c is None:
+        return []
+
+    # BFS from carbonyl C through the acid fragment to build chain ordering
+    # (carbonyl C = locant 1, next C = locant 2, etc.)
+    visited = {carbonyl_c}
+    queue = [(carbonyl_c, 1)]
+    atom_to_locant = {carbonyl_c: 1}
+
+    while queue:
+        current, locant = queue.pop(0)
+        atom = mol.GetAtomWithIdx(current)
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in visited or nbr_idx not in acid_set:
+                continue
+            if nbr_idx == carbonyl_o_idx:
+                # Skip the carbonyl oxygen (=O), it's not numbered
+                continue
+            if nbr.GetSymbol() == 'O' and nbr.GetTotalNumHs() >= 1:
+                # Skip -OH of the acid/fragment (not numbered)
+                continue
+            visited.add(nbr_idx)
+            next_locant = locant + 1 if nbr.GetSymbol() == 'C' else locant
+            atom_to_locant[nbr_idx] = next_locant
+            queue.append((nbr_idx, next_locant))
+
+    return collect_stereodescriptors(mol, atom_to_locant)
 
 
 def find_ester_match(mol) -> Optional[tuple]:

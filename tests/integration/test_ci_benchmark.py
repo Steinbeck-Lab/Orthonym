@@ -149,8 +149,8 @@ CI_BENCHMARK = [
         "/C=C/C=C/[C@@](C)(O)[C@@H](O[C@@H]2OC[C@@H](O[C@H]3C"
         "[C@@](C)(O)[C@H](N(C)C)[C@@H](C)O3)[C@H](O)[C@H]2N)"
         "/C=C\\C=C\\1",
-        "3-butyl-11-hydroxy-5,11,17,21,24-pentamethylazacyclotetracosan"
-        "-2-one",
+        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-3-butyl-11-hydroxy"
+        "-5,11,17,21,24-pentamethylazacyclotetracosan-2-one",
     ),
     (
         "CC(C)[C@@H](NC(N)=O)C(=O)O",
@@ -267,7 +267,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc(OC)c2c(c1CC=C(C)C)O[C@H](c1ccccc1)CC2",
-        "5,7-dimethoxy-8-(2-methylbut-2-enyl)-2-phenylchromane",
+        "(2S)-5,7-dimethoxy-8-(2-methylbut-2-enyl)-2-phenylchromane",
     ),
     (
         "CN=C(N)NCCC/C=C/CCC[C@H](C)[C@H]1OC(=O)/C(C)=C\\C=C/"
@@ -345,7 +345,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC1CCC/C=C\\C=C\\C(O)CC(O)C/C=C\\C=C\\C(O)C/C=C/C=C\\C(=O)O1",
-        "8,14,16-trihydroxy-24-methyloxacyclotetracosan-2-one",
+        "(3Z,5E,9E,11Z,17E,19Z)-8,14,16-trihydroxy-24-methyloxacyclotetracosan-2-one",
     ),
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@@H](O)COP(=O)(O)"
@@ -357,7 +357,7 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
+        "(3S,6R,9S,12R,15S,18R,21R)-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"

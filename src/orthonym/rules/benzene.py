@@ -1478,6 +1478,15 @@ def name_substituted_benzene(
     # oriented_ring[0] = position 1, oriented_ring[1] = position 2, etc.
     atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(oriented_ring)}
 
+    # Collect stereodescriptors for ring atoms (benzene carbons are sp2 so
+    # typically no R/S, but substituents attached at ring positions may carry
+    # E/Z on bonds to ring atoms). We pass the ring atom_to_locant mapping.
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    from rdkit.Chem import rdCIPLabeler
+
+    rdCIPLabeler.AssignCIPLabels(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
     # Separate suffix-type FGs from prefix-type substituents
     suffix_groups: Dict[str, List[int]] = defaultdict(list)
     prefix_groups: Dict[str, List[int]] = defaultdict(list)
@@ -1506,10 +1515,14 @@ def name_substituted_benzene(
 
     # If suffix groups exist, use suffix naming path
     if suffix_groups:
-        return _assemble_benzene_with_suffix(
+        name = _assemble_benzene_with_suffix(
             mol, suffix_groups, prefix_groups, n_substituents_map,
             atom_to_locant, oriented_ring
         )
+        if stereo_descriptors:
+            stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+            name = f"{stereo_prefix}{name}"
+        return name
 
     # === PREFIX-ONLY PATH (existing logic) ===
 
@@ -1528,13 +1541,21 @@ def name_substituted_benzene(
             # Other substituents become prefixes relative to benzonitrile
             if not prefix_groups:
                 # Pure benzonitrile
-                return "benzonitrile"
+                name = "benzonitrile"
+                if stereo_descriptors:
+                    stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+                    name = f"{stereo_prefix}{name}"
+                return name
 
             # Build prefixes for other substituents
             # Need to recalculate locants relative to nitrile at position 1
-            return _name_substituted_benzonitrile(
+            name = _name_substituted_benzonitrile(
                 prefix_groups, nitrile_locant, atom_to_locant, oriented_ring
             )
+            if stereo_descriptors:
+                stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+                name = f"{stereo_prefix}{name}"
+            return name
 
     # Count total number of substituents
     total_substituents = sum(len(locs) for locs in prefix_groups.values())
@@ -1566,7 +1587,14 @@ def name_substituted_benzene(
     prefix_part = _join_benzene_prefixes(prefixes)
 
     # Build final name
-    return f"{prefix_part}benzene"
+    name = f"{prefix_part}benzene"
+
+    # Prepend stereo prefix if descriptors exist
+    if stereo_descriptors:
+        stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+        name = f"{stereo_prefix}{name}"
+
+    return name
 
 
 def _assemble_benzene_with_suffix(

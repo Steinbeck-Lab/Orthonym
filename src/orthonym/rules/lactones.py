@@ -260,11 +260,22 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     # Build atom-to-locant mapping (1-indexed)
     atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
 
+    # Collect stereodescriptors using lactone ring locant mapping
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    from rdkit.Chem import rdCIPLabeler
+
+    rdCIPLabeler.AssignCIPLabels(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
     # Find exocyclic substituents (excluding carbonyl O which is the =O of the lactone)
     excluded = ring_set | {carbonyl_o_idx}
     substituents = _detect_lactone_substituents(mol, ordered, atom_to_locant, excluded)
 
     if not substituents:
+        # No substituents but may have stereo
+        if stereo_descriptors:
+            stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+            return f"{stereo_prefix}{parent_name}"
         return parent_name
 
     # Build prefix string
@@ -291,7 +302,14 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
 
     # Join multiple prefix parts with hyphens, then attach to parent
     prefix = '-'.join(prefix_parts)
-    return f"{prefix}{parent_name}"
+    name = f"{prefix}{parent_name}"
+
+    # Prepend stereo prefix if descriptors exist
+    if stereo_descriptors:
+        stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+        name = f"{stereo_prefix}{name}"
+
+    return name
 
 
 def _detect_lactone_substituents(mol, ordered_ring, atom_to_locant, excluded):
