@@ -178,6 +178,105 @@ class TestEdgeCases:
         assert 'benzene' in result.lower()
 
 
+@pytest.mark.integration
+class TestP441ParentCorrections:
+    """Phase 61 E2E tests: verify parent selection corrections for ring+chain compounds.
+
+    These tests validate that the P-44.1 cascade (PRNT-01 chain length, PRNT-02
+    multiple bonds) and PRNT-05 (PG proximity) changes produce correct naming
+    for compounds that previously had wrong parent selection.
+    """
+
+    def test_cyclohexanone_no_chain_competition(self):
+        """Cyclohexanone: single ring, no chain competition. Ring is parent.
+
+        Verifies single-ring molecules are unaffected by PG proximity changes.
+        """
+        result = name_compound('O=C1CCCCC1')
+        assert 'cyclohex' in result.lower(), (
+            f"Cyclohexanone should use ring parent. Got: {result}"
+        )
+        assert 'one' in result.lower() or 'on-' in result.lower(), (
+            f"Should contain ketone suffix. Got: {result}"
+        )
+
+    def test_benzoic_acid_ring_parent_preserved(self):
+        """Benzoic acid: retained name, ring is parent. No regression."""
+        result = name_compound('c1ccc(C(=O)O)cc1')
+        assert result == 'benzoic acid', (
+            f"Benzoic acid retained name must be preserved. Got: {result}"
+        )
+
+    def test_phenylbutanoic_acid_chain_parent_preserved(self):
+        """4-Phenylbutanoic acid: PG exclusively on chain, chain is parent.
+
+        Verifies the pg_on_chain-only path is not broken by cascade changes.
+        """
+        result = name_compound('c1ccc(CCCC(=O)O)cc1')
+        assert result == '4-phenylbutanoic acid', (
+            f"Chain-only PG should give chain parent. Got: {result}"
+        )
+
+    def test_cyclohexanol_chain_longer_wins(self):
+        """Alcohol on both ring and chain, chain is longer -> chain should be parent.
+
+        OC1CCCCC1CCCCO: cyclohexanol (ring, 6 atoms) + butan-1-ol chain (chain has
+        more atoms including the cyclohexyl-bearing carbon). P-44.1 chain-length
+        criterion should select chain as parent when PG count ties.
+        """
+        result = name_compound('OC1CCCCC1CCCCO')
+        # Chain is parent: "cyclohexyl" should appear as substituent prefix
+        assert 'cyclohexyl' in result.lower() or 'butan' in result.lower(), (
+            f"Chain-length criterion should produce chain parent with cyclohexyl "
+            f"substituent. Got: {result}"
+        )
+
+    def test_multi_ring_pg_proximity_selects_ketone_ring(self):
+        """Multi-ring with PG: cyclohexanone + cyclohexane connected by chain.
+
+        O=C1CCCCC1CCC1CCCCC1: cyclohexanone has PG directly on ring. The other
+        cyclohexane has no PG. PRNT-05 PG proximity should select cyclohexanone
+        ring as the parent (senior ring system for naming).
+        """
+        result = name_compound('O=C1CCCCC1CCC1CCCCC1')
+        # The cyclohexanone ring should be the parent
+        assert 'cyclohex' in result.lower(), (
+            f"Multi-ring should use cyclohexanone as parent ring. Got: {result}"
+        )
+        assert 'one' in result.lower() or 'on-' in result.lower(), (
+            f"Should contain ketone suffix from ring parent. Got: {result}"
+        )
+
+    def test_pyridine_senior_over_cyclohexane(self):
+        """Pyridine + cyclohexane: pyridine is more senior ring system.
+
+        c1ccncc1CCC1CCCCC1: pyridine (heterocyclic, contains N) should be
+        preferred over cyclohexane per P-44.2 ring seniority.
+        """
+        result = name_compound('c1ccncc1CCC1CCCCC1')
+        # Pyridine should be the parent ring, cyclohexane as substituent
+        assert 'pyridin' in result.lower(), (
+            f"Pyridine should be parent ring. Got: {result}"
+        )
+        assert 'cyclohexyl' in result.lower(), (
+            f"Cyclohexane should be cyclohexyl substituent. Got: {result}"
+        )
+
+    def test_trimethylcyclohexenone_ring_parent(self):
+        """3,5,5-Trimethylcyclohex-2-en-1-one: ring is parent (canary).
+
+        CC1=CC(=O)CC(C)(C)C1: monocyclic ring with FG directly on ring.
+        Ring should be parent without chain competition.
+        """
+        result = name_compound('CC1=CC(=O)CC(C)(C)C1')
+        assert 'cyclohex' in result.lower(), (
+            f"Should use cyclohexenone parent. Got: {result}"
+        )
+        assert 'trimethyl' in result.lower(), (
+            f"Should contain trimethyl substituent prefix. Got: {result}"
+        )
+
+
 class TestAlphabetizationWithRingSubstituents:
     """Test alphabetization works correctly with ring substituents."""
 
