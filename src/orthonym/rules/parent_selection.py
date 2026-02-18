@@ -15,7 +15,7 @@ This means:
 - If -COOH is on the chain, chain MUST be parent
 - If -COOH is directly on the ring, ring MUST be parent
 - For hydrocarbons (no FG), rings have seniority over chains (P-44.1.2.2)
-- When FG count is tied, ring always wins (P-52.2.8)
+- When FG count is tied, P-44.1 cascade (chain length > multiple bonds) applied before P-52.2.8 ring default
 - When multiple ring systems exist, the most senior one is the parent (P-44.2)
 """
 
@@ -143,8 +143,8 @@ def is_principal_group_on_chain(
 def _count_multiple_bonds(mol, atom_set: Set[int]) -> int:
     """Count double + triple bonds where both atoms are in atom_set.
 
-    Used by P-44.1 audit logging to compare multiple-bond counts
-    between chain and ring candidates.
+    Used by P-44.1 cascade as second tiebreaker (after chain length)
+    to compare multiple-bond counts between chain and ring candidates.
 
     Args:
         mol: RDKit Mol object
@@ -363,34 +363,8 @@ def select_parent(
                 substituent_rings=substituent_ring_tuples,
                 reasoning=f"More {principal_group} groups on chain ({pg_count_on_chain}) than ring ({pg_count_on_ring})"
             )
-        else:
-            # P-52.2.8: Ring is always preferred when FG count is equal or
-            # more on ring. "When the ring and the chain contain the same
-            # number of skeletal atoms in the ring or chain, the ring system
-            # is always preferred." This extends to FG count tie-breaking.
-
-            # INST-03/INST-04: Audit what P-44.1 chain-length and
-            # multiple-bond criteria WOULD produce (behavior unchanged,
-            # ring still wins)
-            if pg_count_on_ring == pg_count_on_chain:
-                if logger.isEnabledFor(logging.DEBUG):
-                    chain_set = set(principal_chain)
-                    chain_len = len(principal_chain)
-                    ring_size = len(all_ring_atoms)
-                    chain_mult_bonds = _count_multiple_bonds(mol, chain_set)
-                    ring_mult_bonds = _count_multiple_bonds(mol, all_ring_atoms)
-                    logger.debug(
-                        "P44_AUDIT: pg_tied=%d chain_len=%d ring_size=%d "
-                        "chain_would_win_length=%s "
-                        "chain_mult_bonds=%d ring_mult_bonds=%d "
-                        "chain_would_win_bonds=%s "
-                        "decision=ring_default reason=P-52.2.8_blanket",
-                        pg_count_on_ring, chain_len, ring_size,
-                        chain_len > ring_size,
-                        chain_mult_bonds, ring_mult_bonds,
-                        chain_mult_bonds > ring_mult_bonds,
-                    )
-
+        elif pg_count_on_ring > pg_count_on_chain:
+            # Ring has strictly more PGs -> ring wins by count
             best_ring, other_rings = _select_best_ring_system(
                 mol, ring_systems, principal_group_atoms
             )
@@ -399,7 +373,66 @@ def select_parent(
                 parent_type='ring',
                 parent_atoms=list(sorted(best_ring)),
                 substituent_rings=other_ring_tuples,
-                reasoning=f"P-52.2.8 ring wins: {pg_count_on_ring} {principal_group} on ring vs {pg_count_on_chain} on chain"
+                reasoning=f"Ring wins by PG count: {pg_count_on_ring} > {pg_count_on_chain} {principal_group}"
+            )
+        else:
+            # PG counts tied -> P-44.1 cascade: length > multiple bonds > P-52.2.8
+            chain_len = len(principal_chain)
+
+            # Compare chain length vs BEST ring system size (not all_ring_atoms union)
+            best_ring, other_rings = _select_best_ring_system(
+                mol, ring_systems, principal_group_atoms
+            )
+            ring_size = len(best_ring)
+
+            if chain_len > ring_size:
+                # PRNT-01: Chain is longer -> chain wins
+                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+                # Include the best ring in substituent_rings too
+                all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
+                return ParentSelectionResult(
+                    parent_type='chain',
+                    parent_atoms=principal_chain,
+                    substituent_rings=all_sub_rings,
+                    reasoning=f"P-44.1 chain-length: chain ({chain_len}) > ring ({ring_size}), "
+                              f"PG tied at {pg_count_on_ring} {principal_group}"
+                )
+
+            if ring_size > chain_len:
+                # Ring is larger -> ring wins
+                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+                return ParentSelectionResult(
+                    parent_type='ring',
+                    parent_atoms=list(sorted(best_ring)),
+                    substituent_rings=other_ring_tuples,
+                    reasoning=f"P-44.1 ring-size: ring ({ring_size}) > chain ({chain_len}), "
+                              f"PG tied at {pg_count_on_ring} {principal_group}"
+                )
+
+            # Length also tied -> PRNT-02: compare multiple bonds
+            chain_set = set(principal_chain)
+            chain_mult = _count_multiple_bonds(mol, chain_set)
+            ring_mult = _count_multiple_bonds(mol, best_ring)
+
+            if chain_mult > ring_mult:
+                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+                all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
+                return ParentSelectionResult(
+                    parent_type='chain',
+                    parent_atoms=principal_chain,
+                    substituent_rings=all_sub_rings,
+                    reasoning=f"P-44.1 multiple-bonds: chain ({chain_mult}) > ring ({ring_mult}), "
+                              f"PG and length tied"
+                )
+
+            # All criteria tied -> P-52.2.8 final tiebreaker: ring wins
+            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+            return ParentSelectionResult(
+                parent_type='ring',
+                parent_atoms=list(sorted(best_ring)),
+                substituent_rings=other_ring_tuples,
+                reasoning=f"P-52.2.8 ring wins: PG={pg_count_on_ring}, length={ring_size}, "
+                          f"bonds: ring={ring_mult} chain={chain_mult} - all tied"
             )
 
     # Neither on ring nor chain (shouldn't happen in well-formed molecules)
