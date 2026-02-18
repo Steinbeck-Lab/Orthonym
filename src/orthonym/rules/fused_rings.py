@@ -1047,6 +1047,12 @@ def _assemble_fused_heterocycle_name(
         Hypoxanthine: '7H-purin-6-one'
         Xanthine: '7H-purine-2,6-dione'
     """
+    # Collect stereodescriptors using the fused ring locant mapping
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    rdCIPLabeler.AssignCIPLabels(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, atom_mapping)
+    stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
+
     prefix_parts = []
 
     # Handle N-substituents
@@ -1135,8 +1141,10 @@ def _assemble_fused_heterocycle_name(
         oxo_amino_suffix = _build_fused_suffix(substituents, core_name)
         if oxo_amino_suffix:
             modified_core = _apply_suffix_to_core(core_name, oxo_amino_suffix)
-            return _join_prefix_to_parent(prefix_str, modified_core) + suffix_part.lstrip('-')
-        return _join_prefix_to_parent(prefix_str, core_name) + suffix_part
+            name = _join_prefix_to_parent(prefix_str, modified_core) + suffix_part.lstrip('-')
+            return f"{stereo_prefix}{name}" if stereo_prefix else name
+        name = _join_prefix_to_parent(prefix_str, core_name) + suffix_part
+        return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     # Handle suffix-forming groups (oxo and amino only, no detachable suffixes)
     suffix_str = _build_fused_suffix(substituents, core_name)
@@ -1144,9 +1152,11 @@ def _assemble_fused_heterocycle_name(
     if suffix_str:
         # Apply suffix to core name with vowel elision
         modified_core = _apply_suffix_to_core(core_name, suffix_str)
-        return _join_prefix_to_parent(prefix_str, modified_core)
+        name = _join_prefix_to_parent(prefix_str, modified_core)
+        return f"{stereo_prefix}{name}" if stereo_prefix else name
 
-    return _join_prefix_to_parent(prefix_str, core_name)
+    name = _join_prefix_to_parent(prefix_str, core_name)
+    return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 
 def _join_prefix_to_parent(prefix_str: str, parent_name: str) -> str:

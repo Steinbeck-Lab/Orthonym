@@ -768,6 +768,25 @@ def name_substituted_polycyclic(
     if not substituents:
         return pah_name
 
+    # Collect stereodescriptors for chiral substituents on PAH
+    from rdkit.Chem import rdCIPLabeler
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    rdCIPLabeler.AssignCIPLabels(mol)
+
+    # Build atom_to_locant from the PAH numbering
+    pah_data = POLYCYCLIC_DATA.get(pah_name, {})
+    smarts = pah_data.get('smarts', '')
+    pattern = Chem.MolFromSmarts(smarts) if smarts else None
+    atom_to_locant = {}
+    if pattern:
+        matches = mol.GetSubstructMatches(pattern)
+        if matches:
+            match_atoms = list(matches[0])
+            atom_to_locant = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
+
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant) if atom_to_locant else []
+    stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
+
     # Separate suffix-type FGs from prefix-type substituents
     suffix_groups: Dict[str, List[int]] = defaultdict(list)  # suffix_name -> [locants]
     prefix_substituent_groups: Dict[str, List[int]] = defaultdict(list)
@@ -840,10 +859,12 @@ def name_substituted_polycyclic(
             prefixes.append(prefix_str)
             prefix_part = _join_pah_prefixes(sorted(prefixes, key=lambda s: alpha_sort_key(s.lstrip('0123456789,-'))))
 
-        return f"{prefix_part}{pah_name}{suffix_part}"
+        name = f"{prefix_part}{pah_name}{suffix_part}"
+        return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     # Build final name (prefix-only, no suffix FGs)
-    return f"{prefix_part}{pah_name}"
+    name = f"{prefix_part}{pah_name}"
+    return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 
 def _join_pah_prefixes(prefixes: List[str]) -> str:
@@ -1109,8 +1130,8 @@ def _assemble_partially_saturated_carbocycle_name(
     """
     Assemble IUPAC name for partially saturated carbocyclic system.
 
-    Format: [locants]-[prefix][parent]
-    Example: 1,2,3,4-tetrahydronaphthalene
+    Format: [stereo][locants]-[prefix][parent]
+    Example: (1R)-1,2,3,4-tetrahydronaphthalene
 
     Args:
         mol: RDKit Mol object
@@ -1120,12 +1141,19 @@ def _assemble_partially_saturated_carbocycle_name(
         Complete IUPAC name
     """
     from .partial_saturation import format_saturation_prefix, get_saturation_locants
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+    from rdkit.Chem import rdCIPLabeler
 
     parent_name = saturation_info['parent_name']
     prefix = saturation_info['prefix']
     saturated_indices = saturation_info['saturated_indices']
     atom_to_locant = saturation_info.get('atom_to_locant', {})
     is_perhydro = saturation_info['is_perhydro']
+
+    # Collect stereodescriptors using the ring system's locant mapping
+    rdCIPLabeler.AssignCIPLabels(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant) if atom_to_locant else []
+    stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
 
     # Get locants for saturated positions
     if is_perhydro:
@@ -1136,7 +1164,8 @@ def _assemble_partially_saturated_carbocycle_name(
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
     # Assemble final name
-    return f"{formatted_prefix}{parent_name}"
+    name = f"{formatted_prefix}{parent_name}"
+    return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 
 # ============================================================================

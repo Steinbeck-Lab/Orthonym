@@ -72,6 +72,19 @@ def collect_stereodescriptors(
     # Collect E/Z double bonds (bond-based)
     for bond in mol.GetBonds():
         if bond.HasProp('_CIPCode'):
+            # Skip ring-constrained double bonds in small rings: double bonds
+            # in rings of size 8 or fewer have geometry fixed by ring strain,
+            # so E/Z descriptors are not meaningful (e.g., cyclohexene).
+            # Macrocyclic rings (>8 members) CAN have meaningful E/Z geometry.
+            if bond.IsInRing():
+                ri = mol.GetRingInfo()
+                min_ring_size = float('inf')
+                for ring in ri.BondRings():
+                    if bond.GetIdx() in ring:
+                        min_ring_size = min(min_ring_size, len(ring))
+                if min_ring_size <= 8:
+                    continue
+
             begin_idx = bond.GetBeginAtomIdx()
             end_idx = bond.GetEndAtomIdx()
 
