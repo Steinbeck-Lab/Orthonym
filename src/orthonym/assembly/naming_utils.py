@@ -303,6 +303,12 @@ def is_complex_substituent(name: str) -> bool:
     )
     if _MULT_SUBSTITUENT_RE.match(name):
         return True
+    # Compound oxy-prefixes (sulfooxy, phosphonooxy, etc.) require brackets
+    # These are multi-part prefixes that OPSIN/IUPAC require parenthesization for
+    _COMPOUND_OXY_PREFIXES = ('sulfooxy', 'sulfonyloxy', 'phosphonooxy',
+                               'phosphonatoxy', 'carbonyloxy')
+    if name in _COMPOUND_OXY_PREFIXES:
+        return True
     return False
 
 

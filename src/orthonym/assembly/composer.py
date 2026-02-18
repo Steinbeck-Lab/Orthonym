@@ -55,6 +55,25 @@ from ..rules.partial_saturation import (
 from ..data.partial_saturation_refs import get_aromatic_reference, get_reference_smiles
 
 
+def _coverage_gate_threshold(total_heavy: int) -> float:
+    """Return the minimum name-length / heavy-atom ratio for the coverage gate.
+
+    The coverage gate rejects names that are too short for the molecule size
+    (indicating incomplete naming). The threshold is size-adaptive:
+      - HA <= 20: 0.3  (small molecules have short but valid names)
+      - HA > 20:  0.4  (larger molecules need longer names to be adequate)
+
+    Args:
+        total_heavy: Number of heavy atoms in the molecule.
+
+    Returns:
+        Minimum acceptable ratio of len(name) / total_heavy.
+    """
+    if total_heavy <= 20:
+        return 0.3
+    return 0.4
+
+
 def get_saturation_prefix_for_fused_ring(
     mol,
     aromatic_parent_name: Optional[str] = None,
@@ -443,22 +462,36 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # Lactones are cyclic esters that should be named as heterocyclic ketones
     # (e.g., oxolan-2-one, not tetrahydrofuran or "alkyl alkanoate")
     # Must come before polyfunctional because lactones trigger polyfunctional detection
+    # Coverage guard: if molecule is much larger than the lactone ring, the bare
+    # lactone name is incomplete and we should fall through to a handler that
+    # can include substituents (e.g., benzene handler, polyfunctional handler).
     from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
     lactone_info = is_monocyclic_lactone(features.mol)
     if lactone_info:
-        lactone_name = name_monocyclic_lactone(features.mol)
-        if lactone_name:
-            return lactone_name
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        ring_size = lactone_info.get('ring_size', 0)
+        # Only use bare lactone naming when molecule is not much larger than ring
+        # Ring atoms + carbonyl O + up to 3 small substituents = ring_size + 4
+        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
+        if ring_size > 8 or total_heavy <= ring_size + 4:
+            lactone_name = name_monocyclic_lactone(features.mol)
+            if lactone_name:
+                return lactone_name
 
     # Handle monocyclic lactams BEFORE polyfunctional and amide handlers
     # Lactams are cyclic amides named as heterocyclic ketones (parallel to lactones)
     # e.g., azetidin-2-one, pyrrolidin-2-one, piperidin-2-one
+    # Same coverage guard as lactones above.
     from ..rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
     lactam_info = is_monocyclic_lactam(features.mol)
     if lactam_info:
-        lactam_name = name_monocyclic_lactam(features.mol)
-        if lactam_name:
-            return lactam_name
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        ring_size = lactam_info.get('ring_size', 0)
+        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
+        if ring_size > 8 or total_heavy <= ring_size + 4:
+            lactam_name = name_monocyclic_lactam(features.mol)
+            if lactam_name:
+                return lactam_name
 
     # Handle ring-attached esters BEFORE polyfunctional handler
     # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
@@ -656,12 +689,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             })
             total_heavy = features.mol.GetNumHeavyAtoms()
             is_nucleobase_core = complex_name.lower() in _NUCLEOBASE_CORE_NAMES
-            if is_nucleobase_core or total_heavy <= 15 or len(complex_name) / total_heavy >= 0.4:
+            threshold = _coverage_gate_threshold(total_heavy)
+            if is_nucleobase_core or total_heavy <= 15 or len(complex_name) / total_heavy >= threshold:
                 return complex_name
             # else: complex ring name too short -- fall through to simpler handlers
             logger.warning(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
-                "complex_ring", len(complex_name) / max(total_heavy, 1),
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
+                "complex_ring", len(complex_name) / max(total_heavy, 1), threshold,
             )
         # If complex ring naming fails, fall through to simpler handling
 
@@ -694,12 +728,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         hetero_name = _assemble_heterocycle_name(features, style)
         if hetero_name:
             total_heavy = features.mol.GetNumHeavyAtoms()
-            if total_heavy <= 15 or len(hetero_name) / total_heavy >= 0.4:
+            threshold = _coverage_gate_threshold(total_heavy)
+            if total_heavy <= 15 or len(hetero_name) / total_heavy >= threshold:
                 return hetero_name
             # else: heterocycle name too short -- fall through to chain naming
             logger.warning(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
-                "heterocycle", len(hetero_name) / max(total_heavy, 1),
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
+                "heterocycle", len(hetero_name) / max(total_heavy, 1), threshold,
             )
         # If heterocycle naming fails, fall through
 
@@ -710,12 +745,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if benzene_name:
             # Coverage gate: reject if name is too short for molecule size
             total_heavy = features.mol.GetNumHeavyAtoms()
-            if total_heavy <= 10 or len(benzene_name) / total_heavy >= 0.4:
+            threshold = _coverage_gate_threshold(total_heavy)
+            if total_heavy <= 10 or len(benzene_name) / total_heavy >= threshold:
                 return benzene_name
             # else: benzene name too short -- fall through to chain naming
             logger.warning(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=0.4",
-                "benzene", len(benzene_name) / max(total_heavy, 1),
+                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
+                "benzene", len(benzene_name) / max(total_heavy, 1), threshold,
             )
         # If benzene naming fails, fall through
 
@@ -3615,7 +3651,10 @@ def _build_substituted_ring_name(
         count = len(locs)
         loc_str = ','.join(str(l) for l in locs)
         if count == 1:
-            prefix_parts.append(f'{loc_str}-{name}')
+            if is_complex_substituent(name):
+                prefix_parts.append(f'{loc_str}-({name})')
+            else:
+                prefix_parts.append(f'{loc_str}-{name}')
         else:
             mult = get_multiplier_prefix(count, name)
             if is_complex_substituent(name):
@@ -3693,6 +3732,27 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
                 o_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != atom_idx]
                 if h_count == 1 and len(o_nbrs) == 0:
                     sub_groups['hydroxy'].append(ring_pos)
+                elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'S':
+                    # O -> S: check for sulfooxy (-O-S(=O)(=O)-OH)
+                    s_idx = o_nbrs[0].GetIdx()
+                    s_atom = mol.GetAtomWithIdx(s_idx)
+                    # Count =O bonds and -OH bonds on sulfur
+                    s_dbl_o = 0
+                    s_oh = 0
+                    for s_nbr in s_atom.GetNeighbors():
+                        if s_nbr.GetIdx() == ni:
+                            continue  # skip the O that links to ring
+                        if s_nbr.GetSymbol() == 'O':
+                            bond = mol.GetBondBetweenAtoms(s_idx, s_nbr.GetIdx())
+                            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                                s_dbl_o += 1
+                            elif s_nbr.GetTotalNumHs() == 1:
+                                s_oh += 1
+                    if s_dbl_o == 2 and s_oh >= 1:
+                        sub_groups['sulfooxy'].append(ring_pos)
+                    elif s_dbl_o == 2 and s_oh == 0:
+                        # -O-S(=O)(=O)- without OH: sulfonyloxy
+                        sub_groups['sulfonyloxy'].append(ring_pos)
                 elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
                     c_start = o_nbrs[0].GetIdx()
                     c_start_atom = mol.GetAtomWithIdx(c_start)

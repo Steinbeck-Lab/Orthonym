@@ -614,6 +614,23 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 'atoms': [n_idx, neighbors[0].GetIdx()]
             }
 
+    # Fallback: complex N-substituent (non-alkyl chains, heteroatom-containing
+    # groups like guanidino, ureido, etc.).  Collect all atoms via BFS and try
+    # recursive naming.
+    if neighbors:
+        sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+        if len(sub_atoms) > 1 and len(sub_atoms) <= 25:
+            from ..assembly.substituent_naming import name_substituent_fragment
+            frag_name = name_substituent_fragment(
+                mol, sub_atoms, n_idx, list(ring_atoms)
+            )
+            if frag_name:
+                return {
+                    'name': frag_name,
+                    'atoms': sub_atoms,
+                    'is_complex': True,
+                }
+
     return None
 
 

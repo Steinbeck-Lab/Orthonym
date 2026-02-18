@@ -916,6 +916,106 @@ def _identify_functionalized_substituent(
                         'type': 'functionalized'
                     }
 
+    # Check for amino terminus: -CH2-NH2, -CH2-CH2-NH2, etc.
+    # Handles aminomethyl (-CH2NH2), 2-aminoethyl (-CH2CH2NH2), etc.
+    # Only match when the chain between ring and NH2 is purely carbon
+    # (avoids misidentifying complex chains through ribose/phosphate as "aminoalkyl")
+    amino_pattern = Chem.MolFromSmarts('[NX3H2;!$([NX3H2][CX3]=O)]')
+    if amino_pattern:
+        matches = mol.GetSubstructMatches(amino_pattern)
+        for match in matches:
+            n_idx = match[0]
+            if n_idx in chain_atoms:
+                # Verify chain is purely carbon + the terminal N (no intermediate heteroatoms)
+                non_cn_count = sum(1 for idx in chain_atoms
+                                   if mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'N'))
+                if non_cn_count > 0:
+                    continue  # Complex chain with O, S, P etc. — skip
+                if carbon_count == 1:
+                    return {
+                        'name': 'aminomethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'amine',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 2:
+                    return {
+                        'name': '2-aminoethyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'amine',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 3:
+                    return {
+                        'name': '3-aminopropyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'amine',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count > 3:
+                    try:
+                        return {
+                            'name': f'{carbon_count}-amino{get_alkyl_name(carbon_count)}',
+                            'atoms': chain_atoms,
+                            'functional_group': 'amine',
+                            'type': 'functionalized'
+                        }
+                    except (ValueError, KeyError):
+                        pass
+
+    # Check for acetyl/acyl terminus: -C(=O)-R on ring
+    # Handles acetyl (-C(=O)-CH3), etc.
+    acyl_pattern = Chem.MolFromSmarts('[CX3](=O)[#6]')
+    if acyl_pattern:
+        matches = mol.GetSubstructMatches(acyl_pattern)
+        for match in matches:
+            acyl_c = match[0]
+            if acyl_c in chain_atoms and acyl_c == start_idx:
+                # Acyl group directly on ring
+                if carbon_count == 2:
+                    return {
+                        'name': 'acetyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'ketone',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 3:
+                    return {
+                        'name': 'propanoyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'ketone',
+                        'type': 'functionalized'
+                    }
+
+    # Check for ester group: -C(=O)-O-R (suffix: carboxylate/carboxylic acid)
+    ester_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2][#6]')
+    if ester_pattern:
+        matches = mol.GetSubstructMatches(ester_pattern)
+        for match in matches:
+            ester_c = match[0]
+            if ester_c in chain_atoms and ester_c == start_idx:
+                # Ester directly on ring: e.g., -C(=O)OCH3 → "methoxycarbonyl" or
+                # treated as suffix "carboxylate" / "carboxylic acid" depending on context
+                o_idx = match[2]
+                alkyl_atom = match[3]
+                # Check alkyl part
+                alkyl_atoms = _bfs_alkyl_from(mol, alkyl_atom, excluded | set(chain_atoms) - {alkyl_atom})
+                if alkyl_atoms is not None:
+                    alkyl_c_count = sum(1 for idx in alkyl_atoms
+                                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C')
+                    _ALKYL = {1: 'methyl', 2: 'ethyl', 3: 'propyl'}
+                    alkyl_name = _ALKYL.get(alkyl_c_count)
+                    if alkyl_name:
+                        # Return as suffix: "methyl ester" -> suffix_name used in assembly
+                        return {
+                            'name': 'carboxylic acid',
+                            'atoms': chain_atoms,
+                            'functional_group': 'ester',
+                            'type': 'suffix',
+                            'suffix_name': 'carboxylic acid',
+                            'ester_alkyl': alkyl_name,
+                        }
+
     return None
 
 
