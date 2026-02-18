@@ -24,9 +24,10 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 132 golden canary compounds: (SMILES, expected_name)
+# 141 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
+# + 9 from Phase 63 (Stereochemistry Accuracy)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -570,6 +571,43 @@ CANARY_COMPOUNDS = [
         "OCC(O)C(O)C(O)C(O)CO",
         "2,3,4,5-tetrahydroxyhexane-1,6-diol",
     ),
+    # --- Phase 63: Stereochemistry Accuracy RT Fixes (9 compounds) ---
+    (
+        "COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O",
+        "(3S)-6,7-dihydroxy-8-methoxy-3-methylisochroman-4-one",
+    ),
+    (
+        "O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]",
+        "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate",
+    ),
+    (
+        r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
+        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
+    ),
+    (
+        "O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1",
+        "(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid",
+    ),
+    (
+        "C=CC/C=C/CCC(=O)OC",
+        "methyl (4E)-octa-4,7-dienoate",
+    ),
+    (
+        r"CCCC/C=C\CCCCCCCCCOC(C)=O",
+        "(10Z)-pentadec-10-en-1-yl acetate",
+    ),
+    (
+        "O=C([O-])C(=O)C[C@H](O)C(=O)[O-]",
+        "(2S)-2-hydroxy-4-oxopentanedioate",
+    ),
+    (
+        "CCC[C@@H]1OCc2c(O)cccc2[C@H]1O",
+        "(3S,4R)-4,8-dihydroxy-3-propylisochromane",
+    ),
+    (
+        "C[C@@H]1Cc2cc(O)cc(O)c2CO1",
+        "(3R)-6,8-dihydroxy-3-methylisochromane",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -580,7 +618,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt132(smiles, expected_name):
+def test_canary_rt141(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
