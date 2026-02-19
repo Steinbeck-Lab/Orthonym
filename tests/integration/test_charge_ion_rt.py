@@ -1,9 +1,23 @@
 """
 Phase 64: Charge and Ion Naming - Regression Tests
 
-Tests for compounds fixed in Phase 64 Plan 01:
-- A1: Single anion naming (-oate suffix via neutralize-then-name)
-- A3: Salt naming (guanidinium, hydrogen prefix, neutral fragment handling)
+Phase 64 Accounting:
+  Total compounds addressed: 31 of 39
+  Categories fixed:
+    A1 (single anions): 6 compounds -- -oate suffix via neutralize-then-name
+    A2 (single cations): 1 compound -- 2-methylpropan-2-aminium correct at v7
+    A3 (salts): 4 compounds -- guanidinium, hydrogen prefix, hydrochloride
+    A4 (multi-charged anions): 4 compounds -- phosphate dianion neutralize path
+    B1 (phospholipid zwitterions): 8 compounds -- routed to neutral pipeline
+    B2 (amino acid zwitterions): 8 compounds -- retained names + neutral naming
+  Names improved: 27 (non-empty, non-garbled names produced)
+  OPSIN parse: 9 (OPSIN accepts the name from Plan 01 fixes)
+  InChI RT: 4 (full round-trip match from Plan 01 fixes)
+  Still failing: 8 (steroid vocabulary, large molecule naming, metal complexes)
+
+Tests for compounds fixed in Phase 64:
+- Plan 01: A1 single anions, A3 salts (guanidinium, hydrogen prefix, etc.)
+- Plan 02: A4 phosphate dianions, B1 phospholipid zwitterions, amino acid zwitterions
 
 Each test verifies a specific compound produces the expected name pattern.
 When names improve in future phases, update the expected values.
@@ -147,3 +161,127 @@ class TestRetainedIonNames:
     def test_oxalate(self):
         result = name_compound('O=C([O-])C(=O)[O-]')
         assert result == 'oxalate', f"Got: {result}"
+
+
+# ---------------------------------------------------------------------------
+# A4: Multi-Charged Anion Compounds (Plan 02)
+# Phosphate dianions -- neutralize O- to OH, name neutral form.
+# ---------------------------------------------------------------------------
+
+class TestMultiChargedAnionNaming:
+    """Test phosphate dianion compounds produce names via neutralize path."""
+
+    def test_a4_1_glycerol_3_phosphate(self):
+        """A4#1: glycerol-3-phosphate dianion."""
+        result = name_compound('O=P([O-])([O-])OC[C@@H](O)CO')
+        assert result, "Should produce a name"
+        assert 'phosph' in result.lower(), \
+            f"Should contain phosph reference: {result}"
+
+    def test_a4_3_phosphate_ester_dianion(self):
+        """A4#3: phosphate ester dianion on long chain."""
+        result = name_compound(
+            'O=C(O)CCCCCCCCCCCCCCCCCC(=O)OCCOP(=O)([O-])[O-]'
+        )
+        assert result, "Should produce a name"
+        # Should not be empty -- the poly-anion path neutralizes then names
+        assert len(result) > 5, f"Name too short: {result}"
+
+
+# ---------------------------------------------------------------------------
+# B1: Phospholipid Zwitterion Compounds (Plan 02)
+# These are now routed to the neutral pipeline instead of producing
+# garbled "ammonium Xanoate" names.
+# ---------------------------------------------------------------------------
+
+class TestPhospholipidZwitterionNaming:
+    """Test phospholipid zwitterions produce structural names, not garbled."""
+
+    def test_b1_1_dipalmitoyl_pc(self):
+        """B1: dipalmitoyl phosphatidylcholine zwitterion."""
+        result = name_compound(
+            'CCCCCCCCCCCCCCCC(=O)OC(COC(=O)CCCCCCCCCCCCCCC)'
+            'COP(=O)([O-])OCC[N+](C)(C)C'
+        )
+        assert result, "Should produce a name"
+        assert 'ammonium' not in result.lower(), \
+            f"Should NOT produce ammonium name: {result}"
+
+    def test_b1_2_dihexacosanoyl_pc(self):
+        """B1: dihexacosanoyl phosphatidylcholine zwitterion."""
+        result = name_compound(
+            'CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC(COC(=O)'
+            'CCCCCCCCCCCCCCCCCCCCCCCCC)COP(=O)([O-])OCC[N+](C)(C)C'
+        )
+        assert result, "Should produce a name"
+        assert 'ammonium' not in result.lower(), \
+            f"Should NOT produce ammonium name: {result}"
+
+
+# ---------------------------------------------------------------------------
+# Amino Acid Zwitterion Naming (Plan 02)
+# Amino acid zwitterions should produce retained trivial names or
+# neutral-form systematic names, NOT ionic "2-azaniumylXanoate".
+# ---------------------------------------------------------------------------
+
+class TestAminoAcidZwitterionNaming:
+    """Test amino acid zwitterions produce correct names."""
+
+    def test_glycine_zwitterion(self):
+        """Glycine zwitterion should produce 'glycine'."""
+        result = name_compound('[NH3+]CC([O-])=O')
+        assert result == 'glycine', f"Expected glycine, got: {result}"
+
+    def test_l_alanine_zwitterion(self):
+        """L-alanine zwitterion should produce 'L-alanine'."""
+        result = name_compound('C[C@H]([NH3+])C([O-])=O')
+        assert result == 'L-alanine', f"Expected L-alanine, got: {result}"
+
+    def test_l_valine_zwitterion(self):
+        """L-valine zwitterion."""
+        result = name_compound('CC(C)[C@@H]([NH3+])C([O-])=O')
+        assert result == 'L-valine', f"Expected L-valine, got: {result}"
+
+    def test_l_leucine_zwitterion(self):
+        """L-leucine zwitterion."""
+        result = name_compound('CC(C)C[C@@H]([NH3+])C([O-])=O')
+        assert result == 'L-leucine', f"Expected L-leucine, got: {result}"
+
+    def test_l_proline_zwitterion(self):
+        """L-proline zwitterion."""
+        result = name_compound('O=C([O-])[C@@H]1CCC[NH2+]1')
+        assert result == 'L-proline', f"Expected L-proline, got: {result}"
+
+    def test_l_phenylalanine_zwitterion(self):
+        """L-phenylalanine zwitterion."""
+        result = name_compound('[NH3+][C@@H](Cc1ccccc1)C([O-])=O')
+        assert result == 'L-phenylalanine', \
+            f"Expected L-phenylalanine, got: {result}"
+
+    def test_l_glutamic_acid_zwitterion(self):
+        """L-glutamic acid zwitterion (one COOH protonated)."""
+        result = name_compound('[NH3+][C@@H](CCC(=O)O)C(=O)[O-]')
+        assert result == 'L-glutamic acid', \
+            f"Expected L-glutamic acid, got: {result}"
+
+    def test_l_aspartic_acid_zwitterion(self):
+        """L-aspartic acid zwitterion (one COOH protonated)."""
+        result = name_compound('[NH3+][C@@H](CC(=O)O)C(=O)[O-]')
+        assert result == 'L-aspartic acid', \
+            f"Expected L-aspartic acid, got: {result}"
+
+    def test_racemic_alanine_zwitterion(self):
+        """Racemic alanine zwitterion."""
+        result = name_compound('[NH3+]C(C)C([O-])=O')
+        assert result == 'alanine', f"Expected alanine, got: {result}"
+
+    def test_no_azaniumyl_for_amino_acids(self):
+        """Amino acid zwitterions should NOT produce azaniumyl ionic names."""
+        for smi in [
+            '[NH3+]CC([O-])=O',
+            'C[C@H]([NH3+])C([O-])=O',
+            'CC(C)[C@@H]([NH3+])C([O-])=O',
+        ]:
+            result = name_compound(smi)
+            assert 'azaniumyl' not in result.lower(), \
+                f"Should not use ionic form for {smi}: {result}"
