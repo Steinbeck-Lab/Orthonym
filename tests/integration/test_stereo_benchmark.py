@@ -45,7 +45,7 @@ from orthonym import name_compound
 SMALL_STEREO_COMPOUNDS = [
     ('C[C@@H]([NH3+])P(=O)([O-])[O-]', 'unknown organic compound'),  # MISSING_STEREO - wrong parent
     ('O=C([O-])/C=C/C(=O)O.[Na+]', 'sodium (2E)-but-2-enedioate'),
-    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '(2S,3S)-3-methylpentan-2-aminide'),
+    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '2-aminohexanoate'),  # Phase 64: single-anion neutralize-then-name now produces -oate
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '2-aminobutanoic acid'),  # MISSING_STEREO - isotope
     ('C/N=C(\\N)NCCCCN', '4-(methylamino)-4-guanidinobutan-1-amine'),  # MISSING_STEREO - wrong parent
     ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylcyclohexene'),

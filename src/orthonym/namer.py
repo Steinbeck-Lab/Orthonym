@@ -188,13 +188,45 @@ class Orthonym:
                     return result
 
             # No retained ion name found.
+            # For SINGLE anions in small/medium molecules (HA <= 25), use the
+            # dedicated ion naming pipeline (handles aromatic carboxylates like
+            # benzoate/naphthoate correctly). For larger molecules, fall through
+            # to the neutral naming pipeline which produces more complete names.
+            if (len(sites['anions']) == 1 and not sites['cations']
+                    and mol.GetNumHeavyAtoms() <= 25):
+                # Try the existing ion pipeline first
+                ion_result = name_anion(mol, style=self.style)
+                if ion_result:
+                    return ion_result
+                # Ion pipeline returned empty -- try neutralize-then-name
+                try:
+                    from rdkit.Chem import RWMol
+                    from .rules.ions import classify_anion, _acid_name_to_carboxylate
+                    anion_type = classify_anion(mol, sites['anions'][0])
+                    if anion_type == 'carboxylate':
+                        rwmol = RWMol(mol)
+                        for atom in rwmol.GetAtoms():
+                            if atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1:
+                                atom.SetFormalCharge(0)
+                                atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
+                        neutral_mol = rwmol.GetMol()
+                        neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
+                        neutral_namer = Orthonym(style=self.style)
+                        neutral_name = neutral_namer.name(neutral_smi)
+                        if neutral_name:
+                            anion_name = _acid_name_to_carboxylate(
+                                neutral_name, 1
+                            )
+                            if anion_name:
+                                return anion_name
+                except Exception:
+                    pass  # Fall through to normal pipeline
+
             # For POLY-anionic species (2+ anionic sites, e.g., dicarboxylate),
             # try neutralize-then-name: convert [O-] -> OH so carboxylic acid
             # SMARTS can match, then name the neutral form. This prevents
             # empty-string results for polycarboxylate anions where the FG
             # detection only recognizes protonated acids.
-            # Single anions (1 site) fall through to the normal ion pipeline
-            # which handles -ate suffix naming correctly.
             if len(sites['anions']) >= 2 and not sites['cations']:
                 try:
                     from rdkit.Chem import RWMol
