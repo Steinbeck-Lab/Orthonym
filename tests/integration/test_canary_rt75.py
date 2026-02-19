@@ -24,10 +24,11 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 141 golden canary compounds: (SMILES, expected_name)
+# 143 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
+# + 2 from Phase 66 (Medium Molecule Completeness)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -608,6 +609,20 @@ CANARY_COMPOUNDS = [
         "C[C@@H]1Cc2cc(O)cc(O)c2CO1",
         "(3R)-6,8-dihydroxy-3-methylisochromane",
     ),
+    # Phase 66: Medium Molecule Completeness (2 compounds)
+    (
+        r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
+        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-"
+        "11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
+    ),
+    (
+        "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
+        "[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)"
+        "C(=O)O)[C@@]1(C)CC3",
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-"
+        "trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-"
+        "dien-3-yl acetate",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -618,7 +633,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt141(smiles, expected_name):
+def test_canary_rt143(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
