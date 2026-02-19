@@ -262,7 +262,7 @@ class TestParseSaltFragments:
     def test_none_input(self):
         """Test None input returns empty dict."""
         frags = parse_salt_fragments(None)
-        assert frags == {'cations': [], 'anions': []}
+        assert frags == {'cations': [], 'anions': [], 'neutrals': []}
 
 
 class TestEdgeCases:

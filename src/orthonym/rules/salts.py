@@ -63,12 +63,47 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
 
 # === SALT NAMING ===
 
+# Inorganic acid anion to hydroacid salt name mapping
+_HYDROACID_SALT_NAMES = {
+    '[Cl-]': 'hydrochloride',
+    '[Br-]': 'hydrobromide',
+    '[I-]': 'hydroiodide',
+    '[F-]': 'hydrofluoride',
+}
+
+# Hydrogen prefix multipliers for partial salts
+_HYDROGEN_PREFIXES = {
+    1: 'hydrogen',
+    2: 'dihydrogen',
+    3: 'trihydrogen',
+}
+
+
+def _count_protonated_acid_sites(frag_mol) -> int:
+    """Count the number of still-protonated carboxylic acid sites (-COOH).
+
+    Only counts protonated acid groups, NOT deprotonated carboxylates.
+    Used to detect partial deprotonation for "hydrogen" prefix in salt names.
+    E.g., sodium hydrogen fumarate has 1 COOH + 1 COO-.
+    """
+    from rdkit.Chem import MolFromSmarts
+    acid_pat = MolFromSmarts('[CX3](=O)[OX2H1]')
+    if acid_pat:
+        return len(frag_mol.GetSubstructMatches(acid_pat))
+    return 0
+
+
 def name_salt(mol, style: str = 'pin') -> str:
     """
     Name a salt using compositional nomenclature.
 
     Format: cation_name + space + anion_name
     Example: "sodium acetate", "ammonium chloride"
+
+    Also handles:
+    - Neutral organic fragments with inorganic counter-ions (Drug.HCl pattern)
+    - H+ fragments merged with anions for hydroacid salt naming
+    - Partial salts with "hydrogen" prefix (sodium hydrogen fumarate)
 
     For multiple cations/anions, order alphabetically.
     For stoichiometry > 1, use multiplier prefixes.
@@ -90,11 +125,48 @@ def name_salt(mol, style: str = 'pin') -> str:
 
     frags = parse_salt_fragments(mol)
 
+    # --- Handle H+ fragments: merge with Cl-/Br- for hydroacid salt naming ---
+    # H+ is a bare proton fragment (canonical SMILES: '[H+]')
+    h_plus_frags = [f for f in frags['cations'] if f['smiles'] == '[H+]']
+    other_cation_frags = [f for f in frags['cations'] if f['smiles'] != '[H+]']
+    neutrals = frags.get('neutrals', [])
+
+    # Pattern: Organic_neutral.[H+].[Cl-] -> "organic_name hydrochloride"
+    # The H+ merges with Cl- to form HCl, and the neutral organic fragment
+    # is the main compound being named as a hydrochloride salt.
+    if h_plus_frags and not other_cation_frags and neutrals:
+        # Check if all anions are simple halide-type
+        hydroacid_names = []
+        for anion_frag in frags['anions']:
+            hydroacid_name = _HYDROACID_SALT_NAMES.get(anion_frag['smiles'])
+            if hydroacid_name:
+                hydroacid_names.append(hydroacid_name)
+
+        if hydroacid_names and len(hydroacid_names) == len(frags['anions']):
+            # All anions are halides -- name as "organic hydrochloride"
+            # Pick the largest neutral organic fragment as the main compound
+            organic_neutrals = [
+                f for f in neutrals if f['mol'].GetNumHeavyAtoms() > 1
+            ]
+            if organic_neutrals:
+                main_frag = max(organic_neutrals,
+                                key=lambda f: f['mol'].GetNumHeavyAtoms())
+                try:
+                    from ..namer import Orthonym
+                    namer = Orthonym(style=style)
+                    organic_name = namer.name(main_frag['smiles'])
+                    if organic_name:
+                        salt_suffix = ' '.join(sorted(hydroacid_names))
+                        return f"{organic_name} {salt_suffix}"
+                except (RecursionError, ValueError, RuntimeError):
+                    pass
+
     cation_names = []
     anion_names = []
 
-    # Process cations
-    for cation_frag in frags['cations']:
+    # Process cations (excluding H+ fragments already handled above)
+    cation_list = other_cation_frags if h_plus_frags else frags['cations']
+    for cation_frag in cation_list:
         frag_mol = cation_frag['mol']
         smiles = cation_frag['smiles']
 
@@ -123,6 +195,20 @@ def name_salt(mol, style: str = 'pin') -> str:
                 anion_names.append(name)
             # Skip unnamed anions rather than using generic 'anion'
 
+    # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
+    # When an anion fragment still has protonated carboxylic acid groups
+    # (-COOH), it is only partially deprotonated. Insert "hydrogen"
+    # between cation and anion names.
+    # E.g., "sodium hydrogen fumarate" = one Na+ + one COOH + one COO-.
+    hydrogen_prefix = ''
+    if len(frags['anions']) == 1 and cation_names:
+        anion_frag = frags['anions'][0]
+        protonated_acids = _count_protonated_acid_sites(anion_frag['mol'])
+        if protonated_acids > 0:
+            hydrogen_prefix = _HYDROGEN_PREFIXES.get(
+                protonated_acids, 'hydrogen'
+            )
+
     # Handle stoichiometry - count duplicates
     cation_counts = Counter(cation_names)
     anion_counts = Counter(anion_names)
@@ -139,9 +225,11 @@ def name_salt(mol, style: str = 'pin') -> str:
         count = anion_counts[name]
         formatted_anions.append(_apply_stoichiometric_prefix(name, count))
 
-    # Combine: cations first, then anions
-    # Multiple cations/anions are separated by spaces
-    result_parts = formatted_cations + formatted_anions
+    # Combine: cations first, then hydrogen prefix (if any), then anions
+    if hydrogen_prefix and formatted_anions:
+        result_parts = formatted_cations + [hydrogen_prefix] + formatted_anions
+    else:
+        result_parts = formatted_cations + formatted_anions
 
     return ' '.join(result_parts)
 

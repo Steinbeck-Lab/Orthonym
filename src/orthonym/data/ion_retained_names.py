@@ -58,6 +58,9 @@ RETAINED_CATIONS = {
     'C[N+](C)(C)C': 'tetramethylammonium',
     'CC[N+](CC)(CC)CC': 'tetraethylammonium',
 
+    # Guanidinium cation (P-73, Table 7.3)
+    'NC(N)=[NH2+]': 'guanidinium',
+
     # Carbocations (carbonium/carbenium ions)
     '[CH3+]': 'methylium',
     '[CH2+]C': 'ethylium',

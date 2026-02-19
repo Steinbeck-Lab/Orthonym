@@ -342,7 +342,7 @@ def parse_salt_fragments(mol) -> Dict[str, List[Dict[str, Any]]]:
         mol: RDKit Mol object (may contain multiple fragments)
 
     Returns:
-        Dictionary with 'cations' and 'anions' lists.
+        Dictionary with 'cations', 'anions', and 'neutrals' lists.
         Each entry contains:
         - mol: RDKit Mol object for the fragment
         - charge: int - net charge of the fragment
@@ -360,7 +360,8 @@ def parse_salt_fragments(mol) -> Dict[str, List[Dict[str, Any]]]:
     """
     result: Dict[str, List[Dict[str, Any]]] = {
         'cations': [],
-        'anions': []
+        'anions': [],
+        'neutrals': []
     }
 
     if mol is None:
@@ -383,6 +384,7 @@ def parse_salt_fragments(mol) -> Dict[str, List[Dict[str, Any]]]:
             result['cations'].append(frag_info)
         elif charge < 0:
             result['anions'].append(frag_info)
-        # Neutral fragments are ignored (e.g., water of crystallization)
+        else:
+            result['neutrals'].append(frag_info)
 
     return result

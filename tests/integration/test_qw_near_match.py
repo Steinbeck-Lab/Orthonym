@@ -49,7 +49,7 @@ LIPID_SATURATION_FIXES = [
     ),
     pytest.param(
         "O=C([O-])/C=C/C(=O)O.[Na+]",
-        "sodium (2E)-but-2-enedioate",
+        "sodium hydrogen (2E)-but-2-enedioate",  # Phase 64: partial salt hydrogen prefix
         id="lipid-C14-sodium-fumarate",
     ),
 ]
