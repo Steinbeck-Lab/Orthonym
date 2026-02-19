@@ -58,7 +58,7 @@ class TestAssembleNpNamePrefixParts:
             "androst", "androstane", hydroxyls=[17], ketones=[3],
             unsaturation={"ene": [], "yne": []}, stereo_prefix="",
         )
-        assert result == "17-hydroxyandrostane-3-one"
+        assert result == "17-hydroxyandrostan-3-one"
 
     @pytest.mark.integration
     def test_ketone_only_suffix(self):
@@ -139,7 +139,7 @@ class TestAssembleNpEsterName:
             ],
             stereo_prefix="",
         )
-        assert result == "androstane-3,17-diyl diacetate"
+        assert result == "androstan-3,17-diyl diacetate"
 
     @pytest.mark.integration
     def test_mixed_acid_diester_acyloxy_prefix(self):

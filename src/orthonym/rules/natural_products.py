@@ -470,9 +470,10 @@ def _assemble_np_name(
     # e.g., "17-hydroxyandr-4-en-3-one" for testosterone-type
     if unsat_suffix == "an":
         # Saturated: prefix + stem + "an" + ketone
-        # e.g., "androstane-3,17-dione" -> but with 'e' before suffix
+        # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-one, -ol, -yl)
+        # Keep 'e' only when no suffix follows (bare saturated name)
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e{ketone_suffix}"
+            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
         else:
             return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
     else:
@@ -760,8 +761,9 @@ def _assemble_np_ester_name(
             return f"{stereo_prefix}{all_prefix}{stem}{unsat_suffix}e"
 
     # --- Assemble: stereo_prefix + prefix + stem + unsaturation + yl + space + acylate ---
+    # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-yl starts with 'y')
     if unsat_suffix == "an":
-        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e{yl_suffix}"
+        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{yl_suffix}"
     else:
         parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{yl_suffix}"
 
