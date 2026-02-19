@@ -634,6 +634,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         )
         all_prefixes.extend(alkyl_prefixes)
 
+    # --- Merge duplicate bare prefix names ---
+    # When two FG detection paths (e.g., primary_alcohol and secondary_alcohol)
+    # both produce the same bare prefix form ("hydroxy"), merge into one entry
+    # with the correct multiplier ("dihydroxy"). Only bare (no-locant) prefixes
+    # are merged; locanted prefixes represent distinct chain positions.
+    all_prefixes = _merge_bare_duplicate_prefixes(all_prefixes)
+
     # Sort all prefixes alphabetically
     all_prefixes.sort(key=alpha_sort_key)
 
@@ -889,6 +896,78 @@ def _generate_alkyl_prefixes_for_polyfunctional(
         prefixes.append(formatted)
 
     return prefixes
+
+
+def _merge_bare_duplicate_prefixes(prefixes: List[str]) -> List[str]:
+    """Merge duplicate bare (no-locant) prefix strings into single entries.
+
+    Only merges prefixes that have NO locants. Two bare "hydroxy" from
+    primary_alcohol + secondary_alcohol become "dihydroxy". Prefixes with
+    locants, parentheses, or N- are never merged.
+
+    Args:
+        prefixes: Formatted prefix strings.
+
+    Returns:
+        De-duplicated prefix list.
+    """
+    import re as _re
+
+    if len(prefixes) <= 1:
+        return prefixes
+
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    # Group bare (no-locant, no-paren, no-N-) prefixes by base name.
+    bare_groups: Dict[str, List[int]] = {}
+    for i, ptext in enumerate(prefixes):
+        if _re.match(r'^[\d,]+-', ptext):
+            continue
+        if ptext.startswith('(') or ptext.startswith('N-') or ptext.startswith('N,'):
+            continue
+        base = ptext
+        for _cnt, mult in sorted(SIMPLE_MULTIPLIERS.items(),
+                                 key=lambda x: len(x[1]), reverse=True):
+            if ptext.startswith(mult):
+                cand = ptext[len(mult):]
+                if cand and cand[0].islower():
+                    base = cand
+                    break
+        if base not in bare_groups:
+            bare_groups[base] = []
+        bare_groups[base].append(i)
+
+    merged_indices: set = set()
+    extra: List[str] = []
+    for base, indices in bare_groups.items():
+        if len(indices) <= 1:
+            continue
+        total = 0
+        for idx in indices:
+            ptext = prefixes[idx]
+            cnt = 1
+            for c, mult in sorted(SIMPLE_MULTIPLIERS.items(),
+                                   key=lambda x: len(x[1]), reverse=True):
+                if ptext.startswith(mult):
+                    cand = ptext[len(mult):]
+                    if cand and cand[0].islower():
+                        cnt = c
+                        break
+            total += cnt
+            merged_indices.add(idx)
+        if total <= 0:
+            total = len(indices)
+        if total > 1:
+            mult = SIMPLE_MULTIPLIERS.get(total, str(total))
+            extra.append(f"{mult}{base}")
+        else:
+            extra.append(base)
+
+    if not merged_indices:
+        return prefixes
+    result = [prefixes[i] for i in range(len(prefixes)) if i not in merged_indices]
+    result.extend(extra)
+    return result
 
 
 def _join_prefixes(prefix_texts: List[str]) -> str:

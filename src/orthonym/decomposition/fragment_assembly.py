@@ -404,14 +404,31 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
         # "N-methylacetamide", "N-ethylpropanamide"
         amide_name = _acid_to_amide(acid_name)
         if amide_name:
-            result = f"N-{_join_components(amine_prefix, amide_name)}"
+            if amine_prefix.startswith("N-") or amine_prefix.startswith("N,"):
+                # Prefix already carries N-substitution from recursive naming
+                # (e.g., "N-methylcyclohexyl" from "N-methylcyclohexanamine").
+                # Do NOT prepend another "N-" -- the N is already in the prefix.
+                # Result: "N-methylcyclohexylacetamide" (correct).
+                result = _join_components(amine_prefix, amide_name)
+            else:
+                result = f"N-{_join_components(amine_prefix, amide_name)}"
 
     if result is None:
         # Complex amine: use acyl prefix pattern
         # "N-acetylcyclohexanamine"
         acyl_prefix = _acid_to_acyl(acid_name)
         if acyl_prefix and amine_name:
-            result = f"N-{_join_components(acyl_prefix, amine_name)}"
+            if amine_name.startswith("N-") or amine_name.startswith("N,"):
+                # Amine already has N-prefix(es) from recursive naming.
+                # Insert the acyl as an additional N-substituent:
+                #   amine = "N-methylcyclohexanamine"
+                #   acyl  = "acetyl"
+                #   -> "N-acetyl-N-methylcyclohexanamine"
+                # This keeps each N-substituent as a separate "N-X" segment
+                # so _group_n_substituents can properly merge identical ones.
+                result = f"N-{acyl_prefix}-{amine_name}"
+            else:
+                result = f"N-{_join_components(acyl_prefix, amine_name)}"
 
     if result is None:
         return None
