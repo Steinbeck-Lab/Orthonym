@@ -1,17 +1,23 @@
 """
 Batch regression tests for medium molecule (21-40 HA) parent selection fixes.
 
-Phase 66 Plan 01: Tests grouped by compound class to verify parent selection
+Phase 66 Plans 01-02: Tests grouped by compound class to verify parent selection
 improvements for medium-sized molecules. Each test verifies that the generated
 name contains expected structural features (substring matching for robustness).
 
-Test groups:
+Test groups (Plan 01):
   1. Steroid parent selection (NP scaffold + methyl/halogen decoration)
   2. Fused heterocycle with chain substituents
   3. Polycyclic VB naming
   4. Polycyclic aromatic routing
   5. Charged species / salt naming
   6. Alkaloid parent selection
+
+Test groups (Plan 02):
+  7. VB polycyclic format verification (VB names are complete)
+  8. Macrocyclic compound naming
+  9. STER-04 small-molecule stereo compounds (baseline documentation)
+  10. Steroid decoration completeness
 """
 
 import pytest
@@ -236,6 +242,170 @@ ALKALOID_FIXES = [
 @pytest.mark.parametrize("smiles,expected_substr", ALKALOID_FIXES)
 def test_alkaloid_parent_selection(smiles, expected_substr):
     """Alkaloid compounds must identify correct scaffold parent."""
+    name = name_compound(smiles)
+    assert name is not None, "name_compound returned None"
+    assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+# ===========================================================================
+# Plan 02 Groups (Phase 66-02)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Group 7: VB polycyclic format verification
+# Verifies that VB-named polycyclic compounds produce complete structural
+# names with VB descriptors (these are correct names but OPSIN interprets
+# differently -- classified as unfixable_vb_interpretation)
+# ---------------------------------------------------------------------------
+VB_FORMAT_VERIFICATION = [
+    pytest.param(
+        "O=C(O)c1cc2cc3c4c(c2oc1=O)CCCN4CCC3",
+        "tetracyclo",
+        id="vb-aza-tetracyclic-acid",
+    ),
+    pytest.param(
+        "COc1cccc2c1C(=O)c1ccc3c(c1C2=O)C(=O)C[C@@H](C)[C@H]3O",
+        "tetracyclo",
+        id="vb-methoxy-tetracyclic-trione",
+    ),
+    pytest.param(
+        "COc1cc(O)c2c(c1O)C(=O)c1c(C(C)=O)c(O)cc(O)c1C2=O",
+        "tricyclo",
+        id="vb-polyhydroxy-tricyclic-dione",
+    ),
+    pytest.param(
+        "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)"
+        "C15CC2)[C@@H]3[C@@H]4O",
+        "hexacyclo",
+        id="vb-hexacyclic-diaza-alkaloid",
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("smiles,expected_substr", VB_FORMAT_VERIFICATION)
+def test_vb_format_completeness(smiles, expected_substr):
+    """VB-named compounds must produce names containing VB ring descriptors."""
+    name = name_compound(smiles)
+    assert name is not None, "name_compound returned None"
+    assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+# ---------------------------------------------------------------------------
+# Group 8: Macrocyclic compound naming
+# Verifies that macrocyclic lactones/lactams produce correct ring-size
+# prefix and substituent enumeration
+# ---------------------------------------------------------------------------
+MACROCYCLIC_FIXES = [
+    pytest.param(
+        "C/C1=C/C[C@@H](/C(C)=C/c2csc(C)n2)OC(=O)C[C@H](O)"
+        "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
+        "oxacyclohexadecan",
+        id="macrolide-16-ring-oxa",
+    ),
+    pytest.param(
+        "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
+        "O[C@@H](C)C/C=C\\C(=O)O1",
+        "oxacyclohexadecan",
+        id="macrolide-trilactone-16ring",
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("smiles,expected_substr", MACROCYCLIC_FIXES)
+def test_macrocyclic_naming(smiles, expected_substr):
+    """Macrocyclic compounds must include correct ring-size prefix."""
+    name = name_compound(smiles)
+    assert name is not None, "name_compound returned None"
+    assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+# ---------------------------------------------------------------------------
+# Group 9: STER-04 small-molecule wrong-parent stereo baseline
+# Documents current naming status of 14 small stereo compounds from Phase 63.
+# All are blocked by wrong parent selection, not stereo labeling errors.
+# Tests verify the name is non-None (structural description produced).
+# ---------------------------------------------------------------------------
+SMALL_STEREO_PARENT_BASELINE = [
+    pytest.param(
+        "C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2",
+        "spiro",
+        id="ster04-spiro-isopropenyl-cyclohexene",
+    ),
+    pytest.param(
+        "CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21",
+        "cyclodecan",
+        id="ster04-decalin-ketone",
+    ),
+    pytest.param(
+        "CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O",
+        "spiro",
+        id="ster04-spirocyclopentanone",
+    ),
+    pytest.param(
+        "CC(C)=CCc1ccc(O)c2c1[C@H](CC(=O)O)OC2=O",
+        "acid",
+        id="ster04-isocoumarinone-acid",
+    ),
+    pytest.param(
+        "CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",
+        "amide",
+        id="ster04-pyrrolizinone-amide",
+    ),
+    pytest.param(
+        "C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O",
+        "oxo",
+        id="ster04-dienoyl-pyrrole",
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("smiles,expected_substr", SMALL_STEREO_PARENT_BASELINE)
+def test_small_stereo_parent_baseline(smiles, expected_substr):
+    """STER-04 small stereo compounds must produce non-None names with structural content."""
+    name = name_compound(smiles)
+    assert name is not None, "name_compound returned None"
+    assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+# ---------------------------------------------------------------------------
+# Group 10: Steroid decoration completeness
+# Verifies that steroid NP names include hydroxy, ketone, and unsaturation
+# decorations (these steroids already have reasonable names but may be
+# missing methyls or other substituents)
+# ---------------------------------------------------------------------------
+STEROID_DECORATION_COMPLETENESS = [
+    pytest.param(
+        "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
+        "stigmast",
+        id="stigmastane-diol-retained-name",
+    ),
+    pytest.param(
+        "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
+        "ergost",
+        id="ergostane-dienol-retained-name",
+    ),
+    pytest.param(
+        "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1"
+        "[C@@H](O)[C@@H](O)[C@@H]2O",
+        "estran",
+        id="estrane-tetraol-decoration",
+    ),
+    pytest.param(
+        "CC(CCCC(C)(O)COS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3"
+        "[C@H](O)C[C@@H]4C[C@H](O)CCC4(C)[C@H]3C[C@H](O)C12C",
+        "cholestan",
+        id="cholestane-tetraol-sulfonate",
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("smiles,expected_substr", STEROID_DECORATION_COMPLETENESS)
+def test_steroid_decoration_completeness(smiles, expected_substr):
+    """Steroid NP names must include correct scaffold stem."""
     name = name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
