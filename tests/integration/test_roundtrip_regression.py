@@ -511,7 +511,7 @@ PHASE24_WAVE2_FIXES = [
     # F1: Steroid ester prefix hyphen fix (was "3-hydroxy7-oxo", now "3-hydroxy-7-oxo")
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
-        "(3S,4S,5R,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-7-oxoergost-9,24-dien-11-yl acetate",
+        "(3S,4S,5R,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-4-methyl-7-oxoergost-9,24-dien-11-yl acetate",
         "steroid-prefix-hyphen",
     ),
     # F2: Single anion naming preserved (pentanoate must not regress)

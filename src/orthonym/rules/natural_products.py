@@ -183,21 +183,31 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     # 3. Find unsaturation within the scaffold (C=C, C#C)
     unsaturation = _find_scaffold_unsaturation(mol, matched_set, numbering)
 
+    # 3b. Find methyl substituents on scaffold (extra CH3 not part of scaffold)
+    methyls = _find_methyls(mol, scaffold_info, numbering,
+                            exclude_atoms=ester_consumed_atoms)
+
+    # 3c. Find halogen substituents on scaffold
+    halogens = _find_halogens(mol, scaffold_info, numbering,
+                              exclude_atoms=ester_consumed_atoms)
+
     # 4. If esters found, use functional class format (IUPAC P-65.6)
     if esters:
         return _assemble_np_ester_name(
             scaffold_stem, scaffold_name, hydroxyls, ketones,
             unsaturation, esters, stereo_prefix=stereo_prefix,
+            methyls=methyls, halogens=halogens,
         )
 
     # If no decorations found, return bare scaffold name
-    if not hydroxyls and not ketones and not unsaturation["ene"] and not unsaturation["yne"]:
+    if (not hydroxyls and not ketones and not methyls and not halogens
+            and not unsaturation["ene"] and not unsaturation["yne"]):
         return scaffold_name
 
     # 5. Assemble the decorated name (substitutive format)
     return _assemble_np_name(
         scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
-        stereo_prefix=stereo_prefix,
+        stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
     )
 
 
@@ -334,6 +344,84 @@ def _find_ketones(
     return sorted(ketones)
 
 
+def _find_methyls(
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[int]:
+    """Find methyl groups (-CH3) attached to scaffold atoms.
+
+    Returns a sorted list of IUPAC locants where extra methyl groups are found.
+    Only detects methyl groups that are NOT part of the scaffold (extra methyls).
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product().
+        numbering: Target atom index to IUPAC locant mapping.
+        exclude_atoms: Set of atom indices consumed by esters (skip these).
+    """
+    methyls = []
+    exclude = exclude_atoms or set()
+
+    subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+    for sub in subs:
+        attach = sub["attachment_atom"]
+        if attach not in numbering:
+            continue
+
+        # Skip atoms consumed by ester detection
+        if sub["first_atom"] in exclude:
+            continue
+
+        # Single carbon atom substituent with 3 H -> methyl
+        if len(sub["substituent_atoms"]) == 1:
+            first_idx = sub["first_atom"]
+            atom = mol.GetAtomWithIdx(first_idx)
+            if atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() == 3:
+                bond = mol.GetBondBetweenAtoms(attach, first_idx)
+                if bond and bond.GetBondType() == Chem.BondType.SINGLE:
+                    methyls.append(numbering[attach])
+
+    return sorted(methyls)
+
+
+def _find_halogens(
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[Tuple[int, str]]:
+    """Find halogen atoms attached to scaffold atoms.
+
+    Returns a sorted list of (IUPAC locant, halogen_prefix) tuples.
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product().
+        numbering: Target atom index to IUPAC locant mapping.
+        exclude_atoms: Set of atom indices consumed by esters (skip these).
+    """
+    HALOGEN_PREFIX = {9: "fluoro", 17: "chloro", 35: "bromo", 53: "iodo"}
+    halogens = []
+    exclude = exclude_atoms or set()
+
+    subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+    for sub in subs:
+        attach = sub["attachment_atom"]
+        if attach not in numbering:
+            continue
+
+        if sub["first_atom"] in exclude:
+            continue
+
+        if len(sub["substituent_atoms"]) == 1:
+            first_idx = sub["first_atom"]
+            atom = mol.GetAtomWithIdx(first_idx)
+            if atom.GetAtomicNum() in HALOGEN_PREFIX:
+                halogens.append(
+                    (numbering[attach], HALOGEN_PREFIX[atom.GetAtomicNum()])
+                )
+
+    return sorted(halogens, key=lambda x: (x[1], x[0]))
+
+
 def _find_scaffold_unsaturation(
     mol, matched_set: set, numbering: Dict[int, int]
 ) -> Dict[str, List[int]]:
@@ -382,6 +470,8 @@ def _assemble_np_name(
     ketones: List[int],
     unsaturation: Dict[str, List[int]],
     stereo_prefix: str = "",
+    methyls: Optional[List[int]] = None,
+    halogens: Optional[List[Tuple[int, str]]] = None,
 ) -> str:
     """Assemble a decorated natural product name.
 
@@ -395,22 +485,51 @@ def _assemble_np_name(
         ketones: Sorted IUPAC locants of =O groups.
         unsaturation: Dict with 'ene' and 'yne' locant lists.
         stereo_prefix: Stereodescriptor prefix (e.g., "(5R,8S)-") or "".
+        methyls: Optional sorted IUPAC locants of extra methyl groups.
+        halogens: Optional sorted list of (locant, halogen_prefix) tuples.
 
     Returns:
         Assembled IUPAC-style natural product name.
     """
     from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 
-    # --- Build prefix (hydroxy groups) using prefix_parts list pattern ---
-    prefix_parts = []
+    methyls = methyls or []
+    halogens = halogens or []
+
+    # --- Build prefix parts in alphabetical order (IUPAC P-14.5) ---
+    # Collect all prefix entries as (sort_key, prefix_str) for alphabetical ordering
+    prefix_entries = []
+
+    # Halogen prefixes (bromo, chloro, fluoro, iodo)
+    if halogens:
+        # Group by halogen type
+        hal_by_type: Dict[str, List[int]] = defaultdict(list)
+        for loc, hal_name in halogens:
+            hal_by_type[hal_name].append(loc)
+        for hal_name in sorted(hal_by_type.keys()):
+            locs = sorted(hal_by_type[hal_name])
+            locant_str = ",".join(str(loc) for loc in locs)
+            count = len(locs)
+            multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+            prefix_entries.append((hal_name, f"{locant_str}-{multiplier}{hal_name}"))
+
+    # Hydroxy prefix
     if hydroxyls:
         locant_str = ",".join(str(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-        prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
+        prefix_entries.append(("hydroxy", f"{locant_str}-{multiplier}hydroxy"))
 
-    # Join multiple prefix parts with hyphen: "3-hydroxy-7-oxo" not "3-hydroxy7-oxo"
-    prefix = "-".join(prefix_parts)
+    # Methyl prefix
+    if methyls:
+        locant_str = ",".join(str(loc) for loc in methyls)
+        count = len(methyls)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_entries.append(("methyl", f"{locant_str}-{multiplier}methyl"))
+
+    # Sort alphabetically by name (IUPAC P-14.5)
+    prefix_entries.sort(key=lambda x: x[0])
+    prefix = "-".join(entry[1] for entry in prefix_entries)
 
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
@@ -456,15 +575,22 @@ def _assemble_np_name(
     if not prefix and not ketone_suffix and not ene_locs and not yne_locs:
         return stereo_prefix + scaffold_name
 
+    # Build non-OH prefix (methyl, halogen only) for use with -ol suffix
+    non_oh_prefix_entries = [
+        (key, val) for key, val in prefix_entries if key != "hydroxy"
+    ]
+    non_oh_prefix = "-".join(entry[1] for entry in non_oh_prefix_entries)
+
     # If only hydroxyls and no ketone -> use -ol suffix instead of prefix
+    # Methyl/halogen prefixes are still included as prefixes
     if hydroxyls and not ketones:
         locant_str = ",".join(str(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         ol_suffix = f"-{locant_str}-{multiplier}ol"
-        # stem + unsaturation + -ol
-        # e.g., "cholest-5-en-3-ol" for cholesterol-type
-        return f"{stereo_prefix}{stem}{unsat_suffix}{ol_suffix}"
+        # non-OH prefix + stem + unsaturation + -ol
+        # e.g., "4-methylcholest-5-en-3-ol" for methylated cholesterol-type
+        return f"{stereo_prefix}{non_oh_prefix}{stem}{unsat_suffix}{ol_suffix}"
 
     # General case: prefix + stem + unsaturation + ketone
     # e.g., "17-hydroxyandr-4-en-3-one" for testosterone-type
@@ -646,6 +772,8 @@ def _assemble_np_ester_name(
     unsaturation: Dict[str, List[int]],
     esters: List[Dict],
     stereo_prefix: str = "",
+    methyls: Optional[List[int]] = None,
+    halogens: Optional[List[Tuple[int, str]]] = None,
 ) -> str:
     """Assemble a functional class ester name for a natural product.
 
@@ -668,14 +796,31 @@ def _assemble_np_ester_name(
         unsaturation: Dict with 'ene' and 'yne' locant lists.
         esters: List of ester dicts with 'locant' and 'acylate' keys.
         stereo_prefix: Stereodescriptor prefix (e.g., "(5R,8S)-") or "".
+        methyls: Optional sorted IUPAC locants of extra methyl groups.
+        halogens: Optional sorted list of (locant, halogen_prefix) tuples.
 
     Returns:
         Functional class ester name string.
     """
     from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 
+    methyls = methyls or []
+    halogens = halogens or []
+
     # --- Build prefix (all non-ester decorations become prefixes) ---
     prefix_parts = []
+
+    # Halogen prefixes
+    if halogens:
+        hal_by_type: Dict[str, List[int]] = defaultdict(list)
+        for loc, hal_name in halogens:
+            hal_by_type[hal_name].append(loc)
+        for hal_name in sorted(hal_by_type.keys()):
+            locs = sorted(hal_by_type[hal_name])
+            locant_str = ",".join(str(loc) for loc in locs)
+            count = len(locs)
+            multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+            prefix_parts.append(f"{locant_str}-{multiplier}{hal_name}")
 
     # Hydroxyl groups -> "hydroxy" prefix
     if hydroxyls:
@@ -683,6 +828,13 @@ def _assemble_np_ester_name(
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
+
+    # Methyl prefixes
+    if methyls:
+        locant_str = ",".join(str(loc) for loc in methyls)
+        count = len(methyls)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_parts.append(f"{locant_str}-{multiplier}methyl")
 
     # Ketone groups -> "oxo" prefix (NOT "-one" suffix in functional class format)
     if ketones:

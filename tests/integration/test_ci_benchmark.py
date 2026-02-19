@@ -38,7 +38,7 @@ CI_BENCHMARK = [
     (
         "C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)"
         "CC[C@]4(C)C3=CC[C@]12C",
-        "(10S,13R,14R,15S,17R,20R)-15,24-dihydroxychol-7,9-dien-3,24-dione",
+        "(10S,13R,14R,15S,17R,20R)-15,24-dihydroxy-4,4,14-trimethylchol-7,9-dien-3,24-dione",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
@@ -372,7 +372,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC"
         "[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
-        "(5R,6S,10S,13R,14R,17R,20R)-6,21-dihydroxycholest-8,24-dien-3,16,21-trione",
+        "(5R,6S,10S,13R,14R,17R,20R)-6,21-dihydroxy-4,4,14-trimethylcholest-8,24-dien-3,16,21-trione",
     ),
     (
         "CC(C)(O)/C=C/c1cc(O)ccc1O",
