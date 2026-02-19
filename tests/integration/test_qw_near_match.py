@@ -32,19 +32,19 @@ LIPID_SATURATION_FIXES = [
     pytest.param(
         r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)"
         r"COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "2-((11z,14z)-icosa-11,14-dienoyloxy)-1,3-di(linoleoyloxy)propane",
+        "2-[(11z,14z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
         id="lipid-C9-triglyceride-mixed",
     ),
     pytest.param(
         r"CCCCC/C=C\C/C=C\CCCCCCCC(=O)OC[C@H](COC(=O)CCCCCCCCC/C=C\CCCCCC)"
         r"OC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "1,2-di(linoleoyloxy)-3-(oleoyloxy)propane",
+        "1,2-bis(linoleoyloxy)-3-(oleoyloxy)propane",
         id="lipid-C10-triglyceride",
     ),
     pytest.param(
         r"CCCC/C=C\CCCCCCCC(=O)O[C@H](COC(=O)CCC/C=C\C/C=C\C/C=C\CCCCCCCC)"
         r"COC(=O)CCCCCCCCC/C=C\CCCCCC",
-        "1-((5z,8z,11z)-icosa-5,8,11-trienoyloxy)-2-((9z)-tetradec-9-enoyloxy)-3-(oleoyloxy)propane",
+        "1-[(5z,8z,11z)-icosa-5,8,11-trienoyloxy]-2-[(9z)-tetradec-9-enoyloxy]-3-(oleoyloxy)propane",
         id="lipid-C17-triglyceride-mixed-2",
     ),
     pytest.param(

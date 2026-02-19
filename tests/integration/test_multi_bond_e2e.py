@@ -69,7 +69,7 @@ class TestTriglycerides:
         """Triacetin: backward compat -- polyfunctional path should produce
         the same name as before Phase 56."""
         name = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
-        assert name == "1,2,3-tri(acetyloxy)propane", (
+        assert name == "1,2,3-tris(acetyloxy)propane", (
             f"Triacetin backward compat failure: {name}"
         )
 
@@ -77,7 +77,7 @@ class TestTriglycerides:
     def test_tripropionin_exact_name_backward_compat(self):
         """Tripropionin: backward compat -- should still produce polyfunctional name."""
         name = name_compound("CCC(=O)OCC(COC(=O)CC)OC(=O)CC")
-        assert name == "1,2,3-tri(propanoyloxy)propane", (
+        assert name == "1,2,3-tris(propanoyloxy)propane", (
             f"Tripropionin backward compat failure: {name}"
         )
 

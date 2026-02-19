@@ -232,10 +232,10 @@ class TestEsterOPSINRoundTrip:
         assert "(propanoyloxy)" in name
 
     def test_format_diacetate_has_multiplier(self):
-        """Glycerol diacetate uses multiplier prefix di()."""
+        """Glycerol diacetate uses complex multiplier prefix bis() per IUPAC P-16.3.3."""
         name = name_compound("CC(=O)OCC(O)COC(=O)C")
         assert name is not None
-        assert "di" in name
+        assert "bis" in name or "di" in name, f"Expected multiplier in '{name}'"
         assert "acetyloxy" in name
         assert "ol" in name
 

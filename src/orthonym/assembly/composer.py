@@ -4395,9 +4395,10 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
     Pattern: oxygen bonded to chain, also bonded to a carbonyl carbon C(=O),
     which is bonded to an alkyl chain R.
 
-    Returns name like "(ethanoyloxy)" for -O-C(=O)-CH3.
-    Enclosing parens included for IUPAC compound substituent formatting.
-    OPSIN requires: 2-(acetyloxy)benzoic acid.
+    Returns bare name like "acetyloxy" for -O-C(=O)-CH3.
+    Callers handle parenthesization via is_complex_substituent() and
+    format_substituent_prefix(). Per IUPAC P-16.3.3, acyloxy groups are
+    compound prefixes requiring complex multipliers: bis(acetyloxy).
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
@@ -4441,15 +4442,15 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
                 if acyl_carbons == 0:
                     acyl_carbons = 1
 
-                # Build acyloxy name: (prefixanoyloxy) with enclosing parens
-                # OPSIN requires: 2-(acetyloxy)benzoic acid
+                # Build acyloxy name: bare prefixanoyloxy (no parens)
+                # Callers use format_substituent_prefix() for IUPAC parens
                 # Check trivial acid name first, then fall back to systematic
                 from ..data.chain_names import get_acid_stem
                 from ..rules.esters import get_acyloxy_prefix as _get_acyloxy
                 try:
                     acid_stem = get_acid_stem(acyl_carbons)
                     acyloxy = _get_acyloxy(acid_stem)
-                    return f"({acyloxy})"
+                    return acyloxy
                 except (ValueError, KeyError):
                     pass
 

@@ -309,6 +309,13 @@ def is_complex_substituent(name: str) -> bool:
                                'phosphonatoxy', 'carbonyloxy')
     if name in _COMPOUND_OXY_PREFIXES:
         return True
+    # Acyloxy compound prefixes per IUPAC P-16.3.3:
+    # "acetyloxy", "benzoyloxy", "propanoyloxy" etc. are compound prefixes
+    # (acyl + oxy) that require complex multipliers (bis/tris) and parenthesization.
+    if name.endswith('yloxy') and len(name) > 5:
+        # Matches: acetyloxy, benzoyloxy, propanoyloxy, butanoyloxy, etc.
+        # Does NOT match: methoxy, ethoxy (simple alkoxy, no 'yl' before 'oxy')
+        return True
     return False
 
 
@@ -371,16 +378,18 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
 def _has_stereo_prefix(name: str) -> bool:
     """Check if a substituent name starts with a CIP stereo descriptor prefix.
 
-    Detects patterns like "(R)-", "(S)-", "(1R)-", "(2S,3R)-" at the start.
-    This distinguishes stereo-prefixed names from compound substituent names
-    that happen to start with parentheses (e.g., "(2-methylphenyl)").
+    Detects patterns like "(R)-", "(S)-", "(1R)-", "(2S,3R)-", "(11z,14z)-"
+    at the start. This distinguishes stereo-prefixed names from compound
+    substituent names that happen to start with parentheses (e.g.,
+    "(2-methylphenyl)").
 
     A stereo prefix is: '(' + optional digits/comma + single letter R/S/E/Z + ')' + '-'
+    Case-insensitive for E/Z since generated names may use lowercase e/z.
     """
     if not name.startswith('('):
         return False
-    # Match: (R)-, (S)-, (1R)-, (2S,3R)- etc.
-    return bool(re.match(r'^\((?:\d+[RSEZ],)*\d*[RSEZ]\)-', name))
+    # Match: (R)-, (S)-, (1R)-, (2S,3R)-, (11z,14z)- etc.
+    return bool(re.match(r'^\((?:\d+[RSEZrsez],)*\d*[RSEZrsez]\)-', name))
 
 
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:

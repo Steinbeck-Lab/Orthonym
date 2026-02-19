@@ -445,7 +445,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OCC(COC(C)=O)OC(C)=O",
-        "1,2,3-tri(acetyloxy)propane",
+        "1,2,3-tris(acetyloxy)propane",
     ),
     (
         r"O=C(O)CCCC/C=C\CCCCCCCCCC",

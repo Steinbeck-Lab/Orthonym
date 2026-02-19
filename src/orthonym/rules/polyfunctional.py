@@ -883,16 +883,14 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             except ValueError:
                 continue
 
-    # Build formatted prefixes
+    # Build formatted prefixes using format_substituent_prefix for proper
+    # complex substituent handling (e.g., bis(acetyloxy) not bisacetyloxy)
+    from ..assembly.naming_utils import format_substituent_prefix as _fmt_sub
     prefixes = []
     for name, locants in substituent_groups.items():
         count = len(locants)
-        locant_str = ",".join(str(loc) for loc in sorted(locants))
-        if count > 1:
-            multiplier = get_multiplier_prefix(count, name)
-            formatted = f"{locant_str}-{multiplier}{name}"
-        else:
-            formatted = f"{locant_str}-{name}"
+        sorted_locs = sorted(locants)
+        formatted = _fmt_sub(name, sorted_locs, count)
         prefixes.append(formatted)
 
     return prefixes

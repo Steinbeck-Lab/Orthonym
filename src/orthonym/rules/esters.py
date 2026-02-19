@@ -1368,19 +1368,14 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
     # Sort groups alphabetically by acyloxy prefix name
     sorted_groups = sorted(groups.items(), key=lambda x: x[0])
 
-    # Build prefix parts
+    # Build prefix parts using format_substituent_prefix for proper
+    # IUPAC P-16.3.3 parenthesization (acyloxy = compound prefix = bis/tris)
+    from ..assembly.naming_utils import format_substituent_prefix
     parts = []
     for acyloxy, locants in sorted_groups:
         locants.sort()
-        locant_str = ",".join(str(loc) for loc in locants)
         count = len(locants)
-        multiplier = get_multiplier_prefix(count, acyloxy)
-        # Acyloxy prefixes always get parentheses when used with multipliers
-        # or when they contain internal structure
-        if count > 1:
-            parts.append(f"{locant_str}-{multiplier}({acyloxy})")
-        else:
-            parts.append(f"{locant_str}-({acyloxy})")
+        parts.append(format_substituent_prefix(acyloxy, locants, count))
 
     # Check if we can simplify by trying lowest locants numbering
     # Try reverse numbering and pick whichever gives lower first-point-of-difference
@@ -1412,13 +1407,8 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
             parts = []
             for acyloxy, locants in sorted_groups_rev:
                 locants.sort()
-                locant_str = ",".join(str(loc) for loc in locants)
                 count = len(locants)
-                multiplier = get_multiplier_prefix(count, acyloxy)
-                if count > 1:
-                    parts.append(f"{locant_str}-{multiplier}({acyloxy})")
-                else:
-                    parts.append(f"{locant_str}-({acyloxy})")
+                parts.append(format_substituent_prefix(acyloxy, locants, count))
 
     # Assemble: join parts with hyphens, append parent name
     prefix_str = "-".join(parts)

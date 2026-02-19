@@ -71,8 +71,8 @@ class TestWrongParent:
         assert name_compound("OC(=O)c1ccc(O)c(O)c1") == "3,4-dihydroxybenzoic acid"
 
     def test_031_triacetoxypropane(self):
-        """#31: CC(=O)OCC(COC(C)=O)OC(C)=O -> 1,2,3-tri(acetyloxy)propane [RT]."""
-        assert name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O") == "1,2,3-tri(acetyloxy)propane"
+        """#31: CC(=O)OCC(COC(C)=O)OC(C)=O -> 1,2,3-tris(acetyloxy)propane [RT]."""
+        assert name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O") == "1,2,3-tris(acetyloxy)propane"
 
     def test_039_acetamide(self):
         """#39: CC(N)=O -> acetamide [RT]."""
