@@ -24,11 +24,12 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 143 golden canary compounds: (SMILES, expected_name)
+# 158 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
 # + 2 from Phase 66 (Medium Molecule Completeness)
+# + 15 from Phase 67 (v7.0 Final Benchmark)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -623,6 +624,67 @@ CANARY_COMPOUNDS = [
         "trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-"
         "dien-3-yl acetate",
     ),
+    # --- Phase 67: v7.0 Final Benchmark (15 compounds) ---
+    (
+        "CC1CC=C(N2CCCC2)C1=O",
+        "5-methyl-2-pyrrolidinylcyclopent-2-en-1-one",
+    ),
+    (
+        "O=C([O-])/C=C/C(=O)O.[Na+]",
+        "sodium hydrogen (2E)-but-2-enedioate",
+    ),
+    (
+        "CCCC=CCOC(=O)c1ccccc1",
+        "hex-2-en-1-yl benzoate",
+    ),
+    (
+        "CCN(C(C)C)C(C)C",
+        "N-ethyl-N-isopropylpropan-2-amine",
+    ),
+    (
+        "COc1cc(CC(O)C(=O)O)ccc1OS(=O)(=O)O",
+        "3-(3-methoxy-4-(sulfooxy)phenyl)-2-hydroxypropanoic acid",
+    ),
+    (
+        "CCN(CC)Cc1ccccc1",
+        "N-benzyl-N-ethylethan-1-amine",
+    ),
+    (
+        "NC(N)=[NH2+].O=C([O-])C(=O)O",
+        "guanidinium hydrogen ethanedioate",
+    ),
+    (
+        r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
+        "2-[(11z,14z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
+    ),
+    (
+        "NCCc1c[nH]c2ccc(O)cc12",
+        "3-(2-aminoethyl)-5-hydroxy-1H-indole",
+    ),
+    (
+        "O=C([O-])CC=CC(=O)C(=O)[O-]",
+        "2-oxohex-3-enedioate",
+    ),
+    (
+        r"COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\C)CCCC1O",
+        "(9E)-5-hydroxy-16-isobutyl-4-methoxy-9,13,14-trimethyl-17-aza-tricyclo[9.7.0.0(1,15)]octadeca-9,12-dien-2,18-dione",
+    ),
+    (
+        "COC1C2=C(C)C(=O)OC2CC2CCC(O)C(C)C21C",
+        "11-hydroxy-8-methoxy-6,9,10-trimethyl-4-oxa-tricyclo[7.4.0.0(3,7)]tridec-6-en-5-one",
+    ),
+    (
+        "CC(C)(C)[NH3+]",
+        "2-methylpropan-2-aminium",
+    ),
+    (
+        "CC[C@@H](C)c1ncc(C(C)C)[nH]c1=O",
+        "3-[(R)-sec-butyl]-6-isopropyl-2-oxo-1,4-diazine",
+    ),
+    (
+        "O=C(O)CCc1cc(O)c(OS(=O)(=O)O)c(O)c1",
+        "3-(3,5-dihydroxy-4-(sulfooxy)phenyl)propanoic acid",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -633,7 +695,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt143(smiles, expected_name):
+def test_canary_rt158(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
