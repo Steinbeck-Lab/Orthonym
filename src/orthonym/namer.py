@@ -262,6 +262,42 @@ class Orthonym:
 
         # Continue with normal neutral molecule naming
 
+        # CHARGE NEUTRALIZATION for large zwitterions reclassified as 'neutral'
+        # by the HA>20 + quaternary-N guard in detect_species_type().
+        # These molecules still carry formal charges (P-O-, N+) that prevent
+        # FG detection SMARTS from matching (e.g., [OX2H] for COOH).
+        # Neutralize O- to OH; leave quaternary N+ (no H) charged to
+        # preserve valid valence. ONLY applies to molecules that have true
+        # zwitterion character -- NOT to molecules with internal charges
+        # (nitro [N+](=O)[O-], azide, N-oxide) which are normal functional groups.
+        if Chem.GetFormalCharge(mol) == 0:
+            from .perception.ions import _has_true_zwitterion_character
+            if _has_true_zwitterion_character(mol):
+                try:
+                    from rdkit.Chem import RWMol
+                    rwmol = RWMol(mol)
+                    for atom in rwmol.GetAtoms():
+                        charge = atom.GetFormalCharge()
+                        if charge < 0:
+                            # O- -> OH (add H for each negative charge)
+                            atom.SetFormalCharge(0)
+                            cur_h = atom.GetNumExplicitHs()
+                            atom.SetNumExplicitHs(cur_h + abs(charge))
+                        elif charge > 0:
+                            total_h = atom.GetTotalNumHs()
+                            if total_h >= charge:
+                                # Protonated amine: remove H to neutralize
+                                cur_h = atom.GetNumExplicitHs()
+                                atom.SetFormalCharge(0)
+                                atom.SetNumExplicitHs(max(0, cur_h - charge))
+                            # else: quaternary N+ (no H) -- leave charged
+                            # to preserve valid valence
+                    Chem.SanitizeMol(rwmol)
+                    mol = rwmol.GetMol()
+                    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
+                except Exception:
+                    pass  # If neutralization fails, continue with original mol
+
         # MULTIPLICATIVE NOMENCLATURE (IUPAC P-51.3)
         # Detect symmetric molecules with bridge atoms linking identical parent
         # structures (e.g., 4,4'-methylenedianiline). Must come before NP detection

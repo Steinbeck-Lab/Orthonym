@@ -72,12 +72,18 @@ class TestNameZwitterion:
     """Test zwitterion naming."""
 
     def test_glycine_zwitterion_systematic(self):
-        """Test glycine zwitterion with systematic naming."""
+        """Test glycine zwitterion with systematic naming.
+
+        Per IUPAC P-74 recommendation, amino acid zwitterions are named
+        as their neutral form (e.g., "2-aminoacetic acid" or
+        "2-aminoethanoic acid" for glycine), not the ionic form
+        ("2-azaniumylacetate"). OPSIN parses neutral names correctly.
+        """
         mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
         name = name_zwitterion(mol, style='systematic')
-        # Should contain azaniumyl (cation) and acetate (anion)
-        assert 'azaniumyl' in name.lower()
-        assert 'acetate' in name.lower()
+        # Neutral form preferred: "2-aminoacetic acid" or "2-aminoethanoic acid"
+        assert 'amino' in name.lower()
+        assert 'acid' in name.lower() or 'anoic' in name.lower()
 
     def test_glycine_zwitterion_trivial(self):
         """Test glycine zwitterion may use trivial name."""

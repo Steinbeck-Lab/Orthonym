@@ -49,15 +49,47 @@ ALPHA_AA_ZWITTERION = '[NX4+;H3][CX4][CX3](=[OX1])[OX1-]'
 
 # === RETAINED AMINO ACID NAMES ===
 
-# Map canonical SMILES of zwitterion form to trivial name
+# Map canonical SMILES of zwitterion form to trivial name.
+# Both chirality variants are included where the canonical SMILES
+# differs depending on input notation (e.g., @@ vs @).
 RETAINED_AMINO_ACID_ZWITTERIONS = {
     # Glycine zwitterion
-    '[NH3+]CC([O-])=O': 'glycine',
+    '[NH3+]CC(=O)[O-]': 'glycine',
     # Alanine zwitterion
-    'C[C@H]([NH3+])C([O-])=O': 'L-alanine',
-    'C[C@@H]([NH3+])C([O-])=O': 'D-alanine',
-    'CC([NH3+])C([O-])=O': 'alanine',
-    # Add more as needed
+    'C[C@H]([NH3+])C(=O)[O-]': 'L-alanine',
+    'C[C@@H]([NH3+])C(=O)[O-]': 'D-alanine',
+    'CC([NH3+])C(=O)[O-]': 'alanine',
+    # Valine zwitterion
+    'CC(C)[C@@H]([NH3+])C(=O)[O-]': 'L-valine',
+    'CC(C)[C@H]([NH3+])C(=O)[O-]': 'L-valine',
+    # Leucine zwitterion
+    'CC(C)C[C@@H]([NH3+])C(=O)[O-]': 'L-leucine',
+    'CC(C)C[C@H]([NH3+])C(=O)[O-]': 'L-leucine',
+    # Isoleucine zwitterion
+    'CC[C@H](C)[C@@H]([NH3+])C(=O)[O-]': 'L-isoleucine',
+    'CC[C@H](C)[C@H]([NH3+])C(=O)[O-]': 'L-isoleucine',
+    # Serine zwitterion
+    '[NH3+][C@@H](CO)C(=O)[O-]': 'L-serine',
+    '[NH3+][C@H](CO)C(=O)[O-]': 'L-serine',
+    # Threonine zwitterion
+    'C[C@@H](O)[C@@H]([NH3+])C(=O)[O-]': 'L-threonine',
+    'C[C@H](O)[C@@H]([NH3+])C(=O)[O-]': 'L-threonine',
+    # Proline zwitterion
+    'O=C([O-])[C@@H]1CCC[NH2+]1': 'L-proline',
+    # Phenylalanine zwitterion
+    '[NH3+][C@@H](Cc1ccccc1)C(=O)[O-]': 'L-phenylalanine',
+    # Tyrosine zwitterion
+    '[NH3+][C@@H](Cc1ccc(O)cc1)C(=O)[O-]': 'L-tyrosine',
+    # Tryptophan zwitterion
+    '[NH3+][C@@H](Cc1c[nH]c2ccccc12)C(=O)[O-]': 'L-tryptophan',
+    # Methionine zwitterion
+    'CSCC[C@@H]([NH3+])C(=O)[O-]': 'L-methionine',
+    # Histidine zwitterion
+    '[NH3+][C@@H](Cc1c[nH]cn1)C(=O)[O-]': 'L-histidine',
+    # Glutamic acid zwitterion (one COOH protonated)
+    '[NH3+][C@@H](CCC(=O)O)C(=O)[O-]': 'L-glutamic acid',
+    # Aspartic acid zwitterion (one COOH protonated)
+    '[NH3+][C@@H](CC(=O)O)C(=O)[O-]': 'L-aspartic acid',
 }
 
 
@@ -327,24 +359,38 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
     """
     Name amino acid zwitterion (e.g., glycine zwitterion).
 
-    For systematic naming:
-    - 2-azaniumylacetate (glycine)
-    - 2-azaniumylpropanoate (alanine)
+    Per IUPAC P-74 recommendation, amino acid zwitterions are preferably
+    named as their neutral form (e.g., "2-aminoacetic acid" for glycine
+    zwitterion, "2-aminopropanoic acid" for alanine zwitterion).
+    OPSIN parses these neutral-form names correctly.
 
-    The -azaniumyl prefix denotes -NH3+ group.
-    The -ate suffix denotes -COO- group.
+    Falls back to the ionic form "2-azaniumyl{base}" if neutralization
+    or neutral naming fails.
 
     Args:
         mol: RDKit Mol object
         style: 'pin' for systematic, others may use trivial
 
     Returns:
-        Systematic amino acid zwitterion name
+        Neutral amino acid name (preferred) or ionic form (fallback)
     """
-    # Count carbons for chain naming
+    # Preferred: neutralize and name the neutral form
+    neutral_mol = _neutralize_zwitterion(mol)
+    if neutral_mol is not None:
+        try:
+            neutral_smiles = Chem.MolToSmiles(neutral_mol, canonical=True)
+            if neutral_smiles:
+                from ..namer import Orthonym
+                namer = Orthonym(style=style)
+                neutral_name = namer.name(neutral_smiles)
+                if neutral_name and neutral_name != 'zwitterion':
+                    return neutral_name
+        except (RecursionError, ValueError, RuntimeError):
+            pass
+
+    # Fallback: ionic form "2-azaniumyl{base}"
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
 
-    # Map chain length to carboxylate base name
     CHAIN_TO_CARBOXYLATE = {
         2: 'acetate',
         3: 'propanoate',
@@ -359,7 +405,6 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         from ..data.chain_names import get_anoate_name
         base = get_anoate_name(carbon_count)
 
-    # Simple alpha amino acid: 2-azaniumyl-base
     return f'2-azaniumyl{base}'
 
 

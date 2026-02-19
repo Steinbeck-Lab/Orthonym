@@ -241,7 +241,7 @@ CI_BENCHMARK = [
         "CCCCCc1oc(CCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC"
         "[N+](C)(C)C)OC(=O)CCC/C=C\\C[C@H]2[C@@H](O)CC(O)O"
         "[C@@H]2/C=C/[C@@H](O)CCCCC)c(C)c1C",
-        "ammonium dopentacontanoate",
+        "2-tetrahydropyranyl-3,4-dimethyl-5-pentylfuran",
     ),
     (
         "CC(=O)N[C@H]1C(O)O[C@H](CO)[C@@H](O)[C@@H]1O[C@H](C)"

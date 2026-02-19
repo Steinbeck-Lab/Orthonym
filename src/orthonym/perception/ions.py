@@ -104,6 +104,20 @@ def detect_species_type(mol) -> str:
         # No charges at all, just radical electrons -> radical
         return 'radical'
 
+    # Large molecules with quaternary N+ zwitterion pattern (phospholipids):
+    # Route to normal pipeline -- zwitterion naming can't handle complex
+    # structures with 20+ heavy atoms and permanent quaternary N+ charges.
+    # These include phosphatidylcholines and other phospholipid zwitterions.
+    if has_any_charge and net_charge == 0:
+        heavy_atom_count = mol.GetNumHeavyAtoms()
+        has_quat_n = any(
+            a.GetSymbol() == 'N' and a.GetFormalCharge() > 0
+            and a.GetTotalNumHs() == 0
+            for a in mol.GetAtoms()
+        )
+        if heavy_atom_count > 20 and has_quat_n:
+            return 'neutral'
+
     # Check for zwitterion (net zero but has both + and - atoms)
     # EXCLUDE functional groups with internal charges (nitro, azide, etc.)
     # These are not true zwitterions in IUPAC nomenclature sense
