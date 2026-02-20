@@ -254,11 +254,15 @@ class Orthonym:
                 try:
                     from rdkit.Chem import RWMol
                     from .rules.ions import classify_anion, _acid_name_to_carboxylate
+                    from .perception.ions import _get_internal_charge_atoms
                     anion_type = classify_anion(mol, sites['anions'][0])
                     if anion_type == 'carboxylate':
+                        internal_charge_atoms = _get_internal_charge_atoms(mol)
                         rwmol = RWMol(mol)
                         for atom in rwmol.GetAtoms():
-                            if atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1:
+                            if (atom.GetSymbol() == 'O'
+                                    and atom.GetFormalCharge() == -1
+                                    and atom.GetIdx() not in internal_charge_atoms):
                                 atom.SetFormalCharge(0)
                                 atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
                         neutral_mol = rwmol.GetMol()
@@ -283,10 +287,14 @@ class Orthonym:
                 try:
                     from rdkit.Chem import RWMol
                     from .rules.ions import classify_anion, _acid_name_to_carboxylate
+                    from .perception.ions import _get_internal_charge_atoms
+                    internal_charge_atoms = _get_internal_charge_atoms(mol)
                     rwmol = RWMol(mol)
                     neutralized = False
                     for atom in rwmol.GetAtoms():
-                        if atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1:
+                        if (atom.GetSymbol() == 'O'
+                                and atom.GetFormalCharge() == -1
+                                and atom.GetIdx() not in internal_charge_atoms):
                             atom.SetFormalCharge(0)
                             atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
                             neutralized = True

@@ -13,8 +13,41 @@ IUPAC 2013 rules:
 - Zwitterions: named as neutral compounds with +/- indicated
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from rdkit import Chem
+
+
+# IUPAC P-59 Table 5.1: prefix-only groups with internal formal charges.
+# These are bonding features, NOT ionic charges.
+_INTERNAL_CHARGE_SMARTS = [
+    Chem.MolFromSmarts('[NX3+](=O)[O-]'),       # nitro
+    Chem.MolFromSmarts('[n+][O-]'),               # aromatic N-oxide
+    Chem.MolFromSmarts('[N+;!a][O-]'),            # aliphatic N-oxide (cyclic + acyclic)
+    Chem.MolFromSmarts('[N;+0]=[N+]=[N-]'),        # organic azide (NOT azide anion [N-]=[N+]=[N-])
+    Chem.MolFromSmarts('[#6]=[N+]=[N-]'),         # diazo
+]
+# Filter out any None from failed SMARTS compilation
+_INTERNAL_CHARGE_SMARTS = [p for p in _INTERNAL_CHARGE_SMARTS if p is not None]
+
+
+def _get_internal_charge_atoms(mol) -> Set[int]:
+    """Return atom indices whose formal charges are bonding features, not ionic.
+
+    Identifies atoms in prefix-only functional groups (nitro, N-oxide, azide,
+    diazo) per IUPAC P-59 Table 5.1. These atoms have formal charges as part
+    of their bonding structure, NOT as ionic charges.
+
+    Note: Nitroso (N=O) is excluded -- no formal charges in standard SMILES.
+    Note: Only organic azides [N]=[N+]=[N-] are filtered, NOT the azide anion
+    [N-]=[N+]=[N-] which is a genuine ion.
+    """
+    internal: Set[int] = set()
+    for pat in _INTERNAL_CHARGE_SMARTS:
+        for match in mol.GetSubstructMatches(pat):
+            for idx in match:
+                if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
+                    internal.add(idx)
+    return internal
 
 
 def detect_species_type(mol) -> str:
@@ -81,7 +114,12 @@ def detect_species_type(mol) -> str:
             # dedicated retained-name tables (acetate, benzoate, etc.).
             heavy_atom_count = mol.GetNumHeavyAtoms()
             charge_sites = [a for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
-            total_abs_charge = sum(abs(a.GetFormalCharge()) for a in charge_sites)
+
+            # Subtract internal charges (nitro, N-oxide, azide, diazo) from accounting.
+            # These are bonding features per IUPAC P-59, not ionic charges.
+            internal_atoms = _get_internal_charge_atoms(mol)
+            true_charge_sites = [a for a in charge_sites if a.GetIdx() not in internal_atoms]
+            true_abs_charge = sum(abs(a.GetFormalCharge()) for a in true_charge_sites)
 
             from rdkit.Chem import MolFromSmarts
             carboxylate_pat = MolFromSmarts('[O-]C=O')
@@ -90,8 +128,8 @@ def detect_species_type(mol) -> str:
             has_alkoxide = mol.HasSubstructMatch(alkoxide_pat) if alkoxide_pat else False
 
             if (heavy_atom_count > 10
-                    and total_abs_charge <= 1
-                    and len(charge_sites) <= 1
+                    and true_abs_charge <= 1
+                    and len(true_charge_sites) <= 1
                     and not has_carboxylate
                     and not has_alkoxide):
                 species_type = 'neutral'
@@ -103,6 +141,14 @@ def detect_species_type(mol) -> str:
     elif has_radical:
         # No charges at all, just radical electrons -> radical
         return 'radical'
+
+    # If net charge is 0 but all charged atoms are internal (nitro, N-oxide,
+    # azide, diazo), molecule is neutral — not a zwitterion.
+    if has_any_charge and net_charge == 0:
+        internal_atoms = _get_internal_charge_atoms(mol)
+        all_charged = {a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge() != 0}
+        if all_charged and all_charged.issubset(internal_atoms):
+            return 'neutral'
 
     # Large molecules with quaternary N+ zwitterion pattern (phospholipids):
     # Route to normal pipeline -- zwitterion naming can't handle complex
@@ -238,12 +284,15 @@ def _is_nitro_or_similar_group(mol, pos_atom, neg_atom) -> bool:
     return False
 
 
-def get_ion_sites(mol) -> Dict[str, List[Dict[str, Any]]]:
+def get_ion_sites(mol, exclude_internal=True) -> Dict[str, List[Dict[str, Any]]]:
     """
     Get all charged atom sites in a molecule.
 
     Args:
         mol: RDKit Mol object
+        exclude_internal: If True (default), exclude atoms whose formal charges
+            are bonding features of prefix-only groups (nitro, N-oxide, azide,
+            diazo) per IUPAC P-59 Table 5.1.
 
     Returns:
         Dictionary with 'cations' and 'anions' lists.
@@ -288,6 +337,11 @@ def get_ion_sites(mol) -> Dict[str, List[Dict[str, Any]]]:
             result['cations'].append(site_info)
         else:
             result['anions'].append(site_info)
+
+    if exclude_internal:
+        internal = _get_internal_charge_atoms(mol)
+        result['cations'] = [s for s in result['cations'] if s['atom_idx'] not in internal]
+        result['anions'] = [s for s in result['anions'] if s['atom_idx'] not in internal]
 
     return result
 

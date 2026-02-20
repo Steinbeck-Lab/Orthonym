@@ -889,8 +889,15 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
 
                 # Identify substituent
                 symbol = neighbor.GetSymbol()
-                if symbol in SUBSTITUENT_NAMES:
+                sub_name = None
+                # Nitro group: N+(=O)[O-] — must check before simple N→amino
+                if (symbol == 'N' and neighbor.GetFormalCharge() == 1
+                        and sum(1 for n in neighbor.GetNeighbors()
+                                if n.GetSymbol() == 'O') >= 2):
+                    sub_name = 'nitro'
+                elif symbol in SUBSTITUENT_NAMES:
                     sub_name = SUBSTITUENT_NAMES[symbol]
+                if sub_name is not None:
                     if pos not in subs:
                         subs[pos] = []
                     subs[pos].append((sub_name, sub_name))  # (name, sort_key)

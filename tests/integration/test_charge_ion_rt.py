@@ -24,6 +24,7 @@ When names improve in future phases, update the expected values.
 """
 
 import pytest
+from rdkit import Chem
 
 from orthonym import name_compound
 
@@ -285,3 +286,160 @@ class TestAminoAcidZwitterionNaming:
             result = name_compound(smi)
             assert 'azaniumyl' not in result.lower(), \
                 f"Should not use ionic form for {smi}: {result}"
+
+
+# ===================================================================
+# Phase 71: Internal Charge Filtering Tests
+# ===================================================================
+
+class TestInternalChargeFiltering:
+    """Test _get_internal_charge_atoms identifies internal charge patterns."""
+
+    def test_nitro_group_atoms_identified(self):
+        """Nitro N+ and O- should be identified as internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('c1ccc([N+](=O)[O-])cc1')  # nitrobenzene
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) == 2  # N+ and O-
+
+    def test_aromatic_n_oxide_atoms_identified(self):
+        """Pyridine N-oxide N+ and O- should be identified as internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('[O-][n+]1ccccc1')  # pyridine N-oxide
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) == 2  # n+ and O-
+
+    def test_organic_azide_atoms_identified(self):
+        """Organic azide N+ and N- should be identified as internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('c1ccc(N=[N+]=[N-])cc1')  # phenyl azide
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) >= 2  # N+ and N-
+
+    def test_diazo_atoms_identified(self):
+        """Diazo N+ and N- should be identified as internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('C(=[N+]=[N-])c1ccccc1')  # diazomethane derivative
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) >= 2
+
+    def test_azide_anion_not_filtered(self):
+        """Free azide anion [N-]=[N+]=[N-] is a genuine ion, NOT internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('[N-]=[N+]=[N-]')
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) == 0, "Azide anion should not be filtered"
+
+    def test_nitro_carboxylate_only_nitro_filtered(self):
+        """In nitro-carboxylate, only nitro atoms are internal, not carboxylate O-."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1[N+](=O)[O-]')
+        internal = _get_internal_charge_atoms(mol)
+        # Carboxylate O- should NOT be in internal set
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1:
+                for nbr in atom.GetNeighbors():
+                    if nbr.GetSymbol() == 'C' and any(
+                        n.GetSymbol() == 'O' and n.GetFormalCharge() == 0
+                        for n in nbr.GetNeighbors() if n.GetIdx() != atom.GetIdx()
+                    ):
+                        assert atom.GetIdx() not in internal, \
+                            "Carboxylate O- should not be filtered"
+
+    def test_nitroquinoline_n_oxide_all_internal(self):
+        """Nitroquinoline N-oxide: all 4 charged atoms are internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms, detect_species_type
+        mol = Chem.MolFromSmiles('O=[N+]([O-])c1cc[n+]([O-])c2ccccc12')
+        internal = _get_internal_charge_atoms(mol)
+        charged = [a for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
+        assert len(charged) == 4
+        for a in charged:
+            assert a.GetIdx() in internal
+        assert detect_species_type(mol) == 'neutral'
+
+    def test_aliphatic_n_oxide_identified(self):
+        """Trimethylamine N-oxide: N+ and O- are internal."""
+        from orthonym.perception.ions import _get_internal_charge_atoms
+        mol = Chem.MolFromSmiles('C[N+](C)(C)[O-]')
+        internal = _get_internal_charge_atoms(mol)
+        assert len(internal) == 2
+
+
+class TestNitroCompoundNaming:
+    """Test nitro-containing ion compounds produce correct names after filtering."""
+
+    def test_2_nitrobenzoate_produces_oate(self):
+        """2-nitrobenzoate should be named correctly."""
+        result = name_compound('O=C([O-])c1ccccc1[N+](=O)[O-]')
+        assert 'nitro' in result.lower(), f"Expected 'nitro' prefix, got: {result}"
+        assert 'oate' in result or 'ate' in result, f"Expected -oate suffix, got: {result}"
+
+    def test_3_nitrobenzoate_produces_oate(self):
+        """3-nitrobenzoate should be named correctly."""
+        result = name_compound('O=C([O-])c1cccc([N+](=O)[O-])c1')
+        assert 'nitro' in result.lower(), f"Expected 'nitro' prefix, got: {result}"
+        assert 'oate' in result or 'ate' in result, f"Expected -oate suffix, got: {result}"
+
+    def test_4_nitrobenzoate_produces_oate(self):
+        """4-nitrobenzoate should be named correctly."""
+        result = name_compound('O=C([O-])c1ccc([N+](=O)[O-])cc1')
+        assert 'nitro' in result.lower(), f"Expected 'nitro' prefix, got: {result}"
+        assert 'oate' in result or 'ate' in result, f"Expected -oate suffix, got: {result}"
+
+    def test_nitrobenzene_still_neutral(self):
+        """Nitrobenzene (no ionic charge) stays neutral and names correctly."""
+        from orthonym.perception.ions import detect_species_type
+        mol = Chem.MolFromSmiles('c1ccc([N+](=O)[O-])cc1')
+        assert detect_species_type(mol) == 'neutral'
+        result = name_compound('c1ccc([N+](=O)[O-])cc1')
+        assert 'nitro' in result.lower(), f"Expected nitrobenzene name, got: {result}"
+
+    def test_pyridine_n_oxide_still_neutral(self):
+        """Pyridine N-oxide (no true ionic charge) stays neutral."""
+        from orthonym.perception.ions import detect_species_type
+        mol = Chem.MolFromSmiles('[O-][n+]1ccccc1')
+        assert detect_species_type(mol) == 'neutral'
+
+    def test_protonated_nitroaniline_naming(self):
+        """Protonated 4-nitroaniline: NH3+ is true ion, nitro is internal."""
+        from orthonym.perception.ions import detect_species_type
+        mol = Chem.MolFromSmiles('[NH3+]c1ccc([N+](=O)[O-])cc1')
+        assert detect_species_type(mol) == 'ion'
+        result = name_compound('[NH3+]c1ccc([N+](=O)[O-])cc1')
+        assert result != '', f"Should produce a name"
+
+
+class TestGetIonSitesFiltering:
+    """Test get_ion_sites excludes internal charge atoms."""
+
+    def test_nitrobenzoate_sites_filtered(self):
+        """Nitro N+ excluded from cations, nitro O- excluded from anions."""
+        from orthonym.perception.ions import get_ion_sites
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1[N+](=O)[O-]')
+        sites = get_ion_sites(mol)
+        assert len(sites['cations']) == 0, f"Nitro N+ should be filtered: {sites['cations']}"
+        assert len(sites['anions']) == 1, f"Only carboxylate O- should remain: {sites['anions']}"
+
+    def test_raw_sites_available(self):
+        """With exclude_internal=False, all charged atoms returned."""
+        from orthonym.perception.ions import get_ion_sites
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1[N+](=O)[O-]')
+        sites = get_ion_sites(mol, exclude_internal=False)
+        assert len(sites['cations']) >= 1, "Should include nitro N+"
+        assert len(sites['anions']) >= 2, "Should include both carboxylate and nitro O-"
+
+    def test_simple_ion_unaffected(self):
+        """Simple ions (no internal charges) are unaffected by filtering."""
+        from orthonym.perception.ions import get_ion_sites
+        mol = Chem.MolFromSmiles('[NH4+]')
+        sites = get_ion_sites(mol)
+        assert len(sites['cations']) == 1
+        assert len(sites['anions']) == 0
+
+    def test_p74_anionic_center_precedence(self):
+        """IUPAC P-74: anionic center takes precedence for parent selection."""
+        from orthonym.perception.ions import get_ion_sites
+        mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1[N+](=O)[O-]')
+        sites = get_ion_sites(mol)
+        assert len(sites['anions']) > 0, "Anionic site must be identified"
+        assert len(sites['cations']) == 0, "Internal cations must be filtered"
