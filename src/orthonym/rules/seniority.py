@@ -177,6 +177,11 @@ PREFIX_FORMS = {
     "tertiary_sulfonamide": "sulfamoyl",
     "nitrile": "cyano",
     "isocyanide": "isocyano",
+    # Amides as non-principal group prefix (IUPAC P-66.1.1.4 method 2)
+    # Only primary_amide (-CONH2) gets carbamoyl here; secondary/tertiary amides
+    # are already handled via the acylamino naming pathway in the pipeline.
+    # Adding carbamoyl for sec/tert causes double-naming (e.g., "ethanoylamino" + "carbamoyl").
+    "primary_amide": "carbamoyl",
     # Halogens (always prefixes)
     "fluoro": "fluoro",
     "chloro": "chloro",
