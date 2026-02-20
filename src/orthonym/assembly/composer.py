@@ -202,6 +202,23 @@ TERMINAL_GROUPS = {
     "carbamic_acid",    # Retained name, terminal (locant 1)
 }
 
+# Token list for DROP-04 validation: ring+heteroatom branch names must contain
+# a recognized ring system identifier to avoid passing linearized-ring names.
+_RING_NAME_TOKENS = (
+    # Monocyclic
+    'cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
+    'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
+    'oxan', 'oxol', 'azetidin', 'aziridin',
+    # Fused heterocyclic
+    'quinolin', 'isoquinolin', 'benzofur', 'benzothio',
+    'benzimidaz', 'chromen', 'chromane', 'xanthen',
+    'carbazol', 'acridin', 'phenazin', 'phenoxazin',
+    'phenothiazin', 'thianthr', 'purin', 'indazol',
+    'benzotriazol', 'benzoxazol', 'benzisoxazol',
+    'benzothiazol', 'coumarin', 'naphthyridin',
+    'pteridin', 'indolizin', 'isoindol', 'naphth',
+)
+
 
 @dataclass
 class NameFragment:
@@ -4009,10 +4026,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                             mol, sub_atoms, attach_idx, features.principal_chain or []
                         )
                         # Validate: reject if fragment naming linearized a ring
-                        if ring_het_name and not any(tok in ring_het_name.lower() for tok in
-                                ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
-                                 'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
-                                 'oxan', 'oxol', 'azetidin', 'aziridin')):
+                        if ring_het_name and not any(tok in ring_het_name.lower() for tok in _RING_NAME_TOKENS):
                             ring_het_name = None
                         if ring_het_name:
                             if needs_brackets(ring_het_name):

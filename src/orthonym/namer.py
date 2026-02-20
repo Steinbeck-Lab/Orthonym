@@ -107,6 +107,58 @@ class MolecularFeatures:
     total_charge: int = 0  # Net formal charge of the molecule
 
 
+def _should_bypass_fused_guard(features, core_match):
+    """Check if chain should be parent despite fused heterocycle presence.
+
+    Per IUPAC P-44.1.1: chain wins when it has STRICTLY MORE principal
+    characteristic groups than the fused ring system.
+    Per IUPAC P-52.2.8: ring wins when PG counts are equal.
+
+    Only applies when the matched fused core is the dominant ring system.
+    Molecules with substantial additional ring systems beyond the matched
+    core are too complex for simple chain-as-parent bypass.
+
+    Returns True to bypass (chain should be parent), False to keep guard.
+    """
+    if not features.principal_group or not features.principal_group_atoms:
+        return False  # No PG -> ring is parent (P-44.1.2.2)
+
+    core_atoms = set(core_match[1].keys())  # Mol atom indices in fused core
+
+    # Guard 1: if molecule has substantial ring structure beyond the matched
+    # core, it's a complex polycyclic — don't bypass the fused guard.
+    all_ring_atoms = set()
+    for ring in features.mol.GetRingInfo().AtomRings():
+        all_ring_atoms.update(ring)
+    extra_ring_atoms = len(all_ring_atoms - core_atoms)
+    if extra_ring_atoms > 4:
+        return False
+
+    # Guard 2: chain must be longer than ring core (P-52.2.8 ring preference
+    # for equal size). Non-ring heavy atoms must exceed core atom count.
+    non_ring_heavy = features.mol.GetNumHeavyAtoms() - len(all_ring_atoms)
+    if non_ring_heavy <= len(core_atoms):
+        return False
+
+    # Count PGs on fused ring core (directly on ring or bonded to ring atom)
+    ring_pg = 0
+    total_pg = 0
+    for pg_atoms in features.principal_group_atoms:
+        if not pg_atoms:
+            continue
+        total_pg += 1
+        attach = pg_atoms[0]
+        if attach in core_atoms:
+            ring_pg += 1
+            continue
+        atom = features.mol.GetAtomWithIdx(attach)
+        if any(nbr.GetIdx() in core_atoms for nbr in atom.GetNeighbors()):
+            ring_pg += 1
+
+    chain_pg = total_pg - ring_pg
+    return chain_pg > ring_pg  # STRICT inequality per P-52.2.8
+
+
 class Orthonym:
     """
     IUPAC nomenclature generator.
@@ -470,7 +522,7 @@ class Orthonym:
         # Parent selection for molecules with ring AND functionalized chain (IUPAC P-44.1)
         # This must happen BEFORE ring classification to potentially redirect to chain naming
         # EXCEPTION: Skip parent selection for known fused heterocycles (indole, quinoline, etc.)
-        # These should always use ring as parent, with functional chains as substituents
+        # UNLESS chain has strictly more principal groups than ring (P-44.1.1 override)
         if features.is_cyclic and features.principal_group:
             from .rules.parent_selection import select_parent
             from .rules.fused_rings import classify_fused_system
@@ -483,9 +535,12 @@ class Orthonym:
             if fused_type in ('ortho-fused', 'ortho-peri-fused'):
                 core_match = match_fused_heterocycle_core(features.mol)
                 if core_match is not None:
-                    # This is a known fused heterocycle (indole, quinoline, etc.)
-                    # Skip parent selection - ring remains parent
-                    is_known_fused_heterocycle = True
+                    # P-44.1.1 / P-52.2.8: bypass guard when chain has
+                    # strictly more principal groups than the fused ring
+                    if _should_bypass_fused_guard(features, core_match):
+                        is_known_fused_heterocycle = False
+                    else:
+                        is_known_fused_heterocycle = True
 
             # Only do parent selection for non-fused systems or unknown fused systems
             if not is_known_fused_heterocycle:
