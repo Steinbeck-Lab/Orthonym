@@ -468,7 +468,7 @@ CI_BENCHMARK = [
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "N-(2S)-2-(butanoylamino)-aminobutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",
+        "N-(2S)-2-(butanoylamino)-amino-4-carbamoylbutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"

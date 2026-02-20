@@ -94,7 +94,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCCC/C=C\\CCCCCCCCCOC(C)=O', '(10Z)-pentadec-10-en-1-yl acetate'),  # NEWLY_RT (Phase 62)
     ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '(1R,4R)-1,2,3,4-tetrahydronaphthalene'),
     ('CCOC(=O)C[C@@H](SP(=O)(OC)OC)C(=O)OCC', 'diethyl butanedioate'),  # MISSING_STEREO - wrong parent
-    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-oxo1-ethyl-3,5-dimethylcyclohexyl)pentanoic acid'),  # MISSING_STEREO - wrong parent
+    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-oxo1-ethyl-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid'),  # MISSING_STEREO - carbamoyl prefix now correct
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),
     ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(1R,2R)-3-cyclononyl-1-oxiranylpropane-1,2-diol'),
     ('C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O', '(1R,10S,11R,12S,14R)-4,11,14-trihydroxy-10,12-dimethyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one'),
