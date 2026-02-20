@@ -563,7 +563,59 @@ class Orthonym:
                     features.mol, features.ring_systems
                 )
                 features.senior_ring_system = principal if principal else atom_rings[0]
-                features.principal_ring = atom_rings[0]
+
+                # For multi-ring-system molecules, use a SSSR ring from
+                # the senior system as principal_ring when the senior
+                # system is strictly LARGER than the default ring's system.
+                # This ensures fused/bridged senior systems (imidazopyridine,
+                # xanthene) take precedence over small monocyclic rings
+                # (benzene) per IUPAC P-44.2.
+                #
+                # Guards (all must pass to switch):
+                # (a) Senior system must be significantly larger (>= 3
+                #     atoms) than the default — marginal differences
+                #     (1-2 atoms) cause churn without improving names.
+                # (b) Principal FG must NOT be attached to the default
+                #     ring system — per P-44.1, the parent must contain
+                #     the principal characteristic group.
+                if principal and len(features.ring_systems) >= 2:
+                    senior_set = set(principal)
+                    # Find the ring system that contains the default ring
+                    default_system = set(atom_rings[0])
+                    default_system_size = len(atom_rings[0])
+                    for rs in features.ring_systems:
+                        if set(atom_rings[0]).issubset(rs):
+                            default_system = rs
+                            default_system_size = len(rs)
+                            break
+
+                    # Guard (a): senior system must be >= 3 atoms larger
+                    size_diff = len(senior_set) - default_system_size
+                    size_ok = size_diff >= 3
+
+                    # Guard (b): PG must not be on the default system
+                    # (P-44.1: parent must contain the principal group)
+                    from .rules.parent_selection import is_principal_group_on_ring
+                    pg_on_default = False
+                    if features.principal_group_atoms:
+                        pg_on_default = is_principal_group_on_ring(
+                            features.mol, default_system,
+                            features.principal_group_atoms
+                        )
+
+                    if size_ok and not pg_on_default:
+                        best_ring = atom_rings[0]
+                        best_overlap = 0
+                        for ring in atom_rings:
+                            overlap = len(set(ring) & senior_set)
+                            if overlap > best_overlap:
+                                best_overlap = overlap
+                                best_ring = ring
+                        features.principal_ring = best_ring
+                    else:
+                        features.principal_ring = atom_rings[0]
+                else:
+                    features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
 
                 # Check if this is a benzene ring
