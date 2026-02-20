@@ -80,11 +80,8 @@ EXPECTED_FIXED = [
 
     # --- PAH / FUSED AROMATIC ---
     # Phase 46: P-44.2 identifies fused aromatic systems correctly
-    (
-        "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
-        "naphthal",
-        "PAH: large polyaromatic (retained name)",
-    ),
+    # NOTE: 40-atom PAH moved to EXPECTED_UNFIXED -- Phase 69 PAH size guard
+    # correctly prevents naphthalene over-matching. Extended PAH naming needed.
     (
         "CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21",
         "naphthal",
@@ -218,6 +215,12 @@ EXPECTED_FIXED = [
 # These require future work (Phase 47+ NP detection, decomposition, etc.)
 # Marked with xfail(strict=False) -- if they pass, great (xpass), if not, expected.
 EXPECTED_UNFIXED = [
+    # --- Extended PAH (Phase 69: PAH size guard correctly rejects naphthalene) ---
+    (
+        "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
+        "NOT_naphthalene",
+        "PAH: 40-atom 9-ring system needs extended PAH naming (not naphthalene)",
+    ),
     # --- Complex decomposition issues (Phase 48+) ---
     (
         "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",

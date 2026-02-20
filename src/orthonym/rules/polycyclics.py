@@ -109,6 +109,16 @@ def identify_polycyclic(mol) -> Optional[str]:
 
             # If the core matches and we have substituents, this is the PAH
             if core_atoms == pah_data['num_atoms']:
+                # Guard: PAH core must account for majority of ring atoms.
+                # A 10-atom naphthalene inside a 40-atom system is NOT
+                # "substituted naphthalene" -- it's a larger polycyclic.
+                # IUPAC P-44.2.1(e): greater skeletal atoms preferred.
+                all_ring_atoms_in_mol = set()
+                for ring in mol.GetRingInfo().AtomRings():
+                    all_ring_atoms_in_mol.update(ring)
+                total_ring_atoms = len(all_ring_atoms_in_mol)
+                if total_ring_atoms > 0 and core_atoms < total_ring_atoms * 0.6:
+                    continue  # Skip, try smaller PAH or return None
                 return pah_name
 
     return None

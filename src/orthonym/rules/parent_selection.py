@@ -231,6 +231,26 @@ def select_parent(
 
     # Decision logic per IUPAC P-44.1
     if pg_on_chain and not pg_on_ring:
+        # Override: When chain is very short (< 3 atoms) and the molecule
+        # has exactly ONE connected ring system that is large (>= 13 atoms),
+        # selecting the tiny chain as parent drops the entire ring system.
+        # Per P-52.2.8 spirit and P-44.2.1(e) "greater skeletal atoms",
+        # prefer ring. The FG becomes a prefix instead of suffix.
+        #
+        # Guard: only for single-ring-system molecules (VB, fused systems).
+        # Multi-ring-system molecules are not affected.
+        chain_len = len(principal_chain)
+        if (chain_len < 3
+                and len(ring_systems) == 1
+                and len(ring_systems[0]) >= 13):
+            best_ring = ring_systems[0]
+            return ParentSelectionResult(
+                parent_type='ring',
+                parent_atoms=list(sorted(best_ring)),
+                substituent_rings=[],
+                reasoning=f"P-52.2.8 override: tiny chain ({chain_len}) vs large ring ({len(best_ring)}) - ring preferred"
+            )
+
         # Principal group is on chain only - chain MUST be parent
         return ParentSelectionResult(
             parent_type='chain',
