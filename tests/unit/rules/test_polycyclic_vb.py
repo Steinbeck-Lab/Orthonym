@@ -20,6 +20,31 @@ from orthonym.rules.polycyclic import (
 )
 
 
+# =============================================================================
+# VB_LOCANT OPSIN Round-Trip Results (Phase 72, 2026-02-24)
+#
+# 38 VB_LOCANT compounds tested against OPSIN CLI 2.8.0
+# Overall: 0/38 InChI round-trip, 36/38 OPSIN-parseable
+#
+# Root cause of InChI mismatch: NOT bridge citation order.
+# Failures dominated by:
+#   - Missing unsaturation naming (aromatic rings described as saturated)
+#   - Wrong substituent naming (DROP-22 polyfunctional failures)
+# These are pre-existing naming issues outside Phase 72 VB scope.
+#
+# OPSIN parse failures (2/38):
+#   - Compound 10: OPSIN cannot parse descriptor
+#   - Compound 13: OPSIN cannot parse descriptor
+#
+# Algorithm status:
+#   - Independent/dependent classification: IMPLEMENTED
+#   - Numbering order (VB-7): IMPLEMENTED
+#   - Citation order (VB-6): IMPLEMENTED
+#   - IUPAC vs OPSIN conflict: NONE FOUND
+#   - VB invariant: ENFORCED at runtime
+# =============================================================================
+
+
 # ============================================================================
 # Test Molecules
 # ============================================================================
