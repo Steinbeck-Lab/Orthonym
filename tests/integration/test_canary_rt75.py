@@ -24,12 +24,13 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 158 golden canary compounds: (SMILES, expected_name)
+# 183 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
 # + 2 from Phase 66 (Medium Molecule Completeness)
 # + 15 from Phase 67 (v7.0 Final Benchmark)
+# + 25 from Phase 73 (v8.0 Closure: phase improvements + failure sentinels)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -685,6 +686,114 @@ CANARY_COMPOUNDS = [
         "O=C(O)CCc1cc(O)c(OS(=O)(=O)O)c(O)c1",
         "3-(3,5-dihydroxy-4-(sulfooxy)phenyl)propanoic acid",
     ),
+    # --- Phase 73: v8.0 Closure (25 compounds) ---
+    # v8.0 phase improvement canaries: Phase 71 charge routing fixes (8 compounds)
+    (
+        "O=[N+]([O-])c1ccccc1C(=O)[O-]",  # Phase 71: 2-nitrobenzoate charge routing
+        "2-nitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1cccc(C(=O)[O-])c1",  # Phase 71: 3-nitrobenzoate charge routing
+        "3-nitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1ccc(C(=O)[O-])cc1",  # Phase 71: 4-nitrobenzoate charge routing
+        "4-nitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1cc(C(=O)[O-])cc([N+](=O)[O-])c1",  # Phase 71: 3,5-dinitrobenzoate
+        "3,5-dinitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1cc(Cl)ccc1C(=O)[O-]",  # Phase 71: chloro-nitrobenzoate charge routing
+        "4-chloro2-nitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1cc(O)ccc1C(=O)[O-]",  # Phase 71: hydroxy-nitrobenzoate charge routing
+        "4-hydroxy2-nitrobenzoate",
+    ),
+    (
+        "O=[N+]([O-])c1ccccc1",  # Phase 71: nitrobenzene neutral pipeline preserved
+        "nitrobenzene",
+    ),
+    (
+        "[O-][n+]1ccccc1",  # Phase 71: pyridine N-oxide neutral pipeline preserved
+        "pyridine 1-oxide",
+    ),
+    # v8.0 phase improvement canaries: Phase 68 carbamoyl prefix (4 compounds)
+    (
+        "NC(=O)CCCC(=O)O",  # Phase 68: carbamoyl prefix linear acid
+        "5-carbamoylpentanoic acid",
+    ),
+    (
+        "NC(=O)c1ccc(C(=O)O)cc1",  # Phase 68: carbamoyl prefix aromatic acid
+        "4-carbamoylbenzoic acid",
+    ),
+    (
+        "NC(=O)CCC(=O)O",  # Phase 68: carbamoyl prefix short chain
+        "4-carbamoylbutanoic acid",
+    ),
+    (
+        "NC(=O)CC(=O)O",  # Phase 68: carbamoyl prefix minimal chain
+        "3-carbamoylpropanoic acid",
+    ),
+    # Failure taxonomy sentinels: substituent_loss (3 compounds)
+    (
+        "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C",  # Sentinel: substituent_loss - terpene cyclopentane
+        "(3R)-9-cyclopentyl-3,7-dimethylnona-1,6-dien-3-ol",
+    ),
+    (
+        "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1",  # Sentinel: substituent_loss - phenoxy maleimide
+        "1-ethenyl-4-(2-methylbut-2-enoxy)benzene",
+    ),
+    (
+        "COc1ccc(C(=O)N2CCCC2=O)cc1",  # Sentinel: substituent_loss - methoxybenzamide pyrrolidinone
+        "4-methoxybenzamide",
+    ),
+    # Failure taxonomy sentinels: parent_mismatch (3 compounds)
+    (
+        r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # Sentinel: parent_mismatch - cyclohexanone chain
+        "3-(2-oxo1-ethyl-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid",
+    ),
+    (
+        "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic
+        "2,3-dibutyl-4-hydroxypyridine-6-carboxylic acid",
+    ),
+    (
+        r"CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C",  # Sentinel: parent_mismatch - prenyl chromanone
+        "(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol",
+    ),
+    # Failure taxonomy sentinels: fragment_loss (3 compounds)
+    (
+        "O=C(O)Cc1cc(O)ccc1Nc1c(Cl)cccc1Cl",  # Sentinel: fragment_loss - dichloroanilino phenylacetic
+        "2-(3-hydroxyphenyl)ethanoic acid",
+    ),
+    (
+        "CCCCCCCCCc1ccc(OCCO)cc1",  # Sentinel: fragment_loss - nonylphenol ethoxylate
+        "2-phenoxyethan-1-ol",
+    ),
+    (
+        r"CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",  # Sentinel: fragment_loss - heptanoyl pyrrolidinone
+        "heptanamide",
+    ),
+    # Failure taxonomy sentinels: stereo_mismatch (2 compounds)
+    (
+        "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",  # Sentinel: stereo_mismatch - ergostadienol
+        "ergost-7,25-dien-3-ol",
+    ),
+    (
+        "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",  # Sentinel: stereo_mismatch - stigmastandiol
+        "stigmast-5-en-3,7-diol",
+    ),
+    # Failure taxonomy sentinels: opsin_vocab_limit (2 compounds)
+    (
+        "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",  # Sentinel: opsin_vocab - tropyl indolecarboxylate
+        "tropyl 1H-indole-3-carboxylate",
+    ),
+    (
+        "NC(C(=O)O)C(CCC(N)C(=O)O)C(=O)O",  # Sentinel: opsin_vocab - triamino triacid
+        "3-(hydroxymethyl)-2,6-diaminoheptanetrioic acid",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -695,7 +804,7 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt158(smiles, expected_name):
+def test_canary_rt183(smiles, expected_name):
     """Golden canary test: verify round-trip-matching compound still names correctly."""
     result = name_compound(smiles)
     assert result == expected_name, (
