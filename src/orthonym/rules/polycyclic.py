@@ -91,6 +91,7 @@ class BridgeInfo:
     start_bh: int             # Starting bridgehead atom index
     end_bh: int               # Ending bridgehead atom index
     is_secondary: bool = False  # True for secondary bridges
+    is_dependent: bool = False  # True for dependent secondary bridges (VB-7)
     locant_low: Optional[int] = None   # Lower VB locant of endpoint (for secondary)
     locant_high: Optional[int] = None  # Higher VB locant of endpoint (for secondary)
 
@@ -222,8 +223,10 @@ class VonBaeyerAnalyzer:
         secondary_bridges = self._find_secondary_bridges(
             mol, ring_atoms, main_ring, main_bridge, bh_pair
         )
-        numbering = self._assign_numbering(
-            mol, main_ring, main_bridge, secondary_bridges, bh_pair
+        # VB-7: Classify, order, orient, and number secondary bridges
+        # Uses two-pass algorithm: numbering order then citation order
+        secondary_bridges, numbering = self._order_and_number_secondary_bridges(
+            mol, secondary_bridges, main_ring, main_bridge, bh_pair
         )
 
         # Collect all bridge info
@@ -307,12 +310,34 @@ class VonBaeyerAnalyzer:
         secondary_lengths = sorted(bridge_lengths[3:], reverse=True)
         bridge_lengths = primary_lengths + secondary_lengths
 
-        # Build descriptor string
+        # IUPAC VB-6 citation order re-sort for descriptor string
+        # VB-6.2: decreasing length; VB-6.4: lowest locants as ascending set;
+        # VB-6.5: lowest locants in citation order.
+        # Independent bridges cited before dependent bridges.
+        def _citation_sort_key(bridge):
+            loc1 = numbering.get(bridge.start_bh, 0)
+            loc2 = numbering.get(bridge.end_bh, 0)
+            locant_low = min(loc1, loc2)
+            locant_high = max(loc1, loc2)
+            dep = 1 if bridge.is_dependent else 0
+            return (dep, -bridge.length, locant_low, locant_high)
+
+        citation_ordered = sorted(secondary_bridges, key=_citation_sort_key)
+
+        # Build descriptor string (using citation-ordered bridges)
         descriptor = self._build_descriptor(
-            ring_count, primary_lengths, secondary_bridges, numbering
+            ring_count, primary_lengths, citation_ordered, numbering
         )
 
         total_atoms = len(ring_atoms)
+
+        # VB invariant: sum(bridge_lengths) + 2 == total_ring_atoms
+        total_bridge_len = sum(bridge_lengths)
+        if total_bridge_len + 2 != total_atoms:
+            logger.error(
+                "VB invariant violated: sum(%s) + 2 = %d, expected %d total ring atoms",
+                bridge_lengths, total_bridge_len + 2, total_atoms
+            )
 
         return PolycyclicDescriptor(
             ring_count=ring_count,
@@ -882,13 +907,179 @@ class VonBaeyerAnalyzer:
                 )
                 secondary_bridges.append(bridge)
 
-        # Sort: independent before dependent, then by length descending
-        secondary_bridges.sort(key=lambda b: -b.length)
+        # Bridge ordering is handled by _order_and_number_secondary_bridges()
+        # in analyze(), which implements proper VB-7 independent/dependent
+        # classification and multi-criteria sort.
 
         return secondary_bridges
 
     # ========================================================================
-    # VB-7: Numbering
+    # VB-7: Classification, Ordering, and Numbering
+    # ========================================================================
+
+    def _order_and_number_secondary_bridges(
+        self,
+        mol,
+        secondary_bridges: List[BridgeInfo],
+        main_ring: List[int],
+        main_bridge: Optional[BridgeInfo],
+        bh_pair: Tuple[int, int]
+    ) -> Tuple[List[BridgeInfo], Dict[int, int]]:
+        """
+        VB-7: Classify, order, orient, and number all ring atoms.
+
+        Implements a two-pass approach to resolve the circular dependency
+        between locant assignment and bridge ordering:
+
+        1. Number main ring and main bridge atoms (locants are fixed)
+        2. Classify secondary bridges as independent/dependent (VB-5)
+        3. Sort independent bridges by VB-7 criteria and number them
+        4. Iteratively resolve and number dependent bridges
+        5. Orient each bridge so numbering starts from higher-numbered
+           bridgehead (VB-7: "numbered starting from atom next to
+           higher-numbered bridgehead")
+
+        Sort criteria match OPSIN's VonBaeyerSecondaryBridgeSort:
+        (-locant_high, -locant_low, -bridge_length), which is consistent
+        with IUPAC VB-7 ("beginning with the one attached to the
+        highest-numbered bridgehead") and VB-7.2 ("longer bridges
+        numbered before shorter bridges").
+
+        Args:
+            mol: RDKit Mol object
+            secondary_bridges: Unordered list of secondary bridges
+            main_ring: Ordered list of main ring atoms
+            main_bridge: Main bridge info
+            bh_pair: Main bridgehead pair
+
+        Returns:
+            Tuple of (secondary_bridges in numbering order, complete numbering dict)
+        """
+        numbering = {}
+        locant = 1
+
+        # Step 1: Number main ring atoms
+        for atom_idx in main_ring:
+            if atom_idx not in numbering:
+                numbering[atom_idx] = locant
+                locant += 1
+
+        # Step 2: Number main bridge atoms
+        if main_bridge and main_bridge.atoms:
+            for atom_idx in main_bridge.atoms:
+                if atom_idx not in numbering:
+                    numbering[atom_idx] = locant
+                    locant += 1
+
+        if not secondary_bridges:
+            return secondary_bridges, numbering
+
+        # Step 3: Classify secondary bridges as independent or dependent
+        # VB-5: Independent = both endpoints on main ring or main bridge
+        #        Dependent = at least one endpoint on a secondary bridge
+        main_ring_set = set(main_ring)
+        main_bridge_atom_set = set(main_bridge.atoms) if main_bridge else set()
+        assigned = main_ring_set | main_bridge_atom_set
+
+        independent = []
+        dependent = []
+        for bridge in secondary_bridges:
+            if bridge.start_bh in assigned and bridge.end_bh in assigned:
+                bridge.is_dependent = False
+                independent.append(bridge)
+            else:
+                bridge.is_dependent = True
+                dependent.append(bridge)
+
+        # Step 4: Sort independent bridges by VB-7 numbering criteria
+        # VB-7: "beginning with the one attached to the highest-numbered bridgehead"
+        # VB-7.2: "longer bridges numbered before shorter bridges"
+        # Matches OPSIN: (-locant_high, -locant_low, -bridge_length)
+        def _numbering_sort_key(bridge, numb):
+            loc1 = numb.get(bridge.start_bh, 0)
+            loc2 = numb.get(bridge.end_bh, 0)
+            locant_high = max(loc1, loc2)
+            locant_low = min(loc1, loc2)
+            return (-locant_high, -locant_low, -bridge.length)
+
+        independent.sort(key=lambda b: _numbering_sort_key(b, numbering))
+
+        # Step 5: Orient and number independent bridge atoms
+        ordered = []
+        for bridge in independent:
+            # VB-7: "numbered starting from atom next to higher-numbered bridgehead"
+            if bridge.atoms:
+                loc_start = numbering.get(bridge.start_bh, 0)
+                loc_end = numbering.get(bridge.end_bh, 0)
+                if loc_start < loc_end:
+                    # end_bh has higher locant; reverse so atoms[0] is next to end_bh
+                    bridge.atoms = list(reversed(bridge.atoms))
+
+            for atom_idx in bridge.atoms:
+                if atom_idx not in numbering:
+                    numbering[atom_idx] = locant
+                    locant += 1
+
+            assigned.update(bridge.atoms)
+            ordered.append(bridge)
+
+        # Step 6: Iteratively resolve dependent bridges
+        # After numbering independent bridges, some dependent bridges may
+        # now have both endpoints assigned. Process them in rounds.
+        remaining = list(dependent)
+        while remaining:
+            newly_resolvable = []
+            still_remaining = []
+            for b in remaining:
+                if b.start_bh in assigned and b.end_bh in assigned:
+                    newly_resolvable.append(b)
+                else:
+                    still_remaining.append(b)
+
+            if not newly_resolvable:
+                # Force-add remaining (shouldn't happen in valid polycyclics)
+                logger.warning(
+                    "Unresolvable dependent bridges remain: %d bridges",
+                    len(still_remaining)
+                )
+                for bridge in still_remaining:
+                    if bridge.atoms:
+                        loc_start = numbering.get(bridge.start_bh, 0)
+                        loc_end = numbering.get(bridge.end_bh, 0)
+                        if loc_start < loc_end:
+                            bridge.atoms = list(reversed(bridge.atoms))
+                    for atom_idx in bridge.atoms:
+                        if atom_idx not in numbering:
+                            numbering[atom_idx] = locant
+                            locant += 1
+                    assigned.update(bridge.atoms)
+                    ordered.append(bridge)
+                break
+
+            # Sort by VB-7 criteria with current numbering
+            newly_resolvable.sort(key=lambda b: _numbering_sort_key(b, numbering))
+
+            for bridge in newly_resolvable:
+                if bridge.atoms:
+                    loc_start = numbering.get(bridge.start_bh, 0)
+                    loc_end = numbering.get(bridge.end_bh, 0)
+                    if loc_start < loc_end:
+                        bridge.atoms = list(reversed(bridge.atoms))
+
+                for atom_idx in bridge.atoms:
+                    if atom_idx not in numbering:
+                        numbering[atom_idx] = locant
+                        locant += 1
+
+                assigned.update(bridge.atoms)
+                ordered.append(bridge)
+
+            remaining = still_remaining
+
+        return ordered, numbering
+
+    # ========================================================================
+    # VB-7: Numbering (legacy — used by _order_and_number_secondary_bridges)
     # ========================================================================
 
     def _assign_numbering(
