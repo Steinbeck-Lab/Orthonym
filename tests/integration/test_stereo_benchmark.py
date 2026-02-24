@@ -113,7 +113,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estran-3,15,16,17-tetraol'),
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(4S,6S)-4,6,14-trihydroxy-12-methoxy-6-methyl-tricyclo[8.4.0.0(3,8)]tetradec-3-en-2,9-dione'),
     ('C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)C/C=C\\C(=O)O1', '(4R,7Z,10S,13Z,15R,16S)-15-hydroxy-4,10,16-trimethyloxacyclohexadecan-2-one'),
-    ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', '(1S,13S,14S,20S)-20-hydroxy-15-methyl-2,7,9-trioxa-15-aza-pentacyclo[11.7.0.0(6,10).0(14,18).0(4,12)]icos-18-en-3-one'),
+    ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', '(1S,13S,14S,20S)-20-hydroxy-15-methyl-2,7,9-trioxa-15-aza-pentacyclo[11.7.0.0(4,12).0(6,10).0(14,18)]icos-18-en-3-one'),  # Updated P72: IUPAC VB-6 citation order
     ('CCCCC[C@H](O)/C=C/[C@H]1CCC(=O)[C@@H]1C/C=C\\CCCC(=O)O', '(5Z)-7-cyclopentylhept-5-enoic acid'),
     ('CCCCC[C@H](O)/C=C/[C@@H]1[C@@H](C/C=C\\CCCC(=O)O)[C@H](O)C[C@H]1O', '(5Z)-7-cyclopentylhept-5-enoic acid'),
     ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-5-(methylamino)-2-(pentanoylamino)pentanoic acid'),
@@ -122,8 +122,8 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO', '(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid'),  # NEWLY_RT
     ('CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1', '(5R,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one'),
     ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', '(beta-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate'),
-    ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', '(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(12,17).0(2,8)]icosan-5,10-diol'),
-    ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', '(1R,10R,21S)-10-ethyl-12-methyl-4,12-diaza-hexacyclo[9.7.0.2(8,11).1(4,8).0(1,21).0(13,18)]henicosane'),
+    ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', '(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol'),  # Updated P72: IUPAC VB-6 citation order
+    ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', '(1R,10R,21S)-10-ethyl-12-methyl-4,12-diaza-hexacyclo[9.7.0.2(8,11).1(4,8).0(13,18).0(1,21)]henicosane'),  # Updated P72: IUPAC VB-6 citation order
     ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', '(1R)-4,5,13,14-tetramethoxy-10-aza-tetracyclo[8.8.0.0(2,7).0(12,17)]octadecane'),
     ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', '(3R,5S,7R,8R,9S,10S,13R,14S,15R,17R,20R)-3,7,15-trihydroxycholan-24-one'),
     ('C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C', '(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmast-7,24-dien-3-ol'),
@@ -151,7 +151,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-N-(2S)-2-(ethanoylamino)-4-methylpentanoyl(2S)-2-(methylamino)-2-amino-3-phenylpropanoyl-3-(2-aminoethyl)-1H-indole'),
     ('O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1', '(8R,9S,15S)-8-dodecyl-8-hydroxy-1,10-diaza-tetracyclo[7.7.0.0(2,7).0(10,15)]hexadecan-16-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
-    ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', '(6S)-4,21-dihydroxy-15-methoxy-6,17-dimethyl-7-oxa-pentacyclo[11.8.0.0(5,9).0(3,11).0(14,19)]henicosan-2,8,12-trione'),
+    ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', '(6S)-4,21-dihydroxy-15-methoxy-6,17-dimethyl-7-oxa-pentacyclo[11.8.0.0(3,11).0(5,9).0(14,19)]henicosan-2,8,12-trione'),  # Updated P72: IUPAC VB-6 citation order
     ('C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C', '(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmast-7,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3)C(C)C', '(3S,5R,10S,13R,14R,17R,20R)-4,4,14-trimethylergost-8,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C', '(4S,5S,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergost-7,9,24-trien-3-one'),

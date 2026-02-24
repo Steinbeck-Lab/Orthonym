@@ -96,7 +96,7 @@ CI_BENCHMARK = [
     (
         "C=C1[C@@H](O)O[C@H]2[C@H]1C[C@@H](OC(C)=O)[C@]13C(=O)O"
         "[C@H]4C[C@](C)(O)[C@H]([C@H]41)[C@@]31C=C(C)[C@]2(O)O1",
-        "(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,20S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,19-trioxa-hexacyclo[10.6.0.1(9,12).1(1,16).0(4,8).0(13,20)]icos-10-en-18-one acetate",
+        "(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,19S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,20-trioxa-hexacyclo[10.6.0.1(1,16).1(9,12).0(4,8).0(13,19)]icos-10-en-18-one acetate",  # Updated P72: IUPAC VB-6 citation order + VB-7 bridge atom orientation
     ),
     (
         "CC(C)=CCC/C(C)=C/CC/C(C)=C/CC/C(C)=C\\CC/C(C)=C\\CC/C(C)=C"
@@ -366,8 +366,8 @@ CI_BENCHMARK = [
         "C(OC)C(C)(O)C3OC)CC[C@H]12",
         "(1S,7S,9R,12R,17R,20S,21R,22S,25R)-21-docosyl-9-ethyl-26"
         "-hydroxy-1,12,18-trimethyl-22-nonyl-2,5-dioxo-3,6-dioxa"
-        "-pentacyclo[15.8.0.1(4,7).0(20,25).0(7,12)]hexacosa-4,10,18"
-        "-triene-10-carboxylic acid",
+        "-pentacyclo[15.8.0.1(4,7).0(7,12).0(20,25)]hexacosa-4,10,18"
+        "-triene-10-carboxylic acid",  # Updated P72: IUPAC VB-6 citation order
     ),
     (
         "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC"
@@ -425,8 +425,8 @@ CI_BENCHMARK = [
     ),
     (
         "CC(C)C1=C[C@@]23CC[C@H]4C(C)(C)CCC[C@]4(C(=O)O2)C3=CC1=O",
-        "(1R,4S,9R)-13-isopropyl-5,5-dimethyl-15-oxa-tetracyclo"
-        "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,16-dione",
+        "(1R,4S,9R)-13-isopropyl-5,5-dimethyl-16-oxa-tetracyclo"
+        "[8.4.0.2(1,9).0(4,9)]hexadeca-10,13-dien-12,15-dione",  # Updated P72: IUPAC VB-7 bridge atom orientation
     ),
     (
         "COC1=C(N[C@H](C(=O)O)[C@@H](C)O[C@@H]2O[C@H](CO)[C@H](O)"

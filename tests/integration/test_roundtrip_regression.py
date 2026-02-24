@@ -82,7 +82,7 @@ ROUNDTRIP_VERIFIED = [
     ),
     (
         "CC1(C)CCC2(C(=O)O)CCC3(C)C(=CCC4C5(C)CC(O)C(=O)C(C)(C)C5CCC43C)C2C1",
-        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.0(15,20).0(2,11).0(5,10)]docos-13-ene-20-carboxylic acid",
+        "8-hydroxy-1,2,6,6,10,17,17-heptamethyl-7-oxo-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid",  # Updated P72: IUPAC VB-6 citation order
     ),
 
     # Steroid (natural product, with stereodescriptors)

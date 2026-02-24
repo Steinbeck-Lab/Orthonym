@@ -90,7 +90,7 @@ VB_COUNTING_FIXES = [
         "CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C"
         "[C@@]23CC[C@]4(O)CO)O1",
         "(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-"
-        "pentacyclo[9.8.0.1(2,6).0(12,17).0(2,8)]icosan-5,10-diol",
+        "pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol",  # Updated P72: IUPAC VB-6 citation order
         id="vb-C8-pentacyclo",
     ),
     pytest.param(
