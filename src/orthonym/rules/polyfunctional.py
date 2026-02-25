@@ -741,7 +741,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             fg_name, mol, matches[0], principal_chain
         )
         if not prefix_form:
-            logger.warning(
+            # By-design: FGs using functional class naming (ester→alkoxycarbonyl,
+            # secondary_amide→acylamino, thioether, etc.) are handled by
+            # specialized naming paths, not as simple prefixes
+            logger.debug(
                 "DROP-23 substituent_skip: reason=no_fg_prefix_form fg_name=%s",
                 fg_name,
             )

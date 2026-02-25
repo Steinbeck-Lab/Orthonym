@@ -83,18 +83,31 @@ class TestDepthLimit:
         """MAX_NAMING_DEPTH should be 7 (increased for deep iterative decomposition)."""
         assert MAX_NAMING_DEPTH == 7
 
-    def test_depth_limit_returns_none(self):
-        """At MAX_NAMING_DEPTH, name_fragment_recursively returns None immediately."""
+    def test_depth_limit_returns_none_for_uncached(self):
+        """At MAX_NAMING_DEPTH, uncached fragments return None."""
+        _fragment_guard.depth = MAX_NAMING_DEPTH
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # tetradecane, not cached
+        assert result is None
+
+    def test_depth_limit_returns_cached(self):
+        """At MAX_NAMING_DEPTH, cached fragments bypass depth and return a name."""
         _fragment_guard.depth = MAX_NAMING_DEPTH
         result = name_fragment_recursively("CCO")
-        assert result is None
+        assert result == "ethanol"
 
     def test_depth_limit_prevents_crash(self):
         """At depth limit, no crash occurs -- returns None gracefully."""
         _fragment_guard.depth = 10  # Well above limit
-        result = name_fragment_recursively("c1ccccc1")
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # uncached
         assert result is None
         assert get_naming_depth() == 10  # Unchanged since we never entered
+
+    def test_depth_above_limit_returns_cached(self):
+        """Even above depth limit, cached fragments resolve."""
+        _fragment_guard.depth = 10
+        result = name_fragment_recursively("c1ccccc1")
+        assert result == "benzene"
+        assert get_naming_depth() == 10  # Unchanged
 
     def test_depth_six_still_works(self):
         """At depth 6 (one below limit of 7), naming should still succeed."""
@@ -103,11 +116,11 @@ class TestDepthLimit:
         assert result is not None
         assert get_naming_depth() == 6  # Depth restored
 
-    def test_depth_seven_returns_none(self):
-        """At depth 7 (the limit), name_fragment_recursively returns None."""
+    def test_depth_seven_returns_none_for_uncached(self):
+        """At depth 7 (the limit), uncached fragments return None."""
         _fragment_guard.depth = 7
-        result = name_fragment_recursively("CCO")
-        assert result is None  # At limit, returns None
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # uncached
+        assert result is None
         assert get_naming_depth() == 7  # Unchanged since we never entered
 
     def test_depth_one_below_limit_still_works(self):
@@ -149,14 +162,20 @@ class TestFragmentNaming:
         assert result == "acetic acid"
 
     def test_custom_max_depth(self):
-        """Custom max_depth parameter should be respected."""
+        """Custom max_depth parameter should be respected for uncached fragments."""
         _fragment_guard.depth = 1
-        # With max_depth=1, should return None since depth >= max_depth
-        result = name_fragment_recursively("CCO", max_depth=1)
+        # With max_depth=1, uncached fragment returns None (depth >= max_depth)
+        result = name_fragment_recursively("CCCCCCCCCCCCCC", max_depth=1)
         assert result is None
-        # With max_depth=2, should succeed since depth < max_depth
-        result = name_fragment_recursively("CCO", max_depth=2)
-        assert result == "ethanol"
+        # With max_depth=2, uncached fragment succeeds (depth < max_depth)
+        result = name_fragment_recursively("CCCCCCCCCCCCCC", max_depth=2)
+        assert result is not None
+
+    def test_custom_max_depth_cached_bypasses_limit(self):
+        """Cached fragments bypass max_depth entirely."""
+        _fragment_guard.depth = 1
+        result = name_fragment_recursively("CCO", max_depth=1)
+        assert result == "ethanol"  # Cache hit, depth irrelevant
 
 
 @pytest.mark.unit

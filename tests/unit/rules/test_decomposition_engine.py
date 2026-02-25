@@ -258,11 +258,18 @@ class TestRecursionDepth:
         assert result is not None
         assert result == "methane"
 
-    def test_depth_7_returns_none(self):
-        """At naming depth 7 (limit), name_fragment_recursively returns None."""
+    def test_depth_7_returns_none_for_uncached(self):
+        """At naming depth 7 (limit), uncached fragments return None."""
+        _fragment_guard.depth = 7
+        # Use a fragment NOT in FRAGMENT_NAME_CACHE
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # tetradecane
+        assert result is None
+
+    def test_depth_7_returns_cached(self):
+        """At naming depth 7, cached fragments still return a name."""
         _fragment_guard.depth = 7
         result = name_fragment_recursively("CCO")
-        assert result is None
+        assert result == "ethanol"
 
     def test_depth_restores_after_decompose(self):
         """After try_decompose, naming depth should be restored."""

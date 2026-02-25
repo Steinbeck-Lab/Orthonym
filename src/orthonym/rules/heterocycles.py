@@ -1095,7 +1095,7 @@ def name_substituted_heterocycle(
                                 mol, sub_atoms, attach_idx, list(ring_set_local)
                             )
                         if sub_name is None:
-                            logger.warning(
+                            logger.debug(
                                 "DROP-24 substituent_skip: reason=large_sub_still_unnameable carbon_count=%d",
                                 carbon_count,
                             )

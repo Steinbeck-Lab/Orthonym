@@ -414,11 +414,19 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         return None  # Performance guard: too complex for decomposition
 
     # Step 2: Try existing pipeline first (via name_fragment_recursively
-    # to respect the depth guard)
-    from ..assembly.fragment_naming import name_fragment_recursively
+    # to respect the depth guard).
+    # Temporarily disable the runtime fragment cache during this probe
+    # so that intermediate results from the quality gate's self-recursion
+    # don't contaminate later actual fragment naming.
+    from ..assembly.fragment_naming import name_fragment_recursively, _fragment_guard
 
     existing_smiles = Chem.MolToSmiles(mol)
-    existing_name = name_fragment_recursively(existing_smiles)
+    _saved_cache = getattr(_fragment_guard, 'cache', None)
+    _fragment_guard.cache = None
+    try:
+        existing_name = name_fragment_recursively(existing_smiles)
+    finally:
+        _fragment_guard.cache = _saved_cache
 
     # Step 3: Quality gate -- only decompose if existing name is poor
     quality_ok = existing_name and _name_quality_is_acceptable(existing_name, mol)

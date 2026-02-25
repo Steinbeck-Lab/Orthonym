@@ -58,11 +58,17 @@ class TestConstants:
 class TestDepthLimit:
     """Test depth limit enforcement."""
 
-    def test_at_depth_limit_returns_none(self):
-        """When depth == MAX_NAMING_DEPTH (7), should return None."""
+    def test_at_depth_limit_returns_none_for_uncached(self):
+        """When depth == MAX_NAMING_DEPTH (7), uncached fragments return None."""
+        _fragment_guard.depth = 7
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # tetradecane, not cached
+        assert result is None
+
+    def test_at_depth_limit_returns_cached(self):
+        """When depth == MAX_NAMING_DEPTH (7), cached fragments still resolve."""
         _fragment_guard.depth = 7
         result = name_fragment_recursively("CCO")
-        assert result is None
+        assert result == "ethanol"
 
     def test_below_depth_limit_returns_name(self):
         """When depth == 6 (one below limit), should return a name."""

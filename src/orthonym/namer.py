@@ -201,6 +201,16 @@ class Orthonym:
         Raises:
             ValueError: If SMILES is invalid
         """
+        # Start runtime fragment cache session (only at top-level depth)
+        from .assembly.fragment_naming import start_naming_session, end_naming_session
+        start_naming_session()
+        try:
+            return self._name_impl(smiles)
+        finally:
+            end_naming_session()
+
+    def _name_impl(self, smiles: str) -> str:
+        """Internal naming implementation (wrapped by session management)."""
         # Parse SMILES
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:

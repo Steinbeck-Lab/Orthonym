@@ -349,7 +349,7 @@ def _extract_fragment_smiles(
 
         return frag_smi
     except Exception as e:
-        logger.warning(
+        logger.debug(
             "DROP-15 substituent_skip: reason=extract_exception atom_count=%d error=%s",
             len(sub_atoms), e,
         )

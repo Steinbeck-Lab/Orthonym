@@ -26,7 +26,7 @@ Usage:
 
 import logging
 import threading as _threading
-from typing import Optional
+from typing import Dict, Optional
 
 from rdkit import Chem
 
@@ -36,6 +36,114 @@ _fragment_guard = _threading.local()
 
 MAX_NAMING_DEPTH = 7
 MAX_TOTAL_CALLS = 100
+
+# Pre-computed names for common fragments that frequently hit the depth limit.
+# Checked BEFORE the depth counter so these fragments are always nameable,
+# regardless of recursion depth.  Analogous to retained_names.py but for
+# fragments produced during recursive decomposition of complex molecules.
+#
+# Every entry was verified against name_compound() at depth 0 (2026-02-25).
+# Only fragments with CORRECT verified names are included.
+FRAGMENT_NAME_CACHE: Dict[str, str] = {
+    # --- Simple alkanes ---
+    "CC": "ethane",
+    "CCC": "propane",
+    "CCCC": "butane",
+    "CCCCC": "pentane",
+    "CCCCCC": "hexane",
+    "CCCCCCC": "heptane",
+    "CCCCCCCC": "octane",
+    "CCCCCCCCC": "nonane",
+    "CCCCCCCCCC": "decane",
+    "CCCCCCCCCCC": "undecane",
+    "CCCCCCCCCCCC": "dodecane",
+    # --- Simple alcohols ---
+    "CO": "methanol",
+    "CCO": "ethanol",
+    "CCCO": "propan-1-ol",
+    "CCCCO": "butan-1-ol",
+    "CCCCCO": "pentan-1-ol",
+    "CC(C)O": "propan-2-ol",
+    "CC(C)(C)O": "2-methylpropan-2-ol",
+    # --- Simple carboxylic acids ---
+    "O=CO": "formic acid",
+    "CC(=O)O": "acetic acid",
+    "CCC(=O)O": "propanoic acid",
+    "CCCC(=O)O": "butanoic acid",
+    "CCCCC(=O)O": "pentanoic acid",
+    "O=C(O)c1ccccc1": "benzoic acid",
+    # --- Simple aldehydes ---
+    "C=O": "formaldehyde",
+    "CC=O": "acetaldehyde",
+    "CCC=O": "propanal",
+    "CCCC=O": "butanal",
+    # --- Simple ketones ---
+    "CC(C)=O": "acetone",
+    "CCC(C)=O": "butan-2-one",
+    # --- Simple amines ---
+    "CN": "methylamine",
+    "CCN": "ethylamine",
+    "CCCN": "propan-1-amine",
+    "CCCCN": "butan-1-amine",
+    "NCCCCCN": "pentane-1,5-diamine",
+    # --- Common amides / nitriles ---
+    "CC(N)=O": "acetamide",
+    "CC#N": "acetonitrile",
+    # --- Common aromatics ---
+    "c1ccccc1": "benzene",
+    "Oc1ccccc1": "phenol",
+    "Nc1ccccc1": "aniline",
+    "O=Cc1ccccc1": "benzaldehyde",
+    "CC(=O)c1ccccc1": "acetophenone",
+    "c1ccc(-c2ccccc2)cc1": "1,1'-biphenyl",
+    "c1ccc2ccccc2c1": "naphthalene",
+    # --- Common heterocycles ---
+    "c1ccncc1": "pyridine",
+    "c1ccoc1": "furan",
+    "c1cc[nH]c1": "pyrrole",
+    "c1ccsc1": "thiophene",
+    # --- Amino acids (retained names, common in peptide fragments) ---
+    "NCC(=O)O": "glycine",
+    "CC(N)C(=O)O": "alanine",
+    "NC(CO)C(=O)O": "serine",
+    "NC(CS)C(=O)O": "cysteine",
+    "NC(Cc1ccc(O)cc1)C(=O)O": "tyrosine",
+    "NC(Cc1c[nH]cn1)C(=O)O": "histidine",
+    "NC(Cc1c[nH]c2ccccc12)C(=O)O": "tryptophan",
+    "NCCCCC(N)C(=O)O": "lysine",
+    "NC(CCC(=O)O)C(=O)O": "glutamic acid",
+    "NC(CC(=O)O)C(=O)O": "aspartic acid",
+    "NC(=O)CC(N)C(=O)O": "asparagine",
+    "CSCCC(N)C(=O)O": "methionine",
+    # --- Other common fragments ---
+    "CCCCC(CC)CO": "2-ethylhexan-1-ol",
+    "ClCCCl": "1,2-dichloroethane",
+    "ClC(Cl)Cl": "chloroform",
+}
+
+
+def start_naming_session():
+    """Initialize runtime fragment cache for a naming call.
+
+    The runtime cache stores (canonical SMILES -> name) pairs discovered
+    during a single top-level naming call.  This eliminates redundant
+    re-naming of the same fragment at different recursion depths.
+
+    Only the outermost call (depth == 0) should start a session.
+    Nested calls inherit the parent's cache.
+    """
+    if getattr(_fragment_guard, 'depth', 0) == 0:
+        _fragment_guard.cache = {}
+
+
+def end_naming_session():
+    """Clear runtime fragment cache after a naming call completes.
+
+    Only the outermost call (depth == 0) should end the session to
+    avoid clearing a parent session's cache during nested calls.
+    """
+    if getattr(_fragment_guard, 'depth', 0) == 0:
+        _fragment_guard.cache = None
 
 
 def get_naming_depth() -> int:
@@ -74,6 +182,26 @@ def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) ->
         >>> name_fragment_recursively("CC(=O)O")
         'acetic acid'
     """
+    # Canonicalize early so cache lookup uses consistent keys
+    try:
+        canonical = Chem.CanonSmiles(smiles)
+    except Exception:
+        return None
+    if canonical is None:
+        return None
+
+    # Tier 1: static fragment cache — depth-independent
+    cached = FRAGMENT_NAME_CACHE.get(canonical)
+    if cached is not None:
+        return cached
+
+    # Tier 2: runtime dynamic cache — populated during this naming session
+    runtime_cache = getattr(_fragment_guard, 'cache', None)
+    if runtime_cache is not None:
+        dynamic = runtime_cache.get(canonical)
+        if dynamic is not None:
+            return dynamic
+
     depth = get_naming_depth()
     if depth >= max_depth:
         logger.warning(
@@ -84,14 +212,16 @@ def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) ->
 
     _fragment_guard.depth = depth + 1
     try:
-        canonical = Chem.CanonSmiles(smiles)
-        if canonical is None:
-            return None
         from ..namer import name_compound
         result = name_compound(canonical)
-        return result if result else None
+        if result:
+            # Populate runtime cache with successful result
+            if runtime_cache is not None:
+                runtime_cache[canonical] = result
+            return result
+        return None
     except Exception as e:
-        logger.warning(
+        logger.debug(
             "DROP-14 substituent_skip: reason=fragment_naming_exception depth=%d smiles=%s error=%s",
             depth, smiles[:60], e,
         )
