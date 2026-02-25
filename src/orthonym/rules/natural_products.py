@@ -139,25 +139,17 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     scaffold_stem = scaffold_info["scaffold_stem"]
     scaffold_name = scaffold_info["scaffold_name"]
 
-    # Only enumerate decorations for steroids with IUPAC numbering maps
-    if scaffold_class != "steroid":
-        # Coverage gate: non-steroid scaffolds must cover enough of the molecule
-        total_heavy = mol.GetNumHeavyAtoms()
-        if total_heavy > 10:
-            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
-            if scaffold_coverage < 0.50:
-                return None  # Fall through to systematic naming
-        return scaffold_name
-
     # Build target atom index -> IUPAC locant mapping
+    # Works for any scaffold class (steroid, alkaloid) that has a numbering map
     numbering = _build_target_to_iupac(scaffold_info)
     if numbering is None:
-        # Coverage gate: steroid without numbering
+        # No numbering map -> coverage gate, then bare scaffold name
         total_heavy = mol.GetNumHeavyAtoms()
         if total_heavy > 10:
             scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
-            if scaffold_coverage < 0.40:
-                return None  # Steroid scaffold too small for this molecule
+            threshold = 0.40 if scaffold_class == "steroid" else 0.50
+            if scaffold_coverage < threshold:
+                return None  # Fall through to systematic naming
         return scaffold_name
 
     matched_set = set(scaffold_info["matched_atoms"])
@@ -172,24 +164,49 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     for e in esters:
         ester_consumed_atoms.update(e["all_atoms"])
 
+    # 0b. Find epoxy bridges (O bridging two scaffold atoms, e.g. morphine 4,5-epoxy)
+    epoxy_bridges = _find_epoxy_bridges(mol, matched_set, numbering,
+                                        exclude_atoms=ester_consumed_atoms)
+    # Collect oxygen atoms consumed by epoxy bridges so they aren't counted as OH
+    epoxy_consumed = set()
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetIdx() in matched_set:
+            continue
+        neighbors = [n for n in atom.GetNeighbors()]
+        if len(neighbors) == 2:
+            n1, n2 = neighbors
+            if (n1.GetIdx() in matched_set and n2.GetIdx() in matched_set
+                    and n1.GetIdx() in numbering and n2.GetIdx() in numbering):
+                epoxy_consumed.add(atom.GetIdx())
+
+    all_exclude = ester_consumed_atoms | epoxy_consumed
+
+    # 0c. Find methoxy groups (-OCH3) before hydroxyls (consumes O atoms)
+    methoxys = _find_methoxys(mol, scaffold_info, numbering,
+                              exclude_atoms=all_exclude)
+
     # 1. Find hydroxyl groups (exocyclic -OH on scaffold atoms)
     hydroxyls = _find_hydroxyls(mol, scaffold_info, numbering,
-                                exclude_atoms=ester_consumed_atoms)
+                                exclude_atoms=all_exclude)
 
     # 2. Find ketone groups (exocyclic =O on scaffold atoms)
     ketones = _find_ketones(mol, scaffold_info, numbering,
-                            exclude_atoms=ester_consumed_atoms)
+                            exclude_atoms=all_exclude)
 
     # 3. Find unsaturation within the scaffold (C=C, C#C)
     unsaturation = _find_scaffold_unsaturation(mol, matched_set, numbering)
 
     # 3b. Find methyl substituents on scaffold (extra CH3 not part of scaffold)
     methyls = _find_methyls(mol, scaffold_info, numbering,
-                            exclude_atoms=ester_consumed_atoms)
+                            exclude_atoms=all_exclude)
 
     # 3c. Find halogen substituents on scaffold
     halogens = _find_halogens(mol, scaffold_info, numbering,
-                              exclude_atoms=ester_consumed_atoms)
+                              exclude_atoms=all_exclude)
+
+    # 3d. Find N-alkyl groups on scaffold nitrogen atoms
+    n_alkyls = _find_n_alkyl(mol, matched_set, numbering,
+                             exclude_atoms=all_exclude)
 
     # 4. If esters found, use functional class format (IUPAC P-65.6)
     if esters:
@@ -201,13 +218,15 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
 
     # If no decorations found, return bare scaffold name
     if (not hydroxyls and not ketones and not methyls and not halogens
-            and not unsaturation["ene"] and not unsaturation["yne"]):
+            and not unsaturation["ene"] and not unsaturation["yne"]
+            and not epoxy_bridges and not n_alkyls and not methoxys):
         return scaffold_name
 
     # 5. Assemble the decorated name (substitutive format)
     return _assemble_np_name(
         scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
         stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
+        epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
     )
 
 
@@ -218,7 +237,7 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
 def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
     """Build mapping from target molecule atom indices to IUPAC locants.
 
-    Uses the STEROID_NUMBERING_MAPS from the data module.
+    Uses numbering maps from the data module (steroid and alkaloid).
 
     Args:
         scaffold_info: Dict from detect_natural_product().
@@ -227,8 +246,10 @@ def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
         Dict mapping target atom index to IUPAC locant, or None if
         no numbering map is available for this scaffold.
     """
+    from ..data.natural_products import get_scaffold_numbering
+
     scaffold_smiles = scaffold_info["scaffold_smiles"]
-    numbering_map = get_steroid_numbering(scaffold_smiles)
+    numbering_map = get_scaffold_numbering(scaffold_smiles)
     if numbering_map is None:
         return None
 
@@ -373,10 +394,14 @@ def _find_methyls(
             continue
 
         # Single carbon atom substituent with 3 H -> methyl
+        # Skip methyls on nitrogen (those are N-alkyls, handled separately)
         if len(sub["substituent_atoms"]) == 1:
             first_idx = sub["first_atom"]
             atom = mol.GetAtomWithIdx(first_idx)
             if atom.GetAtomicNum() == 6 and atom.GetTotalNumHs() == 3:
+                attach_atom = mol.GetAtomWithIdx(attach)
+                if attach_atom.GetAtomicNum() == 7:
+                    continue  # N-alkyl, not C-methyl
                 bond = mol.GetBondBetweenAtoms(attach, first_idx)
                 if bond and bond.GetBondType() == Chem.BondType.SINGLE:
                     methyls.append(numbering[attach])
@@ -463,6 +488,197 @@ def _find_scaffold_unsaturation(
     return {"ene": sorted(ene_locants), "yne": sorted(yne_locants)}
 
 
+def _find_epoxy_bridges(
+    mol, matched_set: set, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[Tuple[int, int]]:
+    """Find epoxy bridges (oxygen bridging two scaffold atoms).
+
+    An epoxy bridge is an oxygen atom whose ONLY heavy-atom neighbors are both
+    scaffold atoms with IUPAC locants.  Phenolic/enol oxygens (aromatic or
+    doubly bonded) are excluded.
+
+    Returns sorted list of (lower_locant, higher_locant) tuples.
+    """
+    exclude = exclude_atoms or set()
+    bridges = []
+
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8:
+            continue
+        if atom.GetIdx() in matched_set:
+            continue  # Oxygen that IS part of the scaffold (not a substituent)
+        if atom.GetIdx() in exclude:
+            continue
+        if atom.GetIsAromatic():
+            continue
+
+        # Oxygen must have exactly 2 heavy-atom neighbors, both in scaffold
+        neighbors = [n for n in atom.GetNeighbors()]
+        if len(neighbors) != 2:
+            continue
+
+        n1, n2 = neighbors[0], neighbors[1]
+        if n1.GetIdx() not in matched_set or n2.GetIdx() not in matched_set:
+            continue
+        if n1.GetIdx() not in numbering or n2.GetIdx() not in numbering:
+            continue
+
+        # Both bonds must be single (not =O or aromatic)
+        b1 = mol.GetBondBetweenAtoms(atom.GetIdx(), n1.GetIdx())
+        b2 = mol.GetBondBetweenAtoms(atom.GetIdx(), n2.GetIdx())
+        if b1.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        if b2.GetBondType() != Chem.BondType.SINGLE:
+            continue
+
+        loc1, loc2 = numbering[n1.GetIdx()], numbering[n2.GetIdx()]
+        bridges.append((min(loc1, loc2), max(loc1, loc2)))
+
+    return sorted(bridges)
+
+
+def _find_n_alkyl(
+    mol, matched_set: set, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[Tuple[int, str]]:
+    """Find N-alkyl groups on scaffold nitrogen atoms.
+
+    Detects alkyl substituents (methyl, ethyl, etc.) attached to nitrogen
+    atoms that are part of the scaffold.
+
+    Returns sorted list of (locant, alkyl_name) tuples.
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    exclude = exclude_atoms or set()
+    n_alkyls = []
+
+    for atom_idx in matched_set:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetAtomicNum() != 7:  # Only nitrogen
+            continue
+        if atom_idx not in numbering:
+            continue
+
+        # Find non-scaffold carbon neighbors
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in matched_set:
+                continue  # Skip scaffold atoms
+            if nbr_idx in exclude:
+                continue
+            if nbr.GetAtomicNum() != 6:
+                continue  # Only carbon substituents
+
+            bond = mol.GetBondBetweenAtoms(atom_idx, nbr_idx)
+            if not bond or bond.GetBondType() != Chem.BondType.SINGLE:
+                continue
+
+            # Count the alkyl chain length (simple linear alkyl)
+            chain_len = _trace_alkyl_chain(mol, nbr_idx, matched_set)
+            if chain_len > 0:
+                prefix = get_chain_prefix(chain_len)
+                n_alkyls.append((numbering[atom_idx], f"{prefix}yl"))
+
+    return sorted(n_alkyls)
+
+
+def _trace_alkyl_chain(mol, start_idx: int, exclude_set: set) -> int:
+    """Trace a simple unbranched alkyl chain starting from start_idx.
+
+    Returns the chain length (number of carbons).  Returns 0 if the
+    fragment is not a simple unbranched all-carbon chain.
+    """
+    visited = set()
+    current = start_idx
+    length = 0
+
+    while True:
+        atom = mol.GetAtomWithIdx(current)
+        if atom.GetAtomicNum() != 6:
+            break
+        visited.add(current)
+        length += 1
+
+        # Find the next carbon in the chain (not in scaffold, not visited)
+        next_c = None
+        branch = False
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in exclude_set or nbr_idx in visited:
+                continue
+            if nbr.GetAtomicNum() == 6:
+                if next_c is not None:
+                    branch = True  # Branched -> not simple alkyl
+                    break
+                next_c = nbr_idx
+
+        if branch:
+            return 0  # Not a simple chain
+        if next_c is None:
+            break  # End of chain
+        current = next_c
+
+    return length
+
+
+def _find_methoxys(
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[int]:
+    """Find methoxy groups (-OCH3) attached to scaffold atoms.
+
+    Returns sorted list of IUPAC locants where methoxy groups are found.
+    Methoxy consumes the OH position (so it should be excluded from hydroxyls).
+    """
+    methoxys = []
+    exclude = exclude_atoms or set()
+
+    subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+    for sub in subs:
+        attach = sub["attachment_atom"]
+        if attach not in numbering:
+            continue
+        if sub["first_atom"] in exclude:
+            continue
+
+        # Two-atom substituent: O-CH3
+        if len(sub["substituent_atoms"]) == 2:
+            atoms_list = list(sub["substituent_atoms"])
+            first_idx = sub["first_atom"]
+            first_atom = mol.GetAtomWithIdx(first_idx)
+
+            # First atom is oxygen, single bond to scaffold
+            if first_atom.GetAtomicNum() != 8:
+                continue
+            bond = mol.GetBondBetweenAtoms(attach, first_idx)
+            if not bond or bond.GetBondType() != Chem.BondType.SINGLE:
+                continue
+            if first_atom.GetTotalNumHs() != 0:
+                continue  # Has H -> it's an OH, not OCH3
+
+            # Guard: if scaffold atom also has =O, this is an ester, not methoxy
+            attach_atom = mol.GetAtomWithIdx(attach)
+            is_ester_carbonyl = False
+            for nbr in attach_atom.GetNeighbors():
+                if nbr.GetAtomicNum() == 8 and nbr.GetIdx() != first_idx:
+                    b = mol.GetBondBetweenAtoms(attach, nbr.GetIdx())
+                    if b and b.GetBondType() == Chem.BondType.DOUBLE:
+                        is_ester_carbonyl = True
+                        break
+            if is_ester_carbonyl:
+                continue
+
+            # Second atom must be carbon with 3 H (methyl)
+            second_idx = [a for a in atoms_list if a != first_idx][0]
+            second_atom = mol.GetAtomWithIdx(second_idx)
+            if second_atom.GetAtomicNum() == 6 and second_atom.GetTotalNumHs() == 3:
+                methoxys.append(numbering[attach])
+
+    return sorted(methoxys)
+
+
 def _assemble_np_name(
     stem: str,
     scaffold_name: str,
@@ -472,6 +688,9 @@ def _assemble_np_name(
     stereo_prefix: str = "",
     methyls: Optional[List[int]] = None,
     halogens: Optional[List[Tuple[int, str]]] = None,
+    epoxy_bridges: Optional[List[Tuple[int, int]]] = None,
+    n_alkyls: Optional[List[Tuple[int, str]]] = None,
+    methoxys: Optional[List[int]] = None,
 ) -> str:
     """Assemble a decorated natural product name.
 
@@ -487,6 +706,9 @@ def _assemble_np_name(
         stereo_prefix: Stereodescriptor prefix (e.g., "(5R,8S)-") or "".
         methyls: Optional sorted IUPAC locants of extra methyl groups.
         halogens: Optional sorted list of (locant, halogen_prefix) tuples.
+        epoxy_bridges: Optional sorted list of (loc1, loc2) epoxy bridge locants.
+        n_alkyls: Optional sorted list of (locant, alkyl_name) tuples.
+        methoxys: Optional sorted IUPAC locants of -OCH3 groups.
 
     Returns:
         Assembled IUPAC-style natural product name.
@@ -495,10 +717,17 @@ def _assemble_np_name(
 
     methyls = methyls or []
     halogens = halogens or []
+    epoxy_bridges = epoxy_bridges or []
+    n_alkyls = n_alkyls or []
+    methoxys = methoxys or []
 
     # --- Build prefix parts in alphabetical order (IUPAC P-14.5) ---
     # Collect all prefix entries as (sort_key, prefix_str) for alphabetical ordering
     prefix_entries = []
+
+    # Epoxy bridges (e.g., "4,5-epoxy")
+    for loc1, loc2 in epoxy_bridges:
+        prefix_entries.append(("epoxy", f"{loc1},{loc2}-epoxy"))
 
     # Halogen prefixes (bromo, chloro, fluoro, iodo)
     if halogens:
@@ -513,6 +742,13 @@ def _assemble_np_name(
             multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
             prefix_entries.append((hal_name, f"{locant_str}-{multiplier}{hal_name}"))
 
+    # Methoxy prefixes (e.g., "3-methoxy")
+    if methoxys:
+        locant_str = ",".join(str(loc) for loc in methoxys)
+        count = len(methoxys)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
+
     # Hydroxy prefix
     if hydroxyls:
         locant_str = ",".join(str(loc) for loc in hydroxyls)
@@ -520,12 +756,16 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("hydroxy", f"{locant_str}-{multiplier}hydroxy"))
 
-    # Methyl prefix
+    # Methyl prefix (C-methyl on scaffold carbons)
     if methyls:
         locant_str = ",".join(str(loc) for loc in methyls)
         count = len(methyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methyl", f"{locant_str}-{multiplier}methyl"))
+
+    # N-alkyl prefixes (e.g., "17-methyl" for N-methyl at position 17)
+    for loc, alkyl_name in n_alkyls:
+        prefix_entries.append((alkyl_name, f"{loc}-{alkyl_name}"))
 
     # Sort alphabetically by name (IUPAC P-14.5)
     prefix_entries.sort(key=lambda x: x[0])
@@ -604,7 +844,11 @@ def _assemble_np_name(
             return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
     else:
         # Unsaturated: prefix + stem + unsaturation + ketone
-        return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+        # If no suffix follows, add terminal 'e' (IUPAC: "ene"/"yne" not "en"/"yn")
+        if ketone_suffix:
+            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+        else:
+            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
 
 
 def _find_ester_decorations(

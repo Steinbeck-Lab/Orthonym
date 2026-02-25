@@ -85,9 +85,8 @@ class TestAssembleNpNamePrefixParts:
             "cholest", "cholestane", hydroxyls=[], ketones=[],
             unsaturation={"ene": [5], "yne": []}, stereo_prefix="",
         )
-        # NP assembly does not append terminal 'e' for bare unsaturation
-        # (the caller adds it when building the final name for bare scaffolds)
-        assert result == "cholest-5-en"
+        # Terminal 'e' added when no suffix follows (IUPAC: "ene" not "en")
+        assert result == "cholest-5-ene"
 
     @pytest.mark.integration
     def test_bare_scaffold_fallback(self):

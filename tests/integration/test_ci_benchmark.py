@@ -58,7 +58,7 @@ CI_BENCHMARK = [
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
         "(C)[C@H]2[C@@H]1C",
-        "cholestane",
+        "(8R,9S,10S,13S,14S,16S,17R,20S)-16,22-epoxycholestane",
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C@@H](CCCCN)"

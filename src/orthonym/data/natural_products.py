@@ -265,6 +265,41 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# 4. Alkaloid numbering maps  (query atom position → IUPAC locant)
+# ---------------------------------------------------------------------------
+# Same principle as STEROID_NUMBERING_MAPS: the key is the canonical SMILES
+# of the scaffold, and the value maps each query atom index (from
+# GetSubstructMatch) to the traditional IUPAC locant number.
+
+ALKALOID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
+    # Morphinan (16C + 1N = 17 atoms, positions 1-17)
+    # Ring A (aromatic): {1, 2, 3, 4, 11, 12}
+    # Ring B: {5, 6, 7, 8, 13, 14}
+    # Ring C: {9, 10, 11, 12, 13, 14}
+    # Ring D (piperidine): {9, 13, 14, 15, 16, 17(N)}
+    "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13": {
+        0: 2,    # C, Ring A aromatic
+        1: 3,    # C, Ring A aromatic (phenolic OH site in morphine)
+        2: 4,    # C, Ring A aromatic (epoxy bridge site)
+        3: 12,   # C, Ring A/C junction (aromatic)
+        4: 11,   # C, Ring A/C junction (aromatic)
+        5: 1,    # C, Ring A aromatic
+        6: 10,   # C, Ring C (CH2 bridge)
+        7: 9,    # C, Ring C/D junction
+        8: 17,   # N, Ring D nitrogen
+        9: 16,   # C, Ring D
+        10: 15,  # C, Ring D
+        11: 13,  # C, Ring B/C/D tri-junction
+        12: 5,   # C, Ring B (epoxy bridge site)
+        13: 6,   # C, Ring B (hydroxyl site in morphine)
+        14: 7,   # C, Ring B (unsaturation site)
+        15: 8,   # C, Ring B (unsaturation site)
+        16: 14,  # C, Ring B/C/D tri-junction
+    },
+}
+
+
 def get_steroid_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
     """Get IUPAC numbering map for a steroid scaffold.
 
@@ -275,3 +310,20 @@ def get_steroid_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
         Dict mapping query atom index to IUPAC locant, or None if not found.
     """
     return STEROID_NUMBERING_MAPS.get(scaffold_smiles)
+
+
+def get_scaffold_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
+    """Get IUPAC numbering map for any scaffold (steroid or alkaloid).
+
+    Checks steroid maps first, then alkaloid maps.
+
+    Args:
+        scaffold_smiles: Canonical SMILES of the scaffold.
+
+    Returns:
+        Dict mapping query atom index to IUPAC locant, or None if not found.
+    """
+    result = STEROID_NUMBERING_MAPS.get(scaffold_smiles)
+    if result is not None:
+        return result
+    return ALKALOID_NUMBERING_MAPS.get(scaffold_smiles)
