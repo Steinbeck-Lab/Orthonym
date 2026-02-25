@@ -206,6 +206,11 @@ def _resolve_fg_collisions(results):
         # C(=S)OH should not collide with carboxylic_acid (different SMARTS: =S vs =O)
         # but suppress thioketone matches on the C=S carbon
         ('thioic_O_acid', ['thioketone']),
+        # Ester O-Ar bond should NOT also match aromatic_ether.
+        # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
+        # aromatic ether; without this, phenyl esters double-name as both
+        # "phenoxy" and "phenoxycarbonyl".
+        ('ester', ['aromatic_ether']),
     ]:
         if fg_specific in results:
             specific_atoms = set()

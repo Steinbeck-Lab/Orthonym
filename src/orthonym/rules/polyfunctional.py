@@ -127,6 +127,10 @@ def get_fg_prefix_form(
     if fg_name in ("ether", "vinyl_ether", "aromatic_ether"):
         return _get_alkoxy_prefix(mol, atoms, principal_chain)
 
+    # Handle esters specially - generate alkoxycarbonyl prefix (IUPAC P-65.6.3)
+    if fg_name == "ester":
+        return _get_alkoxycarbonyl_prefix(mol, atoms, principal_chain)
+
     # For other groups, use standard prefix form
     return get_prefix(fg_name)
 
@@ -230,6 +234,145 @@ def _get_alkoxy_prefix(
                 return f"{prefix}yloxy"
             except (ValueError, KeyError):
                 return None  # Not "alkoxy" -- let caller handle absence
+
+
+def _get_alkoxycarbonyl_prefix(
+    mol,
+    ester_atoms: tuple,
+    principal_chain: List[int],
+) -> Optional[str]:
+    """Generate alkoxycarbonyl prefix for ester-as-non-principal-group.
+
+    Per IUPAC P-65.6.3, when an ester group -C(=O)-O-R is not the principal
+    characteristic group, it is expressed as an alkoxycarbonyl prefix:
+      -COOCH3   -> methoxycarbonyl
+      -COOC2H5  -> ethoxycarbonyl
+      -COOPh    -> phenoxycarbonyl
+
+    Args:
+        mol: RDKit Mol object.
+        ester_atoms: Tuple from ester SMARTS "[CX3](=O)[OX2][#6]":
+                     (carbonyl_C, carbonyl_O, ester_O, alkyl_C).
+        principal_chain: Atom indices of the principal chain.
+
+    Returns:
+        Alkoxycarbonyl prefix string, or None if this ester should not
+        be named as alkoxycarbonyl (e.g., lactones).
+    """
+    from .esters import parse_ester_fragments, is_lactone
+
+    # Guard 1: lactones are named differently, not as alkoxycarbonyl
+    if is_lactone(mol, ester_atoms):
+        return None
+
+    # Guard 2: orientation check — alkoxycarbonyl only applies when the
+    # carbonyl C is on or bonded to the principal chain, meaning the ester
+    # extends as -C(=O)-O-R away from the chain.  When the ester O is on
+    # the chain instead (chain-O-C(=O)-R), the ester is an acyloxy
+    # substituent, handled by _check_for_acyloxy() in composer.py.
+    carbonyl_c = ester_atoms[0]
+    ester_o = ester_atoms[2] if len(ester_atoms) > 2 else None
+    chain_set = set(principal_chain)
+    if chain_set and ester_o is not None:
+        c_on_chain = carbonyl_c in chain_set
+        o_on_chain = ester_o in chain_set
+        c_adj_chain = c_on_chain or any(
+            nbr.GetIdx() in chain_set
+            for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+            if nbr.GetIdx() != ester_atoms[1]  # exclude carbonyl O
+            and nbr.GetIdx() != ester_o
+        )
+        if not c_adj_chain and o_on_chain:
+            # O faces the chain, C(=O) faces away -> acyloxy, not alkoxycarbonyl
+            return None
+        if not c_adj_chain and not o_on_chain:
+            # Neither end touches the chain; ester is in an isolated branch
+            return None
+
+    # Split ester into acid and alkyl (OR) fragments
+    acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_atoms)
+    if not alkyl_atoms:
+        return None
+
+    if ester_o is None:
+        return None
+
+    # Early return for aromatic alkyl: phenoxycarbonyl, (benzyloxy)carbonyl
+    first_alkyl = alkyl_atoms[0]
+    first_atom = mol.GetAtomWithIdx(first_alkyl)
+
+    if first_atom.GetIsAromatic():
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if first_alkyl in ring and len(ring) == 6:
+                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
+                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                       for r in ring):
+                    return "phenoxycarbonyl"
+        return "phenoxycarbonyl"
+
+    if (not first_atom.GetIsAromatic()
+            and first_atom.GetSymbol() == 'C'
+            and first_atom.GetTotalNumHs() >= 1):
+        arom_nbrs = [n for n in first_atom.GetNeighbors()
+                     if n.GetIdx() != ester_o and n.GetIsAromatic()]
+        non_h_non_arom = [n for n in first_atom.GetNeighbors()
+                          if n.GetIdx() != ester_o
+                          and not n.GetIsAromatic()
+                          and n.GetSymbol() != 'H']
+        if arom_nbrs and not non_h_non_arom:
+            return "(benzyloxy)carbonyl"
+
+    # Guard 3: the alkyl (OR) fragment must be pure carbon (no heteroatoms)
+    # for simple alkoxycarbonyl naming.  Heteroatom-containing fragments
+    # (e.g., amino acid side chains) need complex naming beyond the scope
+    # of this prefix generator.
+    has_heteroatom = any(
+        mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H')
+        for a in alkyl_atoms
+    )
+    if has_heteroatom:
+        return None
+
+    # Guard 4: size sanity — if the OR fragment is larger than the principal
+    # chain, this ester should be handled by functional-class naming.
+    carbon_count = sum(
+        1 for a in alkyl_atoms if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+    )
+    chain_len = len(principal_chain) if principal_chain else 0
+    if chain_len > 0 and carbon_count > chain_len:
+        return None
+    # Reject non-aromatic ring-containing alkyl fragments (macrocyclic esters).
+    # Aromatic rings (phenyl) are already handled above.
+    ring_info = mol.GetRingInfo()
+    has_non_aromatic_ring = any(
+        ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
+        for a in alkyl_atoms
+    )
+    if has_non_aromatic_ring:
+        return None
+
+    if carbon_count == 0:
+        return None
+
+    # Build the alkoxycarbonyl name from ALKOXY_NAMES (same table as ethers)
+    if carbon_count in ALKOXY_NAMES:
+        alkoxy = ALKOXY_NAMES[carbon_count]
+        return f"{alkoxy}carbonyl"
+
+    # For larger/unknown sizes, build from alkyl name
+    try:
+        alkyl_name = get_alkyl_name(carbon_count)
+        if alkyl_name.endswith("yl"):
+            return f"{alkyl_name[:-2]}yloxy" + "carbonyl"
+        return f"{alkyl_name}oxy" + "carbonyl"
+    except (ValueError, KeyError):
+        try:
+            from ..data.chain_names import get_chain_prefix
+            prefix = get_chain_prefix(carbon_count)
+            return f"{prefix}yloxycarbonyl"
+        except (ValueError, KeyError):
+            return None
 
 
 def _count_fragment_atoms(
