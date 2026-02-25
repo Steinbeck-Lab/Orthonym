@@ -181,7 +181,7 @@ CI_BENCHMARK = [
     (
         "C=C[C@@H]1C(=C)CC[C@H]2[C@H]1C[C@H]1OC(=O)[C@@]3(C)"
         "[C@H](O)CC[C@@]2(C)[C@@]13O",
-        "(1R,3R,4S,8S,9R,12R,13S,16S)-4-ethyl-12,16-dihydroxy-9,13"
+        "(1R,3R,4S,8S,9R,12R,13S,16S)-4-ethenyl-12,16-dihydroxy-9,13"
         "-dimethyl-15-oxa-tetracyclo[7.6.1.0(3,8).0(13,16)]hexadecan-14-one",
     ),
     (

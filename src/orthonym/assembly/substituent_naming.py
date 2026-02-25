@@ -39,10 +39,15 @@ logger = logging.getLogger(__name__)
 
 
 def _is_linear_alkyl(mol, sub_atoms: List[int]) -> bool:
-    """Check if a substituent is a straight-chain pure alkyl group.
+    """Check if a substituent is a straight-chain pure saturated alkyl group.
 
-    Returns True if ALL atoms in sub_atoms are carbon AND no carbon has
-    more than 2 carbon neighbors within sub_atoms (i.e., no branching).
+    Returns True if ALL atoms in sub_atoms are carbon, no carbon has
+    more than 2 carbon neighbors within sub_atoms (i.e., no branching),
+    AND all bonds between fragment atoms are single bonds.
+
+    Chains with C=C or C#C bonds are NOT linear alkyl — they are
+    alkenyl/alkynyl substituents that need the unsaturated naming path
+    to produce correct prefix forms (ethenyl, prop-2-en-1-yl, ethynyl).
 
     This is the fast-path guard: if True, use get_alkyl_name(carbon_count)
     directly, avoiding unnecessary recursion.
@@ -52,7 +57,7 @@ def _is_linear_alkyl(mol, sub_atoms: List[int]) -> bool:
         sub_atoms: Atom indices of the substituent.
 
     Returns:
-        True if the substituent is a linear (unbranched) pure-carbon chain.
+        True if the substituent is a linear (unbranched) saturated pure-carbon chain.
     """
     if not sub_atoms:
         return False
@@ -83,7 +88,224 @@ def _is_linear_alkyl(mol, sub_atoms: List[int]) -> bool:
         if c_nbrs_in_sub > 2:
             return False
 
+        # Reject if any intra-fragment bond is unsaturated (C=C or C#C).
+        # These must go through the unsaturated naming path to produce
+        # correct alkenyl/alkynyl names.
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in sub_set:
+                bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() != 1.0:
+                    return False
+
     return True
+
+
+# ============================================================================
+# Unsaturated Linear Chain Naming (IUPAC P-31.1.3)
+# ============================================================================
+
+
+def _name_unsaturated_chain(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Name an unsaturated linear chain substituent per IUPAC P-31.1.3.
+
+    Constructs the correct alkenyl/alkynyl prefix name by:
+    1. Verifying the fragment is an unbranched all-carbon chain with unsaturation
+    2. Tracing the chain from the attachment point
+    3. Trying both numbering directions
+    4. Choosing the direction that gives lowest locant to the free-valence
+       (attachment point) first, then lowest locants to unsaturation
+
+    Examples:
+        CH2=CH-  (attached at CH=)  -> ethenyl
+        CH2=CH-CH2- (attached at CH2) -> prop-2-en-1-yl
+        CH3-CH=CH- (attached at CH=)  -> prop-1-en-1-yl
+        CH2=C(CH3)- (attached at C=) -> prop-1-en-2-yl
+        HC#C- (attached at C)         -> ethynyl
+
+    Args:
+        mol: RDKit Mol object.
+        sub_atoms: Atom indices of the substituent fragment.
+        attach_idx: Index of the first atom of the substituent (bonded to parent).
+        parent_set: Set of atom indices in the parent chain/ring.
+
+    Returns:
+        Prefix-form name (e.g., "ethenyl", "prop-2-en-1-yl") or None if this
+        is not an unsaturated linear chain.
+    """
+    if len(sub_atoms) < 2:
+        return None
+
+    sub_set = set(sub_atoms)
+    ring_info = mol.GetRingInfo()
+
+    # Verify: all carbon, no rings, no branching, has unsaturation
+    has_unsat = False
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None
+        if ring_info.NumAtomRings(idx) > 0:
+            return None
+        c_nbrs = sum(
+            1 for nbr in atom.GetNeighbors()
+            if nbr.GetIdx() in sub_set and nbr.GetSymbol() == 'C'
+        )
+        if c_nbrs > 2:
+            return None  # branched
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in sub_set:
+                bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() != 1.0:
+                    has_unsat = True
+
+    if not has_unsat:
+        return None
+
+    carbon_count = len(sub_atoms)
+
+    # Trace the full chain from one terminal to the other.
+    # Find a terminal atom (exactly 1 neighbor in fragment).
+    terminal = None
+    for idx in sub_atoms:
+        frag_nbrs = [
+            nbr.GetIdx() for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if nbr.GetIdx() in sub_set
+        ]
+        if len(frag_nbrs) == 1:
+            terminal = idx
+            break
+
+    if terminal is None:
+        return None  # no terminal found (cycle?), shouldn't happen
+
+    ordered = [terminal]
+    visited = {terminal}
+    current = terminal
+    while len(ordered) < carbon_count:
+        atom = mol.GetAtomWithIdx(current)
+        next_atom = None
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in sub_set and ni not in visited:
+                next_atom = ni
+                break
+        if next_atom is None:
+            break
+        ordered.append(next_atom)
+        visited.add(next_atom)
+        current = next_atom
+
+    if len(ordered) != carbon_count:
+        return None
+
+    # Try both numbering directions and pick the best per IUPAC rules.
+    fwd = ordered
+    rev = list(reversed(ordered))
+
+    best_name = None
+    best_key = None
+
+    for chain in [fwd, rev]:
+        try:
+            a_locant = chain.index(attach_idx) + 1
+        except ValueError:
+            continue
+
+        # Collect double/triple bond locants (lower-numbered atom in each bond)
+        double_locs = []
+        triple_locs = []
+        for i in range(len(chain) - 1):
+            bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+            if bond is None:
+                continue
+            bt = bond.GetBondTypeAsDouble()
+            if bt == 2.0:
+                double_locs.append(i + 1)
+            elif bt == 3.0:
+                triple_locs.append(i + 1)
+
+        all_unsat = sorted(double_locs + triple_locs)
+        # IUPAC P-31.1.3.4: lowest to free valence first, then to unsaturation
+        key = (a_locant, all_unsat)
+
+        if best_key is None or key < best_key:
+            best_key = key
+            # Build the name for this direction
+            best_name = _build_alkenyl_name(
+                carbon_count, a_locant, double_locs, triple_locs
+            )
+
+    return best_name
+
+
+def _build_alkenyl_name(
+    carbon_count: int,
+    attach_locant: int,
+    double_locants: List[int],
+    triple_locants: List[int],
+) -> str:
+    """Build an alkenyl/alkynyl prefix name from chain data.
+
+    Args:
+        carbon_count: Number of carbons in the substituent chain.
+        attach_locant: 1-indexed position of the free valence (attachment point).
+        double_locants: Sorted list of double bond locants.
+        triple_locants: Sorted list of triple bond locants.
+
+    Returns:
+        Prefix-form name, e.g., "ethenyl", "prop-2-en-1-yl", "ethynyl".
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    stem = get_chain_prefix(carbon_count)
+    double_locants = sorted(double_locants)
+    triple_locants = sorted(triple_locants)
+
+    MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+
+    # For 2-carbon chains: no locants needed for unsaturation
+    if carbon_count == 2:
+        if double_locants:
+            return f"{stem}enyl"
+        if triple_locants:
+            return f"{stem}ynyl"
+        return f"{stem}yl"
+
+    # For longer chains: build with locants
+    parts = []
+
+    # Double bonds
+    if double_locants:
+        loc_str = ",".join(str(l) for l in double_locants)
+        if len(double_locants) == 1:
+            parts.append(f"-{loc_str}-en")
+        else:
+            mult = MULT.get(len(double_locants), str(len(double_locants)))
+            # Insert 'a' before locants for vowel elision (propan -> propa)
+            parts.append(f"a-{loc_str}-{mult}en")
+
+    # Triple bonds
+    if triple_locants:
+        loc_str = ",".join(str(l) for l in triple_locants)
+        if len(triple_locants) == 1:
+            parts.append(f"-{loc_str}-yn")
+        else:
+            mult = MULT.get(len(triple_locants), str(len(triple_locants)))
+            parts.append(f"-{loc_str}-{mult}yn")
+
+    infix = "".join(parts)
+    name = f"{stem}{infix}-{attach_locant}-yl"
+
+    # Clean up double hyphens
+    while "--" in name:
+        name = name.replace("--", "-")
+
+    return name
 
 
 # ============================================================================
@@ -334,11 +556,22 @@ def _check_retained_substituent(
                     return "benzyl"
 
     # --- Alkyl branching detection ---
+    # Retained alkyl names (isopropyl, tert-butyl, etc.) only apply to
+    # saturated fragments.  If any bond within the fragment is double or
+    # triple, this is an unsaturated substituent (alkenyl/alkynyl) that
+    # must be named systematically.
     carbon_atoms = [i for i in sub_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
     carbon_count = len(carbon_atoms)
 
     if carbon_count == 0:
         return None
+
+    for idx in sub_atoms:
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nbr.GetIdx() in frag_set:
+                bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() != 1.0:
+                    return None  # Unsaturated — use systematic naming
 
     attach_atom = mol.GetAtomWithIdx(attach_idx)
     if attach_atom.GetSymbol() != 'C':
@@ -521,7 +754,7 @@ def name_substituent_fragment(
     if retained:
         return _add_substituent_stereo(mol, sub_atoms, retained)
 
-    # Step 2: Fast path -- linear alkyl (no branching, no heteroatoms)
+    # Step 2: Fast path -- linear saturated alkyl (no branching, no unsaturation)
     if _is_linear_alkyl(mol, sub_atoms):
         carbon_count = sum(
             1 for i in sub_atoms
@@ -533,6 +766,14 @@ def name_substituent_fragment(
             except (ValueError, KeyError):
                 return None
         return None
+
+    # Step 2b: Unsaturated linear chain (all C, no branching, has C=C or C#C).
+    # Must be handled before general recursion because the recursive path
+    # doesn't know the attachment point, producing wrong locants
+    # (e.g., "prop-1-enyl" instead of "prop-2-en-1-yl" for allyl).
+    unsat_name = _name_unsaturated_chain(mol, sub_atoms, attach_idx, parent_set)
+    if unsat_name is not None:
+        return _add_substituent_stereo(mol, sub_atoms, unsat_name)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
