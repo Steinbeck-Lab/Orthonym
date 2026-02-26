@@ -3533,7 +3533,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     - benzene -> phenyl
     - cyclohexane -> cyclohexyl
     - pyridine -> pyridyl
-    - etc.
+    - Fused heterocycles -> stem-locant-yl (quinolin-2-yl, 1H-indol-3-yl, etc.)
 
     Args:
         features: MolecularFeatures with ring_substituents_as_groups populated
@@ -3542,6 +3542,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         List of NameFragment objects for ring substituent prefixes
     """
     from ..rules.ring_substituents import get_ring_substituent_name, get_ring_attachment_locant
+    from ..data.fused_heterocycles import match_fused_heterocycle_core, get_fused_heterocycle_prefix
 
     prefixes = []
     ring_groups = getattr(features, 'ring_substituents_as_groups', [])
@@ -3556,8 +3557,6 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
 
     for ring_atoms in ring_groups:
         ring_atom_set = set(ring_atoms)
-        # Get base substituent name (phenyl, cyclohexyl, etc.)
-        base_name = get_ring_substituent_name(features.mol, ring_atoms)
 
         # Find which chain position the ring attaches to
         try:
@@ -3569,6 +3568,40 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             )
         except ValueError:
             continue
+
+        # --- Phase 78: Check for fused heterocycle substituent ---
+        # Try to match the ring fragment against known fused heterocycle cores.
+        # If matched, use static O(1) prefix lookup instead of monocyclic naming.
+        fused_result = match_fused_heterocycle_core(features.mol)
+        if fused_result is not None:
+            het_name, atom_mapping, core_smiles = fused_result
+            # Check that this fused het core overlaps with the ring atoms
+            core_atom_set = set(atom_mapping.keys())
+            if core_atom_set & ring_atom_set:
+                # Find the ring atom that attaches to the chain
+                attach_ring_idx = None
+                for ra in ring_atoms:
+                    atom = features.mol.GetAtomWithIdx(ra)
+                    for nbr in atom.GetNeighbors():
+                        if nbr.GetIdx() in chain_set:
+                            attach_ring_idx = ra
+                            break
+                    if attach_ring_idx is not None:
+                        break
+
+                if attach_ring_idx is not None:
+                    prefix = get_fused_heterocycle_prefix(
+                        core_smiles, attach_ring_idx, atom_mapping
+                    )
+                    if prefix is not None:
+                        # Fused het prefixes always need parentheses
+                        # (they contain locants and hyphens per IUPAC P-16.3.3)
+                        ring_sub_groups[f'({prefix})'].append(locant)
+                        continue
+        # --- End Phase 78 fused het detection ---
+
+        # Get base substituent name (phenyl, cyclohexyl, etc.)
+        base_name = get_ring_substituent_name(features.mol, ring_atoms)
 
         # Detect substituents on the ring itself
         sub_name = _build_substituted_ring_name(
