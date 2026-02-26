@@ -211,12 +211,15 @@ _RING_NAME_TOKENS = (
     'oxan', 'oxol', 'azetidin', 'aziridin',
     # Fused heterocyclic
     'quinolin', 'isoquinolin', 'benzofur', 'benzothio',
-    'benzimidaz', 'chromen', 'chromane', 'xanthen',
+    'benzimidaz', 'chromen', 'chromane', 'chroman', 'xanthen',
     'carbazol', 'acridin', 'phenazin', 'phenoxazin',
     'phenothiazin', 'thianthr', 'purin', 'indazol',
     'benzotriazol', 'benzoxazol', 'benzisoxazol',
     'benzothiazol', 'coumarin', 'naphthyridin',
     'pteridin', 'indolizin', 'isoindol', 'naphth',
+    # Phase 79-02: additional fused het tokens
+    'benzisothiaz', 'benzothiadiaz', 'benzoxadiaz',
+    'cinnol', 'isochroman', 'phthalaz', 'quinaz', 'quinox',
 )
 
 
@@ -2729,27 +2732,76 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                     queue.append(nn.GetIdx())
         if frag:
             cc = sum(1 for i in frag if mol.GetAtomWithIdx(i).GetSymbol() == 'C')
-            # Check for aromatic rings
-            has_phenyl = False
             ring_info = mol.GetRingInfo()
-            for ring in ring_info.AtomRings():
-                if all(r in set(frag) for r in ring) and len(ring) == 6:
-                    if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
-                           mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
-                        non_ring = cc - 6
-                        if non_ring == 0:
-                            n_subs.append("phenyl")
-                            has_phenyl = True
-                            break
-            # --- Phase 79: Direct ring identification for amine N-subs (DROP-25 fix) ---
+            frag_set_fused = set(frag)
+
+            # --- Phase 79-02: Fused het detection for amine N-subs ---
+            # Try fused het identification FIRST (before phenyl check).
+            # Fused hets like quinoline contain a benzene sub-ring that would
+            # falsely match the all-C aromatic phenyl check.
+            has_fused_het_sub = False
+            if cc > 0:
+                from ..data.fused_heterocycles import (
+                    match_fused_heterocycle_core as _match_fh_amine,
+                    get_fused_heterocycle_prefix as _get_fh_prefix_amine,
+                )
+                fused_r_amine = _match_fh_amine(mol)
+                if fused_r_amine is not None:
+                    fh_name, fh_mapping, fh_core_smiles = fused_r_amine
+                    fh_core_atoms = set(fh_mapping.keys())
+                    if fh_core_atoms & frag_set_fused:
+                        # Find the ring atom directly bonded to N
+                        fh_attach = None
+                        for ra in fh_core_atoms & frag_set_fused:
+                            atom_ra = mol.GetAtomWithIdx(ra)
+                            for nbr in atom_ra.GetNeighbors():
+                                if nbr.GetIdx() == n_idx:
+                                    fh_attach = ra
+                                    break
+                            if fh_attach is not None:
+                                break
+                        if fh_attach is not None:
+                            fh_prefix = _get_fh_prefix_amine(fh_core_smiles, fh_attach, fh_mapping)
+                            if fh_prefix is not None:
+                                non_core_c_amine = sum(
+                                    1 for idx in frag_set_fused
+                                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                                    and idx not in fh_core_atoms
+                                )
+                                if non_core_c_amine == 0:
+                                    n_subs.append(fh_prefix)
+                                    has_fused_het_sub = True
+            # --- End Phase 79-02 fused het detection for amine N-subs ---
+
+            # Check for aromatic rings (phenyl)
+            has_phenyl = False
+            if not has_fused_het_sub:
+                for ring in ring_info.AtomRings():
+                    if all(r in frag_set_fused for r in ring) and len(ring) == 6:
+                        if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
+                               mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
+                            # Verify this is an isolated benzene (not part of fused system)
+                            ring_set_chk = set(ring)
+                            is_fused_ring = False
+                            for other_ring in ring_info.AtomRings():
+                                if set(other_ring) != ring_set_chk and set(other_ring) & ring_set_chk:
+                                    is_fused_ring = True
+                                    break
+                            if not is_fused_ring:
+                                non_ring = cc - 6
+                                if non_ring == 0:
+                                    n_subs.append("phenyl")
+                                    has_phenyl = True
+                                    break
+
+            # --- Phase 79-01: Direct ring identification for amine N-subs (DROP-25 fix) ---
             # Before branched/linear alkyl naming, check if the fragment IS a ring.
             # This handles non-phenyl ring substituents on amines (piperidinyl, cyclohexyl, etc.)
             has_ring_sub = False
-            if not has_phenyl and cc > 0:
-                frag_set_ring = set(frag)
+            if not has_phenyl and not has_fused_het_sub and cc > 0:
                 for ring in ring_info.AtomRings():
                     ring_set_inner = set(ring)
-                    if ring_set_inner.issubset(frag_set_ring):
+                    if ring_set_inner.issubset(frag_set_fused):
                         # Check if ring accounts for all C atoms (pure ring sub)
                         non_ring_c = sum(
                             1 for idx in frag
@@ -2763,9 +2815,9 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                                 n_subs.append(ring_prefix)
                                 has_ring_sub = True
                                 break
-            # --- End Phase 79 direct ring identification ---
+            # --- End Phase 79-01 direct ring identification ---
 
-            if not has_phenyl and not has_ring_sub and cc > 0:
+            if not has_phenyl and not has_ring_sub and not has_fused_het_sub and cc > 0:
                 # Check if substituent is branched (any carbon with 3+ heavy
                 # atom neighbors = branching point). Branched groups need
                 # recursive naming for correct IUPAC 2013 names
@@ -4083,13 +4135,32 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     for position, sub_list in features.substituents.items():
         # position is already a 1-indexed locant (from get_substituents)
         for sub_atoms in sub_list:
-            # Skip substituents that are ring atoms (handled separately)
+            # Skip substituents that are purely ring atoms (handled by
+            # _generate_ring_substituent_prefixes). BUT if the substituent
+            # connects to the chain through a heteroatom linker (e.g., N in
+            # N-quinolinylamino), the heteroatom is NOT in ring_atoms_to_skip
+            # and the compound substituent needs heteroatom naming, not
+            # ring-substituent naming. Check: if the attachment point to the
+            # chain is a non-ring heteroatom, let it through to heteroatom
+            # naming instead of skipping.
             if ring_atoms_to_skip and set(sub_atoms) & ring_atoms_to_skip:
-                logger.debug(
-                    "DROP-02 substituent_skip: reason=ring_overlap position=%d",
-                    position,
-                )
-                continue
+                # Find the attachment atom (sub atom bonded to chain)
+                _chain_set_d02 = set(features.principal_chain) if features.principal_chain else set()
+                _attach_is_hetero_linker = False
+                for _idx_d02 in sub_atoms:
+                    _atom_d02 = mol.GetAtomWithIdx(_idx_d02)
+                    if any(nbr.GetIdx() in _chain_set_d02 for nbr in _atom_d02.GetNeighbors()):
+                        # This atom connects to the chain
+                        if _atom_d02.GetSymbol() not in ('C', 'H') and _idx_d02 not in ring_atoms_to_skip:
+                            # Heteroatom linker (e.g., N) not in ring skip set
+                            _attach_is_hetero_linker = True
+                        break
+                if not _attach_is_hetero_linker:
+                    logger.debug(
+                        "DROP-02 substituent_skip: reason=ring_overlap position=%d",
+                        position,
+                    )
+                    continue
 
             # Skip substituents containing the principal group nitrogen
             # (amide N-substituents are handled by _assemble_amide_name,
@@ -4450,13 +4521,54 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
             )
             if sub_has_ring:
-                # Check for phenyl
+                # --- Phase 79-02: Try fused het detection before anilino ---
+                # Fused hets like quinoline contain a benzene sub-ring that
+                # would falsely match the all-C aromatic phenyl check.
+                from ..data.fused_heterocycles import (
+                    match_fused_heterocycle_core as _match_fh_acylamino,
+                    get_fused_heterocycle_prefix as _get_fh_prefix_acylamino,
+                )
+                fused_r_acylamino = _match_fh_acylamino(mol)
+                if fused_r_acylamino is not None:
+                    fh_name_a, fh_mapping_a, fh_core_a = fused_r_acylamino
+                    fh_atoms_a = set(fh_mapping_a.keys())
+                    if fh_atoms_a & sub_set:
+                        # Find ring atom bonded to N
+                        fh_attach_a = None
+                        for ra in fh_atoms_a & sub_set:
+                            atom_ra = mol.GetAtomWithIdx(ra)
+                            for nbr_fh in atom_ra.GetNeighbors():
+                                if nbr_fh.GetIdx() == idx:  # idx is the N atom
+                                    fh_attach_a = ra
+                                    break
+                            if fh_attach_a is not None:
+                                break
+                        if fh_attach_a is not None:
+                            fh_prefix_a = _get_fh_prefix_acylamino(fh_core_a, fh_attach_a, fh_mapping_a)
+                            if fh_prefix_a is not None:
+                                non_core_c_a = sum(
+                                    1 for i in sub_set
+                                    if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                                    and i not in fh_atoms_a
+                                )
+                                if non_core_c_a == 0:
+                                    return f"(({fh_prefix_a})amino)"
+                # --- End Phase 79-02 fused het in acylamino ---
+                # Check for isolated phenyl (not part of a fused system)
                 for ring in ring_info.AtomRings():
                     if all(r in sub_set for r in ring) and len(ring) == 6:
                         all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                         all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                         if all_arom and all_c:
-                            return "anilino"
+                            # Verify this is an isolated benzene (not part of fused system)
+                            ring_set_chk_a = set(ring)
+                            is_fused_a = False
+                            for other_ring in ring_info.AtomRings():
+                                if set(other_ring) != ring_set_chk_a and set(other_ring) & ring_set_chk_a:
+                                    is_fused_a = True
+                                    break
+                            if not is_fused_a:
+                                return "anilino"
                 continue  # Skip non-phenyl ring substituents
 
             # Count carbons attached to N via C-C bonds only
@@ -4671,15 +4783,75 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
             if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
         )
         if sub_has_ring:
-            # Substituent has a ring - check for phenyl/benzene
+            # --- Phase 79-02: Fused heterocycle detection for N-branch ---
+            # Try fused heterocycle identification FIRST (O(1) static lookup,
+            # Phase 78 infrastructure). This must come before the anilino check
+            # because fused hets like quinoline contain a benzene ring that
+            # would falsely match the all-C aromatic 6-membered ring test.
+            from ..data.fused_heterocycles import (
+                match_fused_heterocycle_core as _match_fused_het,
+                get_fused_heterocycle_prefix as _get_fused_het_prefix,
+            )
+            fused_result = _match_fused_het(mol)
+            if fused_result is not None:
+                het_name, atom_mapping, core_smiles = fused_result
+                core_atom_set = set(atom_mapping.keys())
+                # Check that fused het core overlaps with substituent atoms
+                if core_atom_set & sub_set:
+                    # Find the ring atom that attaches to N (or nearest to N)
+                    attach_ring_idx = None
+                    for ra in core_atom_set & sub_set:
+                        atom_ra = mol.GetAtomWithIdx(ra)
+                        for nbr in atom_ra.GetNeighbors():
+                            if nbr.GetIdx() == attach_atom:  # attach_atom is the N
+                                attach_ring_idx = ra
+                                break
+                        if attach_ring_idx is not None:
+                            break
+                    if attach_ring_idx is None:
+                        # Fused het may not be directly bonded to N -- check through intermediate atoms
+                        for ra in core_atom_set & sub_set:
+                            atom_ra = mol.GetAtomWithIdx(ra)
+                            for nbr in atom_ra.GetNeighbors():
+                                if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set:
+                                    attach_ring_idx = ra
+                                    break
+                            if attach_ring_idx is not None:
+                                break
+                    if attach_ring_idx is not None:
+                        prefix = _get_fused_het_prefix(core_smiles, attach_ring_idx, atom_mapping)
+                        if prefix is not None:
+                            # Check if ring accounts for all sub atoms (pure fused het, no linker)
+                            non_core_c = sum(
+                                1 for idx in sub_set
+                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                                and idx not in core_atom_set
+                            )
+                            if non_core_c == 0:
+                                # Pure fused het on N: e.g., (quinolin-8-ylamino)
+                                return f"(({prefix})amino)"
+                            # Fused het with linker carbons: fall through to recursive naming
+            # --- End Phase 79-02 fused het detection for N-branch ---
+
+            # Substituent has a ring - check for phenyl/benzene (anilino)
+            # Only match if the ring is NOT part of a fused system (to avoid
+            # falsely matching benzene ring of quinoline etc.)
             for ring in ring_info.AtomRings():
                 if all(r in sub_set for r in ring) and len(ring) == 6:
                     all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
                     all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                     if all_arom and all_c:
-                        return "anilino"
+                        # Verify this is an isolated benzene ring (not part of fused system)
+                        ring_set_check = set(ring)
+                        is_fused = False
+                        for other_ring in ring_info.AtomRings():
+                            if set(other_ring) != ring_set_check and set(other_ring) & ring_set_check:
+                                is_fused = True
+                                break
+                        if not is_fused:
+                            return "anilino"
 
-            # --- Phase 79: Direct ring identification for N-branch (DROP-18 fix) ---
+            # --- Phase 79-01: Direct ring identification for N-branch (DROP-18 fix) ---
             # Try O(1) ring identification before recursive naming fallback.
             # Only applies when the substituent IS a pure ring (all C atoms are ring atoms).
             from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name
@@ -4698,7 +4870,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                         ring_prefix = _get_ring_sub_name(mol, tuple(ring))
                         if ring_prefix:
                             return f"({ring_prefix}amino)"
-            # --- End Phase 79 direct ring identification ---
+            # --- End Phase 79-01 direct ring identification ---
 
             # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
             # Guard: only for moderately-sized substituents (<=25 atoms).
@@ -4711,10 +4883,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                 # Validate: reject if fragment naming linearized a ring
                 # (produces long-chain names like "nonyl" for ring fragments).
                 # The name should contain "cyclo" or ring-system tokens.
-                if sub_name and not any(tok in sub_name.lower() for tok in
-                        ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
-                         'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
-                         'oxan', 'oxol', 'azetidin', 'aziridin')):
+                if sub_name and not any(tok in sub_name.lower() for tok in _RING_NAME_TOKENS):
                     # Likely linearized a ring -- reject
                     sub_name = None
                 if sub_name:
@@ -4755,7 +4924,57 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
             ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
         )
         if sub_has_ring:
-            # --- Phase 79: Direct ring identification for C-branch (DROP-19 fix) ---
+            # --- Phase 79-02: Fused heterocycle detection for C-branch ---
+            # Try fused het identification first (O(1) static lookup).
+            from ..data.fused_heterocycles import (
+                match_fused_heterocycle_core as _match_fused_het_c,
+                get_fused_heterocycle_prefix as _get_fused_het_prefix_c,
+            )
+            fused_result_c = _match_fused_het_c(mol)
+            if fused_result_c is not None:
+                het_name_c, atom_mapping_c, core_smiles_c = fused_result_c
+                core_atom_set_c = set(atom_mapping_c.keys())
+                if core_atom_set_c & sub_set:
+                    # Find ring atom attached to the C-branch attachment point
+                    attach_ring_idx_c = None
+                    for ra in core_atom_set_c & sub_set:
+                        atom_ra = mol.GetAtomWithIdx(ra)
+                        for nbr in atom_ra.GetNeighbors():
+                            if nbr.GetIdx() == attach_atom:
+                                attach_ring_idx_c = ra
+                                break
+                            if nbr.GetIdx() in chain_set:
+                                attach_ring_idx_c = ra
+                                break
+                        if attach_ring_idx_c is not None:
+                            break
+                    if attach_ring_idx_c is None:
+                        # Check through intermediate atoms
+                        for ra in core_atom_set_c & sub_set:
+                            atom_ra = mol.GetAtomWithIdx(ra)
+                            for nbr in atom_ra.GetNeighbors():
+                                if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set_c:
+                                    attach_ring_idx_c = ra
+                                    break
+                            if attach_ring_idx_c is not None:
+                                break
+                    if attach_ring_idx_c is not None:
+                        prefix_c = _get_fused_het_prefix_c(core_smiles_c, attach_ring_idx_c, atom_mapping_c)
+                        if prefix_c is not None:
+                            non_core_c_count = sum(
+                                1 for idx in sub_set
+                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                                and idx not in core_atom_set_c
+                            )
+                            if non_core_c_count == 0:
+                                # Pure fused het on C-branch
+                                from .naming_utils import needs_brackets
+                                wrapped = f"({prefix_c})"
+                                return wrapped
+                            # Fused het with linker: fall through to recursive naming
+            # --- End Phase 79-02 fused het detection for C-branch ---
+
+            # --- Phase 79-01: Direct ring identification for C-branch (DROP-19 fix) ---
             # Try O(1) ring identification before recursive naming fallback.
             from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name_c
             for ring in ring_info.AtomRings():
@@ -4774,7 +4993,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                             if needs_brackets(ring_prefix):
                                 ring_prefix = f"({ring_prefix})"
                             return ring_prefix
-            # --- End Phase 79 direct ring identification ---
+            # --- End Phase 79-01 direct ring identification ---
 
             # Ring-containing C-branch: try recursive naming
             # Guard: only for moderately-sized substituents (<=25 atoms).
@@ -4785,10 +5004,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     mol, list(sub_set), attach_atom, list(chain_set)
                 )
                 # Validate: reject if fragment naming linearized a ring
-                if sub_name and not any(tok in sub_name.lower() for tok in
-                        ('cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
-                         'furan', 'thio', 'indol', 'pyrrol', 'imidaz',
-                         'oxan', 'oxol', 'azetidin', 'aziridin')):
+                if sub_name and not any(tok in sub_name.lower() for tok in _RING_NAME_TOKENS):
                     sub_name = None
                 if sub_name:
                     if needs_brackets(sub_name):
