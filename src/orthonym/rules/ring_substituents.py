@@ -42,6 +42,7 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     'imidazole': 'imidazolyl',
     'pyrimidine': 'pyrimidinyl',
     'pyrazine': 'pyrazinyl',
+    'pyridazine': 'pyridazinyl',
 
     # Heterocyclic saturated (6-membered)
     'tetrahydropyran': 'tetrahydropyranyl',
@@ -120,9 +121,29 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
             elif heteroatoms == ['N']:
                 return 'pyridine'
             elif heteroatoms == ['N', 'N']:
-                # Could be pyrimidine, pyrazine, pyridazine
-                # For now, return pyrimidine as common case
-                return 'pyrimidine'
+                # Distinguish pyridazine (1,2), pyrimidine (1,3), pyrazine (1,4)
+                # by checking the topological relationship between N atoms
+                n_indices = [idx for idx in ring_atoms
+                             if mol.GetAtomWithIdx(idx).GetSymbol() == 'N']
+                if len(n_indices) == 2:
+                    n1, n2 = n_indices
+                    # Check if N atoms are directly bonded (pyridazine = 1,2-diazine)
+                    n1_nbrs = {nbr.GetIdx() for nbr in mol.GetAtomWithIdx(n1).GetNeighbors()}
+                    if n2 in n1_nbrs:
+                        return 'pyridazine'
+                    # Check shortest path between N atoms in the ring
+                    # Pyrimidine (1,3): 1 C between N's on shorter side
+                    # Pyrazine (1,4): 2 C between N's on both sides (symmetric)
+                    ring_list = list(ring_atoms)
+                    pos1 = ring_list.index(n1)
+                    pos2 = ring_list.index(n2)
+                    sep = abs(pos1 - pos2)
+                    min_sep = min(sep, ring_size - sep)
+                    if min_sep == 3:  # para = pyrazine
+                        return 'pyrazine'
+                    else:  # min_sep == 2 = meta = pyrimidine
+                        return 'pyrimidine'
+                return 'pyrimidine'  # fallback
         else:
             # Saturated 6-membered
             if not heteroatoms:
