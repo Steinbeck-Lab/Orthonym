@@ -30,12 +30,20 @@ class TestPrefixStemsExist:
 
     def test_prefix_stems_exist(self):
         assert isinstance(FUSED_HETEROCYCLE_PREFIX_STEMS, dict)
-        assert len(FUSED_HETEROCYCLE_PREFIX_STEMS) >= 70
+        # 69 entries: 75 total - 2 retained - 1 lactone - 3 SMILES duplicates
+        assert len(FUSED_HETEROCYCLE_PREFIX_STEMS) >= 69
 
     def test_all_data_entries_have_prefix_stems(self):
-        """Every non-retained entry in FUSED_HETEROCYCLE_DATA has a prefix stem."""
+        """Every eligible entry in FUSED_HETEROCYCLE_DATA has a prefix stem.
+
+        Excluded: retained names (adenine, hypoxanthine) and lactones (coumarin).
+        """
+        # Ring system types excluded from prefix stems
+        _excluded_ring_systems = {'benzo-6-membered-lactone'}
         for smiles, data in FUSED_HETEROCYCLE_DATA.items():
             if data.get('is_retained_name'):
+                continue
+            if data.get('ring_system') in _excluded_ring_systems:
                 continue
             assert smiles in FUSED_HETEROCYCLE_PREFIX_STEMS, (
                 f"Missing prefix stem for {data['name']} ({smiles})"
@@ -47,6 +55,14 @@ class TestPrefixStemsExist:
             if data.get('is_retained_name'):
                 assert smiles not in FUSED_HETEROCYCLE_PREFIX_STEMS, (
                     f"Retained name {data['name']} should not be in prefix stems"
+                )
+
+    def test_no_lactones_in_prefix_stems(self):
+        """Lactones (coumarin) are NOT in prefix stems — need special handling."""
+        for smiles, data in FUSED_HETEROCYCLE_DATA.items():
+            if data.get('ring_system') == 'benzo-6-membered-lactone':
+                assert smiles not in FUSED_HETEROCYCLE_PREFIX_STEMS, (
+                    f"Lactone {data['name']} should not be in prefix stems"
                 )
 
 

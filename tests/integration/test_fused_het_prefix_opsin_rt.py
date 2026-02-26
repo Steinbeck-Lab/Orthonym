@@ -93,6 +93,12 @@ def _find_carbon_locant(smiles: str) -> str:
     return "2"
 
 
+# Ring systems that OPSIN does not recognize (rare fusions not in its vocabulary)
+_OPSIN_UNKNOWN_RINGS = {
+    'pyrido[3,4-b]pyridazine',  # Rare ring, not in OPSIN arylGroups.xml
+}
+
+
 def _build_test_params():
     """Build parametrize list for OPSIN round-trip tests."""
     params = []
@@ -100,9 +106,15 @@ def _build_test_params():
         locant = _find_carbon_locant(smiles)
         data = FUSED_HETEROCYCLE_DATA.get(smiles, {})
         name = data.get('name', smiles)
+        marks = []
+        if name in _OPSIN_UNKNOWN_RINGS:
+            marks.append(pytest.mark.xfail(
+                reason=f"OPSIN does not recognize {name}", strict=True
+            ))
         params.append(pytest.param(
             smiles, stem, locant, name,
-            id=name
+            id=name,
+            marks=marks,
         ))
     return params
 

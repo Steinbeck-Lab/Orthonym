@@ -906,6 +906,78 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
 }
 
 
+# =========================================================================
+# PREFIX STEM DERIVATION (Phase 78)
+# =========================================================================
+
+
+def _derive_prefix_stem(name: str) -> str:
+    """Derive IUPAC prefix stem from a fused heterocycle retained name.
+
+    Rule: Drop terminal 'e' from names ending in 'e'.
+    This covers all standard fused heterocycle naming patterns:
+      quinoline → quinolin, 1H-indole → 1H-indol, acridine → acridin
+
+    Names not ending in 'e' are returned unchanged:
+      1-benzofuran → 1-benzofuran, coumarin → coumarin
+
+    Args:
+        name: The IUPAC retained name of the fused heterocycle.
+
+    Returns:
+        The prefix stem suitable for -yl suffix attachment.
+    """
+    if name.endswith('e'):
+        return name[:-1]
+    return name
+
+
+# Entries that should not be included in prefix stems:
+# - Retained names (adenine, hypoxanthine): functional derivatives, not ring systems
+# - Lactones (coumarin): need special "oxo-chromen" prefix, deferred to Phase 80
+_PREFIX_STEM_EXCLUDES = {'is_retained_name', 'benzo-6-membered-lactone'}
+
+# Module-level derivation: compute all prefix stems at import time (O(1) lookup)
+FUSED_HETEROCYCLE_PREFIX_STEMS: Dict[str, str] = {
+    smiles: _derive_prefix_stem(data['name'])
+    for smiles, data in FUSED_HETEROCYCLE_DATA.items()
+    if not data.get('is_retained_name', False)
+    and data.get('ring_system') not in _PREFIX_STEM_EXCLUDES
+}
+
+
+def get_fused_heterocycle_prefix(
+    core_smiles: str,
+    attachment_atom_idx: int,
+    atom_mapping: Dict[int, Union[int, str]],
+) -> Optional[str]:
+    """Get prefix form for a fused heterocycle substituent.
+
+    Static O(1) dict lookup — no recursive naming calls.
+    Returns the IUPAC P-57.1.5 systematic prefix form:
+      stem-locant-yl  (e.g., "quinolin-2-yl", "1H-indol-3-yl")
+
+    Args:
+        core_smiles: Canonical SMILES of the matched fused heterocycle core.
+        attachment_atom_idx: Mol atom index where the ring attaches to parent.
+        atom_mapping: Mapping from mol atom index → IUPAC locant (from
+            match_fused_heterocycle_core()).
+
+    Returns:
+        Prefix string like "quinolin-2-yl" or None if core_smiles not recognized
+        or attachment atom not mapped.
+    """
+    stem = FUSED_HETEROCYCLE_PREFIX_STEMS.get(core_smiles)
+    if stem is None:
+        return None
+
+    locant = atom_mapping.get(attachment_atom_idx)
+    if locant is None:
+        return None
+
+    return f"{stem}-{locant}-yl"
+
+
 # Build SMARTS patterns for substructure matching
 # Use the same SMILES but allow variable substituents
 def _build_smarts_lookup() -> Dict[str, str]:
