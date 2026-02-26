@@ -230,3 +230,164 @@ class TestRingSubstituentPrefixVariety:
         assert result is not None
         result_lower = result.lower()
         assert "pyrid" in result_lower, f"Expected 'pyrid*' in '{result}'"
+
+
+# ===========================================================================
+# Phase 79-02: Fused heterocycle ring-as-substituent tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestFusedHetOnNBranch:
+    """RSUB-02 + RSUB-04: Fused het ring on N-branch via _name_heteroatom_substituent.
+
+    When a fused heterocycle (quinoline, indole, etc.) is bonded to N on a
+    chain parent, the fused het should be identified using static O(1) lookup
+    (match_fused_heterocycle_core + get_fused_heterocycle_prefix) and formatted
+    as "(stem-locant-ylamino)".
+
+    Uses long chains (C10) so the chain wins parent selection over the fused ring.
+    """
+
+    def test_n_quinolinyl_amino_on_chain(self):
+        """N-(quinolin-8-yl)amino group on a decanoic acid chain."""
+        result = name_compound('OC(=O)CCCCCCCCCNc1cccc2cccnc12')
+        assert result is not None, "name_compound returned None"
+        assert 'quinolin' in result.lower(), (
+            f"Expected 'quinolin' in name for N-quinolinylamino, got: {result}"
+        )
+
+    def test_n_indolyl_amino_on_chain(self):
+        """N-(1H-indol-5-yl)amino group on a decanoic acid chain."""
+        result = name_compound('OC(=O)CCCCCCCCCNc1ccc2[nH]ccc2c1')
+        assert result is not None, "name_compound returned None"
+        assert 'indol' in result.lower(), (
+            f"Expected 'indol' in name for N-indolylamino, got: {result}"
+        )
+
+    def test_anilino_not_triggered_for_fused_het(self):
+        """Fused het on N should NOT produce 'anilino' (benzene sub-ring false match).
+
+        Quinoline contains a benzene ring, but the anilino detection should be
+        guarded by the is_fused check to prevent false matching.
+        """
+        result = name_compound('OC(=O)CCCCCCCCCNc1cccc2cccnc12')
+        assert result is not None
+        assert 'anilino' not in result.lower(), (
+            f"Fused het incorrectly identified as anilino: {result}"
+        )
+
+    def test_real_anilino_still_works(self):
+        """Isolated phenyl on N should still produce 'anilino'."""
+        result = name_compound('OC(=O)CCCCCCCCCNc1ccccc1')
+        assert result is not None
+        assert 'anilino' in result.lower(), (
+            f"Expected 'anilino' for isolated phenyl on N, got: {result}"
+        )
+
+
+@pytest.mark.integration
+class TestFusedHetOnCBranch:
+    """RSUB-02: Fused het ring on C-branch via _name_heteroatom_substituent.
+
+    When a fused heterocycle is directly bonded to a carbon on the chain,
+    it should be named using the fused het prefix lookup.
+    """
+
+    def test_quinolinyl_on_c_branch(self):
+        """Quinoline directly bonded to a carbon on a decanoic acid chain."""
+        result = name_compound('OC(=O)CCCCCCCCCc1cccc2cccnc12')
+        assert result is not None, "name_compound returned None"
+        assert 'quinolin' in result.lower(), (
+            f"Expected 'quinolin' in name for quinolinyl on C-branch, got: {result}"
+        )
+
+    def test_indolyl_on_c_branch(self):
+        """Indole directly bonded to a carbon on a decanoic acid chain."""
+        result = name_compound('OC(=O)CCCCCCCCCc1ccc2[nH]ccc2c1')
+        assert result is not None, "name_compound returned None"
+        assert 'indol' in result.lower(), (
+            f"Expected 'indol' in name for indolyl on C-branch, got: {result}"
+        )
+
+
+@pytest.mark.integration
+class TestDROP18Elimination:
+    """RSUB-04: Verify DROP-18 triggers are eliminated for known ring systems.
+
+    These molecules have ring systems on N-branches that previously triggered
+    DROP-18. After Phase 79-01 (monocyclic) and 79-02 (fused het), known
+    ring systems should produce correct prefix names.
+    """
+
+    @pytest.mark.parametrize("smiles,expected_ring_token", [
+        # N-piperidinyl on chain
+        ('OC(=O)CCCN1CCCCC1', 'piperid'),
+        # N-morpholinyl on chain
+        ('OC(=O)CCCN1CCOCC1', 'morphol'),
+        # N-pyrrolidinyl on chain
+        ('OC(=O)CCCN1CCCC1', 'pyrrolid'),
+    ])
+    def test_known_rings_on_n_branch_not_dropped(self, smiles, expected_ring_token):
+        """Known ring systems on N-branches produce ring prefix, not DROP-18."""
+        result = name_compound(smiles)
+        assert result is not None, f"name_compound returned None for {smiles}"
+        assert expected_ring_token in result.lower(), (
+            f"Expected '{expected_ring_token}' in name for {smiles}, got: {result}"
+        )
+
+
+@pytest.mark.integration
+class TestFusedHetSubstRoundTrip:
+    """QUAL-04: Fused het substituent prefix names should contain correct stems.
+
+    Verifies that fused het ring systems appearing as substituents produce
+    names containing the correct IUPAC prefix stem (e.g., quinolin, indol).
+    """
+
+    @pytest.mark.parametrize("smiles,description,expected_tokens", [
+        ('OC(=O)CCCCCCCCCc1cccc2cccnc12', 'quinolinyl on chain',
+         ['quinolin']),
+        ('OC(=O)CCCCCCCCCc1ccc2[nH]ccc2c1', 'indolyl on chain',
+         ['indol']),
+        ('OC(=O)CCCCCCCCCNc1cccc2cccnc12', 'quinolinylamino on chain',
+         ['quinolin']),
+    ])
+    def test_fused_het_sub_prefix_stems(self, smiles, description, expected_tokens):
+        """Fused het substituent names contain correct IUPAC prefix stems."""
+        result = name_compound(smiles)
+        assert result is not None, f"Failed to name: {description}"
+        result_lower = result.lower()
+        for tok in expected_tokens:
+            assert tok in result_lower, (
+                f"Expected '{tok}' in name for {description}: {result}"
+            )
+
+
+@pytest.mark.integration
+class TestDROPReduction:
+    """Verify that DROP-18/DROP-19 are reduced by ring-as-substituent wiring."""
+
+    def test_known_ring_subs_dont_trigger_drops(self):
+        """Molecules with known ring substituents should produce names, not drops."""
+        test_smiles = [
+            'OC(=O)CCCN1CCCCC1',  # N-piperidinyl
+            'OC(=O)CCCN1CCOCC1',  # N-morpholinyl
+            'C(CCCC(=O)O)C1CCCC1',  # cyclopentyl on chain
+        ]
+        for smiles in test_smiles:
+            result = name_compound(smiles)
+            assert result is not None, f"Should produce a name for {smiles}"
+
+    def test_fused_het_subs_produce_names(self):
+        """Fused het ring substituents should produce names with ring tokens."""
+        test_smiles = [
+            ('OC(=O)CCCCCCCCCc1cccc2cccnc12', 'quinolin'),
+            ('OC(=O)CCCCCCCCCNc1cccc2cccnc12', 'quinolin'),
+        ]
+        for smiles, expected in test_smiles:
+            result = name_compound(smiles)
+            assert result is not None, f"Should produce a name for {smiles}"
+            assert expected in result.lower(), (
+                f"Expected '{expected}' in name for {smiles}, got: {result}"
+            )
