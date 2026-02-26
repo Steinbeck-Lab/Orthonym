@@ -191,6 +191,10 @@ PREFIX_FORMS = {
     "nitro": "nitro",
     "nitroso": "nitroso",
     "azido": "azido",
+    # Acid halides as non-principal group prefix (IUPAC P-65.5.1.4)
+    "acid_chloride": "chlorocarbonyl",
+    "acid_bromide": "bromocarbonyl",
+    "acid_fluoride": "fluorocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
     # Ethers and thioethers
@@ -206,7 +210,7 @@ PREFIX_FORMS = {
     "phosphine_oxide": None,
     "phosphate_triester": None,
     "phosphate_diester": None,
-    "phosphate_monoester": None,
+    "phosphate_monoester": "phosphonooxy",  # IUPAC P-67.1.3
 
     "tertiary_phosphine": None,
     "secondary_phosphine": None,

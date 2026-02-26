@@ -36,7 +36,6 @@ NO_SENIORITY_GROUPS = {
     "ether",
     "vinyl_ether",
     "aromatic_ether",
-    "thioether",
     "fluoro",
     "chloro",
     "bromo",
@@ -130,6 +129,18 @@ def get_fg_prefix_form(
     # Handle esters specially - generate alkoxycarbonyl prefix (IUPAC P-65.6.3)
     if fg_name == "ester":
         return _get_alkoxycarbonyl_prefix(mol, atoms, principal_chain)
+
+    # Handle sulfoxide -> (alkyl)sulfinyl compound prefix (IUPAC P-63.6)
+    if fg_name == "sulfoxide":
+        return _get_sulfinyl_prefix(mol, atoms, principal_chain)
+
+    # Handle sulfone -> (alkyl)sulfonyl compound prefix (IUPAC P-63.6)
+    if fg_name == "sulfone":
+        return _get_sulfonyl_prefix(mol, atoms, principal_chain)
+
+    # Handle thioether -> (alkyl)sulfanyl compound prefix (IUPAC P-63.2.5)
+    if fg_name == "thioether":
+        return _get_sulfanyl_prefix(mol, atoms, principal_chain)
 
     # For other groups, use standard prefix form
     return get_prefix(fg_name)
@@ -373,6 +384,195 @@ def _get_alkoxycarbonyl_prefix(
             return f"{prefix}yloxycarbonyl"
         except (ValueError, KeyError):
             return None
+
+
+def _get_sulfinyl_prefix(
+    mol,
+    sulfoxide_atoms: tuple,
+    principal_chain: List[int]
+) -> Optional[str]:
+    """Generate (alkyl)sulfinyl prefix for sulfoxide as non-principal group.
+
+    IUPAC P-63.6: R-S(=O)-R' when not the principal group is expressed as
+    an (alkyl)sulfinyl prefix on the parent chain.
+
+    SMARTS "[SX3](=[OX1])([#6])[#6]" matches (S, O, C1, C2).
+
+    Args:
+        mol: RDKit Mol object.
+        sulfoxide_atoms: Atom indices from sulfoxide SMARTS match.
+        principal_chain: Atom indices of the principal chain.
+
+    Returns:
+        Compound prefix string (e.g., "methylsulfinyl"), or None on failure.
+    """
+    if len(sulfoxide_atoms) < 3:
+        return None
+
+    sulfur_idx = sulfoxide_atoms[0]
+    chain_set = set(principal_chain)
+
+    # Find the two C neighbors of S (skip O neighbors)
+    sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    c_neighbors = [n for n in sulfur.GetNeighbors()
+                   if n.GetSymbol() == 'C']
+    if len(c_neighbors) < 2:
+        return None
+
+    # Determine which C is on the chain vs substituent
+    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
+    c1_on_chain = c1 in chain_set
+    c2_on_chain = c2 in chain_set
+
+    if c1_on_chain and not c2_on_chain:
+        sub_carbon = c2
+    elif c2_on_chain and not c1_on_chain:
+        sub_carbon = c1
+    else:
+        # Neither or both on chain -- use smaller fragment
+        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
+        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
+        sub_carbon = c1 if frag1 <= frag2 else c2
+
+    # Count carbons in substituent fragment
+    carbon_count = _count_fragment_atoms(
+        mol, sub_carbon, {sulfur_idx}, carbons_only=True
+    )
+    if carbon_count == 0:
+        return None
+
+    # Build compound prefix: methylsulfinyl, ethylsulfinyl, etc.
+    try:
+        alkyl = get_alkyl_name(carbon_count)
+        return f"{alkyl}sulfinyl"
+    except (ValueError, KeyError):
+        return None
+
+
+def _get_sulfonyl_prefix(
+    mol,
+    sulfone_atoms: tuple,
+    principal_chain: List[int]
+) -> Optional[str]:
+    """Generate (alkyl)sulfonyl prefix for sulfone as non-principal group.
+
+    IUPAC P-63.6: R-S(=O)(=O)-R' when not the principal group is expressed
+    as an (alkyl)sulfonyl prefix on the parent chain.
+
+    SMARTS "[SX4](=[OX1])(=[OX1])([#6])[#6]" matches (S, O1, O2, C1, C2).
+
+    Args:
+        mol: RDKit Mol object.
+        sulfone_atoms: Atom indices from sulfone SMARTS match.
+        principal_chain: Atom indices of the principal chain.
+
+    Returns:
+        Compound prefix string (e.g., "methylsulfonyl"), or None on failure.
+    """
+    if len(sulfone_atoms) < 3:
+        return None
+
+    sulfur_idx = sulfone_atoms[0]
+    chain_set = set(principal_chain)
+
+    # Find the two C neighbors of S (skip O neighbors)
+    sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    c_neighbors = [n for n in sulfur.GetNeighbors()
+                   if n.GetSymbol() == 'C']
+    if len(c_neighbors) < 2:
+        return None
+
+    # Determine which C is on the chain vs substituent
+    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
+    c1_on_chain = c1 in chain_set
+    c2_on_chain = c2 in chain_set
+
+    if c1_on_chain and not c2_on_chain:
+        sub_carbon = c2
+    elif c2_on_chain and not c1_on_chain:
+        sub_carbon = c1
+    else:
+        # Neither or both on chain -- use smaller fragment
+        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
+        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
+        sub_carbon = c1 if frag1 <= frag2 else c2
+
+    # Count carbons in substituent fragment
+    carbon_count = _count_fragment_atoms(
+        mol, sub_carbon, {sulfur_idx}, carbons_only=True
+    )
+    if carbon_count == 0:
+        return None
+
+    # Build compound prefix: methylsulfonyl, ethylsulfonyl, etc.
+    try:
+        alkyl = get_alkyl_name(carbon_count)
+        return f"{alkyl}sulfonyl"
+    except (ValueError, KeyError):
+        return None
+
+
+def _get_sulfanyl_prefix(
+    mol,
+    thioether_atoms: tuple,
+    principal_chain: List[int]
+) -> Optional[str]:
+    """Generate (alkyl)sulfanyl prefix for thioether as non-principal group.
+
+    IUPAC P-63.2.5: R-S-R' when not the principal group is expressed as
+    an (alkyl)sulfanyl prefix on the parent chain.
+
+    SMARTS "[SX2]([#6])[#6]" matches (S, C1, C2).
+
+    Args:
+        mol: RDKit Mol object.
+        thioether_atoms: Atom indices from thioether SMARTS match.
+        principal_chain: Atom indices of the principal chain.
+
+    Returns:
+        Compound prefix string (e.g., "methylsulfanyl"), or None on failure.
+    """
+    if len(thioether_atoms) < 3:
+        return None
+
+    sulfur_idx = thioether_atoms[0]
+    chain_set = set(principal_chain)
+
+    # Find the two C neighbors of S
+    sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    c_neighbors = [n for n in sulfur.GetNeighbors()
+                   if n.GetSymbol() == 'C']
+    if len(c_neighbors) < 2:
+        return None
+
+    # Determine which C is on the chain vs substituent
+    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
+    c1_on_chain = c1 in chain_set
+    c2_on_chain = c2 in chain_set
+
+    if c1_on_chain and not c2_on_chain:
+        sub_carbon = c2
+    elif c2_on_chain and not c1_on_chain:
+        sub_carbon = c1
+    else:
+        # Neither or both on chain -- use smaller fragment
+        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
+        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
+        sub_carbon = c1 if frag1 <= frag2 else c2
+
+    # Count carbons in substituent fragment
+    carbon_count = _count_fragment_atoms(
+        mol, sub_carbon, {sulfur_idx}, carbons_only=True
+    )
+    if carbon_count == 0:
+        return None
+
+    # Build compound prefix: methylsulfanyl, ethylsulfanyl, etc.
+    try:
+        alkyl = get_alkyl_name(carbon_count)
+        return f"{alkyl}sulfanyl"
+    except (ValueError, KeyError):
+        return None
 
 
 def _count_fragment_atoms(
@@ -1003,7 +1203,20 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         if _attach is not None:
                             break
                     _attach_sym = mol.GetAtomWithIdx(_attach).GetSymbol() if _attach is not None else ''
-                    if not sub_has_ring and _attach_sym != 'O':
+                    # Skip S-attached branches if S is part of a named FG
+                    # (sulfoxide, sulfone, thioether) -- already named by FG prefix system
+                    _S_FG_NAMES = {'sulfoxide', 'sulfone', 'thioether'}
+                    _skip_s_branch = False
+                    if _attach is not None and _attach_sym == 'S':
+                        _all_fgs = features.functional_groups if hasattr(features, 'functional_groups') else {}
+                        for _fg_n in _S_FG_NAMES:
+                            for _fg_match in _all_fgs.get(_fg_n, []):
+                                if _attach in _fg_match:
+                                    _skip_s_branch = True
+                                    break
+                            if _skip_s_branch:
+                                break
+                    if not sub_has_ring and _attach_sym != 'O' and not _skip_s_branch:
                         from ..assembly.substituent_enumerator import (
                             SubstituentInfo,
                             classify_and_name_fragment,
