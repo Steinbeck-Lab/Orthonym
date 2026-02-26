@@ -163,6 +163,37 @@ class TestUnsubstitutedStillWorks:
 
 
 @pytest.mark.integration
+class TestCompoundPrefixEndToEnd:
+    """End-to-end tests: name_compound() produces compound prefixes for substituted fused het substituents."""
+
+    def test_5_methyl_indole_e2e(self):
+        """5-methylindole as substituent on diacid chain → compound prefix in name."""
+        from orthonym.namer import name_compound
+        # 5-methyl-1H-indole attached at C-3 on heptanedioic acid
+        result = name_compound('OC(=O)CCC(CCC(=O)O)c1c[nH]c2ccc(C)cc12')
+        assert result is not None
+        assert '5-methyl-1H-indol' in result
+        assert '-yl)' in result
+
+    def test_6_chloro_quinoline_e2e(self):
+        """6-chloroquinoline as substituent on diacid chain → compound prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound('OC(=O)CCC(CCC(=O)O)c1ccc2cc(Cl)ccc2n1')
+        assert result is not None
+        assert 'chloro' in result
+        assert 'quinolin' in result
+
+    def test_unsubstituted_indole_unchanged_e2e(self):
+        """Unsubstituted indole still produces simple prefix (regression)."""
+        from orthonym.namer import name_compound
+        result = name_compound('OC(=O)CCC(CCC(=O)O)c1c[nH]c2ccccc12')
+        assert result is not None
+        assert '1H-indol-3-yl' in result
+        # Should NOT have inner substituent
+        assert 'methyl' not in result
+
+
+@pytest.mark.integration
 class TestCompoundPrefixNoRecursion:
     """Verify compound prefix uses static lookup, no recursive naming."""
 

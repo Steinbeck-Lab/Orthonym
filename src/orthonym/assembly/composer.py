@@ -2371,24 +2371,26 @@ def _build_bicyclo_unsaturation_suffix(
     double_bonds = unsaturation.get('double_bonds', [])
     triple_bonds = unsaturation.get('triple_bonds', [])
 
-    # Convert atom indices to locants and get the lower locant for each bond
-    double_locants = []
-    for bond in double_bonds:
-        idx1, idx2 = bond
+    # Convert atom indices to locants.
+    # IUPAC P-31.1.4.1: use compound locant "N(M)" when the two atoms of
+    # a double bond do not have locants differing by one.
+    def _to_locant_str(idx1, idx2):
         loc1 = atom_to_locant.get(idx1, 0)
         loc2 = atom_to_locant.get(idx2, 0)
-        double_locants.append(min(loc1, loc2))
+        lower, higher = min(loc1, loc2), max(loc1, loc2)
+        if higher - lower == 1:
+            return str(lower)
+        return f"{lower}({higher})"
 
-    triple_locants = []
-    for bond in triple_bonds:
-        idx1, idx2 = bond
-        loc1 = atom_to_locant.get(idx1, 0)
-        loc2 = atom_to_locant.get(idx2, 0)
-        triple_locants.append(min(loc1, loc2))
+    double_locants = [_to_locant_str(b[0], b[1]) for b in double_bonds]
+    triple_locants = [_to_locant_str(b[0], b[1]) for b in triple_bonds]
 
-    # Sort locants
-    double_locants.sort()
-    triple_locants.sort()
+    # Sort by primary (lower) locant number
+    def _locant_sort_key(s):
+        return int(s.split('(')[0])
+
+    double_locants.sort(key=_locant_sort_key)
+    triple_locants.sort(key=_locant_sort_key)
 
     num_double = len(double_locants)
     num_triple = len(triple_locants)
@@ -3522,6 +3524,85 @@ def _count_from_prefix(text: str, base_name: str) -> int:
     return 1
 
 
+def _detect_fused_het_inner_subs(
+    mol, core_atom_set, atom_mapping, ring_atom_set, chain_set,
+    attach_ring_idx
+) -> str:
+    """Detect substituents on a fused heterocycle core and return formatted prefix string.
+
+    Finds atoms bonded to core atoms that are NOT part of the core and NOT in
+    the chain. Maps their positions to IUPAC locants via atom_mapping.
+
+    Returns:
+        Formatted inner substituent prefix string (e.g., "5-methyl-") or ""
+        if no inner substituents found.
+    """
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+    sub_groups: Dict[str, List] = defaultdict(list)
+
+    for core_idx in core_atom_set:
+        if core_idx == attach_ring_idx:
+            continue  # Skip attachment point
+        iupac_locant = atom_mapping.get(core_idx)
+        if iupac_locant is None:
+            continue
+        atom = mol.GetAtomWithIdx(core_idx)
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in core_atom_set or ni in chain_set or ni in ring_atom_set:
+                continue
+            sym = nbr.GetSymbol()
+            if sym in _HALOGEN_PREFIX:
+                sub_groups[_HALOGEN_PREFIX[sym]].append(iupac_locant)
+            elif sym == 'C' and not nbr.GetIsAromatic():
+                # Simple alkyl: count chain length
+                c_nbrs = [n for n in nbr.GetNeighbors()
+                          if n.GetIdx() != core_idx
+                          and n.GetIdx() not in core_atom_set
+                          and n.GetSymbol() == 'C']
+                if nbr.GetTotalNumHs() == 3 and len(c_nbrs) == 0:
+                    sub_groups['methyl'].append(iupac_locant)
+                elif nbr.GetTotalNumHs() == 2 and len(c_nbrs) == 1:
+                    sub_groups['ethyl'].append(iupac_locant)
+                else:
+                    sub_groups['methyl'].append(iupac_locant)  # fallback
+            elif sym == 'O':
+                h_count = nbr.GetTotalNumHs()
+                o_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != core_idx]
+                if h_count == 1 and len(o_nbrs) == 0:
+                    sub_groups['hydroxy'].append(iupac_locant)
+                elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
+                    c_atom = o_nbrs[0]
+                    if c_atom.GetTotalNumHs() == 3:
+                        sub_groups['methoxy'].append(iupac_locant)
+                    else:
+                        sub_groups['methoxy'].append(iupac_locant)  # fallback
+            elif sym == 'N':
+                h_count = nbr.GetTotalNumHs()
+                n_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != core_idx]
+                if h_count == 2 and len(n_nbrs) == 0:
+                    sub_groups['amino'].append(iupac_locant)
+
+    if not sub_groups:
+        return ""
+
+    # Build prefix string sorted by IUPAC alphabetization
+    from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
+    prefix_parts = []
+    for name in sorted(sub_groups.keys(), key=alpha_sort_key):
+        locs = sorted(sub_groups[name], key=lambda x: (int(x) if str(x).isdigit() else 999, str(x)))
+        count = len(locs)
+        loc_str = ','.join(str(l) for l in locs)
+        if count == 1:
+            prefix_parts.append(f'{loc_str}-{name}')
+        else:
+            mult = get_multiplier_prefix(count, name)
+            prefix_parts.append(f'{loc_str}-{mult}{name}')
+
+    return '-'.join(prefix_parts) + '-' if prefix_parts else ""
+
+
 def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for rings that are substituents on a chain parent.
@@ -3542,7 +3623,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         List of NameFragment objects for ring substituent prefixes
     """
     from ..rules.ring_substituents import get_ring_substituent_name, get_ring_attachment_locant
-    from ..data.fused_heterocycles import match_fused_heterocycle_core, get_fused_heterocycle_prefix
+    from ..data.fused_heterocycles import match_fused_heterocycle_core, get_fused_heterocycle_prefix, get_substituted_fused_het_prefix
 
     prefixes = []
     ring_groups = getattr(features, 'ring_substituents_as_groups', [])
@@ -3590,6 +3671,21 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                         break
 
                 if attach_ring_idx is not None:
+                    # Detect inner substituents on the fused het core
+                    inner_prefix = _detect_fused_het_inner_subs(
+                        features.mol, core_atom_set, atom_mapping,
+                        ring_atom_set, chain_set, attach_ring_idx
+                    )
+                    if inner_prefix:
+                        # Substituted fused het: compound prefix
+                        cpx = get_substituted_fused_het_prefix(
+                            core_smiles, attach_ring_idx,
+                            atom_mapping, inner_prefix
+                        )
+                        if cpx is not None:
+                            ring_sub_groups[cpx].append(locant)
+                            continue
+                    # Unsubstituted fused het: simple prefix
                     prefix = get_fused_heterocycle_prefix(
                         core_smiles, attach_ring_idx, atom_mapping
                     )
