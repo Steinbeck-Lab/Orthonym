@@ -624,14 +624,20 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     """
     Format functional group prefix with locants and multiplier.
 
+    Per IUPAC P-16.3.3, compound substituent prefixes (e.g., methylsulfinyl,
+    methylsulfonyl) are enclosed in parentheses when used with locants.
+    Simple prefixes (hydroxy, oxo, amino) are not parenthesized.
+
     Args:
         prefix_form: Base prefix name (e.g., "hydroxy", "oxo", "methoxy")
         locants: List of locant positions
         count: Number of instances
 
     Returns:
-        Formatted prefix string (e.g., "2-hydroxy", "3-oxo", "2,4-dihydroxy")
+        Formatted prefix string (e.g., "2-hydroxy", "3-oxo", "2-(methylsulfinyl)")
     """
+    from ..assembly.naming_utils import needs_brackets
+
     if not locants:
         # No locants - just return prefix with multiplier if needed
         if count > 1:
@@ -642,11 +648,18 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Format locants
     locant_str = ",".join(str(loc) for loc in sorted(locants))
 
+    # Check if prefix is a compound substituent needing parentheses (P-16.3.3)
+    compound = needs_brackets(prefix_form)
+
     # Get multiplier if multiple instances
     if count > 1:
         multiplier = get_multiplier_prefix(count, prefix_form)
+        if compound:
+            return f"{locant_str}-{multiplier}({prefix_form})"
         return f"{locant_str}-{multiplier}{prefix_form}"
 
+    if compound:
+        return f"{locant_str}-({prefix_form})"
     return f"{locant_str}-{prefix_form}"
 
 

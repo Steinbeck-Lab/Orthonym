@@ -42,7 +42,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
-        "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
+        "(2S)-3-(docosanoyloxy)-1-(decanoyloxy)propan-2-ol",  # alpha order fixed P80
     ),
     ("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O", "8-methylnonyl benzene-1,2-dicarboxylate"),
     (
@@ -63,7 +63,7 @@ CI_BENCHMARK = [
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C@@H](CCCCN)"
         "C(=O)O",
-        "(2S)-2-(pentanoylamino)-6-aminoguanidinohexanoic acid",
+        "(2S)-6-aminoguanidino-2-(pentanoylamino)hexanoic acid",  # alpha order fixed P80
     ),
     (
         "NC(=O)[C@H](CCC/N=C(/N)CF)NC(=O)c1ccccc1",
@@ -76,7 +76,7 @@ CI_BENCHMARK = [
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCCCN)C(=O)O",
-        "(4S)-5-(butylamino)-4-(hexanoylamino)-diaminopentanedioic acid",
+        "(4S)-diamino-5-(butylamino)-methylsulfanyl-4-(hexanoylamino)pentanedioic acid",  # alpha order + P80-01 sulfanyl prefix
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)"
@@ -154,7 +154,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC(C)[C@@H](NC(N)=O)C(=O)O",
-        "(2R)-2-(methanoylamino)-2-carbamoylamino-3-methylbutanoic acid",
+        "(2R)-2-carbamoylamino-2-(methanoylamino)-3-methylbutanoic acid",  # alpha order fixed P80
     ),
     (
         "C/C1=C/[C@@H](C)C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)"
@@ -164,7 +164,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC(=O)N[C@@H](CSCCC(=O)C(=O)O)C(=O)O",
-        "2-oxo-4-propylsulfanylbutanedioic acid",
+        "2-oxo-4-(pentylsulfanyl)butanedioic acid",  # parenthesization + alpha order fixed P80
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
@@ -172,11 +172,11 @@ CI_BENCHMARK = [
     ),
     (
         "CN(C)CCC=C1c2ccccc2COc2ccccc21",
-        "1-(ethylamino)-3-cyclopentadecylpropan-1-amine",
+        "3-cyclopentadecyl-1-(ethylamino)propan-1-amine",  # alpha order fixed P80
     ),
     (
         "N=C(N)NCCC[C@H](NC(=O)CNC(=O)[C@@H](N)CCC(=O)O)C(=O)CCl",
-        "(4S)-5-(ethylamino)-4-aminochloroguanidinooxopentanoic acid",
+        "(4S)-4-aminochloro-5-(ethylamino)-guanidinooxopentanoic acid",  # alpha order fixed P80
     ),
     (
         "C=C[C@@H]1C(=C)CC[C@H]2[C@H]1C[C@H]1OC(=O)[C@@]3(C)"
@@ -210,7 +210,7 @@ CI_BENCHMARK = [
     ),
     (
         "O=C([O-])[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
-        "(2R,3R)-2,3-dihydroxyphosphonobutanoate",  # P-72.2.1: [O-] carboxylate -> -oate
+        "(2R,3R)-2,3-dihydroxyphosphono-4-phosphonooxybutanoate",  # P80-01 phosphonooxy prefix now generated
     ),
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
@@ -220,7 +220,7 @@ CI_BENCHMARK = [
     ("OCCCO", "trimethylene glycol"),
     (
         "O=C([O-])[C@@](O)(CO)C(=O)CO",
-        "(2R)-2-(hydroxymethyl)-4-hydroxy-2-hydroxy-3-oxobutanoate",
+        "(2R)-4-hydroxy-2-hydroxy-2-(hydroxymethyl)-3-oxobutanoate",  # alpha order fixed P80
     ),
     ("CCC1CC=C(N2CCCC2)C1=O", "5-ethyl-2-pyrrolidinylcyclopent-2-en-1-one"),
     (
@@ -310,7 +310,7 @@ CI_BENCHMARK = [
     (
         "CC[C@@H](C)[C@H](NC(=O)[C@H](CC(C)C)N(C)C(=O)[C@@H](C)"
         "NC(=O)[C@H](CCO)NC(=O)c1ccccc1)C(=O)O",
-        "(2S,3R)-2-(hexanoylamino)-3-methylpentanoic acid",
+        "(2S,3R)-3-methyl-2-(hexanoylamino)pentanoic acid",  # alpha order fixed P80
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@H](O)"
@@ -463,12 +463,12 @@ CI_BENCHMARK = [
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CO)NC(=O)[C@@H](N)CCCCN)C(=O)O",
-        "(2S)-2-(propanoylamino)-diaminohydroxy-4-methylsulfanylbutanoic acid",
+        "(2S)-diaminohydroxy-4-(methylsulfanyl)-2-(propanoylamino)butanoic acid",  # alpha order + parenthesization fixed P80
     ),
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "N-(2S)-2-(butanoylamino)-amino-4-carbamoylbutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",
+        "N-(2S)-amino-2-(butanoylamino)-4-carbamoylmethylsulfanylbutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",  # alpha order + P80-01 sulfanyl prefix
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"

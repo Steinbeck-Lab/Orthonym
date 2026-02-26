@@ -167,7 +167,6 @@ def needs_brackets(name: str) -> bool:
     # Functional group prefixes fused with alkyl names are compound substituents.
     # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
     # But NOT: methoxy, ethoxy (these are simple ether prefixes, single concept)
-    # And NOT: methylsulfanyl (single substituent concept)
     _COMPOUND_FG_PREFIXES = (
         'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
         'nitro', 'mercapto', 'sulfanyl', 'phospho',
@@ -187,6 +186,19 @@ def needs_brackets(name: str) -> bool:
             for alkyl in _ALKYL_ROOTS:
                 if remainder == alkyl:
                     return True
+
+    # Compound sulfur/selenium/tellurium prefixes: alkyl + sulfinyl/sulfonyl/sulfanyl
+    # Per IUPAC P-16.3.3, "methylsulfinyl" = methyl + sulfinyl = compound substituent
+    # requiring parentheses: "2-(methylsulfinyl)ethanoic acid"
+    # But NOT bare "sulfinyl", "sulfonyl", "sulfanyl" (simple, no alkyl prefix)
+    _COMPOUND_S_SUFFIXES = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+    for alkyl in _ALKYL_ROOTS:
+        if name_lower.startswith(alkyl):
+            remainder = name_lower[len(alkyl):]
+            for s_suffix in _COMPOUND_S_SUFFIXES:
+                if remainder == s_suffix:
+                    return True
+
     return False
 
 
@@ -309,6 +321,21 @@ def is_complex_substituent(name: str) -> bool:
                                'phosphonatoxy', 'carbonyloxy')
     if name in _COMPOUND_OXY_PREFIXES:
         return True
+    # Compound sulfur prefixes: alkylsulfinyl, alkylsulfonyl, alkylsulfanyl
+    # Per IUPAC P-16.3.3, these are compound substituents (alkyl + sulfinyl/sulfonyl/sulfanyl)
+    # requiring parenthesization and bis/tris multipliers.
+    _ALKYL_ROOTS_COMPLEX = (
+        'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
+        'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
+    )
+    _COMPOUND_S_SUFFIXES_COMPLEX = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+    name_lower = name.lower()
+    for alkyl in _ALKYL_ROOTS_COMPLEX:
+        if name_lower.startswith(alkyl):
+            remainder = name_lower[len(alkyl):]
+            for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
+                if remainder == s_suffix:
+                    return True
     # Acyloxy compound prefixes per IUPAC P-16.3.3:
     # "acetyloxy", "benzoyloxy", "propanoyloxy" etc. are compound prefixes
     # (acyl + oxy) that require complex multipliers (bis/tris) and parenthesization.
@@ -510,6 +537,11 @@ def alpha_sort_key(substituent_name: str) -> str:
     # e.g., "3-methyl" -> "methyl", "2,2-dimethyl" -> "dimethyl"
     # This handles formatted prefix strings that include locants
     text = re.sub(r'^[\d,]+-', '', text)
+
+    # Strip enclosing parentheses again after locant removal
+    # e.g., "4-(methylsulfinyl)" -> "(methylsulfinyl)" after locant strip -> "methylsulfinyl"
+    if text.startswith('(') and text.endswith(')'):
+        text = text[1:-1]
 
     # Strip N-locant prefixes (N- or N,N-) for alphabetization
     # e.g., "N,N-dimethylamino" -> "dimethylamino" -> "amino" (after multi-prefix strip)

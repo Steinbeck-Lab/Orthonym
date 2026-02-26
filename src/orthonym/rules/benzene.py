@@ -884,15 +884,55 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
     if h_count >= 1 and len(neighbors) == 0:
         return {'name': 'sulfanyl', 'atoms': [s_idx]}
 
-    # Thioether (-S-R): named as alkylsulfanyl (methylsulfanyl, etc.)
-    if len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+    # Classify sulfur oxidation state by counting =O neighbors (non-ring)
+    # Sulfoxide: S with 1 =O; Sulfone: S with 2 =O; Thioether: S with 0 =O
+    o_double_neighbors = []
+    c_neighbors = []
+    for n in neighbors:
+        if n.GetSymbol() == 'O':
+            bond = mol.GetBondBetweenAtoms(s_idx, n.GetIdx())
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                o_double_neighbors.append(n)
+        elif n.GetSymbol() == 'C':
+            c_neighbors.append(n)
+
+    # Sulfoxide (-S(=O)-R) or Sulfone (-S(=O)(=O)-R): one C neighbor + =O neighbors
+    if len(c_neighbors) == 1 and len(o_double_neighbors) in (1, 2):
+        c_nbr = c_neighbors[0]
         alkyl_atoms, carbon_count = _collect_pure_alkyl(
-            mol, neighbors[0].GetIdx(), ring_atoms | {s_idx}
+            mol, c_nbr.GetIdx(), ring_atoms | {s_idx} | {o.GetIdx() for o in o_double_neighbors}
+        )
+        alkyl_name = None
+        if alkyl_atoms is not None and carbon_count > 0:
+            from ..assembly.substituent_naming import name_substituent_fragment
+            alkyl_name = name_substituent_fragment(
+                mol, alkyl_atoms, c_nbr.GetIdx(),
+                list(ring_atoms | {s_idx} | {o.GetIdx() for o in o_double_neighbors})
+            )
+            if alkyl_name is None:
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                except (ValueError, KeyError):
+                    alkyl_name = None
+        if alkyl_name:
+            o_atom_idxs = [o.GetIdx() for o in o_double_neighbors]
+            all_sub_atoms = [s_idx] + o_atom_idxs + alkyl_atoms
+            if len(o_double_neighbors) == 2:
+                # Sulfone: alkylsulfonyl
+                return {'name': f'{alkyl_name}sulfonyl', 'atoms': all_sub_atoms}
+            else:
+                # Sulfoxide: alkylsulfinyl
+                return {'name': f'{alkyl_name}sulfinyl', 'atoms': all_sub_atoms}
+
+    # Thioether (-S-R): named as alkylsulfanyl (methylsulfanyl, etc.)
+    if len(c_neighbors) == 1 and len(o_double_neighbors) == 0:
+        alkyl_atoms, carbon_count = _collect_pure_alkyl(
+            mol, c_neighbors[0].GetIdx(), ring_atoms | {s_idx}
         )
         if alkyl_atoms is not None and carbon_count > 0:
             from ..assembly.substituent_naming import name_substituent_fragment
             alkyl_name = name_substituent_fragment(
-                mol, alkyl_atoms, neighbors[0].GetIdx(), list(ring_atoms | {s_idx})
+                mol, alkyl_atoms, c_neighbors[0].GetIdx(), list(ring_atoms | {s_idx})
             )
             if alkyl_name is None:
                 try:

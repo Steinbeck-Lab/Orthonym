@@ -792,7 +792,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(C(=O)O)C(CCC(N)C(=O)O)C(=O)O",  # Sentinel: opsin_vocab - triamino triacid
-        "3-(hydroxymethyl)-2,6-diaminoheptanetrioic acid",
+        "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid",
     ),
 ]
 
