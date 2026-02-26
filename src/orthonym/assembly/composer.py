@@ -2741,7 +2741,31 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                             n_subs.append("phenyl")
                             has_phenyl = True
                             break
+            # --- Phase 79: Direct ring identification for amine N-subs (DROP-25 fix) ---
+            # Before branched/linear alkyl naming, check if the fragment IS a ring.
+            # This handles non-phenyl ring substituents on amines (piperidinyl, cyclohexyl, etc.)
+            has_ring_sub = False
             if not has_phenyl and cc > 0:
+                frag_set_ring = set(frag)
+                for ring in ring_info.AtomRings():
+                    ring_set_inner = set(ring)
+                    if ring_set_inner.issubset(frag_set_ring):
+                        # Check if ring accounts for all C atoms (pure ring sub)
+                        non_ring_c = sum(
+                            1 for idx in frag
+                            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                            and idx not in ring_set_inner
+                        )
+                        if non_ring_c == 0:
+                            from ..rules.ring_substituents import get_ring_substituent_name as _get_rsn
+                            ring_prefix = _get_rsn(mol, tuple(ring))
+                            if ring_prefix:
+                                n_subs.append(ring_prefix)
+                                has_ring_sub = True
+                                break
+            # --- End Phase 79 direct ring identification ---
+
+            if not has_phenyl and not has_ring_sub and cc > 0:
                 # Check if substituent is branched (any carbon with 3+ heavy
                 # atom neighbors = branching point). Branched groups need
                 # recursive naming for correct IUPAC 2013 names
@@ -4654,6 +4678,28 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
                     if all_arom and all_c:
                         return "anilino"
+
+            # --- Phase 79: Direct ring identification for N-branch (DROP-18 fix) ---
+            # Try O(1) ring identification before recursive naming fallback.
+            # Only applies when the substituent IS a pure ring (all C atoms are ring atoms).
+            from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name
+            from ..rules.ring_substituents import identify_ring_system as _identify_ring
+            for ring in ring_info.AtomRings():
+                ring_set_inner = set(ring)
+                if ring_set_inner.issubset(sub_set):
+                    # Check if ring accounts for all C atoms in substituent
+                    # (pure ring vs ring+chain like cyclohexylmethyl)
+                    non_ring_c = sum(
+                        1 for idx in sub_atoms
+                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                        and idx not in ring_set_inner
+                    )
+                    if non_ring_c == 0:
+                        ring_prefix = _get_ring_sub_name(mol, tuple(ring))
+                        if ring_prefix:
+                            return f"({ring_prefix}amino)"
+            # --- End Phase 79 direct ring identification ---
+
             # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
             # Guard: only for moderately-sized substituents (<=25 atoms).
             if len(sub_atoms) <= 25:
@@ -4709,6 +4755,27 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
             ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
         )
         if sub_has_ring:
+            # --- Phase 79: Direct ring identification for C-branch (DROP-19 fix) ---
+            # Try O(1) ring identification before recursive naming fallback.
+            from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name_c
+            for ring in ring_info.AtomRings():
+                ring_set_inner = set(ring)
+                if ring_set_inner.issubset(sub_set):
+                    # Check if ring accounts for all C atoms in substituent
+                    non_ring_c = sum(
+                        1 for idx in sub_atoms
+                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                        and idx not in ring_set_inner
+                    )
+                    if non_ring_c == 0:
+                        ring_prefix = _get_ring_sub_name_c(mol, tuple(ring))
+                        if ring_prefix:
+                            from .naming_utils import needs_brackets
+                            if needs_brackets(ring_prefix):
+                                ring_prefix = f"({ring_prefix})"
+                            return ring_prefix
+            # --- End Phase 79 direct ring identification ---
+
             # Ring-containing C-branch: try recursive naming
             # Guard: only for moderately-sized substituents (<=25 atoms).
             if len(sub_atoms) <= 25:

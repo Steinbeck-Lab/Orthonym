@@ -43,12 +43,23 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     'pyrimidine': 'pyrimidinyl',
     'pyrazine': 'pyrazinyl',
 
-    # Heterocyclic saturated
-    'oxolane': 'oxolanyl',
-    'pyrrolidine': 'pyrrolidinyl',
+    # Heterocyclic saturated (6-membered)
+    'tetrahydropyran': 'tetrahydropyranyl',
     'piperidine': 'piperidinyl',
     'morpholine': 'morpholinyl',
     'piperazine': 'piperazinyl',
+
+    # Heterocyclic saturated (5-membered)
+    'oxolane': 'oxolanyl',
+    'pyrrolidine': 'pyrrolidinyl',
+
+    # Heterocyclic saturated (4-membered)
+    'oxetane': 'oxetanyl',
+    'azetidine': 'azetidinyl',
+
+    # Heterocyclic saturated (3-membered)
+    'oxirane': 'oxiranyl',
+    'aziridine': 'aziridinyl',
 }
 
 # Rings that need position-specific names based on attachment point
