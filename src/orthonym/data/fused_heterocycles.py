@@ -978,6 +978,50 @@ def get_fused_heterocycle_prefix(
     return f"{stem}-{locant}-yl"
 
 
+def get_substituted_fused_het_prefix(
+    core_smiles: str,
+    attachment_atom_idx: int,
+    atom_mapping: Dict[int, Union[int, str]],
+    inner_substituent_prefixes: str,
+) -> Optional[str]:
+    """Get compound prefix for a substituted fused heterocycle substituent.
+
+    When a fused heterocycle ring has its own substituents (e.g., 5-methyl on
+    indole) AND the whole ring is a substituent on another parent, this produces
+    the compound prefix form like "(5-methyl-1H-indol-3-yl)".
+
+    Static O(1) dict lookup for the stem — no recursive naming calls.
+
+    Args:
+        core_smiles: Canonical SMILES of the fused heterocycle core.
+        attachment_atom_idx: Mol atom index where the ring attaches to parent.
+        atom_mapping: Mapping from mol atom index → IUPAC locant.
+        inner_substituent_prefixes: Pre-formatted inner substituent string
+            (e.g., "5-methyl-" or "5,6-dimethyl-"). Already includes locants
+            and multiplicative prefixes. May or may not end with hyphen.
+
+    Returns:
+        Compound prefix in parentheses, e.g., "(5-methyl-1H-indol-3-yl)"
+        or None if core_smiles not recognized.
+    """
+    stem = FUSED_HETEROCYCLE_PREFIX_STEMS.get(core_smiles)
+    if stem is None:
+        return None
+
+    locant = atom_mapping.get(attachment_atom_idx)
+    if locant is None:
+        return None
+
+    # Ensure inner prefix ends with hyphen for proper concatenation
+    inner = inner_substituent_prefixes.rstrip('-')
+    if inner:
+        prefix = f"({inner}-{stem}-{locant}-yl)"
+    else:
+        prefix = f"({stem}-{locant}-yl)"
+
+    return prefix
+
+
 # Build SMARTS patterns for substructure matching
 # Use the same SMILES but allow variable substituents
 def _build_smarts_lookup() -> Dict[str, str]:
