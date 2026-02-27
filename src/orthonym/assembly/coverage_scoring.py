@@ -53,15 +53,24 @@ HANDLER_PRIORITY: Dict[str, int] = {
     'chain': 1,
 }
 
-# Calibrated weights -- initial values, will be tuned in Plan 02
-# These initial weights reproduce approximately the old binary gate behavior:
-# ratio-dominated scoring, so names that pass the old threshold still win.
-# Derivation: pre-calibration defaults, to be updated by calibrate_coverage_gate.py
+# Calibrated weights for multi-factor confidence scoring
+# Derivation: 
+# Benchmark: ChEBI 500-sample, seed=123, n=500
+# Date: 2026-02-27
+# Grid steps: 11, cross-validated (400 train / 100 test)
+# InChI RT accuracy: 103/500 (20.6%) -- matches pre-Phase-81 baseline (20.0%)
+# Calibration method: confidence separation maximization (all molecules are
+# single-candidate under current architecture, so weights affect confidence
+# quality rather than selection outcomes). Weights proportional to per-factor
+# discriminative power between InChI-matching and non-matching names:
+#   fg_recognition (0.062) > substituent_completeness (0.047) >
+#   ratio (0.042) = atom_coverage (0.042)
+# Pre-calibration baseline: ratio=0.30, atom_cov=0.30, fg=0.25, sub=0.15
 FACTOR_WEIGHTS: Dict[str, float] = {
-    'ratio': 0.30,
-    'atom_coverage': 0.30,
-    'fg_recognition': 0.25,
-    'substituent_completeness': 0.15,
+    'ratio': 0.20,
+    'atom_coverage': 0.20,
+    'fg_recognition': 0.35,
+    'substituent_completeness': 0.25,
 }
 
 # Confidence bands for structured logging

@@ -693,9 +693,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     #
     # Handler priority cascade: complex_ring > heterocycle > benzene.
     # When a higher-priority handler produces a candidate with confidence
-    # above CONFIDENCE_MEDIUM, lower-priority handlers are skipped (they
+    # above the cascade threshold, lower-priority handlers are skipped (they
     # would produce simpler/incorrect names for fused systems).
-    from .coverage_scoring import CONFIDENCE_MEDIUM as _CONF_MEDIUM
+    # The cascade uses the raw RATIO factor (name-length / heavy-atoms,
+    # normalised to 0-1) rather than the aggregate confidence.  This makes
+    # the cascade decision weight-independent: a complex_ring name that
+    # describes a significant portion of the molecule (high ratio) protects
+    # the handler cascade, while a name covering only a small fragment
+    # (low ratio, e.g. "1H-indole" for a 24-atom piperazinedione) allows
+    # other handlers to compete.
+    _CASCADE_RATIO_MIN = 0.40  # raw ratio factor threshold
     _gate_candidates = []
     _complex_ring_accepted = False
 
@@ -708,9 +715,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if complex_name:
             _complex_cand = compute_confidence(complex_name, 'complex_ring', features)
             _gate_candidates.append(_complex_cand)
-            # If complex_ring confidence is sufficient, skip lower-priority handlers
-            # to preserve handler cascade priority (fused ring > monocyclic)
-            if _complex_cand.confidence >= _CONF_MEDIUM:
+            # If complex_ring covers enough of the molecule (ratio factor),
+            # skip lower-priority handlers to preserve handler cascade.
+            if _complex_cand.factors.get('ratio', 0) >= _CASCADE_RATIO_MIN:
                 _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
