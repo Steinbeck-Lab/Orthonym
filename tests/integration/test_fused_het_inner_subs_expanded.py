@@ -33,9 +33,20 @@ def _setup_inner_sub_test(smiles):
     ring_atom_set = set(core_atom_set)
     # chain_set is empty for isolated ring tests
     chain_set = set()
-    # Find attachment point: any core carbon bonded to a non-core atom
-    # For unit-level tests, use first available
-    attach_ring_idx = min(core_atom_set)  # placeholder
+    # Find attachment point: pick a core atom that has NO non-core, non-H neighbors
+    # (i.e., not the atom with the substituent). This simulates a chain attachment point.
+    attach_ring_idx = None
+    for ci in sorted(core_atom_set):
+        atom = mol.GetAtomWithIdx(ci)
+        has_non_core_nbr = any(
+            n.GetIdx() not in core_atom_set for n in atom.GetNeighbors()
+        )
+        if not has_non_core_nbr:
+            attach_ring_idx = ci
+            break
+    if attach_ring_idx is None:
+        # Fallback: use the first core atom (some may still work)
+        attach_ring_idx = min(core_atom_set)
     return mol, core_atom_set, atom_mapping, ring_atom_set, chain_set, attach_ring_idx
 
 

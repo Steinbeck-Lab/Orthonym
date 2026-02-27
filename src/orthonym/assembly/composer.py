@@ -3282,11 +3282,25 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         prefixes.extend(ring_prefixes)
 
     # --- Handle non-principal functional groups as prefixes ---
-    # When chain_is_parent, skip FGs on ring atoms (already in ring substituent name)
+    # When chain_is_parent, skip FGs on ring atoms (already in ring substituent name).
+    # Also include non-chain atoms reachable from ring atoms: inner substituents on
+    # fused heterocycles (CF3, NO2, CN, etc.) are named as part of the ring compound
+    # prefix and must NOT leak as FG prefixes on the parent chain.
     ring_atom_set = set()
     if getattr(features, 'chain_is_parent', False):
+        chain_set_for_expand = set(features.principal_chain)
         for rg in getattr(features, 'ring_substituents_as_groups', []):
             ring_atom_set.update(rg)
+        # BFS expand: include all atoms reachable from ring atoms that are not
+        # on the principal chain (captures inner substituents like CF3, NO2, CN)
+        expand_queue = list(ring_atom_set)
+        while expand_queue:
+            aidx = expand_queue.pop()
+            for nbr in features.mol.GetAtomWithIdx(aidx).GetNeighbors():
+                nidx = nbr.GetIdx()
+                if nidx not in ring_atom_set and nidx not in chain_set_for_expand:
+                    ring_atom_set.add(nidx)
+                    expand_queue.append(nidx)
 
     # BUG-B: Collect all substituent branch atom indices.
     # FG matches located entirely on a branch are handled by substituent naming,
@@ -3320,12 +3334,9 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         if ring_atom_set:
             filtered = []
             for match in matches:
-                # Skip FG if its carbon anchor is on a ring substituent
-                # Check: is any carbon in the match a ring atom?
-                on_ring = any(
-                    a in ring_atom_set for a in match
-                    if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C'
-                )
+                # Skip FG if ANY atom in the match is part of the ring
+                # substituent fragment (includes inner substituents like CF3)
+                on_ring = any(a in ring_atom_set for a in match)
                 if not on_ring:
                     filtered.append(match)
             matches = filtered
@@ -3614,6 +3625,9 @@ def _detect_fused_het_inner_subs(
         if no inner substituents found.
     """
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    _ALKOXY_DIRECT = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy'}
+
+    from ..assembly.naming_utils import get_alkyl_name, get_multiplier_prefix as _gmp
 
     sub_groups: Dict[str, List] = defaultdict(list)
 
@@ -3632,32 +3646,85 @@ def _detect_fused_het_inner_subs(
             if sym in _HALOGEN_PREFIX:
                 sub_groups[_HALOGEN_PREFIX[sym]].append(iupac_locant)
             elif sym == 'C' and not nbr.GetIsAromatic():
-                # Simple alkyl: count chain length
-                c_nbrs = [n for n in nbr.GetNeighbors()
-                          if n.GetIdx() != core_idx
-                          and n.GetIdx() not in core_atom_set
-                          and n.GetSymbol() == 'C']
-                if nbr.GetTotalNumHs() == 3 and len(c_nbrs) == 0:
-                    sub_groups['methyl'].append(iupac_locant)
-                elif nbr.GetTotalNumHs() == 2 and len(c_nbrs) == 1:
-                    sub_groups['ethyl'].append(iupac_locant)
-                else:
-                    sub_groups['methyl'].append(iupac_locant)  # fallback
+                # Non-core carbon neighbor -- classify by substructure
+
+                cn_nbrs = [n for n in nbr.GetNeighbors()
+                           if n.GetIdx() != core_idx
+                           and n.GetIdx() not in core_atom_set]
+
+                # (a) Cyano detection: C with triple bond to N, no H on C
+                if (len(cn_nbrs) == 1 and cn_nbrs[0].GetSymbol() == 'N'
+                        and nbr.GetTotalNumHs() == 0):
+                    bond_cn = mol.GetBondBetweenAtoms(ni, cn_nbrs[0].GetIdx())
+                    if bond_cn and bond_cn.GetBondTypeAsDouble() == 3.0:
+                        sub_groups['cyano'].append(iupac_locant)
+                        continue
+
+                # (b) Haloalkyl detection: C bonded only to halogens (no H, no non-hal)
+                hal_map = _HALOGEN_PREFIX
+                hal_nbrs = [n for n in cn_nbrs if n.GetSymbol() in hal_map]
+                non_hal = [n for n in cn_nbrs
+                           if n.GetSymbol() not in hal_map
+                           and n.GetSymbol() != 'H']
+                if hal_nbrs and not non_hal and nbr.GetTotalNumHs() == 0:
+                    hal_counts: Dict[str, int] = defaultdict(int)
+                    for h in hal_nbrs:
+                        hal_counts[h.GetSymbol()] += 1
+                    parts = []
+                    for h_sym in sorted(hal_counts.keys(),
+                                        key=lambda s: hal_map[s]):
+                        cnt = hal_counts[h_sym]
+                        mp = _gmp(cnt, hal_map[h_sym]) if cnt > 1 else ''
+                        parts.append(f'{mp}{hal_map[h_sym]}')
+                    haloalkyl_name = '(' + ''.join(parts) + 'methyl)'
+                    sub_groups[haloalkyl_name].append(iupac_locant)
+                    continue
+
+                # (c) General alkyl using _count_pure_alkyl()
+                c_count = _count_pure_alkyl(
+                    mol, ni, core_atom_set | chain_set | ring_atom_set
+                )
+                if c_count:
+                    try:
+                        sub_groups[get_alkyl_name(c_count)].append(iupac_locant)
+                    except (ValueError, KeyError):
+                        pass  # Skip unrecognizable
+
             elif sym == 'O':
                 h_count = nbr.GetTotalNumHs()
-                o_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != core_idx]
+                o_nbrs = [n for n in nbr.GetNeighbors()
+                          if n.GetIdx() != core_idx
+                          and n.GetIdx() not in core_atom_set]
                 if h_count == 1 and len(o_nbrs) == 0:
                     sub_groups['hydroxy'].append(iupac_locant)
-                elif h_count == 0 and len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
-                    c_atom = o_nbrs[0]
-                    if c_atom.GetTotalNumHs() == 3:
-                        sub_groups['methoxy'].append(iupac_locant)
-                    else:
-                        sub_groups['methoxy'].append(iupac_locant)  # fallback
+                elif (h_count == 0 and len(o_nbrs) == 1
+                      and o_nbrs[0].GetSymbol() == 'C'):
+                    # General alkoxy: count carbons in the -O-C... chain
+                    c_start_idx = o_nbrs[0].GetIdx()
+                    c_count = _count_pure_alkyl(
+                        mol, c_start_idx,
+                        core_atom_set | chain_set | ring_atom_set | {ni}
+                    )
+                    if c_count:
+                        if c_count in _ALKOXY_DIRECT:
+                            sub_groups[_ALKOXY_DIRECT[c_count]].append(
+                                iupac_locant)
+                        else:
+                            from ..data.chain_names import get_chain_prefix
+                            sub_groups[
+                                f'{get_chain_prefix(c_count)}oxy'
+                            ].append(iupac_locant)
+
             elif sym == 'N':
-                h_count = nbr.GetTotalNumHs()
-                n_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != core_idx]
-                if h_count == 2 and len(n_nbrs) == 0:
+                # Nitrogen neighbor -- check nitro vs amino
+                n_nbrs = [n for n in nbr.GetNeighbors()
+                          if n.GetIdx() != core_idx
+                          and n.GetIdx() not in core_atom_set]
+                if (nbr.GetFormalCharge() == 1
+                        and len(n_nbrs) == 2
+                        and all(n.GetSymbol() == 'O' for n in n_nbrs)):
+                    sub_groups['nitro'].append(iupac_locant)
+                elif nbr.GetTotalNumHs() == 2 and len(n_nbrs) == 0:
                     sub_groups['amino'].append(iupac_locant)
 
     if not sub_groups:
