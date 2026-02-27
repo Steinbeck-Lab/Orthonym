@@ -74,6 +74,62 @@ CONFIDENCE_MEDIUM: float = 0.45  # INFO level
 # Factor computation helpers
 # ---------------------------------------------------------------------------
 
+def _is_retained_scaffold_name(name: str) -> bool:
+    """Check if a name is a recognised scaffold name from naming databases.
+
+    Checks RETAINED_NAMES (trivial/common names) and fused heterocycle
+    tables (adenine, indole, purine, etc.).
+
+    This is a general rule: "retained names for recognised scaffolds are
+    always valid regardless of molecule size."
+    """
+    name_lower = name.lower()
+
+    # Check RETAINED_NAMES
+    try:
+        from ..data.retained_names import RETAINED_NAMES
+        for _smi, retained in RETAINED_NAMES.items():
+            if retained.lower() == name_lower:
+                return True
+    except ImportError:
+        pass
+
+    # Check fused heterocycle database (nucleobases, indole, purine, etc.)
+    try:
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        for _smi, entry in FUSED_HETEROCYCLE_DATA.items():
+            entry_name = entry.get('name', '')
+            if entry_name.lower() == name_lower:
+                return True
+    except ImportError:
+        pass
+
+    return False
+
+
+def _is_core_retained_name(name: str) -> bool:
+    """Check if a name is a core retained name that should ALWAYS be boosted.
+
+    Core retained names identify biologically significant scaffolds that are
+    valid as names regardless of molecule size (e.g., adenine in a nucleotide).
+    These correspond to fused heterocycle entries with ``is_retained_name: True``
+    in the FUSED_HETEROCYCLE_DATA.
+
+    Regular retained names (benzene, toluene, etc.) are only boosted for small
+    molecules (total_heavy <= 15) to prevent incorrect boosting.
+    """
+    name_lower = name.lower()
+    try:
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        for _smi, entry in FUSED_HETEROCYCLE_DATA.items():
+            if (entry.get('name', '').lower() == name_lower
+                    and entry.get('is_retained_name', False)):
+                return True
+    except ImportError:
+        pass
+    return False
+
+
 def _compute_fg_recognition(features: Any) -> float:
     """Fraction of detected functional groups with known naming forms.
 
@@ -97,12 +153,18 @@ def _compute_fg_recognition(features: Any) -> float:
     recognised = len(principal_atoms)
 
     # Non-principal groups: count those with known prefix forms
+    # Also count FGs that are named by substitution (ethers, thioethers,
+    # aromatic ethers) even though they don't have a standard prefix in
+    # the PREFIX_FORMS table -- they are handled by dedicated naming code.
+    _SUBSTITUTIVE_FGS = frozenset({
+        'ether', 'thioether', 'aromatic_ether', 'sulfoxide', 'sulfone',
+    })
     from ..rules.seniority import get_prefix
     for fg_name, matches in fg_dict.items():
         if fg_name == principal:
             continue  # Already counted
         prefix = get_prefix(fg_name)
-        if prefix:  # Has a known prefix form -> will be named
+        if prefix or fg_name in _SUBSTITUTIVE_FGS:
             recognised += len(matches)
 
     return min(recognised / total_fg_instances, 1.0)
@@ -126,9 +188,19 @@ def _compute_substituent_completeness(name: str, features: Any) -> float:
     if total_expected == 0:
         return 1.0
 
-    # Heuristic: count locant-prefixed groups in the name
+    # Heuristic: count locant-prefixed groups in the name.
+    # Monosubstituted rings (total_expected == 1) often omit the locant
+    # (e.g., "hexoxybenzene" not "1-hexoxybenzene"), so if the name is
+    # longer than the parent ring name, count the substituent as present.
     locant_groups = re.findall(r'\d+[,-]', name)
     named_subs = min(len(locant_groups), total_expected)
+
+    # For monosubstituted cases without locants, check if the name
+    # contains more than just the parent ring name (indicates a prefix).
+    if named_subs == 0 and total_expected <= 2 and len(name) > 8:
+        # The name has enough characters to suggest substituent prefixes
+        # even without explicit locants.
+        named_subs = min(1, total_expected)
 
     return min(named_subs / total_expected, 1.0)
 
@@ -169,24 +241,31 @@ def compute_confidence(
         atom_cov = ratio_score  # fallback: estimate from name length
 
     # Retained name confidence boost (general rule):
-    # If the candidate name matches a retained name for a recognised
-    # scaffold, set atom_coverage to 1.0. This handles nucleobases,
-    # benzene derivatives, etc. without molecule-specific hacks.
-    try:
-        from ..data.retained_names import RETAINED_NAMES
-        name_lower = name.lower()
-        for _smi, retained in RETAINED_NAMES.items():
-            if retained.lower() == name_lower:
-                atom_cov = 1.0
-                break
-    except ImportError:
-        pass  # Graceful degradation if retained_names unavailable
+    # If the candidate name matches a recognised scaffold name, set all
+    # factors to 1.0. Two tiers:
+    #
+    # 1. Core retained names (is_retained_name=True in fused heterocycle
+    #    data, e.g. adenine): boosted ALWAYS, regardless of molecule size.
+    #    These identify biologically significant scaffolds that are valid
+    #    as names even in large molecules (nucleotides, cofactors).
+    #
+    # 2. Regular retained names (benzene, toluene, indole, etc.): boosted
+    #    only for small molecules (total_heavy <= 15) to prevent incorrect
+    #    boosting of e.g. "1H-indole" on a 36-atom benzamide.
+    is_retained = _is_retained_scaffold_name(name)
+    is_core = _is_core_retained_name(name) if is_retained else False
 
-    # Factor 3: functional group recognition rate
-    fg_recognition = _compute_fg_recognition(features)
+    if is_core or (is_retained and total_heavy <= 15):
+        ratio_score = 1.0
+        atom_cov = 1.0
+        fg_recognition = 1.0
+        sub_completeness = 1.0
+    else:
+        # Factor 3: functional group recognition rate
+        fg_recognition = _compute_fg_recognition(features)
 
-    # Factor 4: substituent completeness
-    sub_completeness = _compute_substituent_completeness(name, features)
+        # Factor 4: substituent completeness
+        sub_completeness = _compute_substituent_completeness(name, features)
 
     factors = {
         'ratio': round(ratio_score, 4),

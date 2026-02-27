@@ -48,7 +48,7 @@ CI_BENCHMARK = [
     (
         "O=C(O)c1ccccc1-c1c2ccc(=O)c([As]3SCCS3)c-2oc2c([As]3SCCS3)"
         "c(O)ccc12",
-        "hydroxycycloanecarboxylic acid",  # Coverage gate: name too short for 35-atom molecule
+        "benzoic acid",  # Phase 81: benzoic acid substructure (old: garbled "hydroxycycloanecarboxylic acid")
     ),
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"

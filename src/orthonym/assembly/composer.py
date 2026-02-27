@@ -33,6 +33,14 @@ from .substituent_enumerator import (
     classify_and_name_fragment,
     collect_substituent_atom_set,
 )
+from .coverage_scoring import (
+    compute_confidence,
+    select_best_candidate,
+    store_confidence,
+    clear_confidence,
+    log_confidence,
+    CandidateName,
+)
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -54,24 +62,8 @@ from ..rules.partial_saturation import (
 )
 from ..data.partial_saturation_refs import get_aromatic_reference, get_reference_smiles
 
-
-def _coverage_gate_threshold(total_heavy: int) -> float:
-    """Return the minimum name-length / heavy-atom ratio for the coverage gate.
-
-    The coverage gate rejects names that are too short for the molecule size
-    (indicating incomplete naming). The threshold is size-adaptive:
-      - HA <= 20: 0.3  (small molecules have short but valid names)
-      - HA > 20:  0.4  (larger molecules need longer names to be adequate)
-
-    Args:
-        total_heavy: Number of heavy atoms in the molecule.
-
-    Returns:
-        Minimum acceptable ratio of len(name) / total_heavy.
-    """
-    if total_heavy <= 20:
-        return 0.3
-    return 0.4
+# _coverage_gate_threshold() removed in Phase 81: replaced by
+# graduated confidence scoring in coverage_scoring.py
 
 
 def get_saturation_prefix_for_fused_ring(
@@ -360,6 +352,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     Returns:
         Complete IUPAC name string
     """
+    # Clear confidence store at start of each naming call
+    clear_confidence()
+
     # INST: Assembly dispatch trace
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
@@ -691,6 +686,19 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if assembly_name:
             return assembly_name
 
+    # --- Candidate collection block ---
+    # Collect scored candidates from the three coverage-gated handlers
+    # (complex_ring, heterocycle, benzene). Non-gated handlers (polycyclic,
+    # partial_sat) keep their direct returns between the collection parts.
+    #
+    # Handler priority cascade: complex_ring > heterocycle > benzene.
+    # When a higher-priority handler produces a candidate with confidence
+    # above CONFIDENCE_MEDIUM, lower-priority handlers are skipped (they
+    # would produce simpler/incorrect names for fused systems).
+    from .coverage_scoring import CONFIDENCE_MEDIUM as _CONF_MEDIUM
+    _gate_candidates = []
+    _complex_ring_accepted = False
+
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
@@ -698,83 +706,93 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.is_cyclic and _is_complex_ring_system(features.mol):
         complex_name = _assemble_complex_ring_name(features.mol, features)
         if complex_name:
-            # Coverage gate: reject if name is too short for molecule size
-            # BUT: bypass for nucleobase retained names (adenine, guanine,
-            # etc.) that correctly identify a core substructure in large
-            # biological molecules (nucleotide cofactors). These specific
-            # names are accepted because they describe the recognizable
-            # core of complex molecules that the pipeline cannot fully name.
-            _NUCLEOBASE_CORE_NAMES = frozenset({
-                'adenine', 'guanine', 'thymine', 'cytosine', 'uracil',
-                'xanthine', 'hypoxanthine', 'purine',
-            })
-            total_heavy = features.mol.GetNumHeavyAtoms()
-            is_nucleobase_core = complex_name.lower() in _NUCLEOBASE_CORE_NAMES
-            threshold = _coverage_gate_threshold(total_heavy)
-            if is_nucleobase_core or total_heavy <= 15 or len(complex_name) / total_heavy >= threshold:
-                return complex_name
-            # else: complex ring name too short -- fall through to simpler handlers
-            logger.debug(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
-                "complex_ring", len(complex_name) / max(total_heavy, 1), threshold,
-            )
+            _complex_cand = compute_confidence(complex_name, 'complex_ring', features)
+            _gate_candidates.append(_complex_cand)
+            # If complex_ring confidence is sufficient, skip lower-priority handlers
+            # to preserve handler cascade priority (fused ring > monocyclic)
+            if _complex_cand.confidence >= _CONF_MEDIUM:
+                _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
     # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
     # Check before benzene since substituted PAHs have benzene substructures
-    polycyclic_name = getattr(features, 'polycyclic_name', None)
-    if polycyclic_name:
-        return _assemble_polycyclic_name(features, style)
+    # NOT gated -- direct return (no coverage quality ambiguity)
+    # Skip if complex_ring already identified the system with adequate
+    # confidence (it provides a more complete VB/fused name for systems
+    # that also have a simpler polycyclic_name or partial_sat match).
+    if not _complex_ring_accepted:
+        polycyclic_name = getattr(features, 'polycyclic_name', None)
+        if polycyclic_name:
+            return _assemble_polycyclic_name(features, style)
 
-    # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
-    # Check BEFORE benzene since they contain benzene substructure
-    if features.is_cyclic:
-        partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
-        if partial_sat_name:
-            return partial_sat_name
+        # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
+        # Check BEFORE benzene since they contain benzene substructure
+        # NOT gated -- direct return
+        if features.is_cyclic:
+            partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
+            if partial_sat_name:
+                return partial_sat_name
 
-    # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
-    # Only reached if not a complex fused system
-    ring_type = getattr(features, 'ring_type', None)
-    if ring_type == 'heterocyclic':
-        # Safety net: check if this heterocycle is actually a lactone
-        # (catches cases where lactone detection in ester routing was bypassed)
-        from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
-        lactone_info = is_monocyclic_lactone(features.mol)
-        if lactone_info:
-            lactone_name = name_monocyclic_lactone(features.mol)
-            if lactone_name:
-                return lactone_name
-        # Coverage gate: heterocycle name must be adequate for molecule size
-        hetero_name = _assemble_heterocycle_name(features, style)
-        if hetero_name:
-            total_heavy = features.mol.GetNumHeavyAtoms()
-            threshold = _coverage_gate_threshold(total_heavy)
-            if total_heavy <= 15 or len(hetero_name) / total_heavy >= threshold:
-                return hetero_name
-            # else: heterocycle name too short -- fall through to chain naming
-            logger.debug(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
-                "heterocycle", len(hetero_name) / max(total_heavy, 1), threshold,
-            )
-        # If heterocycle naming fails, fall through
+    # Only collect heterocycle/benzene candidates if complex_ring didn't
+    # produce a high-confidence result. This preserves the handler priority
+    # cascade: fused/complex ring names should not compete with simpler
+    # monocyclic names when the fused name is adequate.
+    if not _complex_ring_accepted:
+        # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
+        # Only reached if not a complex fused system
+        ring_type = getattr(features, 'ring_type', None)
+        if ring_type == 'heterocyclic':
+            # Safety net: check if this heterocycle is actually a lactone
+            # (catches cases where lactone detection in ester routing was bypassed)
+            from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
+            lactone_info = is_monocyclic_lactone(features.mol)
+            if lactone_info:
+                lactone_name = name_monocyclic_lactone(features.mol)
+                if lactone_name:
+                    return lactone_name
+            # Collect heterocycle candidate
+            hetero_name = _assemble_heterocycle_name(features, style)
+            if hetero_name:
+                _gate_candidates.append(
+                    compute_confidence(hetero_name, 'heterocycle', features)
+                )
+            # If heterocycle naming fails, fall through
 
-    # Handle benzene derivatives
-    # Only reached if not a fused system containing benzene
-    if getattr(features, 'is_benzene', False):
-        benzene_name = _assemble_benzene_name(features, style)
-        if benzene_name:
-            # Coverage gate: reject if name is too short for molecule size
-            total_heavy = features.mol.GetNumHeavyAtoms()
-            threshold = _coverage_gate_threshold(total_heavy)
-            if total_heavy <= 10 or len(benzene_name) / total_heavy >= threshold:
-                return benzene_name
-            # else: benzene name too short -- fall through to chain naming
-            logger.debug(
-                "DROP-20 substituent_skip: reason=coverage_gate_reject handler=%s ratio=%.2f threshold=%.1f",
-                "benzene", len(benzene_name) / max(total_heavy, 1), threshold,
-            )
-        # If benzene naming fails, fall through
+        # Handle benzene derivatives
+        # Only reached if not a fused system containing benzene
+        if getattr(features, 'is_benzene', False):
+            benzene_name = _assemble_benzene_name(features, style)
+            if benzene_name:
+                _gate_candidates.append(
+                    compute_confidence(benzene_name, 'benzene', features)
+                )
+            # If benzene naming fails, fall through
+
+    # --- Select best candidate if any were collected ---
+    if _gate_candidates:
+        best = select_best_candidate(_gate_candidates)
+        log_confidence(best)
+        # Only store confidence at top-level depth (not during recursive
+        # fragment naming) to prevent overwriting top-level metadata.
+        from .fragment_naming import _fragment_guard
+        if getattr(_fragment_guard, 'depth', 0) == 0:
+            store_confidence(best)
+        # Accept the best candidate if its name-length ratio is adequate.
+        # The ratio factor measures len(name)/heavy_atoms, matching the
+        # old binary gate's acceptance criterion. When the ratio is too low,
+        # the handler only captured a small substructure and chain naming
+        # may produce a more complete name.
+        _MIN_RATIO_ACCEPT = 0.30  # Matches old gate threshold for HA <= 20
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        if total_heavy <= 15 or best.factors.get('ratio', 0) >= (_MIN_RATIO_ACCEPT / 1.5):
+            return best.name
+        # Low ratio: fall through but store metadata for debugging
+        logger.debug(
+            "Coverage gate: best candidate ratio too low, falling through "
+            "to chain naming. best_handler=%s best_confidence=%.4f ratio=%.4f",
+            best.handler, best.confidence, best.factors.get('ratio', 0),
+        )
+    # else: no ring candidates -- fall through to chain/simple naming
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
     if features.principal_group == 'nitrile' and features.is_cyclic:
