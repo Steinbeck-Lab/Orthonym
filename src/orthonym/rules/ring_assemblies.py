@@ -745,3 +745,248 @@ def name_ring_assembly(
     sub_prefix = "-".join(prefix_parts)
 
     return f"{sub_prefix}-{base_name}"
+
+
+def name_ring_assembly_prefix(
+    mol, assembly_info: Dict, attachment_atom_idx: int
+) -> Optional[str]:
+    """Generate ring assembly substituent prefix per IUPAC P-28.3.
+
+    When a ring assembly (identical rings joined by single bonds) appears as
+    a substituent on a parent chain, the prefix uses square-bracket notation
+    with primed connection locants and an attachment locant with -yl suffix.
+
+    Format: ``[connection_locants-multiplierRing_name]-attach_locant-yl``
+
+    Args:
+        mol: RDKit Mol object
+        assembly_info: Dict from detect_ring_assembly() with keys:
+            ring_systems, connections, count, ring_type
+        attachment_atom_idx: Atom index where assembly connects to parent chain
+
+    Returns:
+        Prefix string like ``[1,1'-biphenyl]-4-yl`` or None on failure.
+
+    Examples:
+        biphenyl attached at para position -> "[1,1'-biphenyl]-4-yl"
+        bipyridine attached at position 5 -> "[2,2'-bipyridin]-5-yl"
+    """
+    ring_systems = assembly_info['ring_systems']
+    connections = assembly_info['connections']
+    count = assembly_info['count']
+
+    multiplier = ASSEMBLY_MULTIPLIERS.get(count)
+    if multiplier is None:
+        return None
+
+    ring_name = _get_ring_parent_name(mol, ring_systems[0])
+    if ring_name is None:
+        return None
+
+    # Build connection locant string (reuse existing logic from name_ring_assembly)
+    connection_parts = []
+    for a1, a2, s1, s2 in connections:
+        if s1 > s2:
+            a1, a2, s1, s2 = a2, a1, s2, s1
+        loc1 = _get_connection_locant(mol, a1, ring_systems[s1])
+        loc2 = _get_connection_locant(mol, a2, ring_systems[s2])
+        prime1 = _format_prime(s1)
+        prime2 = _format_prime(s2)
+        connection_parts.append(f"{loc1}{prime1},{loc2}{prime2}")
+    connection_str = ":".join(connection_parts)
+
+    # Find which ring system the attachment atom belongs to
+    attach_system_idx = None
+    for i, sys_atoms in enumerate(ring_systems):
+        if attachment_atom_idx in sys_atoms:
+            attach_system_idx = i
+            break
+    if attach_system_idx is None:
+        return None
+
+    # Find the inter-ring connection atom in the attachment ring system.
+    # The assembly numbering starts from the inter-ring bond (locant 1),
+    # so we need to compute the attachment locant relative to that point.
+    inter_ring_conn_atom = None
+    for a1, a2, s1, s2 in connections:
+        if s1 == attach_system_idx:
+            inter_ring_conn_atom = a1
+            break
+        elif s2 == attach_system_idx:
+            inter_ring_conn_atom = a2
+            break
+
+    if inter_ring_conn_atom is not None:
+        # Use _get_substituent_locant which numbers from the inter-ring
+        # connection point (locant 1) and gives the correct position for
+        # the chain attachment point
+        attach_locant = _get_substituent_locant(
+            mol, attachment_atom_idx, attachment_atom_idx,
+            ring_systems[attach_system_idx], inter_ring_conn_atom
+        )
+    else:
+        # Fallback: use _get_connection_locant (for single-ring edge cases)
+        attach_locant = _get_connection_locant(
+            mol, attachment_atom_idx, ring_systems[attach_system_idx]
+        )
+    attach_prime = _format_prime(attach_system_idx)
+
+    # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
+    # (IUPAC P-31.1.3.4: terminal 'e' dropped before '-yl')
+    display_name = ring_name
+    if display_name.endswith('e'):
+        display_name = display_name[:-1]
+
+    # Assembly base: "1,1'-biphenyl" or "2,2'-bipyridin"
+    assembly_base = f"{connection_str}-{multiplier}{display_name}"
+
+    # Full prefix: "[1,1'-biphenyl]-4-yl"
+    return f"[{assembly_base}]-{attach_locant}{attach_prime}-yl"
+
+
+def name_mixed_ring_prefix(
+    mol,
+    ring_systems_list: List[Set[int]],
+    inter_system_bonds: List[Tuple[int, int, int, int]],
+    attachment_atom_idx: int,
+) -> Optional[str]:
+    """Generate compound substituent prefix for non-identical connected rings.
+
+    When two or more non-identical ring systems are connected by single bonds
+    and appear as a substituent on a parent chain, the ring carrying the free
+    valence (chain attachment) is the parent of the compound substituent prefix.
+    The other ring(s) become simple substituents on it.
+
+    For the parent ring of the compound prefix:
+    - Carbocyclic: numbering gives chain attachment locant 1 (lowest locant rule)
+    - Heterocyclic: standard IUPAC numbering (heteroatom at position 1)
+
+    Args:
+        mol: RDKit Mol object
+        ring_systems_list: List of sets of atom indices, one per ring system
+        inter_system_bonds: List of (atom_A, atom_B, system_A, system_B) tuples
+            from _find_inter_system_bonds()
+        attachment_atom_idx: Atom index where the multi-ring fragment connects
+            to the parent chain
+
+    Returns:
+        Compound prefix string like ``(4-(pyridin-2-yl)phenyl)`` or None.
+    """
+    if len(ring_systems_list) < 2:
+        return None
+
+    from .ring_substituents import get_ring_substituent_name, identify_ring_system
+
+    # Determine which ring the chain attaches to -- that becomes the parent
+    # of the compound substituent prefix (it carries the free valence = -yl)
+    parent_idx = None
+    sub_idx = None
+    for i, sys_atoms in enumerate(ring_systems_list):
+        if attachment_atom_idx in sys_atoms:
+            parent_idx = i
+            break
+    if parent_idx is None:
+        return None
+
+    # For 2-ring systems, the other ring is the substituent
+    sub_idx = 1 - parent_idx if len(ring_systems_list) == 2 else None
+    if sub_idx is None:
+        # For 3+ non-identical rings, not yet supported
+        return None
+
+    parent_atoms = ring_systems_list[parent_idx]
+    sub_atoms = ring_systems_list[sub_idx]
+
+    # Get the parent ring's system name (for stem)
+    parent_ring_tuple = tuple(sorted(parent_atoms))
+    parent_ring_name = identify_ring_system(mol, parent_ring_tuple)
+    if not parent_ring_name:
+        return None
+
+    # Get the substituent ring's -yl name
+    sub_ring_tuple = tuple(sorted(sub_atoms))
+
+    # For the substituent ring, get its prefix name with position if applicable
+    # Find where the inter-ring bond attaches to the sub ring
+    sub_attach_atom = None
+    for a1, a2, s1, s2 in inter_system_bonds:
+        if s1 == sub_idx:
+            sub_attach_atom = a1
+            break
+        elif s2 == sub_idx:
+            sub_attach_atom = a2
+            break
+
+    sub_yl_name = get_ring_substituent_name(
+        mol, sub_ring_tuple, attachment_point=sub_attach_atom
+    )
+    if not sub_yl_name:
+        return None
+
+    # Check if sub ring name needs parenthesization (if it contains locants/hyphens)
+    # e.g., "pyridin-2-yl" needs parentheses: "(pyridin-2-yl)"
+    # but "phenyl" does not
+    if '-' in sub_yl_name and not sub_yl_name.startswith('('):
+        sub_display = f"({sub_yl_name})"
+    else:
+        sub_display = sub_yl_name
+
+    # Parent ring stem: drop terminal 'e' before -yl (vowel elision per IUPAC)
+    parent_stem = parent_ring_name
+    if parent_stem.endswith('e'):
+        parent_stem = parent_stem[:-1]
+
+    # Determine locants on the parent ring
+    # Find the inter-ring bond atom on the parent ring
+    parent_conn_atom = None
+    for a1, a2, s1, s2 in inter_system_bonds:
+        if s1 == parent_idx:
+            parent_conn_atom = a1
+            break
+        elif s2 == parent_idx:
+            parent_conn_atom = a2
+            break
+    if parent_conn_atom is None:
+        return None
+
+    # For locant calculation, use _get_substituent_locant which numbers
+    # carbocyclic rings from the chain attachment point (locant 1) and
+    # heterocyclic rings from standard IUPAC numbering
+    connection_locant = _get_substituent_locant(
+        mol, parent_conn_atom, parent_conn_atom,
+        parent_atoms, attachment_atom_idx
+    )
+    attach_locant = _get_substituent_locant(
+        mol, attachment_atom_idx, attachment_atom_idx,
+        parent_atoms, attachment_atom_idx
+    )
+
+    # For heterocyclic parent rings, use the standard IUPAC numbering
+    # (not relative to attachment point). Check if parent is heterocyclic.
+    parent_has_het = any(
+        mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in parent_atoms
+    )
+    if parent_has_het:
+        # Standard IUPAC numbering from _get_connection_locant
+        connection_locant = _get_connection_locant(mol, parent_conn_atom, parent_atoms)
+        attach_locant = _get_connection_locant(mol, attachment_atom_idx, parent_atoms)
+
+    # Build compound prefix
+    # Format: "(connection_locant-sub_displaystem-attach_locant-yl)"
+    # Example with phenyl parent: "(4-(pyridin-2-yl)phenyl)" -- attach_locant omitted when 1
+    # Example with pyridine parent: "(2-phenylpyridin-3-yl)"
+
+    # For benzene, use "phenyl" directly (retained substituent name)
+    # For other rings, use "stem-attach_locant-yl"
+    if parent_ring_name == 'benzene':
+        # Benzene as parent: "phenyl" is the standard substituent name
+        # Locant for connection: the position where sub ring attaches
+        # When chain attachment = position 1, connection locant is meaningful
+        if attach_locant == 1:
+            # Simple case: chain at position 1
+            return f"({connection_locant}-{sub_display}phenyl)"
+        else:
+            return f"({connection_locant}-{sub_display}phenyl)"
+    else:
+        # General case: stem-attach_locant-yl
+        return f"({connection_locant}-{sub_display}{parent_stem}-{attach_locant}-yl)"

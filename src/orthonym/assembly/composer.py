@@ -3771,6 +3771,98 @@ def _detect_fused_het_inner_subs(
     return '-'.join(prefix_parts) + '-' if prefix_parts else ""
 
 
+def _merge_connected_ring_groups(
+    mol, ring_groups: list
+) -> tuple:
+    """Merge ring substituent tuples that are connected by single bonds.
+
+    When parent selection identifies ring substituents, each SSSR ring
+    appears as a separate tuple in ring_substituents_as_groups. For
+    multi-ring fragments like biphenyl, two separate 6-membered ring
+    tuples need to be merged into a single multi-ring fragment before
+    naming.
+
+    Uses union-find to group ring tuples connected by direct single
+    bonds between their atoms.
+
+    Args:
+        mol: RDKit Mol object
+        ring_groups: List of tuples of atom indices (from ring_substituents_as_groups)
+
+    Returns:
+        Tuple of (multi_ring_fragments, single_ring_groups) where:
+        - multi_ring_fragments: list of lists of ring tuples (each with 2+ rings)
+        - single_ring_groups: list of ring tuples not part of any multi-ring fragment
+    """
+    from rdkit.Chem import rdchem
+
+    n = len(ring_groups)
+    if n < 2:
+        return [], list(ring_groups)
+
+    # Build sets for quick membership check
+    ring_sets = [set(rg) for rg in ring_groups]
+
+    # Union-find
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+
+    # Acceptable inter-ring bond types (biphenyl bond may be typed as
+    # SINGLE or AROMATIC depending on kekulization)
+    acceptable_types = {
+        rdchem.BondType.SINGLE,
+        rdchem.BondType.AROMATIC,
+    }
+
+    # Check all pairs of ring groups for connecting single bonds
+    for i in range(n):
+        for j in range(i + 1, n):
+            # Look for a bond between an atom in ring_groups[i] and ring_groups[j]
+            found = False
+            for ai in ring_sets[i]:
+                atom = mol.GetAtomWithIdx(ai)
+                for nbr in atom.GetNeighbors():
+                    nj = nbr.GetIdx()
+                    if nj in ring_sets[j]:
+                        # Check bond type
+                        bond = mol.GetBondBetweenAtoms(ai, nj)
+                        if bond and bond.GetBondType() in acceptable_types:
+                            union(i, j)
+                            found = True
+                            break
+                if found:
+                    break
+
+    # Group by root
+    groups_by_root: dict = {}
+    for i in range(n):
+        root = find(i)
+        if root not in groups_by_root:
+            groups_by_root[root] = []
+        groups_by_root[root].append(i)
+
+    multi_ring_fragments = []
+    single_ring_groups = []
+
+    for root, members in groups_by_root.items():
+        if len(members) >= 2:
+            multi_ring_fragments.append([ring_groups[m] for m in members])
+        else:
+            single_ring_groups.append(ring_groups[members[0]])
+
+    return multi_ring_fragments, single_ring_groups
+
+
 def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for rings that are substituents on a chain parent.
@@ -3804,7 +3896,89 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
 
     chain_set = set(features.principal_chain)
 
-    for ring_atoms in ring_groups:
+    # --- Phase 82: Multi-ring fragment detection pass ---
+    # Before processing individual rings, detect multi-ring fragments
+    # (biphenyl, terphenyl, phenyl-pyridyl pairs, etc.) where ring groups
+    # are connected by single bonds. These must be named as ring assembly
+    # prefixes (P-28.3) or compound substituent prefixes (P-31) instead
+    # of as independent single rings.
+    from ..rules.ring_assemblies import (
+        detect_ring_assembly,
+        name_ring_assembly_prefix,
+        name_mixed_ring_prefix,
+        _find_inter_system_bonds,
+    )
+    from ..rules.ring_substituents import get_ring_attachment_locant as _get_ring_attach_loc
+
+    multi_ring_fragments, single_ring_groups = _merge_connected_ring_groups(
+        features.mol, ring_groups
+    )
+
+    consumed_ring_sets = set()  # Track ring tuples consumed by multi-ring naming
+
+    for fragment in multi_ring_fragments:
+        # fragment is a list of ring tuples (each from ring_substituents_as_groups)
+        ring_systems = [set(rg) for rg in fragment]
+
+        # Find which atom in the fragment connects to the chain
+        attach_atom_idx = None
+        attach_chain_locant = None
+        all_frag_atoms = set()
+        for rg in fragment:
+            all_frag_atoms.update(set(rg))
+
+        # Build a combined tuple of all fragment atoms for locant lookup
+        combined_tuple = tuple(sorted(all_frag_atoms))
+
+        for ra in all_frag_atoms:
+            atom = features.mol.GetAtomWithIdx(ra)
+            for nbr in atom.GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx in chain_set and nbr_idx in features.atom_to_locant:
+                    attach_atom_idx = ra
+                    attach_chain_locant = features.atom_to_locant[nbr_idx]
+                    break
+            if attach_atom_idx is not None:
+                break
+
+        if attach_atom_idx is None or attach_chain_locant is None:
+            # Could not find chain attachment -- fall back to single-ring processing
+            single_ring_groups.extend(fragment)
+            continue
+
+        # Try ring assembly detection (identical rings)
+        assembly_info = detect_ring_assembly(features.mol, ring_systems)
+        if assembly_info is not None:
+            prefix = name_ring_assembly_prefix(
+                features.mol, assembly_info, attach_atom_idx
+            )
+            if prefix is not None:
+                # Ring assembly prefixes contain square brackets and locants,
+                # so they need parentheses wrapping per IUPAC P-16.3.3:
+                # 4-([1,1'-biphenyl]-4-yl)butanoic acid
+                ring_sub_groups[f'({prefix})'].append(attach_chain_locant)
+                # Mark all rings in this fragment as consumed
+                for rg in fragment:
+                    consumed_ring_sets.add(tuple(sorted(rg)))
+                continue
+
+        # Not an assembly (non-identical rings) -- try compound prefix
+        inter_bonds = _find_inter_system_bonds(features.mol, ring_systems)
+        prefix = name_mixed_ring_prefix(
+            features.mol, ring_systems, inter_bonds, attach_atom_idx
+        )
+        if prefix is not None:
+            ring_sub_groups[prefix].append(attach_chain_locant)
+            for rg in fragment:
+                consumed_ring_sets.add(tuple(sorted(rg)))
+            continue
+
+        # Multi-ring naming failed -- fall back to single-ring processing
+        single_ring_groups.extend(fragment)
+
+    # --- End Phase 82 multi-ring detection pass ---
+
+    for ring_atoms in single_ring_groups:
         ring_atom_set = set(ring_atoms)
 
         # Find which chain position the ring attaches to

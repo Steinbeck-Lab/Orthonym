@@ -294,6 +294,8 @@ def _get_ring_position_for_attachment(
         Ring position number (1-indexed), or None if cannot determine
     """
     # For pyridine: N is at position 1, so we number relative to N
+    # Try both ring directions and pick the one giving the lowest locant
+    # at the attachment point (IUPAC lowest locant rule).
     if ring_name == 'pyridine':
         # Find the nitrogen
         n_idx = None
@@ -305,15 +307,25 @@ def _get_ring_position_for_attachment(
         if n_idx is None:
             return None
 
-        # Build ring path from N
-        ring_path = _build_ring_path_from_start(mol, ring_atoms, n_idx)
+        # Try both ring traversal directions from N
+        ring_set = set(ring_atoms)
+        n_atom = mol.GetAtomWithIdx(n_idx)
+        ring_neighbors = [
+            nbr.GetIdx() for nbr in n_atom.GetNeighbors()
+            if nbr.GetIdx() in ring_set
+        ]
 
-        # Find position of attachment atom
-        try:
-            pos = ring_path.index(attachment_atom)
-            return pos + 1  # 1-indexed
-        except ValueError:
-            return None
+        best_pos = None
+        for start_nbr in ring_neighbors:
+            path = _build_ring_path_from_start_via(
+                mol, ring_atoms, n_idx, start_nbr
+            )
+            if attachment_atom in path:
+                pos = path.index(attachment_atom) + 1  # 1-indexed
+                if best_pos is None or pos < best_pos:
+                    best_pos = pos
+
+        return best_pos
 
     # For naphthalene: uses standard IUPAC peripheral numbering
     # Position 1 is adjacent to fusion, position 2 is farther
@@ -362,6 +374,50 @@ def _build_ring_path_from_start(
         if next_idx is None:
             break
 
+        path.append(next_idx)
+        visited.add(next_idx)
+        current = next_idx
+
+    return path
+
+
+def _build_ring_path_from_start_via(
+    mol,
+    ring_atoms: Tuple[int, ...],
+    start_idx: int,
+    first_neighbor: int
+) -> List[int]:
+    """Build an ordered path around the ring starting from start_idx going
+    through first_neighbor.
+
+    This allows choosing the direction of traversal around the ring, which
+    is needed for IUPAC lowest-locant rule: try both directions and pick
+    the one giving lower locants.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Tuple of atom indices in the ring
+        start_idx: Starting atom index (position 1)
+        first_neighbor: The neighbor of start_idx to visit first (direction)
+
+    Returns:
+        List of atom indices in order around the ring
+    """
+    ring_set = set(ring_atoms)
+    path = [start_idx, first_neighbor]
+    visited = {start_idx, first_neighbor}
+
+    current = first_neighbor
+    while len(path) < len(ring_atoms):
+        atom = mol.GetAtomWithIdx(current)
+        next_idx = None
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in ring_set and nbr_idx not in visited:
+                next_idx = nbr_idx
+                break
+        if next_idx is None:
+            break
         path.append(next_idx)
         visited.add(next_idx)
         current = next_idx
