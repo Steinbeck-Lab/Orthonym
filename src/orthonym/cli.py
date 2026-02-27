@@ -57,30 +57,47 @@ def main(args: List[str] = None) -> int:
         type=str,
         help="Output file for batch processing (default: stdout)"
     )
-    
+
+    parser.add_argument(
+        "--confidence",
+        action="store_true",
+        help="Show confidence metadata alongside the name"
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
     if parsed.batch:
-        return _process_batch(parsed.batch, parsed.output, parsed.style, parsed.verbose)
-    
+        return _process_batch(parsed.batch, parsed.output, parsed.style,
+                              parsed.verbose, parsed.confidence)
+
     # Single SMILES mode
     if not parsed.smiles:
         parser.print_help()
         return 1
-    
+
     try:
-        name = name_compound(parsed.smiles, style=parsed.style)
-        
-        if parsed.verbose:
+        if parsed.confidence:
+            result = name_compound(parsed.smiles, style=parsed.style,
+                                   include_confidence=True)
+            print(f"Name:       {result['name']}")
+            print(f"Confidence: {result['confidence']:.4f}")
+            print(f"Handler:    {result['handler']}")
+            if result.get('factors'):
+                print("Factors:")
+                for k, v in result['factors'].items():
+                    print(f"  {k}: {v:.4f}")
+        elif parsed.verbose:
+            name = name_compound(parsed.smiles, style=parsed.style)
             print(f"SMILES: {parsed.smiles}")
             print(f"Style:  {parsed.style}")
             print(f"Name:   {name}")
         else:
+            name = name_compound(parsed.smiles, style=parsed.style)
             print(name)
-        
+
         return 0
-        
+
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -89,7 +106,8 @@ def main(args: List[str] = None) -> int:
         return 1
 
 
-def _process_batch(input_file: str, output_file: str, style: str, verbose: bool) -> int:
+def _process_batch(input_file: str, output_file: str, style: str,
+                    verbose: bool, confidence: bool = False) -> int:
     """Process multiple SMILES from a file."""
     try:
         with open(input_file, 'r') as f:
@@ -100,21 +118,29 @@ def _process_batch(input_file: str, output_file: str, style: str, verbose: bool)
     except IOError as e:
         print(f"Error reading input file: {e}", file=sys.stderr)
         return 1
-    
+
     results = []
     errors = 0
-    
+
     for smiles in smiles_list:
         try:
-            name = name_compound(smiles, style=style)
-            results.append(f"{smiles}\t{name}")
+            if confidence:
+                result = name_compound(smiles, style=style,
+                                       include_confidence=True)
+                results.append(
+                    f"{smiles}\t{result['name']}\t"
+                    f"{result['confidence']:.4f}\t{result['handler']}"
+                )
+            else:
+                nm = name_compound(smiles, style=style)
+                results.append(f"{smiles}\t{nm}")
         except Exception as e:
             results.append(f"{smiles}\tERROR: {e}")
             errors += 1
-    
+
     # Write output
     output_text = "\n".join(results)
-    
+
     if output_file:
         try:
             with open(output_file, 'w') as f:
@@ -128,8 +154,9 @@ def _process_batch(input_file: str, output_file: str, style: str, verbose: bool)
     else:
         print(output_text)
         if verbose:
-            print(f"\nProcessed {len(smiles_list)} SMILES, {errors} errors", file=sys.stderr)
-    
+            print(f"\nProcessed {len(smiles_list)} SMILES, {errors} errors",
+                  file=sys.stderr)
+
     return 0 if errors == 0 else 1
 
 

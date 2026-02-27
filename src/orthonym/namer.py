@@ -209,6 +209,47 @@ class Orthonym:
         finally:
             end_naming_session()
 
+    def name_with_confidence(self, smiles: str) -> dict:
+        """Generate IUPAC name with confidence metadata.
+
+        Returns:
+            dict with keys:
+              - 'name' (str): The IUPAC name
+              - 'confidence' (float): 0.0-1.0 aggregate confidence score
+              - 'factors' (dict): Individual factor scores
+                  {'ratio': float, 'atom_coverage': float,
+                   'fg_recognition': float, 'substituent_completeness': float}
+              - 'handler' (str): Which handler produced the name
+
+        Raises:
+            ValueError: If SMILES is invalid
+        """
+        from .assembly.fragment_naming import start_naming_session, end_naming_session
+        from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
+        start_naming_session()
+        clear_confidence()
+        try:
+            name = self._name_impl(smiles)
+            metadata = retrieve_confidence()
+            # If no candidate was scored (early return path), build minimal metadata
+            if not metadata['name']:
+                metadata = {
+                    'name': name,
+                    'confidence': 1.0,  # Early return paths are high confidence
+                    'factors': {'ratio': 1.0, 'atom_coverage': 1.0,
+                                'fg_recognition': 1.0,
+                                'substituent_completeness': 1.0},
+                    'handler': 'direct',
+                }
+            else:
+                # Ensure name matches (the stored candidate should match
+                # what was returned)
+                metadata['name'] = name
+            return metadata
+        finally:
+            end_naming_session()
+            clear_confidence()
+
     def _name_impl(self, smiles: str) -> str:
         """Internal naming implementation (wrapped by session management)."""
         # Parse SMILES
@@ -1011,7 +1052,8 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 
 
 
-def name_compound(smiles: str, style: str = "pin") -> str:
+def name_compound(smiles: str, style: str = "pin",
+                   include_confidence: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -1022,9 +1064,13 @@ def name_compound(smiles: str, style: str = "pin") -> str:
             - "systematic": Always generate systematic name (bypass retained names)
             - "general": General IUPAC (more flexible)
             - "cas": CAS-style naming
+        include_confidence: If True, return dict with confidence metadata
+            instead of plain str
 
     Returns:
-        IUPAC systematic name
+        str: IUPAC systematic name (default)
+        dict: {'name': str, 'confidence': float, 'factors': dict, 'handler': str}
+              when include_confidence=True
 
     Example:
         >>> name_compound("CCO")
@@ -1037,8 +1083,25 @@ def name_compound(smiles: str, style: str = "pin") -> str:
         'allyl alcohol'
         >>> name_compound("C=CCO", style="systematic")
         'prop-2-en-1-ol'
+        >>> name_compound("CCO", include_confidence=True)
+        {'name': 'ethanol', 'confidence': 1.0, ...}
     """
     namer = Orthonym(style=style)
+
+    if include_confidence:
+        try:
+            return namer.name_with_confidence(smiles)
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.warning("name_with_confidence failed: %s", e)
+            return {
+                'name': _descriptive_fallback(smiles),
+                'confidence': 0.0,
+                'factors': {},
+                'handler': 'fallback',
+            }
+
     try:
         result = namer.name(smiles)
         if result:
