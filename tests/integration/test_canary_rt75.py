@@ -16,6 +16,7 @@ regressions are caught immediately during development.
 Original 75: 
 Phase 49 additions: 10 compounds from missing compound classes (CLS-01 to CLS-05)
 Phase 50 additions: 3 compounds from decomposition format fixes (ether/alkoxy)
+Phase 83 additions: 19 compounds from v9.0 canary expansion (coverage-based + anchors)
 """
 
 import pytest
@@ -24,13 +25,14 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 183 golden canary compounds: (SMILES, expected_name)
+# 202 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
 # + 2 from Phase 66 (Medium Molecule Completeness)
 # + 15 from Phase 67 (v7.0 Final Benchmark)
 # + 25 from Phase 73 (v8.0 Closure: phase improvements + failure sentinels)
+# + 19 from Phase 83 (v9.0 canary expansion: coverage-based + benchmark anchors)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -794,6 +796,95 @@ CANARY_COMPOUNDS = [
         "NC(C(=O)O)C(CCC(N)C(=O)O)C(=O)O",  # Sentinel: opsin_vocab - triamino triacid
         "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid",
     ),
+    # --- Phase 83: v9.0 canary expansion (19 compounds) ---
+    # 4 from Phase 78 (fused heterocycle prefix generation)
+    # 5 from Phase 79 (ring-as-substituent naming)
+    # 3 from Phase 80 (polyfunctional routing)
+    # 4 from Phase 81 (adaptive coverage gate: retained/fused naming)
+    # 1 from Phase 82 (multi-ring substituent expression)
+    # 2 benchmark regression anchors (newly passing in v9.0 benchmark)
+    # Phase 78: Fused heterocycle prefix generation
+    (
+        "OC(=O)CCc1cccc2cccnc12",
+        "8-(2-carboxyethyl)quinoline",
+    ),
+    (
+        "CC(=O)c1ccc2[nH]ccc2c1",
+        "5-acetyl-1H-indole",
+    ),
+    (
+        "OC(=O)c1cc2ccccc2[nH]1",
+        "1H-indole-2-carboxylic acid",
+    ),
+    (
+        "Oc1ccc2ncccc2c1",
+        "6-hydroxyquinoline",
+    ),
+    # Phase 79: Ring-as-substituent naming (non-phenyl rings on chain parents)
+    (
+        "OC(=O)CCC1CCCCC1",
+        "3-cyclohexylpropanoic acid",
+    ),
+    (
+        "OC(=O)CC1CCCC1",
+        "2-cyclopentylethanoic acid",
+    ),
+    (
+        "OC(=O)CC1CCC1",
+        "2-cyclobutylethanoic acid",
+    ),
+    (
+        "OC(=O)CC1CCCCC1",
+        "2-cyclohexylethanoic acid",
+    ),
+    (
+        "CC(=O)C1CCCCC1",
+        "1-cyclohexylethan-1-one",
+    ),
+    # Phase 80: Polyfunctional routing (3+ functional groups)
+    (
+        "OC(=O)C(O)CC(=O)O",
+        "2-hydroxybutanedioic acid",
+    ),
+    (
+        "OC(=O)C(=O)CC(=O)O",
+        "2-oxobutanedioic acid",
+    ),
+    (
+        "OC(=O)CCCC(=O)O",
+        "pentanedioic acid",
+    ),
+    # Phase 81: Adaptive coverage gate (retained/fused names preserved by confidence)
+    (
+        "c1ccc2c(c1)ccc1ccccc12",
+        "phenanthrene",
+    ),
+    (
+        "c1ccc2[nH]ccc2c1",
+        "1H-indole",
+    ),
+    (
+        "C1CC2CCCC(C1)C2",
+        "bicyclo[3.3.1]nonane",
+    ),
+    (
+        "c1ccc2ncccc2c1",
+        "quinoline",
+    ),
+    # Phase 82: Multi-ring substituent expression (biphenyl compound prefix)
+    (
+        "OC(=O)CCc1ccc(-c2ccccc2)cc1",
+        "3-([1,1'-biphenyl]-4-yl)propanoic acid",
+    ),
+    # Benchmark regression anchors (from Phase 83 500-sample benchmark)
+    (
+        "CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O",
+        "(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one",
+    ),
+    (
+        r"C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\C)CC/C=C(\C)CC[C@H]12",
+        "(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -804,8 +895,8 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt183(smiles, expected_name):
-    """Golden canary test: verify round-trip-matching compound still names correctly."""
+def test_canary_rt202(smiles, expected_name):
+    """Golden canary test: verify round-trip-matching compound still names correctly (202 compounds)."""
     result = name_compound(smiles)
     assert result == expected_name, (
         f"CANARY REGRESSION: {smiles}\n"
