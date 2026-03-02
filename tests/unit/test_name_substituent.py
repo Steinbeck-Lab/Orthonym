@@ -357,3 +357,94 @@ class TestParentToPrefixCyclic:
         assert result is not None
         assert "cyclopent" in result.lower()
         assert result.endswith("yl")
+
+
+# ============================================================================
+# TestFusedRingSubstituentFallback: verify gap closure in fused_rings.py
+# ============================================================================
+
+class TestFusedRingSubstituentFallback:
+    """Verify _identify_fused_substituent() no longer returns None for simple C subs."""
+
+    def test_bfs_collect_all_basic(self):
+        """_bfs_collect_all collects all reachable atoms excluding excluded set."""
+        from orthonym.rules.fused_rings import _bfs_collect_all
+        mol = _make_mol("CCCC")  # butane: C0-C1-C2-C3
+        # Collect from atom 1, excluding atom 0
+        result = _bfs_collect_all(mol, 1, {0})
+        assert result == {1, 2, 3}
+
+    def test_bfs_collect_all_with_heteroatoms(self):
+        """_bfs_collect_all traverses through heteroatoms."""
+        from orthonym.rules.fused_rings import _bfs_collect_all
+        mol = _make_mol("CCNCO")  # C0-C1-N2-C3-O4
+        result = _bfs_collect_all(mol, 1, {0})
+        assert result == {1, 2, 3, 4}
+
+    def test_bfs_collect_all_empty_excluded(self):
+        """_bfs_collect_all with no excluded atoms collects everything."""
+        from orthonym.rules.fused_rings import _bfs_collect_all
+        mol = _make_mol("CCC")
+        result = _bfs_collect_all(mol, 0, set())
+        assert result == {0, 1, 2}
+
+    def test_fallback_names_propyl_on_naphthalene(self):
+        """Propyl attached to naphthalene should get a name via fallback."""
+        from orthonym.rules.fused_rings import _identify_fused_substituent
+        mol = _make_mol("CCCc1ccc2ccccc2c1")
+        ri = mol.GetRingInfo()
+        core = set()
+        for ring in ri.AtomRings():
+            core.update(ring)
+        # Atom 0 is the first carbon of propyl chain
+        if 0 not in core:
+            result = _identify_fused_substituent(mol, 0, core)
+            assert result is not None
+            assert 'name' in result
+            assert 'propyl' in result['name'].lower()
+
+
+# ============================================================================
+# TestRingNameTokensReplacement: verify structural check in composer.py
+# ============================================================================
+
+class TestRingNameTokensReplacement:
+    """Verify _RING_NAME_TOKENS replaced with structural check."""
+
+    def test_has_ring_atoms_helper_ring(self):
+        """_has_ring_atoms returns True for ring atoms."""
+        from orthonym.assembly.composer import _has_ring_atoms
+        mol = _make_mol("c1ccccc1C")
+        ring_atoms = set(mol.GetRingInfo().AtomRings()[0])
+        assert _has_ring_atoms(mol, ring_atoms) is True
+
+    def test_has_ring_atoms_helper_non_ring(self):
+        """_has_ring_atoms returns False for non-ring atoms."""
+        from orthonym.assembly.composer import _has_ring_atoms
+        mol = _make_mol("c1ccccc1C")
+        # Find the methyl carbon (not in ring)
+        methyl_idx = None
+        for atom in mol.GetAtoms():
+            if not atom.IsInRing():
+                methyl_idx = atom.GetIdx()
+                break
+        assert methyl_idx is not None
+        assert _has_ring_atoms(mol, {methyl_idx}) is False
+
+    def test_name_reflects_ring_positive(self):
+        """_name_reflects_ring detects ring tokens."""
+        from orthonym.assembly.composer import _name_reflects_ring
+        assert _name_reflects_ring("cyclohexyl") is True
+        assert _name_reflects_ring("phenyl") is True
+        assert _name_reflects_ring("piperidinyl") is True
+        assert _name_reflects_ring("morpholinyl") is True
+        assert _name_reflects_ring("indolyl") is True
+
+    def test_name_reflects_ring_negative(self):
+        """_name_reflects_ring rejects non-ring names."""
+        from orthonym.assembly.composer import _name_reflects_ring
+        assert _name_reflects_ring("methyl") is False
+        assert _name_reflects_ring("ethyl") is False
+        assert _name_reflects_ring("propyl") is False
+        assert _name_reflects_ring("butyl") is False
+        assert _name_reflects_ring("hydroxy") is False
