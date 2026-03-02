@@ -138,25 +138,32 @@ FUNCTIONAL_GROUP_SMARTS = {
     "chloro": "[ClX1][#6]",
     "bromo": "[BrX1][#6]",
     "iodo": "[IX1][#6]",
-    
+
     # === OTHER ===
     "nitro": "[NX3+](=O)[O-]",
     "nitroso": "[NX2]=[OX1]",
     "azido": "[NX1]=[NX2+]=[NX1-]",
 }
 
+# Pre-compile all SMARTS patterns once at module load (avoid recompilation per molecule)
+_COMPILED_FG_SMARTS = {}
+for _fg_name, _smarts in FUNCTIONAL_GROUP_SMARTS.items():
+    _pat = Chem.MolFromSmarts(_smarts)
+    if _pat is not None:
+        _COMPILED_FG_SMARTS[_fg_name] = _pat
+
 
 def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     Detect all functional groups in a molecule.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Dictionary mapping functional group names to lists of atom index tuples.
         Each tuple contains the indices of atoms in one instance of that group.
-        
+
     Example:
         >>> mol = Chem.MolFromSmiles("CC(=O)O")  # acetic acid
         >>> groups = detect_functional_groups(mol)
@@ -166,12 +173,8 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
         1
     """
     results = defaultdict(list)
-    
-    for fg_name, smarts in FUNCTIONAL_GROUP_SMARTS.items():
-        pattern = Chem.MolFromSmarts(smarts)
-        if pattern is None:
-            continue
-        
+
+    for fg_name, pattern in _COMPILED_FG_SMARTS.items():
         matches = mol.GetSubstructMatches(pattern, uniquify=True)
         for match in matches:
             results[fg_name].append(match)
@@ -265,14 +268,10 @@ def has_functional_group(mol, fg_name: str) -> bool:
     Returns:
         True if functional group is present
     """
-    if fg_name not in FUNCTIONAL_GROUP_SMARTS:
-        return False
-    
-    smarts = FUNCTIONAL_GROUP_SMARTS[fg_name]
-    pattern = Chem.MolFromSmarts(smarts)
+    pattern = _COMPILED_FG_SMARTS.get(fg_name)
     if pattern is None:
         return False
-    
+
     return mol.HasSubstructMatch(pattern)
 
 
@@ -287,14 +286,10 @@ def get_functional_group_atoms(mol, fg_name: str) -> List[Tuple[int, ...]]:
     Returns:
         List of tuples of atom indices
     """
-    if fg_name not in FUNCTIONAL_GROUP_SMARTS:
-        return []
-    
-    smarts = FUNCTIONAL_GROUP_SMARTS[fg_name]
-    pattern = Chem.MolFromSmarts(smarts)
+    pattern = _COMPILED_FG_SMARTS.get(fg_name)
     if pattern is None:
         return []
-    
+
     return list(mol.GetSubstructMatches(pattern, uniquify=True))
 
 

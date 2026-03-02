@@ -18,6 +18,32 @@ from typing import List
 
 
 # ============================================================================
+# Pre-compiled patterns and constants (hoisted from function bodies)
+# ============================================================================
+
+# Used by is_complex_substituent() — compound multiplier+substituent patterns
+_MULT_SUBSTITUENT_RE = re.compile(
+    r'^(?:di|tri|tetra|penta|hexa)'
+    r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
+    r'phenyl|naphthyl|cyclopentyl|cyclohexyl|benzyl|vinyl|allyl)'
+)
+
+_COMPOUND_OXY_PREFIXES = frozenset((
+    'sulfooxy', 'sulfonyloxy', 'phosphonooxy', 'phosphonatoxy', 'carbonyloxy',
+))
+
+_ALKYL_ROOTS_COMPLEX = (
+    'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
+    'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
+)
+
+_COMPOUND_S_SUFFIXES_COMPLEX = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+
+# Used by alpha_sort_key() — pre-compiled regex patterns
+_LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
+_N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
+
+# ============================================================================
 # Alkyl Substituent Names
 # ============================================================================
 
@@ -305,30 +331,12 @@ def is_complex_substituent(name: str) -> bool:
     if "-" in name:
         return True
     # Check for embedded multiplier + substituent name patterns (IUPAC P-14.5.2)
-    # E.g., "diphenylphosphanyl" has "diphenyl" = multiplied substituent.
-    # Must NOT match modification prefixes like "tetrahydro", "dihydro".
-    import re
-    _MULT_SUBSTITUENT_RE = re.compile(
-        r'^(?:di|tri|tetra|penta|hexa)'
-        r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
-        r'phenyl|naphthyl|cyclopentyl|cyclohexyl|benzyl|vinyl|allyl)'
-    )
     if _MULT_SUBSTITUENT_RE.match(name):
         return True
-    # Compound oxy-prefixes (sulfooxy, phosphonooxy, etc.) require brackets
-    # These are multi-part prefixes that OPSIN/IUPAC require parenthesization for
-    _COMPOUND_OXY_PREFIXES = ('sulfooxy', 'sulfonyloxy', 'phosphonooxy',
-                               'phosphonatoxy', 'carbonyloxy')
+    # Compound oxy-prefixes require brackets (OPSIN/IUPAC parenthesization)
     if name in _COMPOUND_OXY_PREFIXES:
         return True
-    # Compound sulfur prefixes: alkylsulfinyl, alkylsulfonyl, alkylsulfanyl
-    # Per IUPAC P-16.3.3, these are compound substituents (alkyl + sulfinyl/sulfonyl/sulfanyl)
-    # requiring parenthesization and bis/tris multipliers.
-    _ALKYL_ROOTS_COMPLEX = (
-        'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
-        'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
-    )
-    _COMPOUND_S_SUFFIXES_COMPLEX = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+    # Compound sulfur prefixes per IUPAC P-16.3.3
     name_lower = name.lower()
     for alkyl in _ALKYL_ROOTS_COMPLEX:
         if name_lower.startswith(alkyl):
@@ -490,6 +498,10 @@ IGNORE_FOR_ALPHA = {
 # Note: iso-, neo-, cyclo- are INCLUDED in alphabetization
 # (they are non-detachable prefixes that affect alphabetical order)
 
+# Pre-sorted prefix list for alpha_sort_key() — longest first to avoid partial matches
+_SORTED_ALPHA_PREFIXES = sorted(IGNORE_FOR_ALPHA - {"sec", "tert"},
+                                key=len, reverse=True)
+
 
 def alpha_sort_key(substituent_name: str) -> str:
     """Generate an alphabetization sort key for IUPAC prefix ordering.
@@ -536,7 +548,7 @@ def alpha_sort_key(substituent_name: str) -> str:
     # Strip leading locants (digits and commas followed by hyphen)
     # e.g., "3-methyl" -> "methyl", "2,2-dimethyl" -> "dimethyl"
     # This handles formatted prefix strings that include locants
-    text = re.sub(r'^[\d,]+-', '', text)
+    text = _LOCANT_PREFIX_RE.sub('', text)
 
     # Strip enclosing parentheses again after locant removal
     # e.g., "4-(methylsulfinyl)" -> "(methylsulfinyl)" after locant strip -> "methylsulfinyl"
@@ -545,7 +557,7 @@ def alpha_sort_key(substituent_name: str) -> str:
 
     # Strip N-locant prefixes (N- or N,N-) for alphabetization
     # e.g., "N,N-dimethylamino" -> "dimethylamino" -> "amino" (after multi-prefix strip)
-    text = re.sub(r'^[nN],?[nN]?-', '', text)
+    text = _N_LOCANT_PREFIX_RE.sub('', text)
 
     # Handle hyphenated detachable prefixes: sec- and tert-
     for prefix in ("sec-", "tert-"):
@@ -555,9 +567,7 @@ def alpha_sort_key(substituent_name: str) -> str:
     # Handle non-hyphenated multiplicative prefixes
     # Sort by longest prefix first to avoid partial matches
     # (e.g., 'tetra' before 'tri', 'tetrakis' before 'tetra')
-    sorted_prefixes = sorted(IGNORE_FOR_ALPHA - {"sec", "tert"},
-                             key=len, reverse=True)
-    for prefix in sorted_prefixes:
+    for prefix in _SORTED_ALPHA_PREFIXES:
         if text.startswith(prefix):
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
