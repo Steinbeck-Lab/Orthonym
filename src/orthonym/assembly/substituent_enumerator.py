@@ -246,6 +246,197 @@ def _verify_completeness(mol, parent_atoms, substituents):
 
 
 # ============================================================================
+# Universal Substituent Naming (Phase 85)
+# ============================================================================
+
+
+def name_substituent(mol, frag_atoms, attach_idx):
+    """Name any substituent fragment. Never returns None.
+
+    Five-tier naming cascade:
+      1. Retained substituent names (isopropyl, phenyl, etc.) -- IUPAC preferred
+      2. Static fragment cache (FRAGMENT_NAME_CACHE) -- O(1) lookup
+      3. Linear alkyl fast path (chain_prefixes table)
+      4. Recursive compound naming (name_substituent_fragment)
+      5. Descriptive fallback (guaranteed non-None)
+
+    Args:
+        mol: RDKit Mol of the full molecule.
+        frag_atoms: Set/list of atom indices belonging to the substituent.
+        attach_idx: Atom index WITHIN frag_atoms that bonds to the parent.
+
+    Returns:
+        str: IUPAC prefix name (always non-None, always non-empty).
+
+    References:
+        IUPAC 2013 P-31.1 (detachable prefixes)
+        Phase 85 design: five-tier cascade with guaranteed fallback
+    """
+    from .fragment_naming import FRAGMENT_NAME_CACHE
+    from .substituent_naming import (
+        parent_to_prefix,
+        _check_retained_substituent,
+        _is_linear_alkyl,
+    )
+
+    frag_atoms_set = set(frag_atoms)
+
+    # Edge case: empty fragment
+    if not frag_atoms_set:
+        return "substituent"
+
+    # ---- Tier 1: Retained substituent names ----
+    # Checked first per IUPAC: retained names (phenyl, isopropyl, etc.)
+    # are the preferred forms and must take priority over cache-derived
+    # parent-to-prefix conversions (e.g., "phenyl" not "benzenyl").
+    try:
+        retained = _check_retained_substituent(
+            mol, list(frag_atoms_set), attach_idx
+        )
+        if retained:
+            return retained
+    except Exception:
+        pass
+
+    # ---- Tier 2: Static fragment cache (O(1)) ----
+    try:
+        frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))
+        if frag_smiles:
+            canonical = Chem.CanonSmiles(frag_smiles)
+            if canonical:
+                cached = FRAGMENT_NAME_CACHE.get(canonical)
+                if cached:
+                    # Convert parent name to prefix form
+                    carbon_count = sum(
+                        1 for i in frag_atoms_set
+                        if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+                    )
+                    prefix = parent_to_prefix(cached, chain_length=carbon_count)
+                    if prefix:
+                        return prefix
+    except Exception:
+        pass  # Cache miss is fine, continue to next tier
+
+    # ---- Tier 3: Linear alkyl fast path ----
+    try:
+        if _is_linear_alkyl(mol, list(frag_atoms_set)):
+            carbon_count = sum(
+                1 for i in frag_atoms_set
+                if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+            )
+            if carbon_count > 0:
+                return get_alkyl_name(carbon_count)
+    except Exception:
+        pass
+
+    # ---- Tier 4: Recursive compound naming ----
+    try:
+        result = name_substituent_fragment(
+            mol, list(frag_atoms_set), attach_idx, []
+        )
+        if result:
+            return result
+    except Exception:
+        pass
+
+    # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
+    return _descriptive_fallback(mol, frag_atoms_set, attach_idx)
+
+
+def _descriptive_fallback(mol, frag_atoms, attach_idx):
+    """Produce a compositional description for unnameable fragments.
+
+    Analyzes fragment atoms directly to build a best-effort prefix name.
+    For simple fragments (1-3 atoms), produces specific names like
+    "hydroxy", "amino", "methyl". For complex unnameable fragments,
+    returns "substituent" as absolute last resort.
+
+    Args:
+        mol: RDKit Mol object.
+        frag_atoms: Set of atom indices in the fragment.
+        attach_idx: Attachment atom index.
+
+    Returns:
+        str: Always non-None, always non-empty.
+    """
+    if not frag_atoms:
+        return "substituent"
+
+    # Analyze fragment composition
+    carbons = 0
+    heteroatoms = {}
+    for idx in frag_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        anum = atom.GetAtomicNum()
+        if anum == 1:
+            continue
+        if anum == 6:
+            carbons += 1
+        else:
+            sym = atom.GetSymbol()
+            heteroatoms[sym] = heteroatoms.get(sym, 0) + 1
+
+    # Single-atom fragments
+    if len(frag_atoms) == 1:
+        idx = next(iter(frag_atoms))
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        total_hs = atom.GetTotalNumHs()
+
+        # Halogens
+        if sym in _HALOGEN_MAP:
+            return _HALOGEN_MAP[sym]
+        # Oxygen
+        if sym == 'O':
+            return 'hydroxy' if total_hs >= 1 else 'oxo'
+        # Nitrogen
+        if sym == 'N':
+            if total_hs >= 2:
+                return 'amino'
+            elif total_hs == 1:
+                return 'imino'
+            else:
+                return 'azanyl'
+        # Sulfur
+        if sym == 'S':
+            return 'sulfanyl' if total_hs >= 1 else 'sulfanylidene'
+        # Single carbon
+        if sym == 'C':
+            return 'methyl'
+
+    # Carbon-only fragments: use alkyl names
+    if carbons > 0 and not heteroatoms:
+        try:
+            return get_alkyl_name(carbons)
+        except (ValueError, KeyError):
+            pass
+
+    # Multi-atom heteroatom-only fragments
+    if carbons == 0 and heteroatoms:
+        symbols = sorted(heteroatoms.keys())
+        # -NO2 (nitro)
+        if symbols == ['N', 'O'] and heteroatoms.get('N', 0) == 1 and heteroatoms.get('O', 0) == 2:
+            return 'nitro'
+        # -N3 (azido)
+        if symbols == ['N'] and heteroatoms.get('N', 0) == 3:
+            return 'azido'
+        # Single heteroatom type
+        if len(symbols) == 1:
+            sym = symbols[0]
+            if sym == 'O':
+                return 'hydroxy'
+            if sym == 'N':
+                return 'amino'
+            if sym == 'S':
+                return 'sulfanyl'
+            if sym in _HALOGEN_MAP:
+                return _HALOGEN_MAP[sym]
+
+    # Absolute last resort
+    return "substituent"
+
+
+# ============================================================================
 # Halogen Name Map (for fg_only classification)
 # ============================================================================
 

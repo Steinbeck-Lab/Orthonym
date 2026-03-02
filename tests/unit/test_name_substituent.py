@@ -157,8 +157,16 @@ class TestNeverNone:
 class TestTierOrdering:
     """Verify that the correct tier is selected in the cascade."""
 
+    def test_retained_isopropyl(self):
+        """Isopropyl (branched 3C at center) -> 'isopropyl' via retained names (tier 1)."""
+        mol = _make_mol("CC(C)C")  # isobutane: C0-C1(-C2)-C3
+        # Fragment = {0, 1, 2}, attached at C1 (bonded to parent C3)
+        result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
+        assert result is not None
+        assert "isopropyl" in result.lower()
+
     def test_cache_hit_returns_cache_result(self):
-        """Fragment matching FRAGMENT_NAME_CACHE entry returns cached name."""
+        """Fragment matching FRAGMENT_NAME_CACHE entry returns cached name (tier 2)."""
         # ethanol fragment: "CCO" is in the cache as "ethanol"
         # parent_to_prefix("ethanol", 2) -> "hydroxyethyl" or similar
         mol = _make_mol("CCCO")  # propan-1-ol: C0-C1-C2-O3
@@ -167,14 +175,6 @@ class TestTierOrdering:
         result = name_substituent(mol, {1, 2, 3}, attach_idx=1)
         assert result is not None
         assert isinstance(result, str)
-
-    def test_retained_isopropyl(self):
-        """Isopropyl (branched 3C at center) -> 'isopropyl' via retained names."""
-        mol = _make_mol("CC(C)C")  # isobutane: C0-C1(-C2)-C3
-        # Fragment = {0, 1, 2}, attached at C1 (bonded to parent C3)
-        result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
-        assert result is not None
-        assert "isopropyl" in result.lower()
 
     def test_linear_ethyl(self):
         """Linear ethyl fragment -> 'ethyl' via linear alkyl path."""

@@ -495,11 +495,72 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # Aldehyde: oxo at C-1
         return f"1-oxo{stem}yl"
 
+    # ---- Ester: -oate suffix ---- (IUPAC P-65.6.3)
+    # e.g., "propanoate" -> carboxy prefix form
+    # When ester is not the principal group, the acid portion uses "carboxy"
+    m_oate = re.search(r'(?:an)?oate$', name)
+    if m_oate:
+        shortened = chain_length - 1
+        if shortened >= 1:
+            from ..data.chain_names import get_chain_prefix
+            short_stem = get_chain_prefix(shortened)
+            return f"{shortened}-carboxy{short_stem}yl"
+        return "carboxy"
+
+    # ---- Amide: -carboxamide (most specific first) ---- (IUPAC P-66.1.1.4)
+    # e.g., "benzcarboxamide" -> "carbamoyl" prefix
+    if name.endswith('carboxamide'):
+        stem = name[:-11]  # remove "carboxamide"
+        if stem:
+            return f"carbamoyl{stem}yl"
+        return "carbamoyl"
+
+    # ---- Amide: general -amide suffix ---- (IUPAC P-66.1.1.4)
+    # e.g., "propanamide" -> "2-carbamoylethyl", "acetamide" -> "carbamoylmethyl"
+    m_amide = re.search(r'(?:an)?amide$', name)
+    if m_amide:
+        shortened = chain_length - 1
+        if shortened >= 1:
+            from ..data.chain_names import get_chain_prefix
+            short_stem = get_chain_prefix(shortened)
+            return f"{shortened}-carbamoyl{short_stem}yl"
+        return "carbamoyl"
+
+    # ---- Nitrile: -carbonitrile (most specific first) ---- (IUPAC P-66.1.4.1)
+    # e.g., "benzonitrile" -> "cyanophenyl" (cyano + stem + yl)
+    if name.endswith('carbonitrile'):
+        stem = name[:-12]  # remove "carbonitrile"
+        if stem:
+            return f"cyano{stem}yl"
+        return "cyano"
+
+    # ---- Nitrile: general -nitrile suffix ---- (IUPAC P-66.1.4.1)
+    # e.g., "propanenitrile" -> "2-cyanoethyl", "acetonitrile" -> "cyanomethyl"
+    if name.endswith('nitrile') and not name.endswith('carbonitrile'):
+        shortened = chain_length - 1
+        if shortened >= 1:
+            from ..data.chain_names import get_chain_prefix
+            short_stem = get_chain_prefix(shortened)
+            return f"{shortened}-cyano{short_stem}yl"
+        return "cyano"
+
+    # ---- Cyclic names: cyclo...ane -> cyclo...yl ---- (IUPAC P-31.1.3)
+    # e.g., "cyclohexane" -> "cyclohexyl", "cyclopentane" -> "cyclopentyl"
+    if 'cyclo' in name and name.endswith('ane'):
+        stem = name[:-3]  # remove "ane"
+        return f"{stem}yl"
+
     # ---- Alkane: -ane or -e ending ----
     # e.g., "propane" -> "propyl", "2-methylpropane" -> "2-methylpropyl"
     if name.endswith('ane'):
         stem = name[:-3]  # remove "ane"
         return f"{stem}yl"
+
+    # ---- Heterocyclic -ine ending ---- (IUPAC P-31.1.3)
+    # e.g., "pyridine" -> "pyridinyl", "piperidine" -> "piperidinyl"
+    # Note: -ine must come BEFORE the generic -e fallback
+    if name.endswith('ine'):
+        return name[:-1] + "yl"  # pyridine -> pyridinyl
 
     # ---- Fallback: strip terminal -e if present, add -yl ----
     if name.endswith('e'):
