@@ -413,6 +413,36 @@ def _identify_fused_substituent(
         if func_chain:
             return func_chain
 
+        # General fallback: collect all substituent atoms and delegate to
+        # universal naming (Phase 85 USUB-05 gap closure)
+        # Guards:
+        #   1. start_idx must NOT be a ring atom (ring atoms misidentified as subs
+        #      when core mapping is incomplete -- e.g., coumarin with 3-ring system)
+        #   2. Fragment must NOT contain ring atoms (those need specialized ring naming)
+        #   3. Only common organic elements, no exotic (As, Se, etc.)
+        #   4. Modest size (<=25 atoms)
+        _ring_info = mol.GetRingInfo()
+        if _ring_info.NumAtomRings(start_idx) > 0:
+            return None  # Start atom is in a ring, not a substituent
+        _COMMON_ORGANIC = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
+        sub_atoms = _bfs_collect_all(mol, start_idx, excluded)
+        # Reject if any collected atom is in a ring (ring-crossing BFS artifact)
+        _frag_has_ring = any(_ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms)
+        if sub_atoms and len(sub_atoms) <= 25 and not _frag_has_ring:
+            all_common = all(
+                mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC
+                for idx in sub_atoms
+            )
+            if all_common:
+                from ..assembly.substituent_enumerator import name_substituent
+                fallback_name = name_substituent(mol, sub_atoms, start_idx)
+                # Reject generic descriptive fallbacks -- those indicate unnameable
+                if fallback_name and fallback_name != "substituent":
+                    return {
+                        'name': fallback_name,
+                        'type': 'functionalized',
+                        'atoms': list(sub_atoms),
+                    }
         return None
 
     # Oxygen groups (oxo C=O, hydroxyl -OH)
@@ -623,6 +653,35 @@ def _identify_fused_substituent(
                         }
 
     return None
+
+
+def _bfs_collect_all(mol, start_idx: int, excluded: Set[int]) -> Set[int]:
+    """
+    Collect all atoms reachable from start_idx, excluding atoms in the excluded set.
+
+    Unlike _bfs_alkyl_from, this collects ALL atom types (not just carbon),
+    making it suitable for general-purpose substituent fragment collection.
+
+    Args:
+        mol: RDKit Mol object
+        start_idx: Starting atom index
+        excluded: Set of atom indices to exclude (e.g., ring core atoms)
+
+    Returns:
+        Set of reachable atom indices (always includes start_idx if not in excluded)
+    """
+    visited = set()
+    queue = deque([start_idx])
+    while queue:
+        idx = queue.popleft()
+        if idx in visited or idx in excluded:
+            continue
+        visited.add(idx)
+        for neighbor in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = neighbor.GetIdx()
+            if nidx not in visited and nidx not in excluded:
+                queue.append(nidx)
+    return visited
 
 
 def _bfs_alkyl_from(mol, start_idx: int, excluded: Set[int]) -> Optional[List[int]]:

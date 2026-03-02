@@ -434,6 +434,12 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if generic:
             return generic
 
+        # Phase 85 note: universal fallback for benzene C-substituents deferred.
+        # benzene.py has extensive suffix FG handling and the generic fallback
+        # caused regressions by naming fragments that the suffix pipeline
+        # intentionally drops. Proper benzene integration requires targeted
+        # work in a future phase (handler retrofit Phase 86).
+
     return None
 
 

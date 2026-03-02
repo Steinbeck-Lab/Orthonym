@@ -215,6 +215,26 @@ _RING_NAME_TOKENS = (
 )
 
 
+def _has_ring_atoms(mol, frag_atoms):
+    """Check if any atom in frag_atoms belongs to a ring in mol.
+
+    Used to replace the pure string-based _RING_NAME_TOKENS check with a
+    structural validation: only reject a substituent name as "linearized ring"
+    if the fragment actually contains ring atoms (Phase 85 USUB-06).
+    """
+    ring_info = mol.GetRingInfo()
+    return any(ring_info.NumAtomRings(idx) > 0 for idx in frag_atoms)
+
+
+def _name_reflects_ring(name):
+    """Check if a generated name contains any ring system identifier.
+
+    Uses the existing _RING_NAME_TOKENS list for substring matching.
+    """
+    name_lower = name.lower()
+    return any(tok in name_lower for tok in _RING_NAME_TOKENS)
+
+
 @dataclass
 class NameFragment:
     """A fragment of an IUPAC name."""
@@ -4525,8 +4545,9 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                         ring_het_name = name_substituent_fragment(
                             mol, sub_atoms, attach_idx, features.principal_chain or []
                         )
-                        # Validate: reject if fragment naming linearized a ring
-                        if ring_het_name and not any(tok in ring_het_name.lower() for tok in _RING_NAME_TOKENS):
+                        # Validate: reject only if fragment has ring atoms but name is acyclic
+                        # (Phase 85 structural validation replaces pure string-based check)
+                        if ring_het_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(ring_het_name):
                             ring_het_name = None
                         if ring_het_name:
                             if needs_brackets(ring_het_name):
@@ -5146,10 +5167,9 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                 sub_name = name_substituent_fragment(
                     mol, list(sub_set), attach_atom, list(chain_set)
                 )
-                # Validate: reject if fragment naming linearized a ring
-                # (produces long-chain names like "nonyl" for ring fragments).
-                # The name should contain "cyclo" or ring-system tokens.
-                if sub_name and not any(tok in sub_name.lower() for tok in _RING_NAME_TOKENS):
+                # Validate: reject only if fragment has ring atoms but name is acyclic
+                # (Phase 85 structural validation replaces pure string-based check)
+                if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
                     # Likely linearized a ring -- reject
                     sub_name = None
                 if sub_name:
@@ -5269,8 +5289,9 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                 sub_name = name_substituent_fragment(
                     mol, list(sub_set), attach_atom, list(chain_set)
                 )
-                # Validate: reject if fragment naming linearized a ring
-                if sub_name and not any(tok in sub_name.lower() for tok in _RING_NAME_TOKENS):
+                # Validate: reject only if fragment has ring atoms but name is acyclic
+                # (Phase 85 structural validation replaces pure string-based check)
+                if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
                     sub_name = None
                 if sub_name:
                     if needs_brackets(sub_name):
