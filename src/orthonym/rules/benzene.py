@@ -66,6 +66,21 @@ _SUFFIX_TO_PREFIX = {
 }
 
 
+# Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
+_BENZENE_FG_SMARTS = {
+    'acid': Chem.MolFromSmarts('[CX3](=O)[OX2H1]'),
+    'amide': Chem.MolFromSmarts('[CX3](=O)[NX3H2]'),
+    'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
+    'tert_amide': Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]'),
+    'aldehyde': Chem.MolFromSmarts('[CX3H1](=O)'),
+    'nitrile': Chem.MolFromSmarts('[CX2]#[NX1]'),
+    'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
+    'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
+    'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
+    'sulfonic': Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]'),
+}
+
+
 def is_benzene_ring(mol, ring_atoms: Tuple[int, ...]) -> bool:
     """
     Check if a ring is a benzene ring (6-membered aromatic carbocycle).
@@ -202,111 +217,90 @@ def _identify_suffix_fg_on_benzene(
     # Carbon-based suffix FGs
     if symbol == 'C':
         # Carboxylic acid: C(=O)(OH) -- check before amide!
-        acid_pat = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
-        if acid_pat:
-            for match in mol.GetSubstructMatches(acid_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carboxylic acid', 'suffix_name': 'carboxylic acid',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['acid']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carboxylic acid', 'suffix_name': 'carboxylic acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
         # Primary amide: C(=O)(NH2)
-        amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
-        if amide_pat:
-            for match in mol.GetSubstructMatches(amide_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['amide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
         # Secondary amide: C(=O)(NHR)
-        sec_amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]')
-        if sec_amide_pat:
-            for match in mol.GetSubstructMatches(sec_amide_pat):
-                if match[0] == start_idx:
-                    # Detect N-alkyl substituents
-                    n_subs = _detect_n_substituents(mol, match, ring_atoms)
-                    return {
-                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                        'n_substituents': n_subs,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sec_amide']):
+            if match[0] == start_idx:
+                n_subs = _detect_n_substituents(mol, match, ring_atoms)
+                return {
+                    'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                    'n_substituents': n_subs,
+                }
 
         # Tertiary amide: C(=O)(NR2)
-        tert_amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]')
-        if tert_amide_pat:
-            for match in mol.GetSubstructMatches(tert_amide_pat):
-                if match[0] == start_idx:
-                    n_subs = _detect_n_substituents(mol, match, ring_atoms)
-                    return {
-                        'name': 'carboxamide', 'suffix_name': 'carboxamide',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                        'n_substituents': n_subs,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['tert_amide']):
+            if match[0] == start_idx:
+                n_subs = _detect_n_substituents(mol, match, ring_atoms)
+                return {
+                    'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                    'n_substituents': n_subs,
+                }
 
         # Aldehyde: C(=O)H
-        ald_pat = Chem.MolFromSmarts('[CX3H1](=O)')
-        if ald_pat:
-            for match in mol.GetSubstructMatches(ald_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carbaldehyde', 'suffix_name': 'carbaldehyde',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['aldehyde']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carbaldehyde', 'suffix_name': 'carbaldehyde',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
-        # Nitrile: C#N (keep existing benzonitrile path for single nitrile)
-        nitrile_pat = Chem.MolFromSmarts('[CX2]#[NX1]')
-        if nitrile_pat:
-            for match in mol.GetSubstructMatches(nitrile_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carbonitrile', 'suffix_name': 'carbonitrile',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        # Nitrile: C#N
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['nitrile']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carbonitrile', 'suffix_name': 'carbonitrile',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
         # Acid chloride: C(=O)Cl
-        acid_cl_pat = Chem.MolFromSmarts('[CX3](=O)[Cl]')
-        if acid_cl_pat:
-            for match in mol.GetSubstructMatches(acid_cl_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carbonyl chloride', 'suffix_name': 'carbonyl chloride',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['acid_cl']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carbonyl chloride', 'suffix_name': 'carbonyl chloride',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
         # Thiocarboxylic S-acid: C(=O)(SH)
-        thio_acid_pat = Chem.MolFromSmarts('[CX3](=O)[SX2H1]')
-        if thio_acid_pat:
-            for match in mol.GetSubstructMatches(thio_acid_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'carbothioic S-acid', 'suffix_name': 'carbothioic S-acid',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['thio_acid']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carbothioic S-acid', 'suffix_name': 'carbothioic S-acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
     # Sulfur-based suffix FGs
     if symbol == 'S':
         # Sulfonamide: S(=O)(=O)(NH2)
-        sulfonamide_pat = Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]')
-        if sulfonamide_pat:
-            for match in mol.GetSubstructMatches(sulfonamide_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonamide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
         # Sulfonic acid: S(=O)(=O)(OH)
-        sulfonic_pat = Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]')
-        if sulfonic_pat:
-            for match in mol.GetSubstructMatches(sulfonic_pat):
-                if match[0] == start_idx:
-                    return {
-                        'name': 'sulfonic acid', 'suffix_name': 'sulfonic acid',
-                        'is_suffix': True, 'atoms': sub_atoms,
-                    }
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonic']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfonic acid', 'suffix_name': 'sulfonic acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
 
     return None
 
