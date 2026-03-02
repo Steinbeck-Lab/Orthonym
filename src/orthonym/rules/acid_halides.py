@@ -19,6 +19,7 @@ The acyl name derives from the corresponding acid:
 Reference: IUPAC 2013 Blue Book, P-65.5.1 (Acyl halides)
 """
 
+from collections import deque
 from typing import Optional, Dict, List
 from rdkit import Chem
 
@@ -232,11 +233,11 @@ def _count_acyl_chain(mol, carbonyl_c: int, consumed: set) -> int:
         Chain length (number of carbons including carbonyl).
     """
     visited = {carbonyl_c}
-    queue = [carbonyl_c]
+    queue = deque([carbonyl_c])
     carbon_count = 1
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             nidx = neighbor.GetIdx()

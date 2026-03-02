@@ -19,6 +19,7 @@ The acid name derives from the acyl fragment:
 Reference: IUPAC 2013 Blue Book, P-65.3.1 (Acid anhydrides)
 """
 
+from collections import deque
 from typing import Optional, List, Tuple
 from rdkit import Chem
 
@@ -193,11 +194,11 @@ def _count_acyl_fragment_carbons(mol, carbonyl_c: int, bridge_o: int) -> int:
         Number of carbons in the acyl fragment (including carbonyl carbon).
     """
     visited = {carbonyl_c}
-    queue = [carbonyl_c]
+    queue = deque([carbonyl_c])
     carbon_count = 1
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             nidx = neighbor.GetIdx()

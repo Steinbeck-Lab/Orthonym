@@ -18,7 +18,7 @@ IUPAC 2013 PIN Rules:
 """
 
 from typing import Dict, List, Tuple, Optional, Set
-from collections import defaultdict
+from collections import defaultdict, deque
 from rdkit import Chem
 
 from ..assembly.naming_utils import (
@@ -157,11 +157,11 @@ def _bfs_substituent_atoms(mol, start_idx: int, ring_atoms: Set[int]) -> List[in
         List of all atom indices in the substituent (including start_idx)
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     all_atoms = []
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         all_atoms.append(current_idx)
 
         current_atom = mol.GetAtomWithIdx(current_idx)
@@ -642,12 +642,12 @@ def _collect_pure_alkyl(mol, start_idx: int, excluded: Set[int]):
         Tuple of (list of atom indices, carbon_count) or (None, 0) if not pure alkyl.
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     all_atoms = []
     carbon_count = 0
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 
@@ -1024,12 +1024,12 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     """
     # BFS to find all atoms in the substituent
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     carbon_count = 0
     all_atoms = []
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 
@@ -1132,13 +1132,13 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
     """
     # BFS to find all atoms in the substituent
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     all_atoms = []
     carbon_count = 0
     has_heteroatom = False
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 

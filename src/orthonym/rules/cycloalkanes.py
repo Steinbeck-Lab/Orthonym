@@ -15,7 +15,7 @@ IUPAC 2013 Rules:
 """
 
 from typing import Dict, List, Tuple, Optional, Set
-from collections import defaultdict
+from collections import defaultdict, deque
 from rdkit import Chem
 
 from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name as _canonical_get_alkyl_name
@@ -92,11 +92,11 @@ def _bfs_substituent(mol, start_idx: int, exclude_atoms: Set[int]) -> List[int]:
         List of atom indices in the substituent
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     atoms = []
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         atoms.append(current_idx)
 
         current_atom = mol.GetAtomWithIdx(current_idx)

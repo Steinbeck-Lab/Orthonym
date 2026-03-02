@@ -5,6 +5,7 @@ Implements IUPAC 2013 rules for selecting the principal chain.
 Key change in IUPAC 2013: Chain length takes priority over unsaturation!
 """
 
+from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
@@ -374,10 +375,10 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: Set[int]) -> List[int]:
         List of atom indices in the substituent
     """
     visited = {start_idx}
-    queue = [start_idx]
-    
+    queue = deque([start_idx])
+
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         
         for neighbor in atom.GetNeighbors():

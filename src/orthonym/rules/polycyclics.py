@@ -31,7 +31,7 @@ Integration with fused_rings.py:
 """
 
 from typing import Dict, List, Optional, Tuple, Set, Any
-from collections import defaultdict
+from collections import defaultdict, deque
 from rdkit import Chem
 
 from ..data.polycyclic_data import (
@@ -510,12 +510,12 @@ def _identify_pah_alkyl_group(mol, start_idx: int, core_atoms: Set[int]) -> Opti
     """
     # BFS to find all atoms in the substituent
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     carbon_count = 0
     all_atoms = []
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 
@@ -606,13 +606,13 @@ def _identify_pah_oxygen_group(mol, o_idx: int, core_atoms: Set[int]) -> Optiona
 
         # BFS to find alkyl chain after oxygen
         visited = {c_idx}
-        queue = [c_idx]
+        queue = deque([c_idx])
         alkyl_atoms = []
         carbon_count = 0
         is_pure_alkyl = True
 
         while queue:
-            current_idx = queue.pop(0)
+            current_idx = queue.popleft()
             current_atom = mol.GetAtomWithIdx(current_idx)
             alkyl_atoms.append(current_idx)
 
@@ -664,12 +664,12 @@ def _identify_pah_functionalized_chain(
     """
     # BFS to collect chain atoms
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     chain_atoms = []
     carbon_count = 0
 
     while queue:
-        idx = queue.pop(0)
+        idx = queue.popleft()
         chain_atoms.append(idx)
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() == 'C':

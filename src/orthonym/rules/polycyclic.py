@@ -19,6 +19,7 @@ Reference: IUPAC 2013 Blue Book P-23, VB-1 through VB-9.
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 from itertools import combinations
@@ -780,9 +781,9 @@ class VonBaeyerAnalyzer:
                 # BFS from an unassigned atom to find its connected component
                 start = next(iter(remaining_unassigned))
                 component = set()
-                queue = [start]
+                queue = deque([start])
                 while queue:
-                    current = queue.pop(0)
+                    current = queue.popleft()
                     if current in component:
                         continue
                     component.add(current)

@@ -15,6 +15,7 @@ Provides:
 """
 
 import logging
+from collections import deque
 from typing import Dict, List, Optional, Set
 
 from rdkit import Chem
@@ -91,10 +92,10 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: set) -> list:
         List of atom indices in the substituent fragment.
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     result = [start_idx]
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()

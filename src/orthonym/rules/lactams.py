@@ -24,6 +24,7 @@ Examples:
     C1CCCCC(=O)N1  (epsilon-lactam)    -> azepan-2-one
 """
 
+from collections import deque
 from typing import Dict, List, Optional
 
 from rdkit import Chem
@@ -422,12 +423,12 @@ def _identify_lactam_substituent(mol, start_idx, excluded):
     if symbol == "C":
         # BFS for pure alkyl
         visited = {start_idx}
-        queue = [start_idx]
+        queue = deque([start_idx])
         carbon_count = 0
         is_pure_alkyl = True
 
         while queue:
-            idx = queue.pop(0)
+            idx = queue.popleft()
             a = mol.GetAtomWithIdx(idx)
             if a.GetSymbol() == "C":
                 carbon_count += 1

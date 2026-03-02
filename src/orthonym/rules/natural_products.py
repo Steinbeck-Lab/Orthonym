@@ -20,7 +20,7 @@ Decoration enumeration (steroids):
 - Ester groups     -> functional class format: parent-yl acylate (IUPAC P-65.6)
 """
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -967,11 +967,11 @@ def _count_acid_fragment_carbons(
     """
     visited = {carbonyl_idx, ester_oxy_idx}
     visited.update(scaffold_atoms)
-    queue = [carbonyl_idx]
+    queue = deque([carbonyl_idx])
     carbon_count = 0
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         if atom.GetAtomicNum() == 6:
             carbon_count += 1

@@ -18,7 +18,7 @@ Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 """
 
 from typing import Dict, List, Optional, Set, Tuple, Any
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
@@ -638,11 +638,11 @@ def _bfs_alkyl_from(mol, start_idx: int, excluded: Set[int]) -> Optional[List[in
         List of atom indices if pure alkyl, None if contains heteroatoms
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     all_atoms = []
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 
@@ -676,12 +676,12 @@ def _identify_alkyl_substituent(
     """
     # BFS to find all atoms in the substituent
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     all_atoms = []
     carbon_count = 0
 
     while queue:
-        current_idx = queue.pop(0)
+        current_idx = queue.popleft()
         current_atom = mol.GetAtomWithIdx(current_idx)
         all_atoms.append(current_idx)
 
@@ -756,10 +756,10 @@ def _identify_functionalized_substituent(
     # BFS to collect substituent atoms
     chain_atoms = []
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
 
     while queue:
-        idx = queue.pop(0)
+        idx = queue.popleft()
         chain_atoms.append(idx)
         atom = mol.GetAtomWithIdx(idx)
 

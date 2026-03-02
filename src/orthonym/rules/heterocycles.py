@@ -23,7 +23,7 @@ Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
 
 import logging
 from typing import Dict, List, Tuple, Optional, Set
-from collections import Counter
+from collections import Counter, deque
 
 logger = logging.getLogger(__name__)
 
@@ -955,11 +955,11 @@ def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
         List of atom indices in the substituent
     """
     visited = set()
-    queue = [start_idx]
+    queue = deque([start_idx])
     result = []
 
     while queue:
-        atom_idx = queue.pop(0)
+        atom_idx = queue.popleft()
         if atom_idx in visited or atom_idx in excluded:
             continue
 

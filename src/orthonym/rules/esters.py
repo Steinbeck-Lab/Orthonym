@@ -15,6 +15,7 @@ SMARTS: "[CX3](=O)[OX2][#6]"
         - Position 3: first alkyl carbon (alcohol side)
 """
 
+from collections import deque
 from typing import Tuple, List, Optional
 from rdkit import Chem
 
@@ -86,10 +87,10 @@ def parse_ester_fragments(mol, ester_match: tuple) -> Tuple[List[int], List[int]
 def _bfs_fragment(mol, start_atom: int, exclude_atom: int) -> List[int]:
     """BFS to collect all atoms in a fragment, excluding one connection."""
     visited = {start_atom}
-    queue = [start_atom]
+    queue = deque([start_atom])
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()
@@ -792,11 +793,11 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     # BFS from carbonyl C through the acid fragment to build chain ordering
     # (carbonyl C = locant 1, next C = locant 2, etc.)
     visited = {carbonyl_c}
-    queue = [(carbonyl_c, 1)]
+    queue = deque([(carbonyl_c, 1)])
     atom_to_locant = {carbonyl_c: 1}
 
     while queue:
-        current, locant = queue.pop(0)
+        current, locant = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for nbr in atom.GetNeighbors():
             nbr_idx = nbr.GetIdx()
@@ -1139,10 +1140,10 @@ def _carbons_connected(mol, start: int, target: int, exclude_atoms: set) -> bool
         True if start and target are connected via carbon-only path
     """
     visited = {start}
-    queue = [start]
+    queue = deque([start])
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         if current == target:
             return True
 
@@ -1179,10 +1180,10 @@ def _find_backbone_carbons(mol, c1: int, c2: int, ester_oxygens: set) -> Optiona
     """
     # BFS for shortest path
     visited = {c1}
-    queue = [(c1, [c1])]
+    queue = deque([(c1, [c1])])
 
     while queue:
-        current, path = queue.pop(0)
+        current, path = queue.popleft()
         if current == c2:
             return path
 
@@ -1431,11 +1432,11 @@ def _find_polyol_backbone(mol, start_atoms: list, exclude: set) -> Optional[set]
         return None
 
     visited = set()
-    queue = list(start_atoms)
+    queue = deque(start_atoms)
     visited.update(start_atoms)
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()

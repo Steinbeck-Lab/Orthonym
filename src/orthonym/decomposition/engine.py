@@ -11,6 +11,7 @@ suspiciously short, etc.) are decomposed.
 """
 
 import re
+from collections import deque
 from typing import Dict, List, Optional
 
 from rdkit import Chem
@@ -275,9 +276,9 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
 
         # BFS from a1 without crossing the bond
         visited1 = set()
-        queue = [a1]
+        queue = deque([a1])
         while queue:
-            curr = queue.pop(0)
+            curr = queue.popleft()
             if curr in visited1:
                 continue
             visited1.add(curr)
@@ -291,9 +292,9 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
                     queue.append(nidx)
 
         visited2 = set()
-        queue = [a2]
+        queue = deque([a2])
         while queue:
-            curr = queue.pop(0)
+            curr = queue.popleft()
             if curr in visited2:
                 continue
             visited2.add(curr)

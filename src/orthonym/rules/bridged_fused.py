@@ -19,7 +19,7 @@ Reference: IUPAC 2013 Blue Book, P-25.7 (Bridged Fused Ring Systems)
 """
 
 from typing import Dict, List, Optional, Set, Tuple, Any
-from collections import defaultdict
+from collections import defaultdict, deque
 from rdkit import Chem
 
 from .fused_rings import classify_fused_system, get_shared_atoms
@@ -264,7 +264,7 @@ def _connected_via_set(mol, atom1: int, atom2: int, via_atoms: Set[int]) -> bool
 
     # Check if atom1 is adjacent to any via_atom
     visited = set()
-    queue = []
+    queue = deque()
 
     atom1_obj = mol.GetAtomWithIdx(atom1)
     for neighbor in atom1_obj.GetNeighbors():
@@ -274,7 +274,7 @@ def _connected_via_set(mol, atom1: int, atom2: int, via_atoms: Set[int]) -> bool
             visited.add(nbr_idx)
 
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
 
         # Check if we can reach atom2 from current
         current_atom = mol.GetAtomWithIdx(current)
@@ -356,9 +356,9 @@ def identify_fused_core(mol) -> Optional[Dict[str, Any]]:
 
         # BFS to find all rings in this fused component
         component = set()
-        queue = [ring_idx]
+        queue = deque([ring_idx])
         while queue:
-            current = queue.pop(0)
+            current = queue.popleft()
             if current in component:
                 continue
             component.add(current)

@@ -11,7 +11,7 @@ Assembly order:
 import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
-from collections import defaultdict
+from collections import defaultdict, deque
 
 logger = logging.getLogger(__name__)
 
@@ -4319,11 +4319,11 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
 def _count_pure_alkyl(mol, start_idx, excluded):
     """Count carbons in a pure alkyl chain from start_idx."""
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     carbon_count = 0
 
     while queue:
-        idx = queue.pop(0)
+        idx = queue.popleft()
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() != 'C':
             return None  # Not pure alkyl
@@ -4343,11 +4343,11 @@ def _collect_pure_alkyl_atoms(mol, start_idx, excluded):
     Returns list of carbon atom indices, or None if non-carbon encountered.
     """
     visited = {start_idx}
-    queue = [start_idx]
+    queue = deque([start_idx])
     atoms = []
 
     while queue:
-        idx = queue.pop(0)
+        idx = queue.popleft()
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() != 'C':
             return None  # Not pure alkyl
