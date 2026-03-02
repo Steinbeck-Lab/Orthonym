@@ -10,6 +10,7 @@ Architecture:
   - All fragments: classify -> name via existing naming infrastructure
 
 Public API:
+  - discover_substituents(mol, parent_atoms, parent_type, ...) [Phase 84]
   - extract_ring_substituents(mol, ring_atoms, oriented_ring)
   - extract_chain_substituents(mol, principal_chain, substituents_dict)
   - classify_and_name_fragment(mol, frag_info, parent_atoms, features=None)
@@ -21,7 +22,7 @@ References:
 """
 
 import logging
-from collections import namedtuple
+from collections import deque, namedtuple
 from typing import List, Optional, Set, Dict
 
 from rdkit import Chem
@@ -52,6 +53,196 @@ Fields:
     attach_mol_idx: Original mol atom index of the attachment point on parent.
     frag_atoms: Set of original mol atom indices belonging to this substituent.
 """
+
+
+# ============================================================================
+# Universal Substituent Discovery (Phase 84)
+# ============================================================================
+
+
+def discover_substituents(
+    mol,
+    parent_atoms,
+    parent_type="auto",
+    oriented_ring=None,
+    principal_chain=None,
+    atom_to_locant=None,
+):
+    """Discover ALL substituents on a parent structure.
+
+    Universal entry point that replaces six parallel substituent discovery
+    systems. Every non-parent, non-hydrogen atom in mol is assigned to
+    exactly one SubstituentInfo. No silent drops, no size limits.
+
+    Args:
+        mol: RDKit Mol object.
+        parent_atoms: Set of atom indices defining the parent structure.
+        parent_type: ``"ring"``, ``"chain"``, or ``"auto"`` (auto-detects).
+        oriented_ring: Ring atom indices in IUPAC order (required for ring parents).
+        principal_chain: Chain atom indices in order (required for chain parents).
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+
+    Returns:
+        List[SubstituentInfo] with one entry per substituent fragment.
+    """
+    parent_set = set(parent_atoms)
+
+    if parent_type == "auto":
+        parent_type = _detect_parent_type(mol, parent_set)
+
+    if parent_type == "ring":
+        results = extract_ring_substituents(
+            mol, tuple(parent_set), oriented_ring
+        )
+    else:
+        results = _discover_chain_substituents(
+            mol, parent_set, principal_chain, atom_to_locant
+        )
+
+    _verify_completeness(mol, parent_set, results)
+
+    return results
+
+
+def _detect_parent_type(mol, parent_atoms):
+    """Auto-detect whether parent_atoms represent a ring or chain parent.
+
+    Checks if any complete ring in the molecule is a subset of parent_atoms.
+    If so, returns ``"ring"``; otherwise ``"chain"``.
+
+    Args:
+        mol: RDKit Mol object.
+        parent_atoms: Set of atom indices defining the parent structure.
+
+    Returns:
+        ``"ring"`` or ``"chain"``.
+    """
+    parent_set = set(parent_atoms)
+    ring_info = mol.GetRingInfo()
+    for ring in ring_info.AtomRings():
+        if set(ring).issubset(parent_set):
+            return "ring"
+    return "chain"
+
+
+def _discover_chain_substituents(mol, parent_atoms, principal_chain,
+                                  atom_to_locant=None):
+    """BFS-based substituent discovery for chain parents.
+
+    For each atom on the principal chain, finds non-parent neighbors and
+    BFS-collects complete substituent fragments. Walks through ALL atom
+    types (no carbon-only restriction). No size limit.
+
+    Args:
+        mol: RDKit Mol object.
+        parent_atoms: Set of atom indices in the parent chain.
+        principal_chain: List of atom indices in chain order.
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+
+    Returns:
+        List[SubstituentInfo] namedtuples.
+    """
+    results = []
+    parent_set = set(parent_atoms)
+    assigned = set()
+
+    if principal_chain is None:
+        principal_chain = sorted(parent_set)
+
+    for chain_pos, chain_atom_idx in enumerate(principal_chain):
+        chain_atom = mol.GetAtomWithIdx(chain_atom_idx)
+        for nbr in chain_atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in parent_set or nbr_idx in assigned:
+                continue
+            if nbr.GetAtomicNum() == 1:
+                continue
+
+            frag_atoms = _bfs_collect_fragment(
+                mol, nbr_idx, parent_set, assigned
+            )
+            if not frag_atoms:
+                continue
+            assigned.update(frag_atoms)
+
+            locant = chain_pos + 1
+            if atom_to_locant and chain_atom_idx in atom_to_locant:
+                locant = atom_to_locant[chain_atom_idx]
+
+            results.append(SubstituentInfo(
+                frag_mol=None,
+                locant=locant,
+                attach_mol_idx=chain_atom_idx,
+                frag_atoms=frozenset(frag_atoms),
+            ))
+
+    return results
+
+
+def _bfs_collect_fragment(mol, start_idx, parent_set, already_assigned):
+    """BFS from start_idx, collecting all non-parent heavy atoms.
+
+    CRITICAL: Does NOT stop at heteroatoms. Collects O, N, S, P and all
+    atoms reachable through them. This ensures FG-containing substituents
+    are discovered as compound fragments (USUB-04). No size limit.
+
+    Args:
+        mol: RDKit Mol object.
+        start_idx: Atom index to start BFS from.
+        parent_set: Set of parent atom indices (BFS boundary).
+        already_assigned: Set of atom indices already claimed by another
+            substituent.
+
+    Returns:
+        Set of atom indices in the collected fragment.
+    """
+    visited = set()
+    queue = deque([start_idx])
+    while queue:
+        idx = queue.popleft()
+        if idx in visited or idx in parent_set or idx in already_assigned:
+            continue
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() == 1:
+            continue
+        visited.add(idx)
+        for nbr in atom.GetNeighbors():
+            queue.append(nbr.GetIdx())
+    return visited
+
+
+def _verify_completeness(mol, parent_atoms, substituents):
+    """Assert that all non-parent heavy atoms are accounted for.
+
+    Every non-parent, non-hydrogen atom must be assigned to exactly one
+    SubstituentInfo. Reports double-assigned and missed atoms via assert.
+
+    Args:
+        mol: RDKit Mol object.
+        parent_atoms: Set of parent atom indices.
+        substituents: List of SubstituentInfo namedtuples.
+
+    Raises:
+        AssertionError: If atoms are double-assigned or missed.
+    """
+    parent_set = set(parent_atoms)
+    all_sub_atoms = set()
+    for sub in substituents:
+        overlap = all_sub_atoms & set(sub.frag_atoms)
+        assert not overlap, (
+            f"Double-assigned atoms: {overlap}"
+        )
+        all_sub_atoms.update(sub.frag_atoms)
+
+    expected = set()
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in parent_set:
+            expected.add(atom.GetIdx())
+
+    missed = expected - all_sub_atoms
+    assert not missed, f"Unassigned atoms: {missed}"
+    extra = all_sub_atoms - expected
+    assert not extra, f"Extra atoms not in molecule: {extra}"
 
 
 # ============================================================================
