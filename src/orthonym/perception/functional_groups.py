@@ -305,25 +305,3 @@ def count_functional_groups(mol) -> Dict[str, int]:
     """
     groups = detect_functional_groups(mol)
     return {name: len(matches) for name, matches in groups.items()}
-
-
-def get_all_functional_group_atoms(mol) -> set:
-    """
-    Get all atom indices that are part of any functional group.
-    
-    Useful for identifying which atoms are "special" vs backbone.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        Set of atom indices
-    """
-    all_atoms = set()
-    groups = detect_functional_groups(mol)
-    
-    for matches in groups.values():
-        for match in matches:
-            all_atoms.update(match)
-    
-    return all_atoms
