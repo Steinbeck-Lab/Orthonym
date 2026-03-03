@@ -122,13 +122,19 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
             # or neither (shouldn't happen normally)
             side = "middle"
 
-        # For amide bonds, label the non-acid side as "amine"
-        # Check if any of the bond_infos for this fragment is amide type
+        # For amide and sulfonamide bonds, label the non-acid side as "amine"
+        # Check if any of the bond_infos for this fragment is amide/sulfonamide type
         for binfo in bond_side_map.values():
             if binfo["type"] == "amide":
                 other = binfo["other_atom"]
                 # Check if this fragment contains the amine atom
                 # (using original atom indices from frag_atom_lists)
+                if other is not None and other in set(frag_atoms):
+                    if side == "alkyl":
+                        side = "amine"
+                    break
+            if binfo["type"] == "sulfonamide":
+                other = binfo["other_atom"]
                 if other is not None and other in set(frag_atoms):
                     if side == "alkyl":
                         side = "amine"

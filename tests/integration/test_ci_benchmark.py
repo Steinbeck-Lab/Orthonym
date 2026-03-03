@@ -318,7 +318,7 @@ CI_BENCHMARK = [
         "[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)"
         "[C@H](O)[C@H](O)[C@H]4O)[C@H]3NC(C)=O)[C@H]2O)"
         "[C@@H](CO)O[C@H]1O",
-        "ethanediamide",
+        "(beta-D-galactopyranosyloxy)ethanediamide",
     ),
     (
         "CN1CCCN=C1/C=C/c1cccs1",

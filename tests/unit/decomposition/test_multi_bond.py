@@ -29,15 +29,15 @@ class TestPerformanceGuard:
     """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose()."""
 
     def test_performance_guard_constant_exists(self):
-        """MAX_CLEAVABLE_BONDS constant is defined and is 8."""
-        assert MAX_CLEAVABLE_BONDS == 8
+        """MAX_CLEAVABLE_BONDS constant is defined and is 12."""
+        assert MAX_CLEAVABLE_BONDS == 12
 
     def test_performance_guard_skips_many_bonds(self):
         """try_decompose returns None when molecule has >MAX_CLEAVABLE_BONDS bonds."""
         mol = Chem.MolFromSmiles("CCCCCC")  # Simple molecule for the test
 
-        # Mock find_cleavable_bonds to return 9 bonds (more than MAX_CLEAVABLE_BONDS=8)
-        fake_bonds = [{"bond_idx": i, "type": "ester"} for i in range(9)]
+        # Mock find_cleavable_bonds to return 13 bonds (more than MAX_CLEAVABLE_BONDS=12)
+        fake_bonds = [{"bond_idx": i, "type": "ester"} for i in range(13)]
 
         with patch(
             "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
@@ -209,8 +209,8 @@ class TestMultiBondRetry:
     """Tests for multi-bond retry logic in try_decompose() (DECP-01)."""
 
     def test_max_bond_retry_attempts_constant_exists(self):
-        """MAX_BOND_RETRY_ATTEMPTS constant is defined and is 3."""
-        assert MAX_BOND_RETRY_ATTEMPTS == 3
+        """MAX_BOND_RETRY_ATTEMPTS constant is defined and is 5."""
+        assert MAX_BOND_RETRY_ATTEMPTS == 5
 
     def test_single_bond_path_unchanged(self):
         """Molecule with exactly 1 cleavable bond: result identical to baseline.

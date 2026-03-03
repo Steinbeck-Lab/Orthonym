@@ -21,8 +21,8 @@ from rdkit import Chem
 # Performance guard
 # ---------------------------------------------------------------------------
 
-MAX_CLEAVABLE_BONDS = 8  # Skip decomposition if more than this many bonds
-MAX_BOND_RETRY_ATTEMPTS = 3  # Max bonds to try when multi-bond retry is active
+MAX_CLEAVABLE_BONDS = 12  # Skip decomposition if more than this many bonds
+MAX_BOND_RETRY_ATTEMPTS = 5  # Max bonds to try when multi-bond retry is active
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +206,17 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
             if _dcnt >= 2 and any(_dw.endswith(sfx) for sfx in _PARENT_SFXS):
                 return True
 
+    # Detect duplicated structural fragment names: if a long token (>= 15 chars)
+    # appears 2+ times in the decomposition but not in the existing name, the
+    # decomposition likely split the molecule into two copies of the same
+    # structural fragment (garbled assembly).
+    if _dwords:
+        _existing_words = set(re.findall(r'[a-z]{6,}', existing_name.lower()))
+        for _dw, _dcnt in _dcounts.items():
+            if (_dcnt >= 2 and len(_dw) >= 15
+                    and _dw not in _existing_words):
+                return True
+
     return False
 
 
@@ -217,9 +228,12 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
 _BOND_TYPE_PRIORITY = {
     "ester": 1,
     "amide": 2,
-    "glycosidic": 3,
-    "carbamate": 4,
-    "ether": 5,
+    "phosphodiester": 3,
+    "thioester": 4,
+    "glycosidic": 5,
+    "sulfonamide": 6,
+    "carbamate": 7,
+    "ether": 8,
 }
 
 
@@ -249,7 +263,8 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
     """Select the single best bond to cleave.
 
     Priority:
-    1. By bond type: ester > amide > glycosidic > carbamate
+    1. By bond type: ester > amide > phosphodiester > thioester >
+       glycosidic > sulfonamide > carbamate > ether
     2. Among same type: prefer most balanced split (smallest
        abs(frag1_atoms - frag2_atoms))
 
@@ -323,7 +338,9 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     """Attempt decomposition using a single bond.
 
     Extracted from try_decompose() Steps 4-8. Contains the full
-    cleave-cap-name-assemble pipeline for one bond.
+    cleave-cap-name-assemble pipeline for one bond. Handles all 8
+    bond types: ester, amide, phosphodiester, thioester, glycosidic,
+    sulfonamide, carbamate, ether.
 
     Args:
         mol: RDKit Mol object to decompose.
@@ -382,7 +399,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     """Attempt decomposition of a molecule into named fragments.
 
     This is the main entry point for the decomposition engine. It:
-    1. Finds cleavable bonds (ester, amide, glycosidic, carbamate, ether)
+    1. Finds cleavable bonds (ester, amide, phosphodiester, thioester,
+       glycosidic, sulfonamide, carbamate, ether -- 8 types)
     2. Checks if the existing pipeline name is acceptable (quality gate)
     3. Selects the best bond to cleave
     4. Cleaves and caps the fragments
@@ -467,9 +485,10 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 return existing_name
         return single_result
 
-    # If single-bond result is adequate, return it
+    # If single-bond result is adequate and not worse than existing, return it
     if single_result and _name_quality_is_acceptable(single_result, mol):
-        return single_result
+        if not (existing_name and _decomposition_is_worse(single_result, existing_name, mol)):
+            return single_result
 
     # MULTI-BOND RETRY (DECP-01): try alternative bonds
     tried_indices = {best_bond["bond_idx"]}
@@ -481,6 +500,9 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         tried_indices.add(bond["bond_idx"])
         alt_result = _try_single_bond_decompose(mol, bond, style)
         if alt_result and _name_quality_is_acceptable(alt_result, mol):
+            # Also check that the alternative is not worse than existing name
+            if existing_name and _decomposition_is_worse(alt_result, existing_name, mol):
+                continue
             return alt_result
 
     # Compare decomposition result against existing pipeline name:
