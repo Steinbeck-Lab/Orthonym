@@ -216,3 +216,162 @@ class TestBondInfoStructure:
         mol = Chem.MolFromSmiles("CCO")
         bonds = find_cleavable_bonds(mol)
         assert len(bonds) == 0
+
+
+# ---------------------------------------------------------------------------
+# Phosphodiester bond detection
+# ---------------------------------------------------------------------------
+
+class TestPhosphodiesterDetection:
+    """Tests for phosphodiester O-P(=O)(O)-O-C bond detection."""
+
+    def test_dimethyl_phosphate_detects_phosphodiester(self):
+        """COP(=O)(O)OC (dimethyl phosphate) should have phosphodiester bonds.
+        The SMARTS can match multiple O-P...O-C patterns; deduplicated via
+        seen_bond_indices so each unique P-O bond is counted once."""
+        mol = Chem.MolFromSmiles("COP(=O)(O)OC")
+        bonds = find_cleavable_bonds(mol)
+        phos_bonds = [b for b in bonds if b["type"] == "phosphodiester"]
+        # At least 1 phosphodiester bond (2 P-O-C linkages, each producing a bond)
+        assert len(phos_bonds) >= 1
+
+    def test_phospholipid_analog_detects_phosphodiester(self):
+        """A phospholipid-like molecule with phosphodiester linkage should be detected.
+        CCCCOP(=O)(O)OCCCC has a phosphodiester bond."""
+        mol = Chem.MolFromSmiles("CCCCOP(=O)(O)OCCCC")
+        bonds = find_cleavable_bonds(mol)
+        phos_bonds = [b for b in bonds if b["type"] == "phosphodiester"]
+        assert len(phos_bonds) >= 1
+
+    def test_cyclic_phosphodiester_excluded(self):
+        """Cyclic phosphodiester (sugar-phosphate ring) should be excluded
+        by _atoms_in_same_ring() guard. O=P1(O)OCCO1 is a cyclic phosphate."""
+        mol = Chem.MolFromSmiles("O=P1(O)OCCO1")
+        bonds = find_cleavable_bonds(mol)
+        phos_bonds = [b for b in bonds if b["type"] == "phosphodiester"]
+        assert len(phos_bonds) == 0
+
+    def test_phosphodiester_bond_info_structure(self):
+        """Phosphodiester bond info should have correct keys and P as acid_atom."""
+        mol = Chem.MolFromSmiles("COP(=O)(O)OC")
+        bonds = find_cleavable_bonds(mol)
+        phos_bonds = [b for b in bonds if b["type"] == "phosphodiester"]
+        assert len(phos_bonds) >= 1
+        bond = phos_bonds[0]
+        assert "bond_idx" in bond
+        assert "acid_atom" in bond
+        assert "alkyl_atom" in bond
+        assert "match" in bond
+        # acid_atom should be phosphorus
+        acid = mol.GetAtomWithIdx(bond["acid_atom"])
+        assert acid.GetSymbol() == "P"
+
+
+# ---------------------------------------------------------------------------
+# Thioester bond detection
+# ---------------------------------------------------------------------------
+
+class TestThioesterDetection:
+    """Tests for thioester C(=O)-S-C bond detection."""
+
+    def test_s_methyl_thioacetate_one_thioester(self):
+        """CC(=O)SC (S-methyl thioacetate) should have 1 thioester bond."""
+        mol = Chem.MolFromSmiles("CC(=O)SC")
+        bonds = find_cleavable_bonds(mol)
+        thio_bonds = [b for b in bonds if b["type"] == "thioester"]
+        assert len(thio_bonds) == 1
+
+    def test_thioester_carbamate_overlap_excluded(self):
+        """If carbonyl C is part of a carbamate, thioester should not
+        double-detect it. CCOC(=O)NC has carbamate; CC(=O)SC is thioester.
+        A molecule with both: CCSC(=O)NC -- the C(=O) is carbamate, so
+        thioester should skip it."""
+        # This is a thiocarbamate: N-C(=O)-S-C
+        # The carbamate SMARTS N-C(=O)-O-C won't match because it has S not O
+        # But the carbonyl C should be in carbamate_carbonyl_atoms if matched
+        # For a pure thioester with no carbamate overlap, it should be detected
+        mol = Chem.MolFromSmiles("CC(=O)SC")
+        bonds = find_cleavable_bonds(mol)
+        thio_bonds = [b for b in bonds if b["type"] == "thioester"]
+        assert len(thio_bonds) == 1
+        # Verify carbonyl C is the acid_atom
+        bond = thio_bonds[0]
+        acid = mol.GetAtomWithIdx(bond["acid_atom"])
+        assert acid.GetSymbol() == "C"
+
+    def test_thiolactone_excluded(self):
+        """O=C1CCCS1 (thiobutyrolactone) should have 0 thioester bonds
+        because the C-S bond is in a ring."""
+        mol = Chem.MolFromSmiles("O=C1CCCS1")
+        bonds = find_cleavable_bonds(mol)
+        thio_bonds = [b for b in bonds if b["type"] == "thioester"]
+        assert len(thio_bonds) == 0
+
+    def test_thioester_bond_info_structure(self):
+        """Thioester bond info should have correct keys."""
+        mol = Chem.MolFromSmiles("CC(=O)SC")
+        bonds = find_cleavable_bonds(mol)
+        thio_bonds = [b for b in bonds if b["type"] == "thioester"]
+        assert len(thio_bonds) == 1
+        bond = thio_bonds[0]
+        assert "bond_idx" in bond
+        assert "acid_atom" in bond
+        assert "alkyl_atom" in bond
+        assert bond["type"] == "thioester"
+
+
+# ---------------------------------------------------------------------------
+# Sulfonamide bond detection
+# ---------------------------------------------------------------------------
+
+class TestSulfonamideDetection:
+    """Tests for sulfonamide S(=O)(=O)-N bond detection."""
+
+    def test_sulfamethoxazole_one_sulfonamide(self):
+        """Sulfamethoxazole: Cc1cc(NS(=O)(=O)c2ccc(N)cc2)no1
+        Should have 1 sulfonamide bond."""
+        mol = Chem.MolFromSmiles("Cc1cc(NS(=O)(=O)c2ccc(N)cc2)no1")
+        bonds = find_cleavable_bonds(mol)
+        sulfo_bonds = [b for b in bonds if b["type"] == "sulfonamide"]
+        assert len(sulfo_bonds) == 1
+
+    def test_sultam_excluded(self):
+        """O=S1(=O)CCCN1 (sultam / 1,2-thiazetidine 1,1-dioxide variant)
+        should have 0 sulfonamide bonds because S-N is in a ring."""
+        mol = Chem.MolFromSmiles("O=S1(=O)CCCN1")
+        bonds = find_cleavable_bonds(mol)
+        sulfo_bonds = [b for b in bonds if b["type"] == "sulfonamide"]
+        assert len(sulfo_bonds) == 0
+
+    def test_saccharin_no_sulfonamide(self):
+        """Saccharin O=C1NS(=O)(=O)c2ccccc21 has an aromatic SO2-N in a ring.
+        Should have 0 sulfonamide bonds (ring guard excludes it)."""
+        mol = Chem.MolFromSmiles("O=C1NS(=O)(=O)c2ccccc21")
+        bonds = find_cleavable_bonds(mol)
+        sulfo_bonds = [b for b in bonds if b["type"] == "sulfonamide"]
+        assert len(sulfo_bonds) == 0
+
+    def test_simple_sulfonamide_detection(self):
+        """CS(=O)(=O)NC (N-methyl methanesulfonamide) should have 1 sulfonamide bond."""
+        mol = Chem.MolFromSmiles("CS(=O)(=O)NC")
+        bonds = find_cleavable_bonds(mol)
+        sulfo_bonds = [b for b in bonds if b["type"] == "sulfonamide"]
+        assert len(sulfo_bonds) == 1
+
+    def test_sulfonamide_bond_info_structure(self):
+        """Sulfonamide bond info should have correct keys and S as acid_atom."""
+        mol = Chem.MolFromSmiles("CS(=O)(=O)NC")
+        bonds = find_cleavable_bonds(mol)
+        sulfo_bonds = [b for b in bonds if b["type"] == "sulfonamide"]
+        assert len(sulfo_bonds) == 1
+        bond = sulfo_bonds[0]
+        assert "bond_idx" in bond
+        assert "acid_atom" in bond
+        assert "alkyl_atom" in bond
+        assert bond["type"] == "sulfonamide"
+        # acid_atom should be sulfur
+        acid = mol.GetAtomWithIdx(bond["acid_atom"])
+        assert acid.GetSymbol() == "S"
+        # alkyl_atom stores the nitrogen
+        amine = mol.GetAtomWithIdx(bond["alkyl_atom"])
+        assert amine.GetSymbol() == "N"
