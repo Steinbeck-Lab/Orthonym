@@ -573,6 +573,22 @@ def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     if alkyl and alkyl.endswith("yl"):
         return alkyl[:-2] + "oxy"
 
+    # Phase 86 fallback: for complex fragments where _alcohol_to_alkyl fails,
+    # attempt direct suffix conversion. If the name already ends in "yl"
+    # (from decomposition engine naming), convert to "oxy".
+    if stripped.endswith("yl"):
+        return stripped[:-2] + "oxy"
+
+    # Last resort: if the name ends in common alcohol-like patterns, try
+    # to derive alkoxy. Never return bare "oxy" for organic fragments.
+    # For "-anol" (e.g., cyclopentanol -> cyclopentanoxy):
+    if stripped.endswith("anol"):
+        return stripped[:-4] + "anoxy"
+    if stripped.endswith("ol") and len(stripped) > 2:
+        base = stripped[:-2]
+        if base.endswith("an"):
+            return base[:-2] + "oxy"
+
     return None
 
 
