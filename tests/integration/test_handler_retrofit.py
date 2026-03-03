@@ -229,3 +229,53 @@ class TestEtherOxyFix:
             if result is not None:
                 assert result != "oxy", f"Bare 'oxy' returned for '{name}'"
                 assert result.endswith("oxy"), f"Expected alkoxy form for '{name}', got '{result}'"
+
+
+# ============================================================================
+# Ester handler tests (Plan 02, Task 1)
+# ============================================================================
+
+
+class TestEsterRetrofit:
+    """Tests for ester handler with universal pipeline (acid-side substituents)."""
+
+    def test_methyl_3_methylbutanoate(self):
+        """Branched acid chain: methyl 3-methylbutanoate -- CC(C)CC(=O)OC."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(C)CC(=O)OC")
+        assert result is not None
+        assert "methyl" in result.lower(), f"Expected 'methyl' prefix in '{result}'"
+        assert "butanoate" in result.lower(), f"Expected 'butanoate' in '{result}'"
+        # The 3-methyl substituent on the acid chain must be present
+        assert "3-methyl" in result.lower(), f"Expected '3-methyl' locanted prefix in '{result}'"
+
+    def test_methyl_2_chloropropanoate(self):
+        """Halogen substituent on acid chain: methyl 2-chloropropanoate."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(Cl)C(=O)OC")
+        assert result is not None
+        assert "chloro" in result.lower(), f"Expected 'chloro' in '{result}'"
+        assert "propanoate" in result.lower(), f"Expected 'propanoate' in '{result}'"
+
+    def test_simple_ethyl_acetate_no_regression(self):
+        """Simple ester without substituents: ethyl acetate still works."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(=O)OCC")
+        assert result is not None
+        assert "ethyl" in result.lower(), f"Expected 'ethyl' in '{result}'"
+        assert "acetate" in result.lower(), f"Expected 'acetate' in '{result}'"
+
+    def test_methyl_propanoate_no_regression(self):
+        """Simple 3-carbon acid ester: methyl propanoate still works."""
+        from orthonym.namer import name_compound
+        result = name_compound("CCC(=O)OC")
+        assert result is not None
+        assert "propanoate" in result.lower(), f"Expected 'propanoate' in '{result}'"
+
+    def test_methyl_2_ethylbutanoate(self):
+        """Multiple substituents on acid chain: methyl 2-ethylbutanoate."""
+        from orthonym.namer import name_compound
+        result = name_compound("CCC(CC)C(=O)OC")
+        assert result is not None
+        assert "ethyl" in result.lower(), f"Expected 'ethyl' in '{result}'"
+        assert "butanoate" in result.lower(), f"Expected 'butanoate' in '{result}'"

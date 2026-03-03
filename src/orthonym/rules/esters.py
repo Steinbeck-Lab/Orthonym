@@ -15,13 +15,16 @@ SMARTS: "[CX3](=O)[OX2][#6]"
         - Position 3: first alkyl carbon (alcohol side)
 """
 
+import logging
 from collections import deque
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Set
 from rdkit import Chem
 
 from ..data.trivial_acids import get_acylate_name
 from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_chain_prefix, get_alkyl_name as _chain_alkyl_name, get_acid_stem
+
+logger = logging.getLogger(__name__)
 
 
 def parse_ester_fragments(mol, ester_match: tuple) -> Tuple[List[int], List[int]]:
@@ -678,6 +681,67 @@ def is_lactone(mol, ester_match: tuple) -> bool:
     return False
 
 
+def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]]:
+    """Find the principal (longest) carbon chain in the acid fragment.
+
+    Starts from the carbonyl carbon and finds the longest path through
+    carbon atoms in the acid fragment. This correctly identifies the acid
+    chain length even when the acid fragment is branched.
+
+    Args:
+        mol: RDKit Mol object.
+        acid_atoms: Atom indices of the acid fragment.
+
+    Returns:
+        List of atom indices forming the principal chain (carbonyl C first),
+        or None if carbonyl carbon cannot be found.
+    """
+    acid_set = set(acid_atoms)
+
+    # Find the carbonyl carbon (C with =O bond in acid set)
+    carbonyl_c = None
+    carbonyl_o = None
+    for idx in acid_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if (nbr.GetSymbol() == 'O'
+                    and bond.GetBondTypeAsDouble() == 2.0
+                    and nbr.GetIdx() in acid_set):
+                carbonyl_c = idx
+                carbonyl_o = nbr.GetIdx()
+                break
+        if carbonyl_c is not None:
+            break
+
+    if carbonyl_c is None:
+        return None
+
+    # BFS/DFS to find the longest carbon chain from carbonyl_c
+    acid_carbons = {idx for idx in acid_atoms
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'}
+
+    best_path = [carbonyl_c]
+    queue = deque([(carbonyl_c, [carbonyl_c])])
+    while queue:
+        curr, path = queue.popleft()
+        atom = mol.GetAtomWithIdx(curr)
+        extended = False
+        for nbr in atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if (nidx in acid_carbons
+                    and nidx not in set(path)
+                    and nbr.GetSymbol() == 'C'):
+                queue.append((nidx, path + [nidx]))
+                extended = True
+        if not extended and len(path) > len(best_path):
+            best_path = path
+
+    return best_path
+
+
 def name_ester(mol, ester_match: tuple) -> Optional[str]:
     """
     Generate IUPAC name for an ester.
@@ -718,9 +782,71 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     from rdkit.Chem import rdCIPLabeler
     rdCIPLabeler.AssignCIPLabels(mol)
 
-    # Get acid name and convert to acylate
-    acid_name = get_acid_fragment_name(mol, acid_atoms)
+    # --- Phase 86-02: Acid-side substituent discovery via universal pipeline ---
+    # Find the principal chain in the acid fragment to correctly identify
+    # chain length (excluding branch carbons) and discover substituents.
+    acid_set = set(acid_atoms)
+    acid_has_ring = acid_fragment_has_ring(mol, acid_atoms)
+    acid_principal_chain = None
+    acid_prefix_str = ""
+
+    if not acid_has_ring:
+        acid_principal_chain = _find_acid_principal_chain(mol, acid_atoms)
+
+    if acid_principal_chain and len(acid_principal_chain) >= 2:
+        # Check if acid fragment has branches (substituents on the acid chain).
+        # Branches can be carbon-based (alkyl) OR heteroatom-based (halogens,
+        # hydroxy, etc.). Check for ANY non-chain, non-carbonyl-O atom.
+        chain_set = set(acid_principal_chain)
+        carbonyl_o_set = set()
+        for idx in acid_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'O':
+                for bond in atom.GetBonds():
+                    if bond.GetBondTypeAsDouble() == 2.0:
+                        carbonyl_o_set.add(idx)
+                        break
+        non_chain_atoms = acid_set - chain_set - carbonyl_o_set
+        has_acid_branches = bool(non_chain_atoms)
+
+        if has_acid_branches:
+            # Use principal chain length for the acid name (not total carbon count)
+            chain_length = len(acid_principal_chain)
+            acid_name = get_acid_stem(chain_length)
+
+            # Exclude atoms: carbonyl O(s), ester O, alkyl fragment
+            ester_o = ester_match[2] if len(ester_match) > 2 else None
+            exclude = set(carbonyl_o_set)
+            if ester_o is not None:
+                exclude.add(ester_o)
+            exclude.update(set(alkyl_atoms))
+
+            # Use universal pipeline for acid-side substituents
+            try:
+                from ..assembly.composer import _integrate_universal_prefixes
+                acid_prefix_str = _integrate_universal_prefixes(
+                    mol, chain_set,
+                    parent_type="chain",
+                    principal_chain=acid_principal_chain,
+                    exclude_atoms=exclude,
+                )
+            except Exception as exc:
+                logger.debug("Ester acid-side prefix discovery failed: %s", exc)
+                acid_prefix_str = ""
+        else:
+            # No branches -- use standard acid naming
+            acid_name = get_acid_fragment_name(mol, acid_atoms)
+    else:
+        # Ring acid or short chain -- use standard acid naming
+        acid_name = get_acid_fragment_name(mol, acid_atoms)
+
     acylate_name = get_acylate_name(acid_name)
+
+    # Prepend acid-side substituent prefixes to the acylate name.
+    # The prefix string from _format_prefix_groups ends without a trailing
+    # hyphen; IUPAC joins prefix directly to parent (e.g., "3-methylbutanoate").
+    if acid_prefix_str:
+        acylate_name = f"{acid_prefix_str}{acylate_name}"
 
     # Get alkyl name
     alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
