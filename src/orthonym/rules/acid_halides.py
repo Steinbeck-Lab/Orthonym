@@ -114,8 +114,17 @@ def name_acid_halide(features) -> Optional[str]:
     # Single acid halide: build acyl name
     acyl_name = _build_acyl_name(chain_length)
 
-    # Check for substituents on the chain (non-acid-halide functional groups)
-    sub_prefix = _get_chain_substituent_prefix(mol, features, chain, consumed_atoms)
+    # Discover substituents on the acyl chain via universal pipeline (Phase 86).
+    # Parent atoms = chain; exclude = all atoms consumed by acid halide groups
+    # (carbonyl C, carbonyl O, halogen). This replaces the old
+    # _get_chain_substituent_prefix() which only handled halogen substituents.
+    from ..assembly.composer import _integrate_universal_prefixes
+    sub_prefix = _integrate_universal_prefixes(
+        mol, set(chain) if chain else set(),
+        parent_type="chain",
+        principal_chain=chain,
+        exclude_atoms=consumed_atoms,
+    )
 
     if sub_prefix:
         return f"{sub_prefix}{acyl_name} {halide_word}"

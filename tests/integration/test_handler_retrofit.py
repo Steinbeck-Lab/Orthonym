@@ -131,7 +131,6 @@ class TestIntegrateUniversalPrefixes:
 class TestAcidHalideRetrofit:
     """Tests for acid halide handler with universal pipeline."""
 
-    @pytest.mark.xfail(reason="Task 2: acid halide handler not yet retrofitted")
     def test_3_methylbutanoyl_chloride(self):
         """3-methylbutanoyl chloride: CC(C)CC(=O)Cl"""
         from orthonym.namer import name_compound
