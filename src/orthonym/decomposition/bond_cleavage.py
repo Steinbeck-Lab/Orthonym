@@ -1,9 +1,10 @@
 """
 Bond cleavage detection for decomposition engine.
 
-Identifies ester, amide, glycosidic, carbamate, and ether bonds
-suitable for cleavage, with guards to exclude cyclic variants
-(lactones, lactams, epoxides) and overlapping patterns (carbamates,
+Identifies ester, amide, glycosidic, carbamate, ether, phosphodiester,
+thioester, and sulfonamide bonds suitable for cleavage, with guards to
+exclude cyclic variants (lactones, lactams, thiolactones, sultams,
+epoxides, cyclic phosphodiesters) and overlapping patterns (carbamates,
 ureas, skeletal replacement chains).
 """
 
@@ -28,6 +29,16 @@ _CARBAMATE_SMARTS = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
 
 # Glycosidic: ring-C(-O-ring)-O-C  -- anomeric C-O bond to non-ring
 _GLYCOSIDIC_SMARTS = Chem.MolFromSmarts("[CX4;R]([OX2;R])[OX2;!R][#6]")
+
+# Phosphodiester: O-P(=O)(O)-O-C
+# (atoms: 0=ester_o1, 1=P, 2==O, 3=hydroxyl/anionic O, 4=ester_o2, 5=alkyl_c)
+_PHOSPHODIESTER_SMARTS = Chem.MolFromSmarts("[OX2][PX4](=O)([OX2,OX1-])[OX2][#6]")
+
+# Thioester: C(=O)-S-C  (atoms: 0=carbonyl C, 1==O, 2=sulfur, 3=alkyl C)
+_THIOESTER_SMARTS = Chem.MolFromSmarts("[CX3](=O)[SX2][#6]")
+
+# Sulfonamide: S(=O)(=O)-N  (atoms: 0=sulfur, 1==O, 2==O, 3=nitrogen)
+_SULFONAMIDE_SMARTS = Chem.MolFromSmarts("[SX4](=O)(=O)[NX3]")
 
 # Ether: C-O-C where O is divalent, NOT in a ring, and neither C is a
 # carbonyl carbon or anomeric center. Excludes esters, glycosidic bonds,
@@ -102,16 +113,22 @@ def _bfs_heavy_atoms(mol, start: int, excluded: Set[int]) -> Set[int]:
 def find_cleavable_bonds(mol) -> List[Dict]:
     """Find cleavable bonds in a molecule.
 
-    Detects ester C-O, amide C-N, glycosidic C-O-C, and ether C-O-C bonds,
-    excluding lactones, lactams, carbamates, ureas, epoxides, and
-    skeletal replacement chains.
+    Detects 8 bond types: carbamate, phosphodiester, ester, thioester,
+    amide, sulfonamide, glycosidic, and ether bonds. Excludes cyclic
+    variants (lactones, lactams, thiolactones, sultams, cyclic
+    phosphodiesters, epoxides) and overlapping patterns (carbamates,
+    ureas, skeletal replacement chains).
 
     The detection order matters:
     1. Carbamates are detected first to mark overlapping carbonyl C atoms.
-    2. Esters are detected, skipping any carbonyl C already in a carbamate.
-    3. Amides are detected, skipping any carbonyl C already in a carbamate.
-    4. Glycosidic bonds are detected independently.
-    5. Ether bonds are detected with 5 guards (ring, ester-exclusion,
+    2. Phosphodiesters are detected (P-O bond to alkyl C).
+    3. Esters are detected, skipping any carbonyl C already in a carbamate.
+    4. Thioesters are detected (C(=O)-S-C), skipping carbamate overlap
+       and thiolactones.
+    5. Amides are detected, skipping any carbonyl C already in a carbamate.
+    6. Sulfonamides are detected (S(=O)(=O)-N), excluding sultams.
+    7. Glycosidic bonds are detected independently.
+    8. Ether bonds are detected with 5 guards (ring, ester-exclusion,
        glycosidic-exclusion, skeletal-replacement, minimum-fragment-size).
 
     Args:
@@ -119,7 +136,8 @@ def find_cleavable_bonds(mol) -> List[Dict]:
 
     Returns:
         List of dicts with keys: bond_idx, type, match, acid_atom,
-        alkyl_atom (for esters/ethers) or amine_atom (for amides).
+        alkyl_atom (for esters/ethers/thioesters/phosphodiesters/sulfonamides)
+        or amine_atom (for amides).
     """
     cleavable: List[Dict] = []
     seen_bond_indices: Set[int] = set()
@@ -151,7 +169,32 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                         "match": match,
                     })
 
-    # --- Step 2: Detect ester bonds (skip lactones, skip carbamate overlap) ---
+    # --- Step 2: Detect phosphodiester bonds ---
+    if _PHOSPHODIESTER_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_PHOSPHODIESTER_SMARTS):
+            # match[0]=ester_o1, match[1]=P, match[2]==O, match[3]=hydroxyl/anionic O,
+            # match[4]=ester_o2, match[5]=alkyl_c
+            phosphorus = match[1]
+            ester_o2 = match[4]
+            alkyl_c = match[5]
+
+            # Ring guard: exclude cyclic phosphodiesters (sugar-phosphate rings)
+            if _atoms_in_same_ring(mol, phosphorus, ester_o2):
+                continue
+
+            # Get the bond between P and ester_o2 (the P-O-C bond to cleave)
+            bond = mol.GetBondBetweenAtoms(phosphorus, ester_o2)
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "phosphodiester",
+                    "acid_atom": phosphorus,
+                    "alkyl_atom": alkyl_c,
+                    "match": match,
+                })
+
+    # --- Step 3: Detect ester bonds (skip lactones, skip carbamate overlap) ---
     if _ESTER_SMARTS is not None:
         for match in mol.GetSubstructMatches(_ESTER_SMARTS):
             carbonyl_c = match[0]
@@ -179,7 +222,35 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "match": match,
                 })
 
-    # --- Step 3: Detect amide bonds (skip lactams, skip carbamate overlap) ---
+    # --- Step 4: Detect thioester bonds (C(=O)-S-C) ---
+    if _THIOESTER_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_THIOESTER_SMARTS):
+            carbonyl_c = match[0]
+            # match[1] is =O
+            sulfur = match[2]
+            alkyl_c = match[3]
+
+            # Skip if this carbonyl C is part of a carbamate
+            if carbonyl_c in carbamate_carbonyl_atoms:
+                continue
+
+            # Thiolactone guard: skip if carbonyl C and sulfur are in the same ring
+            if _atoms_in_same_ring(mol, carbonyl_c, sulfur):
+                continue
+
+            # Get the bond between carbonyl C and sulfur (C-S bond to cleave)
+            bond = mol.GetBondBetweenAtoms(carbonyl_c, sulfur)
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "thioester",
+                    "acid_atom": carbonyl_c,
+                    "alkyl_atom": alkyl_c,
+                    "match": match,
+                })
+
+    # --- Step 5: Detect amide bonds (skip lactams, skip carbamate overlap) ---
     if _AMIDE_SMARTS is not None:
         for match in mol.GetSubstructMatches(_AMIDE_SMARTS):
             carbonyl_c = match[0]
@@ -206,7 +277,30 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "match": match,
                 })
 
-    # --- Step 4: Detect glycosidic bonds ---
+    # --- Step 6: Detect sulfonamide bonds (S(=O)(=O)-N) ---
+    if _SULFONAMIDE_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_SULFONAMIDE_SMARTS):
+            sulfur = match[0]
+            # match[1] and match[2] are =O
+            nitrogen = match[3]
+
+            # Sultam guard: skip if sulfur and nitrogen are in the same ring
+            if _atoms_in_same_ring(mol, sulfur, nitrogen):
+                continue
+
+            # Get the bond between sulfur and nitrogen (S-N bond to cleave)
+            bond = mol.GetBondBetweenAtoms(sulfur, nitrogen)
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "sulfonamide",
+                    "acid_atom": sulfur,
+                    "alkyl_atom": nitrogen,
+                    "match": match,
+                })
+
+    # --- Step 7: Detect glycosidic bonds ---
     if _GLYCOSIDIC_SMARTS is not None:
         for match in mol.GetSubstructMatches(_GLYCOSIDIC_SMARTS):
             anomeric_c = match[0]
@@ -226,7 +320,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "match": match,
                 })
 
-    # --- Step 5: Detect ether bonds (C-O-C, not ester/glycosidic/ring) ---
+    # --- Step 8: Detect ether bonds (C-O-C, not ester/glycosidic/ring) ---
     if _ETHER_SMARTS is not None:
         for match in mol.GetSubstructMatches(_ETHER_SMARTS):
             carbon1 = match[0]
