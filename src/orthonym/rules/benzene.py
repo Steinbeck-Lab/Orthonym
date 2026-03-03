@@ -434,11 +434,48 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if generic:
             return generic
 
-        # Phase 85 note: universal fallback for benzene C-substituents deferred.
-        # benzene.py has extensive suffix FG handling and the generic fallback
-        # caused regressions by naming fragments that the suffix pipeline
-        # intentionally drops. Proper benzene integration requires targeted
-        # work in a future phase (handler retrofit Phase 86).
+        # Phase 86: Universal pipeline fallback for complex C-substituents.
+        # By this point, suffix FG detection (line 387-389) has already returned
+        # for recognized suffix patterns (acid, amide, nitrile, aldehyde, etc.).
+        # We only reach here for C-substituents that are NOT suffix FGs and NOT
+        # simple alkyls/haloalkyls -- e.g., cyanomethyl, carbamoylmethyl, etc.
+        #
+        # Guards:
+        # 1. Carbonyl guard: if start C has C=O, it's a carbonyl carbon
+        #    (ester C(=O)OR, ketone C(=O)R). These are FG features handled
+        #    by dedicated handlers; naming them as benzene substituents causes
+        #    routing regressions. All suffix-type carbonyls (acid, amide,
+        #    aldehyde, acid chloride) are already caught by suffix FG check.
+        # 2. Size guard: fragments larger than 10 atoms are major structural
+        #    features (fused systems, long chains), not genuine substituents.
+        if sub_atoms:
+            # Check if start carbon is a carbonyl (has C=O bond)
+            _is_carbonyl = False
+            for _nbr in start_atom.GetNeighbors():
+                if _nbr.GetIdx() in ring_atoms:
+                    continue
+                if _nbr.GetSymbol() == 'O':
+                    _bond = mol.GetBondBetweenAtoms(start_idx, _nbr.GetIdx())
+                    if _bond and _bond.GetBondType() == Chem.BondType.DOUBLE:
+                        _is_carbonyl = True
+                        break
+
+            if not _is_carbonyl:
+                _MAX_FALLBACK_ATOMS = 10
+                if len(sub_atoms) <= _MAX_FALLBACK_ATOMS:
+                    from ..assembly.substituent_enumerator import name_substituent
+                    from ..assembly.naming_utils import needs_brackets
+                    prefix_name = name_substituent(mol, set(sub_atoms), start_idx)
+                    if prefix_name and prefix_name != "substituent":
+                        # Wrap in parentheses if compound name per IUPAC P-14.5.2
+                        is_compound = needs_brackets(prefix_name)
+                        if is_compound and not (prefix_name.startswith('(') and prefix_name.endswith(')')):
+                            prefix_name = f'({prefix_name})'
+                        return {
+                            'name': prefix_name,
+                            'atoms': sub_atoms,
+                            'is_complex': is_compound,
+                        }
 
     return None
 

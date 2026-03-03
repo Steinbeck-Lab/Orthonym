@@ -391,3 +391,160 @@ class TestPolyfunctionalRingAsParent:
         assert "aminocyclohexane" not in result.lower(), (
             f"Ring-as-parent should not intercept sphingolipid, got: '{result}'"
         )
+
+
+# ============================================================================
+# Benzene handler retrofit tests (Plan 03, Task 1)
+# ============================================================================
+
+
+class TestBenzeneRetrofit:
+    """Tests for benzene handler with universal C-substituent fallback.
+
+    Phase 86 Plan 03: _identify_substituent() no longer returns None
+    for complex C-substituents (<=10 atoms, non-carbonyl). Uses
+    name_substituent() from universal pipeline as fallback.
+    """
+
+    def test_complex_c_sub_not_none(self):
+        """_identify_substituent returns non-None for complex C-substituents."""
+        from rdkit import Chem
+        from orthonym.rules.benzene import _identify_substituent
+
+        # Cyanomethyl on benzene
+        mol = Chem.MolFromSmiles("c1ccc(CC#N)cc1")
+        ring_atoms = set()
+        ri = mol.GetRingInfo()
+        for ring in ri.AtomRings():
+            if len(ring) == 6 and all(
+                mol.GetAtomWithIdx(i).GetIsAromatic() and
+                mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                for i in ring
+            ):
+                ring_atoms = set(ring)
+                break
+
+        for ra in ring_atoms:
+            for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetSymbol() == 'C':
+                    result = _identify_substituent(mol, nbr.GetIdx(), ring_atoms)
+                    assert result is not None, (
+                        "Complex C-substituent (cyanomethyl) returned None"
+                    )
+                    assert 'name' in result
+                    assert 'atoms' in result
+                    return
+        pytest.fail("Did not find C-substituent on benzene ring")
+
+    def test_carbamoylmethyl_on_benzene(self):
+        """Carbamoylmethyl on benzene is identified (not None)."""
+        from rdkit import Chem
+        from orthonym.rules.benzene import _identify_substituent
+
+        mol = Chem.MolFromSmiles("c1ccc(CC(=O)N)cc1")
+        ring_atoms = set()
+        ri = mol.GetRingInfo()
+        for ring in ri.AtomRings():
+            if len(ring) == 6 and all(
+                mol.GetAtomWithIdx(i).GetIsAromatic() and
+                mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                for i in ring
+            ):
+                ring_atoms = set(ring)
+                break
+
+        for ra in ring_atoms:
+            for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetSymbol() == 'C':
+                    result = _identify_substituent(mol, nbr.GetIdx(), ring_atoms)
+                    assert result is not None, "Carbamoylmethyl returned None"
+                    return
+        pytest.fail("Did not find C-substituent on benzene ring")
+
+    def test_benzoic_acid_no_double_counting(self):
+        """Benzoic acid remains 'benzoic acid' -- no 'carboxy' prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound("OC(=O)c1ccccc1")
+        assert result is not None
+        assert result.lower() == "benzoic acid", f"Expected 'benzoic acid', got '{result}'"
+
+    def test_benzamide_no_double_counting(self):
+        """Benzamide remains 'benzamide' -- no 'carbamoyl' prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound("NC(=O)c1ccccc1")
+        assert result is not None
+        assert result.lower() == "benzamide", f"Expected 'benzamide', got '{result}'"
+
+    def test_benzonitrile_no_double_counting(self):
+        """Benzonitrile remains 'benzonitrile' -- no 'cyano' prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound("N#Cc1ccccc1")
+        assert result is not None
+        assert result.lower() == "benzonitrile", f"Expected 'benzonitrile', got '{result}'"
+
+    def test_benzaldehyde_no_double_counting(self):
+        """Benzaldehyde remains 'benzaldehyde' -- no 'formyl' prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound("O=Cc1ccccc1")
+        assert result is not None
+        assert result.lower() == "benzaldehyde", f"Expected 'benzaldehyde', got '{result}'"
+
+    def test_toluene_unchanged(self):
+        """Toluene still works (simple alkyl)."""
+        from orthonym.namer import name_compound
+        result = name_compound("Cc1ccccc1")
+        assert result is not None
+        assert result.lower() == "toluene", f"Expected 'toluene', got '{result}'"
+
+    def test_chlorobenzene_unchanged(self):
+        """Chlorobenzene still works (halogen)."""
+        from orthonym.namer import name_compound
+        result = name_compound("Clc1ccccc1")
+        assert result is not None
+        assert result.lower() == "chlorobenzene", f"Expected 'chlorobenzene', got '{result}'"
+
+    def test_4_methylbenzoic_acid_unchanged(self):
+        """4-methylbenzoic acid retains methyl substituent."""
+        from orthonym.namer import name_compound
+        result = name_compound("Cc1ccc(C(=O)O)cc1")
+        assert result is not None
+        assert "methyl" in result.lower(), f"Expected 'methyl' in '{result}'"
+        assert "benzoic acid" in result.lower(), f"Expected 'benzoic acid' in '{result}'"
+
+    def test_4_nitrobenzamide_unchanged(self):
+        """4-nitrobenzamide retains nitro substituent."""
+        from orthonym.namer import name_compound
+        result = name_compound("O=C(N)c1ccc([N+](=O)[O-])cc1")
+        assert result is not None
+        assert "nitro" in result.lower(), f"Expected 'nitro' in '{result}'"
+        assert "benzamide" in result.lower(), f"Expected 'benzamide' in '{result}'"
+
+    def test_ester_on_benzene_not_named_as_sub(self):
+        """Ester carbonyl directly on benzene returns None (handled by ester handler)."""
+        from rdkit import Chem
+        from orthonym.rules.benzene import _identify_substituent
+
+        # Methyl benzoate: COC(=O)c1ccccc1
+        mol = Chem.MolFromSmiles("COC(=O)c1ccccc1")
+        ring_atoms = set()
+        ri = mol.GetRingInfo()
+        for ring in ri.AtomRings():
+            if len(ring) == 6 and all(
+                mol.GetAtomWithIdx(i).GetIsAromatic() and
+                mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                for i in ring
+            ):
+                ring_atoms = set(ring)
+                break
+
+        # Find the ester C (has =O)
+        for ra in ring_atoms:
+            for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetSymbol() == 'C':
+                    result = _identify_substituent(mol, nbr.GetIdx(), ring_atoms)
+                    # Ester carbonyl should return None (carbonyl guard)
+                    assert result is None, (
+                        f"Ester carbonyl on benzene should return None, got {result}"
+                    )
+                    return
+        pytest.fail("Did not find ester C on benzene ring")

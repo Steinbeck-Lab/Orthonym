@@ -611,9 +611,10 @@ PHASE24_PARSE_FIXES = [
         "oxy-complex-ether-decoxy",
     ),
     # B5: Sugar glycoside on benzene -> rhamnopyranosyloxy (was hexosyloxy, then oxan-2-yl)
+    # Phase 86: benzene universal fallback now names the COC(=S)NC- chain substituent
     (
         "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-        "(rhamnopyranosyloxy)hydroxybenzene",
+        "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
         "oxy-glycoside-benzene",
     ),
     # B6: Fused ring system -> phenoxy (was bare "oxy")

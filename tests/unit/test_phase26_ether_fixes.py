@@ -144,9 +144,11 @@ class TestBGroupRegression:
             "B4-decoxy",
         ),
         # B5: Sugar glycoside -> rhamnopyranosyloxy (retained sugar name)
+        # Phase 86: benzene universal fallback now names the COC(=S)NC-
+        # chain as a substituent (previously silently dropped).
         (
             "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-            "(rhamnopyranosyloxy)hydroxybenzene",
+            "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
             "B5-glycosyloxy",
         ),
         # B6: Fused ring system -> phenoxy
