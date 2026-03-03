@@ -279,3 +279,53 @@ class TestEsterRetrofit:
         assert result is not None
         assert "ethyl" in result.lower(), f"Expected 'ethyl' in '{result}'"
         assert "butanoate" in result.lower(), f"Expected 'butanoate' in '{result}'"
+
+
+# ============================================================================
+# Amide handler tests (Plan 02, Task 1)
+# ============================================================================
+
+
+class TestAmideRetrofit:
+    """Tests for amide handler with correct prefix locant joining."""
+
+    def test_n_methylacetamide_no_regression(self):
+        """Simple N-substituted amide: N-methylacetamide."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(=O)NC")
+        assert result is not None
+        assert result.lower() == "n-methylacetamide", f"Expected 'N-methylacetamide', got '{result}'"
+
+    def test_2_methylbutanamide(self):
+        """Chain substituent on saturated amide: 2-methylbutanamide."""
+        from orthonym.namer import name_compound
+        result = name_compound("CCC(C)C(=O)N")
+        assert result is not None
+        assert "methyl" in result.lower(), f"Expected 'methyl' in '{result}'"
+        assert "butanamide" in result.lower(), f"Expected 'butanamide' in '{result}'"
+        # Must NOT have double locant (e.g., "2-2-methyl")
+        assert "2-2-" not in result, f"Double locant found in '{result}'"
+
+    def test_2_ethylpentanamide(self):
+        """Chain substituent on longer saturated amide: 2-ethylpentanamide."""
+        from orthonym.namer import name_compound
+        result = name_compound("CCCC(CC)C(=O)N")
+        assert result is not None
+        assert "ethyl" in result.lower(), f"Expected 'ethyl' in '{result}'"
+        assert "pentanamide" in result.lower(), f"Expected 'pentanamide' in '{result}'"
+        assert "2-2-" not in result, f"Double locant found in '{result}'"
+
+    def test_nndimethylacetamide_no_regression(self):
+        """N,N-disubstituted amide: N,N-dimethylacetamide."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(=O)N(C)C")
+        assert result is not None
+        assert result.lower() == "n,n-dimethylacetamide", f"Expected 'N,N-dimethylacetamide', got '{result}'"
+
+    def test_2_hydroxypropanamide(self):
+        """Hydroxy substituent on saturated amide: 2-hydroxypropanamide."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(O)C(=O)N")
+        assert result is not None
+        assert "hydroxy" in result.lower(), f"Expected 'hydroxy' in '{result}'"
+        assert "propanamide" in result.lower(), f"Expected 'propanamide' in '{result}'"

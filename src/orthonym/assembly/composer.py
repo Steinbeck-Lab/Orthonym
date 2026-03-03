@@ -2768,15 +2768,12 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         base_name = name_amide(mol, amide_atoms)
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
+            # Note: NameFragment.text already includes locants -- use directly.
             prefixes = _generate_prefixes(features)
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    if p.locants:
-                        loc_str = ",".join(str(l) for l in p.locants)
-                        prefix_parts.append(f"{loc_str}-{p.text}")
-                    else:
-                        prefix_parts.append(p.text)
+                    prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
                     return f"{prefix_str}{base_name}"
@@ -2795,15 +2792,14 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         base_name = name_amide(mol, amide_atoms)
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
+            # Note: _generate_prefixes returns NameFragments whose .text
+            # already includes locants (e.g., "2-methyl"), so use .text
+            # directly -- do NOT re-prepend locants from .locants field.
             prefixes = _generate_prefixes(features)
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    if p.locants:
-                        loc_str = ",".join(str(l) for l in p.locants)
-                        prefix_parts.append(f"{loc_str}-{p.text}")
-                    else:
-                        prefix_parts.append(p.text)
+                    prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
                     return f"{prefix_str}{base_name}"
