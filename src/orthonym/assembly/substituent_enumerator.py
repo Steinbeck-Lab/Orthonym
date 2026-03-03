@@ -334,7 +334,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
         result = name_substituent_fragment(
             mol, list(frag_atoms_set), attach_idx, []
         )
-        if result:
+        if result and "unknown" not in result.lower():
             return result
     except Exception:
         pass

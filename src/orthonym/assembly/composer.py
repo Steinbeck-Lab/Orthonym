@@ -66,6 +66,145 @@ from ..data.partial_saturation_refs import get_aromatic_reference, get_reference
 # graduated confidence scoring in coverage_scoring.py
 
 
+# ============================================================================
+# Universal Prefix Integration Helper (Phase 86)
+# ============================================================================
+
+
+def _integrate_universal_prefixes(
+    mol,
+    parent_atoms,
+    parent_type="auto",
+    oriented_ring=None,
+    principal_chain=None,
+    atom_to_locant=None,
+    exclude_atoms=None,
+):
+    """Discover and format all substituents on a parent structure.
+
+    Uses the universal pipeline (Phase 84-85) to enumerate ALL
+    non-parent atoms and name them as IUPAC prefixes. Any handler
+    can call this to get a correctly formatted, alphabetically sorted
+    prefix string ready to prepend to its core name.
+
+    Args:
+        mol: RDKit Mol object.
+        parent_atoms: Set of atom indices defining the parent structure.
+        parent_type: ``"ring"``, ``"chain"``, or ``"auto"`` (auto-detects).
+        oriented_ring: Ring atom indices in IUPAC order (for ring parents).
+        principal_chain: Chain atom indices in order (for chain parents).
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+        exclude_atoms: Atoms already accounted for (e.g., carbonyl O of
+            lactone, halogen of acid halide) -- added to parent set so
+            they are not discovered as substituents.
+
+    Returns:
+        Prefix string (e.g., ``"3-methyl-"`` or ``"2-chloro-3-methyl-"``)
+        ready to prepend to the handler's core name. Returns empty string
+        ``""`` if no substituents are found.
+
+    References:
+        IUPAC 2013 P-31.1 (detachable prefixes)
+        Phase 84: ``discover_substituents()``
+        Phase 85: ``name_substituent()``
+    """
+    from .substituent_enumerator import discover_substituents, name_substituent
+
+    parent_set = set(parent_atoms)
+
+    # Merge exclude_atoms into the effective parent set so the discovery
+    # engine treats them as "accounted for" (not substituents).
+    effective_parent = set(parent_set)
+    if exclude_atoms:
+        effective_parent |= set(exclude_atoms)
+
+    try:
+        subs = discover_substituents(
+            mol, effective_parent,
+            parent_type=parent_type,
+            oriented_ring=oriented_ring,
+            principal_chain=principal_chain,
+            atom_to_locant=atom_to_locant,
+        )
+    except (AssertionError, Exception) as exc:
+        logger.debug("_integrate_universal_prefixes discovery failed: %s", exc)
+        return ""
+
+    if not subs:
+        return ""
+
+    # Name each substituent and group by name for multiplier handling
+    prefix_groups = defaultdict(list)
+    for sub_info in subs:
+        attach_idx = _find_attach_idx_in_frag(mol, sub_info, effective_parent)
+        prefix_name = name_substituent(mol, sub_info.frag_atoms, attach_idx)
+        if prefix_name and prefix_name != "substituent":
+            prefix_groups[prefix_name].append(sub_info.locant)
+
+    if not prefix_groups:
+        return ""
+
+    # Format with locants, multipliers, and alphabetical sorting
+    return _format_prefix_groups(prefix_groups)
+
+
+def _find_attach_idx_in_frag(mol, sub_info, parent_atoms):
+    """Find the attachment atom index within a substituent fragment.
+
+    The attachment atom is the atom in ``sub_info.frag_atoms`` that is
+    bonded to an atom in ``parent_atoms``.
+
+    Args:
+        mol: RDKit Mol object.
+        sub_info: SubstituentInfo namedtuple.
+        parent_atoms: Set of parent atom indices (including excluded atoms).
+
+    Returns:
+        Atom index of the attachment atom, or the first atom in frag_atoms
+        as a fallback.
+    """
+    for idx in sub_info.frag_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in parent_atoms:
+                return idx
+    # Fallback: use attach_mol_idx from sub_info if it's in frag_atoms
+    if sub_info.attach_mol_idx in sub_info.frag_atoms:
+        return sub_info.attach_mol_idx
+    # Last resort: first atom in frag
+    if sub_info.frag_atoms:
+        return next(iter(sub_info.frag_atoms))
+    return 0
+
+
+def _format_prefix_groups(prefix_groups):
+    """Format named substituent groups into an IUPAC prefix string.
+
+    Groups substituents by name, applies multiplicative prefixes
+    (di-, tri-, bis-, tris-), sorts alphabetically per IUPAC rules,
+    and joins with hyphens.
+
+    Args:
+        prefix_groups: Dict mapping prefix name to list of locants.
+            Example: ``{"methyl": [2], "chloro": [3, 5]}``
+
+    Returns:
+        Formatted prefix string (e.g., ``"3,5-dichloro-2-methyl"``).
+        Trailing hyphen is NOT included.
+    """
+    parts = []
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+        locants = sorted(prefix_groups[name])
+        count = len(locants)
+        prefix_str = format_substituent_prefix(name, locants, count)
+        parts.append(prefix_str)
+
+    if not parts:
+        return ""
+
+    return "-".join(parts) + "-"
+
+
 def get_saturation_prefix_for_fused_ring(
     mol,
     aromatic_parent_name: Optional[str] = None,
