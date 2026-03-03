@@ -1484,7 +1484,22 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     try:
         return get_alkyl_name(carbon_count)
     except (ValueError, KeyError):
-        return None
+        pass
+
+    # Phase 86: Universal pipeline fallback for complex R groups that
+    # cannot be named by the simple alkyl/phenyl/benzyl classification above.
+    # This lets functional class handlers (isocyanate, boronic acid, urea, etc.)
+    # correctly name molecules with complex R-groups (functionalized chains,
+    # substituted rings, heteroatom-containing fragments).
+    try:
+        from .substituent_enumerator import name_substituent as _ns_r
+        prefix = _ns_r(mol, set(frag_atoms), start_idx)
+        if prefix and prefix != "substituent":
+            return prefix
+    except Exception:
+        pass
+
+    return None
 
 
 # ============================================================================
@@ -3107,7 +3122,11 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
 
     Ring-attached nitriles use the carbonitrile suffix, e.g.:
     - cyclohexanecarbonitrile
-    - cyclopentanecarbonitrile
+    - 1-methylcyclohexanecarbonitrile
+
+    Phase 86-03: Retrofitted to discover ring substituents via universal
+    pipeline (_integrate_universal_prefixes). Previously dropped all
+    substituents on the ring.
 
     Args:
         features: MolecularFeatures with principal_group='nitrile' and is_cyclic=True
@@ -3134,16 +3153,36 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
 
     parent_name = f"cyclo{stem}ane"
 
-    # Get nitrile atoms
+    # Get nitrile atoms to exclude from substituent discovery
     nitrile_atoms = None
+    exclude_atoms = set()
     if features.principal_group_atoms:
         nitrile_atoms = features.principal_group_atoms[0]
+        if nitrile_atoms:
+            exclude_atoms = set(nitrile_atoms)
 
+    # Build the base nitrile name (ring + carbonitrile)
     if nitrile_atoms:
-        return name_nitrile(features.mol, nitrile_atoms, parent_name=parent_name, is_ring=True)
+        base_name = name_nitrile(features.mol, nitrile_atoms, parent_name=parent_name, is_ring=True)
+    else:
+        base_name = f"{parent_name}carbonitrile"
 
-    # Fallback: just append carbonitrile
-    return f"{parent_name}carbonitrile"
+    # Phase 86-03: Discover ring substituents via universal pipeline
+    # The nitrile C#N atoms are excluded so they are not named as substituents
+    parent_atoms = set(principal_ring)
+    oriented_ring = list(principal_ring)
+
+    prefix_str = _integrate_universal_prefixes(
+        features.mol, parent_atoms,
+        parent_type="ring",
+        oriented_ring=oriented_ring,
+        exclude_atoms=exclude_atoms,
+    )
+
+    if prefix_str:
+        return f"{prefix_str}{base_name}"
+
+    return base_name
 
 
 def _generate_chain_parent(features: Any) -> NameFragment:

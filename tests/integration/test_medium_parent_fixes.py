@@ -70,13 +70,13 @@ FUSED_HETERO_CHAIN_FIXES = [
     pytest.param(
         "C/C1=C/C[C@@H](/C(C)=C/c2csc(C)n2)OC(=O)C[C@H](O)"
         "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
-        "pentamethyloxacyclohexadecan",
+        "pentamethyl",  # P86: now also finds 6-oxo, so substring can't span methyl→oxacyclo
         id="macrolide-pentamethyl-oxacyclohexadecanone",
     ),
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
         "O[C@@H](C)C/C=C\\C(=O)O1",
-        "trimethyloxacyclohexadecan",
+        "trimethyl",  # P86: now also finds 6,12-dioxo, so substring can't span methyl→oxacyclo
         id="macrolide-trimethyl-oxacyclohexadecanone",
     ),
     pytest.param(

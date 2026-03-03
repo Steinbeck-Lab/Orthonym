@@ -149,7 +149,8 @@ CI_BENCHMARK = [
         "/C=C/C=C/[C@@](C)(O)[C@@H](O[C@@H]2OC[C@@H](O[C@H]3C"
         "[C@@](C)(O)[C@H](N(C)C)[C@@H](C)O3)[C@H](O)[C@H]2N)"
         "/C=C\\C=C\\1",
-        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-3-butyl-11-hydroxy"
+        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-12-[(2R,3R,4R,6S)-3-ethyl-6-tetrahydropyranyl"
+        "-4-hydroxy-2,4-dimethyltetrahydropyranyl]-11-hydroxy-3-isobutyl"
         "-5,11,17,21,24-pentamethylazacyclotetracosan-2-one",
     ),
     (
@@ -357,7 +358,8 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "(3S,6R,9S,12R,15S,18R,21R)-3,9,15-tributyl-22-methyl-18-propyloxacyclodocosan-2-one",
+        "(3S,6R,9S,12R,15S,18R,21R)-3-(sec-butyl)-21-(20-carboxyicosyl)-6,12-dihydroxymethyl"
+        "-9,15-diisobutyl-18-isopropyl-22-methyl-5,8,11,14,17,20-hexaoxooxacyclodocosan-2-one",
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"

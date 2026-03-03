@@ -642,14 +642,76 @@ class TestBenzeneRetrofit:
 #   Line 970: Amide (_assemble_amide_name) — 86-02: fixed double-locant bug
 #   Line 684: Polyfunctional (name_polyfunctional) — 86-02: ring-as-parent path
 #   Line 929: Benzene (_assemble_benzene_name) — 86-03: universal fallback for complex C-subs
+#   Line 963: Ring nitrile (_assemble_ring_nitrile_name) — 86-03: universal pipeline for ring subs
 #
 # Category C — Verified safe (audit in 86-03 Task 2):
 #   Line 530: Ion (assemble_ion_name) — own naming pipeline
-#   Line 963: Ring nitrile (_assemble_ring_nitrile_name) — own prefix gen via features
 #   Line 976: Amine (_assemble_amine_name) — extensive R-group handling (phenyl, fused het, ring, alkyl)
+#
+# Functional class handlers (isocyanate, isothiocyanate, carbamic acid, carbamate,
+# urea, guanidine, boronic acid) use _name_r_group() which has universal pipeline
+# fallback (lines 1489-1500) for complex R-groups that can't be named by simple
+# alkyl/phenyl/benzyl classification.
 #
 # All handlers either: (1) successfully name ALL atoms, or (2) return None → fallthrough.
 # No handler silently drops substituents.
+# ============================================================================
+
+
+# ============================================================================
+# Ring nitrile handler retrofit tests (Plan 03, Task 2)
+# ============================================================================
+
+
+class TestRingNitrileRetrofit:
+    """Tests for ring nitrile handler with universal substituent discovery.
+
+    Phase 86-03: _assemble_ring_nitrile_name now uses
+    _integrate_universal_prefixes to discover ring substituents.
+    Previously, ALL substituents on substituted ring nitriles were silently dropped.
+    """
+
+    def test_methylcyclohexanecarbonitrile(self):
+        """Methyl substituent on ring nitrile is now included."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC1(C#N)CCCCC1")
+        assert result is not None
+        assert "methyl" in result.lower(), f"Expected 'methyl' in '{result}'"
+        assert "cyclohexane" in result.lower() or "carbonitrile" in result.lower(), (
+            f"Expected ring nitrile name, got '{result}'"
+        )
+
+    def test_chlorocyclohexanecarbonitrile(self):
+        """Chloro substituent on ring nitrile is included."""
+        from orthonym.namer import name_compound
+        result = name_compound("ClC1CCC(C#N)CC1")
+        assert result is not None
+        assert "chloro" in result.lower(), f"Expected 'chloro' in '{result}'"
+        assert "carbonitrile" in result.lower(), (
+            f"Expected 'carbonitrile' in '{result}'"
+        )
+
+    def test_unsubstituted_cyclohexanecarbonitrile_no_regression(self):
+        """Unsubstituted cyclohexanecarbonitrile still works."""
+        from orthonym.namer import name_compound
+        result = name_compound("C1CCCCC1C#N")
+        assert result is not None
+        assert result.lower() == "cyclohexanecarbonitrile", (
+            f"Expected 'cyclohexanecarbonitrile', got '{result}'"
+        )
+
+    def test_unsubstituted_cyclopentanecarbonitrile_no_regression(self):
+        """Unsubstituted cyclopentanecarbonitrile still works."""
+        from orthonym.namer import name_compound
+        result = name_compound("C1CCCC1C#N")
+        assert result is not None
+        assert result.lower() == "cyclopentanecarbonitrile", (
+            f"Expected 'cyclopentanecarbonitrile', got '{result}'"
+        )
+
+
+# ============================================================================
+# Category C handler safety tests (Plan 03, Task 2)
 # ============================================================================
 
 
@@ -659,12 +721,21 @@ class TestCategoryCHandlerSafety:
     These handlers return None when they can't fully name a molecule,
     allowing the general pipeline to handle it. This test class verifies
     the pattern works for representative compounds.
+
+    Phase 86-03 audit findings:
+    - Functional class handlers (isocyanate, isothiocyanate, carbamic acid,
+      carbamate, urea, guanidine, boronic acid) all use _name_r_group() which
+      has a universal pipeline fallback for complex R-groups.
+    - Sulfoxide, sulfone, thioether handlers return None for complex R -> fallthrough.
+    - Phosphorus handlers have dedicated modules with full naming.
+    - Amine handler has extensive R-group handling (phenyl, fused het, ring, alkyl).
+    - Ring nitrile was retrofitted (previously dropped all substituents).
     """
 
     def test_sulfide_complex_r_falls_through(self):
         """Sulfide handler returns None for complex R-groups, molecule falls through."""
         from orthonym import name_compound
-        # Methyl(cyclopentyl) sulfide — cyclopentyl is complex for simple alkyl naming
+        # Methyl(cyclopentyl) sulfide -- cyclopentyl is complex for simple alkyl naming
         result = name_compound("C1CCCC1SC")
         assert result is not None  # Falls through to general naming
 
@@ -673,6 +744,12 @@ class TestCategoryCHandlerSafety:
         from orthonym import name_compound
         result = name_compound("CN=C=O")
         assert "isocyanate" in result.lower()
+
+    def test_isothiocyanate_simple_works(self):
+        """Isothiocyanate handler correctly names simple R-groups."""
+        from orthonym import name_compound
+        result = name_compound("CN=C=S")
+        assert "isothiocyanate" in result.lower()
 
     def test_boronic_acid_simple_works(self):
         """Boronic acid handler names simple R-groups correctly."""
@@ -686,9 +763,67 @@ class TestCategoryCHandlerSafety:
         result = name_compound("NC(=O)N")
         assert result is not None
 
+    def test_urea_n_substituted(self):
+        """Urea handler correctly names N-substituted ureas."""
+        from orthonym import name_compound
+        result = name_compound("CN(C)C(=O)N")
+        assert result is not None
+        assert "dimethyl" in result.lower(), f"Expected 'dimethyl' in '{result}'"
+        assert "urea" in result.lower(), f"Expected 'urea' in '{result}'"
+
     def test_amine_n_methyl(self):
         """Amine handler produces N-methyl prefix."""
         from orthonym import name_compound
         result = name_compound("CNCC")
         assert result is not None
         assert "methyl" in result.lower()
+
+    def test_carbamic_acid_retained(self):
+        """Carbamic acid handler produces retained name."""
+        from orthonym import name_compound
+        result = name_compound("NC(=O)O")
+        assert result is not None
+        assert "carbamic" in result.lower() or "amino" in result.lower(), (
+            f"Expected carbamic-based name, got '{result}'"
+        )
+
+    def test_n_oxide_pyridine(self):
+        """N-oxide handler correctly names pyridine 1-oxide."""
+        from orthonym import name_compound
+        result = name_compound("[O-][n+]1ccccc1")
+        assert result is not None
+        assert "oxide" in result.lower(), f"Expected 'oxide' in '{result}'"
+
+    def test_sulfoxide_simple(self):
+        """Sulfoxide handler names simple dimethyl sulfoxide."""
+        from orthonym import name_compound
+        result = name_compound("CS(=O)C")
+        assert result is not None
+        assert "sulfoxide" in result.lower(), f"Expected 'sulfoxide' in '{result}'"
+
+    def test_sulfone_simple(self):
+        """Sulfone handler names simple dimethyl sulfone."""
+        from orthonym import name_compound
+        result = name_compound("CS(=O)(=O)C")
+        assert result is not None
+        assert "sulfone" in result.lower(), f"Expected 'sulfone' in '{result}'"
+
+    def test_guanidine_retained(self):
+        """Guanidine handler produces retained name."""
+        from orthonym import name_compound
+        result = name_compound("NC(=N)N")
+        assert result is not None
+
+    def test_oxime_functional_class(self):
+        """Oxime handler uses functional class naming."""
+        from orthonym import name_compound
+        result = name_compound("CC(=NO)C")
+        assert result is not None
+        assert "oxime" in result.lower(), f"Expected 'oxime' in '{result}'"
+
+    def test_carbamate_functional_class(self):
+        """Carbamate handler uses functional class naming."""
+        from orthonym import name_compound
+        result = name_compound("COC(=O)NC")
+        assert result is not None
+        assert "carbamate" in result.lower(), f"Expected 'carbamate' in '{result}'"
