@@ -162,6 +162,9 @@ def assemble_fragment_name(
         "glycosidic": _assemble_glycoside,
         "carbamate": _assemble_carbamate,
         "ether": _assemble_ether,
+        "thioester": _assemble_thioester,
+        "phosphodiester": _assemble_phosphodiester,
+        "sulfonamide": _assemble_sulfonamide,
     }
 
     assembler = assemblers.get(bond_type)
@@ -539,6 +542,108 @@ def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]
     return _join_components(alkoxy, parent_name)
 
 
+def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble thioester name as 'S-alkyl alkanethioate' per IUPAC P-65.6.3.3.
+
+    Thioic S-acid esters are named as functional class names where sulfur
+    replaces oxygen on the ester side. The acid fragment converts to the
+    "-thioate" form and the thiol fragment becomes an "S-alkyl" prefix.
+
+    Args:
+        fragment_names: {"acid": acid_name, "alkyl": thiol_name}
+        style: Naming style.
+
+    Returns:
+        Thioester name like "S-methyl ethanethioate", or None.
+
+    Examples:
+        >>> _assemble_thioester({"acid": "acetic acid", "alkyl": "methanethiol"}, "pin")
+        'S-methyl ethanethioate'
+        >>> _assemble_thioester({"acid": "propanoic acid", "alkyl": "ethanethiol"}, "pin")
+        'S-ethyl propanethioate'
+    """
+    acid_name = fragment_names.get("acid")
+    thiol_name = fragment_names.get("alkyl")
+    if not acid_name or not thiol_name:
+        return None
+
+    thioate = _acid_to_thioate(acid_name)
+    s_prefix = _thiol_to_s_prefix(thiol_name)
+    if not thioate or not s_prefix:
+        return None
+
+    return f"{s_prefix} {thioate}"
+
+
+def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble phosphodiester name per IUPAC P-67.1.3 compositional nomenclature.
+
+    The acid fragment is a phosphoric acid monoester (named by phosphorus.py
+    after capping). The alkyl fragment name identifies the other ester group.
+    Produces: "alkyl [acid-fragment-name]".
+
+    Args:
+        fragment_names: {"acid": acid_name, "alkyl": alkyl_name}
+        style: Naming style.
+
+    Returns:
+        Phosphodiester name, or None.
+
+    Examples:
+        >>> _assemble_phosphodiester({"acid": "methyl dihydrogen phosphate", "alkyl": "methanol"}, "pin")
+        'methyl methyl dihydrogen phosphate'
+    """
+    acid_name = fragment_names.get("acid")
+    alkyl_name = fragment_names.get("alkyl")
+    if not acid_name or not alkyl_name:
+        return None
+
+    alkyl_prefix = _alcohol_to_alkyl(alkyl_name)
+    if alkyl_prefix and acid_name:
+        return f"{alkyl_prefix} {acid_name}"
+    return None
+
+
+def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble sulfonamide as 'N-substituent (parent)sulfonamide' per P-66.6.4.2.2.
+
+    The acid fragment is a sulfonic acid (named after capping). The amine
+    fragment provides the N-substituent prefix. For unsubstituted sulfonamides
+    (amine is ammonia or absent), produces just the parent sulfonamide.
+
+    Args:
+        fragment_names: {"acid": acid_name, "amine": amine_name}
+        style: Naming style.
+
+    Returns:
+        Sulfonamide name like "N-methylbenzenesulfonamide", or None.
+
+    Examples:
+        >>> _assemble_sulfonamide({"acid": "benzenesulfonic acid", "amine": "methanamine"}, "pin")
+        'N-methylbenzenesulfonamide'
+        >>> _assemble_sulfonamide({"acid": "benzenesulfonic acid"}, "pin")
+        'benzenesulfonamide'
+    """
+    acid_name = fragment_names.get("acid")
+    amine_name = fragment_names.get("amine")
+    if not acid_name:
+        return None
+
+    sulfonamide_parent = _acid_to_sulfonamide(acid_name)
+    if not sulfonamide_parent:
+        return None
+
+    # Unsubstituted sulfonamide: no amine or amine is ammonia
+    if not amine_name or amine_name.lower() in ('amine', 'ammonia'):
+        return sulfonamide_parent
+
+    amine_prefix = _amine_to_prefix(amine_name)
+    if amine_prefix:
+        return f"N-{_join_components(amine_prefix, sulfonamide_parent)}"
+
+    return sulfonamide_parent
+
+
 def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     """Convert an alcohol or fragment name to its alkoxy form.
 
@@ -751,6 +856,152 @@ def _acid_to_acyl(acid_name: str) -> str:
 
     # Fallback
     return stem + "yl"
+
+
+def _acid_to_thioate(acid_name: str) -> Optional[str]:
+    """Convert acid name to thioate form per IUPAC P-65.6.3.3.
+
+    The "-thioate" suffix replaces "-oate" in ester naming when sulfur
+    replaces the ester oxygen.
+
+    Args:
+        acid_name: Full acid name (e.g., "acetic acid", "propanoic acid").
+
+    Returns:
+        The thioate form (e.g., "ethanethioate", "propanethioate"), or None.
+
+    Examples:
+        >>> _acid_to_thioate("acetic acid")
+        'ethanethioate'
+        >>> _acid_to_thioate("propanoic acid")
+        'propanethioate'
+    """
+    name = acid_name.strip()
+
+    # For thioester naming, always use systematic form (not trivial)
+    # because thio- derivatives use systematic nomenclature per IUPAC P-65.6.3.3
+
+    # Handle "carboxylic acid" -> "carbothioate"
+    if name.endswith("carboxylic acid"):
+        return name[:-len("carboxylic acid")] + "carbothioate"
+
+    # Trivial acid name -> systematic thioate conversion
+    # Map common trivial acids to their systematic thioate forms
+    _TRIVIAL_TO_THIOATE = {
+        "formic acid": "methanethioate",
+        "acetic acid": "ethanethioate",
+        "propionic acid": "propanethioate",
+        "butyric acid": "butanethioate",
+        "valeric acid": "pentanethioate",
+        "benzoic acid": "benzenecarbothioate",
+    }
+    if name.lower() in _TRIVIAL_TO_THIOATE:
+        return _TRIVIAL_TO_THIOATE[name.lower()]
+
+    # Strip " acid" suffix
+    if name.endswith(" acid"):
+        stem = name[:-5].strip()
+    else:
+        stem = name
+
+    # Systematic: "propanoic" -> "propanethioate" (replace "-oic" with "ethioate")
+    if stem.endswith("oic"):
+        return stem[:-3] + "ethioate"  # propanoic -> propanethioate
+
+    # Generic "-ic" -> "ethioate" (for systematic names)
+    if stem.endswith("ic"):
+        return stem[:-2] + "ethioate"
+
+    # Fallback
+    return stem + "thioate"
+
+
+def _thiol_to_s_prefix(thiol_name: str) -> Optional[str]:
+    """Convert thiol name to S-alkyl prefix for thioester naming.
+
+    Per IUPAC P-65.6.3.3, the sulfur-bearing fragment is designated
+    with an "S-" locant prefix followed by the alkyl name.
+
+    Args:
+        thiol_name: Thiol fragment name (e.g., "methanethiol", "ethanethiol").
+
+    Returns:
+        S-alkyl prefix (e.g., "S-methyl", "S-ethyl"), or None.
+
+    Examples:
+        >>> _thiol_to_s_prefix("methanethiol")
+        'S-methyl'
+        >>> _thiol_to_s_prefix("ethanethiol")
+        'S-ethyl'
+    """
+    name = thiol_name.strip()
+    if not name:
+        return None
+
+    # Try stripping thiol/anethiol suffixes and deriving alkyl name
+    # "methanethiol" -> "meth" + "yl" -> "methyl"
+    # "ethanethiol" -> "eth" + "yl" -> "ethyl"
+    if name.endswith("anethiol"):
+        base = name[:-len("anethiol")]  # "methanethiol" -> "meth"
+        if base:
+            return f"S-{base}yl"
+
+    # Generic "thiol" suffix: "propanethiol" is already handled above
+    # But "phenylthiol" or other forms:
+    if name.endswith("thiol"):
+        base = name[:-5]  # strip "thiol"
+        if base:
+            # If base ends in "ane": "propanethiol" -> "propane" -> not reached (handled above)
+            # If base already looks like an alkyl form
+            if base.endswith("yl"):
+                return f"S-{base}"
+            # Try converting what's left to alkyl
+            # "propane" -> "propyl"  (if base is "propane")
+            if base.endswith("ane"):
+                return f"S-{base[:-3]}yl"
+            if base.endswith("an"):
+                return f"S-{base[:-2]}yl"
+            return f"S-{base}yl"
+
+    # If the name is already in some other form, try using _alcohol_to_alkyl
+    # This handles cases where the fragment is named as an alcohol instead
+    alkyl = _alcohol_to_alkyl(name)
+    if alkyl and alkyl != name:
+        return f"S-{alkyl}"
+
+    return None
+
+
+def _acid_to_sulfonamide(acid_name: str) -> Optional[str]:
+    """Convert sulfonic acid name to sulfonamide form per IUPAC P-66.6.4.
+
+    Replaces 'sulfonic acid' with 'sulfonamide' in the acid name.
+
+    Args:
+        acid_name: Sulfonic acid name (e.g., "benzenesulfonic acid").
+
+    Returns:
+        Sulfonamide parent name (e.g., "benzenesulfonamide"), or None.
+
+    Examples:
+        >>> _acid_to_sulfonamide("benzenesulfonic acid")
+        'benzenesulfonamide'
+        >>> _acid_to_sulfonamide("methanesulfonic acid")
+        'methanesulfonamide'
+    """
+    name = acid_name.strip()
+    if not name:
+        return None
+
+    # Direct conversion: "sulfonic acid" -> "sulfonamide"
+    if name.endswith("sulfonic acid"):
+        return name[:-len("sulfonic acid")] + "sulfonamide"
+
+    # Already a sulfonamide name
+    if name.endswith("sulfonamide"):
+        return name
+
+    return None
 
 
 def _alcohol_to_alkyl(alcohol_name: str) -> str:
