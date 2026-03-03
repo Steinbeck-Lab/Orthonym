@@ -296,39 +296,64 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     rdCIPLabeler.AssignCIPLabels(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
-    # Find exocyclic substituents (excluding carbonyl O which is the =O)
-    excluded = ring_set | {carbonyl_o_idx}
-    substituents = _detect_lactam_substituents(mol, ordered, atom_to_locant, excluded)
+    # Discover exocyclic substituents via universal pipeline (Phase 86).
+    # Parent atoms = ring atoms; exclude = carbonyl O (=O of the lactam).
+    from ..assembly.substituent_enumerator import discover_substituents, name_substituent
+    from ..assembly.composer import _find_attach_idx_in_frag
 
-    if not substituents:
+    effective_parent = ring_set | {carbonyl_o_idx}
+    try:
+        subs = discover_substituents(
+            mol, effective_parent,
+            parent_type="ring",
+            oriented_ring=ordered,
+            atom_to_locant=atom_to_locant,
+        )
+    except Exception:
+        subs = []
+
+    if not subs:
         # No substituents but may have stereo
         if stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
             return f"{stereo_prefix}{parent_name}"
         return parent_name
 
-    # Build prefix string
+    # Name each substituent and track N-substitution
     from collections import defaultdict
-    groups = defaultdict(list)
-    for sub_name, locant, is_on_nitrogen in substituents:
-        groups[(sub_name, is_on_nitrogen)].append(locant)
+    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+    groups = defaultdict(list)  # key: (sub_name, is_on_nitrogen) -> list of locants
+
+    for sub_info in subs:
+        attach_idx = _find_attach_idx_in_frag(mol, sub_info, effective_parent)
+        sub_name = name_substituent(mol, sub_info.frag_atoms, attach_idx)
+        if sub_name and sub_name != "substituent":
+            # Determine if substituent is on nitrogen
+            attach_parent_atom = mol.GetAtomWithIdx(sub_info.attach_mol_idx)
+            is_on_nitrogen = attach_parent_atom.GetSymbol() == "N"
+            groups[(sub_name, is_on_nitrogen)].append(sub_info.locant)
+
+    if not groups:
+        if stereo_descriptors:
+            stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
+            return f"{stereo_prefix}{parent_name}"
+        return parent_name
 
     # Sort locants within each group
     for key in groups:
         groups[key].sort()
 
     # Build prefix parts, sorted alphabetically
-    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
     prefix_parts = []
-    for (name, is_on_nitrogen), locants in sorted(
+    for (sub_name, is_on_nitrogen), locants in sorted(
         groups.items(), key=lambda x: alpha_sort_key(x[0][0])
     ):
         count = len(locants)
         if is_on_nitrogen:
             # N-substitution: N-methyl, N,N-dimethyl
-            prefix_str = _format_n_prefix(name, count)
+            prefix_str = _format_n_prefix(sub_name, count)
         else:
-            prefix_str = format_substituent_prefix(name, locants, count)
+            prefix_str = format_substituent_prefix(sub_name, locants, count)
         prefix_parts.append(prefix_str)
 
     if not prefix_parts:
