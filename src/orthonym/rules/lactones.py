@@ -268,42 +268,27 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     rdCIPLabeler.AssignCIPLabels(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
-    # Find exocyclic substituents (excluding carbonyl O which is the =O of the lactone)
-    excluded = ring_set | {carbonyl_o_idx}
-    substituents = _detect_lactone_substituents(mol, ordered, atom_to_locant, excluded)
+    # Discover exocyclic substituents via universal pipeline (Phase 86).
+    # Parent atoms = ring atoms; exclude = carbonyl O (=O of the lactone).
+    # The _integrate_universal_prefixes helper adds exclude_atoms to the
+    # effective parent set so they are never discovered as substituents.
+    from ..assembly.composer import _integrate_universal_prefixes
+    prefix_str = _integrate_universal_prefixes(
+        mol, ring_set,
+        parent_type="ring",
+        oriented_ring=ordered,
+        atom_to_locant=atom_to_locant,
+        exclude_atoms={carbonyl_o_idx},
+    )
 
-    if not substituents:
+    if not prefix_str:
         # No substituents but may have stereo
         if stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
             return f"{stereo_prefix}{parent_name}"
         return parent_name
 
-    # Build prefix string
-    from collections import defaultdict
-    groups = defaultdict(list)
-    for sub_name, locant in substituents:
-        groups[sub_name].append(locant)
-
-    # Sort locants within each group
-    for name in groups:
-        groups[name].sort()
-
-    # Build prefix parts, sorted alphabetically
-    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix, format_substituent_prefix
-    prefix_parts = []
-    for name in sorted(groups.keys(), key=alpha_sort_key):
-        locants = groups[name]
-        count = len(locants)
-        prefix_str = format_substituent_prefix(name, locants, count)
-        prefix_parts.append(prefix_str)
-
-    if not prefix_parts:
-        return parent_name
-
-    # Join multiple prefix parts with hyphens, then attach to parent
-    prefix = '-'.join(prefix_parts)
-    name = f"{prefix}{parent_name}"
+    name = f"{prefix_str}{parent_name}"
 
     # Prepend stereo prefix if descriptors exist
     if stereo_descriptors:

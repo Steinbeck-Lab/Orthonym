@@ -330,14 +330,25 @@ def name_substituent(mol, frag_atoms, attach_idx):
         pass
 
     # ---- Tier 4: Recursive compound naming ----
-    try:
-        result = name_substituent_fragment(
-            mol, list(frag_atoms_set), attach_idx, []
-        )
-        if result and "unknown" not in result.lower():
-            return result
-    except Exception:
-        pass
+    # Skip Tier 4 for single-atom non-carbon fragments (halogens, -OH, -NH2,
+    # =O, etc.) where the recursive namer produces garbled results like
+    # "ammoniayl" or "unknown organic compoundyl". The descriptive fallback
+    # (Tier 5) handles these correctly.
+    _skip_tier4 = False
+    if len(frag_atoms_set) == 1:
+        _single_atom = mol.GetAtomWithIdx(next(iter(frag_atoms_set)))
+        if _single_atom.GetAtomicNum() != 6:
+            _skip_tier4 = True
+
+    if not _skip_tier4:
+        try:
+            result = name_substituent_fragment(
+                mol, list(frag_atoms_set), attach_idx, []
+            )
+            if result and "unknown" not in result.lower():
+                return result
+        except Exception:
+            pass
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
     return _descriptive_fallback(mol, frag_atoms_set, attach_idx)

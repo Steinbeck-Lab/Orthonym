@@ -202,7 +202,7 @@ def _format_prefix_groups(prefix_groups):
     if not parts:
         return ""
 
-    return "-".join(parts) + "-"
+    return "-".join(parts)
 
 
 def get_saturation_prefix_for_fused_ring(
