@@ -9,6 +9,8 @@ import pytest
 from rdkit import Chem
 
 from orthonym.decomposition.engine import (
+    _coverage_is_adequate,
+    _decomposition_is_worse,
     _name_quality_is_acceptable,
     _name_sugar_fragment,
     _select_best_bond,
@@ -380,3 +382,98 @@ class TestSugarFragmentIntercept:
         """Benzene is not a sugar -- returns None."""
         result = _name_sugar_fragment("c1ccccc1")
         assert result is None
+
+
+# ============================================================================
+# Coverage gate tests (Phase 87 Plan 02)
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestCoverageGate:
+    """Test _coverage_is_adequate() name-length heuristic for decomposition results."""
+
+    def test_small_molecule_always_passes(self):
+        """Molecules with <= 10 heavy atoms always pass coverage gate."""
+        mol = _mol("CC(=O)OCC")  # ethyl acetate, ~6 heavy atoms
+        assert _coverage_is_adequate("ethyl acetate", mol) is True
+
+    def test_small_molecule_short_name_passes(self):
+        """Even a short name passes for small molecules."""
+        mol = _mol("CCO")  # ethanol, 3 heavy atoms
+        assert _coverage_is_adequate("x", mol) is True
+
+    def test_large_molecule_adequate_name_passes(self):
+        """A 30-atom molecule with a long descriptive name passes."""
+        # 30 heavy atoms: need len >= 30 * 1.4 = 42 chars
+        large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # triacontane, 30C
+        long_name = "triacontane-1,2,3,4,5-pentaol"  # 29 chars -- need more
+        long_name2 = "1,2,3,4,5,6,7,8,9,10-decamethyltriacontane"  # 43 chars
+        assert _coverage_is_adequate(long_name2, large_mol) is True
+
+    def test_large_molecule_short_name_rejected(self):
+        """A 30-atom molecule with a short name (33% coverage) is rejected."""
+        large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # 30 heavy atoms
+        short_name = "methane"  # 7 chars << 42 expected min
+        assert _coverage_is_adequate(short_name, large_mol) is False
+
+    def test_empty_name_rejected(self):
+        """Empty string is rejected."""
+        mol = _mol("CCCCCCCCCCCCCCCC")
+        assert _coverage_is_adequate("", mol) is False
+
+    def test_none_name_rejected(self):
+        """None is rejected."""
+        mol = _mol("CCO")
+        assert _coverage_is_adequate(None, mol) is False
+
+    def test_medium_molecule_borderline(self):
+        """A medium molecule (15 heavy atoms) with borderline name length."""
+        # 15 heavy atoms: need len >= 15 * 1.4 = 21 chars
+        mol = _mol("CCCCCCCCCCCCCCC")  # pentadecane, 15 heavy atoms
+        # "pentadecane" = 11 chars -- above 10 HA so heuristic applies
+        assert _coverage_is_adequate("pentadecane", mol) is False
+        # A more descriptive name passes
+        assert _coverage_is_adequate("2,3,4,5-tetramethylundecane", mol) is True
+
+    def test_retained_core_name_on_large_mol(self):
+        """Coverage gate should NOT reject retained core names -- this is
+        handled by the caller (try_decompose), not _coverage_is_adequate.
+        The function itself uses only the name-length heuristic."""
+        # adenine is short (7 chars) but is a retained core name
+        # A large molecule might legitimately be named "adenine" for its core
+        # _coverage_is_adequate only checks length heuristic, not retained names
+        large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # 30 HA
+        # 7 chars << 42 -- heuristic rejects it
+        assert _coverage_is_adequate("adenine", large_mol) is False
+
+
+# ============================================================================
+# Garbled pattern extension tests (Phase 87 Plan 02)
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestGarbledPatternExtension:
+    """Test _decomposition_is_worse() with extended garbled patterns for new bond types."""
+
+    def test_thioateyl_detected_as_garbled(self):
+        """'thioateyl' in decomposed name is detected as garbled."""
+        mol = _mol("CC(=O)SC")
+        assert _decomposition_is_worse("methyl thioateyl", "methyl thioester", mol) is True
+
+    def test_sulfonamideyl_detected_as_garbled(self):
+        """'sulfonamideyl' in decomposed name is detected as garbled."""
+        mol = _mol("CS(=O)(=O)NC")
+        assert _decomposition_is_worse("sulfonamideyl methane", "methanesulfonamide", mol) is True
+
+    def test_phosphateyl_detected_as_garbled(self):
+        """'phosphateyl' in decomposed name is detected as garbled."""
+        mol = _mol("COP(=O)(O)OC")
+        assert _decomposition_is_worse("phosphateyl methane", "dimethyl phosphate", mol) is True
+
+    def test_existing_garbled_patterns_still_work(self):
+        """Existing garbled patterns (aneyl, cycloane, etc.) still detected."""
+        mol = _mol("CCCCCC")
+        assert _decomposition_is_worse("hexaneyl bad", "hexane", mol) is True
+        assert _decomposition_is_worse("cycloane bad", "cyclohexane", mol) is True
