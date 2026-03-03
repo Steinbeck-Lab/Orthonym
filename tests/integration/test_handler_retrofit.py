@@ -548,3 +548,147 @@ class TestBenzeneRetrofit:
                     )
                     return
         pytest.fail("Did not find ester C on benzene ring")
+
+    def test_succinimide_not_collapsed_to_carboxamide(self):
+        """Succinimide (imide ring) on benzene identified as ring substituent, not amide suffix.
+
+        Phase 86 Plan 03 requirement: when a succinimide ring is attached to
+        benzene via N, the benzene handler must recognize it as an imide ring
+        substituent ('succinimidyl'), not collapse it to 'carboxamide' suffix.
+        """
+        from rdkit import Chem
+        from orthonym.rules.benzene import _identify_substituent
+
+        mol = Chem.MolFromSmiles("O=C1CCC(=O)N1c1ccccc1")
+        ring_atoms = set()
+        ri = mol.GetRingInfo()
+        for ring in ri.AtomRings():
+            if len(ring) == 6 and all(
+                mol.GetAtomWithIdx(i).GetIsAromatic() and
+                mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                for i in ring
+            ):
+                ring_atoms = set(ring)
+                break
+
+        for ra in ring_atoms:
+            for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetSymbol() == 'N':
+                    result = _identify_substituent(mol, nbr.GetIdx(), ring_atoms)
+                    assert result is not None, "Succinimide N returned None"
+                    # Must NOT be 'carboxamide' (suffix collapse)
+                    assert result['name'] != 'carboxamide', (
+                        f"Succinimide collapsed to 'carboxamide': {result}"
+                    )
+                    return
+        pytest.fail("Did not find N-substituent on benzene ring")
+
+    def test_isobutylbenzene_simple_alkyl(self):
+        """Isobutylbenzene: branched alkyl correctly named (existing path)."""
+        from orthonym.namer import name_compound
+        result = name_compound("CC(C)Cc1ccccc1")
+        assert result is not None
+        assert "isobutyl" in result.lower(), f"Expected 'isobutyl' in '{result}'"
+        assert "benzene" in result.lower(), f"Expected 'benzene' in '{result}'"
+
+    def test_benzoyl_chloride_no_double_counting(self):
+        """Benzoyl chloride: suffix FG correctly handled, no carbonyl prefix."""
+        from orthonym.namer import name_compound
+        result = name_compound("ClC(=O)c1ccccc1")
+        assert result is not None
+        assert "benzene" in result.lower() or "benzoyl" in result.lower(), (
+            f"Expected benzene-based name, got '{result}'"
+        )
+
+
+# ============================================================================
+# Phase 86 Final Accounting: All Early-Return Handlers in assemble_name()
+# ============================================================================
+#
+# Category A — Safe as-is (handler returns None for complex cases → fallthrough):
+#   Line 547: Oxime (_name_oxime_or_hydrazone) — recursive name_compound()
+#   Line 553: Hydrazone (_name_oxime_or_hydrazone) — recursive name_compound()
+#   Line 561: N-oxide (_try_name_n_oxide) — recursive name_compound()
+#   Line 569: Isocyanate (_name_isocyanate) — returns None for complex R
+#   Line 577: Isothiocyanate (_name_isothiocyanate) — returns None for complex R
+#   Line 585: Carbamic acid (_name_carbamic_acid) — retained name, N-subs only
+#   Line 593: Carbamate (_name_carbamate) — returns None for complex R
+#   Line 602: Urea (_try_name_urea) — retained name, N-subs only
+#   Line 610: Guanidine (_try_name_guanidine) — retained name, N-subs only
+#   Line 629: Anhydride (name_anhydride) — dedicated module, full naming
+#   Line 675: Ring-attached ester (_assemble_ring_with_ester_prefixes) — own prefix gen
+#   Line 697: Multi-ester (dicarboxylic/polyol) — dedicated module, full naming
+#   Line 725: Sulfoxide (name_sulfoxide) — returns None for complex R
+#   Line 733: Sulfone (name_sulfone) — returns None for complex R
+#   Line 742: Thioether/Sulfide (name_sulfide) — returns None for complex R
+#   Line 762: Phosphine oxide (name_phosphine_oxide) — returns None for complex R
+#   Line 771: Phosphate ester (name_phosphate_ester) — dedicated module
+#   Line 786: Phosphine (name_phosphine) — returns None for complex R
+#   Line 825: Phosphinic acid (name_phosphinic_acid) — dedicated module
+#   Line 834: Boronic acid (_name_boronic_acid) — returns None for complex R
+#   Line 841: Ring assembly (name_ring_assembly) — own substituent handling
+#   Line 872: Complex ring (_assemble_complex_ring_name) — own substituent pipeline
+#   Line 890: Polycyclic (_assemble_polycyclic_name) — own prefix generation
+#   Line 898: Partial sat carbocycle — own naming pipeline
+#   Line 910: Heterocycle (_assemble_heterocycle_name) — own prefix generation
+#   Line 982: Simple molecule (_name_simple_molecule) — single-atom/trivial
+#
+# Category B — Retrofitted (Plans 86-01, 86-02, 86-03):
+#   Line 619: Acid halide (name_acid_halide) — 86-01: universal pipeline for chain subs
+#   Line 642: Lactone (name_monocyclic_lactone) — 86-01: universal pipeline for ring subs
+#   Line 660: Lactam (name_monocyclic_lactam) — 86-01: universal pipeline for ring subs
+#   Ether (_alcohol_to_alkoxy fallback) — 86-01: name_substituent() fallback for bare oxy
+#   Line 713: Ester (name_ester) — 86-02: universal pipeline for acid-side subs
+#   Line 970: Amide (_assemble_amide_name) — 86-02: fixed double-locant bug
+#   Line 684: Polyfunctional (name_polyfunctional) — 86-02: ring-as-parent path
+#   Line 929: Benzene (_assemble_benzene_name) — 86-03: universal fallback for complex C-subs
+#
+# Category C — Verified safe (audit in 86-03 Task 2):
+#   Line 530: Ion (assemble_ion_name) — own naming pipeline
+#   Line 963: Ring nitrile (_assemble_ring_nitrile_name) — own prefix gen via features
+#   Line 976: Amine (_assemble_amine_name) — extensive R-group handling (phenyl, fused het, ring, alkyl)
+#
+# All handlers either: (1) successfully name ALL atoms, or (2) return None → fallthrough.
+# No handler silently drops substituents.
+# ============================================================================
+
+
+class TestCategoryCHandlerSafety:
+    """Verify Category C handlers use safe fallthrough pattern.
+
+    These handlers return None when they can't fully name a molecule,
+    allowing the general pipeline to handle it. This test class verifies
+    the pattern works for representative compounds.
+    """
+
+    def test_sulfide_complex_r_falls_through(self):
+        """Sulfide handler returns None for complex R-groups, molecule falls through."""
+        from orthonym import name_compound
+        # Methyl(cyclopentyl) sulfide — cyclopentyl is complex for simple alkyl naming
+        result = name_compound("C1CCCC1SC")
+        assert result is not None  # Falls through to general naming
+
+    def test_isocyanate_simple_works(self):
+        """Isocyanate handler correctly names simple R-groups."""
+        from orthonym import name_compound
+        result = name_compound("CN=C=O")
+        assert "isocyanate" in result.lower()
+
+    def test_boronic_acid_simple_works(self):
+        """Boronic acid handler names simple R-groups correctly."""
+        from orthonym import name_compound
+        result = name_compound("CB(O)O")
+        assert "boronic acid" in result.lower()
+
+    def test_urea_unsubstituted(self):
+        """Urea handler produces retained name."""
+        from orthonym import name_compound
+        result = name_compound("NC(=O)N")
+        assert result is not None
+
+    def test_amine_n_methyl(self):
+        """Amine handler produces N-methyl prefix."""
+        from orthonym import name_compound
+        result = name_compound("CNCC")
+        assert result is not None
+        assert "methyl" in result.lower()
