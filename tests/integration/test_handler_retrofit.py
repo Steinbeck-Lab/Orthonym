@@ -329,3 +329,65 @@ class TestAmideRetrofit:
         assert result is not None
         assert "hydroxy" in result.lower(), f"Expected 'hydroxy' in '{result}'"
         assert "propanamide" in result.lower(), f"Expected 'propanamide' in '{result}'"
+
+
+# ============================================================================
+# Polyfunctional ring-as-parent handler tests (Plan 02, Task 2)
+# ============================================================================
+
+
+class TestPolyfunctionalRingAsParent:
+    """Tests for polyfunctional ring-as-parent path (USUB-10)."""
+
+    def test_ring_as_parent_function_exists(self):
+        """_name_ring_as_parent_polyfunctional is importable."""
+        from orthonym.rules.polyfunctional import _name_ring_as_parent_polyfunctional
+        assert callable(_name_ring_as_parent_polyfunctional)
+
+    def test_4_aminocyclohexanol(self):
+        """Ring-as-parent: 4-aminocyclohexan-1-ol (amino + alcohol on cyclohexane)."""
+        from orthonym.namer import name_compound
+        result = name_compound("OC1CCC(N)CC1")
+        assert result is not None
+        assert "amino" in result.lower(), f"Expected 'amino' in '{result}'"
+        assert "cyclohexan" in result.lower(), f"Expected 'cyclohexan' in '{result}'"
+        assert "ol" in result.lower(), f"Expected '-ol' suffix in '{result}'"
+
+    def test_4_hydroxycyclohexanone(self):
+        """Ring-as-parent: 4-hydroxycyclohexan-1-one (hydroxy + ketone on cyclohexane)."""
+        from orthonym.namer import name_compound
+        result = name_compound("OC1CCC(=O)CC1")
+        assert result is not None
+        assert "hydroxy" in result.lower(), f"Expected 'hydroxy' in '{result}'"
+        assert "cyclohexan" in result.lower(), f"Expected 'cyclohexan' in '{result}'"
+        assert "one" in result.lower(), f"Expected '-one' suffix in '{result}'"
+
+    def test_chain_polyfunctional_unchanged(self):
+        """Chain-as-parent polyfunctional still works: 4-aminobutanoic acid (GABA)."""
+        from orthonym.namer import name_compound
+        result = name_compound("NCCCC(=O)O")
+        assert result is not None
+        assert "amino" in result.lower(), f"Expected 'amino' in '{result}'"
+        assert "butanoic" in result.lower(), f"Expected 'butanoic' in '{result}'"
+        assert "acid" in result.lower(), f"Expected 'acid' in '{result}'"
+
+    def test_complex_sphingolipid_no_ring_intercept(self):
+        """Large molecule with small ring: ring-as-parent should NOT intercept.
+
+        Sphingolipids have a cyclohexane ring but the chain dominates.
+        The ring-as-parent guard must reject compounds where the ring
+        is < 35% of total heavy atoms.
+        """
+        from orthonym.namer import name_compound
+        smiles = (
+            "CCCCCCCCCCCCCCCCCCCCCC[C@H](O)C(=O)N[C@@H]"
+            "(COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)"
+            "[C@H](O)[C@H]1O)C(CCCCCCCCCCCCCCC)"
+            "/C=C/CCCCCCCCCCCCC"
+        )
+        result = name_compound(smiles)
+        assert result is not None
+        # Must NOT contain "cyclohexane" as parent (ring is too small relative to total)
+        assert "aminocyclohexane" not in result.lower(), (
+            f"Ring-as-parent should not intercept sphingolipid, got: '{result}'"
+        )

@@ -792,6 +792,248 @@ def get_non_principal_groups(
     return result
 
 
+def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
+    """Name a polyfunctional compound where the ring is the parent structure.
+
+    Handles the case where ``principal_chain`` is None because the molecule
+    uses a ring as its parent hydride. Builds the name from:
+    1. Ring parent name (from oriented ring or ring detection)
+    2. Principal group suffix with locants on the ring
+    3. Non-principal group prefixes with ring locants
+    4. Substituent prefixes via the universal pipeline
+
+    IUPAC 2013 P-31 through P-43.
+
+    Args:
+        features: MolecularFeatures object (must have is_cyclic=True,
+            principal_group set).
+
+    Returns:
+        Complete IUPAC name, or None if ring parent cannot be determined.
+    """
+    mol = features.mol
+    principal_group = features.principal_group
+    non_principal = getattr(features, 'non_principal_groups', {})
+
+    if not principal_group:
+        return None
+
+    # --- Step 1: Identify ring parent ---
+    ring_info = mol.GetRingInfo()
+    all_rings = ring_info.AtomRings()
+    if not all_rings:
+        return None
+
+    # Use oriented_ring if available, else find the largest ring
+    oriented_ring = getattr(features, 'oriented_ring', None)
+    if oriented_ring:
+        ring_atoms = list(oriented_ring)
+    else:
+        # Pick the largest ring as parent
+        ring_atoms = list(max(all_rings, key=len))
+
+    ring_set = set(ring_atoms)
+    ring_size = len(ring_atoms)
+
+    # --- Step 2: Build ring parent name ---
+    ring_parent_name = _get_ring_parent_name(mol, ring_atoms)
+    if not ring_parent_name:
+        return None
+
+    # --- Step 3: Build locant mapping for ring atoms ---
+    # Use features.atom_to_locant if available, else build from ring order
+    atom_to_locant = features.atom_to_locant
+    if not atom_to_locant:
+        atom_to_locant = {}
+        for i, idx in enumerate(ring_atoms):
+            atom_to_locant[idx] = i + 1
+
+    # --- Step 4: Generate principal group suffix with locants ---
+    from .seniority import get_suffix
+    suffix = get_suffix(principal_group, is_ring=True)
+    if not suffix:
+        # Try chain suffix as fallback
+        suffix = get_suffix(principal_group, is_ring=False)
+    if not suffix:
+        return None
+
+    suffix_locants = []
+    if features.principal_group_atoms:
+        for match in features.principal_group_atoms:
+            for atom_idx in match:
+                if atom_idx in atom_to_locant:
+                    suffix_locants.append(atom_to_locant[atom_idx])
+                    break
+                # For FGs attached TO the ring (e.g., -COOH on cyclohexane),
+                # the center atom may not be in the ring; check neighbors
+                atom = mol.GetAtomWithIdx(atom_idx)
+                for nbr in atom.GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if nidx in atom_to_locant and nidx in ring_set:
+                        suffix_locants.append(atom_to_locant[nidx])
+                        break
+    suffix_locants = sorted(set(suffix_locants))
+
+    # Determine multiplier for multiple principal groups
+    count = len(suffix_locants) if suffix_locants else 1
+    multiplier = get_multiplier_prefix(count, suffix) if count > 1 else ""
+
+    # --- Step 5: Generate non-principal FG prefixes with ring locants ---
+    all_prefixes = []
+    for fg_name, matches in non_principal.items():
+        if not matches:
+            continue
+        if fg_name in NO_SENIORITY_GROUPS and fg_name not in ('alkene', 'alkyne'):
+            # Named as prefix if it has a prefix form
+            prefix_form = get_fg_prefix_form(fg_name, mol, matches[0], None)
+            if prefix_form:
+                fg_locants = []
+                for match in matches:
+                    for atom_idx in match:
+                        if atom_idx in atom_to_locant:
+                            fg_locants.append(atom_to_locant[atom_idx])
+                            break
+                        atom = mol.GetAtomWithIdx(atom_idx)
+                        for nbr in atom.GetNeighbors():
+                            nidx = nbr.GetIdx()
+                            if nidx in atom_to_locant and nidx in ring_set:
+                                fg_locants.append(atom_to_locant[nidx])
+                                break
+                fg_locants = sorted(set(fg_locants))
+                fg_count = len(fg_locants) if fg_locants else len(matches)
+                formatted = format_fg_prefix(prefix_form, fg_locants, fg_count)
+                all_prefixes.append(formatted)
+            continue
+
+        # Seniority-bearing non-principal groups
+        prefix_form = get_prefix(fg_name)
+        if prefix_form:
+            fg_locants = []
+            for match in matches:
+                for atom_idx in match:
+                    if atom_idx in atom_to_locant:
+                        fg_locants.append(atom_to_locant[atom_idx])
+                        break
+                    atom = mol.GetAtomWithIdx(atom_idx)
+                    for nbr in atom.GetNeighbors():
+                        nidx = nbr.GetIdx()
+                        if nidx in atom_to_locant and nidx in ring_set:
+                            fg_locants.append(atom_to_locant[nidx])
+                            break
+            fg_locants = sorted(set(fg_locants))
+            fg_count = len(fg_locants) if fg_locants else len(matches)
+            formatted = format_fg_prefix(prefix_form, fg_locants, fg_count)
+            all_prefixes.append(formatted)
+
+    # --- Step 6: Discover substituents on the ring via universal pipeline ---
+    # Collect atoms consumed by the principal group and non-principal FGs
+    consumed_atoms = set()
+    if features.principal_group_atoms:
+        for match in features.principal_group_atoms:
+            for idx in match:
+                if idx not in ring_set:
+                    consumed_atoms.add(idx)
+    for fg_name, matches in non_principal.items():
+        for match in matches:
+            for idx in match:
+                if idx not in ring_set:
+                    consumed_atoms.add(idx)
+
+    try:
+        from ..assembly.composer import _integrate_universal_prefixes
+        sub_prefix_str = _integrate_universal_prefixes(
+            mol, ring_set,
+            parent_type="ring",
+            oriented_ring=ring_atoms,
+            atom_to_locant=atom_to_locant,
+            exclude_atoms=consumed_atoms,
+        )
+        if sub_prefix_str:
+            all_prefixes.append(sub_prefix_str)
+    except Exception as exc:
+        logger.debug("Ring-as-parent universal prefix failed: %s", exc)
+
+    # Sort prefixes alphabetically
+    all_prefixes.sort(key=alpha_sort_key)
+
+    # --- Step 7: Assemble the complete name ---
+    # Format: [prefixes]-[ring_parent]-[suffix_locants]-[multiplier][suffix]
+    # e.g., "4-hydroxy-cyclohexan-1-one"
+    formatted_suffix = format_suffix_with_locants(
+        ring_parent_name, "", suffix, suffix_locants, multiplier
+    )
+
+    if all_prefixes:
+        prefix_str = _join_prefixes(all_prefixes)
+        if prefix_str and formatted_suffix and prefix_str[-1].isalpha() and formatted_suffix[0].isdigit():
+            name = f"{prefix_str}-{formatted_suffix}"
+        else:
+            name = f"{prefix_str}{formatted_suffix}"
+    else:
+        name = formatted_suffix
+
+    # Add stereodescriptors if present
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        if descriptors:
+            stereo_prefix = format_stereodescriptor_string(descriptors)
+            name = f"{stereo_prefix}{name}"
+
+    return name
+
+
+def _get_ring_parent_name(mol, ring_atoms: list) -> Optional[str]:
+    """Get the parent hydride name for a ring.
+
+    Checks retained names first (benzene, pyridine, etc.), then falls
+    back to systematic cyclo- naming.
+
+    Args:
+        mol: RDKit Mol object.
+        ring_atoms: List of atom indices forming the ring.
+
+    Returns:
+        Ring parent stem (e.g., ``"cyclohexan"``, ``"benzene"``),
+        or None if not determinable.
+    """
+    ring_set = set(ring_atoms)
+    ring_size = len(ring_atoms)
+
+    # Check if ring is all-carbon aromatic (benzene)
+    all_aromatic = all(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring_atoms)
+    all_carbon = all(mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in ring_atoms)
+
+    if ring_size == 6 and all_aromatic and all_carbon:
+        return "benzene"
+
+    # Check for heterocyclic retained names
+    has_heteroatom = any(
+        mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+        for idx in ring_atoms
+    )
+    if has_heteroatom:
+        try:
+            from ..rules.heterocycles import classify_heterocycle
+            het_info = classify_heterocycle(mol, tuple(ring_atoms))
+            if het_info and het_info.get('name'):
+                return het_info['name']
+        except Exception:
+            pass
+
+    # Systematic cyclo- naming for carbocyclic rings
+    if all_carbon:
+        from ..data.chain_names import get_chain_prefix
+        stem = get_chain_prefix(ring_size)
+        if stem:
+            # Return stem without "ane" suffix -- format_suffix_with_locants
+            # will add the appropriate suffix. For cycloalkanes with
+            # functional groups, we need "cyclohexan" not "cyclohexane".
+            return f"cyclo{stem}an"
+
+    return None
+
+
 def name_polyfunctional(features: Any) -> Optional[str]:
     """
     Generate IUPAC name for a polyfunctional compound.
@@ -816,6 +1058,52 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     non_principal = getattr(features, 'non_principal_groups', {})
 
     if not principal_chain or not atom_to_locant:
+        # --- Phase 86-02: Ring-as-parent polyfunctional path ---
+        # When principal_chain is None but the molecule is cyclic, attempt
+        # ring-as-parent naming. Conservative guards prevent intercepting
+        # compounds better handled by specialized fallthrough handlers:
+        # - Only monocyclic (1 ring) -- fused/polycyclic have specialized handlers
+        # - Only fully saturated rings -- unsaturated rings need -ene/-yne handling
+        # - No aromatic rings -- benzene/pyridine/etc. have retained name handlers
+        if getattr(features, 'is_cyclic', False) and principal_group:
+            ring_info = mol.GetRingInfo()
+            n_rings = ring_info.NumRings()
+            if n_rings == 1:
+                ring_atoms = list(ring_info.AtomRings()[0])
+                ring_set = set(ring_atoms)
+                ring_size = len(ring_atoms)
+                total_heavy = mol.GetNumHeavyAtoms()
+
+                # Guard: ring must be a significant portion of the molecule.
+                # If the ring is < 40% of heavy atoms, it's likely a
+                # substituent on a chain parent, not the parent itself.
+                # E.g., sphingolipid with cyclohexane ring but 50+ chain atoms.
+                if total_heavy > 0 and ring_size / total_heavy < 0.35:
+                    pass  # Fall through to return None
+                else:
+                    # Check ring is fully saturated and non-aromatic
+                    has_ring_double = False
+                    is_aromatic = False
+                    for idx in ring_atoms:
+                        atom = mol.GetAtomWithIdx(idx)
+                        if atom.GetIsAromatic():
+                            is_aromatic = True
+                            break
+                        for bond in atom.GetBonds():
+                            other = bond.GetOtherAtomIdx(idx)
+                            if (other in ring_set
+                                    and bond.GetBondTypeAsDouble() == 2.0):
+                                has_ring_double = True
+                                break
+                        if has_ring_double:
+                            break
+
+                    if not is_aromatic and not has_ring_double:
+                        ring_name = _name_ring_as_parent_polyfunctional(
+                            features,
+                        )
+                        if ring_name:
+                            return ring_name
         return None
 
     # --- EL-02: Ester demotion in polyfunctional context ---
