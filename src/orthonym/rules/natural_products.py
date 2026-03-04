@@ -454,28 +454,9 @@ def _find_scaffold_unsaturation(
 
     Returns a dict with 'ene' and 'yne' keys, each a sorted list of
     IUPAC locants (lower locant of each unsaturated bond).
-
-    AROMATIC bonds are resolved via Kekulization so that each aromatic
-    ring contributes the correct number of formal double bonds (e.g., 3
-    for a 6-membered ring), not one per aromatic bond (which would be 6).
-    IUPAC P-31.1.3.4: aromatic ring bonds count as ene unsaturation.
     """
     ene_locants = []
     yne_locants = []
-
-    # Check if molecule has any aromatic bonds in the scaffold
-    has_aromatic = any(
-        bond.GetBondType() == Chem.BondType.AROMATIC
-        and bond.GetBeginAtomIdx() in matched_set
-        and bond.GetEndAtomIdx() in matched_set
-        for bond in mol.GetBonds()
-    )
-
-    # If aromatic bonds exist, Kekulize a copy to resolve them into
-    # alternating SINGLE/DOUBLE bonds for correct ene counting
-    if has_aromatic:
-        mol = Chem.RWMol(mol)
-        Chem.Kekulize(mol, clearAromaticFlags=False)
 
     for bond in mol.GetBonds():
         b_idx = bond.GetBeginAtomIdx()
