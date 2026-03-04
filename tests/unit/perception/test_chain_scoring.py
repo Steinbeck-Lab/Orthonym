@@ -355,6 +355,103 @@ class TestFGInstanceCounting:
         )
 
 
+class TestSkeletalChainFinding:
+    """Tests for find_all_skeletal_chains() and find_longest_skeletal_chain() (PSEL-02).
+
+    Skeletal chains follow C, O, N, S atoms per IUPAC P-44.3 / P-15.4.
+    """
+
+    def test_ether_extends_through_oxygen(self):
+        """CH3-O-CH2-CH3 (diethyl ether): skeletal chain includes O, length 4."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("COCC")
+        chain = find_longest_skeletal_chain(mol)
+        assert len(chain) == 4, f"Ether: skeletal chain should be 4 (C-O-C-C), got {len(chain)}"
+        # Verify O is in the chain
+        chain_atoms = [mol.GetAtomWithIdx(i).GetSymbol() for i in chain]
+        assert "O" in chain_atoms, "Oxygen should be in the skeletal chain"
+
+    def test_amine_extends_through_nitrogen(self):
+        """CH3-NH-CH2-CH3 (N-methylethylamine): skeletal chain includes N, length 4."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("CNCC")
+        chain = find_longest_skeletal_chain(mol)
+        assert len(chain) == 4, f"Amine: skeletal chain should be 4, got {len(chain)}"
+        chain_atoms = [mol.GetAtomWithIdx(i).GetSymbol() for i in chain]
+        assert "N" in chain_atoms
+
+    def test_thioether_extends_through_sulfur(self):
+        """CH3-S-CH2-CH3 (diethyl sulfide): skeletal chain includes S, length 4."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("CSCC")
+        chain = find_longest_skeletal_chain(mol)
+        assert len(chain) == 4, f"Thioether: skeletal chain should be 4, got {len(chain)}"
+        chain_atoms = [mol.GetAtomWithIdx(i).GetSymbol() for i in chain]
+        assert "S" in chain_atoms
+
+    def test_no_heteroatoms_same_as_carbon(self):
+        """Butane: skeletal chain = carbon chain = 4."""
+        from orthonym.perception.chains import find_longest_skeletal_chain, find_longest_carbon_chain
+        mol = Chem.MolFromSmiles("CCCC")
+        skel = find_longest_skeletal_chain(mol)
+        carb = find_longest_carbon_chain(mol)
+        assert len(skel) == len(carb) == 4
+
+    def test_mixed_ether_and_thioether(self):
+        """CH3-O-CH2-S-CH3: chain follows through both O and S, length 5."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("COCSC")
+        chain = find_longest_skeletal_chain(mol)
+        assert len(chain) == 5, f"Mixed O+S: skeletal chain should be 5, got {len(chain)}"
+
+    def test_terminal_oh_stops_naturally(self):
+        """Ethanol CH3-CH2-OH: O has only 1 non-H neighbor, chain is C-C-O = 3."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("CCO")
+        chain = find_longest_skeletal_chain(mol)
+        # The chain extends through O (terminal), so length = 3
+        assert len(chain) == 3, f"Ethanol: skeletal chain should be 3 (C-C-O), got {len(chain)}"
+
+    def test_exclude_atoms_respected(self):
+        """Ring atoms in exclude_atoms are excluded from skeletal chains."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        # Cyclohexane with methyl ether: C1CCCCC1OC
+        mol = Chem.MolFromSmiles("C1CCCCC1OC")
+        ring_atoms = set(range(6))  # Ring is atoms 0-5
+        chain = find_longest_skeletal_chain(mol, exclude_atoms=ring_atoms)
+        # Only O-C outside ring, length = 2
+        assert len(chain) == 2, f"Excluding ring: skeletal chain should be 2, got {len(chain)}"
+
+    def test_empty_molecule_returns_empty(self):
+        """Molecule with no skeletal atoms returns empty."""
+        from orthonym.perception.chains import find_longest_skeletal_chain
+        mol = Chem.MolFromSmiles("[He]")
+        chain = find_longest_skeletal_chain(mol)
+        assert chain == []
+
+    def test_max_chains_limit(self):
+        """PEG-like molecule respects max_chains limit."""
+        from orthonym.perception.chains import find_all_skeletal_chains
+        import time
+        # PEG-6: C-O-C-C-O-C-C-O-C-C-O-C-C-O-C-C-O-C
+        mol = Chem.MolFromSmiles("COCCOCCOCCOCCOCCOC")
+        start = time.time()
+        chains = find_all_skeletal_chains(mol, max_chains=100)
+        elapsed = time.time() - start
+        assert len(chains) <= 100, f"Should respect max_chains limit, got {len(chains)}"
+        assert elapsed < 1.0, f"Should complete in < 1s, took {elapsed:.2f}s"
+
+    def test_find_all_returns_multiple_chains(self):
+        """find_all_skeletal_chains returns all chains, not just longest."""
+        from orthonym.perception.chains import find_all_skeletal_chains
+        mol = Chem.MolFromSmiles("COCC")  # C-O-C-C
+        chains = find_all_skeletal_chains(mol, min_length=2)
+        # Should have multiple chains of different lengths
+        assert len(chains) > 1, "Should find multiple skeletal chains"
+        lengths = [len(c) for c in chains]
+        assert max(lengths) == 4, "Longest chain should be 4"
+
+
 class TestChainScoreReturnsTuple:
     """Verify chain_score returns the expected 9-element tuple structure."""
 

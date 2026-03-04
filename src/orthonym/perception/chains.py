@@ -114,6 +114,140 @@ def find_longest_carbon_chain(
     return results[0]
 
 
+# ============================================================================
+# Skeletal Chain Finding (C, O, N, S) — IUPAC P-44.3 / P-15.4
+# ============================================================================
+
+# Per IUPAC P-15.4, skeletal replacement nomenclature considers
+# O, N, S as part of the principal chain backbone.
+_SKELETAL_ATOMS = {6, 7, 8, 16}  # C, N, O, S
+
+
+def find_all_skeletal_chains(
+    mol,
+    min_length: int = 1,
+    exclude_atoms: Optional[Set[int]] = None,
+    max_chains: int = 10000
+) -> List[List[int]]:
+    """Find all skeletal chains following C, O, N, S atoms.
+
+    Per IUPAC P-44.3 and P-15.4, skeletal replacement nomenclature
+    considers O, N, S as part of the principal chain backbone.
+
+    This function is used specifically for parent selection chain-vs-ring
+    comparison. It does NOT replace find_all_carbon_chains() which is
+    used for standard chain-based naming.
+
+    Scope: Chain FINDING only. Oxa/aza/thia prefix generation is
+    deferred to a later phase.
+
+    Args:
+        mol: RDKit Mol object
+        min_length: Minimum chain length to return
+        exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
+        max_chains: Maximum chains to find (prevents combinatorial explosion)
+
+    Returns:
+        List of lists, each inner list contains atom indices of a skeletal chain
+    """
+    chains: List[List[int]] = []
+    exclude = exclude_atoms or set()
+    chain_limit_hit = False
+
+    def dfs(atom_idx: int, visited: Set[int], path: List[int]):
+        nonlocal chain_limit_hit
+        if chain_limit_hit:
+            return
+
+        if atom_idx in exclude:
+            return
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+
+        # P-15.4: Follow C, N, O, S atoms only
+        if atom.GetAtomicNum() not in _SKELETAL_ATOMS:
+            return
+
+        visited.add(atom_idx)
+        path.append(atom_idx)
+
+        if len(path) >= min_length:
+            chains.append(path.copy())
+            if len(chains) >= max_chains:
+                chain_limit_hit = True
+                path.pop()
+                visited.discard(atom_idx)
+                return
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited:
+                dfs(nbr_idx, visited, path)
+                if chain_limit_hit:
+                    break
+
+        path.pop()
+        visited.discard(atom_idx)
+
+    # Start DFS from each skeletal atom
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() in _SKELETAL_ATOMS and atom.GetIdx() not in exclude:
+            dfs(atom.GetIdx(), set(), [])
+            if chain_limit_hit:
+                break
+
+    return chains
+
+
+def find_longest_skeletal_chain(
+    mol,
+    exclude_atoms: Optional[Set[int]] = None
+) -> List[int]:
+    """Find the longest continuous skeletal chain (C, O, N, S).
+
+    Convenience function parallel to find_longest_carbon_chain().
+    Used for parent selection comparison when heteroatom chains
+    may be longer than carbon-only chains.
+
+    Args:
+        mol: RDKit Mol object
+        exclude_atoms: Optional set of atom indices to skip
+
+    Returns:
+        List of atom indices forming the longest skeletal chain
+    """
+    exclude = exclude_atoms or set()
+
+    def dfs(atom_idx: int, visited: Set[int], path: List[int], results: List[List[int]]):
+        if atom_idx in exclude:
+            return
+
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetAtomicNum() not in _SKELETAL_ATOMS:
+            return
+
+        visited.add(atom_idx)
+        path.append(atom_idx)
+
+        if len(path) > len(results[0]):
+            results[0] = path.copy()
+
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited:
+                dfs(nbr_idx, visited, path, results)
+
+        path.pop()
+        visited.discard(atom_idx)
+
+    results: List[List[int]] = [[]]
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() in _SKELETAL_ATOMS and atom.GetIdx() not in exclude:
+            dfs(atom.GetIdx(), set(), [], results)
+
+    return results[0]
+
+
 def find_principal_chain(
     mol,
     functional_groups: Dict[str, List[tuple]],
