@@ -446,7 +446,7 @@ CI_BENCHMARK = [
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O",
-        "adenine",  # Phase 58: retained core name whitelist bypass
+        "adenine",  # Phase 58: retained core name whitelist bypass (.O single-atom falls through)
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",

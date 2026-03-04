@@ -373,6 +373,46 @@ class Orthonym:
 
         # Continue with normal neutral molecule naming
 
+        # NEUTRAL DOT-DISCONNECTED SMILES: cocrystals, solvates, neutral mixtures
+        # These have '.' in SMILES but no formal charges (species_type == 'neutral').
+        # Salts/ions/zwitterions are already routed above this point.
+        # Split into components, name each independently, join with space.
+        # Only activates when there are 2+ multi-atom (nameable) fragments.
+        # Single-atom fragments (Cl, Br, I, O) are not true mixture components
+        # and their presence means the original pipeline should handle the molecule.
+        if '.' in canonical_smiles and species_type == 'neutral':
+            frags = canonical_smiles.split('.')
+            if len(frags) >= 2:
+                # Parse all fragments and filter out single-atom fragments
+                frag_mols = []
+                for frag_smi in frags:
+                    frag_mol = Chem.MolFromSmiles(frag_smi)
+                    if frag_mol:
+                        ha = frag_mol.GetNumHeavyAtoms()
+                        frag_mols.append((frag_smi, ha))
+
+                # Only split when 2+ multi-atom fragments exist.
+                # Single-atom dots (e.g., .Cl.Cl) are non-molecular entities
+                # that the normal pipeline handles better as part of the whole mol.
+                multi_atom_frags = [(s, ha) for s, ha in frag_mols if ha >= 2]
+                if len(multi_atom_frags) >= 2:
+                    # Sort by descending heavy atom count for consistent output
+                    frag_mols.sort(key=lambda x: -x[1])
+                    component_names = []
+                    for frag_smi, _ in frag_mols:
+                        try:
+                            frag_namer = Orthonym(style=self.style)
+                            frag_name = frag_namer.name(frag_smi)
+                            if frag_name and frag_name != "unknown":
+                                component_names.append(frag_name)
+                        except Exception:
+                            pass  # Skip unnamed fragments
+
+                    if component_names:
+                        return ' '.join(component_names)
+                # If fewer than 2 multi-atom fragments, or no names produced,
+                # fall through to normal pipeline
+
         # CHARGE NEUTRALIZATION for large zwitterions reclassified as 'neutral'
         # by the HA>20 + quaternary-N guard in detect_species_type().
         # These molecules still carry formal charges (P-O-, N+) that prevent

@@ -75,7 +75,11 @@ class TestCoverageGateWhitelist:
 
     @pytest.mark.integration
     def test_adenine_monophosphate_produces_adenine(self):
-        """AMP-like molecule should produce 'adenine' via nucleobase bypass."""
+        """AMP-like molecule should produce 'adenine' via nucleobase bypass.
+
+        The .O (water) is a single-atom fragment which falls through to the
+        normal pipeline rather than splitting via dot-disconnected handling.
+        """
         smiles = "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O"
         name = name_compound(smiles)
         assert name == "adenine", f"Expected 'adenine', got '{name}'"
