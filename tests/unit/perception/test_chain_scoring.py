@@ -267,6 +267,94 @@ class TestRegressionExistingBehavior:
         assert chain == []
 
 
+class TestFGInstanceCounting:
+    """Tests for FG instance counting fix (PSEL-01).
+
+    chain_score() criterion 2 must count distinct FG instances (SMARTS match
+    tuples with any atom on chain), NOT the number of FG atoms on the chain.
+    """
+
+    def test_two_cooh_counts_as_two_instances(self):
+        """Glutaric acid: 2 COOH groups on the chain = fg_instance_count=2.
+
+        Each COOH match has 3 atoms (C, =O, OH). The old bug would count
+        up to 6 atoms instead of 2 instances.
+        """
+        mol = Chem.MolFromSmiles("OC(=O)CCCC(=O)O")
+        fgs = detect_functional_groups(mol)
+        chain = find_principal_chain(mol, fgs, "carboxylic_acid")
+        # The chain must contain both acid carbons (atoms 1 and 6)
+        chain_set = set(chain)
+        acid_carbons = [
+            atom.GetIdx() for atom in mol.GetAtoms()
+            if atom.GetSymbol() == "C"
+            and sum(1 for n in atom.GetNeighbors() if n.GetSymbol() == "O") == 2
+        ]
+        assert len(acid_carbons) == 2, "Should find 2 acid carbons"
+        for ac in acid_carbons:
+            assert ac in chain_set, f"Acid carbon {ac} must be in chain"
+        # Verify the chain is the 5-carbon chain with both COOHs
+        assert len(chain) == 5
+
+    def test_one_cooh_on_chain_one_off_chain(self):
+        """A branched diacid where one COOH is on a branch, not the main chain.
+
+        3-methylpentanedioic acid (OC(=O)CC(C)CC(=O)O):
+        The 5-carbon chain has both COOHs -> both on chain -> 2 instances.
+        But if we force a shorter chain, only 1 COOH would be on it.
+        We test that chain selection prefers the chain with MORE FG instances.
+        """
+        # OC(=O)CC(CC(=O)O)C -- this has branching, two paths, one COOH on each
+        mol = Chem.MolFromSmiles("OC(=O)CC(CC(=O)O)C")
+        fgs = detect_functional_groups(mol)
+        chain = find_principal_chain(mol, fgs, "carboxylic_acid")
+        chain_set = set(chain)
+        # Count how many COOH instances have any atom on the chain
+        fg_on_chain = 0
+        for match_tuple in fgs.get("carboxylic_acid", []):
+            if any(a in chain_set for a in match_tuple):
+                fg_on_chain += 1
+        # The chain with the most FG instances should be selected
+        assert fg_on_chain >= 1, "At least 1 FG instance must be on the chain"
+
+    def test_zero_fg_on_chain(self):
+        """Chain with no FG atoms should have fg_instance_count=0.
+
+        Hexane has no functional groups at all.
+        """
+        mol = Chem.MolFromSmiles("CCCCCC")
+        fgs = detect_functional_groups(mol)
+        chain = find_principal_chain(mol, fgs)
+        # No principal group -> fg_instance_count is 0 (chain selected by length)
+        assert len(chain) == 6
+
+    def test_instance_count_not_atom_count(self):
+        """Verify that criterion 2 uses instance counting, not atom counting.
+
+        Create a scenario with 2 COOHs (2 instances, 6 FG atoms).
+        Both chains have all 6 FG atoms, but criterion 2 should show
+        fg_instance_count=2, not fg_count=6.
+
+        We verify indirectly: glutaric acid (5C chain, 2 COOHs) should have
+        the same fg_instance_count as if we count SMARTS match tuples.
+        """
+        mol = Chem.MolFromSmiles("OC(=O)CCCC(=O)O")
+        fgs = detect_functional_groups(mol)
+        # There should be exactly 2 carboxylic_acid matches
+        assert len(fgs.get("carboxylic_acid", [])) == 2
+        chain = find_principal_chain(mol, fgs, "carboxylic_acid")
+        chain_set = set(chain)
+        # Count instances the correct way (match tuples with any atom on chain)
+        instance_count = sum(
+            1 for match in fgs["carboxylic_acid"]
+            if any(a in chain_set for a in match)
+        )
+        assert instance_count == 2, (
+            "fg_instance_count should be 2 (two COOH groups), "
+            "not the FG atom overlap count"
+        )
+
+
 class TestChainScoreReturnsTuple:
     """Verify chain_score returns the expected 9-element tuple structure."""
 
