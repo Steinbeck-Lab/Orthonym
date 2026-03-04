@@ -622,7 +622,9 @@ class Orthonym:
         # This must happen BEFORE ring classification to potentially redirect to chain naming
         # EXCEPTION: Skip parent selection for known fused heterocycles (indole, quinoline, etc.)
         # UNLESS chain has strictly more principal groups than ring (P-44.1.1 override)
-        if features.is_cyclic and features.principal_group:
+        # P-44.1.2.2: Ring vs chain comparison applies to ALL molecules,
+        # including hydrocarbons. select_parent() handles no-PG case.
+        if features.is_cyclic:
             from .rules.parent_selection import select_parent
             from .rules.fused_rings import classify_fused_system
             from .data.fused_heterocycles import match_fused_heterocycle_core

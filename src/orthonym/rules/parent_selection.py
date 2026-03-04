@@ -143,9 +143,6 @@ def is_principal_group_on_chain(
 def _count_multiple_bonds(mol, atom_set: Set[int]) -> int:
     """Count double + triple bonds where both atoms are in atom_set.
 
-    Used by P-44.1 cascade as second tiebreaker (after chain length)
-    to compare multiple-bond counts between chain and ring candidates.
-
     Args:
         mol: RDKit Mol object
         atom_set: Set of atom indices to consider
@@ -160,6 +157,152 @@ def _count_multiple_bonds(mol, atom_set: Set[int]) -> int:
             if bt == Chem.BondType.DOUBLE or bt == Chem.BondType.TRIPLE:
                 count += 1
     return count
+
+
+def _count_double_bonds(mol, atom_set: Set[int]) -> int:
+    """Count double bonds (not triple) where both atoms are in atom_set."""
+    count = 0
+    for bond in mol.GetBonds():
+        if bond.GetBeginAtomIdx() in atom_set and bond.GetEndAtomIdx() in atom_set:
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                count += 1
+    return count
+
+
+def _get_largest_individual_ring_size(mol, ring_system_atoms: Set[int]) -> int:
+    """Get size of largest individual SSSR ring in a ring system.
+
+    Per P-52.2.8, ring-vs-chain comparison uses individual ring size,
+    not total fused system atom count.
+
+    Args:
+        mol: RDKit Mol object
+        ring_system_atoms: Set of atom indices in the ring system
+
+    Returns:
+        Size of the largest individual ring, or total atoms if no rings found
+    """
+    ri = mol.GetRingInfo()
+    max_size = 0
+    for ring in ri.AtomRings():
+        ring_set = set(ring)
+        if ring_set.issubset(ring_system_atoms):
+            max_size = max(max_size, len(ring))
+    return max_size if max_size > 0 else len(ring_system_atoms)
+
+
+def _count_substituents_on_atoms(mol, atom_set: Set[int]) -> int:
+    """Count non-H substituents attached to atoms in atom_set but not in it."""
+    count = 0
+    for idx in atom_set:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in atom_set and nbr.GetSymbol() != 'H':
+                count += 1
+    return count
+
+
+# ============================================================================
+# Composable P-44.1 Comparators (ring vs chain)
+# ============================================================================
+# Each returns: 1 (chain wins), -1 (ring wins), 0 (tie)
+
+
+def _compare_chain_length(chain_len: int, ring_size: int) -> int:
+    """P-44.1(c): Maximum chain length / ring skeletal atoms."""
+    if chain_len > ring_size:
+        return 1
+    elif ring_size > chain_len:
+        return -1
+    return 0
+
+
+def _compare_multiple_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
+    """P-44.1(d): Maximum number of multiple bonds (double + triple)."""
+    chain_mult = _count_multiple_bonds(mol, chain_set)
+    ring_mult = _count_multiple_bonds(mol, ring_set)
+    if chain_mult > ring_mult:
+        return 1
+    elif ring_mult > chain_mult:
+        return -1
+    return 0
+
+
+def _compare_double_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
+    """P-44.1(e): Maximum number of double bonds."""
+    chain_db = _count_double_bonds(mol, chain_set)
+    ring_db = _count_double_bonds(mol, ring_set)
+    if chain_db > ring_db:
+        return 1
+    elif ring_db > chain_db:
+        return -1
+    return 0
+
+
+def _compare_pg_locants(
+    mol, chain: List[int], ring_set: Set[int],
+    principal_group_atoms: List[tuple]
+) -> int:
+    """P-44.1(f): Lowest locants for principal groups.
+
+    Lower locant set wins (first-point-of-difference).
+    """
+    chain_set = set(chain)
+    # Get PG positions on chain (0-indexed from chain start)
+    chain_pg_pos = []
+    for pg_atoms in principal_group_atoms:
+        if not pg_atoms:
+            continue
+        attachment = pg_atoms[0]
+        if attachment in chain_set:
+            chain_pg_pos.append(chain.index(attachment))
+        else:
+            atom = mol.GetAtomWithIdx(attachment)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in chain_set:
+                    chain_pg_pos.append(chain.index(nbr.GetIdx()))
+                    break
+
+    # For ring, we use sorted atom indices as proxy for locant positions
+    ring_sorted = sorted(ring_set)
+    ring_idx_map = {a: i for i, a in enumerate(ring_sorted)}
+    ring_pg_pos = []
+    for pg_atoms in principal_group_atoms:
+        if not pg_atoms:
+            continue
+        attachment = pg_atoms[0]
+        if attachment in ring_set:
+            ring_pg_pos.append(ring_idx_map[attachment])
+        else:
+            atom = mol.GetAtomWithIdx(attachment)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in ring_set:
+                    ring_pg_pos.append(ring_idx_map[nbr.GetIdx()])
+                    break
+
+    if not chain_pg_pos and not ring_pg_pos:
+        return 0
+
+    chain_sorted = sorted(chain_pg_pos)
+    ring_sorted_pos = sorted(ring_pg_pos)
+    # First-point-of-difference comparison (lower wins)
+    for c, r in zip(chain_sorted, ring_sorted_pos):
+        if c < r:
+            return 1
+        elif r < c:
+            return -1
+    return 0
+
+
+def _compare_substituent_count(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
+    """P-44.1(h): Maximum number of substituents."""
+    chain_subs = _count_substituents_on_atoms(mol, chain_set)
+    ring_subs = _count_substituents_on_atoms(mol, ring_set)
+    if chain_subs > ring_subs:
+        return 1
+    elif ring_subs > chain_subs:
+        return -1
+    return 0
 
 
 def select_parent(
@@ -230,38 +373,18 @@ def select_parent(
     pg_on_chain = is_principal_group_on_chain(mol, principal_chain, principal_group_atoms)
 
     # Decision logic per IUPAC P-44.1
-    if pg_on_chain and not pg_on_ring:
-        # Override: When chain is very short (< 3 atoms) and the molecule
-        # has exactly ONE connected ring system that is large (>= 13 atoms),
-        # selecting the tiny chain as parent drops the entire ring system.
-        # Per P-52.2.8 spirit and P-44.2.1(e) "greater skeletal atoms",
-        # prefer ring. The FG becomes a prefix instead of suffix.
-        #
-        # Guard: only for single-ring-system molecules (VB, fused systems).
-        # Multi-ring-system molecules are not affected.
-        chain_len = len(principal_chain)
-        if (chain_len < 3
-                and len(ring_systems) == 1
-                and len(ring_systems[0]) >= 13):
-            best_ring = ring_systems[0]
-            return ParentSelectionResult(
-                parent_type='ring',
-                parent_atoms=list(sorted(best_ring)),
-                substituent_rings=[],
-                reasoning=f"P-52.2.8 override: tiny chain ({chain_len}) vs large ring ({len(best_ring)}) - ring preferred"
-            )
 
-        # Principal group is on chain only - chain MUST be parent
+    # P-44.1(a): PG on chain only -> chain MUST be parent
+    if pg_on_chain and not pg_on_ring:
         return ParentSelectionResult(
             parent_type='chain',
             parent_atoms=principal_chain,
             substituent_rings=substituent_ring_tuples,
-            reasoning=f"Principal group ({principal_group}) is on chain only"
+            reasoning=f"P-44.1(a): principal group ({principal_group}) is on chain only"
         )
 
+    # P-44.1(a): PG on ring only -> ring is parent
     if pg_on_ring and not pg_on_chain:
-        # Principal group is on ring only - ring is parent
-        # Select best ring system if multiple exist (P-44.2)
         best_ring, other_rings = _select_best_ring_system(
             mol, ring_systems, principal_group_atoms
         )
@@ -270,121 +393,34 @@ def select_parent(
             parent_type='ring',
             parent_atoms=list(sorted(best_ring)),
             substituent_rings=other_ring_tuples,
-            reasoning=f"Principal group ({principal_group}) is on ring only"
+            reasoning=f"P-44.1(a): principal group ({principal_group}) is on ring only"
         )
 
     if pg_on_ring and pg_on_chain:
-        # Special handling for esters when PG is on both ring and chain.
-        # For esters, the acyl (C=O) side determines the parent:
-        #   - If acyl C is bonded to ring -> ring is acid parent
-        #     (e.g., methyl benzoate: ring provides "benzoate")
-        #   - If acyl C is bonded to chain -> chain is acid parent
-        #     (e.g., phenyl butanoate: chain provides "butanoate")
-        # When multiple esters exist, count acyl-on-ring vs acyl-on-chain.
+        # Ester-specific: acyl (C=O) side determines the parent acid
         if principal_group == "ester":
-            acyl_ring_count = 0
-            acyl_chain_count = 0
-            for pg_atoms in principal_group_atoms:
-                if not pg_atoms or len(pg_atoms) < 1:
-                    continue
-                acyl_c = pg_atoms[0]  # carbonyl C
-                atom = mol.GetAtomWithIdx(acyl_c)
-                acyl_on_ring = acyl_c in all_ring_atoms
-                if not acyl_on_ring:
-                    for nbr in atom.GetNeighbors():
-                        if nbr.GetIdx() in all_ring_atoms:
-                            acyl_on_ring = True
-                            break
-                if acyl_on_ring:
-                    acyl_ring_count += 1
-                else:
-                    acyl_chain_count += 1
-            # Decide based on which side has more acyl groups
-            if acyl_ring_count > acyl_chain_count:
-                return ParentSelectionResult(
-                    parent_type='ring',
-                    parent_atoms=list(sorted(all_ring_atoms)),
-                    substituent_rings=[],
-                    reasoning=f"Ester acyl on ring ({acyl_ring_count}) > chain ({acyl_chain_count}) - ring is parent"
-                )
-            elif acyl_chain_count > acyl_ring_count:
-                return ParentSelectionResult(
-                    parent_type='chain',
-                    parent_atoms=principal_chain,
-                    substituent_rings=substituent_ring_tuples,
-                    reasoning=f"Ester acyl on chain ({acyl_chain_count}) > ring ({acyl_ring_count}) - chain is parent"
-                )
-            # Tie: fall through to general count-based comparison below
+            ester_result = _compare_ester_parent(
+                mol, ring_systems, principal_chain, principal_group_atoms,
+                all_ring_atoms, substituent_ring_tuples
+            )
+            if ester_result is not None:
+                return ester_result
+            # Tie: fall through to general cascade
 
-        # General case: Principal group is on both - compare by count
+        # P-44.1(b): Compare PG count on ring vs chain
         pg_count_on_ring = _count_pg_on_ring(mol, all_ring_atoms, principal_group_atoms)
         pg_count_on_chain = _count_pg_on_chain(mol, principal_chain, principal_group_atoms)
 
         if pg_count_on_chain > pg_count_on_ring:
-            # Enhancement 4 (P-52.2.8): When chain is very short (< 3 atoms)
-            # but the ring is large (5+ atoms), prefer ring even when chain
-            # has more FGs -- the short chain is essentially a substituent.
-            # Only override if FG is NOT exclusively on chain (already handled
-            # above by the pg_on_chain and not pg_on_ring branch).
-            if len(principal_chain) < 3 and len(all_ring_atoms) >= 5:
-                best_ring, other_rings = _select_best_ring_system(
-                    mol, ring_systems, principal_group_atoms
-                )
-                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-                return ParentSelectionResult(
-                    parent_type='ring',
-                    parent_atoms=list(sorted(best_ring)),
-                    substituent_rings=other_ring_tuples,
-                    reasoning=f"P-52.2.8 short chain ({len(principal_chain)} atoms) vs large ring ({len(all_ring_atoms)} atoms) - ring preferred"
-                )
-
-            # Enhancement 3 (P-44.1 step 2): Senior atom consideration.
-            # If the ring contains nitrogen and the chain does not, and the
-            # FG count difference is only 1, the ring's senior atom provides
-            # additional signal favoring ring as parent. This is a tiebreaker
-            # supplement when counts are close.
-            if (pg_count_on_chain - pg_count_on_ring == 1
-                    and _ring_system_has_nitrogen(mol, all_ring_atoms)):
-                # Check if chain has nitrogen
-                chain_has_n = any(
-                    mol.GetAtomWithIdx(idx).GetAtomicNum() == 7
-                    for idx in principal_chain
-                )
-                if not chain_has_n:
-                    best_ring, other_rings = _select_best_ring_system(
-                        mol, ring_systems, principal_group_atoms
-                    )
-                    other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-                    return ParentSelectionResult(
-                        parent_type='ring',
-                        parent_atoms=list(sorted(best_ring)),
-                        substituent_rings=other_ring_tuples,
-                        reasoning=f"P-44.1 senior atom: N-containing ring preferred over chain ({pg_count_on_chain} vs {pg_count_on_ring} {principal_group})"
-                    )
-
-            # INST-03/INST-04: Audit chain-length and multiple-bond data
-            # when chain wins by PG count (behavior unchanged)
-            if logger.isEnabledFor(logging.DEBUG):
-                chain_set = set(principal_chain)
-                chain_mult = _count_multiple_bonds(mol, chain_set)
-                ring_mult = _count_multiple_bonds(mol, all_ring_atoms)
-                logger.debug(
-                    "P44_AUDIT: chain_wins_pg_count chain_pg=%d ring_pg=%d "
-                    "chain_len=%d ring_size=%d "
-                    "chain_mult=%d ring_mult=%d",
-                    pg_count_on_chain, pg_count_on_ring,
-                    len(principal_chain), len(all_ring_atoms),
-                    chain_mult, ring_mult,
-                )
-
+            # P-44.1(b): Chain has more PGs -> chain wins
             return ParentSelectionResult(
                 parent_type='chain',
                 parent_atoms=principal_chain,
                 substituent_rings=substituent_ring_tuples,
-                reasoning=f"More {principal_group} groups on chain ({pg_count_on_chain}) than ring ({pg_count_on_ring})"
+                reasoning=f"P-44.1(b): more {principal_group} on chain ({pg_count_on_chain}) than ring ({pg_count_on_ring})"
             )
         elif pg_count_on_ring > pg_count_on_chain:
-            # Ring has strictly more PGs -> ring wins by count
+            # P-44.1(b): Ring has more PGs -> ring wins
             best_ring, other_rings = _select_best_ring_system(
                 mol, ring_systems, principal_group_atoms
             )
@@ -393,67 +429,61 @@ def select_parent(
                 parent_type='ring',
                 parent_atoms=list(sorted(best_ring)),
                 substituent_rings=other_ring_tuples,
-                reasoning=f"Ring wins by PG count: {pg_count_on_ring} > {pg_count_on_chain} {principal_group}"
+                reasoning=f"P-44.1(b): more {principal_group} on ring ({pg_count_on_ring}) than chain ({pg_count_on_chain})"
             )
-        else:
-            # PG counts tied -> P-44.1 cascade: length > multiple bonds > P-52.2.8
-            chain_len = len(principal_chain)
 
-            # Compare chain length vs BEST ring system size (not all_ring_atoms union)
-            best_ring, other_rings = _select_best_ring_system(
-                mol, ring_systems, principal_group_atoms
+        # PG counts tied -> apply P-44.1 cascade criteria (c) through (i)
+        best_ring, other_rings = _select_best_ring_system(
+            mol, ring_systems, principal_group_atoms
+        )
+        # P-52.2.8: Use largest individual ring size, not total fused system
+        ring_size = _get_largest_individual_ring_size(mol, best_ring)
+        chain_len = len(principal_chain)
+        chain_set = set(principal_chain)
+
+        # P-44.1 cascade: criteria (c) through (h)
+        cascade_result = _compare_chain_length(chain_len, ring_size)        # P-44.1(c)
+        if cascade_result == 0:
+            cascade_result = _compare_multiple_bonds(mol, chain_set, best_ring)  # P-44.1(d)
+        if cascade_result == 0:
+            cascade_result = _compare_double_bonds(mol, chain_set, best_ring)    # P-44.1(e)
+        if cascade_result == 0:
+            cascade_result = _compare_pg_locants(
+                mol, principal_chain, best_ring, principal_group_atoms)           # P-44.1(f)
+        # P-44.1(g): lowest locants for multiple bonds — skipped for ring-vs-chain
+        # (bond locant comparison is meaningful only within same structure type)
+        if cascade_result == 0:
+            cascade_result = _compare_substituent_count(mol, chain_set, best_ring)  # P-44.1(h)
+        # P-44.1(i): lowest locants for substituents — skipped for ring-vs-chain
+
+        if cascade_result > 0:
+            # Chain wins
+            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+            all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
+            return ParentSelectionResult(
+                parent_type='chain',
+                parent_atoms=principal_chain,
+                substituent_rings=all_sub_rings,
+                reasoning=f"P-44.1 cascade: chain wins (len={chain_len}, ring={ring_size})"
             )
-            ring_size = len(best_ring)
-
-            if chain_len > ring_size:
-                # PRNT-01: Chain is longer -> chain wins
-                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-                # Include the best ring in substituent_rings too
-                all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
-                return ParentSelectionResult(
-                    parent_type='chain',
-                    parent_atoms=principal_chain,
-                    substituent_rings=all_sub_rings,
-                    reasoning=f"P-44.1 chain-length: chain ({chain_len}) > ring ({ring_size}), "
-                              f"PG tied at {pg_count_on_ring} {principal_group}"
-                )
-
-            if ring_size > chain_len:
-                # Ring is larger -> ring wins
-                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-                return ParentSelectionResult(
-                    parent_type='ring',
-                    parent_atoms=list(sorted(best_ring)),
-                    substituent_rings=other_ring_tuples,
-                    reasoning=f"P-44.1 ring-size: ring ({ring_size}) > chain ({chain_len}), "
-                              f"PG tied at {pg_count_on_ring} {principal_group}"
-                )
-
-            # Length also tied -> PRNT-02: compare multiple bonds
-            chain_set = set(principal_chain)
-            chain_mult = _count_multiple_bonds(mol, chain_set)
-            ring_mult = _count_multiple_bonds(mol, best_ring)
-
-            if chain_mult > ring_mult:
-                other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-                all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
-                return ParentSelectionResult(
-                    parent_type='chain',
-                    parent_atoms=principal_chain,
-                    substituent_rings=all_sub_rings,
-                    reasoning=f"P-44.1 multiple-bonds: chain ({chain_mult}) > ring ({ring_mult}), "
-                              f"PG and length tied"
-                )
-
-            # All criteria tied -> P-52.2.8 final tiebreaker: ring wins
+        elif cascade_result < 0:
+            # Ring wins
             other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
             return ParentSelectionResult(
                 parent_type='ring',
                 parent_atoms=list(sorted(best_ring)),
                 substituent_rings=other_ring_tuples,
-                reasoning=f"P-52.2.8 ring wins: PG={pg_count_on_ring}, length={ring_size}, "
-                          f"bonds: ring={ring_mult} chain={chain_mult} - all tied"
+                reasoning=f"P-44.1 cascade: ring wins (ring={ring_size}, chain={chain_len})"
             )
+
+        # All criteria tied -> P-52.2.8: ring wins as final tiebreaker
+        other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+        return ParentSelectionResult(
+            parent_type='ring',
+            parent_atoms=list(sorted(best_ring)),
+            substituent_rings=other_ring_tuples,
+            reasoning=f"P-52.2.8: all P-44.1 criteria tied - ring wins"
+        )
 
     # Neither on ring nor chain (shouldn't happen in well-formed molecules)
     return ParentSelectionResult(
@@ -570,19 +600,55 @@ def _select_best_ring_system(
 
 
 def _ring_system_has_nitrogen(mol, ring_atoms: Set[int]) -> bool:
-    """Check if any atom in the ring system is nitrogen.
-
-    Used for P-44.1 step 2 senior atom tiebreaking: a ring containing
-    nitrogen is preferred over one without (and over a chain without).
-
-    Args:
-        mol: RDKit Mol object
-        ring_atoms: Set of atom indices in the ring system
-
-    Returns:
-        True if ring system contains at least one nitrogen atom
-    """
+    """Check if any atom in the ring system is nitrogen."""
     for idx in ring_atoms:
-        if mol.GetAtomWithIdx(idx).GetAtomicNum() == 7:  # Nitrogen
+        if mol.GetAtomWithIdx(idx).GetAtomicNum() == 7:
             return True
     return False
+
+
+def _compare_ester_parent(
+    mol, ring_systems, principal_chain, principal_group_atoms,
+    all_ring_atoms, substituent_ring_tuples
+) -> Optional[ParentSelectionResult]:
+    """Ester-specific parent determination: acyl (C=O) side is parent acid.
+
+    For esters, the acyl carbon location determines the parent:
+    - Acyl C bonded to ring -> ring provides the acid name
+    - Acyl C bonded to chain -> chain provides the acid name
+
+    Returns None if tied (fall through to general cascade).
+    """
+    acyl_ring_count = 0
+    acyl_chain_count = 0
+    for pg_atoms in principal_group_atoms:
+        if not pg_atoms or len(pg_atoms) < 1:
+            continue
+        acyl_c = pg_atoms[0]  # carbonyl C
+        atom = mol.GetAtomWithIdx(acyl_c)
+        acyl_on_ring = acyl_c in all_ring_atoms
+        if not acyl_on_ring:
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in all_ring_atoms:
+                    acyl_on_ring = True
+                    break
+        if acyl_on_ring:
+            acyl_ring_count += 1
+        else:
+            acyl_chain_count += 1
+
+    if acyl_ring_count > acyl_chain_count:
+        return ParentSelectionResult(
+            parent_type='ring',
+            parent_atoms=list(sorted(all_ring_atoms)),
+            substituent_rings=[],
+            reasoning=f"Ester acyl on ring ({acyl_ring_count}) > chain ({acyl_chain_count})"
+        )
+    elif acyl_chain_count > acyl_ring_count:
+        return ParentSelectionResult(
+            parent_type='chain',
+            parent_atoms=principal_chain,
+            substituent_rings=substituent_ring_tuples,
+            reasoning=f"Ester acyl on chain ({acyl_chain_count}) > ring ({acyl_ring_count})"
+        )
+    return None  # Tied: fall through to general cascade
