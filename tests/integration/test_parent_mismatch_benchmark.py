@@ -402,3 +402,78 @@ def test_parent_mismatch_improvement_count():
         f"Phase 46 target not met: {correct}/{total} correct (need >= 30).\n"
         f"Still failing:\n" + "\n".join(failures)
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 88 Integration Tests: P-44.1 Chain Selection Fixes
+# ---------------------------------------------------------------------------
+
+class TestPhase88FGInstanceCounting:
+    """PSEL-01: FG instance counting uses distinct instances, not atom overlap."""
+
+    @pytest.mark.integration
+    def test_diacid_both_groups_on_chain(self):
+        """Glutaric acid: both COOHs on the 5-carbon chain (2 instances)."""
+        name = name_compound("OC(=O)CCCC(=O)O")
+        assert name, "Should produce a name for glutaric acid"
+        assert "pentanedioic" in name.lower() or "glutar" in name.lower(), (
+            f"Glutaric acid: expected pentanedioic acid. Got: {name}"
+        )
+
+
+class TestPhase88RingScoring:
+    """PSEL-06: Ring scoring tuple reorder (P-44.2.1 before P-44.2.2)."""
+
+    @pytest.mark.integration
+    def test_pyridine_is_principal_ring(self):
+        """Pyridine retained name should be produced."""
+        name = name_compound("c1ccncc1")
+        assert name, "Should name pyridine"
+        assert "pyridin" in name.lower(), f"Expected pyridine. Got: {name}"
+
+    @pytest.mark.integration
+    def test_phenol_retained(self):
+        """Phenol retained name."""
+        name = name_compound("Oc1ccccc1")
+        assert name, "Should name phenol"
+        assert "phenol" in name.lower(), f"Expected phenol. Got: {name}"
+
+
+class TestPhase88HydrocarbonGuard:
+    """PSEL-05: Parent selection runs for hydrocarbons."""
+
+    @pytest.mark.integration
+    def test_butylcyclohexane_ring_parent(self):
+        """Butylcyclohexane: ring should be parent (P-44.1.2.2)."""
+        name = name_compound("CCCCC1CCCCC1")
+        assert name, "Should produce a name"
+        assert "cyclohex" in name.lower(), (
+            f"Butylcyclohexane: ring should be parent. Got: {name}"
+        )
+
+    @pytest.mark.integration
+    def test_propylcyclopentane_ring_parent(self):
+        """Propylcyclopentane: ring should be parent."""
+        name = name_compound("CCCC1CCCC1")
+        assert name, "Should produce a name"
+        assert "cyclopent" in name.lower(), (
+            f"Propylcyclopentane: ring should be parent. Got: {name}"
+        )
+
+
+class TestPhase88CascadeCriteria:
+    """PSEL-03: Full P-44.1 cascade criteria 5-9."""
+
+    @pytest.mark.integration
+    def test_cyclohexanone_ring_parent(self):
+        """Cyclohexanone: ring with ketone is parent."""
+        name = name_compound("O=C1CCCCC1")
+        assert name, "Should name cyclohexanone"
+        assert "cyclohex" in name.lower(), f"Expected cyclohexanone. Got: {name}"
+
+    @pytest.mark.integration
+    def test_benzoic_acid_ring_parent(self):
+        """Benzoic acid: ring is parent with -COOH suffix."""
+        name = name_compound("OC(=O)c1ccccc1")
+        assert name, "Should name benzoic acid"
+        assert "benz" in name.lower(), f"Expected benzoic acid. Got: {name}"
