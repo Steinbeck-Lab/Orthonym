@@ -274,12 +274,16 @@ def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
 ) -> tuple:
-    """Score a ring system by P-44.2.1 general criteria.
+    """Score a ring system for principal ring system selection.
 
     Returns a scoring tuple where ALL values are arranged so that
-    ``min()`` selects the most senior ring system:
+    ``min()`` selects the most senior ring system.
 
-    - type_rank: P-44.2.2 type hierarchy (lower = senior)
+    IUPAC P-44.2: General criteria (P-44.2.1) are applied BEFORE type
+    hierarchy (P-44.2.2). Type hierarchy is a tiebreaker within the
+    same general criteria class.
+
+    Tuple ordering:
     - -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
     - -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
     - -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
@@ -287,6 +291,7 @@ def ring_system_score(
     - -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
     - -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
     - -heteroatom_variety_score: P-44.2.1(g) more of senior type (negated)
+    - type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
 
     Args:
         mol: RDKit Mol object
@@ -296,7 +301,7 @@ def ring_system_score(
         Tuple suitable for comparison with min() to select most senior
     """
     if not system_atoms:
-        return (999, 0, 0, 0, 0, 0, 0, 0)
+        return (0, 0, 0, 0, 0, 0, 0, 999)
 
     # 1. Type rank
     type_rank = int(classify_ring_system_type(mol, system_atoms))
@@ -337,15 +342,16 @@ def ring_system_score(
         for elem, count in heteroatom_counts.items()
     )
 
+    # P-44.2: General criteria (P-44.2.1) applied BEFORE type hierarchy (P-44.2.2)
     return (
-        type_rank,                          # P-44.2.2 type hierarchy
-        -int(has_heteroatom),               # P-44.2.1(a) heterocyclic preferred
-        -int(has_nitrogen),                 # P-44.2.1(b) N-containing preferred
-        -senior_heteroatom_rank,            # P-44.2.1(c) most senior heteroatom
-        -num_rings,                         # P-44.2.1(d) more rings = senior
-        -num_skeletal_atoms,                # P-44.2.1(e) more atoms = senior
-        -num_heteroatoms,                   # P-44.2.1(f) more heteroatoms
-        -heteroatom_variety_score,          # P-44.2.1(g) more of senior type
+        -int(has_heteroatom),               # P-44.2.1(a): heterocyclic preferred
+        -int(has_nitrogen),                 # P-44.2.1(b): N-containing preferred
+        -senior_heteroatom_rank,            # P-44.2.1(c): most senior heteroatom
+        -num_rings,                         # P-44.2.1(d): more rings = senior
+        -num_skeletal_atoms,                # P-44.2.1(e): more atoms = senior
+        -num_heteroatoms,                   # P-44.2.1(f): more heteroatoms
+        -heteroatom_variety_score,          # P-44.2.1(g): more of senior type
+        type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
     )
 
 

@@ -169,6 +169,43 @@ class TestRingSystemScore:
         # Pyridine should be more senior (lower tuple) because of heteroatom
         assert score_pyridine < score_benzene
 
+    def test_monocyclic_heterocycle_beats_fused_carbocycle(self):
+        """P-44.2.1(a): A monocyclic heterocycle (pyridine) should beat a fused
+        carbocycle (naphthalene). General criteria (heterocyclic preferred)
+        must dominate over type hierarchy (fused > monocyclic)."""
+        mol_pyridine = Chem.MolFromSmiles("c1ccncc1")
+        rs_pyridine = get_ring_systems(mol_pyridine)
+        score_pyridine = ring_system_score(mol_pyridine, rs_pyridine[0])
+
+        mol_naph = Chem.MolFromSmiles("c1ccc2ccccc2c1")
+        rs_naph = get_ring_systems(mol_naph)
+        score_naph = ring_system_score(mol_naph, rs_naph[0])
+
+        assert score_pyridine < score_naph, (
+            f"Monocyclic heterocycle should beat fused carbocycle per P-44.2.1(a). "
+            f"pyridine={score_pyridine}, naphthalene={score_naph}"
+        )
+
+    def test_two_monocyclic_same_type_larger_wins(self):
+        """P-44.2.1(e): Among same-type carbocycles, larger one wins."""
+        mol_7 = Chem.MolFromSmiles("C1CCCCCC1")  # cycloheptane
+        mol_5 = Chem.MolFromSmiles("C1CCCC1")    # cyclopentane
+        rs_7 = get_ring_systems(mol_7)
+        rs_5 = get_ring_systems(mol_5)
+        score_7 = ring_system_score(mol_7, rs_7[0])
+        score_5 = ring_system_score(mol_5, rs_5[0])
+        assert score_7 < score_5
+
+    def test_n_containing_beats_o_containing_same_type(self):
+        """P-44.2.1(b): N-containing heterocycle beats O-containing."""
+        mol_n = Chem.MolFromSmiles("C1CCNCC1")  # piperidine
+        mol_o = Chem.MolFromSmiles("C1CCOCC1")  # tetrahydropyran
+        rs_n = get_ring_systems(mol_n)
+        rs_o = get_ring_systems(mol_o)
+        score_n = ring_system_score(mol_n, rs_n[0])
+        score_o = ring_system_score(mol_o, rs_o[0])
+        assert score_n < score_o
+
     def test_score_is_tuple(self):
         """ring_system_score should return a tuple."""
         mol = Chem.MolFromSmiles("c1ccccc1")
