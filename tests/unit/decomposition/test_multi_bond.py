@@ -326,9 +326,11 @@ class TestMultiBondRetry:
         ):
             result = try_decompose(mol)
 
-        # Should return single_result (best effort fallback)
-        assert result == "bad name 0", (
-            f"Should return single_result as fallback, got: {result}"
+        # With coverage gate (Phase 87-02), "bad name 0" (10 chars) is
+        # rejected for a 30-atom molecule (need >= 18 chars). Result is None
+        # when all decomposition attempts fail coverage + quality checks.
+        assert result is None, (
+            f"Coverage gate should reject inadequate names, got: {result}"
         )
         # Should have tried at most MAX_BOND_RETRY_ATTEMPTS bonds total
         assert len(attempted_bonds) <= MAX_BOND_RETRY_ATTEMPTS, (

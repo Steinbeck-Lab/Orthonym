@@ -181,7 +181,10 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
     # malformed assembly (e.g., "anedicarboxamide", "aneyl", "cycloane")
     garbled_patterns = [
         'anedicarboxamide', 'aneyl', 'unknown', 'cycloane',
-        'acidyl',   # "phosphonic acidyl" etc. -- malformed decomposition assembly
+        'acidyl',       # "phosphonic acidyl" etc. -- malformed decomposition assembly
+        'thioateyl',    # malformed thioester assembly
+        'sulfonamideyl',  # malformed sulfonamide assembly
+        'phosphateyl',  # malformed phosphodiester assembly
     ]
     for pattern in garbled_patterns:
         if pattern in decomp_name.lower() and pattern not in existing_name.lower():
@@ -218,6 +221,55 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
                 return True
 
     return False
+
+
+# ---------------------------------------------------------------------------
+# Coverage-based quality gate for decomposition results
+# ---------------------------------------------------------------------------
+
+def _coverage_is_adequate(name: str, mol) -> bool:
+    """Check if a decomposed name covers enough of the molecule.
+
+    Uses name length as a proxy for atom coverage: a well-named molecule
+    should have roughly 2+ characters per heavy atom (locants, prefixes,
+    parent name, substituents). Names with less than the expected minimum
+    length are considered inadequate coverage.
+
+    NOTE: The locked decision specified leveraging coverage_scoring.py's
+    retrieve_confidence(). However, retrieve_confidence() is only populated
+    by the composer pipeline (compute_confidence()), not the decomposition
+    path. This heuristic achieves the same rejection goal without requiring
+    architectural changes to thread confidence through decomposition.
+    See 87-RESEARCH.md Open Question 2.
+
+    Applied ONLY to decomposition results, NOT to existing pipeline names.
+
+    Args:
+        name: The decomposition-produced name (may be None).
+        mol: RDKit Mol object for the molecule.
+
+    Returns:
+        True if coverage is adequate.
+        False if the name is too short for the molecule's size.
+    """
+    if not name:
+        return False
+
+    heavy_atoms = mol.GetNumHeavyAtoms()
+
+    # Small molecules (<=10 heavy atoms) always pass -- coverage
+    # heuristic is unreliable for tiny molecules.
+    if heavy_atoms <= 10:
+        return True
+
+    # Heuristic: expect ~2.0 chars per heavy atom for a substitutive name.
+    # However, functional class names (ester/amide decomposition) are more
+    # compact (e.g., "phenyl palmitate" = 16 chars for 24 heavy atoms = 0.67).
+    # Use 0.6 chars/HA threshold to avoid false positives on valid compact
+    # names while still catching truly inadequate coverage (e.g., "methane"
+    # for a 30-atom molecule = 0.23 chars/HA).
+    expected_min = int(heavy_atoms * 0.6)
+    return len(name) >= expected_min
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +439,38 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             return None  # Cannot name a fragment -- abort
         fragment_names[frag["side"]] = frag_name
 
+    # Substitutive naming preference: when the acid fragment already has a
+    # principal group (sulfonic acid, phosphonic acid), prefer substitutive
+    # naming over functional class assembly. This handles cases like sulfa
+    # drugs where the acid fragment is already a well-formed parent name.
+    #
+    # IMPORTANT: Do NOT apply substitutive preference for esters or amides.
+    # Esters use functional class naming ("alkyl alkanoate") and amides use
+    # amide naming ("N-alkylalkanamide") -- these are the correct IUPAC forms.
+    # Substitutive preference is only for bond types where the acid fragment
+    # is already a principal-group parent that should receive a prefix.
+    _SUBSTITUTIVE_BOND_TYPES = frozenset({
+        "sulfonamide", "thioester", "phosphodiester",
+    })
+    if bond["type"] in _SUBSTITUTIVE_BOND_TYPES:
+        acid_name = fragment_names.get("acid", "")
+        _PG_INDICATORS = ("-ic acid", "-sulfonic acid", "-phosphonic acid",
+                          "-carboxylic acid")
+        acid_has_pg = any(acid_name.lower().endswith(ind) for ind in _PG_INDICATORS)
+
+        if acid_has_pg:
+            from .fragment_assembly import (_alcohol_to_alkyl, _amine_to_prefix,
+                                            _join_components)
+            alkyl_name = fragment_names.get("alkyl") or fragment_names.get("amine")
+            if alkyl_name:
+                sub_prefix = _alcohol_to_alkyl(alkyl_name) or _amine_to_prefix(alkyl_name)
+                if sub_prefix:
+                    substitutive_name = _join_components(sub_prefix, acid_name)
+                    # Validate substitutive attempt: must pass quality gate and
+                    # not be worse than functional class assembly
+                    if substitutive_name and _name_quality_is_acceptable(substitutive_name, mol):
+                        return substitutive_name
+
     # Assemble (delegate to fragment_assembly module)
     return assemble_fragment_name(bond["type"], fragment_names, style=style)
 
@@ -475,6 +559,11 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # Steps 4-8: Single-bond attempt via helper
     single_result = _try_single_bond_decompose(mol, best_bond, style)
 
+    # Coverage gate: reject decomposition results that don't cover enough
+    # of the molecule's heavy atoms (applied only to decomposition output).
+    if single_result and not _coverage_is_adequate(single_result, mol):
+        single_result = None  # Coverage inadequate, discard this result
+
     # DECP-05: single-bond path returns result directly (backward compat).
     # Quality comparison: if decomposition produced a worse name than the
     # existing pipeline (garbled tokens, bracket mismatches), prefer the
@@ -499,6 +588,9 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             break
         tried_indices.add(bond["bond_idx"])
         alt_result = _try_single_bond_decompose(mol, bond, style)
+        # Coverage gate on retry results
+        if alt_result and not _coverage_is_adequate(alt_result, mol):
+            continue
         if alt_result and _name_quality_is_acceptable(alt_result, mol):
             # Also check that the alternative is not worse than existing name
             if existing_name and _decomposition_is_worse(alt_result, existing_name, mol):

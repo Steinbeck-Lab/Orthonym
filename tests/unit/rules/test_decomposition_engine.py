@@ -405,16 +405,17 @@ class TestCoverageGate:
 
     def test_large_molecule_adequate_name_passes(self):
         """A 30-atom molecule with a long descriptive name passes."""
-        # 30 heavy atoms: need len >= 30 * 1.4 = 42 chars
+        # 30 heavy atoms: need len >= 30 * 0.6 = 18 chars
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # triacontane, 30C
-        long_name = "triacontane-1,2,3,4,5-pentaol"  # 29 chars -- need more
+        long_name = "triacontane-1,2-diol"  # 20 chars >= 18
         long_name2 = "1,2,3,4,5,6,7,8,9,10-decamethyltriacontane"  # 43 chars
+        assert _coverage_is_adequate(long_name, large_mol) is True
         assert _coverage_is_adequate(long_name2, large_mol) is True
 
     def test_large_molecule_short_name_rejected(self):
-        """A 30-atom molecule with a short name (33% coverage) is rejected."""
+        """A 30-atom molecule with a very short name is rejected."""
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # 30 heavy atoms
-        short_name = "methane"  # 7 chars << 42 expected min
+        short_name = "methane"  # 7 chars << 18 expected min (30 * 0.6)
         assert _coverage_is_adequate(short_name, large_mol) is False
 
     def test_empty_name_rejected(self):
@@ -429,11 +430,13 @@ class TestCoverageGate:
 
     def test_medium_molecule_borderline(self):
         """A medium molecule (15 heavy atoms) with borderline name length."""
-        # 15 heavy atoms: need len >= 15 * 1.4 = 21 chars
+        # 15 heavy atoms: need len >= 15 * 0.6 = 9 chars
         mol = _mol("CCCCCCCCCCCCCCC")  # pentadecane, 15 heavy atoms
-        # "pentadecane" = 11 chars -- above 10 HA so heuristic applies
-        assert _coverage_is_adequate("pentadecane", mol) is False
-        # A more descriptive name passes
+        # "pentadecane" = 11 chars >= 9, passes
+        assert _coverage_is_adequate("pentadecane", mol) is True
+        # Very short name rejected (5 chars < 9)
+        assert _coverage_is_adequate("short", mol) is False
+        # A more descriptive name also passes (27 chars >= 9)
         assert _coverage_is_adequate("2,3,4,5-tetramethylundecane", mol) is True
 
     def test_retained_core_name_on_large_mol(self):
@@ -444,7 +447,7 @@ class TestCoverageGate:
         # A large molecule might legitimately be named "adenine" for its core
         # _coverage_is_adequate only checks length heuristic, not retained names
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # 30 HA
-        # 7 chars << 42 -- heuristic rejects it
+        # 7 chars < 18 (30 * 0.6) -- heuristic rejects it
         assert _coverage_is_adequate("adenine", large_mol) is False
 
 
