@@ -903,6 +903,70 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 4},
     },
+
+    # =========================================================================
+    # TRICYCLIC HETEROCYCLES (Phase 89 additions)
+    # =========================================================================
+
+    # Phenanthridine: benz[c]isoquinoline - angular tricyclic, N at position 5
+    # IUPAC numbering: 1-2-3-4-4a-4b-5(N)-6-7-8-8a-9-10-10a (14 atoms)
+    # Canonical: c1ccc2c(c1)ccc1cccnc12
+    'c1ccc2c(c1)ccc1cccnc12': {
+        'name': 'phenanthridine',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {5: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 13: '4b', 12: 5, 11: 6, 10: 7, 9: 8, 8: '8a', 7: 9, 6: 10, 4: '10a'},
+    },
+
+    # 9H-beta-Carboline: pyrido[3,4-b]indole - tricyclic, same topology as carbazole
+    # IUPAC numbering: 1-2-3-4-4a-4b-5-6-7-8-8a-9-9a (13 atoms, 2N)
+    # Canonical: c1ccc2c(c1)[nH]c1cnccc12
+    'c1ccc2c(c1)[nH]c1cnccc12': {
+        'name': '9H-beta-carboline',
+        'tautomer_locant': 9,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 4},
+    },
+
+    # Acridone: acridin-9(10H)-one - tricyclic, exocyclic =O at C-9, NH at pos 10
+    # IUPAC numbering: follows acridine with =O at position 9
+    # Canonical: O=c1c2ccccc2[nH]c2ccccc12
+    'O=c1c2ccccc2[nH]c2ccccc12': {
+        'name': 'acridone',
+        'tautomer_locant': 10,
+        'ring_system': 'tricyclic',
+        'is_retained_name': True,  # Functional derivative (acridin-9(10H)-one), not a base ring system
+        'parent_atoms': 15,
+        'iupac_locants': {0: '=O', 1: 9, 2: '4a', 3: 4, 4: 3, 5: 2, 6: 1, 7: '9a', 8: 10, 9: '8a', 10: 8, 11: 7, 12: 6, 13: 5, 14: '10a'},
+    },
+
+    # =========================================================================
+    # N-BRIDGEHEAD SYSTEMS (Phase 89 additions)
+    # =========================================================================
+
+    # 4H-Quinolizine: pyrido[1,2-a]pyridine analog, N bridgehead
+    # IUPAC numbering: 1-2-3-4-4a(N)-5-6-7-8-8a (10 atoms)
+    # Canonical: C1=CC2=CCC=CN2C=C1
+    'C1=CC2=CCC=CN2C=C1': {
+        'name': '4H-quinolizine',
+        'tautomer_locant': 4,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 10,
+        'iupac_locants': {8: 1, 9: 2, 0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a'},
+    },
+
+    # Quinolizidine: decahydroquinolizine, fully saturated N-bridgehead
+    # IUPAC numbering: same as quinolizine but fully saturated
+    # Canonical: C1CCN2CCCCC2C1
+    'C1CCN2CCCCC2C1': {
+        'name': 'quinolizidine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 10,
+        'iupac_locants': {9: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: 8, 8: '8a'},
+    },
 }
 
 

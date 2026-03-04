@@ -26,6 +26,10 @@ BICYCLO_RETAINED_NAMES: Dict[str, str] = {
     # Most important bridged bicyclic - common in natural products
     "C1CC2CCC1C2": "norbornane",
 
+    # === Bicyclo[2.2.1]hept-2-ene (norbornene) ===
+    # Unsaturated norbornane, common in polymer chemistry
+    "C1=CC2CCC1C2": "norbornene",
+
     # === Bicyclo[1.1.0]butane ===
     # Smallest bicyclic hydrocarbon (4 carbons)
     # Note: Strained system, used in drug design

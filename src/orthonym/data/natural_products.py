@@ -118,6 +118,24 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "penam",
     "O=C(O)C1CSCC2CC(=O)N21":
         "cepham",
+
+    # ---- Flavonoid / chromene derivatives (Phase 89) ----
+    "O=c1cc(-c2ccccc2)oc2ccccc12":
+        "flavone",
+    "O=C1CC(c2ccccc2)Oc2ccccc21":
+        "flavanone",
+    "O=c1c(-c2ccccc2)coc2ccccc12":
+        "isoflavone",
+    "O=C1CCOc2ccccc21":
+        "chromanone",
+    "O=c1ccoc2ccccc12":
+        "chromone",
+
+    # ---- Terpenoid scaffolds (Phase 89) ----
+    "CC1CCC2CC1C2(C)C":
+        "pinane",
+    "CC12CCC(CC1)C2(C)C":
+        "bornane",
 }
 
 

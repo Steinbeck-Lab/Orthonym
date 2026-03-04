@@ -235,6 +235,29 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
         'ring_atoms': 5,
         'description': '5-membered 1,3-thiazole',
     },
+
+    # =========================================================================
+    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES (Phase 89)
+    # =========================================================================
+
+    'pyrazine': {
+        'smiles': 'c1cnccn1',
+        'ring_atoms': 6,
+        'description': '6-membered 1,4-diN-heterocycle',
+    },
+
+    'pyridazine': {
+        'smiles': 'c1ccnnc1',
+        'ring_atoms': 6,
+        'description': '6-membered 1,2-diN-heterocycle',
+    },
+
+    'fluorene': {
+        'smiles': 'c1ccc2c(c1)Cc1ccccc1-2',
+        'ring_atoms': 13,
+        'description': 'tricyclic carbocyclic PAH',
+        'is_carbocycle': True,
+    },
 }
 
 
