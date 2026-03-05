@@ -544,11 +544,36 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
             return f"{shortened}-cyano{short_stem}yl"
         return "cyano"
 
+    # ---- Simple acid names: convert to acyl prefix ---- (IUPAC P-65.1.7)
+    # Only handle simple retained acid names that appear as substituents.
+    # e.g., "formic acid" -> "formyl", "acetic acid" -> "acetyl"
+    _ACID_TO_ACYL_PREFIX = {
+        'formic acid': 'formyl',
+        'acetic acid': 'acetyl',
+        'propionic acid': 'propionyl',
+        'butyric acid': 'butyryl',
+        'benzoic acid': 'benzoyl',
+    }
+    if name in _ACID_TO_ACYL_PREFIX:
+        return _ACID_TO_ACYL_PREFIX[name]
+
     # ---- Cyclic names: cyclo...ane -> cyclo...yl ---- (IUPAC P-31.1.3)
     # e.g., "cyclohexane" -> "cyclohexyl", "cyclopentane" -> "cyclopentyl"
     if 'cyclo' in name and name.endswith('ane'):
         stem = name[:-3]  # remove "ane"
         return f"{stem}yl"
+
+    # ---- Heterocyclic -ane ending ---- (IUPAC P-31.1.3)
+    # Heterocyclic ring names (oxirane, thiirane, oxetane, thietane, oxolane,
+    # thiane, etc.) replace -e with -yl, NOT strip -ane and add -yl.
+    # e.g., "oxirane" -> "oxiranyl" (not "oxiryl")
+    _HETERO_ANE_RINGS = {
+        'oxirane', 'thiirane', 'oxetane', 'thietane', 'oxolane',
+        'thiane', 'dioxane', 'dithiane', 'trioxane',
+    }
+    base_name = name.split('-')[-1] if '-' in name else name
+    if base_name in _HETERO_ANE_RINGS:
+        return name[:-1] + "yl"  # replace -e with -yl
 
     # ---- Alkane: -ane or -e ending ----
     # e.g., "propane" -> "propyl", "2-methylpropane" -> "2-methylpropyl"
