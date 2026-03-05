@@ -83,12 +83,17 @@ class TestScoreFragmentSeniority:
         assert acid_score < amide_score, "acid should be more senior (lower score)"
 
     def test_ring_beats_chain_equal_fg(self):
-        """Ring-containing fragment beats chain-only at equal FG seniority."""
+        """Ring-containing fragment beats chain-only at equal FG seniority.
+
+        Use primary alcohols for both so FG subtype matches exactly.
+        """
         from orthonym.decomposition.fragment_ranker import score_fragment_seniority
 
-        ring_alcohol = score_fragment_seniority("OC1CCCCC1")  # cyclohexanol
-        chain_alcohol = score_fragment_seniority("CCCCCCO")  # hexanol
-        # Both have alcohol; ring should win (lower score)
+        # Cyclohexanemethanol: ring + primary alcohol
+        ring_alcohol = score_fragment_seniority("OCC1CCCCC1")
+        # Heptanol: chain + primary alcohol, same heavy atom count (9)
+        chain_alcohol = score_fragment_seniority("CCCCCCCO")
+        # Both have primary_alcohol; ring should win (lower score)
         assert ring_alcohol < chain_alcohol, "ring fragment should be more senior"
 
     def test_larger_fragment_wins_tiebreaker(self):
