@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 from .perception.ions import detect_species_type, get_ion_sites, get_radical_sites
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
-from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring
+from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring, get_complete_ring_atom_set
 from .perception.stereo import assign_stereochemistry, get_stereocenters, get_double_bond_stereo
 from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
@@ -49,6 +49,7 @@ class MolecularFeatures:
 
     # Ring information
     ring_systems: List[set] = field(default_factory=list)
+    all_ring_atoms: frozenset = field(default_factory=frozenset)  # All atoms in all ring systems (fused/bridged/spiro merged)
     is_cyclic: bool = False
     is_aromatic: bool = False
     ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
@@ -561,6 +562,7 @@ class Orthonym:
 
         # Detect ring systems
         features.ring_systems = get_ring_systems(mol)
+        features.all_ring_atoms = get_complete_ring_atom_set(mol)
         features.is_cyclic = len(features.ring_systems) > 0
 
         # Check aromaticity

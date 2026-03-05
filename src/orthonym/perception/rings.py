@@ -71,6 +71,27 @@ def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
     return systems
 
 
+def get_complete_ring_atom_set(mol) -> frozenset:
+    """Return ALL atoms in ALL ring systems (fused, bridged, spiro merged).
+
+    IUPAC P-25.3: Ring system = all atoms in connected ring components.
+    Includes bridgehead atoms, bridge atoms, spiro atoms.
+    Does NOT include exocyclic atoms (=O, -OH, etc.) per P-31.1.3.
+    RDKit's AtomRings() correctly reports only ring-member atoms.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        frozenset of all ring atom indices across all ring systems
+    """
+    systems = get_ring_systems(mol, include_spiro=True)
+    all_atoms = set()
+    for system in systems:
+        all_atoms.update(system)
+    return frozenset(all_atoms)
+
+
 def is_aromatic_ring(mol, ring_atoms) -> bool:
     """
     Check if all atoms in a ring are aromatic.
