@@ -4557,21 +4557,22 @@ def _collect_pure_alkyl_atoms(mol, start_idx, excluded):
 
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
-    Generate prefix fragments for alkyl substituents and alkoxy groups.
+    Generate prefix fragments for all substituents on chain parents.
 
-    This function:
-    1. Iterates over features.substituents (keyed by 1-indexed position/locant)
-    2. Counts carbon atoms in each substituent to determine name
-    3. Detects ether groups (O bonded to 2 carbons) and names as alkoxy
-    4. Groups identical substituents with their locants
-    5. Formats each group with locants, multipliers
-    6. Sorts alphabetically by base substituent name
+    Uses the universal pipeline (extract_chain_substituents +
+    classify_and_name_fragment) to enumerate and name every non-hydrogen
+    substituent on the principal chain. Mirrors the proven
+    _generate_ring_alkyl_prefixes() pattern.
 
-    Note: When chain_is_parent=True, ring substituents are handled separately
-    by _generate_ring_substituent_prefixes() and should be skipped here.
+    IUPAC rules:
+    - P-31.1.1: Simple substituents (unbranched, no FG) -> di-/tri- multipliers
+    - P-31.1.2: Compound substituents (branched or substituted) -> bis-/tris-
+    - P-14.5: Alphabetical order ignoring multiplicative prefixes
+    - P-16.3.2: Multiplicative prefix selection based on complexity
 
     Returns:
-        List of NameFragment objects for alkyl prefixes, sorted alphabetically
+        List of NameFragment objects for chain substituent prefixes,
+        sorted alphabetically.
     """
     mol = features.mol
 
@@ -4582,212 +4583,88 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         for ring_atoms in ring_groups:
             ring_atoms_to_skip.update(ring_atoms)
 
-    # Group substituents by name: {name: [locants]}
-    substituent_groups: Dict[str, List[int]] = defaultdict(list)
-
-    # Collect atoms that belong to principal group (amide/amine N-substituents
-    # are handled by specialized naming functions, not here)
+    # Collect atoms belonging to the principal group (handled as suffix)
     pg_atom_set = set()
     if features.principal_group_atoms:
         for match in features.principal_group_atoms:
             pg_atom_set.update(match)
 
-    for position, sub_list in features.substituents.items():
-        # position is already a 1-indexed locant (from get_substituents)
-        for sub_atoms in sub_list:
-            # Skip substituents that are purely ring atoms (handled by
-            # _generate_ring_substituent_prefixes). BUT if the substituent
-            # connects to the chain through a heteroatom linker (e.g., N in
-            # N-quinolinylamino), the heteroatom is NOT in ring_atoms_to_skip
-            # and the compound substituent needs heteroatom naming, not
-            # ring-substituent naming. Check: if the attachment point to the
-            # chain is a non-ring heteroatom, let it through to heteroatom
-            # naming instead of skipping.
-            if ring_atoms_to_skip and set(sub_atoms) & ring_atoms_to_skip:
-                # Find the attachment atom (sub atom bonded to chain)
-                _chain_set_d02 = set(features.principal_chain) if features.principal_chain else set()
-                _attach_is_hetero_linker = False
-                for _idx_d02 in sub_atoms:
-                    _atom_d02 = mol.GetAtomWithIdx(_idx_d02)
-                    if any(nbr.GetIdx() in _chain_set_d02 for nbr in _atom_d02.GetNeighbors()):
-                        # This atom connects to the chain
-                        if _atom_d02.GetSymbol() not in ('C', 'H') and _idx_d02 not in ring_atoms_to_skip:
-                            # Heteroatom linker (e.g., N) not in ring skip set
-                            _attach_is_hetero_linker = True
-                        break
-                if not _attach_is_hetero_linker:
-                    logger.debug(
-                        "DROP-02 substituent_skip: reason=ring_overlap position=%d",
-                        position,
-                    )
-                    continue
+    # Use universal pipeline to discover all chain substituents
+    from .substituent_enumerator import extract_chain_substituents
+    sub_infos = extract_chain_substituents(
+        mol, features.principal_chain or [], features.substituents or {}
+    )
 
-            # Skip substituents containing the principal group nitrogen
-            # (amide N-substituents are handled by _assemble_amide_name,
-            #  amine N-substituents by _assemble_amine_name)
-            if features.principal_group in (
-                'primary_amide', 'secondary_amide', 'tertiary_amide',
-                'secondary_amine', 'tertiary_amine',
-            ):
-                if set(sub_atoms) & pg_atom_set:
-                    logger.debug(
-                        "DROP-03 substituent_skip: reason=pg_branch_overlap position=%d pg=%s",
-                        position, features.principal_group,
-                    )
-                    continue
+    # Group substituents by name: {name: [locants]}
+    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    chain_set = set(features.principal_chain) if features.principal_chain else set()
 
-            # Count only carbon atoms in the substituent
-            carbon_count = sum(
-                1 for idx in sub_atoms
-                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-            )
-
-            # Skip non-alkyl substituents (no carbons = functional group like -OH)
-            if carbon_count == 0:
+    for sub_info in sub_infos:
+        # Guard 1: Skip substituents overlapping with ring atoms already
+        # handled by _generate_ring_substituent_prefixes.
+        # BUT if the attachment point is a non-ring heteroatom linker
+        # (e.g., N in N-quinolinylamino), let it through.
+        if ring_atoms_to_skip and sub_info.frag_atoms & ring_atoms_to_skip:
+            _attach_is_hetero_linker = False
+            for _idx in sub_info.frag_atoms:
+                _atom = mol.GetAtomWithIdx(_idx)
+                if any(nbr.GetIdx() in chain_set for nbr in _atom.GetNeighbors()):
+                    if _atom.GetSymbol() not in ('C', 'H') and _idx not in ring_atoms_to_skip:
+                        _attach_is_hetero_linker = True
+                    break
+            if not _attach_is_hetero_linker:
                 logger.debug(
-                    "DROP-01 substituent_skip: reason=zero_carbon position=%d parent_type=chain (by-design: FG prefix loop handles these)",
-                    position,
+                    "DROP-02 substituent_skip: reason=ring_overlap locant=%d",
+                    sub_info.locant,
                 )
                 continue
 
-            # Check if substituent has any heteroatoms (non-C, non-H)
-            has_heteroatom = any(
-                mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
-                for idx in sub_atoms
-            )
-
-            if has_heteroatom:
-                # Check for ether pattern: O bonded to 2 carbons
-                alkoxy_name = _check_for_alkoxy(mol, sub_atoms, features.principal_chain)
-                if alkoxy_name:
-                    substituent_groups[alkoxy_name].append(position)
-                    continue
-
-                # Check for acylamino pattern: -NH-C(=O)-R
-                acylamino_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
-                if acylamino_name:
-                    substituent_groups[acylamino_name].append(position)
-                    continue
-
-                # Check for acyloxy pattern: -O-C(=O)-R
-                acyloxy_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
-                if acyloxy_name:
-                    substituent_groups[acyloxy_name].append(position)
-                    continue
-
-                # Try the established heteroatom naming for known patterns
-                hetero_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
-                if hetero_name:
-                    substituent_groups[hetero_name].append(position)
-                    continue
-
-                # Enumerator fallback for simple non-ring branches only
-                # (thioethers, azido, sulfoxides, etc. that the old function skips).
-                # Ring-containing branches are complex and have specialized paths.
-                ring_info = mol.GetRingInfo()
-                sub_has_ring = any(ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms)
-                if not sub_has_ring:
-                    from .substituent_enumerator import SubstituentInfo
-                    from .naming_utils import needs_brackets
-                    chain_set = set(features.principal_chain) if features.principal_chain else set()
-                    frag_info = SubstituentInfo(
-                        frag_mol=None,
-                        locant=position,
-                        attach_mol_idx=features.principal_chain[position - 1] if features.principal_chain and position <= len(features.principal_chain) else sub_atoms[0],
-                        frag_atoms=frozenset(sub_atoms),
-                    )
-                    enum_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
-                    if enum_name:
-                        # Wrap compound substituent names in brackets if needed
-                        if needs_brackets(enum_name):
-                            enum_name = f"({enum_name})"
-                        substituent_groups[enum_name].append(position)
-                else:
-                    # Ring+heteroatom branch: try recursive naming
-                    # Guard: only for moderately-sized substituents (<=25 atoms).
-                    if len(sub_atoms) <= 25:
-                        from .naming_utils import needs_brackets
-                        # Find attachment point: substituent atom bonded to parent chain
-                        attach_idx = sub_atoms[0]
-                        parent_set = set(features.principal_chain or [])
-                        for idx in sub_atoms:
-                            atom_obj = mol.GetAtomWithIdx(idx)
-                            for nbr in atom_obj.GetNeighbors():
-                                if nbr.GetIdx() in parent_set:
-                                    attach_idx = idx
-                                    break
-                        ring_het_name = name_substituent_fragment(
-                            mol, sub_atoms, attach_idx, features.principal_chain or []
-                        )
-                        # Validate: reject only if fragment has ring atoms but name is acyclic
-                        # (Phase 85 structural validation replaces pure string-based check)
-                        if ring_het_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(ring_het_name):
-                            ring_het_name = None
-                        if ring_het_name:
-                            if needs_brackets(ring_het_name):
-                                ring_het_name = f"({ring_het_name})"
-                            substituent_groups[ring_het_name].append(position)
-                        else:
-                            logger.debug(
-                                "DROP-04 substituent_skip: reason=ring_heteroatom_branch_still_unnameable position=%d",
-                                position,
-                            )
-                    else:
-                        logger.debug(
-                            "DROP-04 substituent_skip: reason=ring_heteroatom_branch_too_large position=%d atoms=%d",
-                            position, len(sub_atoms),
-                        )
+        # Guard 2: Skip substituents overlapping with the principal group
+        # (amide/amine N-substituents handled by specialized assemblers)
+        if features.principal_group in (
+            'primary_amide', 'secondary_amide', 'tertiary_amide',
+            'secondary_amine', 'tertiary_amine',
+        ):
+            if sub_info.frag_atoms & pg_atom_set:
+                logger.debug(
+                    "DROP-03 substituent_skip: reason=pg_branch_overlap locant=%d pg=%s",
+                    sub_info.locant, features.principal_group,
+                )
                 continue
 
-            # Check if substituent is linear (simple alkyl) or branched (needs recursive naming)
-            if _is_linear_alkyl(mol, sub_atoms):
-                # Fast path: simple linear alkyl
+        # Guard 3: Skip pure FG-only substituents (no carbon atoms)
+        # These are handled by the FG prefix loop in _generate_prefixes()
+        has_carbon = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            for idx in sub_info.frag_atoms
+        )
+        if not has_carbon:
+            logger.debug(
+                "DROP-01 substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",
+                sub_info.locant,
+            )
+            continue
+
+        # Name via the universal classify-and-name pipeline
+        name = classify_and_name_fragment(mol, sub_info, chain_set, features)
+        if name is None:
+            # Fallback: try simple carbon-count alkyl naming
+            carbon_count = sum(
+                1 for idx in sub_info.frag_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+            if carbon_count > 0:
                 try:
-                    alkyl_name = get_alkyl_name(carbon_count)
-                    substituent_groups[alkyl_name].append(position)
-                except ValueError:
-                    # Try recursive naming for large linear alkyls
-                    from .naming_utils import needs_brackets
-                    attach_idx = sub_atoms[0]
-                    for idx in sub_atoms:
-                        atom_obj = mol.GetAtomWithIdx(idx)
-                        for nbr in atom_obj.GetNeighbors():
-                            if nbr.GetIdx() in set(features.principal_chain or []):
-                                attach_idx = idx
-                                break
-                    fallback_name = name_substituent_fragment(
-                        mol, sub_atoms, attach_idx, features.principal_chain or []
-                    )
-                    if fallback_name:
-                        if needs_brackets(fallback_name):
-                            fallback_name = f"({fallback_name})"
-                        substituent_groups[fallback_name].append(position)
-                    else:
-                        logger.debug(
-                            "DROP-05 substituent_skip: reason=alkyl_name_valueerror_still_unnameable carbon_count=%d position=%d",
-                            carbon_count, position,
-                        )
-                    continue
-            else:
-                # Complex substituent: use recursive naming
-                attach_idx = sub_atoms[0] if sub_atoms else None
-                if attach_idx is not None:
-                    complex_name = name_substituent_fragment(
-                        mol, sub_atoms, attach_idx, features.principal_chain or []
-                    )
-                    if complex_name:
-                        substituent_groups[complex_name].append(position)
-                    else:
-                        # Fallback to carbon-count based naming
-                        try:
-                            alkyl_name = get_alkyl_name(carbon_count)
-                            substituent_groups[alkyl_name].append(position)
-                        except ValueError:
-                            logger.debug(
-                                "DROP-06 substituent_skip: reason=recursive_and_fallback_failure position=%d carbon_count=%d",
-                                position, carbon_count,
-                            )
-                            continue
+                    name = get_alkyl_name(carbon_count)
+                except (ValueError, KeyError):
+                    pass
+            if name is None:
+                logger.warning(
+                    "DROP-09 substituent_skip: reason=universal_pipeline_unnameable locant=%d",
+                    sub_info.locant,
+                )
+                continue
+        substituent_groups[name].append(sub_info.locant)
 
     # INST-01: Atom coverage audit
     if logger.isEnabledFor(logging.DEBUG):
@@ -4815,9 +4692,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
         # Omit locant for monosubstituted hydrocarbons at position 1
         if is_simple_hydrocarbon and total_substituents == 1 and sorted_locants == [1]:
-            # Just the name, no locant: "methoxy" not "1-methoxy"
             formatted = name
-            # Use empty locants so _assemble_fragments won't re-add "1-"
             emit_locants = ()
         else:
             formatted = format_substituent_prefix(name, sorted_locants, count)

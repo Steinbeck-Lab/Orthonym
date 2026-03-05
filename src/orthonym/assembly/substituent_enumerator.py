@@ -1067,12 +1067,31 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     if attach_idx is None and frag_atoms:
         attach_idx = frag_atoms[0]
 
+    # Special case: O-attached branches (ether substituents)
+    # -O-R -> "alkoxy" (e.g., methoxy, ethoxy, phenoxy)
+    if attach_idx is not None:
+        attach_atom = mol.GetAtomWithIdx(attach_idx)
+        if attach_atom.GetSymbol() == 'O' and attach_atom.GetDegree() == 2:
+            name = _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms)
+            if name:
+                return name
+
     # Special case: S-attached branches (thioether substituents)
     # -S-R -> "alkylsulfanyl" (e.g., methylsulfanyl, ethylsulfanyl)
     if attach_idx is not None:
         attach_atom = mol.GetAtomWithIdx(attach_idx)
         if attach_atom.GetSymbol() == 'S' and attach_atom.GetTotalNumHs() == 0:
             name = _name_sulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms)
+            if name:
+                return name
+
+    # Special case: N-attached branches (amino substituents)
+    # -NH-R -> "alkylamino" (e.g., methylamino, phenylamino/anilino)
+    # -NH-C(=O)-R -> "acylamino" (e.g., acetylamino, benzoylamino)
+    if attach_idx is not None:
+        attach_atom = mol.GetAtomWithIdx(attach_idx)
+        if attach_atom.GetSymbol() == 'N':
+            name = _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms)
             if name:
                 return name
 
@@ -1095,6 +1114,249 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
         "Could not name compound substituent at locant %s: %s",
         frag_info.locant, frag_smiles
     )
+    return None
+
+
+def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """Name an alkoxy-attached branch: -O-R -> alkoxy.
+
+    IUPAC P-63.2.3: Ether substituents named as alkoxy when the oxygen
+    is the attachment point to the parent. Examples:
+      -O-CH3 -> methoxy
+      -O-C2H5 -> ethoxy
+      -O-phenyl -> phenoxy
+      -O-CH2-phenyl -> benzyloxy
+
+    Args:
+        mol: RDKit Mol.
+        frag_atoms: List of atom indices in the fragment.
+        attach_idx: Atom index of the O attachment atom.
+        parent_atoms: Set of parent atom indices.
+
+    Returns:
+        Alkoxy prefix name, or None if not a simple case.
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    frag_set = set(frag_atoms)
+    o_atom = mol.GetAtomWithIdx(attach_idx)
+
+    # Find non-parent neighbor of O (the R group)
+    alkyl_start = None
+    for nbr in o_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms:
+            continue
+        if nbr_idx in frag_set:
+            alkyl_start = nbr_idx
+            break
+
+    if alkyl_start is None:
+        # Bare -O- with no R group (shouldn't happen for compound substituent)
+        return None
+
+    alkyl_atom = mol.GetAtomWithIdx(alkyl_start)
+
+    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
+    if alkyl_atom.GetIsAromatic():
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if alkyl_start in ring and len(ring) == 6:
+                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
+                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                       for r in ring):
+                    return "phenoxy"
+        return "phenoxy"
+
+    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
+    if (not alkyl_atom.GetIsAromatic()
+            and alkyl_atom.GetSymbol() == 'C'
+            and alkyl_atom.GetTotalNumHs() >= 1):
+        arom_nbrs = [n for n in alkyl_atom.GetNeighbors()
+                     if n.GetIdx() != attach_idx and n.GetIsAromatic()]
+        non_h_non_arom = [n for n in alkyl_atom.GetNeighbors()
+                          if n.GetIdx() != attach_idx
+                          and not n.GetIsAromatic()
+                          and n.GetSymbol() != 'H']
+        if arom_nbrs and not non_h_non_arom:
+            return "benzyloxy"
+
+    # Case C: O -> simple alkyl chain -> "methoxy", "ethoxy", etc.
+    # Count carbons in the alkyl part (BFS from alkyl_start excluding O)
+    visited = set()
+    stack = [alkyl_start]
+    carbon_count = 0
+    has_heteroatom = False
+    has_ring = False
+    ring_info = mol.GetRingInfo()
+
+    while stack:
+        idx = stack.pop()
+        if idx in visited or idx == attach_idx:
+            continue
+        if idx not in frag_set:
+            continue
+        visited.add(idx)
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'C':
+            carbon_count += 1
+        elif atom.GetAtomicNum() != 1:
+            has_heteroatom = True
+        if ring_info.NumAtomRings(idx) > 0:
+            has_ring = True
+        for n in atom.GetNeighbors():
+            if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
+                stack.append(n.GetIdx())
+
+    # Only name as alkoxy if the R group is a pure alkyl chain (no heteroatoms, no rings)
+    if has_heteroatom or has_ring or carbon_count == 0:
+        return None
+
+    ALKOXY_NAMES = {
+        1: "methoxy", 2: "ethoxy", 3: "propoxy", 4: "butoxy",
+        5: "pentyloxy", 6: "hexyloxy", 7: "heptyloxy", 8: "octyloxy",
+        9: "nonyloxy", 10: "decyloxy",
+    }
+
+    if carbon_count in ALKOXY_NAMES:
+        return ALKOXY_NAMES[carbon_count]
+    elif carbon_count > 10:
+        return get_chain_prefix(carbon_count) + "yloxy"
+    return None
+
+
+def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """Name an N-attached branch: -NH-R -> alkylamino, phenylamino/anilino.
+
+    IUPAC P-62.2.3: Amine substituents named as amino when nitrogen is the
+    attachment point. Also handles acylamino (-NH-C(=O)-R).
+
+    Key patterns:
+      -NH2 -> amino (handled as fg_only, not here)
+      -NH-CH3 -> methylamino
+      -NH-phenyl -> anilino (retained name for phenylamino)
+      -NH-C(=O)-R -> acylamino (e.g., acetylamino, hexanoylamino)
+      -N(CH3)2 -> dimethylamino
+
+    Args:
+        mol: RDKit Mol.
+        frag_atoms: List of atom indices in the fragment.
+        attach_idx: Atom index of the N attachment atom.
+        parent_atoms: Set of parent atom indices.
+
+    Returns:
+        Amino prefix name, or None if pattern not recognized.
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    frag_set = set(frag_atoms)
+    n_atom = mol.GetAtomWithIdx(attach_idx)
+
+    # Collect non-parent, non-N neighbors
+    branches = []
+    for nbr in n_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms:
+            continue
+        if nbr_idx in frag_set:
+            branches.append(nbr_idx)
+
+    if not branches:
+        return None
+
+    ring_info = mol.GetRingInfo()
+
+    # Check for acylamino: -NH-C(=O)-R
+    for branch_start in branches:
+        branch_atom = mol.GetAtomWithIdx(branch_start)
+        if branch_atom.GetSymbol() != 'C':
+            continue
+        # Check if this C has a =O (carbonyl)
+        has_carbonyl = False
+        for nbr in branch_atom.GetNeighbors():
+            if nbr.GetIdx() == attach_idx:
+                continue
+            if nbr.GetSymbol() == 'O':
+                bond = mol.GetBondBetweenAtoms(branch_start, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() == 2.0:
+                    has_carbonyl = True
+                    break
+        if has_carbonyl:
+            # Count carbons in the acyl R-group (excluding the carbonyl C and =O)
+            acyl_carbons = 0
+            visited = set()
+            stack_c = [branch_start]
+            while stack_c:
+                idx = stack_c.pop()
+                if idx in visited or idx == attach_idx:
+                    continue
+                if idx not in frag_set:
+                    continue
+                visited.add(idx)
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'C':
+                    acyl_carbons += 1
+                for n in atom.GetNeighbors():
+                    if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
+                        stack_c.append(n.GetIdx())
+            if acyl_carbons >= 1:
+                # acyl_carbons includes the carbonyl C
+                # IUPAC acyl nomenclature: chain_prefix + "anoyl" + "amino"
+                # e.g., 2C = ethanoyl + amino, 3C = propanoyl + amino
+                # Special case: 1C = formyl (methanoyl), but formylamino is rare
+                acyl_name = get_chain_prefix(acyl_carbons) + "anoylamino"
+                return acyl_name
+
+    # Check for anilino: -NH-phenyl (isolated benzene ring directly on N)
+    for branch_start in branches:
+        branch_atom = mol.GetAtomWithIdx(branch_start)
+        if branch_atom.GetIsAromatic() and branch_atom.GetSymbol() == 'C':
+            for ring in ring_info.AtomRings():
+                if branch_start in ring and len(ring) == 6:
+                    all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+                    all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+                    if all_arom and all_c:
+                        # Verify isolated (not fused)
+                        ring_set_check = set(ring)
+                        is_fused = any(
+                            set(other) != ring_set_check and set(other) & ring_set_check
+                            for other in ring_info.AtomRings()
+                        )
+                        if not is_fused:
+                            return "anilino"
+
+    # Simple amino: -NH-alkyl or -N(alkyl)2
+    if len(branches) == 1:
+        # BFS from branch to count carbons
+        visited = set()
+        stack_c = [branches[0]]
+        carbon_count = 0
+        has_hetero = False
+        has_ring = False
+        while stack_c:
+            idx = stack_c.pop()
+            if idx in visited or idx == attach_idx:
+                continue
+            if idx not in frag_set:
+                continue
+            visited.add(idx)
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'C':
+                carbon_count += 1
+            elif atom.GetAtomicNum() != 1:
+                has_hetero = True
+            if ring_info.NumAtomRings(idx) > 0:
+                has_ring = True
+            for n in atom.GetNeighbors():
+                if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
+                    stack_c.append(n.GetIdx())
+        if carbon_count > 0 and not has_hetero and not has_ring:
+            try:
+                alkyl_name = get_alkyl_name(carbon_count)
+                return f"{alkyl_name}amino"
+            except (ValueError, KeyError):
+                pass
+
     return None
 
 

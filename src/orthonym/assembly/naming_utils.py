@@ -25,7 +25,25 @@ from typing import List
 _MULT_SUBSTITUENT_RE = re.compile(
     r'^(?:di|tri|tetra|penta|hexa)'
     r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
-    r'phenyl|naphthyl|cyclopentyl|cyclohexyl|benzyl|vinyl|allyl)'
+    r'phenyl|naphthyl|cyclopentyl|cyclohexyl|benzyl|vinyl|allyl|'
+    r'fluoro|chloro|bromo|iodo)'
+)
+
+# Halogen + alkyl compound substituent patterns (e.g., fluoromethyl,
+# trifluoromethyl, chloroethyl). These are compound substituents per
+# IUPAC P-31.1.2.3 and require enclosing marks.
+_HALOALKYL_RE = re.compile(
+    r'^(?:(?:di|tri|tetra|penta|hexa)?(?:fluoro|chloro|bromo|iodo))'
+    r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl)$'
+)
+
+# Alkyl + functional group compound substituent patterns (e.g., methylamino,
+# ethylamino, propylamino). These are compound substituents per IUPAC P-31.1.2
+# and require enclosing marks.
+_ALKYLAMINO_RE = re.compile(
+    r'^(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
+    r'nonyl|decyl|phenyl|benzyl|cyclopentyl|cyclohexyl)'
+    r'(?:amino|imino)$'
 )
 
 _COMPOUND_OXY_PREFIXES = frozenset((
@@ -350,6 +368,17 @@ def is_complex_substituent(name: str) -> bool:
     if name.endswith('yloxy') and len(name) > 5:
         # Matches: acetyloxy, benzoyloxy, propanoyloxy, butanoyloxy, etc.
         # Does NOT match: methoxy, ethoxy (simple alkoxy, no 'yl' before 'oxy')
+        return True
+    # Haloalkyl compound substituents per IUPAC P-31.1.2.3:
+    # "fluoromethyl", "trifluoromethyl", "chloroethyl" etc.
+    if _HALOALKYL_RE.match(name):
+        return True
+    # Alkyl+amino compound substituents per IUPAC P-31.1.2:
+    # "methylamino", "ethylamino", "phenylamino" etc.
+    if _ALKYLAMINO_RE.match(name):
+        return True
+    # Acylamino compound substituents: "ethanoylamino", "propanoylamino" etc.
+    if name.endswith('amino') and 'oyl' in name:
         return True
     return False
 
