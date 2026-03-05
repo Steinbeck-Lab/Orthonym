@@ -84,11 +84,11 @@ class TestCLS01Acetals:
         assert name_compound("COC(C)OC") == "1,1-dimethoxyethane"
 
     @pytest.mark.integration
-    def test_lactol_hydroxy_tetrahydropyran(self):
-        """Lactol (hemiacetal): hydroxy on tetrahydropyran ring."""
+    def test_lactol_hydroxy_oxane(self):
+        """Lactol (hemiacetal): hydroxy on oxane ring."""
         name = name_compound("OC1CCCCO1")
         assert "hydroxy" in name, f"Expected 'hydroxy' in '{name}'"
-        # Should be named as an oxane/tetrahydropyran derivative
+        # Should be named as an oxane/oxane derivative
         assert "pyran" in name or "oxan" in name, (
             f"Expected ring parent (pyran or oxan) in '{name}'"
         )

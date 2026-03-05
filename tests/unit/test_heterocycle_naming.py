@@ -88,8 +88,8 @@ class TestFiveMemberedSaturatedHeterocycles:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # Oxygen - tetrahydrofuran (THF)
-        ("C1CCOC1", "tetrahydrofuran"),
+        # Oxygen - oxolane (THF)
+        ("C1CCOC1", "oxolane"),
         # Nitrogen - pyrrolidine
         ("C1CCNC1", "pyrrolidine"),
         # Sulfur - tetrahydrothiophene (thiolane)
@@ -101,7 +101,7 @@ class TestFiveMemberedSaturatedHeterocycles:
 
     @pytest.mark.unit
     def test_thf_classification(self):
-        """Test classification of tetrahydrofuran."""
+        """Test classification of oxolane."""
         mol = Chem.MolFromSmiles("C1CCOC1")
         ring = mol.GetRingInfo().AtomRings()[0]
         info = classify_heterocycle(mol, ring)
@@ -191,8 +191,8 @@ class TestSixMemberedSaturatedHeterocycles:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # Oxygen - tetrahydropyran
-        ("C1CCOCC1", "tetrahydropyran"),
+        # Oxygen - oxane
+        ("C1CCOCC1", "oxane"),
         # Nitrogen - piperidine
         ("C1CCNCC1", "piperidine"),
         # Sulfur - thiane
@@ -515,7 +515,7 @@ class TestPipelineIntegration:
         ("C1CNC1", "azetidine"),
         ("C1CSC1", "thietane"),
         # 5-membered saturated
-        ("C1CCOC1", "tetrahydrofuran"),
+        ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         ("C1CCSC1", "tetrahydrothiophene"),
         # 5-membered aromatic
@@ -529,7 +529,7 @@ class TestPipelineIntegration:
         ("c1ccno1", "isoxazole"),
         ("c1ccsn1", "isothiazole"),
         # 6-membered saturated
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
         ("C1CCSCC1", "thiane"),
         ("C1COCCN1", "morpholine"),

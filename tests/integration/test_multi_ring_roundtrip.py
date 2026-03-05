@@ -247,7 +247,7 @@ class TestCanaryStability:
         ("c1ccc(cc1)O", "phenol"),
         ("CC(=O)N", "acetamide"),
         ("OC(=O)c1ccccc1", "benzoic acid"),
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("c1ccoc1", "furan"),
         ("C1CCNCC1", "piperidine"),
         ("OC(=O)CCCc1ccccc1", "phenylbutanoic acid"),

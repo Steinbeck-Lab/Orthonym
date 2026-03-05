@@ -4,7 +4,7 @@ Integration tests for ether bond cleavage in the decomposition engine (DEC-01).
 Tests that ether-bridged molecules produce names with alkoxy prefixes when the
 quality gate triggers decomposition, and that small/ring ethers are correctly
 excluded from decomposition via the 5 guards:
-  1. Ring guard (epoxides, oxetane, tetrahydropyran)
+  1. Ring guard (epoxides, oxetane, oxane)
   2. Ester exclusion (carbonyl carbons)
   3. Glycosidic exclusion (anomeric centers)
   4. Skeletal replacement exclusion (polyethers)
@@ -112,16 +112,16 @@ class TestEtherDecomposition:
         )
 
     @pytest.mark.integration
-    def test_guard_tetrahydropyran_ring_ether_excluded(self):
+    def test_guard_oxane_ring_ether_excluded(self):
         """Tetrahydropyran (C1CCOCC1): oxygen is IN the ring.
 
         The ring guard should exclude this -- ether SMARTS requires [OX2;!R]
-        (not in ring). Should produce 'tetrahydropyran' via retained names.
+        (not in ring). Should produce 'oxane' via retained names.
         """
         name = name_compound("C1CCOCC1")
         assert name != "unknown"
-        assert "tetrahydropyran" in name.lower() or "oxane" in name.lower(), (
-            f"Expected tetrahydropyran/oxane, got: {name}"
+        assert "oxane" in name.lower() or "oxane" in name.lower(), (
+            f"Expected oxane/oxane, got: {name}"
         )
 
     @pytest.mark.integration

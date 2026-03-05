@@ -281,13 +281,13 @@ class TestSubstitutedHeterocycleRegression:
         assert name_compound("c1ccoc1") == "furan"
         assert name_compound("c1cc[nH]c1") == "pyrrole"
         assert name_compound("c1ccsc1") == "thiophene"
-        assert name_compound("C1CCOC1") == "tetrahydrofuran"
+        assert name_compound("C1CCOC1") == "oxolane"
         assert name_compound("C1CCNC1") == "pyrrolidine"
 
         # 6-membered
         assert name_compound("c1ccncc1") == "pyridine"
         assert name_compound("C1CCNCC1") == "piperidine"
-        assert name_compound("C1CCOCC1") == "tetrahydropyran"
+        assert name_compound("C1CCOCC1") == "oxane"
         assert name_compound("C1COCCN1") == "morpholine"
 
         # 3 and 4 membered

@@ -81,7 +81,7 @@ class TestIsMonocyclicLactone:
 
     # ---- Negative tests: non-lactones ----
 
-    def test_tetrahydrofuran_not_lactone(self):
+    def test_oxolane_not_lactone(self):
         """THF has no carbonyl -> not a lactone."""
         mol = Chem.MolFromSmiles("C1CCOC1")
         result = is_monocyclic_lactone(mol)
@@ -117,7 +117,7 @@ class TestIsMonocyclicLactone:
         assert result is None
 
     def test_pyran_not_lactone(self):
-        """Oxane (tetrahydropyran) has ring O but no C=O -> not a lactone."""
+        """Oxane (oxane) has ring O but no C=O -> not a lactone."""
         mol = Chem.MolFromSmiles("C1CCOCC1")
         result = is_monocyclic_lactone(mol)
         assert result is None

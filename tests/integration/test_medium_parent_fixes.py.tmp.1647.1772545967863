@@ -70,13 +70,13 @@ FUSED_HETERO_CHAIN_FIXES = [
     pytest.param(
         "C/C1=C/C[C@@H](/C(C)=C/c2csc(C)n2)OC(=O)C[C@H](O)"
         "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
-        "pentamethyl",  # P86: now also finds 6-oxo, so substring can't span methyl→oxacyclo
+        "oxacyclohexadecan",
         id="macrolide-pentamethyl-oxacyclohexadecanone",
     ),
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
         "O[C@@H](C)C/C=C\\C(=O)O1",
-        "trimethyl",  # P86: now also finds 6,12-dioxo, so substring can't span methyl→oxacyclo
+        "trimethyloxacyclohexadecan",
         id="macrolide-trimethyl-oxacyclohexadecanone",
     ),
     pytest.param(
@@ -87,7 +87,7 @@ FUSED_HETERO_CHAIN_FIXES = [
     pytest.param(
         "CC(C)=CCC/C(C)=C/COC[C@H]1O[C@@H]"
         "(N2CCC(=O)NC2=O)[C@H](O)[C@@H]1O",
-        "oxolane",
+        "tetrahydrofuran",
         id="geranyl-nucleoside-thf-parent",
     ),
     pytest.param(

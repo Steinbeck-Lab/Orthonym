@@ -90,7 +90,7 @@ class TestParenthesizationCompounds:
 
     @pytest.mark.integration
     def test_compound_11_no_hybrid_format(self):
-        """Compound #11 (HA=26): bis(acetyloxy)tetrahydrofuran, not di(acetyloxy)."""
+        """Compound #11 (HA=26): bis(acetyloxy)oxolane, not di(acetyloxy)."""
         smiles = "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O"
         name = name_compound(smiles)
         assert "bis(acetyloxy)" in name, (

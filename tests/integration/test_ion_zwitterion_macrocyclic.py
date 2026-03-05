@@ -179,7 +179,7 @@ class TestMacrocyclicNames:
 
         # Tetrahydropyran (6-membered, retained name for oxane)
         name = self._name_ring('C1CCOCC1')
-        assert name in ('oxane', 'tetrahydropyran')
+        assert name in ('oxane', 'oxane')
 
     def test_10_membered_hw_still_works(self):
         """10-membered ring should still use HW naming."""

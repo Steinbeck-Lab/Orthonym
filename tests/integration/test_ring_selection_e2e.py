@@ -118,8 +118,8 @@ class TestMultiRingSeniorSystem:
     def test_thp_cyclopentane_naming(self):
         """End-to-end: THP + cyclopentane should name with THP reference."""
         result = name_compound("C1CCOC(C1)CC1CCCC1")
-        # The name should reference tetrahydropyran (or oxane)
-        assert "tetrahydropyran" in result or "oxan" in result, (
+        # The name should reference oxane (or oxane)
+        assert "oxane" in result or "oxan" in result, (
             f"Expected THP-based name, got: {result}"
         )
 

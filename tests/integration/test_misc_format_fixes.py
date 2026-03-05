@@ -14,8 +14,8 @@ class TestOxolaneSubstituentNaming:
     """Saturated 5-membered O-heterocycle substituents use systematic 'oxolanyl'."""
 
     def test_standalone_thf_retained_name(self):
-        """Standalone tetrahydrofuran keeps retained name."""
-        assert name_compound("C1CCOC1") == "tetrahydrofuran"
+        """Standalone oxolane keeps retained name."""
+        assert name_compound("C1CCOC1") == "oxolane"
 
     def test_thf_substituent_uses_oxolanyl(self):
         """THF ring as substituent on another structure uses 'oxolanyl'."""
@@ -29,7 +29,7 @@ class TestOxolaneSubstituentNaming:
         )
 
     def test_methyl_thf_uses_oxolane(self):
-        """2-methyltetrahydrofuran as parent uses methyloxolane or methyltetrahydrofuran."""
+        """2-methyloxolane as parent uses methyloxolane or methyloxolane."""
         name = name_compound("CC1CCCO1")
         # Either form acceptable for parent; check it names without error
         assert name, "Should produce a name"

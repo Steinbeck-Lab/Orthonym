@@ -71,7 +71,7 @@ class TestRingClassification:
         assert classify_ring(mol, ring) == "aromatic"
 
     @pytest.mark.unit
-    def test_classify_tetrahydrofuran(self):
+    def test_classify_oxolane(self):
         """C1CCOC1 contains oxygen -> heterocyclic."""
         mol = Chem.MolFromSmiles("C1CCOC1")
         ring = mol.GetRingInfo().AtomRings()[0]

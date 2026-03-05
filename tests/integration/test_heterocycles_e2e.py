@@ -38,7 +38,7 @@ class TestHETERO02:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        ("C1CCOC1", "tetrahydrofuran"),
+        ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         ("C1CCSC1", "tetrahydrothiophene"),
     ])
@@ -83,7 +83,7 @@ class TestHETERO04:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
         ("C1CCSCC1", "thiane"),
         ("C1COCCN1", "morpholine"),
@@ -163,13 +163,13 @@ class TestHETERO08:
     def test_saturated_forms_have_retained_names(self):
         """Test that common saturated forms use retained names.
 
-        For tetrahydrofuran, tetrahydropyran, etc., IUPAC prefers
+        For oxolane, oxane, etc., IUPAC prefers
         the retained names over systematic names like
-        'tetrahydrofuran' over 'oxolane'.
+        'oxolane' over 'oxolane'.
         """
         # These saturated forms have retained names
-        assert name_compound("C1CCOC1") == "tetrahydrofuran"
-        assert name_compound("C1CCOCC1") == "tetrahydropyran"
+        assert name_compound("C1CCOC1") == "oxolane"
+        assert name_compound("C1CCOCC1") == "oxane"
 
 
 # =============================================================================
@@ -259,7 +259,7 @@ class TestPhase3Regression:
             ("C1CNC1", "azetidine"),
             ("C1CSC1", "thietane"),
             # 5-membered saturated
-            ("C1CCOC1", "tetrahydrofuran"),
+            ("C1CCOC1", "oxolane"),
             ("C1CCNC1", "pyrrolidine"),
             ("C1CCSC1", "tetrahydrothiophene"),
             # 5-membered aromatic
@@ -269,7 +269,7 @@ class TestPhase3Regression:
             ("c1c[nH]cn1", "imidazole"),
             ("c1cc[nH]n1", "pyrazole"),
             # 6-membered saturated
-            ("C1CCOCC1", "tetrahydropyran"),
+            ("C1CCOCC1", "oxane"),
             ("C1CCNCC1", "piperidine"),
             ("C1CCSCC1", "thiane"),
             ("C1COCCN1", "morpholine"),

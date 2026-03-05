@@ -22,13 +22,13 @@ class TestGroupNSubstituentsDirect:
 
     @pytest.mark.integration
     def test_two_identical_n_prefixes_grouped(self):
-        """N-acetyl-N-acetyltetrahydropyranamine -> N,N-diacetyl form."""
-        result = _group_n_substituents("N-acetyl-N-acetyltetrahydropyranamine")
+        """N-acetyl-N-acetyloxanamine -> N,N-diacetyl form."""
+        result = _group_n_substituents("N-acetyl-N-acetyloxanamine")
         assert "N,N-diacetyl" in result, (
             f"Expected 'N,N-diacetyl' grouping, got: {result}"
         )
-        assert "tetrahydropyranamine" in result, (
-            f"Expected parent 'tetrahydropyranamine' preserved, got: {result}"
+        assert "oxanamine" in result, (
+            f"Expected parent 'oxanamine' preserved, got: {result}"
         )
         # Should NOT contain repeated N-acetyl
         assert "N-acetyl-N-acetyl" not in result, (

@@ -453,7 +453,7 @@ class TestPhase3Regression:
         ("C1CNC1", "azetidine"),
         ("C1CSC1", "thietane"),
         # 5-membered saturated
-        ("C1CCOC1", "tetrahydrofuran"),
+        ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         # 5-membered aromatic
         ("c1ccoc1", "furan"),
@@ -461,7 +461,7 @@ class TestPhase3Regression:
         ("c1ccsc1", "thiophene"),
         ("c1c[nH]cn1", "imidazole"),
         # 6-membered saturated
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
         ("C1COCCN1", "morpholine"),
         # 6-membered aromatic

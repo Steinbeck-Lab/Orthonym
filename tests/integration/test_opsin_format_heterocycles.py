@@ -121,9 +121,9 @@ class TestRetainedHeterocycleNames:
         ("c1ccsc1", "thiophene"),
         ("c1cc[nH]c1", "pyrrole"),
         # Saturated heterocycles
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
-        ("C1CCOC1", "tetrahydrofuran"),
+        ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         ("C1COCCN1", "morpholine"),
         ("C1CNCCN1", "piperazine"),
@@ -144,7 +144,7 @@ class TestRetainedHeterocycleNames:
         ("c1ccsc1", "thiophene"),
         ("c1cc[nH]c1", "pyrrole"),
         ("c1cncnc1", "pyrimidine"),
-        ("C1CCOCC1", "tetrahydropyran"),
+        ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
     ])
     def test_retained_names_opsin_compatible(self, smiles, expected):

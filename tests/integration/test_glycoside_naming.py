@@ -88,7 +88,7 @@ class TestGlycosideNameFormat:
         assert len(name) > 20
 
     def test_glycoside_not_oxane(self):
-        """Glycoside name should NOT contain 'oxan' (systematic tetrahydropyran)."""
+        """Glycoside name should NOT contain 'oxan' (systematic oxane)."""
         name = name_compound("OC[C@H]1O[C@@H](Oc2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O")
         assert "oxan" not in name.lower(), (
             f"Name should use retained sugar name, not systematic oxane: {name}"

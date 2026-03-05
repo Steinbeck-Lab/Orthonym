@@ -174,10 +174,10 @@ class TestBug4HeterocycleSubstituent:
         result = name_compound('C1CCNC1')
         assert 'pyrrolidine' in result.lower()
 
-    def test_tetrahydrofuran_standalone(self):
+    def test_oxolane_standalone(self):
         """Tetrahydrofuran alone should still work."""
         result = name_compound('C1CCOC1')
-        assert 'tetrahydrofuran' in result.lower() or 'oxolane' in result.lower()
+        assert 'oxolane' in result.lower() or 'oxolane' in result.lower()
 
 
 class TestBug5HeterocycleStereo:

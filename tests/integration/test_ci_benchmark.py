@@ -115,7 +115,7 @@ CI_BENCHMARK = [
         "O=c1c(O[C@@H]2OC(CO)[C@@H](O)[C@H](O)C2O[C@@H]2OC(CO)"
         "[C@H](O)[C@H](O)C2O[C@@H]2OC(CO)[C@@H](O)[C@H](O)C2O)"
         "c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12",
-        "5,6-dibutyl-3-tetrahydropyranyl-4-oxo-2-phenyl-2H-pyran",
+        "5,6-dibutyl-3-oxanyl-4-oxo-2-phenyl-2H-pyran",
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CC(N)=O)"
@@ -149,8 +149,8 @@ CI_BENCHMARK = [
         "/C=C/C=C/[C@@](C)(O)[C@@H](O[C@@H]2OC[C@@H](O[C@H]3C"
         "[C@@](C)(O)[C@H](N(C)C)[C@@H](C)O3)[C@H](O)[C@H]2N)"
         "/C=C\\C=C\\1",
-        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-12-[(2R,3R,4R,6S)-3-ethyl-6-tetrahydropyranyl"
-        "-4-hydroxy-2,4-dimethyltetrahydropyranyl]-11-hydroxy-3-isobutyl"
+        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-12-[(2R,3R,4R,6S)-3-ethyl-4-hydroxy-2,4-dimethyl"
+        "-6-oxanyloxyl]-11-hydroxy-3-isobutyl"
         "-5,11,17,21,24-pentamethylazacyclotetracosan-2-one",
     ),
     (
@@ -187,7 +187,7 @@ CI_BENCHMARK = [
     ),
     (
         "C=C1C(=O)OC2/C=C(/CO)C(=O)/C=C\\C(C)(O)CC(OC(=O)/C(C)=C/C)C12",
-        "2,3-dipentadecyl-4-methyl-5-oxotetrahydrofuran",
+        "2,3-dipentadecyl-4-methyl-5-oxooxolane",
     ),
     ("CSCCCCC=NO", "2-aza-8-thianonane"),
     ("O=Cc1ccc2ccccc2c1O", "1-hydroxynaphthalene-2-carbaldehyde"),
@@ -207,7 +207,7 @@ CI_BENCHMARK = [
         "O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H]"
         "(O[C@H]3O[C@H](CO)[C@H](O)[C@H](O)[C@H]3O)[C@H]2O)"
         "[C@@H]1O",
-        "N-acetyl(2R,3R,4R,5S,6R)-3-amino-2,5-ditetrahydropyranyl-4-hydroxy-6-methyltetrahydropyran",
+        "N-acetyl(2R,3R,4R,5S,6R)-3-amino-4-hydroxy-6-methyl-2,5-dioxanyloxane",
     ),
     (
         "O=C([O-])[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
@@ -242,7 +242,7 @@ CI_BENCHMARK = [
         "CCCCCc1oc(CCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC"
         "[N+](C)(C)C)OC(=O)CCC/C=C\\C[C@H]2[C@@H](O)CC(O)O"
         "[C@@H]2/C=C/[C@@H](O)CCCCC)c(C)c1C",
-        "2-tetrahydropyranyl-3,4-dimethyl-5-pentylfuran",
+        "3,4-dimethyl-2-oxanyl-5-pentylfuran",
     ),
     (
         "CC(=O)N[C@H]1C(O)O[C@H](CO)[C@@H](O)[C@@H]1O[C@H](C)"
@@ -259,8 +259,7 @@ CI_BENCHMARK = [
         "OC[C@H]1O[C@H](OC[C@H]2O[C@H](OC[C@H]3O[C@H](O)[C@H](O)"
         "[C@@H](O)[C@@H]3O)[C@H](O)[C@@H](O)[C@H]2O)[C@H](O)"
         "[C@@H](O)[C@@H]1O",
-        "(2R,3S,4S,5R,6S)-6-tetrahydropyranyl-3,4,5-trihydroxy-2"
-        "-methyltetrahydropyran",
+        "(2R,3S,4S,5R,6S)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
     ),
     (
         "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O",
@@ -461,7 +460,7 @@ CI_BENCHMARK = [
         "NC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](N)C[C@@H]2N)"
         "[C@H](O)[C@@H](O)[C@@H]1O",
         "(2R,3S,4S,5R,6R)-6-cyclohexyl-3,4,5-trihydroxy-2-methyl"
-        "tetrahydropyran",
+        "oxane",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CO)NC(=O)[C@@H](N)CCCCN)C(=O)O",

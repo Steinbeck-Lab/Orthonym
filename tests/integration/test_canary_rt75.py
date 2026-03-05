@@ -278,7 +278,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)[C@@H]1OC(O)[C@H](O)[C@@H](O)[C@H]1O",
-        "(2R,3R,4S,5R)-3,4,5,6-tetrahydroxytetrahydropyran-2-carboxylic acid",
+        "(2R,3R,4S,5R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid",
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
@@ -392,10 +392,10 @@ CANARY_COMPOUNDS = [
         "c1ccc(OCC)cc1",
         "ethoxybenzene",
     ),
-    # Ring ether guard (DEC-01: tetrahydropyran not decomposed)
+    # Ring ether guard (DEC-01: oxane not decomposed)
     (
         "C1CCOCC1",
-        "tetrahydropyran",
+        "oxane",
     ),
     # --- Phase 62: Small Molecule Accuracy Sprint (44 compounds) ---
     # Wave 1-3 fixes: parent selection, substituent detection, E/Z ester fragments,
@@ -498,7 +498,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1OC(O)C(O)C(O)C1O",
-        "3,4,5,6-tetrahydroxy-2-methyltetrahydropyran",
+        "3,4,5,6-tetrahydroxy-2-methyloxane",
     ),
     (
         r"CCC/C=C\C/C=C\CCCCCCCC(=O)O",

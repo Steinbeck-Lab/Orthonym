@@ -172,8 +172,8 @@ CORE_NAMING = [
 
     # Saturated heterocycles (retained)
     ("C1CCNCC1", "piperidine"),
-    ("C1CCOCC1", "tetrahydropyran"),
-    ("C1CCOC1", "tetrahydrofuran"),
+    ("C1CCOCC1", "oxane"),
+    ("C1CCOC1", "oxolane"),
 
     # Stereochemistry
     ("C/C=C/C", "(2E)-but-2-ene"),

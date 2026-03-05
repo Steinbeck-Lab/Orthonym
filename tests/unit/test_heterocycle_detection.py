@@ -157,7 +157,7 @@ class TestClassifyHeterocycle:
     # -------------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_tetrahydrofuran_classification(self):
+    def test_oxolane_classification(self):
         """Tetrahydrofuran (THF) - 5-membered saturated, 1 oxygen."""
         mol = Chem.MolFromSmiles("C1CCOC1")
         ring = mol.GetRingInfo().AtomRings()[0]
@@ -277,7 +277,7 @@ class TestClassifyHeterocycle:
         assert info["is_saturated"] is True
 
     @pytest.mark.unit
-    def test_tetrahydropyran_classification(self):
+    def test_oxane_classification(self):
         """Tetrahydropyran - 6-membered saturated, 1 oxygen."""
         mol = Chem.MolFromSmiles("C1CCOCC1")
         ring = mol.GetRingInfo().AtomRings()[0]
@@ -773,11 +773,11 @@ class TestEdgeCases:
         ("c1ccoc1", "O", 5),  # furan
         ("c1cc[nH]c1", "N", 5),  # pyrrole
         ("c1ccsc1", "S", 5),  # thiophene
-        ("C1CCOC1", "O", 5),  # tetrahydrofuran
+        ("C1CCOC1", "O", 5),  # oxolane
         ("C1CCNC1", "N", 5),  # pyrrolidine
         ("c1ccncc1", "N", 6),  # pyridine
         ("c1ncncc1", "N", 6),  # pyrimidine
-        ("C1CCOCC1", "O", 6),  # tetrahydropyran
+        ("C1CCOCC1", "O", 6),  # oxane
         ("C1CCNCC1", "N", 6),  # piperidine
         ("C1COCCN1", "O", 6),  # morpholine (O > N)
         ("C1CNCCN1", "N", 6),  # piperazine

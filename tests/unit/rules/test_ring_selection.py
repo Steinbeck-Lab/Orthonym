@@ -199,7 +199,7 @@ class TestRingSystemScore:
     def test_n_containing_beats_o_containing_same_type(self):
         """P-44.2.1(b): N-containing heterocycle beats O-containing."""
         mol_n = Chem.MolFromSmiles("C1CCNCC1")  # piperidine
-        mol_o = Chem.MolFromSmiles("C1CCOCC1")  # tetrahydropyran
+        mol_o = Chem.MolFromSmiles("C1CCOCC1")  # oxane
         rs_n = get_ring_systems(mol_n)
         rs_o = get_ring_systems(mol_o)
         score_n = ring_system_score(mol_n, rs_n[0])

@@ -140,9 +140,9 @@ class TestMissingSubstituent:
         assert "acetyloxy" in name or "acetoxy" in name
 
     def test_022_sorbofuranose(self):
-        """#22: sorbofuranose - tetrahydrofuran with hydroxy groups."""
+        """#22: sorbofuranose - oxolane with hydroxy groups."""
         name = name_compound("OC[C@@H]1O[C@@](O)(CO)[C@@H](O)[C@@H]1O")
-        assert "tetrahydrofuran" in name or "furan" in name
+        assert "oxolane" in name or "furan" in name
 
     def test_023_bifuran(self):
         """#23: c1cc(-c2ccco2)oc1 -> 2,2'-bifuran [RT]."""
@@ -233,9 +233,9 @@ class TestMissingSubstituent:
         name = name_compound("O=C1OC(=O)c2ccccc21")
         assert "anhydride" in name or name is not None
 
-    def test_067_methyltetrahydropyran(self):
-        """#67: CC1OC(O)C(O)C(O)C1O -> tetrahydropyran derivative [RT]."""
-        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "3,4,5,6-tetrahydroxy-2-methyltetrahydropyran"
+    def test_067_methyloxane(self):
+        """#67: CC1OC(O)C(O)C(O)C1O -> oxane derivative [RT]."""
+        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "3,4,5,6-tetrahydroxy-2-methyloxane"
 
     def test_068_butenolide_acid(self):
         """#68: O=C(O)C1C=CC(=O)O1 - butenolide with acid."""

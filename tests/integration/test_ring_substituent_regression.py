@@ -119,18 +119,18 @@ class TestHeterocycleSubstituents:
         assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
         assert 'piperidine' in name, f"Expected 'piperidine' in '{name}'"
 
-    def test_aminotetrahydropyran(self):
-        """Aminotetrahydropyran must contain 'amino' prefix."""
+    def test_aminooxane(self):
+        """Aminooxane must contain 'amino' prefix."""
         name = name_compound('NC1CCOCC1')
         assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'tetrahydropyran' in name, f"Expected 'tetrahydropyran' in '{name}'"
+        assert 'oxane' in name, f"Expected 'oxane' in '{name}'"
 
-    def test_methyltetrahydrofuran(self):
-        """Methyltetrahydrofuran must contain 'methyl' prefix."""
+    def test_methyloxolane(self):
+        """Methyloxolane must contain 'methyl' prefix."""
         name = name_compound('CC1CCCO1')
         assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
-        assert 'tetrahydrofuran' in name or 'oxolane' in name, \
-            f"Expected 'tetrahydrofuran' or 'oxolane' in '{name}'"
+        assert 'oxolane' in name or 'oxolane' in name, \
+            f"Expected 'oxolane' or 'oxolane' in '{name}'"
 
 
 # ---------------------------------------------------------------------------

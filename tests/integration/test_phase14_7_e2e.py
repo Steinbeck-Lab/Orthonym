@@ -48,8 +48,8 @@ class TestMonocyclicLactones:
         assert result == "oxepan-2-one", f"Expected 'oxepan-2-one', got '{result}'"
 
     @pytest.mark.integration
-    def test_tetrahydrofuran_not_lactone(self):
-        """THF has no C=O, so it is NOT a lactone - should be oxolane/tetrahydrofuran."""
+    def test_oxolane_not_lactone(self):
+        """THF has no C=O, so it is NOT a lactone - should be oxolane/oxolane."""
         result = name_compound("C1CCCO1")
         assert "one" not in result.lower(), (
             f"THF should not have '-one' suffix: got '{result}'"

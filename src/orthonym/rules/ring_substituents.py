@@ -45,7 +45,7 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     'pyridazine': 'pyridazinyl',
 
     # Heterocyclic saturated (6-membered)
-    'tetrahydropyran': 'tetrahydropyranyl',
+    'oxane': 'oxanyl',
     'piperidine': 'piperidinyl',
     'morpholine': 'morpholinyl',
     'piperazine': 'piperazinyl',
@@ -149,7 +149,7 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
             if not heteroatoms:
                 return 'cyclohexane'
             elif heteroatoms == ['O']:
-                return 'tetrahydropyran'
+                return 'oxane'
             elif heteroatoms == ['N']:
                 return 'piperidine'
             elif heteroatoms == ['N', 'O']:

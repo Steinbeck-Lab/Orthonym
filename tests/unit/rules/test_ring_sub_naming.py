@@ -44,7 +44,7 @@ class TestRingSubstituentNamesCompleteness:
             ("C1CCNCC1", "piperidine", "piperidinyl"),
             ("C1COCCN1", "morpholine", "morpholinyl"),
             ("C1CNCCN1", "piperazine", "piperazinyl"),
-            ("C1CCOCC1", "tetrahydropyran", "tetrahydropyranyl"),
+            ("C1CCOCC1", "oxane", "oxanyl"),
             # Saturated heterocyclic (5-membered)
             ("C1CCOC1", "oxolane", "oxolanyl"),
             ("C1CCNC1", "pyrrolidine", "pyrrolidinyl"),

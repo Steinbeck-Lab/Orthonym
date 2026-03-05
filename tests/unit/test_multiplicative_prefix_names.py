@@ -1,7 +1,7 @@
 """Tests for multiplicative naming with prefix-derived parent names (PEP-03).
 
 Validates that _assemble_multiplicative_name() does not produce unparseable
-"di" + saturation prefix concatenation (e.g., "ditetrahydropyran") when the
+"di" + saturation prefix concatenation (e.g., "dioxane") when the
 parent name starts with a modification prefix like tetrahydro, dihydro, etc.
 
 Simple parent names (aniline, benzene, benzoic acid) must still produce
@@ -16,10 +16,10 @@ from orthonym import name_compound
 class TestMultiplicativeNoDiTetrahydro:
     """Multiplicative names must not produce 'ditetrahydro' concatenation."""
 
-    def test_oxydi_tetrahydropyran_no_ditetrahydro(self):
-        """4,4'-oxybis(tetrahydropyran) or substitutive form.
+    def test_oxydi_oxane_no_ditetrahydro(self):
+        """4,4'-oxybis(oxane) or substitutive form.
         SMILES: C1CCOC(C1)OC2CCOCC2
-        Must NOT contain 'ditetrahydropyran' -- OPSIN cannot parse it.
+        Must NOT contain 'dioxane' -- OPSIN cannot parse it.
         """
         name = name_compound("C1CCOC(C1)OC2CCOCC2")
         assert name is not None, "Should produce a name"
@@ -27,10 +27,10 @@ class TestMultiplicativeNoDiTetrahydro:
             f"Produced unparseable 'ditetrahydro' concatenation: {name}"
         )
 
-    def test_methylenedi_tetrahydropyran_no_ditetrahydro(self):
-        """methylenebis(tetrahydropyran) or substitutive form.
+    def test_methylenedi_oxane_no_ditetrahydro(self):
+        """methylenebis(oxane) or substitutive form.
         SMILES: C1CCOC(C1)CC2CCOCC2
-        Must NOT contain 'ditetrahydropyran'.
+        Must NOT contain 'dioxane'.
         """
         name = name_compound("C1CCOC(C1)CC2CCOCC2")
         assert name is not None, "Should produce a name"
