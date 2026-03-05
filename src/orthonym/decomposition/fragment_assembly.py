@@ -436,6 +436,12 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if result is None:
         return None
 
+    # Guard: multi-level decomposition can produce "N-N-" at the start
+    # (outer level adds N-, inner level already starts with N-). This is
+    # never valid IUPAC notation. Deduplicate to single "N-".
+    while result.startswith("N-N-"):
+        result = result[2:]  # strip one "N-"
+
     # Group repeated N-prefix patterns (IUPAC P-16.3.4)
     # This handles cases where recursive fragment naming already produced
     # an "N-acetyl..." prefix, and our assembly adds another "N-acetyl",
