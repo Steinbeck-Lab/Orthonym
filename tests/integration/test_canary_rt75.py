@@ -750,7 +750,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1ccc(C(=O)N2CCCC2=O)cc1",  # Sentinel: substituent_loss - methoxybenzamide pyrrolidinone
-        "4-methoxybenzamide",
+        "N-4-methoxybenzoylpyrrolidin-2-one",  # Updated: quality gate now triggers decomposition covering both rings
     ),
     # Failure taxonomy sentinels: parent_mismatch (3 compounds)
     (

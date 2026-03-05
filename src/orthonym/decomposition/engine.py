@@ -137,6 +137,92 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     except Exception:
         pass  # If bond detection fails, don't block on it
 
+    # Multi-ring fragment drop detection: if the molecule has a cleavable bond
+    # separating exactly two distinct ring systems, but the name only references
+    # one ring system, reject the name as incomplete.
+    #
+    # Conservative approach: only trigger when ALL conditions are met:
+    # 1. Molecule has exactly 2 ring systems separated by cleavable bonds
+    # 2. At least one ring system on each side has >= 5 ring atoms
+    # 3. The name's char/heavy-atom ratio is < 1.5
+    # Exactly 2 ring systems avoids over-triggering on glycosides and
+    # natural products with 3+ ring systems where a single name is correct.
+    try:
+        # Reuse bonds from above if available, otherwise re-detect
+        if 'bonds' not in dir():
+            bonds = find_cleavable_bonds(mol)
+
+        ring_info = mol.GetRingInfo()
+        atom_rings = ring_info.AtomRings()
+
+        if bonds and len(atom_rings) >= 2:
+            ring_atom_sets = [set(r) for r in atom_rings]
+            # Merge overlapping ring sets (fused rings are one system)
+            merged_systems = []
+            for rs in ring_atom_sets:
+                merged = False
+                for ms in merged_systems:
+                    if rs & ms:
+                        ms.update(rs)
+                        merged = True
+                        break
+                if not merged:
+                    merged_systems.append(set(rs))
+
+            if len(merged_systems) == 2:
+                # Only trigger for exactly 2 ring systems. Molecules with 3+
+                # ring systems (glycosides, polycyclic natural products) often
+                # have a single name that correctly covers all rings.
+                for bond_info in bonds:
+                    bond_idx = bond_info.get("bond_idx")
+                    if bond_idx is None:
+                        continue
+                    bond_obj = mol.GetBondWithIdx(bond_idx)
+                    a1 = bond_obj.GetBeginAtomIdx()
+                    a2 = bond_obj.GetEndAtomIdx()
+
+                    # BFS from each side of the cleavable bond to find
+                    # which ring systems are reachable from each side
+                    def _reachable_atoms(start, exclude):
+                        visited = set()
+                        queue = deque([start])
+                        while queue:
+                            a = queue.popleft()
+                            if a in visited:
+                                continue
+                            visited.add(a)
+                            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                                nidx = nb.GetIdx()
+                                if nidx != exclude and nidx not in visited:
+                                    queue.append(nidx)
+                        return visited
+
+                    side1_atoms = _reachable_atoms(a1, a2)
+                    side2_atoms = _reachable_atoms(a2, a1)
+
+                    # Find ring systems on each side
+                    side1_ring_systems = [
+                        ms for ms in merged_systems
+                        if ms & side1_atoms and len(ms) >= 5
+                    ]
+                    side2_ring_systems = [
+                        ms for ms in merged_systems
+                        if ms & side2_atoms and len(ms) >= 5
+                    ]
+
+                    if side1_ring_systems and side2_ring_systems:
+                        # Both sides have substantial ring systems.
+                        # A name covering both ring systems needs enough
+                        # characters to name each (parent + prefix/locants).
+                        # Use a higher ratio threshold (1.5) because naming
+                        # two ring systems requires substantially more chars
+                        # than naming one ring + simple substituents.
+                        ratio = len(name) / heavy_atoms if heavy_atoms else 999
+                        if ratio < 1.5:
+                            return False
+    except Exception:
+        pass  # Guard: never let ring detection crash the quality gate
+
     # Detect half-decomposition artifacts: consecutive duplicate words
     # e.g., "palmitate palmitate" indicates same fragment named twice
     words = name.split()

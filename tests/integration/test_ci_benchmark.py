@@ -412,7 +412,8 @@ CI_BENCHMARK = [
     (
         "COc1cc(/C=C/C(=O)O[C@H]2[C@H](O)C[C@](O)(C(=O)O)C[C@H]2O)"
         "ccc1O",
-        "4-ethenyl-1-hydroxy-2-methoxybenzene",
+        "(1R,2S,3R,5S)-1,2,3-trihydroxy-5-hydroxycyclohexan-5-carboxylic acid "
+        "(2E)-3-(4-hydroxy-3-methoxyphenyl)prop-2-enoate",  # Updated: quality gate now triggers decomposition
     ),
     ("O=C1N=C([O-])c2ccccc21.[K+]", "potassium octanolate"),
     (
