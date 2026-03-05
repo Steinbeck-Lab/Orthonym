@@ -119,6 +119,22 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCCCC(CC)CO": "2-ethylhexan-1-ol",
     "ClCCCl": "1,2-dichloroethane",
     "ClC(Cl)Cl": "chloroform",
+    # --- Fatty acids (common in phospholipids/sphingolipids) ---
+    "CCCCCC(=O)O": "hexanoic acid",
+    "CCCCCCC(=O)O": "heptanoic acid",
+    "CCCCCCCC(=O)O": "octanoic acid",
+    "CCCCCCCCC(=O)O": "nonanoic acid",
+    "CCCCCCCCCC(=O)O": "decanoic acid",
+    "CCCCCCCCCCCC(=O)O": "dodecanoic acid",
+    "CCCCCCCCCCCCCC(=O)O": "tetradecanoic acid",
+    "CCCCCCCCCCCCCCCC(=O)O": "hexadecanoic acid",
+    "CCCCCCCCCCCCCCCCCC(=O)O": "octadecanoic acid",
+    "CCCCCCCCCCCCCCCCCCCC(=O)O": "icosanoic acid",
+    # --- Common biological fragments ---
+    "OCC(O)CO": "glycerol",
+    "OCCO": "ethylene glycol",
+    "NCCO": "2-aminoethanol",
+    "O=P(O)(O)O": "phosphoric acid",
 }
 
 

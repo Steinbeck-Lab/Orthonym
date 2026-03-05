@@ -250,7 +250,7 @@ class Orthonym:
             end_naming_session()
             clear_confidence()
 
-    def _name_impl(self, smiles: str) -> str:
+    def _name_impl(self, smiles: str, _skip_decomposition: bool = False) -> str:
         """Internal naming implementation (wrapped by session management)."""
         # Parse SMILES
         mol = Chem.MolFromSmiles(smiles)
@@ -498,15 +498,13 @@ class Orthonym:
             return skel_name
 
         # DECOMPOSITION ENGINE (v4.0 Phase 39)
-        # For complex molecules with ester/amide/glycosidic bonds that the
-        # existing single-pass pipeline cannot name completely, try cleaving
+        # For complex molecules with ester/amide/glycosidic bonds, try cleaving
         # at functional bonds and naming fragments individually.
-        # Quality gate inside try_decompose() ensures this only activates
-        # when the existing pipeline would produce a poor result.
-        from .decomposition import try_decompose
-        decomposed_name = try_decompose(mol, style=self.style)
-        if decomposed_name is not None:
-            return decomposed_name
+        if not _skip_decomposition:
+            from .decomposition import try_decompose
+            decomposed_name = try_decompose(mol, style=self.style)
+            if decomposed_name is not None:
+                return decomposed_name
 
         # Perceive molecular features
         features = self._perceive(mol, smiles, canonical_smiles)
@@ -522,7 +520,7 @@ class Orthonym:
         # fall back to the fragment naming result. Only triggers for
         # names containing known garbled tokens to avoid performance
         # overhead on normal molecules.
-        if assembled and mol.GetNumHeavyAtoms() > 15:
+        if not _skip_decomposition and assembled and mol.GetNumHeavyAtoms() > 15:
             _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
             assembled_lower = assembled.lower()
             if any(tok in assembled_lower for tok in _GARBLED_TOKENS):
@@ -1163,6 +1161,23 @@ def name_compound(smiles: str, style: str = "pin",
             "Naming error for %s: %s: %s", smiles, type(e).__name__, e
         )
         return _descriptive_fallback(smiles)
+
+
+def name_pipeline_only(smiles: str, style: str = "pin"):
+    """Name a molecule using only the systematic pipeline, skipping decomposition.
+
+    This provides the non-decomposition name without consuming any depth budget
+    on decomposition probes. Used by the decomposition engine to compare its
+    result against what the systematic pipeline would produce.
+
+    Returns:
+        IUPAC name string, or None if naming fails.
+    """
+    try:
+        namer = Orthonym(style=style)
+        return namer._name_impl(smiles, _skip_decomposition=True)
+    except Exception:
+        return None
 
 
 # Metals and inorganic elements (not C, H, N, O, S, P, Se, halogens)
