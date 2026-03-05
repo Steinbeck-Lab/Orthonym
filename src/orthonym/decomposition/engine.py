@@ -471,6 +471,28 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                     if substitutive_name and _name_quality_is_acceptable(substitutive_name, mol):
                         return substitutive_name
 
+    # Amide seniority-based assembly: when amine fragment has higher
+    # P-44.1.1 seniority than acid fragment, use substitutive naming
+    # (amine becomes parent, acid becomes acyl prefix).
+    if bond["type"] == "amide":
+        try:
+            from .fragment_ranker import acid_is_more_senior
+            acid_frag = next((f for f in fragments if f["side"] == "acid"), None)
+            amine_frag = next((f for f in fragments if f["side"] == "amine"), None)
+            if acid_frag and amine_frag:
+                if not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"]):
+                    # Amine is more senior -> substitutive naming
+                    from .fragment_assembly import _acid_to_acyl, _join_components
+                    acid_name = fragment_names.get("acid", "")
+                    amine_name = fragment_names.get("amine", "")
+                    acyl = _acid_to_acyl(acid_name)
+                    if acyl and amine_name:
+                        sub_name = f"N-{_join_components(acyl, amine_name)}"
+                        if sub_name and _name_quality_is_acceptable(sub_name, mol):
+                            return sub_name
+        except Exception:
+            pass  # Any failure: fall through to normal assembly
+
     # Assemble (delegate to fragment_assembly module)
     return assemble_fragment_name(bond["type"], fragment_names, style=style)
 

@@ -110,6 +110,54 @@ def _bfs_heavy_atoms(mol, start: int, excluded: Set[int]) -> Set[int]:
             if mol.GetAtomWithIdx(idx).GetAtomicNum() > 1}
 
 
+def _assign_ether_roles_by_seniority(
+    mol, carbon1: int, carbon2: int,
+    side1: Set[int], side2: Set[int]
+) -> Tuple[int, int]:
+    """Assign ether parent/substituent roles using P-44.1.1 seniority.
+
+    The more senior side becomes acid_atom (parent). Falls back to
+    atom count heuristic if seniority scoring fails or results in a tie.
+
+    Args:
+        mol: RDKit Mol object.
+        carbon1: Atom index of the first ether carbon.
+        carbon2: Atom index of the second ether carbon.
+        side1: Heavy atom indices on carbon1's side.
+        side2: Heavy atom indices on carbon2's side.
+
+    Returns:
+        (acid_atom, alkyl_atom) tuple.
+    """
+    try:
+        from .fragment_ranker import score_fragment_seniority
+
+        smiles1 = Chem.MolFragmentToSmiles(mol, atomsToUse=list(side1))
+        smiles2 = Chem.MolFragmentToSmiles(mol, atomsToUse=list(side2))
+
+        if smiles1 and smiles2:
+            score1 = score_fragment_seniority(smiles1)
+            score2 = score_fragment_seniority(smiles2)
+
+            if score1 < score2:
+                # Side 1 is more senior -> parent
+                return carbon1, carbon2
+            elif score2 < score1:
+                # Side 2 is more senior -> parent
+                return carbon2, carbon1
+            # Scores equal: fall through to atom count
+    except Exception:
+        pass  # Any failure: fall back to atom count
+
+    # Fallback: larger side = parent (original heuristic)
+    if len(side1) > len(side2):
+        return carbon1, carbon2
+    elif len(side2) > len(side1):
+        return carbon2, carbon1
+    else:
+        return min(carbon1, carbon2), max(carbon1, carbon2)
+
+
 def find_cleavable_bonds(mol) -> List[Dict]:
     """Find cleavable bonds in a molecule.
 
@@ -350,17 +398,12 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if len(side1) < 5 or len(side2) < 5:
                 continue
 
-            # Assign roles: larger side = acid_atom (parent), smaller = alkyl
-            if len(side1) > len(side2):
-                acid_atom = carbon1
-                alkyl_atom = carbon2
-            elif len(side2) > len(side1):
-                acid_atom = carbon2
-                alkyl_atom = carbon1
-            else:
-                # Equal size: use lower atom index as acid_atom
-                acid_atom = min(carbon1, carbon2)
-                alkyl_atom = max(carbon1, carbon2)
+            # Assign roles using P-44.1.1 seniority: the more senior side
+            # becomes acid_atom (parent). Falls back to atom count if
+            # seniority scoring fails or ties.
+            acid_atom, alkyl_atom = _assign_ether_roles_by_seniority(
+                mol, carbon1, carbon2, side1, side2
+            )
 
             # Cleavage bond = bond between larger-side carbon and oxygen
             # This way oxygen stays with the smaller fragment (alkyl side)
