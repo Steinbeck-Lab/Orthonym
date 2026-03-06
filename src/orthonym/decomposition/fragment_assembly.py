@@ -374,6 +374,44 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
     return f"{alkyl_prefix} {ate_name}"
 
 
+def _expand_n_locant_for_multiplier(prefix: str) -> str:
+    """Expand N-locant based on multiplier prefix on an N-substituent name.
+
+    When an amine fragment is named with a multiplier (e.g., "dimethyl" from
+    "dimethylamine"), the N-locant must repeat for each substituent on nitrogen:
+      "dimethyl" -> "N,N-"  (two methyls on N)
+      "triethyl" -> "N,N,N-" (three ethyls on N)
+      "methyl"   -> "N-"    (one methyl on N)
+
+    IUPAC P-16.3.4: When identical substituents on nitrogen, use N,N- prefix
+    with multiplying prefix.
+
+    Args:
+        prefix: Substituent prefix (e.g., "dimethyl", "triethyl", "methyl").
+
+    Returns:
+        Appropriate N-locant string ("N-", "N,N-", "N,N,N-", etc.).
+    """
+    _MULT_MAP = {
+        "di": 2, "tri": 3, "tetra": 4, "penta": 5,
+    }
+    # Simple alkyl/aryl suffixes that confirm the multiplier applies to
+    # identical N-substituents (not e.g., "dichloro" which is one substituent
+    # with two chlorines on it).
+    _SIMPLE_SUFFIXES = (
+        "methyl", "ethyl", "propyl", "butyl", "pentyl", "hexyl",
+        "heptyl", "octyl", "nonyl", "decyl", "phenyl", "benzyl",
+        "allyl", "vinyl",
+    )
+    lower = prefix.lower()
+    for mult_prefix, count in _MULT_MAP.items():
+        if lower.startswith(mult_prefix):
+            rest = lower[len(mult_prefix):]
+            if rest in _SIMPLE_SUFFIXES:
+                return ",".join(["N"] * count) + "-"
+    return "N-"
+
+
 def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]:
     """Assemble amide name as 'N-[substituent][acid-amide]'.
 
@@ -414,7 +452,11 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
                 # Result: "N-methylcyclohexylacetamide" (correct).
                 result = _join_components(amine_prefix, amide_name)
             else:
-                result = f"N-{_join_components(amine_prefix, amide_name)}"
+                # Check if prefix has a multiplier (di, tri, tetra) indicating
+                # multiple identical N-substituents. In that case, expand the
+                # N-locant: "dimethyl" -> "N,N-dimethyl", not "N-dimethyl".
+                n_locant = _expand_n_locant_for_multiplier(amine_prefix)
+                result = f"{n_locant}{_join_components(amine_prefix, amide_name)}"
 
     if result is None:
         # Complex amine: use acyl prefix pattern
