@@ -25,6 +25,8 @@ from orthonym.assembly.naming_utils import (
     format_suffix_with_locants,
     apply_enclosing_marks,
     get_bracket_depth,
+    needs_brackets,
+    _ALKYL_ROOTS_FULL,
 )
 
 
@@ -498,3 +500,113 @@ class TestEnclosingMarksDepthCycling:
     def test_bracket_depth_detects_all_types(self, name, expected_depth):
         """get_bracket_depth correctly identifies nesting depth from bracket type."""
         assert get_bracket_depth(name) == expected_depth
+
+
+# ============================================================================
+# TestC11PlusAlkylRootCoverage
+# ============================================================================
+
+@pytest.mark.unit
+class TestC11PlusAlkylRootCoverage:
+    """Tests for C11-C20 alkyl root recognition in utility functions.
+
+    These test edge cases where alkyl roots beyond C10 (undecyl through icosyl)
+    must be recognized by needs_brackets(), is_complex_substituent(), and the
+    regex patterns _HALOALKYL_RE and _ALKYLAMINO_RE.
+    """
+
+    # --- _ALKYL_ROOTS_FULL module-level constant ---
+
+    def test_alkyl_roots_full_has_20_entries(self):
+        """_ALKYL_ROOTS_FULL must contain C1-C20 alkyl names."""
+        assert len(_ALKYL_ROOTS_FULL) == 20
+
+    def test_alkyl_roots_full_contains_undecyl(self):
+        assert "undecyl" in _ALKYL_ROOTS_FULL
+
+    def test_alkyl_roots_full_contains_icosyl(self):
+        assert "icosyl" in _ALKYL_ROOTS_FULL
+
+    # --- needs_brackets() C11+ tests ---
+
+    def test_needs_brackets_hydroxyundecyl(self):
+        """C11: hydroxy + undecyl is a compound substituent."""
+        assert needs_brackets("hydroxyundecyl") is True
+
+    def test_needs_brackets_hydroxydodecyl(self):
+        """C12: hydroxy + dodecyl is a compound substituent."""
+        assert needs_brackets("hydroxydodecyl") is True
+
+    def test_needs_brackets_hydroxyicosyl(self):
+        """C20: hydroxy + icosyl is a compound substituent."""
+        assert needs_brackets("hydroxyicosyl") is True
+
+    def test_needs_brackets_hydroxymethyl_still_works(self):
+        """C1: hydroxy + methyl still works after extension."""
+        assert needs_brackets("hydroxymethyl") is True
+
+    def test_needs_brackets_methylsulfinyl_still_works(self):
+        """C1: methyl + sulfinyl still works after extension."""
+        assert needs_brackets("methylsulfinyl") is True
+
+    def test_needs_brackets_undecylsulfinyl(self):
+        """C11: undecyl + sulfinyl is a compound substituent."""
+        assert needs_brackets("undecylsulfinyl") is True
+
+    # --- is_complex_substituent() C11+ tests ---
+
+    def test_is_complex_undecylsulfinyl(self):
+        """C11: undecylsulfinyl is a complex substituent."""
+        assert is_complex_substituent("undecylsulfinyl") is True
+
+    def test_is_complex_icosylsulfonyl(self):
+        """C20: icosylsulfonyl is a complex substituent."""
+        assert is_complex_substituent("icosylsulfonyl") is True
+
+    def test_is_complex_methylsulfinyl_still_works(self):
+        """C1: methylsulfinyl still works after extension."""
+        assert is_complex_substituent("methylsulfinyl") is True
+
+    # --- Regex patterns C11+ tests ---
+
+    def test_haloalkyl_re_fluoroundecyl(self):
+        """C11: _HALOALKYL_RE should match fluoroundecyl."""
+        from orthonym.assembly.naming_utils import _HALOALKYL_RE
+        assert _HALOALKYL_RE.match("fluoroundecyl") is not None
+
+    def test_haloalkyl_re_trifluoroicosyl(self):
+        """C20: _HALOALKYL_RE should match trifluoroicosyl."""
+        from orthonym.assembly.naming_utils import _HALOALKYL_RE
+        assert _HALOALKYL_RE.match("trifluoroicosyl") is not None
+
+    def test_haloalkyl_re_fluoromethyl_still_works(self):
+        """C1: _HALOALKYL_RE should still match fluoromethyl."""
+        from orthonym.assembly.naming_utils import _HALOALKYL_RE
+        assert _HALOALKYL_RE.match("fluoromethyl") is not None
+
+    def test_alkylamino_re_undecylamino(self):
+        """C11: _ALKYLAMINO_RE should match undecylamino."""
+        from orthonym.assembly.naming_utils import _ALKYLAMINO_RE
+        assert _ALKYLAMINO_RE.match("undecylamino") is not None
+
+    def test_alkylamino_re_icosylamino(self):
+        """C20: _ALKYLAMINO_RE should match icosylamino."""
+        from orthonym.assembly.naming_utils import _ALKYLAMINO_RE
+        assert _ALKYLAMINO_RE.match("icosylamino") is not None
+
+    def test_alkylamino_re_methylamino_still_works(self):
+        """C1: _ALKYLAMINO_RE should still match methylamino."""
+        from orthonym.assembly.naming_utils import _ALKYLAMINO_RE
+        assert _ALKYLAMINO_RE.match("methylamino") is not None
+
+    # --- alpha_sort_key("trioxo") IUPAC P-14.4 behavior ---
+
+    def test_alpha_sort_key_trioxo_returns_oxo(self):
+        """Per IUPAC P-14.4, 'tri' is a multiplicative prefix stripped for
+        alphabetization. alpha_sort_key('trioxo') correctly returns 'oxo'.
+        This is used ONLY as a sort key, never for text reconstruction."""
+        assert alpha_sort_key("trioxo") == "oxo"
+
+    def test_alpha_sort_key_dioxo_returns_oxo(self):
+        """'di' is stripped: dioxo -> oxo."""
+        assert alpha_sort_key("dioxo") == "oxo"
