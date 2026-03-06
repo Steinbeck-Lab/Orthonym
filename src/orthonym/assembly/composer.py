@@ -6290,3 +6290,31 @@ def get_multiplier(count: int, is_complex: bool = False) -> str:
     
     multipliers = COMPLEX_MULTIPLIERS if is_complex else SIMPLE_MULTIPLIERS
     return multipliers.get(count, str(count))
+
+
+def _warn_if_bare_oxy(name: str) -> bool:
+    """Defensive check: detect bare 'oxy' prefix in a generated name.
+
+    Returns True if the name contains a standalone 'oxy' token that is
+    NOT part of a qualified compound word (methoxy, ethoxy, oxybis, etc.).
+    This is a safety net -- the primary fix is at the generation point.
+
+    Args:
+        name: Generated IUPAC name string.
+
+    Returns:
+        True if bare 'oxy' detected, False otherwise.
+    """
+    import re
+    if not name:
+        return False
+    # Split on hyphens, spaces, commas, parentheses
+    tokens = re.split(r'[-\s,()]', name)
+    for tok in tokens:
+        if tok == 'oxy':
+            logger.warning(
+                "BARE_OXY_DETECTED: name=%r contains standalone 'oxy' prefix",
+                name,
+            )
+            return True
+    return False
