@@ -34,7 +34,9 @@ _MULT_SUBSTITUENT_RE = re.compile(
 # IUPAC P-31.1.2.3 and require enclosing marks.
 _HALOALKYL_RE = re.compile(
     r'^(?:(?:di|tri|tetra|penta|hexa)?(?:fluoro|chloro|bromo|iodo))'
-    r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl)$'
+    r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|nonyl|decyl|'
+    r'undecyl|dodecyl|tridecyl|tetradecyl|pentadecyl|'
+    r'hexadecyl|heptadecyl|octadecyl|nonadecyl|icosyl)$'
 )
 
 # Alkyl + functional group compound substituent patterns (e.g., methylamino,
@@ -42,7 +44,9 @@ _HALOALKYL_RE = re.compile(
 # and require enclosing marks.
 _ALKYLAMINO_RE = re.compile(
     r'^(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
-    r'nonyl|decyl|phenyl|benzyl|cyclopentyl|cyclohexyl)'
+    r'nonyl|decyl|undecyl|dodecyl|tridecyl|tetradecyl|pentadecyl|'
+    r'hexadecyl|heptadecyl|octadecyl|nonadecyl|icosyl|'
+    r'phenyl|benzyl|cyclopentyl|cyclohexyl)'
     r'(?:amino|imino)$'
 )
 
@@ -50,12 +54,27 @@ _COMPOUND_OXY_PREFIXES = frozenset((
     'sulfooxy', 'sulfonyloxy', 'phosphonooxy', 'phosphonatoxy', 'carbonyloxy',
 ))
 
-_ALKYL_ROOTS_COMPLEX = (
+# Shared C1-C20 alkyl roots used by needs_brackets(), is_complex_substituent(),
+# and regex patterns. Extends coverage beyond the original C1-C10 lists.
+_ALKYL_ROOTS_FULL = (
     'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
     'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
+    'undecyl', 'dodecyl', 'tridecyl', 'tetradecyl', 'pentadecyl',
+    'hexadecyl', 'heptadecyl', 'octadecyl', 'nonadecyl', 'icosyl',
 )
 
 _COMPOUND_S_SUFFIXES_COMPLEX = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+
+# Functional group prefixes that, when fused with alkyl roots, form compound
+# substituents requiring enclosing marks per IUPAC P-14.5.2.
+# Hoisted to module level for performance (was recreated inside needs_brackets).
+_COMPOUND_FG_PREFIXES = (
+    'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
+    'nitro', 'mercapto', 'sulfanyl', 'phospho',
+    'fluoro', 'chloro', 'bromo', 'iodo',
+    'difluoro', 'trifluoro', 'dichloro', 'trichloro',
+    'dibromo', 'tribromo',
+)
 
 # Used by alpha_sort_key() — pre-compiled regex patterns
 _LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
@@ -211,23 +230,13 @@ def needs_brackets(name: str) -> bool:
     # Functional group prefixes fused with alkyl names are compound substituents.
     # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
     # But NOT: methoxy, ethoxy (these are simple ether prefixes, single concept)
-    _COMPOUND_FG_PREFIXES = (
-        'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
-        'nitro', 'mercapto', 'sulfanyl', 'phospho',
-        'fluoro', 'chloro', 'bromo', 'iodo',
-        'difluoro', 'trifluoro', 'dichloro', 'trichloro',
-        'dibromo', 'tribromo',
-    )
-    _ALKYL_ROOTS = (
-        'methyl', 'ethyl', 'propyl', 'butyl', 'pentyl',
-        'hexyl', 'heptyl', 'octyl', 'nonyl', 'decyl',
-    )
+    # Uses module-level _COMPOUND_FG_PREFIXES and _ALKYL_ROOTS_FULL (C1-C20).
     name_lower = name.lower()
     for fg in _COMPOUND_FG_PREFIXES:
         if name_lower.startswith(fg):
             remainder = name_lower[len(fg):]
             # Check if the remainder is an alkyl root
-            for alkyl in _ALKYL_ROOTS:
+            for alkyl in _ALKYL_ROOTS_FULL:
                 if remainder == alkyl:
                     return True
 
@@ -235,11 +244,10 @@ def needs_brackets(name: str) -> bool:
     # Per IUPAC P-16.3.3, "methylsulfinyl" = methyl + sulfinyl = compound substituent
     # requiring parentheses: "2-(methylsulfinyl)ethanoic acid"
     # But NOT bare "sulfinyl", "sulfonyl", "sulfanyl" (simple, no alkyl prefix)
-    _COMPOUND_S_SUFFIXES = ('sulfinyl', 'sulfonyl', 'sulfanyl')
-    for alkyl in _ALKYL_ROOTS:
+    for alkyl in _ALKYL_ROOTS_FULL:
         if name_lower.startswith(alkyl):
             remainder = name_lower[len(alkyl):]
-            for s_suffix in _COMPOUND_S_SUFFIXES:
+            for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
                 if remainder == s_suffix:
                     return True
 
@@ -356,7 +364,7 @@ def is_complex_substituent(name: str) -> bool:
         return True
     # Compound sulfur prefixes per IUPAC P-16.3.3
     name_lower = name.lower()
-    for alkyl in _ALKYL_ROOTS_COMPLEX:
+    for alkyl in _ALKYL_ROOTS_FULL:
         if name_lower.startswith(alkyl):
             remainder = name_lower[len(alkyl):]
             for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
@@ -596,6 +604,9 @@ def alpha_sort_key(substituent_name: str) -> str:
     # Handle non-hyphenated multiplicative prefixes
     # Sort by longest prefix first to avoid partial matches
     # (e.g., 'tetra' before 'tri', 'tetrakis' before 'tetra')
+    # Note: This correctly strips 'tri' from 'trioxo' -> 'oxo' per IUPAC P-14.4.
+    # The result is used ONLY as a sort key (in key= parameter of sorted/sort),
+    # never for text reconstruction. All callers confirmed to use key= only.
     for prefix in _SORTED_ALPHA_PREFIXES:
         if text.startswith(prefix):
             remainder = text[len(prefix):]
