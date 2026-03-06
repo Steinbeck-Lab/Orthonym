@@ -59,7 +59,11 @@ def get_ring_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List[Li
         Dict mapping ring atom index to list of substituent atom lists.
         Each substituent is a list of atom indices (found via BFS).
     """
-    ring_set = set(ring_atoms)
+    from ..perception.rings import get_containing_ring_system
+
+    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    # Prevents walking into fused/bridged partner rings
+    ring_set = set(get_containing_ring_system(mol, ring_atoms))
     substituents: Dict[int, List[List[int]]] = defaultdict(list)
 
     for ring_idx in ring_atoms:

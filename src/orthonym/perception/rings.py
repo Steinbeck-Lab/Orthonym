@@ -92,6 +92,30 @@ def get_complete_ring_atom_set(mol) -> frozenset:
     return frozenset(all_atoms)
 
 
+def get_containing_ring_system(mol, ring_atoms) -> frozenset:
+    """Return all atoms in the ring system(s) containing the given ring atoms.
+
+    For a single SSSR ring that is part of a fused/bridged/spiro system,
+    this returns the complete merged system. Used by Type A callers
+    (ring-parent substituent detection) to prevent BFS from walking
+    into fused partner rings.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Iterable of atom indices (e.g., one SSSR ring)
+
+    Returns:
+        frozenset of all atom indices in the containing ring system(s)
+    """
+    target = set(ring_atoms)
+    systems = get_ring_systems(mol, include_spiro=True)
+    result = set()
+    for system in systems:
+        if target & system:
+            result.update(system)
+    return frozenset(result) if result else frozenset(target)
+
+
 def is_aromatic_ring(mol, ring_atoms) -> bool:
     """
     Check if all atoms in a ring are aromatic.

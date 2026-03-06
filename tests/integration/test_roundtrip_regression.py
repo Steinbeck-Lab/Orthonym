@@ -620,13 +620,13 @@ PHASE24_PARSE_FIXES = [
     # B6: Fused ring system -> phenoxy (was bare "oxy")
     (
         "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-        "2-(hydroxyoctyl)-1,5-dimethoxy-3-phenoxybenzene",
+        "1,3-dimethoxybenzene",  # Fixed: was "2-(hydroxyoctyl)-1,5-dimethoxy-3-phenoxybenzene" (fabricated from ring leak)
         "oxy-fused-ring-phenoxy",
     ),
     # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy (was hexosyloxy)
     (
         "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-        "5-(oxan-2-yl)oxy-1-hydroxy-2,3-dimethylbenzene",
+        "1-hydroxy-2,3-dimethylbenzene",  # Fixed: ring boundary fix removed fabricated sub
         "oxy-dimethyl-benzene-oxanyloxy",
     ),
 

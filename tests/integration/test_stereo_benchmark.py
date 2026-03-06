@@ -75,7 +75,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1', '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'),  # NEWLY_RT
     ('CC[C@@H](O)C[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,3R)-1-cyclohexylpentane-1,3-diol'),
     ('CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O', '(4S,5R,6S)-3-(1-hydroxy-3-methylbut-2-enyl)-3,4,5,6-tetrahydroxycyclohex-2-en-1-one'),
-    ('CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1', '(2S,3R,4S)-6-(sec-butyl)-4,5-diethyl-2,3-dimethyl-3,4-dihydro-2H-pyran'),
+    ('CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1', '(2S,3R,4S)-6-(sec-butyl)-2,3-dimethyl-3,4-dihydro-2H-pyran'),  # Fixed: fabricated diethyl from ring boundary leak
     ('COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2', '(7aS)-2,3a-dichloro-3-methoxy-7a-methyl-2,3-dihydro-1-benzofuran-6-carboxylic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O', '3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole'),  # MISSING_STEREO - wrong parent
     ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'heptanamide'),  # MISSING_STEREO - wrong parent
@@ -98,7 +98,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),
     ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(1R,2R)-3-cyclononyl-1-oxiranylpropane-1,2-diol'),
     ('C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O', '(1R,10S,11R,12S,14R)-4,11,14-trihydroxy-10,12-dimethyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one'),
-    ('C[C@H]1CCC/C=C/[C@@H]2CC[C@H](O)[C@H]2[C@H](O)/C=C/C(=O)O1', '(3E,5R,6S,7S,8E,13S)-5-hydroxy-13-methyl-2-oxo-6,7-dipropyl-1-oxacyclotridecene'),
+    ('C[C@H]1CCC/C=C/[C@@H]2CC[C@H](O)[C@H]2[C@H](O)/C=C/C(=O)O1', '(3E,5R,6S,7S,8E,13S)-5-hydroxy-13-methyl-2-oxo-1-oxacyclotridecene'),  # Fixed: fabricated dipropyl from ring boundary leak
     ('CC(C)=CCc1ccc(O)c2c1[C@H](CC(=O)O)OC2=O', '2-cyclononylethanoic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C(=O)O[C@H]1/C=C\\C(=O)[C@@H](O)CCC(=O)O[C@@H]1C', '(5S,7Z,9S,10R)-9-(3-carboxypropyl)-5-hydroxy-10-methyl-6-oxooxecan-2-one'),
 ]
@@ -145,7 +145,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(alpha-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),
     ('CC(=O)OC[C@H]1O[C@@H](N2CCC(=O)NC2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O', '1,2-bis(acetyloxy)oxolane'),  # MISSING_STEREO - wrong parent
     ('C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O', '(2R)-2-hydroxy-N-methylindolin-1-one'),
-    ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3R,4R,5R,6S)-3-(2-hydroxy(2R)-butyl)amino-3-hydroxy-6-methylcyclohex-1-enecarbaldehyde'),
+    ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3S,4R,5R,6R)-6-(2-hydroxy(2R)-butyl)amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde'),  # Fixed: ring boundary fix changed substituent/locant assignment
     ('CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O', '(11S,12R)-12-(6E)-2,6-dimethylnona-2,6-dienyl-8,11-dihydroxy-12-methyl-4-pentyl-4-aza-tricyclo[7.4.0.0(2,6)]tridecan-5-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-(2S)-2-(ethanoylamino)-4-methylpentanoyl(2S)-2-amino-2-(methylamino)-3-phenylpropanoyl-3-(2-aminoethyl)-1H-indole'),  # Fixed: duplicate N- from ring boundary leak

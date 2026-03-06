@@ -783,8 +783,12 @@ def get_heterocycle_substituents(
         >>> # N-methyl should be at locant 1 (N position) with is_on_nitrogen=True
     """
     from ..perception.chains import classify_substituent
+    from ..perception.rings import get_containing_ring_system
 
-    ring_set = set(ring_atoms)
+    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    # This prevents walking into fused partner rings (e.g., caffeine's
+    # imidazole BFS leaking into pyrimidine)
+    ring_set = set(get_containing_ring_system(mol, ring_atoms))
     substituents: Dict[int, List[Dict]] = {}
 
     for ring_atom_idx in oriented_ring:

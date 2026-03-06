@@ -115,7 +115,7 @@ CI_BENCHMARK = [
         "O=c1c(O[C@@H]2OC(CO)[C@@H](O)[C@H](O)C2O[C@@H]2OC(CO)"
         "[C@H](O)[C@H](O)C2O[C@@H]2OC(CO)[C@@H](O)[C@H](O)C2O)"
         "c(-c2ccc(O)c(O)c2)oc2cc(O)cc(O)c12",
-        "5,6-dibutyl-3-oxanyl-4-oxo-2-phenyl-2H-pyran",
+        "3-oxanyl-4-oxo-2-phenyl-2H-pyran",  # Fixed: was "5,6-dibutyl-..." (fabricated from ring boundary leak)
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CC(N)=O)"
@@ -133,7 +133,7 @@ CI_BENCHMARK = [
     (
         "CC1(C)C=Cc2c(cc(O)c3c(=O)c4ccc(O[C@@H]5c6c(cc(O)c7c(=O)"
         "c8cccc(O)c8oc67)O[C@H]5C(C)(C)O)c(O)c4oc23)O1",
-        "2,3-dicyclohexyl-6,6-dimethyl-2H-pyran",
+        "6,6-dimethyl-2H-pyran",  # Fixed: was "2,3-dicyclohexyl-..." (fabricated from ring boundary leak)
     ),
     (
         "Nc1ncn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1",
@@ -160,8 +160,7 @@ CI_BENCHMARK = [
     (
         "C/C1=C/[C@@H](C)C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)"
         "[C@H]3C(Cc4c[nH]c5ccccc45)NC(=O)[C@]32C2=N[C@@H](CC2)C1=O",
-        "(2S,4Z,6S,8Z,10R,11R)-2,12-diethyl-4,6-dimethyl-10,11,11"
-        "-trioxiranyl-3-oxo-1-azacyclododecene",
+        "(2S,4Z,6S,8Z,10R,11R)-4,6-dimethyl-3-oxo-1-azacyclododecene",  # Fixed: fabricated subs from ring boundary leak
     ),
     (
         "CC(=O)N[C@@H](CSCCC(=O)C(=O)O)C(=O)O",
@@ -187,7 +186,7 @@ CI_BENCHMARK = [
     ),
     (
         "C=C1C(=O)OC2/C=C(/CO)C(=O)/C=C\\C(C)(O)CC(OC(=O)/C(C)=C/C)C12",
-        "2,3-dipentadecyl-4-methyl-5-oxooxolane",
+        "4-methyl-5-oxooxolane",  # Fixed: fabricated "dipentadecyl" from ring boundary leak
     ),
     ("CSCCCCC=NO", "2-aza-8-thianonane"),
     ("O=Cc1ccc2ccccc2c1O", "1-hydroxynaphthalene-2-carbaldehyde"),
@@ -275,7 +274,7 @@ CI_BENCHMARK = [
         "[C@H](O)C[C@@]2(O)O[C@H](C[C@H](O)C[C@H](OC(=O)CC(=O)O)"
         "C[C@@H](O)C[C@H](O)/C(C)=C\\C=C/[C@H]1C)C[C@@H](O)"
         "[C@@H]2O",
-        "(2R,4R,6R,8R,10S,11Z,13Z,15R,16R,19Z,21Z,23S,24R,26S,27R,28S,31R,32R,34R)-16-dodecyl-4,6,8,10,24,26,28,32,34-nonahydroxy-11,15,19,23,27,31-hexamethyl-18-oxo-2,34-dipropyl-1,17-dioxacyclotetratriacontene propanedioate",
+        "(2R,4R,6R,8R,10S,11Z,13Z,15R,16R,19Z,21Z,23S,24R,26S,27R,28S,31R,32R,34R)-16-dodecyl-4,6,8,10,24,26,28,32,34-nonahydroxy-11,15,19,23,27,31-hexamethyl-18-oxo-1,17-dioxacyclotetratriacontene propanedioate",  # Fixed: fabricated "dipropyl" from ring boundary leak
     ),
     (
         "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O",
@@ -337,7 +336,7 @@ CI_BENCHMARK = [
     ),
     (
         "O=c1cc(-c2ccc(O)cc2)oc2cc(O)c(Cl)c(O)c12",
-        "2,3-dibutyl-4-oxo-6-phenyl-2H-pyran",
+        "4-oxo-6-phenyl-2H-pyran",  # Fixed: was "2,3-dibutyl-..." (fabricated from ring boundary leak)
     ),
     (
         "CCCCCCC[C@@H](O)[C@H](O)CC#CC#C[C@@H](O)CC",
@@ -407,7 +406,7 @@ CI_BENCHMARK = [
     ),
     (
         "CC1=CC2=C(C=O)C(=O)C(C)(O)C(O)C2=CO1",
-        "4,5-dihexyl-2-methyl-4H-pyran",
+        "2-methyl-4H-pyran",  # Fixed: was "4,5-dihexyl-..." (fabricated from ring boundary leak)
     ),
     (
         "COc1cc(/C=C/C(=O)O[C@H]2[C@H](O)C[C@](O)(C(=O)O)C[C@H]2O)"
@@ -450,7 +449,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",
-        "N-methyl-4-[(6E)-2,6-dimethylocta-2,6-dienyl]3-hydroxy-5-methoxybenzamide",  # Coverage gate: improved from bare "1H-indole"
+        "2-[(6E)-2,6-dimethylocta-2,6-dienyl]1-hydroxy-3-methoxybenzene",  # Fixed: benzene BFS no longer walks into fused lactam ring
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"

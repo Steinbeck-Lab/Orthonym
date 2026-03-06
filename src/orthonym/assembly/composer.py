@@ -4173,7 +4173,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     # --- End Phase 82 multi-ring detection pass ---
 
     for ring_atoms in single_ring_groups:
-        ring_atom_set = set(ring_atoms)
+        from ..perception.rings import get_containing_ring_system
+        ring_atom_set = set(get_containing_ring_system(features.mol, ring_atoms))
 
         # Find which chain position the ring attaches to
         try:
@@ -4274,8 +4275,10 @@ def _build_substituted_ring_name(
     on benzene-like rings. Falls back to bare base_name otherwise.
     """
     from rdkit import Chem
+    from ..perception.rings import get_containing_ring_system
 
-    ring_atom_set = set(ring_atoms)
+    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    ring_atom_set = set(get_containing_ring_system(mol, ring_atoms))
 
     # Find attachment point (ring atom bonded to chain atom)
     attachment_idx = None

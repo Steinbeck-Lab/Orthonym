@@ -136,7 +136,11 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
         Dict mapping ring atom index to list of substituent info dicts.
         Each dict has keys: 'name' (str), 'atoms' (list of atom indices)
     """
-    ring_set = set(ring_atoms)
+    from ..perception.rings import get_containing_ring_system
+
+    # Use the complete ring system as BFS boundary (IUPAC P-25.3)
+    # Prevents walking into fused partner rings
+    ring_set = set(get_containing_ring_system(mol, ring_atoms))
     substituents: Dict[int, List[Dict]] = defaultdict(list)
 
     for ring_idx in ring_atoms:

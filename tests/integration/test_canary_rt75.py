@@ -759,7 +759,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic
-        "2,3-dibutyl-4-hydroxypyridine-6-carboxylic acid",
+        "4-hydroxypyridine-6-carboxylic acid",  # Fixed: was "2,3-dibutyl-..." (fabricated from ring boundary leak)
     ),
     (
         r"CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C",  # Sentinel: parent_mismatch - prenyl chromanone
