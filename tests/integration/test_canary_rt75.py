@@ -664,7 +664,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "2-[(11z,14z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
+        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
     ),
     (
         "NCCc1c[nH]c2ccc(O)cc12",

@@ -349,7 +349,7 @@ CI_BENCHMARK = [
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@@H](O)COP(=O)(O)"
         "OC1C(O)C(O)C(O)[C@@H](O)C1O",
-        "(8Z,11Z,14Z)-((8z,11z,14z)-icosa-8,11,14-trienoyloxy)icosa-8,11,14-trienehexaol",
+        "(8Z,11Z,14Z)-((8Z,11Z,14Z)-icosa-8,11,14-trienoyloxy)icosa-8,11,14-trienehexaol",
     ),
     (
         "CCCCCCCC(O)CC(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CCC(=O)O)"

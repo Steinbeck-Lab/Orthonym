@@ -1033,24 +1033,26 @@ def get_acyloxy_prefix(acid_name: str) -> str:
         >>> get_acyloxy_prefix("formic")
         'formyloxy'
     """
-    name = acid_name.lower().strip()
+    name = acid_name.strip()
 
-    # Strip trailing " acid" if present
-    if name.endswith(" acid"):
+    # Strip trailing " acid" if present (case-insensitive check)
+    if name.lower().endswith(" acid"):
         name = name[:-5].strip()
 
-    # Check trivial acid lookup first
-    if name in TRIVIAL_ACID_TO_ACYLOXY:
-        return TRIVIAL_ACID_TO_ACYLOXY[name]
+    # Check trivial acid lookup first (use lowercase key for lookup)
+    name_lower = name.lower()
+    if name_lower in TRIVIAL_ACID_TO_ACYLOXY:
+        return TRIVIAL_ACID_TO_ACYLOXY[name_lower]
 
     # Handle -carboxylic acids (ring acids like cyclopentanecarboxylic, cyclohexanecarboxylic)
     # carboxylic -> carbonyloxy (not carboxylyloxy from the generic -ic rule)
-    if name.endswith("carboxylic"):
+    if name_lower.endswith("carboxylic"):
         return name[:-len("carboxylic")] + "carbonyloxy"
 
     # Systematic conversion: drop "-ic", add "-yloxy"
     # Works for both "-oic" (propanoic -> propanoyloxy) and "-ic" (generic)
-    if name.endswith("ic"):
+    # Preserves original case (important for stereodescriptors like (11Z,14Z)-)
+    if name_lower.endswith("ic"):
         return name[:-2] + "yloxy"
 
     # Fallback: just append "yloxy"

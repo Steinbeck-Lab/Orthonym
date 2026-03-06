@@ -381,3 +381,67 @@ class TestSpeciesTypeDetection:
                 f"Expected species type '{expected}' for {smi}, "
                 f"got '{species}'"
             )
+
+
+# === STEREODESCRIPTOR CASE PRESERVATION TESTS (Phase 091-03) ===
+
+
+class TestStereoCasePreservation:
+    """Verify that E/Z stereodescriptors retain uppercase in acyloxy/ion names.
+
+    Bug: get_acyloxy_prefix() and ion naming functions used .lower() on the
+    entire acid name, converting (11Z,14Z) to (11z,14z). Fixed by preserving
+    original case and using lowercase only for comparison/lookup.
+    """
+
+    @pytest.mark.integration
+    def test_acyloxy_preserves_stereo_case(self):
+        """E/Z descriptors in acyloxy prefixes must be uppercase."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+
+        # Systematic acid with E/Z stereodescriptor
+        result = get_acyloxy_prefix("(11Z,14Z)-icosa-11,14-dienoic")
+        assert "(11Z,14Z)" in result, (
+            f"Expected uppercase (11Z,14Z) in acyloxy prefix, got: {result}"
+        )
+
+    @pytest.mark.integration
+    def test_acyloxy_still_works_for_trivial_acids(self):
+        """Trivial acid lookup must still work (case-insensitive)."""
+        from orthonym.rules.esters import get_acyloxy_prefix
+
+        assert get_acyloxy_prefix("acetic") == "acetyloxy"
+        assert get_acyloxy_prefix("Acetic") == "acetyloxy"
+        assert get_acyloxy_prefix("benzoic") == "benzoyloxy"
+        assert get_acyloxy_prefix("propanoic") == "propanoyloxy"
+
+    @pytest.mark.integration
+    def test_carboxylate_anion_preserves_stereo_case(self):
+        """Carboxylate anion naming preserves stereodescriptor case."""
+        from orthonym.rules.ions import name_carboxylate_anion
+
+        result = name_carboxylate_anion("(2E)-but-2-enoic acid")
+        assert "(2E)" in result, (
+            f"Expected uppercase (2E) in anion name, got: {result}"
+        )
+
+    @pytest.mark.integration
+    @skip_no_opsin
+    def test_e2e_lipid_stereo_uppercase(self):
+        """End-to-end: unsaturated lipid names have uppercase E/Z in acyloxy."""
+        smi = (
+            r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC"
+            r"(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)"
+            r"COC(=O)CCCCCCC/C=C\C/C=C\CCCCC"
+        )
+        name = name_compound(smi)
+        # Name must contain uppercase Z (not lowercase z) in stereo prefix
+        import re
+        stereo_matches = re.findall(r'\(\d+[EZ]', name)
+        lowercase_matches = re.findall(r'\(\d+[ez]', name)
+        assert stereo_matches, (
+            f"Expected E/Z stereodescriptors in name: {name}"
+        )
+        assert not lowercase_matches, (
+            f"Found lowercase stereo descriptors in name: {name}"
+        )

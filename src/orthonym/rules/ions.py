@@ -189,18 +189,22 @@ def name_carboxylate_anion(parent_name: str) -> str:
         >>> name_carboxylate_anion('propanoic acid')
         'propanoate'
     """
-    name = parent_name.lower().strip()
+    name = parent_name.strip()
+    name_lower = name.lower()
 
     # Handle 'oic acid' ending (systematic names)
-    if name.endswith('oic acid'):
+    if name_lower.endswith('oic acid'):
         return name[:-8] + 'oate'
 
     # Handle 'ic acid' ending (trivial names like acetic, formic)
-    if name.endswith('ic acid'):
+    if name_lower.endswith('ic acid'):
         return name[:-7] + 'ate'
 
     # Fallback: just add -ate
-    return name.replace(' acid', 'ate')
+    if ' acid' in name_lower:
+        idx = name_lower.index(' acid')
+        return name[:idx] + 'ate'
+    return name + 'ate'
 
 
 def name_alkoxide_anion(parent_name: str, style: str = 'pin') -> str:
@@ -223,21 +227,22 @@ def name_alkoxide_anion(parent_name: str, style: str = 'pin') -> str:
         >>> name_alkoxide_anion('methanol', style='common')
         'methoxide'
     """
-    name = parent_name.lower().strip()
+    name = parent_name.strip()
+    name_lower = name.lower()
 
     if style == 'pin':
         # PIN style: methanol -> methanolate
-        if name.endswith('ol'):
+        if name_lower.endswith('ol'):
             return name + 'ate'
-        elif name.endswith('anol'):
+        elif name_lower.endswith('anol'):
             return name + 'ate'
         else:
             return name + 'olate'
     else:
         # Common style: methanol -> methoxide
-        if name.endswith('anol'):
+        if name_lower.endswith('anol'):
             return name[:-4] + 'oxide'
-        elif name.endswith('ol'):
+        elif name_lower.endswith('ol'):
             return name[:-2] + 'oxide'
         else:
             return name + 'oxide'
@@ -257,9 +262,10 @@ def name_phenolate_anion(parent_name: str) -> str:
         >>> name_phenolate_anion('phenol')
         'phenolate'
     """
-    name = parent_name.lower().strip()
+    name = parent_name.strip()
+    name_lower = name.lower()
 
-    if name.endswith('ol'):
+    if name_lower.endswith('ol'):
         return name + 'ate'
     else:
         return name + 'olate'
@@ -281,16 +287,17 @@ def name_aminium_cation(parent_name: str) -> str:
         >>> name_aminium_cation('ammonia')
         'ammonium'
     """
-    name = parent_name.lower().strip()
+    name = parent_name.strip()
+    name_lower = name.lower()
 
     # Special case: ammonia -> ammonium
-    if name == 'ammonia':
+    if name_lower == 'ammonia':
         return 'ammonium'
 
     # amine -> aminium
-    if name.endswith('amine'):
+    if name_lower.endswith('amine'):
         return name[:-1] + 'ium'
-    elif name.endswith('ane'):
+    elif name_lower.endswith('ane'):
         # Handle alkane-based names
         return name[:-1] + 'ium'
     else:
@@ -315,14 +322,15 @@ def name_carbenium_cation(parent_name: str) -> str:
         >>> name_carbenium_cation('ethane')
         'ethylium'
     """
-    name = parent_name.lower().strip()
+    name = parent_name.strip()
+    name_lower = name.lower()
 
     # Handle -ane suffix (alkanes)
-    if name.endswith('ane'):
+    if name_lower.endswith('ane'):
         return name[:-3] + 'ylium'
 
     # Handle -yl suffix (already a radical/substituent form)
-    if name.endswith('yl'):
+    if name_lower.endswith('yl'):
         return name + 'ium'
 
     # Default: add -ylium
