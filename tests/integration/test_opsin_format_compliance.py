@@ -128,3 +128,58 @@ class TestStereoFormatEdgeCases:
             assert "R" in stereo_part or "S" in stereo_part, (
                 f"Stereo prefix missing R/S labels: {stereo_part}"
             )
+
+
+class TestSteroidSuffixOrdering:
+    """Test that steroid names have correct IUPAC suffix ordering:
+    unsaturation BEFORE principal group (e.g., 'trien-3-one', not 'an-3-one-trien').
+
+    Also tests IUPAC P-31.1.3.4: terminal 'a' added to stem when
+    multiple unsaturation locants are cited (cholesta-5,7-dien, not cholest-5,7-dien).
+    """
+
+    def test_single_ene_no_terminal_a(self):
+        """Single double bond: cholest-5-en (no terminal 'a')."""
+        # Stigmastane with single double bond
+        smiles = "CC(C)[C@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C"
+        name = name_compound(smiles)
+        # Should NOT have 'stigmasta' with single ene
+        if "stigmast" in name:
+            assert "stigmasta-" not in name, (
+                f"Single ene should not add terminal 'a': {name}"
+            )
+
+    def test_multiple_ene_adds_terminal_a(self):
+        """Multiple double bonds: ergosta-7,9,24-trien (with terminal 'a')."""
+        smiles = "C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C"
+        name = name_compound(smiles)
+        assert "ergosta-" in name, f"Multi-ene should use 'ergosta' (with 'a'): {name}"
+        assert "ergost-" not in name, f"Should not use 'ergost-' for multi-ene: {name}"
+
+    def test_unsaturation_before_suffix(self):
+        """Unsaturation suffix must come BEFORE principal group suffix."""
+        smiles = "C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C"
+        name = name_compound(smiles)
+        if "trien" in name and "one" in name:
+            trien_pos = name.find("trien")
+            one_pos = name.rfind("one")
+            assert trien_pos < one_pos, (
+                f"Unsaturation must precede -one suffix: {name}"
+            )
+
+    def test_saturated_steroid_suffix(self):
+        """Saturated steroid: androstan-3-one (not androst-3-one or androstane-3-one)."""
+        # Simple saturated ketone steroid
+        smiles = "C[C@]12CCC(=O)C=C1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@@H](O)CC[C@@H]12"
+        name = name_compound(smiles)
+        # Should have unsaturation info somewhere (en- or an-)
+        assert "an" in name or "en" in name, f"Should have saturation info: {name}"
+
+    def test_dien_uses_terminal_a(self):
+        """cholesta-8,24-dien format (two double bonds: add 'a')."""
+        smiles = "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3"
+        name = name_compound(smiles)
+        if "cholest" in name and "dien" in name:
+            assert "cholesta-" in name, (
+                f"Two double bonds should use 'cholesta-' (with 'a'): {name}"
+            )

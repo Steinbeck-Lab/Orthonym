@@ -772,8 +772,17 @@ def _assemble_np_name(
     prefix = "-".join(entry[1] for entry in prefix_entries)
 
     # --- Build unsaturation suffix ---
+    # IUPAC P-31.1.3.4: When the total number of unsaturation locants is >= 2,
+    # a terminal 'a' is added to the stem for euphony (e.g., cholesta-5,7-dien,
+    # not cholest-5,7-dien). For a single locant, no 'a' (cholest-5-en).
     ene_locs = unsaturation.get("ene", [])
     yne_locs = unsaturation.get("yne", [])
+    total_unsat_locants = len(ene_locs) + len(yne_locs)
+
+    # Add terminal 'a' to stem when multiple unsaturation locants (IUPAC P-31.1.3.4)
+    effective_stem = stem
+    if total_unsat_locants >= 2:
+        effective_stem = stem + "a"
 
     unsat_suffix = ""
     if ene_locs or yne_locs:
@@ -828,14 +837,14 @@ def _assemble_np_name(
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         ol_suffix = f"-{locant_str}-{multiplier}ol"
-        # non-OH prefix + stem + unsaturation + -ol
-        # e.g., "4-methylcholest-5-en-3-ol" for methylated cholesterol-type
-        return f"{stereo_prefix}{non_oh_prefix}{stem}{unsat_suffix}{ol_suffix}"
+        # non-OH prefix + effective_stem + unsaturation + -ol
+        # e.g., "4-methylcholest-5-en-3-ol" or "cholesta-5,7-dien-3-ol"
+        return f"{stereo_prefix}{non_oh_prefix}{effective_stem}{unsat_suffix}{ol_suffix}"
 
-    # General case: prefix + stem + unsaturation + ketone
+    # General case: prefix + effective_stem + unsaturation + ketone
     # e.g., "17-hydroxyandr-4-en-3-one" for testosterone-type
     if unsat_suffix == "an":
-        # Saturated: prefix + stem + "an" + ketone
+        # Saturated: prefix + stem + "an" + ketone (no 'a' needed for saturated)
         # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-one, -ol, -yl)
         # Keep 'e' only when no suffix follows (bare saturated name)
         if ketone_suffix:
@@ -843,12 +852,12 @@ def _assemble_np_name(
         else:
             return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
     else:
-        # Unsaturated: prefix + stem + unsaturation + ketone
+        # Unsaturated: prefix + effective_stem + unsaturation + ketone
         # If no suffix follows, add terminal 'e' (IUPAC: "ene"/"yne" not "en"/"yn")
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+            return f"{stereo_prefix}{prefix}{effective_stem}{unsat_suffix}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{prefix}{effective_stem}{unsat_suffix}e"
 
 
 def _find_ester_decorations(

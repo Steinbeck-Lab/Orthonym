@@ -781,7 +781,7 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: stereo_mismatch (2 compounds)
     (
         "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",  # Sentinel: stereo_mismatch - ergostadienol
-        "ergost-7,25-dien-3-ol",
+        "ergosta-7,25-dien-3-ol",
     ),
     (
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",  # Sentinel: stereo_mismatch - stigmastandiol
