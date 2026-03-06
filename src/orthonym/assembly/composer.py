@@ -2517,15 +2517,24 @@ def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
     if stereo_descriptors:
         stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
 
+    # Get heteroatom replacement prefix (oxa, aza, thia) if present
+    heteroatom_prefix = bicyclo_data.get('heteroatom_prefix', '')
+
     # Assemble the name
-    # Format: (stereo)-substituent-prefix-descriptor-parent-unsaturation
+    # Format: (stereo)-substituent-prefix-heteroatom-prefix-descriptor-parent-unsaturation
     parts = []
 
     if stereo_prefix:
         parts.append(stereo_prefix)
 
     if sub_prefix:
+        # Ensure substituent prefix ends with hyphen before heteroatom or descriptor
+        if not sub_prefix.endswith('-'):
+            sub_prefix += '-'
         parts.append(sub_prefix)
+
+    if heteroatom_prefix:
+        parts.append(heteroatom_prefix)
 
     # Build the main name: bicyclo[x.y.z]parent-unsat
     main_name = f"{descriptor}{unsat_suffix}"

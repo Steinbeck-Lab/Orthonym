@@ -769,20 +769,31 @@ def get_complete_bicyclo_data(mol) -> Optional[Dict]:
     # Get bridgeheads
     bridgeheads = find_true_bridgeheads(mol)
 
-    # Count ring carbons for parent name
+    # Count ALL ring atoms for parent name (IUPAC: heteroatoms count toward
+    # ring size in replacement nomenclature). carbon_count is kept for
+    # compatibility but total_ring_atoms is what determines the parent name.
+    total_ring_atoms = len(ring_atoms)
     carbon_count = sum(
         1 for idx in ring_atoms
         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
     )
+
+    # Generate heteroatom replacement prefix (oxa, aza, thia) if needed
+    heteroatom_prefix = ""
+    if carbon_count < total_ring_atoms and atom_to_locant:
+        from .polycyclic import get_heteroatom_replacement_prefix
+        heteroatom_prefix = get_heteroatom_replacement_prefix(
+            mol, atom_to_locant, ring_atoms
+        )
 
     # Check for retained name
     from ..data.bicyclo_systems import get_retained_bicyclo_name
     canonical = Chem.CanonSmiles(Chem.MolToSmiles(mol))
     retained = get_retained_bicyclo_name(canonical)
 
-    # Build base name
-    parent_name = _get_alkane_name(carbon_count)
-    base_name = f"{descriptor}{parent_name}" if descriptor else parent_name
+    # Build base name: use total ring atoms for parent (includes heteroatoms)
+    parent_name = _get_alkane_name(total_ring_atoms)
+    base_name = f"{heteroatom_prefix}{descriptor}{parent_name}" if descriptor else parent_name
 
     return {
         'base_name': base_name,
@@ -793,5 +804,6 @@ def get_complete_bicyclo_data(mol) -> Optional[Dict]:
         'unsaturation': unsaturation,
         'bridgeheads': bridgeheads,
         'retained_name': retained,
-        'carbon_count': carbon_count,
+        'carbon_count': total_ring_atoms,  # Use total ring atoms, not just carbons
+        'heteroatom_prefix': heteroatom_prefix,
     }
