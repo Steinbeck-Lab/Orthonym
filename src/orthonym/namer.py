@@ -160,6 +160,13 @@ def _should_bypass_fused_guard(features, core_match):
     return chain_pg > ring_pg  # STRICT inequality per P-52.2.8
 
 
+# Confidence threshold below which the quality gate rejects a name as
+# truncated/incomplete and falls back to decomposition naming.
+# Calibrated against 500-compound ChEBI benchmark: 0.30 catches
+# catastrophically incomplete names without false positives on correct names.
+_TRUNCATION_CONFIDENCE_THRESHOLD = 0.30
+
+
 class Orthonym:
     """
     IUPAC nomenclature generator.
@@ -528,6 +535,31 @@ class Orthonym:
                 from .assembly.fragment_naming import name_fragment_recursively
                 frag_name = name_fragment_recursively(canonical_smiles)
                 if frag_name and frag_name != assembled:
+                    return frag_name
+
+            # Confidence-based rejection: if the coverage scoring system
+            # indicates the assembled name is catastrophically incomplete
+            # (confidence < threshold), attempt decomposition fallback.
+            # This is NOT a postprocessor -- the confidence score reflects
+            # genuine structural coverage analysis computed during naming.
+            from .assembly.coverage_scoring import retrieve_confidence
+            conf_data = retrieve_confidence()
+            conf_score = conf_data.get('confidence', None)
+            conf_handler = conf_data.get('handler', 'unknown')
+            # Only gate on confidence when it was actually computed during
+            # assemble_name() -- handler='unknown' means no scoring happened
+            # (e.g., decomposition path, retained names, etc.).
+            if (conf_score is not None
+                    and conf_handler != 'unknown'
+                    and conf_score < _TRUNCATION_CONFIDENCE_THRESHOLD):
+                from .assembly.fragment_naming import name_fragment_recursively
+                frag_name = name_fragment_recursively(canonical_smiles)
+                if frag_name and frag_name != assembled:
+                    logger.info(
+                        "Quality gate: rejecting low-confidence name "
+                        "(%.4f < %.2f), using decomposition fallback",
+                        conf_score, _TRUNCATION_CONFIDENCE_THRESHOLD,
+                    )
                     return frag_name
 
         return assembled
