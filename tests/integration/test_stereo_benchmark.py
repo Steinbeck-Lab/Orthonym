@@ -49,7 +49,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '2-aminobutanoic acid'),  # MISSING_STEREO - isotope
     ('C/N=C(\\N)NCCCCN', '4-guanidino-4-(methylamino)butan-1-amine'),  # MISSING_STEREO - wrong parent; alpha order fixed P80
     ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylcyclohexene'),
-    ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "N,N'-dipropylurea"),  # MISSING_STEREO - wrong parent
+    ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "(4s,5s)-N,N'-dipropylurea"),  # Phase 92-02: stereo injection for urea handler
     ('NC(=O)N/C=C\\C(=O)OO', '(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol'),  # alpha order fixed P80
     ('C=CC/C=C/CCC(=O)OC', 'methyl (4E)-octa-4,7-dienoate'),  # NEWLY_RT
     ('O=C([O-])C(=O)C[C@H](O)C(=O)[O-]', '(2S)-2-hydroxy-4-oxopentanedioate'),  # NEWLY_RT

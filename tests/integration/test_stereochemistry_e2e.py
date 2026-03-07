@@ -357,3 +357,45 @@ def test_comprehensive_stereo_naming(smiles, checks):
             assert substring in result, f"{smiles}: expected '{substring}' in '{result}'"
         else:
             assert substring not in result, f"{smiles}: unexpected '{substring}' in '{result}'"
+
+
+# =============================================================================
+# Stereo Injection Tests for Early-Return Handlers (Phase 92-02)
+# =============================================================================
+
+class TestStereoInjectionHandlers:
+    """Verify stereo descriptors appear in names from early-return handlers."""
+
+    def test_stereo_in_acid_halide_name(self):
+        """Chiral acid halide gets stereo prefix via _inject_stereo_if_missing."""
+        result = name_compound("O=C(Cl)[C@@H](C)CC")
+        assert re.search(r"\(\d+[RS]\)", result), f"Missing stereo in acid halide: {result}"
+        assert "chloride" in result, f"Not an acid halide name: {result}"
+
+    def test_stereo_in_lactone_name(self):
+        """Chiral lactone gets stereo prefix via _inject_stereo_if_missing."""
+        result = name_compound("O=C1OC[C@@H](C)C1")
+        assert re.search(r"\(\d+[RSrs]\)", result), f"Missing stereo in lactone: {result}"
+
+    def test_stereo_in_lactam_name(self):
+        """Chiral lactam gets stereo prefix via _inject_stereo_if_missing."""
+        result = name_compound("O=C1NC[C@@H](C)C1")
+        assert re.search(r"\(\d+[RSrs]\)", result), f"Missing stereo in lactam: {result}"
+
+    def test_stereo_preserved_for_simple_chain(self):
+        """Simple chiral chain goes through standard path — stereo must appear."""
+        result = name_compound("[C@@H](O)(F)Cl")
+        assert re.search(r"[RSrs]", result), f"Missing stereo in chain compound: {result}"
+
+    def test_no_stereo_false_positive(self):
+        """Achiral molecules must NOT get spurious stereo prefixes."""
+        for smi in ["CCCC", "CCO", "CC(=O)Cl", "O=C1CCCO1"]:
+            result = name_compound(smi)
+            assert not re.match(r"\(\d+[RSrsEZez]", result), \
+                f"False stereo prefix for achiral {smi}: {result}"
+
+    def test_multiple_stereocenters_all_appear(self):
+        """Multiple stereocenters produce multiple descriptors."""
+        result = name_compound("C[C@H](O)[C@@H](O)C")
+        matches = re.findall(r"\d+[RSrs]", result)
+        assert len(matches) >= 2, f"Expected 2+ stereo descriptors in: {result}"

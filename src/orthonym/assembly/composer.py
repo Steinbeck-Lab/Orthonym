@@ -547,20 +547,20 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == 'oxime':
         oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
         if oxime_name:
-            return oxime_name
+            return _inject_stereo_if_missing(features, oxime_name)
 
     # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
     if features.principal_group == 'hydrazone':
         hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
         if hydrazone_name:
-            return hydrazone_name
+            return _inject_stereo_if_missing(features, hydrazone_name)
 
     # Handle N-oxides - functional class naming: "pyridine 1-oxide"
     # Must detect early because N-oxides have internal charges that could
     # confuse other routing (they are classified as 'neutral' by ions.py)
     n_oxide_name = _try_name_n_oxide(features)
     if n_oxide_name:
-        return n_oxide_name
+        return _inject_stereo_if_missing(features, n_oxide_name)
 
     # Handle isocyanates - functional class: "methyl isocyanate"
     # Only when isocyanate is the sole FG (principal_group is None because
@@ -570,7 +570,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         iso_name = _name_isocyanate(features)
         if iso_name:
-            return iso_name
+            return _inject_stereo_if_missing(features, iso_name)
 
     # Handle isothiocyanates - functional class: "methyl isothiocyanate"
     # Same gating as isocyanate above.
@@ -578,14 +578,14 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
-            return isothio_name
+            return _inject_stereo_if_missing(features, isothio_name)
 
     # Handle carbamic acid - retained name with N-substitution (IUPAC P-65.2.3)
     # N-C(=O)-OH -> "carbamic acid", "N-methylcarbamic acid", etc.
     if features.principal_group == 'carbamic_acid':
         carbamic_name = _name_carbamic_acid(features)
         if carbamic_name:
-            return carbamic_name
+            return _inject_stereo_if_missing(features, carbamic_name)
 
     # Handle carbamates - functional class: "ethyl carbamate"
     # Must detect BEFORE generic ester to prevent N loss.
@@ -594,7 +594,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         carb_name = _name_carbamate(features)
         if carb_name:
-            return carb_name
+            return _inject_stereo_if_missing(features, carb_name)
 
     # Handle urea compounds - retained name with N-substitution
     # "urea", "N-methylurea", "N,N-dimethylurea", "N,N'-dimethylurea"
@@ -603,7 +603,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         urea_name = _try_name_urea(features)
         if urea_name:
-            return urea_name
+            return _inject_stereo_if_missing(features, urea_name)
 
     # Handle guanidine compounds - retained name with N-substitution
     # "guanidine", "N-methylguanidine", "N,N-dimethylguanidine"
@@ -611,7 +611,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         guanidine_name = _try_name_guanidine(features)
         if guanidine_name:
-            return guanidine_name
+            return _inject_stereo_if_missing(features, guanidine_name)
 
     # Handle acid halides BEFORE polyfunctional and ester handlers
     # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
@@ -620,7 +620,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.acid_halides import name_acid_halide
         halide_name = name_acid_halide(features)
         if halide_name:
-            return halide_name
+            return _inject_stereo_if_missing(features, halide_name)
 
     # Handle anhydrides BEFORE lactone, polyfunctional, and ester handlers
     # Anhydrides use functional class naming: "ethanoic anhydride" (two-word)
@@ -630,7 +630,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.anhydrides import name_anhydride
         anhydride_name = name_anhydride(features)
         if anhydride_name:
-            return anhydride_name
+            return _inject_stereo_if_missing(features, anhydride_name)
 
     # Handle monocyclic lactones BEFORE polyfunctional, esters, and heterocycles
     # Lactones are cyclic esters that should be named as heterocyclic ketones
@@ -650,7 +650,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if ring_size > 8 or total_heavy <= ring_size + 4:
             lactone_name = name_monocyclic_lactone(features.mol)
             if lactone_name:
-                return lactone_name
+                return _inject_stereo_if_missing(features, lactone_name)
 
     # Handle monocyclic lactams BEFORE polyfunctional and amide handlers
     # Lactams are cyclic amides named as heterocyclic ketones (parallel to lactones)
@@ -665,7 +665,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if ring_size > 8 or total_heavy <= ring_size + 4:
             lactam_name = name_monocyclic_lactam(features.mol)
             if lactam_name:
-                return lactam_name
+                return _inject_stereo_if_missing(features, lactam_name)
 
     # Handle ring-attached esters BEFORE polyfunctional handler
     # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
@@ -5713,6 +5713,40 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
     text = format_stereodescriptor_string(descriptors)
 
     return NameFragment(text=text, fragment_type="stereo")
+
+
+def _inject_stereo_if_missing(features: Any, name: str) -> str:
+    """Prepend stereodescriptor prefix to a name if stereocenters exist but aren't represented.
+
+    Used after early-return handlers that bypass _generate_stereodescriptors().
+    Per IUPAC P-91, stereodescriptors are detachable prefixes placed before the name.
+
+    Args:
+        features: MolecularFeatures with stereocenters and/or double_bond_stereo
+        name: The generated name from a handler (may or may not have stereo already)
+
+    Returns:
+        Name with stereo prefix prepended if needed, or original name if:
+        - No stereocenters/double bond stereo in features
+        - Name already has a stereo prefix
+        - No atom_to_locant mapping available for locant resolution
+    """
+    import re
+
+    if not features.stereocenters and not getattr(features, 'double_bond_stereo', None):
+        return name
+    if not name or name == 'unknown':
+        return name
+
+    # Check if name already has a stereo prefix: starts with (nR or (nS or (nE or (nZ pattern
+    if re.match(r'\(\d+[RSrsEZez]', name):
+        return name
+
+    # Generate stereo prefix using the centralized function
+    stereo_frag = _generate_stereodescriptors(features)
+    if stereo_frag and stereo_frag.text:
+        return f"{stereo_frag.text}{name}"
+    return name
 
 
 def _estimate_parent_size_from_name(parent_name: str) -> int:
