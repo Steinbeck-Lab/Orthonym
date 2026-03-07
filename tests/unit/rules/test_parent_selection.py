@@ -261,6 +261,39 @@ class TestResultDataclass:
         assert result.reasoning == "Test reasoning"
 
 
+class TestFGCountingDedup:
+    """PSEL-01: FG counting deduplication by attachment point."""
+
+    def test_duplicate_pg_atoms_deduplicated_on_chain(self):
+        """If same FG atoms are passed twice, count stays correct."""
+        from orthonym.rules.parent_selection import _count_pg_on_chain
+        from orthonym.perception.chains import find_longest_carbon_chain
+        mol = Chem.MolFromSmiles("OC(=O)CCCCC(=O)O")  # adipic acid
+        fg = detect_functional_groups(mol)
+        chain = find_longest_carbon_chain(mol)
+        pg_atoms = fg.get("carboxylic_acid", [])
+        # Double the matches to simulate overlap
+        doubled = pg_atoms + pg_atoms
+        count = _count_pg_on_chain(mol, chain, doubled)
+        assert count == 2, f"Duplicated matches must not inflate count, got {count}"
+
+    def test_duplicate_pg_atoms_deduplicated_on_ring(self):
+        """If same FG atoms are passed twice, count stays correct on ring."""
+        from orthonym.rules.parent_selection import _count_pg_on_ring
+        mol = Chem.MolFromSmiles("c1cc(C(=O)O)cc(C(=O)O)c1C(=O)O")  # trimesic acid
+        fg = detect_functional_groups(mol)
+        ri = mol.GetRingInfo()
+        ring_atoms = set()
+        for ring in ri.AtomRings():
+            if len(ring) == 6:
+                ring_atoms = set(ring)
+                break
+        pg_atoms = fg.get("carboxylic_acid", [])
+        doubled = pg_atoms + pg_atoms
+        count = _count_pg_on_ring(mol, ring_atoms, doubled)
+        assert count == 3, f"Duplicated matches must not inflate count, got {count}"
+
+
 class TestEdgeCases:
     """Edge case tests for parent selection."""
 

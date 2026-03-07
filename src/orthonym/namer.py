@@ -691,6 +691,7 @@ class Orthonym:
                     exclude_atoms=all_ring_atoms
                 )
 
+
                 # Only do parent selection if we found a meaningful chain (>= 2 carbons)
                 if potential_chain and len(potential_chain) >= 2:
                     # Pass pre-computed chain to select_parent

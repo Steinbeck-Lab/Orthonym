@@ -499,11 +499,20 @@ def _count_pg_on_ring(
     ring_atoms: Set[int],
     principal_group_atoms: List[tuple]
 ) -> int:
-    """Count how many principal group instances are on the ring."""
+    """Count how many distinct principal group instances are on the ring.
+
+    PSEL-01: Deduplicates by match tuple to avoid counting the same
+    physical FG instance multiple times from overlapping SMARTS matches.
+    """
+    seen_matches = set()
     count = 0
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
+        key = tuple(sorted(pg_atoms))
+        if key in seen_matches:
+            continue
+        seen_matches.add(key)
         attachment = pg_atoms[0]
         atom = mol.GetAtomWithIdx(attachment)
         for neighbor in atom.GetNeighbors():
@@ -518,12 +527,21 @@ def _count_pg_on_chain(
     chain_atoms: List[int],
     principal_group_atoms: List[tuple]
 ) -> int:
-    """Count how many principal group instances are on the chain."""
+    """Count how many distinct principal group instances are on the chain.
+
+    PSEL-01: Deduplicates by match tuple to avoid counting the same
+    physical FG instance multiple times from overlapping SMARTS matches.
+    """
     chain_set = set(chain_atoms)
+    seen_matches = set()
     count = 0
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
+        key = tuple(sorted(pg_atoms))
+        if key in seen_matches:
+            continue
+        seen_matches.add(key)
         attachment = pg_atoms[0]
         if attachment in chain_set:
             count += 1
