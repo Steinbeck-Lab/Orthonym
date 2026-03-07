@@ -555,3 +555,130 @@ def test_ez_cip_codes(smiles, expected_stereo):
 def test_format_stereodescriptor_parametrized(descriptors, expected):
     """Parametrized tests for format_stereodescriptor_string."""
     assert format_stereodescriptor_string(descriptors) == expected
+
+
+# =============================================================================
+# Tests for idempotent assign_stereochemistry guard
+# =============================================================================
+
+class TestAssignStereochemistryIdempotent:
+    """Tests for the idempotent guard in assign_stereochemistry()."""
+
+    def test_assign_stereochemistry_idempotent_atoms(self):
+        """assign_stereochemistry() skips re-assignment when _CIPCode already set on atoms."""
+        from src.orthonym.perception.stereo import assign_stereochemistry
+
+        mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+        # First: assign CIP labels directly (simulates namer.py _perceive())
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # Capture original CIP codes
+        original_codes = {}
+        for atom in mol.GetAtoms():
+            if atom.HasProp('_CIPCode'):
+                original_codes[atom.GetIdx()] = atom.GetProp('_CIPCode')
+
+        assert len(original_codes) > 0, "Should have at least one stereocenter"
+
+        # Call assign_stereochemistry -- should be a no-op (idempotent guard)
+        assign_stereochemistry(mol)
+
+        # Verify CIP codes are unchanged
+        for idx, code in original_codes.items():
+            atom = mol.GetAtomWithIdx(idx)
+            assert atom.HasProp('_CIPCode')
+            assert atom.GetProp('_CIPCode') == code
+
+    def test_assign_stereochemistry_idempotent_bonds(self):
+        """assign_stereochemistry() skips re-assignment when _CIPCode set on bonds (E/Z only)."""
+        from src.orthonym.perception.stereo import assign_stereochemistry
+
+        mol = Chem.MolFromSmiles('C/C=C/C')  # (E)-but-2-ene
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # Capture original bond CIP codes
+        original_bond_codes = {}
+        for bond in mol.GetBonds():
+            if bond.HasProp('_CIPCode'):
+                original_bond_codes[bond.GetIdx()] = bond.GetProp('_CIPCode')
+
+        assert len(original_bond_codes) > 0, "Should have at least one E/Z bond"
+
+        # Call assign_stereochemistry -- should be a no-op
+        assign_stereochemistry(mol)
+
+        # Verify bond CIP codes unchanged
+        for idx, code in original_bond_codes.items():
+            bond = mol.GetBondWithIdx(idx)
+            assert bond.HasProp('_CIPCode')
+            assert bond.GetProp('_CIPCode') == code
+
+    def test_assign_stereochemistry_assigns_if_no_cip(self):
+        """assign_stereochemistry() assigns CIP labels when none are present."""
+        from src.orthonym.perception.stereo import assign_stereochemistry
+
+        mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+
+        # Explicitly clear any _CIPCode properties that RDKit may have set
+        for atom in mol.GetAtoms():
+            if atom.HasProp('_CIPCode'):
+                atom.ClearProp('_CIPCode')
+        for bond in mol.GetBonds():
+            if bond.HasProp('_CIPCode'):
+                bond.ClearProp('_CIPCode')
+
+        # Verify no CIP codes exist
+        has_cip = any(atom.HasProp('_CIPCode') for atom in mol.GetAtoms())
+        assert not has_cip, "CIP should not be assigned after clearing"
+
+        # assign_stereochemistry should assign them (guard sees no CIP -> runs labeler)
+        assign_stereochemistry(mol)
+
+        # Now should have CIP codes
+        has_cip = any(atom.HasProp('_CIPCode') for atom in mol.GetAtoms())
+        assert has_cip, "CIP should now be assigned"
+
+
+# =============================================================================
+# Tests for pseudoasymmetric r/s preservation
+# =============================================================================
+
+class TestPseudoasymmetricPreservation:
+    """Tests that pseudoasymmetric centers preserve lowercase r/s."""
+
+    def test_format_stereodescriptor_preserves_lowercase_rs(self):
+        """format_stereodescriptor_string preserves lowercase r/s for pseudoasymmetric."""
+        result = format_stereodescriptor_string([(2, 'r'), (3, 's')])
+        assert result == "(2r,3s)-", f"Expected (2r,3s)- but got {result}"
+
+    def test_format_stereodescriptor_preserves_mixed_case(self):
+        """format_stereodescriptor_string handles mixed R/r and S/s."""
+        result = format_stereodescriptor_string([(2, 'R'), (3, 'r'), (4, 'S')])
+        assert result == "(2R,3r,4S)-", f"Expected (2R,3r,4S)- but got {result}"
+
+    def test_get_stereocenters_preserves_cip_case(self):
+        """get_stereocenters preserves CIP code case as returned by RDKit."""
+        from src.orthonym.perception.stereo import get_stereocenters
+
+        mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        centers = get_stereocenters(mol)
+        assert len(centers) == 1
+
+        # The CIP code should be whatever RDKit assigned -- no forced uppercasing
+        cip = centers[0]['cip']
+        assert cip in ('R', 'S', 'r', 's'), f"CIP code should be valid: {cip}"
+
+    def test_collect_stereodescriptors_preserves_cip_case(self):
+        """collect_stereodescriptors preserves CIP code case (no forced upper)."""
+        mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        atom_to_locant = {0: 4, 1: 3, 3: 2, 4: 1}
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
+        assert len(descriptors) == 1
+        cip = descriptors[0][1]
+        # Should preserve whatever RDKit returned (R in this case)
+        assert cip in ('R', 'S', 'r', 's'), f"CIP code should be valid: {cip}"

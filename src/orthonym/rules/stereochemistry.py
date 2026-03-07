@@ -64,9 +64,8 @@ def collect_stereodescriptors(
             if atom_idx in atom_to_locant:
                 locant = atom_to_locant[atom_idx]
                 cip_code = atom.GetProp('_CIPCode')
-                # Enforce uppercase R/S for OPSIN compatibility
-                if cip_code in ('r', 's'):
-                    cip_code = cip_code.upper()
+                # Preserve CIP code as-is: R/S for normal stereocenters,
+                # r/s for pseudoasymmetric centers per IUPAC P-92.1.4.2.
                 descriptors.append((locant, cip_code))
 
     # Collect E/Z double bonds (bond-based)

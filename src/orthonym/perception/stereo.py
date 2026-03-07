@@ -12,14 +12,27 @@ from rdkit.Chem import rdCIPLabeler
 
 def assign_stereochemistry(mol) -> None:
     """
-    Assign CIP stereochemistry labels to a molecule.
-    
+    Assign CIP stereochemistry labels to a molecule (idempotent guard).
+
+    If CIP labels (_CIPCode) are already present on any atom or bond,
+    this function is a no-op -- the labels were already assigned by
+    the authoritative call in namer.py:_perceive().
+
     Uses the new accurate CIP algorithm (rdCIPLabeler) introduced
     in RDKit 2022.09. Falls back to legacy for simple cases only.
-    
+
     Args:
         mol: RDKit Mol object (modified in place)
     """
+    # Idempotent guard: skip if CIP labels already assigned
+    for atom in mol.GetAtoms():
+        if atom.HasProp('_CIPCode'):
+            return
+    for bond in mol.GetBonds():
+        if bond.HasProp('_CIPCode'):
+            return
+
+    # No CIP labels found -- assign them
     try:
         rdCIPLabeler.AssignCIPLabels(mol)
     except Exception:
@@ -48,11 +61,8 @@ def get_stereocenters(mol) -> List[Dict]:
     for atom in mol.GetAtoms():
         if atom.HasProp('_CIPCode'):
             cip_code = atom.GetProp('_CIPCode')
-            # Enforce uppercase R/S for OPSIN compatibility.
-            # RDKit returns lowercase 'r'/'s' for pseudoasymmetric centers
-            # (IUPAC P-92.1.4.1), but OPSIN requires uppercase R/S.
-            if cip_code in ('r', 's'):
-                cip_code = cip_code.upper()
+            # Preserve CIP code as-is: uppercase R/S for normal stereocenters,
+            # lowercase r/s for pseudoasymmetric centers per IUPAC P-92.1.4.2.
             centers.append({
                 'idx': atom.GetIdx(),
                 'cip': cip_code,
@@ -163,9 +173,8 @@ def get_stereodescriptor_string(
         if atom.HasProp('_CIPCode'):
             idx = atom.GetIdx()
             cip = atom.GetProp('_CIPCode')
-            # Enforce uppercase R/S for OPSIN compatibility
-            if cip in ('r', 's'):
-                cip = cip.upper()
+            # Preserve CIP code as-is: R/S for normal, r/s for pseudoasymmetric
+            # per IUPAC P-92.1.4.2.
 
             if locant_map and idx in locant_map:
                 locant = locant_map[idx]
