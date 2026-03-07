@@ -236,10 +236,11 @@ class TestCollectStereodescriptorsFilter:
         atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
         descs = collect_stereodescriptors(mol, atom_to_locant)
 
-        rs_descs = [(loc, cip) for loc, cip in descs if cip in ('R', 'S')]
-        # Should have at least 1 R/S descriptor
+        # Include lowercase r/s for pseudoasymmetric centers (IUPAC P-92.1.4.2)
+        rs_descs = [(loc, cip) for loc, cip in descs if cip in ('R', 'S', 'r', 's')]
+        # Should have at least 1 R/S/r/s descriptor
         assert len(rs_descs) >= 1, (
-            f"Expected R/S descriptor on ring stereocenter, got: {descs}"
+            f"Expected R/S/r/s descriptor on ring stereocenter, got: {descs}"
         )
 
     def test_format_empty_descriptors(self):

@@ -97,28 +97,14 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     stereo_bonds = []
     for bond in mol.GetBonds():
         if bond.GetBondType() == Chem.BondType.DOUBLE:
-            stereo_label = None
-
-            # Primary: check _CIPCode property set by rdCIPLabeler
             if bond.HasProp('_CIPCode'):
                 cip_code = bond.GetProp('_CIPCode')
                 if cip_code in ('E', 'Z'):
-                    stereo_label = cip_code
-
-            # Fallback: check BondStereo enum
-            if stereo_label is None:
-                bond_stereo = bond.GetStereo()
-                if bond_stereo == Chem.BondStereo.STEREOE:
-                    stereo_label = 'E'
-                elif bond_stereo == Chem.BondStereo.STEREOZ:
-                    stereo_label = 'Z'
-
-            if stereo_label:
-                stereo_bonds.append({
-                    'idx': bond.GetIdx(),
-                    'stereo': stereo_label,
-                    'atoms': (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
-                })
+                    stereo_bonds.append({
+                        'idx': bond.GetIdx(),
+                        'stereo': cip_code,
+                        'atoms': (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()),
+                    })
 
     return stereo_bonds
 
@@ -140,11 +126,10 @@ def has_stereochemistry(mol) -> bool:
         if atom.HasProp('_CIPCode'):
             return True
     
-    # Check for defined double bond stereochemistry
+    # Check for defined double bond stereochemistry via _CIPCode
     for bond in mol.GetBonds():
         if bond.GetBondType() == Chem.BondType.DOUBLE:
-            stereo = bond.GetStereo()
-            if stereo in [Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOZ]:
+            if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z'):
                 return True
     
     return False
@@ -186,24 +171,18 @@ def get_stereodescriptor_string(
             
             descriptors.append((locant, f"{locant}{cip}"))
     
-    # Collect double bond stereochemistry
+    # Collect double bond stereochemistry via _CIPCode
     for bond in mol.GetBonds():
         if bond.GetBondType() == Chem.BondType.DOUBLE:
-            stereo = bond.GetStereo()
-            if stereo == Chem.BondStereo.STEREOE:
-                begin_idx = bond.GetBeginAtomIdx()
-                if locant_map and begin_idx in locant_map:
-                    locant = locant_map[begin_idx]
-                else:
-                    locant = begin_idx + 1
-                descriptors.append((locant, f"{locant}E"))
-            elif stereo == Chem.BondStereo.STEREOZ:
-                begin_idx = bond.GetBeginAtomIdx()
-                if locant_map and begin_idx in locant_map:
-                    locant = locant_map[begin_idx]
-                else:
-                    locant = begin_idx + 1
-                descriptors.append((locant, f"{locant}Z"))
+            if bond.HasProp('_CIPCode'):
+                cip_code = bond.GetProp('_CIPCode')
+                if cip_code in ('E', 'Z'):
+                    begin_idx = bond.GetBeginAtomIdx()
+                    if locant_map and begin_idx in locant_map:
+                        locant = locant_map[begin_idx]
+                    else:
+                        locant = begin_idx + 1
+                    descriptors.append((locant, f"{locant}{cip_code}"))
     
     if not descriptors:
         return ""
