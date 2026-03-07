@@ -64,7 +64,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', '2-(2-oxo(3R)-3-aminobutyl)benzoic acid'),
     ('C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C', '(1S,2S)-1-ethenyl-4-isopropyl-1-methyl-2-(prop-1-en-2-yl)cyclohexane'),  # alpha order fixed P80
     ('CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO', '(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one'),
-    ('CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1', '(1S,4S,7R)-4-isopropyl-1,7-dimethylcyclodecane'),
+    ('CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1', '(1S,4s,7R)-4-isopropyl-1,7-dimethylcyclodecane'),  # lowercase s for pseudoasymmetric center per IUPAC P-92.1.4.2
     ('COc1c(C)c(O)cc2c1C(=O)N[C@H]2C', '(3S)-6-hydroxy-4-methoxy-3,5-dimethylisoindolin-1-one'),
     ('CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl', '(2S)-2-amino-6-(ethylamino)-iminohexanoic acid'),  # alpha order fixed P80
     ('C/C=C/CC(O)CCC(=O)NCC(=O)O', 'hydroxy-2-(octanoylamino)ethanoic acid'),  # alpha order fixed P80

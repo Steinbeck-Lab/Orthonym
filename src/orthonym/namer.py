@@ -22,7 +22,7 @@ from .perception.ions import detect_species_type, get_ion_sites, get_radical_sit
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
 from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring, get_complete_ring_atom_set
-from .perception.stereo import assign_stereochemistry, get_stereocenters, get_double_bond_stereo
+from .perception.stereo import get_stereocenters, get_double_bond_stereo, _CIP_ASSIGNED_PROP
 from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
 from .assembly.composer import assemble_name
@@ -610,9 +610,9 @@ class Orthonym:
         # Assign CIP stereochemistry labels BEFORE extracting stereo info
         # rdCIPLabeler sets _CIPCode on atoms (R/S) and bonds (E/Z)
         rdCIPLabeler.AssignCIPLabels(mol)
+        mol.SetProp(_CIP_ASSIGNED_PROP, '1')  # Mark as done for idempotent guard
 
         # Extract stereochemistry (now depends on _CIPCode being set)
-        assign_stereochemistry(mol)  # Additional cleanup/assignment
         features.stereocenters = get_stereocenters(mol)
         features.double_bond_stereo = get_double_bond_stereo(mol)
 

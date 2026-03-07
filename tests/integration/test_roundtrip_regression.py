@@ -492,11 +492,11 @@ PHASE24_WAVE2_FIXES = [
     ),
 
     # Group D: Stereodescriptor format fixes
-    # D1: Uppercase R/S for pseudoasymmetric centers (was lowercase s)
+    # D1: Lowercase r/s for pseudoasymmetric centers per IUPAC P-92.1.4.2
     (
         "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1",
-        "(1S,4S,7R)-4-isopropyl-1,7-dimethylcyclodecane",
-        "stereo-uppercase-pseudoasymmetric",
+        "(1S,4s,7R)-4-isopropyl-1,7-dimethylcyclodecane",
+        "stereo-lowercase-pseudoasymmetric",
     ),
 
     # Group E: Retained name fixes

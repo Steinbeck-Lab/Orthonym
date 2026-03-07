@@ -10,34 +10,37 @@ from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
 
+_CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
+
+
 def assign_stereochemistry(mol) -> None:
     """
     Assign CIP stereochemistry labels to a molecule (idempotent guard).
 
-    If CIP labels (_CIPCode) are already present on any atom or bond,
-    this function is a no-op -- the labels were already assigned by
-    the authoritative call in namer.py:_perceive().
+    Uses a private marker property to track whether rdCIPLabeler has
+    already been called on this mol object.  This is more reliable than
+    checking for _CIPCode because RDKit's MolFromSmiles() automatically
+    sets atom _CIPCode from @/@@ notation, but does NOT set bond _CIPCode
+    for E/Z -- so an atom-based check would short-circuit and skip the
+    bond labels.
 
-    Uses the new accurate CIP algorithm (rdCIPLabeler) introduced
-    in RDKit 2022.09. Falls back to legacy for simple cases only.
+    The authoritative call site in namer.py:_perceive() sets the marker
+    after calling rdCIPLabeler.  Handler modules call this function for
+    safety (e.g., natural_products runs BEFORE _perceive()).
 
     Args:
         mol: RDKit Mol object (modified in place)
     """
-    # Idempotent guard: skip if CIP labels already assigned
-    for atom in mol.GetAtoms():
-        if atom.HasProp('_CIPCode'):
-            return
-    for bond in mol.GetBonds():
-        if bond.HasProp('_CIPCode'):
-            return
+    if mol.HasProp(_CIP_ASSIGNED_PROP):
+        return
 
-    # No CIP labels found -- assign them
     try:
         rdCIPLabeler.AssignCIPLabels(mol)
     except Exception:
         # Fallback to legacy for very simple molecules
         Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+
+    mol.SetProp(_CIP_ASSIGNED_PROP, '1')
 
 
 def get_stereocenters(mol) -> List[Dict]:

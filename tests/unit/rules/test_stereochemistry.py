@@ -562,15 +562,34 @@ def test_format_stereodescriptor_parametrized(descriptors, expected):
 # =============================================================================
 
 class TestAssignStereochemistryIdempotent:
-    """Tests for the idempotent guard in assign_stereochemistry()."""
+    """Tests for the marker-based idempotent guard in assign_stereochemistry()."""
 
-    def test_assign_stereochemistry_idempotent_atoms(self):
-        """assign_stereochemistry() skips re-assignment when _CIPCode already set on atoms."""
-        from src.orthonym.perception.stereo import assign_stereochemistry
+    def test_assign_stereochemistry_sets_marker(self):
+        """assign_stereochemistry() sets the marker property after first call."""
+        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
-        # First: assign CIP labels directly (simulates namer.py _perceive())
+
+        # Clear any marker that may exist
+        if mol.HasProp(_CIP_ASSIGNED_PROP):
+            mol.ClearProp(_CIP_ASSIGNED_PROP)
+
+        assert not mol.HasProp(_CIP_ASSIGNED_PROP)
+
+        assign_stereochemistry(mol)
+
+        # Marker should now be set
+        assert mol.HasProp(_CIP_ASSIGNED_PROP)
+        assert mol.GetProp(_CIP_ASSIGNED_PROP) == '1'
+
+    def test_assign_stereochemistry_idempotent_with_marker(self):
+        """assign_stereochemistry() skips re-assignment when marker already set."""
+        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
+
+        mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+        # Simulate the authoritative call in namer.py _perceive()
         rdCIPLabeler.AssignCIPLabels(mol)
+        mol.SetProp(_CIP_ASSIGNED_PROP, '1')
 
         # Capture original CIP codes
         original_codes = {}
@@ -580,7 +599,7 @@ class TestAssignStereochemistryIdempotent:
 
         assert len(original_codes) > 0, "Should have at least one stereocenter"
 
-        # Call assign_stereochemistry -- should be a no-op (idempotent guard)
+        # Call assign_stereochemistry -- should be a no-op (marker guard)
         assign_stereochemistry(mol)
 
         # Verify CIP codes are unchanged
@@ -589,12 +608,13 @@ class TestAssignStereochemistryIdempotent:
             assert atom.HasProp('_CIPCode')
             assert atom.GetProp('_CIPCode') == code
 
-    def test_assign_stereochemistry_idempotent_bonds(self):
-        """assign_stereochemistry() skips re-assignment when _CIPCode set on bonds (E/Z only)."""
-        from src.orthonym.perception.stereo import assign_stereochemistry
+    def test_assign_stereochemistry_idempotent_bonds_with_marker(self):
+        """assign_stereochemistry() preserves E/Z bond codes when marker set."""
+        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C/C=C/C')  # (E)-but-2-ene
         rdCIPLabeler.AssignCIPLabels(mol)
+        mol.SetProp(_CIP_ASSIGNED_PROP, '1')
 
         # Capture original bond CIP codes
         original_bond_codes = {}
@@ -613,30 +633,26 @@ class TestAssignStereochemistryIdempotent:
             assert bond.HasProp('_CIPCode')
             assert bond.GetProp('_CIPCode') == code
 
-    def test_assign_stereochemistry_assigns_if_no_cip(self):
-        """assign_stereochemistry() assigns CIP labels when none are present."""
-        from src.orthonym.perception.stereo import assign_stereochemistry
+    def test_assign_stereochemistry_assigns_if_no_marker(self):
+        """assign_stereochemistry() assigns CIP labels when no marker is present."""
+        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
 
-        # Explicitly clear any _CIPCode properties that RDKit may have set
+        # Clear any CIP codes and ensure no marker
         for atom in mol.GetAtoms():
             if atom.HasProp('_CIPCode'):
                 atom.ClearProp('_CIPCode')
-        for bond in mol.GetBonds():
-            if bond.HasProp('_CIPCode'):
-                bond.ClearProp('_CIPCode')
+        if mol.HasProp(_CIP_ASSIGNED_PROP):
+            mol.ClearProp(_CIP_ASSIGNED_PROP)
 
-        # Verify no CIP codes exist
-        has_cip = any(atom.HasProp('_CIPCode') for atom in mol.GetAtoms())
-        assert not has_cip, "CIP should not be assigned after clearing"
-
-        # assign_stereochemistry should assign them (guard sees no CIP -> runs labeler)
+        # assign_stereochemistry should assign CIP labels (no marker -> runs labeler)
         assign_stereochemistry(mol)
 
-        # Now should have CIP codes
+        # Now should have CIP codes and marker
         has_cip = any(atom.HasProp('_CIPCode') for atom in mol.GetAtoms())
         assert has_cip, "CIP should now be assigned"
+        assert mol.HasProp(_CIP_ASSIGNED_PROP), "Marker should be set after assignment"
 
 
 # =============================================================================
