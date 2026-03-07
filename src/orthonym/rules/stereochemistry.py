@@ -23,7 +23,7 @@ atom indices as those are NOT valid IUPAC locants.
 from typing import Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
+from ..perception.stereo import assign_stereochemistry
 
 
 def collect_stereodescriptors(
@@ -51,8 +51,8 @@ def collect_stereodescriptors(
         >>> collect_stereodescriptors(mol, atom_to_locant)
         [(3, 'R')]
     """
-    # Ensure stereochemistry is assigned
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Ensure stereochemistry is assigned (idempotent guard)
+    assign_stereochemistry(mol)
 
     descriptors: List[Tuple[int, str]] = []
 
@@ -481,8 +481,8 @@ def collect_ring_junction_stereo(
         >>> stereo = collect_ring_junction_stereo(mol, bridgeheads, atom_to_locant)
         >>> # Returns [('4a', 'S'), ('8a', 'S')] or similar
     """
-    # Ensure CIP labels are assigned
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Ensure CIP labels are assigned (idempotent guard)
+    assign_stereochemistry(mol)
 
     descriptors: List[Tuple[str, str]] = []
 

@@ -21,8 +21,7 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict, deque
 
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
-
+from ..perception.stereo import assign_stereochemistry
 from ..data.fused_heterocycles import (
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
@@ -1108,7 +1107,7 @@ def _assemble_fused_heterocycle_name(
     """
     # Collect stereodescriptors using the fused ring locant mapping
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    rdCIPLabeler.AssignCIPLabels(mol)
+    assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_mapping)
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
 
@@ -1668,8 +1667,8 @@ def name_saturated_fused_bicyclic(mol, parent_name: str = "decahydronaphthalene"
     if not is_fused_bicyclic(mol):
         return None
 
-    # Assign CIP labels
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Assign CIP labels (idempotent guard)
+    assign_stereochemistry(mol)
 
     # Find bridgehead atoms
     bridgeheads = get_bridgehead_atoms(mol)
@@ -1716,8 +1715,8 @@ def get_ring_junction_stereo_prefix(mol) -> str:
         >>> get_ring_junction_stereo_prefix(mol)
         '(4as,8as)-'
     """
-    # Assign CIP labels
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Assign CIP labels (idempotent guard)
+    assign_stereochemistry(mol)
 
     # Find bridgehead atoms
     bridgeheads = get_bridgehead_atoms(mol)

@@ -16,8 +16,7 @@ Examples:
 
 from typing import Optional, List, Dict
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
-
+from ..perception.stereo import assign_stereochemistry
 from ..data.amino_acids import (
     STANDARD_AMINO_ACIDS,
     AMINO_ACID_ACYL_NAMES,
@@ -365,8 +364,8 @@ def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     if aa_name == "glycine":
         return ""  # Glycine is achiral
 
-    # Assign CIP labels
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Assign CIP labels (idempotent guard)
+    assign_stereochemistry(mol)
 
     # Find the alpha-carbon: sp3 carbon bonded to both N and C(=O)
     # SMARTS: [NX3][CX4][CX3](=O)

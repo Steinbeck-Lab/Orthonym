@@ -1563,9 +1563,9 @@ def name_substituted_benzene(
     # typically no R/S, but substituents attached at ring positions may carry
     # E/Z on bonds to ring atoms). We pass the ring atom_to_locant mapping.
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    from rdkit.Chem import rdCIPLabeler
+    from ..perception.stereo import assign_stereochemistry
 
-    rdCIPLabeler.AssignCIPLabels(mol)
+    assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
     # Separate suffix-type FGs from prefix-type substituents

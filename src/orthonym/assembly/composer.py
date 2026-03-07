@@ -1059,8 +1059,8 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
     tail_idx = match[2]  # OH (oxime) or NH2 (hydrazone)
 
     # Capture C=N E/Z stereo BEFORE modifying the molecule
-    from rdkit.Chem import rdCIPLabeler
-    rdCIPLabeler.AssignCIPLabels(mol)
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
 
     cn_stereo_tag = None
     cn_bond = mol.GetBondBetweenAtoms(c_idx, n_idx)

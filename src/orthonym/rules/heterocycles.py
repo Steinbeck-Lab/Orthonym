@@ -1018,10 +1018,10 @@ def name_substituted_heterocycle(
         get_multiplier_prefix,
     )
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    from rdkit.Chem import rdCIPLabeler
+    from ..perception.stereo import assign_stereochemistry
 
-    # Ensure CIP labels are assigned
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Ensure CIP labels are assigned (idempotent guard)
+    assign_stereochemistry(mol)
 
     # Collect stereodescriptors using the heterocycle locant mapping
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)

@@ -25,8 +25,7 @@ from collections import deque
 from typing import List, Optional, Set
 
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
-
+from ..perception.stereo import assign_stereochemistry
 from .naming_utils import get_alkyl_name
 from .fragment_naming import name_fragment_recursively
 
@@ -758,11 +757,8 @@ def _add_substituent_stereo(mol, sub_atoms, name):
     if not sub_atoms or not name:
         return name
 
-    # Ensure CIP labels are assigned
-    try:
-        rdCIPLabeler.AssignCIPLabels(mol)
-    except Exception:
-        return name
+    # Ensure CIP labels are assigned (idempotent guard)
+    assign_stereochemistry(mol)
 
     # Collect CIP-labeled atoms within the substituent
     stereo_atoms = []

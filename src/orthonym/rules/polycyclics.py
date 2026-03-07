@@ -779,9 +779,9 @@ def name_substituted_polycyclic(
         return pah_name
 
     # Collect stereodescriptors for chiral substituents on PAH
-    from rdkit.Chem import rdCIPLabeler
+    from ..perception.stereo import assign_stereochemistry
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    rdCIPLabeler.AssignCIPLabels(mol)
+    assign_stereochemistry(mol)
 
     # Build atom_to_locant from the PAH numbering
     pah_data = POLYCYCLIC_DATA.get(pah_name, {})
@@ -1152,7 +1152,7 @@ def _assemble_partially_saturated_carbocycle_name(
     """
     from .partial_saturation import format_saturation_prefix, get_saturation_locants
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    from rdkit.Chem import rdCIPLabeler
+    from ..perception.stereo import assign_stereochemistry
 
     parent_name = saturation_info['parent_name']
     prefix = saturation_info['prefix']
@@ -1160,8 +1160,8 @@ def _assemble_partially_saturated_carbocycle_name(
     atom_to_locant = saturation_info.get('atom_to_locant', {})
     is_perhydro = saturation_info['is_perhydro']
 
-    # Collect stereodescriptors using the ring system's locant mapping
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Collect stereodescriptors using the ring system's locant mapping (idempotent guard)
+    assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant) if atom_to_locant else []
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""
 

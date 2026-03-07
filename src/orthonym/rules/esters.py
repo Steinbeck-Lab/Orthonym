@@ -778,9 +778,9 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
             # Complex ring acid (fused heterocycle etc.) - defer to complex naming
             return None
 
-    # Ensure CIP labels are assigned on the whole molecule for stereo collection
-    from rdkit.Chem import rdCIPLabeler
-    rdCIPLabeler.AssignCIPLabels(mol)
+    # Ensure CIP labels are assigned (idempotent guard)
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
 
     # --- Phase 86-02: Acid-side substituent discovery via universal pipeline ---
     # Find the principal chain in the acid fragment to correctly identify

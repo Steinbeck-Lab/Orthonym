@@ -602,11 +602,11 @@ def name_fused_lactone_system(mol: Mol, base_ring: List[int], attached_ring: Lis
     
     # Collect stereochemistry from bicyclic system
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-    from rdkit.Chem import rdCIPLabeler
-    
-    # Ensure CIP labels are assigned
-    rdCIPLabeler.AssignCIPLabels(mol)
-    
+    from ..perception.stereo import assign_stereochemistry
+
+    # Ensure CIP labels are assigned (idempotent guard)
+    assign_stereochemistry(mol)
+
     # Collect stereodescriptors for atoms in the bicyclic system
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
     

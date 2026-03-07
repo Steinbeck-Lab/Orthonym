@@ -24,8 +24,7 @@ from collections import defaultdict, deque
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
-from rdkit.Chem import rdCIPLabeler
-
+from ..perception.stereo import assign_stereochemistry
 from ..data.natural_products import (
     NATURAL_PRODUCT_DERIVATIVES,
     get_natural_product_name,
@@ -278,7 +277,7 @@ def _collect_np_stereo(mol, numbering: Dict[int, int]) -> str:
     """
     from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
-    rdCIPLabeler.AssignCIPLabels(mol)
+    assign_stereochemistry(mol)
     descriptors = collect_stereodescriptors(mol, numbering)
     if descriptors:
         return format_stereodescriptor_string(descriptors)
