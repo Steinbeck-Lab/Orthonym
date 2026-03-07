@@ -35,6 +35,14 @@ BICYCLO_RETAINED_NAMES: Dict[str, str] = {
     # Note: Strained system, used in drug design
     "C1C2CC12": "bicyclo[1.1.0]butane",
 
+    # === Bornane (RING-04): 1,7,7-trimethylbicyclo[2.2.1]heptane ===
+    # Terpene scaffold retained name per IUPAC P-31.1.3.4
+    "CC12CCC(CC1)C2(C)C": "bornane",
+
+    # === Pinane (RING-04): 2,6,6-trimethylbicyclo[3.1.1]heptane ===
+    # Monoterpene scaffold retained name per IUPAC P-31.1.3.4
+    "CC1CCC2CC1C2(C)C": "pinane",
+
     # === Heterobicyclics with retained names ===
     # Quinuclidine: 1-azabicyclo[2.2.2]octane
     # Important in alkaloid chemistry

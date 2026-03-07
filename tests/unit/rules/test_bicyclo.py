@@ -390,8 +390,36 @@ class TestRetainedNames:
 
     @pytest.mark.unit
     def test_retained_names_count(self):
-        """Should have at least 3 retained bicyclo names."""
-        assert len(BICYCLO_RETAINED_NAMES) >= 3
+        """Should have at least 5 retained bicyclo names (RING-04: added bornane, pinane)."""
+        assert len(BICYCLO_RETAINED_NAMES) >= 5
+
+    @pytest.mark.unit
+    def test_bornane_canonical_lookup(self):
+        """Bornane should be found by canonical SMILES (RING-04)."""
+        canonical = "CC12CCC(CC1)C2(C)C"
+        name = get_retained_bicyclo_name(canonical)
+        assert name == "bornane"
+
+    @pytest.mark.unit
+    def test_pinane_canonical_lookup(self):
+        """Pinane should be found by canonical SMILES (RING-04)."""
+        canonical = "CC1CCC2CC1C2(C)C"
+        name = get_retained_bicyclo_name(canonical)
+        assert name == "pinane"
+
+    @pytest.mark.unit
+    def test_bornane_e2e_naming(self):
+        """Bornane SMILES should produce 'bornane' end-to-end."""
+        from orthonym import name_compound
+        name = name_compound("CC12CCC(CC1)C2(C)C")
+        assert name == "bornane"
+
+    @pytest.mark.unit
+    def test_pinane_e2e_naming(self):
+        """Pinane SMILES should produce 'pinane' end-to-end."""
+        from orthonym import name_compound
+        name = name_compound("CC1CCC2CC1C2(C)C")
+        assert name == "pinane"
 
 
 # ============================================================================

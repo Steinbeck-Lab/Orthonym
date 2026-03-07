@@ -161,6 +161,13 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
         'description': 'dibenzo[b,e]pyrazine',
     },
 
+    # RING-05: Xanthene (9H-xanthene, dibenzo[b,e]pyran)
+    'xanthene': {
+        'smiles': 'c1ccc2c(c1)oc1ccccc1c2',
+        'ring_atoms': 13,
+        'description': 'dibenzo[b,e]pyran (9H-xanthene)',
+    },
+
     # =========================================================================
     # PURINES AND PTERIDINES (bicyclic N-heterocycles)
     # =========================================================================

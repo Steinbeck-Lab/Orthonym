@@ -283,6 +283,13 @@ class TestAromaticReferences:
         assert ref is not None
         assert ref['ring_atoms'] == 10
 
+    def test_xanthene_reference(self):
+        """Test xanthene reference data (RING-05)."""
+        ref = AROMATIC_REFERENCES.get('xanthene')
+        assert ref is not None
+        assert ref['ring_atoms'] == 13
+        assert 'o' in ref['smiles'].lower()  # Contains oxygen heteroatom
+
     def test_get_reference_smiles(self):
         """Test get_reference_smiles function."""
         smiles = get_reference_smiles('quinoline')
