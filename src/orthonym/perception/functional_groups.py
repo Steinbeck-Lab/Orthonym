@@ -238,6 +238,9 @@ def _resolve_fg_collisions(results):
         ('imide', ['aldehyde']),
         ('thioic_S_acid', ['aldehyde']),
         ('carbamic_acid', ['aldehyde']),
+        # USUB-11: imide suppresses overlapping amide matches to prevent
+        # double-counting C=O groups (one as amide, one as ketone)
+        ('imide', ['primary_amide', 'secondary_amide', 'tertiary_amide']),
         # PERC-02: broadened amine pattern overlaps with aromatic_amine on aromatic carbons
         ('aromatic_amine', ['primary_amine']),
         # PERC-03: hydroxamic acid suppresses amide + alcohol false positives

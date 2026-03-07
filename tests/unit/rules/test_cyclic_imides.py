@@ -3,6 +3,7 @@
 Succinimide and maleimide are retained names for common cyclic imides.
 They should be returned by the retained name lookup before systematic naming.
 Phthalimide (isoindoline-1,3-dione) already has a correct systematic name.
+Glutarimide (piperidine-2,6-dione) is a retained name for the 6-membered imide.
 """
 
 import pytest
@@ -10,6 +11,7 @@ from rdkit import Chem
 
 from orthonym.namer import name_compound
 from orthonym.data.retained_names import get_retained_name
+from orthonym.perception.functional_groups import detect_functional_groups
 
 
 @pytest.mark.unit
@@ -26,10 +28,15 @@ class TestCyclicImideRetainedNames:
         canonical = Chem.CanonSmiles("O=C1C=CC(=O)N1")
         assert get_retained_name(canonical) == "maleimide"
 
-    def test_phthalimide_not_in_retained_names(self):
-        """Phthalimide should NOT be added as retained name (systematic name is correct)."""
+    def test_glutarimide_retained_name_lookup(self):
+        """Canonical SMILES for glutarimide should be in retained names."""
+        canonical = Chem.CanonSmiles("O=C1CCCC(=O)N1")
+        assert get_retained_name(canonical) == "glutarimide"
+
+    def test_phthalimide_retained_name_lookup(self):
+        """Canonical SMILES for phthalimide should be in retained names."""
         canonical = Chem.CanonSmiles("O=C1NC(=O)c2ccccc21")
-        assert get_retained_name(canonical) is None
+        assert get_retained_name(canonical) == "phthalimide"
 
 
 @pytest.mark.unit
@@ -44,9 +51,13 @@ class TestCyclicImideNaming:
         """O=C1C=CC(=O)N1 -> maleimide."""
         assert name_compound("O=C1C=CC(=O)N1") == "maleimide"
 
-    def test_phthalimide_systematic_name(self):
-        """O=C1NC(=O)c2ccccc21 -> isoindoline-1,3-dione (no regression)."""
-        assert name_compound("O=C1NC(=O)c2ccccc21") == "isoindoline-1,3-dione"
+    def test_glutarimide(self):
+        """O=C1CCCC(=O)N1 -> glutarimide."""
+        assert name_compound("O=C1CCCC(=O)N1") == "glutarimide"
+
+    def test_phthalimide(self):
+        """Phthalimide via retained name."""
+        assert name_compound("O=C1NC(=O)c2ccccc21") == "phthalimide"
 
     def test_n_methyl_succinimide_not_retained(self):
         """N-methylsuccinimide should NOT match the retained name.
@@ -72,3 +83,29 @@ class TestCyclicImideNaming:
     def test_maleimide_alternate_input(self):
         """Alternative SMILES input for maleimide should also work."""
         assert name_compound("C1=CC(=O)NC1=O") == "maleimide"
+
+
+@pytest.mark.unit
+class TestImidePerception:
+    """Test that imide FG detection suppresses overlapping amide matches."""
+
+    def test_imide_suppresses_secondary_amide(self):
+        """When imide detected, overlapping secondary_amide should be suppressed."""
+        mol = Chem.MolFromSmiles('O=C1CCC(=O)N1')  # succinimide
+        fgs = detect_functional_groups(mol)
+        assert 'imide' in fgs
+        assert 'secondary_amide' not in fgs
+
+    def test_imide_suppresses_tertiary_amide(self):
+        """When N-substituted imide detected, tertiary_amide should be suppressed."""
+        mol = Chem.MolFromSmiles('CN1C(=O)CCC1=O')  # N-methylsuccinimide
+        fgs = detect_functional_groups(mol)
+        assert 'imide' in fgs
+        assert 'tertiary_amide' not in fgs
+
+    def test_glutarimide_imide_detected(self):
+        """Glutarimide should be detected as imide."""
+        mol = Chem.MolFromSmiles('O=C1CCCC(=O)N1')
+        fgs = detect_functional_groups(mol)
+        assert 'imide' in fgs
+        assert 'secondary_amide' not in fgs

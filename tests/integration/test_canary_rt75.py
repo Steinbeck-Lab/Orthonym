@@ -368,7 +368,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C1NC(=O)c2ccccc21",
-        "isoindoline-1,3-dione",
+        "phthalimide",
     ),
     # CLS-04: Thiocarboxylic Acids
     (

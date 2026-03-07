@@ -211,9 +211,9 @@ class TestCLS03CyclicImides:
         assert name_compound("O=C1C=CC(=O)N1") == "maleimide"
 
     @pytest.mark.integration
-    def test_isoindoline_dione(self):
-        """Phthalimide -> systematic isoindoline-1,3-dione (IUPAC preferred)."""
-        assert name_compound("O=C1NC(=O)c2ccccc21") == "isoindoline-1,3-dione"
+    def test_phthalimide_retained(self):
+        """Phthalimide -> retained name (IUPAC P-31.1.3.4)."""
+        assert name_compound("O=C1NC(=O)c2ccccc21") == "phthalimide"
 
     @pytest.mark.integration
     def test_methyl_succinimide_derivative(self):

@@ -315,9 +315,11 @@ RETAINED_NAMES = {
     # === COMMON PHARMACEUTICALS (Phase 8 expansion) ===
     "CC(=O)Oc1ccccc1C(=O)O": "aspirin",
 
-    # === CYCLIC IMIDES (Phase 49) ===
+    # === CYCLIC IMIDES (Phase 49, expanded Phase 91.1) ===
     "O=C1CCC(=O)N1": "succinimide",
     "O=C1C=CC(=O)N1": "maleimide",
+    "O=C1CCCC(=O)N1": "glutarimide",
+    "O=C1NC(=O)c2ccccc21": "phthalimide",
 }
 
 
