@@ -41,6 +41,7 @@ SENIORITY_ORDER = [
     "secondary_sulfonamide",
     "tertiary_sulfonamide",
     "hydrazide",
+    "hydroxamic_acid",  # IUPAC P-65.3.3: between hydrazides and imides
     "imide",
     
     # Nitriles
@@ -135,6 +136,7 @@ SUFFIX_FORMS = {
     "oxime": ("oxime", "oxime"),           # functional class suffix
     "hydrazone": ("hydrazone", "hydrazone"),  # functional class suffix
     "boronic_acid": ("boronic acid", "boronic acid"),  # retained acid form
+    "hydroxamic_acid": ("hydroxamic acid", "hydroxamic acid"),  # IUPAC P-65.3.3
 }
 
 # Prefix forms for non-principal groups
@@ -215,6 +217,11 @@ PREFIX_FORMS = {
     "tertiary_phosphine": None,
     "secondary_phosphine": None,
     "primary_phosphine": None,
+    # PERC-04: New FG prefix forms
+    "hydroxamic_acid": "N-hydroxyamido",  # IUPAC P-65.3.3
+    "cyanate": "cyanato",                 # IUPAC P-65.5
+    "thiocyanate": "thiocyanato",         # IUPAC P-65.5
+    "azo": "diazenyl",                    # IUPAC P-67.2
 }
 
 

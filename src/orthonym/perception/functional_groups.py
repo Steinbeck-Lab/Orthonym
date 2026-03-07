@@ -73,10 +73,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     "isocyanide": "[#6][NX2]#[CX1]",
     
     # === CARBONYLS ===
-    # Aldehyde: carbonyl with H and bonded to C (not N/O)
-    # [CX3H1](=O) matches the carbonyl, [#6] ensures attached to carbon
-    # This excludes amides where C is bonded to N
-    "aldehyde": "[CX3H1](=O)[#6]",
+    # Aldehyde: carbonyl C with 1 or 2 H (PERC-01: H2 added for formaldehyde;
+    # collision resolution suppresses false positives on amides/acids)
+    "aldehyde": "[CX3;H1,H2](=O)",
     "ketone": "[#6][CX3](=O)[#6]",
     "thioaldehyde": "[CX3H1](=S)",
     "thioketone": "[#6][CX3](=S)[#6]",
@@ -95,7 +94,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "peroxide": "[#6][OX2][OX2][#6]",
     
     # === AMINES ===
-    "primary_amine": "[NX3H2][CX4]",
+    "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
     "secondary_amine": "[NX3H1]([CX4])[CX4]",
     "tertiary_amine": "[NX3]([CX4])([CX4])[CX4]",
     "aromatic_amine": "[NX3H2][cX3]",
@@ -138,6 +137,16 @@ FUNCTIONAL_GROUP_SMARTS = {
     "chloro": "[ClX1][#6]",
     "bromo": "[BrX1][#6]",
     "iodo": "[IX1][#6]",
+
+    # === HYDROXAMIC ACIDS (PERC-03: P-65.3.3) ===
+    "hydroxamic_acid": "[CX3](=O)[NX3;H1][OX2H]",  # R-C(=O)-NH-OH: free hydroxamic acid only
+
+    # === CYANATES / THIOCYANATES (PERC-03: P-65.5) ===
+    "cyanate": "[OX2][CX2]#[NX1]",
+    "thiocyanate": "[SX2][CX2]#[NX1]",
+
+    # === AZO (PERC-03: P-67.2) ===
+    "azo": "[#6][NX2]=[NX2][#6]",
 
     # === OTHER ===
     "nitro": "[NX3+](=O)[O-]",
@@ -214,6 +223,31 @@ def _resolve_fg_collisions(results):
         # aromatic ether; without this, phenyl esters double-name as both
         # "phenoxy" and "phenoxycarbonyl".
         ('ester', ['aromatic_ether']),
+        # PERC-01: broadened aldehyde [CX3;H1,H2](=O) now matches C=O in acid
+        # derivatives (formates, formamides, etc.); suppress aldehyde on overlap
+        ('carboxylic_acid', ['aldehyde']),
+        ('ester', ['aldehyde']),
+        ('anhydride', ['aldehyde']),
+        ('acid_chloride', ['aldehyde']),
+        ('acid_bromide', ['aldehyde']),
+        ('acid_fluoride', ['aldehyde']),
+        ('primary_amide', ['aldehyde']),
+        ('secondary_amide', ['aldehyde']),
+        ('tertiary_amide', ['aldehyde']),
+        ('hydrazide', ['aldehyde']),
+        ('imide', ['aldehyde']),
+        ('thioic_S_acid', ['aldehyde']),
+        ('carbamic_acid', ['aldehyde']),
+        # PERC-02: broadened amine pattern overlaps with aromatic_amine on aromatic carbons
+        ('aromatic_amine', ['primary_amine']),
+        # PERC-03: hydroxamic acid suppresses amide + alcohol false positives
+        ('hydroxamic_acid', ['primary_amide', 'secondary_amide', 'primary_alcohol',
+                             'secondary_alcohol', 'tertiary_alcohol', 'carboxylic_acid']),
+        # PERC-03: cyanate/thiocyanate suppress ether/thioether + nitrile
+        ('cyanate', ['ether', 'nitrile']),
+        ('thiocyanate', ['thioether', 'nitrile']),
+        # PERC-03: azo suppresses imine
+        ('azo', ['imine']),
     ]:
         if fg_specific in results:
             specific_atoms = set()
