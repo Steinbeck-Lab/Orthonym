@@ -32,7 +32,7 @@ SENIORITY_ORDER = [
     "acid_chloride",
     "acid_bromide",
     "acid_fluoride",
-    
+
     # Nitrogen acid derivatives
     "primary_amide",
     "secondary_amide",
@@ -43,17 +43,17 @@ SENIORITY_ORDER = [
     "hydrazide",
     "hydroxamic_acid",  # IUPAC P-65.3.3: between hydrazides and imides
     "imide",
-    
+
     # Nitriles
     "nitrile",
     "isocyanide",
-    
+
     # Carbonyls
     "aldehyde",
     "ketone",
     "thioaldehyde",
     "thioketone",
-    
+
     # Alcohols and analogs
     "primary_alcohol",
     "secondary_alcohol",
@@ -62,20 +62,27 @@ SENIORITY_ORDER = [
     "enol",
     "thiol",
     "selenol",
-    
+
     # Hydroperoxides
     "hydroperoxide",
-    
+
     # Amines
     "primary_amine",
     "secondary_amine",
     "tertiary_amine",
     "aromatic_amine",
-    
+
     # Imines
     "imine",
     "oxime",
     "hydrazone",
+
+    # Pseudohalides and special groups (prefix-only in IUPAC 2013)
+    # Placed here so they are recognized but always junior to suffix-capable groups
+    "azido",        # P-65.5: prefix-only
+    "azo",          # P-67.2: prefix-only
+    "cyanate",      # P-65.5: prefix-only (pseudohalide)
+    "thiocyanate",  # P-65.5: prefix-only (pseudohalide)
 
     # Sulfur oxidation states (functional class naming, lower seniority than amines)
     "sulfoxide",
@@ -93,7 +100,7 @@ SENIORITY_ORDER = [
 ]
 
 # Suffix forms for principal groups
-# Format: (chain_terminal_suffix, ring_attached_suffix)
+# Format: (chain_terminal_suffix, ring_attached_suffix), or None for functional-class-only
 SUFFIX_FORMS = {
     "carboxylic_acid": ("oic acid", "carboxylic acid"),
     "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
@@ -137,6 +144,28 @@ SUFFIX_FORMS = {
     "hydrazone": ("hydrazone", "hydrazone"),  # functional class suffix
     "boronic_acid": ("boronic acid", "boronic acid"),  # retained acid form
     "hydroxamic_acid": ("hydroxamic acid", "hydroxamic acid"),  # IUPAC P-65.3.3
+    # --- Phase 93-01: close SENIORITY_ORDER suffix gaps ---
+    # FGs with real suffix forms
+    "hydrazide": ("ohydrazide", "carbohydrazide"),  # IUPAC P-66.3
+    "imide": ("imide", "dicarboximide"),  # IUPAC P-66.2
+    # FGs with functional class naming only (no substitutive suffix)
+    "thioester": None,           # IUPAC P-65.3.1: functional class naming (S-alkyl alkanethioate)
+    "isocyanide": None,          # IUPAC 2013 P-66.5.3: prefix-only (isocyano)
+    "sulfoxide": None,           # IUPAC P-63.6: functional class naming (dialkyl sulfoxide)
+    "sulfone": None,             # IUPAC P-63.6: functional class naming (dialkyl sulfone)
+    "thioether": None,           # IUPAC P-63.2: functional class naming (dialkyl sulfide)
+    "phosphine_oxide": None,     # IUPAC P-68.3: functional class naming
+    "phosphate_triester": None,  # IUPAC P-68: functional class naming
+    "phosphate_diester": None,   # IUPAC P-68: functional class naming
+    "phosphate_monoester": None, # IUPAC P-68: substitutive prefix only (phosphonooxy)
+    "tertiary_phosphine": None,  # IUPAC P-68.3: parent hydride naming (phosphane)
+    "secondary_phosphine": None, # IUPAC P-68.3: parent hydride naming
+    "primary_phosphine": None,   # IUPAC P-68.3: parent hydride naming
+    # Prefix-only FGs added to SENIORITY_ORDER (no suffix form)
+    "azido": None,               # IUPAC P-65.5: prefix-only
+    "azo": None,                 # IUPAC P-67.2: prefix-only
+    "cyanate": None,             # IUPAC P-65.5: prefix-only (pseudohalide)
+    "thiocyanate": None,         # IUPAC P-65.5: prefix-only (pseudohalide)
 }
 
 # Prefix forms for non-principal groups
@@ -201,10 +230,10 @@ PREFIX_FORMS = {
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
-    "thioether": None,
-    # Sulfur oxidation states (functional class naming)
-    "sulfoxide": None,  # Named by functional class (dimethyl sulfoxide)
-    "sulfone": None,    # Named by functional class (dimethyl sulfone)
+    "thioether": None,  # IUPAC P-63.2: functional class naming (dialkyl sulfide)
+    # Sulfur oxidation states (IUPAC P-63.6)
+    "sulfoxide": "sulfinyl",  # IUPAC P-63.6: bivalent prefix for -S(=O)-
+    "sulfone": "sulfonyl",    # IUPAC P-63.6: bivalent prefix for -S(=O)2-
     # Phosphorus compounds
     "phosphonic_acid": "phosphono",
     "phosphinic_acid": "phosphino",
@@ -222,6 +251,14 @@ PREFIX_FORMS = {
     "cyanate": "cyanato",                 # IUPAC P-65.5
     "thiocyanate": "thiocyanato",         # IUPAC P-65.5
     "azo": "diazenyl",                    # IUPAC P-67.2
+    # --- Phase 93-01: close SENIORITY_ORDER prefix gaps ---
+    "anhydride": None,            # IUPAC P-65.1: functional class naming only
+    "secondary_amide": None,      # Named via acylamino pathway in universal pipeline
+    "tertiary_amide": None,       # Named via acylamino pathway in universal pipeline
+    "hydrazide": "hydrazinecarbonyl",  # IUPAC P-66.3.5
+    "imide": None,                # Named as heterocyclic ring substituent
+    "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
+    "thioester": None,            # Named via decomposition pathway
 }
 
 
@@ -231,14 +268,14 @@ def get_principal_group(
 ) -> Tuple[Optional[str], List[tuple]]:
     """
     Determine the principal characteristic group.
-    
+
     The principal group is the highest-seniority functional group
     that will be expressed as a suffix in the name.
-    
+
     Args:
         mol: RDKit Mol object
         functional_groups: Dict from detect_functional_groups()
-        
+
     Returns:
         Tuple of (group_name, list_of_atom_index_tuples)
         Returns (None, []) if no suffix-capable group found
@@ -246,37 +283,41 @@ def get_principal_group(
     for fg_name in SENIORITY_ORDER:
         if fg_name in functional_groups and functional_groups[fg_name]:
             return fg_name, functional_groups[fg_name]
-    
+
     return None, []
 
 
 def get_suffix(fg_name: str, is_ring: bool = False) -> Optional[str]:
     """
     Get the suffix form for a functional group.
-    
+
     Args:
         fg_name: Name of functional group
         is_ring: True if the group is attached to a ring (not terminal on chain)
-        
+
     Returns:
         Suffix string, or None if group has no suffix form
     """
     if fg_name not in SUFFIX_FORMS:
         return None
-    
-    chain_suffix, ring_suffix = SUFFIX_FORMS[fg_name]
+
+    entry = SUFFIX_FORMS[fg_name]
+    if entry is None:
+        return None  # Functional class naming only -- no substitutive suffix
+
+    chain_suffix, ring_suffix = entry
     return ring_suffix if is_ring else chain_suffix
 
 
 def get_prefix(fg_name: str) -> Optional[str]:
     """
     Get the prefix form for a functional group.
-    
+
     Used when the group is not the principal group.
-    
+
     Args:
         fg_name: Name of functional group
-        
+
     Returns:
         Prefix string, or None if group has no standard prefix form
     """
@@ -286,10 +327,10 @@ def get_prefix(fg_name: str) -> Optional[str]:
 def is_suffix_group(fg_name: str) -> bool:
     """
     Check if a functional group can be expressed as a suffix.
-    
+
     Args:
         fg_name: Name of functional group
-        
+
     Returns:
         True if group can be a suffix (is in seniority order)
     """
@@ -299,10 +340,10 @@ def is_suffix_group(fg_name: str) -> bool:
 def compare_seniority(fg1: str, fg2: str) -> int:
     """
     Compare seniority of two functional groups.
-    
+
     Args:
         fg1, fg2: Names of functional groups
-        
+
     Returns:
         -1 if fg1 is higher seniority
          0 if equal seniority (or both not in list)
@@ -312,12 +353,12 @@ def compare_seniority(fg1: str, fg2: str) -> int:
         idx1 = SENIORITY_ORDER.index(fg1)
     except ValueError:
         idx1 = len(SENIORITY_ORDER)  # Not in list = lowest priority
-    
+
     try:
         idx2 = SENIORITY_ORDER.index(fg2)
     except ValueError:
         idx2 = len(SENIORITY_ORDER)
-    
+
     if idx1 < idx2:
         return -1  # fg1 is higher (lower index = higher priority)
     elif idx1 > idx2:
@@ -331,23 +372,23 @@ def get_all_prefix_groups(
 ) -> Dict[str, List[tuple]]:
     """
     Get all functional groups that should be named as prefixes.
-    
+
     This includes all groups except the principal group.
-    
+
     Args:
         functional_groups: Dict from detect_functional_groups()
         principal_group: Name of the principal group (or None)
-        
+
     Returns:
         Dict of functional group names to their atom indices,
         excluding the principal group
     """
     prefix_groups = {}
-    
+
     for fg_name, matches in functional_groups.items():
         if fg_name == principal_group:
             continue
         if matches:
             prefix_groups[fg_name] = matches
-    
+
     return prefix_groups
