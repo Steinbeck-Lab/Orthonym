@@ -320,6 +320,6 @@ class TestPhase1Regression:
     def test_unsaturated_still_work(self):
         """Unsaturated compounds should still be named correctly."""
         assert name_compound('C=C') == 'ethene'
-        assert name_compound('C#C') == 'ethyne'
+        assert name_compound('C#C') == 'acetylene'  # retained name (P-31.1.2.1 PIN)
         # IUPAC PIN style uses locants: prop-1-ene not propene
         assert name_compound('CC=C') == 'prop-1-ene'

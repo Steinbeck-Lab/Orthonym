@@ -47,6 +47,11 @@ BICYCLO_RETAINED_NAMES: Dict[str, str] = {
     # Quinuclidine: 1-azabicyclo[2.2.2]octane
     # Important in alkaloid chemistry
     "C1CC2CCC1CN2": "quinuclidine",
+
+    # === Decalin (bicyclo[4.4.0]decane / decahydronaphthalene) ===
+    # Retained name per IUPAC 2013 P-31.1.3
+    # OPSIN RT verified 2026-03-08
+    "C1CCC2CCCCC2C1": "decalin",
 }
 
 

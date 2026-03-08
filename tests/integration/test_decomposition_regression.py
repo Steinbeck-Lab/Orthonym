@@ -41,7 +41,7 @@ BASIC_CANARIES = [
     ("CCC(=O)O", "propanoic acid"),
     ("CCCC(=O)O", "butanoic acid"),
     ("C=C", "ethene"),
-    ("C#C", "ethyne"),
+    ("C#C", "acetylene"),  # retained name (P-31.1.2.1 PIN)
     ("c1ccccc1", "benzene"),
     ("Cc1ccccc1", "toluene"),
     ("Oc1ccccc1", "phenol"),

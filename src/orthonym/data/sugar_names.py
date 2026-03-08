@@ -131,16 +131,36 @@ URONIC_ACID_NAMES = {
     ),
 }
 
+# Amino sugars (Phase 94)
+# === AMINO SUGARS (D-configuration) ===
+# Source: IUPAC 2-Carb carbohydrate nomenclature
+# OPSIN RT verified 2026-03-08 (all 6 pass)
+AMINO_SUGAR_NAMES = {
+    # alpha-D-glucosamine
+    "N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O": ("alpha", "D", "glucosamine"),
+    # beta-D-glucosamine
+    "N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O": ("beta", "D", "glucosamine"),
+    # alpha-D-galactosamine
+    "N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@@H]1O": ("alpha", "D", "galactosamine"),
+    # beta-D-galactosamine
+    "N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@H]1O": ("beta", "D", "galactosamine"),
+    # alpha-D-mannosamine
+    "N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O": ("alpha", "D", "mannosamine"),
+    # beta-D-mannosamine
+    "N[C@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O": ("beta", "D", "mannosamine"),
+}
+
 
 # ============================================================================
 # Merged lookup and non-stereo fallback
 # ============================================================================
 
-# Unified lookup combining all three tables
+# Unified lookup combining all four tables
 ALL_SUGAR_NAMES = {
     **SUGAR_RETAINED_NAMES,
     **NACETYL_SUGAR_NAMES,
     **URONIC_ACID_NAMES,
+    **AMINO_SUGAR_NAMES,
 }
 
 # Build non-stereo fallback: strip all @/@@, re-canonicalize, map to base name

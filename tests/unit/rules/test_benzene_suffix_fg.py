@@ -104,8 +104,8 @@ def test_benzene_dicarboxylic_and_dialdehyde_suffix(smiles, expected):
     ("Nc1ccccc1", "aniline"),
     # Nitrobenzene (retained name)
     ("[O-][N+](=O)c1ccccc1", "nitrobenzene"),
-    # Methoxybenzene (ether)
-    ("COc1ccccc1", "methoxybenzene"),
+    # Anisole (retained name, P-34.1.1.4 PIN; systematic: methoxybenzene)
+    ("COc1ccccc1", "anisole"),
     # Ethoxybenzene
     ("CCOc1ccccc1", "ethoxybenzene"),
     # Halogens

@@ -107,8 +107,8 @@ class TestEtherDecomposition:
         Should use existing alkoxy prefix naming on benzene.
         """
         name = name_compound("c1ccc(OC)cc1")
-        assert name == "methoxybenzene" or "methoxy" in name.lower(), (
-            f"Expected 'methoxybenzene', got: {name}"
+        assert name == "anisole" or name == "methoxybenzene" or "methoxy" in name.lower(), (
+            f"Expected 'anisole' or 'methoxybenzene', got: {name}"
         )
 
     @pytest.mark.integration

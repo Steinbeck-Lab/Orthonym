@@ -121,9 +121,9 @@ class TestNaming:
 
     @pytest.mark.unit
     def test_biphenyl_name(self):
-        """Biphenyl SMILES produces '1,1'-biphenyl'."""
+        """Biphenyl SMILES produces 'biphenyl' (retained name per P-31.1.2.4)."""
         name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert name == "1,1'-biphenyl"
+        assert name == "biphenyl"
 
     @pytest.mark.unit
     def test_bipyridine_contains_bipyridine(self):
@@ -158,8 +158,11 @@ class TestNaming:
 
     @pytest.mark.unit
     def test_primed_locant_format(self):
-        """Primed locants use ASCII apostrophe (U+0027)."""
-        name = name_compound("c1ccc(-c2ccccc2)cc1")
+        """Primed locants use ASCII apostrophe (U+0027).
+
+        Uses substituted biphenyl since unsubstituted biphenyl is a retained name.
+        """
+        name = name_compound("Clc1ccc(-c2ccccc2)cc1")
         assert "'" in name  # ASCII apostrophe
 
     @pytest.mark.unit

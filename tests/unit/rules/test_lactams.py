@@ -186,8 +186,8 @@ class TestLactamEndToEnd:
         assert name_compound("C1CCCC(=O)N1") == "piperidin-2-one"
 
     def test_epsilon_lactam_e2e(self):
-        """Epsilon-lactam through name_compound."""
-        assert name_compound("C1CCCCC(=O)N1") == "azepan-2-one"
+        """Epsilon-lactam through name_compound (returns retained name caprolactam)."""
+        assert name_compound("C1CCCCC(=O)N1") == "caprolactam"
 
     def test_succinimide_not_lactam_e2e(self):
         """Succinimide does NOT produce a lactam name."""

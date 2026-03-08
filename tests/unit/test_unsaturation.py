@@ -58,7 +58,7 @@ class TestAlkyneNaming:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("C#C", "ethyne"),
+        ("C#C", "acetylene"),
         ("C#CC", "prop-1-yne"),
         ("CC#C", "prop-1-yne"),  # Same molecule, different SMILES
         ("CC#CC", "but-2-yne"),
@@ -72,9 +72,9 @@ class TestAlkyneNaming:
 
     @pytest.mark.unit
     def test_ethyne_no_locant(self):
-        """Ethyne should not have a locant (only one possible position)."""
+        """C#C returns retained name 'acetylene' (P-31.1.2.1 PIN)."""
         result = name_compound("C#C")
-        assert result == "ethyne"
+        assert result == "acetylene"
         assert "-" not in result
 
     @pytest.mark.unit

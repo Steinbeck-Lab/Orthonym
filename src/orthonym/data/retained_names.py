@@ -320,6 +320,42 @@ RETAINED_NAMES = {
     "O=C1C=CC(=O)N1": "maleimide",
     "O=C1CCCC(=O)N1": "glutarimide",
     "O=C1NC(=O)c2ccccc21": "phthalimide",
+
+    # === COMMONLY ENCOUNTERED RETAINED NAMES (Phase 94) ===
+    # Source: IUPAC 2013 Blue Book, various sections
+    # OPSIN RT verified 2026-03-08
+    "c1ccc(-c2ccccc2)cc1": "biphenyl",  # P-31.1.2.4 general nomenclature
+    "C#C": "acetylene",  # P-31.1.2.1 PIN for unsubstituted ethyne
+    "COc1ccccc1": "anisole",  # P-34.1.1.4 PIN
+    "O=C1CCCCCN1": "caprolactam",  # P-31.1.4 retained lactam name
+
+    # === NUCLEOSIDES (Phase 94) ===
+    # Retained names per carbohydrate nomenclature conventions
+    # Each nucleoside has fixed beta stereochemistry at anomeric position
+    # OPSIN RT verified 2026-03-08 (all 8 pass)
+    "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O": "adenosine",
+    "Nc1nc2c(ncn2[C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1": "guanosine",
+    "Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1": "cytidine",
+    "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O": "thymidine",
+    "O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1": "uridine",
+    "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "deoxyadenosine",
+    "Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "deoxyguanosine",
+    "Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1": "deoxycytidine",
+
+    # === DISACCHARIDES (Phase 94) ===
+    # NOTE: OPSIN cannot parse most disaccharide names -- InChI validation used
+    # instead of OPSIN RT. Canonical SMILES from PubChem + RDKit canonicalization.
+    "OC[C@@H]1O[C@@](CO)(O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)[C@@H](O)[C@H]1O": "sucrose",
+    "OC[C@H]1O[C@@H](O[C@H]2[C@H](O)[C@@H](O)C(O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O": "maltose",
+    "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)C(O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@H]1O": "lactose",
+    "OC[C@H]1O[C@@H](O[C@@H]2[C@@H](O)[C@H](O)[C@@H](O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O": "cellobiose",
+    "OC[C@H]1O[C@H](O[C@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H](O)[C@H]1O": "trehalose",
+
+    # === MODIFIED SUGARS (Phase 94) ===
+    # N-acetylneuraminic acid (sialic acid / Neu5Ac)
+    # Unique 9-carbon structure, not standard pyranose/furanose
+    # OPSIN RT verified 2026-03-08
+    "CC(=O)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O": "N-acetylneuraminic acid",
 }
 
 

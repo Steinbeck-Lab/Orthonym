@@ -125,10 +125,10 @@ class TestLegitimateAlkoxyPreserved:
 
     @pytest.mark.integration
     def test_methoxybenzene_still_works(self):
-        """Methoxybenzene: should still produce 'methoxybenzene'."""
+        """Methoxybenzene: now returns 'anisole' (retained name, P-34.1.1.4 PIN)."""
         name = name_compound("c1ccc(OC)cc1")
-        assert "methoxy" in name.lower(), (
-            f"Expected 'methoxy' in name, got: {name}"
+        assert name == "anisole" or "methoxy" in name.lower(), (
+            f"Expected 'anisole' or 'methoxy' in name, got: {name}"
         )
 
     @pytest.mark.integration

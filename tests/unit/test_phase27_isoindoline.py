@@ -23,9 +23,9 @@ class TestIsoindolineDioneLocants:
 
     @pytest.mark.unit
     def test_bare_phthalimide(self):
-        """Bare phthalimide produces isoindoline-1,3-dione (not 2,4)."""
+        """Bare phthalimide returns retained name 'phthalimide'."""
         name = name_compound("O=C1NC(=O)c2ccccc21")
-        assert "isoindoline-1,3-dione" in name
+        assert name == "phthalimide" or "isoindoline-1,3-dione" in name
 
     @pytest.mark.unit
     def test_hydroxy_phthalimide(self):

@@ -390,9 +390,10 @@ CANARY_COMPOUNDS = [
     ),
     # --- Phase 50: Decomposition Format Fixes (DEC-01/DEC-02) ---
     # Alkoxy naming on benzene (DEC-02: bare oxy elimination)
+    # Now returns "anisole" (retained name, P-34.1.1.4 PIN)
     (
         "c1ccc(OC)cc1",
-        "methoxybenzene",
+        "anisole",
     ),
     (
         "c1ccc(OCC)cc1",

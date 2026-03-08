@@ -126,7 +126,7 @@ CORE_NAMING = [
     # Alkenes and alkynes
     ("C=C", "ethene"),
     ("CC=CC", "but-2-ene"),
-    ("C#C", "ethyne"),
+    ("C#C", "acetylene"),  # retained name (P-31.1.2.1 PIN)
 
     # Nitriles and amides
     ("CC#N", "acetonitrile"),
@@ -631,11 +631,11 @@ PHASE24_PARSE_FIXES = [
     ),
 
     # Additional stability checks
-    # S1: Simple methoxy stays unchanged (no over-bracketing)
+    # S1: Anisole (retained name, P-34.1.1.4 PIN)
     (
         "COc1ccccc1",
-        "methoxybenzene",
-        "stability-methoxy-no-brackets",
+        "anisole",
+        "stability-anisole-retained-name",
     ),
     # S2: acetyloxybenzene stays correct
     (

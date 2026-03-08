@@ -68,10 +68,11 @@ class TestNoBareOxy:
         )
 
     def test_no_bare_oxy_methoxybenzene(self):
-        """Methoxybenzene has 'methoxy', not bare 'oxy'."""
+        """Anisole (methoxybenzene) does not contain bare 'oxy'."""
         name = name_compound("COc1ccccc1")
-        assert "methoxy" in name.lower(), (
-            f"Expected 'methoxy' in '{name}'"
+        # Now returns "anisole" (retained name, P-34.1.1.4 PIN)
+        assert name == "anisole" or "methoxy" in name.lower(), (
+            f"Expected 'anisole' or 'methoxy' in '{name}'"
         )
         # Bare 'oxy' should not appear
         assert not re.search(r"(?:^|[-\s])oxy(?:$|[-\s])", name), (

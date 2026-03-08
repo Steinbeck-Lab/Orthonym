@@ -269,7 +269,7 @@ class TestZeroRegressionValidation:
             ("CCC", "propane"),
             ("CCCC", "butane"),
             ("C=C", "ethene"),
-            ("C#C", "ethyne"),
+            ("C#C", "acetylene"),  # retained name (P-31.1.2.1 PIN)
             ("CO", "methanol"),
             ("CCO", "ethanol"),
             ("C=O", "formaldehyde"),  # retained name
