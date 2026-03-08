@@ -389,3 +389,21 @@ class TestSMILESValidity:
         """Each new SMILES key must be RDKit canonical."""
         canon = Chem.CanonSmiles(smiles)
         assert smiles == canon, f"Non-canonical key: {smiles} -> {canon}"
+
+
+# ============================================================================
+# Test 9: Steroid Vocabulary Verification (DATA-03)
+# ============================================================================
+
+class TestSteroidVocabulary:
+    """Verify DATA-03: all 6 steroid stems present in NATURAL_PRODUCT_SCAFFOLDS."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("steroid_name", [
+        "gonane", "estrane", "androstane", "pregnane", "cholane", "cholestane",
+    ])
+    def test_steroid_in_scaffolds(self, steroid_name):
+        """Each steroid stem should appear in NATURAL_PRODUCT_SCAFFOLDS values."""
+        from orthonym.data.natural_products import NATURAL_PRODUCT_SCAFFOLDS
+        all_names = [v.get("name", "") for v in NATURAL_PRODUCT_SCAFFOLDS.values()]
+        assert steroid_name in all_names, f"Missing steroid: {steroid_name}"
