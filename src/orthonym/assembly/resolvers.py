@@ -96,7 +96,7 @@ def resolve_parent(features: Any, mol: Any) -> ParentInfo:
         1. polycyclic_name set -> polycyclic_aromatic
         2. is_cyclic and complex ring system -> complex_ring
         3. is_benzene -> benzene
-        4. ring_type == "heterocyclic" -> ring (heterocyclic)
+        4. ring_type startswith "heterocyclic" -> ring (heterocyclic_aromatic/heterocyclic_saturated)
         5. ring_type in (cycloalkane, cycloalkene, aromatic) -> ring
         6. principal_chain -> chain
         7. Fallback -> chain (methane)
@@ -154,7 +154,7 @@ def resolve_parent(features: Any, mol: Any) -> ParentInfo:
 
     # --- 4. Heterocyclic ring ---
     ring_type = getattr(features, 'ring_type', None)
-    if ring_type == 'heterocyclic':
+    if ring_type and ring_type.startswith('heterocyclic'):
         atom_count = _get_ring_atom_count(features, mol)
         atom_to_locant = _extract_heterocycle_locant_map(features)
         label = _get_heterocycle_label(features)

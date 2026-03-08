@@ -72,38 +72,48 @@ class TestRingClassification:
 
     @pytest.mark.unit
     def test_classify_oxolane(self):
-        """C1CCOC1 contains oxygen -> heterocyclic."""
+        """C1CCOC1 contains oxygen -> heterocyclic_saturated."""
         mol = Chem.MolFromSmiles("C1CCOC1")
         ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "heterocyclic"
+        result = classify_ring(mol, ring)
+        assert result == "heterocyclic_saturated"
+        assert result.startswith("heterocyclic")
 
     @pytest.mark.unit
     def test_classify_pyridine(self):
         """c1ccncc1 contains nitrogen (heterocyclic takes priority over aromatic)."""
         mol = Chem.MolFromSmiles("c1ccncc1")
         ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "heterocyclic"
+        result = classify_ring(mol, ring)
+        assert result == "heterocyclic_aromatic"
+        assert result.startswith("heterocyclic")
 
     @pytest.mark.unit
     def test_classify_piperidine(self):
-        """C1CCNCC1 is saturated heterocyclic -> heterocyclic."""
+        """C1CCNCC1 is saturated heterocyclic -> heterocyclic_saturated."""
         mol = Chem.MolFromSmiles("C1CCNCC1")
         ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "heterocyclic"
+        result = classify_ring(mol, ring)
+        assert result == "heterocyclic_saturated"
+        assert result.startswith("heterocyclic")
 
     @pytest.mark.unit
     def test_classify_furan(self):
-        """c1ccoc1 is aromatic heterocyclic -> heterocyclic."""
+        """c1ccoc1 is aromatic heterocyclic -> heterocyclic_aromatic."""
         mol = Chem.MolFromSmiles("c1ccoc1")
         ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "heterocyclic"
+        result = classify_ring(mol, ring)
+        assert result == "heterocyclic_aromatic"
+        assert result.startswith("heterocyclic")
 
     @pytest.mark.unit
     def test_classify_thiophene(self):
-        """c1ccsc1 is aromatic heterocyclic -> heterocyclic."""
+        """c1ccsc1 is aromatic heterocyclic -> heterocyclic_aromatic."""
         mol = Chem.MolFromSmiles("c1ccsc1")
         ring = mol.GetRingInfo().AtomRings()[0]
-        assert classify_ring(mol, ring) == "heterocyclic"
+        result = classify_ring(mol, ring)
+        assert result == "heterocyclic_aromatic"
+        assert result.startswith("heterocyclic")
 
 
 # ============================================================================

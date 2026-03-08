@@ -361,17 +361,22 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
     Classify a ring by its chemical type.
 
     Classification order (check in this order):
-    1. Heterocyclic - contains non-carbon atoms
-    2. Aromatic - all atoms are aromatic (RDKit detection)
-    3. Cycloalkane - saturated, all carbon, no double bonds
-    4. Cycloalkene - unsaturated, all carbon, has double bonds but not aromatic
+    1. Heterocyclic aromatic - contains non-carbon atoms AND all atoms aromatic
+    2. Heterocyclic saturated - contains non-carbon atoms AND not all aromatic
+    3. Aromatic - all atoms are aromatic (RDKit detection), carbocyclic
+    4. Cycloalkane - saturated, all carbon, no double bonds
+    5. Cycloalkene - unsaturated, all carbon, has double bonds but not aromatic
+
+    All heterocyclic return values start with 'heterocyclic' so callers can use
+    ``ring_type.startswith('heterocyclic')`` for backward-compatible matching.
 
     Args:
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices defining the ring
 
     Returns:
-        Classification string: 'heterocyclic', 'aromatic', 'cycloalkane', or 'cycloalkene'
+        Classification string: 'heterocyclic_aromatic', 'heterocyclic_saturated',
+        'aromatic', 'cycloalkane', or 'cycloalkene'
 
     Examples:
         >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
@@ -380,10 +385,18 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
         >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
         >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
         'aromatic'
+        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
+        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        'heterocyclic_aromatic'
+        >>> mol = Chem.MolFromSmiles('C1CCNCC1')  # piperidine
+        >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
+        'heterocyclic_saturated'
     """
     # Check heterocyclic first (highest priority)
     if is_heterocyclic(mol, ring_atoms):
-        return 'heterocyclic'
+        if is_aromatic_ring(mol, ring_atoms):
+            return 'heterocyclic_aromatic'
+        return 'heterocyclic_saturated'
 
     # Check aromatic (carbocyclic)
     if is_aromatic_ring(mol, ring_atoms):

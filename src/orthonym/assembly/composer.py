@@ -741,7 +741,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
     if features.principal_group == 'thioether':
         ring_type = getattr(features, 'ring_type', None)
-        if ring_type != 'heterocyclic':
+        if not (ring_type and ring_type.startswith('heterocyclic')):
             # Guard: skip known fused heterocycles (phenothiazine, thianthrene)
             # These contain S atoms that match thioether SMARTS but should use
             # their retained fused heterocycle names, not functional class sulfide naming.
@@ -907,7 +907,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
         # Only reached if not a complex fused system
         ring_type = getattr(features, 'ring_type', None)
-        if ring_type == 'heterocyclic':
+        if ring_type and ring_type.startswith('heterocyclic'):
             # Safety net: check if this heterocycle is actually a lactone
             # (catches cases where lactone detection in ester routing was bypassed)
             from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
@@ -3293,7 +3293,7 @@ def _generate_ring_parent(features: Any) -> NameFragment:
         # TODO: Implement aromatic naming (Plan 02-04)
         return NameFragment(text="cyclo", fragment_type="parent")
 
-    elif ring_type == 'heterocyclic':
+    elif ring_type and ring_type.startswith('heterocyclic'):
         # TODO: Implement heterocyclic naming (Phase 3)
         return NameFragment(text="cyclo", fragment_type="parent")
 

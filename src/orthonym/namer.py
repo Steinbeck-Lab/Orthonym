@@ -52,7 +52,7 @@ class MolecularFeatures:
     all_ring_atoms: frozenset = field(default_factory=frozenset)  # All atoms in all ring systems (fused/bridged/spiro merged)
     is_cyclic: bool = False
     is_aromatic: bool = False
-    ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic'
+    ring_type: Optional[str] = None  # 'cycloalkane', 'cycloalkene', 'aromatic', 'heterocyclic_aromatic', 'heterocyclic_saturated'
     principal_ring: Optional[tuple] = None  # Atom indices of the principal ring
     senior_ring_system: Optional[tuple] = None  # P-44.2 most senior ring system (atom indices)
     oriented_ring: Optional[List[int]] = None  # Ring atoms reordered for naming
@@ -815,7 +815,7 @@ class Orthonym:
                     features.benzene_substituents = get_benzene_substituents(
                         features.mol, features.principal_ring
                     )
-                elif features.ring_type == 'heterocyclic':
+                elif features.ring_type and features.ring_type.startswith('heterocyclic'):
                     # Heterocyclic ring: classify, detect substituents, and orient
                     from .rules.heterocycles import (
                         classify_heterocycle,
