@@ -686,6 +686,34 @@ class TestPseudoasymmetricPreservation:
         cip = centers[0]['cip']
         assert cip in ('R', 'S', 'r', 's'), f"CIP code should be valid: {cip}"
 
+    def test_intraring_small_ring_no_ez(self):
+        """Double bonds in small rings (<=8) should NOT produce E/Z descriptors."""
+        mol = Chem.MolFromSmiles('C1=CCCCC1')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6}
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
+        ez_descriptors = [d for d in descriptors if d[1] in ('E', 'Z')]
+        assert len(ez_descriptors) == 0, f"Unexpected E/Z in cyclohexene: {ez_descriptors}"
+
+    def test_ez_uses_cipcode_on_bond(self):
+        """E/Z collection uses _CIPCode property on bonds, not BondStereo enum."""
+        mol = Chem.MolFromSmiles('C/C=C/C')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        ez_bond = None
+        for bond in mol.GetBonds():
+            if bond.HasProp('_CIPCode'):
+                ez_bond = bond
+                break
+        assert ez_bond is not None, "rdCIPLabeler should set _CIPCode on E/Z bond"
+        assert ez_bond.GetProp('_CIPCode') == 'E'
+
+        atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4}
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        assert descriptors == [(2, 'E')]
+
     def test_collect_stereodescriptors_preserves_cip_case(self):
         """collect_stereodescriptors preserves CIP code case (no forced upper)."""
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')

@@ -80,9 +80,8 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     """
     Get E/Z configuration of double bonds.
 
-    Uses the _CIPCode property set by rdCIPLabeler as the primary source
-    (more reliable than BondStereo for complex molecules), with fallback
-    to BondStereo enum values.
+    Uses the _CIPCode property set by rdCIPLabeler as the sole source
+    of E/Z labels. BondStereo fallback was removed in Phase 92-03.
 
     Args:
         mol: RDKit Mol object (stereochemistry should be assigned via

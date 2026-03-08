@@ -9,6 +9,7 @@ Tests end-to-end name generation for:
 """
 
 import pytest
+from rdkit import Chem
 from src.orthonym import name_compound
 
 
@@ -236,6 +237,46 @@ class TestDescriptorFormat:
         assert result.startswith('(2Z)-')
 
 
+class TestEZUnification:
+    """Tests verifying E/Z uses _CIPCode exclusively (Phase 92-03)."""
+
+    def test_no_ez_for_cyclohexene(self):
+        """Intraring double bond in cyclohexene gets no E/Z descriptor."""
+        result = name_compound('C1=CCCCC1')
+        assert 'E' not in result and 'Z' not in result, f"False E/Z in cyclohexene: {result}"
+
+    def test_no_ez_for_cyclopentene(self):
+        """Intraring double bond in cyclopentene gets no E/Z descriptor."""
+        result = name_compound('C1=CCCC1')
+        assert 'E' not in result and 'Z' not in result, f"False E/Z in cyclopentene: {result}"
+
+    def test_ez_uses_cip_code_directly(self):
+        """get_stereodescriptor_string uses _CIPCode on bonds, not BondStereo."""
+        from src.orthonym.perception.stereo import get_stereodescriptor_string
+        from rdkit.Chem import rdCIPLabeler
+
+        mol = Chem.MolFromSmiles('C/C=C/C')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # Verify bond has _CIPCode set
+        for bond in mol.GetBonds():
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                assert bond.HasProp('_CIPCode'), "rdCIPLabeler should set _CIPCode on E/Z bonds"
+                assert bond.GetProp('_CIPCode') == 'E'
+
+        locant_map = {0: 1, 1: 2, 2: 3, 3: 4}
+        result = get_stereodescriptor_string(mol, locant_map)
+        assert '(2E)-' == result, f"Expected (2E)- but got {result}"
+
+    def test_e_alkene_end_to_end(self):
+        """E-but-2-ene named correctly end-to-end."""
+        assert name_compound('C/C=C/C') == '(2E)-but-2-ene'
+
+    def test_z_alkene_end_to_end(self):
+        """Z-but-2-ene named correctly end-to-end."""
+        assert name_compound('C/C=C\\C') == '(2Z)-but-2-ene'
+
+
 class TestSpecificCompounds:
     """Tests for specific named compounds."""
 
@@ -266,3 +307,80 @@ class TestSpecificCompounds:
         """Verify Z-but-2-ene exact output."""
         result = name_compound('C/C=C\\C')
         assert result == '(2Z)-but-2-ene'
+
+
+# =============================================================================
+# OPSIN Round-Trip Regression Tests (Phase 92-03, QUAL-04)
+# =============================================================================
+
+import subprocess
+import os
+import glob as glob_module
+
+
+def _find_opsin_jar():
+    """Find OPSIN JAR file."""
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    patterns = [
+        os.path.join(project_root, "opsin-cli-*-jar-with-dependencies.jar"),
+        os.path.join(project_root, "opsin", "opsin-cli", "target", "opsin-cli-*-jar-with-dependencies.jar"),
+    ]
+    for pat in patterns:
+        matches = glob_module.glob(pat)
+        if matches:
+            return matches[0]
+    return None
+
+
+def _opsin_parse(name, opsin_jar):
+    """Parse a name with OPSIN, return SMILES or None."""
+    try:
+        result = subprocess.run(
+            ["java", "-jar", opsin_jar, "-osmi"],
+            input=name, capture_output=True, text=True, timeout=10
+        )
+        smiles = result.stdout.strip()
+        return smiles if smiles and smiles != "" else None
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+
+_opsin_jar = _find_opsin_jar()
+_has_opsin = _opsin_jar is not None
+
+
+@pytest.mark.skipif(not _has_opsin, reason="OPSIN JAR not found")
+class TestStereoOpsinRoundtrip:
+    """OPSIN round-trip regression tests for stereo naming (QUAL-04)."""
+
+    @pytest.mark.parametrize("smiles,expected_name", [
+        ('C/C=C/C', '(2E)-but-2-ene'),
+        ('C/C=C\\C', '(2Z)-but-2-ene'),
+        ('C/C=C/CC', '(2E)-pent-2-ene'),
+        ('CC/C=C\\CC', '(3Z)-hex-3-ene'),
+    ])
+    def test_ez_roundtrip(self, smiles, expected_name):
+        """E/Z compound names parse with OPSIN."""
+        result = name_compound(smiles)
+        assert result == expected_name, f"Name mismatch: {result} != {expected_name}"
+        opsin_smiles = _opsin_parse(result, _opsin_jar)
+        assert opsin_smiles, f"OPSIN failed to parse: {result}"
+        from rdkit import Chem as _C
+        mol_orig = _C.MolFromSmiles(smiles)
+        mol_rt = _C.MolFromSmiles(opsin_smiles)
+        if mol_orig and mol_rt:
+            can_orig = _C.MolToSmiles(mol_orig, isomericSmiles=False)
+            can_rt = _C.MolToSmiles(mol_rt, isomericSmiles=False)
+            assert can_orig == can_rt, f"Round-trip mismatch: {can_orig} != {can_rt}"
+
+    @pytest.mark.parametrize("smiles,expected_name", [
+        ('C[C@@H](O)CC', '(2R)-butan-2-ol'),
+        ('C[C@H](O)CC', '(2S)-butan-2-ol'),
+        ('C[C@H](O)[C@@H](O)C', '(2S,3S)-butane-2,3-diol'),
+    ])
+    def test_rs_roundtrip(self, smiles, expected_name):
+        """R/S compound names parse with OPSIN."""
+        result = name_compound(smiles)
+        assert result == expected_name, f"Name mismatch: {result} != {expected_name}"
+        opsin_smiles = _opsin_parse(result, _opsin_jar)
+        assert opsin_smiles, f"OPSIN failed to parse: {result}"
