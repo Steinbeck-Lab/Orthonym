@@ -17,6 +17,7 @@ Original 75:
 Phase 49 additions: 10 compounds from missing compound classes (CLS-01 to CLS-05)
 Phase 50 additions: 3 compounds from decomposition format fixes (ether/alkoxy)
 Phase 83 additions: 19 compounds from v9.0 canary expansion (coverage-based + anchors)
+Phase 95 additions: 2 compounds newly RT-matching in v10.0 (steroid + epoxycyclohexane)
 """
 
 import os
@@ -31,7 +32,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 202 golden canary compounds: (SMILES, expected_name)
+# 204 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
@@ -39,6 +40,7 @@ from orthonym import name_compound
 # + 15 from Phase 67 (v7.0 Final Benchmark)
 # + 25 from Phase 73 (v8.0 Closure: phase improvements + failure sentinels)
 # + 19 from Phase 83 (v9.0 canary expansion: coverage-based + benchmark anchors)
+# + 2 from Phase 95 (v10.0 newly RT-matching compounds)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -892,6 +894,15 @@ CANARY_COMPOUNDS = [
         r"C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\C)CC/C=C(\C)CC[C@H]12",
         "(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene",
     ),
+    # --- Phase 95: v10.0 canary expansion (2 newly RT-matching compounds) ---
+    (
+        "CO[C@@H](C=C(C)C)C[C@H](C)[C@@H]1CC[C@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)[C@H]3CC[C@@]12C",
+        "(5R,9R,10R,13S,14S,17S,20S,23R)-23-methoxy-4,4,14-trimethylcholesta-7,24-dien-3-one",
+    ),
+    (
+        "O[C@H]1[C@H](O)[C@@H](O)[C@@H]2O[C@@H]2[C@@H]1O",
+        "(1R,2R,3S,4S,5R,6S)-2,3,4,5-tetrahydroxy-7-oxa-bicyclo[4.1.0]heptane",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -902,8 +913,8 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt202(smiles, expected_name):
-    """Golden canary test: verify round-trip-matching compound still names correctly (202 compounds)."""
+def test_canary_rt204(smiles, expected_name):
+    """Golden canary test: verify round-trip-matching compound still names correctly (204 compounds)."""
     result = name_compound(smiles)
     assert result == expected_name, (
         f"CANARY REGRESSION: {smiles}\n"
