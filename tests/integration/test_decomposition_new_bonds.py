@@ -448,11 +448,12 @@ class TestCoverageGate:
         """Functional class names like 'phenyl palmitate' pass the gate.
 
         This was the key insight from Plan 02: functional class names are
-        inherently compact (0.6-0.8 chars/HA).
+        inherently compact (0.6-0.8 chars/HA). With tiered thresholds
+        (Phase 099), ester bond type uses 0.6 threshold.
         """
         mol = _mol("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # phenyl palmitate, 24 HA
         # "phenyl palmitate" = 16 chars for 24 HA = 0.67 chars/HA > 0.6
-        assert _coverage_is_adequate("phenyl palmitate", mol)
+        assert _coverage_is_adequate("phenyl palmitate", mol, bond_type="ester")
 
 
 # ============================================================================

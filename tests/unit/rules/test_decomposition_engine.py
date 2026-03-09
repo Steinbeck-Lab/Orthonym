@@ -394,18 +394,23 @@ class TestCoverageGate:
         assert _coverage_is_adequate("x", mol) is True
 
     def test_large_molecule_adequate_name_passes(self):
-        """A 30-atom molecule with a long descriptive name passes."""
-        # 30 heavy atoms: need len >= 30 * 0.6 = 18 chars
+        """A 30-atom molecule with a long descriptive name passes.
+
+        With tiered thresholds (Phase 099), default bond_type uses 0.8:
+        30 * 0.8 = 24. Ester bond_type uses 0.6: 30 * 0.6 = 18.
+        """
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # triacontane, 30C
-        long_name = "triacontane-1,2-diol"  # 20 chars >= 18
+        long_name = "triacontane-1,2-diol"  # 20 chars >= 18 (ester threshold)
         long_name2 = "1,2,3,4,5,6,7,8,9,10-decamethyltriacontane"  # 43 chars
-        assert _coverage_is_adequate(long_name, large_mol) is True
+        # With ester bond_type (0.6 threshold), 20 chars passes
+        assert _coverage_is_adequate(long_name, large_mol, bond_type="ester") is True
+        # Long name passes even default (0.8) threshold: 43 >= 24
         assert _coverage_is_adequate(long_name2, large_mol) is True
 
     def test_large_molecule_short_name_rejected(self):
         """A 30-atom molecule with a very short name is rejected."""
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")  # 30 heavy atoms
-        short_name = "methane"  # 7 chars << 18 expected min (30 * 0.6)
+        short_name = "methane"  # 7 chars << 24 expected min (30 * 0.8)
         assert _coverage_is_adequate(short_name, large_mol) is False
 
     def test_empty_name_rejected(self):
@@ -419,14 +424,19 @@ class TestCoverageGate:
         assert _coverage_is_adequate(None, mol) is False
 
     def test_medium_molecule_borderline(self):
-        """A medium molecule (15 heavy atoms) with borderline name length."""
-        # 15 heavy atoms: need len >= 15 * 0.6 = 9 chars
+        """A medium molecule (15 heavy atoms) with borderline name length.
+
+        With tiered thresholds (Phase 099):
+        - Default (substitutive): 15 * 0.8 = 12 chars min
+        - Ester (functional-class): 15 * 0.6 = 9 chars min
+        """
         mol = _mol("CCCCCCCCCCCCCCC")  # pentadecane, 15 heavy atoms
-        # "pentadecane" = 11 chars >= 9, passes
-        assert _coverage_is_adequate("pentadecane", mol) is True
-        # Very short name rejected (5 chars < 9)
+        # "pentadecane" = 11 chars: passes 0.6 (ester), fails 0.8 (default)
+        assert _coverage_is_adequate("pentadecane", mol, bond_type="ester") is True
+        assert _coverage_is_adequate("pentadecane", mol) is False  # 11 < 12
+        # Very short name rejected at both thresholds (5 chars < 9)
         assert _coverage_is_adequate("short", mol) is False
-        # A more descriptive name also passes (27 chars >= 9)
+        # A more descriptive name passes even default threshold (27 chars >= 12)
         assert _coverage_is_adequate("2,3,4,5-tetramethylundecane", mol) is True
 
     def test_retained_core_name_on_large_mol(self):

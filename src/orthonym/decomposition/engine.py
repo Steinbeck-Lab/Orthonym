@@ -26,6 +26,17 @@ MAX_BOND_RETRY_ATTEMPTS = 5  # Max bonds to try when multi-bond retry is active
 
 
 # ---------------------------------------------------------------------------
+# Bond type classification for tiered coverage thresholds
+# ---------------------------------------------------------------------------
+
+# Functional-class bond types produce compact names (e.g., "phenyl palmitate")
+# and use a lower chars/HA coverage threshold (0.6).
+# Substitutive bond types (sulfonamide, phosphodiester, ether, default) produce
+# longer names and require a higher threshold (0.8).
+_FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate", "thioester"})
+
+
+# ---------------------------------------------------------------------------
 # Retained-name whitelist for quality gate
 # ---------------------------------------------------------------------------
 
@@ -313,7 +324,7 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
 # Coverage-based quality gate for decomposition results
 # ---------------------------------------------------------------------------
 
-def _coverage_is_adequate(name: str, mol) -> bool:
+def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     """Check if a decomposed name covers enough of the molecule.
 
     Uses name length as a proxy for atom coverage: a well-named molecule
@@ -321,18 +332,18 @@ def _coverage_is_adequate(name: str, mol) -> bool:
     parent name, substituents). Names with less than the expected minimum
     length are considered inadequate coverage.
 
-    NOTE: The locked decision specified leveraging coverage_scoring.py's
-    retrieve_confidence(). However, retrieve_confidence() is only populated
-    by the composer pipeline (compute_confidence()), not the decomposition
-    path. This heuristic achieves the same rejection goal without requiring
-    architectural changes to thread confidence through decomposition.
-    See 87-RESEARCH.md Open Question 2.
+    Tiered thresholds (Phase 099):
+    - Functional-class types (ester, amide, glycosidic, carbamate, thioester)
+      use 0.6 chars/HA -- these produce compact names like "phenyl palmitate".
+    - Substitutive types (sulfonamide, phosphodiester, ether, default)
+      use 0.8 chars/HA -- these produce longer substitutive names.
 
     Applied ONLY to decomposition results, NOT to existing pipeline names.
 
     Args:
         name: The decomposition-produced name (may be None).
         mol: RDKit Mol object for the molecule.
+        bond_type: Bond type string from bond info dict (default="" uses 0.8).
 
     Returns:
         True if coverage is adequate.
@@ -348,13 +359,11 @@ def _coverage_is_adequate(name: str, mol) -> bool:
     if heavy_atoms <= 10:
         return True
 
-    # Heuristic: expect ~2.0 chars per heavy atom for a substitutive name.
-    # However, functional class names (ester/amide decomposition) are more
-    # compact (e.g., "phenyl palmitate" = 16 chars for 24 heavy atoms = 0.67).
-    # Use 0.6 chars/HA threshold to avoid false positives on valid compact
-    # names while still catching truly inadequate coverage (e.g., "methane"
-    # for a 30-atom molecule = 0.23 chars/HA).
-    expected_min = int(heavy_atoms * 0.6)
+    # Tiered threshold: functional-class bond types produce compact names
+    # (e.g., "phenyl palmitate" = 0.67 chars/HA) and use a lower threshold.
+    # Substitutive bond types produce longer names and need a higher threshold.
+    threshold = 0.6 if bond_type in _FUNCTIONAL_CLASS_TYPES else 0.8
+    expected_min = int(heavy_atoms * threshold)
     return len(name) >= expected_min
 
 
@@ -680,7 +689,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
 
     # Coverage gate: reject decomposition results that don't cover enough
     # of the molecule's heavy atoms (applied only to decomposition output).
-    if single_result and not _coverage_is_adequate(single_result, mol):
+    if single_result and not _coverage_is_adequate(single_result, mol, bond_type=best_bond["type"]):
         single_result = None  # Coverage inadequate, discard this result
 
     # DECP-05: single-bond path returns result directly (backward compat).
@@ -708,7 +717,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         tried_indices.add(bond["bond_idx"])
         alt_result = _try_single_bond_decompose(mol, bond, style)
         # Coverage gate on retry results
-        if alt_result and not _coverage_is_adequate(alt_result, mol):
+        if alt_result and not _coverage_is_adequate(alt_result, mol, bond_type=bond["type"]):
             continue
         if alt_result and _name_quality_is_acceptable(alt_result, mol):
             # Also check that the alternative is not worse than existing name
