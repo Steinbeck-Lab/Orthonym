@@ -687,10 +687,9 @@ def _try_neutralize_and_name(mol) -> str:
         if not neutral_smiles:
             return ''
 
-        # Use namer to name the neutral form (deferred import to avoid circular)
-        from ..namer import Orthonym
-        namer = Orthonym(style='pin')
-        neutral_name = namer.name(neutral_smiles)
+        # Use unified fragment naming (cycle-detected, session-cached)
+        from ..assembly.fragment_naming import name_fragment_recursively
+        neutral_name = name_fragment_recursively(neutral_smiles)
         if neutral_name:
             return neutral_name
     except (RecursionError, ValueError, RuntimeError):
@@ -1042,9 +1041,8 @@ def _neutralize_carboxylate_to_acid(mol, anion_site: Dict) -> str:
         if not neutral_smiles:
             return ''
 
-        from ..namer import Orthonym
-        namer = Orthonym(style='pin')
-        acid_name = namer.name(neutral_smiles)
+        from ..assembly.fragment_naming import name_fragment_recursively
+        acid_name = name_fragment_recursively(neutral_smiles)
         if acid_name and ('oic acid' in acid_name or 'ic acid' in acid_name):
             return acid_name
     except (RecursionError, ValueError, RuntimeError):
@@ -1257,9 +1255,8 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
 
         neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
         if neutral_smiles:
-            from ..namer import Orthonym
-            namer = Orthonym(style='pin')
-            amine_name = namer.name(neutral_smiles)
+            from ..assembly.fragment_naming import name_fragment_recursively
+            amine_name = name_fragment_recursively(neutral_smiles)
             if amine_name:
                 # Convert amine suffix to aminium
                 aminium_name = name_aminium_cation(amine_name)

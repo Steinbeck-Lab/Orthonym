@@ -184,9 +184,8 @@ def name_salt(mol, style: str = 'pin') -> str:
                 main_frag = max(organic_neutrals,
                                 key=lambda f: f['mol'].GetNumHeavyAtoms())
                 try:
-                    from ..namer import Orthonym
-                    namer = Orthonym(style=style)
-                    organic_name = namer.name(main_frag['smiles'])
+                    from ..assembly.fragment_naming import name_fragment_recursively
+                    organic_name = name_fragment_recursively(main_frag['smiles'])
                     if organic_name:
                         salt_suffix = ' '.join(sorted(hydroacid_names))
                         return f"{organic_name} {salt_suffix}"
@@ -380,9 +379,8 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         try:
             neutral_smiles = Chem.MolToSmiles(neutral_mol, canonical=True)
             if neutral_smiles:
-                from ..namer import Orthonym
-                namer = Orthonym(style=style)
-                neutral_name = namer.name(neutral_smiles)
+                from ..assembly.fragment_naming import name_fragment_recursively
+                neutral_name = name_fragment_recursively(neutral_smiles)
                 if neutral_name and neutral_name != 'zwitterion':
                     return neutral_name
         except (RecursionError, ValueError, RuntimeError):
@@ -478,9 +476,8 @@ def _name_as_neutral(mol, style: str) -> str:
         if not neutral_smiles:
             return ''
 
-        from ..namer import Orthonym
-        namer = Orthonym(style=style)
-        neutral_name = namer.name(neutral_smiles)
+        from ..assembly.fragment_naming import name_fragment_recursively
+        neutral_name = name_fragment_recursively(neutral_smiles)
         # Guard: never return 'zwitterion' from the neutral naming path
         if neutral_name and neutral_name != 'zwitterion':
             return neutral_name

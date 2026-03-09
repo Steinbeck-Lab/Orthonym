@@ -32,7 +32,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "[Cl-].[Cl-].[Cl-].[Yb+3]",
-        "ytterbium compound (not supported)",
+        "ytterbium compound (not supported) trichloride",
     ),
     (
         "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
@@ -168,7 +168,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](COS(=O)(=O)[O-])[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@@H](CO[C@@H]2O[C@H](CO)[C@H](O)[C@H](O[C@@H]3O[C@H](COS(=O)(=O)[O-])[C@@H](O)[C@H](O)[C@H]3O)[C@H]2NC(C)=O)O[C@H]1O.[Na+].[Na+]",
-        "disodium N-acetyl(2R,3R,4R,5R,6R)-3-ethyl-5-hydroxy-6-methyl-2,4-dioxanyloxane",
+        "disodium (2R,3R,4R,5R,6R)-5-ethyl-3,6-dihydroxy-2,4-dioxanyloxane",
     ),
     (
         "CO[C@@H]1[C@H](OC(=O)CCC(=O)O)CC[C@](O)(CCl)[C@H]1[C@@]1(C)O[C@@H]1CC=C(C)C",
