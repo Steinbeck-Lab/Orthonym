@@ -65,6 +65,88 @@ class TestNamePipelineOnly:
         assert depth_after == depth_before
 
 
+class TestTieredCoverage:
+    """Tests for tiered coverage threshold based on bond type.
+
+    Functional-class types (ester, amide, glycosidic, carbamate, thioester)
+    use 0.6 chars/HA threshold. Substitutive types (sulfonamide,
+    phosphodiester, ether, default) use 0.8 chars/HA threshold.
+    """
+
+    @pytest.mark.unit
+    def test_ester_uses_lower_threshold(self):
+        """Ester bond type should use 0.6 chars/HA threshold."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        # "phenyl palmitate" = 16 chars, 24 HA => 0.67 chars/HA
+        # Passes 0.6 threshold, fails 0.8 threshold
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # ~24 HA
+        assert _coverage_is_adequate("phenyl palmitate", mol, bond_type="ester") is True
+
+    @pytest.mark.unit
+    def test_ester_rejects_too_short(self):
+        """Even with 0.6 threshold, very short names should be rejected."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # ~24 HA
+        assert _coverage_is_adequate("short", mol, bond_type="ester") is False
+
+    @pytest.mark.unit
+    def test_sulfonamide_uses_higher_threshold(self):
+        """Sulfonamide bond type should use 0.8 chars/HA threshold."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        # "phenyl palmitate" = 16 chars, 24 HA => 0.67 chars/HA
+        # Fails 0.8 threshold
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # ~24 HA
+        assert _coverage_is_adequate("phenyl palmitate", mol, bond_type="sulfonamide") is False
+
+    @pytest.mark.unit
+    def test_sulfonamide_passes_with_long_name(self):
+        """Sulfonamide with adequate length should pass 0.8 threshold."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        # "N-methylbenzenesulfonamide" = 25 chars, 20 HA => 1.25 chars/HA
+        mol = Chem.MolFromSmiles("CS(=O)(=O)c1ccc(C)c(C)c1NC")  # ~20 HA approx
+        ha = mol.GetNumHeavyAtoms()
+        name = "N-methylbenzenesulfonamide"
+        # Ensure the molecule has enough HA to test meaningfully (>10)
+        assert ha > 10, f"Need HA > 10 for test, got {ha}"
+        assert _coverage_is_adequate(name, mol, bond_type="sulfonamide") is True
+
+    @pytest.mark.unit
+    def test_small_molecule_exemption_ester(self):
+        """Small molecules (HA <= 10) should always pass regardless of bond type."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        mol = Chem.MolFromSmiles("CC(=O)OC")  # methyl acetate, ~5 HA
+        assert mol.GetNumHeavyAtoms() <= 10
+        assert _coverage_is_adequate("anything", mol, bond_type="ester") is True
+
+    @pytest.mark.unit
+    def test_small_molecule_exemption_default(self):
+        """Small molecules should pass even with empty bond_type."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        mol = Chem.MolFromSmiles("CCCCCC")  # hexane, 6 HA
+        assert mol.GetNumHeavyAtoms() <= 10
+        assert _coverage_is_adequate("anything", mol, bond_type="") is True
+
+    @pytest.mark.unit
+    def test_default_bond_type_uses_high_threshold(self):
+        """No bond_type (default="") should use 0.8 threshold for backward compat."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        # "phenyl palmitate" = 16 chars, 24 HA => 0.67 chars/HA
+        # Should fail 0.8 threshold
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")
+        assert _coverage_is_adequate("phenyl palmitate", mol) is False
+
+    @pytest.mark.unit
+    def test_each_functional_class_type_uses_low_threshold(self):
+        """All 5 functional-class types should use 0.6 threshold."""
+        from orthonym.decomposition.engine import _coverage_is_adequate
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # ~24 HA
+        # "phenyl palmitate" = 16 chars => 0.67 chars/HA, passes 0.6 but fails 0.8
+        for bond_type in ("ester", "amide", "glycosidic", "carbamate", "thioester"):
+            assert _coverage_is_adequate("phenyl palmitate", mol, bond_type=bond_type) is True, (
+                f"bond_type={bond_type} should use 0.6 threshold"
+            )
+
+
 class TestProbeIntegration:
     """Integration tests verifying the probe replacement in try_decompose().
 
