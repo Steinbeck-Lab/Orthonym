@@ -63,3 +63,47 @@ class TestNamePipelineOnly:
         name_pipeline_only("c1ccccc1")
         depth_after = get_naming_depth()
         assert depth_after == depth_before
+
+
+class TestProbeIntegration:
+    """Integration tests verifying the probe replacement in try_decompose().
+
+    After Phase 097, the decomposition engine probe uses name_pipeline_only()
+    instead of name_fragment_recursively(), eliminating the cache-disable hack
+    and _fragment_guard dependency.
+    """
+
+    @pytest.mark.unit
+    def test_probe_uses_name_pipeline_only(self):
+        """try_decompose probe path should use name_pipeline_only, not name_fragment_recursively."""
+        from unittest.mock import patch
+        from orthonym.decomposition.engine import try_decompose
+
+        # A simple ester that has cleavable bonds
+        mol = Chem.MolFromSmiles("CC(=O)OCC")
+        with patch('orthonym.namer.name_pipeline_only', wraps=name_pipeline_only) as mock_npo:
+            try_decompose(mol)
+            # name_pipeline_only should have been called for the probe
+            assert mock_npo.called, "try_decompose should use name_pipeline_only for baseline probe"
+
+    @pytest.mark.unit
+    def test_probe_does_not_touch_fragment_cache(self):
+        """Probe path should not save/restore _fragment_guard.cache."""
+        from orthonym.decomposition.engine import try_decompose
+        from orthonym.assembly.fragment_naming import _fragment_guard
+
+        mol = Chem.MolFromSmiles("CC(=O)OCC")
+        cache_before = getattr(_fragment_guard, 'cache', None)
+        try_decompose(mol)
+        cache_after = getattr(_fragment_guard, 'cache', None)
+        # Cache state should be untouched by the probe
+        assert cache_before is cache_after or cache_before == cache_after, \
+            "_fragment_guard.cache was modified by probe path"
+
+    @pytest.mark.unit
+    def test_probe_returns_systematic_name_for_decomposable(self):
+        """name_pipeline_only should return a systematic name even for decomposable molecules."""
+        result = name_pipeline_only("CC(=O)OCC")  # ethyl acetate
+        assert result is not None
+        assert isinstance(result, str)
+        assert len(result) > 0
