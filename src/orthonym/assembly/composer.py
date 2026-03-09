@@ -1120,9 +1120,9 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
         return None
 
     # Name the parent carbonyl by recursion
-    from ..namer import name_compound
+    from .fragment_naming import name_fragment_recursively
     try:
-        parent_name = name_compound(modified_smiles)
+        parent_name = name_fragment_recursively(modified_smiles)
     except Exception:
         return None
 
@@ -1162,9 +1162,9 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
 # N-oxide naming (functional class: "pyridine 1-oxide", "trimethylamine N-oxide")
 # ============================================================================
 
-# Recursion guard for N-oxide naming (prevents infinite loop when naming base compound)
-import threading as _threading
-_n_oxide_guard = _threading.local()
+# N-oxide naming uses is_top_level_naming() from fragment_naming to prevent
+# infinite recursion. N-oxide functional class naming only runs at top level;
+# during fragment naming, N-oxides are named as prefixes instead (correct IUPAC).
 
 
 def _try_name_n_oxide(features: Any) -> Optional[str]:
@@ -1182,8 +1182,10 @@ def _try_name_n_oxide(features: Any) -> Optional[str]:
     Returns:
         Functional class name, or None if not an N-oxide.
     """
-    # Recursion guard: if we're already naming a base compound, skip
-    if getattr(_n_oxide_guard, 'active', False):
+    # Only apply N-oxide functional class naming at top level.
+    # During fragment naming, N-oxides are named as prefixes instead.
+    from .fragment_naming import is_top_level_naming
+    if not is_top_level_naming():
         return None
 
     from rdkit import Chem
@@ -1240,14 +1242,11 @@ def _name_aromatic_n_oxide(mol, matches) -> Optional[str]:
         return None
 
     # Name the base compound recursively
-    from ..namer import name_compound
-    _n_oxide_guard.active = True
+    from .fragment_naming import name_fragment_recursively
     try:
-        base_name = name_compound(modified_smiles)
+        base_name = name_fragment_recursively(modified_smiles)
     except Exception:
         return None
-    finally:
-        _n_oxide_guard.active = False
 
     if not base_name:
         return None
@@ -1288,14 +1287,11 @@ def _name_aliphatic_n_oxide(mol, matches) -> Optional[str]:
         return None
 
     # Name the base amine recursively
-    from ..namer import name_compound
-    _n_oxide_guard.active = True
+    from .fragment_naming import name_fragment_recursively
     try:
-        base_name = name_compound(modified_smiles)
+        base_name = name_fragment_recursively(modified_smiles)
     except Exception:
         return None
-    finally:
-        _n_oxide_guard.active = False
 
     if not base_name:
         return None
@@ -4993,8 +4989,8 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 _fa = sorted(_af | {_oh, _hh})
                 _fs = _Ch.MolFragmentToSmiles(_rw, _fa, canonical=True)
                 if _fs:
-                    from ..namer import name_compound as _ncf
-                    _an = _ncf(_fs)
+                    from .fragment_naming import name_fragment_recursively
+                    _an = name_fragment_recursively(_fs)
                     if _an:
                         from ..decomposition.fragment_assembly import (
                             _acid_to_acyl,
