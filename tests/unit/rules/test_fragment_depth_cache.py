@@ -2,7 +2,7 @@
 
 Tests the infrastructure in fragment_naming.py:
 - MAX_NAMING_DEPTH = 7 (legacy constant, kept for backward compatibility)
-- MAX_TOTAL_CALLS = 100 (constant available for future use)
+- Cycle-detection via visited-SMILES set
 - Canonical SMILES normalization before calling name_compound()
 - Cycle-guard compound regression tests (V8-DEPTH-01)
 """
@@ -10,7 +10,6 @@ Tests the infrastructure in fragment_naming.py:
 import pytest
 from orthonym.assembly.fragment_naming import (
     MAX_NAMING_DEPTH,
-    MAX_TOTAL_CALLS,
     _fragment_guard,
     _get_visited,
     name_fragment_recursively,
@@ -39,8 +38,6 @@ class TestConstants:
     def test_max_naming_depth_is_7(self):
         assert MAX_NAMING_DEPTH == 7
 
-    def test_max_total_calls_is_100(self):
-        assert MAX_TOTAL_CALLS == 100
 
     def test_basic_fragment_naming_ethanol(self):
         result = name_fragment_recursively("CCO")

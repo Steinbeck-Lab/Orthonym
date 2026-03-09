@@ -30,11 +30,9 @@ logger = logging.getLogger(__name__)
 
 _fragment_guard = _threading.local()
 
-# Legacy constant kept for backward compatibility — no longer enforced
-# as the primary guard. Cycle detection via visited set is the primary
-# mechanism. A safety-net size limit (_MAX_VISITED_SIZE) replaces this.
+# Preserved for any external code that imports this constant.
+# Not enforced internally — cycle detection via visited set is used.
 MAX_NAMING_DEPTH = 7
-MAX_TOTAL_CALLS = 100
 
 # Safety-net maximum: even without exact cycle, limit recursion depth
 # to prevent unbounded decomposition chains where every fragment SMILES
@@ -229,13 +227,13 @@ def is_top_level_naming() -> bool:
     return get_naming_depth() == 0
 
 
-def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) -> Optional[str]:
+def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
     """Name a molecular fragment with cycle-detection guard.
 
-    Uses a visited-SMILES set to detect and break circular recursion
-    instead of an arbitrary depth counter. Before naming a fragment,
-    checks if its canonical SMILES is already being processed up the
-    call stack. If yes (cycle detected), returns a cached name or None.
+    Uses a visited-SMILES set to detect and break circular recursion.
+    Before naming a fragment, checks if its canonical SMILES is already
+    being processed up the call stack. If yes (cycle detected), returns
+    a cached name or None.
 
     A safety-net maximum visited set size (_MAX_VISITED_SIZE=20) prevents
     unbounded recursion from decomposition chains where every fragment
@@ -245,7 +243,6 @@ def name_fragment_recursively(smiles: str, max_depth: int = MAX_NAMING_DEPTH) ->
 
     Args:
         smiles: SMILES string of the fragment to name.
-        max_depth: Legacy parameter, kept for API compatibility. Not enforced.
 
     Returns:
         IUPAC name if successful, None if cycle detected or naming fails.

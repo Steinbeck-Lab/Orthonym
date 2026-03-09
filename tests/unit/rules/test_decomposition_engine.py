@@ -17,7 +17,6 @@ from orthonym.decomposition.engine import (
     try_decompose,
 )
 from orthonym.assembly.fragment_naming import (
-    MAX_NAMING_DEPTH,
     _fragment_guard,
     _get_visited,
     get_naming_depth,
@@ -244,10 +243,6 @@ class TestRecursionDepth:
     def teardown_method(self):
         _fragment_guard.visited = set()
         _fragment_guard.cache = None
-
-    def test_max_naming_depth_constant_preserved(self):
-        """MAX_NAMING_DEPTH legacy constant should be 7."""
-        assert MAX_NAMING_DEPTH == 7
 
     def test_naming_works_without_cycle(self):
         """Fragment naming works when no cycle exists."""
