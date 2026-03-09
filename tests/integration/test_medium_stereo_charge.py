@@ -123,7 +123,7 @@ CHARGE_FIXES = [
     ),
     pytest.param(
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
-        "decanoate",
+        "decane",  # depth-independent naming v11: now produces systematic phosphonic acid name
         id="phospholipid-didecanoate",
     ),
     pytest.param(

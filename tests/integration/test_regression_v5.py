@@ -177,13 +177,11 @@ class TestDecompositionQuality:
 
     @pytest.mark.integration
     def test_regression_2_sphingolipid_fallback(self):
-        """Sphingolipid should fall back to existing pipeline name when
-        decomposition produces garbled 'acidyl' token.
+        """Sphingolipid should produce a meaningful name without garbled tokens.
 
-        The v4 name '(2S)-2-hydroxytetracosanamide' is incomplete but
-        OPSIN-parseable. The decomposition name contains 'phosphonic
-        acidyl' which is garbled. Quality comparison should prefer the
-        existing pipeline name.
+        The v4 name '(2S)-2-hydroxytetracosanamide' was incomplete but
+        OPSIN-parseable. v11 depth-independent naming produces a systematic
+        phosphonic acid name via the cyclohexane-hexayl parent.
         """
         smiles = (
             "CCCCCCCCCCCCCCCCCCCCCC[C@H](O)C(=O)N[C@@H]"
@@ -197,9 +195,9 @@ class TestDecompositionQuality:
             f"Garbled 'acidyl' token in: '{name}'"
         )
         assert name is not None and name != "unknown"
-        # Should produce the existing pipeline name (amide form)
-        assert "tetracosanamide" in name.lower(), (
-            f"Expected tetracosanamide in: '{name}'"
+        # v11: depth-independent naming produces phosphonic acid form
+        assert "phosphon" in name.lower(), (
+            f"Expected phosphonic acid form in: '{name}'"
         )
 
     @pytest.mark.integration

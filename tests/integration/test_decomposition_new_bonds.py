@@ -203,10 +203,10 @@ class TestEndToEndDecomposition:
     """End-to-end tests calling try_decompose() on representative molecules."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_s_methyl_thioacetate_decomposes(self):
         """S-methyl thioacetate (CC(=O)SC) should decompose to a thioester name."""
@@ -245,10 +245,10 @@ class TestThioesterEndToEnd:
     """End-to-end thioester tests with try_decompose."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_s_methyl_thioacetate_e2e(self):
         """S-methyl thioacetate (CC(=O)SC): thioester bond detected and named."""
@@ -273,10 +273,10 @@ class TestSulfonamideEndToEnd:
     """End-to-end sulfonamide tests with try_decompose."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_benzenesulfonamide_unsubstituted(self):
         """Benzenesulfonamide (c1ccc(cc1)S(=O)(=O)N) should name correctly."""
@@ -309,10 +309,10 @@ class TestPhosphodiesterEndToEnd:
     """End-to-end phosphodiester tests with try_decompose."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_dimethyl_phosphate_detection(self):
         """Dimethyl phosphate: phosphodiester bond detected."""
@@ -351,10 +351,10 @@ class TestCombinedMultiBondDecomposition:
     """
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_combined_thioester_amide(self):
         """Simplified CoA analog with thioester + amide bonds.
@@ -465,10 +465,10 @@ class TestDecompositionRegressionGuard:
     """Verify existing decomposition capabilities still work after Phase 87."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_simple_ester_decomposes(self):
         """Simple ester (methyl acetate) still decomposes correctly."""

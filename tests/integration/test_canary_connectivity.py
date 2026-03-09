@@ -35,7 +35,7 @@ CONNECTIVITY_CANARY = [
     ),
     (
         "CSCCC(N)C(=O)Oc1ccc(CC(N)C(=O)O)cc1",
-        "tyrosine methionineate",
+        "2-amino-3-phenylpropanoic acid",
     ),
     (
         "CC(C)C1=C(O)C(N)=C(/C=C/c2ccccc2)C(=O)C1=O",

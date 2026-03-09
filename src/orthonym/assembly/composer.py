@@ -940,8 +940,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         log_confidence(best)
         # Only store confidence at top-level depth (not during recursive
         # fragment naming) to prevent overwriting top-level metadata.
-        from .fragment_naming import _fragment_guard
-        if getattr(_fragment_guard, 'depth', 0) == 0:
+        from .fragment_naming import is_top_level_naming
+        if is_top_level_naming():
             store_confidence(best)
         # Accept the best candidate if its name-length ratio is adequate.
         # The ratio factor measures len(name)/heavy_atoms, matching the

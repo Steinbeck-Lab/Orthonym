@@ -19,6 +19,7 @@ from orthonym.decomposition.engine import (
 from orthonym.assembly.fragment_naming import (
     MAX_NAMING_DEPTH,
     _fragment_guard,
+    _get_visited,
     get_naming_depth,
     name_fragment_recursively,
 )
@@ -146,11 +147,11 @@ class TestTryDecompose:
 
     def setup_method(self):
         """Reset naming depth before each test."""
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
         """Reset naming depth after each test."""
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_no_cleavable_bonds_ethanol(self):
         """Ethanol has no cleavable bonds -- returns None."""
@@ -210,10 +211,10 @@ class TestSizeGuard:
     """Test that size guard prevents fragments >= parent size."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_fragments_must_be_smaller_than_parent(self):
         """Fragment size guard: all fragments must have fewer heavy atoms than parent."""
@@ -234,64 +235,58 @@ class TestSizeGuard:
 
 @pytest.mark.unit
 class TestRecursionDepth:
-    """Test recursion depth limits for decomposition engine."""
+    """Test cycle-detection guard for decomposition engine."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
+        _fragment_guard.cache = None
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
+        _fragment_guard.cache = None
 
-    def test_max_naming_depth_is_seven(self):
-        """MAX_NAMING_DEPTH should be 7 for deep iterative decomposition support."""
+    def test_max_naming_depth_constant_preserved(self):
+        """MAX_NAMING_DEPTH legacy constant should be 7."""
         assert MAX_NAMING_DEPTH == 7
 
-    def test_depth_4_still_names(self):
-        """At naming depth 4 (near limit), fragment naming still works."""
-        _fragment_guard.depth = 4
+    def test_naming_works_without_cycle(self):
+        """Fragment naming works when no cycle exists."""
         result = name_fragment_recursively("C")  # methane
         assert result is not None
         assert result == "methane"
 
-    def test_depth_6_still_names(self):
-        """At naming depth 6 (one below limit), fragment naming still works."""
-        _fragment_guard.depth = 6
-        result = name_fragment_recursively("C")  # methane
-        assert result is not None
-        assert result == "methane"
-
-    def test_depth_7_returns_none_for_uncached(self):
-        """At naming depth 7 (limit), uncached fragments return None."""
-        _fragment_guard.depth = 7
-        # Use a fragment NOT in FRAGMENT_NAME_CACHE
-        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # tetradecane
+    def test_cycle_detected_returns_none_for_uncached(self):
+        """When SMILES is in visited set, uncached fragments return None."""
+        visited = _get_visited()
+        visited.add("CCCCCCCCCCCCCC")  # tetradecane, not in static cache
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")
         assert result is None
 
-    def test_depth_7_returns_cached(self):
-        """At naming depth 7, cached fragments still return a name."""
-        _fragment_guard.depth = 7
+    def test_cycle_detected_returns_cached(self):
+        """When SMILES is in visited set, cached fragments still resolve."""
+        visited = _get_visited()
+        visited.add("CCO")
         result = name_fragment_recursively("CCO")
         assert result == "ethanol"
 
-    def test_depth_restores_after_decompose(self):
-        """After try_decompose, naming depth should be restored."""
-        _fragment_guard.depth = 0
+    def test_visited_set_restores_after_decompose(self):
+        """After try_decompose, visited set should be unchanged."""
+        _fragment_guard.visited = set()
         mol = _mol("CCO")
         try_decompose(mol)
         assert get_naming_depth() == 0
 
-    def test_decompose_respects_depth_guard(self):
-        """try_decompose at high depth should not recurse indefinitely."""
-        _fragment_guard.depth = 4
+    def test_decompose_handles_cycle_gracefully(self):
+        """try_decompose with visited entries should not recurse indefinitely."""
+        visited = _get_visited()
+        visited.add("FAKE_PARENT_1")
+        visited.add("FAKE_PARENT_2")
         mol = _mol("CC(=O)OCC")  # ethyl acetate
-        # At depth 4, fragments at depth 5 would get None from naming
-        # The function should handle this gracefully
         result = try_decompose(mol)
-        # Should return None (cannot name fragments at depth limit)
-        # or None (quality gate passes), either way no crash
         assert result is None or isinstance(result, str)
-        # Depth should be restored
-        assert get_naming_depth() == 4
+        # Parent entries should be preserved
+        assert "FAKE_PARENT_1" in visited
+        assert "FAKE_PARENT_2" in visited
 
 
 # ============================================================================
@@ -304,10 +299,10 @@ class TestDecompositionForCompoundClasses:
     """Test try_decompose behavior on specific compound classes."""
 
     def setup_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def teardown_method(self):
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
 
     def test_carboxylic_acid_no_decomposition(self):
         """Carboxylic acids don't have cleavable ester/amide bonds."""

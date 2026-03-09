@@ -1,10 +1,10 @@
-"""Tests for fragment naming depth limit, canonical SMILES, and compound regression.
+"""Tests for fragment naming cycle guard, canonical SMILES, and compound regression.
 
 Tests the infrastructure in fragment_naming.py:
-- MAX_NAMING_DEPTH = 7 (unchanged, depth 10 causes regressions)
+- MAX_NAMING_DEPTH = 7 (legacy constant, kept for backward compatibility)
 - MAX_TOTAL_CALLS = 100 (constant available for future use)
 - Canonical SMILES normalization before calling name_compound()
-- Depth-limit compound regression tests (V8-DEPTH-01)
+- Cycle-guard compound regression tests (V8-DEPTH-01)
 """
 
 import pytest
@@ -12,6 +12,7 @@ from orthonym.assembly.fragment_naming import (
     MAX_NAMING_DEPTH,
     MAX_TOTAL_CALLS,
     _fragment_guard,
+    _get_visited,
     name_fragment_recursively,
 )
 from orthonym import name_compound
@@ -20,9 +21,11 @@ from orthonym import name_compound
 @pytest.fixture(autouse=True)
 def reset_fragment_guard():
     """Reset thread-local state before and after each test."""
-    _fragment_guard.depth = 0
+    _fragment_guard.visited = set()
+    _fragment_guard.cache = None
     yield
-    _fragment_guard.depth = 0
+    _fragment_guard.visited = set()
+    _fragment_guard.cache = None
 
 
 # ============================================================================
@@ -55,44 +58,40 @@ class TestConstants:
 # ============================================================================
 
 
-class TestDepthLimit:
-    """Test depth limit enforcement."""
+class TestCycleGuard:
+    """Test cycle-detection guard enforcement."""
 
-    def test_at_depth_limit_returns_none_for_uncached(self):
-        """When depth == MAX_NAMING_DEPTH (7), uncached fragments return None."""
-        _fragment_guard.depth = 7
-        result = name_fragment_recursively("CCCCCCCCCCCCCC")  # tetradecane, not cached
+    def test_cycle_detected_returns_none_for_uncached(self):
+        """When SMILES is in visited set, uncached fragments return None."""
+        visited = _get_visited()
+        visited.add("CCCCCCCCCCCCCC")  # tetradecane, not in static cache
+        result = name_fragment_recursively("CCCCCCCCCCCCCC")
         assert result is None
 
-    def test_at_depth_limit_returns_cached(self):
-        """When depth == MAX_NAMING_DEPTH (7), cached fragments still resolve."""
-        _fragment_guard.depth = 7
+    def test_cycle_detected_returns_cached(self):
+        """When SMILES is in visited set, cached fragments still resolve."""
+        visited = _get_visited()
+        visited.add("CCO")
         result = name_fragment_recursively("CCO")
         assert result == "ethanol"
 
-    def test_below_depth_limit_returns_name(self):
-        """When depth == 6 (one below limit), should return a name."""
-        _fragment_guard.depth = 6
+    def test_no_cycle_returns_name(self):
+        """When SMILES is NOT in visited set, should return a name."""
         result = name_fragment_recursively("CCO")
         assert result is not None
 
-    def test_well_below_depth_limit_returns_name(self):
-        """When depth == 3, should return a name."""
-        _fragment_guard.depth = 3
+    def test_visited_set_restored_after_call(self):
+        """Visited set should not grow after a completed call."""
         result = name_fragment_recursively("CCO")
         assert result is not None
+        assert "CCO" not in _get_visited()
 
-    def test_depth_restored_after_call(self):
-        """Depth should be restored to original value after call."""
-        _fragment_guard.depth = 3
+    def test_parent_entries_preserved(self):
+        """Parent entries in visited set should remain after nested call."""
+        visited = _get_visited()
+        visited.add("FAKE_PARENT")
         name_fragment_recursively("CCO")
-        assert _fragment_guard.depth == 3
-
-    def test_depth_restored_after_failure(self):
-        """Depth should be restored even when at the limit."""
-        _fragment_guard.depth = 7
-        name_fragment_recursively("CCO")
-        assert _fragment_guard.depth == 7
+        assert "FAKE_PARENT" in visited
 
 
 # ============================================================================
@@ -106,31 +105,31 @@ class TestCanonicalSmilesConsistency:
     def test_equivalent_smiles_same_name(self):
         """Same molecule in different SMILES notation produces same name."""
         result1 = name_fragment_recursively("CCO")
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
         result2 = name_fragment_recursively("OCC")
         assert result1 == result2
 
     def test_equivalent_smiles_propanol(self):
         """Propan-1-ol in different SMILES forms gives same name."""
         result1 = name_fragment_recursively("CCCO")
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
         result2 = name_fragment_recursively("OCCC")
         assert result1 == result2
 
     def test_equivalent_smiles_branched(self):
         """2-methylpropane in different forms gives same name."""
         result1 = name_fragment_recursively("CC(C)C")
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
         result2 = name_fragment_recursively("C(C)(C)C")
         assert result1 == result2
 
     def test_sequential_toplevel_calls_both_succeed(self):
         """Two consecutive top-level calls should both succeed."""
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
         result1 = name_fragment_recursively("CCO")
         assert result1 is not None
 
-        _fragment_guard.depth = 0
+        _fragment_guard.visited = set()
         result2 = name_fragment_recursively("CCCO")
         assert result2 is not None
 

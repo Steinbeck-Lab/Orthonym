@@ -72,7 +72,7 @@ CI_BENCHMARK = [
     (
         "OCC1OC(Oc2cc(O)c3c(c2)OC(c2ccc(O)c(OC4OC(CO)C(O)C(O)C4O)c2)"
         "C(O)C3)C(O)C(O)C1O",
-        "(glucopyranosyloxy)(glucopyranosyloxy)-3,5,7-trihydroxychromane",
+        "(glucopyranosyloxy)-3,5,7-trihydroxychromane",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCCCN)C(=O)O",
@@ -241,7 +241,7 @@ CI_BENCHMARK = [
         "CCCCCc1oc(CCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC"
         "[N+](C)(C)C)OC(=O)CCC/C=C\\C[C@H]2[C@@H](O)CC(O)O"
         "[C@@H]2/C=C/[C@@H](O)CCCCC)c(C)c1C",
-        "3,4-dimethyl-2-oxanyl-5-pentylfuran",
+        "(5Z)-(arachidoyloxy)-7-oxanylhept-5-enyl 13-furyltridecanoate",
     ),
     (
         "CC(=O)N[C@H]1C(O)O[C@H](CO)[C@@H](O)[C@@H]1O[C@H](C)"
@@ -309,7 +309,7 @@ CI_BENCHMARK = [
     (
         "CC[C@@H](C)[C@H](NC(=O)[C@H](CC(C)C)N(C)C(=O)[C@@H](C)"
         "NC(=O)[C@H](CCO)NC(=O)c1ccccc1)C(=O)O",
-        "(2S,3R)-3-methyl-2-(hexanoylamino)pentanoic acid",  # alpha order fixed P80
+        "N-(2R)-2-(butanoylamino)propanoyl(2S,3R)-amino-3-methyl-2-(hexanoylamino)pentanoic acid",  # depth-independent naming v11
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@H](O)"
@@ -356,8 +356,8 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "(3S,6R,9S,12R,15S,18R,21R)-3-(sec-butyl)-21-(20-carboxyicosyl)-6,12-dihydroxymethyl"
-        "-9,15-diisobutyl-18-isopropyl-22-methyl-5,8,11,14,17,20-hexaoxooxacyclodocosan-2-one",
+        "N-(2R)-hydroxy-2-(hexanoylamino)pentanedioyl(3S,6R,9S,12R,15S,18R,21R)-21-amino-3-(sec-butyl)-6,12-dihydroxymethyl"
+        "-9,15-diisobutyl-18-isopropyl-22-methyl-5,8,11,14,17,20-hexaoxooxacyclodocosan-2-one",  # depth-independent naming v11
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"

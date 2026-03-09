@@ -128,7 +128,7 @@ BENCHMARK_STEROIDS = [
     pytest.param(
         "O=C1C[C@@H](O)[C@]2(C)C3=CC=C4C[C@@H](O)CC[C@@]4(C)[C@H]3CC[C@]12[C@@H](C)CC[C@H](C)C(C)C",
         "androst",  # matched as androstane (not ergostane -- see comment)
-        "(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethylandrost-5,7-dien-17-one",
+        "(3S,9R,10S,13R,14R,15R,18S)-3,15-dihydroxy-14,18-dimethylandrosta-5,7-dien-17-one",
         "opsin_valency_error",
         # Ergostane derivative but C17=O breaks ergostane substructure match.
         # Matched as androstane instead. Extra methyls now enumerated.
@@ -137,7 +137,7 @@ BENCHMARK_STEROIDS = [
     pytest.param(
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
         "stigmast",
-        "(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmast-7,24-dien-3-ol",
+        "(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol",
         "likely_success",
         id="compound_38_stigmast_dien_ol",
     ),
@@ -160,7 +160,7 @@ BENCHMARK_STEROIDS = [
     pytest.param(
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2C3=CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
         "cholest",
-        "(3S,9S,10R,13R,14R,17R,20R)-cholest-5,7-dien-3-ol",
+        "(3S,9S,10R,13R,14R,17R,20R)-cholesta-5,7-dien-3-ol",
         "confirmed_success",
         id="compound_55_cholest_dien_ol",
     ),

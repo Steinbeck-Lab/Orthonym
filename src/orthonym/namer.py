@@ -525,17 +525,16 @@ class Orthonym:
 
         # Final quality gate: if composer produced a garbled name
         # (e.g., "cycloanedicarboxamide" for a multi-amide molecule),
-        # fall back to the fragment naming result. Only triggers for
-        # names containing known garbled tokens to avoid performance
-        # overhead on normal molecules.
+        # fall back to decomposition directly. Does NOT recurse into
+        # name_fragment_recursively to avoid circular feedback loops.
         if not _skip_decomposition and assembled and mol.GetNumHeavyAtoms() > 15:
             _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
             assembled_lower = assembled.lower()
             if any(tok in assembled_lower for tok in _GARBLED_TOKENS):
-                from .assembly.fragment_naming import name_fragment_recursively
-                frag_name = name_fragment_recursively(canonical_smiles)
-                if frag_name and frag_name != assembled:
-                    return frag_name
+                from .decomposition import try_decompose
+                decomp_name = try_decompose(mol, style=self.style)
+                if decomp_name and decomp_name != assembled:
+                    return decomp_name
 
             # Confidence-based rejection: if the coverage scoring system
             # indicates the assembled name is catastrophically incomplete
@@ -552,15 +551,15 @@ class Orthonym:
             if (conf_score is not None
                     and conf_handler != 'unknown'
                     and conf_score < _TRUNCATION_CONFIDENCE_THRESHOLD):
-                from .assembly.fragment_naming import name_fragment_recursively
-                frag_name = name_fragment_recursively(canonical_smiles)
-                if frag_name and frag_name != assembled:
+                from .decomposition import try_decompose
+                decomp_name = try_decompose(mol, style=self.style)
+                if decomp_name and decomp_name != assembled:
                     logger.info(
                         "Quality gate: rejecting low-confidence name "
                         "(%.4f < %.2f), using decomposition fallback",
                         conf_score, _TRUNCATION_CONFIDENCE_THRESHOLD,
                     )
-                    return frag_name
+                    return decomp_name
 
         return assembled
     
