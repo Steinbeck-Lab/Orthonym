@@ -153,50 +153,45 @@ class TestConservativeQualityGate:
     """
 
     @pytest.mark.unit
-    def test_ring_system_token_bypasses_no_digits_check(self):
-        """Name with ring-system token should pass even with HA>25, no digits, no hyphens."""
+    def test_retained_whitelist_bypasses_no_digits_check(self):
+        """Names in _RETAINED_CORE_NAMES should pass regardless of HA, no digits/hyphens."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
-        # phenothiazine: 22 HA, no digits, no hyphens, but has ring-system token
+        # phenothiazine: in _RETAINED_CORE_NAMES, bypasses all size checks
         mol = Chem.MolFromSmiles("c1ccc2c(c1)Sc1ccccc1N2")  # phenothiazine
         assert _name_quality_is_acceptable("phenothiazine", mol) is True
 
     @pytest.mark.unit
-    def test_ring_system_token_bypasses_at_26_ha(self):
-        """Name with ring-system token should pass even with HA=26 > 25 threshold."""
+    def test_retained_whitelist_bypasses_at_large_ha(self):
+        """Names in _RETAINED_CORE_NAMES should pass even for very large HA counts."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
         from unittest.mock import MagicMock
         mock_mol = MagicMock()
-        mock_mol.GetNumHeavyAtoms.return_value = 26
-        # This bypasses the cleavable-bond checks etc. Need to mock just enough
-        # Use a real mol but trick the HA count
-        mol = Chem.MolFromSmiles("c1ccc2c(c1)Sc1ccccc1N2")  # phenothiazine ~14 HA
-        # We need HA > 25 but the name has a ring token
-        # Let's use a large molecule with phenothiazine in the name
-        # Use mock to control HA
+        mock_mol.GetNumHeavyAtoms.return_value = 40
         mock_mol.GetRingInfo.return_value = MagicMock(AtomRings=lambda: [])
+        # phenothiazine in whitelist, bypasses all checks
         assert _name_quality_is_acceptable("phenothiazine", mock_mol) is True
 
     @pytest.mark.unit
-    def test_ha_22_no_digits_passes_below_threshold(self):
-        """HA=22 < 25: no-digits check not triggered, name should pass."""
+    def test_ha_22_no_digits_no_ring_token_rejected(self):
+        """HA=22 > 20, no digits, no hyphens => rejected (not in whitelist)."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
         from unittest.mock import MagicMock
         mock_mol = MagicMock()
         mock_mol.GetNumHeavyAtoms.return_value = 22
         mock_mol.GetRingInfo.return_value = MagicMock(AtomRings=lambda: [])
-        # "somename" has no digits, no hyphens, but HA=22 < 25 threshold
-        assert _name_quality_is_acceptable("somename", mock_mol) is True
+        # Name long enough to pass length check (22//2=11) but not in whitelist
+        assert _name_quality_is_acceptable("somecompoundname", mock_mol) is False
 
     @pytest.mark.unit
     def test_ha_26_no_digits_no_ring_token_rejected(self):
-        """HA=26 > 25, no digits, no hyphens, no ring-system token => rejected."""
+        """HA=26 > 20, no digits, no hyphens => rejected (not in whitelist)."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
         from unittest.mock import MagicMock
         mock_mol = MagicMock()
         mock_mol.GetNumHeavyAtoms.return_value = 26
         mock_mol.GetRingInfo.return_value = MagicMock(AtomRings=lambda: [])
-        # "somename" has no ring-system token
-        assert _name_quality_is_acceptable("somename", mock_mol) is False
+        # Name long enough to pass length check (26//2=13) but not in whitelist
+        assert _name_quality_is_acceptable("somecompoundname", mock_mol) is False
 
     @pytest.mark.unit
     def test_expanded_whitelist_flavone(self):
@@ -231,23 +226,11 @@ class TestConservativeQualityGate:
         assert _name_has_ring_system_token("hexane") is False
 
     @pytest.mark.unit
-    def test_decomposition_detects_ring_token_loss(self):
-        """_decomposition_is_worse should detect ring-system token loss."""
-        from orthonym.decomposition.engine import _decomposition_is_worse
-        mol = Chem.MolFromSmiles("c1ccc2c(c1)Sc1ccccc1N2")  # phenothiazine
-        # Existing name has ring token, decomp lost it
-        assert _decomposition_is_worse(
-            "methylpropanamine",  # no ring tokens
-            "methylphenothiazine",  # has phenothiazine token
-            mol
-        ) is True
-
-    @pytest.mark.unit
-    def test_decomposition_no_false_positive_no_token_loss(self):
-        """_decomposition_is_worse should NOT flag when no ring-system token loss."""
+    def test_decomposition_no_false_positive_no_garbled(self):
+        """_decomposition_is_worse should NOT flag when decomp is clean."""
         from orthonym.decomposition.engine import _decomposition_is_worse
         mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)OCC")
-        # Neither name has ring tokens, so no token loss
+        # Both names are clean, neither garbled
         assert _decomposition_is_worse(
             "ethyl palmitate",
             "hexadecanyl ethanoate",

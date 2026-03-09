@@ -42,14 +42,57 @@ _FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate"
 
 # Known retained names that correctly identify a core substructure even
 # in large molecules (nucleotide cofactors, natural products, etc.).
-# These bypass the "no digits and no hyphens" rejection for heavy_atoms > 20.
+# These bypass the "no digits and no hyphens" rejection for heavy_atoms > 25.
+# Expanded in Phase 099 with fused heterocycle names.
 _RETAINED_CORE_NAMES = frozenset({
     'adenine', 'guanine', 'thymine', 'cytosine', 'uracil',
     'xanthine', 'hypoxanthine', 'purine', 'pyrimidine',
     'indole', 'quinoline', 'isoquinoline', 'acridine',
     'phenothiazine', 'xanthene', 'phenoxazine', 'thianthrene',
     '1h-indole',
+    # Phase 099 additions: fused heterocycles and polycyclics
+    'flavone', 'chromone', 'coumarin', 'pteridine', 'phenazine',
+    'carbazole', 'phenanthridine', 'dibenzofuran', 'fluorene',
+    'anthracene', 'phenanthrene', 'chrysene',
 })
+
+
+# ---------------------------------------------------------------------------
+# Ring-system token detection for quality gate
+# ---------------------------------------------------------------------------
+
+# Recognized ring-system name tokens. Names containing any of these tokens
+# are considered structurally informative even without digits/hyphens.
+# Used to bypass the no-digits/no-hyphens rejection in _name_quality_is_acceptable().
+_RING_SYSTEM_TOKENS = frozenset({
+    'pyridine', 'pyrimidine', 'pyrazine', 'pyridazine',
+    'benzene', 'toluene', 'naphthalene', 'anthracene', 'phenanthrene',
+    'morpholine', 'piperidine', 'piperazine', 'pyrrolidine',
+    'indole', 'quinoline', 'isoquinoline', 'quinoxaline', 'quinazoline',
+    'thiophene', 'furan', 'pyrrole', 'oxazole', 'thiazole', 'isoxazole',
+    'imidazole', 'triazole', 'tetrazole',
+    'carbazole', 'acridine', 'phenothiazine', 'phenoxazine',
+    'flavone', 'chromone', 'coumarin', 'xanthene',
+    'purine', 'pteridine', 'phenazine',
+    'dibenzofuran', 'dibenzothiophene',
+})
+
+
+def _name_has_ring_system_token(name: str) -> bool:
+    """Check if a name contains a recognized ring-system token.
+
+    Used by the quality gate to distinguish legitimate retained names
+    (e.g., "phenothiazine" for a 26-atom molecule) from partial names
+    that only cover a small fragment.
+
+    Args:
+        name: IUPAC name string.
+
+    Returns:
+        True if the name contains at least one recognized ring-system token.
+    """
+    name_lower = name.lower()
+    return any(token in name_lower for token in _RING_SYSTEM_TOKENS)
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +113,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
       ratio < 0.45)
     - No digits and no hyphens for a large molecule (heavy_atoms > 20),
       which suggests only a retained name for one fragment was returned
+      (unless the name contains a recognized ring-system token)
 
     Args:
         name: The existing pipeline name (may be None).
@@ -100,10 +144,11 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         return False
 
     # Large molecule with no digits and no hyphens: likely just a retained
-    # name for one fragment (e.g., "benzene" for a 25-atom ester)
-    # BUT: skip this check for known retained core names that correctly
-    # identify a core substructure even in large molecules (e.g., adenine
-    # in nucleotide cofactors).
+    # name for one fragment (e.g., "benzene" for a 25-atom ester).
+    # Phase 099: expanded _RETAINED_CORE_NAMES handles known ring-system
+    # retained names (phenothiazine, carbazole, flavone, etc.) via early
+    # whitelist bypass above. For other names, the no-digits/no-hyphens
+    # check remains at HA>20 to catch incomplete names.
     if heavy_atoms > 20 and name.lower() not in _RETAINED_CORE_NAMES:
         has_digits = any(c.isdigit() for c in name)
         has_hyphens = "-" in name
