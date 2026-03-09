@@ -60,12 +60,12 @@ class TestPerformanceGuard:
         # The function may still return None for other reasons (quality gate,
         # fragment naming), but it should NOT be because of the performance guard.
         # We verify this by checking that the code progresses past the guard
-        # by mocking the next function call (name_fragment_recursively).
+        # by mocking the next function call (name_pipeline_only, used for probe).
         with patch(
             "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
             return_value=fake_bonds,
         ), patch(
-            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            "orthonym.namer.name_pipeline_only",
             return_value="methyl heptadecanoate",
         ):
             # Quality gate will accept this name, so try_decompose returns None
@@ -267,7 +267,7 @@ class TestMultiBondRetry:
             "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
             return_value=fake_bonds,
         ), patch(
-            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            "orthonym.namer.name_pipeline_only",
             return_value=None,  # Force quality gate to fail for existing name
         ), patch(
             "orthonym.decomposition.engine._try_single_bond_decompose",
@@ -312,7 +312,7 @@ class TestMultiBondRetry:
             "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
             return_value=fake_bonds,
         ), patch(
-            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            "orthonym.namer.name_pipeline_only",
             return_value=None,  # Existing name is None -> quality fails
         ), patch(
             "orthonym.decomposition.engine._try_single_bond_decompose",

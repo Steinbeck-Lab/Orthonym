@@ -257,7 +257,7 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
 
     Args:
         decomp_name: The decomposition result name.
-        existing_name: The existing pipeline name (from name_fragment_recursively).
+        existing_name: The existing pipeline name (from name_pipeline_only).
         mol: RDKit Mol object for the molecule.
 
     Returns:
@@ -632,12 +632,14 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     if len(bonds) > MAX_CLEAVABLE_BONDS:
         return None  # Performance guard: too complex for decomposition
 
-    # Step 2: Try existing pipeline first (via name_fragment_recursively
-    # to respect the cycle guard).
+    # Step 2: Get existing pipeline name via systematic-only path.
+    # name_pipeline_only() skips decomposition, so it cannot recurse back
+    # into try_decompose(). No cache isolation needed.
     # If this SMILES is already in the visited set (being named up the
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
-    from ..assembly.fragment_naming import name_fragment_recursively, _fragment_guard, _get_visited
+    from ..namer import name_pipeline_only
+    from ..assembly.fragment_naming import _get_visited
 
     existing_smiles = Chem.MolToSmiles(mol)
     visited = _get_visited()
@@ -646,15 +648,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
         # Return None to let the caller's assembly pipeline handle naming
         # instead of decomposing (which would produce garbled results).
         return None
-    else:
-        # Temporarily disable the runtime fragment cache during this probe
-        # so that intermediate results don't contaminate later naming.
-        _saved_cache = getattr(_fragment_guard, 'cache', None)
-        _fragment_guard.cache = None
-        try:
-            existing_name = name_fragment_recursively(existing_smiles)
-        finally:
-            _fragment_guard.cache = _saved_cache
+    existing_name = name_pipeline_only(existing_smiles, style=style)
 
     # Step 3: Quality gate -- only decompose if existing name is poor
     quality_ok = existing_name and _name_quality_is_acceptable(existing_name, mol)
