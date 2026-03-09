@@ -37,6 +37,18 @@ _fragment_guard = _threading.local()
 MAX_NAMING_DEPTH = 7
 MAX_TOTAL_CALLS = 100
 
+
+def _get_visited() -> set:
+    """Get the current visited-SMILES set (thread-safe).
+
+    Returns an empty set if no naming session is active.
+    """
+    visited = getattr(_fragment_guard, 'visited', None)
+    if visited is None:
+        visited = set()
+        _fragment_guard.visited = visited
+    return visited
+
 # Pre-computed names for common fragments that frequently hit the depth limit.
 # Checked BEFORE the depth counter so these fragments are always nameable,
 # regardless of recursion depth.  Analogous to retained_names.py but for

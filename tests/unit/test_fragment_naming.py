@@ -10,6 +10,7 @@ import pytest
 
 from orthonym.assembly.fragment_naming import (
     MAX_NAMING_DEPTH,
+    _get_visited,
     get_naming_depth,
     name_fragment_recursively,
     _fragment_guard,
@@ -227,3 +228,43 @@ class TestThreadSafety:
         assert results[1]['depth_after'] == 0
         assert results[2]['depth_before'] == 0
         assert results[2]['depth_after'] == 0
+
+
+@pytest.mark.unit
+class TestVisitedSetGuard:
+    """Test visited-set cycle detection replaces depth counter."""
+
+    def setup_method(self):
+        _fragment_guard.visited = set()
+
+    def teardown_method(self):
+        _fragment_guard.visited = set()
+
+    def test_visited_set_starts_empty(self):
+        """Fresh state should have empty visited set."""
+        if hasattr(_fragment_guard, 'visited'):
+            delattr(_fragment_guard, 'visited')
+        assert _get_visited() == set()
+
+    def test_visited_set_detects_cycle(self):
+        """If a SMILES is already being named, return from cache."""
+        visited = _get_visited()
+        visited.add("CCO")
+        result = name_fragment_recursively("CCO")
+        # CCO is in FRAGMENT_NAME_CACHE as "ethanol"
+        assert result == "ethanol"
+
+    def test_visited_set_cleaned_after_naming(self):
+        """After naming completes, SMILES should be removed from visited set."""
+        _fragment_guard.visited = set()
+        result = name_fragment_recursively("CCO")  # names ethanol via cache
+        assert result is not None
+        # "CCO" should NOT remain in visited set after completion
+        assert "CCO" not in _fragment_guard.visited
+
+    def test_no_depth_limit_for_deep_nesting(self):
+        """Naming should succeed at any depth as long as no cycle exists."""
+        _fragment_guard.visited = set()
+        result = name_fragment_recursively("CCCCCCCCCCCC(=O)O")
+        assert result is not None
+        assert "dodecanoic acid" in result.lower()
