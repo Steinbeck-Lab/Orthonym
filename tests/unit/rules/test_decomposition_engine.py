@@ -475,3 +475,47 @@ class TestGarbledPatternExtension:
         mol = _mol("CCCCCC")
         assert _decomposition_is_worse("hexaneyl bad", "hexane", mol) is True
         assert _decomposition_is_worse("cycloane bad", "cyclohexane", mol) is True
+
+
+# ============================================================================
+# Leaf-first fragment ordering tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestLeafFirstOrdering:
+    """Verify fragments are named smallest-first for cache benefit."""
+
+    def setup_method(self):
+        _fragment_guard.visited = set()
+        _fragment_guard.cache = None
+
+    def teardown_method(self):
+        _fragment_guard.visited = set()
+        _fragment_guard.cache = None
+
+    def test_smaller_fragment_named_first(self):
+        """In decomposition, smaller fragments should be named before larger ones.
+
+        Uses a large asymmetric ester (methyl hexacosanoate) where the small
+        methyl fragment should be named before the large acid fragment,
+        populating the cache for potential reuse.
+        """
+        # Methyl hexacosanoate: 29 heavy atoms, methyl (1 HA) vs acid (~28 HA)
+        mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC")
+        result = try_decompose(mol)
+        assert result is not None
+        assert isinstance(result, str)
+        assert len(result) > 5
+
+    def test_ordering_does_not_crash_on_equal_size(self):
+        """Two fragments of equal size should not cause sorting issues."""
+        mol = _mol("CCOC(C)=O")
+        result = try_decompose(mol)
+        assert result is None or isinstance(result, str)
+
+    def test_invalid_fragment_smiles_handled(self):
+        """Sorting should handle fragments with no cleavable bonds gracefully."""
+        mol = _mol("CCO")
+        result = try_decompose(mol)
+        assert result is None

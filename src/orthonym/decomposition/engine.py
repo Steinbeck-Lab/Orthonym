@@ -508,6 +508,14 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         if frag_mol and frag_mol.GetNumHeavyAtoms() >= parent_heavy:
             return None  # Fragment not smaller -- abort
 
+    # Sort fragments smallest-first (by heavy atom count) so smaller
+    # fragments populate the runtime cache before larger ones that may
+    # contain similar structural motifs (IUPAC P-51 reuse principle).
+    def _frag_sort_key(frag):
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
+    fragments.sort(key=_frag_sort_key)
+
     # Name each fragment recursively (with sugar intercept for glycosidic bonds)
     fragment_names = {}
     for frag in fragments:
