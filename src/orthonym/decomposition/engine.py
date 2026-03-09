@@ -646,6 +646,92 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
 
 
 # ---------------------------------------------------------------------------
+# Multi-bond same-type decomposition helper
+# ---------------------------------------------------------------------------
+
+def _try_multi_bond_decompose(
+    mol, bonds: List[Dict], style: str = "pin"
+) -> Optional[str]:
+    """Attempt decomposition using multiple same-type bonds simultaneously.
+
+    Cleaves all provided bonds at once, names each fragment, and assembles
+    a multi-component name. Currently supports ester bonds (polyester naming
+    per IUPAC P-65.6.3.4). Other bond types fall through to None.
+
+    Args:
+        mol: RDKit Mol object to decompose.
+        bonds: List of bond info dicts (must be >= 2, all same type).
+        style: Naming style ("pin" for preferred IUPAC names).
+
+    Returns:
+        Multi-component IUPAC name, or None if decomposition fails.
+    """
+    # Validate: need >= 2 bonds, all same type
+    if not bonds or len(bonds) < 2:
+        return None
+
+    bond_type = bonds[0]["type"]
+    if not all(b["type"] == bond_type for b in bonds):
+        return None
+
+    from .fragment_capping import cleave_and_cap
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from .fragment_assembly import _assemble_multi_ester
+
+    # Cleave with acid_side_oh = True for ester/amide/glycosidic, False for ether
+    acid_oh = bond_type != "ether"
+    fragments = cleave_and_cap(mol, bonds, acid_side_oh=acid_oh)
+    if not fragments or len(fragments) < 2:
+        return None
+
+    # Size guard: every fragment must be strictly smaller than parent
+    parent_heavy = mol.GetNumHeavyAtoms()
+    for frag in fragments:
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        if frag_mol and frag_mol.GetNumHeavyAtoms() >= parent_heavy:
+            return None
+
+    # Sort fragments smallest-first for cache warming
+    def _frag_sort_key(frag):
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
+    fragments.sort(key=_frag_sort_key)
+
+    # Name each fragment (sugar intercept for glycosidic)
+    fragment_names = {}
+    for frag in fragments:
+        frag_name = None
+
+        # Sugar intercept for glycosidic bonds
+        if bond_type == "glycosidic" and frag["side"] == "acid":
+            frag_name = _name_sugar_fragment(frag["smiles"])
+
+        if not frag_name:
+            frag_name = name_fragment_recursively(frag["smiles"])
+
+        if not frag_name or "unknown" in frag_name.lower():
+            return None  # Cannot name a fragment
+
+        fragment_names[frag["smiles"]] = frag_name
+
+    # Dispatch to bond-type-specific multi-fragment assembler
+    if bond_type == "ester":
+        result = _assemble_multi_ester(fragments, fragment_names, style)
+    else:
+        # Only esters support multi-bond assembly for now
+        return None
+
+    if not result:
+        return None
+
+    # Quality checks on the assembled result
+    if not _coverage_is_adequate(result, mol, bond_type=bond_type):
+        return None
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Main decomposition entry point
 # ---------------------------------------------------------------------------
 
@@ -769,6 +855,23 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             if existing_name and _decomposition_is_worse(alt_result, existing_name, mol):
                 continue
             return alt_result
+
+    # MULTI-BOND SAME-TYPE cleavage (Phase 099): if 3+ bonds of the same
+    # type exist, try cleaving all same-type bonds simultaneously
+    # (IUPAC P-65.6.3.4 polyesters / triglycerides).
+    # Only attempt when no single-bond result was acceptable (count >= 3
+    # to target genuine polyesters, not molecules with just 2 ester bonds
+    # which are better handled by single-bond decomposition).
+    from collections import Counter as _BondCounter
+    bond_type_counts = _BondCounter(b["type"] for b in bonds)
+    for bond_type_key, count in bond_type_counts.most_common():
+        if count >= 3:
+            same_type_bonds = [b for b in bonds if b["type"] == bond_type_key]
+            multi_result = _try_multi_bond_decompose(mol, same_type_bonds, style)
+            if multi_result:
+                if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                    if not (single_result and _decomposition_is_worse(multi_result, single_result, mol)):
+                        return multi_result
 
     # Compare decomposition result against existing pipeline name:
     # if decomposition produced a worse name (garbled, bracket-mismatched,

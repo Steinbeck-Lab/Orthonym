@@ -326,6 +326,9 @@ class TestMultiBondRetry:
         ), patch(
             "orthonym.decomposition.engine._select_best_bond",
             return_value=fake_bonds[0],
+        ), patch(
+            "orthonym.decomposition.engine._try_multi_bond_decompose",
+            return_value=None,  # Disable multi-bond path for this test
         ):
             result = try_decompose(mol)
 
@@ -425,9 +428,9 @@ class TestMultiBondDecompose:
         bonds = find_cleavable_bonds(mol)
         ester_bonds = [b for b in bonds if b["type"] == "ester"]
 
-        # Mock fragment naming to return None
+        # Mock fragment naming to return None (mock at source module)
         with patch(
-            "orthonym.decomposition.engine.name_fragment_recursively",
+            "orthonym.assembly.fragment_naming.name_fragment_recursively",
             return_value=None,
         ):
             result = _try_multi_bond_decompose(mol, ester_bonds, "pin")

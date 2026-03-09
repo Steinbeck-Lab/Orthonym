@@ -139,7 +139,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate'),
     ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2S,3S)-3,5,7-trihydroxychroman-4-one'),
     ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', '(3R,4R,5R,6S)-3-(2-methylbutyl)-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate'),
-    ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'bis(acetyloxy)ethanone acetate'),  # depth-independent naming v11
+    ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'acetic acid (1S,2S,3R,4S,5S,7R,10R)-3,4,5,7-tetrahydroxy-2,6,6-trimethyl-15-oxa-tetracyclo[8.7.0.0(2,7).0(12,16)]heptadecan-11-oneate'),  # Phase 099: multi-bond ester decomposition names tetracyclic core
     ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2R,3S,4S,5R,6R)-3,4,5,6-tetrahydroxy-2-methyloxane'),
     ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(alpha-D-mannopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5,6-tetrahydroxy-2-methyloxane'),
     ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(alpha-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),

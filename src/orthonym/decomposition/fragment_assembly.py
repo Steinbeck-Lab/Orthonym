@@ -692,6 +692,74 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
     return sulfonamide_parent
 
 
+def _assemble_multi_ester(
+    fragments: List[Dict],
+    fragment_names: Dict[str, str],
+    style: str = "pin",
+) -> Optional[str]:
+    """Assemble name for polyesters (triglycerides, etc.) per IUPAC P-65.6.3.4.
+
+    For polyol + multiple acids:
+    - Identical acids: "glycerol triacetate" with multiplicative prefix
+    - Different acids: "glycerol acetate propanoate" positionally listed
+
+    The core fragment (polyol) is identified by score_fragment_seniority()
+    as the most senior fragment (lowest seniority score). The core is
+    typically the "middle" fragment between cleavage points.
+
+    Args:
+        fragments: List of fragment dicts from cleave_and_cap(), each with
+            "smiles" and "side" keys.
+        fragment_names: Dict mapping canonical SMILES to their IUPAC names.
+        style: Naming style ("pin" for preferred IUPAC names).
+
+    Returns:
+        Multi-ester name like "glycerol triacetate", or None if assembly fails.
+    """
+    from .fragment_ranker import score_fragment_seniority
+
+    if not fragments or not fragment_names:
+        return None
+
+    # De-duplicate fragment SMILES for scoring (same SMILES = same fragment)
+    unique_smiles = list(set(f["smiles"] for f in fragments))
+    if len(unique_smiles) < 2:
+        return None  # Need at least core + one acid
+
+    # Identify core fragment as the most senior (lowest seniority score)
+    core_smiles = min(
+        unique_smiles,
+        key=lambda s: score_fragment_seniority(s),
+    )
+    core_name = fragment_names.get(core_smiles, "")
+    if not core_name:
+        return None
+
+    # Collect acid names from non-core fragments
+    ate_names = []
+    for frag in fragments:
+        if frag["smiles"] == core_smiles:
+            continue
+        acid_name = fragment_names.get(frag["smiles"])
+        if not acid_name:
+            continue
+        ate = _acid_to_ate(acid_name)
+        if ate:
+            ate_names.append(ate)
+
+    if not ate_names:
+        return None
+
+    # Identical acids: use multiplicative prefix
+    if len(set(ate_names)) == 1:
+        _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+        mult = _MULT_PREFIX.get(len(ate_names), str(len(ate_names)))
+        return f"{core_name} {mult}{ate_names[0]}"
+
+    # Different acids: list each positionally
+    return f"{core_name} {' '.join(ate_names)}"
+
+
 def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     """Convert an alcohol or fragment name to its alkoxy form.
 
