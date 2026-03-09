@@ -153,6 +153,29 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "OCCO": "ethylene glycol",
     "NCCO": "2-aminoethanol",
     "O=P(O)(O)O": "phosphoric acid",
+    # --- Unsaturated fatty acids (benchmark-driven, verified 2026-03-09) ---
+    "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCC(=O)O": "(4Z,7Z,10Z,13Z,16Z,19Z)-docosa-4,7,10,13,16,19-hexaenoic acid",
+    "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCC(=O)O": "(5Z,8Z,11Z,14Z,17Z)-icosa-5,8,11,14,17-pentaenoic acid",
+    "CCCCCC/C=C\\CCCCCCCC(=O)O": "(9Z)-hexadec-9-enoic acid",
+    "CCCC/C=C\\CCCCCCCC(=O)O": "(9Z)-tetradec-9-enoic acid",
+    "CCCCC/C=C\\CCCCCCCC(=O)O": "(9Z)-pentadec-9-enoic acid",
+    "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)O": "(8Z,11Z,14Z)-icosa-8,11,14-trienoic acid",
+    "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCC(=O)O": "(7Z,10Z,13Z,16Z)-docosa-7,10,13,16-tetraenoic acid",
+    "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)O": "(11Z,14Z)-icosa-11,14-dienoic acid",
+    # --- Branched small acids ---
+    "CC(C)=CC(=O)O": "3-methylbut-2-enoic acid",
+    "C/C=C(/C)C(=O)O": "(2Z)-2-methylbut-2-enoic acid",
+    # --- Additional saturated fatty acids ---
+    "CCCCCCCCCCCCCCC(=O)O": "pentadecanoic acid",
+    "CCCCCCCCCCCCCCCCCCC(=O)O": "nonadecanoic acid",
+    # --- Unsaturated fatty alcohols ---
+    "CC/C=C\\CCO": "(3Z)-hex-3-en-1-ol",
+    "CC/C=C/CCCCCO": "(6E)-non-6-en-1-ol",
+    # --- Additional alcohols ---
+    "CCCCCCCCCCCCO": "dodecan-1-ol",
+    "CCCCCCO": "hexan-1-ol",
+    # --- Branched fatty acids ---
+    "CC(C)CCCCCCCCCCCC(=O)O": "13-methyltetradecanoic acid",
 }
 
 
