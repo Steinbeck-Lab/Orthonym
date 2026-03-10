@@ -858,3 +858,263 @@ class TestFragmentAwareQualityGate:
             )
         finally:
             _fragment_guard.visited = old_visited
+
+
+# ---------------------------------------------------------------------------
+# Phase 099-04: Multi-bond threshold and glycoside/amide assembly tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestMultiBondThresholds:
+    """Tests for bond-type-specific multi-bond thresholds (Phase 099-04)."""
+
+    def test_threshold_dict_has_correct_values(self):
+        """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=3."""
+        from orthonym.decomposition.engine import _MULTI_BOND_THRESHOLD
+        assert _MULTI_BOND_THRESHOLD["glycosidic"] == 2
+        assert _MULTI_BOND_THRESHOLD["amide"] == 3
+        assert _MULTI_BOND_THRESHOLD["ester"] == 3
+
+
+@pytest.mark.unit
+class TestMultiGlycosideAssembly:
+    """Tests for _assemble_multi_glycoside() in fragment_assembly.py (Phase 099-04)."""
+
+    def test_two_sugars_one_aglycone(self):
+        """2 sugar fragments + 1 aglycone produces multi-glycosyloxy pattern."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
+        fragments = [
+            {"smiles": "Oc1ccccc1", "side": "alkyl"},         # phenol (aglycone)
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose-like
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose-like
+        ]
+        fragment_names = {
+            "Oc1ccccc1": "phenol",
+            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
+        }
+        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        assert result is not None, "Should produce a multi-glycoside name"
+        result_lower = result.lower()
+        # Should contain glycosyloxy prefix and phenol
+        assert "glucopyranosyloxy" in result_lower, (
+            f"Should contain glucopyranosyloxy, got: {result}"
+        )
+        assert "phenol" in result_lower, (
+            f"Should contain phenol as aglycone, got: {result}"
+        )
+
+    def test_returns_none_when_all_systematic(self):
+        """Returns None when all sugar fragments have systematic (no retained) names."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
+        fragments = [
+            {"smiles": "Oc1ccccc1", "side": "alkyl"},
+            {"smiles": "OC1CCOCC1", "side": "acid"},  # tetrahydropyran-like (no sugar)
+            {"smiles": "OC1CCOCC1", "side": "acid"},
+        ]
+        fragment_names = {
+            "Oc1ccccc1": "phenol",
+            "OC1CCOCC1": "tetrahydro-2H-pyran-2-ol",  # systematic, no "oxy"
+        }
+        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        assert result is None, (
+            f"Should return None when no sugar retained names, got: {result}"
+        )
+
+    def test_identifies_core_by_seniority(self):
+        """Core fragment (non-sugar) is identified as most senior."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
+        fragments = [
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose
+            {"smiles": "OC(=O)c1ccccc1", "side": "alkyl"},        # benzoic acid (aglycone)
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose
+        ]
+        fragment_names = {
+            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
+            "OC(=O)c1ccccc1": "benzoic acid",
+        }
+        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        assert result is not None
+        # The core should be benzoic acid
+        assert "benzoic acid" in result.lower(), (
+            f"Core should be 'benzoic acid', got: {result}"
+        )
+
+    def test_identical_sugars_use_multiplicative_prefix(self):
+        """Identical sugar fragments should use multiplicative prefix (bis/di)."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
+        fragments = [
+            {"smiles": "Oc1ccccc1", "side": "alkyl"},
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},
+            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},
+        ]
+        fragment_names = {
+            "Oc1ccccc1": "phenol",
+            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
+        }
+        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        assert result is not None
+        result_lower = result.lower()
+        # Identical sugars -> multiplicative prefix
+        assert "bis" in result_lower or "di" in result_lower, (
+            f"Identical sugars should use multiplicative prefix, got: {result}"
+        )
+
+
+@pytest.mark.unit
+class TestMultiAmideAssembly:
+    """Tests for _assemble_multi_amide() in fragment_assembly.py (Phase 099-04)."""
+
+    def test_two_acyl_one_amine(self):
+        """2 acyl fragments + 1 amine core produces 'N-acyl1-N-acyl2-amine' pattern."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
+        fragments = [
+            {"smiles": "NC1CCCCC1", "side": "alkyl"},  # cyclohexanamine (amine core)
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
+            {"smiles": "CCC(=O)O", "side": "acid"},      # propanoic acid
+        ]
+        fragment_names = {
+            "NC1CCCCC1": "cyclohexanamine",
+            "CC(=O)O": "acetic acid",
+            "CCC(=O)O": "propanoic acid",
+        }
+        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        assert result is not None, "Should produce a multi-amide name"
+        result_lower = result.lower()
+        # Should contain N-acyl prefix and amine
+        assert "cyclohexanamine" in result_lower, (
+            f"Should contain amine core, got: {result}"
+        )
+        assert "n-" in result_lower, (
+            f"Should contain N- prefix for acyl groups, got: {result}"
+        )
+
+    def test_returns_none_when_no_acyl_conversion(self):
+        """Returns None when no acid-to-acyl conversion is available."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
+        fragments = [
+            {"smiles": "NC1CCCCC1", "side": "alkyl"},
+            {"smiles": "CCCC", "side": "acid"},  # butane - not an acid
+        ]
+        fragment_names = {
+            "NC1CCCCC1": "cyclohexanamine",
+            "CCCC": "butane",
+        }
+        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        assert result is None, (
+            f"Should return None when no acyl conversion available, got: {result}"
+        )
+
+    def test_identical_acyls_use_multiplicative_prefix(self):
+        """Identical acyl fragments should use N,N-di... grouping."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
+        fragments = [
+            {"smiles": "NC1CCCCC1", "side": "alkyl"},
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "CC(=O)O", "side": "acid"},
+        ]
+        fragment_names = {
+            "NC1CCCCC1": "cyclohexanamine",
+            "CC(=O)O": "acetic acid",
+        }
+        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        assert result is not None
+        result_lower = result.lower()
+        # Identical acyls -> N,N,N-triacetyl pattern
+        assert "acetyl" in result_lower, (
+            f"Should contain acetyl, got: {result}"
+        )
+        # Should have N-prefix
+        assert "n" in result_lower, (
+            f"Should contain N-prefix, got: {result}"
+        )
+
+    def test_core_identified_as_amine(self):
+        """Core fragment is the amine (most senior), non-core are acids."""
+        from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
+        fragments = [
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "NC1CCCCC1", "side": "alkyl"},
+            {"smiles": "CCC(=O)O", "side": "acid"},
+            {"smiles": "CCCC(=O)O", "side": "acid"},
+        ]
+        fragment_names = {
+            "NC1CCCCC1": "cyclohexanamine",
+            "CC(=O)O": "acetic acid",
+            "CCC(=O)O": "propanoic acid",
+            "CCCC(=O)O": "butanoic acid",
+        }
+        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        assert result is not None
+        # Core should be cyclohexanamine
+        assert "cyclohexanamine" in result.lower(), (
+            f"Core should be cyclohexanamine, got: {result}"
+        )
+
+
+@pytest.mark.unit
+class TestMultiBondIntegration:
+    """Integration tests for try_decompose with glycosidic and amide multi-bond paths."""
+
+    def test_try_decompose_multi_glycosidic(self):
+        """try_decompose triggers multi-bond path for molecule with 2+ glycosidic bonds."""
+        # Mock molecule with 2 glycosidic bonds to test dispatch
+        mol = Chem.MolFromSmiles("C" * 30)  # Dummy molecule
+
+        fake_bonds = [
+            {"bond_idx": 0, "type": "glycosidic"},
+            {"bond_idx": 1, "type": "glycosidic"},
+        ]
+
+        multi_result_sentinel = "bis(glucopyranosyloxy)phenol"
+
+        with patch(
+            "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
+            return_value=fake_bonds,
+        ), patch(
+            "orthonym.namer.name_pipeline_only",
+            return_value=None,  # Force quality gate to trigger decomposition
+        ), patch(
+            "orthonym.decomposition.engine._try_single_bond_decompose",
+            return_value=None,
+        ), patch(
+            "orthonym.decomposition.engine._try_multi_bond_decompose",
+            return_value=multi_result_sentinel,
+        ):
+            result = try_decompose(mol)
+
+        assert result == multi_result_sentinel, (
+            f"Should dispatch to multi-bond for 2+ glycosidic bonds, got: {result}"
+        )
+
+    def test_try_decompose_multi_amide(self):
+        """try_decompose triggers multi-bond path for molecule with 3+ amide bonds."""
+        mol = Chem.MolFromSmiles("C" * 30)  # Dummy molecule
+
+        fake_bonds = [
+            {"bond_idx": i, "type": "amide"}
+            for i in range(3)
+        ]
+
+        multi_result_sentinel = "N-acetyl-N-propanoyl-cyclohexanamine"
+
+        with patch(
+            "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
+            return_value=fake_bonds,
+        ), patch(
+            "orthonym.namer.name_pipeline_only",
+            return_value=None,
+        ), patch(
+            "orthonym.decomposition.engine._try_single_bond_decompose",
+            return_value=None,
+        ), patch(
+            "orthonym.decomposition.engine._try_multi_bond_decompose",
+            return_value=multi_result_sentinel,
+        ):
+            result = try_decompose(mol)
+
+        assert result == multi_result_sentinel, (
+            f"Should dispatch to multi-bond for 3+ amide bonds, got: {result}"
+        )
