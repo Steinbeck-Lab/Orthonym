@@ -1062,10 +1062,6 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # - glycosidic: 2 (disaccharide + aglycone)
     # - ester/amide: 3 (2-bond molecules better handled by single-bond)
     # Only attempt when single-bond produced no result at all.
-    # If single_result exists (even if quality gate rejected it), the
-    # single-bond name is likely better than a multi-bond assembly
-    # (which tends to produce garbled names for complex molecules like
-    # peptides with 4+ amide bonds).
     from collections import Counter as _BondCounter
     bond_type_counts = _BondCounter(b["type"] for b in bonds)
     if not single_result:
@@ -1077,6 +1073,18 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 if multi_result:
                     if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                         return multi_result
+
+    # Ester-specific fallback: when single_result exists but failed quality,
+    # multi-bond ester may produce a better name by exposing the clean core
+    # (e.g., removing 3 peripheral acetyloxy groups from a tetracyclic ring).
+    if single_result and not _name_quality_is_acceptable(single_result, mol):
+        ester_count = bond_type_counts.get("ester", 0)
+        if ester_count >= _MULTI_BOND_THRESHOLD.get("ester", 99):
+            ester_bonds = [b for b in bonds if b["type"] == "ester"]
+            multi_result = _try_multi_bond_decompose(mol, ester_bonds, style)
+            if multi_result and _name_quality_is_acceptable(multi_result, mol):
+                if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                    return multi_result
 
     # Compare decomposition result against existing pipeline name:
     # if decomposition produced a worse name (garbled, bracket-mismatched,
