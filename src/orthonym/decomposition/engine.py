@@ -21,7 +21,7 @@ from rdkit import Chem
 # Performance guard
 # ---------------------------------------------------------------------------
 
-MAX_CLEAVABLE_BONDS = 12  # Skip decomposition if more than this many bonds
+MAX_CLEAVABLE_BONDS = 20  # Phase 099: raised from 12, with structural complexity check
 MAX_BOND_RETRY_ATTEMPTS = 5  # Max bonds to try when multi-bond retry is active
 
 
@@ -149,7 +149,15 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # retained names (phenothiazine, carbazole, flavone, etc.) via early
     # whitelist bypass above. For other names, the no-digits/no-hyphens
     # check remains at HA>20 to catch incomplete names.
-    if heavy_atoms > 20 and name.lower() not in _RETAINED_CORE_NAMES:
+    #
+    # Fragment-aware threshold (Phase 099-02): when naming a fragment during
+    # decomposition (visited set non-empty), use HA>30 to be more lenient --
+    # medium-sized fragments with retained names are valid in decomposition
+    # context. At top level (visited set empty), keep HA>20 for strictness.
+    from ..assembly.fragment_naming import _get_visited
+    visited = _get_visited()
+    effective_threshold = 30 if len(visited) > 0 else 20
+    if heavy_atoms > effective_threshold and name.lower() not in _RETAINED_CORE_NAMES:
         has_digits = any(c.isdigit() for c in name)
         has_hyphens = "-" in name
         if not has_digits and not has_hyphens:
@@ -514,6 +522,19 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
                     queue.append(nidx)
 
         return abs(len(visited1) - len(visited2))
+
+    # Sugar-detection bypass: if any glycosidic bond leads to a known sugar,
+    # prefer it. Sugar fragments get retained names (beta-D-glucopyranosyloxy)
+    # which are better than systematic oxane/tetrahydropyran names.
+    # Cap probe at 3 glycosidic bonds to limit performance impact.
+    glycosidic_candidates = [b for b in bonds if b.get("type") == "glycosidic"][:3]
+    for bond in glycosidic_candidates:
+        from .fragment_capping import cleave_and_cap
+        probe_frags = cleave_and_cap(mol, [bond], acid_side_oh=True)
+        if probe_frags:
+            for pf in probe_frags:
+                if pf["side"] == "acid" and _name_sugar_fragment(pf["smiles"]):
+                    return bond  # Sugar bond takes priority
 
     # Sort: first by type priority, then by balance (smaller = better)
     return min(

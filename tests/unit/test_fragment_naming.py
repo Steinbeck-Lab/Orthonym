@@ -138,9 +138,9 @@ class TestLegacyConstants:
         """MAX_NAMING_DEPTH legacy constant should be 7."""
         assert MAX_NAMING_DEPTH == 7
 
-    def test_max_visited_size_is_twenty(self):
-        """Safety-net limit should be 20."""
-        assert _MAX_VISITED_SIZE == 20
+    def test_max_visited_size_is_thirty(self):
+        """Safety-net limit should be 30 (Phase 099: raised from 20)."""
+        assert _MAX_VISITED_SIZE == 30
 
 
 @pytest.mark.unit

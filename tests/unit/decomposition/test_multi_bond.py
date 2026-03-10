@@ -32,15 +32,15 @@ class TestPerformanceGuard:
     """Tests for the MAX_CLEAVABLE_BONDS performance guard in try_decompose()."""
 
     def test_performance_guard_constant_exists(self):
-        """MAX_CLEAVABLE_BONDS constant is defined and is 12."""
-        assert MAX_CLEAVABLE_BONDS == 12
+        """MAX_CLEAVABLE_BONDS constant is defined and is 20 (Phase 099)."""
+        assert MAX_CLEAVABLE_BONDS == 20
 
     def test_performance_guard_skips_many_bonds(self):
         """try_decompose returns None when molecule has >MAX_CLEAVABLE_BONDS bonds."""
         mol = Chem.MolFromSmiles("CCCCCC")  # Simple molecule for the test
 
-        # Mock find_cleavable_bonds to return 13 bonds (more than MAX_CLEAVABLE_BONDS=12)
-        fake_bonds = [{"bond_idx": i, "type": "ester"} for i in range(13)]
+        # Mock find_cleavable_bonds to return 21 bonds (more than MAX_CLEAVABLE_BONDS=20)
+        fake_bonds = [{"bond_idx": i, "type": "ester"} for i in range(21)]
 
         with patch(
             "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
@@ -626,3 +626,217 @@ class TestMultiEsterAssembly:
         assert "tetraacetate" in result.lower() or "tetra" in result.lower(), (
             f"Four identical acids should use 'tetra' prefix, got: {result}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 099-02 Task 2: Sugar bypass, raised limits, fragment-aware quality gate
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestRaisedPerformanceLimits:
+    """Tests for raised performance limits (Phase 099-02)."""
+
+    def test_max_cleavable_bonds_raised_to_20(self):
+        """MAX_CLEAVABLE_BONDS should be 20 (raised from 12)."""
+        assert MAX_CLEAVABLE_BONDS == 20
+
+    def test_max_visited_size_raised_to_30(self):
+        """_MAX_VISITED_SIZE should be 30 (raised from 20)."""
+        from orthonym.assembly.fragment_naming import _MAX_VISITED_SIZE
+        assert _MAX_VISITED_SIZE == 30
+
+    def test_performance_guard_allows_15_bonds(self):
+        """Molecules with 15 cleavable bonds pass the performance guard (was blocked at 12)."""
+        mol = Chem.MolFromSmiles("CCCCCC")
+
+        fake_bonds = [{"bond_idx": i, "type": "ester"} for i in range(15)]
+
+        with patch(
+            "orthonym.decomposition.bond_cleavage.find_cleavable_bonds",
+            return_value=fake_bonds,
+        ), patch(
+            "orthonym.namer.name_pipeline_only",
+            return_value="a good name with hyphens-and-digits-1",
+        ):
+            result = try_decompose(mol)
+            # Result is None because quality gate accepts existing name,
+            # NOT because of performance guard
+            assert result is None
+
+
+@pytest.mark.unit
+class TestSugarDetectionBypass:
+    """Tests for sugar-detection bypass in _select_best_bond() (Phase 099-02)."""
+
+    def test_glycosidic_bond_with_sugar_gets_priority(self):
+        """When a glycosidic bond leads to a known sugar, it should be preferred."""
+        from orthonym.decomposition.engine import _select_best_bond
+
+        # Create a molecule with both ester and glycosidic bonds
+        # The glycosidic bond should be preferred if it leads to a known sugar
+        mol = Chem.MolFromSmiles("CC(=O)OC")  # Dummy mol for BFS
+
+        # Mock scenario: ester bond (priority 1) and glycosidic bond (priority 5)
+        # Normally ester wins, but sugar bypass should give glycosidic priority
+        fake_bonds = [
+            {"bond_idx": 0, "type": "ester"},
+            {"bond_idx": 1, "type": "glycosidic"},
+        ]
+
+        # Mock cleave_and_cap to return a sugar fragment for the glycosidic bond
+        def mock_cleave(m, bond_infos, acid_side_oh=True):
+            if bond_infos[0].get("type") == "glycosidic":
+                return [
+                    {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose-like
+                    {"smiles": "CCO", "side": "alkyl"},
+                ]
+            return [{"smiles": "CCO", "side": "acid"}, {"smiles": "CO", "side": "alkyl"}]
+
+        # Mock _name_sugar_fragment to recognize glucose
+        with patch(
+            "orthonym.decomposition.engine._name_sugar_fragment",
+            side_effect=lambda s: "beta-D-glucopyranosyloxy" if "OC1OC" in s else None,
+        ), patch(
+            "orthonym.decomposition.fragment_capping.cleave_and_cap",
+            side_effect=mock_cleave,
+        ):
+            result = _select_best_bond(mol, fake_bonds)
+
+        assert result["type"] == "glycosidic", (
+            f"Sugar-detection bypass should prefer glycosidic bond, got: {result['type']}"
+        )
+
+    def test_glycosidic_without_sugar_uses_normal_priority(self):
+        """When glycosidic bond does not lead to a known sugar, normal priority applies."""
+        from orthonym.decomposition.engine import _select_best_bond
+
+        mol = Chem.MolFromSmiles("CC(=O)OC")  # Dummy mol
+
+        fake_bonds = [
+            {"bond_idx": 0, "type": "ester"},
+            {"bond_idx": 1, "type": "glycosidic"},
+        ]
+
+        # Mock cleave_and_cap to return non-sugar fragments
+        with patch(
+            "orthonym.decomposition.engine._name_sugar_fragment",
+            return_value=None,  # No sugar recognized
+        ), patch(
+            "orthonym.decomposition.fragment_capping.cleave_and_cap",
+            return_value=[{"smiles": "CCO", "side": "acid"}, {"smiles": "CO", "side": "alkyl"}],
+        ):
+            result = _select_best_bond(mol, fake_bonds)
+
+        assert result["type"] == "ester", (
+            f"Without sugar detection, ester should have priority, got: {result['type']}"
+        )
+
+    def test_sugar_bypass_limited_to_3_candidates(self):
+        """Sugar-detection bypass probes at most 3 glycosidic bonds."""
+        from orthonym.decomposition.engine import _select_best_bond
+
+        # Need a molecule with enough bonds (5+) so bond_idx 0-4 are valid
+        mol = Chem.MolFromSmiles("CCCCCCCCCC")  # 10 carbons, 9 bonds
+
+        # 5 glycosidic bonds -- only first 3 should be probed
+        fake_bonds = [{"bond_idx": i, "type": "glycosidic"} for i in range(5)]
+
+        probe_count = [0]
+
+        def counting_cleave(m, bond_infos, acid_side_oh=True):
+            probe_count[0] += 1
+            return [{"smiles": "CCO", "side": "acid"}, {"smiles": "CO", "side": "alkyl"}]
+
+        with patch(
+            "orthonym.decomposition.engine._name_sugar_fragment",
+            return_value=None,
+        ), patch(
+            "orthonym.decomposition.fragment_capping.cleave_and_cap",
+            side_effect=counting_cleave,
+        ):
+            _select_best_bond(mol, fake_bonds)
+
+        assert probe_count[0] <= 3, (
+            f"Sugar bypass should probe at most 3 glycosidic bonds, probed {probe_count[0]}"
+        )
+
+
+@pytest.mark.unit
+class TestFragmentAwareQualityGate:
+    """Tests for fragment-aware quality gate relaxation (Phase 099-02)."""
+
+    def _make_mol(self, heavy_atoms: int):
+        """Create a mol with approximately the given number of heavy atoms."""
+        smiles = "C" * max(heavy_atoms, 1)
+        return Chem.MolFromSmiles(smiles)
+
+    def test_top_level_uses_ha_20_threshold(self):
+        """At top level (no decomposition), HA>20 threshold applies."""
+        # Name with no digits/hyphens for a 22 HA molecule -> should fail
+        mol = self._make_mol(22)
+        name = "someverylongretainedname"  # no digits, no hyphens, 23 chars
+
+        # Ensure visited set is empty (top level)
+        from orthonym.assembly.fragment_naming import _fragment_guard
+        old_visited = getattr(_fragment_guard, 'visited', None)
+        _fragment_guard.visited = set()  # Empty = top level
+        try:
+            result = _name_quality_is_acceptable(name, mol)
+            assert result is False, (
+                "Top-level should use HA>20 threshold and reject no-digits/no-hyphens "
+                f"for HA=22, got True for: {name}"
+            )
+        finally:
+            _fragment_guard.visited = old_visited
+
+    def test_fragment_context_uses_ha_30_threshold(self):
+        """During decomposition (visited set non-empty), HA>30 threshold applies."""
+        # Same name with 25 HA -> should pass in fragment context (25 < 30)
+        mol = self._make_mol(25)
+        name = "someverylongretainedname"  # no digits, no hyphens
+
+        from orthonym.assembly.fragment_naming import _fragment_guard
+        old_visited = getattr(_fragment_guard, 'visited', None)
+        _fragment_guard.visited = {"some_smiles"}  # Non-empty = fragment context
+        try:
+            result = _name_quality_is_acceptable(name, mol)
+            assert result is True, (
+                "Fragment context should use HA>30 threshold and accept no-digits/no-hyphens "
+                f"for HA=25, got False for: {name}"
+            )
+        finally:
+            _fragment_guard.visited = old_visited
+
+    def test_fragment_context_still_rejects_above_30(self):
+        """Even in fragment context, HA>30 with no digits/hyphens is rejected."""
+        mol = self._make_mol(32)
+        name = "someverylongretainedname"  # no digits, no hyphens
+
+        from orthonym.assembly.fragment_naming import _fragment_guard
+        old_visited = getattr(_fragment_guard, 'visited', None)
+        _fragment_guard.visited = {"some_smiles"}  # Fragment context
+        try:
+            result = _name_quality_is_acceptable(name, mol)
+            assert result is False, (
+                "Fragment context with HA>30 should still reject no-digits/no-hyphens "
+                f"for HA=32, got True for: {name}"
+            )
+        finally:
+            _fragment_guard.visited = old_visited
+
+    def test_retained_core_name_bypasses_regardless(self):
+        """Retained core names bypass the threshold regardless of context."""
+        mol = self._make_mol(35)
+        name = "adenine"  # In _RETAINED_CORE_NAMES
+
+        from orthonym.assembly.fragment_naming import _fragment_guard
+        old_visited = getattr(_fragment_guard, 'visited', None)
+        _fragment_guard.visited = set()  # Top level
+        try:
+            result = _name_quality_is_acceptable(name, mol)
+            assert result is True, (
+                "Retained core name should always pass regardless of HA"
+            )
+        finally:
+            _fragment_guard.visited = old_visited

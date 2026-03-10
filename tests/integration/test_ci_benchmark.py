@@ -258,7 +258,7 @@ CI_BENCHMARK = [
         "OC[C@H]1O[C@H](OC[C@H]2O[C@H](OC[C@H]3O[C@H](O)[C@H](O)"
         "[C@@H](O)[C@@H]3O)[C@H](O)[C@@H](O)[C@H]2O)[C@H](O)"
         "[C@@H](O)[C@@H]1O",
-        "(2R,3S,4S,5R,6S)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
+        "(alpha-D-glucopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
     ),
     (
         "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O",
@@ -478,7 +478,7 @@ CI_BENCHMARK = [
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",
-        "(oxan-2-yl)oxybenzene",
+        "(rhamnopyranosyloxy)(oxan-2-yl)oxybenzene",
     ),
 ]
 

@@ -38,7 +38,7 @@ MAX_NAMING_DEPTH = 7
 # to prevent unbounded decomposition chains where every fragment SMILES
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
-_MAX_VISITED_SIZE = 20
+_MAX_VISITED_SIZE = 30  # Phase 099: raised from 20 for deeper decomposition chains
 
 
 def _get_visited() -> set:
