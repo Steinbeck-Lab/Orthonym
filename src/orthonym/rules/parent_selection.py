@@ -25,6 +25,7 @@ from typing import List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..perception.chains import find_longest_skeletal_chain
 from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
 
@@ -439,6 +440,38 @@ def _compare_substituent_locants(
     return -cmp
 
 
+def _has_bridging_heteroatom(mol, chain: List[int]) -> bool:
+    """Check if a skeletal chain contains a genuine bridging heteroatom.
+
+    A bridging heteroatom is a non-carbon atom (N, O, S) that has at least
+    2 neighbors within the chain, meaning it connects two carbon segments
+    (e.g., C-O-C ether, C-NH-C amine). Terminal heteroatoms from functional
+    groups (e.g., C=O carbonyl oxygen) have only 1 chain neighbor and are
+    NOT bridging.
+
+    This guard prevents skeletal chains from being preferred just because
+    they pick up a terminal functional group atom (Phase 91.1 lesson).
+
+    Args:
+        mol: RDKit Mol object
+        chain: Ordered list of atom indices forming the skeletal chain
+
+    Returns:
+        True if chain contains at least one bridging heteroatom
+    """
+    chain_set = set(chain)
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() == 6:
+            continue  # Skip carbons
+        chain_nbrs = sum(
+            1 for nbr in atom.GetNeighbors() if nbr.GetIdx() in chain_set
+        )
+        if chain_nbrs >= 2:
+            return True
+    return False
+
+
 def _compare_substituent_count(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
     """P-44.1(h): Maximum number of substituents."""
     chain_subs = _count_substituents_on_atoms(mol, chain_set)
@@ -583,8 +616,29 @@ def select_parent(
         )
         # P-52.2.8: Use largest individual ring size, not total fused system
         ring_size = _get_largest_individual_ring_size(mol, best_ring)
-        chain_len = len(principal_chain)
-        chain_set = set(principal_chain)
+
+        # P-44.3(b): Consider heteroatom-inclusive skeletal chain as candidate.
+        # The skeletal chain is only preferred when STRICTLY longer than the
+        # carbon-only chain AND contains the principal group AND has at least
+        # one bridging heteroatom (connecting two carbon segments, e.g., C-O-C).
+        # P-44.1.2.1: same-length chains prefer carbon-only (maximum carbon content).
+        # Phase 91.1 lesson: skeletal chain must go through the FULL cascade.
+        # Guard 4: bridging heteroatom prevents picking up terminal FG atoms.
+        candidate_chain = principal_chain
+        skeletal_chain = find_longest_skeletal_chain(mol, exclude_atoms=all_ring_atoms)
+        if (skeletal_chain
+                and len(skeletal_chain) > len(principal_chain)
+                and principal_group_atoms
+                and is_principal_group_on_chain(mol, skeletal_chain, principal_group_atoms)
+                and _has_bridging_heteroatom(mol, skeletal_chain)):
+            candidate_chain = skeletal_chain
+            logger.debug(
+                "P-44.3(b): Using skeletal chain (len=%d) over carbon chain (len=%d)",
+                len(skeletal_chain), len(principal_chain)
+            )
+
+        chain_len = len(candidate_chain)
+        chain_set = set(candidate_chain)
 
         # P-44.1 cascade: criteria (c) through (i)
         cascade_result = _compare_chain_length(chain_len, ring_size)        # P-44.1(c)
@@ -594,15 +648,15 @@ def select_parent(
             cascade_result = _compare_double_bonds(mol, chain_set, best_ring)    # P-44.1(e)
         if cascade_result == 0:
             cascade_result = _compare_pg_locants(
-                mol, principal_chain, best_ring, principal_group_atoms)           # P-44.1(f)
+                mol, candidate_chain, best_ring, principal_group_atoms)           # P-44.1(f)
         if cascade_result == 0:
             cascade_result = _compare_multiple_bond_locants(
-                mol, principal_chain, best_ring)                                 # P-44.1(g)
+                mol, candidate_chain, best_ring)                                 # P-44.1(g)
         if cascade_result == 0:
             cascade_result = _compare_substituent_count(mol, chain_set, best_ring)  # P-44.1(h)
         if cascade_result == 0:
             cascade_result = _compare_substituent_locants(
-                mol, principal_chain, best_ring)                                 # P-44.1(i)
+                mol, candidate_chain, best_ring)                                 # P-44.1(i)
 
         if cascade_result > 0:
             # Chain wins
@@ -610,7 +664,7 @@ def select_parent(
             all_sub_rings = [tuple(sorted(best_ring))] + other_ring_tuples
             return ParentSelectionResult(
                 parent_type='chain',
-                parent_atoms=principal_chain,
+                parent_atoms=candidate_chain,
                 substituent_rings=all_sub_rings,
                 reasoning=f"P-44.1 cascade: chain wins (len={chain_len}, ring={ring_size})"
             )
