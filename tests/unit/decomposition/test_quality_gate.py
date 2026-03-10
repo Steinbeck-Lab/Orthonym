@@ -458,26 +458,33 @@ class TestNameSizeCoverage:
     """Tests for _name_covers_molecule() heuristic in quality gate.
 
     The name-size coverage heuristic rejects pipeline names that describe
-    less than ~55% of the molecule's heavy atoms when cleavable bonds
+    less than ~45% of the molecule's heavy atoms when cleavable bonds
     exist and decomposition hasn't been attempted yet. This catches cases
-    like "5-chloroquinoline" (17 chars) naming a 23-HA ester molecule
+    like "5-chloroquinoline" (17 chars) naming a 26-HA ester molecule
     where the name only describes the quinoline fragment.
     """
 
     @pytest.mark.unit
     def test_small_molecule_always_passes(self):
-        """_name_covers_molecule returns True for small molecules (HA <= 15)
-        regardless of name length."""
+        """_name_covers_molecule returns True for small/medium molecules
+        (HA <= 20) regardless of name length."""
         from orthonym.decomposition.engine import _name_covers_molecule
         # naphthalene: 10 HA, "naphthalene" = 11 chars
         mol = Chem.MolFromSmiles("c1cccc2ccccc12")  # naphthalene, HA=10
         assert mol is not None
-        assert mol.GetNumHeavyAtoms() <= 15
+        assert mol.GetNumHeavyAtoms() <= 20
         assert _name_covers_molecule("naphthalene", mol) is True
+
+        # heptanamide: 18 HA, amide bond, "heptanamide" = 11 chars
+        # HA=18 <= 20 => bypass => passes
+        mol2 = Chem.MolFromSmiles("CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12")
+        assert mol2 is not None
+        assert mol2.GetNumHeavyAtoms() <= 20
+        assert _name_covers_molecule("heptanamide", mol2) is True
 
     @pytest.mark.unit
     def test_adequate_coverage_passes(self):
-        """_name_covers_molecule returns True when estimated coverage >= 0.55
+        """_name_covers_molecule returns True when estimated coverage >= 0.45
         (e.g., '2-methylnaphthalene' for 11-HA molecule)."""
         from orthonym.decomposition.engine import _name_covers_molecule
         # 2-methylnaphthalene: 11 HA, "2-methylnaphthalene" = 19 chars
@@ -488,13 +495,14 @@ class TestNameSizeCoverage:
 
     @pytest.mark.unit
     def test_partial_coverage_rejected(self):
-        """_name_covers_molecule returns False when estimated coverage < 0.55
-        (e.g., '5-chloroquinoline' for 23-HA ester)."""
+        """_name_covers_molecule returns False when estimated coverage < 0.45
+        (e.g., '5-chloroquinoline' for 26-HA ester)."""
         from orthonym.decomposition.engine import _name_covers_molecule
-        # 5-chloroquinoline: name for a 23-HA ester (OC(=O)CCCCCC-c1ccc(Cl)c2ncccc12)
+        # Long-chain ester with 5-chloroquinoline as the alcohol portion.
         # "5-chloroquinoline" = 17 chars, estimated_ha = 17/1.5 = 11.3
-        # coverage = 11.3/23 = 0.49 < 0.55 => rejected
-        mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")  # 23 HA ester
+        # HA = 26, coverage = 11.3/26 = 0.44 < 0.55 => rejected.
+        # Molecule has 1 ester bond (cleavable).
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCC(=O)Oc1ccc(Cl)c2ncccc12")  # 26 HA ester
         assert mol is not None
         ha = mol.GetNumHeavyAtoms()
         assert ha > 15, f"Need HA > 15, got {ha}"
@@ -525,7 +533,7 @@ class TestNameSizeCoverage:
         _fragment_guard.visited = {"some_smiles_in_progress"}
         try:
             # Large molecule with short name that would normally fail
-            mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")  # 23 HA
+            mol = Chem.MolFromSmiles("CCCCCCCCCCCCC(=O)Oc1ccc(Cl)c2ncccc12")  # 26 HA
             assert _name_covers_molecule("5-chloroquinoline", mol) is True
         finally:
             _fragment_guard.visited = old_visited
@@ -535,11 +543,12 @@ class TestNameSizeCoverage:
         """_name_quality_is_acceptable rejects partial names that pass all
         existing checks but fail name-size coverage."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
-        # Molecule: ester with 23 HA that pipeline names as "5-chloroquinoline"
-        # This name has digits AND hyphens (passes no-digits check),
-        # length 17 >= 23//2=11 (passes short check), ratio 17/23=0.74 (passes
-        # 0.45 threshold). But it only describes ~11 HA of a 23-HA molecule.
-        mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")
+        # Molecule: long-chain ester with 26 HA, pipeline names as
+        # "5-chloroquinoline". This name has digits AND hyphens (passes
+        # no-digits check), length 17 >= 26//2=13 (passes short check),
+        # ratio 17/26=0.65 (passes 0.45 threshold). But it only describes
+        # ~11 HA of a 26-HA molecule (coverage 0.44 < 0.45).
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCCC(=O)Oc1ccc(Cl)c2ncccc12")
         assert mol is not None
         ha = mol.GetNumHeavyAtoms()
         assert ha > 15

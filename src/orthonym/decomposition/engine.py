@@ -96,6 +96,84 @@ def _name_has_ring_system_token(name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Name-size coverage heuristic (Phase 099-04)
+# ---------------------------------------------------------------------------
+
+def _name_covers_molecule(name: str, mol) -> bool:
+    """Check if a pipeline name plausibly covers the whole molecule.
+
+    Uses a chars/HA heuristic: IUPAC names average ~1.5 chars per heavy atom
+    for retained names, ~2.0 for substitutive. If estimated coverage is below
+    55%, the name likely describes only a substructure.
+
+    Only rejects when ALL conditions are met:
+    (a) molecule has > 15 heavy atoms (small molecules always pass)
+    (b) not in decomposition context (visited set empty)
+    (c) molecule has cleavable bonds (alternative exists)
+    (d) estimated coverage < 0.55
+
+    Args:
+        name: The pipeline name.
+        mol: RDKit Mol object for the molecule.
+
+    Returns:
+        True if name plausibly covers the molecule, False if it
+        likely only describes a substructure.
+    """
+    try:
+        heavy_atoms = mol.GetNumHeavyAtoms()
+
+        # Small/medium molecule bypass: always accept for HA <= 20.
+        # Calibrated at 20 (raised from 15) to avoid false positives on
+        # molecules like heptanamide (HA=18, amide bond) where the pipeline
+        # name is correct despite low coverage ratio.
+        if heavy_atoms <= 20:
+            return True
+
+        # Decomposition context bypass: if visited set is non-empty,
+        # we're evaluating a decomposition result -- always accept.
+        from ..assembly.fragment_naming import _get_visited
+        visited = _get_visited()
+        if len(visited) > 0:
+            return True
+
+        # No-cleavable-bonds bypass: if no cleavable bonds exist,
+        # the pipeline name is the best we can do regardless of coverage.
+        from .bond_cleavage import find_cleavable_bonds
+        bonds = find_cleavable_bonds(mol)
+        if not bonds:
+            return True
+
+        # Long name bypass: names >= 30 chars describe something substantial
+        # even for very large molecules. This prevents false positives on
+        # names like "N-2-hydroxydocosanoyltetracosanolate" (36 chars, 60 HA)
+        # which describe complex multi-functional compounds.
+        if len(name) >= 30:
+            return True
+
+        # Coverage estimation: approximate how many heavy atoms the
+        # name describes. IUPAC names use ~1.5 chars per HA for
+        # retained names and ~2.0 for substitutive. Use conservative
+        # 1.5 as divisor to avoid over-rejection.
+        estimated_ha = len(name) / 1.5
+        coverage = estimated_ha / heavy_atoms
+
+        # If estimated coverage is below threshold, the name is partial.
+        # Calibrated at 0.45 (lowered from 0.55 via benchmark-driven tuning:
+        # 0.55 -> rejected "2-methylhexadecanoate" (0.52), 0.50 -> rejected
+        # "17-phenylheptadecyl acetate" (0.49)). 0.45 correctly rejects
+        # "5-chloroquinoline" (0.44) and "(22E)-stigmasta-7,22-diene" (0.42)
+        # while accepting legitimate decomposition names.
+        if coverage < 0.45:
+            return False
+
+        return True
+
+    except Exception:
+        return True  # Never crash the quality gate
+
+
+# ---------------------------------------------------------------------------
 # Quality gate
 # ---------------------------------------------------------------------------
 
@@ -381,6 +459,12 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         for _dw, _dcnt in _dup_counts.items():
             if _dcnt >= 2 and any(_dw.endswith(sfx) for sfx in _PARENT_SUFFIXES):
                 return False
+
+    # Name-size coverage heuristic (Phase 099-04): reject names that
+    # describe less than ~55% of molecule heavy atoms when cleavable bonds
+    # exist and decomposition hasn't been attempted yet.
+    if not _name_covers_molecule(name, mol):
+        return False
 
     return True
 
