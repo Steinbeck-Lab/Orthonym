@@ -37,6 +37,20 @@ _FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate"
 
 
 # ---------------------------------------------------------------------------
+# Bond-type-specific thresholds for multi-bond decomposition (Phase 099-04)
+# ---------------------------------------------------------------------------
+
+# Glycosidic bonds: threshold 2 (disaccharide + aglycone benefits from multi-bond).
+# Ester/amide: threshold 3 (2-bond molecules better handled by single-bond).
+# Phase 099-02 confirmed count>=2 causes regressions on 2-ester phospholipids.
+_MULTI_BOND_THRESHOLD = {
+    "ester": 3,
+    "glycosidic": 2,
+    "amide": 3,
+}
+
+
+# ---------------------------------------------------------------------------
 # Retained-name whitelist for quality gate
 # ---------------------------------------------------------------------------
 
@@ -854,7 +868,11 @@ def _try_multi_bond_decompose(
 
     from .fragment_capping import cleave_and_cap
     from ..assembly.fragment_naming import name_fragment_recursively
-    from .fragment_assembly import _assemble_multi_ester
+    from .fragment_assembly import (
+        _assemble_multi_ester,
+        _assemble_multi_glycoside,
+        _assemble_multi_amide,
+    )
 
     # Cleave with acid_side_oh = True for ester/amide/glycosidic, False for ether
     acid_oh = bond_type != "ether"
@@ -895,8 +913,11 @@ def _try_multi_bond_decompose(
     # Dispatch to bond-type-specific multi-fragment assembler
     if bond_type == "ester":
         result = _assemble_multi_ester(fragments, fragment_names, style)
+    elif bond_type == "glycosidic":
+        result = _assemble_multi_glycoside(fragments, fragment_names, style)
+    elif bond_type == "amide":
+        result = _assemble_multi_amide(fragments, fragment_names, style)
     else:
-        # Only esters support multi-bond assembly for now
         return None
 
     if not result:
@@ -1034,21 +1055,27 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 continue
             return alt_result
 
-    # MULTI-BOND SAME-TYPE cleavage (Phase 099): if 3+ bonds of the same
+    # MULTI-BOND SAME-TYPE cleavage (Phase 099): if N+ bonds of the same
     # type exist, try cleaving all same-type bonds simultaneously
-    # (IUPAC P-65.6.3.4 polyesters / triglycerides).
-    # Only attempt when no single-bond result was acceptable (count >= 3
-    # to target genuine polyesters, not molecules with just 2 ester bonds
-    # which are better handled by single-bond decomposition).
+    # (IUPAC P-65.6.3.4 polyesters / triglycerides, P-68 glycosides).
+    # Bond-type-specific thresholds (Phase 099-04):
+    # - glycosidic: 2 (disaccharide + aglycone)
+    # - ester/amide: 3 (2-bond molecules better handled by single-bond)
+    # Only attempt when single-bond produced no result at all.
+    # If single_result exists (even if quality gate rejected it), the
+    # single-bond name is likely better than a multi-bond assembly
+    # (which tends to produce garbled names for complex molecules like
+    # peptides with 4+ amide bonds).
     from collections import Counter as _BondCounter
     bond_type_counts = _BondCounter(b["type"] for b in bonds)
-    for bond_type_key, count in bond_type_counts.most_common():
-        if count >= 3:
-            same_type_bonds = [b for b in bonds if b["type"] == bond_type_key]
-            multi_result = _try_multi_bond_decompose(mol, same_type_bonds, style)
-            if multi_result:
-                if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
-                    if not (single_result and _decomposition_is_worse(multi_result, single_result, mol)):
+    if not single_result:
+        for bond_type_key, count in bond_type_counts.most_common():
+            threshold = _MULTI_BOND_THRESHOLD.get(bond_type_key, 99)
+            if count >= threshold:
+                same_type_bonds = [b for b in bonds if b["type"] == bond_type_key]
+                multi_result = _try_multi_bond_decompose(mol, same_type_bonds, style)
+                if multi_result:
+                    if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                         return multi_result
 
     # Compare decomposition result against existing pipeline name:

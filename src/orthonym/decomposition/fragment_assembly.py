@@ -760,6 +760,222 @@ def _assemble_multi_ester(
     return f"{core_name} {' '.join(ate_names)}"
 
 
+def _assemble_multi_glycoside(
+    fragments: List[Dict],
+    fragment_names: Dict[str, str],
+    style: str = "pin",
+) -> Optional[str]:
+    """Assemble names for molecules with 2+ glycosidic bonds.
+
+    Pattern: (sugar1-oxy)(sugar2-oxy)aglycone per IUPAC P-68.
+    Each sugar fragment should resolve to a retained glycosyloxy prefix.
+    If NO sugar fragment gets a retained name (all end up as systematic
+    oxanyloxane), fall back to None to prevent garbled names.
+
+    Args:
+        fragments: List of fragment dicts from cleave_and_cap().
+        fragment_names: Dict mapping canonical SMILES to IUPAC names.
+        style: Naming style.
+
+    Returns:
+        Multi-glycoside name like "bis(beta-D-glucopyranosyloxy)phenol",
+        or None if assembly fails.
+    """
+    from .fragment_ranker import score_fragment_seniority
+
+    if not fragments or not fragment_names:
+        return None
+
+    # De-duplicate fragment SMILES for scoring
+    unique_smiles = list(set(f["smiles"] for f in fragments))
+    if len(unique_smiles) < 2:
+        return None  # Need at least core + one sugar
+
+    # Identify sugar vs aglycone fragments. For glycosides, the core
+    # is the aglycone (non-sugar), not the most-senior fragment.
+    # Sugar fragments are identified by: name ending in "oxy" OR
+    # sugar lookup succeeding on the SMILES.
+    sugar_smiles = set()
+    for smi in unique_smiles:
+        frag_name = fragment_names.get(smi, "")
+        if frag_name.endswith("oxy"):
+            sugar_smiles.add(smi)
+        elif lookup_sugar(smi):
+            sugar_smiles.add(smi)
+
+    # Core is the non-sugar fragment. If multiple non-sugars, pick
+    # by seniority. If all are sugars, pick the most senior as core.
+    non_sugar_smiles = [s for s in unique_smiles if s not in sugar_smiles]
+    if non_sugar_smiles:
+        core_smiles = min(
+            non_sugar_smiles,
+            key=lambda s: score_fragment_seniority(s),
+        )
+    else:
+        # All fragments are sugars -- pick the most senior as core
+        core_smiles = min(
+            unique_smiles,
+            key=lambda s: score_fragment_seniority(s),
+        )
+    core_name = fragment_names.get(core_smiles, "")
+    if not core_name:
+        return None
+
+    # Collect glycosyloxy prefixes from non-core fragments
+    glycosyloxy_prefixes: List[str] = []
+    has_retained_sugar = False
+
+    for frag in fragments:
+        if frag["smiles"] == core_smiles:
+            continue
+        frag_name = fragment_names.get(frag["smiles"])
+        if not frag_name:
+            continue
+
+        # Check if the name is a glycosyloxy prefix (ends in "oxy")
+        if frag_name.endswith("oxy"):
+            glycosyloxy_prefixes.append(frag_name)
+            has_retained_sugar = True
+        else:
+            # Try to convert to glycosyloxy prefix via sugar lookup
+            sugar_info = lookup_sugar(frag["smiles"])
+            if sugar_info:
+                anomer, config, base_name = sugar_info
+                prefix = sugar_to_glycosyloxy_prefix(anomer, config, base_name)
+                if prefix:
+                    glycosyloxy_prefixes.append(prefix)
+                    has_retained_sugar = True
+                else:
+                    glycosyloxy_prefixes.append(frag_name)
+            else:
+                glycosyloxy_prefixes.append(frag_name)
+
+    if not glycosyloxy_prefixes:
+        return None
+
+    # Pitfall 4: if no sugar fragment got a retained name, fall back
+    # to prevent garbled "oxanyloxy-oxanyloxy" names
+    if not has_retained_sugar:
+        return None
+
+    # Handle identical sugars with multiplicative prefix
+    prefix_counts = _Counter(glycosyloxy_prefixes)
+    _MULT_PREFIX = {1: "", 2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis"}
+
+    if len(prefix_counts) == 1:
+        # All identical sugars
+        prefix, count = list(prefix_counts.items())[0]
+        mult = _MULT_PREFIX.get(count, str(count))
+        if mult:
+            assembled_prefix = f"{mult}({prefix})"
+        else:
+            assembled_prefix = f"({prefix})"
+    else:
+        # Different sugars: wrap each in parens
+        assembled_parts = []
+        for prefix in glycosyloxy_prefixes:
+            assembled_parts.append(f"({prefix})")
+        assembled_prefix = "".join(assembled_parts)
+
+    return _join_components(assembled_prefix, core_name)
+
+
+def _assemble_multi_amide(
+    fragments: List[Dict],
+    fragment_names: Dict[str, str],
+    style: str = "pin",
+) -> Optional[str]:
+    """Assemble names for molecules with 3+ amide bonds.
+
+    Pattern: N-acyl1,N-acyl2-amine per IUPAC P-66.6.3.
+    Each acyl group as N- prefix on the amine core.
+
+    Args:
+        fragments: List of fragment dicts from cleave_and_cap().
+        fragment_names: Dict mapping canonical SMILES to IUPAC names.
+        style: Naming style.
+
+    Returns:
+        Multi-amide name like "N,N,N-triacetylcyclohexanamine",
+        or None if assembly fails.
+    """
+    from .fragment_ranker import score_fragment_seniority
+
+    if not fragments or not fragment_names:
+        return None
+
+    # De-duplicate fragment SMILES for scoring
+    unique_smiles = list(set(f["smiles"] for f in fragments))
+    if len(unique_smiles) < 2:
+        return None  # Need at least core + one acid
+
+    # For amide assembly, the core is the AMINE fragment, not the acid.
+    # Identify acid fragments: their names end in "acid" or convert to
+    # an acyl prefix successfully. The remaining fragment is the amine core.
+    acid_smiles = set()
+    for smi in unique_smiles:
+        frag_name = fragment_names.get(smi, "").strip().lower()
+        if frag_name.endswith("acid") or frag_name.endswith("ate"):
+            acid_smiles.add(smi)
+
+    # Core is the non-acid fragment (amine). If multiple non-acids, pick
+    # the most senior by seniority scoring.
+    non_acid_smiles = [s for s in unique_smiles if s not in acid_smiles]
+    if non_acid_smiles:
+        core_smiles = min(
+            non_acid_smiles,
+            key=lambda s: score_fragment_seniority(s),
+        )
+    else:
+        # All fragments look like acids -- pick the most senior as core
+        core_smiles = min(
+            unique_smiles,
+            key=lambda s: score_fragment_seniority(s),
+        )
+    core_name = fragment_names.get(core_smiles, "")
+    if not core_name:
+        return None
+
+    # Collect acyl prefixes from non-core fragments
+    acyl_names: List[str] = []
+    for frag in fragments:
+        if frag["smiles"] == core_smiles:
+            continue
+        acid_name = fragment_names.get(frag["smiles"])
+        if not acid_name:
+            continue
+        acyl = _acid_to_acyl(acid_name)
+        if acyl:
+            acyl_names.append(acyl)
+
+    if not acyl_names:
+        return None
+
+    # Group identical acyls for multiplicative prefix
+    acyl_counts = _Counter(acyl_names)
+    _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+
+    # Build the N-prefix assembly
+    n_parts: List[str] = []
+    for acyl, count in sorted(acyl_counts.items()):
+        mult = _MULT_PREFIX.get(count, str(count))
+        n_locant = ",".join(["N"] * count)
+        n_parts.append(f"{n_locant}-{mult}{acyl}")
+
+    if not n_parts:
+        return None
+
+    # Join N-prefix parts with hyphens and append core name
+    prefix_str = "-".join(n_parts)
+    result = _join_components(prefix_str, core_name)
+
+    # Apply N-substituent grouping
+    if result.count("N-") >= 2:
+        result = _group_n_substituents(result)
+
+    return result
+
+
 def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     """Convert an alcohol or fragment name to its alkoxy form.
 

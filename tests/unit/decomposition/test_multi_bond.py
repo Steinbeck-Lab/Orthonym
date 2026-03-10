@@ -990,20 +990,22 @@ class TestMultiAmideAssembly:
             f"Should contain N- prefix for acyl groups, got: {result}"
         )
 
-    def test_returns_none_when_no_acyl_conversion(self):
-        """Returns None when no acid-to-acyl conversion is available."""
+    def test_returns_none_when_core_name_empty(self):
+        """Returns None when core fragment name is empty."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
         fragments = [
             {"smiles": "NC1CCCCC1", "side": "alkyl"},
-            {"smiles": "CCCC", "side": "acid"},  # butane - not an acid
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "CC(=O)O", "side": "acid"},
         ]
         fragment_names = {
-            "NC1CCCCC1": "cyclohexanamine",
-            "CCCC": "butane",
+            "NC1CCCCC1": "",  # Empty core name
+            "CC(=O)O": "acetic acid",
         }
         result = _assemble_multi_amide(fragments, fragment_names, "pin")
         assert result is None, (
-            f"Should return None when no acyl conversion available, got: {result}"
+            f"Should return None when core name is empty, got: {result}"
         )
 
     def test_identical_acyls_use_multiplicative_prefix(self):
