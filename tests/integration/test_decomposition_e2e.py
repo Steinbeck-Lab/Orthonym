@@ -139,18 +139,20 @@ class TestAmideDecomposition:
 
     @pytest.mark.integration
     def test_histidyl_adenylate_produces_complete_name(self):
-        """Nucleotide ester (histidyl-adenylate): was 'adenine'.
-        Phase 58 fix: nucleobase retained names (adenine, guanine, etc.)
-        now bypass the coverage gate for large molecules where the
-        heterocycle IS the recognizable core substructure."""
+        """Nucleotide ester (histidyl-adenylate): Phase 099-03 coverage
+        guard rejects 'adenine' (7 chars for 33 HA = ratio 0.21),
+        triggering decomposition that produces a more complete name."""
         smi = (
             "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
             "[C@@H](N)Cc2c[nH]cn2)[C@H]1O"
         )
         name = name_compound(smi)
         assert name != "unknown"
-        # Adenine is the correct retained name for the core substructure
-        assert name == "adenine", f"Expected 'adenine', got '{name}'"
+        # Coverage guard (Phase 099-03): 'adenine' ratio 0.21 < 0.25 threshold
+        # for HA=33 molecule -> decomposition produces more descriptive name
+        assert name == "adenine (2S)-2-amino-3-imidazolylpropanoate", (
+            f"Expected decomposition result, got '{name}'"
+        )
 
     @pytest.mark.integration
     def test_macrolide_ester_produces_complete_name(self):

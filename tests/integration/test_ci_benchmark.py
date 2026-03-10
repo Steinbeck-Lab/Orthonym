@@ -454,7 +454,7 @@ CI_BENCHMARK = [
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
         "[C@@H](N)Cc2c[nH]cn2)[C@H]1O",
-        "adenine",  # Phase 58: retained core name whitelist bypass
+        "adenine (2S)-2-amino-3-imidazolylpropanoate",  # Phase 099-03: coverage guard rejects "adenine" for 33-HA molecule (ratio 0.21), decomposition produces complete name
     ),
     (
         "NC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](N)C[C@@H]2N)"

@@ -316,34 +316,36 @@ class TestMultiBondUnderCoverage:
     """
 
     @pytest.mark.unit
-    def test_name_missing_ester_tokens_with_ester_and_phospho(self):
-        """Name 'butanedioic acid' has no ester/phospho tokens for a molecule with
-        ester + phosphodiester bonds: should be rejected."""
+    def test_name_missing_bond_tokens_with_ester_and_phospho(self):
+        """Name 'hexadecan-1-ol' has no ester or phospho tokens for a molecule
+        with ester + phosphodiester bonds (HA=27): should be rejected by
+        multi-bond under-coverage check (ratio 0.52 < 0.8, 0/2 types represented)."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
-        # Molecule with ester + phosphodiester bonds, HA=17
-        mol = Chem.MolFromSmiles("CCCCCC(=O)OCCOP(=O)(O)OCC")
+        # Molecule with ester + phosphodiester bonds, HA=27
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCC(=O)OCCCCOP(=O)(O)OCCCC")
         assert mol is not None
         ha = mol.GetNumHeavyAtoms()
-        assert ha > 15, f"Need HA > 15, got {ha}"
-        # "butanedioic acid" has no ester/phospho tokens
-        assert _name_quality_is_acceptable("butanedioic acid", mol) is False
+        assert ha > 20, f"Need HA > 20, got {ha}"
+        # 'hexadecan-1-ol' = 14 chars, ratio=0.52 < 0.8, has digits/hyphens
+        # No ester or phospho tokens -> 0 of 2 represented -> rejected
+        assert _name_quality_is_acceptable("hexadecan-1-ol", mol) is False
 
     @pytest.mark.unit
-    def test_name_with_ester_token_passes(self):
-        """Name 'methyl butanedioate' contains 'oate' (ester token): should pass
-        for a molecule with ester bonds only."""
+    def test_name_with_ester_token_passes_multi_bond(self):
+        """Name '2-methylhexadecanoate' contains 'oate' (ester token): at least
+        half of bond types represented (1/2), should pass."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
-        # Molecule with only 1 ester bond, HA=14
-        mol = Chem.MolFromSmiles("CCCCCCOC(=O)CCC(=O)O")
+        # Same molecule with ester + phosphodiester bonds, HA=27
+        mol = Chem.MolFromSmiles("CCCCCCCCCCCC(=O)OCCCCOP(=O)(O)OCCCC")
         assert mol is not None
-        # Single bond type = no multi-bond under-coverage check
-        # Name has digits and hyphens wouldn't block it either
-        # This should pass because the name is adequate
-        assert _name_quality_is_acceptable("methyl butanedioate", mol) is True
+        # '2-methylhexadecanoate' = 21 chars, ratio=0.78 < 0.8
+        # Has digits (2) and hyphens -> passes no-digits check
+        # 'oate' matches ester -> 1 of 2 represented (1 >= 1.0) -> passes
+        assert _name_quality_is_acceptable("2-methylhexadecanoate", mol) is True
 
     @pytest.mark.unit
     def test_partial_name_rejected_for_multi_bond_molecule(self):
-        """Name '2-aminopropanoic acid' for a 42-HA molecule with 4 bonds
+        """Name 'hexadecan-3-ol' for a 42-HA molecule with 4 bonds
         (ester + amide): partial name should be rejected."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
         # Molecule with 2 ester + 2 amide bonds, HA=42
@@ -351,12 +353,11 @@ class TestMultiBondUnderCoverage:
         assert mol is not None
         ha = mol.GetNumHeavyAtoms()
         assert ha > 30, f"Need large molecule, got HA={ha}"
-        # "(2S)-2-aminopropanoic acid" references amino (amide) but not ester
-        # With 2 distinct bond types, need at least 1 represented (half of 2 = 1)
-        # This name only has 'amino' -> represents amide but not ester
-        # Actually half of 2 is 1.0 and we have 1 represented -> passes
-        # Need to test with a name that represents 0 of 2 types
-        assert _name_quality_is_acceptable("propanedioic acid", mol) is False
+        # 'hexadecan-3-ol' = 14 chars, ratio=0.33 < 0.8
+        # Has digits/hyphens. No ester or amide tokens -> 0/2 -> rejected
+        # (Also caught by short name check: 14 < 21, but multi-bond would
+        # also reject it independently)
+        assert _name_quality_is_acceptable("hexadecan-3-ol", mol) is False
 
     @pytest.mark.unit
     def test_no_cleavable_bonds_always_passes(self):
@@ -368,15 +369,33 @@ class TestMultiBondUnderCoverage:
         assert _name_quality_is_acceptable("pentanoic acid", mol) is True
 
     @pytest.mark.unit
-    def test_name_with_both_amide_and_ester_tokens_passes(self):
+    def test_name_with_amide_and_ester_tokens_passes(self):
         """Name referencing both amide and ester tokens passes for a molecule
-        with both bond types."""
+        with both bond types (ester + amide)."""
         from orthonym.decomposition.engine import _name_quality_is_acceptable
-        # Molecule with ester + amide bonds
-        mol = Chem.MolFromSmiles("CCCCCCCCCC(=O)NCCCC(=O)OCC(NC(=O)CCCCC)CC(=O)OCCCCCCCCCC")
+        # Molecule with 1 ester + 1 amide bond, HA > 15
+        # Only 1 amide carbonyl so multi-amide check doesn't trigger
+        mol = Chem.MolFromSmiles("CC(=O)OCCCC(NC(=O)CCCCC)CCCCC")
         assert mol is not None
-        # "ethyl 2-aminobutanedioate" references both amino (amide) and oate (ester)
-        assert _name_quality_is_acceptable("ethyl 2-aminobutanedioate", mol) is True
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 15, f"Need HA > 15, got {ha}"
+        # "ethyl 2-aminodecanoate" references amino (amide) and oate (ester)
+        # and has digits/hyphens -> passes other checks
+        assert _name_quality_is_acceptable("ethyl 2-aminodecanoate", mol) is True
+
+    @pytest.mark.unit
+    def test_high_ratio_name_skips_multi_bond_check(self):
+        """Names with coverage ratio >= 0.8 skip the multi-bond check,
+        since adequate-length names are presumed to describe the molecule."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Small molecule with 2 distinct bond types, HA=17
+        mol = Chem.MolFromSmiles("CCCCCC(=O)OCCOP(=O)(O)OCC")
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha == 17
+        # 'hexadecan-1-ol' = 14 chars, ratio=14/17=0.82 >= 0.8 -> multi-bond skipped
+        # Also has digits/hyphens, ratio >= 0.45, len >= ha//2
+        assert _name_quality_is_acceptable("hexadecan-1-ol", mol) is True
 
     @pytest.mark.unit
     def test_existing_quality_gate_tests_still_pass(self):

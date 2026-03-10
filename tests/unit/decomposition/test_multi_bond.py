@@ -825,18 +825,36 @@ class TestFragmentAwareQualityGate:
         finally:
             _fragment_guard.visited = old_visited
 
-    def test_retained_core_name_bypasses_regardless(self):
-        """Retained core names bypass the threshold regardless of context."""
-        mol = self._make_mol(35)
-        name = "adenine"  # In _RETAINED_CORE_NAMES
+    def test_retained_core_name_with_coverage_guard(self):
+        """Retained core names pass only when coverage ratio >= 0.25 for HA > 20.
 
+        Phase 099-03: coverage guard added. 'adenine' (7 chars) for HA=35
+        molecule has ratio 0.20 < 0.25 threshold -> rejected.
+        For HA=20 molecules, retained names always pass (HA <= 20).
+        """
         from orthonym.assembly.fragment_naming import _fragment_guard
         old_visited = getattr(_fragment_guard, 'visited', None)
         _fragment_guard.visited = set()  # Top level
         try:
-            result = _name_quality_is_acceptable(name, mol)
-            assert result is True, (
-                "Retained core name should always pass regardless of HA"
+            # HA=35: adenine ratio 0.20 < 0.25 -> rejected
+            mol_35 = self._make_mol(35)
+            result_35 = _name_quality_is_acceptable("adenine", mol_35)
+            assert result_35 is False, (
+                "Coverage guard should reject 'adenine' for HA=35 (ratio 0.20)"
+            )
+
+            # HA=20: retained names always pass (HA <= 20 threshold)
+            mol_20 = self._make_mol(20)
+            result_20 = _name_quality_is_acceptable("adenine", mol_20)
+            assert result_20 is True, (
+                "Retained core names should pass for HA <= 20"
+            )
+
+            # HA=25: adenine ratio 7/25 = 0.28 >= 0.25 -> passes
+            mol_25 = self._make_mol(25)
+            result_25 = _name_quality_is_acceptable("adenine", mol_25)
+            assert result_25 is True, (
+                "Retained core names should pass when ratio >= 0.25"
             )
         finally:
             _fragment_guard.visited = old_visited

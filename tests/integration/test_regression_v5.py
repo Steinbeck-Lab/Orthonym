@@ -11,28 +11,51 @@ from orthonym import name_compound
 
 
 class TestCoverageGateWhitelist:
-    """Regressions 5 and 9: adenine retained name not rejected by quality gate."""
+    """Regressions 5 and 9: adenine coverage guard.
+
+    Phase 099-03: retained-name coverage guard rejects 'adenine' for molecules
+    with HA > 20 and ratio < 0.25. Decomposition now produces more complete
+    names for these large adenine-containing molecules.
+    """
 
     @pytest.mark.integration
     def test_regression_5_adenine_nucleotide(self):
-        """Adenine nucleotide cofactor should produce 'adenine', not garbled systematic."""
+        """Adenine nucleotide (HA=38): coverage guard rejects 'adenine'
+        (ratio 0.18), decomposition produces more descriptive name."""
         smiles = (
             "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC"
             "[C@@H]2SC[C@@H]3NC(=O)N[C@@H]32)[C@@H](O)[C@H]1O"
         )
         name = name_compound(smiles)
-        assert name == "adenine", f"Expected 'adenine', got '{name}'"
+        assert name != "unknown"
+        # Phase 099-03: 'adenine' (7 chars) for 38-HA molecule = ratio 0.18
+        # Below 0.25 threshold -> decomposition attempted
+        assert name != "adenine", (
+            "Coverage guard should reject 'adenine' for HA=38 (ratio 0.18)"
+        )
+        assert len(name) > len("adenine"), (
+            f"Decomposition result should be longer than 'adenine', got: {name}"
+        )
 
     @pytest.mark.integration
     def test_regression_9_coa_thioester(self):
-        """CoA thioester should produce 'adenine', not garbled decomposition."""
+        """CoA thioester (HA=65): coverage guard rejects 'adenine'
+        (ratio 0.11), decomposition produces more descriptive name."""
         smiles = (
             r"CCC/C=C\C/C=C\CCCCCCCC(=O)SCCNC(=O)CCNC(=O)"
             r"[C@H](O)C(C)(C)COP(=O)(O)OP(=O)(O)OC[C@H]1OC"
             r"(n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O"
         )
         name = name_compound(smiles)
-        assert name == "adenine", f"Expected 'adenine', got '{name}'"
+        assert name != "unknown"
+        # Phase 099-03: 'adenine' (7 chars) for 65-HA molecule = ratio 0.11
+        # Below 0.25 threshold -> decomposition attempted
+        assert name != "adenine", (
+            "Coverage guard should reject 'adenine' for HA=65 (ratio 0.11)"
+        )
+        assert len(name) > len("adenine"), (
+            f"Decomposition result should be longer than 'adenine', got: {name}"
+        )
 
     @pytest.mark.integration
     def test_whitelist_does_not_weaken_gate_for_small_rings(self):

@@ -128,9 +128,21 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
 
     # Whitelist: known retained names that correctly identify a core
     # substructure even in large molecules (e.g., adenine in nucleotide
-    # cofactors). These bypass all size-based rejection checks.
+    # cofactors).
+    #
+    # Coverage guard (Phase 099-03): retained names are valid only if they
+    # plausibly describe the whole molecule. "adenine" (7 chars) naming a
+    # 58-HA molecule (ratio 0.12) indicates a partial match -- OPSIN
+    # round-trips to adenine (10 HA), proving the name only covers 17%.
+    # For molecules with HA > 20, require >= 0.25 chars/HA. This catches
+    # adenine-in-CoA (58 HA, ratio 0.12) while preserving adenine
+    # standalone (10 HA), phenothiazine (13 chars/14 HA = 0.93), and
+    # flavone (7 chars/22 HA mock = 0.32).
     if name.lower() in _RETAINED_CORE_NAMES:
-        return True
+        heavy_atoms = mol.GetNumHeavyAtoms()
+        if heavy_atoms <= 20 or len(name) / heavy_atoms >= 0.25:
+            return True
+        # Fall through to other checks (may trigger decomposition)
 
     heavy_atoms = mol.GetNumHeavyAtoms()
 
@@ -286,6 +298,67 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                             return False
     except Exception:
         pass  # Guard: never let ring detection crash the quality gate
+
+    # Multi-bond under-coverage detection (Phase 099-03): if molecule has
+    # multiple distinct cleavable bond types but the name references fewer
+    # than half, the name likely describes only one fragment of a
+    # multi-component molecule.
+    # Example: molecule with ester + phosphodiester bonds named "butanedioic
+    # acid" only covers the acid fragment, not the ester or phosphodiester
+    # linkages.
+    #
+    # IMPORTANT: This check is gated on coverage ratio < 0.8 to avoid
+    # rejecting decomposition results that adequately describe the molecule.
+    # Decomposition names like "N-2,3-dihydroxyhexacosanoylaminocyclohexane-
+    # tetraol" (ratio 0.86) are complete despite not mentioning every bond
+    # type, because they result from cleaving ONE bond and naming each half.
+    # Only pipeline names with low coverage (< 0.8) are suspect.
+    try:
+        # Reuse bonds from the multi-amide block above if available
+        if 'bonds' not in dir():
+            bonds = find_cleavable_bonds(mol)
+        coverage_ratio = len(name) / heavy_atoms if heavy_atoms else 999
+        if bonds and heavy_atoms > 15 and coverage_ratio < 0.8:
+            distinct_bond_types = set(b["type"] for b in bonds)
+            if len(distinct_bond_types) >= 2:
+                # Token mapping: what name tokens indicate each bond type.
+                # Amide tokens include acyl prefixes (anoyl, enoyl, oyl)
+                # since N-acyl naming IS amide naming (IUPAC P-66.6.3).
+                _BOND_TYPE_TOKENS = {
+                    "ester": {"ester", "oate", "ate", "oyloxy",
+                              "acetyloxy", "benzoyloxy", "acetyl",
+                              "benzoyl"},
+                    "amide": {"amide", "amino", "amido", "acetamid",
+                              "formamid", "carbamoyl", "anilino",
+                              "anoyl", "enoyl", "oyl", "acyl"},
+                    "glycosidic": {"glycos", "pyranosyl", "furanosyl",
+                                   "glucos", "galactos", "mannos", "rhamn",
+                                   "fucos", "sugar", "osyl"},
+                    "phosphodiester": {"phosph", "nucleotid"},
+                    "thioester": {"thio"},
+                    "sulfonamide": {"sulfonamid", "sulfamid"},
+                    "carbamate": {"carbamat", "urethane"},
+                    # Ethers are common and don't always produce distinct
+                    # name tokens (ether O becomes "oxa" or is absorbed
+                    # into alkoxy prefixes). Don't penalize.
+                    "ether": set(),
+                }
+                name_lower = name.lower()
+                represented_types = 0
+                for bt in distinct_bond_types:
+                    tokens = _BOND_TYPE_TOKENS.get(bt, set())
+                    if not tokens:
+                        # ether: give benefit of doubt
+                        represented_types += 1
+                        continue
+                    if any(tok in name_lower for tok in tokens):
+                        represented_types += 1
+                # If less than half of distinct bond types are represented,
+                # the name is partial -- reject it
+                if represented_types < len(distinct_bond_types) / 2:
+                    return False
+    except Exception:
+        pass  # Guard: never let bond detection crash the quality gate
 
     # Detect half-decomposition artifacts: consecutive duplicate words
     # e.g., "palmitate palmitate" indicates same fragment named twice
