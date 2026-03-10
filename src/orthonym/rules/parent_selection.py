@@ -815,5 +815,3 @@ def _ring_system_has_nitrogen(mol, ring_atoms: Set[int]) -> bool:
         if mol.GetAtomWithIdx(idx).GetAtomicNum() == 7:
             return True
     return False
-
-
