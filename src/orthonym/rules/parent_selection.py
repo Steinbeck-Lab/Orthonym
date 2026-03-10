@@ -25,6 +25,7 @@ from typing import List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
 
 logger = logging.getLogger(__name__)
@@ -294,6 +295,129 @@ def _compare_pg_locants(
     return 0
 
 
+def _compare_multiple_bond_locants(
+    mol, chain: List[int], ring_set: Set[int]
+) -> int:
+    """P-44.1(g): Lowest locants for multiple bonds.
+
+    Compares the locant sets for double and triple bonds on the chain
+    versus on the ring, using first-point-of-difference (IUPAC P-14.7).
+
+    For chain: bond between chain positions i and i+1 gets locant i+1
+    (1-indexed, using the lower position per IUPAC convention).
+    For ring: atoms are sorted by index and mapped to 1-indexed positions.
+    Bond locant is the lower position of the two bonded atoms.
+
+    Args:
+        mol: RDKit Mol object
+        chain: Ordered list of atom indices forming the principal chain
+        ring_set: Set of atom indices in the ring system
+
+    Returns:
+        1 if chain has lower bond locants (chain wins)
+        -1 if ring has lower bond locants (ring wins)
+        0 if tied or neither has multiple bonds
+    """
+    chain_set = set(chain)
+
+    # Build position maps (1-indexed)
+    chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
+    ring_sorted = sorted(ring_set)
+    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+
+    # Collect bond locants for chain and ring
+    chain_bond_locants = []
+    ring_bond_locants = []
+
+    for bond in mol.GetBonds():
+        bt = bond.GetBondType()
+        if bt != Chem.BondType.DOUBLE and bt != Chem.BondType.TRIPLE:
+            continue
+        a = bond.GetBeginAtomIdx()
+        b = bond.GetEndAtomIdx()
+
+        # Check if bond is on chain (both atoms in chain)
+        if a in chain_set and b in chain_set:
+            locant = min(chain_pos[a], chain_pos[b])
+            chain_bond_locants.append(locant)
+
+        # Check if bond is on ring (both atoms in ring)
+        if a in ring_set and b in ring_set:
+            locant = min(ring_pos[a], ring_pos[b])
+            ring_bond_locants.append(locant)
+
+    if not chain_bond_locants and not ring_bond_locants:
+        return 0
+
+    # Use compare_locant_sets for first-point-of-difference comparison
+    # compare_locant_sets returns: -1 (a preferred), 0 (tie), 1 (b preferred)
+    # We pass chain as a, ring as b:
+    #   -1 (chain preferred) -> return 1 (chain wins)
+    #    1 (ring preferred)  -> return -1 (ring wins)
+    #    0                   -> return 0
+    cmp = compare_locant_sets(chain_bond_locants, ring_bond_locants)
+    return -cmp
+
+
+def _compare_substituent_locants(
+    mol, chain: List[int], ring_set: Set[int]
+) -> int:
+    """P-44.1(i): Lowest locants for substituents (detachable prefixes).
+
+    Compares the locant sets for substituent attachment points on the chain
+    versus on the ring, using first-point-of-difference (IUPAC P-14.7).
+
+    A substituent is any non-hydrogen atom bonded to a chain/ring atom
+    but NOT itself part of the chain/ring.
+
+    For chain: substituent at chain position i gets locant i+1 (1-indexed).
+    For ring: atoms sorted by index, mapped to 1-indexed positions.
+
+    Args:
+        mol: RDKit Mol object
+        chain: Ordered list of atom indices forming the principal chain
+        ring_set: Set of atom indices in the ring system
+
+    Returns:
+        1 if chain has lower substituent locants (chain wins)
+        -1 if ring has lower substituent locants (ring wins)
+        0 if tied or neither has substituents
+    """
+    chain_set = set(chain)
+
+    # Build position maps (1-indexed)
+    chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
+    ring_sorted = sorted(ring_set)
+    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+
+    # Collect substituent locants for chain
+    chain_sub_locants = []
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in chain_set and nbr.GetSymbol() != 'H':
+                # This chain atom has an external substituent
+                chain_sub_locants.append(chain_pos[idx])
+                break  # Only count the position once, even with multiple substituents
+
+    # Collect substituent locants for ring
+    ring_sub_locants = []
+    for idx in ring_sorted:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in ring_set and nbr.GetSymbol() != 'H':
+                ring_sub_locants.append(ring_pos[idx])
+                break
+
+    if not chain_sub_locants and not ring_sub_locants:
+        return 0
+
+    # compare_locant_sets: -1 (a preferred), 0 (tie), 1 (b preferred)
+    # chain=a, ring=b: -1 -> return 1 (chain wins), 1 -> return -1 (ring wins)
+    cmp = compare_locant_sets(chain_sub_locants, ring_sub_locants)
+    return -cmp
+
+
 def _compare_substituent_count(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
     """P-44.1(h): Maximum number of substituents."""
     chain_subs = _count_substituents_on_atoms(mol, chain_set)
@@ -441,7 +565,7 @@ def select_parent(
         chain_len = len(principal_chain)
         chain_set = set(principal_chain)
 
-        # P-44.1 cascade: criteria (c) through (h)
+        # P-44.1 cascade: criteria (c) through (i)
         cascade_result = _compare_chain_length(chain_len, ring_size)        # P-44.1(c)
         if cascade_result == 0:
             cascade_result = _compare_multiple_bonds(mol, chain_set, best_ring)  # P-44.1(d)
@@ -450,11 +574,14 @@ def select_parent(
         if cascade_result == 0:
             cascade_result = _compare_pg_locants(
                 mol, principal_chain, best_ring, principal_group_atoms)           # P-44.1(f)
-        # P-44.1(g): lowest locants for multiple bonds — skipped for ring-vs-chain
-        # (bond locant comparison is meaningful only within same structure type)
+        if cascade_result == 0:
+            cascade_result = _compare_multiple_bond_locants(
+                mol, principal_chain, best_ring)                                 # P-44.1(g)
         if cascade_result == 0:
             cascade_result = _compare_substituent_count(mol, chain_set, best_ring)  # P-44.1(h)
-        # P-44.1(i): lowest locants for substituents — skipped for ring-vs-chain
+        if cascade_result == 0:
+            cascade_result = _compare_substituent_locants(
+                mol, principal_chain, best_ring)                                 # P-44.1(i)
 
         if cascade_result > 0:
             # Chain wins
