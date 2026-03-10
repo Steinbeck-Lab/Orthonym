@@ -452,3 +452,112 @@ class TestProbeIntegration:
         assert result is not None
         assert isinstance(result, str)
         assert len(result) > 0
+
+
+class TestNameSizeCoverage:
+    """Tests for _name_covers_molecule() heuristic in quality gate.
+
+    The name-size coverage heuristic rejects pipeline names that describe
+    less than ~55% of the molecule's heavy atoms when cleavable bonds
+    exist and decomposition hasn't been attempted yet. This catches cases
+    like "5-chloroquinoline" (17 chars) naming a 23-HA ester molecule
+    where the name only describes the quinoline fragment.
+    """
+
+    @pytest.mark.unit
+    def test_small_molecule_always_passes(self):
+        """_name_covers_molecule returns True for small molecules (HA <= 15)
+        regardless of name length."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        # naphthalene: 10 HA, "naphthalene" = 11 chars
+        mol = Chem.MolFromSmiles("c1cccc2ccccc12")  # naphthalene, HA=10
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() <= 15
+        assert _name_covers_molecule("naphthalene", mol) is True
+
+    @pytest.mark.unit
+    def test_adequate_coverage_passes(self):
+        """_name_covers_molecule returns True when estimated coverage >= 0.55
+        (e.g., '2-methylnaphthalene' for 11-HA molecule)."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        # 2-methylnaphthalene: 11 HA, "2-methylnaphthalene" = 19 chars
+        # estimated_ha = 19/1.5 = 12.7; coverage = 12.7/11 = 1.15 > 0.55
+        mol = Chem.MolFromSmiles("Cc1ccc2ccccc2c1")  # 2-methylnaphthalene, HA=11
+        assert mol is not None
+        assert _name_covers_molecule("2-methylnaphthalene", mol) is True
+
+    @pytest.mark.unit
+    def test_partial_coverage_rejected(self):
+        """_name_covers_molecule returns False when estimated coverage < 0.55
+        (e.g., '5-chloroquinoline' for 23-HA ester)."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        # 5-chloroquinoline: name for a 23-HA ester (OC(=O)CCCCCC-c1ccc(Cl)c2ncccc12)
+        # "5-chloroquinoline" = 17 chars, estimated_ha = 17/1.5 = 11.3
+        # coverage = 11.3/23 = 0.49 < 0.55 => rejected
+        mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")  # 23 HA ester
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 15, f"Need HA > 15, got {ha}"
+        assert _name_covers_molecule("5-chloroquinoline", mol) is False
+
+    @pytest.mark.unit
+    def test_no_cleavable_bonds_always_passes(self):
+        """_name_covers_molecule returns True when no cleavable bonds exist,
+        even if coverage ratio is low, because pipeline name is the only option."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        # Anthracene: 14 HA, no cleavable bonds, short name
+        # "anthracene" = 10 chars, estimated_ha = 10/1.5 = 6.7
+        # coverage = 6.7/14 = 0.48 < 0.55, BUT no cleavable bonds => pass
+        mol = Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1")  # anthracene, 14 HA
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha == 14
+        assert _name_covers_molecule("anthracene", mol) is True
+
+    @pytest.mark.unit
+    def test_decomposition_context_always_passes(self):
+        """_name_covers_molecule returns True when visited set is non-empty
+        (decomposition context) to avoid rejecting decomposition results."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        from orthonym.assembly.fragment_naming import _fragment_guard
+        # Simulate decomposition context: set visited to non-empty
+        old_visited = getattr(_fragment_guard, 'visited', None)
+        _fragment_guard.visited = {"some_smiles_in_progress"}
+        try:
+            # Large molecule with short name that would normally fail
+            mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")  # 23 HA
+            assert _name_covers_molecule("5-chloroquinoline", mol) is True
+        finally:
+            _fragment_guard.visited = old_visited
+
+    @pytest.mark.unit
+    def test_quality_gate_rejects_partial_names(self):
+        """_name_quality_is_acceptable rejects partial names that pass all
+        existing checks but fail name-size coverage."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Molecule: ester with 23 HA that pipeline names as "5-chloroquinoline"
+        # This name has digits AND hyphens (passes no-digits check),
+        # length 17 >= 23//2=11 (passes short check), ratio 17/23=0.74 (passes
+        # 0.45 threshold). But it only describes ~11 HA of a 23-HA molecule.
+        mol = Chem.MolFromSmiles("OC(=O)CCCCCCc1ccc(Cl)c2ncccc12")
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 15
+        # Should be rejected by name-size coverage
+        assert _name_quality_is_acceptable("5-chloroquinoline", mol) is False
+
+    @pytest.mark.unit
+    def test_integration_large_molecule_partial_name_triggers_decomp(self):
+        """Integration: molecules with HA>15 and partial pipeline names
+        should trigger decomposition (try_decompose returns non-None)."""
+        from orthonym.decomposition.engine import _name_covers_molecule
+        # (22E)-stigmasta-7,22-diene naming a 52-HA glycoside
+        # Name = 27 chars, estimated_ha = 27/1.5 = 18; coverage = 18/52 = 0.35 < 0.55
+        # Large steroid glycoside
+        smiles = "CC(C)C(C)CC=CC(C)C1CCC2C3=CCC4CC(OC5OC(CO)C(O)C(O)C5O)CCC4(C)C3CCC12C"
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 30, f"Need large molecule, got HA={ha}"
+        # Name covers only the steroid, not the sugar
+        assert _name_covers_molecule("(22E)-stigmasta-7,22-diene", mol) is False
