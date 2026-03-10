@@ -575,16 +575,6 @@ def select_parent(
         )
 
     if pg_on_ring and pg_on_chain:
-        # Ester-specific: acyl (C=O) side determines the parent acid
-        if principal_group == "ester":
-            ester_result = _compare_ester_parent(
-                mol, ring_systems, principal_chain, principal_group_atoms,
-                all_ring_atoms, substituent_ring_tuples
-            )
-            if ester_result is not None:
-                return ester_result
-            # Tie: fall through to general cascade
-
         # P-44.1(b): Compare PG count on ring vs chain
         pg_count_on_ring = _count_pg_on_ring(mol, all_ring_atoms, principal_group_atoms)
         pg_count_on_chain = _count_pg_on_chain(mol, principal_chain, principal_group_atoms)
@@ -827,48 +817,3 @@ def _ring_system_has_nitrogen(mol, ring_atoms: Set[int]) -> bool:
     return False
 
 
-def _compare_ester_parent(
-    mol, ring_systems, principal_chain, principal_group_atoms,
-    all_ring_atoms, substituent_ring_tuples
-) -> Optional[ParentSelectionResult]:
-    """Ester-specific parent determination: acyl (C=O) side is parent acid.
-
-    For esters, the acyl carbon location determines the parent:
-    - Acyl C bonded to ring -> ring provides the acid name
-    - Acyl C bonded to chain -> chain provides the acid name
-
-    Returns None if tied (fall through to general cascade).
-    """
-    acyl_ring_count = 0
-    acyl_chain_count = 0
-    for pg_atoms in principal_group_atoms:
-        if not pg_atoms or len(pg_atoms) < 1:
-            continue
-        acyl_c = pg_atoms[0]  # carbonyl C
-        atom = mol.GetAtomWithIdx(acyl_c)
-        acyl_on_ring = acyl_c in all_ring_atoms
-        if not acyl_on_ring:
-            for nbr in atom.GetNeighbors():
-                if nbr.GetIdx() in all_ring_atoms:
-                    acyl_on_ring = True
-                    break
-        if acyl_on_ring:
-            acyl_ring_count += 1
-        else:
-            acyl_chain_count += 1
-
-    if acyl_ring_count > acyl_chain_count:
-        return ParentSelectionResult(
-            parent_type='ring',
-            parent_atoms=list(sorted(all_ring_atoms)),
-            substituent_rings=[],
-            reasoning=f"Ester acyl on ring ({acyl_ring_count}) > chain ({acyl_chain_count})"
-        )
-    elif acyl_chain_count > acyl_ring_count:
-        return ParentSelectionResult(
-            parent_type='chain',
-            parent_atoms=principal_chain,
-            substituent_rings=substituent_ring_tuples,
-            reasoning=f"Ester acyl on chain ({acyl_chain_count}) > ring ({acyl_ring_count})"
-        )
-    return None  # Tied: fall through to general cascade
