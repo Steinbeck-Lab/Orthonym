@@ -246,53 +246,74 @@ def _compare_pg_locants(
 ) -> int:
     """P-44.1(f): Lowest locants for principal groups.
 
-    Lower locant set wins (first-point-of-difference).
+    Compares the locant sets for principal characteristic group attachment
+    points on the chain versus on the ring, using first-point-of-difference
+    comparison (IUPAC P-14.7).
+
+    Locants are 1-indexed IUPAC-style positions (per P-14.7):
+    - Chain: position along the chain list (atom at index 0 -> locant 1).
+    - Ring: sorted atom indices mapped to 1-indexed positions. This is a
+      positional proxy consistent with ring numbering convention used
+      throughout the P-44.1 cascade. True IUPAC ring numbering (P-14.7)
+      follows ring perception rules, but for ring-vs-chain comparison
+      the consistent positional convention produces equivalent results.
+
+    Args:
+        mol: RDKit Mol object
+        chain: Ordered list of atom indices forming the principal chain
+        ring_set: Set of atom indices in the ring system
+        principal_group_atoms: List of tuples of atom indices from SMARTS matches
+
+    Returns:
+        1 if chain has lower PG locants (chain wins)
+        -1 if ring has lower PG locants (ring wins)
+        0 if tied or neither has PG locants
     """
     chain_set = set(chain)
-    # Get PG positions on chain (0-indexed from chain start)
-    chain_pg_pos = []
+
+    # Build 1-indexed position maps (IUPAC P-14.7: locants start at 1)
+    chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
+    ring_sorted = sorted(ring_set)
+    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+
+    # Get PG locants on chain (1-indexed IUPAC locants)
+    chain_pg_locants = []
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
         attachment = pg_atoms[0]
         if attachment in chain_set:
-            chain_pg_pos.append(chain.index(attachment))
+            chain_pg_locants.append(chain_pos[attachment])
         else:
             atom = mol.GetAtomWithIdx(attachment)
             for nbr in atom.GetNeighbors():
                 if nbr.GetIdx() in chain_set:
-                    chain_pg_pos.append(chain.index(nbr.GetIdx()))
+                    chain_pg_locants.append(chain_pos[nbr.GetIdx()])
                     break
 
-    # For ring, we use sorted atom indices as proxy for locant positions
-    ring_sorted = sorted(ring_set)
-    ring_idx_map = {a: i for i, a in enumerate(ring_sorted)}
-    ring_pg_pos = []
+    # Get PG locants on ring (1-indexed positional proxy)
+    ring_pg_locants = []
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
         attachment = pg_atoms[0]
         if attachment in ring_set:
-            ring_pg_pos.append(ring_idx_map[attachment])
+            ring_pg_locants.append(ring_pos[attachment])
         else:
             atom = mol.GetAtomWithIdx(attachment)
             for nbr in atom.GetNeighbors():
                 if nbr.GetIdx() in ring_set:
-                    ring_pg_pos.append(ring_idx_map[nbr.GetIdx()])
+                    ring_pg_locants.append(ring_pos[nbr.GetIdx()])
                     break
 
-    if not chain_pg_pos and not ring_pg_pos:
+    if not chain_pg_locants and not ring_pg_locants:
         return 0
 
-    chain_sorted = sorted(chain_pg_pos)
-    ring_sorted_pos = sorted(ring_pg_pos)
-    # First-point-of-difference comparison (lower wins)
-    for c, r in zip(chain_sorted, ring_sorted_pos):
-        if c < r:
-            return 1
-        elif r < c:
-            return -1
-    return 0
+    # Use compare_locant_sets for first-point-of-difference comparison
+    # compare_locant_sets returns: -1 (a preferred), 0 (tie), 1 (b preferred)
+    # chain=a, ring=b: -1 -> return 1 (chain wins), 1 -> return -1 (ring wins)
+    cmp = compare_locant_sets(chain_pg_locants, ring_pg_locants)
+    return -cmp
 
 
 def _compare_multiple_bond_locants(
