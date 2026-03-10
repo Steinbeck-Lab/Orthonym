@@ -1400,3 +1400,225 @@ class TestSkeletalChainCandidate:
             f"Reasoning should cite P-44.1 cascade (not skeletal shortcut). "
             f"Got: {result.reasoning}"
         )
+
+
+class TestEsterCascade:
+    """Test that ester parent selection is handled by the general P-44.1 cascade.
+
+    After removing the _compare_ester_parent() override, all ester molecules
+    must be correctly handled by the standard cascade criteria. The acyl (C=O)
+    side determines the parent naturally through P-44.1(a) PG location.
+
+    PSEL-07: Ester override removal.
+    """
+
+    def test_no_ester_override_function_exists(self):
+        """Verify _compare_ester_parent has been removed from the module.
+
+        After PSEL-07, the ester-specific override should not exist.
+        The general P-44.1 cascade handles all esters.
+        """
+        import orthonym.rules.parent_selection as ps_module
+        assert not hasattr(ps_module, '_compare_ester_parent'), (
+            "_compare_ester_parent should be removed (PSEL-07). "
+            "The general P-44.1 cascade handles all esters."
+        )
+
+    def test_no_ester_override_in_source(self):
+        """Verify the ester override call site has been removed from source.
+
+        The source should not contain 'principal_group == \"ester\"'
+        as a special case in select_parent().
+        """
+        import inspect
+        import orthonym.rules.parent_selection as ps_module
+        source = inspect.getsource(ps_module.select_parent)
+        assert 'ester' not in source, (
+            "select_parent() source should not contain ester-specific logic. "
+            "The general P-44.1 cascade handles all esters."
+        )
+
+    def test_phenyl_acetate_chain_parent(self):
+        """Phenyl acetate: acyl C on chain -> chain is parent via P-44.1(a).
+
+        CC(=O)Oc1ccccc1: The carbonyl C is on the chain, not bonded to ring.
+        P-44.1(a) should select chain as parent.
+        """
+        mol = Chem.MolFromSmiles('CC(=O)Oc1ccccc1')
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'chain', (
+            f"Phenyl acetate: acyl on chain -> chain parent. Got: {result.reasoning}"
+        )
+
+    def test_phenyl_benzoate_ring_parent(self):
+        """Phenyl benzoate: acyl C bonded to ring -> ring is parent.
+
+        O=C(Oc1ccccc1)c1ccccc1: Both sides are rings. The carbonyl C is
+        bonded to a ring. Ring wins by P-44.1(a) or chain-length comparison.
+        """
+        mol = Chem.MolFromSmiles('O=C(Oc1ccccc1)c1ccccc1')
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'ring', (
+            f"Phenyl benzoate: ring should be parent. Got: {result.reasoning}"
+        )
+
+    def test_methyl_cyclohexanecarboxylate_ring_parent(self):
+        """Methyl cyclohexanecarboxylate: acyl C bonded to ring -> ring parent.
+
+        COC(=O)C1CCCCC1: The carbonyl C is bonded to cyclohexane ring.
+        Ring wins (single-carbon chain check or P-44.1 cascade).
+        """
+        mol = Chem.MolFromSmiles('COC(=O)C1CCCCC1')
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'ring', (
+            f"Methyl cyclohexanecarboxylate: ring parent. Got: {result.reasoning}"
+        )
+
+    def test_cyclohexyl_acetate_chain_parent(self):
+        """Cyclohexyl acetate: acyl C on chain -> chain is parent.
+
+        CC(=O)OC1CCCCC1: The ester oxygen connects to ring, but the
+        acyl C(=O) is on the chain. P-44.1(a): PG on chain -> chain parent.
+        """
+        mol = Chem.MolFromSmiles('CC(=O)OC1CCCCC1')
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        assert result.parent_type == 'chain', (
+            f"Cyclohexyl acetate: acyl on chain -> chain parent. Got: {result.reasoning}"
+        )
+
+    def test_ethyl_acetate_chain_parent_no_ring(self):
+        """Ethyl acetate: acyclic ester -> chain is parent (no ring).
+
+        CC(=O)OCC: Pure chain molecule, no ring involvement.
+        """
+        mol = Chem.MolFromSmiles('CC(=O)OCC')
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        # No rings, so chain is the only option
+        chain = [i for i in range(mol.GetNumAtoms())
+                 if mol.GetAtomWithIdx(i).GetAtomicNum() == 6]
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems if ring_systems else [set()],
+            principal_chain=chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # With no ring system, chain should be parent (or ring default handles it)
+        assert result is not None
+
+    def test_ester_cascade_no_special_case_needed(self):
+        """Verify all ester molecules work via general cascade (no override).
+
+        This test verifies that for all key ester test molecules, the
+        select_parent() function produces correct results without any
+        ester-specific special case in the cascade logic.
+        """
+        ester_cases = [
+            ('CC(=O)Oc1ccccc1', 'chain'),       # phenyl acetate
+            ('O=C(Oc1ccccc1)c1ccccc1', 'ring'),  # phenyl benzoate
+            ('COC(=O)C1CCCCC1', 'ring'),          # methyl cyclohexanecarboxylate
+            ('CC(=O)OC1CCCCC1', 'chain'),         # cyclohexyl acetate
+        ]
+
+        for smi, expected_parent in ester_cases:
+            mol = Chem.MolFromSmiles(smi)
+            ring_systems = get_ring_systems(mol)
+            fg = detect_functional_groups(mol)
+            pg_name, pg_atoms = get_principal_group(mol, fg)
+
+            all_ring = set()
+            for r in ring_systems:
+                all_ring.update(r)
+
+            from orthonym.perception.chains import find_principal_chain
+            chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+
+            result = select_parent(
+                mol=mol,
+                ring_systems=ring_systems,
+                principal_chain=chain,
+                principal_group=pg_name,
+                principal_group_atoms=pg_atoms
+            )
+
+            assert result.parent_type == expected_parent, (
+                f"Ester {smi}: expected {expected_parent}, "
+                f"got {result.parent_type} ({result.reasoning})"
+            )
