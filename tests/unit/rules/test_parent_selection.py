@@ -1140,3 +1140,263 @@ class TestP441CriterionFLocants:
         assert 'P-14.7' in source or 'P-44.1(f)' in source, (
             "_compare_pg_locants should reference IUPAC locant rules"
         )
+
+
+@pytest.mark.unit
+class TestSkeletalChainCandidate:
+    """Tests for skeletal chain (C,N,O,S) candidate integration in select_parent().
+
+    IUPAC P-44.3(b) requires considering heteroatom-inclusive skeletal chains
+    when determining the principal chain. The skeletal chain from chains.py
+    must be wired into select_parent() as a candidate that goes through the
+    full P-44.1 cascade.
+
+    Guards (Phase 91.1 lesson):
+    - Guard 1: skeletal chain must be STRICTLY longer than carbon-only chain
+    - Guard 2: skeletal chain must contain the principal group
+    - Guard 3: skeletal chain goes through full cascade (no shortcut)
+    """
+
+    def test_skeletal_chain_used_when_strictly_longer_and_contains_pg(self):
+        """Skeletal chain is used as candidate when strictly longer than carbon
+        chain AND contains the principal group.
+
+        O=C1CCCCC1NCCOCC(=O)C: cyclohexanone (ring=6) + chain with N and O.
+        - Carbon-only principal chain: 3 atoms
+        - Skeletal chain: 7 atoms (N-C-C-O-C-C-O, includes heteroatoms)
+        - PG (ketone) on both ring and chain
+        - PG on skeletal chain: True
+        - With skeletal candidate: skeletal(7) > ring(6) -> chain wins by cascade
+        - Without: carbon(3) < ring(6) -> ring wins (current behavior)
+        """
+        smiles = 'O=C1CCCCC1NCCOCC(=O)C'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # With skeletal chain integration, the 7-atom skeletal chain
+        # should beat the 6-atom ring via P-44.1(c)
+        assert result.parent_type == 'chain', (
+            f"Skeletal chain (7 atoms) should beat ring (6 atoms) via P-44.1(c). "
+            f"Got: {result.reasoning}"
+        )
+
+    def test_skeletal_chain_longer_with_more_heteroatoms(self):
+        """Longer skeletal chain with N and O beats ring in cascade.
+
+        O=C1CCCCC1NCCOCCCC(=O)C: cyclohexanone + longer chain with N and O.
+        - Ring: 6 atoms
+        - Carbon-only chain: 5 atoms
+        - Skeletal chain: 9 atoms (much longer, includes N and O)
+        - PG on both ring and chain
+        """
+        smiles = 'O=C1CCCCC1NCCOCCCC(=O)C'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # Skeletal chain (9) >> ring (6) -> chain should win
+        assert result.parent_type == 'chain', (
+            f"Skeletal chain (9 atoms) should beat ring (6 atoms). "
+            f"Got: {result.reasoning}"
+        )
+
+    def test_skeletal_chain_ignored_when_pg_not_on_it(self):
+        """Skeletal chain without PG is ignored; carbon chain used instead.
+
+        c1ccc(CC(=O)O)c(NCCC)c1: benzene with COOH on one arm, amino-chain
+        on another arm. Skeletal chain goes through amino arm (N-C-C-C) and
+        does NOT contain COOH -> skeletal chain must be ignored.
+        """
+        smiles = 'c1ccc(CC(=O)O)c(NCCC)c1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain, find_longest_skeletal_chain
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        # Verify precondition: skeletal chain doesn't contain PG
+        skeletal = find_longest_skeletal_chain(mol, exclude_atoms=all_ring)
+        from orthonym.rules.parent_selection import is_principal_group_on_chain
+        pg_on_skel = is_principal_group_on_chain(mol, skeletal, pg_atoms)
+        assert not pg_on_skel, (
+            "Precondition: skeletal chain should NOT contain PG for this test"
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # PG (COOH) is on chain only (bonded to ring, so detected as on-chain
+        # via the chain carbon), not on ring. Should be chain parent.
+        # The skeletal chain being longer should NOT matter since it doesn't contain PG.
+        assert result.parent_type == 'chain', (
+            f"PG on chain only, skeletal chain without PG should be ignored. "
+            f"Got: {result.reasoning}"
+        )
+
+    def test_same_length_skeletal_prefers_carbon_chain(self):
+        """When skeletal chain == carbon chain length, carbon chain preferred.
+
+        P-44.1.2.1: maximum carbon content principle. Same-length chains
+        prefer carbon-only chain.
+
+        O=C1CCCCC1CCCCC(=O)C: cyclohexanone + hexanone chain (no heteroatoms).
+        Carbon chain = skeletal chain length -> no switch to skeletal.
+        """
+        smiles = 'O=C1CCCCC1CCCCC(=O)C'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # This is the P-52.2.8 tiebreaker test from TestP441Cascade.
+        # Same-length carbon chain -> no skeletal chain switch -> ring wins.
+        assert result.parent_type == 'ring', (
+            f"Same-length chains -> carbon-only preferred, ring wins by P-52.2.8. "
+            f"Got: {result.reasoning}"
+        )
+
+    def test_no_heteroatoms_behavior_unchanged(self):
+        """Molecules with no heteroatoms in chain should behave identically.
+
+        c1ccc(CCCC(=O)O)cc1: phenylbutanoic acid, carbon-only chain.
+        No heteroatoms in chain -> skeletal chain = carbon chain (+ O from
+        functional group). Behavior unchanged: PG on chain only -> chain parent.
+        """
+        smiles = 'c1ccc(CCCC(=O)O)cc1'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        from orthonym.perception.chains import find_principal_chain
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # PG on chain only -> chain wins via P-44.1(a). No change.
+        assert result.parent_type == 'chain', (
+            f"Phenylbutanoic acid: PG on chain only -> chain parent. "
+            f"Got: {result.reasoning}"
+        )
+
+    def test_skeletal_chain_goes_through_full_cascade(self):
+        """Skeletal chain must go through full P-44.1 cascade, not shortcut.
+
+        When skeletal chain is used as candidate, it participates in the
+        full ring-vs-chain cascade (criteria c through i), not a blind
+        preference for the longer chain. This is the Phase 91.1 lesson.
+
+        O=C1CCCCC1NCCOCC(=O)C: skeletal(7) > ring(6). The chain wins
+        through the cascade criterion (c) -- not a shortcut.
+        """
+        smiles = 'O=C1CCCCC1NCCOCC(=O)C'
+        mol = Chem.MolFromSmiles(smiles)
+        ring_systems = get_ring_systems(mol)
+        fg = detect_functional_groups(mol)
+        pg_name, pg_atoms = get_principal_group(mol, fg)
+
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+
+        from orthonym.perception.chains import find_principal_chain
+        principal_chain = find_principal_chain(
+            mol, fg, pg_name, exclude_atoms=all_ring
+        )
+
+        result = select_parent(
+            mol=mol,
+            ring_systems=ring_systems,
+            principal_chain=principal_chain,
+            principal_group=pg_name,
+            principal_group_atoms=pg_atoms
+        )
+
+        # The reasoning should cite P-44.1 cascade, confirming it went
+        # through the cascade rather than a skeletal-chain shortcut.
+        assert result.parent_type == 'chain', (
+            f"Skeletal chain through cascade should select chain. "
+            f"Got: {result.reasoning}"
+        )
+        assert 'P-44.1' in result.reasoning, (
+            f"Reasoning should cite P-44.1 cascade (not skeletal shortcut). "
+            f"Got: {result.reasoning}"
+        )
