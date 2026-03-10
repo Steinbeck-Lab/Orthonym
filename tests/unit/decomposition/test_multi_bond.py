@@ -627,6 +627,87 @@ class TestMultiEsterAssembly:
             f"Four identical acids should use 'tetra' prefix, got: {result}"
         )
 
+    def test_core_size_guard_rejects_small_core(self):
+        """Core-size guard rejects when core HA < max non-core HA (Phase 099-05).
+
+        Scenario: core has 2 HA (ethanol-like), non-core has 4 HA (acetic acid).
+        The guard should reject because the core is smaller than a non-core fragment,
+        indicating a pathological split where the ring system was lost.
+        """
+        # Mock score_fragment_seniority so that "CO" (methanol, 2 HA) is chosen as core
+        # and "CCCC(=O)O" (butanoic acid, 6 HA) is the non-core acid
+        fragments = [
+            {"smiles": "CO", "side": "middle"},       # methanol: 2 HA
+            {"smiles": "CCCC(=O)O", "side": "acid"},  # butanoic acid: 6 HA
+            {"smiles": "CCCC(=O)O", "side": "acid"},  # butanoic acid: 6 HA
+        ]
+        fragment_names = {
+            "CO": "methanol",
+            "CCCC(=O)O": "butanoic acid",
+        }
+        # Patch seniority so methanol is "most senior" (lowest score = core)
+        with patch(
+            "orthonym.decomposition.fragment_ranker.score_fragment_seniority",
+            side_effect=lambda s: 0 if s == "CO" else 10,
+        ):
+            result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        assert result is None, (
+            "Core-size guard should reject when core HA (2) < max non-core HA (6), "
+            f"but got: {result}"
+        )
+
+    def test_core_size_guard_allows_large_core(self):
+        """Core-size guard allows when core HA >= all non-core HA (Phase 099-05).
+
+        Scenario: glycerol (6 HA) core, acetic acid (4 HA) non-core.
+        The guard should allow because the core is larger.
+        """
+        fragments = [
+            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol: 6 HA
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+        ]
+        fragment_names = {
+            "OCC(O)CO": "glycerol",
+            "CC(=O)O": "acetic acid",
+        }
+        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        assert result is not None, (
+            "Core-size guard should allow when core HA (6) > non-core HA (4)"
+        )
+        assert "glycerol" in result.lower()
+
+    def test_core_size_guard_allows_equal(self):
+        """Core-size guard allows when core HA == max non-core HA (Phase 099-05).
+
+        Scenario: both core and non-core have 4 HA. Edge case: no rejection
+        on equal sizes.
+        """
+        # Use butanediol (4 C + 2 O = 6 HA) as core and butanoic acid (4 C + 2 O = 6 HA)
+        # Actually let's use precise HA counts. propan-1-ol "CCCO" = 4 HA, propionic acid "CCC(=O)O" = 5 HA
+        # For exact equal: ethanol "CCO" = 3 HA vs propanol "CCCO" = 4 HA ... no.
+        # Let's just use mock to control: both at 4 HA. E.g. "CCCO" (4 HA) and "CC(=O)O" (4 HA)
+        fragments = [
+            {"smiles": "CCCO", "side": "middle"},       # propan-1-ol: 4 HA
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+        ]
+        fragment_names = {
+            "CCCO": "propan-1-ol",
+            "CC(=O)O": "acetic acid",
+        }
+        # Patch seniority so propan-1-ol is core
+        with patch(
+            "orthonym.decomposition.fragment_ranker.score_fragment_seniority",
+            side_effect=lambda s: 0 if s == "CCCO" else 10,
+        ):
+            result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        assert result is not None, (
+            "Core-size guard should allow when core HA (4) == max non-core HA (4), "
+            f"but got None"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Phase 099-02 Task 2: Sugar bypass, raised limits, fragment-aware quality gate
