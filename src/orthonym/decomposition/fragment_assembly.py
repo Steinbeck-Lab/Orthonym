@@ -18,6 +18,8 @@ import re as _re
 from collections import Counter as _Counter
 from typing import Dict, List, Optional
 
+from rdkit import Chem as _Chem
+
 from ..data.trivial_acids import get_acylate_name, TRIVIAL_ACID_TO_ACYLATE
 from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
 
@@ -734,6 +736,21 @@ def _assemble_multi_ester(
     core_name = fragment_names.get(core_smiles, "")
     if not core_name:
         return None
+
+    # Core-size guard (Phase 099-05): reject when core fragment has fewer
+    # heavy atoms than any non-core fragment. This prevents pathological
+    # multi-ester splits where peripheral ester bonds are cleaved on a
+    # complex ring system, leaving a tiny core and losing the ring system.
+    core_mol = _Chem.MolFromSmiles(core_smiles)
+    if core_mol is not None:
+        core_ha = core_mol.GetNumHeavyAtoms()
+        non_core_smiles_set = [s for s in unique_smiles if s != core_smiles]
+        for nc_smi in non_core_smiles_set:
+            nc_mol = _Chem.MolFromSmiles(nc_smi)
+            if nc_mol is not None:
+                nc_ha = nc_mol.GetNumHeavyAtoms()
+                if nc_ha > core_ha:
+                    return None  # Core is smaller than a non-core fragment
 
     # Collect acid names from non-core fragments
     ate_names = []

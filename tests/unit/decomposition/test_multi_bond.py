@@ -550,15 +550,19 @@ class TestMultiEsterAssembly:
         )
 
     def test_core_identified_via_seniority(self):
-        """Core fragment (glycerol) is identified as most senior by score_fragment_seniority."""
+        """Core fragment (glycerol) is identified as most senior by score_fragment_seniority.
+
+        Uses acetic acid (4 HA) as non-core so glycerol (6 HA) passes the
+        core-size guard (Phase 099-05).
+        """
         fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol (has OHs)
-            {"smiles": "CCCCCCCCCCCCCCCC(=O)O", "side": "acid"},  # palmitic acid
-            {"smiles": "CCCCCCCCCCCCCCCC(=O)O", "side": "acid"},  # palmitic acid
+            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol (6 HA)
+            {"smiles": "CC(=O)O", "side": "acid"},      # acetic acid (4 HA)
+            {"smiles": "CC(=O)O", "side": "acid"},      # acetic acid (4 HA)
         ]
         fragment_names = {
             "OCC(O)CO": "glycerol",
-            "CCCCCCCCCCCCCCCC(=O)O": "hexadecanoic acid",
+            "CC(=O)O": "acetic acid",
         }
         result = _assemble_multi_ester(fragments, fragment_names, "pin")
         assert result is not None
