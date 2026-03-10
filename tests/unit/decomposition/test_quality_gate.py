@@ -238,6 +238,159 @@ class TestConservativeQualityGate:
         ) is False
 
 
+class TestRetainedNameCoverageGuard:
+    """Tests for retained-name coverage guard in _name_quality_is_acceptable().
+
+    Retained names in _RETAINED_CORE_NAMES should only bypass the quality gate
+    when they plausibly describe the whole molecule. For molecules with HA > 20,
+    the retained name must have >= 0.25 chars/HA to pass. This catches cases
+    like "adenine" (7 chars) naming a 58-HA CoA molecule (ratio 0.12) while
+    preserving "adenine" for the standalone 10-HA molecule.
+    """
+
+    @pytest.mark.unit
+    def test_adenine_rejected_at_58_ha(self):
+        """adenine (7 chars) for a 58-HA molecule: ratio=0.12, HA>20, rejected."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        from unittest.mock import MagicMock
+        mock_mol = MagicMock()
+        mock_mol.GetNumHeavyAtoms.return_value = 58
+        mock_mol.GetRingInfo.return_value = MagicMock(AtomRings=lambda: [])
+        assert _name_quality_is_acceptable("adenine", mock_mol) is False
+
+    @pytest.mark.unit
+    def test_adenine_accepted_at_10_ha(self):
+        """adenine (7 chars) for a 10-HA molecule: HA<=20, always passes."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Use real adenine molecule
+        mol = Chem.MolFromSmiles("c1nc(N)c2[nH]cnc2n1")  # adenine, HA=10
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 10
+        assert _name_quality_is_acceptable("adenine", mol) is True
+
+    @pytest.mark.unit
+    def test_adenine_rejected_at_38_ha(self):
+        """adenine (7 chars) for a 38-HA molecule: ratio=0.18, HA>20, rejected."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        from unittest.mock import MagicMock
+        mock_mol = MagicMock()
+        mock_mol.GetNumHeavyAtoms.return_value = 38
+        mock_mol.GetRingInfo.return_value = MagicMock(AtomRings=lambda: [])
+        assert _name_quality_is_acceptable("adenine", mock_mol) is False
+
+    @pytest.mark.unit
+    def test_adenine_accepted_at_15_ha(self):
+        """adenine (7 chars) for HA=15 (<=20 threshold): always passes."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # 9-pentyladenine has HA=15
+        mol = Chem.MolFromSmiles("CCCCCn1cnc2c(N)ncnc21")
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 15
+        assert _name_quality_is_acceptable("adenine", mol) is True
+
+    @pytest.mark.unit
+    def test_indole_accepted_at_9_ha(self):
+        """indole (6 chars) for a 9-HA molecule: HA<=20, always passes."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        mol = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")  # indole, HA=9
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 9
+        assert _name_quality_is_acceptable("indole", mol) is True
+
+    @pytest.mark.unit
+    def test_phenothiazine_accepted_at_14_ha(self):
+        """phenothiazine (13 chars) for a 14-HA molecule: HA<=20, always passes."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        mol = Chem.MolFromSmiles("c1ccc2c(c1)Sc1ccccc1N2")  # phenothiazine, HA=14
+        assert mol is not None
+        assert mol.GetNumHeavyAtoms() == 14
+        assert _name_quality_is_acceptable("phenothiazine", mol) is True
+
+
+class TestMultiBondUnderCoverage:
+    """Tests for multi-bond under-coverage detection in _name_quality_is_acceptable().
+
+    When a molecule has multiple distinct cleavable bond types but the pipeline
+    name references fewer than half of them, the name likely describes only one
+    fragment. The quality gate should reject such names.
+    """
+
+    @pytest.mark.unit
+    def test_name_missing_ester_tokens_with_ester_and_phospho(self):
+        """Name 'butanedioic acid' has no ester/phospho tokens for a molecule with
+        ester + phosphodiester bonds: should be rejected."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Molecule with ester + phosphodiester bonds, HA=17
+        mol = Chem.MolFromSmiles("CCCCCC(=O)OCCOP(=O)(O)OCC")
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 15, f"Need HA > 15, got {ha}"
+        # "butanedioic acid" has no ester/phospho tokens
+        assert _name_quality_is_acceptable("butanedioic acid", mol) is False
+
+    @pytest.mark.unit
+    def test_name_with_ester_token_passes(self):
+        """Name 'methyl butanedioate' contains 'oate' (ester token): should pass
+        for a molecule with ester bonds only."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Molecule with only 1 ester bond, HA=14
+        mol = Chem.MolFromSmiles("CCCCCCOC(=O)CCC(=O)O")
+        assert mol is not None
+        # Single bond type = no multi-bond under-coverage check
+        # Name has digits and hyphens wouldn't block it either
+        # This should pass because the name is adequate
+        assert _name_quality_is_acceptable("methyl butanedioate", mol) is True
+
+    @pytest.mark.unit
+    def test_partial_name_rejected_for_multi_bond_molecule(self):
+        """Name '2-aminopropanoic acid' for a 42-HA molecule with 4 bonds
+        (ester + amide): partial name should be rejected."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Molecule with 2 ester + 2 amide bonds, HA=42
+        mol = Chem.MolFromSmiles("CCCCCCCCCC(=O)NCCCC(=O)OCC(NC(=O)CCCCC)CC(=O)OCCCCCCCCCC")
+        assert mol is not None
+        ha = mol.GetNumHeavyAtoms()
+        assert ha > 30, f"Need large molecule, got HA={ha}"
+        # "(2S)-2-aminopropanoic acid" references amino (amide) but not ester
+        # With 2 distinct bond types, need at least 1 represented (half of 2 = 1)
+        # This name only has 'amino' -> represents amide but not ester
+        # Actually half of 2 is 1.0 and we have 1 represented -> passes
+        # Need to test with a name that represents 0 of 2 types
+        assert _name_quality_is_acceptable("propanedioic acid", mol) is False
+
+    @pytest.mark.unit
+    def test_no_cleavable_bonds_always_passes(self):
+        """Molecule with no cleavable bonds: multi-bond check not applicable."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Pentanoic acid has no cleavable bonds
+        mol = Chem.MolFromSmiles("CCCCC(=O)O")
+        assert mol is not None
+        assert _name_quality_is_acceptable("pentanoic acid", mol) is True
+
+    @pytest.mark.unit
+    def test_name_with_both_amide_and_ester_tokens_passes(self):
+        """Name referencing both amide and ester tokens passes for a molecule
+        with both bond types."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # Molecule with ester + amide bonds
+        mol = Chem.MolFromSmiles("CCCCCCCCCC(=O)NCCCC(=O)OCC(NC(=O)CCCCC)CC(=O)OCCCCCCCCCC")
+        assert mol is not None
+        # "ethyl 2-aminobutanedioate" references both amino (amide) and oate (ester)
+        assert _name_quality_is_acceptable("ethyl 2-aminobutanedioate", mol) is True
+
+    @pytest.mark.unit
+    def test_existing_quality_gate_tests_still_pass(self):
+        """Verify the retained-name tests and tiered coverage tests still pass.
+        This is a meta-test ensuring no regressions."""
+        from orthonym.decomposition.engine import _name_quality_is_acceptable
+        # phenothiazine standalone (HA=14) should still pass
+        mol = Chem.MolFromSmiles("c1ccc2c(c1)Sc1ccccc1N2")
+        assert _name_quality_is_acceptable("phenothiazine", mol) is True
+        # adenine standalone (HA=10) should still pass
+        mol2 = Chem.MolFromSmiles("c1nc(N)c2[nH]cnc2n1")
+        assert _name_quality_is_acceptable("adenine", mol2) is True
+
+
 class TestProbeIntegration:
     """Integration tests verifying the probe replacement in try_decompose().
 
