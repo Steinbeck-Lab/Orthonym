@@ -208,7 +208,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C1CC[C@@H](C/C=C2/CC[C@]3(OC2)O[C@@]2(O)CC[C@]3(C)OC2(C)C)C(C)(C)[C@H]1[C@@H](O)C=C1CCOC1=O",
-        "(1S,2S,5S)-2,7,7-trimethyl-6,8,12-trioxa-tricyclo[3.1.0.5(1,1).2(2,5)]tridecan-5-ol",
+        "(1S,2S,5S,9Z)-2,7,7-trimethyl-6,8,12-trioxa-tricyclo[3.1.0.5(1,1).2(2,5)]tridecan-5-ol",
     ),
     (
         "C=C1/C=C/C(=O)N(C)CC(=O)O[C@@H](CCCCCCCCCCCCCC)[C@H](C)C(=O)[C@](C)(O)C(=O)NCC(=O)N1",

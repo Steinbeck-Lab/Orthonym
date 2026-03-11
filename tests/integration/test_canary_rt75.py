@@ -764,7 +764,7 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: parent_mismatch (3 compounds)
     (
         r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # Sentinel: parent_mismatch - cyclohexanone chain
-        "3-(2-oxo1-ethyl-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid",
+        "3-(2-oxo(1E)-1-ethylidene-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid",
     ),
     (
         "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic

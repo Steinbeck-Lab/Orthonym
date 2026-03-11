@@ -54,7 +54,7 @@ STEREO_AUTOUNLOCK = [
     pytest.param(
         "C=C1CC[C@@H](C/C=C2/CC[C@]3(OC2)O[C@@]2(O)CC[C@]3(C)"
         "OC2(C)C)C(C)(C)[C@H]1[C@@H](O)C=C1CCOC1=O",
-        "(1S,2S,5S)",
+        "(1S,2S,5S,9Z)",
         id="tricyclic-trioxa-1S2S5S",
     ),
     pytest.param(

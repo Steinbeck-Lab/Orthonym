@@ -48,7 +48,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC[C@H](C)[C@H](N)C(=O)[O-]', '2-aminohexanoate'),  # Phase 64: single-anion neutralize-then-name now produces -oate
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '2-aminobutanoic acid'),  # MISSING_STEREO - isotope
     ('C/N=C(\\N)NCCCCN', '4-guanidino-4-(methylamino)butan-1-amine'),  # MISSING_STEREO - wrong parent; alpha order fixed P80
-    ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylcyclohexene'),
+    ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylidenecyclohexene'),
     ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "(4s,5s)-N,N'-dipropylurea"),  # Phase 92-02: stereo injection for urea handler
     ('NC(=O)N/C=C\\C(=O)OO', '(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol'),  # alpha order fixed P80
     ('C=CC/C=C/CCC(=O)OC', 'methyl (4E)-octa-4,7-dienoate'),  # NEWLY_RT
@@ -62,7 +62,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('N[C@@H](COC(=O)CCC(=O)O)C(=O)O', 'butanedioic acid'),  # MISSING_STEREO - wrong parent
     ('C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O', '(octanoyloxy)-2-pyrrolidinylprop-2-enimide'),  # MISSING_STEREO - wrong parent; depth-independent naming v11
     ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', '2-(2-oxo(3R)-3-aminobutyl)benzoic acid'),
-    ('C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C', '(1S,2S)-1-ethenyl-4-isopropyl-1-methyl-2-(prop-1-en-2-yl)cyclohexane'),  # alpha order fixed P80
+    ('C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C', '(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane'),  # alpha order fixed P80; P102-02: isopropylidene (exocyclic =C)
     ('CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO', '(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one'),
     ('CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1', '(1S,4s,7R)-4-isopropyl-1,7-dimethylcyclodecane'),  # lowercase s for pseudoasymmetric center per IUPAC P-92.1.4.2
     ('COc1c(C)c(O)cc2c1C(=O)N[C@H]2C', '(3S)-6-hydroxy-4-methoxy-3,5-dimethylisoindolin-1-one'),
@@ -79,7 +79,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2', '(7aS)-2,3a-dichloro-3-methoxy-7a-methyl-2,3-dihydro-1-benzofuran-6-carboxylic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O', '3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole'),  # MISSING_STEREO - wrong parent
     ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'heptanamide'),  # MISSING_STEREO - wrong parent
-    ('C/C=C1\\[C@H]2C=C(C)C[C@]1([NH3+])c1ccc(=O)[nH]c1C2', '(2R,6R)-4-methyl-9-aza-tricyclo[6.4.0.1(2,6)]tridec-4-en-10-one'),
+    ('C/C=C1\\[C@H]2C=C(C)C[C@]1([NH3+])c1ccc(=O)[nH]c1C2', '(2R,6R,13E)-4-methyl-9-aza-tricyclo[6.4.0.1(2,6)]tridec-4-en-10-one'),
     ('CO[C@@H]1[C@H](O)[C@@H](CO)O[C@H]1n1ccc(=O)[nH]c1=O', '(2R,3R,4R,5R)-4-hydroxy-3,5-dimethyl-2-pyrimidinyloxolane'),
     ('CCCCC[C@@H](O)[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,2R)-1-cyclohexylheptane-1,2-diol'),
     ('C[C@H]1C[C@H](O)[C@@H]2[C@H]1[C@@H]1[C@H](CC[C@]2(C)O)[C@@]1(C)CO', '(1S,2S,5S,6R,7R,8R,9S,11S)-2,6,6,9-tetramethyl-tricyclo[6.3.0.0(5,7)]undecan-2,11-diol'),
@@ -94,7 +94,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCCC/C=C\\CCCCCCCCCOC(C)=O', '(10Z)-pentadec-10-en-1-yl acetate'),  # NEWLY_RT (Phase 62)
     ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '(1R,4R)-1,2,3,4-tetrahydronaphthalene'),
     ('CCOC(=O)C[C@@H](SP(=O)(OC)OC)C(=O)OCC', 'diethyl butanedioate'),  # MISSING_STEREO - wrong parent
-    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-oxo1-ethyl-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid'),  # MISSING_STEREO - carbamoyl prefix now correct
+    ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-oxo(1E)-1-ethylidene-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid'),  # P102-02: ethylidene + E/Z for exocyclic =C
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),
     ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(1R,2R)-3-cyclononyl-1-oxiranylpropane-1,2-diol'),
     ('C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O', '(1R,10S,11R,12S,14R)-4,11,14-trihydroxy-10,12-dimethyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one'),

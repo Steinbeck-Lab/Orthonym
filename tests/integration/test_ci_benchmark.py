@@ -297,7 +297,7 @@ CI_BENCHMARK = [
     ),
     (
         "C[C@H](O)/C=C1\\C[C@H](O)[C@]23C[C@H]2C(C)(C)O[C@]3(O)C1=O",
-        "(1S,2S,6S,9R)-2,6-dihydroxy-8,8-dimethyl-7-oxa-tricyclo"
+        "(1S,2S,4E,6S,9R)-2,6-dihydroxy-8,8-dimethyl-7-oxa-tricyclo"
         "[4.4.0.0(1,9)]decan-5-one",
     ),
     (

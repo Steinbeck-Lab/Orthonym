@@ -87,14 +87,32 @@ def collect_stereodescriptors(
             begin_idx = bond.GetBeginAtomIdx()
             end_idx = bond.GetEndAtomIdx()
 
-            # Both atoms must be in mapping
+            # Determine locant for this E/Z bond.
+            # Standard case: both atoms in atom_to_locant -> use lower locant.
+            # Exocyclic case (IUPAC P-91.2): one atom in a ring that is
+            # in atom_to_locant, the other outside the ring -> use the
+            # ring atom's locant.  Only applies to true ring-exocyclic
+            # bonds (prevents false E/Z on chain substituent bonds).
             if begin_idx in atom_to_locant and end_idx in atom_to_locant:
-                locant_a = atom_to_locant[begin_idx]
-                locant_b = atom_to_locant[end_idx]
-                # IUPAC: use lower locant for bond position
-                locant = min(locant_a, locant_b)
-                cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
-                descriptors.append((locant, cip_code))
+                # Both in parent -- standard behaviour
+                locant = min(atom_to_locant[begin_idx],
+                             atom_to_locant[end_idx])
+            elif begin_idx in atom_to_locant and end_idx not in atom_to_locant:
+                # Only include if the in-mapping atom is in a ring
+                # (true exocyclic bond, not a chain substituent bond)
+                if not mol.GetAtomWithIdx(begin_idx).IsInRing():
+                    continue
+                locant = atom_to_locant[begin_idx]
+            elif end_idx in atom_to_locant and begin_idx not in atom_to_locant:
+                if not mol.GetAtomWithIdx(end_idx).IsInRing():
+                    continue
+                locant = atom_to_locant[end_idx]
+            else:
+                # Neither atom in parent -- skip
+                continue
+
+            cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
+            descriptors.append((locant, cip_code))
 
     # Sort by locant ascending
     descriptors.sort(key=lambda x: x[0])

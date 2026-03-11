@@ -5541,6 +5541,29 @@ def _count_carbon_chain(mol, start_idx: int, exclude: set) -> int:
     return count
 
 
+def _convert_yl_to_ylidene(name: str) -> str:
+    """Convert an alkyl substituent name to its ylidene form.
+
+    IUPAC P-31.1.3.1: Substituents attached to a parent by a double bond
+    use the suffix -ylidene instead of -yl.
+
+    Examples:
+        methyl   -> methylidene
+        ethyl    -> ethylidene
+        propyl   -> propylidene
+        isopropyl -> isopropylidene
+        phenyl   -> phenylid (not applicable for ring exocyclic, but handled)
+        vinyl    -> vinylidene
+
+    If the name doesn't end in -yl, returns the name with 'idene' appended
+    (handles edge cases like retained names).
+    """
+    if name.endswith('yl'):
+        # methyl -> methylidene, ethyl -> ethylidene
+        return name + 'idene'
+    return name
+
+
 def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for ALL substituents on rings (alkyl, heteroatom, compound).
@@ -5558,6 +5581,8 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     Returns:
         List of NameFragment objects for ring substituent prefixes, sorted alphabetically
     """
+    from rdkit import Chem
+
     mol = features.mol
     ring_substituents = features.ring_substituents
     oriented_ring = features.oriented_ring
@@ -5598,6 +5623,17 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
             )
             continue
 
+        # IUPAC P-31.1.3.1: Detect exocyclic double bond attachment.
+        # If the bond from the ring atom to the substituent is DOUBLE,
+        # the substituent uses -ylidene suffix instead of -yl.
+        is_exocyclic_double = False
+        attach_idx = sub_info.attach_mol_idx
+        for frag_idx in sub_info.frag_atoms:
+            bond = mol.GetBondBetweenAtoms(attach_idx, frag_idx)
+            if bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE:
+                is_exocyclic_double = True
+                break
+
         # Classify and name via the unified pipeline
         name = classify_and_name_fragment(mol, sub_info, ring_set, features)
         if name is None:
@@ -5618,6 +5654,12 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     sub_info.locant,
                 )
                 continue
+
+        # IUPAC P-31.1.3.1: Convert -yl to -ylidene for exocyclic double bonds.
+        # =CH2 -> methylidene, =CHCH3 -> ethylidene, =C(CH3)2 -> propan-2-ylidene
+        if is_exocyclic_double and name:
+            name = _convert_yl_to_ylidene(name)
+
         substituent_groups[name].append(sub_info.locant)
 
     # Count ALL ring substituents (alkyl + FG), not just the ones we named
