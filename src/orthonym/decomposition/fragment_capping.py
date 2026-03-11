@@ -3,6 +3,10 @@ Fragment capping for decomposition engine.
 
 After bond cleavage, replaces dummy atoms with H or OH to produce
 valid molecule fragments for recursive naming.
+
+IUPAC P-44.1: Principal characteristic group determines which side of a
+cleavage retains the parent suffix. Acid-side fragments are capped with OH
+to reconstruct the parent acid; alkyl/amine-side fragments are capped with H.
 """
 
 from typing import Dict, List, Set
@@ -16,6 +20,7 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
 
     Uses RDKit FragmentOnBonds to cleave, then replaces dummy atoms:
     - Acid-side fragments: cap with OH (produces carboxylic acid) if acid_side_oh=True
+      per IUPAC P-44.1 principal characteristic group preservation
     - Alkyl/amine-side fragments: cap with H
 
     Fragment side labeling uses dummyLabels to track which dummy came from

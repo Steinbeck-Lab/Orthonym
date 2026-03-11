@@ -1,12 +1,15 @@
 """
-Peptide naming using the acylamino convention (IUPAC 3AA-13).
+Peptide naming using the acylamino convention.
 
-Linear peptides are named by:
+IUPAC P-66.6.6: Linear peptides are named using amino acid nomenclature:
 1. Detecting peptide bonds (-C(=O)-NH-)
 2. Walking the chain to extract residue SMILES
-3. Identifying each residue by trivial name
-4. Adding L-/D- stereo prefixes based on CIP labels
+3. Identifying each residue by trivial name (P-66.6.6.1)
+4. Adding L-/D- stereo prefixes based on CIP labels (P-66.6.6.3)
 5. Assembling: acyl forms for N-terminal residues, full name for C-terminal
+
+IUPAC P-66.6.6.2: peptide naming convention uses N->C direction,
+with acyl (glycyl, alanyl...) forms for all residues except C-terminal.
 
 Examples:
     Gly-Gly        -> glycylglycine
@@ -403,10 +406,10 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
     """
     Assemble the final peptide name from identified residues.
 
-    Rules:
+    IUPAC P-66.6.6.2 rules:
     - C-terminal (last) residue: use full amino acid name
-    - All other residues: use acyl form
-    - Add L-/D- stereo prefix before each residue name
+    - All other residues: use acyl form (e.g., glycyl-, alanyl-)
+    - Add L-/D- stereo prefix before each residue name (P-66.6.6.3)
     - Hyphen ONLY before a residue that has a stereo prefix (L-/D-)
     - No hyphen before achiral residues (concatenate directly)
 

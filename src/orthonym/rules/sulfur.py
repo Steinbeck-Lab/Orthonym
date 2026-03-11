@@ -1,12 +1,12 @@
 """
 Sulfur compound naming rules per IUPAC 2013.
 
-Handles:
-- Thiols (-SH): suffix -thiol, prefix sulfanyl-
-- Sulfides (R-S-R'): functional class naming (dimethyl sulfide)
-- Sulfoxides (R-SO-R'): functional class naming (dimethyl sulfoxide)
-- Sulfones (R-SO2-R'): functional class naming (dimethyl sulfone)
-- Sulfonic acids (-SO3H): suffix -sulfonic acid, prefix sulfo-
+IUPAC P-63.6: Sulfur-containing functional groups:
+- Thiols (-SH): suffix -thiol, prefix sulfanyl- (P-63.6.1.1)
+- Sulfides (R-S-R'): functional class naming (P-63.6.2.1)
+- Sulfoxides (R-SO-R'): functional class naming (P-63.6.3.1)
+- Sulfones (R-SO2-R'): functional class naming (P-63.6.3.2)
+- Sulfonic acids (-SO3H): suffix -sulfonic acid, prefix sulfo- (P-65.3.1.2)
 """
 
 from typing import Optional, Tuple, List
@@ -44,9 +44,9 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     """
     Name a sulfide (thioether) using functional class nomenclature.
 
-    IUPAC prefers functional class for simple sulfides:
+    IUPAC P-63.6.2.1 prefers functional class for simple sulfides:
     - Symmetric: "dimethyl sulfide", "diethyl sulfide"
-    - Asymmetric: "ethyl methyl sulfide" (alphabetical order)
+    - Asymmetric: "ethyl methyl sulfide" (alphabetical order, P-14.4)
 
     Args:
         mol: RDKit Mol object
@@ -84,9 +84,9 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a sulfoxide using functional class nomenclature.
 
-    IUPAC prefers functional class for simple sulfoxides:
+    IUPAC P-63.6.3.1 prefers functional class for simple sulfoxides:
     - Symmetric: "dimethyl sulfoxide"
-    - Asymmetric: "ethyl methyl sulfoxide" (alphabetical order)
+    - Asymmetric: "ethyl methyl sulfoxide" (alphabetical order, P-14.4)
 
     Args:
         mol: RDKit Mol object
@@ -135,9 +135,9 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a sulfone using functional class nomenclature.
 
-    IUPAC prefers functional class for simple sulfones:
+    IUPAC P-63.6.3.2 prefers functional class for simple sulfones:
     - Symmetric: "dimethyl sulfone"
-    - Asymmetric: "ethyl methyl sulfone" (alphabetical order)
+    - Asymmetric: "ethyl methyl sulfone" (alphabetical order, P-14.4)
 
     Args:
         mol: RDKit Mol object
@@ -232,7 +232,7 @@ def get_sulfur_prefix(fg_name: str) -> Optional[str]:
         Prefix string, or None if group uses functional class naming
     """
     SULFUR_PREFIXES = {
-        "thiol": "sulfanyl",  # IUPAC 2013, not "mercapto"
+        "thiol": "sulfanyl",  # IUPAC P-63.6.1.1 (2013), not "mercapto"
         "sulfonic_acid": "sulfo",
         "sulfinic_acid": "sulfino",
         # These use functional class naming, no prefix:

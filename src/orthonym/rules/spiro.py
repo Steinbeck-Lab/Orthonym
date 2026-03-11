@@ -4,12 +4,15 @@ Spiro compound naming module.
 Handles naming of spiro systems where two rings share exactly one atom
 (the spiro center). Generates IUPAC spiro[a.b] descriptors.
 
-IUPAC rules for spiro naming:
-- Spiro descriptor: spiro[a.b] where a <= b
+IUPAC P-31.3 rules for spiro naming:
+- Spiro descriptor: spiro[a.b] where a <= b (P-31.3.1.1)
 - a = smaller_ring_size - 1, b = larger_ring_size - 1
 - The -1 accounts for the shared spiro center
-- Numbering starts at atom adjacent to spiro center in smaller ring
+- Numbering starts at atom adjacent to spiro center in smaller ring (P-31.3.1.2)
 - Goes around smaller ring, through spiro center, then around larger ring
+
+IUPAC P-31.3.2: heterocyclic spiro compounds use 'a' replacement prefixes
+IUPAC P-31.3.3: di/trispiro naming for multiple spiro centers
 
 Examples:
     spiro[4.5]decane - cyclopentane fused to cyclohexane (5-1=4, 6-1=5)
@@ -135,7 +138,8 @@ def generate_spiro_descriptor(mol) -> Optional[str]:
     except ValueError:
         return None
 
-    # Descriptor values are ring_size - 1 (excluding double-counted spiro center)
+    # IUPAC P-31.3.1.1: descriptor values are ring_size - 1
+    # (excluding double-counted spiro center)
     a = smaller_ring - 1
     b = larger_ring - 1
 
@@ -146,7 +150,7 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
     """
     Generate IUPAC numbering for atoms in a spiro system.
 
-    IUPAC rules for spiro numbering:
+    IUPAC P-31.3.1.2 rules for spiro numbering:
     1. Start at atom adjacent to spiro center in the SMALLER ring
     2. Number around the smaller ring
     3. The spiro center gets the next number

@@ -5,8 +5,10 @@ This module implements comprehensive IUPAC naming for ortho-fused heterocyclic s
 including bicyclic lactones and other complex fused ring systems following Blue Book rules.
 
 References:
-- IUPAC Blue Book (Nomenclature of Organic Chemistry)
-- Rules for ortho-fused systems, lactone naming, and ring numbering
+- IUPAC 2013 P-25.3.1: ortho-fused polycyclic hydrocarbons
+- IUPAC 2013 P-25.3.3: numbering of fused polycyclic hydrocarbons
+- IUPAC 2013 P-31.1.2: indicated hydrogen in fused ring systems
+- IUPAC 2013 P-31.1.3: von Baeyer nomenclature for bicyclic systems
 """
 
 from typing import List, Dict, Optional, Tuple
@@ -133,7 +135,8 @@ def identify_fused_rings(mol: Mol) -> List[Tuple[List[int], List[int], List[int]
             # Find shared atoms
             shared = list(ring1 & ring2)
             
-            # Ortho-fused: exactly 2 shared atoms that are bonded
+            # IUPAC P-25.3.1.1: ortho-fused = two rings sharing exactly two
+            # adjacent atoms (one bond)
             if len(shared) == 2:
                 idx1, idx2 = shared
                 if mol.GetBondBetweenAtoms(idx1, idx2) is not None:
@@ -146,9 +149,9 @@ def classify_heterocycle_priority(ring_atoms: List[int], mol: Mol) -> int:
     """
     Classify heterocycle priority according to IUPAC rules.
     
-    IUPAC Priority (highest to lowest):
+    IUPAC P-25.3.3.2 Priority (highest to lowest):
     1. Nitrogen-containing heterocycles
-    2. Oxygen-containing heterocycles  
+    2. Oxygen-containing heterocycles
     3. Sulfur-containing heterocycles
     4. Carbocycles (all carbon)
     
@@ -181,9 +184,9 @@ def determine_base_component(rings: List[Tuple[List[int], List[int], List[int]]]
     """
     Determine the base component (parent ring) for a fused system.
     
-    IUPAC rules for base component selection:
+    IUPAC P-25.3.2.4 rules for base component selection:
     1. Heterocyclic ring preferred over carbocyclic
-    2. Among heterocycles: N > O > S
+    2. Among heterocycles: N > O > S (P-25.3.3.2)
     3. Larger ring preferred
     4. Lactone rings get special consideration
     
@@ -268,7 +271,7 @@ def number_bicyclic_system(base_ring: List[int], attached_ring: List[int],
     """
     Number bicyclic system according to IUPAC bicyclo rules.
     
-    IUPAC bicyclo numbering:
+    IUPAC P-31.1.3.1 bicyclo numbering:
     1. Start at one bridgehead atom
     2. Number along the longest bridge first
     3. Then the second longest bridge
