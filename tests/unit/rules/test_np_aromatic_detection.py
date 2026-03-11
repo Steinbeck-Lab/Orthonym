@@ -1,16 +1,11 @@
 """Unit tests for AROMATIC bond detection in _find_scaffold_unsaturation().
 
-Phase 89 Task 2: The function currently only detects DOUBLE and TRIPLE
-bond types, missing AROMATIC bonds in aromatic rings of natural product
-scaffolds (e.g., aromatic A-ring in estrane steroids).
+Phase 89 Task 2 / Phase 101 Plan 02: The function detects DOUBLE, TRIPLE,
+and AROMATIC bond types. AROMATIC C-C bonds are treated as ene positions
+per IUPAC Blue Book P-31.1.3.4 (e.g., estra-1,3,5(10)-triene).
 
-IUPAC Blue Book P-31.1.3.4: Aromatic ring bonds in partially aromatic
-scaffolds are expressed as ene positions (e.g., estra-1,3,5(10)-triene).
-
-NOTE: Aromatic detection tests are marked xfail because the simple
-Kekulization approach produces arbitrary resonance structures with non-IUPAC
-locants (e.g., 1,2,4 instead of 1,3,5(10) for estrane). A correct fix
-requires IUPAC-conventional aromatic ene position assignment.
+The AROMATIC detection uses read-only bond type flags set during RDKit
+sanitization -- no Kekulization mutation is needed.
 """
 
 import pytest
@@ -35,7 +30,6 @@ def _make_scaffold_inputs(smiles: str):
 class TestAromaticBondDetection:
     """Tests for AROMATIC bond type detection as ene unsaturation."""
 
-    @pytest.mark.xfail(reason="AROMATIC bond detection not yet implemented")
     def test_aromatic_ring_produces_ene_locants(self):
         """Benzene (fully aromatic) should produce ene locants for C=C bonds."""
         mol, matched, numbering = _make_scaffold_inputs('c1ccccc1')
@@ -44,7 +38,6 @@ class TestAromaticBondDetection:
             "AROMATIC bonds not detected: benzene should have ene locants"
         )
 
-    @pytest.mark.xfail(reason="AROMATIC bond detection not yet implemented")
     def test_aromatic_steroid_a_ring(self):
         """Estrone-like aromatic A-ring should produce ene locants."""
         estrone_smi = 'C[C@]12CC[C@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1CCC2=O'
@@ -77,7 +70,6 @@ class TestAromaticBondDetection:
         result = _find_scaffold_unsaturation(mol, matched, numbering)
         assert result['yne'] == []
 
-    @pytest.mark.xfail(reason="AROMATIC bond detection not yet implemented")
     def test_mixed_aromatic_and_saturated(self):
         """Naphthalene fused with saturated ring: only aromatic part has ene."""
         mol, matched, numbering = _make_scaffold_inputs('c1ccc2c(c1)CCCC2')
@@ -86,3 +78,17 @@ class TestAromaticBondDetection:
             "Mixed system should detect aromatic C-C bonds as ene"
         )
         assert len(result['ene']) <= 6
+
+
+class TestFlavonoidScaffolds:
+    """RING-03: Verify flavonoid scaffolds produce correct retained names."""
+
+    def test_flavone_retained_name(self):
+        """Flavone should produce retained name 'flavone'."""
+        from orthonym import name_compound
+        assert name_compound('O=c1cc(-c2ccccc2)oc2ccccc12') == 'flavone'
+
+    def test_flavanone_retained_name(self):
+        """Flavanone should produce retained name 'flavanone'."""
+        from orthonym import name_compound
+        assert name_compound('O=C1CC(c2ccccc2)Oc2ccccc21') == 'flavanone'

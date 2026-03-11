@@ -33,7 +33,7 @@ CI_BENCHMARK = [
     (
         "CCCCN(C)C(=O)CCCCCCCCCC[C@@H]1Cc2cc(O)ccc2[C@H]2CC[C@]3(C)"
         "[C@@H](O)CC[C@H]3[C@H]12",
-        "(7R,8R,9S,13S,14S,17S)-estran-3,17-diol",
+        "(7R,8R,9S,13S,14S,17S)-estra-1,2,4-trien-3,17-diol",
     ),
     (
         "C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)"

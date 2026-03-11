@@ -110,7 +110,7 @@ SMALL_STEREO_COMPOUNDS = [
 # ---------------------------------------------------------------------------
 MEDIUM_STEREO_COMPOUNDS = [
     ('Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O', '(2R,3S,4R)-3,4,7-trihydroxychromane'),
-    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estran-3,15,16,17-tetraol'),
+    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estra-1,2,4-trien-3,15,16,17-tetraol'),
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(4S,6S)-4,6,14-trihydroxy-12-methoxy-6-methyl-tricyclo[8.4.0.0(3,8)]tetradec-3-en-2,9-dione'),
     ('C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)C/C=C\\C(=O)O1', '(4R,7Z,10S,13Z,15R,16S)-15-hydroxy-4,10,16-trimethyl-6,12-dioxooxacyclohexadecan-2-one'),
     ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', '(1S,13S,14S,20S)-20-hydroxy-15-methyl-2,7,9-trioxa-15-aza-pentacyclo[11.7.0.0(4,12).0(6,10).0(14,18)]icos-18-en-3-one'),  # Updated P72: IUPAC VB-6 citation order

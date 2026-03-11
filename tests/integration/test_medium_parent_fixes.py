@@ -390,7 +390,7 @@ STEROID_DECORATION_COMPLETENESS = [
     pytest.param(
         "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1"
         "[C@@H](O)[C@@H](O)[C@@H]2O",
-        "estran",
+        "estra",
         id="estrane-tetraol-decoration",
     ),
     pytest.param(

@@ -69,7 +69,7 @@ EXPECTED_FIXED = [
     ),
     (
         "C[C@]12CC[C@H]3[C@@H](CCc4cc(O)ccc43)[C@@H]1CC[C@@H]2O",
-        "estran",
+        "estra",
         "Steroid: estrane-3,17-diol",
     ),
     (

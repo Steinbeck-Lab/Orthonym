@@ -76,8 +76,8 @@ class TestNPDecorationEnumeration:
     def test_estradiol_decoration(self):
         """Estradiol: estrane with two -OH groups.
 
-        Due to aromatic ring A not being detected as discrete ene bonds,
-        the result is estran-3,17-diol (acceptable limitation).
+        Aromatic ring A is now detected via Kekulized copy (Phase 101-02),
+        producing ene locants for the aromatic C=C bonds.
         """
         smiles = "OC1CCC2C3CCc4cc(O)ccc4C3CCC12C"
         result = name_compound(smiles)

@@ -72,8 +72,13 @@ def name_natural_product(mol) -> Optional[str]:
         # Bare scaffold -- but check for internal unsaturation
         numbering = _build_target_to_iupac(scaffold_info)
         if numbering:
+            scaffold_arom = _build_scaffold_aromatic_atoms(
+                scaffold_info.get("scaffold_smiles"),
+                scaffold_info.get("matched_atoms"),
+            )
             unsaturation = _find_scaffold_unsaturation(
-                mol, set(scaffold_info["matched_atoms"]), numbering
+                mol, set(scaffold_info["matched_atoms"]), numbering,
+                scaffold_aromatic_atoms=scaffold_arom,
             )
             if unsaturation["ene"] or unsaturation["yne"]:
                 stereo_prefix = _collect_np_stereo(mol, numbering)
@@ -192,8 +197,15 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     ketones = _find_ketones(mol, scaffold_info, numbering,
                             exclude_atoms=all_exclude)
 
-    # 3. Find unsaturation within the scaffold (C=C, C#C)
-    unsaturation = _find_scaffold_unsaturation(mol, matched_set, numbering)
+    # 3. Find unsaturation within the scaffold (C=C, C#C, AROMATIC)
+    scaffold_arom = _build_scaffold_aromatic_atoms(
+        scaffold_info.get("scaffold_smiles"),
+        scaffold_info.get("matched_atoms"),
+    )
+    unsaturation = _find_scaffold_unsaturation(
+        mol, matched_set, numbering,
+        scaffold_aromatic_atoms=scaffold_arom,
+    )
 
     # 3b. Find methyl substituents on scaffold (extra CH3 not part of scaffold)
     methyls = _find_methyls(mol, scaffold_info, numbering,
@@ -446,18 +458,110 @@ def _find_halogens(
     return sorted(halogens, key=lambda x: (x[1], x[0]))
 
 
+def _build_scaffold_aromatic_atoms(
+    scaffold_smiles: Optional[str], matched_atoms: Optional[tuple]
+) -> set:
+    """Build the set of target atom indices that are aromatic in the scaffold pattern.
+
+    For scaffolds whose SMARTS already contain aromatic atoms (e.g. morphinan
+    ``c1ccc2c(c1)...``), the returned set marks those atoms so that
+    ``_find_scaffold_unsaturation`` can skip inherent aromatic bonds.
+
+    Returns an empty set when no scaffold SMILES is provided or when the
+    scaffold contains no aromatic atoms (e.g. steroid scaffolds).
+    """
+    if not scaffold_smiles or matched_atoms is None:
+        return set()
+
+    scaffold_mol = Chem.MolFromSmiles(scaffold_smiles)
+    if scaffold_mol is None:
+        return set()
+
+    aromatic_query_indices = {
+        atom.GetIdx()
+        for atom in scaffold_mol.GetAtoms()
+        if atom.GetIsAromatic()
+    }
+    if not aromatic_query_indices:
+        return set()
+
+    # Map query atom positions to target atom indices
+    return {
+        matched_atoms[qi]
+        for qi in aromatic_query_indices
+        if qi < len(matched_atoms)
+    }
+
+
 def _find_scaffold_unsaturation(
-    mol, matched_set: set, numbering: Dict[int, int]
+    mol, matched_set: set, numbering: Dict[int, int],
+    scaffold_aromatic_atoms: Optional[set] = None,
 ) -> Dict[str, List[int]]:
     """Find double and triple bonds within the scaffold.
+
+    Detects explicit DOUBLE and TRIPLE bonds directly.  For aromatic rings
+    (IUPAC P-31.1.3.4), Kekulizes a *copy* of the molecule to resolve
+    aromatic bonds into canonical alternating DOUBLE/SINGLE pattern, then
+    counts the resulting DOUBLE bonds between aromatic C-C atoms.  The
+    original molecule is never mutated.
+
+    Aromatic bonds that are *inherent* to the scaffold pattern (e.g.
+    morphinan Ring A, whose SMARTS already contains ``c`` atoms) are excluded
+    because the base scaffold name already encodes that aromaticity.
+
+    Args:
+        mol: RDKit Mol object.
+        matched_set: Atom indices belonging to the scaffold.
+        numbering: Map from atom index to IUPAC locant.
+        scaffold_aromatic_atoms: Atom indices that are aromatic in the
+            scaffold SMARTS pattern (from ``_build_scaffold_aromatic_atoms``).
+            When ``None`` or empty, all aromatic C-C ene positions are counted.
 
     Returns a dict with 'ene' and 'yne' keys, each a sorted list of
     IUPAC locants (lower locant of each unsaturated bond).
     """
+    if scaffold_aromatic_atoms is None:
+        scaffold_aromatic_atoms = set()
+
     ene_locants = []
     yne_locants = []
 
+    # Determine if we need Kekulized bond orders for aromatic detection.
+    # Check whether the molecule has any aromatic scaffold C-C bonds that
+    # are NOT inherent to the scaffold pattern.
+    has_novel_aromatic = False
     for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.AROMATIC:
+            continue
+        b_idx = bond.GetBeginAtomIdx()
+        e_idx = bond.GetEndAtomIdx()
+        if b_idx not in matched_set or e_idx not in matched_set:
+            continue
+        b_atom = mol.GetAtomWithIdx(b_idx)
+        e_atom = mol.GetAtomWithIdx(e_idx)
+        if b_atom.GetAtomicNum() != 6 or e_atom.GetAtomicNum() != 6:
+            continue
+        # Skip inherent scaffold aromaticity
+        if b_idx in scaffold_aromatic_atoms and e_idx in scaffold_aromatic_atoms:
+            continue
+        has_novel_aromatic = True
+        break
+
+    # Kekulize a COPY to resolve aromatic bonds into explicit DOUBLE/SINGLE.
+    # clearAromaticFlags=False preserves GetIsAromatic() for filtering.
+    kek_mol = None
+    if has_novel_aromatic:
+        try:
+            kek_mol = Chem.RWMol(mol)
+            Chem.Kekulize(kek_mol, clearAromaticFlags=False)
+        except Exception:
+            kek_mol = None  # Fall back: skip aromatic detection
+
+    # Use the Kekulized copy when available, otherwise the original (for
+    # explicit DOUBLE/TRIPLE bonds the result is identical).
+    scan_mol = kek_mol if kek_mol is not None else mol
+
+    for bond in scan_mol.GetBonds():
         b_idx = bond.GetBeginAtomIdx()
         e_idx = bond.GetEndAtomIdx()
 
@@ -470,8 +574,8 @@ def _find_scaffold_unsaturation(
             continue
 
         # Only carbon-carbon bonds
-        b_atom = mol.GetAtomWithIdx(b_idx)
-        e_atom = mol.GetAtomWithIdx(e_idx)
+        b_atom = scan_mol.GetAtomWithIdx(b_idx)
+        e_atom = scan_mol.GetAtomWithIdx(e_idx)
         if b_atom.GetAtomicNum() != 6 or e_atom.GetAtomicNum() != 6:
             continue
 
@@ -480,6 +584,10 @@ def _find_scaffold_unsaturation(
         lower_loc = min(b_loc, e_loc)
 
         if bond.GetBondType() == Chem.BondType.DOUBLE:
+            # For Kekulized aromatic bonds, check the scaffold-inherent filter
+            if b_atom.GetIsAromatic() and e_atom.GetIsAromatic():
+                if b_idx in scaffold_aromatic_atoms and e_idx in scaffold_aromatic_atoms:
+                    continue  # Inherent scaffold aromaticity
             ene_locants.append(lower_loc)
         elif bond.GetBondType() == Chem.BondType.TRIPLE:
             yne_locants.append(lower_loc)
