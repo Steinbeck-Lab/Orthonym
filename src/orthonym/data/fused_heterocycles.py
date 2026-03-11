@@ -910,13 +910,13 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
 
     # Phenanthridine: benz[c]isoquinoline - angular tricyclic, N at position 5
     # IUPAC numbering: 1-2-3-4-4a-4b-5(N)-6-7-8-8a-9-10-10a (14 atoms)
-    # Canonical: c1ccc2c(c1)ccc1cccnc12
-    'c1ccc2c(c1)ccc1cccnc12': {
+    # Canonical: c1ccc2c(c1)cnc1ccccc12 (FIXED: was c1ccc2c(c1)ccc1cccnc12)
+    'c1ccc2c(c1)cnc1ccccc12': {
         'name': 'phenanthridine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {5: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 13: '4b', 12: 5, 11: 6, 10: 7, 9: 8, 8: '8a', 7: 9, 6: 10, 4: '10a'},
+        'iupac_locants': {12: 1, 11: 2, 10: 3, 9: 4, 8: '4a', 4: '4b', 7: 5, 6: 6, 5: 7, 0: 8, 3: '8a', 1: 9, 2: 10, 13: '10a'},
     },
 
     # 9H-beta-Carboline: pyrido[3,4-b]indole - tricyclic, same topology as carbazole
@@ -947,14 +947,14 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # =========================================================================
 
     # 4H-Quinolizine: pyrido[1,2-a]pyridine analog, N bridgehead
-    # IUPAC numbering: 1-2-3-4-4a(N)-5-6-7-8-8a (10 atoms)
-    # Canonical: C1=CC2=CCC=CN2C=C1
-    'C1=CC2=CCC=CN2C=C1': {
+    # IUPAC numbering: 1-2-3-4-4a(N)-6-7-8-9-9a (10 atoms, position 5 skipped)
+    # Canonical: C1=CCN2C=CC=CC2=C1 (FIXED: was C1=CC2=CCC=CN2C=C1)
+    'C1=CCN2C=CC=CC2=C1': {
         'name': '4H-quinolizine',
         'tautomer_locant': 4,
         'ring_system': 'bridgehead',
         'parent_atoms': 10,
-        'iupac_locants': {8: 1, 9: 2, 0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a'},
+        'iupac_locants': {9: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 6, 5: 7, 6: 8, 7: 9, 8: '9a'},
     },
 
     # Quinolizidine: decahydroquinolizine, fully saturated N-bridgehead
@@ -966,6 +966,79 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'ring_system': 'bridgehead',
         'parent_atoms': 10,
         'iupac_locants': {9: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: 8, 8: '8a'},
+    },
+
+    # Pyrrolizine: pyrrolo[1,2-a]pyrrole - bicyclic, N bridgehead
+    # IUPAC numbering: 1-2-3-3a(N)-5-6-7-7a (8 atoms, position 4 skipped)
+    # Canonical: C1=Cn2cccc2C1
+    'C1=Cn2cccc2C1': {
+        'name': 'pyrrolizine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 8,
+        'iupac_locants': {7: 1, 0: 2, 1: 3, 2: '3a', 3: 5, 4: 6, 5: 7, 6: '7a'},
+    },
+
+    # =========================================================================
+    # PHASE 101 ADDITIONS: New fused heterocycle entries
+    # =========================================================================
+
+    # Xanthone: 9H-xanthen-9-one - tricyclic with ring O and exocyclic =O
+    # IUPAC numbering: 1-2-3-4-4a-4b-5-6-7-8-8a-9-9a (ring O at 10a, =O at 9)
+    # Canonical: O=c1c2ccccc2oc2ccccc12
+    'O=c1c2ccccc2oc2ccccc12': {
+        'name': 'xanthone',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'is_retained_name': True,
+        'parent_atoms': 15,
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '10a', 9: '4b', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
+    },
+
+    # Thioxanthone: 9H-thioxanthen-9-one - sulfur analogue of xanthone
+    # IUPAC numbering: same as xanthone but S instead of O in ring
+    # Canonical: O=c1c2ccccc2sc2ccccc12
+    'O=c1c2ccccc2sc2ccccc12': {
+        'name': 'thioxanthone',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'is_retained_name': True,
+        'parent_atoms': 15,
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '10a', 9: '4b', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
+    },
+
+    # 1,10-Phenanthroline: angular tricyclic diazine, N at positions 1 and 10
+    # IUPAC numbering: 1(N)-2-3-4-4a-4b-5-6-7-8-8a-9-10(N)-10a (14 atoms)
+    # Canonical: c1cnc2c(c1)ccc1cccnc12
+    'c1cnc2c(c1)ccc1cccnc12': {
+        'name': '1,10-phenanthroline',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {12: 1, 11: 2, 10: 3, 9: 4, 8: '4a', 4: '4b', 7: 5, 6: 6, 5: 7, 0: 8, 3: '8a', 1: 9, 2: 10, 13: '10a'},
+    },
+
+    # 1H-Perimidine: 1H-perimidin-2-amine parent - peri-fused tricyclic
+    # Naphtho[1,8-de] fused imidazoline
+    # IUPAC numbering: 1-2-3-3a-4-5-6-6a-7-8-9-9a-9b (13 atoms)
+    # Canonical: C1=Nc2cccc3cccc(c23)N1
+    'C1=Nc2cccc3cccc(c23)N1': {
+        'name': '1H-perimidine',
+        'tautomer_locant': 1,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {12: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 7, 8: 8, 9: 9, 10: '9a', 11: '9b'},
+    },
+
+    # Thioxanthene: dibenzo[b,e]thiopyran (9H-thioxanthene) - S analogue of xanthene
+    # IUPAC numbering: same as xanthene but S at 10a position
+    # Canonical: c1ccc2c(c1)Cc1ccccc1S2
+    'c1ccc2c(c1)Cc1ccccc1S2': {
+        'name': '9H-thioxanthene',
+        'tautomer_locant': 9,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 10, 13: 4},
     },
 }
 
