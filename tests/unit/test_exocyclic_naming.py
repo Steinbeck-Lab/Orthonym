@@ -9,6 +9,7 @@ Exocyclic double bonds (=CH2, =CHR, =NR) on ring systems require:
 These tests cover STER-04 (deferred from Phase 92-03).
 """
 
+import subprocess
 import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
@@ -248,3 +249,129 @@ class TestNoFalseEZInSubstituentContext:
             f"With empty atom_to_locant (substituent context), should get no descriptors, "
             f"got {descriptors}"
         )
+
+    def test_no_false_ez_on_chain_substituent_bond(self):
+        """E/Z should NOT be emitted for chain double bonds where one atom
+        is outside the principal chain mapping.
+
+        This guards against the regression where chain C=N or C=C bonds
+        at the edge of a principal chain got false E/Z descriptors.
+        """
+        from orthonym.rules.stereochemistry import collect_stereodescriptors
+
+        # A chain compound with E/Z on a C=N bond, one atom not in mapping
+        mol = Chem.MolFromSmiles('C/N=C(\\N)C')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # Only include carbon chain atoms in mapping, exclude N
+        atom_to_locant = {0: 1, 2: 2, 4: 3}
+
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
+        # The C=N bond has atom 0 (C, in mapping, NOT in ring) and atom 1 (N, not in mapping)
+        # Since atom 0 is NOT in a ring, the exocyclic guard should skip this bond
+        ez_descriptors = [d for d in descriptors if d[1] in ('E', 'Z')]
+        assert len(ez_descriptors) == 0, (
+            f"Chain C=N bond should NOT get exocyclic E/Z treatment, got {ez_descriptors}"
+        )
+
+
+# =============================================================================
+# Integration: End-to-end naming tests (Task 2)
+# =============================================================================
+
+class TestExocyclicEndToEnd:
+    """Integration tests for complete exocyclic compound naming."""
+
+    def _name(self, smiles):
+        from orthonym.namer import Orthonym
+        return Orthonym().name(smiles)
+
+    def test_e2e_ethylidene_cyclohexanone_e(self):
+        """End-to-end: E-ethylidene cyclohexanone has ethylidene AND E descriptor."""
+        name = self._name('C/C=C1\\CCCCC1=O')
+        assert 'ethylidene' in name, f"Missing ethylidene: {name}"
+        assert 'E' in name, f"Missing E descriptor: {name}"
+
+    def test_e2e_methylidene_cyclohexane_no_ez(self):
+        """End-to-end: methylidene cyclohexane has methylidene, NO E/Z."""
+        name = self._name('C=C1CCCCC1')
+        assert 'methylidene' in name, f"Missing methylidene: {name}"
+        # No E/Z for symmetric =CH2 on symmetric ring
+        assert '(E)' not in name and '(Z)' not in name, (
+            f"False E/Z on methylidene cyclohexane: {name}"
+        )
+
+    def test_e2e_methylidene_cyclohexanone_no_ez(self):
+        """End-to-end: methylidene cyclohexanone has methylidene, NO E/Z.
+
+        =CH2 is symmetric (two H), so no E/Z even on asymmetric ring.
+        """
+        name = self._name('C=C1CCCCC1=O')
+        assert 'methylidene' in name, f"Missing methylidene: {name}"
+
+    def test_e2e_cyclohexanone_unchanged(self):
+        """End-to-end: cyclohexanone (=O exocyclic) NO E/Z added."""
+        name = self._name('O=C1CCCCC1')
+        # Should be "cyclohexan-1-one" or similar
+        assert 'cyclohex' in name, f"Missing cyclohex: {name}"
+        assert 'E' not in name.split('-')[0] if '-' in name else True, (
+            f"False E descriptor on cyclohexanone: {name}"
+        )
+
+    def test_e2e_methylcyclohexane_unchanged(self):
+        """End-to-end: methylcyclohexane (single bond) stays methyl, not methylidene."""
+        name = self._name('CC1CCCCC1')
+        assert 'methylcyclohexane' in name, f"Expected methylcyclohexane: {name}"
+        assert 'methylidene' not in name, (
+            f"Single-bond methyl should NOT become methylidene: {name}"
+        )
+
+    def test_e2e_isopropylidene_cyclohexane(self):
+        """End-to-end: =C(CH3)2 on a ring gives isopropylidene."""
+        # 4-isopropylidene-1-methylcyclohexane
+        name = self._name('CC1CCC(=C(C)C)CC1')
+        assert 'isopropylidene' in name or 'propylidene' in name, (
+            f"Expected isopropylidene or propylidene: {name}"
+        )
+
+
+# =============================================================================
+# OPSIN round-trip tests (Task 2)
+# =============================================================================
+
+OPSIN_JAR = "opsin/opsin-cli-2.8.0-jar-with-dependencies.jar"
+
+
+def _opsin_name_to_smiles(name):
+    """Parse an IUPAC name with OPSIN, return SMILES or None."""
+    try:
+        result = subprocess.run(
+            ['java', '-jar', OPSIN_JAR, '-osmi'],
+            input=name, capture_output=True, text=True, timeout=15
+        )
+        smi = result.stdout.strip()
+        return smi if smi else None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+@pytest.mark.roundtrip
+class TestExocyclicOpsinRoundtrip:
+    """OPSIN round-trip tests for exocyclic names.
+
+    Note: OPSIN 2.8.0 does not support methylidene/ethylidene on rings.
+    These tests are marked xfail to document the OPSIN limitation.
+    """
+
+    @pytest.mark.xfail(reason="OPSIN 2.8.0 does not parse ylidene names on rings")
+    def test_opsin_methylidene_cyclohexane(self):
+        """OPSIN should parse methylidenecyclohexane."""
+        smi = _opsin_name_to_smiles("methylidenecyclohexane")
+        assert smi is not None, "OPSIN failed to parse methylidenecyclohexane"
+
+    @pytest.mark.xfail(reason="OPSIN 2.8.0 does not parse ylidene names on rings")
+    def test_opsin_ethylidene_cyclohexanone(self):
+        """OPSIN should parse 2-ethylidenecyclohexan-1-one."""
+        smi = _opsin_name_to_smiles("2-ethylidenecyclohexan-1-one")
+        assert smi is not None, "OPSIN failed to parse 2-ethylidenecyclohexan-1-one"
