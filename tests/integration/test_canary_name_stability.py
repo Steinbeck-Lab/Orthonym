@@ -460,7 +460,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)C(=O)OC[C@H]1O[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O",
-        "(alpha-D-glucopyranosyloxy)(butanoyloxy)-2-methylpropanetriol",
+        # Updated: branched acid naming fix correctly identifies 2-methylpropanoyl
+        # (principal chain = 3C) instead of butanoyl (4C total carbon count).
+        # IUPAC P-65.6.3.2.2: acyloxy prefix uses principal chain for acid stem.
+        "(alpha-D-glucopyranosyloxy)((2-methylpropanoyl)oxy)-2-methylpropanetriol",
     ),
     (
         "[F][Au]([F])([F])([F])[F]",

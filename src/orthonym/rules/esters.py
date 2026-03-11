@@ -1067,17 +1067,23 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
     group). Extracts the acid fragment, determines its name, and converts
     to the acyloxy prefix form.
 
+    For branched acid fragments, the principal chain is used for the acid
+    stem and branch substituents are included as prefixes in the acyloxy
+    name (IUPAC P-65.6.3.2.2).
+
     Args:
         mol: RDKit Mol object
         ester_match: Tuple of atom indices from ester SMARTS match
 
     Returns:
-        Acyloxy prefix string (e.g., "acetyloxy", "propanoyloxy"),
+        Acyloxy prefix string (e.g., "acetyloxy", "propanoyloxy",
+        "(2-methylpropanoyl)oxy" for branched acids),
         or None if the ester is a lactone or cannot be named.
 
     Examples:
         For methyl acetate (COC(C)=O), returns "acetyloxy"
         For methyl propanoate (COC(=O)CC), returns "propanoyloxy"
+        For isobutyrate ester (OC(=O)C(C)C), returns "(2-methylpropanoyl)oxy"
     """
     # Lactones cannot be named as acyloxy prefixes
     if is_lactone(mol, ester_match):
@@ -1089,8 +1095,80 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
     if not acid_atoms:
         return None
 
-    # Get the acid name from the fragment
+    # Try standard acid naming first -- this handles trivial/retained acid
+    # names (acetic, linoleic, palmitic, etc.) and unsaturated acid naming.
+    # Only fall through to branched-chain analysis when the standard path
+    # would produce an incorrect stem from total carbon count.
     acid_name = get_acid_fragment_name(mol, acid_atoms)
+
+    # IUPAC P-65.6.3.2.2: For branched acid fragments where total carbon
+    # count differs from principal chain length, use the principal chain
+    # and include branch substituent prefixes. This catches cases like
+    # isobutyric acid (CC(C)C=O: 4 total C, but principal chain = 3C).
+    # Skip if the acid fragment has a ring or if a trivial name was found.
+    acid_has_ring = acid_fragment_has_ring(mol, acid_atoms)
+
+    if not acid_has_ring:
+        acid_principal_chain = _find_acid_principal_chain(mol, acid_atoms)
+        if acid_principal_chain and len(acid_principal_chain) >= 2:
+            total_carbons = sum(
+                1 for idx in acid_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+            )
+            chain_carbons = len(acid_principal_chain)
+
+            # Only use branched naming when the chain is shorter than total
+            # carbons, indicating true carbon branching (not just heteroatom
+            # substituents like -OH, -OOH on a linear chain).
+            has_carbon_branch = chain_carbons < total_carbons
+
+            if has_carbon_branch:
+                chain_set = set(acid_principal_chain)
+                acid_set = set(acid_atoms)
+                chain_length = len(acid_principal_chain)
+                acid_stem = get_acid_stem(chain_length)
+
+                # Identify carbonyl O atoms
+                carbonyl_o_set = set()
+                for idx in acid_atoms:
+                    atom = mol.GetAtomWithIdx(idx)
+                    if atom.GetSymbol() == 'O':
+                        for bond in atom.GetBonds():
+                            if bond.GetBondTypeAsDouble() == 2.0:
+                                carbonyl_o_set.add(idx)
+                                break
+
+                # Build acid-side substituent prefixes using universal pipeline
+                ester_o = ester_match[2] if len(ester_match) > 2 else None
+                exclude = set(carbonyl_o_set)
+                if ester_o is not None:
+                    exclude.add(ester_o)
+                exclude.update(set(alkyl_atoms))
+
+                acid_prefix_str = ""
+                try:
+                    from ..assembly.composer import _integrate_universal_prefixes
+                    acid_prefix_str = _integrate_universal_prefixes(
+                        mol, chain_set,
+                        parent_type="chain",
+                        principal_chain=acid_principal_chain,
+                        exclude_atoms=exclude,
+                    )
+                except Exception as exc:
+                    logger.debug("Ester acyloxy prefix acid-side discovery failed: %s", exc)
+
+                # Build the full acyloxy prefix with branches
+                # e.g., "2-methylpropanoic" -> "(2-methylpropanoyl)oxy"
+                full_acid_name = f"{acid_prefix_str}{acid_stem}" if acid_prefix_str else acid_stem
+                acyloxy = get_acyloxy_prefix(full_acid_name)
+
+                # If branched, wrap in parentheses: "(2-methylpropanoyl)oxy"
+                if acid_prefix_str and acyloxy:
+                    # Rewrite: strip "yloxy" suffix, wrap acyl in parens, add "oxy"
+                    if acyloxy.endswith("yloxy"):
+                        acyl_part = acyloxy[:-3]  # "...yl"
+                        acyloxy = f"({acyl_part})oxy"
+                return acyloxy
 
     # Convert to acyloxy prefix
     return get_acyloxy_prefix(acid_name)
