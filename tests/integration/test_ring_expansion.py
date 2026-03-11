@@ -55,7 +55,8 @@ class TestFusedHeterocycleNaming:
     """Tests that new fused heterocycle entries produce retained names."""
 
     def test_phenanthridine(self):
-        name = name_compound("c1ccc2c(c1)ccc1cccnc12")
+        # Fixed: was c1ccc2c(c1)ccc1cccnc12 (non-canonical SMILES)
+        name = name_compound("c1ccc2c(c1)cnc1ccccc12")
         assert "phenanthridine" in name.lower()
         assert not _has_vb_notation(name)
 
@@ -70,7 +71,8 @@ class TestFusedHeterocycleNaming:
         assert not _has_vb_notation(name)
 
     def test_4h_quinolizine(self):
-        smi = _canonical("C1=CC2=CCC=CN2C=C1")
+        # Fixed SMILES (Phase 101): was C1=CC2=CCC=CN2C=C1
+        smi = _canonical("C1=CCN2C=CC=CC2=C1")
         name = name_compound(smi)
         assert "quinolizin" in name.lower()
         assert not _has_vb_notation(name)
@@ -86,11 +88,8 @@ class TestFusedHeterocycleNaming:
 
     def test_substituted_phenanthridine(self):
         """6-chlorophenanthridine should get substituent + retained name."""
-        smi = "Clc1ncc2ccccc2c1-c1ccccc1"
-        # Use canonical form
-        mol = Chem.MolFromSmiles("c1ccc2c(c1)ccc1cc(Cl)cnc12")
-        if mol:
-            smi = Chem.MolToSmiles(mol)
+        # Fixed: use correct phenanthridine SMILES (Phase 101)
+        smi = "Clc1nc2ccccc2c2ccccc12"
         name = name_compound(smi)
         lower = name.lower()
         assert "phenanthridine" in lower
@@ -159,7 +158,7 @@ class TestOPSINRoundTrip:
     """Validate OPSIN can parse all new retained names."""
 
     COMPOUNDS = [
-        ("c1ccc2c(c1)ccc1cccnc12", "phenanthridine"),
+        ("c1ccc2c(c1)cnc1ccccc12", "phenanthridine"),  # Fixed SMILES (Phase 101)
         ("c1ccc2c(c1)[nH]c1cnccc12", "beta-carboline"),
         ("O=c1c2ccccc2[nH]c2ccccc12", "acridone"),
         ("O=c1cc(-c2ccccc2)oc2ccccc12", "flavone"),

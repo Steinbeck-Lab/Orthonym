@@ -809,3 +809,436 @@ class TestChromeneVariants:
         data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)CCO2']
         assert data['ring_system'] == 'benzo-5-membered-saturated'
         assert data['parent_atoms'] == 9
+
+
+class TestPhase101FixedEntries:
+    """Tests for entries fixed in Phase 101-01 (corrected SMILES keys)."""
+
+    @pytest.mark.unit
+    def test_phenanthridine_exact_match(self):
+        """Phenanthridine with corrected SMILES should return correct name."""
+        mol = Chem.MolFromSmiles('c1ccc2c(c1)cnc1ccccc12')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == 'phenanthridine'
+        assert result[1] is None
+
+    @pytest.mark.unit
+    def test_phenanthridine_canonical_smiles_in_dict(self):
+        """Phenanthridine SMILES key must match RDKit canonical form."""
+        smi = 'c1ccc2c(c1)cnc1ccccc12'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_phenanthridine_locant_nitrogen_at_5(self):
+        """Phenanthridine N should be at IUPAC position 5."""
+        mol = Chem.MolFromSmiles('c1ccc2c(c1)cnc1ccccc12')
+        data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)cnc1ccccc12']
+        locants = data['iupac_locants']
+        for idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'N':
+                assert locant == 5, f"N should be at position 5, got {locant}"
+
+    @pytest.mark.unit
+    def test_phenanthridine_has_14_atoms(self):
+        """Phenanthridine should have 14 parent atoms."""
+        data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)cnc1ccccc12']
+        assert data['parent_atoms'] == 14
+        assert len(data['iupac_locants']) == 14
+
+    @pytest.mark.unit
+    def test_phenanthridine_fusion_locants(self):
+        """Phenanthridine should have junction locants 4a, 4b, 8a, 10a."""
+        data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)cnc1ccccc12']
+        locant_values = set(data['iupac_locants'].values())
+        for junction in ['4a', '4b', '8a', '10a']:
+            assert junction in locant_values, f"Missing junction locant {junction}"
+
+    @pytest.mark.unit
+    def test_phenanthridine_old_smiles_not_in_dict(self):
+        """The old broken SMILES key should NOT be in the dictionary."""
+        assert 'c1ccc2c(c1)ccc1cccnc12' not in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_4h_quinolizine_exact_match(self):
+        """4H-quinolizine with corrected SMILES should return correct name."""
+        mol = Chem.MolFromSmiles('C1=CCN2C=CC=CC2=C1')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == '4H-quinolizine'
+        assert result[1] == 4
+
+    @pytest.mark.unit
+    def test_4h_quinolizine_canonical_smiles_in_dict(self):
+        """4H-quinolizine SMILES key must match RDKit canonical form."""
+        smi = 'C1=CCN2C=CC=CC2=C1'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_4h_quinolizine_bridgehead_type(self):
+        """4H-quinolizine should be classified as bridgehead."""
+        data = FUSED_HETEROCYCLE_DATA['C1=CCN2C=CC=CC2=C1']
+        assert data['ring_system'] == 'bridgehead'
+
+    @pytest.mark.unit
+    def test_4h_quinolizine_old_smiles_not_in_dict(self):
+        """The old broken 4H-quinolizine SMILES key should NOT be in the dictionary."""
+        assert 'C1=CC2=CCC=CN2C=C1' not in FUSED_HETEROCYCLE_DATA
+
+
+class TestPhase101NewEntries:
+    """Tests for new entries added in Phase 101-01."""
+
+    # --- Xanthone ---
+
+    @pytest.mark.unit
+    def test_xanthone_exact_match(self):
+        """Xanthone should return correct retained name."""
+        mol = Chem.MolFromSmiles('O=c1c2ccccc2oc2ccccc12')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == 'xanthone'
+
+    @pytest.mark.unit
+    def test_xanthone_canonical_smiles_in_dict(self):
+        """Xanthone SMILES key must match RDKit canonical form."""
+        smi = 'O=c1c2ccccc2oc2ccccc12'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_xanthone_is_retained_name(self):
+        """Xanthone should be marked as a retained name."""
+        data = FUSED_HETEROCYCLE_DATA['O=c1c2ccccc2oc2ccccc12']
+        assert data.get('is_retained_name') is True
+
+    @pytest.mark.unit
+    def test_xanthone_has_15_atoms(self):
+        """Xanthone should have 15 parent atoms (includes =O)."""
+        data = FUSED_HETEROCYCLE_DATA['O=c1c2ccccc2oc2ccccc12']
+        assert data['parent_atoms'] == 15
+
+    @pytest.mark.unit
+    def test_xanthone_has_exocyclic_oxygen(self):
+        """Xanthone locant map should include '=O' for exocyclic oxygen."""
+        data = FUSED_HETEROCYCLE_DATA['O=c1c2ccccc2oc2ccccc12']
+        assert '=O' in data['iupac_locants'].values()
+
+    # --- Thioxanthone ---
+
+    @pytest.mark.unit
+    def test_thioxanthone_exact_match(self):
+        """Thioxanthone should return correct retained name."""
+        mol = Chem.MolFromSmiles('O=c1c2ccccc2sc2ccccc12')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == 'thioxanthone'
+
+    @pytest.mark.unit
+    def test_thioxanthone_canonical_smiles_in_dict(self):
+        """Thioxanthone SMILES key must match RDKit canonical form."""
+        smi = 'O=c1c2ccccc2sc2ccccc12'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_thioxanthone_is_retained_name(self):
+        """Thioxanthone should be marked as a retained name."""
+        data = FUSED_HETEROCYCLE_DATA['O=c1c2ccccc2sc2ccccc12']
+        assert data.get('is_retained_name') is True
+
+    # --- 1,10-Phenanthroline ---
+
+    @pytest.mark.unit
+    def test_phenanthroline_exact_match(self):
+        """1,10-phenanthroline should return correct name."""
+        mol = Chem.MolFromSmiles('c1cnc2c(c1)ccc1cccnc12')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == '1,10-phenanthroline'
+        assert result[1] is None
+
+    @pytest.mark.unit
+    def test_phenanthroline_canonical_smiles_in_dict(self):
+        """1,10-phenanthroline SMILES key must match RDKit canonical form."""
+        smi = 'c1cnc2c(c1)ccc1cccnc12'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_phenanthroline_has_two_nitrogens(self):
+        """1,10-phenanthroline should have N at positions 1 and 10."""
+        mol = Chem.MolFromSmiles('c1cnc2c(c1)ccc1cccnc12')
+        data = FUSED_HETEROCYCLE_DATA['c1cnc2c(c1)ccc1cccnc12']
+        locants = data['iupac_locants']
+        n_positions = []
+        for idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'N':
+                n_positions.append(locant)
+        assert sorted(n_positions) == [1, 10], f"N positions: {n_positions}"
+
+    @pytest.mark.unit
+    def test_phenanthroline_has_14_atoms(self):
+        """1,10-phenanthroline should have 14 parent atoms."""
+        data = FUSED_HETEROCYCLE_DATA['c1cnc2c(c1)ccc1cccnc12']
+        assert data['parent_atoms'] == 14
+
+    # --- 1H-Perimidine ---
+
+    @pytest.mark.unit
+    def test_perimidine_exact_match(self):
+        """1H-perimidine should return correct name."""
+        mol = Chem.MolFromSmiles('C1=Nc2cccc3cccc(c23)N1')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == '1H-perimidine'
+        assert result[1] == 1
+
+    @pytest.mark.unit
+    def test_perimidine_canonical_smiles_in_dict(self):
+        """1H-perimidine SMILES key must match RDKit canonical form."""
+        smi = 'C1=Nc2cccc3cccc(c23)N1'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_perimidine_has_13_atoms(self):
+        """1H-perimidine should have 13 parent atoms."""
+        data = FUSED_HETEROCYCLE_DATA['C1=Nc2cccc3cccc(c23)N1']
+        assert data['parent_atoms'] == 13
+
+    @pytest.mark.unit
+    def test_perimidine_has_peri_junction(self):
+        """1H-perimidine should have 9b peri-junction locant."""
+        data = FUSED_HETEROCYCLE_DATA['C1=Nc2cccc3cccc(c23)N1']
+        assert '9b' in data['iupac_locants'].values()
+
+    # --- 9H-Thioxanthene ---
+
+    @pytest.mark.unit
+    def test_thioxanthene_exact_match(self):
+        """9H-thioxanthene should return correct name."""
+        mol = Chem.MolFromSmiles('c1ccc2c(c1)Cc1ccccc1S2')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == '9H-thioxanthene'
+        assert result[1] == 9
+
+    @pytest.mark.unit
+    def test_thioxanthene_canonical_smiles_in_dict(self):
+        """9H-thioxanthene SMILES key must match RDKit canonical form."""
+        smi = 'c1ccc2c(c1)Cc1ccccc1S2'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_thioxanthene_has_14_atoms(self):
+        """9H-thioxanthene should have 14 parent atoms."""
+        data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)Cc1ccccc1S2']
+        assert data['parent_atoms'] == 14
+
+    @pytest.mark.unit
+    def test_thioxanthene_has_sulfur_mapped(self):
+        """9H-thioxanthene should have S mapped at same position as xanthene O."""
+        mol = Chem.MolFromSmiles('c1ccc2c(c1)Cc1ccccc1S2')
+        data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)Cc1ccccc1S2']
+        locants = data['iupac_locants']
+        # Thioxanthene uses same locant mapping as xanthene (S replaces O)
+        xanthene_data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)Cc1ccccc1O2']
+        s_locant = None
+        o_locant = None
+        for idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'S':
+                s_locant = locant
+        xanthene_mol = Chem.MolFromSmiles('c1ccc2c(c1)Cc1ccccc1O2')
+        for idx, locant in xanthene_data['iupac_locants'].items():
+            atom = xanthene_mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() == 'O':
+                o_locant = locant
+        assert s_locant == o_locant, (
+            f"S locant ({s_locant}) should match xanthene O locant ({o_locant})"
+        )
+
+    # --- Pyrrolizine ---
+
+    @pytest.mark.unit
+    def test_pyrrolizine_exact_match(self):
+        """Pyrrolizine should return correct name."""
+        mol = Chem.MolFromSmiles('C1=Cn2cccc2C1')
+        result = get_fused_heterocycle_name(mol)
+        assert result is not None
+        assert result[0] == 'pyrrolizine'
+        assert result[1] is None
+
+    @pytest.mark.unit
+    def test_pyrrolizine_canonical_smiles_in_dict(self):
+        """Pyrrolizine SMILES key must match RDKit canonical form."""
+        smi = 'C1=Cn2cccc2C1'
+        mol = Chem.MolFromSmiles(smi)
+        canon = Chem.MolToSmiles(mol)
+        assert canon == smi
+        assert smi in FUSED_HETEROCYCLE_DATA
+
+    @pytest.mark.unit
+    def test_pyrrolizine_bridgehead_type(self):
+        """Pyrrolizine should be classified as bridgehead."""
+        data = FUSED_HETEROCYCLE_DATA['C1=Cn2cccc2C1']
+        assert data['ring_system'] == 'bridgehead'
+
+    @pytest.mark.unit
+    def test_pyrrolizine_has_8_atoms(self):
+        """Pyrrolizine should have 8 parent atoms."""
+        data = FUSED_HETEROCYCLE_DATA['C1=Cn2cccc2C1']
+        assert data['parent_atoms'] == 8
+
+    @pytest.mark.unit
+    def test_pyrrolizine_has_bridgehead_junctions(self):
+        """Pyrrolizine should have junction locants 3a and 7a."""
+        data = FUSED_HETEROCYCLE_DATA['C1=Cn2cccc2C1']
+        locant_values = set(data['iupac_locants'].values())
+        assert '3a' in locant_values, "Missing junction locant 3a"
+        assert '7a' in locant_values, "Missing junction locant 7a"
+
+
+class TestPhase101EndToEndNaming:
+    """End-to-end naming tests for Phase 101 fixed/new entries."""
+
+    @pytest.mark.unit
+    def test_phenanthridine_e2e(self):
+        """Phenanthridine SMILES should produce 'phenanthridine'."""
+        from orthonym import name_compound
+        result = name_compound('c1ccc2c(c1)cnc1ccccc12')
+        assert result == 'phenanthridine'
+
+    @pytest.mark.unit
+    def test_4h_quinolizine_e2e(self):
+        """4H-quinolizine SMILES should produce '4H-quinolizine'."""
+        from orthonym import name_compound
+        result = name_compound('C1=CCN2C=CC=CC2=C1')
+        assert result == '4H-quinolizine'
+
+    @pytest.mark.unit
+    def test_xanthone_e2e(self):
+        """Xanthone SMILES should produce 'xanthone'."""
+        from orthonym import name_compound
+        result = name_compound('O=c1c2ccccc2oc2ccccc12')
+        assert result == 'xanthone'
+
+    @pytest.mark.unit
+    def test_thioxanthone_e2e(self):
+        """Thioxanthone SMILES should produce 'thioxanthone'."""
+        from orthonym import name_compound
+        result = name_compound('O=c1c2ccccc2sc2ccccc12')
+        assert result == 'thioxanthone'
+
+    @pytest.mark.unit
+    def test_phenanthroline_e2e(self):
+        """1,10-phenanthroline SMILES should produce '1,10-phenanthroline'."""
+        from orthonym import name_compound
+        result = name_compound('c1cnc2c(c1)ccc1cccnc12')
+        assert result == '1,10-phenanthroline'
+
+    @pytest.mark.unit
+    def test_perimidine_e2e(self):
+        """1H-perimidine SMILES should produce '1H-perimidine'."""
+        from orthonym import name_compound
+        result = name_compound('C1=Nc2cccc3cccc(c23)N1')
+        assert result == '1H-perimidine'
+
+    @pytest.mark.unit
+    def test_thioxanthene_e2e(self):
+        """9H-thioxanthene SMILES should produce '9H-thioxanthene'."""
+        from orthonym import name_compound
+        result = name_compound('c1ccc2c(c1)Cc1ccccc1S2')
+        assert result == '9H-thioxanthene'
+
+    @pytest.mark.unit
+    def test_pyrrolizine_e2e(self):
+        """Pyrrolizine SMILES should produce 'pyrrolizine'."""
+        from orthonym import name_compound
+        result = name_compound('C1=Cn2cccc2C1')
+        assert result == 'pyrrolizine'
+
+    @pytest.mark.unit
+    def test_6_methylphenanthridine_e2e(self):
+        """6-methylphenanthridine should have correct locant from naming."""
+        from orthonym import name_compound
+        result = name_compound('Cc1nc2ccccc2c2ccccc12')
+        assert '6-methyl' in result
+        assert 'phenanthridine' in result
+
+    @pytest.mark.unit
+    def test_2_methylpyrrolizine_e2e(self):
+        """2-methylpyrrolizine should have correct locant from naming."""
+        from orthonym import name_compound
+        result = name_compound('CC1=Cn2cccc2C1')
+        assert '2-methyl' in result
+        assert 'pyrrolizine' in result
+
+
+class TestPhase101ComprehensiveCanonicalConsistency:
+    """Comprehensive test that ALL dictionary entries have canonical SMILES keys."""
+
+    @pytest.mark.unit
+    def test_all_entries_have_canonical_smiles_keys(self):
+        """Every SMILES key in FUSED_HETEROCYCLE_DATA must equal its RDKit canonical form."""
+        non_canonical = []
+        for smi, data in FUSED_HETEROCYCLE_DATA.items():
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                non_canonical.append(f"{data['name']}: INVALID SMILES {smi}")
+                continue
+            canon = Chem.MolToSmiles(mol)
+            if canon != smi:
+                non_canonical.append(
+                    f"{data['name']}: key={smi}, canonical={canon}"
+                )
+        assert not non_canonical, (
+            f"Non-canonical SMILES keys found:\n" + "\n".join(non_canonical)
+        )
+
+    @pytest.mark.unit
+    def test_all_entries_have_required_fields(self):
+        """Every entry must have name, tautomer_locant, ring_system, parent_atoms, iupac_locants."""
+        required = ['name', 'tautomer_locant', 'ring_system', 'parent_atoms', 'iupac_locants']
+        missing_fields = []
+        for smi, data in FUSED_HETEROCYCLE_DATA.items():
+            for field in required:
+                if field not in data:
+                    missing_fields.append(f"{data.get('name', smi)}: missing {field}")
+        assert not missing_fields, (
+            f"Missing required fields:\n" + "\n".join(missing_fields)
+        )
+
+    @pytest.mark.unit
+    def test_no_duplicate_names(self):
+        """No two entries should have the same name."""
+        names = [data['name'] for data in FUSED_HETEROCYCLE_DATA.values()]
+        duplicates = [n for n in names if names.count(n) > 1]
+        assert not duplicates, f"Duplicate names found: {set(duplicates)}"
+
+    @pytest.mark.unit
+    def test_dictionary_has_at_least_80_entries(self):
+        """Dictionary should have at least 80 entries after Phase 101 additions."""
+        assert len(FUSED_HETEROCYCLE_DATA) >= 80, (
+            f"Expected >= 80 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
+        )

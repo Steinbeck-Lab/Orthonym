@@ -617,10 +617,10 @@ PHASE24_PARSE_FIXES = [
         "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
         "oxy-glycoside-benzene",
     ),
-    # B6: Fused ring system -> phenoxy (was bare "oxy")
+    # B6: Fused ring system -> xanthone (correctly identified after Phase 101 xanthone entry)
     (
         "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-        "1,3-dimethoxybenzene",  # Fixed: was "2-(hydroxyoctyl)-1,5-dimethoxy-3-phenoxybenzene" (fabricated from ring leak)
+        "8-hydroxy-1,3-dimethoxy-6-methylxanthone",  # Phase 101: xanthone core now recognized
         "oxy-fused-ring-phenoxy",
     ),
     # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy (was hexosyloxy)

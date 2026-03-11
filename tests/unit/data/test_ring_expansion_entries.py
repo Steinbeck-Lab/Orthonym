@@ -32,30 +32,30 @@ class TestPhenanthridineEntry:
     """Phenanthridine: angular tricyclic, N at IUPAC position 5."""
 
     def test_entry_exists(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         assert can in FUSED_HETEROCYCLE_DATA
 
     def test_name(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         assert FUSED_HETEROCYCLE_DATA[can]['name'] == 'phenanthridine'
 
     def test_parent_atoms(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         data = FUSED_HETEROCYCLE_DATA[can]
         mol = Chem.MolFromSmiles(can)
         assert data['parent_atoms'] == mol.GetNumAtoms()
 
     def test_iupac_locants_count(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         data = FUSED_HETEROCYCLE_DATA[can]
         assert len(data['iupac_locants']) == data['parent_atoms']
 
     def test_canonical_roundtrip(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         assert _canonical(can) == can
 
     def test_ring_system(self):
-        can = _canonical('c1ccc2c(c1)ccc1cccnc12')
+        can = _canonical('c1ccc2c(c1)cnc1ccccc12')
         assert FUSED_HETEROCYCLE_DATA[can]['ring_system'] == 'tricyclic'
 
 
@@ -120,26 +120,26 @@ class TestQuinolizineEntry:
     """4H-Quinolizine: N-bridgehead bicyclic."""
 
     def test_entry_exists(self):
-        can = _canonical('C1=CC2=CCC=CN2C=C1')
+        can = _canonical('C1=CCN2C=CC=CC2=C1')
         assert can in FUSED_HETEROCYCLE_DATA
 
     def test_name(self):
-        can = _canonical('C1=CC2=CCC=CN2C=C1')
+        can = _canonical('C1=CCN2C=CC=CC2=C1')
         name = FUSED_HETEROCYCLE_DATA[can]['name']
         assert 'quinolizine' in name.lower()
 
     def test_parent_atoms(self):
-        can = _canonical('C1=CC2=CCC=CN2C=C1')
+        can = _canonical('C1=CCN2C=CC=CC2=C1')
         data = FUSED_HETEROCYCLE_DATA[can]
         assert data['parent_atoms'] == 10
 
     def test_iupac_locants_count(self):
-        can = _canonical('C1=CC2=CCC=CN2C=C1')
+        can = _canonical('C1=CCN2C=CC=CC2=C1')
         data = FUSED_HETEROCYCLE_DATA[can]
         assert len(data['iupac_locants']) == data['parent_atoms']
 
     def test_tautomer_locant(self):
-        can = _canonical('C1=CC2=CCC=CN2C=C1')
+        can = _canonical('C1=CCN2C=CC=CC2=C1')
         data = FUSED_HETEROCYCLE_DATA[can]
         assert data['tautomer_locant'] == 4
 
@@ -268,10 +268,10 @@ class TestCanonicalSmilesIntegrity:
     """Verify all new dictionary keys are truly canonical SMILES."""
 
     @pytest.mark.parametrize("smiles", [
-        'c1ccc2c(c1)ccc1cccnc12',      # phenanthridine
+        'c1ccc2c(c1)cnc1ccccc12',      # phenanthridine
         'c1ccc2c(c1)[nH]c1cnccc12',     # beta-carboline
         'O=c1c2ccccc2[nH]c2ccccc12',    # acridone
-        'C1=CC2=CCC=CN2C=C1',           # 4H-quinolizine
+        'C1=CCN2C=CC=CC2=C1',           # 4H-quinolizine
         'C1CCN2CCCCC2C1',               # quinolizidine
         'O=c1cc(-c2ccccc2)oc2ccccc12',  # flavone
         'O=C1CC(c2ccccc2)Oc2ccccc21',   # flavanone

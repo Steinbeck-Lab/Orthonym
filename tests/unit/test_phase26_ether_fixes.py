@@ -152,10 +152,10 @@ class TestBGroupRegression:
             "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
             "B5-glycosyloxy",
         ),
-        # B6: Fused ring system -> phenoxy
+        # B6: Fused ring system -> xanthone (correctly identified after Phase 101 xanthone entry)
         (
             "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-            "1,3-dimethoxybenzene",  # Fixed: fabricated subs from ring boundary leak
+            "8-hydroxy-1,3-dimethoxy-6-methylxanthone",  # Phase 101: xanthone core now recognized
             "B6-phenoxy",
         ),
         # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy
