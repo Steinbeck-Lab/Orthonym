@@ -2374,67 +2374,170 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
     # Build acyloxy prefix(es)
     # Group by prefix name for multipliers
     from collections import defaultdict as _dd
-    prefix_groups: Dict[str, List[int]] = _dd(list)
+    ester_prefix_groups: Dict[str, List[int]] = _dd(list)
 
     for ester_info in exocyclic_esters:
         prefix = ester_info['acyloxy_prefix']
-        prefix_groups[prefix].append(ester_info['ring_attach_atom_idx'])
+        ester_prefix_groups[prefix].append(ester_info['ring_attach_atom_idx'])
 
     # Determine total number of ester substituents on the ring
-    total_esters = sum(len(v) for v in prefix_groups.values())
+    total_esters = sum(len(v) for v in ester_prefix_groups.values())
 
-    # Compute ring locants for attachment atoms when multiple esters present
+    # IUPAC P-31.1.2: all substituents on the parent ring receive coordinated
+    # locants from a single unified numbering system.  Always find the ring
+    # atoms so that ester prefixes and non-ester substituents share one system.
+    ring_atoms_tuple = None
+    ring_set_for_parent: set = set()
+    for r in ring_info.AtomRings():
+        if attach_atom in r:
+            ring_atoms_tuple = r
+            ring_set_for_parent = set(r)
+            break
+
+    # Collect all ester-related atoms (acid fragment + ester O) to exclude
+    # from universal prefix discovery so they are not re-discovered as
+    # generic substituents.
+    from ..rules.esters import parse_ester_fragments
+    ester_exclude_atoms: set = set()
+    for ester_info in exocyclic_esters:
+        match = ester_info['ester_match']
+        acid_atoms, _alkyl = parse_ester_fragments(mol, match)
+        ester_exclude_atoms.update(acid_atoms)
+        # Also exclude the ester oxygen itself (match[2])
+        if len(match) > 2:
+            ester_exclude_atoms.add(match[2])
+
+    # Discover non-ester substituents via the universal pipeline.
+    non_ester_prefix_groups: Dict[str, List[int]] = _dd(list)
+    if ring_atoms_tuple is not None:
+        try:
+            from .substituent_enumerator import discover_substituents, name_substituent
+            effective_parent = ring_set_for_parent | ester_exclude_atoms
+
+            # Compute oriented_ring from ring numbering so that
+            # extract_ring_substituents can assign locants properly.
+            oriented = None
+            numbering_candidates = _number_ring_from_attachment(
+                mol, ring_atoms_tuple, attach_atom
+            )
+            if numbering_candidates:
+                numbering = numbering_candidates[0]  # {locant: atom_idx}
+                oriented = tuple(
+                    numbering[loc] for loc in sorted(numbering.keys())
+                )
+
+            subs = discover_substituents(
+                mol, effective_parent,
+                parent_type="ring",
+                oriented_ring=oriented,
+            )
+            if subs:
+                for sub_info in subs:
+                    # Size guard: only accept small substituent fragments
+                    # that the naming pipeline handles reliably. Complex
+                    # multi-atom fragments (nucleobases, long chains with
+                    # functional groups) tend to produce garbled names.
+                    frag_ha = len(sub_info.frag_atoms)
+                    if frag_ha > 6:
+                        logger.debug(
+                            "Skipping large non-ester sub (HA=%d): %s",
+                            frag_ha, sub_info.frag_atoms,
+                        )
+                        continue
+                    a_idx = _find_attach_idx_in_frag(
+                        mol, sub_info, effective_parent
+                    )
+                    prefix_name = name_substituent(
+                        mol, sub_info.frag_atoms, a_idx
+                    )
+                    if not prefix_name or prefix_name == "substituent":
+                        continue
+                    # Quality filter: reject garbled names (spaces, digits
+                    # directly following letters without hyphens).
+                    if ' ' in prefix_name:
+                        logger.debug(
+                            "Rejecting garbled non-ester sub name: %s",
+                            prefix_name,
+                        )
+                        continue
+                    non_ester_prefix_groups[prefix_name].append(
+                        sub_info.attach_mol_idx
+                    )
+        except Exception as exc:
+            logger.debug(
+                "Ring ester non-ester sub discovery failed: %s", exc
+            )
+
+    # Merge ester and non-ester prefix groups
+    all_prefix_groups: Dict[str, List[int]] = _dd(list)
+    for name, atoms in ester_prefix_groups.items():
+        all_prefix_groups[name].extend(atoms)
+    for name, atoms in non_ester_prefix_groups.items():
+        all_prefix_groups[name].extend(atoms)
+
+    total_substituents = sum(len(v) for v in all_prefix_groups.values())
+
+    # Compute ring numbering when locants are needed (2+ total substituents)
     ring_atom_to_locant: Dict[int, int] = {}
-    if total_esters > 1:
-        # Find the ring containing the attachment atoms and compute numbering
-        ring_atoms = None
-        for r in ring_info.AtomRings():
-            if attach_atom in r:
-                ring_atoms = r
-                break
-        if ring_atoms:
-            # Collect all attachment atom indices
-            all_attach = []
-            for ester_info in exocyclic_esters:
-                all_attach.append(ester_info['ring_attach_atom_idx'])
-            # Use _number_ring_from_attachment for IUPAC-optimal numbering
-            # Try all attachment atoms as position 1, pick lowest locant set
-            best_mapping = None
-            best_locants = None
-            for start_idx in all_attach:
-                candidates = _number_ring_from_attachment(mol, ring_atoms, start_idx)
-                if not candidates:
-                    continue
-                for numbering in candidates:
-                    # numbering is {locant: atom_idx}, invert it
-                    inv = {v: k for k, v in numbering.items()}
-                    locant_set = sorted(inv.get(a, 999) for a in all_attach)
-                    if best_locants is None or locant_set < best_locants:
-                        best_locants = locant_set
-                        best_mapping = inv
-            if best_mapping:
-                ring_atom_to_locant = best_mapping
+    if total_substituents > 1 and ring_atoms_tuple is not None:
+        # Collect all ring attachment atom indices (ester + non-ester)
+        all_attach = []
+        for atoms_list in all_prefix_groups.values():
+            for a in atoms_list:
+                if a in ring_set_for_parent:
+                    all_attach.append(a)
+        # Use _number_ring_from_attachment for IUPAC-optimal numbering.
+        # Try all attachment atoms as position 1, pick lowest locant set.
+        best_mapping = None
+        best_locants = None
+        for start_idx in all_attach:
+            candidates = _number_ring_from_attachment(
+                mol, ring_atoms_tuple, start_idx
+            )
+            if not candidates:
+                continue
+            for numbering in candidates:
+                # numbering is {locant: atom_idx}, invert to {atom_idx: locant}
+                inv = {v: k for k, v in numbering.items()}
+                locant_set = sorted(inv.get(a, 999) for a in all_attach)
+                if best_locants is None or locant_set < best_locants:
+                    best_locants = locant_set
+                    best_mapping = inv
+        if best_mapping:
+            ring_atom_to_locant = best_mapping
 
     # Build prefix parts with locants
     prefix_parts = []
-    for prefix_name, attach_atoms_list in sorted(prefix_groups.items()):
+    for prefix_name, attach_atoms_list in sorted(all_prefix_groups.items()):
         count = len(attach_atoms_list)
-        if total_esters == 1:
-            # Single ester on ring: no locant needed
+        is_acyloxy = prefix_name in ester_prefix_groups
+        if total_substituents == 1:
+            # Single substituent on ring: no locant needed
             prefix_parts.append(prefix_name)
         elif count == 1:
-            # One instance of this prefix but multiple esters total: need locant
+            # One instance of this prefix: need locant
             locant = ring_atom_to_locant.get(attach_atoms_list[0], 1)
-            prefix_parts.append(f"{locant}-({prefix_name})")
+            if is_acyloxy:
+                prefix_parts.append(f"{locant}-({prefix_name})")
+            else:
+                prefix_parts.append(f"{locant}-{prefix_name}")
         else:
-            # Multiple instances of same prefix: locants + bis/tris multiplier
-            locants = sorted(ring_atom_to_locant.get(a, 1) for a in attach_atoms_list)
+            # Multiple instances of same prefix: locants + multiplier
+            locants = sorted(
+                ring_atom_to_locant.get(a, 1) for a in attach_atoms_list
+            )
             locant_str = ",".join(str(loc) for loc in locants)
-            # Acyloxy names are complex (contain "yloxy"), use bis/tris
             multiplier = get_multiplier_prefix(count, prefix_name)
-            prefix_parts.append(f"{locant_str}-{multiplier}({prefix_name})")
+            if is_acyloxy:
+                prefix_parts.append(
+                    f"{locant_str}-{multiplier}({prefix_name})"
+                )
+            else:
+                prefix_parts.append(
+                    f"{locant_str}-{multiplier}{prefix_name}"
+                )
 
-    # Sort alphabetically
+    # Sort alphabetically per IUPAC P-14.4
     prefix_parts.sort(key=lambda x: alpha_sort_key(x))
 
     # Join prefixes with hyphens
