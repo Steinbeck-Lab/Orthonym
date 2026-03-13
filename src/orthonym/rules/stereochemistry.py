@@ -28,7 +28,8 @@ from ..perception.stereo import assign_stereochemistry
 
 def collect_stereodescriptors(
     mol,
-    atom_to_locant: Dict[int, int]
+    atom_to_locant: Dict[int, int],
+    include_near_parent_ez: bool = False
 ) -> List[Tuple[int, str]]:
     """
     Collect all stereodescriptors from a molecule using IUPAC locants.
@@ -38,6 +39,12 @@ def collect_stereodescriptors(
         atom_to_locant: Mapping from atom index to IUPAC locant number.
                        Only atoms in this mapping are considered (principal
                        chain/ring atoms).
+        include_near_parent_ez: If True, also collect E/Z bonds that are
+                       one hop away from the parent (i.e., neither bond atom
+                       is in atom_to_locant, but one has a neighbor that is).
+                       Per IUPAC P-93.5.2, substituent E/Z attached directly
+                       to the parent should be reported. Only enable for
+                       top-level naming, not decomposition fragments.
 
     Returns:
         List of (locant, cip_code) tuples, sorted by locant ascending.
@@ -108,8 +115,29 @@ def collect_stereodescriptors(
                     continue
                 locant = atom_to_locant[end_idx]
             else:
-                # Neither atom in parent -- skip
-                continue
+                # Neither atom in parent.
+                if not include_near_parent_ez:
+                    continue
+                # One-hop case (IUPAC P-93.5.2): E/Z bonds in
+                # substituents attached directly to the parent should
+                # be reported, referencing the parent locant at the
+                # attachment point.  Example: a styrenyl substituent
+                # on a ring has C=C entirely off the ring, but one
+                # bond atom is directly bonded to a ring atom that
+                # IS in atom_to_locant.
+                locant = None
+                for idx in (begin_idx, end_idx):
+                    atom = mol.GetAtomWithIdx(idx)
+                    for nbr in atom.GetNeighbors():
+                        nbr_idx = nbr.GetIdx()
+                        if nbr_idx in atom_to_locant:
+                            candidate = atom_to_locant[nbr_idx]
+                            if locant is None or (isinstance(candidate, int) and
+                                                  isinstance(locant, int) and
+                                                  candidate < locant):
+                                locant = candidate
+                if locant is None:
+                    continue
 
             cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
             descriptors.append((locant, cip_code))

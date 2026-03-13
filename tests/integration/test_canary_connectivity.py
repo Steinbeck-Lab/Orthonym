@@ -39,7 +39,7 @@ CONNECTIVITY_CANARY = [
     ),
     (
         "CC(C)C1=C(O)C(N)=C(/C=C/c2ccccc2)C(=O)C1=O",
-        "4-amino-5-hydroxy-6-isopropyl-3-styrenylcyclohexa-3,5-diene-1,2-dione",
+        "(3E)-4-amino-5-hydroxy-6-isopropyl-3-styrenylcyclohexa-3,5-diene-1,2-dione",
     ),
 ]
 

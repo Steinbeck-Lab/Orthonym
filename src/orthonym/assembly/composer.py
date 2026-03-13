@@ -4756,6 +4756,34 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             )
             continue
 
+        # Guard 3b: Skip substituent branches entirely covered by a single
+        # non-principal FG match ONLY for FG types whose prefix form includes
+        # the carbon (carbamoyl, carboxy, chlorocarbonyl, etc.).
+        # These branches ARE the FG and should be emitted as FG prefixes
+        # by _generate_prefixes(), NOT as alkyl compound substituents.
+        # IUPAC P-66.1(c): non-principal amide = carbamoyl prefix.
+        # NOTE: Only applies to specific terminal-C FG types. Other FGs
+        # (amine, ketone, secondary_amide, etc.) must NOT trigger this guard.
+        _GUARD3B_FG_TYPES = {
+            'primary_amide', 'carboxylic_acid',
+            'acid_chloride', 'acid_bromide', 'acid_fluoride',
+        }
+        _skip_as_fg_branch = False
+        for _fg_name, _fg_matches in features.functional_groups.items():
+            if _fg_name == features.principal_group:
+                continue
+            if _fg_name not in _GUARD3B_FG_TYPES:
+                continue
+            for _fg_match in _fg_matches:
+                fg_match_set = set(_fg_match)
+                if fg_match_set and sub_info.frag_atoms.issubset(fg_match_set):
+                    _skip_as_fg_branch = True
+                    break
+            if _skip_as_fg_branch:
+                break
+        if _skip_as_fg_branch:
+            continue
+
         # Name via the universal classify-and-name pipeline
         name = classify_and_name_fragment(mol, sub_info, chain_set, features)
         if name is None:
@@ -5844,8 +5872,13 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
     if not atom_to_locant:
         return None
 
-    # Collect stereodescriptors with proper locants
-    descriptors = collect_stereodescriptors(mol, atom_to_locant)
+    # Collect stereodescriptors with proper locants.
+    # Enable near-parent E/Z detection for top-level naming only:
+    # substituent E/Z bonds one hop from the parent ring/chain should
+    # be included in the stereo block per IUPAC P-93.5.2.
+    descriptors = collect_stereodescriptors(
+        mol, atom_to_locant, include_near_parent_ez=True
+    )
 
     if not descriptors:
         return None
