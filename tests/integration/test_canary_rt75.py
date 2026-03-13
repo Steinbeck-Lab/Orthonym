@@ -1007,7 +1007,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCC#CC#CCCCCCCC(=O)O",
-        "hexadec-8,10-diynoic acid",
+        "hexadeca-8,10-diynoic acid",
     ),
     (
         "NC(=O)CC[C@H](NC(=O)CNC(=O)[C@@H](N)CO)C(=O)O",
@@ -1103,7 +1103,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC#CC#CC#CC(O)C(O)CO",
-        "2,3-dihydroxydec-4,6,8-triyn-1-ol",
+        "2,3-dihydroxydeca-4,6,8-triyn-1-ol",
     ),
     (
         "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
@@ -1207,7 +1207,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCC[C@@H](O)[C@H](O)CC#CC#C[C@@H](O)CC",
-        "(3S,9R,10R)-heptadec-4,6-diyne-3,9,10-triol",
+        "(3S,9R,10R)-heptadeca-4,6-diyne-3,9,10-triol",
     ),
     (
         "CCCCC(O)C#CC(O)C(O)C(O)CCCCCCCC(=O)O",

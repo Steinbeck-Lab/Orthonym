@@ -275,34 +275,39 @@ def _build_alkenyl_name(
             return f"{stem}ynyl"
         return f"{stem}yl"
 
-    # For longer chains: build with locants
-    parts = []
+    # For longer chains: build with locants using structured assembly.
+    # Each segment is (locant_str, multiplier, bond_suffix).
+    # The 'a' euphonic connector is added when multiple bonds have multiplied
+    # locants (diene, diyne) per IUPAC P-31.1.3.4.
+    num_double = len(double_locants)
+    num_triple = len(triple_locants)
+    needs_a = (num_double > 1) or (num_triple > 1 and num_double == 0)
 
-    # Double bonds
+    segments = []
     if double_locants:
         loc_str = ",".join(str(l) for l in double_locants)
-        if len(double_locants) == 1:
-            parts.append(f"-{loc_str}-en")
-        else:
-            mult = MULT.get(len(double_locants), str(len(double_locants)))
-            # Insert 'a' before locants for vowel elision (propan -> propa)
-            parts.append(f"a-{loc_str}-{mult}en")
+        mult = MULT.get(num_double, str(num_double)) if num_double > 1 else ""
+        segments.append((loc_str, mult, "en"))
 
-    # Triple bonds
     if triple_locants:
         loc_str = ",".join(str(l) for l in triple_locants)
-        if len(triple_locants) == 1:
-            parts.append(f"-{loc_str}-yn")
-        else:
-            mult = MULT.get(len(triple_locants), str(len(triple_locants)))
-            parts.append(f"-{loc_str}-{mult}yn")
+        mult = MULT.get(num_triple, str(num_triple)) if num_triple > 1 else ""
+        segments.append((loc_str, mult, "yn"))
 
-    infix = "".join(parts)
+    # Assemble infix: "a" (if needed) then "-locants-[mult]bond" per segment
+    infix = ""
+    if needs_a:
+        infix = "a"
+    for loc_str, mult, bond in segments:
+        infix += f"-{loc_str}-{mult}{bond}"
+
+    if not needs_a and infix:
+        # infix already starts with "-" from the first segment
+        pass
+    elif not infix:
+        infix = ""
+
     name = f"{stem}{infix}-{attach_locant}-yl"
-
-    # Clean up double hyphens
-    while "--" in name:
-        name = name.replace("--", "-")
 
     return name
 

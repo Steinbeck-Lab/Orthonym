@@ -857,9 +857,12 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     # Collect R/S stereodescriptors for atoms in the acid fragment.
     # Skip if the acid name already contains stereo (e.g., from the unsaturation
     # path which produces names like "(4E)-octa-4,7-dienoic").
+    # Use specific stereo-prefix regex to avoid false matches with parenthesized
+    # substituent names like "(oxan-2-yl)oxy" (IUPAC P-93.5).
+    import re
     from .stereochemistry import format_stereodescriptor_string
     acid_stereo = []
-    if not (acylate_name.startswith('(') and ')' in acylate_name):
+    if not re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', acylate_name):
         acid_stereo = _collect_ester_fragment_stereo(mol, acid_atoms, ester_match)
         # Only keep R/S descriptors (E/Z is handled by the unsaturation path)
         acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in ('R', 'S')]

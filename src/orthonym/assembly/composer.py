@@ -5917,8 +5917,12 @@ def _inject_stereo_if_missing(features: Any, name: str) -> str:
     if not name or name == 'unknown':
         return name
 
-    # Check if name already has a stereo prefix: starts with (nR or (nS or (nE or (nZ pattern
-    if re.match(r'\(\d+[RSrsEZez]', name):
+    # Check if name already has a stereo prefix: starts with (R)-, (2R)-, (E)-, (4E)-,
+    # (2R,3S)-, etc.  Allow zero or more digits before each stereo letter; require
+    # closing ")- " to avoid false matches with parenthesized substituent names
+    # like "(oxan-2-yl)oxy".  The pattern matches the full stereo descriptor block:
+    # one or more comma-separated [digits][stereo-letter] groups inside parentheses.
+    if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
         return name
 
     # Generate stereo prefix using the centralized function
@@ -6147,6 +6151,12 @@ def _build_unsaturation_infix(
     This is used when there's a functional group suffix. The unsaturation
     part is inserted between the stem and the suffix locants.
 
+    The infix is assembled structurally so that hyphens are inserted only
+    where needed -- no post-hoc band-aid cleanup required.
+
+    IUPAC P-31.1.3.4: when total unsaturation locant count >= 2, prefix
+    with 'a' for euphony (e.g., 'a-1,3-dien' not '-1,3-dien').
+
     Args:
         double_locants: Sorted list of locants for double bonds.
         triple_locants: Sorted list of locants for triple bonds.
@@ -6161,6 +6171,12 @@ def _build_unsaturation_infix(
         '-1-en'
         >>> _build_unsaturation_infix([1], [4])
         '-1-en-4-yn'
+        >>> _build_unsaturation_infix([1, 3], [])
+        'a-1,3-dien'
+        >>> _build_unsaturation_infix([], [1, 3])
+        'a-1,3-diyn'
+        >>> _build_unsaturation_infix([1, 3], [5])
+        'a-1,3-dien-5-yn'
     """
     num_double = len(double_locants)
     num_triple = len(triple_locants)
@@ -6168,37 +6184,40 @@ def _build_unsaturation_infix(
     if num_double == 0 and num_triple == 0:
         return "an"  # Saturated
 
-    parts = []
+    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
+    # used when total unsaturation locants >= 2 (diene, diyne, enyne etc.)
+    total_locants = num_double + num_triple
+    needs_a = (total_locants >= 2) and (num_double > 1 or num_triple > 1)
 
-    # Double bonds
+    # Build segments: each is a tuple (locant_str, multiplier, bond_type)
+    segments = []
+
     if num_double > 0:
-        double_str = ",".join(str(loc) for loc in double_locants)
-        if num_double == 1:
-            parts.append(f"-{double_str}-en")
-        else:
-            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
-            # For multiple double bonds, add 'a' connector: butadiene not butdiene
-            parts.append(f"a-{double_str}-{multiplier}en")
+        loc_str = ",".join(str(loc) for loc in double_locants)
+        multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double)) if num_double > 1 else ""
+        segments.append((loc_str, multiplier, "en"))
 
-    # Triple bonds
     if num_triple > 0:
-        triple_str = ",".join(str(loc) for loc in triple_locants)
-        if num_triple == 1:
-            parts.append(f"-{triple_str}-yn")
-        else:
-            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
-            parts.append(f"-{triple_str}-{multiplier}yn")
+        loc_str = ",".join(str(loc) for loc in triple_locants)
+        multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple)) if num_triple > 1 else ""
+        segments.append((loc_str, multiplier, "yn"))
 
-    # Special case: if only double bonds and parts starts with 'a-' for diene,
-    # we need to handle this differently for saturated stem
-    if parts:
-        result = "".join(parts)
-        # Clean up any double hyphens
-        while "--" in result:
-            result = result.replace("--", "-")
-        return result
+    # Assemble: "a" (if needed) then each segment as "-locants-[mult]bond"
+    # joined with hyphens between them.
+    result_parts = []
+    if needs_a:
+        result_parts.append("a")
 
-    return "an"
+    for loc_str, mult, bond in segments:
+        result_parts.append(loc_str)
+        result_parts.append(f"{mult}{bond}")
+
+    # Join all parts with hyphens; prepend leading hyphen if no 'a' connector
+    result = "-".join(result_parts)
+    if not needs_a:
+        result = "-" + result
+
+    return result
 
 
 def _build_hydrocarbon_name(
@@ -6221,6 +6240,9 @@ def _build_hydrocarbon_name(
 
     For mono-cycloalkenes (single double bond in ring), locants are omitted
     per IUPAC convention (cyclohexene, not cyclohex-1-ene).
+
+    The name is assembled structurally so that hyphens are inserted only
+    where needed -- no post-hoc band-aid cleanup required.
 
     Args:
         stem: Chain prefix (e.g., 'but', 'pent', 'cyclohex').
@@ -6259,62 +6281,59 @@ def _build_hydrocarbon_name(
         return f"{stem}ane"
 
     # Check if this is a 2-carbon chain (ethene/ethyne) where locants are omitted
-    # The stem 'eth' indicates 2 carbons
     is_two_carbon = stem == "eth"
 
     # For mono-cycloalkenes, locant is omitted (cyclohexene, not cyclohex-1-ene)
-    # This is IUPAC convention for simple mono-unsaturated cyclic compounds
     omit_mono_cycloalkene_locant = is_cyclic and num_double == 1 and num_triple == 0
 
-    parts = [stem]
+    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
+    # used when multiple bonds have multiplied locants (diene, diyne, etc.)
+    needs_a = (num_double > 1) or (num_triple > 1 and num_double == 0)
 
-    # Double bonds
+    # Build segments as structured data, then join cleanly
+    # Each segment: (locant_str_or_None, multiplier, bond_suffix)
+    segments = []
+
     if num_double > 0:
         if num_double == 1:
             if is_two_carbon and num_triple == 0:
-                # ethene - no locant needed
-                parts.append("en")
+                segments.append((None, "", "en"))
             elif omit_mono_cycloalkene_locant:
-                # cyclohexene - no locant needed for mono-cycloalkene
-                parts.append("en")
+                segments.append((None, "", "en"))
             else:
-                # Single double bond with locant: but-1-ene
-                double_str = ",".join(str(loc) for loc in double_locants)
-                parts.append(f"-{double_str}-en")
+                loc_str = ",".join(str(loc) for loc in double_locants)
+                segments.append((loc_str, "", "en"))
         else:
-            # Multiple double bonds: buta-1,3-diene, cyclohexa-1,3-diene
-            # Add 'a' before locants for pronunciation
-            double_str = ",".join(str(loc) for loc in double_locants)
-            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
-            parts.append(f"a-{double_str}-{multiplier}en")
+            loc_str = ",".join(str(loc) for loc in double_locants)
+            mult = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            segments.append((loc_str, mult, "en"))
 
-    # Triple bonds
     if num_triple > 0:
         if num_triple == 1:
             if is_two_carbon and num_double == 0:
-                # ethyne - no locant needed
-                parts.append("yn")
+                segments.append((None, "", "yn"))
             else:
-                # Single triple bond with locant
-                triple_str = ",".join(str(loc) for loc in triple_locants)
-                parts.append(f"-{triple_str}-yn")
+                loc_str = ",".join(str(loc) for loc in triple_locants)
+                segments.append((loc_str, "", "yn"))
         else:
-            # Multiple triple bonds
-            triple_str = ",".join(str(loc) for loc in triple_locants)
-            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
-            # If there were also double bonds, we already have 'a', otherwise add it
-            if num_double == 0:
-                parts.append(f"a-{triple_str}-{multiplier}yn")
-            else:
-                parts.append(f"-{triple_str}-{multiplier}yn")
+            loc_str = ",".join(str(loc) for loc in triple_locants)
+            mult = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            segments.append((loc_str, mult, "yn"))
 
-    # Add final 'e'
-    result = "".join(parts) + "e"
+    # Assemble: stem [+ "a" if needed] [+ segments joined with hyphens] + "e"
+    result = stem
+    if needs_a:
+        result += "a"
 
-    # Clean up: handle edge cases
-    # 1. Double hyphens shouldn't happen but clean up just in case
-    while "--" in result:
-        result = result.replace("--", "-")
+    for loc_str, mult, bond in segments:
+        if loc_str is not None:
+            result += f"-{loc_str}-{mult}{bond}"
+        else:
+            # No locant: directly append bond suffix (ethene, cyclohexene)
+            result += f"{mult}{bond}"
+
+    # Final terminal 'e' for the hydrocarbon ending
+    result += "e"
 
     return result
 

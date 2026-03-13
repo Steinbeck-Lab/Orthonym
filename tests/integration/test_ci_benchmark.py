@@ -340,7 +340,7 @@ CI_BENCHMARK = [
     ),
     (
         "CCCCCCC[C@@H](O)[C@H](O)CC#CC#C[C@@H](O)CC",
-        "(3S,9R,10R)-heptadec-4,6-diyne-3,9,10-triol",
+        "(3S,9R,10R)-heptadeca-4,6-diyne-3,9,10-triol",
     ),
     (
         "CC1CCC/C=C\\C=C\\C(O)CC(O)C/C=C\\C=C\\C(O)C/C=C/C=C\\C(=O)O1",
