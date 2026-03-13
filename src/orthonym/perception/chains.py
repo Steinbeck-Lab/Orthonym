@@ -248,6 +248,73 @@ def find_longest_skeletal_chain(
     return results[0]
 
 
+def _get_non_principal_terminal_carbons(
+    mol,
+    functional_groups: Dict[str, List[tuple]],
+    principal_group: Optional[str] = None,
+) -> Set[int]:
+    """Identify terminal FG carbons of non-principal groups whose prefix includes C.
+
+    Only FGs where the non-principal prefix represents the entire terminal group
+    including its carbon are excluded from chain enumeration:
+    - carbamoyl (-C(=O)NH2): prefix includes C
+    - carboxy (-COOH): prefix includes C (when non-principal acid)
+    - chlorocarbonyl (-C(=O)Cl): prefix includes C
+
+    FGs where the prefix represents only the heteroatom attachment are NOT excluded:
+    - cyano (#N on chain C): nitrile C IS a chain member
+    - oxo (=O on chain C): aldehyde C IS a chain member
+
+    Per IUPAC 2013 P-66.1(c), P-65.1.1.1.
+
+    Args:
+        mol: RDKit Mol object
+        functional_groups: Dict from detect_functional_groups()
+        principal_group: Name of principal functional group (or None)
+
+    Returns:
+        Set of atom indices for non-principal FG terminal carbons
+    """
+    _TERMINAL_C_FGS = {
+        'carboxylic_acid': 0,
+        'primary_amide': 0,
+        'acid_chloride': 0,
+        'acid_bromide': 0,
+        'acid_fluoride': 0,
+    }
+
+    principal_carbons: Set[int] = set()
+    if principal_group and principal_group in functional_groups:
+        for match in functional_groups[principal_group]:
+            if principal_group in _TERMINAL_C_FGS:
+                c_idx = _TERMINAL_C_FGS[principal_group]
+                if c_idx < len(match):
+                    principal_carbons.add(match[c_idx])
+
+    terminal_carbons: Set[int] = set()
+    for fg_name, c_idx in _TERMINAL_C_FGS.items():
+        if fg_name == principal_group:
+            continue
+        if fg_name not in functional_groups:
+            continue
+        for match in functional_groups[fg_name]:
+            if c_idx >= len(match):
+                continue
+            carbon_atom_idx = match[c_idx]
+            if carbon_atom_idx in principal_carbons:
+                continue
+            atom = mol.GetAtomWithIdx(carbon_atom_idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            carbon_nbr_count = sum(
+                1 for nbr in atom.GetNeighbors() if nbr.GetSymbol() == 'C'
+            )
+            if carbon_nbr_count <= 1:
+                terminal_carbons.add(carbon_atom_idx)
+
+    return terminal_carbons
+
+
 def find_principal_chain(
     mol,
     functional_groups: Dict[str, List[tuple]],
@@ -268,6 +335,10 @@ def find_principal_chain(
     8. Maximum substituents
     9. Lowest locants for substituents
 
+    Non-principal suffix-capable FG terminal carbons (e.g., the C in -C(=O)NH2
+    when amide is not the principal group) are excluded from chain enumeration
+    to prevent chain length inflation (IUPAC P-44.3).
+
     Args:
         mol: RDKit Mol object
         functional_groups: Dict from detect_functional_groups()
@@ -277,15 +348,28 @@ def find_principal_chain(
     Returns:
         List of atom indices forming the principal chain, in order
     """
-    chains = find_all_carbon_chains(mol, min_length=1, exclude_atoms=exclude_atoms)
+    np_terminal_carbons = _get_non_principal_terminal_carbons(
+        mol, functional_groups, principal_group
+    )
+    combined_exclude = set(exclude_atoms) if exclude_atoms else set()
+    combined_exclude |= np_terminal_carbons
+
+    chains = find_all_carbon_chains(
+        mol, min_length=1,
+        exclude_atoms=combined_exclude if combined_exclude else None
+    )
     
     if not chains:
         return []
     
-    # Get atoms belonging to principal functional group
+    # Get atoms belonging to principal functional group.
+    # Keep both the flat atom set (for contains-check) and the match
+    # tuples list (for correct instance counting per P-44.1(b)).
     fg_atoms = set()
+    fg_matches: List[tuple] = []
     if principal_group and principal_group in functional_groups:
-        for match in functional_groups[principal_group]:
+        fg_matches = functional_groups[principal_group]
+        for match in fg_matches:
             fg_atoms.update(match)
     
     def count_bonds_in_chain(chain: List[int]) -> Tuple[int, int]:
@@ -374,19 +458,56 @@ def find_principal_chain(
         rev_score = tuple(-p for p in rev)
         return max(fwd_score, rev_score)
 
+    def _compute_double_bond_locant_score(chain: List[int]) -> tuple:
+        """Criterion 7.5 (P-44.1(h)): Lowest locants for double bonds only.
+
+        When two chains have the same combined multiple-bond locant set,
+        the chain with lower double-bond-only locants is preferred.
+        This breaks ties between en-yne orientations.
+        """
+        positions = []
+        for i in range(len(chain) - 1):
+            bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+            if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                positions.append(i)
+        if not positions:
+            return (0,)
+        fwd = sorted(positions)
+        rev = sorted(len(chain) - 2 - p for p in positions)
+        fwd_score = (1,) + tuple(-p for p in fwd)
+        rev_score = (1,) + tuple(-p for p in rev)
+        return max(fwd_score, rev_score)
+
     def chain_score(chain: List[int]) -> tuple:
         """
         Calculate selection score for a chain.
-        Returns 9-element tuple for comparison (higher = better).
+        Returns 10-element tuple for comparison (higher = better).
         Implements all IUPAC 2013 P-44 criteria.
+
+        Tuple elements:
+          0: contains_fg (bool as int)
+          1: fg_count (FG instances, not atoms -- P-44.1(b))
+          2: length (chain length -- P-44.1(a))
+          3: multiple_bonds (double + triple count -- P-44.1(c))
+          4: double_bonds (double bond count -- P-44.1(d))
+          5: fg_locants_score (lowest FG locants -- P-44.1(f))
+          6: bond_locants_score (lowest multiple bond locants -- P-44.1(g))
+          7: double_bond_locants_score (lowest double bond locants -- P-44.1(h))
+          8: sub_count (substituent count -- P-44.1(i))
+          9: sub_locants_score (lowest substituent locants -- P-44.1(j))
         """
         chain_set = set(chain)
 
         # Criterion 1: Contains principal group
         contains_fg = 1 if (fg_atoms & chain_set) else 0
 
-        # Criterion 2: Count of principal groups in chain
-        fg_count = len(fg_atoms & chain_set)
+        # Criterion 2: Count of principal group INSTANCES in chain.
+        # P-44.1(b): Count how many FG match tuples have at least one
+        # atom on the chain. This counts instances (e.g., 2 for two COOH
+        # groups) rather than total atoms (which would be 6 for two COOH).
+        fg_count = sum(
+            1 for match in fg_matches if set(match) & chain_set
+        )
 
         # Criterion 3: Chain length (IUPAC 2013 prioritizes length!)
         length = len(chain)
@@ -398,8 +519,13 @@ def find_principal_chain(
         # Criterion 6: Lowest locants for principal group
         fg_locants_score = _compute_fg_locant_score(chain)
 
-        # Criterion 7: Lowest locants for multiple bonds
+        # Criterion 7: Lowest locants for multiple bonds (combined)
         bond_locants_score = _compute_bond_locant_score(chain)
+
+        # Criterion 7.5 (P-44.1(h)): Lowest locants for double bonds only.
+        # Breaks ties when combined bond locants are equal but double bond
+        # positions differ (e.g., en-yne orientation).
+        double_bond_locants_score = _compute_double_bond_locant_score(chain)
 
         # Criterion 8: Maximum substituents
         sub_count = _count_substituents(chain)
@@ -408,7 +534,8 @@ def find_principal_chain(
         sub_locants_score = _compute_sub_locant_score(chain)
 
         return (contains_fg, fg_count, length, multiple_bonds, double_bonds,
-                fg_locants_score, bond_locants_score, sub_count, sub_locants_score)
+                fg_locants_score, bond_locants_score, double_bond_locants_score,
+                sub_count, sub_locants_score)
     
     # Find chain with highest score
     best_chain = max(chains, key=chain_score)
