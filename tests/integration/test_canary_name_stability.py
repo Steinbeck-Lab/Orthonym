@@ -172,7 +172,8 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CO[C@@H]1[C@H](OC(=O)CCC(=O)O)CC[C@](O)(CCl)[C@H]1[C@@]1(C)O[C@@H]1CC=C(C)C",
-        "(1R,2S,3S,4R)-2-[(3R)-2-methyl-3-(2-methylbut-2-enyl)oxiryl]-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
+        # P-44.3 fix: no-PG path now selects chain over small oxirane ring in substituent
+        "(1R,2S,3S,4R)-2-(3-methyl-1-oxiranylbut-2-enyl)-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
     ),
     (
         r"C=CCO/N=C(\C(=O)N[C@H]1CN2CC(S(C)(=O)=O)=C(C(=O)O)N2C1=O)c1csc(N)n1",
@@ -646,11 +647,10 @@ P44_3_CANARY = [
         "(3R)-3-(butanoyloxy)-hydroxybutanoate",
     ),
     # --- Hydrocarbon no-PG (3 compounds) ---
-    # Synthetic: cyclopropane + decane; chain (10) >> ring (3), but no-PG
-    # path currently returns ring unconditionally
+    # Synthetic: cyclopropane + decane; P-44.3 fix: chain (10) > ring (3)
     (
         "C1CC1CCCCCCCCCC",
-        "decylcyclopropane",
+        "1-cyclopropyldecane",
     ),
     # Synthetic: cyclohexane + butyl; ring (6) > chain (4), ring correct
     (

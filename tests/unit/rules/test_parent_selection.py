@@ -1711,11 +1711,6 @@ class TestTotalRingAtomMetric:
 
         assert individual == total == 6, "Single ring: individual == total"
 
-    @pytest.mark.xfail(
-        reason="Phase 104: individual ring size (6) used instead of total system (10). "
-               "After Plan 02, ring (10 atoms) should beat chain (8 atoms) per P-44.3(a).",
-        strict=True
-    )
     def test_naphthalene_octyl_ring_wins(self):
         """Naphthoic acid + octanoic acid: PG on both ring and chain.
 
@@ -1740,11 +1735,6 @@ class TestTotalRingAtomMetric:
             f"Got: {result.parent_type} -- {result.reasoning}"
         )
 
-    @pytest.mark.xfail(
-        reason="Phase 104: individual ring size (6) used instead of total system (14). "
-               "After Plan 02, ring (14 atoms) should beat chain (6 atoms) per P-44.3(a).",
-        strict=True
-    )
     def test_anthracene_hexyl_ring_wins(self):
         """Anthracene-acid + hexanoic acid: PG on both.
 
@@ -1808,11 +1798,6 @@ class TestNoPGSizeComparison:
     is much longer (e.g., cyclopropane + decane).
     """
 
-    @pytest.mark.xfail(
-        reason="Phase 104: no-PG path unconditionally returns ring. "
-               "After Plan 02, chain (10 atoms) should beat ring (3 atoms).",
-        strict=True
-    )
     def test_cyclopropane_decane_chain_wins(self):
         """Cyclopropane (3 atoms) + decane (10 atoms), no PG.
 
@@ -1868,11 +1853,6 @@ class TestNoPGSizeComparison:
             f"Got: {result.parent_type} -- {result.reasoning}"
         )
 
-    @pytest.mark.xfail(
-        reason="Phase 104: no-PG path unconditionally returns ring. "
-               "After Plan 02, chain (8 atoms) should beat ring (4 atoms).",
-        strict=True
-    )
     def test_cyclobutane_octane_chain_wins(self):
         """Cyclobutane (4 atoms) + octane (8 atoms), no PG.
 
@@ -1955,12 +1935,6 @@ class TestNPBackboneEarlyReturn:
             f"Cholesterol: ring should be parent. Got: {result.reasoning}"
         )
 
-    @pytest.mark.xfail(
-        reason="Phase 104: no NP early-return in select_parent(). "
-               "After Plan 02, NP backbone (steroid) should force ring parent "
-               "even when PG is on chain only.",
-        strict=True
-    )
     def test_steroid_with_pg_on_chain_ring_wins(self):
         """Steroid (cholanic acid) with COOH on chain only -> ring should be parent.
 

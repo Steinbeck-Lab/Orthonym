@@ -26,6 +26,7 @@ from typing import List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..perception.chains import find_longest_skeletal_chain
+from ..perception.natural_products import detect_natural_product
 from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
 
@@ -537,14 +538,43 @@ def select_parent(
             reasoning="Single carbon chain - ring is parent"
         )
 
-    # No principal group (hydrocarbon) - ring has seniority (P-44.1.2.2)
-    if not principal_group or not principal_group_atoms:
+    # P-31.1.3.4: Natural product backbones always use ring as parent
+    np_info = detect_natural_product(mol)
+    if np_info is not None:
+        best_ring, other_rings = _select_best_ring_system(
+            mol, ring_systems, principal_group_atoms
+        )
+        other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
         return ParentSelectionResult(
             parent_type='ring',
-            parent_atoms=list(sorted(all_ring_atoms)),
-            substituent_rings=[],
-            reasoning="No principal group - ring has seniority (P-44.1.2.2)"
+            parent_atoms=list(sorted(best_ring)),
+            substituent_rings=other_ring_tuples,
+            reasoning=f"P-31.1.3.4: {np_info['scaffold_class']} NP backbone - ring is parent"
         )
+
+    # No principal group (hydrocarbon) - compare ring vs chain size
+    if not principal_group or not principal_group_atoms:
+        best_ring, other_rings = _select_best_ring_system(mol, ring_systems)
+        total_ring_atoms = len(best_ring)
+        chain_len = len(principal_chain)
+        if total_ring_atoms >= chain_len:
+            # Ring wins on tie (P-44.1.2.2, P-52.2.8)
+            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+            return ParentSelectionResult(
+                parent_type='ring',
+                parent_atoms=list(sorted(best_ring)),
+                substituent_rings=other_ring_tuples,
+                reasoning=f"P-44.1.2.2: no PG, ring ({total_ring_atoms}) >= chain ({chain_len})"
+            )
+        else:
+            # Chain is genuinely longer - chain is parent
+            all_ring_tuples = [tuple(sorted(best_ring))] + [tuple(sorted(r)) for r in other_rings]
+            return ParentSelectionResult(
+                parent_type='chain',
+                parent_atoms=principal_chain,
+                substituent_rings=all_ring_tuples,
+                reasoning=f"P-44.3: no PG, chain ({chain_len}) > ring ({total_ring_atoms})"
+            )
 
     # Check where principal group is located
     pg_on_ring = is_principal_group_on_ring(mol, all_ring_atoms, principal_group_atoms)
@@ -604,8 +634,8 @@ def select_parent(
         best_ring, other_rings = _select_best_ring_system(
             mol, ring_systems, principal_group_atoms
         )
-        # P-52.2.8: Use largest individual ring size, not total fused system
-        ring_size = _get_largest_individual_ring_size(mol, best_ring)
+        # P-44.3(a): Use total ring system atom count for ring-vs-chain comparison
+        ring_size = len(best_ring)
 
         # P-44.3(b): Consider heteroatom-inclusive skeletal chain as candidate.
         # The skeletal chain is only preferred when STRICTLY longer than the
