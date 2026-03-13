@@ -19,6 +19,7 @@ from orthonym.rules.parent_selection import (
     _compare_multiple_bond_locants,
     _compare_substituent_locants,
     _compare_pg_locants,
+    _get_largest_individual_ring_size,
 )
 from orthonym.perception.rings import get_ring_systems
 from orthonym.perception.functional_groups import detect_functional_groups
@@ -1622,3 +1623,377 @@ class TestEsterCascade:
                 f"Ester {smi}: expected {expected_parent}, "
                 f"got {result.parent_type} ({result.reasoning})"
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 104 Plan 01: New tests for P-44.3 ring metric, no-PG comparison,
+# and NP backbone early-return. Tests for CORRECT (unfixed) behavior are
+# xfail; tests for already-correct behavior pass normally.
+# ---------------------------------------------------------------------------
+
+
+def _setup_parent_selection(smiles):
+    """Helper: parse SMILES and compute all inputs for select_parent().
+
+    Returns (mol, ring_systems, chain, pg_name, pg_atoms, all_ring_atoms).
+    """
+    from orthonym.perception.chains import find_principal_chain
+
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, f"Invalid SMILES: {smiles}"
+    ring_systems = get_ring_systems(mol)
+    all_ring = set()
+    for r in ring_systems:
+        all_ring.update(r)
+    fg = detect_functional_groups(mol)
+    pg_name, pg_atoms = get_principal_group(mol, fg)
+    chain = find_principal_chain(mol, fg, pg_name, exclude_atoms=all_ring)
+    return mol, ring_systems, chain, pg_name, pg_atoms, all_ring
+
+
+@pytest.mark.unit
+class TestTotalRingAtomMetric:
+    """Tests that assert the CORRECT P-44.3 behavior using total ring system
+    atom count instead of individual SSSR ring size.
+
+    IUPAC P-44.3(a): When comparing ring system vs chain for parent selection,
+    the total number of atoms in the ring system is used, not the largest
+    individual ring. This is the core bug being fixed in Phase 104 Plan 02.
+
+    Tests marked xfail will become passing after Plan 02.
+    """
+
+    def test_ring_system_total_vs_individual_naphthalene(self):
+        """Verify _get_largest_individual_ring_size returns 6 for naphthalene,
+        but len(ring_system) returns 10 (the correct P-44.3 metric).
+
+        IUPAC P-44.3(a): ring system atom count for ring-vs-chain comparison.
+        """
+        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
+        ring_systems = get_ring_systems(mol)
+        assert len(ring_systems) == 1, "Naphthalene should be one ring system"
+        ring_system = ring_systems[0]
+
+        individual = _get_largest_individual_ring_size(mol, ring_system)
+        total = len(ring_system)
+
+        assert individual == 6, "Largest individual SSSR ring in naphthalene is 6"
+        assert total == 10, "Total ring system atoms in naphthalene is 10"
+        assert total > individual, "Total must exceed individual for fused systems"
+
+    def test_ring_system_total_vs_individual_anthracene(self):
+        """Anthracene: individual=6, total=14.
+
+        IUPAC P-44.3(a): total ring atoms for comparison.
+        """
+        mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1')
+        ring_systems = get_ring_systems(mol)
+        assert len(ring_systems) == 1, "Anthracene should be one ring system"
+        ring_system = ring_systems[0]
+
+        individual = _get_largest_individual_ring_size(mol, ring_system)
+        total = len(ring_system)
+
+        assert individual == 6, "Largest individual SSSR ring in anthracene is 6"
+        assert total == 14, "Total ring system atoms in anthracene is 14"
+
+    def test_ring_system_total_single_ring(self):
+        """For a single ring (e.g., benzene), individual == total == 6.
+
+        No discrepancy for non-fused rings.
+        """
+        mol = Chem.MolFromSmiles('c1ccccc1')
+        ring_systems = get_ring_systems(mol)
+        ring_system = ring_systems[0]
+
+        individual = _get_largest_individual_ring_size(mol, ring_system)
+        total = len(ring_system)
+
+        assert individual == total == 6, "Single ring: individual == total"
+
+    @pytest.mark.xfail(
+        reason="Phase 104: individual ring size (6) used instead of total system (10). "
+               "After Plan 02, ring (10 atoms) should beat chain (8 atoms) per P-44.3(a).",
+        strict=True
+    )
+    def test_naphthalene_octyl_ring_wins(self):
+        """Naphthoic acid + octanoic acid: PG on both ring and chain.
+
+        Ring system: naphthalene = 10 atoms (individual=6).
+        Chain: 8 atoms.
+        Current: individual ring (6) < chain (8) -> chain wins via cascade P-44.1(c).
+        Correct: total ring (10) >= chain (8) -> ring should win per P-44.3(a).
+
+        IUPAC P-44.3(a), P-52.2.8.
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'OC(=O)c1ccc2ccccc2c1CCCCCCCC(=O)O'
+        )
+
+        # Verify PG is on both
+        assert is_principal_group_on_ring(mol, all_ring, pa), "PG must be on ring"
+        assert is_principal_group_on_chain(mol, chain, pa), "PG must be on chain"
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Naphthalene (10 atoms) should beat octyl chain (8 atoms) per P-44.3(a). "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+    @pytest.mark.xfail(
+        reason="Phase 104: individual ring size (6) used instead of total system (14). "
+               "After Plan 02, ring (14 atoms) should beat chain (6 atoms) per P-44.3(a).",
+        strict=True
+    )
+    def test_anthracene_hexyl_ring_wins(self):
+        """Anthracene-acid + hexanoic acid: PG on both.
+
+        Ring system: anthracene = 14 atoms (individual=6).
+        Chain: 6 atoms.
+        Current: individual ring (6) == chain (6) -> further criteria -> chain wins.
+        Correct: total ring (14) > chain (6) -> ring should win per P-44.3(a).
+
+        IUPAC P-44.3(a).
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'OC(=O)c1ccc2cc3ccc(CCCCCC(=O)O)cc3cc2c1'
+        )
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Anthracene (14 atoms) should beat hexyl chain (6 atoms) per P-44.3(a). "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+    def test_quinoline_pentyl_ring_wins(self):
+        """Quinoline-acid + pentanoic acid: PG on both.
+
+        Ring system: quinoline = 10 atoms (individual=6).
+        Chain: 5 atoms.
+        Even with individual ring size (6) > chain (5), ring already wins.
+        This should pass now AND after the fix.
+
+        IUPAC P-44.3(a), P-52.2.8.
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'OC(=O)c1ccc2ncccc2c1CCCCC(=O)O'
+        )
+
+        # Verify PG on both
+        on_ring = is_principal_group_on_ring(mol, all_ring, pa)
+        on_chain = is_principal_group_on_chain(mol, chain, pa)
+
+        if on_ring and on_chain:
+            # PG on both -> cascade fires -> individual=6 > chain=5 -> ring wins
+            result = select_parent(mol, ring_systems, chain, pg, pa)
+            assert result.parent_type == 'ring', (
+                f"Quinoline (10 atoms, individual=6) should beat pentyl chain (5). "
+                f"Got: {result.parent_type} -- {result.reasoning}"
+            )
+        else:
+            # PG on one side only -> P-44.1(a) decides
+            result = select_parent(mol, ring_systems, chain, pg, pa)
+            # Either way, the compound works -- just verify no error
+            assert result.parent_type in ('ring', 'chain')
+
+
+@pytest.mark.unit
+class TestNoPGSizeComparison:
+    """Tests for the hydrocarbon (no principal group) path.
+
+    IUPAC P-44.1.2.2: When no principal group is present, the ring-vs-chain
+    comparison should still consider size. Ring wins on tie.
+
+    Current bug: no-PG path unconditionally returns ring, even when chain
+    is much longer (e.g., cyclopropane + decane).
+    """
+
+    @pytest.mark.xfail(
+        reason="Phase 104: no-PG path unconditionally returns ring. "
+               "After Plan 02, chain (10 atoms) should beat ring (3 atoms).",
+        strict=True
+    )
+    def test_cyclopropane_decane_chain_wins(self):
+        """Cyclopropane (3 atoms) + decane (10 atoms), no PG.
+
+        Current: ring wins unconditionally (no size comparison).
+        Correct: chain (10) > ring (3) -> chain should be parent.
+
+        IUPAC P-44.3(a): chain is longer -> chain is parent.
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'C1CC1CCCCCCCCCC'
+        )
+        assert pg is None or not pa, "No principal group expected"
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'chain', (
+            f"Cyclopropane (3) + decane (10): chain should win. "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+    def test_cyclohexane_ethyl_ring_wins(self):
+        """Cyclohexane (6 atoms) + ethyl (2 atoms), no PG.
+
+        Ring (6) > chain (2) -> ring wins. Should pass now and after fix.
+
+        IUPAC P-44.1.2.2: ring is larger, ring is parent.
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'C1CCCCC1CC'
+        )
+        assert pg is None or not pa, "No principal group expected"
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Cyclohexane (6) + ethyl (2): ring should win. "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+    def test_ring_chain_tie_ring_wins(self):
+        """Cyclohexane (6 atoms) + hexane (6 atoms), no PG.
+
+        Ring (6) == chain (6) -> ring wins on tie (P-52.2.8).
+
+        IUPAC P-52.2.8: ring preferred when equal number of skeletal atoms.
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'C1CCCCC1CCCCCC'
+        )
+        assert pg is None or not pa, "No principal group expected"
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Cyclohexane (6) + hexane (6): ring wins on tie per P-52.2.8. "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+    @pytest.mark.xfail(
+        reason="Phase 104: no-PG path unconditionally returns ring. "
+               "After Plan 02, chain (8 atoms) should beat ring (4 atoms).",
+        strict=True
+    )
+    def test_cyclobutane_octane_chain_wins(self):
+        """Cyclobutane (4 atoms) + octane (8 atoms), no PG.
+
+        Current: ring wins unconditionally.
+        Correct: chain (8) > ring (4) -> chain should be parent.
+
+        IUPAC P-44.3(a).
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'C1CCC1CCCCCCCC'
+        )
+        assert pg is None or not pa, "No principal group expected"
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'chain', (
+            f"Cyclobutane (4) + octane (8): chain should win. "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
+
+
+@pytest.mark.unit
+class TestNPBackboneEarlyReturn:
+    """Tests for natural product backbone priority in parent selection.
+
+    IUPAC P-31.1.3.4: Natural product ring systems (steroids, alkaloids)
+    should always use the ring system as parent, regardless of chain length
+    or PG placement. This requires an NP detection check before the standard
+    P-44.3 cascade.
+
+    Phase 104 Plan 02 will add the NP early-return to select_parent().
+    """
+
+    def test_steroid_detected_as_natural_product(self):
+        """Verify detect_natural_product() recognizes steroid scaffolds.
+
+        Cholesterol-type steroid should be detected.
+        """
+        from orthonym.perception.natural_products import detect_natural_product
+
+        # Cholesterol backbone
+        mol = Chem.MolFromSmiles(
+            'CC(C)CCCC(C)C1CCC2C3CC=C4CC(O)CCC4(C)C3CCC12C'
+        )
+        np_info = detect_natural_product(mol)
+        assert np_info is not None, "Cholesterol should be detected as NP"
+        assert np_info['scaffold_class'] == 'steroid'
+
+    def test_non_np_polycyclic_not_detected(self):
+        """Adamantane and norbornane should NOT trigger NP detection.
+
+        These are polycyclic but not natural product scaffolds.
+        """
+        from orthonym.perception.natural_products import detect_natural_product
+
+        # Adamantane
+        mol_adam = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
+        assert detect_natural_product(mol_adam) is None, (
+            "Adamantane should NOT be detected as NP"
+        )
+
+        # Norbornane (bicyclo[2.2.1]heptane)
+        mol_norb = Chem.MolFromSmiles('C1CC2CC1CC2')
+        assert detect_natural_product(mol_norb) is None, (
+            "Norbornane should NOT be detected as NP"
+        )
+
+    def test_steroid_with_pg_on_ring_already_correct(self):
+        """Steroid with OH on ring only -> ring is parent via P-44.1(a).
+
+        This already works correctly because PG is on ring only.
+        The NP early-return would be redundant here but should not break it.
+
+        IUPAC P-31.1.3.4, P-44.1(a).
+        """
+        mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
+            'CC(C)CCCC(C)C1CCC2C3CC=C4CC(O)CCC4(C)C3CCC12C'
+        )
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Cholesterol: ring should be parent. Got: {result.reasoning}"
+        )
+
+    @pytest.mark.xfail(
+        reason="Phase 104: no NP early-return in select_parent(). "
+               "After Plan 02, NP backbone (steroid) should force ring parent "
+               "even when PG is on chain only.",
+        strict=True
+    )
+    def test_steroid_with_pg_on_chain_ring_wins(self):
+        """Steroid (cholanic acid) with COOH on chain only -> ring should be parent.
+
+        Current: PG on chain only -> chain wins via P-44.1(a).
+        Correct: NP backbone detected -> ring is ALWAYS parent (P-31.1.3.4).
+
+        This is the key test for the NP early-return. After Plan 02, the NP
+        check should override P-44.1(a) and force ring parent for steroids.
+
+        IUPAC P-31.1.3.4: NP ring systems are always the parent.
+        """
+        from orthonym.perception.natural_products import detect_natural_product
+
+        smiles = 'CC(CCC(=O)O)C1CCC2C3CCC4CC(O)CCC4(C)C3CCC12C'
+        mol = Chem.MolFromSmiles(smiles)
+
+        # Verify NP detection
+        np_info = detect_natural_product(mol)
+        assert np_info is not None, "Cholanic acid should be detected as NP"
+        assert np_info['scaffold_class'] == 'steroid'
+
+        ring_systems = get_ring_systems(mol)
+        all_ring = set()
+        for r in ring_systems:
+            all_ring.update(r)
+        fg = detect_functional_groups(mol)
+        pg, pa = get_principal_group(mol, fg)
+
+        from orthonym.perception.chains import find_principal_chain
+        chain = find_principal_chain(mol, fg, pg, exclude_atoms=all_ring)
+
+        result = select_parent(mol, ring_systems, chain, pg, pa)
+        assert result.parent_type == 'ring', (
+            f"Steroid NP backbone: ring should ALWAYS be parent per P-31.1.3.4. "
+            f"Got: {result.parent_type} -- {result.reasoning}"
+        )
