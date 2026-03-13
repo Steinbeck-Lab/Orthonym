@@ -283,15 +283,42 @@ class VonBaeyerAnalyzer:
         # Collect bridge lengths for descriptor
         bridge_lengths = [branch1_len, branch2_len, main_bridge_len]
 
-        # Add secondary bridges
+        # Add secondary bridges, filtering out invalid ones.
+        # Invalid bridges: self-loops, unmapped endpoints, degenerate locants.
+        valid_secondary = []
         for sb in secondary_bridges:
-            # Determine locants using numbering
             ep1 = sb.start_bh
             ep2 = sb.end_bh
+
+            # Filter self-loop bridges (same atom as both endpoints)
+            if ep1 == ep2:
+                logger.debug(
+                    "Filtering self-loop bridge in analyze: ep=%s, len=%d",
+                    ep1, sb.length
+                )
+                continue
+
             loc1 = numbering.get(ep1, 0)
             loc2 = numbering.get(ep2, 0)
+
+            # Filter bridges with unmapped endpoints
+            if loc1 is None or loc2 is None or loc1 == 0 or loc2 == 0:
+                logger.debug(
+                    "Filtering bridge with unmapped endpoint in analyze: "
+                    "ep1=%s(loc=%s), ep2=%s(loc=%s)", ep1, loc1, ep2, loc2
+                )
+                continue
+
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
+
+            # Filter degenerate bridges with identical locants
+            if locant_low == locant_high:
+                logger.debug(
+                    "Filtering degenerate bridge in analyze: loc=%s",
+                    locant_low
+                )
+                continue
 
             sb_info = BridgeInfo(
                 atoms=sb.atoms,
@@ -304,6 +331,7 @@ class VonBaeyerAnalyzer:
             )
             all_bridges.append(sb_info)
             bridge_lengths.append(sb.length)
+            valid_secondary.append(sb)
 
         # Sort bridge lengths: first three (branch1, branch2, main bridge) descending,
         # then secondary bridges descending
@@ -323,7 +351,7 @@ class VonBaeyerAnalyzer:
             dep = 1 if bridge.is_dependent else 0
             return (dep, -bridge.length, locant_low, locant_high)
 
-        citation_ordered = sorted(secondary_bridges, key=_citation_sort_key)
+        citation_ordered = sorted(valid_secondary, key=_citation_sort_key)
 
         # Build descriptor string (using citation-ordered bridges)
         descriptor = self._build_descriptor(

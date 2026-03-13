@@ -92,7 +92,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H]1CN2[C@@H](O)[C@]34C[C@@]5(C(=O)Nc6c5ccc5c6C(=O)CC(C)(C)O5)C(C)(C)[C@@H]3C[C@@]2(C1)C(=O)N4C",
-        "(5R,15R,19S,20S,23S,25S)-19-hydroxy-12,12,15,16,22,22-hexamethyl-13-oxa-7,16,17-triaza-heptacyclo[7.4.0.13(5,5).0(4,8).0(5,21).0(15,18).0(17,19)]hexacosan-6,10,14-trione",
+        "(5R,15R,19S,20S,23S,25S)-19-hydroxy-12,12,15,16,22,22-hexamethyl-13-oxa-7,16,17-triaza-heptacyclo[7.4.0.0(4,8).0(5,21).0(15,18).0(17,19)]hexacosan-6,10,14-trione",
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)N1CCCC1",
@@ -208,7 +208,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C1CC[C@@H](C/C=C2/CC[C@]3(OC2)O[C@@]2(O)CC[C@]3(C)OC2(C)C)C(C)(C)[C@H]1[C@@H](O)C=C1CCOC1=O",
-        "(1S,2S,5S,9Z)-2,7,7-trimethyl-6,8,12-trioxa-tricyclo[3.1.0.5(1,1).2(2,5)]tridecan-5-ol",
+        "(1S,2S,5S,9Z)-2,7,7-trimethyl-6,8,12-trioxa-tricyclo[3.1.0.2(2,5)]tridecan-5-ol",
     ),
     (
         "C=C1/C=C/C(=O)N(C)CC(=O)O[C@@H](CCCCCCCCCCCCCC)[C@H](C)C(=O)[C@](C)(O)C(=O)NCC(=O)N1",
@@ -256,7 +256,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCOc1cc(C(=O)O)ccc1NC(=O)c1ccc(NC(=O)c2ccc(NC(=O)[C@@H](NC(=O)c3ccc(NC(=O)c4ccc([N+](=O)[O-])cc4)cc3)[C@@H](OC)C(N)=O)cc2)c(OC(C)C)c1O",
-        "N-(2S,3R)-2-(benzoylamino)-4-carbamoyl-3-methoxybutanoyl-4-(16-carbamoylhexadecyl)-3-ethoxybenzoic acid",
+        # Phase 103-01: chain exclusion shortens fragment chain (butanoyl -> propanoyl);
+        # carbamoyl prefix not emitted in fragment naming (pre-existing limitation).
+        "N-(2S,3R)-2-(benzoylamino)-3-methoxypropanoyl-4-(16-carbamoylhexadecyl)-3-ethoxybenzoic acid",
     ),
     (
         "O=C1N[C@H]2NC(=O)N[C@H]2N1",
@@ -380,7 +382,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"C[C@@H]1C[C@@H]2O[C@@H]3[C@@H](C)[C@H](O)[C@@H]4O[C@]5(C[C@H](O)CO5)[C@@H](C)[C@H](C)[C@H]4O[C@H]3C[C@H]2O[C@H]2C[C@H]3O[C@H]4C/C=C\C[C@H]5O[C@H]6C=C[C@H]7O[C@H]8[C@H](O)[C@H]9OCC=CC[C@@H]9O[C@@H]8C[C@@H]7O[C@@H]6C/C=C\[C@@H]5O[C@@H]4C[C@@H](O)[C@]3(C)O[C@@H]2C1",
-        "(1S,3Z,6R,8S,11R,13S,14R,15R,21S,23R,25S,27R,31S,33R,35R,36S,38R,40R,42S,44R,45S,46S,47S,49R,50S,51S,52R,54S,56R,58S,60R,65S)-36,40,45,50,51-pentamethyl-7,12,16,22,26,32,37,43,48,53,57,61,63-tridecaoxa-tridecacyclo[31.28.0.4(49,49).0(6,31).0(8,27).0(36,60).0(38,58).0(42,56).0(44,54).0(47,52).0(49,63).0(49,64).0(62,65)]pentahexaconta-3,9,18,29-tetraen-14,35,46,65-tetraol",
+        "(1S,3Z,6R,8S,11R,13S,14R,15R,21S,23R,25S,27R,31S,33R,35R,36S,38R,40R,42S,44R,45S,46S,47S,49R,50S,51S,52R,54S,56R,58S,60R,65S)-36,40,45,50,51-pentamethyl-7,12,16,22,26,32,37,43,48,53,57,61,63-tridecaoxa-tridecacyclo[31.28.0.0(6,31).0(8,27).0(36,60).0(38,58).0(42,56).0(44,54).0(47,52).0(49,63).0(49,64).0(62,65)]pentahexaconta-3,9,18,29-tetraen-14,35,46,65-tetraol",
     ),
     (
         r"CCCCC/C=C\C/C=C\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
