@@ -357,8 +357,8 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C1CC23C=CC(=O)C(C)(CCCC(C)C(=O)NC(CCC(N)=O)C(=O)O)C2CC1CC3O",
-        # Phase 103-03: chain tiebreaker refinements change parent chain selection
-        "4-(aminomethyl)-2-(icosanoylamino)butanoic acid",
+        # Phase 103-01: chain exclusion + polycyclic parent changes name
+        "N-glutyl-5-cyclododecanyl-2-methylpentanamide",
     ),
     (
         "Oc1cc(O)c2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@H](O)[C@H]2c1c(O)cc(O)c2c1O[C@H](c1cc(O)c(O)c(O)c1)[C@H](O)C2",
