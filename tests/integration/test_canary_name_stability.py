@@ -530,3 +530,188 @@ def test_canary_name_stability(smiles, expected_name):
         f"  Expected: {expected_name}\n"
         f"  Got: {result}"
     )
+
+
+# ---------------------------------------------------------------------------
+# P-44.3 canary compounds: 25 compounds frozen BEFORE Phase 104 parent
+# selection changes. These track the impact of fixing the ring-vs-chain
+# parent selection metric (IUPAC P-44.3(a)).
+#
+# Categories covered:
+#   - Fused ring + chain (8): ring system total atoms > chain but individual
+#     ring < chain, causing wrong parent selection
+#   - NP backbone (5): steroids/alkaloids with long side chains
+#   - Aromatic + FG on chain (5): single 6-membered ring where PG is on chain
+#   - Hydrocarbon no-PG (3): ring + chain with no principal FG
+#   - Multi-ring + branch (4): complex multi-ring systems with branching
+#
+# Phase 104 Plan 01: canary expansion. After Plan 02 changes, some of these
+# names will change as the parent selection becomes IUPAC-compliant. Any name
+# change must be verified as an intentional improvement, not a regression.
+# ---------------------------------------------------------------------------
+
+P44_3_CANARY = [
+    # --- Fused ring + chain (8 compounds) ---
+    # Row 12: anthranilic acid derivative; fused ring system should be parent
+    # per P-44.3 but individual ring size (6) < chain causes chain selection
+    (
+        "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O",
+        "2-(2-oxo(3R)-3-aminobutyl)benzoic acid",
+    ),
+    # Row 45: imidazopyridine + tolyl; fused system (9 atoms) vs chain
+    (
+        "Cc1ccc(-c2nc3ccc(C)cn3c2CC(=O)N(C)C)cc1",
+        "2-benzyl-3-(3-carbamoylpropyl)-6-methylimidazo[1,2-a]pyridine",
+    ),
+    # Row 47: pentacyclic anthraquinone; large fused system vs chain
+    (
+        "COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(OC)cc(OC)c(O)c2c(O)c1C3=O",
+        "4,6,22-trihydroxy-7,9,16-trimethoxy-18-methyl-pentacyclo[12.8.0.0(3,12).0(5,10).0(15,20)]docosan-2,13-dione",
+    ),
+    # Row 51: lactone with two phenyl groups; fused system vs chain
+    (
+        "O=C(O)C1=C(c2ccccc2)C(=Cc2ccccc2)C(=O)O1",
+        "3-benzyl-5-formyl-4-phenyloxolan-2-one",
+    ),
+    # Row 54: tricyclic with methoxy; fused ring system vs chain
+    (
+        "COC(=O)[C@@]1(O)C(=O)C=C2c3cc(OC)cc(O)c3C(=O)CC21",
+        "(5S)-5-ethyl-5,10-dihydroxy-12-methoxy-tricyclo[7.4.0.0(2,6)]tridec-2-en-4,8-dione",
+    ),
+    # Row 57: pentacyclic with methylenedioxy; fused system dominant
+    (
+        "COc1cc2c(cc1OC)C1C(CO2)Oc2c(ccc3occc23)C1",
+        "18,19-dimethoxy-7,12,15-trioxa-pentacyclo[11.8.0.0(3,11).0(6,10).0(16,21)]henicosane",
+    ),
+    # Row 60: anthraquinone + acetic acid chain
+    (
+        "COc1cccc2c1C(=O)c1ccc3c(c1C2=O)C(=O)C[C@@H](CC(=O)O)C3",
+        "2-cyclooctadecanylethanoic acid",
+    ),
+    # Row 82: tetracyclic stilbenoid; large fused system vs ethyl chain
+    (
+        "CC[C@@H]1Cc2cc(O)ccc2C2=C1c1ccc(O)cc1C[C@H]2O",
+        "(9R,18R)-9-ethyl-tetracyclo[8.8.0.0(2,7).0(11,16)]octadec-1-en-5,14,18-triol",
+    ),
+    # --- NP backbone compounds (5 compounds) ---
+    # Row 46: strychnine-type alkaloid; NP backbone should be ring parent
+    (
+        "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6NC5=O)[C@H]4C[C@H]2[C@@H]1C[C@@H]3OC(C)=O",
+        "(8R,9R,11S,12S,14S,15R)-14-ethoxy-15-ethyl-5,23-diaza-hexacyclo[9.3.0.2(1,12).0(5,9).0(17,22)]tetracosan-24-one",
+    ),
+    # Row 58: aspidosperma alkaloid skeleton; NP ring system vs chain
+    (
+        "CC[C@H]1[C@@H]2CC3[C@@H]4N(C)c5ccccc5[C@@]43CC[C@@H]2C[C@H]1C(=O)OC",
+        "(3R,4S,5R,7R,10S,18S)-4,5-diethyl-17-methyl-17-aza-pentacyclo[8.8.0.0(3,7).0(10,18).0(11,16)]octadecane",
+    ),
+    # Row 59: long-chain amide with indole; NP ring vs C24 chain
+    (
+        "CCCCCCCCCCCCCCCCCCCCCCCC(=O)NCCc1c[nH]c2ccccc12",
+        "N-tetracosanoyl-3-(2-aminoethyl)-1H-indole",
+    ),
+    # Row 69: chromanone NP derivative; tricyclic ring vs short chain
+    (
+        "C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@@H]2C1",
+        "(1R,10R,12S,14R)-4,14-dihydroxy-12-methyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one",
+    ),
+    # Row 94: venlafaxine-type; cyclohexyl ring + methoxyphenyl
+    (
+        "COc1ccc(C(CN(C)C)C2(O)CCCCC2)cc1.[Cl-].[H+]",
+        "1-(hydroxydecyl)-4-methoxybenzene hydrochloride",
+    ),
+    # --- Aromatic + FG on chain (5 compounds) ---
+    # Row 4: cyclohexanone + chain with acid and amide
+    (
+        r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",
+        "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid",
+    ),
+    # Row 48: diaminotoluene + phenylpropyl chain
+    (
+        "Cc1ccc(NCCCc2ccccc2)c(N)c1",
+        "2-amino-4-methyl-1-(N-propylbenzenylamino)benzene",
+    ),
+    # Row 42: cyanoacetamide with benzene; PG (acid) is on chain
+    (
+        "N#CC(NC(=O)CC(=O)O)c1ccccc1",
+        "3-anilinopropanoic acid",
+    ),
+    # Row 74: quinoline thioether + ester chain
+    (
+        "COC(=O)CSc1cc(C)nc2ccccc12",
+        "2-methylquinoline",
+    ),
+    # Row 83: malate ester derivative; chain vs ring parent
+    (
+        "C[C@H](CC(=O)[O-])OC(=O)C[C@@H](C)O",
+        "(3R)-3-(butanoyloxy)-hydroxybutanoate",
+    ),
+    # --- Hydrocarbon no-PG (3 compounds) ---
+    # Synthetic: cyclopropane + decane; chain (10) >> ring (3), but no-PG
+    # path currently returns ring unconditionally
+    (
+        "C1CC1CCCCCCCCCC",
+        "decylcyclopropane",
+    ),
+    # Synthetic: cyclohexane + butyl; ring (6) > chain (4), ring correct
+    (
+        "C1CCCCC1CCCC",
+        "butylcyclohexane",
+    ),
+    # Synthetic: cyclobutane + ethyl; ring (4) > chain (2), ring correct
+    (
+        "C1CCC1CC",
+        "ethylcyclobutane",
+    ),
+    # --- Multi-ring + branch (4 compounds) ---
+    # Row 22: oxazole with pyridyl and sulfonamide substituents
+    (
+        "CC(C)(C)c1nc(-c2cccc(NS(=O)(=O)c3c(F)cccc3F)c2)c(-c2ccncc2)o1",
+        "2-(tert-butyl)-4-phenyl-5-pyridyloxazole",
+    ),
+    # Row 28: gallic acid derivative with multiple ester branches
+    (
+        "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
+        "3-tetradecoxy-4,5-dihydroxybenzoic acid",
+    ),
+    # Row 36: biphenyl with prenyl and methoxy groups
+    (
+        "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1O",
+        "4',5,4-trihydroxy-3,2-dimethoxy-3'-2-methylbut-2-enyl-1,1'-biphenyl",
+    ),
+    # Row 38: isoflavone glycoside; flavone ring vs sugar chain
+    (
+        "O=c1c(-c2ccc(OC3OC(CO)C(O)C(O)C3O)cc2)coc2cc(O)cc(O)c12",
+        "(glucopyranosyloxy)-4-oxo-5-phenyl-2H-pyran",
+    ),
+]
+
+# Build test IDs for P-44.3 canary
+_P44_3_IDS = [
+    smiles[:40].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
+    for smiles, _ in P44_3_CANARY
+]
+
+
+@pytest.mark.parametrize("smiles,expected_name", P44_3_CANARY, ids=_P44_3_IDS)
+def test_canary_p44_3(smiles, expected_name):
+    """P-44.3 canary test: freeze current names BEFORE parent selection fix (25 compounds).
+
+    These compounds are known P-44.3 parent selection failures from FAILURE-TRACES.md.
+    They are frozen at their CURRENT (pre-fix) names so that Phase 104 Plan 02 changes
+    can be tracked. After the parent selection fix, some names will intentionally change
+    as the ring-vs-chain metric becomes IUPAC-compliant (total ring atoms instead of
+    individual ring size).
+
+    Categories:
+    - Fused ring + chain (8): individual ring < chain but total system >= chain
+    - NP backbone (5): steroids/alkaloids with long side chains
+    - Aromatic + FG on chain (5): single ring where PG is on chain
+    - Hydrocarbon no-PG (3): ring + chain with no principal FG
+    - Multi-ring + branch (4): complex multi-ring systems
+    """
+    result = name_compound(smiles)
+    assert result == expected_name, (
+        f"CANARY REGRESSION (P-44.3 tier): {smiles}\n"
+        f"  Expected: {expected_name}\n"
+        f"  Got: {result}"
+    )
