@@ -437,7 +437,7 @@ CI_BENCHMARK = [
     (
         "CC(=O)CCC1=C(C)C[C@@]2(CC1=O)C(=O)[C@@H]1C[C@@](O)(CO1)C2=O",
         "(1S,3R,5R)-9-butyl-5-hydroxy-10-methyl-7-oxa-tricyclo"
-        "[3.2.1.5(3,3)]tridec-9-en-2,4,13-trione",
+        "[3.2.1]tridec-9-en-2,4,13-trione",  # Phase 103-02: VB bridge filtering
     ),
     (
         "CCCCCCCCCCCCC1=C(OC(C)=O)C(=O)c2ccccc2C1=O",
@@ -469,7 +469,7 @@ CI_BENCHMARK = [
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "N-(2S)-amino-2-(butanoylamino)-4-carbamoylmethylsulfanylbutanoyl(2S)-2-amino-3-imidazolylpropanoic acid",  # alpha order + P80-01 sulfanyl prefix
+        "N-(2S)-amino-2-(butanoylamino)-3-carbamoylmethylsulfanylpropanoyl(2S)-2-amino-3-imidazolylpropanoic acid",  # Phase 103-01: chain exclusion (butanoyl->propanoyl)
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"

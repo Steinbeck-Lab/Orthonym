@@ -23,6 +23,7 @@ from .naming_utils import (
     format_substituent_prefix,
     alpha_sort_key,
     get_alkyl_name,
+    is_complex_substituent,
     SIMPLE_MULTIPLIERS,
     COMPLEX_MULTIPLIERS,
 )
@@ -5807,8 +5808,12 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
         if is_monosubstituted:
             # Monosubstituted: omit locant (it's always 1)
-            # Just the substituent name: "methyl" not "1-methyl"
-            formatted = name
+            # But complex substituents still need enclosing marks per
+            # IUPAC P-14.5.2 (e.g., "(2-methylbut-2-en-1-yl)benzene")
+            if is_complex_substituent(name) and not name.startswith('('):
+                formatted = f"({name})"
+            else:
+                formatted = name
             # Use empty locants so _assemble_fragments won't re-add "1-"
             emit_locants = ()
         else:

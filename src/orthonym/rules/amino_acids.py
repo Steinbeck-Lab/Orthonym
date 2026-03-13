@@ -41,6 +41,8 @@ _EXTRA_FG_SMARTS = [
     '[F,Cl,Br,I]',               # Halogen
     '[N+](=O)[O-]',              # Nitro
     '[CX3;!$([CX3](=O)[OX2H1]);!$([CX3](=O)[NX3])](=O)',  # Ketone C=O (excludes acid and amide C=O)
+    '[CX3](=O)[NX3H2]',         # Primary amide -C(=O)NH2 (e.g., glutamine side chain)
+    '[CX2]#[NX1]',              # Nitrile -C#N (e.g., cyano-amino acids)
 ]
 
 

@@ -1459,6 +1459,36 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 if _attach_in_ring:
                     continue
 
+            # Skip substituent branches entirely covered by a single non-principal
+            # FG match ONLY for FG types whose prefix form includes the carbon
+            # (carbamoyl, carboxy, chlorocarbonyl, etc.).  These are the FG itself
+            # (e.g., -C(=O)NH2 for amide) and are emitted as FG prefixes by the
+            # FG prefix loop above.  Processing them here would produce incorrect
+            # compound substituent names like "(aminomethyl)".
+            # IUPAC P-66.1(c): non-principal amide = carbamoyl prefix.
+            # NOTE: Only applies to specific terminal-C FG types. Other FGs
+            # (amine, ketone, secondary_amide, etc.) must NOT trigger this guard.
+            _POLY_GUARD_FG_TYPES = {
+                'primary_amide', 'carboxylic_acid',
+                'acid_chloride', 'acid_bromide', 'acid_fluoride',
+            }
+            _sub_set = set(sub_atoms)
+            _skip_fg_branch = False
+            _non_principal = getattr(features, 'non_principal_groups', {})
+            for _fg_nm, _fg_ms in _non_principal.items():
+                if _fg_nm not in _POLY_GUARD_FG_TYPES:
+                    continue
+                if not _fg_ms:
+                    continue
+                for _fg_m in _fg_ms:
+                    if set(_fg_m) and _sub_set.issubset(set(_fg_m)):
+                        _skip_fg_branch = True
+                        break
+                if _skip_fg_branch:
+                    break
+            if _skip_fg_branch:
+                continue
+
             # Count only carbon atoms
             carbon_count = sum(
                 1 for idx in sub_atoms

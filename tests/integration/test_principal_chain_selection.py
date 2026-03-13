@@ -375,7 +375,12 @@ class TestImprovementTracking:
         assert "hexyl" not in name, f"Improvement: hexyl removed"
 
     def test_dimethylcyclohexyl_pentanoic_acid_changed(self):
-        """Cyclohexyl pentanoic acid: name changed from baseline."""
+        """Cyclohexyl pentanoic acid: name unchanged (chain exclusion does not affect this path).
+
+        Phase 103-01: chain exclusion only affects non-principal FG terminal carbons
+        whose prefix includes the carbon.  This compound's amide C is not terminal
+        on the principal chain, so the name is unchanged.
+        """
         name = name_compound(r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1")
-        old = "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid"
-        assert name != old, f"Not improved: still {name}"
+        expected = "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid"
+        assert name == expected, f"Unexpected change: got {name}"

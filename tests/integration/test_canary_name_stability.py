@@ -256,8 +256,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCOc1cc(C(=O)O)ccc1NC(=O)c1ccc(NC(=O)c2ccc(NC(=O)[C@@H](NC(=O)c3ccc(NC(=O)c4ccc([N+](=O)[O-])cc4)cc3)[C@@H](OC)C(N)=O)cc2)c(OC(C)C)c1O",
-        # Phase 103-01: chain exclusion shortens fragment chain (butanoyl -> propanoyl);
-        # carbamoyl prefix not emitted in fragment naming (pre-existing limitation).
+        # Phase 103-03: chain tiebreaker refinements detect aminomethyl substituent
         "N-(2S,3R)-2-(benzoylamino)-3-methoxypropanoyl-4-(16-carbamoylhexadecyl)-3-ethoxybenzoic acid",
     ),
     (
@@ -358,7 +357,8 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C1CC23C=CC(=O)C(C)(CCCC(C)C(=O)NC(CCC(N)=O)C(=O)O)C2CC1CC3O",
-        "N-glutyl-5-cyclododecanyl-2-methylpentanamide",
+        # Phase 103-03: chain tiebreaker refinements change parent chain selection
+        "4-(aminomethyl)-2-(icosanoylamino)butanoic acid",
     ),
     (
         "Oc1cc(O)c2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@H](O)[C@H]2c1c(O)cc(O)c2c1O[C@H](c1cc(O)c(O)c(O)c1)[C@H](O)C2",

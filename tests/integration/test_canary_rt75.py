@@ -735,7 +735,8 @@ CANARY_COMPOUNDS = [
     # v8.0 phase improvement canaries: Phase 68 carbamoyl prefix (4 compounds)
     (
         "NC(=O)CCCC(=O)O",  # Phase 68: carbamoyl prefix linear acid
-        "5-carbamoylpentanoic acid",
+        # Phase 103-03: chain tiebreaker changes shorten parent chain
+        "4-carbamoylbutanoic acid",
     ),
     (
         "NC(=O)c1ccc(C(=O)O)cc1",  # Phase 68: carbamoyl prefix aromatic acid
@@ -743,11 +744,13 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)CCC(=O)O",  # Phase 68: carbamoyl prefix short chain
-        "4-carbamoylbutanoic acid",
+        # Phase 103-03: chain tiebreaker changes shorten parent chain
+        "3-carbamoylpropanoic acid",
     ),
     (
         "NC(=O)CC(=O)O",  # Phase 68: carbamoyl prefix minimal chain
-        "3-carbamoylpropanoic acid",
+        # Phase 103-03: chain tiebreaker changes shorten parent chain
+        "2-carbamoylethanoic acid",
     ),
     # Failure taxonomy sentinels: substituent_loss (3 compounds)
     (
@@ -765,7 +768,8 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: parent_mismatch (3 compounds)
     (
         r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # Sentinel: parent_mismatch - cyclohexanone chain
-        "3-(2-oxo(1E)-1-ethylidene-3,5-dimethylcyclohexyl)-5-carbamoylpentanoic acid",
+        # Phase 103-03: chain tiebreaker refinements change parent chain selection
+        "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid",
     ),
     (
         "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic
