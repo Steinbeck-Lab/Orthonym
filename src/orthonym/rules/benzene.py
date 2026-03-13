@@ -26,6 +26,7 @@ from ..assembly.naming_utils import (
     get_multiplier_prefix,
     format_substituent_prefix,
     alpha_sort_key,
+    is_complex_substituent,
 )
 
 
@@ -1652,10 +1653,14 @@ def name_substituted_benzene(
 
         if is_monosubstituted:
             # Monosubstituted: just "chloro", "methyl", etc. - no locant
-            # Strip outer parentheses for monosubstituted complex names
-            # e.g., "(N-methylamino)" -> "N-methylamino" for "N-methylaminobenzene"
-            if name.startswith('(') and name.endswith(')'):
-                prefix_str = name[1:-1]
+            if name.startswith('(') or name.startswith('['):
+                # Already has enclosing marks (possibly internal, e.g.
+                # "(oxan-2-yl)oxy") -- keep as-is to avoid double-wrapping
+                prefix_str = name
+            elif is_complex_substituent(name):
+                # Complex substituent needs enclosing marks per IUPAC P-14.5.2
+                # e.g., "(2-methylbut-2-en-1-yl)benzene"
+                prefix_str = f"({name})"
             else:
                 prefix_str = name
         else:
@@ -2012,8 +2017,12 @@ def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
         count = len(locants)
 
         if is_mono:
-            if name.startswith('(') and name.endswith(')'):
-                prefix_str = name[1:-1]
+            if name.startswith('(') or name.startswith('['):
+                # Already has enclosing marks -- keep as-is
+                prefix_str = name
+            elif is_complex_substituent(name):
+                # Complex substituent needs enclosing marks per IUPAC P-14.5.2
+                prefix_str = f"({name})"
             else:
                 prefix_str = name
         else:
