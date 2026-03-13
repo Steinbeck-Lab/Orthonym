@@ -856,7 +856,12 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
 
-    # Hydroxy prefix
+    # Hydroxy prefix: added to prefix_entries for the ketone+hydroxyl path
+    # (line 957-965) where hydroxyl is a non-principal group prefix.
+    # When hydroxyl is the principal group (no ketones), the hydroxyl-only path
+    # at line 942-949 uses non_oh_prefix (which strips hydroxy) and adds -ol suffix.
+    # IUPAC P-35.2.1: principal group as suffix only.
+    # IUPAC P-59.1: non-principal groups as prefixes only.
     if hydroxyls:
         locant_str = ",".join(str(loc) for loc in hydroxyls)
         count = len(hydroxyls)

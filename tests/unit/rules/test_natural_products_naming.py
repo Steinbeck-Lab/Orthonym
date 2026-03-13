@@ -202,3 +202,89 @@ class TestPipelineIntegration:
     def test_camphor_via_name_compound(self):
         result = name_compound(CAMPHOR_SMILES)
         assert result == "camphor"
+
+
+# ===========================================================================
+# Test Class 5: NP hydroxyl prefix/suffix exclusivity (Phase 105-02)
+# ===========================================================================
+
+@pytest.mark.unit
+class TestNPHydroxylRepresentation:
+    """Verify hydroxyl appears as suffix OR prefix, never both.
+
+    IUPAC P-35.2.1: principal group as suffix only.
+    IUPAC P-59.1: non-principal groups as prefixes only.
+
+    - Hydroxyl-only steroid: -ol suffix, NO hydroxy prefix
+    - Hydroxyl+ketone steroid: hydroxy prefix + -one suffix
+    - Ketone-only steroid: -one suffix, NO hydroxy prefix
+    """
+
+    def test_hydroxyl_only_steroid_uses_ol_suffix(self):
+        """Hydroxyl-only steroid: should have -ol suffix and NO 'hydroxy' prefix."""
+        # Cholest-5-en-3-ol (cholesterol without the retained name)
+        smiles = (
+            "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C"
+            "[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"
+        )
+        result = name_compound(smiles)
+        # cholesterol is a retained name, so check directly
+        assert result == "cholesterol"
+
+    def test_hydroxyl_only_steroid_systematic(self):
+        """Non-retained hydroxyl steroid should use -ol suffix, no hydroxy prefix."""
+        # Androstan-3-ol (no retained name for this)
+        smiles = "O[C@H]1CC[C@@]2(C)[C@H]3CC[C@@]4(C)[C@@H](CC2)CC[C@@H]4[C@@H]3CC1"
+        mol = _mol(smiles)
+        result = name_natural_product(mol)
+        if result is not None:
+            # If detected as NP: should have -ol suffix without hydroxy prefix
+            assert "ol" in result, f"Expected -ol suffix in '{result}'"
+            # Should not have both
+            lower = result.lower()
+            if lower.endswith("ol") or "-ol" in lower:
+                assert "hydroxy" not in lower, (
+                    f"Both 'hydroxy' prefix and '-ol' suffix found in: '{result}'"
+                )
+
+    def test_ketone_steroid_no_hydroxy(self):
+        """Ketone-only steroid: -one suffix, no hydroxy prefix."""
+        # Androst-4-en-3-one (no OH group)
+        smiles = (
+            "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]43C)[C@@H]1CCC2"
+        )
+        mol = _mol(smiles)
+        result = name_natural_product(mol)
+        if result is not None:
+            lower = result.lower()
+            assert "hydroxy" not in lower, (
+                f"Unexpected 'hydroxy' in ketone-only steroid: '{result}'"
+            )
+
+    def test_hydroxyl_plus_ketone_steroid(self):
+        """Hydroxyl+ketone steroid: hydroxy prefix + -one suffix."""
+        # Testosterone: 17-hydroxyandr-4-en-3-one
+        smiles = (
+            "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]43C)"
+            "[C@@H]1CC[C@@H]2O"
+        )
+        result = name_compound(smiles)
+        lower = result.lower()
+        # Should have hydroxy prefix AND -one suffix, but NOT -ol suffix
+        assert "hydroxy" in lower, (
+            f"Expected 'hydroxy' prefix for hydroxyl+ketone steroid: '{result}'"
+        )
+        assert "one" in lower, (
+            f"Expected '-one' suffix for hydroxyl+ketone steroid: '{result}'"
+        )
+        # Should NOT have -ol suffix (hydroxyl is prefix when ketone present)
+        # Allow 'ol' in words like 'hydroxy' but not as suffix
+        name_after_last_hyphen = result.rsplit("-", 1)[-1] if "-" in result else result
+        has_ol_suffix = name_after_last_hyphen.lower().startswith("ol") or result.lower().endswith("ol")
+        if has_ol_suffix:
+            # Only fail if it's actually a suffix, not part of another word
+            # "3-ol" would be wrong, "hydroxy" containing 'ol' is fine
+            import re
+            assert not re.search(r'-\d*-?\w*ol\b', result.lower().replace("hydroxy", "")), (
+                f"Both 'hydroxy' prefix and '-ol' suffix for same group in: '{result}'"
+            )
