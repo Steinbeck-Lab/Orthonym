@@ -578,6 +578,57 @@ NAME_STABILITY_CANARY = [
         "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
         "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
     ),
+    # --- Phase 107-02 canary compounds ---
+    # FIX-13: iterative decomposition (multi-ester with glycosidic linkage)
+    (
+        "CC(=O)OCC1OC(OC(=O)C)C(OC(C)=O)C(OC(C)=O)C1OC(C)=O",
+        "1,2,3,4-tetrakis(acetyloxy)oxane",
+    ),
+    # FIX-10: fused ring dictionary (dibenzofuran)
+    (
+        "c1ccc2c(c1)oc1ccccc12",
+        "dibenzofuran",
+    ),
+    # FIX-10: fused ring dictionary (dibenzothiophene)
+    (
+        "c1ccc2c(c1)sc1ccccc12",
+        "dibenzothiophene",
+    ),
+    # FIX-10: fused ring dictionary (9H-carbazole)
+    (
+        "c1ccc2c(c1)[nH]c1ccccc12",
+        "9H-carbazole",
+    ),
+    # FIX-14: ylidene substituent naming (methylidenecyclohexane)
+    (
+        "C=C1CCCCC1",
+        "methylidenecyclohexane",
+    ),
+    # FIX-14: ylidene on chain parent (3-methylidenepentane)
+    (
+        "CCC(=C)CC",
+        "3-methylidenepentane",
+    ),
+    # FIX-15: skeletal replacement for large heterocyclic ring
+    (
+        "C1CCOCCO1",
+        "1,4-dioxacycloheptane",
+    ),
+    # FIX-15: mixed heteroatom large ring replacement
+    (
+        "C1CCNCCOC1",
+        "1-oxa-4-azacyclooctane",
+    ),
+    # FIX-15: zwitterion detection (beta-alanine)
+    (
+        "[NH3+]CCC(=O)[O-]",
+        "beta-alanine",
+    ),
+    # FIX-15: zwitterion detection (betaine)
+    (
+        "C[N+](C)(C)CC(=O)[O-]",
+        "betaine",
+    ),
 ]
 
 # Build test IDs from first 40 chars of SMILES (sanitized for pytest)

@@ -1229,6 +1229,47 @@ CANARY_COMPOUNDS = [
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
         "(2S)-3-(docosanoyloxy)-1-(decanoyloxy)propan-2-ol",
     ),
+    # --- Phase 107-02 RT canary compounds ---
+    # FIX-10: fused ring dictionary (dibenzofuran) - RT validated
+    (
+        "c1ccc2c(c1)oc1ccccc12",
+        "dibenzofuran",
+    ),
+    # FIX-10: fused ring dictionary (dibenzothiophene) - RT validated
+    (
+        "c1ccc2c(c1)sc1ccccc12",
+        "dibenzothiophene",
+    ),
+    # FIX-10: fused ring dictionary (9H-carbazole) - RT validated
+    (
+        "c1ccc2c(c1)[nH]c1ccccc12",
+        "9H-carbazole",
+    ),
+    # FIX-14: ylidene naming (methylidenecyclohexane) - RT validated
+    (
+        "C=C1CCCCC1",
+        "methylidenecyclohexane",
+    ),
+    # FIX-14: ylidene on chain (3-methylidenepentane) - RT validated
+    (
+        "CCC(=C)CC",
+        "3-methylidenepentane",
+    ),
+    # FIX-15: skeletal replacement large ring - RT validated
+    (
+        "C1CCOCCO1",
+        "1,4-dioxacycloheptane",
+    ),
+    # FIX-15: mixed heteroatom large ring - RT validated
+    (
+        "C1CCNCCOC1",
+        "1-oxa-4-azacyclooctane",
+    ),
+    # FIX-15: zwitterion beta-alanine - RT validated
+    (
+        "[NH3+]CCC(=O)[O-]",
+        "beta-alanine",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
