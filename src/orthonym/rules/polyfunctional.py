@@ -1201,11 +1201,20 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if not matches:
                 continue
 
-        # BUG-B: Skip simple FG matches located entirely on a *small* substituent
-        # branch (<=3 carbons) that gets named as a compound substituent by
-        # _name_heteroatom_substituent() (e.g., hydroxymethyl, aminomethyl).
-        # Only applies to simple FGs: alcohol, amine, halogens.
-        # Long branches or complex FGs are NOT handled by substituent naming.
+        # BUG-B guard: Skip FG matches located entirely on a small substituent
+        # branch (<=3 carbons) when the substituent naming path demonstrably
+        # handles them (producing e.g. "hydroxymethyl", "chloromethyl").
+        # IUPAC P-59.1(a): all non-principal FGs must appear as prefixes.
+        # This guard prevents DOUBLE-naming (both substituent prefix AND standalone
+        # FG prefix for the same group).
+        #
+        # Verified empirically (Phase 105-01): each FG type below produces the
+        # correct prefix via substituent naming on 1-3C branches:
+        #   - Halogens: "fluoromethyl", "chloromethyl", "bromomethyl", "iodomethyl"
+        #   - primary_alcohol: "hydroxymethyl" on -CH2OH
+        #   - secondary_alcohol: "hydroxy" included in branch name
+        #   - primary_amine: "aminomethyl" on -CH2NH2
+        # FG types NOT verified safe must NOT be added to this set.
         _BRANCH_HANDLED_FGS = {
             'primary_alcohol', 'secondary_alcohol', 'primary_amine',
             'fluoro', 'chloro', 'bromo', 'iodo',
@@ -1233,8 +1242,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         break
                 if not on_small_branch:
                     filtered_matches.append(match)
+            original_count = len(non_principal[fg_name])
             matches = filtered_matches
             if not matches:
+                if original_count > 0:
+                    logger.debug(
+                        "DROP-17 polyfunc_bugb: fg_name=%s filtered=%d "
+                        "(substituent naming handles these on small branches)",
+                        fg_name, original_count,
+                    )
                 continue
 
         # Get prefix form for this FG
