@@ -131,36 +131,28 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
 
 
 def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optional[str]:
-    """Name an N-substituent, handling aromatic rings and alkyl chains."""
+    """Name an N-substituent by delegating to the universal naming pipeline.
+
+    All N-substituent naming is handled by ``name_substituent()`` from the
+    universal pipeline (Phase 85), which provides correct IUPAC names via
+    a five-tier cascade: retained names (isopropyl, phenyl, tert-butyl),
+    fragment cache, linear alkyl fast path, recursive naming, and fallback.
+
+    This replaces the previous approach that used only carbon count to
+    produce linear alkyl names, causing cyclopentyl -> "pentyl",
+    isopropyl -> "propyl", pyridinyl -> "pentyl", etc.
+    """
+    if not sub_atoms:
+        return None
+
+    from ..assembly.substituent_enumerator import name_substituent
     sub_set = set(sub_atoms)
+    # attach_idx is the first atom in BFS order (directly bonded to nitrogen)
+    attach_idx = sub_atoms[0]
+    result = name_substituent(mol, sub_set, attach_idx)
+    if result:
+        return result
 
-    # Check for aromatic ring in substituent
-    ring_info = mol.GetRingInfo()
-    for ring in ring_info.AtomRings():
-        if not all(r in sub_set for r in ring):
-            continue
-        if len(ring) == 6:
-            all_aromatic = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
-            all_carbon = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
-            if all_aromatic and all_carbon:
-                # Phenyl-based substituent
-                non_ring_carbons = sum(
-                    1 for idx in sub_atoms
-                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and idx not in set(ring)
-                )
-                if non_ring_carbons == 0:
-                    return "phenyl"
-                elif non_ring_carbons == 1:
-                    return "benzyl"
-                elif non_ring_carbons == 2:
-                    return "2-phenylethyl"
-
-    # Fall back to alkyl name
-    if carbon_count > 0:
-        try:
-            return get_alkyl_name(carbon_count)
-        except (ValueError, KeyError):
-            return None
     return None
 
 

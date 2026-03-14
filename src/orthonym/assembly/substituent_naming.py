@@ -645,7 +645,12 @@ def _check_retained_substituent(
                 if non_ring_carbons == 0:
                     return "phenyl"
                 elif non_ring_carbons == 1:
-                    return "benzyl"
+                    # Benzyl only if the attachment point is the non-ring
+                    # carbon (CH2 bridging parent to ring). If the attachment
+                    # point is a ring carbon, this is a substituted phenyl
+                    # (e.g., 4-methylphenyl), not benzyl.
+                    if attach_idx not in ring_set:
+                        return "benzyl"
 
     # --- Alkyl branching detection ---
     # Retained alkyl names (isopropyl, tert-butyl, etc.) only apply to

@@ -562,7 +562,7 @@ P44_3_CANARY = [
     # Row 45: imidazopyridine + tolyl; fused system (9 atoms) vs chain
     (
         "Cc1ccc(-c2nc3ccc(C)cn3c2CC(=O)N(C)C)cc1",
-        "2-benzyl-3-(3-carbamoylpropyl)-6-methylimidazo[1,2-a]pyridine",
+        "3-(3-carbamoylpropyl)-6-methyl-2-toluenylimidazo[1,2-a]pyridine",
     ),
     # Row 47: pentacyclic anthraquinone; large fused system vs chain
     (
@@ -606,9 +606,10 @@ P44_3_CANARY = [
         "(3R,4S,5R,7R,10S,18S)-4,5-diethyl-17-methyl-17-aza-pentacyclo[8.8.0.0(3,7).0(10,18).0(11,16)]octadecane",
     ),
     # Row 59: long-chain amide with indole; NP ring vs C24 chain
+    # Updated Phase 106: N-substituent pipeline produces amide-centric name
     (
         "CCCCCCCCCCCCCCCCCCCCCCCC(=O)NCCc1c[nH]c2ccccc12",
-        "N-tetracosanoyl-3-(2-aminoethyl)-1H-indole",
+        "N-3-ethyl-1H-indolyltetracosanamide",
     ),
     # Row 69: chromanone NP derivative; tricyclic ring vs short chain
     (
