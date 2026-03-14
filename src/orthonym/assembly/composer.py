@@ -2002,6 +2002,28 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     if not substituents:
         return "benzene"
 
+    # INST-01: Atom coverage audit for benzene naming path
+    if logger.isEnabledFor(logging.DEBUG):
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        parent_count = len(ring_atoms) if ring_atoms else 6
+        named_count = len(substituents) if substituents else 0
+        coverage = (parent_count + named_count) / max(total_heavy, 1)
+        logger.debug(
+            "ATOM_COVERAGE: smiles=%s total_heavy=%d parent=%d named_subs=%d coverage=%.2f",
+            features.canonical_smiles, total_heavy, parent_count, named_count, coverage,
+        )
+        named_atom_count = 0
+        if substituents:
+            for sub_atoms_list in substituents.values() if isinstance(substituents, dict) else [substituents]:
+                if isinstance(sub_atoms_list, (list, tuple)):
+                    named_atom_count += len(sub_atoms_list)
+                else:
+                    named_atom_count += 1
+        logger.debug(
+            "ATOM_COVERAGE_DETAIL: smiles=%s named_atom_count=%d",
+            features.canonical_smiles, named_atom_count,
+        )
+
     # Orient the ring for lowest locants
     oriented_ring = orient_benzene(mol, ring_atoms, substituents)
 
@@ -2834,6 +2856,28 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     # Check for substituents
     substituents = getattr(features, 'heterocycle_substituents', None)
     atom_to_locant = getattr(features, 'heterocycle_atom_to_locant', None)
+
+    # INST-01: Atom coverage audit for heterocycle naming path
+    if logger.isEnabledFor(logging.DEBUG):
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        parent_count = len(features.principal_ring) if features.principal_ring else 0
+        named_count = len(substituents) if substituents else 0
+        coverage = (parent_count + named_count) / max(total_heavy, 1)
+        logger.debug(
+            "ATOM_COVERAGE: smiles=%s total_heavy=%d parent=%d named_subs=%d coverage=%.2f",
+            features.canonical_smiles, total_heavy, parent_count, named_count, coverage,
+        )
+        named_atom_count = 0
+        if substituents:
+            for sub_entry in substituents.values() if isinstance(substituents, dict) else substituents:
+                if isinstance(sub_entry, (list, tuple)):
+                    named_atom_count += len(sub_entry)
+                else:
+                    named_atom_count += 1
+        logger.debug(
+            "ATOM_COVERAGE_DETAIL: smiles=%s named_atom_count=%d",
+            features.canonical_smiles, named_atom_count,
+        )
 
     if substituents and atom_to_locant:
         # Generate substituted name with N-locants and C-locants
@@ -4816,6 +4860,15 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             "ATOM_COVERAGE: smiles=%s total_heavy=%d parent=%d named_subs=%d coverage=%.2f",
             features.canonical_smiles, total_heavy, parent_count, named_count, coverage,
         )
+        # ATOM_COVERAGE_DETAIL: actual heavy atoms in named substituent fragments
+        named_atom_count = sum(
+            len(si.frag_atoms) for si in sub_infos
+            if si.frag_atoms and not (pg_atom_set and si.frag_atoms & pg_atom_set)
+        )
+        logger.debug(
+            "ATOM_COVERAGE_DETAIL: smiles=%s named_atom_count=%d",
+            features.canonical_smiles, named_atom_count,
+        )
 
     # Count total number of substituents for locant omission decision
     total_substituents = sum(len(locs) for locs in substituent_groups.values())
@@ -5793,6 +5846,26 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
             name = _convert_yl_to_ylidene(name)
 
         substituent_groups[name].append(sub_info.locant)
+
+    # INST-01: Atom coverage audit for ring parent naming path
+    if logger.isEnabledFor(logging.DEBUG):
+        total_heavy = features.mol.GetNumHeavyAtoms()
+        parent_count = len(oriented_ring)
+        named_count = sum(len(locs) for locs in substituent_groups.values()) if substituent_groups else 0
+        coverage = (parent_count + named_count) / max(total_heavy, 1)
+        logger.debug(
+            "ATOM_COVERAGE: smiles=%s total_heavy=%d parent=%d named_subs=%d coverage=%.2f",
+            features.canonical_smiles, total_heavy, parent_count, named_count, coverage,
+        )
+        # ATOM_COVERAGE_DETAIL: actual heavy atoms in named substituent fragments
+        named_atom_count = 0
+        for sub_info in sub_infos:
+            if sub_info.frag_atoms and not (pg_atom_set and sub_info.frag_atoms & pg_atom_set):
+                named_atom_count += len(sub_info.frag_atoms)
+        logger.debug(
+            "ATOM_COVERAGE_DETAIL: smiles=%s named_atom_count=%d",
+            features.canonical_smiles, named_atom_count,
+        )
 
     # Count ALL ring substituents (alkyl + FG), not just the ones we named
     # This prevents monosubstituted=True when there's 1 alkyl + 1 halogen

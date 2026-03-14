@@ -8,6 +8,8 @@ Canary compounds exercise:
 - BUG-B guard: FGs (hydroxy, amino, halogen) on small substituent branches
 - Polyfunctional prefix completeness: multiple FGs on chain compounds
 - Ring polyfunctional: FGs on ring + FGs on branches
+- Ring prefix conversion: heterocyclic ring substituents (Plan 03)
+- Unsaturation format: 'a' euphonic connector (Plan 02)
 - IUPAC P-59.1(a): all non-principal groups as prefixes
 """
 
@@ -30,6 +32,13 @@ PHASE105_CANARY = [
     ("OC1CCCCC1C(=O)O", "2-hydroxycyclohexan-1-carboxylic acid"),
     # -- Multi-FG complexity --
     ("NCC(CC(N)C(=O)O)C(=O)O", "4-amino-2-(aminomethyl)pentanedioic acid"),
+    # -- Ring prefix conversion (Plan 03): heterocyclic -ane ring names --
+    ("O=C(O)CC1CCOCC1", "2-oxanylethanoic acid"),
+    ("O=C(O)CC1CCNCC1", "2-piperidinylethanoic acid"),
+    ("O=C(O)CC1CCCO1", "2-oxolanylethanoic acid"),
+    # -- Unsaturation format (Plan 02): 'a' euphonic connector --
+    ("CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)O",
+     "(9Z,12Z,15Z)-octadeca-9,12,15-trienoic acid"),
 ]
 
 _CANARY_IDS = [
