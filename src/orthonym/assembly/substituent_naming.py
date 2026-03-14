@@ -375,6 +375,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     3. Adding the prefix at the correct locant
     4. Appending -yl at the free-valence position
 
+    Per IUPAC P-46.2, the point of free valency receives the lowest
+    possible locant consistent with any fixed numbering of the parent
+    hydride. For chain-derived substituents with no fixed numbering,
+    the chain is oriented so the attachment point is at locant 1.
+
     Args:
         parent_name: Parent compound IUPAC name (e.g., "propan-2-ol").
         chain_length: Number of carbons in the substituent chain.

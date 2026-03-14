@@ -4834,6 +4834,17 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         if _skip_as_fg_branch:
             continue
 
+        # IUPAC P-31.1.3.1 / P-29.1(b): Detect exocyclic double bond attachment.
+        # If the bond from the chain atom to the substituent is DOUBLE,
+        # the substituent uses -ylidene suffix instead of -yl.
+        is_exocyclic_double = False
+        attach_idx = sub_info.attach_mol_idx
+        for frag_idx in sub_info.frag_atoms:
+            bond = mol.GetBondBetweenAtoms(attach_idx, frag_idx)
+            if bond is not None and bond.GetBondTypeAsDouble() == 2.0:
+                is_exocyclic_double = True
+                break
+
         # Name via the universal classify-and-name pipeline
         name = classify_and_name_fragment(mol, sub_info, chain_set, features)
         if name is None:
@@ -4853,6 +4864,12 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     sub_info.locant,
                 )
                 continue
+
+        # IUPAC P-31.1.3.1: Convert -yl to -ylidene for exocyclic double bonds.
+        # =CH2 -> methylidene, =CHCH3 -> ethylidene, =C(CH3)2 -> propan-2-ylidene
+        if is_exocyclic_double and name:
+            name = _convert_yl_to_ylidene(name)
+
         substituent_groups[name].append(sub_info.locant)
 
     # INST-01: Atom coverage audit

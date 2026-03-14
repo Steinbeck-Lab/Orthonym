@@ -95,11 +95,36 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
-    # Gate 1: No rings allowed (chain replacement only)
+    # Gate 1: Rings gate (IUPAC P-15.4 / P-22.1.3)
+    # Chain replacement requires no rings, EXCEPT for large heterocyclic
+    # rings (>= 7 members with heteroatoms) where skeletal replacement
+    # naming may be simpler than substitutive naming.
+    # Small rings (<= 6 members) are handled by Hantzsch-Widman naming.
     # ----------------------------------------------------------------
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() > 0:
-        return None
+        # Check if ALL rings are large (>= 7) and contain heteroatoms
+        all_rings_large_hetero = True
+        for ring in ring_info.AtomRings():
+            if len(ring) < 7:
+                all_rings_large_hetero = False
+                break
+            # Check ring has at least one heteroatom
+            has_hetero = any(
+                mol.GetAtomWithIdx(idx).GetSymbol() in REPLACEMENT_TERMS
+                for idx in ring
+            )
+            if not has_hetero:
+                all_rings_large_hetero = False
+                break
+        if not all_rings_large_hetero:
+            return None
+        # For large heterocyclic rings, try cyclic replacement naming
+        # per IUPAC P-22.1.3. Keep the "no priority FGs" gate.
+        for pat in _PRIORITY_FG_PATTERNS:
+            if mol.HasSubstructMatch(pat):
+                return None
+        return _try_cyclic_replacement_name(mol, ring_info)
 
     # ----------------------------------------------------------------
     # Gate 2: No priority functional groups
@@ -583,3 +608,128 @@ def _build_replacement_name(
     else:
         # Plain replacement name: "3,6-dioxaoctane"
         return f'{replacement_prefix}{chain_prefix}ane'
+
+
+def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
+    """Try cyclic skeletal replacement naming for large heterocyclic rings.
+
+    Per IUPAC P-22.1.3, large heterocyclic rings (>= 7 members) can use
+    replacement nomenclature (oxa-/aza-/thia- prefixes on cycloalkane parent).
+    Example: 1,4-dioxacyclononane for a 9-membered ring with 2 oxygens.
+
+    Only applies when:
+    - Single ring with >= 7 members
+    - Ring contains heteroatoms from REPLACEMENT_TERMS
+    - No substituents off the ring (all heavy atoms are ring atoms)
+    - No priority functional groups (checked before calling this function)
+
+    Args:
+        mol: RDKit molecule object.
+        ring_info: RDKit RingInfo object.
+
+    Returns:
+        Replacement name string or None if not applicable.
+    """
+    rings = ring_info.AtomRings()
+    if len(rings) != 1:
+        return None  # Only handle single-ring molecules for now
+
+    ring = rings[0]
+    ring_size = len(ring)
+
+    # Gate: all heavy atoms must be in the ring (no substituents)
+    if mol.GetNumAtoms() != ring_size:
+        return None
+
+    # Collect heteroatom positions in the ring
+    ring_atoms = list(ring)
+    heteroatoms = []
+    for i, atom_idx in enumerate(ring_atoms):
+        atom = mol.GetAtomWithIdx(atom_idx)
+        symbol = atom.GetSymbol()
+        if symbol in REPLACEMENT_TERMS:
+            heteroatoms.append((i, symbol))
+
+    if not heteroatoms:
+        return None
+
+    # Orient the ring to give lowest locants to heteroatoms.
+    # Try all rotations and both directions; pick the one giving the
+    # lowest heteroatom locant set at first point of difference.
+    best_locant_set = None
+    best_positions = None
+
+    for start in range(ring_size):
+        for direction in [1, -1]:
+            # Build the ordered ring from this starting point
+            ordered = []
+            for step in range(ring_size):
+                idx = (start + step * direction) % ring_size
+                ordered.append(ring_atoms[idx])
+
+            # Compute heteroatom locants (1-based)
+            positions = []
+            for i, atom_idx in enumerate(ordered):
+                atom = mol.GetAtomWithIdx(atom_idx)
+                symbol = atom.GetSymbol()
+                if symbol in REPLACEMENT_TERMS:
+                    positions.append((i + 1, symbol))
+
+            locant_set = sorted(pos[0] for pos in positions)
+
+            if best_locant_set is None or locant_set < best_locant_set:
+                best_locant_set = locant_set
+                best_positions = positions
+
+    if not best_positions:
+        return None
+
+    # Build the cyclic replacement name using cyclo- prefix
+    chain_prefix = get_chain_prefix(ring_size)
+
+    # Group heteroatoms by element symbol
+    element_groups: Dict[str, List[int]] = defaultdict(list)
+    for locant, symbol in best_positions:
+        element_groups[symbol].append(locant)
+
+    for symbol in element_groups:
+        element_groups[symbol].sort()
+
+    # Sort groups: by lowest locant, then alphabetically by replacement term
+    sorted_groups = sorted(
+        element_groups.items(),
+        key=lambda item: (min(item[1]), REPLACEMENT_TERMS[item[0]])
+    )
+
+    parts = []
+    for symbol, locants in sorted_groups:
+        term = REPLACEMENT_TERMS[symbol]
+        locant_str = ','.join(str(loc) for loc in locants)
+        count = len(locants)
+
+        if count == 1:
+            multiplier = ''
+        elif count in SIMPLE_MULTIPLIERS:
+            multiplier = SIMPLE_MULTIPLIERS[count]
+        else:
+            multiplier = SIMPLE_MULTIPLIERS.get(count, f'{count}')
+
+        parts.append(f'{locant_str}-{multiplier}{term}')
+
+    replacement_prefix = '-'.join(parts)
+
+    # Check if all ring bonds are single (saturated -> cycloalkane)
+    all_single = True
+    for i in range(ring_size):
+        a1 = ring_atoms[i]
+        a2 = ring_atoms[(i + 1) % ring_size]
+        bond = mol.GetBondBetweenAtoms(a1, a2)
+        if bond and bond.GetBondTypeAsDouble() != 1.0:
+            all_single = False
+            break
+
+    if all_single:
+        return f'{replacement_prefix}cyclo{chain_prefix}ane'
+    else:
+        # Unsaturated large heterocyclic rings -- not handled here
+        return None

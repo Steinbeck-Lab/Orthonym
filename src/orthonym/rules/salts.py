@@ -46,6 +46,12 @@ STOICHIOMETRIC_PREFIXES = {
 # SMARTS for alpha-amino acid zwitterion pattern
 ALPHA_AA_ZWITTERION = '[NX4+;H3][CX4][CX3](=[OX1])[OX1-]'
 
+# SMARTS for beta-amino acid zwitterion pattern (2-carbon gap)
+BETA_AA_ZWITTERION = '[NX4+;H3][CX4][CX4][CX3](=[OX1])[OX1-]'
+
+# SMARTS for gamma-amino acid zwitterion pattern (3-carbon gap)
+GAMMA_AA_ZWITTERION = '[NX4+;H3][CX4][CX4][CX4][CX3](=[OX1])[OX1-]'
+
 
 # === RETAINED AMINO ACID NAMES ===
 
@@ -90,6 +96,16 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     '[NH3+][C@@H](CCC(=O)O)C(=O)[O-]': 'L-glutamic acid',
     # Aspartic acid zwitterion (one COOH protonated)
     '[NH3+][C@@H](CC(=O)O)C(=O)[O-]': 'L-aspartic acid',
+    # Beta-alanine zwitterion (beta-amino acid)
+    '[NH3+]CCC(=O)[O-]': 'beta-alanine',
+    # GABA zwitterion (gamma-aminobutyric acid)
+    '[NH3+]CCCC(=O)[O-]': '4-aminobutanoic acid',
+    # Betaine (trimethylammonioacetate) -- IUPAC P-74.1.1
+    'C[N+](C)(C)CC(=O)[O-]': 'betaine',
+    # L-Carnitine zwitterion
+    'C[N+](C)(C)C[C@H](O)CC(=O)[O-]': 'L-carnitine',
+    # DL-Carnitine (racemic)
+    'C[N+](C)(C)CC(O)CC(=O)[O-]': 'carnitine',
 }
 
 
@@ -334,24 +350,32 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
 
 def _is_amino_acid_zwitterion(mol) -> bool:
     """
-    Check if molecule is amino acid zwitterion [NH3+]-C-[COO-].
+    Check if molecule is amino acid zwitterion [NH3+]-Cn-[COO-].
+
+    Detects alpha, beta, and gamma amino acid zwitterion patterns
+    per IUPAC P-74.1.1.
 
     Args:
         mol: RDKit Mol object
 
     Returns:
-        True if molecule matches alpha-amino acid zwitterion pattern
+        True if molecule matches alpha/beta/gamma amino acid zwitterion pattern
 
     Example:
         >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
         >>> _is_amino_acid_zwitterion(mol)
         True
+        >>> mol = Chem.MolFromSmiles('[NH3+]CCC([O-])=O')
+        >>> _is_amino_acid_zwitterion(mol)
+        True
     """
-    pattern = Chem.MolFromSmarts(ALPHA_AA_ZWITTERION)
-    if pattern is None:
-        return False
+    # Check alpha, beta, and gamma patterns
+    for smarts in (ALPHA_AA_ZWITTERION, BETA_AA_ZWITTERION, GAMMA_AA_ZWITTERION):
+        pattern = Chem.MolFromSmarts(smarts)
+        if pattern is not None and mol.HasSubstructMatch(pattern):
+            return True
 
-    return mol.HasSubstructMatch(pattern)
+    return False
 
 
 def _name_amino_acid_zwitterion(mol, style: str) -> str:
