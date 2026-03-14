@@ -113,11 +113,11 @@ class TestThiocarboxylicAcidSeniority:
     def test_dithioic_acid_ring_suffix(self):
         assert get_suffix("dithioic_acid", is_ring=True) == "carbodithioic acid"
 
-    def test_prefix_forms_are_none(self):
-        """Thiocarboxylic acids rarely appear as prefixes."""
-        assert get_prefix("thioic_S_acid") is None
-        assert get_prefix("thioic_O_acid") is None
-        assert get_prefix("dithioic_acid") is None
+    def test_prefix_forms(self):
+        """Thiocarboxylic acids have prefix forms per IUPAC P-65.1.1.4."""
+        assert get_prefix("thioic_S_acid") == "sulfanylcarbonyl"
+        assert get_prefix("thioic_O_acid") == "carbothioyl"
+        assert get_prefix("dithioic_acid") == "dithiocarboxy"
 
 
 # ============================================================================

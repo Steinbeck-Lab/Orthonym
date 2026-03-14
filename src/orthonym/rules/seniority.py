@@ -171,9 +171,9 @@ SUFFIX_FORMS = {
 # Prefix forms for non-principal groups
 PREFIX_FORMS = {
     "carboxylic_acid": "carboxy",
-    "thioic_S_acid": None,   # Rare as prefix; functional class naming
-    "thioic_O_acid": None,   # Rare as prefix; functional class naming
-    "dithioic_acid": None,   # Rare as prefix; functional class naming
+    "thioic_S_acid": "sulfanylcarbonyl",  # IUPAC P-65.1.1.4: S-acid prefix (-C(=O)SH)
+    "thioic_O_acid": "carbothioyl",      # IUPAC P-65.1.1.4: O-acid prefix (-C(=S)OH)
+    "dithioic_acid": "dithiocarboxy",     # IUPAC P-65.1.1.4: dithioic acid prefix (-C(=S)SH)
     "carbamic_acid": "carbamoyloxy",  # When not principal group
     "sulfonic_acid": "sulfo",
     "sulfinic_acid": "sulfino",
