@@ -23,6 +23,7 @@ from rdkit import Chem
 
 MAX_CLEAVABLE_BONDS = 20  # Phase 099: raised from 12, with structural complexity check
 MAX_BOND_RETRY_ATTEMPTS = 5  # Max bonds to try when multi-bond retry is active
+MAX_DECOMP_LEVELS = 3  # Phase 107: max iterative decomposition levels for mixed bond types
 
 
 # ---------------------------------------------------------------------------
@@ -588,7 +589,23 @@ def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     # Substitutive bond types produce longer names and need a higher threshold.
     threshold = 0.6 if bond_type in _FUNCTIONAL_CLASS_TYPES else 0.8
     expected_min = int(heavy_atoms * threshold)
-    return len(name) >= expected_min
+
+    # Phase 107: Retained-name coverage bonus.
+    # Names containing retained-name tokens (adenine, cholesterol, etc.)
+    # describe more structure than their character count suggests -- retained
+    # names are intentionally shorter than systematic names. Apply a 1.5x
+    # multiplier to effective name length for coverage comparison.
+    # This bonus applies ONLY at the fragment-level coverage check, NOT
+    # to the final assembled name quality check.
+    name_lower = name.lower()
+    retained_bonus = 1.0
+    for rn in _RETAINED_CORE_NAMES:
+        if rn in name_lower:
+            retained_bonus = 1.5
+            break
+
+    effective_length = len(name) * retained_bonus
+    return effective_length >= expected_min
 
 
 # ---------------------------------------------------------------------------
@@ -931,6 +948,138 @@ def _try_multi_bond_decompose(
 
 
 # ---------------------------------------------------------------------------
+# Iterative mixed-type decomposition (Phase 107)
+# ---------------------------------------------------------------------------
+
+def _try_iterative_mixed_decompose(
+    mol, bonds: List[Dict], style: str = "pin"
+) -> Optional[str]:
+    """Iteratively decompose large molecules with mixed bond types.
+
+    After initial single-bond cleavage, re-scan each resulting fragment
+    for additional cleavable bonds of DIFFERENT types. This handles
+    phospholipid-type molecules (phosphodiester + ester bonds) and
+    glycoside-ester hybrids.
+
+    Algorithm:
+    1. Initial cleavage with _select_best_bond()
+    2. For each fragment with HA > 30 that still contains cleavable bonds
+       of a DIFFERENT type, cleave the best sub-bond
+    3. Maximum MAX_DECOMP_LEVELS levels (iterative, not recursive)
+    4. Quality gate comparison at each level
+
+    Args:
+        mol: RDKit Mol object.
+        bonds: List of all cleavable bond dicts.
+        style: Naming style.
+
+    Returns:
+        Assembled name string, or None if decomposition fails or is worse.
+    """
+    import logging
+    from .bond_cleavage import find_cleavable_bonds
+    from .fragment_capping import cleave_and_cap
+    from ..assembly.fragment_naming import name_fragment_recursively
+
+    logger = logging.getLogger(__name__)
+
+    if not bonds or len(bonds) < 2:
+        return None
+
+    # Need at least 2 different bond types for mixed decomposition
+    bond_types_present = set(b["type"] for b in bonds)
+    if len(bond_types_present) < 2:
+        return None
+
+    # Initial cleavage
+    best_bond = _select_best_bond(mol, bonds)
+    initial_frags = cleave_and_cap(mol, [best_bond], acid_side_oh=True)
+    if not initial_frags or len(initial_frags) < 2:
+        return None
+
+    used_bond_types = {best_bond["type"]}
+    all_fragments = list(initial_frags)
+    parent_heavy = mol.GetNumHeavyAtoms()
+
+    # Iterative decomposition across levels
+    for level in range(MAX_DECOMP_LEVELS - 1):  # Already did level 0
+        new_fragments = []
+        changed = False
+        for frag in all_fragments:
+            frag_mol = Chem.MolFromSmiles(frag["smiles"])
+            if frag_mol is None:
+                new_fragments.append(frag)
+                continue
+            frag_ha = frag_mol.GetNumHeavyAtoms()
+            if frag_ha <= 30:
+                new_fragments.append(frag)
+                continue
+            # Re-scan for cleavable bonds of DIFFERENT types
+            sub_bonds = find_cleavable_bonds(frag_mol)
+            sub_bonds = [b for b in sub_bonds if b["type"] not in used_bond_types]
+            if not sub_bonds:
+                new_fragments.append(frag)
+                continue
+            # Cleave the best sub-bond
+            sub_best = _select_best_bond(frag_mol, sub_bonds)
+            sub_frags = cleave_and_cap(frag_mol, [sub_best], acid_side_oh=True)
+            if sub_frags and len(sub_frags) >= 2:
+                # Size guard: sub-fragments must be smaller than original
+                all_smaller = all(
+                    (Chem.MolFromSmiles(sf["smiles"]) is None or
+                     Chem.MolFromSmiles(sf["smiles"]).GetNumHeavyAtoms() < frag_ha)
+                    for sf in sub_frags
+                )
+                if all_smaller:
+                    new_fragments.extend(sub_frags)
+                    used_bond_types.add(sub_best["type"])
+                    changed = True
+                else:
+                    new_fragments.append(frag)
+            else:
+                new_fragments.append(frag)
+        all_fragments = new_fragments
+        if not changed:
+            break
+
+    # Name each fragment
+    fragment_names = {}
+    for frag in all_fragments:
+        frag_name = _name_sugar_fragment(frag["smiles"])
+        if not frag_name:
+            frag_name = name_fragment_recursively(frag["smiles"])
+        if not frag_name or "unknown" in frag_name.lower():
+            return None
+        fragment_names[frag["smiles"]] = frag_name
+
+    # Simple assembly: join fragment names
+    # Sort fragments by size (largest first = parent)
+    sorted_frags = sorted(
+        all_fragments,
+        key=lambda f: len(fragment_names.get(f["smiles"], "")),
+        reverse=True,
+    )
+
+    # Use the largest-named fragment as the base and prefix others
+    if len(sorted_frags) <= 1:
+        return None
+
+    parts = [fragment_names[f["smiles"]] for f in sorted_frags]
+    # Join with space (functional class style)
+    assembled = " ".join(parts)
+
+    # Quality gate: the assembled name must be acceptable
+    if not _name_quality_is_acceptable(assembled, mol):
+        return None
+
+    # Coverage gate
+    if not _coverage_is_adequate(assembled, mol, bond_type=best_bond["type"]):
+        return None
+
+    return assembled
+
+
+# ---------------------------------------------------------------------------
 # Main decomposition entry point
 # ---------------------------------------------------------------------------
 
@@ -1055,6 +1204,17 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 continue
             return alt_result
 
+    # Phase 107: Iterative mixed-type decomposition.
+    # If single-bond retry produced no acceptable result AND the molecule has
+    # cleavable bonds of multiple types, try iterative decomposition.
+    if not single_result or not _name_quality_is_acceptable(single_result, mol):
+        bond_types_present = set(b["type"] for b in bonds)
+        if len(bond_types_present) >= 2 and mol.GetNumHeavyAtoms() > 30:
+            iterative_result = _try_iterative_mixed_decompose(mol, bonds, style)
+            if iterative_result:
+                if not (existing_name and _decomposition_is_worse(iterative_result, existing_name, mol)):
+                    return iterative_result
+
     # MULTI-BOND SAME-TYPE cleavage (Phase 099): if N+ bonds of the same
     # type exist, try cleaving all same-type bonds simultaneously
     # (IUPAC P-65.6.3.4 polyesters / triglycerides, P-68 glycosides).
@@ -1070,6 +1230,24 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             if count >= threshold:
                 same_type_bonds = [b for b in bonds if b["type"] == bond_type_key]
                 multi_result = _try_multi_bond_decompose(mol, same_type_bonds, style)
+                if multi_result:
+                    if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
+                        return multi_result
+
+    # Phase 107: Mixed-bond threshold relaxation.
+    # When total cleavable bonds >= 3 across all types and no single type
+    # reached its threshold above, relax the ester threshold to 2 for
+    # mixed-type molecules (e.g., 2 esters + 1 glycosidic).
+    # Only for ester type (glycosidic already at 2, amide stays at 3).
+    # Guard: only when single-bond produced no acceptable result.
+    if not single_result or not _name_quality_is_acceptable(single_result, mol):
+        total_cleavable = sum(bond_type_counts.values())
+        ester_count = bond_type_counts.get("ester", 0)
+        if total_cleavable >= 3 and ester_count >= 2 and len(bond_type_counts) >= 2:
+            # Only apply relaxation if standard threshold was NOT reached
+            if ester_count < _MULTI_BOND_THRESHOLD.get("ester", 99):
+                ester_bonds = [b for b in bonds if b["type"] == "ester"]
+                multi_result = _try_multi_bond_decompose(mol, ester_bonds, style)
                 if multi_result:
                     if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                         return multi_result
