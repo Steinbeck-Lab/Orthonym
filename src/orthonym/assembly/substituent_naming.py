@@ -569,11 +569,13 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
 
     # ---- Heterocyclic -ane ending ---- (IUPAC P-31.1.3)
     # Heterocyclic ring names (oxirane, thiirane, oxetane, thietane, oxolane,
-    # thiane, etc.) replace -e with -yl, NOT strip -ane and add -yl.
-    # e.g., "oxirane" -> "oxiranyl" (not "oxiryl")
+    # oxane, thiane, etc.) replace -e with -yl, NOT strip -ane and add -yl.
+    # e.g., "oxirane" -> "oxiranyl" (not "oxiryl"), "oxane" -> "oxanyl" (not "oxyl")
     _HETERO_ANE_RINGS = {
         'oxirane', 'thiirane', 'oxetane', 'thietane', 'oxolane',
-        'thiane', 'dioxane', 'dithiane', 'trioxane',
+        'oxane', 'thiane', 'thiolane',
+        'dioxane', 'dioxolane', 'dithiane', 'dithiolane', 'trioxane',
+        'borolane', 'boroxane', 'silolane',
     }
     base_name = name.split('-')[-1] if '-' in name else name
     if base_name in _HETERO_ANE_RINGS:
