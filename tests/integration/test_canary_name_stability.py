@@ -508,6 +508,41 @@ NAME_STABILITY_CANARY = [
         "C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O",
         "(octanoyloxy)-2-pyrrolidinylprop-2-enimide",
     ),
+    # ---- Phase 106-01: N-substituent naming canaries (FIX-11) ----
+    # Cycloalkyl, branched, heterocyclic, and mixed N-substituents
+    # that were previously mis-named as linear alkyls.
+    (
+        "CC(=O)NC1CCCC1",
+        "N-cyclopentylacetamide",
+    ),
+    (
+        "CC(=O)NC1CCCCC1",
+        "N-cyclohexylacetamide",
+    ),
+    (
+        "CC(=O)NC(C)C",
+        "N-isopropylacetamide",
+    ),
+    (
+        "CC(=O)Nc1ccncc1",
+        "N-pyridinylacetamide",
+    ),
+    (
+        "CC(=O)N(CC)C1CCCCC1",
+        "N-cyclohexyl-N-ethylacetamide",
+    ),
+    (
+        "O=CNC1CCCC1",
+        "N-cyclopentylformamide",
+    ),
+    (
+        "CCC(=O)NC(C)(C)C",
+        "N-tert-butylpropanamide",
+    ),
+    (
+        "CC(=O)N(C)c1ccccc1",
+        "N-methyl-N-phenylacetamide",
+    ),
 ]
 
 # Build test IDs from first 40 chars of SMILES (sanitized for pytest)
