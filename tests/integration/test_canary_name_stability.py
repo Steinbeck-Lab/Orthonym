@@ -543,6 +543,41 @@ NAME_STABILITY_CANARY = [
         "CC(=O)N(C)c1ccccc1",
         "N-methyl-N-phenylacetamide",
     ),
+    # ---- Phase 106-02: Multi-ester naming canaries (FIX-04, DECO-08/DECO-09) ----
+    # Dicarboxylic diesters, polyol polyesters, independent esters, single ester,
+    # DECO-09 (3+ ester bonds), DECO-08 (HA > 30)
+    (
+        "COC(=O)CC(=O)OC",
+        "dimethyl propanedioate",
+    ),
+    (
+        "COC(=O)CC(=O)OCC",
+        "ethyl methyl propanedioate",
+    ),
+    (
+        "CC(=O)OCC(COC(C)=O)OC(C)=O",
+        "1,2,3-tris(acetyloxy)propane",
+    ),
+    (
+        "CC(=O)OCOCOC(=O)CC",
+        "(acetyloxy)(propanoyloxy)-propoxypropan-1-oate",
+    ),
+    (
+        "CC(=O)OCNC(=O)OCC",
+        "(acetyloxy)ethan-1-oate",
+    ),
+    (
+        "CCOC(C)=O",
+        "ethyl acetate",
+    ),
+    (
+        "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O",
+        "1,2-bis(acetyloxy)oxolane",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
+        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
+    ),
 ]
 
 # Build test IDs from first 40 chars of SMILES (sanitized for pytest)
