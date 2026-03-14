@@ -943,6 +943,88 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
+    # PHASE 107 ADDITIONS: Missing common tricyclic heterocycles
+    # =========================================================================
+
+    # Dibenzofuran: dibenzo[b,d]furan - two benzo rings fused to furan
+    # Same topology as carbazole (NH -> O), IUPAC numbering same pattern
+    # Canonical: c1ccc2c(c1)oc1ccccc12
+    'c1ccc2c(c1)oc1ccccc12': {
+        'name': 'dibenzofuran',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+    },
+
+    # Dibenzothiophene: dibenzo[b,d]thiophene - two benzo rings fused to thiophene
+    # Same topology as dibenzofuran (O -> S)
+    # Canonical: c1ccc2c(c1)sc1ccccc12
+    'c1ccc2c(c1)sc1ccccc12': {
+        'name': 'dibenzothiophene',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+    },
+
+    # Benzo[f]quinoline: angular tricyclic, N at position 1
+    # IUPAC numbering: 1(N)-2-3-4-4a-5-6-6a-7-8-9-10-10a-10b
+    # Canonical: c1ccc2c(c1)ccc1ncccc12
+    'c1ccc2c(c1)ccc1ncccc12': {
+        'name': 'benzo[f]quinoline',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {9: 1, 10: 2, 11: 3, 12: 4, 13: '4a', 7: 5, 6: 6, 4: '6a', 5: 7, 0: 8, 1: 9, 2: 10, 3: '10a', 8: '10b'},
+    },
+
+    # Benzo[h]quinoline: linear tricyclic, N at position 1
+    # IUPAC numbering: 1(N)-2-3-4-4a-5-5a-6-7-8-9-9a-10-10a
+    # Canonical: c1ccc2cc3ncccc3cc2c1
+    'c1ccc2cc3ncccc3cc2c1': {
+        'name': 'benzo[h]quinoline',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {6: 1, 7: 2, 8: 3, 9: 4, 10: '4a', 11: 5, 12: '5a', 13: 6, 0: 7, 1: 8, 2: 9, 3: '9a', 4: 10, 5: '10a'},
+    },
+
+    # Benzo[g]quinoline: linear tricyclic, N at position 3 (different from benzo[h])
+    # IUPAC numbering follows standard peripheral path
+    # Canonical: c1ccc2cc3cnccc3cc2c1
+    'c1ccc2cc3cnccc3cc2c1': {
+        'name': 'benzo[g]quinoline',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {7: 1, 8: 2, 9: 3, 6: 4, 5: '4a', 10: '5a', 11: 5, 12: '9a', 13: 6, 0: 7, 1: 8, 2: 9, 3: '9a', 4: 10},
+    },
+
+    # 9H-Fluoren-9-one (fluorenone): two benzo rings fused to cyclopentanone
+    # Exocyclic =O at position 9
+    # Canonical: O=C1c2ccccc2-c2ccccc21
+    'O=C1c2ccccc2-c2ccccc21': {
+        'name': '9H-fluoren-9-one',
+        'tautomer_locant': 9,
+        'ring_system': 'tricyclic',
+        'is_retained_name': True,
+        'parent_atoms': 14,
+        'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '4b', 9: 5, 10: 6, 11: 7, 12: 8, 13: '8a'},
+    },
+
+    # Phenanthridin-6(5H)-one: phenanthridine with =O at C-6, NH at N-5
+    # Canonical: O=c1[nH]c2ccccc2c2ccccc12
+    'O=c1[nH]c2ccccc2c2ccccc12': {
+        'name': 'phenanthridin-6(5H)-one',
+        'tautomer_locant': 5,
+        'ring_system': 'tricyclic',
+        'is_retained_name': True,
+        'parent_atoms': 15,
+        'iupac_locants': {0: '=O', 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '10a', 9: '4b', 10: 7, 11: 8, 12: 9, 13: 10, 14: '10b'},
+    },
+
+    # =========================================================================
     # N-BRIDGEHEAD SYSTEMS (Phase 89 additions)
     # =========================================================================
 

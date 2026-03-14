@@ -59,6 +59,80 @@ SIMPLE_MULTIPLIERS = {
 }
 
 
+def _compute_general_indicated_h(mol, ring_atom_set: Set[int],
+                                  atom_to_locant: Dict[int, Any]) -> List:
+    """Compute indicated hydrogen for non-retained fused systems.
+
+    Per IUPAC P-14.7: In a ring system with maximum non-cumulative double bonds,
+    indicated hydrogen marks positions where an 'extra' hydrogen is present
+    (the atom is saturated in the actual molecule but would be unsaturated
+    in the ideal parent).
+
+    Algorithm:
+    1. For each ring atom, compute expected H count in maximally unsaturated parent
+    2. Compare with actual H count in molecule
+    3. If actual > expected at a tautomeric position, record as indicated H
+
+    Args:
+        mol: RDKit Mol object.
+        ring_atom_set: Set of atom indices in the fused ring system.
+        atom_to_locant: Mapping from atom index to IUPAC locant.
+
+    Returns:
+        List of locants for indicated hydrogen positions, sorted.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    indicated = []
+    for idx in ring_atom_set:
+        atom = mol.GetAtomWithIdx(idx)
+        symbol = atom.GetSymbol()
+        if symbol not in ('N', 'C', 'O', 'S'):
+            continue
+
+        # Only consider atoms that are NOT aromatic in the molecule
+        # but are ring atoms (potential tautomeric sites)
+        if atom.GetIsAromatic():
+            continue
+
+        actual_hs = atom.GetTotalNumHs()
+
+        # Expected Hs in maximally unsaturated parent:
+        # - Aromatic C with 2 ring bonds: 1H (like benzene C)
+        # - Aromatic C with 3+ ring bonds (fusion junction): 0H
+        # - Aromatic N in 6-membered ring (pyridine-type): 0H
+        # - Aromatic N in 5-membered ring (pyrrole-type): 1H (indicated H)
+        # - O, S in ring: 0H expected
+        ring_bond_count = sum(
+            1 for bond in atom.GetBonds()
+            if bond.GetOtherAtom(atom).GetIdx() in ring_atom_set
+        )
+        expected = 0
+        if symbol == 'C':
+            expected = 1 if ring_bond_count <= 2 else 0
+        elif symbol == 'N':
+            expected = 0  # In maximally unsaturated parent, N donates lone pair
+
+        if actual_hs > expected:
+            locant = atom_to_locant.get(idx)
+            if locant is not None:
+                indicated.append(locant)
+            else:
+                logger.debug(
+                    "Indicated H atom %d (%s) has no locant mapping",
+                    idx, symbol,
+                )
+
+    # Sort: numeric locants first, then string locants
+    def _sort_key(loc):
+        if isinstance(loc, int):
+            return (0, loc, '')
+        return (1, 0, str(loc))
+
+    return sorted(indicated, key=_sort_key)
+
+
 def get_shared_atoms(mol, ring1: Tuple[int, ...], ring2: Tuple[int, ...]) -> Set[int]:
     """
     Get atoms shared between two rings.

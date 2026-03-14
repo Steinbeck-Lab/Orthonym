@@ -67,7 +67,8 @@ _RETAINED_CORE_NAMES = frozenset({
     '1h-indole',
     # Phase 099 additions: fused heterocycles and polycyclics
     'flavone', 'chromone', 'coumarin', 'pteridine', 'phenazine',
-    'carbazole', 'phenanthridine', 'dibenzofuran', 'fluorene',
+    'carbazole', 'phenanthridine', 'dibenzofuran', 'dibenzothiophene',
+    'fluorene', 'fluorenone',
     'anthracene', 'phenanthrene', 'chrysene',
 })
 
