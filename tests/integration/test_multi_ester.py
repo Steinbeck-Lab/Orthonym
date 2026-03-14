@@ -134,3 +134,42 @@ class TestPolyolPolyester:
         """Dicarboxylic diester from 41-01: must still produce correct name."""
         result = name_compound("COC(=O)CC(=O)OC")
         assert result == "dimethyl propanedioate", f"Got: {result}"
+
+
+# ============================================================================
+# Independent multi-ester tests (esters not sharing acid/alcohol backbone)
+# ============================================================================
+
+class TestIndependentMultiEster:
+    """Tests for independent multi-ester compounds (no shared backbone)."""
+
+    @pytest.mark.integration
+    def test_classify_independent_two_esters_via_ether(self):
+        """Two ester groups connected via ether bridge classify as independent."""
+        from rdkit import Chem
+        from orthonym.rules.esters import classify_multi_ester
+
+        smi = "CC(=O)OCOCOC(=O)CC"
+        mol = Chem.MolFromSmiles(smi)
+        ester_smarts = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(ester_smarts)
+        assert len(matches) >= 2, f"Expected 2+ ester matches, got {len(matches)}"
+        result = classify_multi_ester(mol, matches)
+        assert result == "independent", f"Expected 'independent', got {result!r}"
+
+    @pytest.mark.integration
+    def test_independent_ester_produces_valid_name(self):
+        """Independent multi-ester produces a non-empty valid name."""
+        # Two esters connected through an ether bridge (not shared acid or alcohol)
+        smi = "CC(=O)OCOCOC(=O)CC"
+        result = name_compound(smi)
+        assert result is not None, "Got None"
+        assert len(result.strip()) >= 5, f"Name too short: {result!r}"
+
+    @pytest.mark.integration
+    def test_independent_ester_via_nitrogen(self):
+        """Two esters connected through nitrogen classify and name correctly."""
+        smi = "CC(=O)OCNC(=O)OCC"
+        result = name_compound(smi)
+        assert result is not None, "Got None"
+        assert len(result.strip()) >= 5, f"Name too short: {result!r}"

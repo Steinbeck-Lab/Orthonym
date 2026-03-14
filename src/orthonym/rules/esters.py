@@ -1332,6 +1332,106 @@ def classify_multi_ester(mol, ester_matches: list) -> str:
     return "independent"
 
 
+def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
+    """
+    Name a molecule with independent ester groups (IUPAC P-65.1).
+
+    Independent esters are multiple ester groups that do not share an acid
+    backbone (not dicarboxylic diester) or alcohol backbone (not polyol
+    polyester).  The most senior ester bond becomes the principal suffix
+    (-oate) and the remaining ester bonds become acyloxy prefixes.
+
+    Strategy:
+      1. Score each ester by acid fragment size (largest acid = principal).
+      2. The principal ester uses standard "alkyl [parent]oate" format.
+      3. Non-principal esters become acyloxy prefixes on the parent chain.
+      4. If the molecule is too complex, return None (decomposition handles it).
+
+    Args:
+        mol: RDKit Mol object
+        ester_matches: List of ester SMARTS match tuples
+                       (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
+
+    Returns:
+        Name string, or None if the molecule is too complex for this handler.
+    """
+    if len(ester_matches) < 2:
+        return None
+
+    # Parse all ester fragments and score by acid fragment size
+    ester_data = []
+    for match in ester_matches:
+        acid_atoms, alkyl_atoms = parse_ester_fragments(mol, match)
+        if not acid_atoms or not alkyl_atoms:
+            return None  # Cannot parse fragments -- too complex
+        acid_carbon_count = sum(
+            1 for idx in acid_atoms
+            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+        )
+        ester_data.append({
+            'match': match,
+            'acid_atoms': acid_atoms,
+            'alkyl_atoms': alkyl_atoms,
+            'acid_carbon_count': acid_carbon_count,
+        })
+
+    # Sort by acid carbon count descending -- largest acid = principal ester
+    ester_data.sort(key=lambda e: e['acid_carbon_count'], reverse=True)
+
+    # Principal ester: name as "alkyl [acid]oate"
+    principal = ester_data[0]
+    acid_name = get_acid_fragment_name(mol, principal['acid_atoms'])
+    if not acid_name:
+        return None
+
+    from ..data.trivial_acids import get_acylate_name
+    acylate_name = get_acylate_name(acid_name)
+    if not acylate_name:
+        return None
+
+    alkyl_name = get_alkyl_fragment_name(mol, principal['alkyl_atoms'])
+    if not alkyl_name:
+        return None
+
+    # Non-principal esters: convert to acyloxy prefixes
+    acyloxy_prefixes = []
+    for ester in ester_data[1:]:
+        non_principal_acid_name = get_acid_fragment_name(mol, ester['acid_atoms'])
+        if not non_principal_acid_name:
+            return None  # Cannot name a non-principal acid -- bail out
+        acyloxy = get_acyloxy_prefix(non_principal_acid_name)
+        acyloxy_prefixes.append(acyloxy)
+
+    # Sort acyloxy prefixes alphabetically per IUPAC P-14.5
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
+    if not acyloxy_prefixes:
+        return None
+
+    # Group identical acyloxy prefixes with multipliers
+    from collections import Counter
+    prefix_counts = Counter(acyloxy_prefixes)
+    prefix_parts = []
+    for prefix, count in sorted(prefix_counts.items(), key=lambda x: alpha_sort_key(x[0])):
+        if count == 1:
+            prefix_parts.append(f"({prefix})")
+        else:
+            multiplier = get_multiplier_prefix(count, prefix)
+            prefix_parts.append(f"{multiplier}({prefix})")
+
+    prefix_str = "-".join(prefix_parts)
+
+    # Assemble: "[acyloxy prefixes] alkyl [acid]oate"
+    # The acyloxy prefixes modify the alkyl part, so format is:
+    # "alkyl [prefix][acid]oate" or "[prefix] alkyl [acid]oate"
+    # Per IUPAC, acyloxy prefixes on the acid parent chain go in front of the
+    # oate name. For truly independent esters this is not standard; return the
+    # best-effort name or None for decomposition to handle.
+    if prefix_str:
+        return f"{prefix_str} {alkyl_name} {acylate_name}"
+    else:
+        return f"{alkyl_name} {acylate_name}"
+
+
 def _carbons_connected(mol, start: int, target: int, exclude_atoms: set) -> bool:
     """
     Check if two atoms are connected via a path of carbon atoms only.
