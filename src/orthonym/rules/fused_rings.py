@@ -317,6 +317,12 @@ def name_fused_heterocycle(mol) -> Optional[str]:
 
     core_name, atom_mapping, _core_smiles = core_result
 
+    # NOTE: General indicated hydrogen (_compute_general_indicated_h) is
+    # implemented but NOT wired here. Dictionary-matched fused systems handle
+    # indicated H via tautomer_locant in fused_heterocycles.py entries.
+    # The general algorithm is reserved for future systematic fusion naming
+    # of non-retained fused systems (deferred from Phase 107).
+
     # Find substituents on the core
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)
 
