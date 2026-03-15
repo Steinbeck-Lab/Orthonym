@@ -32,7 +32,7 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 284 golden canary compounds: (SMILES, expected_name)
+# 312 golden canary compounds: (SMILES, expected_name)
 # Original 75 from Phase 44 + 10 from Phase 49 + 3 from Phase 50
 # + 44 from Phase 62 (Small Molecule Accuracy Sprint)
 # + 9 from Phase 63 (Stereochemistry Accuracy)
@@ -42,6 +42,7 @@ from orthonym import name_compound
 # + 19 from Phase 83 (v9.0 canary expansion: coverage-based + benchmark anchors)
 # + 2 from Phase 95 (v10.0 newly RT-matching compounds)
 # + 80 from Phase 102-04 (v11.0 canary expansion: newly identified RT-matching)
+# + 28 from Phase 108 (v12.0 canary expansion: newly RT-matching from benchmark)
 # ---------------------------------------------------------------------------
 
 CANARY_COMPOUNDS = [
@@ -1270,6 +1271,119 @@ CANARY_COMPOUNDS = [
         "[NH3+]CCC(=O)[O-]",
         "beta-alanine",
     ),
+    # --- Phase 108 v12.0 canary expansion (30 newly RT-matching compounds) ---
+    (
+        "COc1ccc(C(=O)N2CCCC2=O)cc1",
+        "N-4-methoxybenzoylpyrrolidin-2-one",
+    ),
+    (
+        "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",
+        "(5E,7E)-5-nitrotetradeca-5,7-dienoic acid",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\C[C@@H](O)CC(=O)O",
+        "(3R,5Z,8Z,11Z,14Z)-3-hydroxyicosa-5,8,11,14-tetraenoic acid",
+    ),
+    (
+        "C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C",
+        "(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane",
+    ),
+    (
+        "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",
+        "(10E,15Z)-9,12,13-trihydroxyoctadeca-10,15-dienoic acid",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\C/C=C\\CCCCC(=O)[O-]",
+        "(6Z,9Z,12Z)-octadeca-6,9,12-trienoate",
+    ),
+    (
+        "O=C(O)/C(Cl)=C\\C(=O)C(Cl)C(=O)O",
+        "(2E)-2,5-dichloro-4-oxohex-2-enedioic acid",
+    ),
+    (
+        "CCC/C=C\\C#CC/C=C\\CCCCCCCC(=O)O",
+        "(9Z,14Z)-octadeca-9,14-dien-12-ynoic acid",
+    ),
+    (
+        "C=C1C=C[C@H](C(C)C)CC1",
+        "(3S)-3-isopropyl-6-methylidenecyclohexene",
+    ),
+    (
+        "Cc1ccc(OC(=O)C(C)C)cc1",
+        "1-((2-methylpropanoyl)oxy)-4-methylbenzene",
+    ),
+    (
+        "CCCC/C=C\\CCCCCCCCCOC(C)=O",
+        "(10Z)-pentadec-10-en-1-yl acetate",
+    ),
+    (
+        "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCCCCCCCCCCCCC(=O)[O-]",
+        "(19Z,22Z,25Z,28Z,31Z)-tetratriaconta-19,22,25,28,31-pentaenoate",
+    ),
+    (
+        "CCCCCCC/C=C\\CCCCCCC(=O)O",
+        "(8Z)-hexadec-8-enoic acid",
+    ),
+    (
+        "NC(=O)CCCC(N)C(=O)O",
+        "2-amino-5-carbamoylpentanoic acid",
+    ),
+    (
+        "CC/C=C(\\C)CC/C=C(\\C)CCC=C(C)C",
+        "(6E,10E)-2,6,10-trimethyltrideca-2,6,10-triene",
+    ),
+    (
+        "CCCCCCC/C=C\\CCCCCCCC(=O)[O-]",
+        "(9Z)-heptadec-9-enoate",
+    ),
+    (
+        "C/C(C=O)=C\\CC/C(C)=C/C=O",
+        "(2E,6E)-2,6-dimethylocta-2,6-dienedial",
+    ),
+    (
+        "CCCCC/C=C\\C=C\\C=C/CCCCCCC(=O)O",
+        "(8Z,10E,12Z)-octadeca-8,10,12-trienoic acid",
+    ),
+    (
+        "CCCCCCCC/C=C\\CCCCCCO",
+        "(7Z)-hexadec-7-en-1-ol",
+    ),
+    (
+        "C/C=C\\CCCCC(=O)O",
+        "(6Z)-oct-6-enoic acid",
+    ),
+    (
+        "C/C=C(\\C)CCC=C(C)C",
+        "(6E)-2,6-dimethylocta-2,6-diene",
+    ),
+    (
+        "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
+        "8-hydroxy-1,3-dimethoxy-6-methylxanthone",
+    ),
+    (
+        "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
+        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
+    ),
+    (
+        "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12",
+        "(1R,3E,7E,11R,12R,15S,16R)-1,4,8,12-tetramethyl-15-prop-1-en-2-yl-tricyclo[9.7.0.0(12,16)]octadeca-3,7-diene",
+    ),
+    (
+        "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate",
+    ),
+    (
+        "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
+        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",
+    ),
+    (
+        "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",
+        "(1S,2E,7S,8E,12R,15S,16S,17S)-7-hydroxy-15-isobutyl-3,17,18-trimethyl-11-oxa-14-aza-tricyclo[10.7.0.0(12,16)]nonadeca-2,8,18-trien-10,13-dione",
+    ),
+    (
+        "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O",
+        "(9E)-5-hydroxy-16-isobutyl-4-methoxy-9,13,14-trimethyl-17-aza-tricyclo[9.7.0.0(1,15)]octadeca-9,12-dien-2,18-dione",
+    ),
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
@@ -1280,8 +1394,8 @@ _CANARY_IDS = [
 
 
 @pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt284(smiles, expected_name):
-    """Golden canary test: verify round-trip-matching compound still names correctly (284 compounds)."""
+def test_canary_rt312(smiles, expected_name):
+    """Golden canary test: verify round-trip-matching compound still names correctly (312 compounds)."""
     result = name_compound(smiles)
     assert result == expected_name, (
         f"CANARY REGRESSION: {smiles}\n"

@@ -16,9 +16,10 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# 120 name-stability canary compounds: (SMILES, expected_name)
+# 168 name-stability canary compounds: (SMILES, expected_name)
 # All OPSIN-unparseable benchmark compounds with frozen names
 # Phase 095 v10.0 canary expansion
+# + 48 from Phase 108 (v12.0 canary expansion: diverse failure categories)
 # ---------------------------------------------------------------------------
 
 NAME_STABILITY_CANARY = [
@@ -629,6 +630,204 @@ NAME_STABILITY_CANARY = [
         "C[N+](C)(C)CC(=O)[O-]",
         "betaine",
     ),
+    # --- Phase 108 v12.0 canary expansion (48 compounds for 500+ total) ---
+    # substituent_loss compounds (18)
+    (
+        "C=CCSSSSC",
+        "2,3,4,5-tetrathiaoctane",
+    ),
+    (
+        "CC(=O)c1c(C)c[nH]c1C",
+        "1-pyrrolylethan-1-one",
+    ),
+    (
+        "Nc1nc(N)nc(NC2CC2)n1",
+        "4,6-diamino-2-cyclopropyl-1,3,5-triazine",
+    ),
+    (
+        "COC(=O)c1cc2ccccc2cn1",
+        "3-acetylisoquinoline",
+    ),
+    (
+        "c1csc(-c2ccn3cnnc3n2)c1",
+        "[1,2,4]triazolo[1,5-a]pyridine",
+    ),
+    (
+        "N=C(N)NC(=N)Nc1ccc(O)cc1",
+        "1-hydroxy-4-(N-methylguanidinyl)benzene",
+    ),
+    (
+        "COc1cc(CO)cc(CC=C(C)C)c1O",
+        "2-hydroxy-5-(hydroxymethyl)-1-methoxy-3-(2-methylbut-2-enyl)benzene",
+    ),
+    (
+        "COc1cc(C(=O)CC(C)C)oc(=O)c1",
+        "4-methyl-6-oxo-2-pentyl-2H-pyran",
+    ),
+    (
+        "CC[C@H](C)[C@H](N)C(=O)[O-]",
+        "2-aminohexanoate",
+    ),
+    (
+        "COc1cc(COC(C)=O)ccc1OC(C)=O",
+        "1-(acetyloxy)-2-hydroxymethylbenzene",
+    ),
+    (
+        "O=C([O-])CCCOc1ccc(Cl)cc1Cl",
+        "4-phenoxybutanoate",
+    ),
+    (
+        "C=C(C)C1C=C2C(C)=CCCC2(C)CC1",
+        "decahydronaphthalene",
+    ),
+    (
+        "N[C@H](C[13C](=O)O)[13C](=O)O",
+        "2-aminobutanoic acid",
+    ),
+    (
+        "COc1c(C)c(O)cc2c1C(=O)N[C@H]2C",
+        "(3S)-6-hydroxy-4-methoxy-3,5-dimethylisoindolin-1-one",
+    ),
+    (
+        "C=CCC(CCc1ccccc1)OC(C)c1ccccc1",
+        "1-phenylethoxy(hex-5-en-1-yl)benzene",
+    ),
+    (
+        "CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl",
+        "(2S)-2-amino-6-(ethylamino)-iminohexanoic acid",
+    ),
+    (
+        "Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1",
+        "isoindoline-1,3-dione",
+    ),
+    (
+        "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
+        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+    ),
+    # fragment_loss compounds (8)
+    (
+        "O=CCS(=O)(=O)[O-]",
+        "ethanolate",
+    ),
+    (
+        "Cc1cc(=O)c2c(O)cc(O)cc2o1",
+        "6-methyl-4-oxo-2H-pyran",
+    ),
+    (
+        "CCOP(=S)(COC)OP(=S)(OCC)OCC",
+        "methoxymethylethylethylethane",
+    ),
+    (
+        "COc1cc(C2OC2C(=O)NCCCCN)ccc1O",
+        "1-hydroxy-2-methoxybenzene",
+    ),
+    (
+        "Cc1c(CO)oc(=O)c2c(O)cc(O)cc12",
+        "2,3-dimethyl-6-oxo-2H-pyran",
+    ),
+    (
+        "N[C@@H](COC(=O)CCC(=O)O)C(=O)O",
+        "butanedioic acid",
+    ),
+    (
+        "CCCCCCCCNC(O)CCc1ccc(O)c(OC)c1",
+        "1-hydroxy-2-methoxybenzene",
+    ),
+    (
+        "CCCCCC(C)OC(=O)COc1ccc(Cl)c2cccnc12",
+        "5-chloroquinoline",
+    ),
+    # parent_mismatch compounds (8)
+    (
+        "CC1=NCCO1",
+        "2-methyloxazole",
+    ),
+    (
+        "*N=C=N[1*]",
+        "2,4-diazapentane",
+    ),
+    (
+        "C/N=C(\\N)NCCCCN",
+        "4-guanidino-4-(methylamino)butan-1-amine",
+    ),
+    (
+        "CCCOC(C)OCCc1ccccc1",
+        "ethoxyethylpropylbenzene",
+    ),
+    (
+        "NC(=O)N/C=C\\C(=O)OO",
+        "(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol",
+    ),
+    (
+        "C=C(C)C#Cc1c(O)ccc(O)c1C=O",
+        "1,4-dihydroxy-3-(2-methylbut-1-en-3-ynyl)benzenecarbaldehyde",
+    ),
+    (
+        "C/C=C/CC(O)CCC(=O)NCC(=O)O",
+        "hydroxy-2-(octanoylamino)ethanoic acid",
+    ),
+    (
+        "Cc1c(O)cc2c(c1O)C(=O)c1ccccc1C2=O",
+        "11,13-dihydroxy-12-methyl-tricyclo[8.4.0.0(3,8)]tetradecan-2,9-dione",
+    ),
+    # opsin_error compounds (12)
+    (
+        "C=CC(=O)NCCC[N+](C)(C)C",
+        "N-methylmethylmethylpropylaminiumylprop-2-enamide",
+    ),
+    (
+        "CC(C)CC(=O)OC1OC(C(=O)O)C(O)C(O)C1O",
+        "(glucuronopyranosyloxy)isovaleric acid",
+    ),
+    (
+        "CC(C)C1=C(O)C(N)=C(/C=C/c2ccccc2)C(=O)C1=O",
+        "(3E)-4-amino-5-hydroxy-6-isopropyl-3-styrenylcyclohexa-3,5-diene-1,2-dione",
+    ),
+    (
+        "CC1(C)SC(C(NC(=O)COc2ccccc2)C(=O)O)NC1C(=O)O",
+        "3-cyclopentyl-6-phenoxy-7-phenylheptanedioic acid",
+    ),
+    (
+        "O=C1O/C(=C/c2ccccc2)C(Cc2ccccc2)=C1Cc1ccccc1",
+        "(5E)-3,4,5-tribenzyloxolan-2-one",
+    ),
+    (
+        "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1",
+        "(6E)-6-imidazolyl-2,5-dioxo-3-pyrrolylpiperazine",
+    ),
+    (
+        "C/C=C1\\[C@H]2C=C(C)C[C@]1([NH3+])c1ccc(=O)[nH]c1C2",
+        "(2R,6R,13E)-4-methyl-9-aza-tricyclo[6.4.0.1(2,6)]tridec-4-en-10-one",
+    ),
+    (
+        "CC1=C[C@]2(C[C@H]1C)c1c(c(-c3ccccc3)c[nH]c1=O)O[C@@H]2O",
+        "(8S,9R,13R)-8-hydroxy-10,13-dimethyl-5-phenyl-7-oxa-3-aza-tricyclo[4.3.0]tridec-10-en-2-one",
+    ),
+    (
+        "CC1(C)[C@@H]2C[C@]34CCCN3C[C@@]2(C[C@@]12C(=O)Nc1cc(Cl)c(Cl)cc12)NC4=O",
+        "(1S,3S,9S,11R)-12,12-dimethyl-7,14,21-triaza-hexacyclo[7.3.0.2(3,9).0(3,7).0(15,20)]docosan-13,22-dione",
+    ),
+    (
+        "CC1OC(c2ccccc2O)=NC1C(=O)NCCCN(CCCNC(=O)c1cccc(O)c1O)C(=O)C1N=C(c2ccccc2O)OC1C",
+        "N-5-methyl-2-phenyloxazole-4-carbonyl-5-methyl-2,4-diphenyloxazole",
+    ),
+    (
+        "COC1C(=O)OC2C(O)CO/C=C\\C3=C(CCC(=O)OCC2/C=C(/C)C24OC5CC(O)C2C(C=CC4C1OC)C5)C(=O)OC3=O",
+        "(4Z)-butanedioic anhydride",
+    ),
+    (
+        "C=C1C(=O)O[C@H](CCCCCCCCCCCCC[C@@H](C)OC2OC(CO)C(O)C(OC3OC(CO)C(O)C(O)C3O)C2O)[C@H]1C(=O)O",
+        "(glucopyranosyloxy)(4S,5R)-5-(2-pentadecyl-3,4,5-trihydroxy-6-methyloxyl)-4-formyl-3-methyloxolan-2-one",
+    ),
+    # stereo_mismatch compounds (2)
+    (
+        "CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO",
+        "(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one",
+    ),
+    (
+        "CC(CC(=O)CC(C)C1C[C@H](O)[C@@]2(C)C3=C(C(=O)CC12C)C1(C)CC[C@H](O)C(C)(C)C1C[C@@H]3O)C(=O)O",
+        "(3S,7S,14R,15S)-3,7,15,27-tetrahydroxy-4,4,14-trimethylcholest-8-en-11,23,27-trione",
+    ),
 ]
 
 # Build test IDs from first 40 chars of SMILES (sanitized for pytest)
@@ -640,7 +839,7 @@ _CANARY_IDS = [
 
 @pytest.mark.parametrize("smiles,expected_name", NAME_STABILITY_CANARY, ids=_CANARY_IDS)
 def test_canary_name_stability(smiles, expected_name):
-    """Name-stability canary test: verify name consistency for OPSIN-unparseable compounds (120 compounds).
+    """Name-stability canary test: verify name consistency for OPSIN-unparseable compounds (168 compounds).
 
     These compounds generate names that OPSIN cannot parse. Since round-trip
     validation is impossible, freezing the exact name string is the only way to
