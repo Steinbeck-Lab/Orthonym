@@ -21,6 +21,7 @@ SENIORITY_ORDER = [
     "carbamic_acid",
     "sulfonic_acid",
     "sulfinic_acid",
+    "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
     "phosphonic_acid",
     "phosphinic_acid",
     "boronic_acid",    # P-68.3 boron acid
@@ -32,6 +33,7 @@ SENIORITY_ORDER = [
     "acid_chloride",
     "acid_bromide",
     "acid_fluoride",
+    "acid_iodide",    # IUPAC P-65.5.1: parallel to other acid halides
 
     # Nitrogen acid derivatives
     "primary_amide",
@@ -43,6 +45,7 @@ SENIORITY_ORDER = [
     "hydrazide",
     "hydroxamic_acid",  # IUPAC P-65.3.3: between hydrazides and imides
     "imide",
+    "amidine",     # IUPAC P-66.4.1: between imide and nitrile
 
     # Nitriles
     "nitrile",
@@ -60,11 +63,9 @@ SENIORITY_ORDER = [
     "tertiary_alcohol",
     "phenol",
     "enol",
+    "hydroperoxide",   # IUPAC P-43 Table 5.1: Class 19 (higher than thiol)
     "thiol",
     "selenol",
-
-    # Hydroperoxides
-    "hydroperoxide",
 
     # Amines
     "primary_amine",
@@ -83,6 +84,9 @@ SENIORITY_ORDER = [
     "azo",          # P-67.2: prefix-only
     "cyanate",      # P-65.5: prefix-only (pseudohalide)
     "thiocyanate",  # P-65.5: prefix-only (pseudohalide)
+    "diazo",           # P-61.5: prefix-only
+    "disulfide",       # P-63.6.2: prefix-only
+    "hydrazine_fg",    # P-62.4: prefix-only
 
     # Sulfur oxidation states (functional class naming, lower seniority than amines)
     "sulfoxide",
@@ -166,6 +170,13 @@ SUFFIX_FORMS = {
     "azo": None,                 # IUPAC P-67.2: prefix-only
     "cyanate": None,             # IUPAC P-65.5: prefix-only (pseudohalide)
     "thiocyanate": None,         # IUPAC P-65.5: prefix-only (pseudohalide)
+    # Phase 109: 6 new FG classes
+    "acid_iodide": ("oyl iodide", "carbonyl iodide"),  # IUPAC P-65.5.1
+    "amidine": ("imidamide", "carboximidamide"),        # IUPAC P-66.4.1
+    "sulfenic_acid": ("sulfenic acid", "sulfenic acid"),  # IUPAC P-65.3.1.4
+    "diazo": None,               # P-61.5: prefix-only
+    "disulfide": None,           # P-63.6.2: prefix-only
+    "hydrazine_fg": None,        # P-62.4: prefix-only
 }
 
 # Prefix forms for non-principal groups
@@ -259,6 +270,13 @@ PREFIX_FORMS = {
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
     "thioester": None,            # Named via decomposition pathway
+    # Phase 109: 6 new FG classes
+    "acid_iodide": "iodocarbonyl",     # IUPAC P-65.5.1.4
+    "amidine": "amidino",              # IUPAC P-66.4.1
+    "sulfenic_acid": "sulfeno",        # IUPAC P-65.3.1.4
+    "diazo": "diazo",                  # P-61.5
+    "disulfide": "disulfanediyl",      # P-63.6.2
+    "hydrazine_fg": "hydrazinyl",      # P-62.4
 }
 
 

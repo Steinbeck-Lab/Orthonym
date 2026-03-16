@@ -24,6 +24,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
     "sulfinic_acid": "[SX3](=O)[OX2H1]",
+    "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
     "phosphonic_acid": "[PX4](=O)([OX2H1])[OX2H1]",
     # Phosphinic acid: R2P(=O)(OH) - two C attached to P
     "phosphinic_acid": "[PX4](=O)([OX2H1])([#6])[#6]",
@@ -35,7 +36,8 @@ FUNCTIONAL_GROUP_SMARTS = {
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
-    
+    "acid_iodide": "[CX3](=O)[I]",  # DATA-04: IUPAC P-65.5.1
+
     # === NITROGEN ACID DERIVATIVES ===
     "primary_amide": "[CX3](=O)[NX3H2]",
     "secondary_amide": "[CX3](=O)[NX3H1][#6]",
@@ -56,6 +58,9 @@ FUNCTIONAL_GROUP_SMARTS = {
 
     # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
     "guanidine": "[NX3][CX3](=[NX2])[NX3]",
+
+    # === AMIDINE (IUPAC P-66.4.1: C(=NH)NH2, less specific than guanidine) ===
+    "amidine": "[CX3](=[NX2H])[NX3H2]",  # DATA-03
 
     # === ISOCYANATES/ISOTHIOCYANATES (cumulated double bonds) ===
     "isocyanate": "[#6][NX2]=[CX2]=[OX1]",
@@ -95,20 +100,22 @@ FUNCTIONAL_GROUP_SMARTS = {
     
     # === AMINES ===
     "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
-    "secondary_amine": "[NX3H1]([CX4])[CX4]",
-    "tertiary_amine": "[NX3]([CX4])([CX4])[CX4]",
+    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3])[CX4,cX3]",  # DATA-02: sp3 or aromatic C, exclude amides/guanidines
+    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3])([CX4,cX3])[CX4,cX3]",  # DATA-02: sp3 or aromatic C, exclude amides/guanidines
     "aromatic_amine": "[NX3H2][cX3]",
     
     # === IMINES ===
     "imine": "[CX3]=[NX2H]",
     "oxime": "[CX3]=[NX2][OX2H]",
     "hydrazone": "[CX3]=[NX2][NX3]",
+    "hydrazine_fg": "[NX3;H1;!$([NX3][CX3]=O)][NX3H2]",  # DATA-05c: P-62.4 -NH-NH2, excludes hydrazides
     
     # === ETHERS (no suffix - substitutive naming) ===
     "ether": "[OX2]([CX4])[CX4]",
     "vinyl_ether": "[OX2]([#6])[CX3]=[CX3]",
     "aromatic_ether": "[OX2]([#6])[cX3]",
     "thioether": "[SX2]([#6])[#6]",
+    "disulfide": "[#6][SX2][SX2][#6]",  # DATA-05b: P-63.6.2
 
     # === PHOSPHORUS COMPOUNDS (check more specific first) ===
     # Phosphate esters (C-O-P bonds, not C-P bonds) - check before phosphine oxide
@@ -152,6 +159,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "nitro": "[NX3+](=O)[O-]",
     "nitroso": "[NX2]=[OX1]",
     "azido": "[NX1]=[NX2+]=[NX1-]",
+    "diazo": "[#6]=[NX2+]=[NX1-]",  # DATA-05a: P-61.5 diazo group
 }
 
 # Pre-compile all SMARTS patterns once at module load (avoid recompilation per molecule)
@@ -251,6 +259,18 @@ def _resolve_fg_collisions(results):
         ('thiocyanate', ['thioether', 'nitrile']),
         # PERC-03: azo suppresses imine
         ('azo', ['imine']),
+        # DATA-03: guanidine suppresses amidine (guanidine is more specific)
+        ('guanidine', ['amidine']),
+        # DATA-03: amidine suppresses imine and primary_amine on its atoms
+        ('amidine', ['imine', 'primary_amine']),
+        # DATA-04: acid iodide suppresses aldehyde (parallel to other acid halides)
+        ('acid_iodide', ['aldehyde']),
+        # DATA-05b: disulfide suppresses thioether if S atoms overlap
+        ('disulfide', ['thioether']),
+        # DATA-05c: hydrazine suppresses primary_amine on its -NH2 nitrogen
+        ('hydrazine_fg', ['primary_amine']),
+        # DATA-05c: hydrazide is more specific than hydrazine_fg
+        ('hydrazide', ['hydrazine_fg']),
     ]:
         if fg_specific in results:
             specific_atoms = set()
