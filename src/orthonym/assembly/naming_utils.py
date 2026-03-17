@@ -80,6 +80,95 @@ _COMPOUND_FG_PREFIXES = (
 _LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
 _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
 
+
+# ============================================================================
+# Terminal Functional Group Types (IUPAC P-14.3.4.1)
+# ============================================================================
+
+# Terminal functional groups that always occupy position 1 by definition.
+# The chain is numbered FROM the terminal group, so locant-1 is implicit.
+# Canonical source: IUPAC P-14.3.4.1. Used by should_omit_locant_one().
+TERMINAL_FG_TYPES = frozenset({
+    "carboxylic_acid",  # Always at chain end (locant 1)
+    "aldehyde",         # Always at chain end (locant 1)
+    "nitrile",          # Always at chain end (locant 1)
+    "primary_amide",    # Always at chain end (locant 1)
+    "secondary_amide",  # Always at chain end (locant 1)
+    "tertiary_amide",   # Always at chain end (locant 1)
+    "acid_chloride",    # Always at chain end (locant 1)
+    "acid_bromide",     # Always at chain end (locant 1)
+    "acid_fluoride",    # Always at chain end (locant 1)
+    "thioic_S_acid",    # Always at chain end (locant 1)
+    "thioic_O_acid",    # Always at chain end (locant 1)
+    "dithioic_acid",    # Always at chain end (locant 1)
+    "carbamic_acid",    # Retained name, terminal (locant 1)
+})
+
+
+# ============================================================================
+# Centralized Locant-1 Elision (IUPAC P-14.3.4)
+# ============================================================================
+
+
+def should_omit_locant_one(
+    *,
+    context: str,
+    chain_length: int = 0,
+    is_ring: bool = False,
+    is_heterocyclic: bool = False,
+    is_monosubstituted: bool = False,
+    fg_type: str = "",
+) -> bool:
+    """Determine whether locant-1 should be omitted per IUPAC P-14.3.4.
+
+    Centralized decision point for ALL locant-1 elision in the pipeline.
+    Every call site that decides whether to omit locant-1 must use this
+    function rather than reimplementing the logic inline.
+
+    Args:
+        context: One of "suffix", "prefix", or "bond".
+        chain_length: Length of the parent chain (0 for rings).
+        is_ring: True if the parent is a ring system.
+        is_heterocyclic: True if the ring contains heteroatoms.
+        is_monosubstituted: True if only one substituent/FG is present.
+        fg_type: Functional group type string (e.g., "carboxylic_acid").
+
+    Returns:
+        True if locant-1 should be omitted from the name.
+    """
+    # Rule 1: Methane derivatives (chain_length=1): always omit
+    # Only position exists, so locant is always trivially 1.
+    if chain_length == 1:
+        return True
+
+    # Rule 2: 2-carbon bond locants (ethene/ethyne): omit bond locant
+    # Only one possible position for the double/triple bond.
+    if context == "bond" and chain_length == 2:
+        return True
+
+    # Rule 3: Terminal groups: suffix locant-1 is implicit
+    # Chain is numbered from the terminal group (acid, aldehyde, nitrile, etc.)
+    if context == "suffix" and fg_type in TERMINAL_FG_TYPES:
+        return True
+
+    # Rule 4: Monosubstituted rings
+    if context == "prefix" and is_ring and is_monosubstituted:
+        if is_heterocyclic:
+            return False  # Position matters in heterocycles
+        return True  # Symmetric carbocyclic: omit
+
+    # Rule 5: Monosubstituted hydrocarbon chain at position 1
+    if context == "prefix" and not is_ring and is_monosubstituted and chain_length > 1:
+        return True
+
+    # Rule 6: Mono-cycloalkene bond locant
+    # Single double bond in a ring: locant omitted (cyclohexene, not cyclohex-1-ene)
+    if context == "bond" and is_ring and is_monosubstituted:
+        return True
+
+    return False
+
+
 # ============================================================================
 # Alkyl Substituent Names
 # ============================================================================
