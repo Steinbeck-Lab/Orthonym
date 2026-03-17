@@ -373,3 +373,120 @@ class TestRingSizeCalculation:
         # spiro[5.5]undecane: 5 + 5 + 1 = 11 atoms
         mol2 = Chem.MolFromSmiles('C1CCC2(CC1)CCCCC2')
         assert mol2.GetNumAtoms() == 11
+
+
+class TestDispiroRouting:
+    """Tests that dispiro compounds route to spiro naming, not polycyclic-bridged."""
+
+    @pytest.mark.unit
+    def test_dispiro_classified_as_spiro(self):
+        """Dispiro compound classified as 'spiro' not 'polycyclic-bridged'."""
+        from src.orthonym.assembly.composer import _classify_complex_ring
+        mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')  # dispiro[2.1.2.1]octane
+        assert _classify_complex_ring(mol) == 'spiro'
+
+    @pytest.mark.unit
+    def test_dispiro_not_none(self):
+        """Dispiro compounds should not return None."""
+        mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')
+        assert name_spiro_system(mol) is not None
+
+    @pytest.mark.unit
+    def test_dispiro_larger_classified_as_spiro(self):
+        """Larger dispiro compound also classified as 'spiro'."""
+        from src.orthonym.assembly.composer import _classify_complex_ring
+        mol = Chem.MolFromSmiles('C1CCCC12CCC1(CCCC1)CC2')  # dispiro[4.2.4.2]tetradecane
+        assert _classify_complex_ring(mol) == 'spiro'
+
+
+class TestDispiroNaming:
+    """Tests for dispiro compound naming per IUPAC P-24.2.2."""
+
+    @pytest.mark.unit
+    def test_dispiro_2_1_2_1_octane(self):
+        mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dispiro' in name
+        assert 'octane' in name
+
+    @pytest.mark.unit
+    def test_dispiro_4_2_4_2_tetradecane(self):
+        mol = Chem.MolFromSmiles('C1CCCC12CCC1(CCCC1)CC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dispiro' in name
+        assert 'tetradecane' in name
+
+    @pytest.mark.unit
+    def test_dispiro_2_0_2_1_heptane(self):
+        mol = Chem.MolFromSmiles('C1CC12C1(CC1)C2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dispiro' in name
+        assert 'heptane' in name
+
+    @pytest.mark.unit
+    def test_dispiro_5_1_5_1_tetradecane(self):
+        mol = Chem.MolFromSmiles('C1CCCCC12CC1(CCCCC1)C2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dispiro' in name
+
+    @pytest.mark.unit
+    def test_dispiro_2_2_2_2_decane(self):
+        mol = Chem.MolFromSmiles('C1CC12CCC1(CC1)CC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dispiro' in name
+        assert 'decane' in name
+
+    @pytest.mark.unit
+    def test_dispiro_descriptor_format(self):
+        """Dispiro descriptor has format dispiro[a.b.c.d]."""
+        mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        import re
+        assert re.search(r'dispiro\[\d+\.\d+\.\d+\.\d+\]', name), \
+            f"Expected dispiro[a.b.c.d] format, got: {name}"
+
+
+class TestHeterospiroNaming:
+    """Tests for heterospiro naming per IUPAC P-24.2.4.1."""
+
+    @pytest.mark.unit
+    def test_1_oxa_spiro_4_5_decane(self):
+        mol = Chem.MolFromSmiles('O1CCCC12CCCCC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'oxa' in name
+        assert 'spiro' in name
+
+    @pytest.mark.unit
+    def test_2_8_dioxa_spiro_4_5_decane(self):
+        mol = Chem.MolFromSmiles('C1OCCC12CCOCC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'dioxa' in name
+        assert 'spiro' in name
+
+    @pytest.mark.unit
+    def test_oxa_thia_spiro(self):
+        mol = Chem.MolFromSmiles('C1OCC12CSC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        assert 'oxa' in name
+        assert 'thia' in name
+        assert 'spiro' in name
+
+    @pytest.mark.unit
+    def test_heterospiro_includes_locants(self):
+        """Heterospiro names include locants for heteroatoms."""
+        mol = Chem.MolFromSmiles('O1CCCC12CCCCC2')
+        name = name_spiro_system(mol)
+        assert name is not None
+        # Should have a numeric locant before 'oxa'
+        import re
+        assert re.search(r'\d+-.*oxa', name), \
+            f"Expected locant before 'oxa', got: {name}"
