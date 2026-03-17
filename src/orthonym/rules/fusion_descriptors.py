@@ -214,21 +214,29 @@ def get_child_locants(
 def generate_fusion_descriptor(
     parent_ring: List[int],
     child_ring: List[int],
-    shared_atoms: Set[int]
+    shared_atoms: Set[int],
+    child_is_benzene: bool = False,
 ) -> str:
     """
     Generate the fusion descriptor [num,num-letter] format.
 
-    Combines child locants and parent fusion letter into the standard
-    IUPAC fusion descriptor format.
+    Child locants are ordered according to IUPAC convention: the child
+    position bonded to the lower-numbered parent edge atom is listed
+    first, then the child position bonded to the higher-numbered parent
+    edge atom. This can produce ascending [2,3-b] or descending [3,2-b]
+    depending on the relative orientation of parent and child numbering.
+
+    For benzene as child (all positions equivalent), child locants are
+    omitted and only the edge letter is used: [b] instead of [1,2-b].
 
     Args:
-        parent_ring: List of atom indices in the parent ring
-        child_ring: List of atom indices in the child ring
+        parent_ring: List of atom indices in the parent ring (IUPAC order)
+        child_ring: List of atom indices in the child ring (IUPAC order)
         shared_atoms: Set of atom indices shared between rings
+        child_is_benzene: If True, omit child locants (all equivalent)
 
     Returns:
-        Fusion descriptor string like "[4,5-d]" or "[a]" for simple cases
+        Fusion descriptor string like "[3,2-b]" or "[b]" for benzene child
         Returns empty string if descriptor cannot be generated
 
     Examples:
@@ -238,25 +246,63 @@ def generate_fusion_descriptor(
     if len(shared_atoms) != 2:
         return ''
 
-    # Convert set to tuple
-    atoms_tuple = tuple(sorted(shared_atoms))
+    shared_list = list(shared_atoms)
+    atom_a, atom_b = shared_list[0], shared_list[1]
 
-    # Get parent fusion letter
-    fusion_letter = get_fusion_letter(parent_ring, atoms_tuple)
-    if not fusion_letter:
+    # Find parent positions of shared atoms
+    try:
+        parent_pos_a = parent_ring.index(atom_a)
+        parent_pos_b = parent_ring.index(atom_b)
+    except ValueError:
         return ''
 
-    # Get child locants
-    child_locs = get_child_locants(child_ring, atoms_tuple)
-    if child_locs == (0, 0):
+    # Determine which shared atom is at the lower parent position
+    if parent_pos_a < parent_pos_b:
+        # Check adjacency: normal or wraparound
+        ring_size = len(parent_ring)
+        if parent_pos_b - parent_pos_a == 1:
+            parent_lower_atom = atom_a  # at lower pos
+            parent_higher_atom = atom_b  # at higher pos
+            edge_idx = parent_pos_a
+        elif parent_pos_b - parent_pos_a == ring_size - 1:
+            # Wraparound: pos_a is near start, pos_b is near end
+            parent_lower_atom = atom_b  # at higher pos = lower edge (wraparound)
+            parent_higher_atom = atom_a  # at lower pos = higher edge
+            edge_idx = parent_pos_b
+        else:
+            return ''  # Not adjacent
+    else:
+        ring_size = len(parent_ring)
+        if parent_pos_a - parent_pos_b == 1:
+            parent_lower_atom = atom_b
+            parent_higher_atom = atom_a
+            edge_idx = parent_pos_b
+        elif parent_pos_a - parent_pos_b == ring_size - 1:
+            parent_lower_atom = atom_a
+            parent_higher_atom = atom_b
+            edge_idx = parent_pos_a
+        else:
+            return ''
+
+    # Get edge letter
+    if edge_idx >= len(EDGE_LETTERS):
+        return ''
+    fusion_letter = EDGE_LETTERS[edge_idx]
+
+    # For benzene child, omit child locants
+    if child_is_benzene:
+        return f"[{fusion_letter}]"
+
+    # Get child positions of shared atoms
+    try:
+        child_pos_lower = child_ring.index(parent_lower_atom) + 1  # 1-indexed
+        child_pos_higher = child_ring.index(parent_higher_atom) + 1
+    except ValueError:
         return ''
 
-    # Build descriptor
-    # For simple cases (benzene fused to parent), may use just [a]
-    # For more complex, use [num,num-letter]
-    loc1, loc2 = child_locs
-
-    return f"[{loc1},{loc2}-{fusion_letter}]"
+    # IUPAC convention: first child locant corresponds to parent lower edge,
+    # second child locant corresponds to parent higher edge
+    return f"[{child_pos_lower},{child_pos_higher}-{fusion_letter}]"
 
 
 def get_fusion_prefix(ring_name: str) -> str:
@@ -903,6 +949,194 @@ def build_multi_component_name(
     return f"{multiplier}{prefix}{descriptor}{parent_name}"
 
 
+def _get_iupac_ring_order_for_fusion(
+    mol,
+    ring_atoms: List[int],
+    shared_atoms: Set[int],
+    is_child: bool = False,
+) -> List[int]:
+    """
+    Get IUPAC-numbered ring order suitable for fusion descriptor generation.
+
+    For heterocyclic rings, IUPAC numbering starts at the highest-priority
+    heteroatom. The direction is chosen to give lowest locants to:
+    1. Remaining heteroatoms (standard IUPAC rule)
+    2. If single heteroatom (no remaining heteroatoms to tiebreak):
+       for child rings, pick direction giving lowest fusion bond locants;
+       for parent rings, pick direction giving lowest fusion edge letter.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: List of atom indices in the ring
+        shared_atoms: Set of atom indices shared with the other ring
+        is_child: True if this ring is the child (attached component)
+
+    Returns:
+        List of atom indices in IUPAC numbering order
+    """
+    ring_set = set(ring_atoms)
+
+    # Collect heteroatoms with priority
+    HETERO_PRIORITY = {'O': 0, 'S': 1, 'N': 2}
+    hetero_info = []
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        if sym in HETERO_PRIORITY:
+            hetero_info.append((HETERO_PRIORITY[sym], idx))
+
+    if not hetero_info:
+        # Carbocyclic ring: for fusion, pick direction giving lowest
+        # locants to shared atoms
+        return _orient_carbocyclic_for_fusion(mol, ring_atoms, shared_atoms)
+
+    hetero_info.sort()
+    start_atom = hetero_info[0][1]
+
+    # Build adjacency within ring
+    ring_neighbors = {}
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        nbrs = []
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in ring_set and nbr_idx != idx:
+                nbrs.append(nbr_idx)
+        ring_neighbors[idx] = nbrs
+
+    def walk_ring(start, first_step):
+        result = [start]
+        prev = start
+        curr = first_step
+        while curr != start:
+            result.append(curr)
+            nbrs = ring_neighbors[curr]
+            next_atoms = [n for n in nbrs if n != prev]
+            if not next_atoms:
+                break
+            prev = curr
+            curr = next_atoms[0]
+        return result
+
+    start_nbrs = ring_neighbors.get(start_atom, [])
+    if len(start_nbrs) < 2:
+        return list(ring_atoms)
+
+    order_a = walk_ring(start_atom, start_nbrs[0])
+    order_b = walk_ring(start_atom, start_nbrs[1])
+
+    # First tiebreaker: remaining heteroatom locants
+    remaining_hetero_indices = [idx for _, idx in hetero_info[1:]]
+
+    if remaining_hetero_indices:
+        def hetero_locants(order):
+            locs = []
+            for h_idx in remaining_hetero_indices:
+                try:
+                    pos = order.index(h_idx) + 1
+                    locs.append(pos)
+                except ValueError:
+                    locs.append(999)
+            return sorted(locs)
+
+        locs_a = hetero_locants(order_a)
+        locs_b = hetero_locants(order_b)
+
+        for la, lb in zip(locs_a, locs_b):
+            if la < lb:
+                return order_a
+            elif lb < la:
+                return order_b
+
+    # No remaining heteroatoms or tied: use fusion bond locants as tiebreaker
+    # Pick direction giving lowest locants to shared atoms
+    def shared_locants(order):
+        locs = []
+        for s_idx in shared_atoms:
+            try:
+                pos = order.index(s_idx) + 1
+                locs.append(pos)
+            except ValueError:
+                locs.append(999)
+        return sorted(locs)
+
+    slocs_a = shared_locants(order_a)
+    slocs_b = shared_locants(order_b)
+
+    for sa, sb in zip(slocs_a, slocs_b):
+        if sa < sb:
+            return order_a
+        elif sb < sa:
+            return order_b
+
+    return order_a
+
+
+def _orient_carbocyclic_for_fusion(
+    mol,
+    ring_atoms: List[int],
+    shared_atoms: Set[int],
+) -> List[int]:
+    """
+    Orient a carbocyclic ring for fusion descriptor generation.
+
+    Since all atoms are equivalent in a symmetric carbocyclic ring,
+    choose numbering that starts adjacent to a shared atom and gives
+    lowest locants to the shared atoms.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: List of atom indices
+        shared_atoms: Set of shared atom indices
+
+    Returns:
+        Reordered list of atom indices
+    """
+    ring_set = set(ring_atoms)
+
+    # Build adjacency within ring
+    ring_neighbors = {}
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        nbrs = []
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in ring_set and nbr_idx != idx:
+                nbrs.append(nbr_idx)
+        ring_neighbors[idx] = nbrs
+
+    def walk_ring(start, first_step):
+        result = [start]
+        prev = start
+        curr = first_step
+        while curr != start:
+            result.append(curr)
+            nbrs = ring_neighbors[curr]
+            next_atoms = [n for n in nbrs if n != prev]
+            if not next_atoms:
+                break
+            prev = curr
+            curr = next_atoms[0]
+        return result
+
+    # Try every atom as starting point and both directions
+    best_order = None
+    best_shared_locs = None
+
+    for start_atom in ring_atoms:
+        start_nbrs = ring_neighbors.get(start_atom, [])
+        if len(start_nbrs) < 2:
+            continue
+        for first_nbr in start_nbrs:
+            order = walk_ring(start_atom, first_nbr)
+            locs = sorted(order.index(s) + 1 for s in shared_atoms if s in order)
+            if best_shared_locs is None or locs < best_shared_locs:
+                best_shared_locs = locs
+                best_order = order
+
+    return best_order if best_order else list(ring_atoms)
+
+
 def generate_systematic_name_for_fused_pair(
     mol,
     ring1: List[int],
@@ -913,7 +1147,8 @@ def generate_systematic_name_for_fused_pair(
     Generate systematic fusion name for a pair of fused rings.
 
     This is the main entry point for generating fusion names when
-    no retained name exists.
+    no retained name exists. Uses IUPAC-numbered ring ordering for
+    correct edge letters and child locants.
 
     Args:
         mol: RDKit Mol object
@@ -940,8 +1175,20 @@ def generate_systematic_name_for_fused_pair(
     if not parent_name or not child_name:
         return None
 
-    # Generate fusion descriptor
-    descriptor = generate_fusion_descriptor(parent_ring, child_ring, shared_atoms)
+    # Get IUPAC-ordered rings for correct descriptor generation
+    parent_iupac = _get_iupac_ring_order_for_fusion(
+        mol, parent_ring, shared_atoms, is_child=False
+    )
+    child_iupac = _get_iupac_ring_order_for_fusion(
+        mol, child_ring, shared_atoms, is_child=True
+    )
+
+    # Generate fusion descriptor using IUPAC-ordered rings
+    # For benzene as child, omit child locants (all positions equivalent)
+    child_is_benz = child_name == 'benzene'
+    descriptor = generate_fusion_descriptor(
+        parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_benz
+    )
     if not descriptor:
         return None
 

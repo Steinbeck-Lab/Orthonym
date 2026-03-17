@@ -133,6 +133,177 @@ def _compute_general_indicated_h(mol, ring_atom_set: Set[int],
     return sorted(indicated, key=_sort_key)
 
 
+def _try_algorithmic_fusion_name(mol) -> Optional[str]:
+    """
+    Attempt systematic fusion naming for 2-component ortho-fused systems.
+
+    Called as fallback when dictionary lookup fails. Uses IUPAC P-25.1
+    to P-25.3 rules for component identification, descriptor generation,
+    and name assembly.
+
+    Only handles 2-component ortho-fused systems (SSSR has exactly 2 rings
+    sharing exactly 2 atoms). 3+ component systems deferred (DEFR-07).
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Systematic fusion name, or None if cannot be generated
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+
+    # Gate: exactly 2 rings in SSSR
+    if len(atom_rings) != 2:
+        return None
+
+    ring1, ring2 = atom_rings[0], atom_rings[1]
+    shared = get_shared_atoms(mol, ring1, ring2)
+
+    # Gate: exactly 2 shared atoms = ortho-fused
+    if len(shared) != 2:
+        return None
+
+    # Gate: at least one ring must be heterocyclic
+    # Purely carbocyclic fused systems (naphthalene, tetrahydronaphthalene)
+    # are named via the carbocyclic pathway, not heterocycle fusion naming
+    ring1_hetero = is_heterocyclic(mol, list(ring1))
+    ring2_hetero = is_heterocyclic(mol, list(ring2))
+    if not ring1_hetero and not ring2_hetero:
+        return None
+
+    # Gate: at least one ring must have aromatic atoms
+    # Non-aromatic fused heterocycles (e.g., pyrazolidine bridged systems)
+    # need dihydro/tetrahydro prefixes which the simple algorithmic path
+    # does not handle. Only generate names for aromatic fused systems.
+    ring1_aromatic = is_aromatic_ring(mol, list(ring1))
+    ring2_aromatic = is_aromatic_ring(mol, list(ring2))
+    if not ring1_aromatic and not ring2_aromatic:
+        return None
+
+    # Gate: molecule should be an unsubstituted fused ring system
+    # (all heavy atoms are ring atoms + no exocyclic substituents beyond H)
+    # Substituted fused systems need prefix/suffix handling that the
+    # algorithmic path does not yet support. Substituted molecules should
+    # fall through to the existing naming pipeline.
+    ring_atom_set = set(ring1) | set(ring2)
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if idx not in ring_atom_set and atom.GetAtomicNum() != 1:
+            return None  # Has substituents
+
+    from .fusion_descriptors import (
+        generate_systematic_name_for_fused_pair,
+        identify_parent_and_child,
+        _get_iupac_ring_order_for_fusion,
+    )
+
+    # Try to generate systematic name
+    name = generate_systematic_name_for_fused_pair(
+        mol, list(ring1), list(ring2), shared
+    )
+
+    if not name:
+        return None
+
+    # Compute indicated hydrogen for the algorithmic fused system
+    parent_name, child_name, parent_ring, child_ring = identify_parent_and_child(
+        mol, set(ring1), set(ring2)
+    )
+
+    # Build atom-to-locant mapping for indicated H computation
+    atom_to_locant = _build_algorithmic_locant_map(
+        mol, parent_ring, child_ring, shared, parent_name, child_name
+    )
+
+    ring_atom_set = set(ring1) | set(ring2)
+    indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
+
+    if indicated_h:
+        h_parts = ','.join(str(loc) + 'H' for loc in indicated_h)
+        name = f"{h_parts}-{name}"
+
+    logger.debug(
+        "Algorithmic fusion name for %s: %s",
+        Chem.MolToSmiles(mol), name,
+    )
+
+    return name
+
+
+def _build_algorithmic_locant_map(
+    mol,
+    parent_ring: List[int],
+    child_ring: List[int],
+    shared: Set[int],
+    parent_name: str,
+    child_name: str,
+) -> Dict[int, Any]:
+    """
+    Build atom-to-IUPAC-locant mapping for a 2-component fused system.
+
+    For 2-component ortho-fused, peripheral numbering starts at the parent
+    ring and continues through the child ring. Fusion junction atoms get
+    'Na' suffix locants (e.g., 4a, 8a).
+
+    This mapping is used by _compute_general_indicated_h() to assign
+    locant labels to atoms with indicated hydrogen.
+
+    Args:
+        mol: RDKit Mol object
+        parent_ring: List of atom indices in the parent ring
+        child_ring: List of atom indices in the child ring
+        shared: Set of atom indices shared between the two rings
+        parent_name: Name of the parent ring component
+        child_name: Name of the child ring component
+
+    Returns:
+        Dict mapping atom index to IUPAC locant (int or str like '4a')
+    """
+    from .fusion_descriptors import _get_iupac_ring_order_for_fusion
+
+    parent_iupac = _get_iupac_ring_order_for_fusion(
+        mol, parent_ring, shared, is_child=False
+    )
+    child_iupac = _get_iupac_ring_order_for_fusion(
+        mol, child_ring, shared, is_child=True
+    )
+
+    atom_to_locant: Dict[int, Any] = {}
+    locant = 1
+
+    # Walk the periphery: parent non-shared atoms first, then junction,
+    # then child non-shared atoms, then second junction atom
+    # For a simple 2-ring ortho-fused system, the periphery is:
+    # parent non-shared atoms -> first shared atom (Xa) ->
+    # child non-shared atoms -> second shared atom (Ya)
+
+    # Number parent ring atoms (non-shared get integer locants)
+    parent_shared_positions = []
+    for i, atom_idx in enumerate(parent_iupac):
+        if atom_idx not in shared:
+            atom_to_locant[atom_idx] = locant
+            locant += 1
+        else:
+            # Record position for 'a' suffix locant
+            parent_shared_positions.append((i, atom_idx, locant - 1))
+
+    # Assign 'a' suffix locants to shared atoms in parent order
+    for _, atom_idx, prev_loc in parent_shared_positions:
+        atom_to_locant[atom_idx] = f"{prev_loc}a"
+
+    # Number child ring atoms (non-shared continue integer sequence)
+    for atom_idx in child_iupac:
+        if atom_idx not in shared and atom_idx not in atom_to_locant:
+            atom_to_locant[atom_idx] = locant
+            locant += 1
+
+    return atom_to_locant
+
+
 def get_shared_atoms(mol, ring1: Tuple[int, ...], ring2: Tuple[int, ...]) -> Set[int]:
     """
     Get atoms shared between two rings.
@@ -313,6 +484,11 @@ def name_fused_heterocycle(mol) -> Optional[str]:
     # Try substructure matching for substituted fused heterocycles
     core_result = match_fused_heterocycle_core(mol)
     if core_result is None:
+        # Try algorithmic systematic fusion naming (IUPAC P-25.1 to P-25.3)
+        # for 2-component ortho-fused systems not in the dictionary
+        algorithmic_name = _try_algorithmic_fusion_name(mol)
+        if algorithmic_name:
+            return algorithmic_name
         return None
 
     core_name, atom_mapping, _core_smiles = core_result

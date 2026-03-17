@@ -613,3 +613,211 @@ class TestEdgeCases:
         assert desc.endswith(']')
         assert '-' in desc
         assert ',' in desc
+
+
+# ============================================================================
+# Test IUPAC-ordered descriptor generation (Plan 112-02)
+# ============================================================================
+
+class TestIUPACOrderedDescriptors:
+    """Tests for fusion descriptors generated from IUPAC-ordered rings."""
+
+    @pytest.mark.unit
+    def test_furo_pyrrole_descriptor_iupac(self):
+        """furo[2,3-b]pyrrole: furan fused to pyrrole at edge b."""
+        mol = Chem.MolFromSmiles('c1cc2ccoc2[nH]1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'furo[2,3-b]pyrrole'
+
+    @pytest.mark.unit
+    def test_thieno_thiophene_descriptor(self):
+        """thieno[2,3-b]thiophene: correct edge letter and child locants."""
+        mol = Chem.MolFromSmiles('c1cc2ccsc2s1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'thieno[2,3-b]thiophene'
+
+    @pytest.mark.unit
+    def test_thieno_pyridine_descriptor_3_2_b(self):
+        """thieno[3,2-b]pyridine: descending child locants with edge b."""
+        mol = Chem.MolFromSmiles('c1cnc2ccsc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'thieno[3,2-b]pyridine'
+
+    @pytest.mark.unit
+    def test_furo_pyridine_descriptor_3_2_b(self):
+        """furo[3,2-b]pyridine: descending child locants with edge b."""
+        mol = Chem.MolFromSmiles('c1cnc2ccoc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'furo[3,2-b]pyridine'
+
+    @pytest.mark.unit
+    def test_furo_pyrimidine_descriptor_2_3_d(self):
+        """furo[2,3-d]pyrimidine: edge d on pyrimidine parent."""
+        mol = Chem.MolFromSmiles('c1ncc2ccoc2n1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'furo[2,3-d]pyrimidine'
+
+    @pytest.mark.unit
+    def test_thieno_pyrimidine_descriptor_2_3_d(self):
+        """thieno[2,3-d]pyrimidine: edge d on pyrimidine parent."""
+        mol = Chem.MolFromSmiles('c1ncc2ccsc2n1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'thieno[2,3-d]pyrimidine'
+
+    @pytest.mark.unit
+    def test_benzo_c_thiophene_descriptor(self):
+        """benzo[c]thiophene: benzene child locants omitted."""
+        mol = Chem.MolFromSmiles('c1ccc2cscc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'benzo[c]thiophene'
+
+    @pytest.mark.unit
+    def test_benzo_d_thiazole_descriptor(self):
+        """benzo[d]thiazole: benzene child locants omitted."""
+        mol = Chem.MolFromSmiles('c1ccc2scnc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'benzo[d]thiazole'
+
+    @pytest.mark.unit
+    def test_benzo_d_imidazole_descriptor(self):
+        """benzo[d]imidazole: benzene child locants omitted."""
+        mol = Chem.MolFromSmiles('c1ccc2[nH]cnc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'benzo[d]imidazole'
+
+    @pytest.mark.unit
+    def test_pyrido_pyrazine_descriptor(self):
+        """pyrido[2,3-b]pyrazine: pyridine-pyrazine fusion."""
+        mol = Chem.MolFromSmiles('c1cnc2nccnc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'pyrido[2,3-b]pyrazine'
+
+    @pytest.mark.unit
+    def test_furo_c_pyridine_descriptor(self):
+        """furo[3,2-c]pyridine: edge c on pyridine parent."""
+        mol = Chem.MolFromSmiles('c1cc2occc2cn1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'furo[3,2-c]pyridine'
+
+    @pytest.mark.unit
+    def test_thieno_c_pyridine_descriptor(self):
+        """thieno[2,3-c]pyridine: edge c on pyridine parent."""
+        mol = Chem.MolFromSmiles('c1cc2ccsc2cn1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'thieno[2,3-c]pyridine'
+
+    @pytest.mark.unit
+    def test_pyrrolo_pyridine_descriptor(self):
+        """pyrrolo[2,3-b]pyridine: correct descriptor for pyrrole-pyridine."""
+        mol = Chem.MolFromSmiles('c1cnc2[nH]ccc2c1')
+        ri = mol.GetRingInfo()
+        rings = ri.AtomRings()
+        shared = set(rings[0]) & set(rings[1])
+
+        result = generate_systematic_name_for_fused_pair(
+            mol, list(rings[0]), list(rings[1]), shared
+        )
+        assert result == 'pyrrolo[2,3-b]pyridine'
+
+    @pytest.mark.unit
+    def test_descriptor_format_valid_regex(self):
+        """All generated descriptors match valid IUPAC format."""
+        import re
+        # Pattern: [num,num-letter] or [letter]
+        pattern = re.compile(r'^\[\d+,\d+-[a-z]\]$|^\[[a-z]\]$')
+
+        test_smiles = [
+            'c1cc2ccoc2[nH]1',   # furo[2,3-b]pyrrole
+            'c1cnc2ccsc2c1',     # thieno[3,2-b]pyridine
+            'c1ccc2cscc2c1',     # benzo[c]thiophene
+            'c1ncc2ccoc2n1',     # furo[2,3-d]pyrimidine
+        ]
+
+        for smiles in test_smiles:
+            mol = Chem.MolFromSmiles(smiles)
+            ri = mol.GetRingInfo()
+            rings = ri.AtomRings()
+            shared = set(rings[0]) & set(rings[1])
+
+            result = generate_systematic_name_for_fused_pair(
+                mol, list(rings[0]), list(rings[1]), shared
+            )
+            assert result is not None, f"No name for {smiles}"
+
+            # Extract descriptor from name
+            desc_match = re.search(r'\[.*?\]', result)
+            assert desc_match is not None, f"No descriptor in {result}"
+            desc = desc_match.group()
+            assert pattern.match(desc), f"Invalid descriptor format: {desc} in {result}"
