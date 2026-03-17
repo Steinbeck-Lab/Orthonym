@@ -27,6 +27,12 @@ from ..data.polycyclic_data import (
 from ..data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
 )
+from ..data.fusion_components import (
+    MONOCYCLIC_COMPONENTS,
+    get_component_by_pattern,
+    get_component_seniority,
+    get_component_prefix,
+)
 from ..perception.rings import (
     get_ring_info,
     get_ring_systems,
@@ -350,11 +356,14 @@ def identify_parent_and_child(
     """
     Determine which ring is parent and which is child for fusion naming.
 
-    Parent selection criteria (IUPAC 2013):
-    1. Larger ring system (more atoms) is parent
-    2. Nitrogen-containing heterocycle takes priority as parent
-    3. More senior heteroatom (O > S > N) may affect selection
-    4. Ring with more fusion positions (more edges) is preferred
+    Parent selection follows IUPAC 2013 P-25.2.1 seniority:
+    1. Heterocyclic ring is senior to carbocyclic (regardless of size)
+    2. Among heterocyclic: nitrogen-containing > oxygen > sulfur
+    3. Among same heteroatom type: larger ring > smaller ring
+    4. Among same size/heteroatom: more heteroatoms > fewer
+
+    The MORE SENIOR ring is the parent (base component, appears last in name).
+    The LESS SENIOR ring is the child (becomes the fusion prefix).
 
     Args:
         mol: RDKit Mol object
@@ -369,116 +378,265 @@ def identify_parent_and_child(
     ring_a_list = list(ring_a)
     ring_b_list = list(ring_b)
 
-    # Get ring properties
-    size_a = len(ring_a)
-    size_b = len(ring_b)
+    # Identify both rings first
+    name_a = _identify_ring_name(mol, ring_a_list)
+    name_b = _identify_ring_name(mol, ring_b_list)
 
-    is_hetero_a = is_heterocyclic(mol, ring_a_list)
-    is_hetero_b = is_heterocyclic(mol, ring_b_list)
+    if not name_a and not name_b:
+        return ('', '', [], [])
 
-    is_aromatic_a = is_aromatic_ring(mol, ring_a_list)
-    is_aromatic_b = is_aromatic_ring(mol, ring_b_list)
+    # Get seniority values (lower = more senior = preferred as parent)
+    seniority_a = get_component_seniority(name_a) if name_a else 999
+    seniority_b = get_component_seniority(name_b) if name_b else 999
 
-    # Determine parent by size first
-    parent_ring: List[int]
-    child_ring: List[int]
-
-    if size_a > size_b:
-        parent_ring = ring_a_list
-        child_ring = ring_b_list
-    elif size_b > size_a:
-        parent_ring = ring_b_list
-        child_ring = ring_a_list
+    # More senior ring (lower seniority value) is parent
+    if seniority_a < seniority_b:
+        return (name_a, name_b, ring_a_list, ring_b_list)
+    elif seniority_b < seniority_a:
+        return (name_b, name_a, ring_b_list, ring_a_list)
     else:
-        # Same size - use heteroatom criteria
-        # For heterocyclic + carbocyclic fusion, heterocycle is typically parent
-        if is_hetero_a and not is_hetero_b:
-            parent_ring = ring_a_list
-            child_ring = ring_b_list
-        elif is_hetero_b and not is_hetero_a:
-            parent_ring = ring_b_list
-            child_ring = ring_a_list
+        # Same seniority -- use ring size as tiebreaker (larger = parent)
+        if len(ring_a) >= len(ring_b):
+            return (name_a, name_b, ring_a_list, ring_b_list)
         else:
-            # Default: first ring is parent (arbitrary but consistent)
-            parent_ring = ring_a_list
-            child_ring = ring_b_list
+            return (name_b, name_a, ring_b_list, ring_a_list)
 
-    # Get names for the rings
-    parent_name = _identify_ring_name(mol, parent_ring)
-    child_name = _identify_ring_name(mol, child_ring)
 
-    return (parent_name, child_name, parent_ring, child_ring)
+def _hetero_gap(mol, ring_atoms: List[int], hetero_indices: List[int]) -> int:
+    """
+    Compute the shortest gap between two heteroatoms walking around a ring.
+
+    The gap is the number of non-heteroatom atoms on the shorter path
+    between the two heteroatoms around the ring. This distinguishes
+    positional isomers:
+    - gap=0: adjacent (pyrazole/1,2-diazole, pyridazine/1,2-diazine)
+    - gap=1: separated by 1 C (imidazole/1,3-diazole, pyrimidine/1,3-diazine)
+    - gap=2: separated by 2 C (pyrazine/1,4-diazine)
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: List of atom indices defining the ring
+        hetero_indices: List of exactly 2 atom indices (heteroatoms in the ring)
+
+    Returns:
+        Shortest gap count (0 = adjacent, 1 = one C between, etc.)
+    """
+    if len(hetero_indices) != 2:
+        return -1
+
+    ring_size = len(ring_atoms)
+    h0, h1 = hetero_indices
+
+    # Find positions of the heteroatoms in the ring
+    try:
+        pos0 = ring_atoms.index(h0)
+        pos1 = ring_atoms.index(h1)
+    except ValueError:
+        return -1
+
+    # Walk from pos0 to pos1 in both directions, count non-hetero atoms
+    # Direction 1: pos0 -> pos0+1 -> ... -> pos1
+    gap_cw = 0
+    i = (pos0 + 1) % ring_size
+    while i != pos1:
+        gap_cw += 1
+        i = (i + 1) % ring_size
+
+    # Direction 2: pos0 -> pos0-1 -> ... -> pos1
+    gap_ccw = 0
+    i = (pos0 - 1) % ring_size
+    while i != pos1:
+        gap_ccw += 1
+        i = (i - 1) % ring_size
+
+    return min(gap_cw, gap_ccw)
 
 
 def _identify_ring_name(mol, ring_atoms: List[int]) -> str:
     """
-    Identify the name of a ring based on its structure.
+    Identify the IUPAC name of a monocyclic ring based on its structure.
 
-    Checks against known ring systems (polycyclics, heterocycles).
+    Distinguishes positional isomers by examining the relative positions
+    of heteroatoms around the ring:
+    - 5-membered 2N: imidazole (1,3) vs pyrazole (1,2)
+    - 5-membered N+O: oxazole (1,3) vs isoxazole (1,2)
+    - 5-membered N+S: thiazole (1,3) vs isothiazole (1,2)
+    - 6-membered 2N: pyrimidine (1,3) vs pyridazine (1,2) vs pyrazine (1,4)
+
+    Uses the MONOCYCLIC_COMPONENTS registry via get_component_by_pattern().
 
     Args:
         mol: RDKit Mol object
         ring_atoms: List of atom indices in the ring
 
     Returns:
-        Ring name or empty string if unknown
+        Ring name (e.g., 'pyrimidine', 'imidazole') or empty string if unknown
     """
     ring_size = len(ring_atoms)
     is_hetero = is_heterocyclic(mol, ring_atoms)
     is_aromatic = is_aromatic_ring(mol, ring_atoms)
 
-    # Check for 6-membered aromatic carbocycle (benzene)
-    if ring_size == 6 and is_aromatic and not is_hetero:
-        return 'benzene'
+    # Collect heteroatom info
+    hetero_symbols = []
+    hetero_indices = []
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        symbol = atom.GetSymbol()
+        if symbol != 'C':
+            hetero_symbols.append(symbol)
+            hetero_indices.append(idx)
 
-    # Check for common heterocycles
-    if is_hetero and ring_size == 5:
-        # Get heteroatom types
-        heteroatoms = []
-        for idx in ring_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            symbol = atom.GetSymbol()
-            if symbol != 'C':
-                heteroatoms.append(symbol)
-
-        if heteroatoms == ['O']:
-            return 'furan'
-        elif heteroatoms == ['S']:
-            return 'thiophene'
-        elif heteroatoms == ['N']:
-            return 'pyrrole'
-        elif sorted(heteroatoms) == ['N', 'N']:
-            return 'pyrazole'
-        elif sorted(heteroatoms) == ['N', 'O']:
-            return 'oxazole'
-        elif sorted(heteroatoms) == ['N', 'S']:
-            return 'thiazole'
-
-    if is_hetero and ring_size == 6:
-        heteroatoms = []
-        for idx in ring_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            symbol = atom.GetSymbol()
-            if symbol != 'C':
-                heteroatoms.append(symbol)
-
-        if heteroatoms == ['N']:
-            return 'pyridine'
-        elif sorted(heteroatoms) == ['N', 'N']:
-            return 'pyrimidine'  # or pyrazine/pyridazine - simplified
-        elif heteroatoms == ['O']:
-            return 'pyran'
-
-    # Default: use generic names based on size
+    # Carbocyclic rings
     if not is_hetero:
+        if ring_size == 6 and is_aromatic:
+            return 'benzene'
         if ring_size == 5:
-            return 'cyclopentene' if not is_aromatic else 'cyclopentadiene'
+            return 'cyclopentadiene' if is_aromatic else 'cyclopentene'
+        if ring_size == 6:
+            return 'benzene' if is_aromatic else 'cyclohexene'
+        if ring_size == 7:
+            return 'cycloheptadiene' if is_aromatic else 'cycloheptene'
+        return ''
+
+    # Heterocyclic rings: use registry with gap disambiguation
+    sorted_symbols = sorted(hetero_symbols)
+
+    # Compute gap for 2-heteroatom rings
+    gap = None
+    if len(hetero_indices) == 2:
+        gap = _hetero_gap(mol, ring_atoms, hetero_indices)
+
+    # Try registry lookup
+    result = get_component_by_pattern(ring_size, sorted_symbols, gap)
+    if result:
+        return result
+
+    # Fallback for single-heteroatom rings not in registry
+    if len(hetero_symbols) == 1:
+        sym = hetero_symbols[0]
+        if ring_size == 5:
+            if sym == 'O':
+                return 'furan'
+            elif sym == 'S':
+                return 'thiophene'
+            elif sym == 'N':
+                return 'pyrrole'
         elif ring_size == 6:
-            return 'cyclohexene' if not is_aromatic else 'benzene'
-        elif ring_size == 7:
-            return 'cycloheptene'
+            if sym == 'N':
+                return 'pyridine'
+            elif sym == 'O':
+                return 'pyran'
 
     return ''
+
+
+def _get_iupac_ring_order(mol, ring_atoms: List[int]) -> List[int]:
+    """
+    Reorder ring atoms to match IUPAC numbering convention.
+
+    For heterocyclic rings:
+    - IUPAC position 1 is the highest-priority heteroatom
+      (O > S > N per Hantzsch-Widman convention)
+    - Number in the direction that gives lowest locants to remaining heteroatoms
+    - Walk the ring using molecular adjacency (bonds)
+
+    For carbocyclic rings:
+    - Return atoms in current order (numbering determined by fusion context)
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: List of atom indices in the ring
+
+    Returns:
+        List of atom indices reordered to match IUPAC numbering
+    """
+    ring_set = set(ring_atoms)
+
+    # Collect heteroatoms with their priority
+    # Priority: O (highest) > S > N (among common heteroatoms)
+    HETERO_PRIORITY = {'O': 0, 'S': 1, 'N': 2}
+    hetero_info = []  # (priority, atom_idx)
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        if sym in HETERO_PRIORITY:
+            hetero_info.append((HETERO_PRIORITY[sym], idx))
+
+    if not hetero_info:
+        # Carbocyclic: return as-is
+        return list(ring_atoms)
+
+    # Start atom: highest-priority heteroatom (lowest priority value)
+    hetero_info.sort()
+    start_atom = hetero_info[0][1]
+
+    # Build adjacency within ring
+    ring_neighbors = {}
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        nbrs = []
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in ring_set and nbr_idx != idx:
+                nbrs.append(nbr_idx)
+        ring_neighbors[idx] = nbrs
+
+    # Walk ring in both directions from start_atom
+    def walk_ring(start, first_step):
+        """Walk the ring from start via first_step, return ordered atom list."""
+        result = [start]
+        prev = start
+        curr = first_step
+        while curr != start:
+            result.append(curr)
+            nbrs = ring_neighbors[curr]
+            # Go to the neighbor that isn't where we came from
+            next_atoms = [n for n in nbrs if n != prev]
+            if not next_atoms:
+                break
+            prev = curr
+            curr = next_atoms[0]
+        return result
+
+    # Get neighbors of start atom in ring
+    start_nbrs = ring_neighbors.get(start_atom, [])
+    if len(start_nbrs) < 2:
+        return list(ring_atoms)
+
+    # Walk both directions
+    order_a = walk_ring(start_atom, start_nbrs[0])
+    order_b = walk_ring(start_atom, start_nbrs[1])
+
+    # Pick direction giving lowest locants to remaining heteroatoms
+    remaining_hetero_indices = [idx for _, idx in hetero_info[1:]]
+
+    if not remaining_hetero_indices:
+        # Only one heteroatom, either direction is fine
+        return order_a
+
+    def hetero_locants(order):
+        """Get IUPAC positions (1-indexed) of remaining heteroatoms."""
+        locs = []
+        for h_idx in remaining_hetero_indices:
+            try:
+                pos = order.index(h_idx) + 1  # 1-indexed
+                locs.append(pos)
+            except ValueError:
+                locs.append(999)
+        return sorted(locs)
+
+    locs_a = hetero_locants(order_a)
+    locs_b = hetero_locants(order_b)
+
+    # First-point-of-difference comparison
+    for la, lb in zip(locs_a, locs_b):
+        if la < lb:
+            return order_a
+        elif lb < la:
+            return order_b
+
+    # Tie: use direction A by default
+    return order_a
 
 
 def identify_fusion_edges(

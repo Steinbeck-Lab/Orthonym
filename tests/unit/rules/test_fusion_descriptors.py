@@ -445,8 +445,8 @@ class TestIdentifyParentAndChild:
     """Tests for identify_parent_and_child function."""
 
     @pytest.mark.unit
-    def test_larger_ring_is_parent(self):
-        """Larger ring should be identified as parent."""
+    def test_heterocyclic_is_parent_over_carbocyclic(self):
+        """IUPAC seniority: heterocyclic ring is parent over carbocyclic (P-25.2.1)."""
         mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         ri = mol.GetRingInfo()
         rings = ri.AtomRings()
@@ -464,9 +464,11 @@ class TestIdentifyParentAndChild:
             parent_name, child_name, parent_ring, child_ring = identify_parent_and_child(
                 mol, ring_6, ring_5
             )
-            # 6-membered should be parent
-            assert len(parent_ring) == 6
-            assert len(child_ring) == 5
+            # Pyrrole (N-heterocycle) is more senior than benzene (carbocycle)
+            assert parent_name == 'pyrrole', f"Expected pyrrole as parent, got {parent_name}"
+            assert child_name == 'benzene', f"Expected benzene as child, got {child_name}"
+            assert len(parent_ring) == 5
+            assert len(child_ring) == 6
 
     @pytest.mark.unit
     def test_benzene_identified(self):
