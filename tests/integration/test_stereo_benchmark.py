@@ -96,7 +96,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCOC(=O)C[C@@H](SP(=O)(OC)OC)C(=O)OCC', 'diethyl butanedioate'),  # MISSING_STEREO - wrong parent
     ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid'),  # Phase 103-01: chain exclusion changes path
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),
-    ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(1R,2R)-3-cyclononyl-1-oxiranylpropane-1,2-diol'),
+    ('COc1cccc2c1CO[C@@H]2C[C@@H](O)[C@@H](O)[C@@H]1O[C@@H]1C', '(2R,3R)-1-cyclononyl-3-oxiranylpropane-2,3-diol'),  # Phase 110: alphabetical tiebreaker (cyclononyl < oxiranyl)
     ('C[C@H]1C[C@@H](O)[C@H]2C(=O)c3c(O)cccc3O[C@]2(C)[C@@H]1O', '(1R,10S,11R,12S,14R)-4,11,14-trihydroxy-10,12-dimethyl-9-oxa-tricyclo[8.4.0.0(3,8)]tetradecan-2-one'),
     ('C[C@H]1CCC/C=C/[C@@H]2CC[C@H](O)[C@H]2[C@H](O)/C=C/C(=O)O1', '(3E,5R,6S,7S,8E,13S)-5-hydroxy-13-methyl-2-oxo-1-oxacyclotridecene'),  # Fixed: fabricated dipropyl from ring boundary leak
     ('CC(C)=CCc1ccc(O)c2c1[C@H](CC(=O)O)OC2=O', '2-cyclononylethanoic acid'),  # MISSING_STEREO - wrong parent
