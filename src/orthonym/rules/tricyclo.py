@@ -556,52 +556,33 @@ def generate_polycyclo_descriptor(mol) -> Optional[str]:
 def _generate_higher_polycyclo_descriptor(mol, classification: str) -> Optional[str]:
     """
     Generate descriptor for tetracyclo and higher systems.
-    
-    Uses iterative approach:
-    1. Find all bridgeheads
-    2. Find largest main ring with two bridgeheads
-    3. Find all bridges between bridgehead pairs
-    4. Sort bridges by length (descending)
-    5. Format as classification[a.b.c.d^e,f.g^h,i...]
+
+    Delegates to VonBaeyerAnalyzer (polycyclic.py) which implements
+    the full IUPAC VB-1 through VB-7 algorithm with proper main ring
+    finding, independent/dependent bridge classification, and locant assignment.
     """
-    bridgeheads = find_all_bridgeheads(mol)
+    from .polycyclic import VonBaeyerAnalyzer
+
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+
+    if not ring_atoms:
+        return None
+
+    analyzer = VonBaeyerAnalyzer()
+
+    # Check that this is actually a polycyclic system
+    bridgeheads = analyzer._find_all_bridgeheads(mol, ring_atoms)
     if len(bridgeheads) < 2:
         return None
-    
-    ring_atoms = get_ring_atoms(mol)
-    ri = mol.GetRingInfo()
-    rings = ri.AtomRings()
-    
-    # Find all SSSR rings and their sizes
-    ring_sizes = []
-    for ring in rings:
-        ring_set = set(ring)
-        bhs_in_ring = ring_set & bridgeheads
-        # Calculate "bridge length" as atoms between bridgeheads
-        if len(bhs_in_ring) >= 2:
-            # For each pair of bridgeheads in ring, calculate path
-            bh_list = list(bhs_in_ring)
-            for i, bh1 in enumerate(bh_list):
-                for bh2 in bh_list[i+1:]:
-                    # Find path through this ring
-                    path_len = _ring_path_length(ring, bh1, bh2)
-                    if path_len >= 0:
-                        ring_sizes.append(path_len)
-    
-    # Sort and format
-    ring_sizes.sort(reverse=True)
-    
-    # Take first few bridge lengths for the descriptor
-    # IUPAC format: prefix[a.b.c.d^e,f...] where a >= b >= c >= ...
-    if len(ring_sizes) >= 3:
-        bridge_strs = [str(s) for s in ring_sizes[:4]]  # First 4 bridges
-        descriptor = f"{classification}[{'.'.join(bridge_strs)}]"
-    elif ring_sizes:
-        descriptor = f"{classification}[{'.'.join(str(s) for s in ring_sizes)}]"
-    else:
-        descriptor = f"{classification}[...]"
-    
-    return descriptor
+
+    try:
+        desc = analyzer.analyze(mol, ring_atoms)
+        return desc.descriptor_string
+    except Exception:
+        return None
 
 
 def _ring_path_length(ring: Tuple[int, ...], bh1: int, bh2: int) -> int:
@@ -655,91 +636,111 @@ def name_polycyclo_system(mol) -> Optional[str]:
 def _name_higher_polycyclo_system(mol, classification: str) -> Optional[str]:
     """
     Generate full IUPAC name for tetracyclo+ systems.
-    
+
     Includes:
-    - Heteroatom prefixes (oxa, aza, thia)
-    - Descriptor
+    - Heteroatom prefixes (oxa, aza, thia) with correct VB locants
+    - Descriptor from VonBaeyerAnalyzer
     - Parent alkane name
     """
-    ring_atoms = get_ring_atoms(mol)
-    
-    # Count carbons and heteroatoms in ring system
-    carbon_count = 0
+    from .polycyclic import VonBaeyerAnalyzer
+
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+
+    analyzer = VonBaeyerAnalyzer()
+    numbering = None
+
+    try:
+        desc = analyzer.analyze(mol, ring_atoms)
+        descriptor = desc.descriptor_string
+        total_atoms = desc.total_atoms
+        numbering = desc.numbering
+    except Exception:
+        descriptor = _generate_higher_polycyclo_descriptor(mol, classification)
+        if not descriptor:
+            descriptor = f"{classification}[...]"
+        total_atoms = len(ring_atoms)
+
+    # Get parent name
+    parent_name = _get_alkane_name(total_atoms)
+
+    # Check for heteroatoms
     heteroatoms = []
-    
     for idx in ring_atoms:
         atom = mol.GetAtomWithIdx(idx)
         symbol = atom.GetSymbol()
-        if symbol == 'C':
-            carbon_count += 1
-        else:
+        if symbol != 'C':
             heteroatoms.append((idx, symbol))
-    
-    # Total ring size (for parent name)
-    total_ring_atoms = len(ring_atoms)
-    
-    # Generate descriptor
-    descriptor = _generate_higher_polycyclo_descriptor(mol, classification)
-    if not descriptor:
-        descriptor = f"{classification}[...]"
-    
-    # Generate parent alkane name based on total atoms
-    parent_name = _get_alkane_name(total_ring_atoms)
-    
-    # Generate heteroatom prefixes
-    hetero_prefix = _generate_heteroatom_prefix(mol, heteroatoms, ring_atoms)
-    
-    if hetero_prefix:
-        return f"{hetero_prefix}{descriptor}{parent_name}"
-    else:
-        return f"{descriptor}{parent_name}"
+
+    if heteroatoms:
+        prefix = _generate_heteroatom_prefix(mol, heteroatoms, ring_atoms, numbering=numbering)
+        return f"{prefix}{descriptor}{parent_name}"
+
+    return f"{descriptor}{parent_name}"
 
 
 def _generate_heteroatom_prefix(
     mol,
     heteroatoms: List[Tuple[int, str]],
-    ring_atoms: Set[int]
+    ring_atoms: Set[int],
+    numbering: Optional[Dict[int, int]] = None
 ) -> str:
     """
     Generate IUPAC heteroatom replacement prefix.
-    
+
     Format: "2,5-dioxa-8-aza-" etc.
-    
+
     Args:
         mol: RDKit Mol object
         heteroatoms: List of (atom_idx, symbol) tuples
         ring_atoms: Set of ring atom indices
-        
+        numbering: Optional VB numbering map (atom_idx -> IUPAC locant).
+                   If None, generates numbering via VonBaeyerAnalyzer.
+
     Returns:
         Prefix string or empty string
     """
     if not heteroatoms:
         return ""
-    
+
+    # Get VB numbering if not provided
+    if numbering is None:
+        from .polycyclic import VonBaeyerAnalyzer
+        analyzer = VonBaeyerAnalyzer()
+        try:
+            desc = analyzer.analyze(mol, ring_atoms)
+            numbering = desc.numbering
+        except Exception:
+            numbering = {}
+
     from .polycyclic_bridged import get_heteroatom_prefix
-    
-    # Group by element
+
+    # Group by element, using VB numbering for locants
     by_element: Dict[str, List[int]] = {}
     for idx, symbol in heteroatoms:
         if symbol not in by_element:
             by_element[symbol] = []
-        by_element[symbol].append(idx)
-    
-    # Generate numbering (simplified - just use atom index + 1 for now)
+        # Use VB numbering locant, fall back to idx+1 if not in map
+        locant = numbering.get(idx, idx + 1)
+        by_element[symbol].append(locant)
+
+    # Generate prefix parts
     prefix_parts = []
-    
+
     # Priority order for heteroatoms: O, S, Se, N, P, Si, B
     priority_order = ['O', 'S', 'Se', 'N', 'P', 'Si', 'B']
-    
+
     for element in priority_order:
         if element in by_element:
-            indices = sorted(by_element[element])
-            locants = [str(idx + 1) for idx in indices]  # Simplified locants
-            
+            locants = sorted(by_element[element])
+            locant_strs = [str(loc) for loc in locants]
+
             prefix_name = get_heteroatom_prefix(element)
-            
+
             # Multiplier prefix
-            count = len(indices)
+            count = len(locants)
             if count == 1:
                 mult = ""
             elif count == 2:
@@ -752,22 +753,22 @@ def _generate_heteroatom_prefix(
                 mult = "penta"
             else:
                 mult = f"{count}-"
-            
-            locant_str = ",".join(locants)
+
+            locant_str = ",".join(locant_strs)
             prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
-    
+
     # Handle any remaining elements not in priority order
-    for element, indices in by_element.items():
+    for element in by_element:
         if element not in priority_order:
-            locants = [str(idx + 1) for idx in sorted(indices)]
+            locants = sorted(by_element[element])
             prefix_name = get_heteroatom_prefix(element)
-            count = len(indices)
-            mult = "" if count == 1 else ("di" if count == 2 else f"{count}-")
-            prefix_parts.append(f"{','.join(locants)}-{mult}{prefix_name}")
-    
+            count = len(locants)
+            mult = "" if count == 1 else ("di" if count == 2 else ("tri" if count == 3 else f"{count}-"))
+            prefix_parts.append(f"{','.join(str(loc) for loc in locants)}-{mult}{prefix_name}")
+
     if prefix_parts:
         return "-".join(prefix_parts) + "-"
-    
+
     return ""
 
 
