@@ -356,6 +356,100 @@ RETAINED_NAMES = {
     # Unique 9-carbon structure, not standard pyranose/furanose
     # OPSIN RT verified 2026-03-08
     "CC(=O)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O": "N-acetylneuraminic acid",
+
+    # === ADDITIONAL POLYCYCLIC AROMATICS (Phase 109 expansion) ===
+    # All canonical SMILES verified via Chem.CanonSmiles + OPSIN RT 2026-03-16
+    "c1ccc2c(c1)c1ccccc1c1ccccc21": "triphenylene",
+    "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61": "coronene",
+    "c1ccc2c(c1)-c1cccc3cccc-2c13": "fluoranthene",
+
+    # === BENZOIC ACID DERIVATIVES (Phase 109 expansion) ===
+    # Note: salicylic acid and gallic acid omitted -- existing tests expect
+    # systematic names (2-hydroxybenzoic acid, 3,4,5-trihydroxybenzoic acid)
+    "O=C(O)c1cccc(C(=O)O)c1": "isophthalic acid",
+    "Nc1ccccc1C(=O)O": "anthranilic acid",
+    "Nc1ccc(C(=O)O)cc1": "4-aminobenzoic acid",
+    "COc1cc(C(=O)O)ccc1O": "vanillic acid",
+
+    # === ANHYDRIDES (Phase 109 expansion) ===
+    # Note: acetic/succinic anhydride omitted -- existing tests expect
+    # systematic names (ethanoic anhydride, butanedioic anhydride)
+    "O=C1C=CC(=O)O1": "maleic anhydride",
+    "O=C1OC(=O)c2ccccc21": "phthalic anhydride",
+
+    # === HETEROCYCLE DERIVATIVES (Phase 109 expansion) ===
+    "O=c1ccc2ccccc2o1": "coumarin",       # 2H-chromen-2-one
+    "O=c1ccoc2ccccc12": "chromone",       # 4H-chromen-4-one
+    "O=c1c2ccccc2oc2ccccc12": "xanthone",  # 9H-xanthen-9-one
+    "O=C(O)c1cccnc1": "nicotinic acid",   # pyridine-3-carboxylic acid
+    "O=C(O)c1ccncc1": "isonicotinic acid",  # pyridine-4-carboxylic acid
+    "O=C(O)c1ccccn1": "picolinic acid",   # pyridine-2-carboxylic acid
+    "NC(=O)c1cccnc1": "nicotinamide",     # pyridine-3-carboxamide
+    "O=C1NS(=O)(=O)c2ccccc21": "saccharin",  # 1,1-dioxo-1,2-benzothiazol-3-one
+
+    # === ADDITIONAL AMINES (Phase 109 expansion) ===
+    "NCCCCN": "putrescine",    # butane-1,4-diamine
+    "NCCCCCN": "cadaverine",   # pentane-1,5-diamine
+
+    # === ADDITIONAL SOLVENTS (Phase 109 expansion) ===
+    "C1COCO1": "1,3-dioxolane",
+
+    # === NUCLEOBASES (Phase 109 expansion) ===
+    "O=c1cc[nH]c(=O)[nH]1": "uracil",
+    "Cc1c[nH]c(=O)[nH]c1=O": "thymine",
+    "Nc1cc[nH]c(=O)n1": "cytosine",
+    "Nc1ncnc2[nH]cnc12": "adenine",
+    "Nc1nc2[nH]cnc2c(=O)[nH]1": "guanine",
+
+    # === LONG-CHAIN DIACIDS (Phase 109 expansion) ===
+    "O=C(O)CCCCCCC(=O)O": "suberic acid",   # octanedioic acid
+    "O=C(O)CCCCCCCC(=O)O": "azelaic acid",  # nonanedioic acid
+    "O=C(O)CCCCCCCCC(=O)O": "sebacic acid",  # decanedioic acid
+
+    # === AROMATIC DERIVATIVES (Phase 109 expansion) ===
+    "c1ccc(Nc2ccccc2)cc1": "diphenylamine",
+
+    # === BENZALDEHYDE DERIVATIVES (Phase 109 expansion) ===
+    "COc1cc(C=O)ccc1O": "vanillin",           # 4-hydroxy-3-methoxybenzaldehyde
+    "O=Cc1ccc(O)cc1": "4-hydroxybenzaldehyde",
+    "COc1ccc(C=O)cc1": "anisaldehyde",        # 4-methoxybenzaldehyde
+    "O=Cc1cccnc1": "nicotinaldehyde",         # pyridine-3-carbaldehyde
+    "O=Cc1ccncc1": "isonicotinaldehyde",      # pyridine-4-carbaldehyde
+
+    # === NAPHTHOL (Phase 109 expansion) ===
+    "Oc1cccc2ccccc12": "1-naphthol",
+
+    # === MISCELLANEOUS AROMATICS (Phase 109 expansion) ===
+    "OC(c1ccccc1)c1ccccc1": "benzhydrol",             # diphenylmethanol
+    "O=c1cc(-c2ccccc2)oc2ccccc12": "flavone",         # 2-phenyl-4H-chromen-4-one
+    "Nc1ccc(N)cc1": "1,4-phenylenediamine",           # benzene-1,4-diamine
+    "Oc1cccc(O)c1O": "pyrogallol",                    # benzene-1,2,3-triol
+    "CC(=O)c1ccc(O)cc1": "4-hydroxyacetophenone",
+
+    # === ADDITIONAL COMMON COMPOUNDS (Phase 109 expansion) ===
+    # All canonical SMILES verified via Chem.CanonSmiles 2026-03-16
+    "C1CCC2CCCCC2C1": "decahydronaphthalene",         # decalin
+    "O=C(O)c1ccco1": "furan-2-carboxylic acid",       # furoic acid
+    "c1ccc(-c2ccncc2)nc1": "2,2'-bipyridine",         # bipyridyl
+    "Oc1cc(O)cc(O)c1": "phloroglucinol",              # benzene-1,3,5-triol
+    "c1ccc2c(c1)ccc1cccnc12": "benzo[f]quinoline",
+    "c1ccc2c(c1)ccc1ncccc12": "benzo[h]quinoline",
+    "Oc1ccc2c(c1)OCO2": "sesamol",                    # 3,4-methylenedioxyphenol
+    "O=Cc1ccc2c(c1)OCO2": "piperonal",                # 3,4-methylenedioxybenzaldehyde
+    "C=CCc1ccc2c(c1)OCO2": "safrole",
+    "CC(=O)c1ccco1": "2-acetylfuran",
+    # Note: tetracene SMILES was actually benz[a]anthracene (angular) - removed
+    "Cc1cc(C)c(O)c(C)c1": "mesitol",                  # 2,4,6-trimethylphenol
+    "CC(C)(C)c1ccccc1": "tert-butylbenzene",
+    "c1ccc(CCc2ccccc2)cc1": "1,2-diphenylethane",     # bibenzyl
+    "C=Cc1ccc(C=C)cc1": "1,4-divinylbenzene",
+    "Cc1cc(C)c(C)cc1C": "durene",                     # 1,2,4,5-tetramethylbenzene
+    "c1ccc(Cc2ccccc2)cc1": "diphenylmethane",
+    "c1ccc(C(c2ccccc2)c2ccccc2)cc1": "triphenylmethane",
+    "C1=Cc2ccccc2C1": "1H-indene",
+    "c1ccc(SSc2ccccc2)cc1": "diphenyl disulfide",
+    "Cc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]": "2,4,6-trinitrotoluene",
+    "O=Cc1ccco1": "furfural",                         # furan-2-carbaldehyde
 }
 
 

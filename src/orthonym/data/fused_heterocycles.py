@@ -1122,6 +1122,483 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 10, 13: 4},
     },
+
+    # =========================================================================
+    # PHASE 109 EXPANSION: 60+ new entries to reach 150+ total
+    # =========================================================================
+
+    # Isobenzofuran: benzo[c]furan
+    'c1ccc2cocc2c1': {
+        'name': 'isobenzofuran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 2,1-Benzisoxazole
+    'c1ccc2oncc2c1': {
+        'name': '2,1-benzisoxazole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 1,3-Benzoselenazole
+    'c1ccc2[se]cnc2c1': {
+        'name': '1,3-benzoselenazole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Note: Naphthalene omitted to avoid substructure matching conflicts with naphtho-fused entries.
+    # 1H-Indene
+    'C1=Cc2ccccc2C1': {
+        'name': '1H-indene',
+        'tautomer_locant': 1,
+        'ring_system': 'bicyclic-carbocyclic',
+        'parent_atoms': 9,
+        'iupac_locants': {8: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a'},
+    },
+    # Indane (2,3-dihydro-1H-indene)
+    'c1ccc2c(c1)CCC2': {
+        'name': 'indane',
+        'tautomer_locant': None,
+        'ring_system': 'bicyclic-saturated',
+        'parent_atoms': 9,
+        'iupac_locants': {8: 1, 7: 2, 6: 3, 4: '3a', 5: 4, 0: 5, 1: 6, 2: 7, 3: '7a'},
+    },
+    # Note: Tetralin (1,2,3,4-tetrahydronaphthalene) intentionally NOT included here.
+    # It is a pure carbocyclic compound named via systematic naming (1,2,3,4-tetrahydronaphthalene).
+    # Including it would override the systematic naming with the retained name "tetralin".
+    # Note: Anthracene, phenanthrene, 9H-fluorene omitted to avoid substructure matching
+    # conflicts with their derivatives (naphthacene, chrysene, fluorenone, etc.).
+    # Biphenylene
+    'c1ccc2c(c1)-c1ccccc1-2': {
+        'name': 'biphenylene',
+        'tautomer_locant': None,
+        'ring_system': 'non-benzenoid',
+        'parent_atoms': 12,
+        'iupac_locants': {5: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 11: '4b', 10: 5, 9: 6, 8: 7, 7: 8, 6: '8a', 4: '8b'},
+    },
+    # Acenaphthylene
+    'C1=Cc2cccc3cccc1c23': {
+        'name': 'acenaphthylene',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic-carbocyclic',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 1, 1: 2, 2: '2a', 3: 3, 4: 4, 5: 5, 6: '5a', 7: 6, 8: 7, 9: 8, 10: '8a', 11: '8b'},
+    },
+    # 1H-Phenalene
+    'C1=Cc2cccc3cccc(c23)C1': {
+        'name': '1H-phenalene',
+        'tautomer_locant': 1,
+        'ring_system': 'tricyclic-carbocyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {12: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 7, 8: 8, 9: 9, 10: '9a', 11: '9b'},
+    },
+    # Pyrene
+    'c1cc2ccc3cccc4ccc(c1)c2c34': {
+        'name': 'pyrene',
+        'tautomer_locant': None,
+        'ring_system': 'tetracyclic-carbocyclic',
+        'parent_atoms': 16,
+        'iupac_locants': {1: 1, 0: 2, 13: 3, 12: '3a', 11: 4, 10: 5, 9: '5a', 8: 6, 7: 7, 6: 8, 5: '8a', 4: 9, 3: 10, 2: '10a', 14: '10b', 15: '10c'},
+    },
+    # Chrysene
+    'c1ccc2c(c1)ccc1c3ccccc3ccc21': {
+        'name': 'chrysene',
+        'tautomer_locant': None,
+        'ring_system': 'tetracyclic-carbocyclic',
+        'parent_atoms': 18,
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '12a', 5: 1, 6: 12, 7: 11, 8: '10b', 9: '10a', 10: 10, 11: 9, 12: 8, 13: 7, 14: '6a', 15: 6, 16: 5, 17: '4b'},
+    },
+    # Triphenylene
+    'c1ccc2c(c1)c1ccccc1c1ccccc21': {
+        'name': 'triphenylene',
+        'tautomer_locant': None,
+        'ring_system': 'tetracyclic-carbocyclic',
+        'parent_atoms': 18,
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: '8b', 13: 9, 14: 10, 15: 11, 16: 12, 17: '12a', 3: '12b'},
+    },
+    # Naphthacene (tetracene)
+    'c1ccc2cc3cc4ccccc4cc3cc2c1': {
+        'name': 'naphthacene',
+        'tautomer_locant': None,
+        'ring_system': 'tetracyclic-carbocyclic',
+        'parent_atoms': 18,
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 17: 4, 16: '4a', 15: 5, 14: '5a', 13: 6, 12: '6a', 11: 7, 10: 8, 9: 9, 8: 10, 7: '10a', 6: 11, 5: '11a', 4: 12, 3: '12a'},
+    },
+    # s-Indacene
+    'C1=Cc2cc3c(cc2=C1)C=CC=3': {
+        'name': 's-indacene',
+        'tautomer_locant': None,
+        'ring_system': 'non-benzenoid',
+        'parent_atoms': 12,
+        'iupac_locants': {1: 1, 0: 2, 8: 3, 7: '3a', 6: 4, 5: '4a', 9: 5, 10: 6, 11: 7, 4: '7a', 3: 8, 2: '8a'},
+    },
+    # as-Indacene
+    'C1=Cc2c3c(ccc2=C1)=CC=C3': {
+        'name': 'as-indacene',
+        'tautomer_locant': None,
+        'ring_system': 'non-benzenoid',
+        'parent_atoms': 12,
+        'iupac_locants': {1: 1, 0: 2, 8: 3, 7: '3a', 6: 4, 5: 5, 4: '5a', 9: 6, 10: 7, 11: 8, 3: '8a', 2: '8b'},
+    },
+    # Heptalene
+    'C1=CC=C2C=CC=CC=C2C=1': {
+        'name': 'heptalene',
+        'tautomer_locant': None,
+        'ring_system': 'non-benzenoid',
+        'parent_atoms': 11,
+        'iupac_locants': {3: 1, 2: 2, 1: 3, 0: 4, 10: '4a', 9: 5, 8: 6, 7: 7, 6: 8, 5: '8a', 4: 9},
+    },
+    # 1H-Pyrazolo[3,4-b]pyridine
+    'c1cnc2[nH]ncc2c1': {
+        'name': '1H-pyrazolo[3,4-b]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'pyrazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Oxazolo[5,4-b]pyridine
+    'c1cnc2ncoc2c1': {
+        'name': 'oxazolo[5,4-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'oxazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Thiazolo[5,4-b]pyridine
+    'c1cnc2scnc2c1': {
+        'name': 'thiazolo[5,4-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thiazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Isoxazolo[5,4-b]pyridine
+    'c1cnc2oncc2c1': {
+        'name': 'isoxazolo[5,4-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'isoxazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Thieno[3,2-d]pyrimidine
+    'c1cnc2scnc2n1': {
+        'name': 'thieno[3,2-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyrimidine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Pyrido[2,3-c]pyridazine
+    'c1cnc2cnncc2c1': {
+        'name': 'pyrido[2,3-c]pyridazine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyridazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+    },
+    # Pyrazino[2,3-b]pyrazine
+    'c1cnc2nccnc2n1': {
+        'name': 'pyrazino[2,3-b]pyrazine',
+        'tautomer_locant': None,
+        'ring_system': 'pyrazinopyrazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+    },
+    # Pyrido[3,2-d]pyrimidine
+    'c1cc2ncncc2cn1': {
+        'name': 'pyrido[3,2-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyrimidine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 2, 1: 3, 2: '4a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '8a', 8: 8, 9: 1},
+    },
+    # Pyrido[4,3-d]pyrimidine
+    'c1cc2nccnc2cn1': {
+        'name': 'pyrido[4,3-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'pyridopyrimidine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 2, 1: 3, 2: '4a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '8a', 8: 8, 9: 1},
+    },
+    # Thieno[2,3-c]pyridine
+    'c1cc2ccsc2cn1': {
+        'name': 'thieno[2,3-c]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Thieno[3,4-b]pyridine
+    'c1cc2sccc2cn1': {
+        'name': 'thieno[3,4-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Furo[2,3-c]pyridine
+    'c1cc2occc2cn1': {
+        'name': 'furo[2,3-c]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'furopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # 1H-Pyrrolo[2,3-c]pyridine
+    'c1cc2[nH]ccc2cn1': {
+        'name': '1H-pyrrolo[2,3-c]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'azaindole',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Pyrazolo[1,5-a]pyridine
+    'c1cnn2cccc2c1': {
+        'name': 'pyrazolo[1,5-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+    },
+    # [1,2,3,4]Tetrazolo[1,5-a]pyridine
+    'c1ccn2nnnc2c1': {
+        'name': '[1,2,3,4]tetrazolo[1,5-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+    },
+    # [1,2,4]Triazolo[4,3-a]pyridine
+    'c1ccn2ncnc2c1': {
+        'name': '[1,2,4]triazolo[4,3-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+    },
+    # Imidazo[2,1-b]thiazole (5+5 bridgehead, 8 atoms)
+    'c1cn2ccsc2n1': {
+        'name': 'imidazo[2,1-b]thiazole',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 6, 1: 5, 2: '5a', 3: 3, 4: 2, 5: 1, 6: '3a', 7: 7},
+    },
+    # Pyrrolo[1,2-a]pyrimidine
+    'c1cc2ccncn2c1': {
+        'name': 'pyrrolo[1,2-a]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a'},
+    },
+    # Pyrrolo[1,2-a]pyrazine
+    'c1cc2cnccn2c1': {
+        'name': 'pyrrolo[1,2-a]pyrazine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a'},
+    },
+    # Pyrrolizidine (fully saturated, 8 atoms)
+    'C1CC2CCCN2C1': {
+        'name': 'pyrrolizidine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 8,
+        'iupac_locants': {7: 1, 0: 2, 1: 3, 2: '3a', 3: 5, 4: 6, 5: 7, 6: '7a'},
+    },
+    # Indolizidine (fully saturated, 9 atoms)
+    'C1CCN2CCCC2C1': {
+        'name': 'indolizidine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {8: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: '8a'},
+    },
+    # Phenoxathiin
+    'c1ccc2c(c1)Oc1ccccc1S2': {
+        'name': 'phenoxathiin',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 10, 6: '5a', 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 4},
+    },
+    # Furo[3,2-b]quinoline
+    'c1ccc2c(c1)oc1cccnc12': {
+        'name': 'furo[3,2-b]quinoline',
+        'tautomer_locant': None,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+    },
+    # Thieno[2,3-b]thiophene
+    'c1cc2sccc2s1': {
+        'name': 'thieno[2,3-b]thiophene',
+        'tautomer_locant': None,
+        'ring_system': 'thienothiophene',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 3, 1: 2, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 1},
+    },
+    # Thieno[3,2-b]thiophene
+    'c1cc2ccsc2s1': {
+        'name': 'thieno[3,2-b]thiophene',
+        'tautomer_locant': None,
+        'ring_system': 'thienothiophene',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: 1},
+    },
+    # Xanthine (3,7-dihydro-1H-purine-2,6-dione)
+    'O=c1[nH]c(=O)c2nc[nH]c2[nH]1': {
+        'name': 'xanthine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 11,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 'O2', 5: 5, 6: 7, 7: 8, 8: 9, 9: 4, 10: 3},
+    },
+    # Alloxazine (benzo[g]pteridine-2,4(1H,3H)-dione)
+    'O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1': {
+        'name': 'alloxazine',
+        'tautomer_locant': None,
+        'ring_system': 'pteridine-related',
+        'parent_atoms': 16,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'O2', 1: 2, 2: 3, 3: 4, 4: 'O4', 5: '4a', 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 10, 14: '10a', 15: 1},
+    },
+    # Pyrimido[4,5-d]pyrimidine
+    'c1ncc2ncncc2n1': {
+        'name': 'pyrimido[4,5-d]pyrimidine',
+        'tautomer_locant': None,
+        'ring_system': 'pyrimidopyrimidine',
+        'parent_atoms': 10,
+        'iupac_locants': {9: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: 8, 8: '8a'},
+    },
+    # 1H-Pyrrolo[2,3-b]pyrazine
+    'c1ncc2[nH]ccc2n1': {
+        'name': '1H-pyrrolo[2,3-b]pyrazine',
+        'tautomer_locant': 1,
+        'ring_system': 'pyrrolopyrazine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 1, 2: 6, 3: 5, 4: 7, 5: 8, 6: 9, 7: 4, 8: 3},
+    },
+    # 2H-Isothiochromene
+    'C1=Cc2ccccc2SC1': {
+        'name': '2H-isothiochromene',
+        'tautomer_locant': 2,
+        'ring_system': 'benzothiopyran',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 4, 1: 3, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
+    },
+    # Thiochromane
+    'c1ccc2c(c1)CCCS2': {
+        'name': 'thiochromane',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # 2,3-Dihydro-1,4-benzodioxine
+    'c1ccc2c(c1)OCCO2': {
+        'name': '2,3-dihydro-1,4-benzodioxine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # 2,3-Dihydro-1-benzothiophene
+    'c1ccc2c(c1)CCS2': {
+        'name': '2,3-dihydro-1-benzothiophene',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-saturated',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
+    },
+    # 1,2,3,4-Tetrahydroquinazoline
+    'c1ccc2c(c1)NCCN2': {
+        'name': '1,2,3,4-tetrahydroquinazoline',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # 3,4-Dihydroisoquinoline
+    'C1=NCc2ccccc2C1': {
+        'name': '3,4-dihydroisoquinoline',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 1, 1: 2, 2: 3, 9: 4, 8: '4a', 7: 5, 6: 6, 5: 7, 4: 8, 3: '8a'},
+    },
+    # 2,3-Dihydro-1H-pyrrolo[2,3-b]pyridine
+    'c1cnc2c(c1)CCN2': {
+        'name': '2,3-dihydro-1H-pyrrolo[2,3-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-saturated',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 3, 7: 2, 8: 1},
+    },
+    # Pyrazolo[1,5-a]pyrazine (bridgehead, 9 atoms)
+    'c1cnn2ccnc2c1': {
+        'name': 'pyrazolo[1,5-a]pyrazine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+    },
+    # 1H-Pyrazolo[3,4-c]pyridine
+    'c1cc2[nH]ncc2cn1': {
+        'name': '1H-pyrazolo[3,4-c]pyridine',
+        'tautomer_locant': 1,
+        'ring_system': 'pyrazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Thieno[2,3-d]pyridazine
+    'c1cc2ccsc2nn1': {
+        'name': 'thieno[2,3-d]pyridazine',
+        'tautomer_locant': None,
+        'ring_system': 'thienopyridazine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Oxazolo[5,4-c]pyridine
+    'c1cc2ncoc2cn1': {
+        'name': 'oxazolo[5,4-c]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'oxazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Thiazolo[5,4-c]pyridine
+    'c1cc2ncsc2cn1': {
+        'name': 'thiazolo[5,4-c]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'thiazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {5: 1, 4: 2, 3: 3, 2: '3a', 1: 4, 0: 5, 8: 6, 7: 7, 6: '7a'},
+    },
+    # Isoxazolo[4,5-b]pyridine
+    'c1cnc2nocc2c1': {
+        'name': 'isoxazolo[4,5-b]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'isoxazolopyridine',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # Pyrazino[2,3-c]pyridazine
+    'c1cc2nccnc2nn1': {
+        'name': 'pyrazino[2,3-c]pyridazine',
+        'tautomer_locant': None,
+        'ring_system': 'pyrazinopyridazine',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 2, 1: 3, 2: '4a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '8a', 8: 8, 9: 1},
+    },
 }
 
 
