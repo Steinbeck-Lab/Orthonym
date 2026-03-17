@@ -72,6 +72,11 @@ _HETEROATOM_SENIORITY = {
     'P': 1,
 }
 
+# Seniority order for P-44.2.1(g) term-by-term variety comparison.
+# Tuple position i represents the count of element _HETEROATOM_VARIETY_ORDER[i].
+# Negated counts so min() selects ring with MORE of senior element.
+_HETEROATOM_VARIETY_ORDER = ['N', 'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P']
+
 
 # ============================================================================
 # Ring System Type Classification
@@ -283,15 +288,17 @@ def ring_system_score(
     hierarchy (P-44.2.2). Type hierarchy is a tiebreaker within the
     same general criteria class.
 
-    Tuple ordering:
-    - -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
-    - -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
-    - -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
-    - -num_rings: P-44.2.1(d) more rings = senior (negated)
-    - -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
-    - -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
-    - -heteroatom_variety_score: P-44.2.1(g) more of senior type (negated)
-    - type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
+    Tuple ordering (17 elements):
+    - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
+    - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
+    - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
+    - [3]  -num_rings: P-44.2.1(d) more rings = senior (negated)
+    - [4]  -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
+    - [5]  -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
+    - [6..15] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
+              (-count_N, -count_F, -count_Cl, -count_Br, -count_I,
+               -count_O, -count_S, -count_Se, -count_Te, -count_P)
+    - [16] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
 
     Args:
         mol: RDKit Mol object
@@ -301,7 +308,7 @@ def ring_system_score(
         Tuple suitable for comparison with min() to select most senior
     """
     if not system_atoms:
-        return (0, 0, 0, 0, 0, 0, 0, 999)
+        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999,)
 
     # 1. Type rank
     type_rank = int(classify_ring_system_type(mol, system_atoms))
@@ -336,10 +343,12 @@ def ring_system_score(
     # Number of skeletal atoms
     num_skeletal_atoms = len(system_atoms)
 
-    # Heteroatom variety score: sum of (count * seniority) for each element
-    heteroatom_variety_score = sum(
-        count * _HETEROATOM_SENIORITY.get(elem, 0)
-        for elem, count in heteroatom_counts.items()
+    # P-44.2.1(g): heteroatom variety -- term-by-term comparison by seniority
+    # Build tuple: (-count_of_N, -count_of_F, ..., -count_of_P)
+    # Negated so min() selects ring with MORE of the most-senior element
+    heteroatom_variety_tuple = tuple(
+        -heteroatom_counts.get(elem, 0)
+        for elem in _HETEROATOM_VARIETY_ORDER
     )
 
     # P-44.2: General criteria (P-44.2.1) applied BEFORE type hierarchy (P-44.2.2)
@@ -350,7 +359,7 @@ def ring_system_score(
         -num_rings,                         # P-44.2.1(d): more rings = senior
         -num_skeletal_atoms,                # P-44.2.1(e): more atoms = senior
         -num_heteroatoms,                   # P-44.2.1(f): more heteroatoms
-        -heteroatom_variety_score,          # P-44.2.1(g): more of senior type
+        *heteroatom_variety_tuple,          # P-44.2.1(g): 10 elements, term-by-term
         type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
     )
 
