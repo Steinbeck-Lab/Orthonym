@@ -1334,8 +1334,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         suffix_locants = sorted(set(suffix_locants))
 
     # For terminal groups (acid, aldehyde), locant is implicit
-    from ..assembly.composer import TERMINAL_GROUPS
-    if principal_group in TERMINAL_GROUPS:
+    from ..assembly.naming_utils import should_omit_locant_one
+    if should_omit_locant_one(context="suffix", fg_type=principal_group):
         suffix_locants = []
 
     # Determine multiplier for multiple principal groups

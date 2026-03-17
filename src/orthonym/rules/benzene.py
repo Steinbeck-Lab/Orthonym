@@ -27,6 +27,7 @@ from ..assembly.naming_utils import (
     format_substituent_prefix,
     alpha_sort_key,
     is_complex_substituent,
+    should_omit_locant_one,
 )
 
 
@@ -1644,6 +1645,12 @@ def name_substituted_benzene(
 
     # For monosubstituted benzenes, omit the locant (it's always 1)
     is_monosubstituted = total_substituents == 1
+    _omit = should_omit_locant_one(
+        context="prefix",
+        is_ring=True,
+        is_heterocyclic=False,  # Benzene is always carbocyclic
+        is_monosubstituted=is_monosubstituted,
+    )
 
     # Build prefix strings, sorted alphabetically by substituent name
     prefixes = []
@@ -1651,7 +1658,7 @@ def name_substituted_benzene(
         locants = prefix_groups[name]
         count = len(locants)
 
-        if is_monosubstituted:
+        if _omit:
             # Monosubstituted: just "chloro", "methyl", etc. - no locant
             if name.startswith('(') or name.startswith('['):
                 # Already has enclosing marks (possibly internal, e.g.
@@ -2010,13 +2017,19 @@ def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
 
     total = sum(len(locs) for locs in prefix_groups.values())
     is_mono = total == 1
+    _omit = should_omit_locant_one(
+        context="prefix",
+        is_ring=True,
+        is_heterocyclic=False,  # Benzene is always carbocyclic
+        is_monosubstituted=is_mono,
+    )
 
     prefixes = []
     for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
         locants = prefix_groups[name]
         count = len(locants)
 
-        if is_mono:
+        if _omit:
             if name.startswith('(') or name.startswith('['):
                 # Already has enclosing marks -- keep as-is
                 prefix_str = name

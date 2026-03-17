@@ -22,18 +22,8 @@ from typing import Dict, List, Any, Optional
 
 from ..rules.seniority import get_suffix
 from ..rules.locants import get_functional_group_locants
+from .naming_utils import TERMINAL_FG_TYPES, should_omit_locant_one
 
-
-# Terminal functional groups whose locant is implicitly 1 (omitted from name)
-# Must be consistent with TERMINAL_GROUPS in composer.py
-TERMINAL_GROUPS = {
-    "carboxylic_acid",
-    "aldehyde",
-    "nitrile",
-    "primary_amide",
-    "secondary_amide",
-    "tertiary_amide",
-}
 
 # Polycyclic aromatic names that have fixed IUPAC numbering
 _NAMED_PAH_SYSTEMS = {
@@ -266,10 +256,10 @@ def resolve_suffix(features: Any, parent_info: ParentInfo) -> SuffixInfo:
             fg_count = len(fg_locants)
 
         # Terminal groups: locant implicitly 1, omit from name
-        if fg_name not in TERMINAL_GROUPS:
+        if not should_omit_locant_one(context="suffix", fg_type=fg_name):
             locants = fg_locants
 
-    is_terminal = fg_name in TERMINAL_GROUPS
+    is_terminal = fg_name in TERMINAL_FG_TYPES
 
     return SuffixInfo(
         text=suffix_text,

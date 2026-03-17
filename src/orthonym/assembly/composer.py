@@ -24,8 +24,10 @@ from .naming_utils import (
     alpha_sort_key,
     get_alkyl_name,
     is_complex_substituent,
+    should_omit_locant_one,
     SIMPLE_MULTIPLIERS,
     COMPLEX_MULTIPLIERS,
+    TERMINAL_FG_TYPES,
 )
 from ..data.chain_names import get_chain_prefix
 from .substituent_naming import name_substituent_fragment, _is_linear_alkyl
@@ -318,6 +320,7 @@ IGNORE_FOR_ALPHA = set(SIMPLE_MULTIPLIERS.values()) | set(COMPLEX_MULTIPLIERS.va
 
 # Terminal functional groups that NEVER include locants in the name
 # These are always at position 1 by definition (chain numbered from terminal group)
+# Canonical source: TERMINAL_FG_TYPES in naming_utils.py
 TERMINAL_GROUPS = {
     "carboxylic_acid",  # Always at chain end (locant 1)
     "aldehyde",         # Always at chain end (locant 1)
@@ -3539,8 +3542,7 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
             fg_count = len(fg_locants)
 
         # Terminal groups: locant is implicitly 1, do NOT include in name
-        if fg_name in TERMINAL_GROUPS:
-            # For terminal groups, we don't include the locant
+        if should_omit_locant_one(context="suffix", fg_type=fg_name):
             locants = ()
         else:
             # For non-terminal groups (alcohol, ketone), include locants
@@ -3790,17 +3792,15 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                 multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
                 prefix_text = f"{multiplier}{prefix_text}"
 
-            # Omit locants when they are trivially unambiguous:
-            # - Chain length 1 (methane derivatives): only position 1 exists
-            # - Single FG at position 1 on a chain with no principal group
+            # Omit locants when they are trivially unambiguous (centralized)
             chain = getattr(features, 'principal_chain', [])
             chain_len = len(chain)
-            omit_locants = False
-            if chain_len == 1:
-                omit_locants = True
-            elif (chain_len > 0 and features.principal_group is None
-                  and count == 1 and fg_locants == [1]):
-                omit_locants = True
+            omit_locants = should_omit_locant_one(
+                context="prefix",
+                chain_length=chain_len,
+                is_monosubstituted=(count == 1 and fg_locants == [1]
+                                    and features.principal_group is None),
+            )
 
             prefixes.append(NameFragment(
                 text=prefix_text,
@@ -4905,8 +4905,16 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         count = len(locants)
         sorted_locants = sorted(locants)
 
-        # Omit locant for monosubstituted hydrocarbons at position 1
-        if is_simple_hydrocarbon and total_substituents == 1 and sorted_locants == [1]:
+        # Omit locant for monosubstituted hydrocarbons at position 1.
+        # The is_monosubstituted guard encodes the full original condition so
+        # that multi-substituent methane derivatives still go through
+        # format_substituent_prefix for bracket wrapping.
+        if should_omit_locant_one(
+            context="prefix",
+            chain_length=len(getattr(features, 'principal_chain', [])),
+            is_monosubstituted=(is_simple_hydrocarbon and total_substituents == 1
+                                and sorted_locants == [1]),
+        ) and total_substituents == 1:
             formatted = name
             emit_locants = ()
         else:
@@ -5901,8 +5909,20 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     for name, locants in substituent_groups.items():
         count = len(locants)
 
-        if is_monosubstituted:
-            # Monosubstituted: omit locant (it's always 1)
+        # Determine if this ring is heterocyclic (for locant-1 elision decision)
+        _ring_is_heterocyclic = any(
+            mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+            for a in oriented_ring
+        )
+        _omit_locant = should_omit_locant_one(
+            context="prefix",
+            is_ring=True,
+            is_heterocyclic=_ring_is_heterocyclic,
+            is_monosubstituted=is_monosubstituted,
+        )
+
+        if _omit_locant:
+            # Monosubstituted carbocyclic ring: omit locant (it's always 1)
             # But complex substituents still need enclosing marks per
             # IUPAC P-14.5.2 (e.g., "(2-methylbut-2-en-1-yl)benzene")
             if is_complex_substituent(name) and not name.startswith('('):
@@ -6375,11 +6395,14 @@ def _build_hydrocarbon_name(
         # Saturated hydrocarbon
         return f"{stem}ane"
 
-    # Check if this is a 2-carbon chain (ethene/ethyne) where locants are omitted
-    is_two_carbon = stem == "eth"
-
-    # For mono-cycloalkenes, locant is omitted (cyclohexene, not cyclohex-1-ene)
-    omit_mono_cycloalkene_locant = is_cyclic and num_double == 1 and num_triple == 0
+    # Centralized bond locant elision: ethene/ethyne (2-carbon) and mono-cycloalkenes
+    _chain_len = 2 if stem == "eth" else 0
+    omit_bond_locant = should_omit_locant_one(
+        context="bond",
+        chain_length=_chain_len,
+        is_ring=is_cyclic,
+        is_monosubstituted=(num_double == 1 and num_triple == 0),
+    )
 
     # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
     # used when multiple bonds have multiplied locants (diene, diyne, etc.)
@@ -6391,9 +6414,7 @@ def _build_hydrocarbon_name(
 
     if num_double > 0:
         if num_double == 1:
-            if is_two_carbon and num_triple == 0:
-                segments.append((None, "", "en"))
-            elif omit_mono_cycloalkene_locant:
+            if omit_bond_locant:
                 segments.append((None, "", "en"))
             else:
                 loc_str = ",".join(str(loc) for loc in double_locants)
@@ -6405,7 +6426,7 @@ def _build_hydrocarbon_name(
 
     if num_triple > 0:
         if num_triple == 1:
-            if is_two_carbon and num_double == 0:
+            if omit_bond_locant and num_double == 0:
                 segments.append((None, "", "yn"))
             else:
                 loc_str = ",".join(str(loc) for loc in triple_locants)
