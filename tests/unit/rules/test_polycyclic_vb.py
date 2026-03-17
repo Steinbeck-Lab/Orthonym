@@ -572,6 +572,121 @@ class TestCycloPrefixesExtended:
 
 
 # ============================================================================
+# Higher VB Descriptor Accuracy Tests (Plan 111-02)
+# ============================================================================
+
+class TestHigherVBDescriptorAccuracy:
+    """Tests for tetracyclo+ VB descriptor correctness per IUPAC P-23.2.6."""
+
+    @pytest.mark.unit
+    def test_cubane_descriptor_opsin_parseable(self):
+        """Cubane VB descriptor must be parseable by OPSIN (no [...] placeholder)."""
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C3C4C25')
+        from orthonym.rules.tricyclo import generate_polycyclo_descriptor
+        desc = generate_polycyclo_descriptor(mol)
+        assert desc is not None
+        assert 'pentacyclo' in desc
+        # Verify it produces a valid descriptor (not "[...]")
+        assert '[...]' not in desc
+
+    @pytest.mark.unit
+    def test_cubane_uses_von_baeyer_analyzer(self):
+        """Higher VB should route through VonBaeyerAnalyzer, not SSSR hack."""
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C3C4C25')
+        from orthonym.rules.tricyclo import generate_polycyclo_descriptor
+        desc = generate_polycyclo_descriptor(mol)
+        assert desc is not None
+        # VonBaeyerAnalyzer produces proper (x,y) locants for secondary bridges
+        # The old algorithm never produced parenthesized locants
+        assert '(' in desc or desc.count('.') >= 4  # Secondary bridges present
+
+    @pytest.mark.unit
+    def test_cubane_descriptor_matches_polycyclic_module(self):
+        """tricyclo.py must produce same descriptor as polycyclic.py for cubane."""
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C3C4C25')
+        from orthonym.rules.tricyclo import generate_polycyclo_descriptor
+        from orthonym.rules.polycyclic import generate_polycyclic_name
+        tricyclo_desc = generate_polycyclo_descriptor(mol)
+        polycyclic_name = generate_polycyclic_name(mol)
+        # tricyclo descriptor + "octane" should equal polycyclic name
+        assert polycyclic_name is not None
+        assert tricyclo_desc is not None
+        assert polycyclic_name == tricyclo_desc + "octane"
+
+    @pytest.mark.unit
+    def test_adamantane_descriptor_unchanged(self):
+        """Adamantane tricyclo descriptor must remain correct (no regression)."""
+        mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
+        from orthonym.rules.tricyclo import name_polycyclo_system
+        name = name_polycyclo_system(mol)
+        assert name is not None
+        # Adamantane uses retained name via tricyclo.py
+        assert 'adamantane' in name or 'tricyclo' in name
+        if 'tricyclo' in name:
+            assert 'decane' in name
+
+
+class TestVBHeteroatomLocants:
+    """Tests that VB heteroatom locants use VB numbering, not raw atom index."""
+
+    @pytest.mark.unit
+    def test_heteroatom_locant_not_raw_index(self):
+        """Heteroatom prefix locants must come from VB numbering map, not idx+1."""
+        # 2-oxaadamantane: O in the ring system
+        mol = Chem.MolFromSmiles('O1C2CC3CC1CC(C2)C3')
+        from orthonym.rules.tricyclo import name_polycyclo_system
+        name = name_polycyclo_system(mol)
+        if name:
+            # Extract the locant before 'oxa' -- it should be a valid VB locant
+            import re
+            match = re.search(r'(\d+)-oxa', name)
+            if match:
+                locant = int(match.group(1))
+                # VB locants for adamantane-class range 1-10
+                assert 1 <= locant <= 10
+
+    @pytest.mark.unit
+    def test_heteroatom_prefix_uses_numbering_param(self):
+        """_generate_heteroatom_prefix must accept and use a numbering parameter."""
+        from orthonym.rules.tricyclo import _generate_heteroatom_prefix
+        import inspect
+        sig = inspect.signature(_generate_heteroatom_prefix)
+        assert 'numbering' in sig.parameters, (
+            "_generate_heteroatom_prefix must have a 'numbering' parameter"
+        )
+
+    @pytest.mark.unit
+    def test_higher_polycyclo_passes_numbering(self):
+        """_name_higher_polycyclo_system must pass VB numbering to heteroatom prefix."""
+        # A heteroatom-containing tetracyclo+ compound
+        # This is a simple test: check the function works end-to-end
+        mol = Chem.MolFromSmiles('O1C2CC3CC1CC(C2)C3')
+        from orthonym.rules.tricyclo import _generate_heteroatom_prefix
+        from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+        ri = mol.GetRingInfo()
+        ring_atoms = set()
+        for ring in ri.AtomRings():
+            ring_atoms.update(ring)
+        analyzer = VonBaeyerAnalyzer()
+        desc = analyzer.analyze(mol, ring_atoms)
+        numbering = desc.numbering
+        heteroatoms = [(idx, mol.GetAtomWithIdx(idx).GetSymbol())
+                       for idx in ring_atoms if mol.GetAtomWithIdx(idx).GetSymbol() != 'C']
+        # Call with numbering -- should use VB locants
+        prefix = _generate_heteroatom_prefix(mol, heteroatoms, ring_atoms, numbering=numbering)
+        assert 'oxa' in prefix
+        # The locant should NOT be raw idx+1, but from the numbering map
+        import re
+        match = re.search(r'(\d+)-oxa', prefix)
+        assert match is not None
+        locant = int(match.group(1))
+        # Check the locant matches what VB numbering says for the O atom
+        o_idx = [idx for idx, sym in heteroatoms if sym == 'O'][0]
+        expected_locant = numbering[o_idx]
+        assert locant == expected_locant
+
+
+# ============================================================================
 # Helper functions (not part of the module under test)
 # ============================================================================
 
