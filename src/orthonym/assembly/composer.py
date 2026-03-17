@@ -2118,6 +2118,12 @@ def _is_complex_ring_system(mol) -> bool:
     if is_bicyclo_system(mol):
         return True
 
+    # Check spiro BEFORE polycyclic-bridged (P-24.2).
+    # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
+    # to return True. Spiro check must precede polycyclic to avoid misrouting.
+    if is_spiro_system(mol):
+        return True
+
     # Check polycyclic-bridged (tricyclo+ pure bridged systems)
     if is_polycyclic_system(mol):
         return True
@@ -2125,10 +2131,6 @@ def _is_complex_ring_system(mol) -> bool:
     # Check fused rings (ortho-fused or ortho-peri-fused)
     fused_type = classify_fused_system(mol)
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
-        return True
-
-    # Check spiro (two rings sharing one atom)
-    if is_spiro_system(mol):
         return True
 
     return False
@@ -2226,6 +2228,13 @@ def _classify_complex_ring(mol) -> str:
             if fused_type in ('ortho-fused', 'ortho-peri-fused'):
                 return fused_type
 
+    # Check spiro BEFORE polycyclic-bridged (P-24.2).
+    # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
+    # to return True. The refined is_spiro_system() checks n_rings == n_spiro + 1,
+    # so complex polycyclic molecules with incidental spiro atoms are excluded.
+    if is_spiro_system(mol):
+        return 'spiro'
+
     # Check polycyclic-bridged (tricyclo+ bridged systems) BEFORE fused
     # This is critical: is_polycyclic_system correctly distinguishes
     # TRUE bridged systems (adamantane) from fused systems (perylene)
@@ -2238,10 +2247,6 @@ def _classify_complex_ring(mol) -> str:
     fused_type = classify_fused_system(mol)
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
         return fused_type
-
-    # Check spiro
-    if is_spiro_system(mol):
-        return 'spiro'
 
     return 'simple'
 

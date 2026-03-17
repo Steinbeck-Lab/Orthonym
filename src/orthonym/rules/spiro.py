@@ -1,22 +1,28 @@
 """
 Spiro compound naming module.
 
-Handles naming of spiro systems where two rings share exactly one atom
-(the spiro center). Generates IUPAC spiro[a.b] descriptors.
+Handles naming of spiro systems where rings share exactly one atom each
+(the spiro center). Generates IUPAC spiro[a.b] descriptors for monospiro
+and dispiro[a.b.c.d] for polyspiro compounds.
 
-IUPAC P-31.3 rules for spiro naming:
-- Spiro descriptor: spiro[a.b] where a <= b (P-31.3.1.1)
+IUPAC P-31.3 / P-24.2 rules for spiro naming:
+- Monospiro descriptor: spiro[a.b] where a <= b (P-31.3.1.1)
 - a = smaller_ring_size - 1, b = larger_ring_size - 1
 - The -1 accounts for the shared spiro center
 - Numbering starts at atom adjacent to spiro center in smaller ring (P-31.3.1.2)
 - Goes around smaller ring, through spiro center, then around larger ring
 
-IUPAC P-31.3.2: heterocyclic spiro compounds use 'a' replacement prefixes
-IUPAC P-31.3.3: di/trispiro naming for multiple spiro centers
+IUPAC P-24.2.2: dispiro/trispiro naming for multiple spiro centers
+- dispiro[a.b.c.d] where a,b,c,d are segment sizes between spiro atoms
+- Numbering starts in terminal ring, proceeds through spiro atoms
+
+IUPAC P-24.2.4.1: heterocyclic spiro compounds use skeletal replacement
+'a' prefixes (oxa, aza, thia, etc.) with locants from spiro numbering
 
 Examples:
     spiro[4.5]decane - cyclopentane fused to cyclohexane (5-1=4, 6-1=5)
     spiro[5.5]undecane - two cyclohexanes sharing one carbon (6-1=5, 6-1=5)
+    dispiro[2.1.2.1]octane - three rings sharing two spiro centers
 """
 
 from typing import Dict, List, Optional, Set, Tuple
@@ -24,42 +30,49 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..perception.rings import get_spiro_atoms
-
+from ..rules.polycyclic_bridged import get_heteroatom_prefix
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 
+# Polyspiro prefix names indexed by number of spiro centers
+_POLYSPIRO_PREFIXES = [
+    '',           # 0 (unused)
+    'spiro',      # 1 = monospiro
+    'dispiro',    # 2
+    'trispiro',   # 3
+    'tetraspiro', # 4
+    'pentaspiro', # 5
+]
+
 
 def is_spiro_system(mol) -> bool:
     """
-    Check if molecule contains a spiro system.
+    Check if molecule is a pure spiro system.
 
-    For simple spiro: exactly 1 spiro atom and 2 rings.
-    For dispiro/trispiro: multiple spiro atoms (future support).
+    A pure spiro system has N spiro atoms connecting N+1 rings, with
+    no additional fused or bridged ring junctions. Molecules that have
+    spiro atoms but also have additional polycyclic complexity (fused,
+    bridged, etc.) are NOT classified as spiro systems.
 
     Args:
         mol: RDKit Mol object
 
     Returns:
-        True if molecule has at least one spiro center
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')  # spiro[4.5]decane
-        >>> is_spiro_system(mol)
-        True
-        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
-        >>> is_spiro_system(mol)
-        False
+        True if molecule is a pure spiro system
     """
     spiro_atoms = get_spiro_atoms(mol)
-
     if not spiro_atoms:
         return False
 
-    # For simple monospiro: exactly 1 spiro atom
-    # The get_spiro_atoms function already validates that each spiro atom
-    # is shared by exactly 2 rings
-    return len(spiro_atoms) >= 1
+    # A pure spiro system with N spiro atoms should have exactly N+1 SSSR rings.
+    # If there are more rings, the molecule has additional fused/bridged
+    # ring junctions and should not be classified as a spiro system.
+    ri = mol.GetRingInfo()
+    n_rings = ri.NumRings()
+    n_spiro = len(spiro_atoms)
+
+    return n_rings == n_spiro + 1
 
 
 def get_spiro_ring_sizes(mol, spiro_center: int) -> Tuple[int, int]:
@@ -75,16 +88,8 @@ def get_spiro_ring_sizes(mol, spiro_center: int) -> Tuple[int, int]:
 
     Raises:
         ValueError: If spiro_center is not in exactly 2 rings
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')  # spiro[4.5]decane
-        >>> spiro_atoms = list(get_spiro_atoms(mol))
-        >>> get_spiro_ring_sizes(mol, spiro_atoms[0])
-        (5, 6)
     """
     ri = mol.GetRingInfo()
-
-    # Find all rings containing the spiro center
     rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
 
     if len(rings_containing) != 2:
@@ -95,55 +100,426 @@ def get_spiro_ring_sizes(mol, spiro_center: int) -> Tuple[int, int]:
 
     size1 = len(rings_containing[0])
     size2 = len(rings_containing[1])
-
-    # Return sorted (smaller first)
     return (min(size1, size2), max(size1, size2))
 
 
 def generate_spiro_descriptor(mol) -> Optional[str]:
     """
-    Generate the spiro[a.b] descriptor for a spiro compound.
+    Generate the spiro descriptor for a spiro compound.
 
-    For simple monospiro compounds (one spiro center), returns spiro[a.b]
-    where a and b are (ring_size - 1) for each ring, with a <= b.
+    For monospiro (1 spiro center): spiro[a.b] where a <= b.
+    For polyspiro (2+ spiro centers): dispiro[a.b.c.d], trispiro[...], etc.
 
     Args:
         mol: RDKit Mol object
 
     Returns:
-        Spiro descriptor string like "spiro[4.5]", or None if not spiro
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')  # spiro[4.5]decane
-        >>> generate_spiro_descriptor(mol)
-        'spiro[4.5]'
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCCC2')  # spiro[5.5]undecane
-        >>> generate_spiro_descriptor(mol)
-        'spiro[5.5]'
+        Spiro descriptor string like "spiro[4.5]" or "dispiro[2.1.2.1]",
+        or None if not spiro
     """
     spiro_atoms = get_spiro_atoms(mol)
-
     if not spiro_atoms:
         return None
 
-    # For now, handle only simple monospiro (one spiro center)
-    # Dispiro/trispiro support can be added later
-    if len(spiro_atoms) != 1:
-        return None  # TODO: Handle dispiro, trispiro
+    if len(spiro_atoms) == 1:
+        spiro_center = list(spiro_atoms)[0]
+        try:
+            smaller_ring, larger_ring = get_spiro_ring_sizes(mol, spiro_center)
+        except ValueError:
+            return None
+        a = smaller_ring - 1
+        b = larger_ring - 1
+        return f"spiro[{a}.{b}]"
 
-    spiro_center = list(spiro_atoms)[0]
+    # Polyspiro (dispiro, trispiro, etc.)
+    return _generate_polyspiro_descriptor(mol, spiro_atoms)
 
-    try:
-        smaller_ring, larger_ring = get_spiro_ring_sizes(mol, spiro_center)
-    except ValueError:
+
+def _generate_polyspiro_descriptor(mol, spiro_atoms: Set[int]) -> Optional[str]:
+    """
+    Generate the polyspiro descriptor (dispiro, trispiro, etc.).
+
+    For N spiro centers sharing N+1 rings, the descriptor has 2*N segments.
+    """
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+
+    ring_chain, spiro_chain = _build_ring_chain(mol, all_rings, spiro_atoms)
+    if ring_chain is None or spiro_chain is None:
+        return None
+    if len(spiro_chain) != len(spiro_atoms):
         return None
 
-    # IUPAC P-31.3.1.1: descriptor values are ring_size - 1
-    # (excluding double-counted spiro center)
-    a = smaller_ring - 1
-    b = larger_ring - 1
+    segments = _compute_spiro_segments(mol, ring_chain, spiro_chain)
+    if not segments:
+        return None
 
-    return f"spiro[{a}.{b}]"
+    n_spiro = len(spiro_atoms)
+    if n_spiro < len(_POLYSPIRO_PREFIXES):
+        prefix = _POLYSPIRO_PREFIXES[n_spiro]
+    else:
+        prefix = f'{n_spiro}spiro'
+
+    seg_str = '.'.join(str(s) for s in segments)
+    return f"{prefix}[{seg_str}]"
+
+
+def _build_ring_chain(
+    mol,
+    all_rings: List[List[int]],
+    spiro_atoms: Set[int],
+) -> Tuple[Optional[List[List[int]]], Optional[List[int]]]:
+    """
+    Build an ordered chain of rings connected by spiro atoms.
+
+    For dispiro (2 spiro atoms, 3 rings):
+    result = [terminal_ring_1, middle_ring, terminal_ring_2]
+    spiro_order = [spiro_atom_1, spiro_atom_2]
+    """
+    ring_spiro_map = []
+    for ring in all_rings:
+        ring_set = set(ring)
+        shared = ring_set & spiro_atoms
+        ring_spiro_map.append(shared)
+
+    terminal_indices = [i for i, s in enumerate(ring_spiro_map) if len(s) == 1]
+    if len(terminal_indices) < 2:
+        return None, None
+
+    n_rings = len(all_rings)
+    ring_adj: Dict[int, List[Tuple[int, int]]] = {i: [] for i in range(n_rings)}
+    for i in range(n_rings):
+        for j in range(i + 1, n_rings):
+            common_spiro = ring_spiro_map[i] & ring_spiro_map[j]
+            if common_spiro:
+                for sa in common_spiro:
+                    ring_adj[i].append((j, sa))
+                    ring_adj[j].append((i, sa))
+
+    best_result = None
+
+    for start_idx in terminal_indices:
+        visited_rings = {start_idx}
+        chain = [all_rings[start_idx]]
+        spiro_order: List[int] = []
+        current = start_idx
+
+        while True:
+            found_next = False
+            for next_ring, via_spiro in ring_adj[current]:
+                if next_ring not in visited_rings:
+                    visited_rings.add(next_ring)
+                    chain.append(all_rings[next_ring])
+                    spiro_order.append(via_spiro)
+                    current = next_ring
+                    found_next = True
+                    break
+            if not found_next:
+                break
+
+        if len(spiro_order) == len(spiro_atoms):
+            segments = _compute_spiro_segments(mol, chain, spiro_order)
+            if segments:
+                if best_result is None or segments < best_result[2]:
+                    best_result = (chain, spiro_order, segments)
+
+    if best_result is None:
+        return None, None
+    return best_result[0], best_result[1]
+
+
+def _compute_spiro_segments(
+    mol,
+    ring_chain: List[List[int]],
+    spiro_chain: List[int],
+) -> List[int]:
+    """
+    Compute the segment sizes for a polyspiro descriptor.
+
+    For dispiro with ring_chain = [ring_A, ring_B, ring_C] and
+    spiro_chain = [s1, s2]:
+    - Segment 1: non-spiro atoms in ring_A
+    - Segment 2: one path through ring_B between s1 and s2
+    - Segment 3: non-spiro atoms in ring_C
+    - Segment 4: other path through ring_B between s1 and s2
+    """
+    segments: List[int] = []
+    n_rings = len(ring_chain)
+
+    for ring_idx in range(n_rings):
+        ring = ring_chain[ring_idx]
+        ring_set = set(ring)
+        spiro_in_ring = [s for s in spiro_chain if s in ring_set]
+
+        if len(spiro_in_ring) == 1:
+            # Terminal ring: one segment = non-spiro atoms
+            seg = len(ring) - 1
+            segments.append(seg)
+
+        elif len(spiro_in_ring) == 2:
+            # Middle ring: two segments (two paths between the two spiro atoms)
+            s1, s2 = spiro_in_ring[0], spiro_in_ring[1]
+            path1, path2 = _find_two_paths(mol, ring, s1, s2)
+            seg_a = len(path1) - 2
+            seg_b = len(path2) - 2
+            segments.append(min(seg_a, seg_b))
+            segments.append(max(seg_a, seg_b))
+
+    # Reorder for IUPAC format: interleave terminal and middle ring segments
+    if n_rings >= 3:
+        segments = _reorder_segments_iupac(segments, n_rings)
+
+    return segments
+
+
+def _reorder_segments_iupac(
+    raw_segments: List[int],
+    n_rings: int,
+) -> List[int]:
+    """
+    Reorder segments from ring-sequential order to IUPAC descriptor order.
+
+    Ring-sequential: [term1, mid_short, mid_long, term2]
+    IUPAC: [term1, mid_short, term2, mid_long]
+    """
+    if n_rings == 3 and len(raw_segments) == 4:
+        return [raw_segments[0], raw_segments[1], raw_segments[3], raw_segments[2]]
+    return raw_segments
+
+
+def _find_two_paths(
+    mol,
+    ring: List[int],
+    start: int,
+    end: int,
+) -> Tuple[List[int], List[int]]:
+    """
+    Find the two paths around a ring between start and end atoms.
+    """
+    ring_set = set(ring)
+    adj: Dict[int, List[int]] = {a: [] for a in ring}
+    for a in ring:
+        atom = mol.GetAtomWithIdx(a)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ring_set:
+                adj[a].append(nbr.GetIdx())
+
+    neighbors_of_start = [n for n in adj[start] if n in ring_set]
+    if len(neighbors_of_start) < 2:
+        return ([start, end], [start, end])
+
+    path1 = _ring_walk_to(adj, start, end, neighbors_of_start[0])
+    path2 = _ring_walk_to(adj, start, end, neighbors_of_start[1])
+    return path1, path2
+
+
+def _ring_walk_to(
+    adj: Dict[int, List[int]],
+    start: int,
+    end: int,
+    first_step: int,
+) -> List[int]:
+    """Walk around a ring from start via first_step until we reach end."""
+    path = [start, first_step]
+    visited = {start, first_step}
+    current = first_step
+
+    max_steps = len(adj) + 1
+    for _ in range(max_steps):
+        if current == end:
+            break
+        for nbr in adj[current]:
+            if nbr not in visited:
+                path.append(nbr)
+                visited.add(nbr)
+                current = nbr
+                break
+    return path
+
+
+def _walk_ring_from_spiro(
+    mol,
+    ring: List[int],
+    spiro_center: int,
+    already_visited: Set[int],
+) -> List[int]:
+    """
+    Walk around a ring starting from the atom adjacent to spiro_center,
+    going around the ring and ending at spiro_center.
+    Returns atoms in walk order: [non-spiro atoms..., spiro_center]
+    """
+    ring_set = set(ring)
+    spiro_atom = mol.GetAtomWithIdx(spiro_center)
+
+    ring_neighbors = []
+    for nbr in spiro_atom.GetNeighbors():
+        if nbr.GetIdx() in ring_set and nbr.GetIdx() != spiro_center:
+            ring_neighbors.append(nbr.GetIdx())
+
+    if not ring_neighbors:
+        return list(ring)
+
+    start = None
+    for nbr in ring_neighbors:
+        if nbr not in already_visited:
+            start = nbr
+            break
+    if start is None:
+        start = ring_neighbors[0]
+
+    ordered = [start]
+    walk_visited = {start, spiro_center}
+
+    current = start
+    while len(ordered) < len(ring) - 1:
+        atom = mol.GetAtomWithIdx(current)
+        found = False
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in ring_set and nbr_idx not in walk_visited:
+                ordered.append(nbr_idx)
+                walk_visited.add(nbr_idx)
+                current = nbr_idx
+                found = True
+                break
+        if not found:
+            break
+
+    ordered.append(spiro_center)
+    return ordered
+
+
+def _walk_ring_between_spiros(
+    mol,
+    ring: List[int],
+    entry_spiro: int,
+    exit_spiro: int,
+    already_visited: Set[int],
+) -> List[int]:
+    """Walk through a middle ring from entry_spiro to exit_spiro."""
+    path1, path2 = _find_two_paths(mol, ring, entry_spiro, exit_spiro)
+    unvisited1 = sum(1 for a in path1 if a not in already_visited)
+    unvisited2 = sum(1 for a in path2 if a not in already_visited)
+    return path1 if unvisited1 >= unvisited2 else path2
+
+
+def _walk_unvisited_ring_atoms(
+    mol,
+    ring: List[int],
+    entry_spiro: int,
+    already_visited: Set[int],
+) -> List[int]:
+    """Walk the unvisited portion of a middle ring."""
+    ring_set = set(ring)
+    unvisited = [a for a in ring if a not in already_visited]
+    if not unvisited:
+        return []
+
+    start = None
+    for a in unvisited:
+        atom = mol.GetAtomWithIdx(a)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in already_visited and nbr.GetIdx() in ring_set:
+                start = a
+                break
+        if start:
+            break
+
+    if start is None:
+        return unvisited
+
+    ordered = [start]
+    walk_visited = {start}
+    current = start
+    while len(ordered) < len(unvisited):
+        atom = mol.GetAtomWithIdx(current)
+        found = False
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if (nbr_idx in ring_set
+                    and nbr_idx not in walk_visited
+                    and nbr_idx not in already_visited):
+                ordered.append(nbr_idx)
+                walk_visited.add(nbr_idx)
+                current = nbr_idx
+                found = True
+                break
+        if not found:
+            break
+    return ordered
+
+
+def _build_polyspiro_numbering_sequence(
+    mol,
+    ring_chain: List[List[int]],
+    spiro_chain: List[int],
+) -> List[int]:
+    """
+    Build the IUPAC numbering sequence for a polyspiro system.
+    """
+    n_rings = len(ring_chain)
+    sequence: List[int] = []
+    visited: Set[int] = set()
+
+    for ring_idx in range(n_rings):
+        ring = ring_chain[ring_idx]
+
+        if ring_idx == 0:
+            entry_spiro = spiro_chain[0]
+            ordered = _walk_ring_from_spiro(mol, ring, entry_spiro, visited)
+            for a in ordered:
+                if a not in visited:
+                    sequence.append(a)
+                    visited.add(a)
+        elif ring_idx == n_rings - 1:
+            entry_spiro = spiro_chain[-1]
+            ordered = _walk_ring_from_spiro(mol, ring, entry_spiro, visited)
+            for a in ordered:
+                if a not in visited:
+                    sequence.append(a)
+                    visited.add(a)
+        else:
+            entry_spiro = spiro_chain[ring_idx - 1]
+            exit_spiro = spiro_chain[ring_idx]
+            path = _walk_ring_between_spiros(
+                mol, ring, entry_spiro, exit_spiro, visited
+            )
+            for a in path:
+                if a not in visited:
+                    sequence.append(a)
+                    visited.add(a)
+
+    # Return path through middle rings (remaining unvisited atoms)
+    for ring_idx in range(n_rings - 2, 0, -1):
+        ring = ring_chain[ring_idx]
+        unvisited_in_ring = [a for a in ring if a not in visited]
+        if unvisited_in_ring:
+            entry_spiro = spiro_chain[ring_idx]
+            path = _walk_unvisited_ring_atoms(mol, ring, entry_spiro, visited)
+            for a in path:
+                if a not in visited:
+                    sequence.append(a)
+                    visited.add(a)
+
+    return sequence
+
+
+def _get_polyspiro_numbering(
+    mol, spiro_atoms: Set[int]
+) -> Optional[Dict[int, int]]:
+    """Generate IUPAC numbering for a polyspiro system."""
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+
+    ring_chain, spiro_chain = _build_ring_chain(mol, all_rings, spiro_atoms)
+    if ring_chain is None:
+        return None
+
+    sequence = _build_polyspiro_numbering_sequence(mol, ring_chain, spiro_chain)
+    if not sequence:
+        return None
+
+    return {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
 
 
 def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
@@ -162,17 +538,8 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
 
     Returns:
         Dictionary mapping atom index to IUPAC locant (1-indexed)
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')  # spiro[4.5]decane
-        >>> spiro_atoms = list(get_spiro_atoms(mol))
-        >>> numbering = get_spiro_numbering(mol, spiro_atoms[0])
-        >>> len(numbering) == 10  # 10 atoms total
-        True
     """
     ri = mol.GetRingInfo()
-
-    # Get the two rings
     rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
 
     if len(rings_containing) != 2:
@@ -181,7 +548,6 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
     ring1 = list(rings_containing[0])
     ring2 = list(rings_containing[1])
 
-    # Determine which is smaller
     if len(ring1) <= len(ring2):
         smaller_ring = ring1
         larger_ring = ring2
@@ -189,73 +555,42 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
         smaller_ring = ring2
         larger_ring = ring1
 
-    # Find position of spiro center in each ring
     spiro_pos_small = smaller_ring.index(spiro_center)
     spiro_pos_large = larger_ring.index(spiro_center)
 
-    # Reorder smaller ring to put spiro center at the end
-    # We want to start at the atom AFTER the spiro center (going around the ring)
     reordered_small = (
-        smaller_ring[spiro_pos_small + 1:] +
-        smaller_ring[:spiro_pos_small + 1]
+        smaller_ring[spiro_pos_small + 1:]
+        + smaller_ring[:spiro_pos_small + 1]
     )
-
-    # Reorder larger ring to put spiro center at the start
-    # (we continue from spiro center into larger ring)
     reordered_large = (
-        larger_ring[spiro_pos_large + 1:] +
-        larger_ring[:spiro_pos_large]  # Exclude spiro center (already numbered)
+        larger_ring[spiro_pos_large + 1:]
+        + larger_ring[:spiro_pos_large]
     )
 
-    # Combine: smaller ring (excluding spiro) + spiro center + larger ring (excluding spiro)
-    # The spiro center is at position len(smaller_ring) - 1 in smaller_ring
-    # Actually: start at atom after spiro in smaller, go around smaller,
-    # spiro center is numbered, then continue around larger
+    sequence = reordered_small[:-1]
+    sequence.append(spiro_center)
+    sequence.extend(reordered_large)
 
-    # Build the numbering sequence
-    # smaller ring atoms (excluding spiro center, starting from atom after spiro)
-    sequence = reordered_small[:-1]  # All except the spiro center at the end
-    sequence.append(spiro_center)     # Add spiro center
-    sequence.extend(reordered_large)  # Add larger ring atoms (excluding spiro)
-
-    # Create atom_to_locant mapping (1-indexed)
     atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
-
     return atom_to_locant
 
 
-def _get_ring_adjacent_to_spiro(mol, ring_atoms: List[int], spiro_center: int) -> List[int]:
-    """
-    Order ring atoms starting from atom adjacent to spiro center.
-
-    Finds the two neighbors of spiro center that are in this ring,
-    then returns the ring in order starting from one of them.
-
-    Args:
-        mol: RDKit Mol object
-        ring_atoms: List of atom indices in the ring
-        spiro_center: Atom index of the spiro center
-
-    Returns:
-        Ring atoms in order starting from atom adjacent to spiro center
-    """
+def _get_ring_adjacent_to_spiro(
+    mol, ring_atoms: List[int], spiro_center: int
+) -> List[int]:
+    """Order ring atoms starting from atom adjacent to spiro center."""
     ring_set = set(ring_atoms)
     spiro_atom = mol.GetAtomWithIdx(spiro_center)
 
-    # Find neighbors of spiro center that are in this ring
     ring_neighbors = []
     for neighbor in spiro_atom.GetNeighbors():
         if neighbor.GetIdx() in ring_set:
             ring_neighbors.append(neighbor.GetIdx())
 
     if len(ring_neighbors) != 2:
-        return ring_atoms  # Unexpected, return as-is
+        return ring_atoms
 
-    # Start from the first ring neighbor and walk around the ring
-    # Choose the neighbor that gives the correct direction
     start_atom = ring_neighbors[0]
-
-    # Build ordered ring starting from start_atom
     ordered = [start_atom]
     visited = {start_atom}
     current = start_atom
@@ -288,14 +623,8 @@ def get_spiro_substituents(
 
     Returns:
         Dictionary mapping locant to substituent name
-
-    Note:
-        For simple unsubstituted spiro compounds, returns empty dict.
-        Substituent naming will be implemented for Phase 6.
     """
     ri = mol.GetRingInfo()
-
-    # Get all atoms in the spiro system (both rings)
     rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
 
     spiro_atoms = set()
@@ -303,20 +632,14 @@ def get_spiro_substituents(
         spiro_atoms.update(ring)
 
     substituents = {}
-
     for atom_idx in spiro_atoms:
         if atom_idx not in atom_to_locant:
             continue
-
         atom = mol.GetAtomWithIdx(atom_idx)
         locant = atom_to_locant[atom_idx]
-
-        # Find neighbors not in the spiro system
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()
             if nbr_idx not in spiro_atoms:
-                # This is a substituent
-                # For now, just count carbons for simple alkyl naming
                 carbon_count = _count_substituent_carbons(mol, nbr_idx, spiro_atoms)
                 if carbon_count > 0:
                     from ..data.chain_names import get_alkyl_name as _gal
@@ -329,7 +652,7 @@ def _count_substituent_carbons(mol, start_idx: int, exclude: Set[int]) -> int:
     """Count carbon atoms in a substituent group via BFS."""
     from collections import deque
 
-    visited = set()
+    visited: Set[int] = set()
     queue = deque([start_idx])
     count = 0
 
@@ -338,11 +661,9 @@ def _count_substituent_carbons(mol, start_idx: int, exclude: Set[int]) -> int:
         if atom_idx in visited or atom_idx in exclude:
             continue
         visited.add(atom_idx)
-
         atom = mol.GetAtomWithIdx(atom_idx)
         if atom.GetSymbol() == 'C':
             count += 1
-
         for neighbor in atom.GetNeighbors():
             nbr_idx = neighbor.GetIdx()
             if nbr_idx not in visited and nbr_idx not in exclude:
@@ -352,15 +673,7 @@ def _count_substituent_carbons(mol, start_idx: int, exclude: Set[int]) -> int:
 
 
 def _get_alkane_name(atom_count: int) -> str:
-    """
-    Get the alkane name for a given atom count.
-
-    Args:
-        atom_count: Total number of atoms (carbons) in the spiro system
-
-    Returns:
-        Alkane parent name (e.g., "decane", "undecane")
-    """
+    """Get the alkane name for a given atom count."""
     return f"{_get_chain_prefix(atom_count)}ane"
 
 
@@ -368,8 +681,8 @@ def name_spiro_system(mol) -> Optional[str]:
     """
     Generate the complete IUPAC name for a spiro compound.
 
-    For simple monospiro hydrocarbons, returns spiro[a.b]alkane
-    (e.g., "spiro[4.5]decane", "spiro[5.5]undecane").
+    Handles monospiro, dispiro, trispiro hydrocarbons and heterospiro
+    compounds with skeletal replacement 'a' prefixes.
 
     Args:
         mol: RDKit Mol object
@@ -378,61 +691,119 @@ def name_spiro_system(mol) -> Optional[str]:
         Complete spiro name, or None if not a valid spiro system
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')  # spiro[4.5]decane
+        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')
         >>> name_spiro_system(mol)
         'spiro[4.5]decane'
-        >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCCC2')  # spiro[5.5]undecane
-        >>> name_spiro_system(mol)
-        'spiro[5.5]undecane'
     """
     descriptor = generate_spiro_descriptor(mol)
-
     if descriptor is None:
         return None
 
-    spiro_atoms = get_spiro_atoms(mol)
+    spiro_atoms_set = get_spiro_atoms(mol)
+    n_spiro = len(spiro_atoms_set)
 
-    if len(spiro_atoms) != 1:
-        return None  # Only simple monospiro for now
-
-    spiro_center = list(spiro_atoms)[0]
-
-    # Get the two rings
     ri = mol.GetRingInfo()
-    rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
+    all_rings = [list(r) for r in ri.AtomRings()]
 
-    if len(rings_containing) != 2:
-        return None
+    if n_spiro == 1:
+        spiro_center = list(spiro_atoms_set)[0]
+        rings_containing = [r for r in all_rings if spiro_center in set(r)]
+        if len(rings_containing) != 2:
+            return None
+        total_atoms = len(rings_containing[0]) + len(rings_containing[1]) - 1
+    else:
+        spiro_ring_atoms: Set[int] = set()
+        for ring in all_rings:
+            ring_set = set(ring)
+            if ring_set & spiro_atoms_set:
+                spiro_ring_atoms |= ring_set
+        total_atoms = len(spiro_ring_atoms)
 
-    # Count total carbons in the spiro system
-    # This is (ring1_size + ring2_size - 1) because spiro center is shared
-    ring1_size = len(rings_containing[0])
-    ring2_size = len(rings_containing[1])
-    total_atoms = ring1_size + ring2_size - 1  # -1 for shared spiro center
-
-    # Get the alkane parent name
     parent_name = _get_alkane_name(total_atoms)
 
-    # For heterospiro, we would add heteroatom prefixes here
-    # For now, just handle hydrocarbon spiro compounds
+    # Collect all ring atoms in the spiro system
+    ring_atoms_to_check: Set[int] = set()
+    for ring in all_rings:
+        ring_set = set(ring)
+        if ring_set & spiro_atoms_set:
+            ring_atoms_to_check |= ring_set
 
-    # Check for heteroatoms in the spiro system
-    all_ring_atoms = set(rings_containing[0]) | set(rings_containing[1])
-    has_heteroatoms = False
-    for atom_idx in all_ring_atoms:
-        if mol.GetAtomWithIdx(atom_idx).GetSymbol() != 'C':
-            has_heteroatoms = True
-            break
+    has_heteroatoms = any(
+        mol.GetAtomWithIdx(idx).GetSymbol() != 'C'
+        for idx in ring_atoms_to_check
+    )
 
     if has_heteroatoms:
-        # TODO: Handle heterospiro naming
-        # For now, return just the carbocyclic name
-        pass
+        hetero_prefix = _build_hetero_prefix(mol, spiro_atoms_set, ring_atoms_to_check)
+        if hetero_prefix:
+            return f"{hetero_prefix}{descriptor}{parent_name}"
 
     return f"{descriptor}{parent_name}"
 
 
-def get_rings_from_spiro_center(mol, spiro_center: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+def _build_hetero_prefix(
+    mol,
+    spiro_atoms_set: Set[int],
+    ring_atoms: Set[int],
+) -> Optional[str]:
+    """
+    Build the skeletal replacement 'a' prefix for heterospiro compounds.
+
+    Generates prefix strings like "2,8-dioxa", "2-oxa-6-thia" using
+    spiro numbering locants and IUPAC priority ordering.
+    """
+    n_spiro = len(spiro_atoms_set)
+
+    if n_spiro == 1:
+        spiro_center = list(spiro_atoms_set)[0]
+        numbering = get_spiro_numbering(mol, spiro_center)
+    else:
+        numbering = _get_polyspiro_numbering(mol, spiro_atoms_set)
+
+    if not numbering:
+        return None
+
+    heteroatom_info = []
+    for atom_idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(atom_idx)
+        symbol = atom.GetSymbol()
+        if symbol != 'C':
+            locant = numbering.get(atom_idx)
+            if locant is not None:
+                heteroatom_info.append((locant, symbol))
+
+    if not heteroatom_info:
+        return None
+
+    # IUPAC priority order: O > S > Se > N > P > Si > B
+    priority_order = ['O', 'S', 'Se', 'N', 'P', 'Si', 'B']
+
+    by_element: Dict[str, List[int]] = {}
+    for locant, symbol in heteroatom_info:
+        by_element.setdefault(symbol, []).append(locant)
+
+    mult_names = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+    prefix_parts = []
+    for element in priority_order:
+        if element in by_element:
+            locants = sorted(by_element[element])
+            prefix_name = get_heteroatom_prefix(element)
+            count = len(locants)
+            mult = mult_names.get(count, f'{count}-')
+            locant_str = ','.join(str(loc) for loc in locants)
+            prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
+
+    if not prefix_parts:
+        return None
+
+    # Join parts with hyphens; no trailing hyphen -- the last 'a' prefix
+    # connects directly to the spiro descriptor (e.g., "2-oxa-6-thiaspiro")
+    return '-'.join(prefix_parts)
+
+
+def get_rings_from_spiro_center(
+    mol, spiro_center: int
+) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
     """
     Get the two rings sharing a spiro center.
 
@@ -442,13 +813,11 @@ def get_rings_from_spiro_center(mol, spiro_center: int) -> Tuple[Tuple[int, ...]
 
     Returns:
         Tuple of two ring tuples: (smaller_ring, larger_ring)
-        Each ring is a tuple of atom indices
 
     Raises:
         ValueError: If spiro_center is not in exactly 2 rings
     """
     ri = mol.GetRingInfo()
-
     rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
 
     if len(rings_containing) != 2:
@@ -459,7 +828,6 @@ def get_rings_from_spiro_center(mol, spiro_center: int) -> Tuple[Tuple[int, ...]
     ring1 = tuple(rings_containing[0])
     ring2 = tuple(rings_containing[1])
 
-    # Return sorted by size (smaller first)
     if len(ring1) <= len(ring2):
         return (ring1, ring2)
     else:
