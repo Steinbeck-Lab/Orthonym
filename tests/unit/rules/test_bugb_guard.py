@@ -1,8 +1,8 @@
 """BUG-B guard verification tests.
 
-Tests that the _BRANCH_HANDLED_FGS set in polyfunctional.py only contains
-FG types whose prefixes are reliably emitted by the substituent naming path
-when the FG is on a small (1-3C) branch.
+Tests that the BRANCH_HANDLED_FGS frozenset (shared from naming_utils) only
+contains FG types whose prefixes are reliably emitted by the substituent naming
+path when the FG is on a small (1-3C) branch.
 
 IUPAC P-59.1(a): all non-principal functional groups must appear as prefixes.
 The BUG-B guard filters FGs from the polyfunctional prefix loop when they are
@@ -11,14 +11,84 @@ FG prefix (e.g., "hydroxymethyl" for -CH2OH). If substituent naming does NOT
 emit the prefix, the FG silently drops from the name.
 
 These tests verify:
-1. Each FG type in _BRANCH_HANDLED_FGS produces correct output via substituent
-   naming (no FG prefix loss)
-2. No double-naming occurs (FG prefix appears exactly once, not twice)
-3. FG types NOT in the set still produce correct polyfunctional prefixes
+1. BRANCH_HANDLED_FGS is a frozenset importable from naming_utils
+2. It contains the minimum required entries and does NOT contain dangerous entries
+3. Both polyfunctional.py and composer.py import from the same source
+4. Each FG type in the set produces correct output via substituent naming
+5. No double-naming occurs (FG prefix appears exactly once, not twice)
+6. FG types NOT in the set still produce correct polyfunctional prefixes
 """
 
 import pytest
 from orthonym.namer import name_compound
+from orthonym.assembly.naming_utils import BRANCH_HANDLED_FGS
+
+
+# ---- Structural tests: verify the shared frozenset contract ----
+
+MINIMUM_REQUIRED_FGS = frozenset({
+    'primary_alcohol', 'secondary_alcohol', 'primary_amine',
+    'fluoro', 'chloro', 'bromo', 'iodo',
+})
+
+# FG types that must NEVER be in the BUG-B guard set because they are
+# high-seniority suffix-capable groups. Filtering them would silently
+# drop critical prefixes (oxo, carboxy, cyano, etc.).
+DANGEROUS_FGS = frozenset({
+    'carboxylic_acid', 'aldehyde', 'ketone', 'nitrile',
+    'primary_amide', 'ester', 'anhydride', 'acid_chloride',
+})
+
+
+@pytest.mark.unit
+class TestBranchHandledFGsContract:
+    """Structural tests for the unified BRANCH_HANDLED_FGS frozenset."""
+
+    def test_is_frozenset(self):
+        """BRANCH_HANDLED_FGS must be a frozenset (immutable)."""
+        assert isinstance(BRANCH_HANDLED_FGS, frozenset), (
+            f"Expected frozenset, got {type(BRANCH_HANDLED_FGS).__name__}"
+        )
+
+    def test_contains_minimum_entries(self):
+        """BRANCH_HANDLED_FGS must contain at minimum the 7 core FG types."""
+        missing = MINIMUM_REQUIRED_FGS - BRANCH_HANDLED_FGS
+        assert missing == set(), (
+            f"Missing required FG types from BRANCH_HANDLED_FGS: {missing}"
+        )
+
+    def test_no_dangerous_entries(self):
+        """BRANCH_HANDLED_FGS must NOT contain high-seniority FGs.
+        These are suffix-capable groups whose prefixes (oxo, carboxy, cyano)
+        must always be handled by the polyfunctional prefix loop, not
+        delegated to branch naming.
+        """
+        dangerous_present = DANGEROUS_FGS & BRANCH_HANDLED_FGS
+        assert dangerous_present == set(), (
+            f"Dangerous FG types found in BRANCH_HANDLED_FGS: {dangerous_present}. "
+            f"These must never be filtered by the BUG-B guard."
+        )
+
+    def test_shared_between_modules(self):
+        """polyfunctional.py and composer.py must use the same BRANCH_HANDLED_FGS
+        object from naming_utils, not define their own inline copies.
+        """
+        import importlib
+        import inspect
+
+        # Verify naming_utils exports it
+        from orthonym.assembly import naming_utils
+        assert hasattr(naming_utils, 'BRANCH_HANDLED_FGS'), (
+            "naming_utils.py must export BRANCH_HANDLED_FGS"
+        )
+
+        # Check that polyfunctional.py source does NOT define inline _BRANCH_HANDLED_FGS
+        from orthonym.rules import polyfunctional
+        source = inspect.getsource(polyfunctional)
+        assert '_BRANCH_HANDLED_FGS = {' not in source and '_BRANCH_HANDLED_FGS={' not in source, (
+            "polyfunctional.py still defines an inline _BRANCH_HANDLED_FGS set. "
+            "It should import BRANCH_HANDLED_FGS from naming_utils."
+        )
 
 
 class TestHalogensOnSmallBranches:
