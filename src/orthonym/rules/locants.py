@@ -112,6 +112,7 @@ def orient_chain(
         b. Lowest locants for multiple bonds (double + triple, as a set)
         c. Lowest locants for double bonds specifically
         d. Lowest locants for substituents (detachable prefixes)
+        e. Lowest locant for alphabetically first substituent (P-14.4(g))
 
     For pure hydrocarbons (no principal group), criterion (a) is skipped.
 
@@ -194,6 +195,20 @@ def orient_chain(
             if result == -1:
                 return forward
             if result == 1:
+                return reverse
+
+    # --- Criterion (e): Lowest locant for alphabetically first substituent ---
+    # P-14.4(g): when substituent locant sets are identical in both directions,
+    # prefer the orientation giving the lowest locant to the first-cited prefix
+    # (alphabetically first substituent).
+    if substituent_positions:
+        sub_atoms = set(substituent_positions.keys()) & chain_set
+        if len(sub_atoms) >= 2:  # Need 2+ substituent positions for this to matter
+            fwd_alpha = _alphabetical_tiebreaker(forward, fwd_map, substituent_positions, mol)
+            rev_alpha = _alphabetical_tiebreaker(reverse, rev_map, substituent_positions, mol)
+            if fwd_alpha < rev_alpha:
+                return forward
+            if rev_alpha < fwd_alpha:
                 return reverse
 
     # All criteria tied -- return forward (arbitrary but deterministic)
@@ -343,6 +358,67 @@ def get_bond_locants(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _alphabetical_tiebreaker(
+    chain: List[int],
+    atom_to_locant: Dict[int, int],
+    substituent_positions: Dict[int, List],
+    mol,
+) -> tuple:
+    """Build a comparison key for the alphabetical tiebreaker (criterion e).
+
+    For each substituent attachment point on the chain, determine the
+    substituent name (based on carbon count for simple alkyl groups) and
+    its locant. Return a tuple of (alpha_sort_key, locant) pairs sorted
+    by alpha_sort_key first, so that lexicographic comparison of tuples
+    selects the orientation giving the lowest locant to the
+    alphabetically first substituent.
+
+    Args:
+        chain: Ordered chain atom indices.
+        atom_to_locant: Mapping from atom index to 1-indexed locant.
+        substituent_positions: Dict mapping chain atom index to list of
+            substituent atom groups.
+        mol: RDKit Mol object.
+
+    Returns:
+        Tuple for lexicographic comparison. Lower = preferred.
+    """
+    from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name
+
+    chain_set = set(chain)
+    entries = []
+
+    for atom_idx, sub_groups in substituent_positions.items():
+        if atom_idx not in chain_set:
+            continue
+        locant = atom_to_locant.get(atom_idx)
+        if locant is None:
+            continue
+
+        # Count carbon atoms in the first substituent group at this position
+        # (sufficient for the alphabetical comparison of simple alkyls)
+        for sub_atoms in sub_groups:
+            carbon_count = sum(
+                1 for a in sub_atoms
+                if mol.GetAtomWithIdx(a).GetSymbol() == "C"
+            )
+            if carbon_count > 0:
+                name = get_alkyl_name(carbon_count)
+            else:
+                # Non-carbon substituent (e.g., halogen): use atom symbol
+                if sub_atoms:
+                    name = mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol().lower()
+                else:
+                    name = "zzz"
+            entries.append((alpha_sort_key(name), locant))
+
+    # Sort by alpha key first, then by locant
+    entries.sort()
+    # Return as flat tuple for lexicographic comparison:
+    # the first entry's (alpha_key, locant) dominates
+    return tuple(item for pair in entries for item in pair)
 
 
 def _get_bond_locant_atoms(
