@@ -375,8 +375,18 @@ class TestGetFusionPrefix:
     @pytest.mark.unit
     def test_fallback_ene_rule(self):
         """Unknown -ene endings should use fallback rule."""
-        # Fallback: -ene -> -o
-        assert get_fusion_prefix('cyclohexene') == 'cyclohexo'
+        # Fallback: -ene -> -o (use name not in FUSION_PREFIXES dict)
+        assert get_fusion_prefix('cyclononene') == 'cyclonono'
+
+    @pytest.mark.unit
+    def test_cyclohexene_prefix(self):
+        """cyclohexene should map to cyclohexa (IUPAC standard)."""
+        assert get_fusion_prefix('cyclohexene') == 'cyclohexa'
+
+    @pytest.mark.unit
+    def test_cyclopentadiene_prefix(self):
+        """cyclopentadiene should map to cyclopenta."""
+        assert get_fusion_prefix('cyclopentadiene') == 'cyclopenta'
 
     @pytest.mark.unit
     def test_fallback_ole_rule(self):

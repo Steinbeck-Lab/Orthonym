@@ -60,6 +60,11 @@ FUSION_PREFIXES: Dict[str, str] = {
     'phenanthrene': 'phenanthro',
     'pyrene': 'pyreno',
     'fluorene': 'fluoreno',
+    'cyclopentadiene': 'cyclopenta',
+    'cyclopentene': 'cyclopenta',
+    'cycloheptadiene': 'cyclohepta',
+    'cycloheptene': 'cyclohepta',
+    'cyclohexene': 'cyclohexa',
 
     # 5-membered heterocycles
     'furan': 'furo',
@@ -1184,10 +1189,13 @@ def generate_systematic_name_for_fused_pair(
     )
 
     # Generate fusion descriptor using IUPAC-ordered rings
-    # For benzene as child, omit child locants (all positions equivalent)
-    child_is_benz = child_name == 'benzene'
+    # For carbocyclic child (all positions equivalent), omit child locants
+    # benzene -> [b], cyclopentadiene -> [b], cycloheptadiene -> [b]
+    CARBOCYCLIC_CHILDREN = {'benzene', 'cyclopentadiene', 'cyclopentene',
+                            'cycloheptadiene', 'cycloheptene', 'cyclohexene'}
+    child_is_carbo = child_name in CARBOCYCLIC_CHILDREN
     descriptor = generate_fusion_descriptor(
-        parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_benz
+        parent_iupac, child_iupac, shared_atoms, child_is_benzene=child_is_carbo
     )
     if not descriptor:
         return None
