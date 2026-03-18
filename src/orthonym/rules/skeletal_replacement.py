@@ -38,7 +38,13 @@ REPLACEMENT_TERMS: Dict[str, str] = {
     'Te': 'tellura',
     'N': 'aza',
     'P': 'phospha',
+    'As': 'arsa',
+    'Sb': 'stiba',
+    'Bi': 'bisma',
     'Si': 'sila',
+    'Ge': 'germa',
+    'Sn': 'stanna',
+    'Pb': 'plumba',
     'B': 'bora',
 }
 
@@ -653,11 +659,33 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     if not heteroatoms:
         return None
 
+    # Check bond types: detect saturated vs unsaturated vs aromatic
+    all_single = True
+    has_aromatic = False
+    for i in range(ring_size):
+        a1 = ring_atoms[i]
+        a2 = ring_atoms[(i + 1) % ring_size]
+        bond = mol.GetBondBetweenAtoms(a1, a2)
+        if bond:
+            btype = bond.GetBondTypeAsDouble()
+            if btype == 1.5:
+                has_aromatic = True
+                break
+            elif btype != 1.0:
+                all_single = False
+
+    # Aromatic rings use Hantzsch-Widman or retained names, not replacement
+    if has_aromatic:
+        return None
+
     # Orient the ring to give lowest locants to heteroatoms.
     # Try all rotations and both directions; pick the one giving the
     # lowest heteroatom locant set at first point of difference.
-    best_locant_set = None
+    # For unsaturated rings, double bond locants serve as tiebreaker
+    # after heteroatom locants (per IUPAC P-31.1.3.4).
+    best_key = None
     best_positions = None
+    best_ordered = None
 
     for start in range(ring_size):
         for direction in [1, -1]:
@@ -675,11 +703,27 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                 if symbol in REPLACEMENT_TERMS:
                     positions.append((i + 1, symbol))
 
-            locant_set = sorted(pos[0] for pos in positions)
+            hetero_locant_set = sorted(pos[0] for pos in positions)
 
-            if best_locant_set is None or locant_set < best_locant_set:
-                best_locant_set = locant_set
+            # Compute double bond locants for tiebreaker
+            db_locants = []
+            if not all_single:
+                for i in range(ring_size):
+                    a1 = ordered[i]
+                    a2 = ordered[(i + 1) % ring_size]
+                    bond = mol.GetBondBetweenAtoms(a1, a2)
+                    if bond and bond.GetBondTypeAsDouble() == 2.0:
+                        # Locant of double bond = lower-numbered atom (1-based)
+                        db_locants.append(i + 1)
+                db_locants.sort()
+
+            # Combined comparison key: heteroatom locants first, then DB locants
+            comparison_key = (hetero_locant_set, db_locants)
+
+            if best_key is None or comparison_key < best_key:
+                best_key = comparison_key
                 best_positions = positions
+                best_ordered = ordered
 
     if not best_positions:
         return None
@@ -718,18 +762,83 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
 
     replacement_prefix = '-'.join(parts)
 
-    # Check if all ring bonds are single (saturated -> cycloalkane)
-    all_single = True
-    for i in range(ring_size):
-        a1 = ring_atoms[i]
-        a2 = ring_atoms[(i + 1) % ring_size]
-        bond = mol.GetBondBetweenAtoms(a1, a2)
-        if bond and bond.GetBondTypeAsDouble() != 1.0:
-            all_single = False
-            break
-
     if all_single:
         return f'{replacement_prefix}cyclo{chain_prefix}ane'
+
+    # Unsaturated large heterocyclic rings: build name with -ene/-adiene/-atriene
+    # Compute double bond locants from the best orientation
+    db_locants = []
+    for i in range(ring_size):
+        a1 = best_ordered[i]
+        a2 = best_ordered[(i + 1) % ring_size]
+        bond = mol.GetBondBetweenAtoms(a1, a2)
+        if bond and bond.GetBondTypeAsDouble() == 2.0:
+            db_locants.append(i + 1)
+    db_locants.sort()
+
+    if not db_locants:
+        # No double bonds found despite all_single being False (shouldn't happen)
+        return f'{replacement_prefix}cyclo{chain_prefix}ane'
+
+    return _build_unsaturated_cyclic_name(
+        replacement_prefix, chain_prefix, db_locants
+    )
+
+
+def _build_unsaturated_cyclic_name(
+    replacement_prefix: str,
+    chain_prefix: str,
+    double_bond_locants: List[int],
+) -> str:
+    """Build cyclic replacement name with unsaturation suffix.
+
+    Constructs names like '1-oxacyclohept-4,5-diene' from the replacement
+    prefix, chain size prefix, and double bond locant positions.
+
+    Handles vowel elision: when chain_prefix ends in 'a' and the suffix
+    starts with a vowel, the trailing 'a' is dropped (e.g., 'octa' + 'ene'
+    becomes 'octene', not 'octaene'). Since get_chain_prefix() returns
+    stems without trailing 'a' (e.g., 'oct', 'dec'), and we build the
+    suffix directly, no special elision is needed for most cases.
+
+    For single double bond: '-{locant}-ene'
+    For 2 double bonds: '-{loc1},{loc2}-diene'  (with linking 'a')
+    For 3 double bonds: '-{loc1},{loc2},{loc3}-triene' (with linking 'a')
+
+    Args:
+        replacement_prefix: Heteroatom prefix (e.g., '1-oxa').
+        chain_prefix: Ring size prefix from get_chain_prefix() (e.g., 'hept').
+        double_bond_locants: Sorted list of 1-based locant positions for
+            double bonds.
+
+    Returns:
+        Complete unsaturated cyclic replacement name string.
+    """
+    count = len(double_bond_locants)
+    locant_str = ','.join(str(loc) for loc in double_bond_locants)
+
+    if count == 1:
+        suffix = 'ene'
     else:
-        # Unsaturated large heterocyclic rings -- not handled here
-        return None
+        # For multiple double bonds: multiplier + 'ene'
+        # 2 DB = "diene", 3 DB = "triene", 4 DB = "tetraene", etc.
+        if count in SIMPLE_MULTIPLIERS:
+            multiplier = SIMPLE_MULTIPLIERS[count]
+        else:
+            multiplier = str(count)
+        suffix = f'{multiplier}ene'
+
+    # Build stem: cyclo + chain_prefix
+    # get_chain_prefix() returns e.g., 'hept', 'oct', 'dec' (no trailing 'a')
+    # IUPAC convention for unsaturation:
+    # - Single ene: stem without linking vowel -> cyclohept-2-ene
+    # - Multiple ene: stem with linking 'a' -> cyclohepta-2,4-diene
+    # The linking 'a' goes on the stem when the suffix starts with a
+    # consonant (d in diene, t in triene).
+    stem = chain_prefix
+    if count > 1:
+        # Add linking vowel 'a' to chain prefix for multi-ene
+        # "hept" -> "hepta", "oct" -> "octa", "dec" -> "deca"
+        stem = chain_prefix + 'a'
+
+    return f'{replacement_prefix}cyclo{stem}-{locant_str}-{suffix}'
