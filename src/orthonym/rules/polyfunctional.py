@@ -21,6 +21,7 @@ from ..assembly.naming_utils import (
     format_suffix_with_locants,
     get_alkyl_name,
     ALKYL_NAMES,
+    BRANCH_HANDLED_FGS,
 )
 from .seniority import (
     get_principal_group,
@@ -1204,22 +1205,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # BUG-B guard: Skip FG matches located entirely on a small substituent
         # branch (<=3 carbons) when the substituent naming path demonstrably
         # handles them (producing e.g. "hydroxymethyl", "chloromethyl").
-        # IUPAC P-59.1(a): all non-principal FGs must appear as prefixes.
-        # This guard prevents DOUBLE-naming (both substituent prefix AND standalone
-        # FG prefix for the same group).
-        #
-        # Verified empirically (Phase 105-01): each FG type below produces the
-        # correct prefix via substituent naming on 1-3C branches:
-        #   - Halogens: "fluoromethyl", "chloromethyl", "bromomethyl", "iodomethyl"
-        #   - primary_alcohol: "hydroxymethyl" on -CH2OH
-        #   - secondary_alcohol: "hydroxy" included in branch name
-        #   - primary_amine: "aminomethyl" on -CH2NH2
-        # FG types NOT verified safe must NOT be added to this set.
-        _BRANCH_HANDLED_FGS = {
-            'primary_alcohol', 'secondary_alcohol', 'primary_amine',
-            'fluoro', 'chloro', 'bromo', 'iodo',
-        }
-        if _branch_atoms and fg_name in _BRANCH_HANDLED_FGS:
+        # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
+        if _branch_atoms and fg_name in BRANCH_HANDLED_FGS:
             filtered_matches = []
             for match in matches:
                 if not all(a in _branch_atoms for a in match):

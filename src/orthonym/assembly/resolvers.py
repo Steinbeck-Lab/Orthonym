@@ -221,7 +221,13 @@ def resolve_suffix(features: Any, parent_info: ParentInfo) -> SuffixInfo:
     if not fg_name:
         return SuffixInfo()
 
-    is_ring = getattr(features, 'is_cyclic', False)
+    # Correct is_ring: chain suffix for chain parents, ring suffix for ring parents.
+    if getattr(features, 'chain_is_parent', False):
+        is_ring = False
+    elif getattr(features, 'principal_chain', None):
+        is_ring = False
+    else:
+        is_ring = getattr(features, 'is_cyclic', False)
     suffix_text = get_suffix(fg_name, is_ring=is_ring)
 
     if not suffix_text:

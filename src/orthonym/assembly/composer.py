@@ -28,6 +28,7 @@ from .naming_utils import (
     SIMPLE_MULTIPLIERS,
     COMPLEX_MULTIPLIERS,
     TERMINAL_FG_TYPES,
+    BRANCH_HANDLED_FGS,
 )
 from ..data.chain_names import get_chain_prefix
 from .substituent_naming import name_substituent_fragment, _is_linear_alkyl
@@ -3508,7 +3509,14 @@ def _generate_suffix(features: Any) -> Optional[NameFragment]:
     if not fg_name:
         return None
 
-    is_ring = features.is_cyclic
+    # Correct is_ring: use chain suffix when chain is parent or principal chain exists,
+    # ring suffix only when ring is parent and PG is on a ring carbon.
+    if getattr(features, 'chain_is_parent', False):
+        is_ring = False
+    elif features.principal_chain:
+        is_ring = False
+    else:
+        is_ring = features.is_cyclic
     suffix_text = get_suffix(fg_name, is_ring=is_ring)
 
     if not suffix_text:
@@ -3727,14 +3735,8 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
 
         # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
         # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
-        # Covers all FG types the unified enumerator now handles as branch components.
-        _BRANCH_HANDLED_FGS = {
-            'primary_alcohol', 'secondary_alcohol', 'primary_amine',
-            'fluoro', 'chloro', 'bromo', 'iodo',
-            'thiol', 'thioether', 'nitro', 'azido',
-            'secondary_amine', 'tertiary_amine',
-        }
-        if branch_atoms and fg_name in _BRANCH_HANDLED_FGS:
+        # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
+        if branch_atoms and fg_name in BRANCH_HANDLED_FGS:
             filtered_branch = []
             for match in matches:
                 if not all(a in branch_atoms for a in match):

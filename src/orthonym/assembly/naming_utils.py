@@ -54,6 +54,24 @@ _COMPOUND_OXY_PREFIXES = frozenset((
     'sulfooxy', 'sulfonyloxy', 'phosphonooxy', 'phosphonatoxy', 'carbonyloxy',
 ))
 
+# BUG-B guard: FG types that substituent naming demonstrably handles on 1-3C branches.
+# Each entry verified empirically (Phase 105-01 + Phase 113-01) to produce correct
+# prefix via name_substituent() on small branches in BOTH polyfunctional.py and
+# composer.py code paths. FG types NOT in this set stay in the polyfunctional
+# prefix list (IUPAC P-59.1).
+#
+# NOTE: thiol, nitro, azido, secondary_amine, tertiary_amine were previously in
+# composer.py's inline set but NOT in polyfunctional.py's set. Testing showed that
+# the polyfunctional path's substituent naming does NOT reliably handle these FG
+# types on small branches (drops sulfanyl, nitro, amino, azido prefixes).
+# These are excluded from the unified set to prevent silent FG drops.
+BRANCH_HANDLED_FGS: frozenset = frozenset({
+    'primary_alcohol',    # -> "hydroxymethyl", "2-hydroxypropyl"
+    'secondary_alcohol',  # -> "hydroxy" included in branch name
+    'primary_amine',      # -> "aminomethyl", "2-aminoethyl"
+    'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
+})
+
 # Shared C1-C20 alkyl roots used by needs_brackets(), is_complex_substituent(),
 # and regex patterns. Extends coverage beyond the original C1-C10 lists.
 _ALKYL_ROOTS_FULL = (
