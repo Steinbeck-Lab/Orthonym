@@ -40,6 +40,89 @@ class TestReplacementTerms:
     def test_sila_present(self):
         assert REPLACEMENT_TERMS['Si'] == 'sila'
 
+    def test_arsa_present(self):
+        assert REPLACEMENT_TERMS['As'] == 'arsa'
+
+    def test_stiba_present(self):
+        assert REPLACEMENT_TERMS['Sb'] == 'stiba'
+
+    def test_bisma_present(self):
+        assert REPLACEMENT_TERMS['Bi'] == 'bisma'
+
+    def test_germa_present(self):
+        assert REPLACEMENT_TERMS['Ge'] == 'germa'
+
+    def test_stanna_present(self):
+        assert REPLACEMENT_TERMS['Sn'] == 'stanna'
+
+    def test_plumba_present(self):
+        assert REPLACEMENT_TERMS['Pb'] == 'plumba'
+
+    def test_total_element_count(self):
+        assert len(REPLACEMENT_TERMS) == 14
+
+    def test_tellura_present(self):
+        assert REPLACEMENT_TERMS['Te'] == 'tellura'
+
+    def test_bora_present(self):
+        assert REPLACEMENT_TERMS['B'] == 'bora'
+
+
+# ============================================================================
+# Unsaturated large heterocyclic ring replacement naming
+# ============================================================================
+
+@pytest.mark.unit
+class TestUnsaturatedCyclicReplacement:
+    """Test unsaturated large heterocyclic ring replacement naming."""
+
+    def test_oxacycloheptadiene(self):
+        """7-member ring with O and 2 double bonds."""
+        mol = Chem.MolFromSmiles('C1=CC=COCC1')
+        result = try_skeletal_replacement_name(mol)
+        assert result is not None
+        assert 'oxa' in result
+        assert 'diene' in result
+
+    def test_oxacyclooctatriene(self):
+        """8-member ring with O and 3 double bonds."""
+        mol = Chem.MolFromSmiles('O1C=CC=CC=CC1')
+        result = try_skeletal_replacement_name(mol)
+        assert result is not None
+        assert 'oxa' in result
+        assert 'triene' in result
+
+    def test_oxacyclooctadiene(self):
+        """8-member ring with O and 2 double bonds."""
+        mol = Chem.MolFromSmiles('C1=CC=COCCC1')
+        result = try_skeletal_replacement_name(mol)
+        assert result is not None
+        assert 'oxa' in result
+        assert 'diene' in result
+
+    def test_saturated_still_works(self):
+        """Regression: saturated dioxacyclononane unchanged."""
+        mol = Chem.MolFromSmiles('C1COCCOCCC1')
+        result = try_skeletal_replacement_name(mol)
+        assert result is not None
+        assert 'ane' in result
+        assert 'ene' not in result
+
+    def test_aromatic_6member_not_replacement(self):
+        """Aromatic rings should NOT get replacement naming (6-member < 7)."""
+        mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine, 6-member aromatic
+        result = try_skeletal_replacement_name(mol)
+        assert result is None
+
+    def test_no_double_vowel(self):
+        """Name should not have double vowels at prefix-suffix junction."""
+        mol = Chem.MolFromSmiles('C1=CC=COCCC1')  # 8-member, O, 2 DB
+        result = try_skeletal_replacement_name(mol)
+        assert result is not None
+        # Should not contain "octaadiene" or "octaene" - should be "octadiene"
+        assert 'aa' not in result
+        assert 'ae' not in result
+
 
 # ============================================================================
 # Basic dioxa chains
