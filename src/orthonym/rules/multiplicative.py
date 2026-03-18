@@ -18,6 +18,8 @@ from typing import Optional, List, Tuple, Dict
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
+from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -50,6 +52,16 @@ _TWO_ATOM_BRIDGES = [
     ("C", "C", 2, 2, "ethylene"),     # CH2-CH2
     ("C", "C", 1, 1, "vinylene"),     # CH=CH (rare)
 ]
+
+# Multi-atom bridge names: (element, H_count, ring_neighbor_count) -> bridge_name
+# These handle star-topology bridges where 3+ identical parents radiate from
+# a single central atom (IUPAC P-51.3.3).
+_MULTI_BRIDGE_NAMES: Dict[Tuple[str, int, int], str] = {
+    ("N", 0, 3): "nitrilo",           # N connecting 3 rings (trivalent)
+    ("C", 1, 3): "methylidyne",       # CH connecting 3 rings (trivalent)
+    ("C", 0, 4): "methanetetrayl",    # C connecting 4 rings (tetravalent)
+}
+
 
 # Retained parent names for common ring+FG combinations
 # Maps canonical SMILES -> (retained_name, fg_locant)
@@ -91,6 +103,11 @@ def name_multiplicative(mol) -> Optional[str]:
 
     # --- Try two-atom bridges ---
     result = _try_two_atom_bridges(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Try multi-atom bridges (3+ units, star topology) ---
+    result = _try_multi_atom_bridges(mol, ring_atoms)
     if result is not None:
         return result
 
@@ -257,6 +274,101 @@ def _classify_two_atom_bridge(atom1, atom2) -> Optional[str]:
         # Check reverse order
         if sym1 == s2 and sym2 == s1 and h1 == expected_h2 and h2 == expected_h1:
             return name
+    return None
+
+
+def _classify_multi_bridge(atom, ring_nbr_count: int) -> Optional[str]:
+    """Classify a multi-valent bridge atom by element + H count + ring neighbor count.
+
+    Args:
+        atom: RDKit atom (the bridge candidate).
+        ring_nbr_count: Number of ring-atom neighbors.
+
+    Returns:
+        Bridge name (e.g., 'nitrilo', 'methylidyne', 'methanetetrayl') or None.
+    """
+    sym = atom.GetSymbol()
+    h = atom.GetTotalNumHs()
+    return _MULTI_BRIDGE_NAMES.get((sym, h, ring_nbr_count))
+
+
+def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
+    """Try to find star-topology bridges connecting 3+ identical ring systems.
+
+    A multi-atom bridge is a single non-ring atom connected to 3 or more ring
+    atoms, where removing the bridge produces 3+ identical fragments.
+
+    Examples:
+        N connecting 3 phenol rings -> nitrilotriphenol
+        CH connecting 3 phenol rings -> methylidynetriphenol
+        C connecting 4 phenol rings -> methanetetrayltetraphenol
+    """
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if idx in ring_atoms:
+            continue  # Bridge atoms are NOT in rings
+
+        neighbors = atom.GetNeighbors()
+        heavy_neighbors = [n for n in neighbors if n.GetAtomicNum() > 1]
+
+        # Count ring neighbors
+        ring_neighbors = [n for n in heavy_neighbors if n.GetIdx() in ring_atoms]
+        ring_nbr_count = len(ring_neighbors)
+
+        # Must have 3+ ring neighbors for multi-bridge
+        if ring_nbr_count < 3:
+            continue
+
+        # All heavy neighbors must be ring atoms (no non-ring non-H substituents)
+        if len(heavy_neighbors) != ring_nbr_count:
+            continue
+
+        # Classify the bridge
+        bridge_name = _classify_multi_bridge(atom, ring_nbr_count)
+        if bridge_name is None:
+            continue
+
+        # Split molecule by removing the bridge atom
+        emol = RWMol(Chem.RWMol(mol))
+        emol.RemoveAtom(idx)
+
+        try:
+            Chem.SanitizeMol(emol)
+        except Exception:
+            continue
+
+        result_mol = emol.GetMol()
+        frag_mols = Chem.GetMolFrags(result_mol, asMols=True, sanitizeFrags=True)
+        unit_count = len(frag_mols)
+
+        if unit_count < 3:
+            continue
+
+        # Check all fragments are identical
+        canon_smiles_list = [Chem.MolToSmiles(f) for f in frag_mols]
+        canon_set = set(Chem.CanonSmiles(s) for s in canon_smiles_list)
+        if len(canon_set) != 1:
+            continue  # Non-identical fragments
+
+        canon_parent = canon_set.pop()
+
+        # Name the parent structure
+        parent_name = _name_parent(canon_parent)
+        if parent_name is None:
+            continue
+
+        # Get bridge locant using the first ring neighbor
+        first_ring_nbr_idx = ring_neighbors[0].GetIdx()
+        locant = _get_bridge_locant(mol, idx, first_ring_nbr_idx, ring_atoms)
+
+        # Assemble multiplicative name with unit_count
+        result = _assemble_multiplicative_name(
+            locant, bridge_name, parent_name, unit_count=unit_count
+        )
+        if result is not None:
+            return result
+        continue
+
     return None
 
 
@@ -454,15 +566,39 @@ def _find_principal_group_atom_in_ring(
     return None
 
 
+def _build_primed_locant_str(locant: int, unit_count: int) -> str:
+    """Build a primed locant string for multiplicative naming.
+
+    For each unit i in [0, unit_count), appends i primes to the locant.
+    Example: locant=4, unit_count=3 -> "4,4',4''"
+    Example: locant=4, unit_count=4 -> "4,4',4'',4'''"
+
+    Args:
+        locant: The IUPAC locant number.
+        unit_count: Number of identical parent units.
+
+    Returns:
+        Comma-separated primed locant string.
+    """
+    prime = "'"
+    parts = []
+    for i in range(unit_count):
+        parts.append(f"{locant}{prime * i}")
+    return ",".join(parts)
+
+
 def _assemble_multiplicative_name(
-    locant: int, bridge_name: str, parent_name: str
+    locant: int, bridge_name: str, parent_name: str, unit_count: int = 2
 ) -> Optional[str]:
     """Assemble the final multiplicative name.
 
-    Format: [locant],[locant']-[bridge]di[parent]
-    Example: 4,4'-methylenedianiline
+    Format: [locants]-[bridge][multiplier][parent]
+    Examples:
+        4,4'-methylenedianiline (2 units)
+        4,4',4''-nitrilotriphenol (3 units)
+        4,4',4'',4'''-methanetetrayltetraphenol (4 units)
 
-    For acid names with spaces (like "benzoic acid"), the 'di' prefix
+    For acid names with spaces (like "benzoic acid"), the multiplier prefix
     goes before the base name: 4,4'-oxydibenzoic acid
 
     If the parent name starts with a saturation/modification prefix
@@ -475,28 +611,32 @@ def _assemble_multiplicative_name(
         locant: IUPAC locant of the bridge attachment point.
         bridge_name: Name of the bridge group (e.g., "methylene", "oxy").
         parent_name: IUPAC name of one parent unit (e.g., "aniline", "benzoic acid").
+        unit_count: Number of identical parent units (default 2 for backward compat).
 
     Returns:
         Complete multiplicative name, or None if the parent name has a
-        saturation prefix that would produce unparseable "di+prefix" output.
+        saturation prefix that would produce unparseable multiplier+prefix output.
     """
     # Check for saturation/modification prefixes in the parent name
     # that would produce unparseable "di+prefix" concatenation
     parent_lower = parent_name.lower()
     if any(parent_lower.startswith(p) for p in SATURATION_PREFIXES):
-        # "di" + "tetrahydropyran" -> "ditetrahydropyran" is unparseable
-        # Return None to fall through to substitutive naming
         return None
 
-    # Build locant pair: e.g., "4,4'"
-    locant_str = f"{locant},{locant}'"
+    # Get multiplier from SIMPLE_MULTIPLIERS (di, tri, tetra, etc.)
+    multiplier = SIMPLE_MULTIPLIERS.get(unit_count, "")
+    if not multiplier:
+        return None
 
-    # Handle names with spaces (e.g., "benzoic acid" -> "dibenzoic acid")
+    # Build primed locant string: e.g., "4,4'" for 2 units, "4,4',4''" for 3
+    locant_str = _build_primed_locant_str(locant, unit_count)
+
+    # Handle names with spaces (e.g., "benzoic acid" -> "tribenzoic acid")
     if " " in parent_name:
         parts = parent_name.split(" ", 1)
         base = parts[0]  # "benzoic"
         suffix = parts[1]  # "acid"
-        return f"{locant_str}-{bridge_name}di{base} {suffix}"
+        return f"{locant_str}-{bridge_name}{multiplier}{base} {suffix}"
     else:
         # Simple name: "aniline" -> "dianiline"
-        return f"{locant_str}-{bridge_name}di{parent_name}"
+        return f"{locant_str}-{bridge_name}{multiplier}{parent_name}"
