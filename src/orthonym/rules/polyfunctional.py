@@ -1410,6 +1410,29 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             stereo_prefix = format_stereodescriptor_string(descriptors)
             name = f"{stereo_prefix}{name}"
 
+    # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
+    # Guarded by logger level check so there is no performance impact in production.
+    if logger.isEnabledFor(logging.DEBUG):
+        detected_fgs = set()
+        for fg_name_audit, fg_matches in non_principal.items():
+            if fg_name_audit in ('alkene', 'alkyne'):
+                continue
+            if fg_matches:
+                detected_fgs.add(fg_name_audit)
+        missing_fgs = set()
+        for fg_audit in detected_fgs:
+            prefix = PREFIX_FORMS.get(fg_audit)
+            if prefix is None:
+                continue  # functional-class-only, no prefix form expected
+            if prefix and prefix in name:
+                continue
+            missing_fgs.add(fg_audit)
+        if missing_fgs:
+            logger.debug(
+                "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
+                missing_fgs, name, getattr(features, 'canonical_smiles', '?'),
+            )
+
     return name
 
 

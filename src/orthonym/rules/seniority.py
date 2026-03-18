@@ -180,6 +180,8 @@ SUFFIX_FORMS = {
 }
 
 # Prefix forms for non-principal groups
+# Audit (Phase 113-01): verified all SENIORITY_ORDER entries have a PREFIX_FORMS
+# key. None entries are genuinely functional-class-only (no IUPAC prefix form).
 PREFIX_FORMS = {
     "carboxylic_acid": "carboxy",
     "thioic_S_acid": "sulfanylcarbonyl",  # IUPAC P-65.1.1.4: S-acid prefix (-C(=O)SH)

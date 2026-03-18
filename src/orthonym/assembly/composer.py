@@ -1036,7 +1036,37 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             fragments.append(stereo)
 
     # Assemble in correct order
-    return _assemble_fragments(fragments, style)
+    assembled = _assemble_fragments(fragments, style)
+
+    # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
+    # Guarded by logger level check so there is no performance impact in production.
+    if logger.isEnabledFor(logging.DEBUG):
+        from ..rules.seniority import PREFIX_FORMS
+        detected_fgs = set()
+        fg_dict = getattr(features, 'functional_groups', {})
+        pg = getattr(features, 'principal_group', None)
+        for fg_name_audit, fg_matches in fg_dict.items():
+            if fg_name_audit in ('alkene', 'alkyne'):
+                continue
+            if fg_name_audit == pg:
+                continue  # principal group is the suffix, not a prefix
+            if fg_matches:
+                detected_fgs.add(fg_name_audit)
+        missing_fgs = set()
+        for fg_audit in detected_fgs:
+            prefix = PREFIX_FORMS.get(fg_audit)
+            if prefix is None:
+                continue  # functional-class-only, no prefix form expected
+            if prefix and prefix in assembled:
+                continue
+            missing_fgs.add(fg_audit)
+        if missing_fgs:
+            logger.debug(
+                "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
+                missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
+            )
+
+    return assembled
 
 
 def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
