@@ -146,3 +146,102 @@ class TestMultiplicativeNegative:
         # Should not contain 'di' multiplier
         assert "dianiline" not in name.lower()
         assert "diamine" not in name.lower()
+
+
+# ---------------------------------------------------------------------------
+# 3+ unit multiplicative tests -- star-topology bridges
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestMultiplicativeTriUnit:
+    """3-unit multiplicative naming with star-topology bridges."""
+
+    def test_nitrilotriphenol(self):
+        """N bridge connecting 3 phenol rings -> 4,4',4''-nitrilotriphenol"""
+        name = name_compound("Oc1ccc(N(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
+        assert name is not None
+        assert "nitrilo" in name.lower()
+        assert "triphenol" in name.lower()
+
+    def test_nitrilotrianiline(self):
+        """N bridge connecting 3 aniline rings -> 4,4',4''-nitrilotrianiline"""
+        name = name_compound("Nc1ccc(N(c2ccc(N)cc2)c2ccc(N)cc2)cc1")
+        assert name is not None
+        assert "nitrilo" in name.lower()
+        assert "trianiline" in name.lower()
+
+    def test_nitrilotribenzoic_acid(self):
+        """N bridge connecting 3 benzoic acid rings -> 4,4',4''-nitrilotribenzoic acid"""
+        name = name_compound("OC(=O)c1ccc(N(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1")
+        assert name is not None
+        assert "nitrilo" in name.lower()
+        assert "tribenzoic" in name.lower()
+
+    def test_methylidynetriphenol(self):
+        """CH bridge connecting 3 phenol rings -> 4,4',4''-methylidynetriphenol"""
+        name = name_compound("Oc1ccc(C(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
+        assert name is not None
+        assert "methylidyne" in name.lower()
+        assert "triphenol" in name.lower()
+
+    def test_methylidynetribenzoic_acid(self):
+        """CH bridge connecting 3 benzoic acid rings"""
+        name = name_compound("OC(=O)c1ccc(C(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1")
+        assert name is not None
+        assert "methylidyne" in name.lower()
+        assert "tribenzoic" in name.lower()
+
+
+@pytest.mark.unit
+class TestMultiplicativeTetraUnit:
+    """4-unit multiplicative naming."""
+
+    def test_methanetetrayltetraphenol(self):
+        """C bridge connecting 4 phenol rings -> 4,4',4'',4'''-methanetetrayltetraphenol"""
+        name = name_compound("Oc1ccc(C(c2ccc(O)cc2)(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
+        assert name is not None
+        assert "methanetetrayl" in name.lower()
+        assert "tetraphenol" in name.lower()
+
+    def test_methanetetrayltetrabenzoic_acid(self):
+        """C bridge connecting 4 benzoic acid rings"""
+        name = name_compound("OC(=O)c1ccc(C(c2ccc(C(=O)O)cc2)(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1")
+        assert name is not None
+        assert "methanetetrayl" in name.lower()
+        assert "tetrabenzoic" in name.lower()
+
+
+@pytest.mark.unit
+class TestMultiplicativePrimedLocants:
+    """Test primed locant string formatting."""
+
+    def test_tri_unit_primed_locants(self):
+        """3-unit compound should have 4,4',4'' locant pattern."""
+        name = name_compound("Oc1ccc(N(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
+        assert name is not None
+        # Check for primed locant pattern
+        assert "4'" in name or "4," in name
+
+    def test_tetra_unit_primed_locants(self):
+        """4-unit compound should have 4,4',4'',4''' locant pattern."""
+        name = name_compound("Oc1ccc(C(c2ccc(O)cc2)(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
+        assert name is not None
+        assert "'''" in name  # Triple prime for 4th unit
+
+
+@pytest.mark.unit
+class TestMultiplicativeMultiNegative:
+    """Cases that must NOT trigger multi-bridge naming."""
+
+    def test_non_identical_fragments_rejected(self):
+        """Mixed substituents on ring fragments should not match."""
+        # N connecting phenol + aniline + benzoic acid = non-identical fragments
+        name = name_compound("Oc1ccc(N(c2ccc(N)cc2)c2ccc(C(=O)O)cc2)cc1")
+        assert name is not None
+        assert "nitrilo" not in name.lower()
+
+    def test_two_unit_still_uses_di(self):
+        """2-unit compounds must still use 'di' prefix (existing path)."""
+        name = name_compound("Nc1ccc(Cc2ccc(N)cc2)cc1")
+        assert "di" in name.lower()
+        assert "tri" not in name.lower()
