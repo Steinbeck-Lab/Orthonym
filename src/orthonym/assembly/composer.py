@@ -5485,6 +5485,28 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     if needs_brackets(sub_name):
                         sub_name = f"({sub_name})"
                     return sub_name
+            # Fallback: recursive naming via name_fragment_recursively()
+            # for ring-containing N-branch fragments that failed direct naming.
+            if len(sub_atoms) <= 25:
+                try:
+                    frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
+                    if frag_smiles:
+                        from .fragment_naming import name_fragment_recursively
+                        from .substituent_naming import parent_to_prefix
+                        frag_name = name_fragment_recursively(frag_smiles)
+                        if frag_name:
+                            carbon_count = sum(
+                                1 for idx in sub_atoms
+                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                            )
+                            prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                            if prefix:
+                                from .naming_utils import needs_brackets
+                                if needs_brackets(prefix):
+                                    prefix = f"({prefix})"
+                                return f"({prefix}amino)"
+                except Exception:
+                    pass
             logger.debug(
                 "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
             )
@@ -5606,6 +5628,28 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                     if needs_brackets(sub_name):
                         sub_name = f"({sub_name})"
                     return sub_name
+            # Fallback: recursive naming via name_fragment_recursively()
+            # for ring-containing C-branch fragments that failed direct naming.
+            if len(sub_atoms) <= 25:
+                try:
+                    frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
+                    if frag_smiles:
+                        from .fragment_naming import name_fragment_recursively
+                        from .substituent_naming import parent_to_prefix
+                        frag_name = name_fragment_recursively(frag_smiles)
+                        if frag_name:
+                            carbon_count = sum(
+                                1 for idx in sub_atoms
+                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                            )
+                            prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                            if prefix:
+                                from .naming_utils import needs_brackets
+                                if needs_brackets(prefix):
+                                    prefix = f"({prefix})"
+                                return prefix
+                except Exception:
+                    pass
             logger.debug(
                 "DROP-19 substituent_skip: reason=c_branch_ring_sub_still_unnameable",
             )

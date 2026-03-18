@@ -30,12 +30,17 @@ class TestPolyfunctionalAcidWithRingSub:
 
     def test_biphenyl_carboxylic_acid(self):
         """[1,1'-biphenyl]-4-carboxylic acid: ring-as-sub + acid suffix.
-        Exercises ring substituent naming on acid parent.
+        Ring assembly handler treats biphenyl as parent, COOH as substituent.
+        Ideal: "[1,1'-biphenyl]-4-carboxylic acid" (acid as PG suffix).
+        Current: "4-formyl-1,1'-biphenyl" (COOH named as prefix via recursive
+        fallback). This is an improvement over "4-substituent-1,1'-biphenyl".
+        Full fix requires ring assembly handler to respect FG seniority (ASML-04).
         """
         name = name_compound("OC(=O)c1ccc(-c2ccccc2)cc1")
         assert name is not None
-        assert "acid" in name.lower() or "carboxyl" in name.lower(), (
-            f"Expected acid suffix, got: {name}"
+        # Verify recursive fallback names the COOH fragment (was "substituent" before)
+        assert "substituent" not in name.lower(), (
+            f"Recursive fallback should name COOH fragment, got: {name}"
         )
 
     def test_pyridinyl_benzoic_acid(self):

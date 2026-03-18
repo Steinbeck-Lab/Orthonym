@@ -626,7 +626,28 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
                 prefix = get_chain_prefix(carbon_count)
                 return f"{prefix}oxy"
 
-    # Fallback: use fragment naming
+    # Fallback: use recursive naming via name_fragment_recursively()
+    # This handles compound substituents (C + heteroatoms) on ring assemblies,
+    # such as COOH, CONH2, CHO, etc., that the simple patterns above miss.
+    if sub_atoms and len(sub_atoms) <= 25:
+        try:
+            frag_smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=sub_atoms)
+            if frag_smiles:
+                from ..assembly.fragment_naming import name_fragment_recursively
+                from ..assembly.substituent_naming import parent_to_prefix
+                frag_name = name_fragment_recursively(frag_smiles)
+                if frag_name:
+                    carbon_count = sum(
+                        1 for i in sub_atoms
+                        if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                    )
+                    prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    if prefix:
+                        return prefix
+        except Exception:
+            pass
+
+    # Last resort: return generic placeholder (should be rare after recursive fallback)
     return "substituent"
 
 

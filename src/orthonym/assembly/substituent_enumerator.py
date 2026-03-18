@@ -1108,6 +1108,35 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
             else:
                 return name
 
+    # Fallback: recursive naming for ring-containing compound fragments.
+    # Use name_fragment_recursively() which has cycle detection via visited set.
+    # This handles cases where the fragment is a ring system with heteroatoms
+    # that the simpler naming paths above cannot handle (DROP-18/19/24/25).
+    # Guard: only for moderately-sized fragments (<=25 atoms).
+    if len(frag_atoms) <= 25:
+        frag_smiles = _get_frag_smiles(mol, frag_atoms)
+        if frag_smiles and frag_smiles != "unknown":
+            try:
+                from .fragment_naming import name_fragment_recursively
+                from .substituent_naming import parent_to_prefix
+                frag_name = name_fragment_recursively(frag_smiles)
+                if frag_name:
+                    # Convert parent name to prefix form (e.g., "benzoic acid" -> not useful,
+                    # but "pyridine" -> "pyridinyl", "cyclohexanone" -> "oxocyclohexyl")
+                    carbon_count = sum(
+                        1 for idx in frag_atoms
+                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                    )
+                    prefix_name = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    if prefix_name:
+                        logger.debug(
+                            "DROP-18/19 fallback: recursive naming for %s -> %s",
+                            frag_smiles, prefix_name,
+                        )
+                        return prefix_name
+            except Exception:
+                pass  # Keep falling through to warning
+
     # If naming infrastructure couldn't handle it, log warning
     frag_smiles = _get_frag_smiles(mol, frag_atoms)
     logger.warning(
