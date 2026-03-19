@@ -25,10 +25,17 @@ from ..perception.rings import get_ring_info, is_aromatic_ring
 
 
 # Assembly multiplier prefixes (IUPAC P-28.2)
+# Source: IUPAC Blue Book Table P-28.2, verified against OPSIN multipliers.xml
 ASSEMBLY_MULTIPLIERS = {
     2: "bi",
     3: "ter",
     4: "quater",
+    5: "quinque",
+    6: "sexi",
+    7: "septi",
+    8: "octi",
+    9: "novi",
+    10: "deci",
 }
 
 
@@ -262,9 +269,41 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
         else:
             return f"cyclo{prefix}ane"
 
-    # Multi-ring fused systems as assembly units (rare but possible)
-    # e.g., binaphthalene -- two identical fused ring systems
-    # For now, return None; this would need fused ring naming
+    # Multi-ring fused systems as assembly units (e.g., binaphthalene, biquinoline)
+    # Per IUPAC P-28.1: fused ring systems can serve as identical ring assembly units.
+    # Use existing infrastructure: dictionary fast path (150+ entries), then algorithmic fallback.
+
+    # Step 1: Extract subsystem SMILES for lookup
+    system_smi = Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(system_atoms), canonical=True)
+    if not system_smi:
+        return None
+
+    # Step 2: Create standalone mol for canonical SMILES matching
+    sub_mol = Chem.MolFromSmiles(system_smi)
+    if sub_mol is None:
+        return None
+    can_smi = Chem.MolToSmiles(sub_mol, canonical=True)
+
+    # Step 3: Try fused heterocycle dictionary (fast path, 150+ entries from Phase 109)
+    from ..data.fused_heterocycles import get_fused_heterocycle_name
+    fused_result = get_fused_heterocycle_name(sub_mol)
+    if fused_result:
+        name, _tautomer_locant = fused_result
+        # Include indicated H prefix if present (e.g., "1H-indole")
+        return name
+
+    # Step 4: Try retained names for carbocyclic fused systems (naphthalene, anthracene, etc.)
+    from ..data.retained_names import get_retained_name
+    retained = get_retained_name(can_smi)
+    if retained:
+        return retained
+
+    # Step 5: Try algorithmic fused ring generator (Phase 112 fallback)
+    from .fused_rings import _try_algorithmic_fusion_name
+    algo_name = _try_algorithmic_fusion_name(sub_mol)
+    if algo_name:
+        return algo_name
+
     return None
 
 
