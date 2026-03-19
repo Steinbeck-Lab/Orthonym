@@ -28,12 +28,175 @@ from ..perception.stereo import assign_stereochemistry
 from ..data.natural_products import (
     NATURAL_PRODUCT_DERIVATIVES,
     get_natural_product_name,
+    get_scaffold_numbering,
     get_steroid_numbering,
 )
 from ..perception.natural_products import (
     detect_natural_product,
     get_scaffold_substituents,
 )
+
+
+# ---------------------------------------------------------------------------
+# Steroid angular methyl reference data
+# ---------------------------------------------------------------------------
+# For each steroid scaffold, which angular methyls (C-18, C-19) are EXPECTED
+# but ABSENT. This enables nor-detection: estrane lacks C-19 (= 19-norandrostane),
+# gonane lacks both C-18 and C-19 (= 18,19-dinorandrostane).
+#
+# IUPAC steroid nomenclature:
+#   C-18: angular methyl at ring C/D junction (bonded to C-13)
+#   C-19: angular methyl at ring A/B junction (bonded to C-10)
+
+_STEROID_MISSING_ANGULAR_METHYLS: Dict[str, List[int]] = {
+    "androstane": [],        # Has both C-18 and C-19
+    "estrane": [19],         # Has C-18, lacks C-19 (= 19-norandrostane)
+    "gonane": [18, 19],      # Lacks both (bare tetracycle)
+    "pregnane": [],          # Has both
+    "cholestane": [],        # Has both
+    "cholane": [],           # Has both
+    "ergostane": [],         # Has both
+    "campestane": [],        # Has both
+    "stigmastane": [],       # Has both
+}
+
+
+def detect_np_modifications(
+    mol, scaffold_info: Dict, numbering: Dict[int, int]
+) -> List[Dict]:
+    """Detect nor-, homo-, seco- modifications vs matched NP scaffold.
+
+    Compares the molecule's structure against the matched scaffold to identify
+    structural modifications per IUPAC steroid nomenclature rules 3S-7/3S-8.
+
+    Current detection capabilities:
+    - nor-: Missing angular methyls (C-18, C-19) in steroid scaffolds.
+      Detected by comparing the matched scaffold's numbering against the
+      reference expectation for a complete steroid.
+    - homo-: Placeholder for ring expansion detection (future).
+    - seco-: Placeholder for ring-opening detection (future).
+
+    Args:
+        mol: RDKit Mol object.
+        scaffold_info: Dict from detect_natural_product() with keys:
+            scaffold_name, scaffold_stem, scaffold_class, scaffold_smiles,
+            matched_atoms, non_scaffold_atoms.
+        numbering: Target atom index -> IUPAC locant mapping from
+            _build_target_to_iupac().
+
+    Returns:
+        List of modification dicts, each with keys:
+            - prefix: str ('nor', 'homo', or 'seco')
+            - locants: List[int] (IUPAC locant numbers)
+            - ring_letter: Optional[str] (for homo-, e.g., 'D')
+        Empty list if no modifications detected.
+    """
+    if mol is None or scaffold_info is None or numbering is None:
+        return []
+
+    modifications: List[Dict] = []
+
+    scaffold_class = scaffold_info.get("scaffold_class", "")
+    scaffold_name = scaffold_info.get("scaffold_name", "")
+
+    # --- NOR detection ---
+    # For steroid scaffolds, check angular methyl positions.
+    # The _STEROID_MISSING_ANGULAR_METHYLS table defines which locants
+    # are absent from each named scaffold.
+    if scaffold_class == "steroid":
+        missing_methyls = _STEROID_MISSING_ANGULAR_METHYLS.get(
+            scaffold_name, []
+        )
+        if missing_methyls:
+            modifications.append({
+                "prefix": "nor",
+                "locants": sorted(missing_methyls),
+                "ring_letter": None,
+            })
+
+    # --- HOMO detection ---
+    # Ring expansion: a ring in the molecule has one more member than expected.
+    # For steroid scaffolds, compare ring sizes in the matched region against
+    # the scaffold query molecule's ring sizes.
+    # NOTE: Full homo-detection requires comparing ring membership counts
+    # between the molecule and scaffold query. This is deferred to a future
+    # phase as it requires ring-size analysis on the matched substructure.
+
+    # --- SECO detection ---
+    # Ring opening: a scaffold ring bond is absent in the molecule.
+    # Seco compounds typically don't match the parent scaffold at all
+    # (because the substructure match fails when a ring is broken),
+    # so seco-detection requires a different approach (e.g., seco-specific
+    # scaffold patterns). This is deferred to a future phase.
+
+    return modifications
+
+
+def format_np_modification_prefix(modifications: List[Dict]) -> str:
+    """Format modification prefixes per IUPAC nomenclature.
+
+    IUPAC steroid nomenclature rules 3S-7, 3S-8:
+    - nor-: '{locant}-nor' or '{loc1},{loc2}-dinor' etc.
+    - homo-: '{ring_letter}-homo' or '{locant}-homo'
+    - seco-: '{loc1},{loc2}-seco'
+
+    Multiple modifications are sorted alphabetically by prefix name
+    (homo < nor < seco) and concatenated with hyphens.
+
+    Args:
+        modifications: List of modification dicts from detect_np_modifications().
+
+    Returns:
+        Combined prefix string (e.g., '19-nor', 'D-homo-19-nor-9,10-seco')
+        or empty string if no modifications.
+    """
+    if not modifications:
+        return ""
+
+    # Multiplicative prefixes for nor-
+    _NOR_MULTIPLIERS = {
+        1: "",
+        2: "di",
+        3: "tri",
+        4: "tetra",
+        5: "penta",
+    }
+
+    # Sort alphabetically by prefix name
+    sorted_mods = sorted(modifications, key=lambda m: m["prefix"])
+
+    parts = []
+    for mod in sorted_mods:
+        prefix = mod["prefix"]
+        locants = sorted(mod.get("locants", []))
+        ring_letter = mod.get("ring_letter")
+
+        if prefix == "nor":
+            count = len(locants)
+            multiplier = _NOR_MULTIPLIERS.get(count, str(count))
+            locant_str = ",".join(str(loc) for loc in locants)
+            if locant_str:
+                parts.append(f"{locant_str}-{multiplier}{prefix}")
+            else:
+                parts.append(prefix)
+
+        elif prefix == "homo":
+            if ring_letter:
+                parts.append(f"{ring_letter}-{prefix}")
+            elif locants:
+                locant_str = ",".join(str(loc) for loc in locants)
+                parts.append(f"{locant_str}-{prefix}")
+            else:
+                parts.append(prefix)
+
+        elif prefix == "seco":
+            locant_str = ",".join(str(loc) for loc in locants)
+            if locant_str:
+                parts.append(f"{locant_str}-{prefix}")
+            else:
+                parts.append(prefix)
+
+    return "-".join(parts)
 
 
 def name_natural_product(mol) -> Optional[str]:
