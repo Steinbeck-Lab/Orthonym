@@ -18,7 +18,10 @@ from src.orthonym.perception.stereo import (
     detect_axial_chirality,
     _manual_allene_cip,
 )
-from src.orthonym.rules.stereochemistry import format_stereodescriptor_string
+from src.orthonym.rules.stereochemistry import (
+    collect_stereodescriptors,
+    format_stereodescriptor_string,
+)
 
 
 # =============================================================================
@@ -291,3 +294,120 @@ class TestFormatWithAxialDescriptors:
         """[(1, 'Ra'), (2, 'S'), (3, 'E')] -> '(1Ra,2S,3E)-'"""
         result = format_stereodescriptor_string([(1, 'Ra'), (2, 'S'), (3, 'E')])
         assert result == '(1Ra,2S,3E)-'
+
+
+# =============================================================================
+# Test collect_stereodescriptors with axial chirality integration
+# =============================================================================
+
+class TestCollectStereodescriptorsAxial:
+    """Tests for axial chirality flowing through collect_stereodescriptors."""
+
+    def test_atropisomer_in_atom_to_locant_returns_descriptor(self):
+        """Atropisomer bond atom in atom_to_locant -> Ra/Sa included."""
+        mol = _make_biaryl_atropisomer(Chem.BondStereo.STEREOATROPCW)
+        # Find the biaryl bond begin atom index
+        begin_atom = None
+        for bond in mol.GetBonds():
+            if bond.GetStereo() == Chem.BondStereo.STEREOATROPCW:
+                begin_atom = bond.GetBeginAtomIdx()
+                break
+        assert begin_atom is not None
+
+        # Create atom_to_locant including the begin atom of the atropisomer bond
+        # Map all ring atoms to sequential locants
+        atom_to_locant = {}
+        for i, atom in enumerate(mol.GetAtoms()):
+            atom_to_locant[i] = i + 1
+
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        # Should contain an Sa descriptor (STEREOATROPCW -> M -> Sa)
+        axial_descs = [(loc, cip) for loc, cip in descriptors if cip in ('Ra', 'Sa')]
+        assert len(axial_descs) >= 1
+        assert axial_descs[0][1] == 'Sa'
+
+    def test_atropisomer_not_in_locant_map_filtered_out(self):
+        """Atropisomer bond atom NOT in atom_to_locant -> filtered out."""
+        mol = _make_biaryl_atropisomer(Chem.BondStereo.STEREOATROPCW)
+        # Empty locant map -- axial chirality should be filtered out
+        atom_to_locant = {}
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        axial_descs = [(loc, cip) for loc, cip in descriptors if cip in ('Ra', 'Sa')]
+        assert len(axial_descs) == 0
+
+    def test_point_and_axial_chirality_both_collected(self):
+        """Molecule with R/S + atropisomer chirality gets all descriptors."""
+        # Build biaryl with stereocenter: C[C@H](O)c1ccccc1-c1ccccc1C
+        mol = Chem.RWMol(Chem.MolFromSmiles('C[C@H](O)c1ccccc1-c1ccccc1C'))
+        for bond in mol.GetBonds():
+            b = bond.GetBeginAtom()
+            e = bond.GetEndAtom()
+            if (b.IsInRing() and e.IsInRing() and not bond.IsInRing()
+                    and b.GetIsAromatic() and e.GetIsAromatic()):
+                bond.SetStereo(Chem.BondStereo.STEREOATROPCCW)
+                b_nbrs = [n.GetIdx() for n in b.GetNeighbors()
+                           if n.GetIdx() != e.GetIdx()]
+                e_nbrs = [n.GetIdx() for n in e.GetNeighbors()
+                           if n.GetIdx() != b.GetIdx()]
+                bond.SetStereoAtoms(b_nbrs[0], e_nbrs[0])
+                break
+        final_mol = mol.GetMol()
+        rdCIPLabeler.AssignCIPLabels(final_mol)
+
+        # Map all atoms to locants
+        atom_to_locant = {i: i + 1 for i in range(final_mol.GetNumAtoms())}
+        descriptors = collect_stereodescriptors(final_mol, atom_to_locant)
+
+        # Should have both R/S and Ra/Sa descriptors
+        rs_descs = [(l, c) for l, c in descriptors if c in ('R', 'S')]
+        axial_descs = [(l, c) for l, c in descriptors if c in ('Ra', 'Sa')]
+        assert len(rs_descs) >= 1, "Should have R/S descriptor"
+        assert len(axial_descs) >= 1, "Should have Ra/Sa descriptor"
+
+    def test_end_to_end_format_ra_with_s(self):
+        """End-to-end: collect_stereodescriptors -> format produces '(NRa,MS)-' style."""
+        # Create a molecule with both types and format the output
+        mol = Chem.RWMol(Chem.MolFromSmiles('C[C@H](O)c1ccccc1-c1ccccc1C'))
+        for bond in mol.GetBonds():
+            b = bond.GetBeginAtom()
+            e = bond.GetEndAtom()
+            if (b.IsInRing() and e.IsInRing() and not bond.IsInRing()
+                    and b.GetIsAromatic() and e.GetIsAromatic()):
+                bond.SetStereo(Chem.BondStereo.STEREOATROPCCW)
+                b_nbrs = [n.GetIdx() for n in b.GetNeighbors()
+                           if n.GetIdx() != e.GetIdx()]
+                e_nbrs = [n.GetIdx() for n in e.GetNeighbors()
+                           if n.GetIdx() != b.GetIdx()]
+                bond.SetStereoAtoms(b_nbrs[0], e_nbrs[0])
+                break
+        final_mol = mol.GetMol()
+        rdCIPLabeler.AssignCIPLabels(final_mol)
+
+        atom_to_locant = {i: i + 1 for i in range(final_mol.GetNumAtoms())}
+        descriptors = collect_stereodescriptors(final_mol, atom_to_locant)
+        result = format_stereodescriptor_string(descriptors)
+
+        # Should be a parenthesized prefix like "(2S,7Ra)-" or similar
+        assert result.startswith('(')
+        assert result.endswith(')-')
+        assert 'Ra' in result or 'Sa' in result, "Should contain axial descriptor"
+        # Should also have R or S for the point chirality
+        # (need to check for R/S not preceded by another letter to avoid matching Ra/Sa)
+        import re
+        has_point_chirality = bool(re.search(r'\d[RS](?![a])', result))
+        assert has_point_chirality, f"Should contain R/S point chirality descriptor in {result}"
+
+    def test_opsin_limitation_documented(self):
+        """OPSIN cannot interpret Ra/Sa descriptors.
+
+        This test documents the known OPSIN limitation: OPSIN's
+        StereochemistryHandler.java throws StereochemistryException
+        for AXIAL_TYPE_VAL. Names containing Ra/Sa will fail OPSIN
+        round-trip validation. This is NOT an Orthonym bug.
+
+        See: opsin/opsin-core/src/main/java/.../StereochemistryHandler.java
+        See: 115-RESEARCH.md Pitfall 4
+        """
+        # This is a documentation-only test -- it always passes.
+        # The actual OPSIN limitation is documented in the docstring.
+        pass

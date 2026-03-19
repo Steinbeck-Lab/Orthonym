@@ -23,7 +23,7 @@ atom indices as those are NOT valid IUPAC locants.
 from typing import Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
-from ..perception.stereo import assign_stereochemistry
+from ..perception.stereo import assign_stereochemistry, detect_axial_chirality
 
 
 def collect_stereodescriptors(
@@ -141,6 +141,19 @@ def collect_stereodescriptors(
 
             cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
             descriptors.append((locant, cip_code))
+
+    # Collect axial chirality (Ra/Sa) -- atropisomers and allenes (IUPAC P-93.5)
+    axial_elements = detect_axial_chirality(mol)
+    for element in axial_elements:
+        cip = element.get('cip')
+        if cip is None:
+            continue  # Undetermined chirality -- skip
+        locant_atom = element.get('locant_atom')
+        if locant_atom is not None and locant_atom in atom_to_locant:
+            locant = atom_to_locant[locant_atom]
+            descriptors.append((locant, cip))
+        # If locant_atom not in atom_to_locant, the axial chirality element
+        # is not on the principal chain/ring -- skip (same filtering as R/S)
 
     # Sort by locant ascending
     descriptors.sort(key=lambda x: x[0])
