@@ -198,3 +198,176 @@ class TestNamingNegatives:
         # Should not contain 'bi' prefix for assembly naming
         assert "biphenyl" not in name
         assert "bicyclo" not in name.lower() or "cyclohex" in name
+
+
+# ---------------------------------------------------------------------------
+# RING-01: Higher multiplier tests (quinque through deci)
+# ---------------------------------------------------------------------------
+
+class TestHigherMultipliers:
+    """Tests for ASSEMBLY_MULTIPLIERS extension to 5-10 (IUPAC P-28.2)."""
+
+    @pytest.mark.unit
+    def test_quinque_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[5] == 'quinque'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[5] == "quinque"
+
+    @pytest.mark.unit
+    def test_sexi_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[6] == 'sexi'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[6] == "sexi"
+
+    @pytest.mark.unit
+    def test_septi_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[7] == 'septi'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[7] == "septi"
+
+    @pytest.mark.unit
+    def test_octi_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[8] == 'octi'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[8] == "octi"
+
+    @pytest.mark.unit
+    def test_novi_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[9] == 'novi'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[9] == "novi"
+
+    @pytest.mark.unit
+    def test_deci_in_dict(self):
+        """ASSEMBLY_MULTIPLIERS[10] == 'deci'."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[10] == "deci"
+
+    @pytest.mark.unit
+    def test_all_nine_entries(self):
+        """ASSEMBLY_MULTIPLIERS has exactly 9 entries (2 through 10)."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert len(ASSEMBLY_MULTIPLIERS) == 9
+        for k in range(2, 11):
+            assert k in ASSEMBLY_MULTIPLIERS
+
+    @pytest.mark.unit
+    def test_quinquepyridine_name(self):
+        """name_ring_assembly() with 5 identical pyridine rings returns name
+        containing 'quinquepyridine'."""
+        # 5 pyridines linked: c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1
+        smiles = "c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1-c1ccncc1"
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"Invalid SMILES: {smiles}"
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is not None, "Should detect 5-ring pyridine assembly"
+        assert info["count"] == 5
+        result = name_ring_assembly(mol, info, None)
+        assert result is not None
+        assert "quinquepyridine" in result
+
+    @pytest.mark.unit
+    def test_quinquephenyl_prefix(self):
+        """name_ring_assembly() with 5 identical benzene rings returns name
+        containing 'quinquephenyl'."""
+        from orthonym.rules.ring_assemblies import name_ring_assembly_prefix
+        smiles = "c1ccc(-c2ccc(-c3ccc(-c4ccc(-c5ccccc5)cc4)cc3)cc2)cc1"
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"Invalid SMILES: {smiles}"
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is not None, "Should detect 5-ring benzene assembly"
+        assert info["count"] == 5
+        result = name_ring_assembly(mol, info, None)
+        assert result is not None
+        assert "quinquephenyl" in result
+
+    @pytest.mark.unit
+    def test_count_11_unsupported(self):
+        """ASSEMBLY_MULTIPLIERS does not contain count=11."""
+        from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
+        assert 11 not in ASSEMBLY_MULTIPLIERS
+
+    @pytest.mark.unit
+    def test_regression_biphenyl(self):
+        """Regression: biphenyl detection and naming still works."""
+        name = name_compound("c1ccc(-c2ccccc2)cc1")
+        assert name == "biphenyl"
+
+    @pytest.mark.unit
+    def test_regression_bipyridine(self):
+        """Regression: bipyridine detection and naming still works."""
+        name = name_compound("c1ccncc1-c2ccncc2")
+        assert "bipyridine" in name
+
+
+# ---------------------------------------------------------------------------
+# RING-02: Fused ring assembly unit tests
+# ---------------------------------------------------------------------------
+
+class TestFusedRingAssemblyUnits:
+    """Tests for fused ring systems as ring assembly units (IUPAC P-28.1)."""
+
+    @pytest.mark.unit
+    def test_get_ring_parent_name_naphthalene(self):
+        """_get_ring_parent_name() with naphthalene system atoms returns 'naphthalene'."""
+        from orthonym.rules.ring_assemblies import _get_ring_parent_name
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")
+        # naphthalene is a single ring system; all atoms form the system
+        system_atoms = set(range(mol.GetNumAtoms()))
+        name = _get_ring_parent_name(mol, system_atoms)
+        assert name is not None, "_get_ring_parent_name returned None for naphthalene"
+        assert name == "naphthalene"
+
+    @pytest.mark.unit
+    def test_get_ring_parent_name_quinoline(self):
+        """_get_ring_parent_name() with quinoline system atoms returns 'quinoline'."""
+        from orthonym.rules.ring_assemblies import _get_ring_parent_name
+        mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        system_atoms = set(range(mol.GetNumAtoms()))
+        name = _get_ring_parent_name(mol, system_atoms)
+        assert name is not None, "_get_ring_parent_name returned None for quinoline"
+        assert name == "quinoline"
+
+    @pytest.mark.unit
+    def test_get_ring_parent_name_indole(self):
+        """_get_ring_parent_name() with indole system atoms returns a name containing 'indole'."""
+        from orthonym.rules.ring_assemblies import _get_ring_parent_name
+        mol = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")
+        system_atoms = set(range(mol.GetNumAtoms()))
+        name = _get_ring_parent_name(mol, system_atoms)
+        assert name is not None, "_get_ring_parent_name returned None for indole"
+        assert "indole" in name
+
+    @pytest.mark.unit
+    def test_binaphthalene_detection(self):
+        """detect_ring_assembly() on two identical naphthalene systems returns count==2."""
+        # 1,1'-binaphthalene
+        smiles = "c1ccc2ccccc2c1-c1ccc2ccccc2c1"
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"Invalid SMILES: {smiles}"
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is not None, "Should detect binaphthalene as 2-ring assembly"
+        assert info["count"] == 2
+
+    @pytest.mark.unit
+    def test_binaphthalene_name(self):
+        """name_compound() on binaphthalene SMILES produces name containing 'binaphthalene'."""
+        smiles = "c1ccc2ccccc2c1-c1ccc2ccccc2c1"
+        name = name_compound(smiles)
+        assert name is not None
+        assert "binaphthalene" in name or "binaphthalen" in name, \
+            f"Expected 'binaphthalene' in name, got: {name}"
+
+    @pytest.mark.unit
+    def test_biquinoline_detection(self):
+        """detect_ring_assembly() on two identical quinoline systems returns count==2."""
+        smiles = "c1ccc2ncccc2c1-c1ccc2ncccc2c1"
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"Invalid SMILES: {smiles}"
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is not None, "Should detect biquinoline as 2-ring assembly"
+        assert info["count"] == 2
