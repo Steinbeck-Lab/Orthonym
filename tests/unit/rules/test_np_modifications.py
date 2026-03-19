@@ -82,8 +82,13 @@ class TestDetectNpModifications:
         modifications = detect_np_modifications(mol, scaffold_info, numbering)
         assert modifications == []
 
-    def test_estrane_detects_19_nor(self):
-        """Estrane (19-norandrostane) should detect missing C-19 as nor modification."""
+    def test_estrane_no_nor_detected(self):
+        """Estrane scaffold's numbering lacks C-19 so no nor- is detected.
+
+        Estrane is structurally 19-norandrostane but has its own retained name.
+        Since estrane's numbering map doesn't include locant 19, the nor-
+        detection correctly skips it -- the scaffold name "estrane" is used.
+        """
         mol = _mol(ESTRANE_SMILES)
         from orthonym.perception.natural_products import detect_natural_product
         from orthonym.rules.natural_products import _build_target_to_iupac
@@ -95,13 +100,15 @@ class TestDetectNpModifications:
         assert numbering is not None
 
         modifications = detect_np_modifications(mol, scaffold_info, numbering)
-        assert len(modifications) >= 1
-        nor_mods = [m for m in modifications if m["prefix"] == "nor"]
-        assert len(nor_mods) == 1
-        assert 19 in nor_mods[0]["locants"]
+        # Estrane scaffold numbering lacks C-19, so no nor- detected
+        assert modifications == []
 
-    def test_gonane_detects_18_19_dinor(self):
-        """Gonane (base tetracycle) should detect missing C-18 and C-19."""
+    def test_gonane_no_nor_detected(self):
+        """Gonane scaffold's numbering lacks C-18 and C-19 so no nor- detected.
+
+        Gonane is the bare tetracyclic steroid with its own name. Its numbering
+        map doesn't include locants 18 or 19, so no modification is detected.
+        """
         mol = _mol(GONANE_SMILES)
         from orthonym.perception.natural_products import detect_natural_product
         from orthonym.rules.natural_products import _build_target_to_iupac
@@ -113,9 +120,8 @@ class TestDetectNpModifications:
         assert numbering is not None
 
         modifications = detect_np_modifications(mol, scaffold_info, numbering)
-        nor_mods = [m for m in modifications if m["prefix"] == "nor"]
-        assert len(nor_mods) == 1
-        assert sorted(nor_mods[0]["locants"]) == [18, 19]
+        # Gonane numbering lacks both C-18 and C-19
+        assert modifications == []
 
     def test_cholestane_no_modifications(self):
         """Cholestane has both angular methyls -- no nor modifications."""
@@ -130,6 +136,48 @@ class TestDetectNpModifications:
 
         modifications = detect_np_modifications(mol, scaffold_info, numbering)
         assert modifications == []
+
+    def test_androstane_has_both_angular_methyls(self):
+        """Androstane molecule has both C-18 and C-19 -- no nor modification."""
+        mol = _mol(ANDROSTANE_SMILES)
+        from orthonym.perception.natural_products import detect_natural_product
+        from orthonym.rules.natural_products import _build_target_to_iupac
+
+        scaffold_info = detect_natural_product(mol)
+        assert scaffold_info is not None
+        numbering = _build_target_to_iupac(scaffold_info)
+        assert numbering is not None
+
+        # Androstane numbering includes locants 18 and 19
+        locants = set(numbering.values())
+        assert 18 in locants
+        assert 19 in locants
+
+        # Both methyls present -> no modifications
+        modifications = detect_np_modifications(mol, scaffold_info, numbering)
+        assert modifications == []
+
+    def test_format_and_pipeline_integration(self):
+        """Integration: format_np_modification_prefix produces correct prefix for
+        nor-modification and _assemble_np_name inserts it before the stem."""
+        from orthonym.rules.natural_products import _assemble_np_name, format_np_modification_prefix
+
+        modifications = [
+            {"prefix": "nor", "locants": [19], "ring_letter": None}
+        ]
+        mod_prefix = format_np_modification_prefix(modifications)
+        assert mod_prefix == "19-nor"
+
+        # Test with _assemble_np_name
+        result = _assemble_np_name(
+            stem="androst",
+            scaffold_name="androstane",
+            hydroxyls=[],
+            ketones=[3],
+            unsaturation={"ene": [4], "yne": []},
+            modification_prefix=mod_prefix,
+        )
+        assert "19-norandrost" in result
 
     def test_non_np_molecule_returns_none_from_pipeline(self):
         """Molecules that don't match any NP scaffold return None."""
@@ -233,21 +281,39 @@ class TestFormatNpModificationPrefix:
 class TestNameNaturalProductWithModifications:
     """Integration test: modification prefixes in full naming pipeline."""
 
-    def test_estrane_produces_name_with_19_nor(self):
-        """A 19-norandrostane (estrane) derivative should contain '19-nor' in name."""
-        # Estrane with a 4-en-3-one decoration (norethisterone-like backbone)
-        # 19-Norandrost-4-en-3-one
-        # Estrane + double bond at C4-C5 + ketone at C3
-        # Use an unsaturated estrane derivative
+    def test_estrane_retains_scaffold_name(self):
+        """Estrane has its own scaffold name -- no modification prefix added.
+
+        Estrane = 19-norandrostane structurally, but since estrane has its own
+        IUPAC retained name and numbering map (without C-19), it is named
+        as 'estrane' without a modification prefix.
+        """
         mol = _mol(ESTRANE_SMILES)
         result = name_natural_product(mol)
-        # The bare estrane scaffold should produce a name with '19-nor'
-        # OR it may still return 'estrane' if the pipeline prioritizes the scaffold name
-        # The key requirement: detect_np_modifications detects 19-nor
         assert result is not None
-        # If modifications are integrated, the name should contain '19-nor'
-        # If not yet integrated (Task 1 only), estrane is still returned
-        # This test validates detection works; Task 2 wires it into the pipeline
+        assert result == "estrane"
+
+    def test_gonane_retains_scaffold_name(self):
+        """Gonane has its own scaffold name -- no modification prefix added."""
+        mol = _mol(GONANE_SMILES)
+        result = name_natural_product(mol)
+        assert result is not None
+        assert result == "gonane"
+
+    def test_androstane_no_modification_prefix(self):
+        """Androstane has both angular methyls -- no modification prefix."""
+        mol = _mol(ANDROSTANE_SMILES)
+        result = name_natural_product(mol)
+        assert result is not None
+        assert "nor" not in result, f"Unexpected 'nor' in '{result}'"
+        assert result == "androstane"
+
+    def test_cholestane_no_modification_prefix(self):
+        """Cholestane has both angular methyls -- no modification prefix."""
+        mol = _mol(CHOLESTANE_SMILES)
+        result = name_natural_product(mol)
+        assert result is not None
+        assert "nor" not in result, f"Unexpected 'nor' in '{result}'"
 
     def test_exact_derivative_cholesterol_unaffected(self):
         """Exact derivatives bypass modification detection entirely."""
@@ -260,3 +326,71 @@ class TestNameNaturalProductWithModifications:
         mol = _mol(MORPHINE_SMILES)
         result = name_natural_product(mol)
         assert result == "morphine"
+
+    def test_non_np_ethanol_returns_none(self):
+        """Non-NP molecules still return None from name_natural_product."""
+        mol = _mol("CCO")
+        result = name_natural_product(mol)
+        assert result is None
+
+    def test_non_np_benzene_returns_none(self):
+        """Benzene is not a natural product scaffold."""
+        mol = _mol("c1ccccc1")
+        result = name_natural_product(mol)
+        assert result is None
+
+
+# ===========================================================================
+# Test Class 4: Full pipeline integration via name_compound()
+# ===========================================================================
+
+@pytest.mark.unit
+class TestNameNaturalProductIntegration:
+    """End-to-end tests via name_compound() for NP modification prefixes."""
+
+    def test_name_compound_estrane_retains_name(self):
+        """name_compound() on estrane scaffold produces 'estrane' (retained name)."""
+        from orthonym import name_compound
+        mol = _mol(ESTRANE_SMILES)
+        result = name_compound(Chem.MolToSmiles(mol))
+        assert result is not None
+        assert result == "estrane"
+
+    def test_name_compound_cholesterol_unchanged(self):
+        """name_compound() on cholesterol still returns 'cholesterol'."""
+        from orthonym import name_compound
+        result = name_compound(CHOLESTEROL_SMILES)
+        assert result == "cholesterol"
+
+    def test_modification_prefix_before_stem_in_assembled_name(self):
+        """Modification prefix appears before scaffold stem in assembled name."""
+        from orthonym.rules.natural_products import _assemble_np_name
+        # Test _assemble_np_name directly with modification_prefix
+        result = _assemble_np_name(
+            stem="androst",
+            scaffold_name="androstane",
+            hydroxyls=[],
+            ketones=[3],
+            unsaturation={"ene": [4], "yne": []},
+            stereo_prefix="",
+            modification_prefix="19-nor",
+        )
+        # The modification prefix should be before the stem
+        assert "19-nor" in result
+        # Should produce something like "19-norandrost-4-en-3-one"
+        assert result.startswith("19-nor") or "19-norandrost" in result
+
+    def test_assemble_np_name_no_modification(self):
+        """_assemble_np_name without modification_prefix works unchanged."""
+        from orthonym.rules.natural_products import _assemble_np_name
+        result = _assemble_np_name(
+            stem="androst",
+            scaffold_name="androstane",
+            hydroxyls=[],
+            ketones=[3],
+            unsaturation={"ene": [4], "yne": []},
+            stereo_prefix="",
+        )
+        # Without modification prefix, name starts with stem
+        assert result.startswith("androst")
+        assert "19-nor" not in result

@@ -38,26 +38,24 @@ from ..perception.natural_products import (
 
 
 # ---------------------------------------------------------------------------
-# Steroid angular methyl reference data
+# Steroid angular methyl positions for nor-detection
 # ---------------------------------------------------------------------------
-# For each steroid scaffold, which angular methyls (C-18, C-19) are EXPECTED
-# but ABSENT. This enables nor-detection: estrane lacks C-19 (= 19-norandrostane),
-# gonane lacks both C-18 and C-19 (= 18,19-dinorandrostane).
+# For steroid scaffolds that include C-18 and C-19 in their numbering,
+# these constants define the ring junction atoms where angular methyls attach.
 #
 # IUPAC steroid nomenclature:
 #   C-18: angular methyl at ring C/D junction (bonded to C-13)
 #   C-19: angular methyl at ring A/B junction (bonded to C-10)
+#
+# Nor-detection: if a scaffold's numbering includes locant 18 or 19, but the
+# actual molecule is missing the methyl carbon at that position, it's a nor-
+# modification. If the scaffold numbering doesn't include the locant at all
+# (e.g., estrane has no C-19), no modification is detected -- the scaffold's
+# own name is used (e.g., "estrane" not "19-norandrostane").
 
-_STEROID_MISSING_ANGULAR_METHYLS: Dict[str, List[int]] = {
-    "androstane": [],        # Has both C-18 and C-19
-    "estrane": [19],         # Has C-18, lacks C-19 (= 19-norandrostane)
-    "gonane": [18, 19],      # Lacks both (bare tetracycle)
-    "pregnane": [],          # Has both
-    "cholestane": [],        # Has both
-    "cholane": [],           # Has both
-    "ergostane": [],         # Has both
-    "campestane": [],        # Has both
-    "stigmastane": [],       # Has both
+_ANGULAR_METHYL_JUNCTION = {
+    18: 13,  # C-18 methyl is bonded to C-13 (ring C/D junction)
+    19: 10,  # C-19 methyl is bonded to C-10 (ring A/B junction)
 }
 
 
@@ -97,16 +95,51 @@ def detect_np_modifications(
     modifications: List[Dict] = []
 
     scaffold_class = scaffold_info.get("scaffold_class", "")
-    scaffold_name = scaffold_info.get("scaffold_name", "")
 
     # --- NOR detection ---
-    # For steroid scaffolds, check angular methyl positions.
-    # The _STEROID_MISSING_ANGULAR_METHYLS table defines which locants
-    # are absent from each named scaffold.
+    # For steroid scaffolds, check angular methyl positions (C-18, C-19).
+    # Only detect nor- if the scaffold numbering INCLUDES the angular methyl
+    # locant but the actual molecule is MISSING the methyl carbon at that
+    # position. If the scaffold numbering doesn't include the locant (e.g.,
+    # estrane lacks C-19), no modification is detected -- use the scaffold
+    # name as-is.
     if scaffold_class == "steroid":
-        missing_methyls = _STEROID_MISSING_ANGULAR_METHYLS.get(
-            scaffold_name, []
-        )
+        # Build reverse map: IUPAC locant -> target atom index
+        locant_to_target = {v: k for k, v in numbering.items()}
+        missing_methyls = []
+
+        for methyl_locant, junction_locant in _ANGULAR_METHYL_JUNCTION.items():
+            # Only check if the scaffold numbering includes BOTH the methyl
+            # locant and the junction locant
+            if methyl_locant not in locant_to_target:
+                continue  # Scaffold doesn't have this position (e.g., estrane lacks C-19)
+            if junction_locant not in locant_to_target:
+                continue
+
+            methyl_target_idx = locant_to_target[methyl_locant]
+            junction_target_idx = locant_to_target[junction_locant]
+
+            # The methyl carbon should be bonded to the junction carbon.
+            # Check if the methyl atom in the molecule is actually a terminal
+            # methyl (CH3) or if it's been removed/replaced.
+            methyl_atom = mol.GetAtomWithIdx(methyl_target_idx)
+            junction_atom = mol.GetAtomWithIdx(junction_target_idx)
+
+            # Check if the methyl atom has the expected connectivity:
+            # a terminal methyl bonded to the junction should have exactly
+            # 1 heavy-atom neighbor (the junction) and 3 hydrogens
+            heavy_neighbors = [
+                n for n in methyl_atom.GetNeighbors()
+                if n.GetAtomicNum() > 1
+            ]
+            if len(heavy_neighbors) == 0:
+                # The methyl position maps to a hydrogen-only atom or
+                # an atom with no heavy neighbors -- methyl is absent
+                missing_methyls.append(methyl_locant)
+            elif methyl_atom.GetAtomicNum() != 6:
+                # The position is occupied by a non-carbon atom
+                missing_methyls.append(methyl_locant)
+
         if missing_methyls:
             modifications.append({
                 "prefix": "nor",
@@ -229,11 +262,19 @@ def name_natural_product(mol) -> Optional[str]:
     if scaffold_info is None:
         return None
 
+    # Step 3b: Detect NP modifications (nor-, homo-, seco-)
+    # Build numbering early so it can be reused in Steps 4-6
+    numbering = _build_target_to_iupac(scaffold_info)
+    modification_prefix = ""
+    if numbering is not None:
+        modifications = detect_np_modifications(mol, scaffold_info, numbering)
+        if modifications:
+            modification_prefix = format_np_modification_prefix(modifications)
+
     # Step 4: Check if molecule is just the bare scaffold (no substituents)
     non_scaffold = scaffold_info["non_scaffold_atoms"]
     if not non_scaffold:
         # Bare scaffold -- but check for internal unsaturation
-        numbering = _build_target_to_iupac(scaffold_info)
         if numbering:
             scaffold_arom = _build_scaffold_aromatic_atoms(
                 scaffold_info.get("scaffold_smiles"),
@@ -252,6 +293,7 @@ def name_natural_product(mol) -> Optional[str]:
                     ketones=[],
                     unsaturation=unsaturation,
                     stereo_prefix=stereo_prefix,
+                    modification_prefix=modification_prefix,
                 )
         # Coverage gate: reject bare scaffold if it covers too little
         total_heavy = mol.GetNumHeavyAtoms()
@@ -259,6 +301,8 @@ def name_natural_product(mol) -> Optional[str]:
             scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
             if scaffold_coverage < 0.60:
                 return None  # Fall through to systematic naming
+        if modification_prefix:
+            return modification_prefix + scaffold_info["scaffold_name"]
         return scaffold_info["scaffold_name"]
 
     # Step 5: Check if non-scaffold atoms are only hydrogens
@@ -273,13 +317,19 @@ def name_natural_product(mol) -> Optional[str]:
             scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
             if scaffold_coverage < 0.60:
                 return None  # Fall through to systematic naming
+        if modification_prefix:
+            return modification_prefix + scaffold_info["scaffold_name"]
         return scaffold_info["scaffold_name"]
 
     # Step 6: Scaffold with substituents -- enumerate decorations
-    return name_natural_product_with_substituents(mol, scaffold_info)
+    return name_natural_product_with_substituents(
+        mol, scaffold_info, modification_prefix=modification_prefix
+    )
 
 
-def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
+def name_natural_product_with_substituents(
+    mol, scaffold_info: Dict, modification_prefix: str = ""
+) -> str:
     """Name a natural product with decorations on the scaffold.
 
     For steroids: enumerates hydroxyl, ketone, unsaturation, and ester
@@ -298,6 +348,8 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
             - scaffold_smiles: str
             - matched_atoms: tuple
             - non_scaffold_atoms: set
+        modification_prefix: NP modification prefix string (e.g., '19-nor')
+            to insert before the scaffold stem. Empty string if no modifications.
 
     Returns:
         Name string for the natural product.
@@ -317,6 +369,8 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
             threshold = 0.40 if scaffold_class == "steroid" else 0.50
             if scaffold_coverage < threshold:
                 return None  # Fall through to systematic naming
+        if modification_prefix:
+            return modification_prefix + scaffold_name
         return scaffold_name
 
     matched_set = set(scaffold_info["matched_atoms"])
@@ -394,6 +448,8 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
     if (not hydroxyls and not ketones and not methyls and not halogens
             and not unsaturation["ene"] and not unsaturation["yne"]
             and not epoxy_bridges and not n_alkyls and not methoxys):
+        if modification_prefix:
+            return modification_prefix + scaffold_name
         return scaffold_name
 
     # 5. Assemble the decorated name (substitutive format)
@@ -401,6 +457,7 @@ def name_natural_product_with_substituents(mol, scaffold_info: Dict) -> str:
         scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
         stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
         epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
+        modification_prefix=modification_prefix,
     )
 
 
@@ -961,11 +1018,17 @@ def _assemble_np_name(
     epoxy_bridges: Optional[List[Tuple[int, int]]] = None,
     n_alkyls: Optional[List[Tuple[int, str]]] = None,
     methoxys: Optional[List[int]] = None,
+    modification_prefix: str = "",
 ) -> str:
     """Assemble a decorated natural product name.
 
-    Format: {stereo_prefix}{prefix}{stem}{unsaturation_suffix}{ketone_suffix}
+    Format: {stereo_prefix}{fg_prefix}{modification_prefix}{stem}{unsat}{suffix}
     Example: "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol"
+    With modification: "17-hydroxy-19-norandrost-4-en-3-one"
+
+    The modification prefix (nor-, homo-, seco-) is inserted directly before
+    the scaffold stem, after any functional group prefixes. This follows
+    IUPAC convention where modification prefixes are stem modifications.
 
     Args:
         stem: Scaffold stem (e.g., "cholest", "androst").
@@ -979,6 +1042,8 @@ def _assemble_np_name(
         epoxy_bridges: Optional sorted list of (loc1, loc2) epoxy bridge locants.
         n_alkyls: Optional sorted list of (locant, alkyl_name) tuples.
         methoxys: Optional sorted IUPAC locants of -OCH3 groups.
+        modification_prefix: NP modification prefix (e.g., '19-nor') to insert
+            before the stem. Empty string if no modifications.
 
     Returns:
         Assembled IUPAC-style natural product name.
@@ -1097,6 +1162,8 @@ def _assemble_np_name(
     # For NP names: hydroxyl is always prefix, ketone always suffix
     # If neither ketone nor hydroxyl, and no unsaturation -> bare scaffold name
     if not prefix and not ketone_suffix and not ene_locs and not yne_locs:
+        if modification_prefix:
+            return stereo_prefix + modification_prefix + scaffold_name
         return stereo_prefix + scaffold_name
 
     # Build non-OH prefix (methyl, halogen only) for use with -ol suffix
@@ -1112,27 +1179,27 @@ def _assemble_np_name(
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         ol_suffix = f"-{locant_str}-{multiplier}ol"
-        # non-OH prefix + effective_stem + unsaturation + -ol
+        # non-OH prefix + modification_prefix + effective_stem + unsaturation + -ol
         # e.g., "4-methylcholest-5-en-3-ol" or "cholesta-5,7-dien-3-ol"
-        return f"{stereo_prefix}{non_oh_prefix}{effective_stem}{unsat_suffix}{ol_suffix}"
+        return f"{stereo_prefix}{non_oh_prefix}{modification_prefix}{effective_stem}{unsat_suffix}{ol_suffix}"
 
-    # General case: prefix + effective_stem + unsaturation + ketone
-    # e.g., "17-hydroxyandr-4-en-3-one" for testosterone-type
+    # General case: prefix + modification_prefix + effective_stem + unsaturation + ketone
+    # e.g., "17-hydroxy-19-norandr-4-en-3-one" for norethisterone-type
     if unsat_suffix == "an":
-        # Saturated: prefix + stem + "an" + ketone (no 'a' needed for saturated)
+        # Saturated: prefix + modification_prefix + stem + "an" + ketone
         # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-one, -ol, -yl)
         # Keep 'e' only when no suffix follows (bare saturated name)
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{ketone_suffix}"
+            return f"{stereo_prefix}{prefix}{modification_prefix}{stem}{unsat_suffix}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{prefix}{stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{prefix}{modification_prefix}{stem}{unsat_suffix}e"
     else:
-        # Unsaturated: prefix + effective_stem + unsaturation + ketone
+        # Unsaturated: prefix + modification_prefix + effective_stem + unsaturation + ketone
         # If no suffix follows, add terminal 'e' (IUPAC: "ene"/"yne" not "en"/"yn")
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{effective_stem}{unsat_suffix}{ketone_suffix}"
+            return f"{stereo_prefix}{prefix}{modification_prefix}{effective_stem}{unsat_suffix}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{prefix}{effective_stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{prefix}{modification_prefix}{effective_stem}{unsat_suffix}e"
 
 
 def _find_ester_decorations(
