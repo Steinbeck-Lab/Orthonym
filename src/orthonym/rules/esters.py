@@ -791,54 +791,116 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     acid_prefix_str = ""
 
     if not acid_has_ring:
+        # --- Chain acid path (existing logic, unchanged) ---
         acid_principal_chain = _find_acid_principal_chain(mol, acid_atoms)
 
-    if acid_principal_chain and len(acid_principal_chain) >= 2:
-        # Check if acid fragment has branches (substituents on the acid chain).
-        # Branches can be carbon-based (alkyl) OR heteroatom-based (halogens,
-        # hydroxy, etc.). Check for ANY non-chain, non-carbonyl-O atom.
-        chain_set = set(acid_principal_chain)
-        carbonyl_o_set = set()
-        for idx in acid_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            if atom.GetSymbol() == 'O':
-                for bond in atom.GetBonds():
-                    if bond.GetBondTypeAsDouble() == 2.0:
-                        carbonyl_o_set.add(idx)
+        if acid_principal_chain and len(acid_principal_chain) >= 2:
+            # Check if acid fragment has branches (substituents on the acid chain).
+            # Branches can be carbon-based (alkyl) OR heteroatom-based (halogens,
+            # hydroxy, etc.). Check for ANY non-chain, non-carbonyl-O atom.
+            chain_set = set(acid_principal_chain)
+            carbonyl_o_set = set()
+            for idx in acid_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'O':
+                    for bond in atom.GetBonds():
+                        if bond.GetBondTypeAsDouble() == 2.0:
+                            carbonyl_o_set.add(idx)
+                            break
+            non_chain_atoms = acid_set - chain_set - carbonyl_o_set
+            has_acid_branches = bool(non_chain_atoms)
+
+            if has_acid_branches:
+                # Use principal chain length for the acid name (not total carbon count)
+                chain_length = len(acid_principal_chain)
+                acid_name = get_acid_stem(chain_length)
+
+                # Exclude atoms: carbonyl O(s), ester O, alkyl fragment
+                ester_o = ester_match[2] if len(ester_match) > 2 else None
+                exclude = set(carbonyl_o_set)
+                if ester_o is not None:
+                    exclude.add(ester_o)
+                exclude.update(set(alkyl_atoms))
+
+                # Use universal pipeline for acid-side substituents
+                try:
+                    from ..assembly.composer import _integrate_universal_prefixes
+                    acid_prefix_str = _integrate_universal_prefixes(
+                        mol, chain_set,
+                        parent_type="chain",
+                        principal_chain=acid_principal_chain,
+                        exclude_atoms=exclude,
+                    )
+                except Exception as exc:
+                    logger.debug("Ester acid-side prefix discovery failed: %s", exc)
+                    acid_prefix_str = ""
+            else:
+                # No branches -- use standard acid naming
+                acid_name = get_acid_fragment_name(mol, acid_atoms)
+        else:
+            # Short chain -- use standard acid naming
+            acid_name = get_acid_fragment_name(mol, acid_atoms)
+    else:
+        # --- ESTR-01/ESTR-02: Ring acid path (NEW) ---
+        # ring_acid_name already computed at line 776 and verified non-None
+        # (otherwise we would have returned None at line 779).
+        acid_name = ring_acid_name
+
+        # Discover substituents on the ring atoms using universal pipeline
+        ring_info = mol.GetRingInfo()
+        ring_atoms_in_acid = []
+        for ring in ring_info.AtomRings():
+            ring_set_local = set(ring)
+            if ring_set_local.issubset(acid_set):
+                ring_atoms_in_acid = list(ring)
+                break  # Use first complete ring in acid fragment
+
+        if ring_atoms_in_acid:
+            # Orient ring: position 1 = ring atom bonded to carbonyl C
+            carbonyl_c = ester_match[0]  # carbonyl carbon index
+            start_atom = None
+            for idx in ring_atoms_in_acid:
+                for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+                    if nbr.GetIdx() == carbonyl_c:
+                        start_atom = idx
                         break
-        non_chain_atoms = acid_set - chain_set - carbonyl_o_set
-        has_acid_branches = bool(non_chain_atoms)
+                if start_atom is not None:
+                    break
 
-        if has_acid_branches:
-            # Use principal chain length for the acid name (not total carbon count)
-            chain_length = len(acid_principal_chain)
-            acid_name = get_acid_stem(chain_length)
+            if start_atom is not None:
+                pos = ring_atoms_in_acid.index(start_atom)
+                oriented_ring = ring_atoms_in_acid[pos:] + ring_atoms_in_acid[:pos]
+            else:
+                oriented_ring = ring_atoms_in_acid
 
-            # Exclude atoms: carbonyl O(s), ester O, alkyl fragment
+            # Build exclude set: carbonyl C, carbonyl O(s), ester O, alkyl atoms
             ester_o = ester_match[2] if len(ester_match) > 2 else None
-            exclude = set(carbonyl_o_set)
+            carbonyl_o_set = set()
+            for idx in acid_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'O':
+                    for bond in atom.GetBonds():
+                        nbr_atom = bond.GetOtherAtom(atom)
+                        # Only match true carbonyl O (O=C), not nitro O (O=N)
+                        if (bond.GetBondTypeAsDouble() == 2.0
+                                and nbr_atom.GetSymbol() == 'C'):
+                            carbonyl_o_set.add(idx)
+                            break
+            exclude = set(alkyl_atoms) | carbonyl_o_set | {carbonyl_c}
             if ester_o is not None:
                 exclude.add(ester_o)
-            exclude.update(set(alkyl_atoms))
 
-            # Use universal pipeline for acid-side substituents
             try:
                 from ..assembly.composer import _integrate_universal_prefixes
                 acid_prefix_str = _integrate_universal_prefixes(
-                    mol, chain_set,
-                    parent_type="chain",
-                    principal_chain=acid_principal_chain,
+                    mol, set(ring_atoms_in_acid),
+                    parent_type="ring",
+                    oriented_ring=oriented_ring,
                     exclude_atoms=exclude,
                 )
             except Exception as exc:
-                logger.debug("Ester acid-side prefix discovery failed: %s", exc)
+                logger.debug("Ester ring-acid prefix discovery failed: %s", exc)
                 acid_prefix_str = ""
-        else:
-            # No branches -- use standard acid naming
-            acid_name = get_acid_fragment_name(mol, acid_atoms)
-    else:
-        # Ring acid or short chain -- use standard acid naming
-        acid_name = get_acid_fragment_name(mol, acid_atoms)
 
     acylate_name = get_acylate_name(acid_name)
 

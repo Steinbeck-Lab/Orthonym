@@ -448,7 +448,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C#CCN1CC(=O)N(COC(=O)[C@@H]2[C@@H](C=C(C)C)C2(C)C)C1=O",
-        "heptyl (2R,3R)-cyclopropanecarboxylate",
+        "heptyl (2R,3R)-2,2-dimethyl-3-(2-methylprop-1-enyl)cyclopropanecarboxylate",
     ),
     (
         "CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O",
