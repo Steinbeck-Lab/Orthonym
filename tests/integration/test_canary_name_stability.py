@@ -682,7 +682,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "N[C@H](C[13C](=O)O)[13C](=O)O",
-        "2-aminobutanoic acid",
+        "(2R)-2-aminobutanedioic acid",
     ),
     (
         "COc1c(C)c(O)cc2c1C(=O)N[C@H]2C",

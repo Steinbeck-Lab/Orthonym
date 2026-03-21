@@ -46,7 +46,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('C[C@@H]([NH3+])P(=O)([O-])[O-]', 'unknown organic compound'),  # MISSING_STEREO - wrong parent
     ('O=C([O-])/C=C/C(=O)O.[Na+]', 'sodium hydrogen (2E)-but-2-enedioate'),  # Phase 64: partial salt hydrogen prefix
     ('CC[C@H](C)[C@H](N)C(=O)[O-]', '2-aminohexanoate'),  # Phase 64: single-anion neutralize-then-name now produces -oate
-    ('N[C@H](C[13C](=O)O)[13C](=O)O', '2-aminobutanoic acid'),  # MISSING_STEREO - isotope
+    ('N[C@H](C[13C](=O)O)[13C](=O)O', '(2R)-2-aminobutanedioic acid'),  # AMAC-01 fix: dioic acid via polyfunctional pipeline
     ('C/N=C(\\N)NCCCCN', '4-guanidino-4-(methylamino)butan-1-amine'),  # MISSING_STEREO - wrong parent; alpha order fixed P80
     ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylidenecyclohexene'),
     ('O=C1N[C@H]2NC(=O)N[C@H]2N1', "(4s,5s)-N,N'-dipropylurea"),  # Phase 92-02: stereo injection for urea handler

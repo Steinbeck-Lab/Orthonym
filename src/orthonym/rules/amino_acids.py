@@ -222,6 +222,15 @@ def _name_amino_acid_systematic(mol) -> str:
         if len(amine_matches) > 1:
             return None  # Multiple amines - use general naming pipeline
 
+    # AMAC-01: Multiple COOH groups -> polyfunctional pipeline
+    # Dicarboxylic amino acids (aspartic, glutamic) need "dioic acid" suffix
+    # which the specialized handler can't produce (it hardcodes mono-acid).
+    cooh_pattern = Chem.MolFromSmarts('[CX3](=O)[OX2H1]')
+    if cooh_pattern:
+        cooh_matches = mol.GetSubstructMatches(cooh_pattern)
+        if len(cooh_matches) >= 2:
+            return None  # Dicarboxylic - use polyfunctional pipeline
+
     # If the molecule has rings, the simple carbon-count approach would
     # include ring carbons in the chain length (e.g., tyrosine would give
     # "2-aminononanoic acid" instead of falling through to the general
