@@ -1,26 +1,27 @@
 """
-Phase 46 Parent Mismatch Benchmark: Measures improvement in parent structure selection.
+Parent Mismatch Benchmark: Measures improvement in parent structure selection.
 
-This test file targets the 68 parent_mismatch RT failures identified in Phase 46 research.
-These are compounds where OPSIN parses the generated name but InChI doesn't match because
-the wrong parent structure was selected (wrong ring system, wrong ring-vs-chain decision,
-or wrong principal group location).
+Originally created in Phase 46, targeting parent_mismatch RT failures where OPSIN
+parses the generated name but InChI doesn't match because the wrong parent structure
+was selected (wrong ring system, wrong ring-vs-chain decision, or wrong principal
+group location).
 
-Categories (per 46-RESEARCH.md):
-  - Steroid/terpenoid wrong VB name: 22 failures
-  - PAH/fused with wrong ring picked: 12 failures
-  - Bridged polycyclic wrong classification: 9 failures
-  - Acyclic (no ring) wrong parent chain: 15 failures
-  - Monocyclic ring wrong: 8 failures
-  - Fused heterocycle wrong: 2 failures
+Phase 118 audit (55 compounds from v13 benchmark) found:
+  - 28 hit P-44.1 cascade (correct parent selection, name wrong for other reasons)
+  - 9 no ring systems (acyclic -- parent selection not applicable)
+  - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- Phase 119+)
+  - 5 P-44.1(a) chain only
+  - 3 P-44.1(a) ring only
+  - 2 hydrocarbon rules
+  - 1 P-44.1(b) PG count comparison
 
-Success criterion: At least 30 of 68 parent_mismatch compounds produce names
-with the correct parent structure (measured by expected parent substring match).
+Phase 118 changes:
+  - Fixed is_principal_group_on_ring self-check (symmetry with chain counterpart)
+  - Fixed _count_pg_on_ring self-check (symmetry with chain counterpart)
+  - Moved 5 xpassed compounds from EXPECTED_UNFIXED to EXPECTED_FIXED
+  - 7 "unclear" fallback compounds deferred (PG detection range limitation)
 
-Phase 46 changes:
-  - Plan 46-01: ring_selection.py with P-44.2 ring system type classification
-  - Plan 46-02: select_principal_ring_system() integrated into namer.py as metadata
-  - Plan 46-03: Enhanced parent_selection.py with P-44.1 cascade + P-52.2.8
+Success criterion: At least 35 of 43 benchmark compounds produce correct parent names.
 """
 
 import pytest
@@ -209,10 +210,39 @@ EXPECTED_FIXED = [
         "benzothioph",
         "FusedHet: benzothiophene salt",
     ),
+
+    # --- Phase 118 audit: compounds confirmed fixed by earlier phases (moved from EXPECTED_UNFIXED) ---
+    (
+        "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",
+        "indol",
+        "Peptide with indole - fixed by decomposition improvements",
+    ),
+    (
+        "COc1ccc(C(=O)N2CCCC2=O)cc1",
+        "methoxy",
+        "Benzoylpyrrolidinone - fixed by decomposition improvements",
+    ),
+    (
+        "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O",
+        "amino",
+        "Aminobenzoic acid derivative - fixed by FG detection improvements",
+    ),
+    (
+        "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC[C@@H]2SC[C@@H]3NC(=O)"
+        "N[C@@H]32)[C@@H](O)[C@H]1O",
+        "adenosin",
+        "Nucleotide conjugate - fixed by multi-fragment assembly improvements",
+    ),
+    (
+        "CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",
+        "cyclohex",
+        "Cyclohexanone with chain FG - fixed by FG detection improvements",
+    ),
 ]
 
-# Compounds where Phase 46 is NOT expected to fix parent selection.
-# These require future work (Phase 47+ NP detection, decomposition, etc.)
+# Compounds where parent selection is NOT expected to be fixed yet.
+# Phase 118 audit: these require work outside parent selection scope
+# (NP detection, decomposition, extended FG detection, chain detection).
 # Marked with xfail(strict=False) -- if they pass, great (xpass), if not, expected.
 EXPECTED_UNFIXED = [
     # --- Extended PAH (Phase 69: PAH size guard correctly rejects naphthalene) ---
@@ -221,28 +251,13 @@ EXPECTED_UNFIXED = [
         "NOT_naphthalene",
         "PAH: 40-atom 9-ring system needs extended PAH naming (not naphthalene)",
     ),
-    # --- Complex decomposition issues (Phase 48+) ---
-    (
-        "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",
-        "indol",
-        "Peptide with indole - decomposition fragment naming",
-    ),
-    (
-        "COc1ccc(C(=O)N2CCCC2=O)cc1",
-        "methoxy",
-        "Benzoylpyrrolidinone - decomposition boundary issue",
-    ),
-    (
-        "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O",
-        "amino",
-        "Aminobenzoic acid derivative - wrong principal group",
-    ),
+    # --- Complex decomposition issues (Phase 119+) ---
     (
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
         "diketopiperazin",
         "Complex diketopiperazine - decomposition",
     ),
-    # --- NP detection scope (Phase 47) ---
+    # --- NP detection scope (Phase 119+) ---
     (
         "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
         "tropan",
@@ -266,19 +281,6 @@ EXPECTED_UNFIXED = [
         "OC[C@H](N)C(=O)O",
         "phospho",
         "Phospholipid - multi-fragment naming",
-    ),
-    # --- Nucleotide naming ---
-    (
-        "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC[C@@H]2SC[C@@H]3NC(=O)"
-        "N[C@@H]32)[C@@H](O)[C@H]1O",
-        "adenosin",
-        "Nucleotide conjugate - multi-fragment assembly",
-    ),
-    # --- Wrong FG detection ---
-    (
-        "CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",
-        "cyclohex",
-        "Cyclohexanone with chain FG - wrong FG detection",
     ),
     # --- Diketopiperazine ---
     (
@@ -316,7 +318,7 @@ PARENT_MISMATCH_COMPOUNDS = EXPECTED_FIXED + [
     ],
 )
 def test_parent_mismatch_fixed(smiles, expected_parent_substring, description):
-    """Phase 46 should produce correct parent structure for these compounds.
+    """Should produce correct parent structure for these compounds.
 
     Verifies that the generated name contains the expected parent structure
     substring, indicating the correct ring system or chain was selected.
@@ -345,12 +347,12 @@ def test_parent_mismatch_fixed(smiles, expected_parent_substring, description):
         for i, (_, _, d) in enumerate(EXPECTED_UNFIXED)
     ],
 )
-@pytest.mark.xfail(strict=False, reason="Phase 47+: requires NP detection, decomposition, or FG fixes")
+@pytest.mark.xfail(strict=False, reason="Phase 119+: requires NP detection, decomposition, chain detection, or extended PG range")
 def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description):
-    """Compounds where Phase 46 alone cannot fix parent selection.
+    """Compounds where parent selection alone cannot fix the generated name.
 
-    These require future work: NP detection scope (Phase 47),
-    decomposition improvements (Phase 48), or FG detection fixes.
+    These require future work: NP detection scope, decomposition improvements,
+    chain detection fixes, or extended PG detection range.
     Marked xfail(strict=False) so xpass is a bonus, not a failure.
     """
     name = name_compound(smiles)
@@ -369,14 +371,21 @@ def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description)
 
 @pytest.mark.integration
 def test_parent_mismatch_improvement_count():
-    """At least 30/68 parent_mismatch failures should now produce correct parent names.
+    """At least 35/43 parent_mismatch failures should now produce correct parent names.
 
-    Phase 46 success criterion: >= 30 compounds from the parent_mismatch category
-    have names containing the correct parent structure (ring system or chain).
+    Updated by Phase 118 audit: 35 EXPECTED_FIXED + 8 EXPECTED_UNFIXED = 43 total.
+    Phase 118 moved 5 xpassed compounds to EXPECTED_FIXED.
+    The self-check fix is a correctness improvement (zero behavioral change for
+    all_ring_atoms callers, but ensures symmetry with chain counterparts).
 
-    This counts across ALL parent_mismatch compounds (both expected-fixed and
-    expected-unfixed). If the threshold is not met, this test fails to flag
-    that the phase improvements were insufficient.
+    Phase 118 audit of all 55 v13 parent_mismatch compounds found:
+      - 28 hit P-44.1 cascade (correct parent selection, name wrong for other reasons)
+      - 9 no ring systems (acyclic -- parent selection not applicable)
+      - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- deferred)
+      - 5 P-44.1(a) chain only
+      - 3 P-44.1(a) ring only
+      - 2 hydrocarbon rules
+      - 1 P-44.1(b) PG count comparison
     """
     correct = 0
     total = len(PARENT_MISMATCH_COMPOUNDS)
@@ -392,14 +401,14 @@ def test_parent_mismatch_improvement_count():
     # Report results regardless of pass/fail
     print(f"\n=== Parent Mismatch Improvement Count ===")
     print(f"Correct parent: {correct}/{total}")
-    print(f"Target: >= 30/{total}")
+    print(f"Target: >= 35/{total}")
     if failures:
         print(f"\nStill failing ({len(failures)}):")
         for f in failures:
             print(f)
 
-    assert correct >= 30, (
-        f"Phase 46 target not met: {correct}/{total} correct (need >= 30).\n"
+    assert correct >= 35, (
+        f"Phase 118 target not met: {correct}/{total} correct (need >= 35).\n"
         f"Still failing:\n" + "\n".join(failures)
     )
 
