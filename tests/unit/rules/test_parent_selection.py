@@ -118,6 +118,62 @@ class TestIsPrincipalGroupOnRing:
         result = is_principal_group_on_ring(mol, ring_atoms, pg_atoms)
         assert result is True, "OH is on benzene carbon"
 
+    def test_cyclohexanone_pg_on_ring(self):
+        """Ring ketone where pg_atoms[0] (flanking C) IS a ring atom."""
+        mol = Chem.MolFromSmiles('O=C1CCCCC1')
+        ring_info = mol.GetRingInfo()
+        ring_atoms = set(ring_info.AtomRings()[0])
+        fg = detect_functional_groups(mol)
+        _, pg_atoms = get_principal_group(mol, fg)
+        result = is_principal_group_on_ring(mol, ring_atoms, pg_atoms)
+        assert result is True, "Ketone flanking C is a ring atom - self-check should detect"
+
+    def test_cyclohexanol_pg_on_ring(self):
+        """Ring alcohol where pg_atoms[0] (O) is NOT a ring atom but neighbor (C) IS."""
+        mol = Chem.MolFromSmiles('OC1CCCCC1')
+        ring_info = mol.GetRingInfo()
+        ring_atoms = set(ring_info.AtomRings()[0])
+        fg = detect_functional_groups(mol)
+        _, pg_atoms = get_principal_group(mol, fg)
+        result = is_principal_group_on_ring(mol, ring_atoms, pg_atoms)
+        assert result is True, "OH neighbor C is in ring - neighbor check should detect"
+
+    def test_methylcyclohexanone_pg_on_ring(self):
+        """Ring ketone with substituent -- pg should still be on ring."""
+        mol = Chem.MolFromSmiles('CC1CCC(=O)CC1')
+        ring_info = mol.GetRingInfo()
+        ring_atoms = set(ring_info.AtomRings()[0])
+        fg = detect_functional_groups(mol)
+        _, pg_atoms = get_principal_group(mol, fg)
+        result = is_principal_group_on_ring(mol, ring_atoms, pg_atoms)
+        assert result is True, "Ring ketone with methyl sub - self-check should detect"
+
+
+class TestCountPgOnRingSelfCheck:
+    """Tests for _count_pg_on_ring self-check behavior."""
+
+    def test_count_pg_on_ring_cyclohexanone(self):
+        """Single ring ketone -- count should be 1 via self-check."""
+        from orthonym.rules.parent_selection import _count_pg_on_ring
+        mol = Chem.MolFromSmiles('O=C1CCCCC1')
+        ring_info = mol.GetRingInfo()
+        ring_atoms = set(ring_info.AtomRings()[0])
+        fg = detect_functional_groups(mol)
+        _, pg_atoms = get_principal_group(mol, fg)
+        count = _count_pg_on_ring(mol, ring_atoms, pg_atoms)
+        assert count == 1, f"Single ring ketone count should be 1, got {count}"
+
+    def test_count_pg_on_ring_cyclohexanedione(self):
+        """Two ring ketones -- count should be 2."""
+        from orthonym.rules.parent_selection import _count_pg_on_ring
+        mol = Chem.MolFromSmiles('O=C1CCC(=O)CC1')
+        ring_info = mol.GetRingInfo()
+        ring_atoms = set(ring_info.AtomRings()[0])
+        fg = detect_functional_groups(mol)
+        _, pg_atoms = get_principal_group(mol, fg)
+        count = _count_pg_on_ring(mol, ring_atoms, pg_atoms)
+        assert count == 2, f"Two ring ketones count should be 2, got {count}"
+
 
 class TestSelectParent:
     """Tests for select_parent() main function."""

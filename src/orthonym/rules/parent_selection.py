@@ -86,6 +86,11 @@ def is_principal_group_on_ring(
         # For [CX4][OX2H1] (alcohol): atom 0 is C bearing OH
         attachment_atom = pg_atoms[0]
 
+        # Self-check: attachment atom itself may be a ring atom
+        # (mirrors is_principal_group_on_chain which has this at L132)
+        if attachment_atom in ring_atoms_set:
+            return True
+
         # Check if attachment atom is directly bonded to a ring atom
         atom = mol.GetAtomWithIdx(attachment_atom)
         for neighbor in atom.GetNeighbors():
@@ -736,6 +741,11 @@ def _count_pg_on_ring(
             continue
         seen_matches.add(key)
         attachment = pg_atoms[0]
+        # Self-check: attachment atom itself may be a ring atom
+        # (mirrors _count_pg_on_chain which has this at L768)
+        if attachment in ring_atoms:
+            count += 1
+            continue
         atom = mol.GetAtomWithIdx(attachment)
         for neighbor in atom.GetNeighbors():
             if neighbor.GetIdx() in ring_atoms:
