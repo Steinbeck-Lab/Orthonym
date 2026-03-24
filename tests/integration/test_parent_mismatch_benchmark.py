@@ -211,6 +211,13 @@ EXPECTED_FIXED = [
         "FusedHet: benzothiophene salt",
     ),
 
+    # --- Phase 118-02: DKP compound with indole (piperazine-2,5-dione retained name added) ---
+    (
+        "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1",
+        "piperazin",
+        "Diketopiperazine with indole - fixed by Phase 118-02 (piperazine-2,5-dione retained name)",
+    ),
+
     # --- Phase 118 audit: compounds confirmed fixed by earlier phases (moved from EXPECTED_UNFIXED) ---
     (
         "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",
@@ -251,11 +258,11 @@ EXPECTED_UNFIXED = [
         "NOT_naphthalene",
         "PAH: 40-atom 9-ring system needs extended PAH naming (not naphthalene)",
     ),
-    # --- Complex decomposition issues (Phase 119+) ---
+    # --- Complex DKP (Phase 119+: indoline fused system beats standalone DKP in ring scoring) ---
     (
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
-        "diketopiperazin",
-        "Complex diketopiperazine - decomposition",
+        "piperazin",
+        "DKP with indoline - fused ring system (11 atoms) outscores standalone DKP ring (6 atoms)",
     ),
     # --- NP detection scope (Phase 119+) ---
     (
@@ -282,12 +289,7 @@ EXPECTED_UNFIXED = [
         "phospho",
         "Phospholipid - multi-fragment naming",
     ),
-    # --- Diketopiperazine ---
-    (
-        "O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1",
-        "diketopiperazin",
-        "Diketopiperazine with indole - complex heterocycle",
-    ),
+    # --- Diketopiperazine (compound 7 promoted to EXPECTED_FIXED by Phase 118-02) ---
     # --- Ammonium salts with complex anion ---
     (
         "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(C)=O",

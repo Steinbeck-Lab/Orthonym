@@ -142,7 +142,8 @@ RETAINED_NAMES = {
     "C1CCSCC1": "thiane",
     "C1COCCN1": "morpholine",
     "C1CNCCN1": "piperazine",
-    
+    "O=C1CNCC(=O)N1": "piperazine-2,5-dione",  # Diketopiperazine (IUPAC P-31.1.2)
+
     # === CYCLOALKANES ===
     "C1CC1": "cyclopropane",
     "C1CCC1": "cyclobutane",
