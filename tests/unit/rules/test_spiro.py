@@ -19,9 +19,17 @@ from src.orthonym.rules.spiro import (
     generate_spiro_descriptor,
     get_spiro_numbering,
     get_spiro_substituents,
-    name_spiro_system,
+    name_spiro_system as _name_spiro_system_raw,
     get_rings_from_spiro_center,
 )
+
+
+def name_spiro_system(mol):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_spiro_system_raw(mol)
+    if result is None:
+        return None
+    return result[0]
 from src.orthonym.perception.rings import get_spiro_atoms
 
 

@@ -13,9 +13,17 @@ import re
 from rdkit import Chem
 
 from src.orthonym.rules.fused_rings import (
-    name_fused_heterocycle,
+    name_fused_heterocycle as _name_fused_heterocycle_raw,
     _try_algorithmic_fusion_name,
 )
+
+
+def name_fused_heterocycle(mol):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_fused_heterocycle_raw(mol)
+    if result is None:
+        return None
+    return result[0]
 from src.orthonym.data.fused_heterocycles import (
     get_fused_heterocycle_name,
     FUSED_HETEROCYCLE_DATA,

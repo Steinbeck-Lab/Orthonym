@@ -11,9 +11,17 @@ Assembly order:
 import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
-from collections import defaultdict, deque
+from collections import defaultdict, deque, namedtuple
 
 logger = logging.getLogger(__name__)
+
+# Structured result from complex ring sub-handlers.
+# Returned by _assemble_complex_ring_name() to provide ring atom and
+# numbering information for the universal substituent pipeline (Phase 119).
+ComplexRingResult = namedtuple(
+    'ComplexRingResult',
+    ['name', 'ring_atoms', 'atom_to_locant', 'substituents_included']
+)
 
 from ..rules.seniority import get_suffix, get_prefix
 from ..rules.locants import get_functional_group_locants, get_bond_locants
@@ -880,8 +888,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
     # that would otherwise trigger early exit to wrong naming path
     if features.is_cyclic and _is_complex_ring_system(features.mol):
-        complex_name = _assemble_complex_ring_name(features.mol, features)
-        if complex_name:
+        complex_result = _assemble_complex_ring_name(features.mol, features)
+        if complex_result:
+            complex_name = complex_result.name
             _complex_cand = compute_confidence(complex_name, 'complex_ring', features)
             _gate_candidates.append(_complex_cand)
             # If complex_ring covers enough of the molecule (ratio factor),
@@ -2282,7 +2291,7 @@ def _classify_complex_ring(mol) -> str:
     return 'simple'
 
 
-def _assemble_complex_ring_name(mol, features) -> Optional[str]:
+def _assemble_complex_ring_name(mol, features):
     """
     Assemble IUPAC name for a complex ring system.
 
@@ -2298,7 +2307,8 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
         features: MolecularFeatures object (for substituents, stereo, etc.)
 
     Returns:
-        Complete IUPAC name, or None if naming fails
+        ComplexRingResult namedtuple with (name, ring_atoms, atom_to_locant,
+        substituents_included), or None if naming fails.
 
     Note:
         Supports complete naming with substituents, unsaturation, and stereo for all types.
@@ -2310,47 +2320,53 @@ def _assemble_complex_ring_name(mol, features) -> Optional[str]:
     try:
         if ring_type == 'bridged-fused':
             # FR-8 nomenclature for bridged fused systems
-            name = name_bridged_fused_system(mol)
-            if name:
-                return name
+            result = name_bridged_fused_system(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Bridged-fused naming failed for molecule")
             return None
 
         elif ring_type == 'bicyclo':
             # Complete bicyclo naming with substituents, unsaturation, stereo
-            name = _assemble_complete_bicyclo_name(mol, features)
-            if name:
-                return name
+            result = _assemble_complete_bicyclo_name(mol, features)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Bicyclo naming failed for molecule")
             return None
 
         elif ring_type == 'polycyclic-bridged':
             # Von Baeyer naming for tricyclo+ systems (e.g., adamantane)
-            name = name_polycyclic_complete(mol, features)
-            if name:
-                return name
+            result = name_polycyclic_complete(mol, features)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Polycyclic-bridged naming failed for molecule")
             return None
 
         elif ring_type == 'spiro':
             # Spiro naming (spiro[4.5]decane, etc.)
-            name = name_spiro_system(mol)
-            if name:
-                return name
+            result = name_spiro_system(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Spiro naming failed for molecule")
             return None
 
         elif ring_type in ('ortho-fused', 'ortho-peri-fused'):
             # Fused ring naming - try heterocycle first, then carbocyclic
             # Heterocycles have retained names like indole, quinoline
-            name = name_fused_heterocycle(mol)
-            if name:
-                return name
+            result = name_fused_heterocycle(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
             # Try ortho-fused bicyclic (carbocyclic fallback)
-            name = name_ortho_fused_bicyclic(mol)
-            if name:
-                return name
+            result = name_ortho_fused_bicyclic(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
             logging.warning(f"Fused ring naming failed for {ring_type} system")
             return None
@@ -2619,7 +2635,7 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
     return f"{prefix_str}{ring_parent}"
 
 
-def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
+def _assemble_complete_bicyclo_name(mol, features):
     """
     Assemble complete IUPAC name for a bicyclo system with substituents, unsaturation, and stereo.
 
@@ -2633,17 +2649,28 @@ def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
         features: MolecularFeatures object
 
     Returns:
-        Complete IUPAC name, or None if naming fails
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included)
+        where substituents_included is True (bicyclo handler discovers
+        substituents via get_complete_bicyclo_data), or None if naming fails.
     """
     from ..rules.bicyclo import get_complete_bicyclo_data, name_bicyclo_system
     from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     from rdkit.Chem import rdCIPLabeler
 
+    # Collect all ring atoms from SSSR for structured return
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for r in ri.AtomRings():
+        ring_atoms.update(r)
+
     # Get complete bicyclo data
     bicyclo_data = get_complete_bicyclo_data(mol)
     if not bicyclo_data:
         # Fall back to simple naming
-        return name_bicyclo_system(mol)
+        fallback_name = name_bicyclo_system(mol)
+        if fallback_name:
+            return (fallback_name, ring_atoms, {}, True)
+        return None
 
     # If there's a retained name and no substituents or unsaturation, use it
     retained_name = bicyclo_data.get('retained_name')
@@ -2656,13 +2683,14 @@ def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
     has_substituents = bool(substituents)
     has_unsaturation = bool(double_bonds) or bool(triple_bonds)
 
+    atom_to_locant = bicyclo_data.get('atom_to_locant', {})
+
     # For unsubstituted, saturated compounds with retained names, use the retained name
     if retained_name and not has_substituents and not has_unsaturation:
-        return retained_name
+        return (retained_name, ring_atoms, atom_to_locant, True)
 
     # Get key data
     descriptor = bicyclo_data.get('descriptor')
-    atom_to_locant = bicyclo_data.get('atom_to_locant', {})
     carbon_count = bicyclo_data.get('carbon_count', 0)
 
     # Get parent stem
@@ -2709,7 +2737,7 @@ def _assemble_complete_bicyclo_name(mol, features) -> Optional[str]:
     # Join parts
     name = "".join(parts)
 
-    return name
+    return (name, ring_atoms, atom_to_locant, True)
 
 
 def _get_bicyclo_parent_stem(carbon_count: int) -> str:

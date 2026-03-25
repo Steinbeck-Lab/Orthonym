@@ -1253,9 +1253,10 @@ def get_fused_aromatic_core(mol) -> Optional[str]:
     from .fused_rings import name_fused_heterocycle
 
     # Check fused heterocycles FIRST (they take priority)
-    heterocycle_name = name_fused_heterocycle(mol)
-    if heterocycle_name:
-        return heterocycle_name
+    heterocycle_result = name_fused_heterocycle(mol)
+    if heterocycle_result:
+        # name_fused_heterocycle returns a tuple (name, ring_atoms, atom_to_locant, subs_included)
+        return heterocycle_result[0] if isinstance(heterocycle_result, tuple) else heterocycle_result
 
     # Check carbocyclic PAHs
     pah_name = identify_polycyclic(mol)
@@ -1302,9 +1303,10 @@ def name_substituted_fused_aromatic(
 
     if is_heterocycle:
         # Delegate to fused_rings module for heterocycle naming
-        result = name_fused_heterocycle(mol)
-        if result:
-            return result
+        # name_fused_heterocycle returns a tuple (name, ring_atoms, atom_to_locant, subs_included)
+        fused_result = name_fused_heterocycle(mol)
+        if fused_result:
+            return fused_result[0] if isinstance(fused_result, tuple) else fused_result
         return core_name
 
     # Handle carbocyclic PAH
@@ -1359,8 +1361,10 @@ def identify_fused_system(mol) -> Optional[Dict[str, Any]]:
 
     # Check for fused heterocycle first
     if is_fused_heterocyclic_system(mol):
-        heterocycle_name = name_fused_heterocycle(mol)
-        if heterocycle_name:
+        heterocycle_result = name_fused_heterocycle(mol)
+        if heterocycle_result:
+            # name_fused_heterocycle returns a tuple (name, ring_atoms, atom_to_locant, subs_included)
+            heterocycle_name = heterocycle_result[0] if isinstance(heterocycle_result, tuple) else heterocycle_result
             # Check if substituted
             canonical = Chem.MolToSmiles(mol, canonical=True)
             from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA

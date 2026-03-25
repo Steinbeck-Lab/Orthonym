@@ -436,7 +436,7 @@ def is_fused_bicyclic(mol) -> bool:
     return len(shared) == 2
 
 
-def name_fused_heterocycle(mol) -> Optional[str]:
+def name_fused_heterocycle(mol):
     """
     Generate IUPAC name for a fused heterocycle.
 
@@ -452,34 +452,38 @@ def name_fused_heterocycle(mol) -> Optional[str]:
         mol: RDKit Mol object
 
     Returns:
-        IUPAC name string, or None if not a recognized fused heterocycle
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included)
+        where substituents_included is True (fused heterocycle handler
+        already discovers substituents via get_fused_heterocycle_substituents),
+        or None if not a recognized fused heterocycle.
 
     Examples:
         >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
-        >>> name_fused_heterocycle(mol)
+        >>> result = name_fused_heterocycle(mol)
+        >>> result[0]
         '1H-indole'
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
-        >>> name_fused_heterocycle(mol)
-        '5-methyl-1H-indole'
-        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(c(=O)n2C)C')  # caffeine
-        >>> name_fused_heterocycle(mol)
-        '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione'
     """
     if mol is None:
         return None
+
+    # Collect all ring atoms from SSSR for structured return
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for r in ri.AtomRings():
+        ring_atoms.update(r)
 
     # Check xanthine derivatives FIRST (caffeine, theophylline, etc.)
     # These have specific N-position numbering that differs from standard
     # heterocycle patterns (uses numeric locants like 1,3,7-trimethyl)
     xanthine_name = get_xanthine_name(mol)
     if xanthine_name:
-        return xanthine_name
+        return (xanthine_name, ring_atoms, {}, True)
 
     # First try exact match for unsubstituted fused heterocycle
     result = get_fused_heterocycle_name(mol)
     if result:
         name, tautomer_locant = result
-        return name  # Name already includes tautomer locant if present
+        return (name, ring_atoms, {}, True)  # Name already includes tautomer locant if present
 
     # Try substructure matching for substituted fused heterocycles
     core_result = match_fused_heterocycle_core(mol)
@@ -488,7 +492,7 @@ def name_fused_heterocycle(mol) -> Optional[str]:
         # for 2-component ortho-fused systems not in the dictionary
         algorithmic_name = _try_algorithmic_fusion_name(mol)
         if algorithmic_name:
-            return algorithmic_name
+            return (algorithmic_name, ring_atoms, {}, True)
         return None
 
     core_name, atom_mapping, _core_smiles = core_result
@@ -503,10 +507,11 @@ def name_fused_heterocycle(mol) -> Optional[str]:
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)
 
     if not substituents:
-        return core_name
+        return (core_name, ring_atoms, atom_mapping, True)
 
     # Build the substituted name
-    return _assemble_fused_heterocycle_name(mol, core_name, substituents, atom_mapping)
+    name = _assemble_fused_heterocycle_name(mol, core_name, substituents, atom_mapping)
+    return (name, ring_atoms, atom_mapping, True)
 
 
 def get_fused_heterocycle_substituents(
@@ -1652,7 +1657,7 @@ def _join_fused_prefixes(prefixes: List[str]) -> str:
     return result + "-"
 
 
-def name_ortho_fused_bicyclic(mol) -> Optional[str]:
+def name_ortho_fused_bicyclic(mol):
     """
     Generate name for an ortho-fused bicyclic system without a retained name.
 
@@ -1665,7 +1670,8 @@ def name_ortho_fused_bicyclic(mol) -> Optional[str]:
         mol: RDKit Mol object
 
     Returns:
-        IUPAC name string, or None if not an ortho-fused bicyclic
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included),
+        or None if not an ortho-fused bicyclic.
 
     Examples:
         >>> # For systems without retained names, would generate systematic names
@@ -1675,15 +1681,22 @@ def name_ortho_fused_bicyclic(mol) -> Optional[str]:
         return None
 
     # First check if it's a known fused heterocycle
-    heterocycle_name = name_fused_heterocycle(mol)
-    if heterocycle_name:
-        return heterocycle_name
+    # name_fused_heterocycle now returns a tuple or None -- pass through directly
+    heterocycle_result = name_fused_heterocycle(mol)
+    if heterocycle_result:
+        return heterocycle_result
 
     # For fully saturated carbocyclic ortho-fused systems (e.g., decalin),
     # generate {saturation_prefix}{aromatic_parent} naming
     saturated_name = _name_saturated_fused_carbocyclic(mol)
     if saturated_name:
-        return saturated_name
+        # Wrap bare string into structured tuple
+        # Saturated fused carbocyclics do NOT discover substituents
+        ri = mol.GetRingInfo()
+        ring_atoms = set()
+        for r in ri.AtomRings():
+            ring_atoms.update(r)
+        return (saturated_name, ring_atoms, {}, False)
 
     # For other carbocyclic ortho-fused systems, check polycyclic data
     # (naphthalene, etc.) - this is handled by polycyclics module

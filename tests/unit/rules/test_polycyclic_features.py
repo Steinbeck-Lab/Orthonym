@@ -19,8 +19,16 @@ from orthonym.rules.polycyclic import (
     get_polycyclic_substituents,
     get_polycyclic_unsaturation,
     get_polycyclic_stereo,
-    name_polycyclic_complete,
+    name_polycyclic_complete as _name_polycyclic_complete_raw,
 )
+
+
+def name_polycyclic_complete(mol, features=None):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_polycyclic_complete_raw(mol, features)
+    if result is None:
+        return None
+    return result[0]
 
 
 # ============================================================================

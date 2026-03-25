@@ -677,7 +677,7 @@ def _get_alkane_name(atom_count: int) -> str:
     return f"{_get_chain_prefix(atom_count)}ane"
 
 
-def name_spiro_system(mol) -> Optional[str]:
+def name_spiro_system(mol):
     """
     Generate the complete IUPAC name for a spiro compound.
 
@@ -688,11 +688,15 @@ def name_spiro_system(mol) -> Optional[str]:
         mol: RDKit Mol object
 
     Returns:
-        Complete spiro name, or None if not a valid spiro system
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included)
+        where substituents_included is False (spiro handler does not
+        discover substituents via universal pipeline), or None if not
+        a valid spiro system.
 
     Examples:
         >>> mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')
-        >>> name_spiro_system(mol)
+        >>> result = name_spiro_system(mol)
+        >>> result[0]
         'spiro[4.5]decane'
     """
     descriptor = generate_spiro_descriptor(mol)
@@ -728,6 +732,15 @@ def name_spiro_system(mol) -> Optional[str]:
         if ring_set & spiro_atoms_set:
             ring_atoms_to_check |= ring_set
 
+    # Compute IUPAC numbering for the spiro system
+    if n_spiro == 1:
+        spiro_center = list(spiro_atoms_set)[0]
+        atom_to_locant = get_spiro_numbering(mol, spiro_center)
+    else:
+        atom_to_locant = _get_polyspiro_numbering(mol, spiro_atoms_set)
+        if atom_to_locant is None:
+            atom_to_locant = {}
+
     has_heteroatoms = any(
         mol.GetAtomWithIdx(idx).GetSymbol() != 'C'
         for idx in ring_atoms_to_check
@@ -736,9 +749,11 @@ def name_spiro_system(mol) -> Optional[str]:
     if has_heteroatoms:
         hetero_prefix = _build_hetero_prefix(mol, spiro_atoms_set, ring_atoms_to_check)
         if hetero_prefix:
-            return f"{hetero_prefix}{descriptor}{parent_name}"
+            name = f"{hetero_prefix}{descriptor}{parent_name}"
+            return (name, ring_atoms_to_check, atom_to_locant, False)
 
-    return f"{descriptor}{parent_name}"
+    name = f"{descriptor}{parent_name}"
+    return (name, ring_atoms_to_check, atom_to_locant, False)
 
 
 def _build_hetero_prefix(

@@ -206,9 +206,11 @@ class TestNameAssembly:
             # Alternative: use a simpler test case
             pytest.skip("Could not create test molecule")
         result = name_bridged_fused_system(mol)
-        # If it returns a name, verify format
+        # If it returns a result, verify format
         if result is not None:
-            assert isinstance(result, str)
+            # Result is now a tuple (name, ring_atoms, atom_to_locant, subs_included)
+            assert isinstance(result, tuple) and len(result) == 4
+            assert isinstance(result[0], str)
             # Should contain bridge prefix like "methano", "ethano", etc.
             # and a fused parent like "naphthalene", "anthracene", etc.
 

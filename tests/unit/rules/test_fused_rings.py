@@ -16,13 +16,29 @@ from rdkit import Chem
 from src.orthonym.rules.fused_rings import (
     classify_fused_system,
     is_fused_bicyclic,
-    name_fused_heterocycle,
+    name_fused_heterocycle as _name_fused_heterocycle_raw,
     get_fused_heterocycle_substituents,
     get_shared_atoms,
-    name_ortho_fused_bicyclic,
+    name_ortho_fused_bicyclic as _name_ortho_fused_bicyclic_raw,
     is_fused_aromatic_system,
     is_fused_heterocyclic_system,
 )
+
+
+def name_fused_heterocycle(mol):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_fused_heterocycle_raw(mol)
+    if result is None:
+        return None
+    return result[0]
+
+
+def name_ortho_fused_bicyclic(mol):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_ortho_fused_bicyclic_raw(mol)
+    if result is None:
+        return None
+    return result[0]
 from src.orthonym.data.fused_heterocycles import match_fused_heterocycle_core
 
 

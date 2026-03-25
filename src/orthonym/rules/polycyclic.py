@@ -2160,7 +2160,7 @@ def _detect_ring_functional_groups(
 # Complete Name Assembly (Plan 16-03)
 # ============================================================================
 
-def name_polycyclic_complete(mol, features=None) -> Optional[str]:
+def name_polycyclic_complete(mol, features=None):
     """
     Generate the complete IUPAC name for a polycyclic bridged system.
 
@@ -2184,7 +2184,10 @@ def name_polycyclic_complete(mol, features=None) -> Optional[str]:
                   If None, FG detection is performed directly via SMARTS.
 
     Returns:
-        Complete IUPAC name, or None if not a polycyclic system
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included)
+        where substituents_included is True (polycyclic handler discovers
+        substituents via get_polycyclic_substituents + _detect_ring_functional_groups),
+        or None if not a polycyclic system.
     """
     from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
 
@@ -2270,7 +2273,7 @@ def name_polycyclic_complete(mol, features=None) -> Optional[str]:
     # Join - the stereo prefix ends with '-', substituent prefix ends with '-', etc.
     name = ''.join(name_parts)
 
-    return name
+    return (name, ring_atoms, desc.numbering, True)
 
 
 def _assemble_substituent_prefix(

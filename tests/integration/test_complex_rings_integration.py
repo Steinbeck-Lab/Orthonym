@@ -48,7 +48,9 @@ class TestPerceptionLayerAccessibility:
         # Test with spiro[4.5]decane
         mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')
         assert is_spiro_system(mol) == True
-        assert name_spiro_system(mol) == 'spiro[4.5]decane'
+        result = name_spiro_system(mol)
+        assert result is not None
+        assert result[0] == 'spiro[4.5]decane'
 
     @pytest.mark.integration
     def test_fused_functions_accessible(self):
@@ -62,7 +64,9 @@ class TestPerceptionLayerAccessibility:
         # Test with indole
         mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
         assert classify_fused_system(mol) == 'ortho-fused'
-        assert name_fused_heterocycle(mol) == '1H-indole'
+        result = name_fused_heterocycle(mol)
+        assert result is not None
+        assert result[0] == '1H-indole'
 
     @pytest.mark.integration
     def test_composer_imports_work(self):

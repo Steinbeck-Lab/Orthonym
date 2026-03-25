@@ -613,7 +613,7 @@ def get_bridge_prefix(bridge_info: Dict[str, Any]) -> str:
 # Name Assembly
 # ============================================================================
 
-def name_bridged_fused_system(mol) -> Optional[str]:
+def name_bridged_fused_system(mol):
     """
     Generate the IUPAC name for a bridged fused system.
 
@@ -629,7 +629,9 @@ def name_bridged_fused_system(mol) -> Optional[str]:
         mol: RDKit Mol object
 
     Returns:
-        IUPAC name string, or None if not a bridged fused system
+        Tuple of (name, ring_atoms, atom_to_locant, substituents_included)
+        where substituents_included is False (bridged-fused handler does not
+        discover substituents), or None if not a bridged fused system.
 
     Examples:
         >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
@@ -656,6 +658,12 @@ def name_bridged_fused_system(mol) -> Optional[str]:
     bridges = identify_bridges(mol, core_atoms)
     if not bridges:
         return None  # Should have bridges if detect_bridged_fused returned True
+
+    # Collect ALL ring system atoms (core + bridge atoms) for substituent discovery
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for r in ri.AtomRings():
+        ring_atoms.update(r)
 
     # Generate parent name
     if core_name:
@@ -705,9 +713,11 @@ def name_bridged_fused_system(mol) -> Optional[str]:
     # Combine parts
     if name_parts:
         prefix_str = '-'.join(name_parts)
-        return f"{prefix_str}{parent_name}"
+        name = f"{prefix_str}{parent_name}"
     else:
-        return parent_name
+        name = parent_name
+
+    return (name, ring_atoms, core_numbering, False)
 
 
 # ============================================================================
@@ -761,7 +771,9 @@ def get_bridged_fused_info(mol) -> Optional[Dict[str, Any]]:
         return None
 
     bridges = identify_bridges(mol, core['core_atoms'])
-    name = name_bridged_fused_system(mol)
+    result = name_bridged_fused_system(mol)
+    # name_bridged_fused_system returns a tuple (name, ring_atoms, atom_to_locant, subs_included) or None
+    name = result[0] if isinstance(result, tuple) else result
 
     return {
         'is_bridged_fused': True,

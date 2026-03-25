@@ -16,7 +16,15 @@ Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 import pytest
 from rdkit import Chem
 from src.orthonym import name_compound
-from src.orthonym.rules.fused_rings import name_fused_heterocycle
+from src.orthonym.rules.fused_rings import name_fused_heterocycle as _name_fused_heterocycle_raw
+
+
+def name_fused_heterocycle(mol):
+    """Wrapper that extracts just the name string from the tuple result."""
+    result = _name_fused_heterocycle_raw(mol)
+    if result is None:
+        return None
+    return result[0]
 
 
 # =============================================================================
