@@ -218,6 +218,19 @@ EXPECTED_FIXED = [
         "Diketopiperazine with indole - fixed by Phase 118-02 (piperazine-2,5-dione retained name)",
     ),
 
+    # --- Phase 118-02: Tropane NP naming (numbering map added) ---
+    (
+        "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
+        "tropan",
+        "Tropane ester HCl salt - fixed by Phase 118-02 (tropane numbering map)",
+    ),
+    # --- Phase 118-02: Ergostene derivative (exact SMILES lookup) ---
+    (
+        "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C",
+        "ergost",
+        "Steroid: ergostene - fixed by Phase 118-02 (NP derivative lookup)",
+    ),
+
     # --- Phase 118 audit: compounds confirmed fixed by earlier phases (moved from EXPECTED_UNFIXED) ---
     (
         "CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12",
@@ -264,17 +277,7 @@ EXPECTED_UNFIXED = [
         "piperazin",
         "DKP with indoline - fused ring system (11 atoms) outscores standalone DKP ring (6 atoms)",
     ),
-    # --- NP detection scope (Phase 119+) ---
-    (
-        "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
-        "tropan",
-        "Tropane ester HCl salt - NP scope",
-    ),
-    (
-        "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C",
-        "ergost",
-        "Steroid: ergostene without stereo - NP detection gap",
-    ),
+    # --- Tropane and ergostene promoted to EXPECTED_FIXED by Phase 118-02 ---
     # --- Morphinan / complex NP ---
     (
         "COC1=CC=C2[C@H]3Cc4ccc(OC)c5c4[C@@]2(C[C@@H](C2=C[C@@]4(O)[C@H]6Cc7ccc(O)c8c7"
@@ -373,10 +376,10 @@ def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description)
 
 @pytest.mark.integration
 def test_parent_mismatch_improvement_count():
-    """At least 35/43 parent_mismatch failures should now produce correct parent names.
+    """At least 37/43 parent_mismatch failures should now produce correct parent names.
 
-    Updated by Phase 118 audit: 35 EXPECTED_FIXED + 8 EXPECTED_UNFIXED = 43 total.
-    Phase 118 moved 5 xpassed compounds to EXPECTED_FIXED.
+    Updated by Phase 118-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total.
+    Phase 118-02 promoted tropane + ergostene from EXPECTED_UNFIXED to EXPECTED_FIXED.
     The self-check fix is a correctness improvement (zero behavioral change for
     all_ring_atoms callers, but ensures symmetry with chain counterparts).
 
@@ -403,14 +406,14 @@ def test_parent_mismatch_improvement_count():
     # Report results regardless of pass/fail
     print(f"\n=== Parent Mismatch Improvement Count ===")
     print(f"Correct parent: {correct}/{total}")
-    print(f"Target: >= 35/{total}")
+    print(f"Target: >= 37/{total}")
     if failures:
         print(f"\nStill failing ({len(failures)}):")
         for f in failures:
             print(f)
 
-    assert correct >= 35, (
-        f"Phase 118 target not met: {correct}/{total} correct (need >= 35).\n"
+    assert correct >= 37, (
+        f"Phase 118-02 target not met: {correct}/{total} correct (need >= 37).\n"
         f"Still failing:\n" + "\n".join(failures)
     )
 

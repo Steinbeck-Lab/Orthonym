@@ -232,7 +232,7 @@ def test_charged_species_naming(smiles, expected_substr):
 ALKALOID_FIXES = [
     pytest.param(
         "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",
-        "piperidine",  # depth-independent naming v11: now sees piperidine parent
+        "tropan",  # Phase 118-02: tropane NP naming correctly identifies tropane scaffold
         id="tropane-indole-ester",
     ),
 ]

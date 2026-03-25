@@ -128,12 +128,13 @@ class TestEstimateNameCoverageHeuristic:
 class TestNPScaffoldCoverageGate:
     """Tests that NP scaffold coverage gates reject bare names for oversized molecules."""
 
-    def test_large_molecule_small_np_scaffold_returns_none(self):
-        """Tropane (9 atoms) in a 25-atom molecule (coverage 0.36) -> None.
+    def test_large_molecule_small_np_scaffold_with_numbering_names_substituents(self):
+        """Tropane (9 atoms) in a 25-atom molecule with numbering map -> names substituents.
 
         CN1C2CCCC1CC2 is detected as tropane scaffold (9 heavy atoms).
         Adding a C16 chain yields 25 heavy atoms, coverage = 9/25 = 0.36.
-        The coverage gate should return None instead of bare 'tropane'.
+        With tropane numbering map (Phase 118-02), the NP pipeline can enumerate
+        substituents instead of falling through the coverage gate.
         """
         from orthonym.rules.natural_products import name_natural_product
 
@@ -146,10 +147,9 @@ class TestNPScaffoldCoverageGate:
         assert total_heavy > 10, f"Expected >10 heavy atoms, got {total_heavy}"
 
         result = name_natural_product(mol)
-        # Coverage gate should reject bare scaffold name
-        assert result is None, (
-            f"Expected None for tropane in {total_heavy}-atom molecule, got '{result}'"
-        )
+        # With numbering map, tropane names substituents instead of hitting coverage gate
+        assert result is not None, "Tropane with numbering map should name substituents"
+        assert "tropan" in result.lower(), f"Expected 'tropan' in: {result}"
 
     def test_np_scaffold_covering_most_of_molecule_returns_name(self):
         """Pure tropane scaffold (coverage = 1.0) -> returns 'tropane'."""

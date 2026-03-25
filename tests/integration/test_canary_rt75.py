@@ -804,8 +804,8 @@ CANARY_COMPOUNDS = [
     ),
     # Failure taxonomy sentinels: opsin_vocab_limit (2 compounds)
     (
-        "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",  # Sentinel: opsin_vocab - tropyl indolecarboxylate
-        "nonanoyloxypiperidine",
+        "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl",  # Phase 118-02: tropane NP naming
+        "(1R,3r,5S)-tropan-3-yl nonanoate",
     ),
     (
         "NC(C(=O)O)C(CCC(N)C(=O)O)C(=O)O",  # Sentinel: opsin_vocab - triamino triacid
@@ -1468,8 +1468,8 @@ def _get_opsin_results() -> dict[str, str | None]:
 # These are xfail'd rather than treated as Orthonym bugs.
 _OPSIN_LIMITATIONS: dict[str, str] = {
     # OPSIN vocabulary gaps — valid IUPAC names beyond OPSIN's parser coverage
-    "nonanoyloxypiperidine": (
-        "Depth-independent naming regressed tropyl naming (was tropyl 1H-indole-3-carboxylate)"
+    "(1R,3r,5S)-tropan-3-yl nonanoate": (
+        "Phase 118-02: tropane NP naming correctly identifies tropane as parent. OPSIN may not parse tropan-3-yl ester format."
     ),
     "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid": (
         "OPSIN cannot parse 'heptanetrioic acid' (rare tricarboxylic acid suffix)"

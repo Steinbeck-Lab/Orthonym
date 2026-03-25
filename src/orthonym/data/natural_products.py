@@ -131,6 +131,13 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "O=c1ccoc2ccccc12":
         "chromone",
 
+    # ---- Ergostane derivatives with non-standard ring perception ----
+    # RDKit perceives (5,6,5,6) ring topology instead of (5,6,6,6) for these
+    # compounds, preventing scaffold substructure match against ergostane.
+    # Added as exact derivative entries (same pattern as cholesterol, morphine).
+    "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C":
+        "ergosta-7,24(28)-dien-3-ol",
+
     # ---- Terpenoid scaffolds (Phase 89) ----
     "CC1CCC2CC1C2(C)C":
         "pinane",
@@ -314,6 +321,31 @@ ALKALOID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         14: 7,   # C, Ring B (unsaturation site)
         15: 8,   # C, Ring B (unsaturation site)
         16: 14,  # C, Ring B/C/D tri-junction
+    },
+
+    # Tropane = 8-methyl-8-azabicyclo[3.2.1]octane (8C + 1N = 9 atoms)
+    # IUPAC numbering: C-1/C-5 bridgeheads, C-2/C-3/C-4 (3-carbon bridge),
+    # C-6/C-7 (2-carbon bridge), N-8 (one-atom bridge). N-methyl not numbered.
+    # Scaffold SMILES atom layout: CN1[C@@H]2CCC[C@H]1CC2
+    #   Atom 0: C (N-methyl, NOT part of numbered skeleton)
+    #   Atom 1: N (bridgehead nitrogen)
+    #   Atom 2: C (bridgehead connecting N to 3-bridge and 2-bridge)
+    #   Atom 3: C (3-carbon bridge, position 2)
+    #   Atom 4: C (3-carbon bridge, position 3)
+    #   Atom 5: C (3-carbon bridge, position 4)
+    #   Atom 6: C (bridgehead connecting N to 3-bridge and 2-bridge)
+    #   Atom 7: C (2-carbon bridge, position 6)
+    #   Atom 8: C (2-carbon bridge, position 7)
+    "CN1[C@@H]2CCC[C@H]1CC2": {
+        # 0: N-methyl -- NOT mapped (substituent on N, not part of skeleton)
+        1: 8,    # N (bridgehead nitrogen)
+        2: 1,    # C (bridgehead, junction with 3-bridge and 2-bridge)
+        3: 2,    # C (3-carbon bridge)
+        4: 3,    # C (3-carbon bridge, middle -- classical tropan-3-ol position)
+        5: 4,    # C (3-carbon bridge)
+        6: 5,    # C (bridgehead, junction with 3-bridge and 2-bridge)
+        7: 6,    # C (2-carbon bridge)
+        8: 7,    # C (2-carbon bridge)
     },
 }
 
