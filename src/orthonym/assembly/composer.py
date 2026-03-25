@@ -3850,8 +3850,11 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
     # --- Handle ring substituents from features.ring_substituents ---
     ring_substituents = getattr(features, 'ring_substituents', None)
     oriented_ring = getattr(features, 'oriented_ring', None)
+    # DROP-07 fix: track FG atoms handled by ring alkyl prefixes to prevent
+    # double-emission in the global FG loop below
+    handled_ring_fg_atoms = frozenset()
     if ring_substituents and features.mol and oriented_ring:
-        ring_prefixes = _generate_ring_alkyl_prefixes(features)
+        ring_prefixes, handled_ring_fg_atoms = _generate_ring_alkyl_prefixes(features)
         prefixes.extend(ring_prefixes)
 
     # --- Handle non-principal functional groups as prefixes ---
@@ -3914,6 +3917,13 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
                     filtered.append(match)
             matches = filtered
 
+        # DROP-07 fix: skip FG matches already handled as ring substituents
+        # by _generate_ring_alkyl_prefixes() to prevent double-emission.
+        # FG SMARTS matches include anchor atoms (e.g., C-F match = (C_idx, F_idx)),
+        # so check if ANY atom in the match is in the handled set.
+        if handled_ring_fg_atoms:
+            matches = [m for m in matches if not any(a in handled_ring_fg_atoms for a in m)]
+
         # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
         # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
         # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
@@ -3957,9 +3967,13 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
             original_count = len(matches)
             matches = filtered_branch
             if not matches and original_count > 0:
-                # BUG-B genuinely removed all matches — this is a real over-filter
-                logger.warning(
-                    "DROP-17 substituent_skip: reason=bug_b_overfilter fg_name=%s original_count=%d",
+                # DROP-17: BUG-B removed all matches. Per-branch containment
+                # check ensures each match is genuinely on a small branch whose
+                # compound name (e.g., "chloromethyl") already includes the FG.
+                # Do NOT blindly restore -- that would cause double-emission.
+                # Only log for diagnostic purposes.
+                logger.debug(
+                    "DROP-17 all_filtered: fg_name=%s original_count=%d (branch naming handles these)",
                     fg_name, original_count,
                 )
 
@@ -6011,13 +6025,62 @@ def _convert_yl_to_ylidene(name: str) -> str:
     return name
 
 
-def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
+def _detect_fg_only_prefix(mol, frag_atoms, attach_mol_idx):
+    """Detect the IUPAC prefix for an FG-only ring substituent fragment.
+
+    DROP-07 fix: instead of deferring FG-only ring substituents to the global
+    FG prefix loop (which lacks ring locant context), detect them here so
+    _generate_ring_alkyl_prefixes() can emit them with correct oriented_ring
+    locants and proper monosubstituted locant-1 elision.
+
+    Args:
+        mol: RDKit Mol object
+        frag_atoms: frozenset of atom indices in the fragment (no carbons)
+        attach_mol_idx: Ring atom index this fragment is bonded to
+
+    Returns:
+        str: IUPAC prefix name (e.g., "fluoro", "hydroxy", "oxo", "amino"),
+             or None if unrecognizable (let global FG loop handle).
+    """
+    if not frag_atoms:
+        return None
+
+    # Single-atom fragments (most common: halogens, single O/N/S)
+    if len(frag_atoms) == 1:
+        idx = next(iter(frag_atoms))
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+
+        halogen_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+        if sym in halogen_map:
+            return halogen_map[sym]
+
+        # Oxygen: check bond type to distinguish hydroxy vs oxo
+        if sym == 'O':
+            bond = mol.GetBondBetweenAtoms(idx, attach_mol_idx)
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                return 'oxo'
+            return 'hydroxy'
+
+        if sym == 'N':
+            return 'amino'
+        if sym == 'S':
+            return 'sulfanyl'
+
+    # Multi-atom FG-only fragments (e.g., -NO2 = nitro, -N3 = azido)
+    # These are complex; let the global FG loop handle them with its
+    # SMARTS-based detection for correct classification.
+    return None
+
+
+def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     """
     Generate prefix fragments for ALL substituents on rings (alkyl, heteroatom, compound).
 
     Uses the unified substituent enumerator (ReplaceCore-based) to extract and
-    name every non-hydrogen substituent on the ring parent. This replaces the
-    old path that silently dropped heteroatom-containing substituents.
+    name every non-hydrogen substituent on the ring parent. FG-only substituents
+    (halogens, -OH, -NH2, =O as non-principal) are detected via _detect_fg_only_prefix()
+    and emitted with correct oriented_ring locants (DROP-07 fix).
 
     IUPAC rules for cycloalkane substituent locants:
     - Monosubstituted cycloalkanes: locant 1 is implicit and omitted
@@ -6026,7 +6089,9 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
       (1,2-dimethylcyclohexane)
 
     Returns:
-        List of NameFragment objects for ring substituent prefixes, sorted alphabetically
+        Tuple of (List[NameFragment], frozenset): prefix fragments sorted
+        alphabetically, and the set of atom indices for FG-only substituents
+        that were handled here (to prevent double-emission in the global FG loop).
     """
     from rdkit import Chem
 
@@ -6048,6 +6113,10 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
     ring_set = set(oriented_ring)
 
+    # DROP-07 fix: track FG-only substituents handled here to prevent
+    # double-emission in the global FG prefix loop of _generate_prefixes()
+    handled_ring_fg_atoms = set()
+
     for sub_info in sub_infos:
         # Skip substituents whose atoms overlap with the principal group
         # (e.g., =O when ketone is the principal group -- handled as suffix)
@@ -6055,19 +6124,29 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
             continue
 
         # Check if this is a pure FG-only substituent (no carbon atoms)
-        # FG-only substituents (halogens, -OH, -NH2, =O as non-principal)
-        # are handled by _generate_prefixes via the FG prefix loop
+        # DROP-07 fix: detect FG type and emit prefix with correct ring locant
+        # instead of deferring to the global FG loop (which lacks ring context)
         has_carbon = any(
             mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             for idx in sub_info.frag_atoms
         )
         if not has_carbon:
-            # FG-only: skip here, _generate_prefixes handles these
-            # By-design: FG prefix loop in _generate_prefixes() handles these
-            logger.debug(
-                "DROP-07 substituent_skip: reason=fg_only_ring_sub locant=%d",
-                sub_info.locant,
+            fg_prefix = _detect_fg_only_prefix(
+                mol, sub_info.frag_atoms, sub_info.attach_mol_idx
             )
+            if fg_prefix:
+                substituent_groups[fg_prefix].append(sub_info.locant)
+                handled_ring_fg_atoms.update(sub_info.frag_atoms)
+                logger.debug(
+                    "DROP-07 fixed: fg_only_ring_sub prefix=%s locant=%d",
+                    fg_prefix, sub_info.locant,
+                )
+            else:
+                # Multi-atom FG-only (e.g., -NO2): let global FG loop handle
+                logger.debug(
+                    "DROP-07 substituent_defer: reason=complex_fg_only locant=%d",
+                    sub_info.locant,
+                )
             continue
 
         # IUPAC P-31.1.3.1: Detect exocyclic double bond attachment.
@@ -6177,7 +6256,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> List[NameFragment]:
     # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
     prefixes.sort(key=lambda f: alpha_sort_key(f.text))
 
-    return prefixes
+    return prefixes, frozenset(handled_ring_fg_atoms)
 
 
 def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
