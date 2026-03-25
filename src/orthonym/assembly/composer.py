@@ -891,6 +891,20 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         complex_result = _assemble_complex_ring_name(features.mol, features)
         if complex_result:
             complex_name = complex_result.name
+
+            # RING-03: Universal pipeline discovers substituents for handlers
+            # that don't do their own substituent discovery (spiro, bridged-fused,
+            # saturated fused carbocyclic). Handlers that already include subs
+            # (fused heterocycles, bicyclo, polycyclic) set substituents_included=True
+            # and are skipped to avoid double-counting.
+            if (not complex_result.substituents_included
+                    and complex_result.atom_to_locant):
+                complex_name = _enrich_complex_ring_with_subs(
+                    features.mol, complex_name,
+                    complex_result.ring_atoms,
+                    complex_result.atom_to_locant,
+                )
+
             _complex_cand = compute_confidence(complex_name, 'complex_ring', features)
             _gate_candidates.append(_complex_cand)
             # If complex_ring covers enough of the molecule (ratio factor),
@@ -2379,6 +2393,115 @@ def _assemble_complex_ring_name(mol, features):
         # Graceful degradation - log and return None
         logging.warning(f"Complex ring naming error: {e}")
         return None
+
+
+def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
+    """Discover and prepend substituent prefixes to a complex ring parent name.
+
+    Called when a complex ring sub-handler sets substituents_included=False,
+    meaning the handler returned a bare parent name without substituent prefixes.
+    Uses the universal pipeline (discover_substituents + name_substituent) to
+    find all non-ring atoms bonded to ring atoms, name them, and prepend as
+    alphabetized IUPAC prefixes.
+
+    Args:
+        mol: RDKit Mol object
+        ring_name: The bare parent ring name (e.g., "spiro[4.5]decane")
+        ring_atoms: Set of all atom indices in the ring system
+        atom_to_locant: Dict mapping mol atom indices to IUPAC locant values
+
+    Returns:
+        Name with substituent prefixes prepended, or original ring_name if
+        no substituents found or on error.
+    """
+    from .substituent_enumerator import discover_substituents, name_substituent
+    from .naming_utils import get_multiplier_prefix, alpha_sort_key
+    from collections import defaultdict
+
+    if not atom_to_locant:
+        return ring_name
+
+    # Build oriented_ring from atom_to_locant: atoms sorted by locant value
+    # This gives extract_ring_substituents the IUPAC numbering order
+    try:
+        oriented_ring = tuple(
+            a for a, _ in sorted(atom_to_locant.items(), key=lambda x: (
+                # Handle mixed int/str locants: ints sort before strings
+                (0, x[1]) if isinstance(x[1], int) else (1, x[1])
+            ))
+        )
+    except (TypeError, ValueError):
+        return ring_name
+
+    # Discover substituents using universal pipeline
+    try:
+        subs = discover_substituents(
+            mol, ring_atoms, "ring", oriented_ring=oriented_ring
+        )
+    except Exception as e:
+        logger.debug("_enrich_complex_ring_with_subs: discover failed: %s", e)
+        return ring_name
+
+    if not subs:
+        return ring_name
+
+    # Group substituents by prefix name, collecting locants
+    prefix_groups = defaultdict(list)  # name -> [locant1, locant2, ...]
+    for sub_info in subs:
+        # Skip large fragments that produce garbled names (same guard as
+        # _assemble_ring_with_ester_prefixes)
+        frag_ha = len(sub_info.frag_atoms)
+        if frag_ha > 12:
+            logger.debug(
+                "_enrich_complex_ring_with_subs: skip large frag HA=%d", frag_ha
+            )
+            continue
+
+        a_idx = _find_attach_idx_in_frag(mol, sub_info, ring_atoms)
+        prefix_name = name_substituent(mol, sub_info.frag_atoms, a_idx)
+
+        if not prefix_name or prefix_name == "substituent":
+            continue
+        # Quality filter: reject garbled names with spaces
+        if ' ' in prefix_name:
+            logger.debug(
+                "_enrich_complex_ring_with_subs: reject garbled: %s", prefix_name
+            )
+            continue
+
+        # Use locant from sub_info (assigned by discover_substituents using
+        # oriented_ring ordering). Convert to string for formatting.
+        locant = sub_info.locant
+        if locant is not None:
+            prefix_groups[prefix_name].append(locant)
+        else:
+            # Fallback: use atom_to_locant directly
+            attach_idx = sub_info.attach_mol_idx
+            if attach_idx in atom_to_locant:
+                prefix_groups[prefix_name].append(atom_to_locant[attach_idx])
+
+    if not prefix_groups:
+        return ring_name
+
+    # Build prefix parts with locants and multiplier prefixes
+    prefix_parts = []
+    for name, locants in prefix_groups.items():
+        # Sort locants numerically (int) then lexically (str)
+        locants.sort(key=lambda x: (0, x) if isinstance(x, int) else (1, str(x)))
+        count = len(locants)
+        if count == 1:
+            prefix_parts.append(f"{locants[0]}-{name}")
+        else:
+            locant_str = ",".join(str(loc) for loc in locants)
+            multiplier = get_multiplier_prefix(count, name)
+            prefix_parts.append(f"{locant_str}-{multiplier}{name}")
+
+    # Alphabetize prefixes per IUPAC P-14.4
+    prefix_parts.sort(key=lambda x: alpha_sort_key(x))
+
+    # Join prefix parts and prepend to ring name
+    prefix_str = "-".join(prefix_parts)
+    return f"{prefix_str}{ring_name}" if prefix_str else ring_name
 
 
 def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[str]:
