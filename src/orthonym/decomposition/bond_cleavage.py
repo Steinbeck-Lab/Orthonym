@@ -9,7 +9,7 @@ ureas, skeletal replacement chains).
 """
 
 from collections import deque
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
@@ -158,6 +158,104 @@ def _assign_ether_roles_by_seniority(
         return min(carbon1, carbon2), max(carbon1, carbon2)
 
 
+def _maybe_swap_parent_roles(
+    mol, acid_idx: int, other_idx: int, bond_type: str,
+    bridging_atoms: Optional[Set[int]] = None,
+) -> Tuple[int, int, bool]:
+    """Check if parent/child roles should be swapped based on P-44.1.1 seniority.
+
+    Uses BFS to identify fragments on each side of the bond, then compares
+    them using score_fragment_seniority(). Includes a size guard: when the
+    non-acid fragment has >=3x heavy atoms AND equal/higher seniority, swap.
+
+    Simple ester exemption: when bond_type == "ester" and both fragments
+    have <10 heavy atoms, keep traditional acid-side parent for functional
+    class naming (preserves "ethyl acetate" style).
+
+    Args:
+        mol: RDKit Mol object.
+        acid_idx: Atom index currently designated as acid side.
+        other_idx: Atom index currently designated as alkyl/amine side.
+        bond_type: Bond type string for exemption logic.
+        bridging_atoms: Set of atom indices that bridge between acid_idx
+            and other_idx (e.g., ester oxygen, thioester sulfur). These
+            are excluded from BFS on both sides. None for directly bonded
+            atoms (amide C-N, sulfonamide S-N).
+
+    Returns:
+        (final_acid_idx, final_other_idx, roles_swapped) tuple.
+    """
+    try:
+        from .fragment_ranker import score_fragment_seniority
+
+        # Build BFS exclusion sets: each side excludes the other side's
+        # starting atom plus any bridging atoms.
+        bridge = bridging_atoms or set()
+        excluded_for_acid = {other_idx} | bridge
+        excluded_for_other = {acid_idx} | bridge
+
+        acid_side = _bfs_heavy_atoms(mol, acid_idx, excluded=excluded_for_acid)
+        other_side = _bfs_heavy_atoms(mol, other_idx, excluded=excluded_for_other)
+
+        # Simple ester exemption: both sides <10 HA -> keep traditional roles
+        if bond_type == "ester" and len(acid_side) < 10 and len(other_side) < 10:
+            return acid_idx, other_idx, False
+
+        # Amide exemption: never swap at detection time. The engine already
+        # has a robust post-cleavage amide N-acyl seniority check
+        # (engine.py:835-852) that operates on the actual capped fragment
+        # SMILES (which are smaller, don't cross other cleavable bonds).
+        # Detection-time swap for amides causes regressions in peptide-like
+        # and macrocyclic compounds where BFS traverses through other amide
+        # bonds, creating misleading size/seniority asymmetry.
+        if bond_type == "amide":
+            return acid_idx, other_idx, False
+
+        # Generate fragment SMILES for seniority scoring
+        smiles_acid = Chem.MolFragmentToSmiles(mol, atomsToUse=list(acid_side))
+        smiles_other = Chem.MolFragmentToSmiles(mol, atomsToUse=list(other_side))
+
+        if not smiles_acid or not smiles_other:
+            return acid_idx, other_idx, False
+
+        score_acid = score_fragment_seniority(smiles_acid)
+        score_other = score_fragment_seniority(smiles_other)
+
+        # Size guard: extreme size asymmetry overrides minor seniority diffs.
+        # The acid fragment's capping (OH -> aldehyde/acid) can artificially
+        # inflate its seniority rank.  Three tiers:
+        #
+        # 1) >=5x HA ratio: always swap (overwhelming size difference).
+        # 2) >=3x HA ratio AND other has ring while acid does not: swap
+        #    (ring-containing fragment is the obvious parent).
+        # 3) >=3x HA ratio AND other is at least as senior: swap.
+        size_ratio_met = len(other_side) >= 3 * len(acid_side)
+        if size_ratio_met:
+            if len(other_side) >= 5 * len(acid_side):
+                return other_idx, acid_idx, True  # SWAP -- overwhelming size
+
+            # Check ring presence: score tuple position 3 is -has_ring
+            # (-1 = has ring, 0 = no ring)
+            other_has_ring = score_other[3] < 0
+            acid_has_ring = score_acid[3] < 0
+            if other_has_ring and not acid_has_ring:
+                return other_idx, acid_idx, True  # SWAP -- ring vs no ring
+
+            if score_other <= score_acid:
+                return other_idx, acid_idx, True  # SWAP -- seniority
+
+        # Do NOT swap based on standard seniority alone. In multi-bond
+        # molecules, BFS from one side crosses other cleavable bonds,
+        # picking up higher-seniority FGs from distant parts of the molecule.
+        # This creates misleading seniority comparisons. Only the size guard
+        # above (3x+ ratio with ring/size advantage) should trigger swap.
+
+        return acid_idx, other_idx, False  # No swap
+
+    except Exception:
+        return acid_idx, other_idx, False  # Any failure: no swap
+
+
 def find_cleavable_bonds(mol) -> List[Dict]:
     """Find cleavable bonds in a molecule.
 
@@ -208,13 +306,19 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                 # Lactone guard: skip if both atoms in same ring
                 if not _atoms_in_same_ring(mol, carbonyl_c, ester_o):
                     seen_bond_indices.add(bond.GetIdx())
+                    alkyl_c = match[4] if len(match) > 4 else ester_o
+                    _, _, swapped = _maybe_swap_parent_roles(
+                        mol, carbonyl_c, alkyl_c, "carbamate",
+                        bridging_atoms={ester_o},
+                    )
                     cleavable.append({
                         "bond_idx": bond.GetIdx(),
                         "type": "carbamate",
                         "acid_atom": carbonyl_c,
-                        "alkyl_atom": match[4] if len(match) > 4 else ester_o,
+                        "alkyl_atom": alkyl_c,
                         "amine_atom": nitrogen,
                         "match": match,
+                        "roles_swapped": swapped,
                     })
 
     # --- Step 2: Detect phosphodiester bonds ---
@@ -234,12 +338,17 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             bond = mol.GetBondBetweenAtoms(phosphorus, ester_o2)
             if bond and bond.GetIdx() not in seen_bond_indices:
                 seen_bond_indices.add(bond.GetIdx())
+                _, _, swapped = _maybe_swap_parent_roles(
+                    mol, phosphorus, alkyl_c, "phosphodiester",
+                    bridging_atoms={ester_o2},
+                )
                 cleavable.append({
                     "bond_idx": bond.GetIdx(),
                     "type": "phosphodiester",
                     "acid_atom": phosphorus,
                     "alkyl_atom": alkyl_c,
                     "match": match,
+                    "roles_swapped": swapped,
                 })
 
     # --- Step 3: Detect ester bonds (skip lactones, skip carbamate overlap) ---
@@ -262,12 +371,17 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             bond = mol.GetBondBetweenAtoms(carbonyl_c, ester_o)
             if bond and bond.GetIdx() not in seen_bond_indices:
                 seen_bond_indices.add(bond.GetIdx())
+                _, _, swapped = _maybe_swap_parent_roles(
+                    mol, carbonyl_c, alkyl_c, "ester",
+                    bridging_atoms={ester_o},
+                )
                 cleavable.append({
                     "bond_idx": bond.GetIdx(),
                     "type": "ester",
                     "acid_atom": carbonyl_c,
                     "alkyl_atom": alkyl_c,
                     "match": match,
+                    "roles_swapped": swapped,
                 })
 
     # --- Step 4: Detect thioester bonds (C(=O)-S-C) ---
@@ -290,12 +404,17 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             bond = mol.GetBondBetweenAtoms(carbonyl_c, sulfur)
             if bond and bond.GetIdx() not in seen_bond_indices:
                 seen_bond_indices.add(bond.GetIdx())
+                _, _, swapped = _maybe_swap_parent_roles(
+                    mol, carbonyl_c, alkyl_c, "thioester",
+                    bridging_atoms={sulfur},
+                )
                 cleavable.append({
                     "bond_idx": bond.GetIdx(),
                     "type": "thioester",
                     "acid_atom": carbonyl_c,
                     "alkyl_atom": alkyl_c,
                     "match": match,
+                    "roles_swapped": swapped,
                 })
 
     # --- Step 5: Detect amide bonds (skip lactams, skip carbamate overlap) ---
@@ -317,12 +436,17 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             bond = mol.GetBondBetweenAtoms(carbonyl_c, nitrogen)
             if bond and bond.GetIdx() not in seen_bond_indices:
                 seen_bond_indices.add(bond.GetIdx())
+                _, _, swapped = _maybe_swap_parent_roles(
+                    mol, carbonyl_c, nitrogen, "amide",
+                    bridging_atoms=None,
+                )
                 cleavable.append({
                     "bond_idx": bond.GetIdx(),
                     "type": "amide",
                     "acid_atom": carbonyl_c,
                     "amine_atom": nitrogen,
                     "match": match,
+                    "roles_swapped": swapped,
                 })
 
     # --- Step 6: Detect sulfonamide bonds (S(=O)(=O)-N) ---
@@ -340,12 +464,17 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             bond = mol.GetBondBetweenAtoms(sulfur, nitrogen)
             if bond and bond.GetIdx() not in seen_bond_indices:
                 seen_bond_indices.add(bond.GetIdx())
+                _, _, swapped = _maybe_swap_parent_roles(
+                    mol, sulfur, nitrogen, "sulfonamide",
+                    bridging_atoms=None,
+                )
                 cleavable.append({
                     "bond_idx": bond.GetIdx(),
                     "type": "sulfonamide",
                     "acid_atom": sulfur,
                     "alkyl_atom": nitrogen,
                     "match": match,
+                    "roles_swapped": swapped,
                 })
 
     # --- Step 7: Detect glycosidic bonds ---
@@ -366,6 +495,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "acid_atom": anomeric_c,
                     "alkyl_atom": aglycone_c,
                     "match": match,
+                    "roles_swapped": False,
                 })
 
     # --- Step 8: Detect ether bonds (C-O-C, not ester/glycosidic/ring) ---
@@ -418,6 +548,7 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "acid_atom": acid_atom,
                     "alkyl_atom": alkyl_atom,
                     "match": match,
+                    "roles_swapped": False,
                 })
 
     return cleavable
