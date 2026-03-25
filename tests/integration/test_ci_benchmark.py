@@ -96,7 +96,7 @@ CI_BENCHMARK = [
     (
         "C=C1[C@@H](O)O[C@H]2[C@H]1C[C@@H](OC(C)=O)[C@]13C(=O)O"
         "[C@H]4C[C@](C)(O)[C@H]([C@H]41)[C@@]31C=C(C)[C@]2(O)O1",
-        "(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,19S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,20-trioxa-hexacyclo[10.6.0.1(1,16).1(9,12).0(4,8).0(13,19)]icos-10-en-18-one acetate",  # Updated P72: IUPAC VB-6 citation order + VB-7 bridge atom orientation
+        "(acetyloxy)(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,19S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,20-trioxa-hexacyclo[10.6.0.1(1,16).1(9,12).0(4,8).0(13,19)]icos-10-en-18-one",  # Updated P120: seniority swap -> substitutive (acetyloxy) prefix
     ),
     (
         "CC(C)=CCC/C(C)=C/CC/C(C)=C/CC/C(C)=C\\CC/C(C)=C\\CC/C(C)=C"
@@ -274,7 +274,7 @@ CI_BENCHMARK = [
         "[C@H](O)C[C@@]2(O)O[C@H](C[C@H](O)C[C@H](OC(=O)CC(=O)O)"
         "C[C@@H](O)C[C@H](O)/C(C)=C\\C=C/[C@H]1C)C[C@@H](O)"
         "[C@@H]2O",
-        "(2R,4R,6R,8R,10S,11Z,13Z,15R,16R,19Z,21Z,23S,24R,26S,27R,28S,31R,32R,34R)-16-dodecyl-4,6,8,10,24,26,28,32,34-nonahydroxy-11,15,19,23,27,31-hexamethyl-18-oxo-1,17-dioxacyclotetratriacontene propanedioate",  # Fixed: fabricated "dipropyl" from ring boundary leak
+        "(propanedioyloxy)(2R,4R,6R,8R,10S,11Z,13Z,15R,16R,19Z,21Z,23S,24R,26S,27R,28S,31R,32R,34R)-16-dodecyl-4,6,8,10,24,26,28,32,34-nonahydroxy-11,15,19,23,27,31-hexamethyl-18-oxo-1,17-dioxacyclotetratriacontene",  # Updated P120: seniority swap -> substitutive (propanedioyloxy) prefix
     ),
     (
         "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O",

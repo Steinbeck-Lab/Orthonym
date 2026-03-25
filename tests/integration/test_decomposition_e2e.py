@@ -82,7 +82,12 @@ class TestEsterDecomposition:
         name = name_compound(smi)
         assert name != "unknown"
         assert name != "icosyl acetate", "Should not be just 'icosyl acetate' (fragment loss)"
-        assert "acetate" in name.lower(), f"Expected 'acetate' in name, got: {name}"
+        # With seniority swap, the name may use substitutive (acetyloxy) prefix
+        # instead of functional class (acetate) suffix
+        assert ("acetate" in name.lower()
+                or "acetyloxy" in name.lower()), (
+            f"Expected 'acetate' or 'acetyloxy' in name, got: {name}"
+        )
         # The decomposed name should be much more descriptive
         assert len(name) > 30, f"Complex molecule name too short: {name}"
 

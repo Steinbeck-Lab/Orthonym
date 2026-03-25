@@ -797,6 +797,45 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             return None  # Cannot name a fragment -- abort
         fragment_names[frag["side"]] = frag_name
 
+    # --- Seniority-based substitutive assembly for swapped-role bonds ---
+    # When _maybe_swap_parent_roles() detected that the non-acid fragment
+    # is the correct parent (roles_swapped=True), attempt substitutive
+    # naming: acid fragment becomes a prefix on the larger parent fragment.
+    # The acid_atom/alkyl_atom in the bond dict are NOT swapped -- only the
+    # flag is set. We swap the naming roles here at assembly time.
+    if bond.get("roles_swapped"):
+        try:
+            from .fragment_assembly import _acid_to_acyl, _join_components
+            acid_name = fragment_names.get("acid", "")
+            other_name = (fragment_names.get("alkyl")
+                          or fragment_names.get("amine", ""))
+
+            if bond["type"] == "ester":
+                # Acyloxy prefix: "acetic acid" -> "(acetyloxy)" prefix on parent
+                acyl = _acid_to_acyl(acid_name)
+                if acyl and other_name:
+                    sub_name = _join_components(f"({acyl}oxy)", other_name)
+                    if sub_name and _name_quality_is_acceptable(sub_name, mol):
+                        return sub_name
+
+            elif bond["type"] == "thioester":
+                # Acylthio prefix: "acetic acid" -> "(acetylthio)" prefix on parent
+                acyl = _acid_to_acyl(acid_name)
+                if acyl and other_name:
+                    sub_name = _join_components(f"({acyl}thio)", other_name)
+                    if sub_name and _name_quality_is_acceptable(sub_name, mol):
+                        return sub_name
+
+            elif bond["type"] in ("phosphodiester", "sulfonamide", "carbamate"):
+                # For uncommon bond types, fall through to normal assembly.
+                # The roles_swapped flag is informational; the existing assembler
+                # will attempt naming with the original (un-swapped) atom indices.
+                pass
+
+            # Fallback: if substitutive naming failed, fall through to normal assembly
+        except Exception:
+            pass  # Any failure: fall through to normal assembly
+
     # Substitutive naming preference: when the acid fragment already has a
     # principal group (sulfonic acid, phosphonic acid), prefer substitutive
     # naming over functional class assembly. This handles cases like sulfa
@@ -832,7 +871,12 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # Amide seniority-based assembly: when amine fragment has higher
     # P-44.1.1 seniority than acid fragment, use substitutive naming
     # (amine becomes parent, acid becomes acyl prefix).
-    if bond["type"] == "amide":
+    # Guard: skip if roles_swapped is already True (detection-time swap
+    # already handled the seniority assignment -- swapping again would
+    # double-invert). In practice, amide roles_swapped is always False
+    # (amides are exempt from detection-time swap), but this guard
+    # provides defense-in-depth.
+    if bond["type"] == "amide" and not bond.get("roles_swapped"):
         try:
             from .fragment_ranker import acid_is_more_senior
             acid_frag = next((f for f in fragments if f["side"] == "acid"), None)

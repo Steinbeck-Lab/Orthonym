@@ -376,7 +376,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)OC1CC2OC3C=C(C)C(=O)[C@@H](O)[C@]3(C)[C@]1(C)[C@]21CO1",
-        "(6S,7S,8S,12S)-5,8-dihydroxy-6,7,10-trimethyl-2-oxa-tetracyclo[5.4.0.1(3,6)]tetradec-10-en-9-one acetate",
+        "(acetyloxy)(6S,7S,8S,12S)-5,8-dihydroxy-6,7,10-trimethyl-2-oxa-tetracyclo[5.4.0.1(3,6)]tetradec-10-en-9-one",
     ),
     (
         "COCC1=C2[C@@H]3CC(C)(C)C[C@@H]3C[C@@]2(O)CC1=O",
