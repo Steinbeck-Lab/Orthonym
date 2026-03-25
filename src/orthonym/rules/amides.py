@@ -10,6 +10,7 @@ Amide naming follows these patterns:
 Based on IUPAC 2013 Blue Book P-66.1.
 """
 
+import re
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
 
@@ -21,6 +22,20 @@ from ..assembly.naming_utils import (
     alpha_sort_key,
     ALKYL_NAMES,
 )
+
+# Pattern matching a leading positional locant (digit(s)) in a substituent
+# name.  Used to detect compound N-substituent names that need
+# parenthesization per IUPAC P-14.5.2.
+_POSITIONAL_LOCANT_RE = re.compile(r'(?:^|\b)\d')
+
+
+def _has_positional_locants(name: str) -> bool:
+    """Check if a substituent name contains positional locants (digits).
+
+    Returns True for names like "4-methylcyclohexyl" or "3,5-dimethylcyclohexyl"
+    but False for retained names like "tert-butyl", "sec-butyl", "isopropyl".
+    """
+    return bool(_POSITIONAL_LOCANT_RE.search(name))
 
 
 # Standard stems - delegated to centralized chain_names module
@@ -151,9 +166,196 @@ def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optiona
     attach_idx = sub_atoms[0]
     result = name_substituent(mol, sub_set, attach_idx)
     if result:
+        result = _enrich_ring_n_substituent(mol, result, sub_atoms)
         return result
 
     return None
+
+
+def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str:
+    """Enrich a ring-based N-substituent name with sub-substituent prefixes.
+
+    If the N-substituent fragment contains a ring with additional non-ring
+    atoms (sub-substituents), this function discovers those sub-substituents
+    via the universal pipeline and prepends their IUPAC-locanted prefixes
+    to the base ring name.
+
+    Follows the ``_enrich_complex_ring_with_subs()`` pattern from Phase 119.
+
+    Args:
+        mol: RDKit Mol object.
+        base_name: Name returned by ``name_substituent()`` (e.g., "cyclohexyl").
+        sub_atoms: List of atom indices in the N-substituent fragment (BFS order).
+
+    Returns:
+        Enriched name with locanted sub-substituent prefixes, or the original
+        ``base_name`` unchanged if no ring or no sub-substituents found.
+    """
+    from ..assembly.substituent_enumerator import discover_substituents, name_substituent
+
+    sub_set = set(sub_atoms)
+    ring_info = mol.GetRingInfo()
+
+    # Find the first ring whose atoms are entirely within the fragment
+    frag_ring_atoms = None
+    for ring in ring_info.AtomRings():
+        ring_set = set(ring)
+        if ring_set.issubset(sub_set):
+            frag_ring_atoms = ring_set
+            break
+
+    if not frag_ring_atoms:
+        return base_name  # No ring in fragment
+
+    # Check if there are non-ring atoms in the fragment (sub-substituents)
+    non_ring_in_frag = sub_set - frag_ring_atoms
+    if not non_ring_in_frag:
+        return base_name  # Ring-only, nothing to enrich
+
+    # Orient the ring starting from the attachment atom (sub_atoms[0], bonded
+    # to nitrogen) as locant 1.  Choose the traversal direction that yields
+    # the lowest locant set for sub-substituents (IUPAC P-31.1.3).
+    attach_atom = sub_atoms[0]  # first atom in BFS = bonded to N
+    oriented_ring = _orient_ring_from_attachment(mol, frag_ring_atoms, attach_atom)
+
+    if not oriented_ring:
+        return base_name
+
+    # Discover sub-substituents on the ring
+    try:
+        subs = discover_substituents(
+            mol, frag_ring_atoms, "ring", oriented_ring=tuple(oriented_ring)
+        )
+    except Exception:
+        return base_name
+
+    if not subs:
+        return base_name
+
+    # Name and collect sub-substituent prefixes, filtering to only those
+    # whose atoms are within the N-substituent fragment scope
+    prefix_groups = defaultdict(list)  # name -> [locant, ...]
+    for sub_info in subs:
+        frag_atoms_set = set(sub_info.frag_atoms)
+        # Skip sub-substituents outside the N-substituent scope (e.g., the
+        # amide chain attached back through nitrogen)
+        if not frag_atoms_set.issubset(sub_set):
+            continue
+        # Skip oversized fragments (same guard as _enrich_complex_ring_with_subs)
+        if len(sub_info.frag_atoms) > 12:
+            continue
+
+        a_idx = sub_info.attach_mol_idx
+        if a_idx not in frag_atoms_set:
+            a_idx = next(iter(frag_atoms_set))
+
+        prefix_name = name_substituent(mol, sub_info.frag_atoms, a_idx)
+        if not prefix_name or prefix_name == "substituent":
+            continue
+        if ' ' in prefix_name:
+            continue
+
+        locant = sub_info.locant
+        if locant is not None:
+            prefix_groups[prefix_name].append(locant)
+
+    if not prefix_groups:
+        return base_name
+
+    # Build prefix parts with locants and multiplier prefixes
+    prefix_parts = []
+    for name, locants in prefix_groups.items():
+        locants.sort(key=lambda x: (0, x) if isinstance(x, int) else (1, str(x)))
+        count = len(locants)
+        if count == 1:
+            prefix_parts.append(f"{locants[0]}-{name}")
+        else:
+            locant_str = ",".join(str(loc) for loc in locants)
+            multiplier = get_multiplier_prefix(count, name)
+            prefix_parts.append(f"{locant_str}-{multiplier}{name}")
+
+    prefix_parts.sort(key=lambda x: alpha_sort_key(x))
+
+    # Use the ring stem name as the base (e.g., "cyclohexyl")
+    ring_base = _extract_ring_base_name(base_name, frag_ring_atoms, mol)
+    prefix_str = "-".join(prefix_parts)
+    return f"{prefix_str}{ring_base}" if prefix_str else base_name
+
+
+def _extract_ring_base_name(full_name: str, ring_atoms: set, mol) -> str:
+    """Extract the bare ring stem name from a potentially enriched name."""
+    ring_size = len(ring_atoms)
+    is_aromatic = any(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring_atoms)
+    if is_aromatic:
+        return full_name
+    from ..data.chain_names import get_chain_prefix
+    stem = get_chain_prefix(ring_size)
+    base = f"cyclo{stem}yl"
+    if base in full_name:
+        return base
+    return full_name
+
+
+def _orient_ring_from_attachment(mol, ring_atoms: set, attach_atom: int) -> List[int]:
+    """Orient a ring starting from the attachment atom, choosing the direction
+    that gives the lowest locant set for sub-substituents."""
+    if attach_atom not in ring_atoms:
+        for nbr in mol.GetAtomWithIdx(attach_atom).GetNeighbors():
+            if nbr.GetIdx() in ring_atoms:
+                attach_atom = nbr.GetIdx()
+                break
+        else:
+            return []
+
+    ring_adj = {}
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        ring_adj[idx] = [
+            nbr.GetIdx() for nbr in atom.GetNeighbors()
+            if nbr.GetIdx() in ring_atoms
+        ]
+
+    start_neighbors = ring_adj.get(attach_atom, [])
+    if len(start_neighbors) < 2:
+        return sorted(ring_atoms)
+
+    def _traverse(start, first_neighbor):
+        path = [start, first_neighbor]
+        prev, current = start, first_neighbor
+        while len(path) < len(ring_atoms):
+            nxt = [n for n in ring_adj[current] if n != prev]
+            if not nxt:
+                break
+            path.append(nxt[0])
+            prev, current = current, nxt[0]
+        return path
+
+    dir1 = _traverse(attach_atom, start_neighbors[0])
+    dir2 = _traverse(attach_atom, start_neighbors[1])
+
+    def _sub_locants(oriented):
+        locant_map = {a: i + 1 for i, a in enumerate(oriented)}
+        locs = []
+        for idx in oriented:
+            atom = mol.GetAtomWithIdx(idx)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetAtomicNum() > 1:
+                    locs.append(locant_map[idx])
+                    break
+        return sorted(locs)
+
+    locs1 = _sub_locants(dir1)
+    locs2 = _sub_locants(dir2)
+
+    for a, b in zip(locs1, locs2):
+        if a < b:
+            return dir1
+        elif b < a:
+            return dir2
+
+    if len(locs1) <= len(locs2):
+        return dir1
+    return dir2
 
 
 def _bfs_substituent(mol, start_idx: int, exclude: set) -> List[int]:
@@ -207,13 +409,18 @@ def format_n_substitution(substituents: List[Dict]) -> str:
     parts = []
     for name in sorted(groups.keys(), key=alpha_sort_key):
         count = groups[name]
+        # IUPAC P-14.5.2: compound substituents with positional locants
+        # (e.g., "4-methylcyclohexyl") must be enclosed in parentheses.
+        # Retained names like "tert-butyl" do NOT get brackets.
+        has_locants = _has_positional_locants(name)
+        display_name = f"({name})" if has_locants else name
         if count == 1:
-            parts.append(f"N-{name}")
+            parts.append(f"N-{display_name}")
         else:
             # Multiple of same: N,N-di...
             multiplier = get_multiplier_prefix(count, name)
             n_locants = ",".join(["N"] * count)
-            parts.append(f"{n_locants}-{multiplier}{name}")
+            parts.append(f"{n_locants}-{multiplier}{display_name}")
 
     # Join parts with hyphen
     return "-".join(parts)
