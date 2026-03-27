@@ -95,20 +95,21 @@ def name_anhydride(features) -> Optional[str]:
     if is_cyclic:
         return _name_cyclic_anhydride(total_chain_length)
 
-    # Acyclic anhydride: count carbon chains on each side
-    chain1_length = _count_acyl_fragment_carbons(mol, c1_idx, bridge_o)
-    chain2_length = _count_acyl_fragment_carbons(mol, c2_idx, bridge_o)
+    # Acyclic anhydride: name each acyl fragment as its corresponding acid.
+    # Uses _name_acyl_acid() which calls _integrate_universal_prefixes()
+    # per D-01 to discover branch substituents on acyl chains.
+    acid1_name = _name_acyl_acid(mol, c1_idx, bridge_o, anhydride_info['o1'])
+    acid2_name = _name_acyl_acid(mol, c2_idx, bridge_o, anhydride_info['o2'])
 
-    if chain1_length == chain2_length:
+    if acid1_name is None or acid2_name is None:
+        return None
+
+    if acid1_name == acid2_name:
         # Symmetric anhydride
-        acid_name = _build_acid_name(chain1_length)
-        return f"{acid_name} anhydride"
+        return f"{acid1_name} anhydride"
     else:
         # Mixed/asymmetric anhydride: alphabetical order
-        acid1 = _build_acid_name(chain1_length)
-        acid2 = _build_acid_name(chain2_length)
-        # Sort alphabetically
-        acids = sorted([acid1, acid2])
+        acids = sorted([acid1_name, acid2_name])
         return f"{acids[0]} {acids[1]} anhydride"
 
 
@@ -213,6 +214,141 @@ def _count_acyl_fragment_carbons(mol, carbonyl_c: int, bridge_o: int) -> int:
                 carbon_count += 1
 
     return carbon_count
+
+
+def _collect_acyl_fragment_atoms(mol, carbonyl_c: int, bridge_o: int) -> set:
+    """Collect ALL heavy atom indices in an acyl fragment via BFS.
+
+    Unlike _count_acyl_fragment_carbons which only follows carbons,
+    this follows all bonds except through the bridge oxygen.
+
+    Args:
+        mol: RDKit Mol object.
+        carbonyl_c: Atom index of the carbonyl carbon.
+        bridge_o: Atom index of the bridge oxygen (to exclude).
+
+    Returns:
+        Set of atom indices in the acyl fragment.
+    """
+    visited = {carbonyl_c}
+    queue = deque([carbonyl_c])
+    while queue:
+        current = queue.popleft()
+        atom = mol.GetAtomWithIdx(current)
+        for neighbor in atom.GetNeighbors():
+            nidx = neighbor.GetIdx()
+            if nidx in visited or nidx == bridge_o:
+                continue
+            visited.add(nidx)
+            queue.append(nidx)
+    return visited
+
+
+def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
+    """Find the longest carbon chain starting from ``start`` within frag_atoms.
+
+    Uses DFS to find the longest simple path of carbon atoms.
+
+    Args:
+        mol: RDKit Mol object.
+        start: Atom index to start from (carbonyl carbon).
+        frag_atoms: Set of atom indices in the fragment.
+
+    Returns:
+        Ordered list of atom indices [start, ..., end].
+    """
+    carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
+
+    best_path = [start]
+
+    def dfs(current, visited, path):
+        nonlocal best_path
+        if len(path) > len(best_path):
+            best_path = list(path)
+        atom = mol.GetAtomWithIdx(current)
+        for nbr in atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in visited or nidx not in carbon_set:
+                continue
+            visited.add(nidx)
+            path.append(nidx)
+            dfs(nidx, visited, path)
+            path.pop()
+            visited.discard(nidx)
+
+    dfs(start, {start}, [start])
+    return best_path
+
+
+def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str:
+    """Name an acyl fragment as its corresponding acid, with substituent prefixes.
+
+    Uses _integrate_universal_prefixes() (per D-01) to discover branch
+    substituents on the acyl chain. For simple linear chains, falls back
+    to the fast _build_acid_name() path.
+
+    Args:
+        mol: RDKit Mol object.
+        carbonyl_c: Index of the carbonyl carbon C(=O).
+        bridge_o: Index of the bridge oxygen (to exclude from fragment).
+        carbonyl_o: Index of the carbonyl oxygen (=O).
+
+    Returns:
+        Acid name WITHOUT " acid" suffix (e.g., "2-methylpropanoic"), or None.
+    """
+    frag_atoms = _collect_acyl_fragment_atoms(mol, carbonyl_c, bridge_o)
+
+    # Identify carbon atoms in the fragment
+    chain_carbons = [i for i in frag_atoms
+                     if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
+
+    # Quick path: check if fragment has any branching or heteroatom substituents.
+    # If it's a simple linear chain of only carbons + the carbonyl O, use fast path.
+    non_c_non_carbonyl_o = [i for i in frag_atoms
+                            if i != carbonyl_o
+                            and mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+    is_branched = False
+    for i in chain_carbons:
+        atom = mol.GetAtomWithIdx(i)
+        c_nbrs_in_frag = sum(1 for n in atom.GetNeighbors()
+                             if n.GetIdx() in frag_atoms
+                             and n.GetSymbol() == 'C')
+        if c_nbrs_in_frag > 2:
+            is_branched = True
+            break
+
+    if not is_branched and not non_c_non_carbonyl_o:
+        # Simple linear chain: use existing fast path (no substituents to discover)
+        return _build_acid_name(len(chain_carbons))
+
+    # Branched or has heteroatom substituents: use _integrate_universal_prefixes()
+    # per D-01 to discover and name substituents on the acyl chain.
+    principal_chain = _find_longest_chain(mol, carbonyl_c, frag_atoms)
+    chain_set = set(principal_chain)
+
+    # Build atom_to_locant: carbonyl C = position 1 (IUPAC carboxylic acid numbering)
+    atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(principal_chain)}
+
+    # Exclude atoms: (1) carbonyl oxygen (=O) is part of the acid suffix,
+    # not a substituent; (2) all atoms outside this fragment (the other acyl
+    # side + bridge oxygen) must be excluded so the discovery engine only
+    # sees substituents within THIS acyl fragment.
+    all_atom_idxs = set(range(mol.GetNumAtoms()))
+    exclude = (all_atom_idxs - frag_atoms) | {carbonyl_o}
+
+    from ..assembly.composer import _integrate_universal_prefixes
+    prefix_str = _integrate_universal_prefixes(
+        mol, chain_set,
+        parent_type="chain",
+        principal_chain=principal_chain,
+        atom_to_locant=atom_to_locant,
+        exclude_atoms=exclude,
+    )
+
+    base_acid = _build_acid_name(len(principal_chain))
+    if prefix_str:
+        return f"{prefix_str}{base_acid}"
+    return base_acid
 
 
 def _build_acid_name(chain_length: int) -> str:
