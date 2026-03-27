@@ -85,7 +85,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"CO[C@H]1C=C/C=C\C=C/C[C@H](OC(=O)[C@@H](C)NC(=O)C2=CCCCC2)[C@H](C)[C@@H](O)/C(C)=C\CCc2cc(O)cc(c2O)NC(=O)C1",
-        "1-(cyclohexanecarbonyloxy)-3,9-dihydroxy-14-hydroxymethyl-2,4-dimethyl-12-oxo-8-propyl1-azacyclohenicosene",
+        "(2R)-1-(cyclohexanecarbonyloxy)-3,9-dihydroxy-14-hydroxymethyl-2,4-dimethyl-12-oxo-8-propyl1-azacyclohenicosene",
     ),
     (
         "CC[C@@H]1OC(=O)C=C[C@H](C)[C@@H](O[C@@H]2O[C@H](C)C[C@H](N(C)C)C2O)CC[C@@H](C)C(=O)C=C[C@@H]2O[C@@H]2[C@]1(O)CO[C@@H]1OC(C)[C@H](O)[C@H](OC)[C@@H]1OC",
@@ -319,7 +319,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)OC[C@H]1O[C@@H](O[C@]2(COC(C)=O)O[C@H](COC(=O)/C=C/c3ccccc3)[C@@H](O)[C@@H]2OC(=O)/C=C/c2ccccc2)[C@H](OC(C)=O)[C@@H](O)[C@@H]1OC(C)=O",
-        "1,1-bis(acetyloxy)-1-(benzoyloxy)-2-hydroxyoxolane",
+        "(2E)-1,1-bis(acetyloxy)-1-(benzoyloxy)-2-hydroxyoxolane",
     ),
     (
         "C[C@@H]1O[C@@H](O[C@@H]2C[C@H](c3ccc4c(c3O)C(=O)C3=C(C4=O)[C@@]4(O)C(=O)C[C@](C)(O)C[C@@]4(O)C=C3)O[C@H](C)[C@H]2O)CC[C@@H]1O[C@H]1C[C@@H](O)[C@H](O)[C@@H](C)O1",

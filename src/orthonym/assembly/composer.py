@@ -541,14 +541,17 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     species_type = getattr(features, 'species_type', 'neutral')
 
     # Salt, zwitterion: functional class naming (truly different naming structure)
+    # Stereo: handled by assemble_ion_name() (ions/salts rarely have stereo in benchmark)
     if species_type in ('salt', 'zwitterion'):
         return assemble_ion_name(features, features.mol, style)
 
     # Radical: also uses specialized naming
+    # Stereo: handled by assemble_ion_name()
     if species_type == 'radical':
         return assemble_ion_name(features, features.mol, style)
 
     # Single-component ion: try aspect-based composition first
+    # Stereo: handled by assemble_ion_name() / aspect composition
     if species_type == 'ion' and not _composing_ion:
         composed_name = _try_ion_aspect_composition(features, style)
         if composed_name:
@@ -705,9 +708,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if exocyclic and not _is_complex_ring_system(features.mol):
             ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
             if ring_ester_name:
-                return ring_ester_name
+                return _inject_stereo_if_missing(features, ring_ester_name)
 
     # Handle polyfunctional compounds (multiple distinct functional groups)
+    # Stereo: handled by name_polyfunctional() (collects stereo internally)
     if getattr(features, 'is_polyfunctional', False):
         from ..rules.polyfunctional import name_polyfunctional
         poly_name = name_polyfunctional(features)
@@ -725,6 +729,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         all_esters = getattr(features, 'all_ester_matches', None)
         if all_esters and len(all_esters) >= 2 and not getattr(features, 'is_polyfunctional', False):
             from ..rules.esters import classify_multi_ester, name_dicarboxylic_diester, name_polyol_polyester, name_independent_esters
+            # Stereo: handled by ester naming functions (acid-fragment stereo internally)
             ester_type = classify_multi_ester(features.mol, all_esters)
             if ester_type == "dicarboxylic_diester":
                 diester_name = name_dicarboxylic_diester(features.mol, all_esters)
@@ -747,6 +752,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if ester_match:
             from ..rules.esters import name_ester
             # Simple acyclic ester: use "alkyl alkanoate" naming
+            # Stereo: handled by name_ester() (collects acid-fragment stereo internally)
             ester_name = name_ester(features.mol, ester_match)
             if ester_name:
                 return ester_name
@@ -761,13 +767,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if matches:
                 name = name_sulfoxide(features.mol, matches[0])
                 if name:
-                    return name
+                    return _inject_stereo_if_missing(features, name)
         elif features.principal_group == 'sulfone':
             matches = features.functional_groups.get('sulfone', [])
             if matches:
                 name = name_sulfone(features.mol, matches[0])
                 if name:
-                    return name
+                    return _inject_stereo_if_missing(features, name)
 
     # Handle thioethers (sulfides) - also use functional class
     # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
@@ -787,7 +793,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     sulfur_idx = matches[0][0]
                     name = name_sulfide(features.mol, sulfur_idx)
                     if name:
-                        return name
+                        return _inject_stereo_if_missing(features, name)
 
     # Handle phosphorus functional class compounds (phosphine oxide, phosphates, phosphines)
     # These use functional class or substitutive naming, not suffix-based
@@ -797,7 +803,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if matches:
             name = name_phosphine_oxide(features.mol, matches[0])
             if name:
-                return name
+                return _inject_stereo_if_missing(features, name)
 
     # Handle phosphate esters
     if features.principal_group in ('phosphate_triester', 'phosphate_diester', 'phosphate_monoester'):
@@ -811,7 +817,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 if atom.GetSymbol() == 'P':
                     name = name_phosphate_ester(features.mol, idx)
                     if name:
-                        return name
+                        return _inject_stereo_if_missing(features, name)
                     break
 
     # Handle phosphines (tertiary, secondary, primary)
@@ -850,7 +856,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 if atom.GetSymbol() == 'P':
                     name = name_phosphine(features.mol, idx)
                     if name:
-                        return name
+                        return _inject_stereo_if_missing(features, name)
                     break
 
     # Handle phosphinic acid (suffix naming, but needs special assembly)
@@ -860,13 +866,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if matches:
             name = name_phosphinic_acid(features.mol, matches[0])
             if name:
-                return name
+                return _inject_stereo_if_missing(features, name)
 
     # Handle boronic acids - functional class: "methylboronic acid", "phenylboronic acid"
     if features.principal_group == 'boronic_acid':
         boronic_name = _name_boronic_acid(features)
         if boronic_name:
-            return boronic_name
+            return _inject_stereo_if_missing(features, boronic_name)
 
     # Handle ring assemblies (biphenyl, bipyridine) BEFORE complex ring systems
     # Ring assemblies are separate identical ring systems connected by single bonds
@@ -875,7 +881,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.ring_assemblies import name_ring_assembly
         assembly_name = name_ring_assembly(features.mol, assembly_info, features)
         if assembly_name:
-            return assembly_name
+            return _inject_stereo_if_missing(features, assembly_name)
 
     # --- Candidate collection block ---
     # Collect scored candidates from the three coverage-gated handlers
@@ -936,11 +942,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if not _complex_ring_accepted:
         polycyclic_name = getattr(features, 'polycyclic_name', None)
         if polycyclic_name:
+            # Stereo: handled by name_substituted_polycyclic() internally
             return _assemble_polycyclic_name(features, style)
 
         # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
         # Check BEFORE benzene since they contain benzene substructure
         # NOT gated -- direct return
+        # Stereo: handled by _assemble_partially_saturated_carbocycle_name() internally
         if features.is_cyclic:
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
@@ -998,6 +1006,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         _MIN_RATIO_ACCEPT = 0.30  # Matches old gate threshold for HA <= 20
         total_heavy = features.mol.GetNumHeavyAtoms()
         if total_heavy <= 15 or best.factors.get('ratio', 0) >= (_MIN_RATIO_ACCEPT / 1.5):
+            # Stereo: handled by individual handlers (complex_ring, heterocycle, benzene)
             return best.name
         # Low ratio: fall through but store metadata for debugging
         logger.debug(
@@ -1009,23 +1018,27 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
     if features.principal_group == 'nitrile' and features.is_cyclic:
-        return _assemble_ring_nitrile_name(features, style)
+        return _inject_stereo_if_missing(features, _assemble_ring_nitrile_name(features, style))
 
     # Handle amides (including N-substituted amides)
     # Multi-amide compounds (diamide, triamide) fall through to normal suffix path
     # so that the multiplier prefix (di-, tri-) is correctly applied.
+    # Stereo: handled within _assemble_amide_name() -- unsaturated path calls
+    # _generate_stereodescriptors(); ring/saturated paths inject stereo at return.
     if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
         pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
         if pg_count == 1:
             return _assemble_amide_name(features, style)
 
     # Handle secondary/tertiary amines: add N-alkyl prefixes
+    # Stereo: handled by _assemble_amine_name() (calls _generate_stereodescriptors)
     if features.principal_group in ('secondary_amine', 'tertiary_amine'):
         amine_name = _assemble_amine_name(features, style)
         if amine_name:
             return amine_name
 
     # Handle simple cases
+    # Stereo: not applicable (single atom / very simple molecules have no stereocenters)
     if not features.principal_chain and not features.ring_systems:
         # Single atom or very simple molecule
         return _name_simple_molecule(features)
@@ -3153,8 +3166,8 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
-                    return f"{prefix_str}{base_name}"
-            return base_name
+                    return _inject_stereo_if_missing(features, f"{prefix_str}{base_name}")
+            return _inject_stereo_if_missing(features, base_name)
         return "amide"
 
     # Chain amides: use general assembly fragments when the chain has unsaturation
@@ -3179,8 +3192,8 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
-                    return f"{prefix_str}{base_name}"
-            return base_name
+                    return _inject_stereo_if_missing(features, f"{prefix_str}{base_name}")
+            return _inject_stereo_if_missing(features, base_name)
 
     # Unsaturated chain amides: use general assembly fragments for correct stereo + unsaturation
     fragments = []
