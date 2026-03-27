@@ -6259,7 +6259,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     return prefixes, frozenset(handled_ring_fg_atoms)
 
 
-def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
+def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional[Dict[int, int]] = None) -> Optional[NameFragment]:
     """
     Generate stereodescriptor prefix using correct IUPAC locants.
 
@@ -6271,8 +6271,15 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
     - Heterocycles: uses features.heterocycle_atom_to_locant
     - Cycloalkanes/cycloalkenes: builds from features.oriented_ring
 
+    When atom_to_locant_override is provided, it takes priority over all
+    features.* fields. This allows early-return handlers to pass the correct
+    locant map for the structure they are naming (which may differ from
+    features.principal_ring).
+
     Args:
         features: MolecularFeatures object with stereocenters and/or double_bond_stereo
+        atom_to_locant_override: Optional explicit locant map. When provided,
+            bypasses the features.* priority chain entirely.
 
     Returns:
         NameFragment with stereodescriptor prefix like "(2R)-" or "(2E,3R)-",
@@ -6286,19 +6293,24 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
 
     mol = features.mol
 
-    # Determine which atom_to_locant mapping to use
-    # For acyclic: features.atom_to_locant (from chain orientation)
-    # For rings: features.heterocycle_atom_to_locant or build from oriented_ring
-    atom_to_locant = features.atom_to_locant
+    # When an explicit override is provided, use it directly instead of
+    # reading from features.* fields. This allows early-return handlers
+    # to pass the correct locant map for the structure they are naming
+    # (which may differ from features.principal_ring).
+    if atom_to_locant_override:
+        atom_to_locant = atom_to_locant_override
+    else:
+        # Existing priority chain (unchanged):
+        atom_to_locant = features.atom_to_locant
 
-    # For heterocycles, use ring-specific mapping
-    if getattr(features, 'heterocycle_atom_to_locant', None):
-        atom_to_locant = features.heterocycle_atom_to_locant
-    elif getattr(features, 'oriented_ring', None):
-        # Build mapping from oriented_ring for cycloalkanes/cycloalkenes
-        # oriented_ring is a list of atom indices in ring order starting at position 1
-        # This creates ring_atom_to_locant: {atom_idx: ring_locant} where locants are 1-indexed
-        atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(features.oriented_ring)}
+        # For heterocycles, use ring-specific mapping
+        if getattr(features, 'heterocycle_atom_to_locant', None):
+            atom_to_locant = features.heterocycle_atom_to_locant
+        elif getattr(features, 'oriented_ring', None):
+            # Build mapping from oriented_ring for cycloalkanes/cycloalkenes
+            # oriented_ring is a list of atom indices in ring order starting at position 1
+            # This creates ring_atom_to_locant: {atom_idx: ring_locant} where locants are 1-indexed
+            atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(features.oriented_ring)}
 
     if not atom_to_locant:
         return None
@@ -6320,7 +6332,7 @@ def _generate_stereodescriptors(features: Any) -> Optional[NameFragment]:
     return NameFragment(text=text, fragment_type="stereo")
 
 
-def _inject_stereo_if_missing(features: Any, name: str) -> str:
+def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional[Dict[int, int]] = None) -> str:
     """Prepend stereodescriptor prefix to a name if stereocenters exist but aren't represented.
 
     Used after early-return handlers that bypass _generate_stereodescriptors().
@@ -6329,6 +6341,9 @@ def _inject_stereo_if_missing(features: Any, name: str) -> str:
     Args:
         features: MolecularFeatures with stereocenters and/or double_bond_stereo
         name: The generated name from a handler (may or may not have stereo already)
+        atom_to_locant: Optional explicit locant map to forward to
+            _generate_stereodescriptors. When provided, bypasses the features.*
+            priority chain. Pass None to use default features.* resolution.
 
     Returns:
         Name with stereo prefix prepended if needed, or original name if:
@@ -6352,7 +6367,7 @@ def _inject_stereo_if_missing(features: Any, name: str) -> str:
         return name
 
     # Generate stereo prefix using the centralized function
-    stereo_frag = _generate_stereodescriptors(features)
+    stereo_frag = _generate_stereodescriptors(features, atom_to_locant_override=atom_to_locant)
     if stereo_frag and stereo_frag.text:
         return f"{stereo_frag.text}{name}"
     return name

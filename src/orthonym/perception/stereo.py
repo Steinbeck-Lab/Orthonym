@@ -140,57 +140,34 @@ def get_stereodescriptor_string(
 ) -> str:
     """
     Generate stereodescriptor string for name prefix.
-    
-    Format: (2R,3S)-... or (E)-... or (2R,3S,5E)-...
-    
+
+    DEPRECATED: Prefer collect_stereodescriptors() + format_stereodescriptor_string()
+    from orthonym.rules.stereochemistry directly.
+
+    Delegates to the production pipeline. When locant_map is None, uses an identity
+    mapping (atom_idx -> idx+1) for backward compatibility with test call sites.
+
     Args:
         mol: RDKit Mol object
-        locant_map: Optional mapping from atom index to locant number
-                    If None, uses atom indices as locants
-        
-    Returns:
-        Stereodescriptor string (empty if no stereochemistry)
-    """
-    assign_stereochemistry(mol)
-    
-    descriptors = []
-    
-    # Collect atom stereocenters
-    for atom in mol.GetAtoms():
-        if atom.HasProp('_CIPCode'):
-            idx = atom.GetIdx()
-            cip = atom.GetProp('_CIPCode')
-            # Preserve CIP code as-is: R/S for normal, r/s for pseudoasymmetric
-            # per IUPAC P-92.1.4.2.
+        locant_map: Optional mapping from atom index to locant number.
+                    If None, uses identity mapping (idx+1).
 
-            if locant_map and idx in locant_map:
-                locant = locant_map[idx]
-            else:
-                locant = idx + 1  # 1-indexed fallback
-            
-            descriptors.append((locant, f"{locant}{cip}"))
-    
-    # Collect double bond stereochemistry via _CIPCode
-    for bond in mol.GetBonds():
-        if bond.GetBondType() == Chem.BondType.DOUBLE:
-            if bond.HasProp('_CIPCode'):
-                cip_code = bond.GetProp('_CIPCode')
-                if cip_code in ('E', 'Z'):
-                    begin_idx = bond.GetBeginAtomIdx()
-                    if locant_map and begin_idx in locant_map:
-                        locant = locant_map[begin_idx]
-                    else:
-                        locant = begin_idx + 1
-                    descriptors.append((locant, f"{locant}{cip_code}"))
-    
+    Returns:
+        Stereodescriptor string like "(2R,3S)-" or empty string if no stereochemistry.
+    """
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    assign_stereochemistry(mol)
+
+    if locant_map is None:
+        # Identity mapping for backward compat (test call sites)
+        locant_map = {atom.GetIdx(): atom.GetIdx() + 1 for atom in mol.GetAtoms()}
+
+    descriptors = collect_stereodescriptors(mol, locant_map)
     if not descriptors:
         return ""
-    
-    # Sort by locant and join
-    descriptors.sort(key=lambda x: x[0])
-    descriptor_strings = [d[1] for d in descriptors]
-    
-    return f"({','.join(descriptor_strings)})-"
+
+    return format_stereodescriptor_string(descriptors)
 
 
 def count_stereocenters(mol) -> int:
