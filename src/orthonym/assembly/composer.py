@@ -540,17 +540,21 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # Check for ionic/radical species first - route to specialized assembly
     species_type = getattr(features, 'species_type', 'neutral')
 
-    # Salt, zwitterion: functional class naming (truly different naming structure)
+    # ASML-10 by-design: Salt/zwitterion handlers use functional class naming
+    # (IUPAC P-73). Ions have no detachable prefixes -- the ion composition
+    # IS the name. No substituent discovery needed.
     # Stereo: handled by assemble_ion_name() (ions/salts rarely have stereo in benchmark)
     if species_type in ('salt', 'zwitterion'):
         return assemble_ion_name(features, features.mol, style)
 
-    # Radical: also uses specialized naming
+    # ASML-10 by-design: Radical handler uses specialized naming (IUPAC P-68).
     # Stereo: handled by assemble_ion_name()
     if species_type == 'radical':
         return assemble_ion_name(features, features.mol, style)
 
-    # Single-component ion: try aspect-based composition first
+    # ASML-10 by-design: Single-component ion uses aspect composition or
+    # assemble_ion_name(). Ion naming follows IUPAC P-73 functional class
+    # naming; no detachable prefixes needed.
     # Stereo: handled by assemble_ion_name() / aspect composition
     if species_type == 'ion' and not _composing_ion:
         composed_name = _try_ion_aspect_composition(features, style)
@@ -571,7 +575,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if hydrazone_name:
             return _inject_stereo_if_missing(features, hydrazone_name, atom_to_locant=None)
 
-    # Handle N-oxides - functional class naming: "pyridine 1-oxide"
+    # ASML-10 verified: N-oxide handler creates modified molecule and names
+    # recursively via name_compound(). The recursive call handles substituents
+    # through whatever handler matches the base compound. Verified: "4-methylpyridine
+    # 1-oxide" correctly includes methyl via recursive path. No enrichment needed.
     # Must detect early because N-oxides have internal charges that could
     # confuse other routing (they are classified as 'neutral' by ions.py)
     n_oxide_name = _try_name_n_oxide(features)
@@ -580,7 +587,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         _noxide_locant_map = getattr(features, 'heterocycle_atom_to_locant', None) or features.atom_to_locant
         return _inject_stereo_if_missing(features, n_oxide_name, atom_to_locant=_noxide_locant_map)
 
-    # Handle isocyanates - functional class: "methyl isocyanate"
+    # ASML-10 complete: Isocyanate handler calls _name_r_group() which uses
+    # the Phase 125 non_ring_heavy fix and name_substituent() fallback for
+    # substituted aromatic R-groups. Substituted phenyl correctly named.
     # Only when isocyanate is the sole FG (principal_group is None because
     # isocyanate is not in SENIORITY_ORDER). When another FG is principal,
     # isocyanate becomes prefix "isocyanato" via the polyfunctional handler.
@@ -590,15 +599,17 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if iso_name:
             return _inject_stereo_if_missing(features, iso_name, atom_to_locant=None)
 
-    # Handle isothiocyanates - functional class: "methyl isothiocyanate"
-    # Same gating as isocyanate above.
+    # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
+    # as isocyanate -- Phase 125 fix applies. Same gating as isocyanate above.
     if (features.functional_groups.get('isothiocyanate')
             and features.principal_group is None):
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
             return _inject_stereo_if_missing(features, isothio_name, atom_to_locant=None)
 
-    # Handle carbamic acid - retained name with N-substitution (IUPAC P-65.2.3)
+    # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
+    # the Phase 125 fix for substituted aromatic R-groups.
+    # Retained name with N-substitution (IUPAC P-65.2.3)
     # N-C(=O)-OH -> "carbamic acid", "N-methylcarbamic acid", etc.
     if features.principal_group == 'carbamic_acid':
         carbamic_name = _name_carbamic_acid(features)
@@ -607,7 +618,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # use the features.* priority chain (heterocycle > oriented_ring > chain).
             return _inject_stereo_if_missing(features, carbamic_name, atom_to_locant=None)
 
-    # Handle carbamates - functional class: "ethyl carbamate"
+    # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
+    # for both N- and O-substituent naming.
     # Must detect BEFORE generic ester to prevent N loss.
     # Only when carbamate is the primary FG (no higher-seniority principal group).
     if (features.functional_groups.get('carbamate')
@@ -618,7 +630,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # _generate_stereodescriptors use the features.* priority chain.
             return _inject_stereo_if_missing(features, carb_name, atom_to_locant=None)
 
-    # Handle urea compounds - retained name with N-substitution
+    # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
+    # for N-substituent naming. Retained name with N-substitution.
     # "urea", "N-methylurea", "N,N-dimethylurea", "N,N'-dimethylurea"
     # Must detect BEFORE polyfunctional handler to prevent garbled output
     if (features.functional_groups.get('urea')
@@ -629,7 +642,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # use the features.* priority chain.
             return _inject_stereo_if_missing(features, urea_name, atom_to_locant=None)
 
-    # Handle guanidine compounds - retained name with N-substitution
+    # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
+    # for N-substituent naming. Retained name with N-substitution.
     # "guanidine", "N-methylguanidine", "N,N-dimethylguanidine"
     if (features.functional_groups.get('guanidine')
             and features.principal_group is None):
@@ -639,7 +653,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # use the features.* priority chain.
             return _inject_stereo_if_missing(features, guanidine_name, atom_to_locant=None)
 
-    # Handle acid halides BEFORE polyfunctional and ester handlers
+    # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
+    # chain/ring parent naming with suffix. Substituents handled via normal
+    # prefix generation in the dedicated rule module.
     # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
     # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
     if features.principal_group in ('acid_chloride', 'acid_bromide', 'acid_fluoride'):
@@ -648,7 +664,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if halide_name:
             return _inject_stereo_if_missing(features, halide_name, atom_to_locant=None)
 
-    # Handle anhydrides BEFORE lactone, polyfunctional, and ester handlers
+    # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
+    # component naming. Substituents handled within the module.
     # Anhydrides use functional class naming: "ethanoic anhydride" (two-word)
     # Must come before lactone because cyclic anhydrides (O=C1CCC(=O)O1) would
     # otherwise be misidentified as lactones
@@ -658,9 +675,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if anhydride_name:
             return _inject_stereo_if_missing(features, anhydride_name, atom_to_locant=None)
 
-    # Handle monocyclic lactones BEFORE polyfunctional, esters, and heterocycles
-    # Lactones are cyclic esters that should be named as heterocyclic ketones
-    # (e.g., oxolan-2-one, not tetrahydrofuran or "alkyl alkanoate")
+    # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
+    # for exocyclic substituent discovery (Phase 86 wired, lactones.py).
+    # Lactones are cyclic esters named as heterocyclic ketones.
     # Must come before polyfunctional because lactones trigger polyfunctional detection
     # Coverage guard: if molecule is much larger than the lactone ring, the bare
     # lactone name is incomplete and we should fall through to a handler that
@@ -680,8 +697,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
                 return _inject_stereo_if_missing(features, lactone_name, atom_to_locant=None)
 
-    # Handle monocyclic lactams BEFORE polyfunctional and amide handlers
-    # Lactams are cyclic amides named as heterocyclic ketones (parallel to lactones)
+    # ASML-10 complete: Lactam handler calls _integrate_universal_prefixes()
+    # for exocyclic substituent discovery (parallel to lactones).
+    # Lactams are cyclic amides named as heterocyclic ketones.
     # e.g., azetidin-2-one, pyrrolidin-2-one, piperidin-2-one
     # Same coverage guard as lactones above.
     from ..rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
@@ -697,7 +715,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
                 return _inject_stereo_if_missing(features, lactam_name, atom_to_locant=None)
 
-    # Handle ring-attached esters BEFORE polyfunctional handler
+    # ASML-10 complete: Ring-attached ester handler uses
+    # _assemble_ring_with_ester_prefixes() which generates acyloxy prefixes
+    # on the ring parent. Ring substituents handled via ring naming path.
     # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
     # use acyloxy prefix naming on ring parent, not polyfunctional naming
     # BUT: skip for polycyclic/complex ring systems -- those need the complex
@@ -710,8 +730,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if ring_ester_name:
                 return _inject_stereo_if_missing(features, ring_ester_name)
 
-    # Handle polyfunctional compounds (multiple distinct functional groups)
-    # Stereo: handled by name_polyfunctional() (collects stereo internally)
+    # ASML-10 complete: Polyfunctional handler (polyfunctional.py) uses
+    # _integrate_universal_prefixes() for substituent discovery on both
+    # chain and ring parents. Stereo: handled by name_polyfunctional() internally.
     if getattr(features, 'is_polyfunctional', False):
         from ..rules.polyfunctional import name_polyfunctional
         poly_name = name_polyfunctional(features)
@@ -745,7 +766,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     return indep_name
                 # If returns None, fall through to single ester or decomposition
 
-    # Handle esters (two-component naming: "alkyl alkanoate")
+    # ASML-10 complete: Ester handler (esters.py) names acid and alkyl
+    # components independently. Acid-fragment stereo handled internally.
     # Only reached for acyclic esters (ring-attached esters handled above)
     if features.principal_group == "ester":
         ester_match = getattr(features, 'ester_match', None)
@@ -758,8 +780,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 return ester_name
         # If name_ester returns None (lactone or complex), fall through
 
-    # Handle sulfur functional class compounds (sulfide, sulfoxide, sulfone)
-    # These use functional class naming, not suffix-based
+    # ASML-10 self-gating: Sulfoxide/sulfone handlers use _count_alkyl_carbons()
+    # which returns None for any non-simple-alkyl R-group. The handler returns
+    # None, and the molecule falls through to polyfunctional or chain/ring parent
+    # path where the universal pipeline operates. No substituents silently dropped.
     if features.principal_group in ('sulfoxide', 'sulfone'):
         from ..rules.sulfur import name_sulfoxide, name_sulfone
         if features.principal_group == 'sulfoxide':
@@ -775,7 +799,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 if name:
                     return _inject_stereo_if_missing(features, name)
 
-    # Handle thioethers (sulfides) - also use functional class
+    # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
+    # None for complex R-groups. Falls through to universal pipeline. No silent drop.
     # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
     if features.principal_group == 'thioether':
         ring_type = getattr(features, 'ring_type', None)
@@ -795,8 +820,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     if name:
                         return _inject_stereo_if_missing(features, name)
 
-    # Handle phosphorus functional class compounds (phosphine oxide, phosphates, phosphines)
-    # These use functional class or substitutive naming, not suffix-based
+    # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
+    # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
+    # molecules fall through to universal pipeline. No substituents silently dropped.
     if features.principal_group == 'phosphine_oxide':
         from ..rules.phosphorus import name_phosphine_oxide
         matches = features.functional_groups.get('phosphine_oxide', [])
@@ -868,13 +894,17 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if name:
                 return _inject_stereo_if_missing(features, name)
 
-    # Handle boronic acids - functional class: "methylboronic acid", "phenylboronic acid"
+    # ASML-10 complete: Boronic acid handler calls _name_r_group() (Phase 125
+    # fix) for R-group naming. Substituted aromatic R-groups correctly named.
     if features.principal_group == 'boronic_acid':
         boronic_name = _name_boronic_acid(features)
         if boronic_name:
             return _inject_stereo_if_missing(features, boronic_name)
 
-    # Handle ring assemblies (biphenyl, bipyridine) BEFORE complex ring systems
+    # ASML-10 verified: Ring assembly has own _get_substituent_info() at
+    # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
+    # Verified: ring assembly substituent discovery covers halogens, hydroxy, amino,
+    # and alkyl groups. No enrichment needed.
     # Ring assemblies are separate identical ring systems connected by single bonds
     assembly_info = getattr(features, 'ring_assembly_info', None)
     if assembly_info:
@@ -1016,11 +1046,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         )
     # else: no ring candidates -- fall through to chain/simple naming
 
-    # Handle ring-attached nitriles (cyclohexanecarbonitrile, etc.)
+    # ASML-10 complete: Ring nitrile handler uses _assemble_ring_nitrile_name()
+    # which includes ring substituent prefixes in the name.
     if features.principal_group == 'nitrile' and features.is_cyclic:
         return _inject_stereo_if_missing(features, _assemble_ring_nitrile_name(features, style))
 
-    # Handle amides (including N-substituted amides)
+    # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
+    # N-substituent prefixes and chain/ring substituent discovery.
     # Multi-amide compounds (diamide, triamide) fall through to normal suffix path
     # so that the multiplier prefix (di-, tri-) is correctly applied.
     # Stereo: handled within _assemble_amide_name() -- unsaturated path calls
@@ -1030,7 +1062,8 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if pg_count == 1:
             return _assemble_amide_name(features, style)
 
-    # Handle secondary/tertiary amines: add N-alkyl prefixes
+    # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
+    # N-alkyl prefixes and generates chain/ring substituent prefixes.
     # Stereo: handled by _assemble_amine_name() (calls _generate_stereodescriptors)
     if features.principal_group in ('secondary_amine', 'tertiary_amine'):
         amine_name = _assemble_amine_name(features, style)
