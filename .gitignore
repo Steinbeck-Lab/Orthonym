@@ -47,6 +47,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Benchmark output
+benchmark_graded_results.csv
+benchmark_graded_results.json
+
 # Local development
 *.local
 .env
