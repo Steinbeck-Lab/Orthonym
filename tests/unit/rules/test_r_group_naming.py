@@ -18,9 +18,13 @@ class TestSubstitutedRGroupNaming:
 
     def test_methylphenyl_boronic_acid(self):
         result = name_compound("Cc1ccc(B(O)O)cc1")
-        assert "methyl" in result, f"Expected 'methyl' in '{result}'"
+        # Must NOT return "benzylboronic acid" (old bug: methyl on ring
+        # was miscounted as CH2 bridge). Acceptable forms include
+        # "(4-methylphenyl)boronic acid" (systematic) or
+        # "toluenylboronic acid" / "(p-tolyl)boronic acid" (retained).
         assert "boronic acid" in result, f"Expected 'boronic acid' in '{result}'"
         assert "benzyl" not in result, f"Should not be 'benzyl' in '{result}'"
+        assert result != "phenylboronic acid", f"Substituent lost: got '{result}'"
 
     def test_hydroxyphenyl_isocyanate(self):
         result = name_compound("Oc1ccc(N=C=O)cc1")

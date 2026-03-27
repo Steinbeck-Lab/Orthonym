@@ -1493,14 +1493,47 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
             if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
                    mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
                 # Has a benzene ring
-                non_ring_carbons = sum(
+                # Count ALL non-ring heavy atoms (not just carbons).
+                # Non-carbon substituents (Cl, OH, NH2, F, Br, NO2) on
+                # the ring were invisible to the old carbon-only check,
+                # causing "phenyl" to be returned for e.g. 4-chlorophenyl.
+                # Phase 125 fix: count any atom with atomic number > 1
+                # (i.e., exclude only hydrogens).
+                non_ring_heavy = sum(
                     1 for i in frag_atoms
-                    if i not in ring_set and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                    if i not in ring_set
+                    and mol.GetAtomWithIdx(i).GetAtomicNum() > 1
                 )
-                if non_ring_carbons == 0:
+                if non_ring_heavy == 0:
                     return "phenyl"
-                elif non_ring_carbons == 1:
-                    return "benzyl"
+                elif non_ring_heavy == 1:
+                    # Only return "benzyl" if the single non-ring heavy
+                    # atom is a carbon that is the attachment point
+                    # (CH2-phenyl pattern, i.e. start_idx is outside the ring).
+                    # If the non-ring atom is a heteroatom (e.g., Cl on ring)
+                    # or a carbon substituent on the ring (e.g., methyl in
+                    # 4-methylphenyl), fall through to name_substituent().
+                    non_ring_atoms = [
+                        i for i in frag_atoms
+                        if i not in ring_set
+                        and mol.GetAtomWithIdx(i).GetAtomicNum() > 1
+                    ]
+                    if (len(non_ring_atoms) == 1
+                            and mol.GetAtomWithIdx(non_ring_atoms[0]).GetSymbol() == 'C'
+                            and non_ring_atoms[0] == start_idx):
+                        return "benzyl"
+                # Fragment has ring substituents or complex structure:
+                # jump directly to name_substituent() universal fallback,
+                # bypassing the alkyl chain code which would miscount
+                # aromatic ring carbons as a linear chain (e.g. "hexyl").
+                try:
+                    from .substituent_enumerator import name_substituent as _ns_r
+                    prefix = _ns_r(mol, set(frag_atoms), start_idx)
+                    if prefix and prefix != "substituent":
+                        return prefix
+                except Exception:
+                    pass
+                return None
 
     # Count carbons and check branching for alkyl name
     carbon_atoms = [i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C']

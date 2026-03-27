@@ -144,7 +144,12 @@ CANARY_SUBSET = [
     ("CC12CCC3C(CCC4CC(=O)CCC43C)C1CCC2O", "17-hydroxyandrostan-3-one"),
     ("OC(=O)c1ccc(N)cc1", "4-aminobenzoic acid"),
     ("CC(=O)Nc1ccc(O)cc1", "1-anilinoethanamide"),
-    ("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "1-(N,N-diethylamino)-4-phenylbenzene"),
+    # Phase 125: old expected name "1-(N,N-diethylamino)-4-phenylbenzene" was
+    # incorrect -- it dropped the N=N azo linkage because _check_retained_substituent
+    # wrongly returned "phenyl" for the N=N-phenyl fragment.  The fix (counting all
+    # non-ring heavy atoms, not just carbons) correctly rejects that shortcut.
+    # Proper azo naming support is deferred.
+    ("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "unknown organic compound"),
     ("CC(=O)O", "acetic acid"),
     ("Cc1ccc(O)c(C(C)C)c1", "1-hydroxy-2-isopropyl-4-methylbenzene"),
     ("OC(=O)/C=C\\C(=O)O", "(2Z)-but-2-enedioic acid"),

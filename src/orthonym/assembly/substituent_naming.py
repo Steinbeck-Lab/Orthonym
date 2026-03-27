@@ -642,19 +642,32 @@ def _check_retained_substituent(
             if all(mol.GetAtomWithIdx(r).GetIsAromatic() and
                    mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
                 # Has a benzene ring
-                non_ring = [i for i in sub_atoms if i not in ring_set]
-                non_ring_carbons = sum(
-                    1 for i in non_ring
-                    if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                # Phase 125 fix: count ALL non-ring heavy atoms, not
+                # just carbons.  Heteroatom substituents (Cl, OH, NH2,
+                # F, Br, NO2) on the ring were invisible to the old
+                # carbon-only check, causing "phenyl" to be returned
+                # for substituted rings like 4-chlorophenyl.
+                non_ring_heavy = sum(
+                    1 for i in sub_atoms
+                    if i not in ring_set
+                    and mol.GetAtomWithIdx(i).GetAtomicNum() > 1
                 )
-                if non_ring_carbons == 0:
+                if non_ring_heavy == 0:
                     return "phenyl"
-                elif non_ring_carbons == 1:
-                    # Benzyl only if the attachment point is the non-ring
-                    # carbon (CH2 bridging parent to ring). If the attachment
-                    # point is a ring carbon, this is a substituted phenyl
-                    # (e.g., 4-methylphenyl), not benzyl.
-                    if attach_idx not in ring_set:
+                elif non_ring_heavy == 1:
+                    # Benzyl only if the attachment point is a non-ring
+                    # carbon (CH2 bridging parent to ring). If the
+                    # attachment point is a ring carbon, this is a
+                    # substituted phenyl (e.g., 4-methylphenyl or
+                    # 4-chlorophenyl), not benzyl.
+                    non_ring_atoms = [
+                        i for i in sub_atoms
+                        if i not in ring_set
+                        and mol.GetAtomWithIdx(i).GetAtomicNum() > 1
+                    ]
+                    if (len(non_ring_atoms) == 1
+                            and mol.GetAtomWithIdx(non_ring_atoms[0]).GetSymbol() == 'C'
+                            and attach_idx not in ring_set):
                         return "benzyl"
 
     # --- Alkyl branching detection ---

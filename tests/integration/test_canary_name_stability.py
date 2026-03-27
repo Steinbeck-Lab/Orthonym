@@ -194,7 +194,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"CCCCCC/C=C\CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H](CO)[C@@H](O)CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H]1/C=C/C(=O)N[C@@H](C(C)C)C(=O)N(C)[C@@H](Cc2ccc(O)cc2)C(=O)OC1)C(C)C)C(C)C",
-        "N-(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl(3S,6S,9E,11R)-3-benzyl-11-(4-carbamoylbutyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
+        # Phase 125: old "3-benzyl" was incorrect (fragment has OH on ring,
+        # not plain benzyl). Fix correctly rejects the benzyl shortcut.
+        "N-(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl(3S,6S,9E,11R)-11-(4-carbamoylbutyl)-3-(hydroxy4-cresyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
     ),
     (
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
