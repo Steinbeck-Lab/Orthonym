@@ -305,7 +305,8 @@ CI_BENCHMARK = [
         "C[C@H]([C@H](C)CC[C@H](CC)C(C)C)[C@@]1(C)C[C@@H]3O",
         "(3S,5R,10S,12S,13R,14S,15S,17R,20R,24S)-stigmast-8-en-3,12,14,15-tetraol",
     ),
-    ("Nc1[nH]c(=S)ncc1F", "4-amino-1,3-diazine"),
+    # Phase 125-03: fluorine on heterocycle now correctly detected
+    ("Nc1[nH]c(=S)ncc1F", "4-amino-5-fluoro-1,3-diazine"),
     (
         "CC[C@@H](C)[C@H](NC(=O)[C@H](CC(C)C)N(C)C(=O)[C@@H](C)"
         "NC(=O)[C@H](CCO)NC(=O)c1ccccc1)C(=O)O",

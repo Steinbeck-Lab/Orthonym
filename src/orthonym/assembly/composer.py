@@ -2544,7 +2544,7 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         # Skip large fragments that produce garbled names (same guard as
         # _assemble_ring_with_ester_prefixes)
         frag_ha = len(sub_info.frag_atoms)
-        if frag_ha > 12:
+        if frag_ha > 20:
             logger.debug(
                 "_enrich_complex_ring_with_subs: skip large frag HA=%d", frag_ha
             )

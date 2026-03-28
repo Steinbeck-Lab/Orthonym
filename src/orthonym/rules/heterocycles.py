@@ -918,6 +918,11 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
     symbol = first_atom.GetSymbol()
     h_count = first_atom.GetTotalNumHs()
 
+    # Halogens (F, Cl, Br, I) -- IUPAC P-31.1.2.1
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    if symbol in _HALOGEN_PREFIX:
+        return _HALOGEN_PREFIX[symbol]
+
     # Amino (-NH2)
     if symbol == 'N' and h_count == 2:
         return 'amino'
@@ -942,6 +947,13 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
             other_idx = bond.GetOtherAtomIdx(sub_atoms[0])
             if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
                 return 'oxo'
+
+    # Imino (=NH) -- IUPAC P-31.1.3
+    if symbol == 'N' and h_count == 1 and len(sub_atoms) == 1:
+        for bond in first_atom.GetBonds():
+            other_idx = bond.GetOtherAtomIdx(sub_atoms[0])
+            if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
+                return 'imino'
 
     return None
 
