@@ -443,6 +443,50 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
             if sym in _HALOGEN_MAP:
                 return _HALOGEN_MAP[sym]
 
+    # ---- Compound substituents: carbon + heteroatom combinations ----
+    # IUPAC P-31.1.3: compound prefix names built from
+    # heteroatom-prefix + alkyl-stem (e.g., hydroxymethyl, aminoethyl).
+    # Restricted to avoid positional ambiguity.
+
+    if carbons > 0 and heteroatoms:
+        # Cyano: exactly 1C + 1N with triple bond (nitrile substituent)
+        if carbons == 1 and heteroatoms == {'N': 1}:
+            for idx in frag_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'C':
+                    for nbr in atom.GetNeighbors():
+                        if nbr.GetIdx() in frag_atoms and nbr.GetSymbol() == 'N':
+                            bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                            if bond and bond.GetBondTypeAsDouble() == 3.0:
+                                return 'cyano'
+
+        # 2-HA fragments (1 carbon + 1 heteroatom): unambiguous position
+        total_ha = carbons + sum(heteroatoms.values())
+        if total_ha <= 2 and carbons == 1:
+            hetero_prefix = None
+            for idx in frag_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                sym = atom.GetSymbol()
+                if sym == 'O':
+                    hetero_prefix = 'hydroxy' if atom.GetTotalNumHs() >= 1 else 'oxo'
+                    break
+                elif sym == 'N':
+                    hetero_prefix = 'amino' if atom.GetTotalNumHs() >= 2 else 'imino'
+                    break
+                elif sym == 'S':
+                    hetero_prefix = 'sulfanyl' if atom.GetTotalNumHs() >= 1 else 'thio'
+                    break
+                elif sym in _HALOGEN_MAP:
+                    hetero_prefix = _HALOGEN_MAP[sym]
+                    break
+
+            if hetero_prefix:
+                try:
+                    alkyl_stem = get_alkyl_name(carbons)
+                    return f"{hetero_prefix}{alkyl_stem}"
+                except (ValueError, KeyError):
+                    pass
+
     # Absolute last resort
     return "substituent"
 

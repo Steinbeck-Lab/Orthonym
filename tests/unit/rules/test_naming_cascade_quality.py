@@ -113,3 +113,55 @@ class TestFragmentNameCache:
         assert "O=C(O)CC(=O)O" in FRAGMENT_NAME_CACHE  # propanedioic acid
         assert "O=C(O)CCC(=O)O" in FRAGMENT_NAME_CACHE  # butanedioic acid
         assert "O=C(O)CCCC(=O)O" in FRAGMENT_NAME_CACHE  # pentanedioic acid
+
+
+class TestTier5DescriptiveFallback:
+    """Tier 5 fallback should produce compound names for small C+heteroatom fragments."""
+
+    def test_cyano_detection(self):
+        """C#N should produce 'cyano' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("C#N")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "cyano", f"Expected 'cyano', got '{result}'"
+
+    def test_hydroxymethyl_detection(self):
+        """C-OH (2 HA) should produce 'hydroxymethyl' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("CO")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "hydroxymethyl", f"Expected 'hydroxymethyl', got '{result}'"
+
+    def test_aminomethyl_detection(self):
+        """C-NH2 (2 HA) should produce 'aminomethyl' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("CN")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "aminomethyl", f"Expected 'aminomethyl', got '{result}'"
+
+    def test_fluoromethyl_detection(self):
+        """C-F (2 HA) should produce 'fluoromethyl' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("CF")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "fluoromethyl", f"Expected 'fluoromethyl', got '{result}'"
+
+    def test_chloromethyl_detection(self):
+        """C-Cl (2 HA) should produce 'chloromethyl' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("CCl")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "chloromethyl", f"Expected 'chloromethyl', got '{result}'"
+
+    def test_sulfanylmethyl_detection(self):
+        """C-SH (2 HA) should produce 'sulfanylmethyl' not 'substituent'."""
+        from orthonym.assembly.substituent_enumerator import _descriptive_fallback
+
+        mol = Chem.MolFromSmiles("CS")
+        result = _descriptive_fallback(mol, frozenset([0, 1]), 0)
+        assert result == "sulfanylmethyl", f"Expected 'sulfanylmethyl', got '{result}'"
