@@ -68,3 +68,48 @@ class TestCycloalkylRetainedNameUnit:
         ring = list(ring_info.AtomRings()[0])
         result = _check_retained_substituent(mol, ring, ring[0])
         assert result == "cyclopropyl", f"Expected 'cyclopropyl', got '{result}'"
+
+
+class TestFragmentNameCache:
+    """Verify common fragments are in the FRAGMENT_NAME_CACHE."""
+
+    def test_cache_has_branched_alkanes(self):
+        """Branched alkanes should be in cache for Tier 2 hits."""
+        from orthonym.assembly.fragment_naming import FRAGMENT_NAME_CACHE
+
+        assert "CC(C)C" in FRAGMENT_NAME_CACHE  # 2-methylpropane
+        assert "CCC(C)C" in FRAGMENT_NAME_CACHE  # 2-methylbutane
+        assert "CC(C)(C)C" in FRAGMENT_NAME_CACHE  # 2,2-dimethylpropane
+
+    def test_cache_has_cycloalkanes(self):
+        """Cycloalkanes should be in cache."""
+        from orthonym.assembly.fragment_naming import FRAGMENT_NAME_CACHE
+
+        assert "C1CC1" in FRAGMENT_NAME_CACHE  # cyclopropane
+        assert "C1CCC1" in FRAGMENT_NAME_CACHE  # cyclobutane
+        assert "C1CCCC1" in FRAGMENT_NAME_CACHE  # cyclopentane
+        assert "C1CCCCC1" in FRAGMENT_NAME_CACHE  # cyclohexane
+
+    def test_cache_has_substituted_aromatics(self):
+        """Common substituted aromatics should be in cache."""
+        from orthonym.assembly.fragment_naming import FRAGMENT_NAME_CACHE
+
+        assert "Cc1ccccc1" in FRAGMENT_NAME_CACHE  # toluene
+        assert "CCc1ccccc1" in FRAGMENT_NAME_CACHE  # ethylbenzene
+        assert "COc1ccccc1" in FRAGMENT_NAME_CACHE  # anisole
+
+    def test_cache_has_substituted_heterocycles(self):
+        """Common substituted heterocycles should be in cache."""
+        from orthonym.assembly.fragment_naming import FRAGMENT_NAME_CACHE
+
+        assert "Cc1ccncc1" in FRAGMENT_NAME_CACHE  # 4-methylpyridine
+        assert "Cc1ccccn1" in FRAGMENT_NAME_CACHE  # 2-methylpyridine
+        assert "Cc1cccnc1" in FRAGMENT_NAME_CACHE  # 3-methylpyridine
+
+    def test_cache_has_dicarboxylic_acids(self):
+        """Common dicarboxylic acids should be in cache."""
+        from orthonym.assembly.fragment_naming import FRAGMENT_NAME_CACHE
+
+        assert "O=C(O)CC(=O)O" in FRAGMENT_NAME_CACHE  # propanedioic acid
+        assert "O=C(O)CCC(=O)O" in FRAGMENT_NAME_CACHE  # butanedioic acid
+        assert "O=C(O)CCCC(=O)O" in FRAGMENT_NAME_CACHE  # pentanedioic acid

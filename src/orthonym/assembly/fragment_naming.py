@@ -174,6 +174,41 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CCCCCCO": "hexan-1-ol",
     # --- Branched fatty acids ---
     "CC(C)CCCCCCCCCCCC(=O)O": "13-methyltetradecanoic acid",
+    # --- Branched alkanes (verified 2026-03-28, Phase 125-03) ---
+    "CC(C)C": "2-methylpropane",
+    "CCC(C)C": "2-methylbutane",
+    "CC(C)(C)C": "2,2-dimethylpropane",
+    "CCCC(C)C": "2-methylpentane",
+    "CCC(C)CC": "3-methylpentane",
+    # --- Cycloalkanes (verified 2026-03-28, Phase 125-03) ---
+    "C1CC1": "cyclopropane",
+    "C1CCC1": "cyclobutane",
+    "C1CCCC1": "cyclopentane",
+    "C1CCCCC1": "cyclohexane",
+    "C1CCCCCC1": "cycloheptane",
+    # --- Substituted aromatics (verified 2026-03-28, Phase 125-03) ---
+    "Cc1ccccc1": "toluene",
+    "CCc1ccccc1": "ethylbenzene",
+    "CC(C)c1ccccc1": "cumene",
+    "COc1ccccc1": "anisole",
+    "Clc1ccccc1": "chlorobenzene",
+    "Fc1ccccc1": "fluorobenzene",
+    "Brc1ccccc1": "bromobenzene",
+    "O=[N+]([O-])c1ccccc1": "nitrobenzene",
+    # --- Substituted heterocycles (verified 2026-03-28, Phase 125-03) ---
+    "Cc1ccncc1": "4-methylpyridine",
+    "Cc1ccccn1": "2-methylpyridine",
+    "Cc1cccnc1": "3-methylpyridine",
+    # --- Ethers and sulfides (verified 2026-03-28, Phase 125-03) ---
+    "COC": "methoxymethane",
+    "CCOCC": "ethoxyethane",
+    "CSC": "dimethyl sulfide",
+    # --- Dicarboxylic acids (verified 2026-03-28, Phase 125-03) ---
+    "O=C(O)CO": "2-hydroxyethanoic acid",
+    "O=C(O)CC(=O)O": "propanedioic acid",
+    "O=C(O)CCC(=O)O": "butanedioic acid",
+    "O=C(O)C(=O)O": "ethanedioic acid",
+    "O=C(O)CCCC(=O)O": "pentanedioic acid",
 }
 
 
