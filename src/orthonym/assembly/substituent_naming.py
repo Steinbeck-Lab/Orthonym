@@ -670,6 +670,41 @@ def _check_retained_substituent(
                             and attach_idx not in ring_set):
                         return "benzyl"
 
+    # --- Cycloalkyl detection (IUPAC P-31.1.3.4) ---
+    # Saturated carbocyclic rings used as substituents: cyclopropyl, cyclobutyl,
+    # cyclopentyl, cyclohexyl, cycloheptyl, cyclooctyl.
+    # Must be all-carbon, all-single-bond, no extra non-ring heavy atoms.
+    _CYCLO_RETAINED = {
+        3: 'cyclopropyl', 4: 'cyclobutyl', 5: 'cyclopentyl',
+        6: 'cyclohexyl', 7: 'cycloheptyl', 8: 'cyclooctyl',
+    }
+    for ring in ring_info.AtomRings():
+        ring_set = set(ring)
+        if not ring_set.issubset(frag_set):
+            continue
+        ring_size = len(ring)
+        if ring_size not in _CYCLO_RETAINED:
+            continue
+        # All ring atoms must be carbon
+        if not all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring):
+            continue
+        # All bonds in ring must be single
+        all_single = True
+        for i in range(ring_size):
+            bond = mol.GetBondBetweenAtoms(ring[i], ring[(i + 1) % ring_size])
+            if bond and bond.GetBondTypeAsDouble() != 1.0:
+                all_single = False
+                break
+        if not all_single:
+            continue
+        # No non-ring heavy atoms (unsubstituted ring only)
+        non_ring_heavy = sum(
+            1 for i in sub_atoms
+            if i not in ring_set and mol.GetAtomWithIdx(i).GetAtomicNum() > 1
+        )
+        if non_ring_heavy == 0 and attach_idx in ring_set:
+            return _CYCLO_RETAINED[ring_size]
+
     # --- Alkyl branching detection ---
     # Retained alkyl names (isopropyl, tert-butyl, etc.) only apply to
     # saturated fragments.  If any bond within the fragment is double or
