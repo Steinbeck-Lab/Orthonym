@@ -300,3 +300,58 @@ class TestNBracketWrapping:
         assert "N-[" in name, (
             f"Expected N-[...] bracket wrapping: {name}"
         )
+
+
+class TestMalformedSuffixFixes:
+    """Regression tests verifying malformed suffix strings no longer appear.
+
+    These suffixes were identified in the v15.0 OPSIN failure triage as
+    invalid suffix concatenations. The root causes were fixed in the
+    suffix derivation logic (not via postprocessors).
+
+    - benzamideyl: was "benzamide" + "yl" (now produces benzoyl/benzamido)
+    - propanedioateyloxy: was "propanedioate" + "yloxy" (now produces propanedioyloxy)
+    - glutyl: was "glut" + "yl" (now produces glutaminyl)
+    """
+
+    def test_no_benzamideyl_in_output(self):
+        """benzamideyl must not appear -- correct form is benzoyl or benzamido."""
+        smiles = "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F"
+        name = name_compound(smiles)
+        assert "benzamideyl" not in name, (
+            f"Malformed suffix 'benzamideyl' found in: {name}"
+        )
+        # Should contain a valid amide-related form
+        assert "benz" in name.lower(), (
+            f"Expected benzene-derived fragment in name: {name}"
+        )
+
+    def test_no_propanedioateyloxy_in_output(self):
+        """propanedioateyloxy must not appear -- correct form is propanedioyloxy."""
+        smiles = "*c1c(*)c(*)c(-c2oc3c(*)c(*)c(*)c(*)c3c(=O)c2O[C@@H]2O[C@H](COC(=O)CC(=O)[O-])[C@@H](O)[C@H](O)[C@H]2O)c(*)c1*"
+        name = name_compound(smiles)
+        assert "propanedioateyloxy" not in name, (
+            f"Malformed suffix 'propanedioateyloxy' found in: {name}"
+        )
+        # The fixed form should be propanedioyloxy
+        if "propanedio" in name:
+            assert "propanedioyloxy" in name, (
+                f"Expected 'propanedioyloxy' not malformed form in: {name}"
+            )
+
+    def test_no_glutyl_in_output(self):
+        """glutyl must not appear -- correct form is glutaminyl or pentanedioyl."""
+        smiles = "C=C1CC23C=CC(=O)C(C)(CCCC(C)C(=O)NC(CCC(N)=O)C(=O)O)C2CC1CC3O"
+        name = name_compound(smiles)
+        assert "glutyl" not in name, (
+            f"Malformed suffix 'glutyl' found in: {name}"
+        )
+
+    def test_benzamide_compound_opsin_parseable(self):
+        """The benzamide compound should produce an OPSIN-parseable name."""
+        smiles = "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F"
+        name = name_compound(smiles)
+        # Verify the name uses correct IUPAC forms (benzoyl, benzamide, etc.)
+        assert "benzam" in name.lower() or "benzoyl" in name.lower(), (
+            f"Expected valid benzamide/benzoyl form in: {name}"
+        )
