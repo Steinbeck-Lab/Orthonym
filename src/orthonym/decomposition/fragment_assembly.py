@@ -22,6 +22,7 @@ from rdkit import Chem as _Chem
 
 from ..data.trivial_acids import get_acylate_name, TRIVIAL_ACID_TO_ACYLATE
 from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
+from ..assembly.naming_utils import _wrap_n_substituent
 
 
 # ============================================================================
@@ -473,9 +474,10 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
                 #   -> "N-acetyl-N-methylcyclohexanamine"
                 # This keeps each N-substituent as a separate "N-X" segment
                 # so _group_n_substituents can properly merge identical ones.
-                result = f"N-{acyl_prefix}-{amine_name}"
+                result = f"N-{_wrap_n_substituent(acyl_prefix)}-{amine_name}"
             else:
-                result = f"N-{_join_components(acyl_prefix, amine_name)}"
+                wrapped = _wrap_n_substituent(acyl_prefix)
+                result = f"N-{_join_components(wrapped, amine_name)}"
 
     if result is None:
         return None
@@ -689,7 +691,8 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
 
     amine_prefix = _amine_to_prefix(amine_name)
     if amine_prefix:
-        return f"N-{_join_components(amine_prefix, sulfonamide_parent)}"
+        wrapped = _wrap_n_substituent(amine_prefix)
+        return f"N-{_join_components(wrapped, sulfonamide_parent)}"
 
     return sulfonamide_parent
 

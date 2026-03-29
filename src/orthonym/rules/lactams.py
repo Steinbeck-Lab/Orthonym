@@ -373,13 +373,14 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
 
 def _format_n_prefix(name: str, count: int) -> str:
     """Format an N-substituent prefix for a lactam."""
-    from ..assembly.naming_utils import get_multiplier_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix, _wrap_n_substituent
 
+    wrapped = _wrap_n_substituent(name)
     if count == 1:
-        return f"N-{name}"
+        return f"N-{wrapped}"
     n_locants = ",".join(["N"] * count)
     multiplier = get_multiplier_prefix(count, name)
-    return f"{n_locants}-{multiplier}{name}"
+    return f"{n_locants}-{multiplier}{wrapped}"
 
 
 def _detect_lactam_substituents(mol, ordered_ring, atom_to_locant, excluded):

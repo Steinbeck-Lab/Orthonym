@@ -1604,12 +1604,14 @@ def _apply_suffix_to_core(core_name: str, suffix: str) -> str:
 
 def _format_n_prefix(name: str, count: int) -> str:
     """Format an N-substituent prefix (N-methyl, N,N-dimethyl)."""
+    from ..assembly.naming_utils import _wrap_n_substituent
+    wrapped = _wrap_n_substituent(name)
     if count == 1:
-        return f"N-{name}-"
+        return f"N-{wrapped}-"
     else:
         n_locants = ",".join(["N"] * count)
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{n_locants}-{multiplier}{name}-"
+        return f"{n_locants}-{multiplier}{wrapped}-"
 
 
 def _format_c_prefix(name: str, locants: List[int], count: int) -> str:

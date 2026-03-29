@@ -183,3 +183,120 @@ class TestSteroidSuffixOrdering:
             assert "cholesta-" in name, (
                 f"Two double bonds should use 'cholesta-' (with 'a'): {name}"
             )
+
+
+class TestNBracketWrapping:
+    """Test IUPAC P-16.3.3 bracket escalation for N-substituents.
+
+    When an N-substituent name contains parenthesized content (stereo
+    descriptors or compound substituent names), the N-prefix must use
+    square brackets: N-[...] instead of bare N-(...).
+
+    Root cause: N-prefix construction sites (composer.py, fragment_assembly.py,
+    engine.py, amides.py, benzene.py, etc.) previously produced f"N-{name}"
+    without checking for parentheses. Now all sites route through
+    _wrap_n_substituent() which applies P-16.3.3 bracket escalation.
+    """
+
+    # ---- Unit-level tests for _wrap_n_substituent ----
+
+    def test_simple_name_unchanged(self):
+        """Simple substituent names without parens are NOT wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        assert _wrap_n_substituent("methyl") == "methyl"
+
+    def test_dimethyl_unchanged(self):
+        """Multiplicative prefixes without parens are NOT wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        assert _wrap_n_substituent("dimethyl") == "dimethyl"
+
+    def test_ethyl_unchanged(self):
+        """Simple alkyl names without parens are NOT wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        assert _wrap_n_substituent("ethyl") == "ethyl"
+
+    def test_stereo_prefix_wrapped(self):
+        """Stereo-containing N-substituent gets square brackets."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        result = _wrap_n_substituent("(2S)-2-(pentanoylamino)propanoyl")
+        assert result == "[(2S)-2-(pentanoylamino)propanoyl]"
+
+    def test_complex_stereo_wrapped(self):
+        """Multi-stereo N-substituent gets square brackets."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        result = _wrap_n_substituent(
+            "(2R,3S)-3-hydroxy-2-(benzoylamino)butanoyl"
+        )
+        assert result == "[(2R,3S)-3-hydroxy-2-(benzoylamino)butanoyl]"
+
+    def test_already_bracketed_unchanged(self):
+        """Names already in square brackets are NOT double-wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        assert _wrap_n_substituent("[already-bracketed]") == "[already-bracketed]"
+
+    def test_balanced_outer_parens_unchanged(self):
+        """Names with balanced outer parens are already enclosed."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        assert _wrap_n_substituent("(3-ethyl-1H-indolyl)") == "(3-ethyl-1H-indolyl)"
+
+    def test_locanted_sub_wrapped(self):
+        """N-substituent with internal locant parens gets wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        result = _wrap_n_substituent("2-(nonanoylamino)pentanedioyl")
+        assert result == "[2-(nonanoylamino)pentanedioyl]"
+
+    def test_adenine_sub_wrapped(self):
+        """N-substituent with internal compound parens gets wrapped."""
+        from orthonym.assembly.naming_utils import _wrap_n_substituent
+        result = _wrap_n_substituent("7-(10-carboxydecyl)adenineyl")
+        assert result == "[7-(10-carboxydecyl)adenineyl]"
+
+    # ---- Integration-level regression tests for simple N-compounds ----
+
+    def test_n_methylacetamide_no_brackets(self):
+        """N-methylacetamide must NOT get unnecessary brackets."""
+        name = name_compound("CC(=O)NC")
+        assert "N-methyl" in name, f"Expected N-methyl: {name}"
+        assert "N-[" not in name, f"Simple N-methyl must not be bracketed: {name}"
+
+    def test_nn_dimethylformamide_no_brackets(self):
+        """N,N-dimethylformamide must NOT get unnecessary brackets."""
+        name = name_compound("CN(C)C=O")
+        assert "N,N-dimethyl" in name, f"Expected N,N-dimethyl: {name}"
+        assert "[" not in name, f"Simple N,N-dimethyl must not be bracketed: {name}"
+
+    def test_n_ethylpropanamide_no_brackets(self):
+        """N-ethylpropanamide must NOT get unnecessary brackets."""
+        name = name_compound("CCC(=O)NCC")
+        assert "N-ethyl" in name, f"Expected N-ethyl: {name}"
+        assert "N-[" not in name, f"Simple N-ethyl must not be bracketed: {name}"
+
+    # ---- Integration tests for bracket-fixable compounds ----
+
+    def test_pentanoylamino_propanoyl_gets_brackets(self):
+        """N-[(2S)-2-(pentanoylamino)propanoyl]-... gets square brackets."""
+        smiles = "C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O"
+        name = name_compound(smiles)
+        assert "N-[" in name, (
+            f"Expected N-[...] bracket wrapping for stereo N-substituent: {name}"
+        )
+        # Must not have bare N-(2S) pattern
+        assert "N-(2S)" not in name, (
+            f"Should not have bare N-(2S) without brackets: {name}"
+        )
+
+    def test_hexanoylamino_phenylpropanoyl_gets_brackets(self):
+        """N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-... gets square brackets."""
+        smiles = r"CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\c1c[nH]c2ccccc12"
+        name = name_compound(smiles)
+        assert "N-[" in name, (
+            f"Expected N-[...] bracket wrapping: {name}"
+        )
+
+    def test_hydroxytetracosanoyl_gets_brackets(self):
+        """N-[(2S)-2-hydroxytetracosanoyl]-... gets square brackets."""
+        smiles = "CCCCCCCCCCCCCCCCCCCCCC[C@H](O)C(=O)N[C@@H](COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O)[C@H](O)CCCCCCCCCCCCCCC"
+        name = name_compound(smiles)
+        assert "N-[" in name, (
+            f"Expected N-[...] bracket wrapping: {name}"
+        )

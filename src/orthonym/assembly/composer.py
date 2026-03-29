@@ -33,6 +33,7 @@ from .naming_utils import (
     get_alkyl_name,
     is_complex_substituent,
     should_omit_locant_one,
+    _wrap_n_substituent,
     SIMPLE_MULTIPLIERS,
     COMPLEX_MULTIPLIERS,
     TERMINAL_FG_TYPES,
@@ -1871,10 +1872,10 @@ def _name_carbamate(features: Any) -> Optional[str]:
     for name in sorted(sub_counts.keys()):
         count = sub_counts[name]
         if count == 1:
-            n_prefix_parts.append(f"N-{name}")
+            n_prefix_parts.append(f"N-{_wrap_n_substituent(name)}")
         else:
             mult = get_multiplier_prefix(count, name)
-            n_prefix_parts.append(f"N,N-{mult}{name}")
+            n_prefix_parts.append(f"N,N-{mult}{_wrap_n_substituent(name)}")
 
     n_prefix = ",".join(n_prefix_parts)
     return f"{r_name} {n_prefix}carbamate"
@@ -3514,10 +3515,10 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     for name in sorted(sub_counts.keys()):
         count = sub_counts[name]
         if count == 1:
-            n_prefix_parts.append(f"N-{name}")
+            n_prefix_parts.append(f"N-{_wrap_n_substituent(name)}")
         else:
             mult = SIMPLE_MULTIPLIERS.get(count, str(count))
-            n_prefix_parts.append(f"N,{'N,' * (count - 1)}{mult}{name}")
+            n_prefix_parts.append(f"N,{'N,' * (count - 1)}{mult}{_wrap_n_substituent(name)}")
 
     n_prefix = "-".join(n_prefix_parts)
 

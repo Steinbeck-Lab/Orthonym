@@ -571,6 +571,64 @@ def _has_stereo_prefix(name: str) -> bool:
     return bool(re.match(r'^\((?:\d+[RSEZrsez],)*\d*[RSEZrsez]\)-', name))
 
 
+def _wrap_n_substituent(name: str) -> str:
+    """Apply IUPAC P-16.3.3 bracket escalation to an N-substituent name.
+
+    When an N-substituent already contains parentheses (from stereo
+    descriptors or compound substituent names), the outer enclosure must
+    use square brackets to maintain unambiguous nesting.
+
+    Simple names (no parentheses) are returned unchanged -- they do not
+    need brackets around them in N-prefix context.
+
+    Names that already have balanced outer enclosing marks -- starting
+    with '(' or '[' and ending with the matching close, where the opening
+    mark at position 0 is balanced at the final position -- are returned
+    unchanged (already properly enclosed).
+
+    Args:
+        name: The bare N-substituent name (without N- prefix).
+
+    Returns:
+        The name, optionally wrapped in square brackets.
+
+    Examples:
+        >>> _wrap_n_substituent("methyl")
+        'methyl'
+        >>> _wrap_n_substituent("dimethyl")
+        'dimethyl'
+        >>> _wrap_n_substituent("(2S)-2-(pentanoylamino)propanoyl")
+        '[(2S)-2-(pentanoylamino)propanoyl]'
+        >>> _wrap_n_substituent("(2R,3S)-3-hydroxy-2-(benzoylamino)butanoyl")
+        '[(2R,3S)-3-hydroxy-2-(benzoylamino)butanoyl]'
+        >>> _wrap_n_substituent("[already-bracketed]")
+        '[already-bracketed]'
+        >>> _wrap_n_substituent("(3-ethyl-1H-indolyl)")
+        '(3-ethyl-1H-indolyl)'
+    """
+    # Already has outer square brackets -- no double-wrapping
+    if name.startswith('[') and name.endswith(']'):
+        return name
+    # Already has balanced outer parentheses as enclosing marks --
+    # this means a previous step already enclosed the name. Check that
+    # the opening paren at position 0 is balanced at the final position.
+    if name.startswith('(') and name.endswith(')'):
+        depth = 0
+        for i, ch in enumerate(name):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+            if depth == 0 and i == len(name) - 1:
+                # The opening paren matches the closing paren at the end
+                return name
+    # Contains parentheses (stereo prefix, compound sub-substituent, etc.)
+    # -> escalate to square brackets per P-16.3.3
+    if '(' in name:
+        return f"[{name}]"
+    return name
+
+
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 

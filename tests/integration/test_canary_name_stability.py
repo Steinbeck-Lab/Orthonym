@@ -49,7 +49,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
-        "N-(2S,3R)-3-hydroxy-2-(pentanoylamino)butanoyl(2S)-2-amino-3-phenylpropanoic acid",
+        "N-[(2S,3R)-3-hydroxy-2-(pentanoylamino)butanoyl](2S)-2-amino-3-phenylpropanoic acid",
     ),
     (
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
@@ -61,11 +61,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCCCNC(=O)CCl)NC(=O)[C@H](CC(=O)O)NC(C)=O)[C@@H](C)O)C(=O)NCC(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O)C(C)C",
-        "N-(3S)-chloro-3-(ethanoylamino)-4-(hexylamino)-hydroxybutanedioyl-L-phenylalanyl-L-valyl-L-glutamyl-L-glutaminyl-L-glutamyl-L-glutamic acid",
+        "N-[(3S)-chloro-3-(ethanoylamino)-4-(hexylamino)-hydroxybutanedioyl]-L-phenylalanyl-L-valyl-L-glutamyl-L-glutaminyl-L-glutamyl-L-glutamic acid",
     ),
     (
         r"CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\c1c[nH]c2ccccc12",
-        "N-(2S)-2-(hexanoylamino)-3-phenylpropanoyl-3-(2-aminoethyl)-1H-indole",
+        "N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-3-(2-aminoethyl)-1H-indole",
     ),
     (
         "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O",
@@ -77,7 +77,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@@H](C(=O)[O-])C(=O)SCCNC(=O)CCNC(=O)[C@H](O)C(C)(C)COP(=O)([O-])OP(=O)([O-])OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)([O-])[O-]",
-        "N-7-(10-carboxydecyl)adenineyl(2S)-amino-2-(aminomethyl)-2-(pentylsulfanyl)butanoate",
+        "N-[7-(10-carboxydecyl)adenineyl](2S)-amino-2-(aminomethyl)-2-(pentylsulfanyl)butanoate",
     ),
     (
         "CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C",
@@ -109,7 +109,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC[C@H](O)C(=O)N[C@@H](COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O)[C@H](O)CCCCCCCCCCCCCCC",
-        "N-(2S)-2-hydroxytetracosanoyl(1S,2R,3S,4S,5R,6R)-aminocyclohexane-2,3,4,5,6-pentaol",
+        "N-[(2S)-2-hydroxytetracosanoyl](1S,2R,3S,4S,5R,6R)-aminocyclohexane-2,3,4,5,6-pentaol",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",
@@ -196,7 +196,7 @@ NAME_STABILITY_CANARY = [
         r"CCCCCC/C=C\CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H](CO)[C@@H](O)CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H]1/C=C/C(=O)N[C@@H](C(C)C)C(=O)N(C)[C@@H](Cc2ccc(O)cc2)C(=O)OC1)C(C)C)C(C)C",
         # Phase 125: old "3-benzyl" was incorrect (fragment has OH on ring,
         # not plain benzyl). Fix correctly rejects the benzyl shortcut.
-        "N-(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl(3S,6S,9E,11R)-11-(4-carbamoylbutyl)-3-(hydroxy4-cresyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
+        "N-[(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl](3S,6S,9E,11R)-11-(4-carbamoylbutyl)-3-(hydroxy4-cresyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
     ),
     (
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
@@ -220,7 +220,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCC(C)/C=C(C)/C=C/C(=O)NC1=C[C@@](O)(/C=C/C=C/C=C/C(=O)NC2=C(O)CCC2=O)[C@H](O)CC1=O",
-        "N-(2E,4E)-4,6-dimethyldeca-2,4-dienoyl(2E,4E,6E)-7-(5-amino-2-hydroxycyclohexyl)-1-(cyclopentylamino)-7-hydroxyhepta-2,4,6-trienamide",
+        "N-[(2E,4E)-4,6-dimethyldeca-2,4-dienoyl](2E,4E,6E)-7-(5-amino-2-hydroxycyclohexyl)-1-(cyclopentylamino)-7-hydroxyhepta-2,4,6-trienamide",
     ),
     (
         "CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1",
@@ -232,7 +232,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O",
-        "N-(2S)-2-(pentanoylamino)propanoyl-2-aminopropanoic acid",
+        "N-[(2S)-2-(pentanoylamino)propanoyl]-2-aminopropanoic acid",
     ),
     (
         "CS[C@@]1(CO)C(=O)N2[C@H]3N(c4ccc5oc6cc(=O)c(N)c(C(=O)O)c-6nc5c4C(=O)O)c4ccccc4[C@@]3(c3c[nH]c4ccccc34)[C@H](O)[C@]2(SC)C(=O)N1C",
@@ -240,7 +240,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@@H](C)[C@H]1C(=O)N(C)[C@@H](Cc2ccc(OC)c(Br)c2)C(=O)N[C@@H]([C@@H](C)CC)C(=O)O[C@H](C)[C@H](NC(=O)[C@H](NC(=O)[C@@H](COS(=O)(=O)O)OC)C(C)C)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C@H]2CC[C@@H](O)N1C2=O",
-        "N-(2R)-methoxy-3-methyl-2-(propanoylamino)-sulfobutanoyl(1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,11,17-tributyl-21-hydroxy-8,15-dimethyl-14-octyl-9-oxa-2,5,12,15,18-pentaaza-bicyclo[16.3.1]docosane",
+        "N-[(2R)-methoxy-3-methyl-2-(propanoylamino)-sulfobutanoyl](1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,11,17-tributyl-21-hydroxy-8,15-dimethyl-14-octyl-9-oxa-2,5,12,15,18-pentaaza-bicyclo[16.3.1]docosane",
     ),
     (
         "O.O.O.O.O.O.O.O=S(=O)([O-])[O-].[Ni+2]",
@@ -261,7 +261,7 @@ NAME_STABILITY_CANARY = [
     (
         "CCOc1cc(C(=O)O)ccc1NC(=O)c1ccc(NC(=O)c2ccc(NC(=O)[C@@H](NC(=O)c3ccc(NC(=O)c4ccc([N+](=O)[O-])cc4)cc3)[C@@H](OC)C(N)=O)cc2)c(OC(C)C)c1O",
         # Phase 103-03: chain tiebreaker refinements detect aminomethyl substituent
-        "N-(2S,3R)-2-(benzoylamino)-3-methoxypropanoyl-4-(16-carbamoylhexadecyl)-3-ethoxybenzoic acid",
+        "N-[(2S,3R)-2-(benzoylamino)-3-methoxypropanoyl]-4-(16-carbamoylhexadecyl)-3-ethoxybenzoic acid",
     ),
     (
         "O=C1N[C@H]2NC(=O)N[C@H]2N1",
@@ -329,7 +329,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CSCC[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)N1CCC[C@@H]1C(=O)O",
-        "N-(2S)-2-amino-3-phenylpropanoyl(2R)-N-pentylpyrrolidine-2-carboxylic acid",
+        "N-[(2S)-2-amino-3-phenylpropanoyl](2R)-N-pentylpyrrolidine-2-carboxylic acid",
     ),
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
@@ -374,7 +374,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCC(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)NC(CCC(=O)N[C@@H]1C(=O)N[C@@H](CCC(=O)O)C(=O)NC2CC[C@@H](O)N(C2=O)[C@@H](C(C)C)C(=O)N(C)[C@@H](Cc2ccccc2)C(=O)N[C@@H]([C@@H](C)CC)C(=O)O[C@@H]1C)C(=O)O",
-        "N-2-(nonanoylamino)pentanedioyl-3-cyclodocosylpropanoic acid",
+        "N-[2-(nonanoylamino)pentanedioyl]-3-cyclodocosylpropanoic acid",
     ),
     (
         "CC(=O)OC1CC2OC3C=C(C)C(=O)[C@@H](O)[C@]3(C)[C@]1(C)[C@]21CO1",
@@ -426,7 +426,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1C(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",
-        "N-3-(2-carboxyethyl)-1H-indoleyl(2S,3R)-3-hydroxy-2-(pentanoylamino)butanoic acid",
+        "N-[3-(2-carboxyethyl)-1H-indoleyl](2S,3R)-3-hydroxy-2-(pentanoylamino)butanoic acid",
     ),
     (
         r"C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\C(=O)O[C@@H](C)C/C=C\C(=O)O1",
@@ -438,7 +438,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",
-        "N-(2S)-amino-2-(butanoylamino)-methylsulfanylbutanedioyl-3-(2-carboxyethyl)-1H-indole",
+        "N-[(2S)-amino-2-(butanoylamino)-methylsulfanylbutanedioyl]-3-(2-carboxyethyl)-1H-indole",
     ),
     (
         "C/C(=C/C(=O)CC(C)C(=O)O)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)C[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)C1CC3=O",
@@ -497,7 +497,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",
-        "N-(2S,3S)-3-methyl-2-(pentanoylamino)pentanoyl(2S)-2-amino-3-imidazolylpropanoic acid",
+        "N-[(2S,3S)-3-methyl-2-(pentanoylamino)pentanoyl](2S)-2-amino-3-imidazolylpropanoic acid",
     ),
     (
         "CC(=O)Oc1ccc(-c2c(O)c(O)c(-c3ccc(O)c(O)c3)c(OC(C)=O)c2OC(C)=O)cc1",

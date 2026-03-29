@@ -1890,16 +1890,17 @@ def _name_substituted_benzamide(
         IUPAC name like "4-methylbenzamide" or "N-methylbenzamide"
     """
     # Build N-substituent prefix part
+    from ..assembly.naming_utils import _wrap_n_substituent
     n_prefix = ""
     if n_substituents:
         if len(n_substituents) == 1:
-            n_prefix = f"N-{n_substituents[0]}"
+            n_prefix = f"N-{_wrap_n_substituent(n_substituents[0])}"
         elif len(n_substituents) == 2 and n_substituents[0] == n_substituents[1]:
             mp = get_multiplier_prefix(2, n_substituents[0])
-            n_prefix = f"N,N-{mp}{n_substituents[0]}"
+            n_prefix = f"N,N-{mp}{_wrap_n_substituent(n_substituents[0])}"
         else:
             # Different N-substituents
-            parts = [f"N-{name}" for name in n_substituents]
+            parts = [f"N-{_wrap_n_substituent(name)}" for name in n_substituents]
             n_prefix = "-".join(parts)
 
     if not prefix_groups and not n_prefix:

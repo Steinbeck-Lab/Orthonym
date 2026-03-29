@@ -414,6 +414,9 @@ def format_n_substitution(substituents: List[Dict]) -> str:
         # Retained names like "tert-butyl" do NOT get brackets.
         has_locants = _has_positional_locants(name)
         display_name = f"({name})" if has_locants else name
+        # Apply P-16.3.3 bracket escalation for N-substituents with parens
+        from ..assembly.naming_utils import _wrap_n_substituent
+        display_name = _wrap_n_substituent(display_name)
         if count == 1:
             parts.append(f"N-{display_name}")
         else:

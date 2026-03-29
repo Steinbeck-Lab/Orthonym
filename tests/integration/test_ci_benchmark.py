@@ -127,7 +127,7 @@ CI_BENCHMARK = [
         "(CCCN=C(N)N)C(=O)N[C@H]2CC[C@@H](O)N(C2=O)[C@@H]"
         "([C@@H](C)CC)C(=O)N(C)[C@@H](CC(=O)c2ccccc2N)C(=O)"
         "N[C@@H](C(C)C)C(=O)O[C@@H]1C",
-        "N-(2S)-2-(hexanoylamino)butanedioyl(1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,17-dibutyl-21-hydroxy-8,15-dimethyl-14-octyl-11-propyl-9-oxa-2,5,12,15,18-pentaaza-bicyclo[16.3.1]docosane",
+        "N-[(2S)-2-(hexanoylamino)butanedioyl](1S,4S,7S,8R,11S,14S,17S,21R)-7-amino-4,17-dibutyl-21-hydroxy-8,15-dimethyl-14-octyl-11-propyl-9-oxa-2,5,12,15,18-pentaaza-bicyclo[16.3.1]docosane",
     ),
     ("CC(C)CCCCCCCC=O", "9-methyldecanal"),
     (
@@ -215,7 +215,7 @@ CI_BENCHMARK = [
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
         "(CCC(=O)O)C(=O)N[C@@H](CC(C)C)C(=O)O)C(C)C",
-        "N-(2S)-2-(pentanoylamino)-3-phenylpropanoyl-L-glutamyl-L-leucine",
+        "N-[(2S)-2-(pentanoylamino)-3-phenylpropanoyl]-L-glutamyl-L-leucine",
     ),
     ("OCCCO", "trimethylene glycol"),
     (
@@ -310,7 +310,7 @@ CI_BENCHMARK = [
     (
         "CC[C@@H](C)[C@H](NC(=O)[C@H](CC(C)C)N(C)C(=O)[C@@H](C)"
         "NC(=O)[C@H](CCO)NC(=O)c1ccccc1)C(=O)O",
-        "N-(2R)-2-(butanoylamino)propanoyl(2S,3R)-amino-3-methyl-2-(hexanoylamino)pentanoic acid",  # depth-independent naming v11
+        "N-[(2R)-2-(butanoylamino)propanoyl](2S,3R)-amino-3-methyl-2-(hexanoylamino)pentanoic acid",  # depth-independent naming v11; N-bracket fix v15
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@H](O)"
@@ -357,8 +357,8 @@ CI_BENCHMARK = [
         "C(=O)N[C@H]1C(=O)N[C@H](C(C)C)C(=O)N[C@@H](CC(C)C)"
         "C(=O)N[C@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](CO)"
         "C(=O)N[C@@H]([C@@H](C)CC)C(=O)OC1C",
-        "N-(2R)-hydroxy-2-(hexanoylamino)pentanedioyl(3S,6R,9S,12R,15S,18R,21R)-21-amino-3-(sec-butyl)-6,12-dihydroxymethyl"
-        "-9,15-diisobutyl-18-isopropyl-22-methyl-5,8,11,14,17,20-hexaoxooxacyclodocosan-2-one",  # depth-independent naming v11
+        "N-[(2R)-hydroxy-2-(hexanoylamino)pentanedioyl](3S,6R,9S,12R,15S,18R,21R)-21-amino-3-(sec-butyl)-6,12-dihydroxymethyl"
+        "-9,15-diisobutyl-18-isopropyl-22-methyl-5,8,11,14,17,20-hexaoxooxacyclodocosan-2-one",  # depth-independent naming v11; N-bracket fix v15
     ),
     (
         "CC[C@@H]1C[C@@]23OC(=O)C(=C2O)OC(=O)[C@]2(C)[C@H](CCCC"
@@ -470,7 +470,7 @@ CI_BENCHMARK = [
     (
         "CSCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)"
         "C(=O)O",
-        "N-(2S)-amino-2-(butanoylamino)-3-carbamoylmethylsulfanylpropanoyl(2S)-2-amino-3-imidazolylpropanoic acid",  # Phase 103-01: chain exclusion (butanoyl->propanoyl)
+        "N-[(2S)-amino-2-(butanoylamino)-3-carbamoylmethylsulfanylpropanoyl](2S)-2-amino-3-imidazolylpropanoic acid",  # Phase 103-01: chain exclusion; N-bracket fix v15
     ),
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"

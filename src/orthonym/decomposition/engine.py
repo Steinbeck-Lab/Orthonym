@@ -885,11 +885,13 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                 if not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"]):
                     # Amine is more senior -> substitutive naming
                     from .fragment_assembly import _acid_to_acyl, _join_components
+                    from ..assembly.naming_utils import _wrap_n_substituent
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
                     acyl = _acid_to_acyl(acid_name)
                     if acyl and amine_name:
-                        sub_name = f"N-{_join_components(acyl, amine_name)}"
+                        wrapped_acyl = _wrap_n_substituent(acyl)
+                        sub_name = f"N-{_join_components(wrapped_acyl, amine_name)}"
                         if sub_name and _name_quality_is_acceptable(sub_name, mol):
                             return sub_name
         except Exception:
