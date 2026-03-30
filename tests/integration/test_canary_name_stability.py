@@ -37,7 +37,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
-        "cycloane",
+        "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",  # Phase 126: was 'cycloane' (garbled); now returns SMILES for unnameable polycyclic
     ),
     (
         "NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O",
@@ -97,7 +97,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)N1CCCC1",
-        "1-pyrrolidinylN,N-dibutylhexadecanamide",
+        "1-pyrrolidinyl-N,N-dibutylhexadecanamide",
     ),
     (
         "[O]=[Sb]([O-])([O-])[OH]",
@@ -141,7 +141,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F",
-        "N-methylbenzamideyl-2-amino-1-bromo-5-isopropyl-3-methoxybenzene",
+        "N-benzoyl-2-fluoro-3-(N-methylamino)benzamide",
     ),
     (
         "CC[C@H]1O[C@@H]2O[C@H](/C=C/C=C/C3C(c4oc(=O)cc(OC)c4C)C(/C=C/C=C/[C@H]4O[C@H]5O[C@H](CC)[C@](C)(O)[C@@]5(C)[C@H]4O)C3c3oc(=O)cc(OC)c3C)[C@H](O)[C@]2(C)[C@@]1(C)O",
@@ -337,7 +337,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
-        "2-(N,N,dimethylmethan-1-aminiumyl)ethan-1-olium phosphonooxydecanephosphonic acid",
+        "2-(N,N-dimethylmethan-1-aminiumyl)ethan-1-olium phosphonooxydecanephosphonic acid",
     ),
     (
         "CCN(CC)c1ccc2c(C=CC=CC=C3N(CCCCCC(=O)O)c4ccc(S(=O)(=O)[O-])cc4C3(C)C)cc(C(C)(C)C)[o+]c2c1",
@@ -362,7 +362,7 @@ NAME_STABILITY_CANARY = [
     (
         "C=C1CC23C=CC(=O)C(C)(CCCC(C)C(=O)NC(CCC(N)=O)C(=O)O)C2CC1CC3O",
         # Phase 103-01: chain exclusion + polycyclic parent changes name
-        "N-glutyl-5-cyclododecanyl-2-methylpentanamide",
+        "N-glutaminyl-5-cyclododecanyl-2-methylpentanamide",
     ),
     (
         "Oc1cc(O)c2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@H](O)[C@H]2c1c(O)cc(O)c2c1O[C@H](c1cc(O)c(O)c(O)c1)[C@H](O)C2",

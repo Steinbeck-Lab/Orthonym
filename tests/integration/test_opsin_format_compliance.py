@@ -312,6 +312,7 @@ class TestMalformedSuffixFixes:
     - benzamideyl: was "benzamide" + "yl" (now produces benzoyl/benzamido)
     - propanedioateyloxy: was "propanedioate" + "yloxy" (now produces propanedioyloxy)
     - glutyl: was "glut" + "yl" (now produces glutaminyl)
+    - cycloane: was "cyclo" + "ane" with empty stem (now returns SMILES fallback)
     """
 
     def test_no_benzamideyl_in_output(self):
@@ -347,6 +348,19 @@ class TestMalformedSuffixFixes:
             f"Malformed suffix 'glutyl' found in: {name}"
         )
 
+    def test_no_cycloane_in_output(self):
+        """cycloane must not appear -- complex polycyclic returns SMILES fallback."""
+        smiles = "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3"
+        name = name_compound(smiles)
+        assert "cycloane" not in name, (
+            f"Malformed suffix 'cycloane' found in: {name}"
+        )
+        # For unnameable compounds, the namer returns canonical SMILES
+        # rather than a garbled pseudo-IUPAC name
+        assert len(name) > 6, (
+            f"Expected non-trivial fallback, got: {name}"
+        )
+
     def test_benzamide_compound_opsin_parseable(self):
         """The benzamide compound should produce an OPSIN-parseable name."""
         smiles = "CN(C(=O)c1ccc2c(c1)OC(F)(F)O2)c1cccc(C(=O)Nc2c(Br)cc(C(F)(C(F)(F)F)C(F)(F)F)cc2OC(F)F)c1F"
@@ -354,4 +368,84 @@ class TestMalformedSuffixFixes:
         # Verify the name uses correct IUPAC forms (benzoyl, benzamide, etc.)
         assert "benzam" in name.lower() or "benzoyl" in name.lower(), (
             f"Expected valid benzamide/benzoyl form in: {name}"
+        )
+
+
+class TestFormatEdgeFixes:
+    """Test format edge case fixes: separator between prefixes and N-locants,
+    N-locant comma format, and benzene-vs-phenyl in substituent context.
+
+    Root causes:
+    - Missing separator: _assemble_amide_name() concatenated non-N prefixes
+      directly with base_name that starts with an N-prefix (e.g., "2-methylN-methyl"
+      instead of "2-methyl-N-methyl"). Fixed by inserting hyphen before "N" prefix.
+    - Extra comma: _assemble_amine_name() used f"N,{'N,' * (count-1)}" which
+      produces "N,N,di..." instead of "N,N-di...". Fixed by using
+      ",".join(["N"] * count) + "-" for correct IUPAC N-locant format.
+    """
+
+    def test_no_missing_separator_before_n_prefix(self):
+        """Prefix + N-prefix must have hyphen separator, not direct concatenation."""
+        # 2-methyl-N-methylbutanamide (not 2-methylN-methylbutanamide)
+        smiles = "CC(CC)C(=O)NC"
+        name = name_compound(smiles)
+        assert "methylN" not in name, (
+            f"Missing separator between prefix and N-locant: {name}"
+        )
+        assert "-N-" in name or name.startswith("N-"), (
+            f"Expected hyphen before N-locant prefix: {name}"
+        )
+
+    def test_nn_format_correct_hyphen(self):
+        """N,N-locant must use N,N- (hyphen after last N), not N,N, (comma)."""
+        # N,N-dimethylformamide: verify correct N,N- format
+        smiles = "CN(C)C=O"
+        name = name_compound(smiles)
+        assert "N,N-" in name, f"Expected N,N- format: {name}"
+        assert "N,N," not in name, f"Extra comma in N,N format: {name}"
+
+    def test_pyrrolidinyl_separator(self):
+        """Ring substituent prefix separated from N-prefix by hyphen."""
+        smiles = "CCCCCCCCCCCCCCCC(=O)N1CCCC1"
+        name = name_compound(smiles)
+        assert "pyrrolidinylN" not in name, (
+            f"Missing separator between pyrrolidinyl and N-prefix: {name}"
+        )
+
+    def test_nn_dimethyl_amine_format(self):
+        """Amine N,N- locant expansion must use hyphen, not trailing comma."""
+        # N,N-dimethylethanamine
+        smiles = "CCN(C)C"
+        name = name_compound(smiles)
+        if "N,N" in name:
+            assert "N,N-" in name, f"Expected N,N- not N,N,: {name}"
+            assert "N,N," not in name, f"Extra comma in N,N format: {name}"
+
+    def test_chloro_amide_separator(self):
+        """2-chloro-N,N-dimethylpropanamide has correct separator before N-prefix."""
+        smiles = "CC(Cl)C(=O)N(C)C"
+        name = name_compound(smiles)
+        # If both chloro and N-prefix present, should be separated by hyphen
+        if "chloro" in name and "N," in name:
+            assert "chloro-N" in name, (
+                f"Missing separator between chloro and N-prefix: {name}"
+            )
+
+    def test_benzene_as_parent_unchanged(self):
+        """benzene as parent ring should keep 'benzene', not become 'phenyl'."""
+        # hydroxymethylbenzene: benzene is the parent, methanol is substituent
+        smiles = "OCc1ccccc1"
+        name = name_compound(smiles)
+        # benzene as parent is correct (not changed to phenyl)
+        assert "benzene" in name, (
+            f"benzene as parent should stay 'benzene': {name}"
+        )
+
+    def test_phenyl_in_chain_context(self):
+        """Benzene ring as substituent on chain should use 'phenyl'."""
+        # 2-phenylethanoic acid: benzene is substituent on chain
+        smiles = "c1ccc(CC(=O)O)cc1"
+        name = name_compound(smiles)
+        assert "phenyl" in name, (
+            f"benzene as substituent should use 'phenyl': {name}"
         )

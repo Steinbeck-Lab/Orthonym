@@ -3233,7 +3233,10 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
-                    return _inject_stereo_if_missing(features, f"{prefix_str}{base_name}")
+                    # Insert hyphen before N-locant prefix (base_name may
+                    # start with "N-" or "N,N-" from name_amide())
+                    sep = "-" if base_name[:1] == "N" else ""
+                    return _inject_stereo_if_missing(features, f"{prefix_str}{sep}{base_name}")
             return _inject_stereo_if_missing(features, base_name)
         return "amide"
 
@@ -3259,7 +3262,10 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
-                    return _inject_stereo_if_missing(features, f"{prefix_str}{base_name}")
+                    # Insert hyphen before N-locant prefix (base_name may
+                    # start with "N-" or "N,N-" from name_amide())
+                    sep = "-" if base_name[:1] == "N" else ""
+                    return _inject_stereo_if_missing(features, f"{prefix_str}{sep}{base_name}")
             return _inject_stereo_if_missing(features, base_name)
 
     # Unsaturated chain amides: use general assembly fragments for correct stereo + unsaturation
@@ -3518,7 +3524,8 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
             n_prefix_parts.append(f"N-{_wrap_n_substituent(name)}")
         else:
             mult = SIMPLE_MULTIPLIERS.get(count, str(count))
-            n_prefix_parts.append(f"N,{'N,' * (count - 1)}{mult}{_wrap_n_substituent(name)}")
+            n_locants = ",".join(["N"] * count)
+            n_prefix_parts.append(f"{n_locants}-{mult}{_wrap_n_substituent(name)}")
 
     n_prefix = "-".join(n_prefix_parts)
 
@@ -3687,21 +3694,22 @@ def _generate_ring_parent(features: Any) -> NameFragment:
     principal_ring = getattr(features, 'principal_ring', None)
 
     if not principal_ring:
-        # Fallback: no ring identified
-        return NameFragment(text="cyclo", fragment_type="parent")
+        # Fallback: no ring identified -- return empty parent to avoid
+        # generating garbled 'cycloane' (cyclo + ane with no stem)
+        return NameFragment(text="", fragment_type="parent")
 
     ring_size = len(principal_ring)
 
-    # Guard: ring_size must produce a valid stem; otherwise return None-safe placeholder
+    # Guard: ring_size must produce a valid stem; otherwise return empty parent
     try:
         stem = get_chain_prefix(ring_size)
     except (ValueError, KeyError):
-        # Invalid ring size (0, negative, etc.) -- return safe placeholder
-        return NameFragment(text="cyclo", fragment_type="parent")
+        # Invalid ring size (0, negative, etc.) -- return empty parent
+        return NameFragment(text="", fragment_type="parent")
 
     # Guard: stem must be non-empty to avoid generating 'cycloane'
     if not stem:
-        return NameFragment(text="cyclo", fragment_type="parent")
+        return NameFragment(text="", fragment_type="parent")
 
     if ring_type == 'cycloalkane':
         # Cycloalkane naming: cyclo + stem + an (e.g., cyclohexan)
@@ -3723,15 +3731,18 @@ def _generate_ring_parent(features: Any) -> NameFragment:
         )
 
     elif ring_type == 'aromatic':
-        # TODO: Implement aromatic naming (Plan 02-04)
-        return NameFragment(text="cyclo", fragment_type="parent")
+        # Aromatic ring type not handled by cyclic naming -- return empty
+        # parent to signal that this ring needs a specialized handler
+        # (benzene retained name, fused ring dictionary, etc.)
+        return NameFragment(text="", fragment_type="parent")
 
     elif ring_type and ring_type.startswith('heterocyclic'):
-        # TODO: Implement heterocyclic naming (Phase 3)
-        return NameFragment(text="cyclo", fragment_type="parent")
+        # Heterocyclic ring type not handled by cyclic naming -- return
+        # empty parent to signal need for specialized handler
+        return NameFragment(text="", fragment_type="parent")
 
-    # Unknown ring type, return placeholder
-    return NameFragment(text="cyclo", fragment_type="parent")
+    # Unknown ring type -- return empty parent rather than garbled 'cyclo'
+    return NameFragment(text="", fragment_type="parent")
 
 
 def _get_unsaturation_suffix(features: Any) -> str:

@@ -530,11 +530,23 @@ class Orthonym:
         if not _skip_decomposition and assembled and mol.GetNumHeavyAtoms() > 15:
             _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
             assembled_lower = assembled.lower()
-            if any(tok in assembled_lower for tok in _GARBLED_TOKENS):
+            is_garbled = any(tok in assembled_lower for tok in _GARBLED_TOKENS)
+
+            # Also detect stub-only names: when the parent text is empty,
+            # the assembly may produce just a bare suffix like "ane" or "ol".
+            # A name shorter than 6 chars for a 15+ atom molecule is garbled.
+            if not is_garbled and len(assembled) < 6:
+                is_garbled = True
+
+            if is_garbled:
                 from .decomposition import try_decompose
                 decomp_name = try_decompose(mol, style=self.style)
                 if decomp_name and decomp_name != assembled:
                     return decomp_name
+                # Decomposition also failed: return the SMILES-based
+                # canonical SMILES as an honest fallback rather than a
+                # garbled pseudo-IUPAC name that could mislead.
+                return canonical_smiles
 
             # Confidence-based rejection: if the coverage scoring system
             # indicates the assembled name is catastrophically incomplete
