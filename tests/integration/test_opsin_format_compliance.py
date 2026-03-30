@@ -382,6 +382,9 @@ class TestFormatEdgeFixes:
     - Extra comma: _assemble_amine_name() used f"N,{'N,' * (count-1)}" which
       produces "N,N,di..." instead of "N,N-di...". Fixed by using
       ",".join(["N"] * count) + "-" for correct IUPAC N-locant format.
+    - benzene-vs-phenyl: decomposition fragment assembly used "benzene" parent
+      name when fragment was used as a substituent prefix. Fixed by adding
+      _parent_to_substituent_prefix() conversion per IUPAC P-31.1.3.4.
     """
 
     def test_no_missing_separator_before_n_prefix(self):
@@ -448,4 +451,32 @@ class TestFormatEdgeFixes:
         name = name_compound(smiles)
         assert "phenyl" in name, (
             f"benzene as substituent should use 'phenyl': {name}"
+        )
+
+    def test_methoxybenzene_becomes_methoxyphenyl_in_substituent(self):
+        """Fragment with methoxybenzene used as substituent prefix uses phenyl.
+
+        Root cause: decomposition fragment assembly used parent name 'benzene'
+        directly when constructing substituent prefixes. Fixed by
+        _parent_to_substituent_prefix() converting benzene -> phenyl per
+        IUPAC P-31.1.3.4.
+        """
+        smiles = "COc1cccc2c1[C@@H](OC)O[C@H]2c1c(O)ccc2c1C(=O)CC(C)(O)C2"
+        name = name_compound(smiles)
+        assert "methoxybenzene" not in name, (
+            f"benzene in substituent context should be phenyl: {name}"
+        )
+        if "methoxy" in name and "phenyl" in name:
+            assert "methoxyphenyl" in name, (
+                f"Expected 'methoxyphenyl' form: {name}"
+            )
+
+    def test_simple_methoxybenzene_parent_unchanged(self):
+        """Simple methoxybenzene (anisole) as parent is NOT converted to phenyl."""
+        # This compound is anisole -- benzene is the parent ring, not a substituent
+        smiles = "COc1ccccc1"
+        name = name_compound(smiles)
+        # Should be anisole (retained name) or methoxybenzene (systematic)
+        assert "phenyl" not in name, (
+            f"Parent benzene should NOT become phenyl: {name}"
         )

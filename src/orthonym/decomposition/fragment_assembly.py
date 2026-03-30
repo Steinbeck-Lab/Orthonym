@@ -61,6 +61,45 @@ def _join_components(left: str, right: str) -> str:
 
 
 # ============================================================================
+# Ring parent -> substituent prefix conversion (IUPAC P-31.1.3.4)
+# ============================================================================
+
+# When a fragment name is used as a substituent prefix (e.g., wrapped in
+# parentheses), ring parent names must be converted to their substituent
+# forms: "benzene" -> "phenyl", "naphthalene" -> "naphthyl", etc.
+_RING_PARENT_TO_SUBSTITUENT = {
+    "benzene": "phenyl",
+    "naphthalene": "naphthyl",
+    "anthracene": "anthryl",
+    "phenanthrene": "phenanthryl",
+    "toluene": "tolyl",
+}
+
+
+def _parent_to_substituent_prefix(name: str) -> str:
+    """Convert ring parent names to substituent prefix form per IUPAC P-31.1.3.4.
+
+    When a fragment name ending in a ring parent name (e.g., "methoxybenzene")
+    is used as a substituent prefix, the ring name must be converted to its
+    substituent form (e.g., "methoxyphenyl").
+
+    Only converts the LAST ring-parent-name token in the name to preserve
+    any substituent prefixes already present (e.g., "methoxy" stays).
+
+    Args:
+        name: Fragment name that may contain a ring parent name.
+
+    Returns:
+        Name with ring parent converted to substituent form, or original
+        name if no conversion applies.
+    """
+    for parent, sub in _RING_PARENT_TO_SUBSTITUENT.items():
+        if name.endswith(parent):
+            return name[:-len(parent)] + sub
+    return name
+
+
+# ============================================================================
 # Trivial acid conversions that don't follow simple suffix rules
 # ============================================================================
 
@@ -529,8 +568,9 @@ def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[
     if sugar_name.endswith("oxy"):
         sugar_prefix = sugar_name
     else:
-        # Fallback: use as-is (may be a systematic or retained name)
-        sugar_prefix = sugar_name
+        # When used as a substituent prefix, convert ring parent names to
+        # substituent form per IUPAC P-31.1.3.4 (e.g., benzene -> phenyl)
+        sugar_prefix = _parent_to_substituent_prefix(sugar_name)
 
     # Assemble as "(prefix)aglycone" with proper hyphenation
     return _join_components(f"({sugar_prefix})", aglycone_name)
@@ -1172,8 +1212,12 @@ def _acid_to_acyl(acid_name: str) -> str:
 
     Used for N-acyl naming of amides with complex amines.
 
+    Handles acid names ("acetic acid"), ester names ("propanedioate"),
+    and amide names ("benzamide", "N-methylbenzamide") that may be passed
+    when the decomposition engine mislabels fragment types.
+
     Args:
-        acid_name: Full acid name.
+        acid_name: Full acid name (or amide/ester name).
 
     Returns:
         Acyl prefix (e.g., "acetyl", "propanoyl", "benzoyl").
@@ -1185,12 +1229,72 @@ def _acid_to_acyl(acid_name: str) -> str:
         'propanoyl'
         >>> _acid_to_acyl("benzoic acid")
         'benzoyl'
+        >>> _acid_to_acyl("benzamide")
+        'benzoyl'
+        >>> _acid_to_acyl("N-methylbenzamide")
+        'N-methylbenzoyl'
+        >>> _acid_to_acyl("propanedioate")
+        'propanedioyl'
     """
     name = acid_name.strip()
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_ACYL:
         return _TRIVIAL_ACID_TO_ACYL[name.lower()]
+
+    # Handle amide names passed as acid names (e.g., "benzamide",
+    # "N-methylbenzamide"). The decomposition engine sometimes labels
+    # amide fragments as "acid" in the fragment_names dict.
+    # Convert amide -> acid -> acyl to get the correct prefix.
+    # Reverse lookup: amide -> acid for trivial names
+    _trivial_amide_to_acid = {v: k for k, v in _TRIVIAL_ACID_TO_AMIDE.items()}
+
+    # Strip N-substituent prefix if present (e.g., "N-methylbenzamide" -> "benzamide")
+    n_prefix = ""
+    bare_name = name
+    import re as _re
+    n_match = _re.match(r'^(N(?:,N)*-[a-z]+)-(.+)$', name)
+    if n_match and n_match.group(2).endswith("amide"):
+        n_prefix = n_match.group(1) + "-"
+        bare_name = n_match.group(2)
+
+    if bare_name.lower() in _trivial_amide_to_acid:
+        acid = _trivial_amide_to_acid[bare_name.lower()]
+        acyl = _acid_to_acyl(acid)  # recursive call with the acid name
+        return n_prefix + acyl
+
+    # Systematic amide -> acyl: "propanamide" -> "propanoyl"
+    if bare_name.endswith("amide") and " acid" not in bare_name:
+        stem = bare_name[:-5]  # strip "amide"
+        if stem:
+            # "propanamide" -> "propan" -> "propanoyl"
+            return n_prefix + stem + "oyl"
+
+    # Handle ester "-ate" -> acyl "-oyl": "propanedioate" -> "propanedioyl"
+    # First check trivial ester->acyl via reverse lookup of acid tables
+    if name.endswith("ate") and " acid" not in name:
+        # Reverse lookup: build ester -> acid -> acyl chain for trivial names
+        from ..data.trivial_acids import TRIVIAL_ACID_TO_ACYLATE
+        _trivial_ester_to_acyl = {}
+        for acid_stem, ester in TRIVIAL_ACID_TO_ACYLATE.items():
+            # acid_stem = "acetic", ester = "acetate"
+            acid_full = acid_stem + " acid"
+            if acid_full.lower() in _TRIVIAL_ACID_TO_ACYL:
+                _trivial_ester_to_acyl[ester.lower()] = _TRIVIAL_ACID_TO_ACYL[acid_full.lower()]
+        if name.lower() in _trivial_ester_to_acyl:
+            return _trivial_ester_to_acyl[name.lower()]
+
+        # Systematic ester -> acyl
+        stem = name[:-3]  # strip "ate"
+        if stem:
+            # Check systematic pattern: "-oate" -> "-oyl"
+            if stem.endswith("o"):
+                # "benzoate" -> "benzo" -> "benzoyl"
+                # "propanoate" -> "propano" -> but we want "propanoyl"
+                return stem + "yl"
+            else:
+                # "propanedioate" -> "propanedio" -> "propanedioyl"
+                return stem + "oyl"
 
     # Handle "carboxylic acid" -> "carbonyl"
     if name.endswith("carboxylic acid"):
@@ -1444,6 +1548,8 @@ def _amine_to_prefix(amine_name: str) -> Optional[str]:
         'ethyl'
         >>> _amine_to_prefix("aniline")
         'phenyl'
+        >>> _amine_to_prefix("glutamine")
+        'glutaminyl'
     """
     name = amine_name.strip()
 
@@ -1453,6 +1559,15 @@ def _amine_to_prefix(amine_name: str) -> Optional[str]:
 
     # Systematic: ends with "amine" -> strip and convert
     if name.endswith("amine"):
+        # Check amino acid acyl names FIRST for names ending in "amine".
+        # Amino acids like glutamine, asparagine end in "amine" but are NOT
+        # simple amines -- stripping "amine" gives nonsense ("glut" + "yl").
+        # Their correct prefix forms are in the amino acid data module.
+        from ..data.amino_acids import get_amino_acid_acyl_name
+        aa_prefix = get_amino_acid_acyl_name(name)
+        if aa_prefix:
+            return aa_prefix
+
         base = name[:-5]  # "methylamine" -> "methyl"
         if not base:
             return None

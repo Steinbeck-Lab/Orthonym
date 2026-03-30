@@ -406,7 +406,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cccc2c1[C@@H](OC)O[C@H]2c1c(O)ccc2c1C(=O)CC(C)(O)C2",
-        "(methoxybenzene)methanol",
+        "(methoxyphenyl)methanol",  # Phase 126: was '(methoxybenzene)methanol'; benzene -> phenyl in substituent context (IUPAC P-31.1.3.4)
     ),
     (
         "NC(N)=NCCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",
