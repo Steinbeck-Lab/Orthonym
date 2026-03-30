@@ -524,3 +524,26 @@ class TestLeafFirstOrdering:
         mol = _mol("CCO")
         result = try_decompose(mol)
         assert result is None
+
+
+# ============================================================================
+# _name_fragment_with_fallback tests (Phase 127)
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestNameFragmentWithFallback:
+    """Test _name_fragment_with_fallback() helper function."""
+
+    def test_fallback_returns_name_for_simple_smiles(self):
+        """Simple molecule naming via fallback should return ethanol."""
+        from orthonym.decomposition.engine import _name_fragment_with_fallback
+        result = _name_fragment_with_fallback("CCO")
+        assert result is not None
+        assert "ethanol" in result.lower()
+
+    def test_fallback_returns_none_for_invalid(self):
+        """Invalid SMILES should return None from fallback."""
+        from orthonym.decomposition.engine import _name_fragment_with_fallback
+        result = _name_fragment_with_fallback("[invalid]")
+        assert result is None
