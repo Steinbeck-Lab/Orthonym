@@ -27,6 +27,49 @@ MAX_DECOMP_LEVELS = 3  # Phase 107: max iterative decomposition levels for mixed
 
 
 # ---------------------------------------------------------------------------
+# Fragment naming with fallback (Phase 127)
+# ---------------------------------------------------------------------------
+
+
+def _name_fragment_with_fallback(smiles: str):
+    """Name a fragment: recursive naming first, pipeline-only fallback.
+
+    Per D-01: When name_fragment_recursively() returns None (depth/cycle limit hit),
+    fall back to name_pipeline_only() instead of aborting the entire decomposition.
+    name_pipeline_only() uses the full IUPAC pipeline without triggering decomposition
+    recursion, preserving all substituents.
+
+    Returns:
+        IUPAC name string, or None if both attempts fail.
+    """
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from ..namer import name_pipeline_only
+
+    # Primary: recursive naming (may trigger sub-decomposition)
+    name = name_fragment_recursively(smiles)
+    if name and "unknown" not in name.lower():
+        return name
+
+    # Fallback: full systematic pipeline without decomposition (D-01)
+    name = name_pipeline_only(smiles)
+    if name and "unknown" not in name.lower():
+        return name
+
+    return None
+
+
+def _get_max_decomp_levels(mol) -> int:
+    """Return max decomposition levels based on molecule size.
+
+    Per D-04: HA > 50 molecules (phospholipids, polysaccharides) need one
+    extra level to fully decompose mixed bond types.
+    """
+    if mol.GetNumHeavyAtoms() > 50:
+        return 4
+    return MAX_DECOMP_LEVELS  # Default: 3
+
+
+# ---------------------------------------------------------------------------
 # Bond type classification for tiered coverage thresholds
 # ---------------------------------------------------------------------------
 
@@ -754,7 +797,6 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         fails at any step (capping, size guard, fragment naming, assembly).
     """
     from .fragment_capping import cleave_and_cap
-    from ..assembly.fragment_naming import name_fragment_recursively
     from .fragment_assembly import assemble_fragment_name
 
     # Cleave and cap
@@ -780,7 +822,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
     fragments.sort(key=_frag_sort_key)
 
-    # Name each fragment recursively (with sugar intercept for glycosidic bonds)
+    # Name each fragment with fallback (Phase 127: D-01)
     fragment_names = {}
     for frag in fragments:
         frag_name = None
@@ -789,12 +831,12 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         if bond["type"] == "glycosidic" and frag["side"] == "acid":
             frag_name = _name_sugar_fragment(frag["smiles"])
 
-        # Fall through to recursive naming if sugar lookup failed or non-sugar fragment
+        # Fall through to fallback naming if sugar lookup failed or non-sugar fragment
         if not frag_name:
-            frag_name = name_fragment_recursively(frag["smiles"])
+            frag_name = _name_fragment_with_fallback(frag["smiles"])
 
         if not frag_name or "unknown" in frag_name.lower():
-            return None  # Cannot name a fragment -- abort
+            return None  # Truly unnameable -- abort
         fragment_names[frag["side"]] = frag_name
 
     # --- Seniority-based substitutive assembly for swapped-role bonds ---
@@ -931,7 +973,6 @@ def _try_multi_bond_decompose(
         return None
 
     from .fragment_capping import cleave_and_cap
-    from ..assembly.fragment_naming import name_fragment_recursively
     from .fragment_assembly import (
         _assemble_multi_ester,
         _assemble_multi_glycoside,
@@ -967,10 +1008,10 @@ def _try_multi_bond_decompose(
             frag_name = _name_sugar_fragment(frag["smiles"])
 
         if not frag_name:
-            frag_name = name_fragment_recursively(frag["smiles"])
+            frag_name = _name_fragment_with_fallback(frag["smiles"])
 
         if not frag_name or "unknown" in frag_name.lower():
-            return None  # Cannot name a fragment
+            return None  # Truly unnameable -- abort
 
         fragment_names[frag["smiles"]] = frag_name
 
@@ -1026,7 +1067,6 @@ def _try_iterative_mixed_decompose(
     import logging
     from .bond_cleavage import find_cleavable_bonds
     from .fragment_capping import cleave_and_cap
-    from ..assembly.fragment_naming import name_fragment_recursively
 
     logger = logging.getLogger(__name__)
 
@@ -1048,8 +1088,9 @@ def _try_iterative_mixed_decompose(
     all_fragments = list(initial_frags)
     parent_heavy = mol.GetNumHeavyAtoms()
 
-    # Iterative decomposition across levels
-    for level in range(MAX_DECOMP_LEVELS - 1):  # Already did level 0
+    # Iterative decomposition across levels (Phase 127: D-04 conditional levels)
+    max_levels = _get_max_decomp_levels(mol)
+    for level in range(max_levels - 1):  # Already did level 0
         new_fragments = []
         changed = False
         for frag in all_fragments:
@@ -1089,14 +1130,14 @@ def _try_iterative_mixed_decompose(
         if not changed:
             break
 
-    # Name each fragment
+    # Name each fragment (Phase 127: D-01 fallback)
     fragment_names = {}
     for frag in all_fragments:
         frag_name = _name_sugar_fragment(frag["smiles"])
         if not frag_name:
-            frag_name = name_fragment_recursively(frag["smiles"])
+            frag_name = _name_fragment_with_fallback(frag["smiles"])
         if not frag_name or "unknown" in frag_name.lower():
-            return None
+            return None  # Truly unnameable -- abort
         fragment_names[frag["smiles"]] = frag_name
 
     # Simple assembly: join fragment names

@@ -38,7 +38,7 @@ MAX_NAMING_DEPTH = 7
 # to prevent unbounded decomposition chains where every fragment SMILES
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
-_MAX_VISITED_SIZE = 30  # Phase 099: raised from 20 for deeper decomposition chains
+_MAX_VISITED_SIZE = 50  # Phase 127: raised from 30 for deeper decomposition; fallback at limit
 
 
 def _get_visited() -> set:
@@ -317,9 +317,15 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
     # SMILES is different (different capping) but naming never terminates.
     if len(visited) >= _MAX_VISITED_SIZE:
         logger.warning(
-            "DEPTH safety net: visited set size=%d >= %d, smiles=%s",
+            "DEPTH safety net: visited set size=%d >= %d, smiles=%s -- trying pipeline fallback",
             len(visited), _MAX_VISITED_SIZE, smiles[:60],
         )
+        from ..namer import name_pipeline_only
+        fallback_name = name_pipeline_only(canonical)
+        if fallback_name and "unknown" not in fallback_name.lower():
+            if runtime_cache is not None:
+                runtime_cache[canonical] = fallback_name
+            return fallback_name
         return None
 
     # Mark as in-progress, name it, then unmark

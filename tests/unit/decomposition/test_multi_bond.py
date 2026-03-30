@@ -428,9 +428,9 @@ class TestMultiBondDecompose:
         bonds = find_cleavable_bonds(mol)
         ester_bonds = [b for b in bonds if b["type"] == "ester"]
 
-        # Mock fragment naming to return None (mock at source module)
+        # Mock both recursive and pipeline fallback to return None (Phase 127)
         with patch(
-            "orthonym.assembly.fragment_naming.name_fragment_recursively",
+            "orthonym.decomposition.engine._name_fragment_with_fallback",
             return_value=None,
         ):
             result = _try_multi_bond_decompose(mol, ester_bonds, "pin")
@@ -726,10 +726,10 @@ class TestRaisedPerformanceLimits:
         """MAX_CLEAVABLE_BONDS should be 20 (raised from 12)."""
         assert MAX_CLEAVABLE_BONDS == 20
 
-    def test_max_visited_size_raised_to_30(self):
-        """_MAX_VISITED_SIZE should be 30 (raised from 20)."""
+    def test_max_visited_size_raised_to_50(self):
+        """_MAX_VISITED_SIZE should be 50 (raised from 30 in Phase 127)."""
         from orthonym.assembly.fragment_naming import _MAX_VISITED_SIZE
-        assert _MAX_VISITED_SIZE == 30
+        assert _MAX_VISITED_SIZE == 50
 
     def test_performance_guard_allows_15_bonds(self):
         """Molecules with 15 cleavable bonds pass the performance guard (was blocked at 12)."""

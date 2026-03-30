@@ -100,14 +100,15 @@ class TestCycleDetection:
         result = name_fragment_recursively("CCO")
         assert result == "ethanol"
 
-    def test_safety_net_returns_none(self):
-        """When visited set reaches _MAX_VISITED_SIZE, return None."""
+    def test_safety_net_uses_pipeline_fallback(self):
+        """When visited set reaches _MAX_VISITED_SIZE, pipeline fallback is tried (Phase 127)."""
         visited = _get_visited()
         for i in range(_MAX_VISITED_SIZE):
             visited.add(f"FAKE_SMILES_{i}")
-        # Now at the limit — new uncached SMILES should return None
+        # Now at the limit -- pipeline fallback should produce a name for valid SMILES
         result = name_fragment_recursively("CCCCCCCCCCCCCC")
-        assert result is None
+        assert result is not None
+        assert "tetradecane" in result.lower()
 
     def test_safety_net_allows_cached(self):
         """Even at safety net limit, cached fragments still resolve."""
@@ -138,9 +139,9 @@ class TestLegacyConstants:
         """MAX_NAMING_DEPTH legacy constant should be 7."""
         assert MAX_NAMING_DEPTH == 7
 
-    def test_max_visited_size_is_thirty(self):
-        """Safety-net limit should be 30 (Phase 099: raised from 20)."""
-        assert _MAX_VISITED_SIZE == 30
+    def test_max_visited_size_is_fifty(self):
+        """Safety-net limit should be 50 (Phase 127: raised from 30)."""
+        assert _MAX_VISITED_SIZE == 50
 
 
 @pytest.mark.unit
