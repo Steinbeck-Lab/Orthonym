@@ -38,6 +38,7 @@ HALIDE_WORDS = {
     "acid_chloride": "chloride",
     "acid_bromide": "bromide",
     "acid_fluoride": "fluoride",
+    "acid_iodide": "iodide",
 }
 
 # Halogen prefix names (for substituent halogens that are NOT part of acid halide)

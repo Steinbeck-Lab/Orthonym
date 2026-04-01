@@ -113,8 +113,15 @@ def detect_partial_saturation(
     if sp3_count == 0:
         return None
 
-    # Calculate hydrogen count: each sp3 atom in ring adds ~2H vs aromatic
-    hydrogen_count = sp3_count * 2
+    # Calculate hydrogen count based on actual atom valence
+    # Carbon sp3 adds 2H vs aromatic, but N adds only 1H (trivalent)
+    hydrogen_count = 0
+    for idx in sp3_indices:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() == 7:  # Nitrogen
+            hydrogen_count += 1  # N-H (trivalent N in ring)
+        else:
+            hydrogen_count += 2  # C adds 2H when saturated
 
     # Check for perhydro (fully saturated)
     # When all ring atoms are sp3

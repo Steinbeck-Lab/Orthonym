@@ -583,7 +583,8 @@ def _compare_locants(set_a: List[int], set_b: List[int]) -> bool:
         if a > b:
             return False
     
-    # If all compared elements are equal, shorter set wins
+    # If all compared elements are equal, prefer shorter or equal set
+    # (deterministic tiebreaker for symmetric molecules)
     return len(a_sorted) <= len(b_sorted)
 
 

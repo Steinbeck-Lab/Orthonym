@@ -62,22 +62,22 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     if len(neighbors) != 2:
         return None
 
-    # Count carbons in each alkyl group
-    alkyl_names = []
+    # Characterize each substituent (aryl or alkyl)
+    sub_names = []
     for neighbor in neighbors:
-        carbon_count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {sulfur_idx})
-        if carbon_count == 0 or carbon_count > 10:
-            return None  # Not a simple alkyl
-        alkyl_names.append(get_alkyl_name(carbon_count))
+        name, count = _characterize_sulfur_substituent(mol, neighbor.GetIdx(), {sulfur_idx})
+        if name is None:
+            return None  # Unrecognized substituent
+        sub_names.append(name)
 
     # Sort alphabetically
-    alkyl_names.sort()
+    sub_names.sort()
 
     # Check for symmetry
-    if alkyl_names[0] == alkyl_names[1]:
-        return f"di{alkyl_names[0]} sulfide"
+    if sub_names[0] == sub_names[1]:
+        return f"di{sub_names[0]} sulfide"
     else:
-        return f"{alkyl_names[0]} {alkyl_names[1]} sulfide"
+        return f"{sub_names[0]} {sub_names[1]} sulfide"
 
 
 def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
@@ -113,22 +113,22 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     if len(neighbors) != 2:
         return None
 
-    # Count carbons in each alkyl group
-    alkyl_names = []
+    # Characterize each substituent (aryl or alkyl)
+    sub_names = []
     for neighbor in neighbors:
-        carbon_count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {sulfur_idx})
-        if carbon_count == 0 or carbon_count > 10:
+        name, count = _characterize_sulfur_substituent(mol, neighbor.GetIdx(), {sulfur_idx})
+        if name is None:
             return None
-        alkyl_names.append(get_alkyl_name(carbon_count))
+        sub_names.append(name)
 
     # Sort alphabetically
-    alkyl_names.sort()
+    sub_names.sort()
 
     # Check for symmetry
-    if alkyl_names[0] == alkyl_names[1]:
-        return f"di{alkyl_names[0]} sulfoxide"
+    if sub_names[0] == sub_names[1]:
+        return f"di{sub_names[0]} sulfoxide"
     else:
-        return f"{alkyl_names[0]} {alkyl_names[1]} sulfoxide"
+        return f"{sub_names[0]} {sub_names[1]} sulfoxide"
 
 
 def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
@@ -164,22 +164,22 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     if len(neighbors) != 2:
         return None
 
-    # Count carbons in each alkyl group
-    alkyl_names = []
+    # Characterize each substituent (aryl or alkyl)
+    sub_names = []
     for neighbor in neighbors:
-        carbon_count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {sulfur_idx})
-        if carbon_count == 0 or carbon_count > 10:
+        name, count = _characterize_sulfur_substituent(mol, neighbor.GetIdx(), {sulfur_idx})
+        if name is None:
             return None
-        alkyl_names.append(get_alkyl_name(carbon_count))
+        sub_names.append(name)
 
     # Sort alphabetically
-    alkyl_names.sort()
+    sub_names.sort()
 
     # Check for symmetry
-    if alkyl_names[0] == alkyl_names[1]:
-        return f"di{alkyl_names[0]} sulfone"
+    if sub_names[0] == sub_names[1]:
+        return f"di{sub_names[0]} sulfone"
     else:
-        return f"{alkyl_names[0]} {alkyl_names[1]} sulfone"
+        return f"{sub_names[0]} {sub_names[1]} sulfone"
 
 
 def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -> str:
@@ -198,29 +198,62 @@ def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -
     return f"{parent_name}sulfonic acid"
 
 
-def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
-    """Count carbon atoms in an alkyl group via BFS."""
+def _characterize_sulfur_substituent(mol, start_idx: int, exclude: set):
+    """Characterize a substituent attached to sulfur as aryl or alkyl.
+
+    Returns:
+        Tuple of (name, carbon_count) where name is "phenyl"/"naphthyl" for aryl
+        or the alkyl name string. Returns (None, 0) if uncharacterizable.
+    """
+    start_atom = mol.GetAtomWithIdx(start_idx)
+
+    # Check for aryl groups (phenyl, naphthyl)
+    if start_atom.GetIsAromatic() and start_atom.GetSymbol() == 'C':
+        aromatic_atoms = set()
+        aq = deque([start_idx])
+        while aq:
+            ai = aq.popleft()
+            if ai in aromatic_atoms or ai in exclude:
+                continue
+            a = mol.GetAtomWithIdx(ai)
+            if a.GetIsAromatic() and a.GetSymbol() == 'C':
+                aromatic_atoms.add(ai)
+                for nb in a.GetNeighbors():
+                    ni = nb.GetIdx()
+                    if ni not in aromatic_atoms and ni not in exclude:
+                        aq.append(ni)
+        ar_count = len(aromatic_atoms)
+        if ar_count == 6:
+            return ("phenyl", 6)
+        elif ar_count == 10:
+            return ("naphthyl", 10)
+        return (None, 0)
+
+    # Alkyl group: BFS counting only carbon atoms
     visited = set()
     queue = deque([start_idx])
     count = 0
-
     while queue:
         atom_idx = queue.popleft()
         if atom_idx in visited or atom_idx in exclude:
             continue
         visited.add(atom_idx)
-
         atom = mol.GetAtomWithIdx(atom_idx)
         if atom.GetSymbol() == 'C':
             count += 1
-
             for neighbor in atom.GetNeighbors():
                 nbr_idx = neighbor.GetIdx()
                 if nbr_idx not in visited and nbr_idx not in exclude:
-                    # Only follow C-C bonds for simple alkyls
                     if neighbor.GetSymbol() == 'C':
                         queue.append(nbr_idx)
+    if count == 0 or count > 10:
+        return (None, 0)
+    return (get_alkyl_name(count), count)
 
+
+def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
+    """Count carbon atoms in an alkyl group via BFS (backward-compatible)."""
+    _, count = _characterize_sulfur_substituent(mol, start_idx, exclude)
     return count
 
 
