@@ -434,8 +434,47 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         sep = "-" if stem and stem[0].isdigit() else ""
         return f"{locant}-hydroxy{sep}{stem}yl"
 
+    # ---- Multi-FG alcohol: -diol, -triol ----
+    # e.g., "propane-1,2-diol" -> "2,3-dihydroxypropyl"
+    # e.g., "ethane-1,2-diol" -> "2-hydroxy-1-(hydroxymethyl)" ... complex
+    m_diol = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)ol$', name)
+    if m_diol:
+        locants = m_diol.group(1)
+        multiplier = m_diol.group(2)
+        stem = name[:m_diol.start()]
+        if stem.endswith('an'):
+            stem = stem[:-2]
+        elif stem.endswith('a'):
+            stem = stem[:-1]
+        prefix = "hydroxy" if multiplier == '' else f"{multiplier}hydroxy"
+        return f"{locants}-{prefix}{stem}yl"
+
+    # ---- Multi-FG ketone: -dione, -trione ----
+    m_dione = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)one$', name)
+    if m_dione:
+        locants = m_dione.group(1)
+        multiplier = m_dione.group(2)
+        stem = name[:m_dione.start()]
+        if stem.endswith('an'):
+            stem = stem[:-2]
+        elif stem.endswith('a'):
+            stem = stem[:-1]
+        return f"{locants}-{multiplier}oxo{stem}yl"
+
+    # ---- Multi-FG amine: -diamine, -triamine ----
+    m_diamine = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)amine$', name)
+    if m_diamine:
+        locants = m_diamine.group(1)
+        multiplier = m_diamine.group(2)
+        stem = name[:m_diamine.start()]
+        if stem.endswith('an'):
+            stem = stem[:-2]
+        elif stem.endswith('a'):
+            stem = stem[:-1]
+        return f"{locants}-{multiplier}amino{stem}yl"
+
     # ---- Unlocanted alcohol: ends in -ol (e.g., "ethanol", "methanol") ----
-    if name.endswith('ol') and not name.endswith('diol'):
+    if name.endswith('ol') and not name.endswith('diol') and not name.endswith('triol'):
         # Strip -ol, check for -an prefix
         base = name[:-2]  # remove "ol"
         if base.endswith('an'):
@@ -490,7 +529,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
 
     # ---- Aldehyde: ends in -al or -anal ----
     # e.g., "propanal" -> "1-oxopropyl"
-    if name.endswith('al') and not name.endswith('nal') or name.endswith('anal'):
+    if (name.endswith('al') and not name.endswith('nal')) or name.endswith('anal'):
         if name.endswith('anal'):
             stem = name[:-4]  # remove "anal"
         elif name.endswith('al'):
