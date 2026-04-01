@@ -6004,6 +6004,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                         return '(' + ''.join(halogen_parts) + alkyl + ')'
 
             # BUG-D: For C-chain with OH: name as hydroxyalkyl
+            # Locant computed via BFS distance from attachment point
             if heteroatoms == {'O'}:
                 # Check if the O is -OH (not C=O or ether)
                 for i in sub_atoms:
@@ -6014,12 +6015,39 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                             if total_carbons == 1:
                                 return f"(hydroxy{alkyl})"
                             else:
-                                return f"({total_carbons}-hydroxy{alkyl})"
+                                # Find the carbon bearing OH via BFS
+                                oh_carbon = None
+                                for nb in a.GetNeighbors():
+                                    if nb.GetSymbol() == 'C':
+                                        oh_carbon = nb.GetIdx()
+                                        break
+                                # Compute BFS distance from attachment to OH carbon
+                                oh_locant = total_carbons  # default: terminal
+                                if oh_carbon is not None:
+                                    from collections import deque as _deque
+                                    _bfs_q = _deque([(attach_atom, 1)])
+                                    _bfs_v = set()
+                                    while _bfs_q:
+                                        _ci, _d = _bfs_q.popleft()
+                                        if _ci in _bfs_v or _ci in chain_set:
+                                            continue
+                                        _bfs_v.add(_ci)
+                                        if _ci == oh_carbon:
+                                            oh_locant = _d
+                                            break
+                                        _ca = mol.GetAtomWithIdx(_ci)
+                                        if _ca.GetSymbol() == 'C':
+                                            for _nb in _ca.GetNeighbors():
+                                                _ni = _nb.GetIdx()
+                                                if _ni not in _bfs_v and _ni not in chain_set:
+                                                    _bfs_q.append((_ni, _d + 1))
+                                return f"({oh_locant}-hydroxy{alkyl})"
                         except (ValueError, KeyError):
                             pass
 
             # BUG-C: For C-chain with NH2: name as (aminoalkyl)
             # e.g., -CH2NH2 -> (aminomethyl), -CH2CH2NH2 -> (2-aminoethyl)
+            # Locant computed via BFS distance from attachment point
             if 'N' in heteroatoms:
                 # Check for terminal primary amine (-NH2) on the chain
                 for i in sub_atoms:
@@ -6031,9 +6059,32 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
                             if total_carbons == 1:
                                 return f"(amino{alkyl})"
                             else:
-                                # Locant for amino on sub-chain: N is at terminal
-                                # position = total_carbons (farthest from attachment)
-                                return f"({total_carbons}-amino{alkyl})"
+                                # Find the carbon bearing NH2 via BFS
+                                nh2_carbon = None
+                                for nb in a.GetNeighbors():
+                                    if nb.GetSymbol() == 'C':
+                                        nh2_carbon = nb.GetIdx()
+                                        break
+                                nh2_locant = total_carbons  # default: terminal
+                                if nh2_carbon is not None:
+                                    from collections import deque as _deque
+                                    _bfs_q = _deque([(attach_atom, 1)])
+                                    _bfs_v = set()
+                                    while _bfs_q:
+                                        _ci, _d = _bfs_q.popleft()
+                                        if _ci in _bfs_v or _ci in chain_set:
+                                            continue
+                                        _bfs_v.add(_ci)
+                                        if _ci == nh2_carbon:
+                                            nh2_locant = _d
+                                            break
+                                        _ca = mol.GetAtomWithIdx(_ci)
+                                        if _ca.GetSymbol() == 'C':
+                                            for _nb in _ca.GetNeighbors():
+                                                _ni = _nb.GetIdx()
+                                                if _ni not in _bfs_v and _ni not in chain_set:
+                                                    _bfs_q.append((_ni, _d + 1))
+                                return f"({nh2_locant}-amino{alkyl})"
                         except (ValueError, KeyError):
                             pass
 
