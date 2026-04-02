@@ -754,7 +754,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCOC(C)OCCc1ccccc1",
-        "ethoxyethylpropylbenzene",
+        "(1-hydroxy-1-ethoxyethylpropyl)benzene",  # PERC-05: generic alcohol detects fragment hydroxyl
     ),
     (
         "NC(=O)N/C=C\\C(=O)OO",

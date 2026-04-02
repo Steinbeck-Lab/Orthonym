@@ -52,7 +52,7 @@ def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
     ri = mol.GetRingInfo()
     systems = []
 
-    for ring in sorted(ri.AtomRings(), key=lambda r: tuple(sorted(r))):  # PERC-08: deterministic order
+    for ring in ri.AtomRings():  # PERC-08: merge is order-independent (produces same sets)
         ring_atoms = set(ring)
 
         # Threshold: >1 for fused only, >0 to include spiro

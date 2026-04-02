@@ -104,8 +104,8 @@ FUNCTIONAL_GROUP_SMARTS = {
     
     # === AMINES ===
     "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
-    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,CX3])[CX4,cX3,CX3]",  # DATA-02+PERC-07: sp3, aromatic, or sp2 C; exclude amides/guanidines
-    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,CX3])([CX4,cX3,CX3])[CX4,cX3,CX3]",  # DATA-02+PERC-07: sp3, aromatic, or sp2 C; exclude amides/guanidines
+    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
+    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
     "aromatic_amine": "[NX3H2][cX3]",
     
     # === IMINES ===
