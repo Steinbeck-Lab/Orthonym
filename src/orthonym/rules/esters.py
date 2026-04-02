@@ -916,6 +916,17 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not alkyl_name:
         return None
 
+    # STER-12: Collect alkyl-side (alcohol fragment) stereo descriptors.
+    # Skip if the alkyl name already contains a stereo prefix.
+    import re as _re
+    from .stereochemistry import format_stereodescriptor_string as _fmt_stereo
+    if not _re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
+        alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
+        alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
+        if alkyl_stereo:
+            alkyl_stereo_prefix = _fmt_stereo(alkyl_stereo)
+            alkyl_name = f"{alkyl_stereo_prefix}{alkyl_name}"
+
     # Collect R/S stereodescriptors for atoms in the acid fragment.
     # Skip if the acid name already contains stereo (e.g., from the unsaturation
     # path which produces names like "(4E)-octa-4,7-dienoic").
@@ -1004,6 +1015,99 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
             next_locant = locant + 1 if nbr.GetSymbol() == 'C' else locant
             atom_to_locant[nbr_idx] = next_locant
             queue.append((nbr_idx, next_locant))
+
+    return collect_stereodescriptors(mol, atom_to_locant)
+
+
+def _collect_alkyl_fragment_stereo(mol, alkyl_atoms: List[int],
+                                   ester_match: tuple) -> list:
+    """Collect R/S stereodescriptors for the alkyl fragment of an ester.
+
+    Builds an atom_to_locant mapping for the alkyl chain using IUPAC
+    numbering: finds the longest carbon chain, numbers from the terminal
+    that gives the lowest locant to the attachment point (O-bonded C).
+
+    Args:
+        mol: RDKit Mol object (CIP labels should already be assigned).
+        alkyl_atoms: Atom indices of the alkyl fragment.
+        ester_match: Ester SMARTS match tuple.
+
+    Returns:
+        List of (locant, cip_code) tuples for alkyl fragment stereocenters.
+    """
+    from .stereochemistry import collect_stereodescriptors
+
+    alkyl_set = set(alkyl_atoms)
+
+    # Find the oxygen-bonded carbon in the alkyl fragment (attachment point).
+    anchor_c = None
+    for idx in alkyl_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for nbr in atom.GetNeighbors():
+            if nbr.GetSymbol() == 'O' and nbr.GetIdx() not in alkyl_set:
+                anchor_c = idx
+                break
+        if anchor_c is not None:
+            break
+
+    if anchor_c is None:
+        return []
+
+    # Collect carbon atoms in the alkyl fragment
+    carbon_atoms = [
+        idx for idx in alkyl_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    ]
+
+    if len(carbon_atoms) <= 1:
+        return []
+
+    # Build adjacency for carbons within alkyl fragment
+    adj: dict = {c: [] for c in carbon_atoms}
+    for c in carbon_atoms:
+        atom = mol.GetAtomWithIdx(c)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in adj:
+                adj[c].append(nbr.GetIdx())
+
+    # Find the longest chain through the alkyl fragment using DFS from
+    # each terminal carbon. The longest chain determines IUPAC numbering.
+    terminals = [c for c in carbon_atoms if len(adj[c]) <= 1]
+    if not terminals:
+        terminals = carbon_atoms  # fallback: all are potential starts
+
+    best_chain: list = []
+    for start in terminals:
+        # DFS to find longest path from start
+        stack = [(start, [start])]
+        while stack:
+            node, path = stack.pop()
+            extended = False
+            for nbr in adj[node]:
+                if nbr not in path:
+                    stack.append((nbr, path + [nbr]))
+                    extended = True
+            if not extended and len(path) > len(best_chain):
+                best_chain = path
+
+    if not best_chain:
+        return []
+
+    # Number the chain: choose direction that gives the anchor_c the
+    # lowest locant (IUPAC rule: lowest locant for attachment point).
+    if anchor_c in best_chain:
+        idx_fwd = best_chain.index(anchor_c) + 1  # 1-based locant forward
+        idx_rev = len(best_chain) - best_chain.index(anchor_c)  # 1-based reversed
+        if idx_rev < idx_fwd:
+            best_chain = list(reversed(best_chain))
+    # else: anchor not on longest chain (branch); keep forward order
+
+    # Build atom_to_locant from the numbered chain
+    atom_to_locant = {}
+    for i, atom_idx in enumerate(best_chain):
+        atom_to_locant[atom_idx] = i + 1  # 1-based
 
     return collect_stereodescriptors(mol, atom_to_locant)
 
