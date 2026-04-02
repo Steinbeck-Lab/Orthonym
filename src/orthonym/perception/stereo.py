@@ -5,10 +5,12 @@ CRITICAL: Always use rdCIPLabeler.AssignCIPLabels(), not the legacy
 Chem.AssignStereochemistry() which fails on complex molecules.
 """
 
+import logging
 from typing import List, Dict, Optional
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
+logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
@@ -36,8 +38,12 @@ def assign_stereochemistry(mol) -> None:
 
     try:
         rdCIPLabeler.AssignCIPLabels(mol)
-    except Exception:
-        # Fallback to legacy for very simple molecules
+    except (ValueError, RuntimeError, KeyError) as exc:
+        mol_info = Chem.MolToSmiles(mol) if mol.GetNumAtoms() > 0 else "empty"
+        logger.warning(
+            "CIP assignment failed for %s, falling back to legacy: %s",
+            mol_info, exc,
+        )
         Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
 
     mol.SetProp(_CIP_ASSIGNED_PROP, '1')
@@ -303,6 +309,34 @@ def detect_axial_chirality(mol) -> List[Dict]:
     return results
 
 
+def _cip_priority_key(mol_h, atom_idx: int, exclude_idx: int) -> tuple:
+    """CIP priority key for allene terminal substituent.
+
+    Uses IUPAC P-92.1.3 sequence rules (simplified):
+    (1) Higher atomic number > lower
+    (2) Sum of neighbor atomic numbers (excluding connection to terminal C)
+
+    This handles the vast majority of allene cases without full CIP tree
+    traversal.
+
+    Args:
+        mol_h: RDKit Mol with explicit H.
+        atom_idx: Index of the substituent atom.
+        exclude_idx: Index of the terminal carbon (excluded from neighbor sum).
+
+    Returns:
+        Tuple (atomic_number, neighbor_atomic_number_sum) for comparison.
+    """
+    atom = mol_h.GetAtomWithIdx(atom_idx)
+    primary = atom.GetAtomicNum()
+    secondary = sum(
+        mol_h.GetAtomWithIdx(n.GetIdx()).GetAtomicNum()
+        for n in atom.GetNeighbors()
+        if n.GetIdx() != exclude_idx
+    )
+    return (primary, secondary)
+
+
 def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     """
     Determine Ra/Sa for an allene by comparing terminal substituent priorities.
@@ -312,7 +346,8 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     If the arrangement from highest-priority-near to highest-priority-far
     is clockwise: Ra. If counterclockwise: Sa.
 
-    Uses RDKit canonical atom ranks as a proxy for CIP priority ordering.
+    Uses true CIP priority based on atomic number (primary) and neighbor
+    atomic number sums (secondary), per IUPAC P-92.1.3.
 
     Args:
         mol: RDKit Mol object
@@ -335,38 +370,42 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
 
     # Add explicit Hs for priority analysis
     mol_h = Chem.AddHs(mol)
-    ranks = Chem.CanonicalRankAtoms(mol_h)
 
     term_a_idx, term_b_idx = terminal_atoms
 
     # Get substituents on each terminal atom (excluding the allene central C)
     def _get_terminal_substituents(atom_idx):
-        """Get substituent atom indices and their ranks for a terminal atom."""
+        """Get substituent atom indices and their CIP priority keys for a terminal atom."""
         atom = mol_h.GetAtomWithIdx(atom_idx)
         subs = []
         for nbr in atom.GetNeighbors():
             nbr_idx = nbr.GetIdx()
             if nbr_idx != central_idx:
-                subs.append((nbr_idx, ranks[nbr_idx]))
-        # Sort by rank descending (higher rank = higher CIP priority proxy)
+                priority = _cip_priority_key(mol_h, nbr_idx, atom_idx)
+                subs.append((nbr_idx, priority))
+        # Sort by priority descending (higher priority first)
         subs.sort(key=lambda x: x[1], reverse=True)
         return subs
 
     subs_a = _get_terminal_substituents(term_a_idx)
     subs_b = _get_terminal_substituents(term_b_idx)
 
-    # Check achirality: if both substituents on a terminal are chemically
-    # equivalent (same atomic number), the allene is achiral at that terminal.
-    # We cannot use canonical ranks for this check because CanonicalRankAtoms
-    # differentiates even chemically equivalent atoms (e.g., two H atoms
-    # on the same carbon get different ranks).
+    # Check achirality: if both substituents on a terminal have identical
+    # CIP priority keys, the allene is achiral at that terminal.
+    # Compares atomic number + neighbor atomic number sums -- not just
+    # atomic number equality.
     def _terminal_is_achiral(subs_list):
-        """Check if a terminal's substituents are chemically equivalent."""
+        """Check if a terminal's substituents are chemically equivalent.
+
+        Compares CIP priority keys (atomic number + neighbor atomic number
+        sums) -- not just atomic number. Two carbons with different
+        substituent trees (e.g., methyl vs ethyl) are NOT equivalent.
+        """
         if len(subs_list) < 2:
             return False
-        atom_a = mol_h.GetAtomWithIdx(subs_list[0][0])
-        atom_b = mol_h.GetAtomWithIdx(subs_list[1][0])
-        return atom_a.GetAtomicNum() == atom_b.GetAtomicNum()
+        # Compare CIP priority keys -- if equal, substituents are equivalent
+        # at the first two levels of the CIP tree
+        return subs_list[0][1] == subs_list[1][1]
 
     if _terminal_is_achiral(subs_a) or _terminal_is_achiral(subs_b):
         return None  # Achiral allene
@@ -375,11 +414,18 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     # The CHI_ALLENE tag encodes the enantiomer via the neighbor ordering
     # in the atom's neighbor list.
 
-    # Priority ordering: for each terminal, get the high-priority sub index
+    # Priority ordering: for each terminal, get the high-priority sub
+    # atom index and CIP priority key
     high_a = subs_a[0][0] if subs_a else None
     high_b = subs_b[0][0] if subs_b else None
 
     if high_a is None or high_b is None:
+        return None
+
+    priority_high_a = subs_a[0][1] if subs_a else None
+    priority_high_b = subs_b[0][1] if subs_b else None
+
+    if priority_high_a is None or priority_high_b is None:
         return None
 
     # Get the neighbor order as stored in the molecule for the central atom
@@ -390,27 +436,24 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     if len(nbr_list) != 2:
         return None
 
-    rank_high_a = ranks[high_a]
-    rank_high_b = ranks[high_b]
-
     # The terminal atom that appears first in the central atom's neighbor
     # list defines the "near" end for chirality determination.
     first_terminal = nbr_list[0]
+
+    if first_terminal == term_a_idx:
+        near_high_priority = priority_high_a
+        far_high_priority = priority_high_b
+    else:
+        near_high_priority = priority_high_b
+        far_high_priority = priority_high_a
 
     # Determine sense based on the elongated tetrahedron model:
     # View along the allene axis from the near terminal to the far terminal.
     # If high-priority-near to high-priority-far is clockwise: Ra
     # If counterclockwise: Sa
-    if first_terminal == term_a_idx:
-        near_high_rank = rank_high_a
-        far_high_rank = rank_high_b
-    else:
-        near_high_rank = rank_high_b
-        far_high_rank = rank_high_a
-
-    if near_high_rank > far_high_rank:
+    if near_high_priority > far_high_priority:
         return 'Ra'
-    elif near_high_rank < far_high_rank:
+    elif near_high_priority < far_high_priority:
         return 'Sa'
     else:
         return None  # Identical priorities -- achiral
