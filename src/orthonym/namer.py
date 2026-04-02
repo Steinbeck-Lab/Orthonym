@@ -705,13 +705,25 @@ class Orthonym:
 
                 # Only do parent selection if we found a meaningful chain (>= 2 carbons)
                 if potential_chain and len(potential_chain) >= 2:
+                    # ASML-19: Build ring_info for IUPAC ring numbering
+                    # When a fused heterocycle core was matched (but guard was
+                    # bypassed), use its iupac_locants for correct locant
+                    # comparison in parent selection cascade.
+                    _ring_info = None
+                    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+                        het_match = match_fused_heterocycle_core(features.mol)
+                        if het_match is not None:
+                            _, atom_mapping, _ = het_match
+                            _ring_info = {"iupac_locants": atom_mapping}
+
                     # Pass pre-computed chain to select_parent
                     selection = select_parent(
                         mol=features.mol,
                         ring_systems=features.ring_systems,
                         principal_chain=potential_chain,
                         principal_group=features.principal_group,
-                        principal_group_atoms=features.principal_group_atoms
+                        principal_group_atoms=features.principal_group_atoms,
+                        ring_info=_ring_info
                     )
 
                     if selection.parent_type == 'chain':

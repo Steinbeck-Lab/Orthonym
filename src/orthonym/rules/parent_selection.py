@@ -33,6 +33,48 @@ from .ring_selection import ring_system_score
 logger = logging.getLogger(__name__)
 
 
+def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
+    """Build atom-to-locant map using IUPAC ring numbering.
+
+    Per ASML-19 / D-10: Uses actual IUPAC ring numbering when available,
+    instead of sorted atom index positional proxy.
+
+    Priority:
+    1. iupac_locants from fused heterocycle data (authoritative IUPAC numbering)
+    2. Fallback: sorted atom indices mapped to 1-indexed positions
+       (correct for carbocyclic rings where any consistent numbering
+        produces equivalent comparison results due to ring symmetry)
+
+    Args:
+        ring_set: Set of atom indices in the ring system
+        ring_info: Optional dict with 'iupac_locants' key mapping
+                   atom_idx -> IUPAC locant (int or str like '3a').
+                   May contain atoms outside ring_set; only ring atoms
+                   with integer locants are used.
+
+    Returns:
+        Dict mapping atom_idx -> IUPAC locant position (int)
+    """
+    if ring_info and ring_info.get("iupac_locants"):
+        iupac = ring_info["iupac_locants"]
+        # Only include atoms that are in ring_set, filter string locants
+        ring_pos = {}
+        for atom_idx in ring_set:
+            if atom_idx in iupac:
+                locant = iupac[atom_idx]
+                if isinstance(locant, int):
+                    ring_pos[atom_idx] = locant
+        # If we got positions for all ring atoms, use them
+        if len(ring_pos) == len(ring_set):
+            return ring_pos
+        # If partial coverage (e.g., string locants for fusion atoms),
+        # fall through to sorted fallback
+
+    # Fallback: sorted atom indices (correct for carbocyclic rings)
+    ring_sorted = sorted(ring_set)
+    return {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+
+
 @dataclass
 class ParentSelectionResult:
     """Result of parent structure selection.
@@ -249,7 +291,8 @@ def _compare_double_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
 
 def _compare_pg_locants(
     mol, chain: List[int], ring_set: Set[int],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    ring_info: dict = None
 ) -> int:
     """P-44.1(f): Lowest locants for principal groups.
 
@@ -259,17 +302,15 @@ def _compare_pg_locants(
 
     Locants are 1-indexed IUPAC-style positions (per P-14.7):
     - Chain: position along the chain list (atom at index 0 -> locant 1).
-    - Ring: sorted atom indices mapped to 1-indexed positions. This is a
-      positional proxy consistent with ring numbering convention used
-      throughout the P-44.1 cascade. True IUPAC ring numbering (P-14.7)
-      follows ring perception rules, but for ring-vs-chain comparison
-      the consistent positional convention produces equivalent results.
+    - Ring: IUPAC ring numbering when available (via ring_info), otherwise
+      sorted atom indices mapped to 1-indexed positions as fallback.
 
     Args:
         mol: RDKit Mol object
         chain: Ordered list of atom indices forming the principal chain
         ring_set: Set of atom indices in the ring system
         principal_group_atoms: List of tuples of atom indices from SMARTS matches
+        ring_info: Optional dict with 'iupac_locants' for IUPAC ring numbering
 
     Returns:
         1 if chain has lower PG locants (chain wins)
@@ -280,8 +321,7 @@ def _compare_pg_locants(
 
     # Build 1-indexed position maps (IUPAC P-14.7: locants start at 1)
     chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
-    ring_sorted = sorted(ring_set)
-    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+    ring_pos = _build_ring_pos(ring_set, ring_info=ring_info)
 
     # Get PG locants on chain (1-indexed IUPAC locants)
     chain_pg_locants = []
@@ -324,7 +364,8 @@ def _compare_pg_locants(
 
 
 def _compare_multiple_bond_locants(
-    mol, chain: List[int], ring_set: Set[int]
+    mol, chain: List[int], ring_set: Set[int],
+    ring_info: dict = None
 ) -> int:
     """P-44.1(g): Lowest locants for multiple bonds.
 
@@ -333,13 +374,15 @@ def _compare_multiple_bond_locants(
 
     For chain: bond between chain positions i and i+1 gets locant i+1
     (1-indexed, using the lower position per IUPAC convention).
-    For ring: atoms are sorted by index and mapped to 1-indexed positions.
+    For ring: IUPAC ring numbering when available (via ring_info), otherwise
+    sorted atom indices mapped to 1-indexed positions as fallback.
     Bond locant is the lower position of the two bonded atoms.
 
     Args:
         mol: RDKit Mol object
         chain: Ordered list of atom indices forming the principal chain
         ring_set: Set of atom indices in the ring system
+        ring_info: Optional dict with 'iupac_locants' for IUPAC ring numbering
 
     Returns:
         1 if chain has lower bond locants (chain wins)
@@ -350,8 +393,7 @@ def _compare_multiple_bond_locants(
 
     # Build position maps (1-indexed)
     chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
-    ring_sorted = sorted(ring_set)
-    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+    ring_pos = _build_ring_pos(ring_set, ring_info=ring_info)
 
     # Collect bond locants for chain and ring
     chain_bond_locants = []
@@ -388,7 +430,8 @@ def _compare_multiple_bond_locants(
 
 
 def _compare_substituent_locants(
-    mol, chain: List[int], ring_set: Set[int]
+    mol, chain: List[int], ring_set: Set[int],
+    ring_info: dict = None
 ) -> int:
     """P-44.1(i): Lowest locants for substituents (detachable prefixes).
 
@@ -399,12 +442,14 @@ def _compare_substituent_locants(
     but NOT itself part of the chain/ring.
 
     For chain: substituent at chain position i gets locant i+1 (1-indexed).
-    For ring: atoms sorted by index, mapped to 1-indexed positions.
+    For ring: IUPAC ring numbering when available (via ring_info), otherwise
+    sorted atom indices mapped to 1-indexed positions as fallback.
 
     Args:
         mol: RDKit Mol object
         chain: Ordered list of atom indices forming the principal chain
         ring_set: Set of atom indices in the ring system
+        ring_info: Optional dict with 'iupac_locants' for IUPAC ring numbering
 
     Returns:
         1 if chain has lower substituent locants (chain wins)
@@ -415,8 +460,7 @@ def _compare_substituent_locants(
 
     # Build position maps (1-indexed)
     chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
-    ring_sorted = sorted(ring_set)
-    ring_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
+    ring_pos = _build_ring_pos(ring_set, ring_info=ring_info)
 
     # Collect substituent locants for chain
     chain_sub_locants = []
@@ -430,7 +474,7 @@ def _compare_substituent_locants(
 
     # Collect substituent locants for ring
     ring_sub_locants = []
-    for idx in ring_sorted:
+    for idx in sorted(ring_set):
         atom = mol.GetAtomWithIdx(idx)
         for nbr in atom.GetNeighbors():
             if nbr.GetIdx() not in ring_set and nbr.GetSymbol() != 'H':
@@ -494,7 +538,8 @@ def select_parent(
     ring_systems: List[set],
     principal_chain: List[int],
     principal_group: Optional[str],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    ring_info: dict = None
 ) -> ParentSelectionResult:
     """
     Select parent structure per IUPAC P-44.1.
@@ -514,6 +559,9 @@ def select_parent(
         principal_chain: Pre-computed principal chain (from namer.py)
         principal_group: Name of principal functional group (or None)
         principal_group_atoms: List of tuples of atom indices
+        ring_info: Optional dict with 'iupac_locants' for IUPAC ring numbering
+                   (from fused heterocycle data). Used by locant comparison
+                   functions per ASML-19.
 
     Returns:
         ParentSelectionResult with decision and metadata
@@ -673,15 +721,18 @@ def select_parent(
             cascade_result = _compare_double_bonds(mol, chain_set, best_ring)    # P-44.1(e)
         if cascade_result == 0:
             cascade_result = _compare_pg_locants(
-                mol, candidate_chain, best_ring, principal_group_atoms)           # P-44.1(f)
+                mol, candidate_chain, best_ring, principal_group_atoms,
+                ring_info=ring_info)                                              # P-44.1(f)
         if cascade_result == 0:
             cascade_result = _compare_multiple_bond_locants(
-                mol, candidate_chain, best_ring)                                 # P-44.1(g)
+                mol, candidate_chain, best_ring,
+                ring_info=ring_info)                                              # P-44.1(g)
         if cascade_result == 0:
             cascade_result = _compare_substituent_count(mol, chain_set, best_ring)  # P-44.1(h)
         if cascade_result == 0:
             cascade_result = _compare_substituent_locants(
-                mol, candidate_chain, best_ring)                                 # P-44.1(i)
+                mol, candidate_chain, best_ring,
+                ring_info=ring_info)                                              # P-44.1(i)
 
         if cascade_result > 0:
             # Chain wins
