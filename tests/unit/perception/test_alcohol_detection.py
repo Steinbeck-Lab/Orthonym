@@ -53,8 +53,13 @@ class TestGenericAlcoholDetection:
         )
 
     def test_specific_subtypes_still_work(self):
-        """CCO (ethanol): primary_alcohol specific pattern still matches."""
+        """CCO (ethanol): primary_alcohol specific pattern still matches.
+        Generic 'alcohol' is suppressed by collision resolution when a specific
+        subtype matches (avoids double-naming as both suffix and prefix)."""
         mol = Chem.MolFromSmiles("CCO")
         fgs = detect_functional_groups(mol)
         assert "primary_alcohol" in fgs and len(fgs["primary_alcohol"]) > 0
-        assert "alcohol" in fgs and len(fgs["alcohol"]) > 0  # Generic also matches
+        # Generic "alcohol" is suppressed by collision resolution when primary_alcohol matches
+        assert "alcohol" not in fgs, (
+            "Generic 'alcohol' should be suppressed when specific subtype matches"
+        )

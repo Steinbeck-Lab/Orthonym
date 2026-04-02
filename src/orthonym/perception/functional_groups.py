@@ -86,6 +86,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     "thioketone": "[#6][CX3](=S)[#6]",
     
     # === ALCOHOLS AND ANALOGS ===
+    # Generic catch-all: any OH on sp3 carbon (IUPAC P-63.1)
+    # Complements specific sub-type patterns below; ensures detection of
+    # OH on carbons with non-carbon neighbors (halogens, nitrogen, sulfur)
+    "alcohol": "[OX2H][CX4]",  # PERC-05: generic catch-all per D-01
     "primary_alcohol": "[OX2H][CX4H2]",
     "secondary_alcohol": "[OX2H][CX4H1]([#6])[#6]",
     "tertiary_alcohol": "[OX2H][CX4]([#6])([#6])[#6]",
@@ -100,8 +104,8 @@ FUNCTIONAL_GROUP_SMARTS = {
     
     # === AMINES ===
     "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
-    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3])[CX4,cX3]",  # DATA-02: sp3 or aromatic C, exclude amides/guanidines
-    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3])([CX4,cX3])[CX4,cX3]",  # DATA-02: sp3 or aromatic C, exclude amides/guanidines
+    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,CX3])[CX4,cX3,CX3]",  # DATA-02+PERC-07: sp3, aromatic, or sp2 C; exclude amides/guanidines
+    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,CX3])([CX4,cX3,CX3])[CX4,cX3,CX3]",  # DATA-02+PERC-07: sp3, aromatic, or sp2 C; exclude amides/guanidines
     "aromatic_amine": "[NX3H2][cX3]",
     
     # === IMINES ===
@@ -271,6 +275,14 @@ def _resolve_fg_collisions(results):
         ('hydrazine_fg', ['primary_amine']),
         # DATA-05c: hydrazide is more specific than hydrazine_fg
         ('hydrazide', ['hydrazine_fg']),
+        # PERC-05: specific alcohol subtypes suppress generic "alcohol" on same atoms
+        ('primary_alcohol', ['alcohol']),
+        ('secondary_alcohol', ['alcohol']),
+        ('tertiary_alcohol', ['alcohol']),
+        ('phenol', ['alcohol']),
+        ('enol', ['alcohol']),
+        # PERC-05: hydroxamic acid suppresses generic alcohol too
+        ('hydroxamic_acid', ['alcohol']),
     ]:
         if fg_specific in results:
             specific_atoms = set()

@@ -81,7 +81,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C",
-        "(3R,4R,5R,6S)-3-(2-methylbutyl)-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",
+        "(3R,4R,5R,6S)-3-(2-methylbutyl)hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",  # PERC-05: generic alcohol detects hemiaminal OH
     ),
     (
         r"CO[C@H]1C=C/C=C\C=C/C[C@H](OC(=O)[C@@H](C)NC(=O)C2=CCCCC2)[C@H](C)[C@@H](O)/C(C)=C\CCc2cc(O)cc(c2O)NC(=O)C1",

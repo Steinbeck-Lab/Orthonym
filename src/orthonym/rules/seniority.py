@@ -63,6 +63,7 @@ SENIORITY_ORDER = [
     "tertiary_alcohol",
     "phenol",
     "enol",
+    "alcohol",         # PERC-05: generic catch-all, same seniority tier as other alcohols
     "hydroperoxide",   # IUPAC P-43 Table 5.1: Class 19 (higher than thiol)
     "thiol",
     "selenol",
@@ -136,6 +137,7 @@ SUFFIX_FORMS = {
     "tertiary_alcohol": ("ol", "ol"),
     "phenol": ("ol", "ol"),
     "enol": ("ol", "ol"),
+    "alcohol": ("ol", "ol"),  # PERC-05: generic catch-all suffix form
     "thiol": ("thiol", "thiol"),
     "selenol": ("selenol", "selenol"),
     "hydroperoxide": ("peroxol", "peroxol"),
@@ -198,6 +200,7 @@ PREFIX_FORMS = {
     "tertiary_alcohol": "hydroxy",
     "phenol": "hydroxy",
     "enol": "hydroxy",
+    "alcohol": "hydroxy",  # PERC-05: generic catch-all prefix form
     "thiol": "sulfanyl",
     "selenol": "selanyl",
     "hydroperoxide": "hydroperoxy",
