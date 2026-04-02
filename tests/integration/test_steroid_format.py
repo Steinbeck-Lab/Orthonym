@@ -9,8 +9,8 @@ Tests the format correctness of steroid name assembly, covering:
 
 import pytest
 
-from src.orthonym import name_compound
-from src.orthonym.rules.natural_products import (
+from orthonym import name_compound
+from orthonym.rules.natural_products import (
     _acylate_to_acyloxy,
     _assemble_np_ester_name,
     _assemble_np_name,

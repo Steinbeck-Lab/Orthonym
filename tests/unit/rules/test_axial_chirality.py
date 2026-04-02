@@ -14,11 +14,11 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
-from src.orthonym.perception.stereo import (
+from orthonym.perception.stereo import (
     detect_axial_chirality,
     _manual_allene_cip,
 )
-from src.orthonym.rules.stereochemistry import (
+from orthonym.rules.stereochemistry import (
     collect_stereodescriptors,
     format_stereodescriptor_string,
 )

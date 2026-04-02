@@ -9,11 +9,11 @@ The core bug this addresses:
 """
 import pytest
 from rdkit import Chem
-from src.orthonym.perception.chains import (
+from orthonym.perception.chains import (
     classify_substituent,
     is_ring_substituent,
 )
-from src.orthonym.namer import name_compound
+from orthonym.namer import name_compound
 
 
 class TestIsRingSubstituent:

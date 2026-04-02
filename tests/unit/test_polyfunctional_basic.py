@@ -68,8 +68,8 @@ class TestPolyfunctionalDetection:
     def test_single_fg_not_polyfunctional(self):
         # Simple alcohol - single FG type
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import detect_polyfunctional
-        from src.orthonym.perception.functional_groups import detect_functional_groups
+        from orthonym.rules.polyfunctional import detect_polyfunctional
+        from orthonym.perception.functional_groups import detect_functional_groups
 
         mol = Chem.MolFromSmiles("CCO")
         fgs = detect_functional_groups(mol)
@@ -78,8 +78,8 @@ class TestPolyfunctionalDetection:
     def test_multiple_same_fg_not_polyfunctional(self):
         # Diol - multiple instances of same FG type
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import detect_polyfunctional
-        from src.orthonym.perception.functional_groups import detect_functional_groups
+        from orthonym.rules.polyfunctional import detect_polyfunctional
+        from orthonym.perception.functional_groups import detect_functional_groups
 
         mol = Chem.MolFromSmiles("OCCO")
         fgs = detect_functional_groups(mol)
@@ -89,8 +89,8 @@ class TestPolyfunctionalDetection:
     def test_two_different_fgs_is_polyfunctional(self):
         # Hydroxy acid - two different FGs
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import detect_polyfunctional
-        from src.orthonym.perception.functional_groups import detect_functional_groups
+        from orthonym.rules.polyfunctional import detect_polyfunctional
+        from orthonym.perception.functional_groups import detect_functional_groups
 
         mol = Chem.MolFromSmiles("OCC(=O)O")
         fgs = detect_functional_groups(mol)
@@ -144,21 +144,21 @@ class TestPrefixFormatting:
     """Test FG prefix formatting functions."""
 
     def test_format_single_hydroxy(self):
-        from src.orthonym.rules.polyfunctional import format_fg_prefix
+        from orthonym.rules.polyfunctional import format_fg_prefix
         assert format_fg_prefix("hydroxy", [2], 1) == "2-hydroxy"
 
     def test_format_single_oxo(self):
-        from src.orthonym.rules.polyfunctional import format_fg_prefix
+        from orthonym.rules.polyfunctional import format_fg_prefix
         assert format_fg_prefix("oxo", [3], 1) == "3-oxo"
 
     def test_format_dihydroxy(self):
-        from src.orthonym.rules.polyfunctional import format_fg_prefix
+        from orthonym.rules.polyfunctional import format_fg_prefix
         result = format_fg_prefix("hydroxy", [2, 4], 2)
         assert "dihydroxy" in result
         assert "2,4" in result
 
     def test_format_no_locants(self):
-        from src.orthonym.rules.polyfunctional import format_fg_prefix
+        from orthonym.rules.polyfunctional import format_fg_prefix
         assert format_fg_prefix("hydroxy", [], 1) == "hydroxy"
 
 
@@ -167,7 +167,7 @@ class TestAlkoxyPrefixForm:
 
     def test_methoxy_prefix(self):
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import get_fg_prefix_form
+        from orthonym.rules.polyfunctional import get_fg_prefix_form
 
         mol = Chem.MolFromSmiles("COCC")
         # Match for methoxy: ether oxygen + methyl
@@ -176,7 +176,7 @@ class TestAlkoxyPrefixForm:
 
     def test_ethoxy_prefix(self):
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import get_fg_prefix_form
+        from orthonym.rules.polyfunctional import get_fg_prefix_form
 
         mol = Chem.MolFromSmiles("CCOCC")
         # Ether oxygen is at index 2
@@ -189,7 +189,7 @@ class TestLocantDetermination:
 
     def test_alcohol_locant_in_hydroxy_acid(self):
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import get_non_principal_fg_locants
+        from orthonym.rules.polyfunctional import get_non_principal_fg_locants
 
         # 2-hydroxypropanoic acid: CC(O)C(=O)O
         mol = Chem.MolFromSmiles("CC(O)C(=O)O")
@@ -203,7 +203,7 @@ class TestLocantDetermination:
 
     def test_ketone_locant_in_keto_acid(self):
         from rdkit import Chem
-        from src.orthonym.rules.polyfunctional import get_non_principal_fg_locants
+        from orthonym.rules.polyfunctional import get_non_principal_fg_locants
 
         # 2-oxopropanoic acid: CC(=O)C(=O)O
         mol = Chem.MolFromSmiles("CC(=O)C(=O)O")

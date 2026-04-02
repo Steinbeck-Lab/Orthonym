@@ -1,7 +1,7 @@
 """Unit tests for salt and zwitterion naming."""
 import pytest
 from rdkit import Chem
-from src.orthonym.rules.salts import (
+from orthonym.rules.salts import (
     name_salt,
     name_zwitterion,
     is_salt,

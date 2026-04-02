@@ -10,7 +10,7 @@ Tests end-to-end name generation for:
 
 import pytest
 from rdkit import Chem
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 class TestRSDescriptors:
@@ -252,7 +252,7 @@ class TestEZUnification:
 
     def test_ez_uses_cip_code_directly(self):
         """get_stereodescriptor_string uses _CIPCode on bonds, not BondStereo."""
-        from src.orthonym.perception.stereo import get_stereodescriptor_string
+        from orthonym.perception.stereo import get_stereodescriptor_string
         from rdkit.Chem import rdCIPLabeler
 
         mol = Chem.MolFromSmiles('C/C=C/C')

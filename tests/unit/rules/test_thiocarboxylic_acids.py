@@ -9,9 +9,9 @@ Tests three variants:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.perception.functional_groups import detect_functional_groups
-from src.orthonym.rules.seniority import get_suffix, get_prefix
-from src.orthonym.namer import name_compound
+from orthonym.perception.functional_groups import detect_functional_groups
+from orthonym.rules.seniority import get_suffix, get_prefix
+from orthonym.namer import name_compound
 
 
 # ============================================================================

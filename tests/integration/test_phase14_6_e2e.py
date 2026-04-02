@@ -11,7 +11,7 @@ Tests the 6 bugs fixed in this phase:
 """
 
 import pytest
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 class TestBug1And5AromaticCarboxylate:

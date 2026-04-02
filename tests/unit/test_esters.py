@@ -104,7 +104,7 @@ class TestEsterFragmentParsing:
     def test_parse_methyl_acetate(self):
         """Parse methyl acetate into acid and alkyl fragments."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments
+        from orthonym.rules.esters import parse_ester_fragments
 
         mol = Chem.MolFromSmiles("COC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -123,7 +123,7 @@ class TestEsterFragmentParsing:
     def test_parse_ethyl_propanoate(self):
         """Parse ethyl propanoate into acid and alkyl fragments."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments
+        from orthonym.rules.esters import parse_ester_fragments
 
         mol = Chem.MolFromSmiles("CCOC(=O)CC")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -146,7 +146,7 @@ class TestLactoneDetection:
     def test_gamma_butyrolactone_is_lactone(self):
         """Gamma-butyrolactone should be detected as a lactone."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import is_lactone
+        from orthonym.rules.esters import is_lactone
 
         # gamma-butyrolactone: C1CC(=O)OC1
         mol = Chem.MolFromSmiles("C1CC(=O)OC1")
@@ -159,7 +159,7 @@ class TestLactoneDetection:
     def test_delta_valerolactone_is_lactone(self):
         """Delta-valerolactone should be detected as a lactone."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import is_lactone
+        from orthonym.rules.esters import is_lactone
 
         # delta-valerolactone: C1CCC(=O)OC1
         mol = Chem.MolFromSmiles("C1CCC(=O)OC1")
@@ -172,7 +172,7 @@ class TestLactoneDetection:
     def test_simple_ester_not_lactone(self):
         """Simple esters should not be detected as lactones."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import is_lactone
+        from orthonym.rules.esters import is_lactone
 
         mol = Chem.MolFromSmiles("COC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -184,7 +184,7 @@ class TestLactoneDetection:
     def test_ethyl_acetate_not_lactone(self):
         """Ethyl acetate should not be detected as lactone."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import is_lactone
+        from orthonym.rules.esters import is_lactone
 
         mol = Chem.MolFromSmiles("CCOC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -200,7 +200,7 @@ class TestAcidFragmentNaming:
     def test_one_carbon_acid_is_formic(self):
         """1-carbon acid should be named formic."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import get_acid_fragment_name
+        from orthonym.rules.esters import get_acid_fragment_name
 
         mol = Chem.MolFromSmiles("COC=O")
         # Acid fragment is just the C=O carbon
@@ -211,7 +211,7 @@ class TestAcidFragmentNaming:
     def test_two_carbon_acid_is_acetic(self):
         """2-carbon acid should be named acetic."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments, get_acid_fragment_name
+        from orthonym.rules.esters import parse_ester_fragments, get_acid_fragment_name
 
         mol = Chem.MolFromSmiles("COC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -224,7 +224,7 @@ class TestAcidFragmentNaming:
     def test_three_carbon_acid_is_propanoic(self):
         """3-carbon acid should be named propanoic."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments, get_acid_fragment_name
+        from orthonym.rules.esters import parse_ester_fragments, get_acid_fragment_name
 
         mol = Chem.MolFromSmiles("COC(=O)CC")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -241,7 +241,7 @@ class TestAlkylFragmentNaming:
     def test_one_carbon_alkyl_is_methyl(self):
         """1-carbon alkyl should be named methyl."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
+        from orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
 
         mol = Chem.MolFromSmiles("COC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -254,7 +254,7 @@ class TestAlkylFragmentNaming:
     def test_two_carbon_alkyl_is_ethyl(self):
         """2-carbon alkyl should be named ethyl."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
+        from orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
 
         mol = Chem.MolFromSmiles("CCOC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -267,7 +267,7 @@ class TestAlkylFragmentNaming:
     def test_three_carbon_alkyl_is_propyl(self):
         """3-carbon alkyl should be named propyl."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
+        from orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
 
         mol = Chem.MolFromSmiles("CCCOC(C)=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
@@ -283,27 +283,27 @@ class TestAcylateConversion:
 
     def test_acetic_to_acetate(self):
         """Acetic should convert to acetate."""
-        from src.orthonym.data.trivial_acids import get_acylate_name
+        from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("acetic") == "acetate"
 
     def test_formic_to_formate(self):
         """Formic should convert to formate."""
-        from src.orthonym.data.trivial_acids import get_acylate_name
+        from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("formic") == "formate"
 
     def test_propanoic_to_propanoate(self):
         """Propanoic should convert to propanoate."""
-        from src.orthonym.data.trivial_acids import get_acylate_name
+        from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("propanoic") == "propanoate"
 
     def test_butanoic_to_butanoate(self):
         """Butanoic should convert to butanoate."""
-        from src.orthonym.data.trivial_acids import get_acylate_name
+        from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("butanoic") == "butanoate"
 
     def test_benzoic_to_benzoate(self):
         """Benzoic should convert to benzoate."""
-        from src.orthonym.data.trivial_acids import get_acylate_name
+        from orthonym.data.trivial_acids import get_acylate_name
         assert get_acylate_name("benzoic") == "benzoate"
 
 
@@ -312,27 +312,27 @@ class TestSystematicAcylate:
 
     def test_chain_1_is_methanoate(self):
         """Chain length 1 should be methanoate."""
-        from src.orthonym.data.trivial_acids import get_systematic_acylate
+        from orthonym.data.trivial_acids import get_systematic_acylate
         assert get_systematic_acylate(1) == "methanoate"
 
     def test_chain_2_is_ethanoate(self):
         """Chain length 2 should be ethanoate."""
-        from src.orthonym.data.trivial_acids import get_systematic_acylate
+        from orthonym.data.trivial_acids import get_systematic_acylate
         assert get_systematic_acylate(2) == "ethanoate"
 
     def test_chain_3_is_propanoate(self):
         """Chain length 3 should be propanoate."""
-        from src.orthonym.data.trivial_acids import get_systematic_acylate
+        from orthonym.data.trivial_acids import get_systematic_acylate
         assert get_systematic_acylate(3) == "propanoate"
 
     def test_chain_4_is_butanoate(self):
         """Chain length 4 should be butanoate."""
-        from src.orthonym.data.trivial_acids import get_systematic_acylate
+        from orthonym.data.trivial_acids import get_systematic_acylate
         assert get_systematic_acylate(4) == "butanoate"
 
     def test_chain_5_is_pentanoate(self):
         """Chain length 5 should be pentanoate."""
-        from src.orthonym.data.trivial_acids import get_systematic_acylate
+        from orthonym.data.trivial_acids import get_systematic_acylate
         assert get_systematic_acylate(5) == "pentanoate"
 
 
@@ -342,7 +342,7 @@ class TestLactoneNaming:
     def test_gamma_butyrolactone_returns_none(self):
         """Lactones should return None from name_ester (deferred handling)."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import name_ester
+        from orthonym.rules.esters import name_ester
 
         # gamma-butyrolactone: C1CC(=O)OC1
         mol = Chem.MolFromSmiles("C1CC(=O)OC1")
@@ -382,7 +382,7 @@ class TestEsterFindMatch:
     def test_find_ester_in_methyl_acetate(self):
         """Find ester match in methyl acetate."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import find_ester_match
+        from orthonym.rules.esters import find_ester_match
 
         mol = Chem.MolFromSmiles("COC(C)=O")
         match = find_ester_match(mol)
@@ -392,7 +392,7 @@ class TestEsterFindMatch:
     def test_find_ester_returns_none_for_non_ester(self):
         """Non-esters should return None."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import find_ester_match
+        from orthonym.rules.esters import find_ester_match
 
         mol = Chem.MolFromSmiles("CCCC")  # butane
         match = find_ester_match(mol)
@@ -401,7 +401,7 @@ class TestEsterFindMatch:
     def test_find_ester_returns_none_for_carboxylic_acid(self):
         """Carboxylic acids should not match as esters."""
         from rdkit import Chem
-        from src.orthonym.rules.esters import find_ester_match
+        from orthonym.rules.esters import find_ester_match
 
         mol = Chem.MolFromSmiles("CC(=O)O")  # acetic acid
         match = find_ester_match(mol)

@@ -11,7 +11,7 @@ to IUPAC positions for monocyclic components:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.fusion_descriptors import _get_iupac_ring_order
+from orthonym.rules.fusion_descriptors import _get_iupac_ring_order
 
 
 def _get_ring_and_order(smiles):

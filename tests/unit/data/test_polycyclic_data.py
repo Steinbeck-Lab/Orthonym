@@ -8,7 +8,7 @@ for the polycyclic aromatic hydrocarbon lookup tables.
 import pytest
 from rdkit import Chem
 
-from src.orthonym.data.polycyclic_data import (
+from orthonym.data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
     get_polycyclic_by_name,

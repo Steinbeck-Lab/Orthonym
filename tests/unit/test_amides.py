@@ -11,7 +11,7 @@ Based on IUPAC 2013 Blue Book P-66.1.
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.amides import (
+from orthonym.rules.amides import (
     get_amide_type,
     get_n_substituents,
     format_n_substitution,
@@ -236,25 +236,25 @@ class TestAmideIntegration:
 
     def test_formamide_retained(self):
         """NC=O should be named formamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("NC=O")
         assert result == "formamide"
 
     def test_acetamide_retained(self):
         """CC(=O)N should be named acetamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CC(=O)N")
         assert result == "acetamide"
 
     def test_propanamide(self):
         """CCC(=O)N should be named propanamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCC(=O)N")
         assert result == "propanamide"
 
     def test_butanamide(self):
         """CCCC(=O)N should be named butanamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCCC(=O)N")
         assert result == "butanamide"
 
@@ -264,25 +264,25 @@ class TestSecondaryAmidesIntegration:
 
     def test_n_methylformamide(self):
         """CNC=O should be named N-methylformamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CNC=O")
         assert result == "N-methylformamide"
 
     def test_n_methylacetamide(self):
         """CNC(C)=O should be named N-methylacetamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CNC(C)=O")
         assert result == "N-methylacetamide"
 
     def test_n_ethylacetamide(self):
         """CCNC(C)=O should be named N-ethylacetamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCNC(C)=O")
         assert result == "N-ethylacetamide"
 
     def test_n_methylpropanamide(self):
         """CNC(=O)CC should be named N-methylpropanamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CNC(=O)CC")
         assert result == "N-methylpropanamide"
 
@@ -292,25 +292,25 @@ class TestTertiaryAmidesIntegration:
 
     def test_n_n_dimethylformamide(self):
         """CN(C)C=O should be named N,N-dimethylformamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CN(C)C=O")
         assert result == "N,N-dimethylformamide"
 
     def test_n_n_dimethylacetamide(self):
         """CN(C)C(C)=O should be named N,N-dimethylacetamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CN(C)C(C)=O")
         assert result == "N,N-dimethylacetamide"
 
     def test_n_ethyl_n_methylacetamide(self):
         """CCN(C)C(C)=O -> N-ethyl-N-methylacetamide"""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCN(C)C(C)=O")
         assert result == "N-ethyl-N-methylacetamide"
 
     def test_n_n_diethylacetamide(self):
         """CCN(CC)C(C)=O should be named N,N-diethylacetamide."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCN(CC)C(C)=O")
         assert result == "N,N-diethylacetamide"
 
@@ -320,6 +320,6 @@ class TestRingAttachedAmidesIntegration:
 
     def test_cyclohexanecarboxamide(self):
         """NC(=O)C1CCCCC1 -> cyclohexanecarboxamide"""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("NC(=O)C1CCCCC1")
         assert result == "cyclohexanecarboxamide"

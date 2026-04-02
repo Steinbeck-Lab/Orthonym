@@ -20,14 +20,14 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
-from src.orthonym.rules.bicyclo import (
+from orthonym.rules.bicyclo import (
     get_bicyclo_numbering,
     get_bicyclo_substituents,
     detect_bicyclo_unsaturation,
     get_complete_bicyclo_data,
     get_bicyclo_ring_atoms,
 )
-from src.orthonym.namer import name_compound
+from orthonym.namer import name_compound
 
 
 # ============================================================================

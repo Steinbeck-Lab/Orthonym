@@ -6,7 +6,7 @@ priority ordering, and complete HW name building.
 """
 
 import pytest
-from src.orthonym.data.hw_heteroatoms import (
+from orthonym.data.hw_heteroatoms import (
     HW_PREFIXES,
     HETEROATOM_PRIORITY,
     get_hw_prefix,
@@ -14,7 +14,7 @@ from src.orthonym.data.hw_heteroatoms import (
     compare_heteroatom_priority,
     sort_heteroatoms_by_priority,
 )
-from src.orthonym.data.hw_stems import (
+from orthonym.data.hw_stems import (
     HW_STEMS,
     HETEROATOMS_USE_ANE,
     HETEROATOMS_USE_INANE,

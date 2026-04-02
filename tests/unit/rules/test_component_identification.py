@@ -12,11 +12,11 @@ Tests that _identify_ring_name() correctly distinguishes:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.fusion_descriptors import (
+from orthonym.rules.fusion_descriptors import (
     _identify_ring_name,
     identify_parent_and_child,
 )
-from src.orthonym.data.fusion_components import (
+from orthonym.data.fusion_components import (
     MONOCYCLIC_COMPONENTS,
     get_component_by_pattern,
     get_component_seniority,

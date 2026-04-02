@@ -16,8 +16,8 @@ Requirements tested:
 import pytest
 from rdkit import Chem
 
-from src.orthonym import name_compound
-from src.orthonym.assembly.composer import _classify_complex_ring
+from orthonym import name_compound
+from orthonym.assembly.composer import _classify_complex_ring
 
 
 # =============================================================================

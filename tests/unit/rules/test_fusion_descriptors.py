@@ -14,7 +14,7 @@ Tests cover:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.fusion_descriptors import (
+from orthonym.rules.fusion_descriptors import (
     EDGE_LETTERS,
     get_fusion_edge,
     get_fusion_letter,
@@ -486,7 +486,7 @@ class TestIdentifyParentAndChild:
         mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
         ring_atoms = list(mol.GetRingInfo().AtomRings()[0])
 
-        from src.orthonym.rules.fusion_descriptors import _identify_ring_name
+        from orthonym.rules.fusion_descriptors import _identify_ring_name
         name = _identify_ring_name(mol, ring_atoms)
         assert name == 'benzene'
 
@@ -496,7 +496,7 @@ class TestIdentifyParentAndChild:
         mol = Chem.MolFromSmiles('c1ccoc1')  # furan
         ring_atoms = list(mol.GetRingInfo().AtomRings()[0])
 
-        from src.orthonym.rules.fusion_descriptors import _identify_ring_name
+        from orthonym.rules.fusion_descriptors import _identify_ring_name
         name = _identify_ring_name(mol, ring_atoms)
         assert name == 'furan'
 
@@ -506,7 +506,7 @@ class TestIdentifyParentAndChild:
         mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
         ring_atoms = list(mol.GetRingInfo().AtomRings()[0])
 
-        from src.orthonym.rules.fusion_descriptors import _identify_ring_name
+        from orthonym.rules.fusion_descriptors import _identify_ring_name
         name = _identify_ring_name(mol, ring_atoms)
         assert name == 'pyridine'
 
@@ -516,7 +516,7 @@ class TestIdentifyParentAndChild:
         mol = Chem.MolFromSmiles('c1ccsc1')  # thiophene
         ring_atoms = list(mol.GetRingInfo().AtomRings()[0])
 
-        from src.orthonym.rules.fusion_descriptors import _identify_ring_name
+        from orthonym.rules.fusion_descriptors import _identify_ring_name
         name = _identify_ring_name(mol, ring_atoms)
         assert name == 'thiophene'
 
@@ -526,7 +526,7 @@ class TestIdentifyParentAndChild:
         mol = Chem.MolFromSmiles('c1cc[nH]c1')  # pyrrole
         ring_atoms = list(mol.GetRingInfo().AtomRings()[0])
 
-        from src.orthonym.rules.fusion_descriptors import _identify_ring_name
+        from orthonym.rules.fusion_descriptors import _identify_ring_name
         name = _identify_ring_name(mol, ring_atoms)
         assert name == 'pyrrole'
 

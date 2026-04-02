@@ -1,7 +1,7 @@
 """Unit tests for ion/radical perception."""
 import pytest
 from rdkit import Chem
-from src.orthonym.perception.ions import (
+from orthonym.perception.ions import (
     detect_species_type,
     get_ion_sites,
     get_radical_sites,

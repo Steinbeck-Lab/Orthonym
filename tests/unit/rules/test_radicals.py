@@ -9,7 +9,7 @@ Tests radical naming according to IUPAC 2013 P-71:
 """
 import pytest
 from rdkit import Chem
-from src.orthonym.rules.radicals import (
+from orthonym.rules.radicals import (
     classify_radical,
     name_radical,
     get_radical_suffix,
@@ -23,7 +23,7 @@ from src.orthonym.rules.radicals import (
     RADICAL_TYPE_NAMES,
     RETAINED_RADICALS,
 )
-from src.orthonym.perception.ions import get_radical_sites
+from orthonym.perception.ions import get_radical_sites
 
 
 # =============================================================================
@@ -87,7 +87,7 @@ class TestRadicalConstants:
 
     def test_chain_prefixes_available(self):
         """Chain prefixes accessible via centralized chain_names module."""
-        from src.orthonym.data.chain_names import get_chain_prefix
+        from orthonym.data.chain_names import get_chain_prefix
         assert get_chain_prefix(1) == 'meth'
         assert get_chain_prefix(2) == 'eth'
         assert get_chain_prefix(3) == 'prop'

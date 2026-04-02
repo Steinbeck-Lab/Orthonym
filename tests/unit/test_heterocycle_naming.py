@@ -16,8 +16,8 @@ Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
 import pytest
 from rdkit import Chem
 
-from src.orthonym import name_compound
-from src.orthonym.rules.heterocycles import (
+from orthonym import name_compound
+from orthonym.rules.heterocycles import (
     name_heterocycle,
     build_hw_name,
     get_ring_canonical_smiles,

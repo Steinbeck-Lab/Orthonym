@@ -3,7 +3,7 @@
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.sulfur import (
+from orthonym.rules.sulfur import (
     name_thiol,
     name_sulfide,
     name_sulfoxide,

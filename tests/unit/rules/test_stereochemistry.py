@@ -9,7 +9,7 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
-from src.orthonym.rules.stereochemistry import (
+from orthonym.rules.stereochemistry import (
     collect_stereodescriptors,
     collect_ring_stereodescriptors,
     format_stereodescriptor_string,
@@ -566,7 +566,7 @@ class TestAssignStereochemistryIdempotent:
 
     def test_assign_stereochemistry_sets_marker(self):
         """assign_stereochemistry() sets the marker property after first call."""
-        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
+        from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
 
@@ -584,7 +584,7 @@ class TestAssignStereochemistryIdempotent:
 
     def test_assign_stereochemistry_idempotent_with_marker(self):
         """assign_stereochemistry() skips re-assignment when marker already set."""
-        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
+        from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
         # Simulate the authoritative call in namer.py _perceive()
@@ -610,7 +610,7 @@ class TestAssignStereochemistryIdempotent:
 
     def test_assign_stereochemistry_idempotent_bonds_with_marker(self):
         """assign_stereochemistry() preserves E/Z bond codes when marker set."""
-        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
+        from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C/C=C/C')  # (E)-but-2-ene
         rdCIPLabeler.AssignCIPLabels(mol)
@@ -635,7 +635,7 @@ class TestAssignStereochemistryIdempotent:
 
     def test_assign_stereochemistry_assigns_if_no_marker(self):
         """assign_stereochemistry() assigns CIP labels when no marker is present."""
-        from src.orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
+        from orthonym.perception.stereo import assign_stereochemistry, _CIP_ASSIGNED_PROP
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
 
@@ -674,7 +674,7 @@ class TestPseudoasymmetricPreservation:
 
     def test_get_stereocenters_preserves_cip_case(self):
         """get_stereocenters preserves CIP code case as returned by RDKit."""
-        from src.orthonym.perception.stereo import get_stereocenters
+        from orthonym.perception.stereo import get_stereocenters
 
         mol = Chem.MolFromSmiles('C[C@@H](O)CC')
         rdCIPLabeler.AssignCIPLabels(mol)

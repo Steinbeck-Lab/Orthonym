@@ -11,7 +11,7 @@ Tests:
 
 import pytest
 from rdkit import Chem
-from src.orthonym.data.fused_heterocycles import (
+from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
@@ -522,7 +522,7 @@ class TestIUPACLocantMappings:
         - Positions 4-7: benzene ring carbons
         - Position 7a: fusion atom
         """
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         indole_data = FUSED_HETEROCYCLE_DATA['c1ccc2[nH]ccc2c1']
         locants = indole_data['iupac_locants']
@@ -552,7 +552,7 @@ class TestIUPACLocantMappings:
         - C6: pyrimidine carbon
         - N7, C8, N9: imidazole atoms (N9 has H)
         """
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         purine_data = FUSED_HETEROCYCLE_DATA['c1ncc2nc[nH]c2n1']
         locants = purine_data['iupac_locants']
@@ -577,7 +577,7 @@ class TestIUPACLocantMappings:
         - Positions 5,6,7,8: benzene ring
         - Position 8a: fusion
         """
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         quinoline_data = FUSED_HETEROCYCLE_DATA['c1ccc2ncccc2c1']
         locants = quinoline_data['iupac_locants']
@@ -678,7 +678,7 @@ class TestIUPACLocantMappings:
     @pytest.mark.unit
     def test_all_entries_have_iupac_locants(self):
         """All FUSED_HETEROCYCLE_DATA entries should have iupac_locants field."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         missing = []
         for smiles, data in FUSED_HETEROCYCLE_DATA.items():
@@ -695,7 +695,7 @@ class TestIUPACLocantMappings:
     @pytest.mark.unit
     def test_iupac_locants_mapping_size_matches_parent_atoms(self):
         """Each iupac_locants mapping should have same size as parent_atoms."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mismatches = []
         for smiles, data in FUSED_HETEROCYCLE_DATA.items():
@@ -717,7 +717,7 @@ class TestChromeneVariants:
     def test_coumarin_in_data(self):
         """Coumarin should be in FUSED_HETEROCYCLE_DATA."""
         from rdkit import Chem
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mol = Chem.MolFromSmiles('O=c1ccc2ccccc2o1')
         canonical = Chem.MolToSmiles(mol)
@@ -727,7 +727,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_coumarin_systematic_name(self):
         """Coumarin should have correct systematic name."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         coumarin_data = FUSED_HETEROCYCLE_DATA['O=c1ccc2ccccc2o1']
         assert coumarin_data['systematic'] == '2H-chromen-2-one'
@@ -736,7 +736,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_coumarin_e2e(self):
         """O=c1ccc2ccccc2o1 should return coumarin or chromen-2-one."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound('O=c1ccc2ccccc2o1')
         result_lower = result.lower()
         assert 'coumarin' in result_lower or 'chromen' in result_lower, f"Got {result}"
@@ -745,7 +745,7 @@ class TestChromeneVariants:
     def test_dihydrobenzofuran_in_data(self):
         """2,3-dihydro-1-benzofuran should be in FUSED_HETEROCYCLE_DATA."""
         from rdkit import Chem
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mol = Chem.MolFromSmiles('C1Cc2ccccc2O1')
         canonical = Chem.MolToSmiles(mol)
@@ -756,7 +756,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_dihydrobenzofuran_e2e(self):
         """C1Cc2ccccc2O1 should return 2,3-dihydro-1-benzofuran."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound('C1Cc2ccccc2O1')
         result_lower = result.lower()
         assert 'benzofuran' in result_lower or 'dihydro' in result_lower, f"Got {result}"
@@ -765,7 +765,7 @@ class TestChromeneVariants:
     def test_chromane_already_exists(self):
         """Chromane (3,4-dihydro-2H-chromene) should already be in data."""
         from rdkit import Chem
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCO2')
         canonical = Chem.MolToSmiles(mol)
@@ -776,7 +776,7 @@ class TestChromeneVariants:
     def test_isochromane_already_exists(self):
         """Isochromane should already be in data."""
         from rdkit import Chem
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCOC2')
         canonical = Chem.MolToSmiles(mol)
@@ -786,7 +786,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_2h_chromene_exists(self):
         """2H-chromene should be in data."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         # 2H-chromene canonical SMILES
         assert 'C1=Cc2ccccc2OC1' in FUSED_HETEROCYCLE_DATA
@@ -795,7 +795,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_coumarin_ring_system_type(self):
         """Coumarin should have lactone ring system classification."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         coumarin_data = FUSED_HETEROCYCLE_DATA['O=c1ccc2ccccc2o1']
         assert coumarin_data['ring_system'] == 'benzo-6-membered-lactone'
@@ -804,7 +804,7 @@ class TestChromeneVariants:
     @pytest.mark.unit
     def test_dihydrobenzofuran_ring_system_type(self):
         """2,3-dihydro-1-benzofuran should have saturated ring system."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)CCO2']
         assert data['ring_system'] == 'benzo-5-membered-saturated'

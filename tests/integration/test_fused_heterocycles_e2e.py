@@ -15,8 +15,8 @@ Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 
 import pytest
 from rdkit import Chem
-from src.orthonym import name_compound
-from src.orthonym.rules.fused_rings import name_fused_heterocycle as _name_fused_heterocycle_raw
+from orthonym import name_compound
+from orthonym.rules.fused_rings import name_fused_heterocycle as _name_fused_heterocycle_raw
 
 
 def name_fused_heterocycle(mol):
@@ -244,13 +244,13 @@ class TestDataCoverage:
     @pytest.mark.integration
     def test_minimum_entry_count(self):
         """Should have at least 35 fused heterocycle entries (Phase 7 target: 38)."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         assert len(FUSED_HETEROCYCLE_DATA) >= 35, f"Only {len(FUSED_HETEROCYCLE_DATA)} entries"
 
     @pytest.mark.integration
     def test_all_entries_have_locants(self):
         """All entries should have iupac_locants field."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         missing = []
         for smiles, data in FUSED_HETEROCYCLE_DATA.items():
             if 'iupac_locants' not in data:
@@ -260,7 +260,7 @@ class TestDataCoverage:
     @pytest.mark.integration
     def test_key_fused_heterocycles_present(self):
         """Verify key fused heterocycles are in the data."""
-        from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         expected_names = [
             '1H-indole',

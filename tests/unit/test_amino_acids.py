@@ -140,7 +140,7 @@ class TestAminoAcidDetection:
     def test_not_amino_acid_acid_only(self):
         """Simple carboxylic acid is not an amino acid."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import detect_amino_acid
+        from orthonym.rules.amino_acids import detect_amino_acid
 
         # Simple acid - no amino group
         mol = Chem.MolFromSmiles("CC(=O)O")
@@ -149,7 +149,7 @@ class TestAminoAcidDetection:
     def test_not_amino_acid_amine_only(self):
         """Simple amine is not an amino acid."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import detect_amino_acid
+        from orthonym.rules.amino_acids import detect_amino_acid
 
         # Simple amine - no acid
         mol = Chem.MolFromSmiles("CCN")
@@ -158,7 +158,7 @@ class TestAminoAcidDetection:
     def test_is_amino_acid_glycine(self):
         """Glycine is detected as amino acid."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import detect_amino_acid
+        from orthonym.rules.amino_acids import detect_amino_acid
 
         mol = Chem.MolFromSmiles("NCC(=O)O")
         assert detect_amino_acid(mol) is True
@@ -166,7 +166,7 @@ class TestAminoAcidDetection:
     def test_is_amino_acid_alanine(self):
         """Alanine is detected as amino acid."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import detect_amino_acid
+        from orthonym.rules.amino_acids import detect_amino_acid
 
         mol = Chem.MolFromSmiles("CC(N)C(=O)O")
         assert detect_amino_acid(mol) is True
@@ -174,7 +174,7 @@ class TestAminoAcidDetection:
     def test_proline_detected(self):
         """Proline (cyclic) is detected as amino acid."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import detect_amino_acid
+        from orthonym.rules.amino_acids import detect_amino_acid
 
         mol = Chem.MolFromSmiles("OC(=O)C1CCCN1")
         assert detect_amino_acid(mol) is True
@@ -185,7 +185,7 @@ class TestSystematicAminoAcidNaming:
 
     def test_2_aminopropanoic_acid_systematic(self):
         """Test systematic naming function directly."""
-        from src.orthonym.rules.amino_acids import _name_amino_acid_systematic
+        from orthonym.rules.amino_acids import _name_amino_acid_systematic
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles("CC(N)C(=O)O")
@@ -194,7 +194,7 @@ class TestSystematicAminoAcidNaming:
 
     def test_2_aminobutanoic_acid_systematic(self):
         """Test 4-carbon amino acid systematic."""
-        from src.orthonym.rules.amino_acids import _name_amino_acid_systematic
+        from orthonym.rules.amino_acids import _name_amino_acid_systematic
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles("CCC(N)C(=O)O")
@@ -207,17 +207,17 @@ class TestAminoAcidDataModule:
 
     def test_get_amino_acid_name_glycine(self):
         """get_amino_acid_name returns glycine."""
-        from src.orthonym.data.amino_acids import get_amino_acid_name
+        from orthonym.data.amino_acids import get_amino_acid_name
         assert get_amino_acid_name("NCC(=O)O") == "glycine"
 
     def test_get_amino_acid_name_unknown(self):
         """get_amino_acid_name returns None for unknown."""
-        from src.orthonym.data.amino_acids import get_amino_acid_name
+        from orthonym.data.amino_acids import get_amino_acid_name
         assert get_amino_acid_name("CCCCC") is None
 
     def test_is_standard_amino_acid(self):
         """is_standard_amino_acid works correctly."""
-        from src.orthonym.data.amino_acids import is_standard_amino_acid
+        from orthonym.data.amino_acids import is_standard_amino_acid
         assert is_standard_amino_acid("NCC(=O)O") is True
         assert is_standard_amino_acid("CC(N)C(=O)O") is True
         assert is_standard_amino_acid("CCCCC") is False
@@ -229,7 +229,7 @@ class TestNSubstitutedAminoAcidDetection:
     def test_sarcosine_is_n_substituted(self):
         """Sarcosine (N-methylglycine) should be detected as N-substituted."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import is_n_substituted_amino_acid
+        from orthonym.rules.amino_acids import is_n_substituted_amino_acid
 
         mol = Chem.MolFromSmiles("CNCC(=O)O")
         assert is_n_substituted_amino_acid(mol) is True
@@ -237,7 +237,7 @@ class TestNSubstitutedAminoAcidDetection:
     def test_glycine_not_n_substituted(self):
         """Glycine is not N-substituted."""
         from rdkit import Chem
-        from src.orthonym.rules.amino_acids import is_n_substituted_amino_acid
+        from orthonym.rules.amino_acids import is_n_substituted_amino_acid
 
         mol = Chem.MolFromSmiles("NCC(=O)O")
         assert is_n_substituted_amino_acid(mol) is False

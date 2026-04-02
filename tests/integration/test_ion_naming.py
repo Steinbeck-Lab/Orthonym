@@ -1,6 +1,6 @@
 """Integration tests for complete ion naming pipeline."""
 import pytest
-from src.orthonym.namer import name_compound
+from orthonym.namer import name_compound
 
 
 class TestAnionNaming:
@@ -171,7 +171,7 @@ class TestSpeciesTypeDetection:
 
     def test_salt_detection(self):
         """Test that salts are routed correctly."""
-        from src.orthonym.perception.ions import detect_species_type
+        from orthonym.perception.ions import detect_species_type
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles('[Na+].[Cl-]')
@@ -179,7 +179,7 @@ class TestSpeciesTypeDetection:
 
     def test_ion_detection(self):
         """Test that single ions are detected correctly."""
-        from src.orthonym.perception.ions import detect_species_type
+        from orthonym.perception.ions import detect_species_type
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles('[NH4+]')
@@ -187,7 +187,7 @@ class TestSpeciesTypeDetection:
 
     def test_zwitterion_detection(self):
         """Test that zwitterions are detected correctly."""
-        from src.orthonym.perception.ions import detect_species_type
+        from orthonym.perception.ions import detect_species_type
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
@@ -195,7 +195,7 @@ class TestSpeciesTypeDetection:
 
     def test_radical_detection(self):
         """Test that radicals are detected correctly."""
-        from src.orthonym.perception.ions import detect_species_type
+        from orthonym.perception.ions import detect_species_type
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles('[CH3]')
@@ -203,7 +203,7 @@ class TestSpeciesTypeDetection:
 
     def test_neutral_detection(self):
         """Test that neutral molecules are detected correctly."""
-        from src.orthonym.perception.ions import detect_species_type
+        from orthonym.perception.ions import detect_species_type
         from rdkit import Chem
 
         mol = Chem.MolFromSmiles('CCO')
@@ -215,7 +215,7 @@ class TestMolecularFeaturesIonFields:
 
     def test_salt_features(self):
         """Test that salt features are populated."""
-        from src.orthonym.namer import Orthonym
+        from orthonym.namer import Orthonym
         from rdkit import Chem
 
         namer = Orthonym()
@@ -231,7 +231,7 @@ class TestMolecularFeaturesIonFields:
 
     def test_radical_features(self):
         """Test that radical features are populated."""
-        from src.orthonym.namer import Orthonym
+        from orthonym.namer import Orthonym
         from rdkit import Chem
 
         namer = Orthonym()
@@ -246,7 +246,7 @@ class TestMolecularFeaturesIonFields:
 
     def test_neutral_features(self):
         """Test that neutral molecule features have default values."""
-        from src.orthonym.namer import Orthonym
+        from orthonym.namer import Orthonym
         from rdkit import Chem
 
         namer = Orthonym()

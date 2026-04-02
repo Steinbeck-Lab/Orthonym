@@ -11,7 +11,7 @@ Tests:
 
 import pytest
 from rdkit import Chem
-from src.orthonym.data.xanthine_derivatives import (
+from orthonym.data.xanthine_derivatives import (
     XANTHINE_DERIVATIVES,
     identify_xanthine,
     get_xanthine_name,

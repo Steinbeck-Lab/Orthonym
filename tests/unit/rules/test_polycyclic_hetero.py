@@ -16,7 +16,7 @@ Reference: IUPAC 2013 Blue Book P-23.4 and P-25.5
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.polycyclic import (
+from orthonym.rules.polycyclic import (
     HETEROATOM_PREFIXES,
     get_heteroatom_replacement_prefix,
     detect_polycyclic_lactone,

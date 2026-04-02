@@ -13,7 +13,7 @@ Coverage of IUPAC 2013 P-23.3 (polycyclic ring systems).
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.polycyclic_bridged import (
+from orthonym.rules.polycyclic_bridged import (
     get_ring_count,
     count_cuts_to_open,
     classify_bridged_system,
@@ -287,7 +287,7 @@ class TestPolycyclicIntegration:
 # Tests for Zero-Length Secondary Bridges (Plan 16-08)
 # ============================================================================
 
-from src.orthonym.rules.polycyclic import VonBaeyerAnalyzer, generate_polycyclic_name
+from orthonym.rules.polycyclic import VonBaeyerAnalyzer, generate_polycyclic_name
 
 
 def _get_ring_atoms(mol):

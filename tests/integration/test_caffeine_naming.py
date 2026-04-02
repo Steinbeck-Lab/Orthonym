@@ -14,7 +14,7 @@ These compounds require specific N-position numbering:
 """
 
 import pytest
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 class TestCaffeineNaming:

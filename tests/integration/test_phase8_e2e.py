@@ -22,9 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from rdkit import Chem
 
-from src.orthonym import name_compound as name_molecule
-from src.orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
-from src.orthonym.data.retained_names import RETAINED_NAMES
+from orthonym import name_compound as name_molecule
+from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+from orthonym.data.retained_names import RETAINED_NAMES
 
 
 class TestEXT01PartialSaturation:

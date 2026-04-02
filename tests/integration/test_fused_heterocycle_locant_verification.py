@@ -13,8 +13,8 @@ Requirements tested:
 import pytest
 from rdkit import Chem
 
-from src.orthonym import name_compound
-from src.orthonym.data.fused_heterocycles import (
+from orthonym import name_compound
+from orthonym.data.fused_heterocycles import (
     match_fused_heterocycle_core,
     FUSED_HETEROCYCLE_DATA,
 )

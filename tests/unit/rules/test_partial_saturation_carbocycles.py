@@ -17,13 +17,13 @@ IUPAC 2013 Blue Book P-31.1.1:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.partial_saturation import (
+from orthonym.rules.partial_saturation import (
     detect_carbocyclic_partial_saturation,
     is_tetrahydronaphthalene,
     format_saturation_prefix,
     get_saturation_prefix,
 )
-from src.orthonym.namer import name_compound
+from orthonym.namer import name_compound
 
 
 class TestCarbocyclicPartialSaturationDetection:

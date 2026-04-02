@@ -14,7 +14,7 @@ Reference: IUPAC 2013 Blue Book, Sections P-23 (Bridged Systems),
 """
 
 import pytest
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 # =============================================================================

@@ -7,7 +7,7 @@ Tests ion classification and naming functions per IUPAC 2013 P-72/P-73.
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.ions import (
+from orthonym.rules.ions import (
     classify_anion,
     classify_cation,
     name_anion,
@@ -20,7 +20,7 @@ from src.orthonym.rules.ions import (
     get_anion_suffix,
     get_cation_suffix,
 )
-from src.orthonym.perception.ions import get_ion_sites
+from orthonym.perception.ions import get_ion_sites
 
 
 class TestClassifyAnion:
@@ -582,8 +582,8 @@ class TestAromaticCarboxylateHelpers:
 
     def test_find_carboxyl_carbon_acetate(self):
         """_find_carboxyl_carbon should find the carboxyl C in acetate."""
-        from src.orthonym.rules.ions import _find_carboxyl_carbon
-        from src.orthonym.perception.ions import get_ion_sites
+        from orthonym.rules.ions import _find_carboxyl_carbon
+        from orthonym.perception.ions import get_ion_sites
 
         mol = Chem.MolFromSmiles('CC(=O)[O-]')
         sites = get_ion_sites(mol)
@@ -595,8 +595,8 @@ class TestAromaticCarboxylateHelpers:
 
     def test_find_carboxyl_carbon_benzoate(self):
         """_find_carboxyl_carbon should find the carboxyl C in benzoate."""
-        from src.orthonym.rules.ions import _find_carboxyl_carbon
-        from src.orthonym.perception.ions import get_ion_sites
+        from orthonym.rules.ions import _find_carboxyl_carbon
+        from orthonym.perception.ions import get_ion_sites
 
         mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
         sites = get_ion_sites(mol)
@@ -607,8 +607,8 @@ class TestAromaticCarboxylateHelpers:
 
     def test_detect_aromatic_benzoate(self):
         """_detect_aromatic_carboxylate should return 'benzoate' for benzene attachment."""
-        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
-        from src.orthonym.perception.ions import get_ion_sites
+        from orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from orthonym.perception.ions import get_ion_sites
 
         mol = Chem.MolFromSmiles('O=C([O-])c1ccccc1')
         sites = get_ion_sites(mol)
@@ -618,8 +618,8 @@ class TestAromaticCarboxylateHelpers:
 
     def test_detect_aromatic_naphthoate(self):
         """_detect_aromatic_carboxylate should return 'naphthoate' for naphthalene attachment."""
-        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
-        from src.orthonym.perception.ions import get_ion_sites
+        from orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from orthonym.perception.ions import get_ion_sites
 
         mol = Chem.MolFromSmiles('O=C([O-])c1ccc2ccccc2c1')
         sites = get_ion_sites(mol)
@@ -629,8 +629,8 @@ class TestAromaticCarboxylateHelpers:
 
     def test_detect_aromatic_none_for_acyclic(self):
         """_detect_aromatic_carboxylate should return None for acyclic carboxylates."""
-        from src.orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
-        from src.orthonym.perception.ions import get_ion_sites
+        from orthonym.rules.ions import _find_carboxyl_carbon, _detect_aromatic_carboxylate
+        from orthonym.perception.ions import get_ion_sites
 
         mol = Chem.MolFromSmiles('CC(=O)[O-]')
         sites = get_ion_sites(mol)

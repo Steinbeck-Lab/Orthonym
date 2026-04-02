@@ -13,7 +13,7 @@ Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.fusion_descriptors import (
+from orthonym.rules.fusion_descriptors import (
     format_complex_fusion,
     handle_duplicate_edge_fusion,
     generate_multi_fusion_descriptor,
@@ -24,7 +24,7 @@ from src.orthonym.rules.fusion_descriptors import (
     get_fusion_edge,
     EDGE_LETTERS,
 )
-from src.orthonym.data.polycyclic_data import (
+from orthonym.data.polycyclic_data import (
     COMPLEX_FUSION_DATA,
     get_complex_fusion_info,
     get_complex_fusion_by_name,

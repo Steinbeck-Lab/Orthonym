@@ -51,7 +51,7 @@ class TestGenerateStereodescriptorsOverride:
 
     def test_override_map_used_when_provided(self):
         """Test 1: Override map takes priority over features.atom_to_locant."""
-        from src.orthonym.assembly.composer import _generate_stereodescriptors
+        from orthonym.assembly.composer import _generate_stereodescriptors
 
         # C[C@H](O)CC -- atom 1 is the stereocenter
         # With features.atom_to_locant = {0:1, 1:2, 3:3, 4:4}, stereocenter at locant 2
@@ -72,7 +72,7 @@ class TestGenerateStereodescriptorsOverride:
 
     def test_fallback_to_features_when_no_override(self):
         """Test 2: Without override, falls back to features.atom_to_locant (backward compat)."""
-        from src.orthonym.assembly.composer import _generate_stereodescriptors
+        from orthonym.assembly.composer import _generate_stereodescriptors
 
         features = _make_features(
             'C[C@H](O)CC',
@@ -93,7 +93,7 @@ class TestInjectStereoIfMissing:
 
     def test_forwards_override_to_generate(self):
         """Test 3: atom_to_locant is forwarded to _generate_stereodescriptors."""
-        from src.orthonym.assembly.composer import _inject_stereo_if_missing
+        from orthonym.assembly.composer import _inject_stereo_if_missing
 
         features = _make_features(
             'C[C@H](O)CC',
@@ -110,7 +110,7 @@ class TestInjectStereoIfMissing:
 
     def test_backward_compat_no_third_arg(self):
         """Test 4: Calling with only (features, name) works identically to before."""
-        from src.orthonym.assembly.composer import _inject_stereo_if_missing
+        from orthonym.assembly.composer import _inject_stereo_if_missing
 
         features = _make_features(
             'C[C@H](O)CC',
@@ -132,7 +132,7 @@ class TestGetStereodescriptorStringDelegation:
 
     def test_with_explicit_locant_map(self):
         """Test 5: With locant_map, uses collect_stereodescriptors correctly."""
-        from src.orthonym.perception.stereo import get_stereodescriptor_string
+        from orthonym.perception.stereo import get_stereodescriptor_string
 
         mol = Chem.MolFromSmiles('C[C@H](O)CC')
         rdCIPLabeler.AssignCIPLabels(mol)
@@ -146,7 +146,7 @@ class TestGetStereodescriptorStringDelegation:
 
     def test_with_none_locant_map_uses_identity(self):
         """Test 6: With locant_map=None, uses identity mapping (idx+1)."""
-        from src.orthonym.perception.stereo import get_stereodescriptor_string
+        from orthonym.perception.stereo import get_stereodescriptor_string
 
         mol = Chem.MolFromSmiles('C[C@H](O)CC')
         rdCIPLabeler.AssignCIPLabels(mol)
@@ -158,7 +158,7 @@ class TestGetStereodescriptorStringDelegation:
 
     def test_ez_backward_compat(self):
         """Test 7: E/Z output matches existing test case (2E)- for but-2-ene."""
-        from src.orthonym.perception.stereo import get_stereodescriptor_string
+        from orthonym.perception.stereo import get_stereodescriptor_string
 
         mol = Chem.MolFromSmiles('C/C=C/C')
         rdCIPLabeler.AssignCIPLabels(mol)

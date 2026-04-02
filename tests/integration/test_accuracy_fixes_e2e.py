@@ -12,7 +12,7 @@ These tests ensure all accuracy fixes work together without regression
 and cover the compound classes identified in GAP_ANALYSIS.md.
 """
 import pytest
-from src.orthonym.namer import name_compound
+from orthonym.namer import name_compound
 
 
 class TestBug1AromaticSubstituents:

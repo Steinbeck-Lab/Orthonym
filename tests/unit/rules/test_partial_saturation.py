@@ -15,7 +15,7 @@ hydrogen to specified positions of an otherwise unsaturated parent structure.
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.partial_saturation import (
+from orthonym.rules.partial_saturation import (
     detect_partial_saturation,
     get_saturation_prefix,
     format_saturation_prefix,
@@ -25,14 +25,14 @@ from src.orthonym.rules.partial_saturation import (
     count_ring_sp3_atoms,
     get_ring_saturation_level,
 )
-from src.orthonym.data.partial_saturation_refs import (
+from orthonym.data.partial_saturation_refs import (
     AROMATIC_REFERENCES,
     get_aromatic_reference,
     get_reference_smiles,
     get_reference_ring_atoms,
     list_reference_names,
 )
-from src.orthonym.assembly.composer import (
+from orthonym.assembly.composer import (
     get_saturation_prefix_for_fused_ring,
     assemble_fused_ring_with_saturation,
 )
@@ -237,21 +237,21 @@ class TestE2ESaturationNaming:
 
     def test_tetrahydroquinoline_e2e(self):
         """Test that tetrahydroquinoline gets correct retained name."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
 
         result = name_compound('c1ccc2c(c1)CCCN2')
         assert result == '1,2,3,4-tetrahydroquinoline'
 
     def test_indoline_e2e(self):
         """Test that indoline gets correct retained name."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
 
         result = name_compound('c1ccc2c(c1)CCN2')
         assert result == 'indoline'
 
     def test_tetrahydroisoquinoline_e2e(self):
         """Test tetrahydroisoquinoline naming."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
 
         result = name_compound('c1ccc2c(c1)CCNC2')
         assert result == '1,2,3,4-tetrahydroisoquinoline'

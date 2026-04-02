@@ -15,14 +15,14 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
-from src.orthonym.rules.stereochemistry import (
+from orthonym.rules.stereochemistry import (
     get_bridgehead_atoms,
     collect_ring_junction_stereo,
     format_ring_junction_stereo,
     determine_simple_cis_trans,
     get_junction_locants_for_fused_system,
 )
-from src.orthonym.rules.fused_rings import (
+from orthonym.rules.fused_rings import (
     name_saturated_fused_bicyclic,
     get_ring_junction_stereo_prefix,
     get_simple_cis_trans_prefix,

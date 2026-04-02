@@ -15,7 +15,7 @@ Tests the complete SMILES -> name pipeline for natural products:
 import pytest
 from rdkit import Chem
 
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------

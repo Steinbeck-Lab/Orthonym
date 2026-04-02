@@ -1,7 +1,7 @@
 """End-to-end tests for phosphorus compound naming."""
 
 import pytest
-from src.orthonym import name_compound
+from orthonym import name_compound
 
 
 class TestPhosphineE2E:

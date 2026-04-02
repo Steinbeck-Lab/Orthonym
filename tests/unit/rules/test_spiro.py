@@ -13,7 +13,7 @@ IUPAC spiro rules:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.spiro import (
+from orthonym.rules.spiro import (
     is_spiro_system,
     get_spiro_ring_sizes,
     generate_spiro_descriptor,
@@ -30,7 +30,7 @@ def name_spiro_system(mol):
     if result is None:
         return None
     return result[0]
-from src.orthonym.perception.rings import get_spiro_atoms
+from orthonym.perception.rings import get_spiro_atoms
 
 
 class TestIsSpiroSystem:
@@ -389,7 +389,7 @@ class TestDispiroRouting:
     @pytest.mark.unit
     def test_dispiro_classified_as_spiro(self):
         """Dispiro compound classified as 'spiro' not 'polycyclic-bridged'."""
-        from src.orthonym.assembly.composer import _classify_complex_ring
+        from orthonym.assembly.composer import _classify_complex_ring
         mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')  # dispiro[2.1.2.1]octane
         assert _classify_complex_ring(mol) == 'spiro'
 
@@ -402,7 +402,7 @@ class TestDispiroRouting:
     @pytest.mark.unit
     def test_dispiro_larger_classified_as_spiro(self):
         """Larger dispiro compound also classified as 'spiro'."""
-        from src.orthonym.assembly.composer import _classify_complex_ring
+        from orthonym.assembly.composer import _classify_complex_ring
         mol = Chem.MolFromSmiles('C1CCCC12CCC1(CCCC1)CC2')  # dispiro[4.2.4.2]tetradecane
         assert _classify_complex_ring(mol) == 'spiro'
 

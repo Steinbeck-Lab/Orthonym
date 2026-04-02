@@ -3,7 +3,7 @@
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.phosphorus import (
+from orthonym.rules.phosphorus import (
     name_phosphine,
     name_phosphine_oxide,
     name_phosphonic_acid,

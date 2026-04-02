@@ -16,7 +16,7 @@ Coverage:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.bicyclo import (
+from orthonym.rules.bicyclo import (
     find_true_bridgeheads,
     is_bicyclo_system,
     find_bridge_paths,
@@ -25,7 +25,7 @@ from src.orthonym.rules.bicyclo import (
     name_bicyclo_system,
     get_bicyclo_ring_atoms,
 )
-from src.orthonym.data.bicyclo_systems import (
+from orthonym.data.bicyclo_systems import (
     get_retained_bicyclo_name,
     is_retained_bicyclo,
     BICYCLO_RETAINED_NAMES,

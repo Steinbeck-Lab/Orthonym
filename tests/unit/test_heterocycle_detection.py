@@ -17,7 +17,7 @@ IUPAC 2013 heterocycle numbering rules:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.heterocycles import (
+from orthonym.rules.heterocycles import (
     classify_heterocycle,
     number_heterocycle_ring,
     orient_heterocycle,

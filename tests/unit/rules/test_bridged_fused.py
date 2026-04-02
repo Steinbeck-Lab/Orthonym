@@ -16,7 +16,7 @@ Key concepts:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.bridged_fused import (
+from orthonym.rules.bridged_fused import (
     detect_bridged_fused,
     identify_fused_core,
     identify_bridges,

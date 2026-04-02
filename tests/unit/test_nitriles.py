@@ -11,7 +11,7 @@ Based on IUPAC 2013 Blue Book P-66.1.
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.nitriles import (
+from orthonym.rules.nitriles import (
     is_ring_attached_nitrile,
     get_nitrile_parent_chain,
     name_nitrile,
@@ -141,24 +141,24 @@ class TestNitrileIntegration:
 
     def test_acetonitrile_retained_name(self):
         """CC#N should be named acetonitrile (retained name)."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         assert name_compound("CC#N") == "acetonitrile"
 
     def test_propanenitrile_systematic(self):
         """CCC#N should be named propanenitrile (systematic)."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCC#N")
         assert result == "propanenitrile"
 
     def test_butanenitrile_systematic(self):
         """CCCC#N should be named butanenitrile."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCCC#N")
         assert result == "butanenitrile"
 
     def test_pentanenitrile_systematic(self):
         """CCCCC#N should be named pentanenitrile."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CCCCC#N")
         assert result == "pentanenitrile"
 
@@ -168,13 +168,13 @@ class TestSubstitutedNitriles:
 
     def test_2_methylpropanenitrile(self):
         """(CH3)2CH-CN should be 2-methylpropanenitrile."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CC(C)C#N")
         assert result == "2-methylpropanenitrile"
 
     def test_3_methylbutanenitrile(self):
         """(CH3)2CH-CH2-CN should be 3-methylbutanenitrile."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("CC(C)CC#N")
         assert result == "3-methylbutanenitrile"
 
@@ -184,13 +184,13 @@ class TestRingAttachedNitriles:
 
     def test_cyclohexanecarbonitrile(self):
         """Nitrile attached to cyclohexane uses -carbonitrile suffix."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("C1CCCCC1C#N")
         assert result == "cyclohexanecarbonitrile"
 
     def test_cyclopentanecarbonitrile(self):
         """Nitrile attached to cyclopentane uses -carbonitrile suffix."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         result = name_compound("C1CCCC1C#N")
         assert result == "cyclopentanecarbonitrile"
 
@@ -200,7 +200,7 @@ class TestNitrileAsPrefix:
 
     def test_cyanoacetic_acid(self):
         """Acid is higher seniority than nitrile -> 2-cyanoacetic acid."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         # N#C-CH2-COOH
         result = name_compound("N#CCC(=O)O")
         # Acid is principal group, nitrile becomes cyano- prefix
@@ -212,7 +212,7 @@ class TestNitrileAmideIntegration:
 
     def test_cyanoacetamide(self):
         """Compound with both nitrile and amide -> amide is principal."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         # N#C-CH2-C(=O)NH2 - 2-cyanoacetamide
         result = name_compound("NC(=O)CC#N")
         # Amide is higher seniority than nitrile
@@ -220,7 +220,7 @@ class TestNitrileAmideIntegration:
 
     def test_aminoacetonitrile(self):
         """Compound with amine and nitrile -> nitrile is principal."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
         # H2N-CH2-C#N
         result = name_compound("NCC#N")
         # Nitrile is higher seniority than amine

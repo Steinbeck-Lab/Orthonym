@@ -13,7 +13,7 @@ Tests cover:
 import pytest
 from rdkit import Chem
 
-from src.orthonym.rules.fused_rings import (
+from orthonym.rules.fused_rings import (
     classify_fused_system,
     is_fused_bicyclic,
     name_fused_heterocycle as _name_fused_heterocycle_raw,
@@ -39,7 +39,7 @@ def name_ortho_fused_bicyclic(mol):
     if result is None:
         return None
     return result[0]
-from src.orthonym.data.fused_heterocycles import match_fused_heterocycle_core
+from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
 
 
 # ============================================================================
@@ -537,7 +537,7 @@ class TestOxoAminoFusedHeterocycles:
     @pytest.mark.unit
     def test_oxo_detection(self):
         """Verify oxo group (C=O) is correctly identified."""
-        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+        from orthonym.rules.fused_rings import _identify_fused_substituent
         # Hypoxanthine structure
         mol = Chem.MolFromSmiles('O=c1[nH]cnc2nc[nH]c12')
         # O is at index 0, core atoms are 1-9
@@ -550,7 +550,7 @@ class TestOxoAminoFusedHeterocycles:
     @pytest.mark.unit
     def test_amino_detection(self):
         """Verify amino group (-NH2) is correctly identified."""
-        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+        from orthonym.rules.fused_rings import _identify_fused_substituent
         # Adenine structure
         mol = Chem.MolFromSmiles('Nc1ncnc2nc[nH]c12')
         # N(amino) is at index 0, core atoms are 1-9
@@ -579,8 +579,8 @@ class TestOxoAminoFusedHeterocycles:
         substituent detection is bypassed. This test uses a compound that doesn't
         have a retained name to test the substituent detection pathway.
         """
-        from src.orthonym.rules.fused_rings import get_fused_heterocycle_substituents
-        from src.orthonym.data.fused_heterocycles import match_fused_heterocycle_core
+        from orthonym.rules.fused_rings import get_fused_heterocycle_substituents
+        from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
 
         # Test with 5-aminoindole (no retained name, so detection runs)
         mol = Chem.MolFromSmiles('Nc1ccc2[nH]ccc2c1')
@@ -718,7 +718,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_cyanomethyl_function_directly(self):
         """Test _identify_functionalized_substituent detects nitrile chains."""
-        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+        from orthonym.rules.fused_rings import _identify_functionalized_substituent
 
         # Simple nitrile: N#CC (acetonitrile without attachment)
         mol = Chem.MolFromSmiles('N#CC')
@@ -732,7 +732,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_indole_acetonitrile_e2e(self):
         """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
 
         result = name_compound('N#CCc1c[nH]c2ccccc12')
         assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
@@ -751,7 +751,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_indole_acetic_acid_e2e(self):
         """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'."""
-        from src.orthonym import name_compound
+        from orthonym import name_compound
 
         result = name_compound('OC(=O)Cc1c[nH]c2ccccc12')
         assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
@@ -770,7 +770,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_cyanoethyl_detection(self):
         """Test detection of 2-cyanoethyl substituent (3 carbons)."""
-        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+        from orthonym.rules.fused_rings import _identify_functionalized_substituent
 
         # Propionitrile: N#CCC
         mol = Chem.MolFromSmiles('N#CCC')
@@ -782,7 +782,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_carboxyethyl_detection(self):
         """Test detection of 2-carboxyethyl substituent."""
-        from src.orthonym.rules.fused_rings import _identify_functionalized_substituent
+        from orthonym.rules.fused_rings import _identify_functionalized_substituent
 
         # Propanoic acid: OC(=O)CC (3 carbons)
         mol = Chem.MolFromSmiles('OC(=O)CC')
@@ -795,7 +795,7 @@ class TestFunctionalizedSubstituents:
     @pytest.mark.unit
     def test_functionalized_fallback_in_identify_fused_substituent(self):
         """Test that _identify_fused_substituent uses functionalized fallback."""
-        from src.orthonym.rules.fused_rings import _identify_fused_substituent
+        from orthonym.rules.fused_rings import _identify_fused_substituent
 
         # Build indole-3-acetonitrile
         mol = Chem.MolFromSmiles('N#CCc1c[nH]c2ccccc12')
