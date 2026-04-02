@@ -104,6 +104,21 @@ SENIORITY_ORDER = [
     "primary_phosphine",
 ]
 
+# ASML-18 / D-08: Map subtypes to canonical parent for seniority comparison.
+# IUPAC P-65.1: All alcohol types have equal seniority; all amine types have equal seniority.
+# Used only in get_principal_group() for equalization; SENIORITY_ORDER stays intact per D-09.
+_SENIORITY_PARENT = {
+    "primary_alcohol": "alcohol",
+    "secondary_alcohol": "alcohol",
+    "tertiary_alcohol": "alcohol",
+    "phenol": "alcohol",
+    "enol": "alcohol",
+    "primary_amine": "amine",
+    "secondary_amine": "amine",
+    "tertiary_amine": "amine",
+    "aromatic_amine": "amine",
+}
+
 # Suffix forms for principal groups
 # Format: (chain_terminal_suffix, ring_attached_suffix), or None for functional-class-only
 SUFFIX_FORMS = {

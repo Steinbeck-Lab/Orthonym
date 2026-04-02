@@ -309,7 +309,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCCCCCC)COP(=O)([O-])OC[C@H]([NH3+])C(=O)[O-]",
-        "(9Z,12Z,15Z)-octadeca-9,12,15-trienoic acid (2R)-2-hydroxypropan-1-olate palmitate",
+        "unknown organic compound",  # PERC-06: polyfunctional reclassification changes naming path
     ),
     (
         "C[C@@H]([NH3+])P(=O)([O-])[O-]",

@@ -63,6 +63,22 @@ ALKOXY_NAMES = {
 }
 
 
+# PERC-06 / D-03: Normalize FG subtypes to parent class for polyfunctional counting.
+# IUPAC treats primary/secondary/tertiary alcohol as the same FG class.
+PARENT_CLASS_MAP = {
+    "primary_alcohol": "alcohol",
+    "secondary_alcohol": "alcohol",
+    "tertiary_alcohol": "alcohol",
+    "phenol": "alcohol",
+    "enol": "alcohol",
+    "alcohol": "alcohol",
+    "primary_amine": "amine",
+    "secondary_amine": "amine",
+    "tertiary_amine": "amine",
+    "aromatic_amine": "amine",
+}
+
+
 def detect_polyfunctional(mol, functional_groups: Dict[str, List[tuple]]) -> bool:
     """
     Determine if a molecule has multiple distinct functional groups.
@@ -96,8 +112,9 @@ def detect_polyfunctional(mol, functional_groups: Dict[str, List[tuple]]) -> boo
         if fg_name in exclude_groups:
             continue
 
-        # Count this as a distinct group
-        distinct_groups.add(fg_name)
+        # Normalize to parent class before counting (PERC-06 / D-03)
+        parent = PARENT_CLASS_MAP.get(fg_name, fg_name)
+        distinct_groups.add(parent)
 
     return len(distinct_groups) >= 2
 

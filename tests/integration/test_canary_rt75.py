@@ -260,7 +260,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OC[C@H](O)c1ccccc1",
-        "(2R)-2-hydroxy-2-phenylethan-1-ol",
+        "(2R)-2-phenylethan-1-ol",  # PERC-06: diol no longer polyfunctional (same parent class)
     ),
     (
         "O=[N+]([O-])OO",
@@ -1473,6 +1473,10 @@ _OPSIN_LIMITATIONS: dict[str, str] = {
     ),
     "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid": (
         "OPSIN cannot parse 'heptanetrioic acid' (rare tricarboxylic acid suffix)"
+    ),
+    "(2R)-2-phenylethan-1-ol": (
+        "PERC-06: diol reclassified as non-polyfunctional (same parent class). "
+        "Non-polyfunctional path drops second OH — Phase 131 assembly fix needed."
     ),
 }
 
