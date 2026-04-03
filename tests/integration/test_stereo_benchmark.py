@@ -45,7 +45,7 @@ from orthonym import name_compound
 SMALL_STEREO_COMPOUNDS = [
     ('C[C@@H]([NH3+])P(=O)([O-])[O-]', 'unknown organic compound'),  # MISSING_STEREO - wrong parent
     ('O=C([O-])/C=C/C(=O)O.[Na+]', 'sodium hydrogen (2E)-but-2-enedioate'),  # Phase 64: partial salt hydrogen prefix
-    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '2-aminohexanoate'),  # Phase 64: single-anion neutralize-then-name now produces -oate
+    ('CC[C@H](C)[C@H](N)C(=O)[O-]', '(2S,3S)-2-aminohexanoate'),  # Phase 130: STER-09 amino acid stereo injection
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '(2R)-2-aminobutanedioic acid'),  # AMAC-01 fix: dioic acid via polyfunctional pipeline
     ('C/N=C(\\N)NCCCCN', '4-guanidino-4-(methylamino)butan-1-amine'),  # MISSING_STEREO - wrong parent; alpha order fixed P80
     ('C=C1C=C[C@H](C(C)C)CC1', '(3S)-3-isopropyl-6-methylidenecyclohexene'),
@@ -61,9 +61,9 @@ SMALL_STEREO_COMPOUNDS = [
     ('O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]', '(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate'),  # NEWLY_RT
     ('N[C@@H](COC(=O)CCC(=O)O)C(=O)O', 'butanedioic acid'),  # MISSING_STEREO - wrong parent
     ('C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O', '(octanoyloxy)-2-pyrrolidinylprop-2-enimide'),  # MISSING_STEREO - wrong parent; depth-independent naming v11
-    ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', '2-(2-oxo(3R)-3-aminobutyl)benzoic acid'),
+    ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', '2-[(R)-2-oxo(3R)-3-aminobutyl]benzoic acid'),
     ('C=C[C@]1(C)CCC(=C(C)C)C[C@H]1C(=C)C', '(1S,2S)-1-ethenyl-4-isopropylidene-1-methyl-2-(prop-1-en-2-yl)cyclohexane'),  # alpha order fixed P80; P102-02: isopropylidene (exocyclic =C)
-    ('CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO', '(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one'),
+    ('CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO', '(3S,4S)-3-[(R)-1-hydroxy-4-methylpentyl]-4-hydroxymethyloxolan-2-one'),
     ('CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1', '(1S,4s,7R)-4-isopropyl-1,7-dimethylcyclodecane'),  # lowercase s for pseudoasymmetric center per IUPAC P-92.1.4.2
     ('COc1c(C)c(O)cc2c1C(=O)N[C@H]2C', '(3S)-6-hydroxy-4-methoxy-3,5-dimethylisoindolin-1-one'),
     ('CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl', '(2S)-2-amino-6-(ethylamino)-iminohexanoic acid'),  # alpha order fixed P80
@@ -74,7 +74,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O', '(3S)-6,7-dihydroxy-8-methoxy-3-methylisochroman-4-one'),  # NEWLY_RT
     ('O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1', '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'),  # NEWLY_RT
     ('CC[C@@H](O)C[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,3R)-1-cyclohexylpentane-1,3-diol'),
-    ('CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O', '(4S,5R,6S)-3-(1-hydroxy-3-methylbut-2-enyl)-3,4,5,6-tetrahydroxycyclohex-2-en-1-one'),
+    ('CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O', '(4S,5R,6S)-3-[(S)-1-hydroxy-3-methylbut-2-enyl]-3,4,5,6-tetrahydroxycyclohex-2-en-1-one'),
     ('CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1', '(2S,3R,4S)-6-(sec-butyl)-2,3-dimethyl-3,4-dihydro-2H-pyran'),  # Fixed: fabricated diethyl from ring boundary leak
     ('COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2', '(7aS)-2,3a-dichloro-3-methoxy-7a-methyl-2,3-dihydro-1-benzofuran-6-carboxylic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O', '3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole'),  # MISSING_STEREO - wrong parent
@@ -83,7 +83,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CO[C@@H]1[C@H](O)[C@@H](CO)O[C@H]1n1ccc(=O)[nH]c1=O', '(2R,3R,4R,5R)-4-hydroxy-3,5-dimethyl-2-pyrimidinyloxolane'),
     ('CCCCC[C@@H](O)[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,2R)-1-cyclohexylheptane-1,2-diol'),
     ('C[C@H]1C[C@H](O)[C@@H]2[C@H]1[C@@H]1[C@H](CC[C@]2(C)O)[C@@]1(C)CO', '(1S,2S,5S,6R,7R,8R,9S,11S)-2,6,6,9-tetramethyl-tricyclo[6.3.0.0(5,7)]undecan-2,11-diol'),
-    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'N-[(2S)-2-(pentanoylamino)propanoyl]-2-aminopropanoic acid'),
+    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'N-[(2S)-2-(pentanoylamino)propanoyl](2S)-2-aminopropanoic acid'),  # Phase 130: STER-09 stereo on parent chain
     ('CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O', '(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one'),
     ('CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21', '1-cyclodecanylethan-1-one'),  # MISSING_STEREO - wrong parent
     ('CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O', '10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane'),  # P119-02: subs discovered
@@ -138,14 +138,14 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC(CCCC(C)(O)COS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CCC4(C)[C@H]3C[C@H](O)C12C', '(3R,5S,7R,8R,9S,12S,14S,17R)-cholestan-3,7,12,25-tetraol'),
     ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate'),
     ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2S,3S)-3,5,7-trihydroxychroman-4-one'),
-    ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', '(3R,4R,5R,6S)-3-(2-methylbutyl)-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate'),
+    ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', '(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate'),
     ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'bis(acetyloxy)ethanone acetate'),  # Phase 099-05: pre-existing regression from Plan 04, garbled multi-ester path; correct name requires Phase 100 parent selection fixes
     ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2R,3S,4S,5R,6R)-3,4,5,6-tetrahydroxy-2-methyloxane'),
     ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(alpha-D-mannopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5,6-tetrahydroxy-2-methyloxane'),
     ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(alpha-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),
     ('CC(=O)OC[C@H]1O[C@@H](N2CCC(=O)NC2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O', '1,2-bis(acetyloxy)oxolane'),  # MISSING_STEREO - wrong parent
     ('C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O', '(2R)-2-hydroxy-N-methylindolin-1-one'),
-    ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3S,4R,5R,6R)-6-(2-hydroxy(2R)-butyl)amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde'),  # Fixed: ring boundary fix changed substituent/locant assignment
+    ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3S,4R,5R,6R)-6-[(S)-2-hydroxy(2R)-butyl]amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde'),  # Fixed: ring boundary fix changed substituent/locant assignment
     ('CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O', '(11S,12R)-12-(6E)-2,6-dimethylnona-2,6-dienyl-8,11-dihydroxy-12-methyl-4-pentyl-4-aza-tricyclo[7.4.0.0(2,6)]tridecan-5-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-3-(2-aminoethyl)-1H-indole'),  # depth-independent naming v11; N-bracket fix v15

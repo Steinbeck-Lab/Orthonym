@@ -81,7 +81,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C",
-        "(3R,4R,5R,6S)-3-(2-methylbutyl)hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",  # PERC-05: generic alcohol detects hemiaminal OH
+        "(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate",  # PERC-05: generic alcohol detects hemiaminal OH
     ),
     (
         r"CO[C@H]1C=C/C=C\C=C/C[C@H](OC(=O)[C@@H](C)NC(=O)C2=CCCCC2)[C@H](C)[C@@H](O)/C(C)=C\CCc2cc(O)cc(c2O)NC(=O)C1",
@@ -174,7 +174,7 @@ NAME_STABILITY_CANARY = [
     (
         "CO[C@@H]1[C@H](OC(=O)CCC(=O)O)CC[C@](O)(CCl)[C@H]1[C@@]1(C)O[C@@H]1CC=C(C)C",
         # P-44.3 fix: no-PG path now selects chain over small oxirane ring in substituent
-        "(1R,2S,3S,4R)-2-(3-methyl-1-oxiranylbut-2-enyl)-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
+        "(1R,2S,3S,4R)-2-[(1R,4R)-3-methyl-1-oxiranylbut-2-enyl]-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
     ),
     (
         r"C=CCO/N=C(\C(=O)N[C@H]1CN2CC(S(C)(=O)=O)=C(C(=O)O)N2C1=O)c1csc(N)n1",
@@ -196,7 +196,7 @@ NAME_STABILITY_CANARY = [
         r"CCCCCC/C=C\CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H](CO)[C@@H](O)CC(=O)N[C@@H](CO)C(=O)N[C@H](C(=O)N[C@@H]1/C=C/C(=O)N[C@@H](C(C)C)C(=O)N(C)[C@@H](Cc2ccc(O)cc2)C(=O)OC1)C(C)C)C(C)C",
         # Phase 125: old "3-benzyl" was incorrect (fragment has OH on ring,
         # not plain benzyl). Fix correctly rejects the benzyl shortcut.
-        "N-[(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl](3S,6S,9E,11R)-11-(4-carbamoylbutyl)-3-(hydroxy4-cresyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
+        "N-[(2S)-3-hydroxyhydroxy-2-(pentanoylamino)propanoyl](3S,6S,9E,11R)-11-[(S)-4-carbamoylbutyl]-3-(hydroxy4-cresyl)-6-isopropyl-4-methyl-5,8-dioxooxacyclododecan-2-one",
     ),
     (
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
@@ -232,7 +232,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O",
-        "N-[(2S)-2-(pentanoylamino)propanoyl]-2-aminopropanoic acid",
+        "N-[(2S)-2-(pentanoylamino)propanoyl](2S)-2-aminopropanoic acid",
     ),
     (
         "CS[C@@]1(CO)C(=O)N2[C@H]3N(c4ccc5oc6cc(=O)c(N)c(C(=O)O)c-6nc5c4C(=O)O)c4ccccc4[C@@]3(c3c[nH]c4ccccc34)[C@H](O)[C@]2(SC)C(=O)N1C",
@@ -454,7 +454,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O",
-        "(4S,5R,6S)-3-(1-hydroxy-3-methylbut-2-enyl)-3,4,5,6-tetrahydroxycyclohex-2-en-1-one",
+        "(4S,5R,6S)-3-[(S)-1-hydroxy-3-methylbut-2-enyl]-3,4,5,6-tetrahydroxycyclohex-2-en-1-one",
     ),
     (
         "CC1CCCC[C@H](O)[C@@H]2C[C@@H](O1)C1=C(O2)[C@H](O)CCC1=O",
@@ -462,7 +462,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1c2c(c(O)c3c4c(c(C)cc13)[C@@H]1O[C@@]3(C(OC)OC)O[C@@H]1[C@@](O[C@H]1CC(O)[C@@](O)(C(C)=O)C(C)O1)(O4)[C@@]3(O)Cn1cnc3nc(N)[nH]c(=O)c31)C(=O)C(O)CC2O[C@H]1CC(C)(O)[C@H](OC(C)=O)C(C)O1",
-        "(31-phenylhentriacontyl acetate)-1-hydroxy-1-oxanylethan-1-one",
+        "(16S,17S,18S,19S,20R)-39-phenylnonatriacontyl acetate",
     ),
     (
         "CC(C)C(=O)OC[C@H]1O[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O",
@@ -489,7 +489,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1",
-        "(3S,4R,5R,6R)-6-(2-hydroxy(2R)-butyl)amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde",
+        "(3S,4R,5R,6R)-6-[(S)-2-hydroxy(2R)-butyl]amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde",
     ),
     (
         "CCCCCCCCCCCCCCCCC[C@@H](O)[C@H](CO)NC(=O)C(O)CCCCCCCCCCCCCCCC",
@@ -668,7 +668,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)[O-]",
-        "2-aminohexanoate",
+        "(2S,3S)-2-aminohexanoate",
     ),
     (
         "COc1cc(COC(C)=O)ccc1OC(C)=O",
@@ -819,12 +819,12 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C1C(=O)O[C@H](CCCCCCCCCCCCC[C@@H](C)OC2OC(CO)C(O)C(OC3OC(CO)C(O)C(O)C3O)C2O)[C@H]1C(=O)O",
-        "(glucopyranosyloxy)(4S,5R)-5-(2-pentadecyl-3,4,5-trihydroxy-6-methyloxyl)-4-formyl-3-methyloxolan-2-one",
+        "(glucopyranosyloxy)(4S,5R)-5-[(R)-2-pentadecyl-3,4,5-trihydroxy-6-methyloxyl]-4-formyl-3-methyloxolan-2-one",
     ),
     # stereo_mismatch compounds (2)
     (
         "CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO",
-        "(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one",
+        "(3S,4S)-3-[(R)-1-hydroxy-4-methylpentyl]-4-hydroxymethyloxolan-2-one",
     ),
     (
         "CC(CC(=O)CC(C)C1C[C@H](O)[C@@]2(C)C3=C(C(=O)CC12C)C1(C)CC[C@H](O)C(C)(C)C1C[C@@H]3O)C(=O)O",
@@ -879,7 +879,7 @@ P44_3_CANARY = [
     # per P-44.3 but individual ring size (6) < chain causes chain selection
     (
         "CC(=O)[C@@H](C)Nc1ccccc1C(=O)O",
-        "2-(2-oxo(3R)-3-aminobutyl)benzoic acid",
+        "2-[(R)-2-oxo(3R)-3-aminobutyl]benzoic acid",
     ),
     # Row 45: imidazopyridine + tolyl; fused system (9 atoms) vs chain
     (

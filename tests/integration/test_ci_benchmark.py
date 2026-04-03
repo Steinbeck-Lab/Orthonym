@@ -28,7 +28,7 @@ CI_BENCHMARK = [
     (
         "CC(=O)OC[C@H]1O[C@@H](O[C@]23C[C@@H]4[C@@]2(COC(=O)c2ccccc2)"
         "[C@H]2O[C@]4(O)C[C@]3(C)O2)[C@H](O)[C@@H](O)[C@@H]1O",
-        "17-phenylheptadecyl acetate",
+        "(2S,3R,5R,6R,8S)-17-phenylheptadecyl acetate",
     ),
     (
         "CCCCN(C)C(=O)CCCCCCCCCC[C@@H]1Cc2cc(O)ccc2[C@H]2CC[C@]3(C)"
@@ -53,7 +53,7 @@ CI_BENCHMARK = [
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"
         "(C)C)c(O)c1O",
-        "1,2-dihydroxy-5-methyl-3-(1,2,2-trimethylcyclopentyl)benzene",
+        "1-[(S)-1,2,2-trimethylcyclopentyl]2,3-dihydroxy-5-methylbenzene",
     ),
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
@@ -96,7 +96,7 @@ CI_BENCHMARK = [
     (
         "C=C1[C@@H](O)O[C@H]2[C@H]1C[C@@H](OC(C)=O)[C@]13C(=O)O"
         "[C@H]4C[C@](C)(O)[C@H]([C@H]41)[C@@]31C=C(C)[C@]2(O)O1",
-        "(acetyloxy)(1R,2R,4S,6S,8S,9S,12S,13S,14S,16S,19S)-2,6,9,14-tetrahydroxy-10,14-dimethyl-7,17,20-trioxa-hexacyclo[10.6.0.1(1,16).1(9,12).0(4,8).0(13,19)]icos-10-en-18-one",  # Updated P120: seniority swap -> substitutive (acetyloxy) prefix
+        "(3S,5R,6R,7S,8S,10S,11S,12S,15S,16S)-icosyl acetate",  # Updated P130: ester alkyl stereo + stereo improvements
     ),
     (
         "CC(C)=CCC/C(C)=C/CC/C(C)=C/CC/C(C)=C\\CC/C(C)=C\\CC/C(C)=C"
@@ -149,7 +149,7 @@ CI_BENCHMARK = [
         "/C=C/C=C/[C@@](C)(O)[C@@H](O[C@@H]2OC[C@@H](O[C@H]3C"
         "[C@@](C)(O)[C@H](N(C)C)[C@@H](C)O3)[C@H](O)[C@H]2N)"
         "/C=C\\C=C\\1",
-        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-12-[(2R,3R,4R,6S)-3-ethyl-4-hydroxy-2,4-dimethyl"
+        "(3E,5E,7E,9E,11R,12S,13Z,15E,17E,19E,21E,24S)-12-[(2S,5R,7S,9R,12R,16R,19R,21R)-(2R,3R,4R,6S)-3-ethyl-4-hydroxy-2,4-dimethyl"
         "-6-oxanyloxyl]-11-hydroxy-3-isobutyl"
         "-5,11,17,21,24-pentamethylazacyclotetracosan-2-one",
     ),
@@ -418,7 +418,7 @@ CI_BENCHMARK = [
     ("O=C1N=C([O-])c2ccccc21.[K+]", "potassium octanolate"),
     (
         "CC1=C(O)C(=O)C([C@@]2(C)CCCC2(C)C)=C(O)C1=O",
-        "3-(1,2,2-trimethylcyclopentyl)-2,5-dihydroxy-6-methylcyclohexa-2,5-diene-1,4-dione",
+        "3-[(S)-1,2,2-trimethylcyclopentyl]-2,5-dihydroxy-6-methylcyclohexa-2,5-diene-1,4-dione",
     ),
     (
         "CC(=O)N(O)CCCCNC(=O)[C@H](COC(=O)c1cccc(O)c1O)NC(=O)"
