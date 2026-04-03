@@ -188,6 +188,15 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     # Try trivial name lookup first
     trivial = get_amino_acid_name(canonical_smiles)
     if trivial:
+        # STER-09 / D-03: Inject stereo for trivial names (IUPAC P-91)
+        from ..perception.stereo import assign_stereochemistry
+        from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+        assign_stereochemistry(mol)
+        locant_map = _build_amino_acid_locant_map(mol)
+        descriptors = collect_stereodescriptors(mol, locant_map)
+        if descriptors:
+            stereo_prefix = format_stereodescriptor_string(descriptors)
+            return f"{stereo_prefix}{trivial}"
         return trivial
 
     # Generate systematic name
@@ -253,7 +262,77 @@ def _name_amino_acid_systematic(mol) -> str:
 
     # For alpha-amino acids, the amino group is at position 2
     # (position 1 is the acid carbon)
-    return f"2-amino{stem}anoic acid"
+    name = f"2-amino{stem}anoic acid"
+
+    # STER-09: Inject CIP stereodescriptors (self-contained, runs before perception)
+    from ..perception.stereo import assign_stereochemistry
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    assign_stereochemistry(mol)
+    locant_map = _build_amino_acid_locant_map(mol)
+    descriptors = collect_stereodescriptors(mol, locant_map)
+    if descriptors:
+        stereo_prefix = format_stereodescriptor_string(descriptors)
+        name = f"{stereo_prefix}{name}"
+
+    return name
+
+
+def _build_amino_acid_locant_map(mol) -> dict:
+    """Build atom_to_locant map for amino acid backbone.
+
+    Locant 1 = acid carbon (C(=O)O), then walk along the carbon backbone.
+    For alpha-amino acids, the stereocenter is at locant 2.
+
+    Args:
+        mol: RDKit Mol object.
+
+    Returns:
+        Dict mapping atom index to IUPAC locant number.
+    """
+    from collections import deque
+
+    # Find the acid carbon: a carbon with a C=O double bond and C-OH single bond
+    acid_c = None
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C':
+            continue
+        has_double_o = False
+        has_single_o = False
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if nbr.GetSymbol() == 'O' and bond.GetBondTypeAsDouble() == 2.0:
+                has_double_o = True
+            elif nbr.GetSymbol() == 'O' and bond.GetBondTypeAsDouble() == 1.0:
+                has_single_o = True
+        if has_double_o and has_single_o:
+            acid_c = atom.GetIdx()
+            break
+
+    if acid_c is None:
+        return {}
+
+    # BFS from acid carbon through the carbon backbone
+    atom_to_locant = {acid_c: 1}
+    visited = {acid_c}
+    queue = deque([(acid_c, 1)])
+
+    while queue:
+        current, locant = queue.popleft()
+        atom = mol.GetAtomWithIdx(current)
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in visited:
+                continue
+            if nbr.GetSymbol() == 'C':
+                next_locant = locant + 1
+                atom_to_locant[nbr_idx] = next_locant
+                visited.add(nbr_idx)
+                queue.append((nbr_idx, next_locant))
+            else:
+                visited.add(nbr_idx)
+
+    return atom_to_locant
 
 
 def is_n_substituted_amino_acid(mol) -> bool:

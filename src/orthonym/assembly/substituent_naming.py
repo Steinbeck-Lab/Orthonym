@@ -1006,7 +1006,7 @@ def name_substituent_fragment(
     )
     prefix_name = parent_to_prefix(parent_name, chain_length=carbon_count)
 
-    return prefix_name
+    return _add_substituent_stereo(mol, sub_atoms, prefix_name)
 
 
 # ============================================================================
