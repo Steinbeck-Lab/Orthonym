@@ -364,6 +364,36 @@ def _extract_fragment_smiles(
 # Parent-to-Prefix Conversion (IUPAC P-31.1.3)
 # ============================================================================
 
+# ASML-17: Retained name -> correct IUPAC substituent prefix form.
+# These names have special IUPAC-defined substituent forms that cannot be
+# derived by simple suffix-stripping. Checked BEFORE the regex cascade.
+# Reference: IUPAC 2013 Blue Book P-31.1.3.4, P-68.3
+_RETAINED_NAME_PREFIX = {
+    # Heterocyclic retained names with IUPAC-defined substituent forms
+    'adenine': 'adenin-9-yl',           # purine derivative, attachment at N-9
+    'guanine': 'guanin-9-yl',           # purine derivative, attachment at N-9
+    'indole': '1H-indol-3-yl',          # standard attachment at C-3
+    'purine': 'purin-9-yl',             # standard attachment at N-9
+    'uracil': 'uracil-1-yl',            # pyrimidine-2,4(1H,3H)-dione
+    'thymine': 'thymin-1-yl',            # 5-methyluracil
+    'cytosine': 'cytosin-1-yl',          # pyrimidine derivative
+    'xanthine': 'xanthin-7-yl',          # purine-2,6-dione
+    'hypoxanthine': 'hypoxanthin-9-yl',  # purine-6-ol
+
+    # Acid-derived retained names -> acyl prefix forms
+    'glutaric acid': 'glutaryl',         # pentanedioyl
+    'succinic acid': 'succinyl',         # butanedioyl
+    'malonic acid': 'malonyl',           # propanedioyl
+    'maleic acid': 'maleoyl',            # cis-butenedioyl
+    'fumaric acid': 'fumaryl',           # trans-butenedioyl
+    'oxalic acid': 'oxalyl',             # ethanedioyl
+    'phthalic acid': 'phthaloyl',        # benzene-1,2-dicarbonyl
+
+    # Note: acetamide, formamide, benzamide are handled by the -amide regex
+    # cascade (producing carbamoyl prefix form per IUPAC P-66.1.1.4).
+    # They do NOT need lookup table entries.
+}
+
 
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
@@ -393,6 +423,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         return ""
 
     name = parent_name.strip()
+
+    # ASML-17: Check retained name lookup FIRST (before regex cascade)
+    name_lower = name.lower()
+    if name_lower in _RETAINED_NAME_PREFIX:
+        return _RETAINED_NAME_PREFIX[name_lower]
 
     # ---- Carboxylic acids: -oic acid / -anoic acid ----
     # e.g., "butanoic acid" -> "3-carboxypropyl"
@@ -638,7 +673,14 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         return name[:-1] + "yl"  # pyridine -> pyridinyl
 
     # ---- Fallback: strip terminal -e if present, add -yl ----
+    # Guard: names ending in -amide/-imide should NOT use naive -e stripping
     if name.endswith('e'):
+        if name.endswith('amide'):
+            # amide -> amido form (e.g., "formamide" -> "formamido")
+            return name[:-1] + 'o'  # -amide -> -amido
+        if name.endswith('imide'):
+            # imide -> imido form (e.g., "succinimide" -> "succinimido")
+            return name[:-1] + 'o'  # -imide -> -imido
         return name[:-1] + "yl"
 
     # If name already ends in -yl, return as-is
