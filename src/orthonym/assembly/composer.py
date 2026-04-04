@@ -689,9 +689,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         total_heavy = features.mol.GetNumHeavyAtoms()
         ring_size = lactone_info.get('ring_size', 0)
         # Only use bare lactone naming when molecule is not much larger than ring
-        # Ring atoms + carbonyl O + up to 3 small substituents = ring_size + 4
+        # Ring atoms + carbonyl O + up to 8 exocyclic heavy atoms = ring_size + 8
         # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 4:
+        if ring_size > 8 or total_heavy <= ring_size + 8:
             lactone_name = name_monocyclic_lactone(features.mol)
             if lactone_name:
                 # Lactone handler already includes stereo with correct ring locants.
@@ -709,7 +709,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         total_heavy = features.mol.GetNumHeavyAtoms()
         ring_size = lactam_info.get('ring_size', 0)
         # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 4:
+        if ring_size > 8 or total_heavy <= ring_size + 8:
             lactam_name = name_monocyclic_lactam(features.mol)
             if lactam_name:
                 # Lactam handler already includes stereo with correct ring locants.
@@ -2542,14 +2542,7 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
     # Group substituents by prefix name, collecting locants
     prefix_groups = defaultdict(list)  # name -> [locant1, locant2, ...]
     for sub_info in subs:
-        # Skip large fragments that produce garbled names (same guard as
-        # _assemble_ring_with_ester_prefixes)
         frag_ha = len(sub_info.frag_atoms)
-        if frag_ha > 20:
-            logger.debug(
-                "_enrich_complex_ring_with_subs: skip large frag HA=%d", frag_ha
-            )
-            continue
 
         a_idx = _find_attach_idx_in_frag(mol, sub_info, ring_atoms)
         prefix_name = name_substituent(mol, sub_info.frag_atoms, a_idx)
@@ -2558,8 +2551,11 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
             continue
         # Quality filter: reject garbled names with spaces
         if ' ' in prefix_name:
-            logger.debug(
-                "_enrich_complex_ring_with_subs: reject garbled: %s", prefix_name
+            log_level = logging.WARNING if frag_ha > 20 else logging.DEBUG
+            logger.log(
+                log_level,
+                "_enrich_complex_ring_with_subs: reject garbled (HA=%d): %s",
+                frag_ha, prefix_name,
             )
             continue
 
