@@ -31,7 +31,7 @@ CONNECTIVITY_CANARY = [
     ),
     (
         "CC(C)CC[C@@H](O)[C@H]1C(=O)OC[C@@H]1CO",
-        "(3S,4S)-3-(1-hydroxy-4-methylpentyl)-4-hydroxymethyloxolan-2-one",
+        "(3S,4S)-3-[(R)-1-hydroxy-4-methylpentyl]-4-hydroxymethyloxolan-2-one",  # Phase 130: stereo (R) added
     ),
     (
         "CSCCC(N)C(=O)Oc1ccc(CC(N)C(=O)O)cc1",

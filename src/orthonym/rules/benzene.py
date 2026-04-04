@@ -54,6 +54,7 @@ _SUFFIX_PRIORITY = [
     'carboxamide',
     'carbonitrile',
     'carbaldehyde',
+    'ol',  # ASML-13: hydroxyl as suffix when principal group on benzene
 ]
 
 # Prefix forms for suffix FGs when they are NOT the principal group
@@ -65,6 +66,7 @@ _SUFFIX_TO_PREFIX = {
     'carboxamide': 'carbamoyl',
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
+    'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
 }
 
 
@@ -1596,6 +1598,17 @@ def name_substituted_benzene(
     for name in prefix_groups:
         prefix_groups[name].sort()
 
+    # --- ASML-13: Reclassify hydroxyl as suffix when it IS the principal group ---
+    # _identify_oxygen_group always returns hydroxy as prefix. When hydroxyl is
+    # the principal group (no higher-seniority suffix FG detected), move it to
+    # suffix_groups so it routes to the phenol/ol naming path.
+    if 'hydroxy' in prefix_groups and not suffix_groups:
+        # No other suffix FGs detected -- hydroxyl IS the principal group.
+        # Move from prefix to suffix.
+        suffix_groups['ol'] = prefix_groups.pop('hydroxy')
+    # When suffix_groups is non-empty (acid, aldehyde, etc.), hydroxyl stays
+    # as prefix "hydroxy" -- correct per IUPAC seniority rules.
+
     # If suffix groups exist, use suffix naming path
     if suffix_groups:
         name = _assemble_benzene_with_suffix(
@@ -1757,6 +1770,29 @@ def _assemble_benzene_with_suffix(
         prefix_form = _SUFFIX_TO_PREFIX.get(sfx_name, sfx_name)
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
+
+    # ASML-13: Handle hydroxyl suffix -- phenol retained name for benzene
+    if chosen_suffix == 'ol':
+        ol_locants = chosen_locants
+        if len(ol_locants) == 1:
+            # Single OH on benzene: use "phenol" retained name
+            return _name_substituted_phenol(
+                remaining_prefix_groups, ol_locants[0],
+                atom_to_locant, oriented_ring
+            )
+        else:
+            # Multiple OH on benzene: benzenediol, benzenetriol
+            # Use systematic naming with multiplied -ol suffix.
+            from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+            mult = SIMPLE_MULTIPLIERS.get(len(ol_locants), str(len(ol_locants)))
+            loc_str = ','.join(str(l) for l in sorted(ol_locants))
+            suffix_part = f"benzene-{loc_str}-{mult}ol"
+            if remaining_prefix_groups:
+                prefix_part = _build_prefix_string_with_locants(
+                    remaining_prefix_groups, mono_needs_locant=True
+                )
+                return f"{prefix_part}{suffix_part}"
+            return suffix_part
 
     # Check for special "benzoic acid" retained base name:
     # Single carboxylic acid -> "benzoic acid" base (P-65.1.2.1)

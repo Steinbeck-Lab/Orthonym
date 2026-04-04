@@ -62,7 +62,7 @@ ROUNDTRIP_VERIFIED = [
 
     # Aromatic compounds
     ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
-    ("OCc1ccc(O)cc1", "1-hydroxy-4-(hydroxymethyl)benzene"),
+    ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  # ASML-13: phenol suffix routing
     ("CN(C)c1ccc(N)cc1", "1-amino-4-(N,N-dimethylamino)benzene"),
 
     # Fused aromatic
@@ -569,7 +569,7 @@ PHASE24_PARSE_FIXES = [
     # A1: hydroxymethyl on polysubstituted benzene gets parentheses
     (
         "OCc1ccc(O)cc1",
-        "1-hydroxy-4-(hydroxymethyl)benzene",
+        "4-(hydroxymethyl)phenol",  # ASML-13: phenol suffix routing
         "bracket-hydroxymethyl-benzene",
     ),
     # A2: hydroxymethyl + chloro on benzene
@@ -589,13 +589,13 @@ PHASE24_PARSE_FIXES = [
     # B1: Biphenyl ether -> phenoxy (was bare "oxy")
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+        "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
         "oxy-biphenyl-ether-phenoxy",
     ),
     # B2: Glycoside on benzene -> (oxan-2-yl)oxy (was hexosyloxy, originally bare "oxy")
     (
         "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-        "1-(oxan-2-yl)oxy-2-hydroxy-4-methylbenzene",
+        "((2R,4R,6S)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid)-4-methylbenzene-1,2-diol",  # ASML-13: phenol suffix routing + decomposition
         "oxy-glycoside-oxanyloxy",
     ),
     # B3: Galloyl ester chain -> tetradecoxy (was bare "oxy")
@@ -614,7 +614,7 @@ PHASE24_PARSE_FIXES = [
     # Phase 86: benzene universal fallback now names the COC(=S)NC- chain substituent
     (
         "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-        "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
+        "(rhamnopyranosyloxy)-4-(1-methoxy-1-(methylamino)methyl)phenol",  # ASML-13: phenol suffix routing
         "oxy-glycoside-benzene",
     ),
     # B6: Fused ring system -> xanthone (correctly identified after Phase 101 xanthone entry)
@@ -626,7 +626,7 @@ PHASE24_PARSE_FIXES = [
     # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy (was hexosyloxy)
     (
         "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-        "1-hydroxy-2,3-dimethylbenzene",  # Fixed: ring boundary fix removed fabricated sub
+        "2,3-dimethylphenol",  # ASML-13: phenol suffix routing (was hydroxydimethylbenzene)
         "oxy-dimethyl-benzene-oxanyloxy",
     ),
 
@@ -683,13 +683,13 @@ PHASE24_PARSE_FIXES_ROUNDTRIP = [
     # RT1: (hydroxymethyl) with parentheses parses in OPSIN
     (
         "OCc1ccc(O)cc1",
-        "1-hydroxy-4-(hydroxymethyl)benzene",
+        "4-(hydroxymethyl)phenol",  # ASML-13: phenol suffix routing
         "rt-hydroxymethyl-brackets",
     ),
     # RT2: phenoxy parses in OPSIN (was bare "oxy" - OPSIN failed)
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+        "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
         "rt-phenoxy-biphenyl-ether",
     ),
     # RT3: tetradecoxy parses in OPSIN (was bare "oxy" - OPSIN failed)

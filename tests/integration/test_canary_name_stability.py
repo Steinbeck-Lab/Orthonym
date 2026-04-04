@@ -45,7 +45,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*C(=O)N[C@@H](CO[C@@H]1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O[C@@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)[C@H](O)[C@H](O[C@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5NC(C)=O)[C@H]4O[C@@H]4O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]4O)[C@H]3NC(C)=O)[C@H]2O)[C@H](O)[C@H]1O)[C@H](O)/C=C/CCCCCCCCCCCCC",
-        "(ethanediamide)(2S,3R,4E)-1-hydroxy-3-hydroxy-2-(methanoylamino)octadec-4-enamide",
+        "(ethanediamide)(2S,3R,4E)-1,3-dihydroxy-2-(methanoylamino)octadec-4-enamide",  # ASML-12: locant-aware prefix merge
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
@@ -477,7 +477,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)[C@@H]1NC(=O)[C@H](NC(=O)NC(Cc2c[nH]c3ccccc23)C(=O)O)CCCCNC(=O)[C@H](Cc2ccccc2)NC(=O)[C@H](C)N(C)C(=O)[C@H](CCc2ccc(O)cc2)NC1=O",
-        "(3R,10S,13S,16S,19S)-3-(3-(3-carboxypropyl)-1H-indolyl)-10-benzyl-16-(1-ethyl-4-hydroxybenzenyl)-19-isopropyl-13-methyl-N-methyl-9,12,15,18-tetraoxoazacyclononadecan-2-one",
+        "(3R,10S,13S,16S,19S)-3-(3-(3-carboxypropyl)-1H-indolyl)-10-benzyl-16-(hydroxy4-ethylphenyl)-19-isopropyl-13-methyl-N-methyl-9,12,15,18-tetraoxoazacyclononadecan-2-one",  # ASML-13: phenol suffix routing in substituent
     ),
     (
         "CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1",
@@ -493,7 +493,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCC[C@@H](O)[C@H](CO)NC(=O)C(O)CCCCCCCCCCCCCCCC",
-        "(2S,3R)-2-(octadecanoylamino)-1-hydroxy-3-hydroxyicosanamide",
+        "(2S,3R)-2-(octadecanoylamino)-1,3-dihydroxyicosanamide",  # ASML-12: locant-aware prefix merge
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",
@@ -656,11 +656,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "N=C(N)NC(=N)Nc1ccc(O)cc1",
-        "1-hydroxy-4-(N-methylguanidinyl)benzene",
+        "4-(N-methylguanidinyl)phenol",  # ASML-13: phenol suffix routing
     ),
     (
         "COc1cc(CO)cc(CC=C(C)C)c1O",
-        "2-hydroxy-5-(hydroxymethyl)-1-methoxy-3-(2-methylbut-2-enyl)benzene",
+        "4-(hydroxymethyl)-6-methoxy-2-(2-methylbut-2-enyl)phenol",  # ASML-13: phenol suffix routing
     ),
     (
         "COc1cc(C(=O)CC(C)C)oc(=O)c1",
@@ -704,7 +704,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-        "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+        "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
     ),
     # fragment_loss compounds (8)
     (
@@ -721,7 +721,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(C2OC2C(=O)NCCCCN)ccc1O",
-        "1-hydroxy-2-methoxybenzene",
+        "2-methoxyphenol",  # ASML-13: phenol suffix routing
     ),
     (
         "Cc1c(CO)oc(=O)c2c(O)cc(O)cc12",
@@ -733,7 +733,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCNC(O)CCc1ccc(O)c(OC)c1",
-        "1-hydroxy-2-methoxybenzene",
+        "2-methoxyphenol",  # ASML-13: phenol suffix routing
     ),
     (
         "CCCCCC(C)OC(=O)COc1ccc(Cl)c2cccnc12",

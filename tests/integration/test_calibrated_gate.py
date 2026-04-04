@@ -151,7 +151,7 @@ CANARY_SUBSET = [
     # Proper azo naming support is deferred.
     ("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "unknown organic compound"),
     ("CC(=O)O", "acetic acid"),
-    ("Cc1ccc(O)c(C(C)C)c1", "1-hydroxy-2-isopropyl-4-methylbenzene"),
+    ("Cc1ccc(O)c(C(C)C)c1", "2-isopropyl-4-methylphenol"),  # ASML-13: phenol suffix routing
     ("OC(=O)/C=C\\C(=O)O", "(2Z)-but-2-enedioic acid"),
     ("OC(=O)c1ccccc1O", "2-hydroxybenzoic acid"),
     ("c1ccc2c(c1)cc1ccc3ccccc3c1c2", "benz[a]anthracene"),

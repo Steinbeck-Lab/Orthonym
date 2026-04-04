@@ -178,8 +178,8 @@ class TestMissingSubstituent:
         assert name is not None and len(name) > 5
 
     def test_035_disubstituted_phenol(self):
-        """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2-hydroxy-1,3-diisobutylbenzene [RT]."""
-        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2-hydroxy-1,3-diisobutylbenzene"
+        """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2,6-diisobutylphenol [RT]."""
+        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-diisobutylphenol"  # ASML-13: phenol suffix routing
 
     def test_036_cyclohexyl_arachidate(self):
         """#36: CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1 -> cyclohexyl arachidate [RT]."""

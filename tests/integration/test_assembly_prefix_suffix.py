@@ -56,8 +56,12 @@ class TestASML13PhenolRouting:
         assert "hydroxy" in result.lower(), f"Expected hydroxy prefix, got: {result}"
         assert "benzoic acid" in result.lower(), f"Expected benzoic acid, got: {result}"
 
-    def test_methylphenol(self):
-        """Cresol: should produce methylphenol not methylhydroxybenzene."""
-        result = name_compound("Cc1ccc(O)cc1")
+    def test_ethylphenol(self):
+        """Ethylphenol: should produce ethylphenol not ethylhydroxybenzene.
+
+        Note: methylphenol (cresol) is a retained name and does not exercise
+        the ASML-13 suffix routing path. Use ethylphenol instead.
+        """
+        result = name_compound("CCc1ccc(O)cc1")
         assert result is not None
         assert "phenol" in result.lower(), f"Expected phenol, got: {result}"

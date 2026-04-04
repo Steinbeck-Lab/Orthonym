@@ -184,7 +184,7 @@ ROUNDTRIP_CANARIES = [
     ("CCCCCCCCCCCCCC(O)CC", "hexadecan-3-ol"),
     ("C/C=C/CCCCCCCCC", "(2E)-dodec-2-ene"),
     ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
-    ("OCc1ccc(O)cc1", "1-hydroxy-4-(hydroxymethyl)benzene"),
+    ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  # ASML-13: phenol suffix routing
     ("c1ccc2ccccc2c1", "naphthalene"),
     # Fatty acid with Z geometry
     ("CCCCCCCC/C=C\\CCCCCCCC(=O)O", "(9Z)-octadec-9-enoic acid"),

@@ -221,7 +221,7 @@ AB_CANARY_COMPOUNDS = [
     # Aldehyde
     ("CCCCC=O", "pentanal"),
     # Ring compound - benzene derivative
-    ("Cc1ccc(O)cc1C", "4-hydroxy-1,2-dimethylbenzene"),
+    ("Cc1ccc(O)cc1C", "3,4-dimethylphenol"),  # ASML-13: phenol suffix routing
     ("COc1ccc(OC)c(OC)c1", "1,2,4-trimethoxybenzene"),
     # Heterocycle
     ("CCCc1nc(C)c(C)nc1C", "2,3,6-trimethyl-5-propylpyrazine"),

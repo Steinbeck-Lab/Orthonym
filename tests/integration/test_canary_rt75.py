@@ -156,7 +156,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1ccc(O)cc1C",
-        "4-hydroxy-1,2-dimethylbenzene",
+        "3,4-dimethylphenol",  # ASML-13: phenol suffix routing
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)O",
@@ -324,7 +324,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(O)C[C@H](O)CCCCCCO",
-        "(3R)-9-hydroxy-3-hydroxynonanoic acid",
+        "(3R)-3,9-dihydroxynonanoic acid",  # ASML-12: locant-aware prefix merge
     ),
     (
         "COc1c(-c2ccccc2)c2ccc(O)cc2[nH]c1=O",
@@ -469,7 +469,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)Cc1cccc(CC(C)C)c1O",
-        "2-hydroxy-1,3-diisobutylbenzene",
+        "2,6-diisobutylphenol",  # ASML-13: phenol suffix routing
     ),
     (
         "CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1",

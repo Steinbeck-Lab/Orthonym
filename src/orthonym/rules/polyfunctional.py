@@ -1713,17 +1713,31 @@ def _merge_bare_duplicate_prefixes(prefixes: List[str]) -> List[str]:
     for base, entries in groups.items():
         if len(entries) <= 1:
             continue
-        # Combine all locants and mark original indices as merged
-        all_locants: List[int] = []
-        for idx, locs in entries:
-            all_locants.extend(locs)
-            merged_indices.add(idx)
-        all_locants = sorted(set(all_locants))
-        total_count = len(all_locants) if all_locants else len(entries)
 
-        # Rebuild using format_fg_prefix (peer function in this module)
-        rebuilt = format_fg_prefix(base, all_locants, total_count)
-        extra.append(rebuilt)
+        # Separate bare (no locants) from locanted entries
+        bare_entries = [(idx, locs) for idx, locs in entries if not locs]
+        locanted_entries = [(idx, locs) for idx, locs in entries if locs]
+
+        # Only merge within the same category (all-bare or all-locanted).
+        # Mixed groups (bare + locanted) are NOT merged because bare
+        # prefixes have no position info to combine with locants.
+        merge_sets = []
+        if len(bare_entries) > 1:
+            merge_sets.append(bare_entries)
+        if len(locanted_entries) > 1:
+            merge_sets.append(locanted_entries)
+
+        for merge_group in merge_sets:
+            all_locants: List[int] = []
+            for idx, locs in merge_group:
+                all_locants.extend(locs)
+                merged_indices.add(idx)
+            all_locants = sorted(set(all_locants))
+            total_count = len(all_locants) if all_locants else len(merge_group)
+
+            # Rebuild using format_fg_prefix (peer function in this module)
+            rebuilt = format_fg_prefix(base, all_locants, total_count)
+            extra.append(rebuilt)
 
     result = [prefixes[i] for i in range(len(prefixes)) if i not in merged_indices]
     result.extend(extra)

@@ -53,7 +53,7 @@ CI_BENCHMARK = [
     (
         "Cc1cc([C@@]2(C)CCCC2(C)C)c(O)c(O)c1-c1c(C)cc([C@@]2(C)CCCC2"
         "(C)C)c(O)c1O",
-        "1-[(S)-1,2,2-trimethylcyclopentyl]2,3-dihydroxy-5-methylbenzene",
+        "1-[(S)-1,2,2-trimethylcyclopentyl]5-methylbenzene-2,3-diol",  # ASML-13: benzene-diol suffix routing
     ),
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
@@ -220,7 +220,7 @@ CI_BENCHMARK = [
     ("OCCCO", "trimethylene glycol"),
     (
         "O=C([O-])[C@@](O)(CO)C(=O)CO",
-        "(2R)-4-hydroxy-2-hydroxy-2-(hydroxymethyl)-3-oxobutanoate",  # alpha order fixed P80
+        "(2R)-2,4-dihydroxy-2-(hydroxymethyl)-3-oxobutanoate",  # ASML-12: locant-aware prefix merge
     ),
     ("CCC1CC=C(N2CCCC2)C1=O", "5-ethyl-2-pyrrolidinylcyclopent-2-en-1-one"),
     (
@@ -450,7 +450,7 @@ CI_BENCHMARK = [
     ),
     (
         "COc1cc2c(c(O)c1C/C=C(\\C)CCC=C(C)C)CN(CCc1c[nH]c3ccccc13)C2=O",
-        "2-[(6E)-2,6-dimethylocta-2,6-dienyl]1-hydroxy-3-methoxybenzene",  # Fixed: benzene BFS no longer walks into fused lactam ring
+        "2-[(6E)-2,6-dimethylocta-2,6-dienyl]3-methoxyphenol",  # ASML-13: phenol suffix routing (was hydroxybenzene)
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
@@ -475,7 +475,7 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCc1c(O)ccc(C(=O)C2C(c3c(O)cc(/C=C/c4cc(O)c(O)cc4O)"
         "cc3O)C=C(C)CC2c2ccc(OC3OC(C(=O)O)C(O)C(O)C3O)cc2O)c1O",
-        "(glucuronopyranosyloxy)-1,3-dihydroxy-2-(2-methylbut-2-enyl)benzene",
+        "(glucuronopyranosyloxy)-2-(2-methylbut-2-enyl)benzene-1,3-diol",  # ASML-13: benzene-diol suffix routing
     ),
     (
         "COC(=O)c1ccccc1OC1OC(COC2OC(C)C(O)C(O)C2O)C(O)C(O)C1O",

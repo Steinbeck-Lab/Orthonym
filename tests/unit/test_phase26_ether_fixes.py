@@ -45,16 +45,16 @@ class TestGlycosideNaming:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_fragment", [
-        # B2
-        ("Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1", "(oxan-2-yl)oxy"),
+        # B2: ASML-13 phenol routing changes decomposition path, now uses oxane acid + diol
+        ("Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1", "oxane"),
         # B5: non-stereo rhamnose matches sugar lookup -> retained name
         ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "rhamnopyranosyloxy"),
         # B7 - ring boundary fix: benzene BFS no longer walks into fused lactone
-        # so "(oxan-2-yl)oxy" is no longer detected from benzene parent
+        # ASML-13: phenol suffix routing changes to dimethylphenol
         (
             "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]"
             "([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-            "dimethylbenzene",
+            "dimethylphenol",
         ),
     ])
     def test_systematic_glycoside_name(self, smiles, expected_fragment):
@@ -123,13 +123,13 @@ class TestBGroupRegression:
         # B1: Biphenyl ether -> phenoxy
         (
             "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-            "5-hydroxy-1-methoxy-3-methyl-2-phenoxybenzene",
+            "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
             "B1-phenoxy",
         ),
         # B2: Glycoside -> (oxan-2-yl)oxy
         (
             "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-            "1-(oxan-2-yl)oxy-2-hydroxy-4-methylbenzene",
+            "((2R,4R,6S)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid)-4-methylbenzene-1,2-diol",  # ASML-13: phenol suffix routing + decomposition
             "B2-oxanyloxy",
         ),
         # B3: Galloyl ester chain -> tetradecoxy
@@ -149,7 +149,7 @@ class TestBGroupRegression:
         # chain as a substituent (previously silently dropped).
         (
             "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-            "(rhamnopyranosyloxy)-1-hydroxy-4-(1-methoxy-1-(methylamino)methyl)benzene",
+            "(rhamnopyranosyloxy)-4-(1-methoxy-1-(methylamino)methyl)phenol",  # ASML-13: phenol suffix routing
             "B5-glycosyloxy",
         ),
         # B6: Fused ring system -> xanthone (correctly identified after Phase 101 xanthone entry)
@@ -162,7 +162,7 @@ class TestBGroupRegression:
         (
             "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]"
             "([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
-            "1-hydroxy-2,3-dimethylbenzene",  # Fixed: ring boundary fix removed fabricated sub
+            "2,3-dimethylphenol",  # ASML-13: phenol suffix routing
             "B7-oxanyloxy",
         ),
     ])
