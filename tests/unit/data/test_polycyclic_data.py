@@ -334,3 +334,107 @@ class TestBackwardCompatibility:
         result = get_polycyclic_by_smiles('c1ccc2c(c1)ccc1c3ccccc3ccc21')
         assert result is not None
         assert result['name'] == 'chrysene'
+
+
+# ============================================================================
+# IUPAC Numbering Correctness Tests (DATA-07)
+# ============================================================================
+
+@pytest.mark.unit
+class TestIupacNumberingCorrectness:
+    """Tests for IUPAC numbering map correctness in polycyclic_data.py."""
+
+    def test_naphthalene_fusion_locants_are_strings(self):
+        """Naphthalene fusion positions must use string 'a' notation, not floats."""
+        numbering = POLYCYCLIC_DATA['naphthalene']['iupac_numbering']
+        fusion_values = [v for v in numbering.values() if isinstance(v, str)]
+        float_values = [v for v in numbering.values() if isinstance(v, float)]
+        assert len(float_values) == 0, f"Found float locants: {float_values}"
+        assert '4a' in fusion_values, "Missing '4a' fusion locant"
+        assert '8a' in fusion_values, "Missing '8a' fusion locant"
+
+    def test_naphthalene_has_10_entries(self):
+        """Naphthalene iupac_numbering must have exactly 10 entries."""
+        numbering = POLYCYCLIC_DATA['naphthalene']['iupac_numbering']
+        assert len(numbering) == 10, f"Expected 10 entries, got {len(numbering)}"
+
+    def test_naphthalene_fusion_atoms_are_degree3(self):
+        """Naphthalene fusion atoms (mapped to string locants) should have degree 3."""
+        data = POLYCYCLIC_DATA['naphthalene']
+        mol = Chem.MolFromSmiles(data['canonical_smiles'])
+        numbering = data['iupac_numbering']
+        for atom_idx, locant in numbering.items():
+            if isinstance(locant, str):
+                atom = mol.GetAtomWithIdx(atom_idx)
+                assert atom.GetDegree() == 3, (
+                    f"Fusion atom idx {atom_idx} (locant {locant}) has degree "
+                    f"{atom.GetDegree()}, expected 3"
+                )
+
+    def test_anthracene_numbering_nonempty(self):
+        """Anthracene iupac_numbering must be populated (not empty)."""
+        numbering = POLYCYCLIC_DATA['anthracene']['iupac_numbering']
+        assert len(numbering) > 0, "Anthracene iupac_numbering is empty"
+
+    def test_anthracene_has_14_entries(self):
+        """Anthracene iupac_numbering must have exactly 14 entries."""
+        numbering = POLYCYCLIC_DATA['anthracene']['iupac_numbering']
+        assert len(numbering) == 14, f"Expected 14 entries, got {len(numbering)}"
+
+    def test_phenanthrene_numbering_nonempty(self):
+        """Phenanthrene iupac_numbering must be populated (not empty)."""
+        numbering = POLYCYCLIC_DATA['phenanthrene']['iupac_numbering']
+        assert len(numbering) > 0, "Phenanthrene iupac_numbering is empty"
+
+    def test_phenanthrene_has_14_entries(self):
+        """Phenanthrene iupac_numbering must have exactly 14 entries."""
+        numbering = POLYCYCLIC_DATA['phenanthrene']['iupac_numbering']
+        assert len(numbering) == 14, f"Expected 14 entries, got {len(numbering)}"
+
+    def test_pyrene_numbering_nonempty(self):
+        """Pyrene iupac_numbering must be populated (not empty)."""
+        numbering = POLYCYCLIC_DATA['pyrene']['iupac_numbering']
+        assert len(numbering) > 0, "Pyrene iupac_numbering is empty"
+
+    def test_pyrene_has_16_entries(self):
+        """Pyrene iupac_numbering must have exactly 16 entries."""
+        numbering = POLYCYCLIC_DATA['pyrene']['iupac_numbering']
+        assert len(numbering) == 16, f"Expected 16 entries, got {len(numbering)}"
+
+    def test_all_fusion_locants_are_strings(self):
+        """All fusion locants across all PAH entries should be strings (not floats)."""
+        import re
+        for name, data in POLYCYCLIC_DATA.items():
+            numbering = data.get('iupac_numbering', {})
+            for atom_idx, locant in numbering.items():
+                if isinstance(locant, float):
+                    raise AssertionError(
+                        f"{name}: atom idx {atom_idx} has float locant {locant}, "
+                        f"should be string like '{int(locant)}a'"
+                    )
+                if isinstance(locant, str):
+                    assert re.match(r'^\d+[a-z]$', locant), (
+                        f"{name}: string locant '{locant}' doesn't match pattern 'Na' "
+                        f"(digit(s) followed by single lowercase letter)"
+                    )
+
+    def test_all_peripheral_locants_are_ints(self):
+        """All peripheral locants across all PAH entries should be ints."""
+        for name, data in POLYCYCLIC_DATA.items():
+            numbering = data.get('iupac_numbering', {})
+            for atom_idx, locant in numbering.items():
+                if not isinstance(locant, str):
+                    assert isinstance(locant, int), (
+                        f"{name}: atom idx {atom_idx} has {type(locant).__name__} "
+                        f"locant {locant}, expected int (peripheral) or str (fusion)"
+                    )
+
+    def test_numbering_count_matches_num_atoms(self):
+        """For populated entries, iupac_numbering count must match num_atoms."""
+        for name, data in POLYCYCLIC_DATA.items():
+            numbering = data.get('iupac_numbering', {})
+            if numbering:  # Only check populated entries
+                assert len(numbering) == data['num_atoms'], (
+                    f"{name}: iupac_numbering has {len(numbering)} entries "
+                    f"but num_atoms is {data['num_atoms']}"
+                )
