@@ -100,7 +100,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)N1CCC[C@@H]1C(=O)O",
-        "N-L-seryl-L-serineyl(2R)-pyrrolidine-2-carboxylic acid",
+        "(2R)-N-hexylpyrrolidine-2-carboxylic acid",
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",

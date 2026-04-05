@@ -1154,7 +1154,7 @@ def _looks_like_convertible_name(name: str) -> bool:
 # Name transformation helpers
 # ============================================================================
 
-def _acid_to_ate(acid_name: str) -> str:
+def _acid_to_ate(acid_name: str) -> Optional[str]:
     """Convert acid name to '-ate' form for ester naming.
 
     Handles both systematic names (propanoic acid -> propanoate) and
@@ -1164,7 +1164,8 @@ def _acid_to_ate(acid_name: str) -> str:
         acid_name: Full acid name (e.g., "acetic acid", "propanoic acid").
 
     Returns:
-        The '-ate' form (e.g., "acetate", "propanoate").
+        The '-ate' form (e.g., "acetate", "propanoate"), or None if input
+        is not a recognized acid name (per D-09).
 
     Examples:
         >>> _acid_to_ate("acetic acid")
@@ -1175,12 +1176,17 @@ def _acid_to_ate(acid_name: str) -> str:
         'benzoate'
         >>> _acid_to_ate("cyclohexanecarboxylic acid")
         'cyclohexanecarboxylate'
+        >>> _acid_to_ate("ethanol")  # non-acid -> None
     """
     name = acid_name.strip()
 
     # Guard: if already in -ate form, don't convert again
     if name.endswith("ate") and " acid" not in name:
         return name
+
+    # Per D-09: pre-validate that input looks like an acid name
+    if not _looks_like_acid_name(name):
+        return None  # Per D-09: not an acid -- don't fabricate
 
     # Handle "carboxylic acid" -> "carboxylate"
     if name.endswith("carboxylic acid"):
@@ -1204,11 +1210,11 @@ def _acid_to_ate(acid_name: str) -> str:
     if stem.endswith("ic"):
         return stem[:-2] + "ate"
 
-    # Fallback: append "ate"
-    return stem + "ate"
+    # Per D-09: no recognized pattern matched -- return None instead of garbage
+    return None
 
 
-def _acid_to_amide(acid_name: str) -> str:
+def _acid_to_amide(acid_name: str) -> Optional[str]:
     """Convert acid name to '-amide' form.
 
     Handles systematic (propanoic acid -> propanamide) and
@@ -1218,7 +1224,8 @@ def _acid_to_amide(acid_name: str) -> str:
         acid_name: Full acid name.
 
     Returns:
-        The '-amide' form.
+        The '-amide' form, or None if input is not a recognized acid name
+        (per D-10).
 
     Examples:
         >>> _acid_to_amide("acetic acid")
@@ -1229,12 +1236,17 @@ def _acid_to_amide(acid_name: str) -> str:
         'benzamide'
         >>> _acid_to_amide("cyclohexanecarboxylic acid")
         'cyclohexanecarboxamide'
+        >>> _acid_to_amide("ethanol")  # non-acid -> None
     """
     name = acid_name.strip()
 
     # Guard: if already in -amide form, don't convert again
     if name.endswith("amide") and " acid" not in name:
         return name
+
+    # Per D-10: pre-validate that input looks like an acid name
+    if not _looks_like_acid_name(name):
+        return None  # Per D-10: not an acid -- don't fabricate
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_AMIDE:
@@ -1260,11 +1272,11 @@ def _acid_to_amide(acid_name: str) -> str:
     if stem.endswith("ic"):
         return stem[:-2] + "amide"
 
-    # Fallback
-    return stem + "amide"
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
+    return None
 
 
-def _acid_to_acyl(acid_name: str) -> str:
+def _acid_to_acyl(acid_name: str) -> Optional[str]:
     """Convert acid name to acyl prefix form.
 
     Used for N-acyl naming of amides with complex amines.
@@ -1277,7 +1289,8 @@ def _acid_to_acyl(acid_name: str) -> str:
         acid_name: Full acid name (or amide/ester name).
 
     Returns:
-        Acyl prefix (e.g., "acetyl", "propanoyl", "benzoyl").
+        Acyl prefix (e.g., "acetyl", "propanoyl", "benzoyl"), or None if
+        input is not a recognized convertible name (per D-10).
 
     Examples:
         >>> _acid_to_acyl("acetic acid")
@@ -1292,12 +1305,18 @@ def _acid_to_acyl(acid_name: str) -> str:
         'N-methylbenzoyl'
         >>> _acid_to_acyl("propanedioate")
         'propanedioyl'
+        >>> _acid_to_acyl("cyclohexane")  # non-convertible -> None
     """
     name = acid_name.strip()
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_ACYL:
         return _TRIVIAL_ACID_TO_ACYL[name.lower()]
+
+    # Per D-10: pre-validate that input looks like a convertible name
+    # (acid, amide, or ester). Place AFTER trivial lookup to preserve shortcut.
+    if not _looks_like_convertible_name(name):
+        return None  # Per D-10: not convertible -- don't fabricate
 
     # Handle amide names passed as acid names (e.g., "benzamide",
     # "N-methylbenzamide"). The decomposition engine sometimes labels
@@ -1371,8 +1390,8 @@ def _acid_to_acyl(acid_name: str) -> str:
     if stem.endswith("ic"):
         return stem[:-2] + "yl"
 
-    # Fallback
-    return stem + "yl"
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
+    return None
 
 
 def _acid_to_thioate(acid_name: str) -> Optional[str]:
@@ -1415,6 +1434,11 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
     if name.lower() in _TRIVIAL_TO_THIOATE:
         return _TRIVIAL_TO_THIOATE[name.lower()]
 
+    # Per D-10: pre-validate that input looks like an acid name
+    # (placed AFTER carboxylic acid special case and trivial lookup)
+    if not _looks_like_acid_name(name):
+        return None  # Per D-10: not an acid -- don't fabricate
+
     # Strip " acid" suffix
     if name.endswith(" acid"):
         stem = name[:-5].strip()
@@ -1429,8 +1453,8 @@ def _acid_to_thioate(acid_name: str) -> Optional[str]:
     if stem.endswith("ic"):
         return stem[:-2] + "ethioate"
 
-    # Fallback
-    return stem + "thioate"
+    # Per D-10: no recognized pattern matched -- return None instead of garbage
+    return None
 
 
 def _thiol_to_s_prefix(thiol_name: str) -> Optional[str]:
