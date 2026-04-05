@@ -220,7 +220,7 @@ class TestVBRegressionGuard:
     """Ensure currently-passing polycyclic compounds remain correct."""
 
     @pytest.mark.parametrize("smiles,expected_substr", [
-        ("C12CC3CC(CC(C3)C1)C2", "tricyclo[3.3.1.1(3,7)]decane"),
+        ("C12CC3CC(CC(C3)C1)C2", "adamantane"),  # retained name per IUPAC P-31.1.2.1
         ("C1CC2CC1CC2", "norbornane"),  # retained name
     ])
     def test_regression_compounds(self, smiles, expected_substr):

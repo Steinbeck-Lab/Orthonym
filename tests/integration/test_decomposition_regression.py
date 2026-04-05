@@ -36,7 +36,7 @@ BASIC_CANARIES = [
     ("CC(O)C", "propan-2-ol"),
     ("CC=O", "acetaldehyde"),
     ("CCC=O", "propanal"),
-    ("CC(=O)C", "acetone"),
+    ("CC(=O)C", "propan-2-one"),
     ("CC(=O)O", "acetic acid"),
     ("CCC(=O)O", "propanoic acid"),
     ("CCCC(=O)O", "butanoic acid"),

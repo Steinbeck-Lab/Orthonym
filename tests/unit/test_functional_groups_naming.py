@@ -125,7 +125,7 @@ class TestKetoneNaming:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("CC(C)=O", "acetone"),       # Retained name
+        ("CC(C)=O", "propan-2-one"),  # IUPAC 2013 PIN (acetone removed from retained names)
         ("CCC(C)=O", "butan-2-one"),  # Systematic with locant
         ("CCCC(C)=O", "pentan-2-one"),
         ("CCC(CC)=O", "pentan-3-one"),
@@ -135,9 +135,9 @@ class TestKetoneNaming:
         assert name_compound(smiles) == expected
 
     @pytest.mark.unit
-    def test_acetone_retained(self):
-        """Acetone is a retained name, not propan-2-one."""
-        assert name_compound("CC(C)=O") == "acetone"
+    def test_propan_2_one_pin(self):
+        """Propan-2-one is the IUPAC 2013 PIN (acetone removed from retained names)."""
+        assert name_compound("CC(C)=O") == "propan-2-one"
 
     @pytest.mark.unit
     def test_butan_2_one_locant(self):
@@ -256,7 +256,7 @@ class TestRetainedNamePrecedence:
         ("CCO", "ethanol"),
         ("C=O", "formaldehyde"),
         ("CC=O", "acetaldehyde"),
-        ("CC(C)=O", "acetone"),
+        ("CC(C)=O", "propan-2-one"),
         ("C(=O)O", "formic acid"),
         ("CC(=O)O", "acetic acid"),
     ])

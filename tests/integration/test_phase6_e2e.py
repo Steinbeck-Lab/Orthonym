@@ -483,7 +483,7 @@ class TestPhase4Regression:
         ("CC=O", "acetaldehyde"),
         ("CCC=O", "propanal"),
         # Ketones
-        ("CC(C)=O", "acetone"),
+        ("CC(C)=O", "propan-2-one"),
         ("CCC(C)=O", "butan-2-one"),
         # Carboxylic acids
         ("CC(=O)O", "acetic acid"),

@@ -128,9 +128,9 @@ class TestCubaneAdded:
     @pytest.mark.unit
     def test_cubane_in_bicyclo_retained_names(self):
         """Cubane canonical SMILES should be a key in BICYCLO_RETAINED_NAMES."""
-        assert "C12C3C4C1C1C2C3C41" in BICYCLO_RETAINED_NAMES
+        assert "C12C3C4C1C1C3C2C41" in BICYCLO_RETAINED_NAMES
 
     @pytest.mark.unit
     def test_cubane_value_correct(self):
         """BICYCLO_RETAINED_NAMES should map cubane SMILES to 'cubane'."""
-        assert BICYCLO_RETAINED_NAMES.get("C12C3C4C1C1C2C3C41") == "cubane"
+        assert BICYCLO_RETAINED_NAMES.get("C12C3C4C1C1C3C2C41") == "cubane"

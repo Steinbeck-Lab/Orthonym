@@ -18,9 +18,9 @@ class TestRetainedNamesCount:
     """Verify dictionary size meets expansion target."""
 
     def test_minimum_entry_count(self):
-        """Dictionary must have at least 290 entries (240 original + 50 new)."""
-        assert len(RETAINED_NAMES) >= 290, (
-            f"Expected >= 290 entries, got {len(RETAINED_NAMES)}"
+        """Dictionary must have at least 283 entries (290 original - 7 non-PIN removals in Phase 133)."""
+        assert len(RETAINED_NAMES) >= 283, (
+            f"Expected >= 283 entries, got {len(RETAINED_NAMES)}"
         )
 
 
@@ -245,7 +245,7 @@ class TestNoRegressions:
         ("c1ccncc1", "pyridine"),
         ("C1CCCCC1", "cyclohexane"),
         ("O=Cc1ccccc1", "benzaldehyde"),
-        ("CC(C)=O", "acetone"),
+        # NOTE: CC(C)=O (acetone) removed from retained names in Phase 133 -- PIN is propan-2-one
         ("NC(N)=O", "urea"),
         ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
         ("C#C", "acetylene"),

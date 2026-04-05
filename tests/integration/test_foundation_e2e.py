@@ -307,6 +307,6 @@ class TestEdgeCases:
         assert name_compound("CCO") == "ethanol"
 
     @pytest.mark.integration
-    def test_retained_name_acetone(self):
-        """Acetone (retained name)."""
-        assert name_compound("CC(C)=O") == "acetone"
+    def test_propan_2_one_pin(self):
+        """Propan-2-one is the IUPAC 2013 PIN (not acetone retained name)."""
+        assert name_compound("CC(C)=O") == "propan-2-one"

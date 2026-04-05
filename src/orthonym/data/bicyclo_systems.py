@@ -57,7 +57,7 @@ BICYCLO_RETAINED_NAMES: Dict[str, str] = {
     "C1C2CC3CC1CC(C2)C3": "adamantane",
 
     # === Cubane: pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane retained name per IUPAC P-31.1.2.1 ===
-    "C12C3C4C1C1C2C3C41": "cubane",
+    "C12C3C4C1C1C3C2C41": "cubane",
 }
 
 

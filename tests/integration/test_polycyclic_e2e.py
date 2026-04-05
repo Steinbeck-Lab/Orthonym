@@ -27,13 +27,10 @@ class TestVonBaeyerE2E:
         assert 'norbornane' in result.lower() or 'bicyclo[2.2.1]heptane' in result.lower(), \
             f"Expected norbornane or bicyclo[2.2.1]heptane, got: {result}"
 
-    def test_adamantane_tricyclo(self):
-        """Adamantane: tricyclo[3.3.1.1(3,7)]decane."""
+    def test_adamantane_retained_name(self):
+        """Adamantane: retained name per IUPAC P-31.1.2.1."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
-        assert 'decane' in result.lower(), f"Expected decane, got: {result}"
-        # Verify descriptor pattern
-        assert '3.3.1.1' in result, f"Expected 3.3.1.1 in descriptor, got: {result}"
+        assert result == 'adamantane', f"Expected adamantane, got: {result}"
 
     def test_bicyclo_222_octane(self):
         """Bicyclo[2.2.2]octane: existing naming preserved."""
@@ -48,12 +45,11 @@ class TestVonBaeyerE2E:
         assert 'ene' in result.lower() or 'norbornene' in result.lower(), \
             f"Expected -ene or norbornene, got: {result}"
 
-    def test_cubane_pentacyclo(self):
-        """Cubane: pentacyclo system."""
-        # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane
+    def test_cubane_retained_name(self):
+        """Cubane: retained name per IUPAC P-31.1.2.1."""
+        # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane, retained name preferred
         result = name_compound('C12C3C4C1C5C3C4C25')
-        assert 'pentacyclo' in result.lower(), f"Expected pentacyclo for cubane, got: {result}"
-        assert 'octane' in result.lower(), f"Expected octane for cubane, got: {result}"
+        assert result == 'cubane', f"Expected cubane, got: {result}"
 
 
 class TestSubstitutedPolycyclicE2E:
@@ -112,7 +108,7 @@ class TestHeteroatomReplacementE2E:
         # This would route through polycyclic.py which has oxa- support
         # For now, just verify tricyclo systems work
         result = name_compound('C1C2CC3CC1CC(C2)C3')  # Adamantane
-        assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
+        assert result == 'adamantane', f"Expected adamantane, got: {result}"
 
 
 class TestPolycyclicLactoneE2E:
@@ -254,21 +250,23 @@ class TestRegressionE2E:
 class TestSuccessCriteria:
     """Explicit tests for Phase 16 success criteria from PLAN.md."""
 
-    def test_adamantane_produces_correct_tricyclo_name(self):
-        """SUCCESS-1: Adamantane SMILES produces correct tricyclo name."""
+    def test_adamantane_produces_retained_name(self):
+        """SUCCESS-1: Adamantane SMILES produces retained name 'adamantane'."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert 'tricyclo' in result, f"Criterion 1 FAIL: no tricyclo in {result}"
-        assert '3.3.1.1' in result, f"Criterion 1 FAIL: wrong descriptor in {result}"
-        assert 'decane' in result.lower(), f"Criterion 1 FAIL: no decane in {result}"
+        assert result == 'adamantane', f"Criterion 1 FAIL: expected 'adamantane', got {result}"
 
     def test_vb_verification_formula(self):
-        """SUCCESS-6: VB verification formula passes for adamantane."""
-        # For adamantane: 3 + 3 + 1 + 1 = 8 bridge atoms + 2 bridgeheads = 10 atoms
-        # The formula sum(bridge_lengths) + 2 == total_ring_atoms must hold
-        # This is implicitly tested by the tricyclo descriptor being correct
-        result = name_compound('C1C2CC3CC1CC(C2)C3')
-        # If tricyclo[3.3.1.1...]decane is produced, verification passed
-        assert 'tricyclo[3.3.1.1' in result, f"Criterion 6 FAIL: {result}"
+        """SUCCESS-6: VB verification formula passes for adamantane.
+
+        VB descriptor is still correct internally (tricyclo[3.3.1.1(3,7)]decane),
+        but name_compound returns the retained name 'adamantane'. Verify via
+        low-level generate_polycyclic_name instead.
+        """
+        from rdkit import Chem
+        from orthonym.rules.polycyclic import generate_polycyclic_name
+        mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
+        base_name = generate_polycyclic_name(mol)
+        assert 'tricyclo[3.3.1.1' in base_name, f"Criterion 6 FAIL: {base_name}"
 
     def test_existing_bicyclo_routing_untouched(self):
         """SUCCESS-7: Existing bicyclo, spiro, fused routing untouched."""
@@ -291,12 +289,16 @@ class TestDescriptorFormats:
         assert 'bicyclo[2.2.2]' in result.lower(), f"Expected bicyclo[2.2.2], got: {result}"
 
     def test_tricyclo_secondary_bridge_locants(self):
-        """Tricyclo with parenthesized locants for secondary bridges (OPSIN-compatible)."""
-        result = name_compound('C1C2CC3CC1CC(C2)C3')  # adamantane
-        # OPSIN-compatible format: parenthesized locants after bridge length (e.g., 1(3,7))
-        # Unambiguous for multi-digit locants
-        assert '1(3,7)' in result or '1(7,3)' in result, \
-            f"Expected parenthesized locants '1(3,7)' in {result}"
+        """Tricyclo with parenthesized locants for secondary bridges (OPSIN-compatible).
+
+        Adamantane now returns retained name; test VB format via generate_polycyclic_name.
+        """
+        from rdkit import Chem
+        from orthonym.rules.polycyclic import generate_polycyclic_name
+        mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        base_name = generate_polycyclic_name(mol)
+        assert '1(3,7)' in base_name or '1(7,3)' in base_name, \
+            f"Expected parenthesized locants '1(3,7)' in {base_name}"
 
 
 class TestEdgeCases:
@@ -445,11 +447,9 @@ class TestPolycyclicFunctionalGroups:
         assert 'tricyclo' in result.lower(), f"Expected tricyclo descriptor, got: {result}"
 
     def test_polycyclic_no_fg_unchanged(self):
-        """Adamantane without FGs: name unchanged (regression guard)."""
+        """Adamantane without FGs: retained name (regression guard)."""
         result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert 'tricyclo' in result.lower(), f"Expected tricyclo, got: {result}"
-        assert 'decane' in result.lower(), f"Expected decane, got: {result}"
-        assert '3.3.1.1' in result, f"Expected 3.3.1.1 descriptor, got: {result}"
+        assert result == 'adamantane', f"Expected adamantane, got: {result}"
 
     def test_norbornane_retained_name_preserved(self):
         """Norbornane retained name not broken by FG changes."""
@@ -473,27 +473,28 @@ class TestOPSINCompatibleVBFormat:
     """
 
     def test_adamantane_opsin_format(self):
-        """Adamantane: tricyclo[3.3.1.1(3,7)]decane - OPSIN-compatible."""
+        """Adamantane: retained name is OPSIN-compatible.
+
+        Adamantane now returns retained name; VB descriptor format tested via
+        generate_polycyclic_name in other tests.
+        """
         result = name_compound('C1C2CC3CC1CC(C2)C3')
-        assert '1(3,7)' in result or '1(7,3)' in result, \
-            f"Expected parenthesized locants '1(3,7)' in: {result}"
+        assert result == 'adamantane', f"Expected retained name 'adamantane', got: {result}"
         # Must NOT contain old LaTeX-style notation
         assert '^{' not in result, \
             f"Found old ^{{}} notation in: {result}"
 
     def test_cubane_opsin_format(self):
-        """Cubane: pentacyclo descriptor with zero-length bridges, OPSIN-compatible."""
+        """Cubane: retained name is OPSIN-compatible.
+
+        Cubane now returns retained name; VB descriptor format tested via
+        generate_polycyclic_name.
+        """
         result = name_compound('C12C3C4C1C5C3C4C25')
-        assert 'pentacyclo[' in result, f"Expected pentacyclo, got: {result}"
-        assert 'octane' in result.lower(), f"Expected octane, got: {result}"
+        assert result == 'cubane', f"Expected retained name 'cubane', got: {result}"
         # Must NOT contain old LaTeX-style notation
         assert '^{' not in result, \
             f"Found old ^{{}} notation in cubane: {result}"
-        # Must contain zero-length bridge entries with parenthesized locants
-        import re
-        zero_bridges = re.findall(r'0\(\d+,\d+\)', result)
-        assert len(zero_bridges) >= 1, \
-            f"Expected zero-length bridge entries with parenthesized locants in cubane descriptor: {result}"
 
     def test_norbornane_no_secondary_bridges(self):
         """Norbornane (bicyclo[2.2.1]heptane) has no secondary bridges - format unchanged."""

@@ -203,7 +203,7 @@ def simple_aldehydes():
 def simple_ketones():
     """Simple ketone test cases."""
     return [
-        ("CC(C)=O", "acetone"),
+        ("CC(C)=O", "propan-2-one"),
         ("CCC(C)=O", "butan-2-one"),
         ("CCCC(C)=O", "pentan-2-one"),
         ("CCC(CC)=O", "pentan-3-one"),

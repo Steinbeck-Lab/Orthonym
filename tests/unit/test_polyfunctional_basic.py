@@ -135,9 +135,9 @@ class TestPolyfunctionalIntegration:
 
     def test_existing_ketone_naming_unchanged(self):
         # Ensure simple ketone naming still works
-        # acetone is the retained name for propan-2-one
+        # propan-2-one is the IUPAC 2013 PIN (acetone removed from retained names)
         result = name_compound("CC(=O)C")
-        assert result in ["acetone", "propan-2-one"]
+        assert result == "propan-2-one"
 
 
 class TestPrefixFormatting:

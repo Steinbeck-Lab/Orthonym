@@ -116,7 +116,7 @@ CORE_NAMING = [
     ("CCC=O", "propanal"),
 
     # Ketones
-    ("CC(=O)C", "acetone"),
+    ("CC(=O)C", "propan-2-one"),
 
     # Carboxylic acids
     ("CC(=O)O", "acetic acid"),
@@ -760,8 +760,8 @@ PHASE24_RT_IMPROVEMENTS = [
     # tricyclo[3.3.1.1(3,7)] -- unambiguous for multi-digit locants
     (
         "C1C2CC3CC1CC(C2)C3",
-        "tricyclo[3.3.1.1(3,7)]decane",
-        "vb-parenthesized-locants-adamantane",
+        "adamantane",
+        "retained-name-adamantane",
     ),
     # Isoindoline dione format (phthalimide) -- normalized to isoindoline-1,3-dione
     (

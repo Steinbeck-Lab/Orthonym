@@ -274,7 +274,7 @@ class TestZeroRegressionValidation:
             ("CCO", "ethanol"),
             ("C=O", "formaldehyde"),  # retained name
             ("CC=O", "acetaldehyde"),  # retained name
-            ("CC(=O)C", "acetone"),  # retained name
+            ("CC(=O)C", "propan-2-one"),  # IUPAC 2013 PIN
         ]
         for smi, expected in cases:
             name = name_compound(smi)

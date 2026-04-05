@@ -233,10 +233,9 @@ class TestLocantValidation:
         assert result == 'ethanol', f'Expected ethanol, got: {result}'
 
     def test_existing_propanone_unchanged(self):
-        """Propan-2-one / acetone should be unchanged."""
+        """Propan-2-one is the IUPAC 2013 PIN."""
         result = name_compound('CC(=O)C')
-        # Acetone is a retained name
-        assert result in ('acetone', 'propan-2-one'), f'Got: {result}'
+        assert result == 'propan-2-one', f'Got: {result}'
 
     def test_hexanol_locant_valid(self):
         """Hexan-1-ol locant should be within parent size 6."""
