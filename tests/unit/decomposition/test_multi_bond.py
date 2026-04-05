@@ -17,6 +17,7 @@ from orthonym.decomposition.engine import (
     _name_quality_is_acceptable,
     _try_single_bond_decompose,
     _try_multi_bond_decompose,
+    _try_iterative_mixed_decompose,
     try_decompose,
 )
 from orthonym.decomposition.fragment_assembly import _assemble_multi_ester
@@ -1204,4 +1205,262 @@ class TestMultiBondIntegration:
 
         assert result == multi_result_sentinel, (
             f"Should dispatch to multi-bond for 3+ amide bonds, got: {result}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 132-03: Fragment storage and role-based core identification tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestFragmentStorageAndRoles:
+    """Tests for DECO-17 (list-of-tuples storage) and DECO-18 (middle-fragment
+    core identification) fixes in engine.py and fragment_assembly.py.
+
+    These tests verify:
+    - Identical SMILES fragments are preserved (not deduplicated by dict key)
+    - Middle-role fragments are preferred as core candidates
+    - Multiple middle fragments ranked by seniority
+    - Assemblers use new List[Tuple[Dict, str]] signature
+    - None returns from transformation functions handled gracefully
+    - Iterative mixed decomposer also uses list-of-tuples storage
+    """
+
+    # -- Test 1: Identical acid fragments retained --
+
+    def test_identical_acid_fragments_retained(self):
+        """When _try_multi_bond_decompose receives fragments with identical
+        SMILES (simulating a triglyceride with 3 identical fatty acids), all
+        fragments appear in the named list (not deduplicated by dict overwrite).
+
+        DECO-17: verifies that named_fragments is a list of tuples, not a dict.
+        """
+        mol = Chem.MolFromSmiles("CC(=O)OCC(COC(C)=O)OC(C)=O")  # triacetin
+        from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
+        bonds = find_cleavable_bonds(mol)
+        ester_bonds = [b for b in bonds if b["type"] == "ester"]
+
+        if len(ester_bonds) < 2:
+            pytest.skip("Triacetin should have >= 2 ester bonds for this test")
+
+        # The multi-bond decomposer should produce a result with a
+        # multiplicative prefix ("tri") proving all 3 identical fragments
+        # were retained. With dict storage, only 1 copy would survive.
+        result = _try_multi_bond_decompose(mol, ester_bonds, "pin")
+        if result is not None:
+            result_lower = result.lower()
+            assert "tri" in result_lower or "3" in result_lower, (
+                f"Triacetin should have 'tri' prefix (3 identical acids), got: {result}"
+            )
+
+    # -- Test 2: Multi-ester assembly counts duplicates --
+
+    def test_multi_ester_assembly_counts_duplicates(self):
+        """_assemble_multi_ester with 3 identical acid names produces
+        multiplicative prefix 'tri' (not 'mono' or bare).
+
+        Uses the NEW assembler signature: List[Tuple[Dict, str]].
+        """
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+        ]
+        result = _assemble_multi_ester(named_fragments)
+        assert result is not None, "Should assemble a multi-ester name"
+        result_lower = result.lower()
+        assert "triacetate" in result_lower, (
+            f"3 identical acids should produce 'triacetate', got: {result}"
+        )
+        assert "glycerol" in result_lower, (
+            f"Core should be glycerol, got: {result}"
+        )
+
+    # -- Test 3: Middle fragment identified as core --
+
+    def test_middle_fragment_identified_as_core(self):
+        """_assemble_multi_ester with fragments where one has side='middle'
+        uses that fragment as core.
+
+        DECO-18: middle-role fragments should be preferred as core.
+        """
+        named_fragments = [
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+        ]
+        result = _assemble_multi_ester(named_fragments)
+        assert result is not None
+        assert result.lower().startswith("glycerol"), (
+            f"Middle fragment (glycerol) should be core, got: {result}"
+        )
+
+    # -- Test 4: Middle fragment preferred over seniority --
+
+    def test_middle_fragment_preferred_over_seniority(self):
+        """When a 'middle' fragment exists, it is used as core even if another
+        fragment has higher seniority score.
+
+        Uses mock seniority to make an acid fragment appear more senior than
+        the middle fragment. The middle role should still win.
+        """
+        named_fragments = [
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CCCO", "side": "middle"}, "propan-1-ol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+        ]
+        # Even with mock seniority favoring acetic acid, the middle
+        # fragment should be chosen as core
+        with patch(
+            "orthonym.decomposition.fragment_ranker.score_fragment_seniority",
+            side_effect=lambda s: (-5, 0, 0, 0, 0) if "CC(=O)O" in s else (0, 10, 3, 0, 0),
+        ):
+            result = _assemble_multi_ester(named_fragments)
+        assert result is not None
+        assert "propan-1-ol" in result.lower(), (
+            f"Middle fragment should be core regardless of seniority, got: {result}"
+        )
+
+    # -- Test 5: No middle falls back to seniority --
+
+    def test_no_middle_falls_back_to_seniority(self):
+        """When no fragment has side='middle', core identification falls back
+        to seniority (existing behavior preserved).
+        """
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "alkyl"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+        ]
+        result = _assemble_multi_ester(named_fragments)
+        assert result is not None
+        # Glycerol has higher seniority than acetic acid (more FGs, larger)
+        assert "glycerol" in result.lower(), (
+            f"Without middle, seniority should pick glycerol as core, got: {result}"
+        )
+
+    # -- Test 6: Multiple middles ranked by seniority --
+
+    def test_multiple_middles_ranked_by_seniority(self):
+        """When 2 fragments have side='middle', the most senior one is used
+        as core (per D-08).
+        """
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CCCO", "side": "middle"}, "propan-1-ol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+        ]
+        result = _assemble_multi_ester(named_fragments)
+        assert result is not None
+        # glycerol (3 OH, 6 HA) should be more senior than propan-1-ol (1 OH, 4 HA)
+        assert "glycerol" in result.lower(), (
+            f"Most senior middle fragment (glycerol) should be core, got: {result}"
+        )
+
+    # -- Test 7: New signature accepted --
+
+    def test_named_fragments_list_signature(self):
+        """_assemble_multi_ester accepts List[Tuple[Dict, str]] (new signature).
+
+        Verifies the new signature works and returns a non-None result for
+        a valid input. The old signature (fragments, fragment_names, style)
+        should no longer be the primary interface.
+        """
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CCC(=O)O", "side": "acid"}, "propanoic acid"),
+        ]
+        # Should not raise TypeError
+        result = _assemble_multi_ester(named_fragments)
+        assert result is not None, (
+            "New List[Tuple] signature should produce a valid result"
+        )
+
+    # -- Test 8: Assembler handles None from _acid_to_ate --
+
+    def test_assembler_handles_none_from_acid_to_ate(self):
+        """When _acid_to_ate returns None for a non-acid fragment, the
+        assembler skips that fragment (per D-11).
+
+        Simulates a fragment whose name doesn't look like an acid, so
+        _acid_to_ate returns None. The assembler should skip it gracefully.
+        """
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CCCCCC", "side": "acid"}, "hexane"),  # Not an acid name
+        ]
+        # _acid_to_ate("hexane") should return None (per D-09 pre-validation)
+        # The assembler should skip hexane and still produce a result with
+        # just the acetic acid arm
+        result = _assemble_multi_ester(named_fragments)
+        # Result should contain acetate (from acetic acid) but not crash
+        if result is not None:
+            assert "hexanoate" not in result.lower(), (
+                f"Non-acid 'hexane' should not produce -ate form, got: {result}"
+            )
+
+    # -- Test 9: Iterative decomposer preserves duplicates --
+
+    def test_iterative_decomposer_preserves_duplicates(self):
+        """The iterative mixed decomposer also uses list-of-tuples
+        (per Pitfall 5 from RESEARCH.md).
+
+        Verifies that _try_iterative_mixed_decompose does not use dict
+        storage that would deduplicate identical fragment SMILES.
+        """
+        from orthonym.decomposition.engine import _try_iterative_mixed_decompose
+
+        mol = Chem.MolFromSmiles("C" * 30)  # Dummy molecule
+
+        # Create fake bonds with 2 different types (needed for mixed decomposition)
+        fake_bonds = [
+            {"bond_idx": 0, "type": "ester"},
+            {"bond_idx": 1, "type": "amide"},
+        ]
+
+        # Track fragment naming calls to verify all fragments are named
+        naming_calls = []
+        original_fallback = None
+
+        def tracking_namer(smiles):
+            naming_calls.append(smiles)
+            return f"fragment-{len(naming_calls)}"
+
+        # Mock the decomposition to produce identical fragments
+        identical_frags = [
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "CC(=O)O", "side": "acid"},
+            {"smiles": "OCC(O)CO", "side": "alkyl"},
+        ]
+
+        with patch(
+            "orthonym.decomposition.engine._select_best_bond",
+            return_value=fake_bonds[0],
+        ), patch(
+            "orthonym.decomposition.fragment_capping.cleave_and_cap",
+            return_value=identical_frags,
+        ), patch(
+            "orthonym.decomposition.engine._name_sugar_fragment",
+            return_value=None,
+        ), patch(
+            "orthonym.decomposition.engine._name_fragment_with_fallback",
+            side_effect=tracking_namer,
+        ), patch(
+            "orthonym.decomposition.engine._name_quality_is_acceptable",
+            return_value=True,
+        ), patch(
+            "orthonym.decomposition.engine._coverage_is_adequate",
+            return_value=True,
+        ):
+            result = _try_iterative_mixed_decompose(mol, fake_bonds, "pin")
+
+        # With list-of-tuples, all 3 fragments should be named individually.
+        # With dict storage, the 2 identical "CC(=O)O" would be named once.
+        assert len(naming_calls) >= 3, (
+            f"All fragments should be named (including duplicates), "
+            f"but only {len(naming_calls)} naming calls made: {naming_calls}"
         )
