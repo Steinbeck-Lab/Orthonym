@@ -16,7 +16,7 @@ Each assembler handles name transformations:
 
 import re as _re
 from collections import Counter as _Counter
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem as _Chem
 
@@ -738,8 +738,7 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
 
 
 def _assemble_multi_ester(
-    fragments: List[Dict],
-    fragment_names: Dict[str, str],
+    named_fragments: List[Tuple[Dict, str]],
     style: str = "pin",
 ) -> Optional[str]:
     """Assemble name for polyesters (triglycerides, etc.) per IUPAC P-65.6.3.4.
@@ -748,14 +747,13 @@ def _assemble_multi_ester(
     - Identical acids: "glycerol triacetate" with multiplicative prefix
     - Different acids: "glycerol acetate propanoate" positionally listed
 
-    The core fragment (polyol) is identified by score_fragment_seniority()
-    as the most senior fragment (lowest seniority score). The core is
-    typically the "middle" fragment between cleavage points.
+    The core fragment is identified by role label preference:
+    1. Fragments with side="middle" (backbone between cleavage points)
+    2. Fall back to score_fragment_seniority() (existing behavior)
 
     Args:
-        fragments: List of fragment dicts from cleave_and_cap(), each with
-            "smiles" and "side" keys.
-        fragment_names: Dict mapping canonical SMILES to their IUPAC names.
+        named_fragments: List of (fragment_dict, name_str) tuples. Each
+            fragment_dict has "smiles" and "side" keys. Preserves duplicates.
         style: Naming style ("pin" for preferred IUPAC names).
 
     Returns:
@@ -763,54 +761,58 @@ def _assemble_multi_ester(
     """
     from .fragment_ranker import score_fragment_seniority
 
-    if not fragments or not fragment_names:
+    if not named_fragments or len(named_fragments) < 2:
         return None
 
-    # De-duplicate fragment SMILES for scoring (same SMILES = same fragment)
-    unique_smiles = list(set(f["smiles"] for f in fragments))
-    if len(unique_smiles) < 2:
-        return None  # Need at least core + one acid
+    # Per D-06, D-07: identify core by role, then by seniority
+    middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
+    if middle_frags:
+        # Per D-08: multiple middles -> pick most senior
+        core_frag, core_name = min(
+            middle_frags,
+            key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+        )
+    else:
+        # No middle label: fall back to seniority over unique SMILES (existing behavior)
+        # Build unique representatives for seniority scoring
+        seen_smiles = {}
+        for f, n in named_fragments:
+            if f["smiles"] not in seen_smiles:
+                seen_smiles[f["smiles"]] = (f, n)
+        if len(seen_smiles) < 2:
+            return None  # Need at least core + one acid by unique SMILES
+        core_frag, core_name = min(
+            seen_smiles.values(),
+            key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+        )
 
-    # Identify core fragment as the most senior (lowest seniority score)
-    core_smiles = min(
-        unique_smiles,
-        key=lambda s: score_fragment_seniority(s),
-    )
-    core_name = fragment_names.get(core_smiles, "")
     if not core_name:
         return None
 
-    # Core-size guard (Phase 099-05): reject when core fragment has fewer
-    # heavy atoms than any non-core fragment. This prevents pathological
-    # multi-ester splits where peripheral ester bonds are cleaved on a
-    # complex ring system, leaving a tiny core and losing the ring system.
-    core_mol = _Chem.MolFromSmiles(core_smiles)
+    # Core-size guard (Phase 099-05): reject when core is smaller than any non-core
+    core_mol = _Chem.MolFromSmiles(core_frag["smiles"])
     if core_mol is not None:
         core_ha = core_mol.GetNumHeavyAtoms()
-        non_core_smiles_set = [s for s in unique_smiles if s != core_smiles]
-        for nc_smi in non_core_smiles_set:
-            nc_mol = _Chem.MolFromSmiles(nc_smi)
-            if nc_mol is not None:
-                nc_ha = nc_mol.GetNumHeavyAtoms()
-                if nc_ha > core_ha:
-                    return None  # Core is smaller than a non-core fragment
+        for frag, name in named_fragments:
+            if frag is core_frag:
+                continue
+            nc_mol = _Chem.MolFromSmiles(frag["smiles"])
+            if nc_mol is not None and nc_mol.GetNumHeavyAtoms() > core_ha:
+                return None
 
-    # Collect acid names from non-core fragments
+    # Per D-04: collect acid names from non-core fragments, count by name (not SMILES)
     ate_names = []
-    for frag in fragments:
-        if frag["smiles"] == core_smiles:
+    for frag, name in named_fragments:
+        if frag is core_frag:
             continue
-        acid_name = fragment_names.get(frag["smiles"])
-        if not acid_name:
-            continue
-        ate = _acid_to_ate(acid_name)
-        if ate:
+        ate = _acid_to_ate(name)
+        if ate:  # Per D-11: None from _acid_to_ate is skipped
             ate_names.append(ate)
 
     if not ate_names:
         return None
 
-    # Identical acids: use multiplicative prefix
+    # Identical acids: use multiplicative prefix (per D-04: compare names not SMILES)
     if len(set(ate_names)) == 1:
         _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
         mult = _MULT_PREFIX.get(len(ate_names), str(len(ate_names)))
@@ -821,8 +823,7 @@ def _assemble_multi_ester(
 
 
 def _assemble_multi_glycoside(
-    fragments: List[Dict],
-    fragment_names: Dict[str, str],
+    named_fragments: List[Tuple[Dict, str]],
     style: str = "pin",
 ) -> Optional[str]:
     """Assemble names for molecules with 2+ glycosidic bonds.
@@ -832,9 +833,13 @@ def _assemble_multi_glycoside(
     If NO sugar fragment gets a retained name (all end up as systematic
     oxanyloxane), fall back to None to prevent garbled names.
 
+    The core fragment is identified by role label preference:
+    1. Fragments with side="middle" (backbone between cleavage points)
+    2. Fall back to non-sugar seniority ranking (existing behavior)
+
     Args:
-        fragments: List of fragment dicts from cleave_and_cap().
-        fragment_names: Dict mapping canonical SMILES to IUPAC names.
+        named_fragments: List of (fragment_dict, name_str) tuples. Each
+            fragment_dict has "smiles" and "side" keys. Preserves duplicates.
         style: Naming style.
 
     Returns:
@@ -843,41 +848,54 @@ def _assemble_multi_glycoside(
     """
     from .fragment_ranker import score_fragment_seniority
 
-    if not fragments or not fragment_names:
+    if not named_fragments or len(named_fragments) < 2:
         return None
 
-    # De-duplicate fragment SMILES for scoring
-    unique_smiles = list(set(f["smiles"] for f in fragments))
-    if len(unique_smiles) < 2:
-        return None  # Need at least core + one sugar
-
-    # Identify sugar vs aglycone fragments. For glycosides, the core
-    # is the aglycone (non-sugar), not the most-senior fragment.
+    # Identify sugar vs aglycone fragments from the named tuples.
     # Sugar fragments are identified by: name ending in "oxy" OR
     # sugar lookup succeeding on the SMILES.
-    sugar_smiles = set()
-    for smi in unique_smiles:
-        frag_name = fragment_names.get(smi, "")
-        if frag_name.endswith("oxy"):
-            sugar_smiles.add(smi)
-        elif lookup_sugar(smi):
-            sugar_smiles.add(smi)
+    sugar_indices = set()
+    for i, (frag, name) in enumerate(named_fragments):
+        if name.endswith("oxy"):
+            sugar_indices.add(i)
+        elif lookup_sugar(frag["smiles"]):
+            sugar_indices.add(i)
 
-    # Core is the non-sugar fragment. If multiple non-sugars, pick
-    # by seniority. If all are sugars, pick the most senior as core.
-    non_sugar_smiles = [s for s in unique_smiles if s not in sugar_smiles]
-    if non_sugar_smiles:
-        core_smiles = min(
-            non_sugar_smiles,
-            key=lambda s: score_fragment_seniority(s),
+    # Per D-06, D-07: identify core by role first, then by non-sugar seniority
+    middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
+    if middle_frags:
+        # Per D-08: multiple middles -> pick most senior
+        core_frag, core_name = min(
+            middle_frags,
+            key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
         )
     else:
-        # All fragments are sugars -- pick the most senior as core
-        core_smiles = min(
-            unique_smiles,
-            key=lambda s: score_fragment_seniority(s),
-        )
-    core_name = fragment_names.get(core_smiles, "")
+        # No middle label: use sugar/non-sugar classification
+        non_sugar_pairs = [
+            (f, n) for i, (f, n) in enumerate(named_fragments)
+            if i not in sugar_indices
+        ]
+        if non_sugar_pairs:
+            # Build unique representatives for seniority scoring
+            seen_smiles = {}
+            for f, n in non_sugar_pairs:
+                if f["smiles"] not in seen_smiles:
+                    seen_smiles[f["smiles"]] = (f, n)
+            core_frag, core_name = min(
+                seen_smiles.values(),
+                key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+            )
+        else:
+            # All fragments are sugars -- pick the most senior as core
+            seen_smiles = {}
+            for f, n in named_fragments:
+                if f["smiles"] not in seen_smiles:
+                    seen_smiles[f["smiles"]] = (f, n)
+            core_frag, core_name = min(
+                seen_smiles.values(),
+                key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+            )
+
     if not core_name:
         return None
 
@@ -885,16 +903,13 @@ def _assemble_multi_glycoside(
     glycosyloxy_prefixes: List[str] = []
     has_retained_sugar = False
 
-    for frag in fragments:
-        if frag["smiles"] == core_smiles:
-            continue
-        frag_name = fragment_names.get(frag["smiles"])
-        if not frag_name:
+    for frag, name in named_fragments:
+        if frag is core_frag:
             continue
 
         # Check if the name is a glycosyloxy prefix (ends in "oxy")
-        if frag_name.endswith("oxy"):
-            glycosyloxy_prefixes.append(frag_name)
+        if name.endswith("oxy"):
+            glycosyloxy_prefixes.append(name)
             has_retained_sugar = True
         else:
             # Try to convert to glycosyloxy prefix via sugar lookup
@@ -906,9 +921,9 @@ def _assemble_multi_glycoside(
                     glycosyloxy_prefixes.append(prefix)
                     has_retained_sugar = True
                 else:
-                    glycosyloxy_prefixes.append(frag_name)
+                    glycosyloxy_prefixes.append(name)
             else:
-                glycosyloxy_prefixes.append(frag_name)
+                glycosyloxy_prefixes.append(name)
 
     if not glycosyloxy_prefixes:
         return None
@@ -941,8 +956,7 @@ def _assemble_multi_glycoside(
 
 
 def _assemble_multi_amide(
-    fragments: List[Dict],
-    fragment_names: Dict[str, str],
+    named_fragments: List[Tuple[Dict, str]],
     style: str = "pin",
 ) -> Optional[str]:
     """Assemble names for molecules with 3+ amide bonds.
@@ -950,9 +964,13 @@ def _assemble_multi_amide(
     Pattern: N-acyl1,N-acyl2-amine per IUPAC P-66.6.3.
     Each acyl group as N- prefix on the amine core.
 
+    The core fragment is identified by role label preference:
+    1. Fragments with side="middle" (amine backbone in polyamides)
+    2. Fall back to non-acid seniority ranking (existing behavior)
+
     Args:
-        fragments: List of fragment dicts from cleave_and_cap().
-        fragment_names: Dict mapping canonical SMILES to IUPAC names.
+        named_fragments: List of (fragment_dict, name_str) tuples. Each
+            fragment_dict has "smiles" and "side" keys. Preserves duplicates.
         style: Naming style.
 
     Returns:
@@ -961,51 +979,60 @@ def _assemble_multi_amide(
     """
     from .fragment_ranker import score_fragment_seniority
 
-    if not fragments or not fragment_names:
+    if not named_fragments or len(named_fragments) < 2:
         return None
 
-    # De-duplicate fragment SMILES for scoring
-    unique_smiles = list(set(f["smiles"] for f in fragments))
-    if len(unique_smiles) < 2:
-        return None  # Need at least core + one acid
-
-    # For amide assembly, the core is the AMINE fragment, not the acid.
-    # Identify acid fragments: their names end in "acid" or convert to
-    # an acyl prefix successfully. The remaining fragment is the amine core.
-    acid_smiles = set()
-    for smi in unique_smiles:
-        frag_name = fragment_names.get(smi, "").strip().lower()
-        if frag_name.endswith("acid") or frag_name.endswith("ate"):
-            acid_smiles.add(smi)
-
-    # Core is the non-acid fragment (amine). If multiple non-acids, pick
-    # the most senior by seniority scoring.
-    non_acid_smiles = [s for s in unique_smiles if s not in acid_smiles]
-    if non_acid_smiles:
-        core_smiles = min(
-            non_acid_smiles,
-            key=lambda s: score_fragment_seniority(s),
+    # Per D-06, D-07: identify core by role first, then by non-acid seniority
+    middle_frags = [(f, n) for f, n in named_fragments if f.get("side") == "middle"]
+    if middle_frags:
+        # Per D-08: multiple middles -> pick most senior
+        core_frag, core_name = min(
+            middle_frags,
+            key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
         )
     else:
-        # All fragments look like acids -- pick the most senior as core
-        core_smiles = min(
-            unique_smiles,
-            key=lambda s: score_fragment_seniority(s),
-        )
-    core_name = fragment_names.get(core_smiles, "")
+        # No middle label: identify acid fragments by name and pick non-acid core
+        acid_indices = set()
+        for i, (frag, name) in enumerate(named_fragments):
+            n = name.strip().lower()
+            if n.endswith("acid") or n.endswith("ate"):
+                acid_indices.add(i)
+
+        non_acid_pairs = [
+            (f, n) for i, (f, n) in enumerate(named_fragments)
+            if i not in acid_indices
+        ]
+        if non_acid_pairs:
+            # Build unique representatives for seniority scoring
+            seen_smiles = {}
+            for f, n in non_acid_pairs:
+                if f["smiles"] not in seen_smiles:
+                    seen_smiles[f["smiles"]] = (f, n)
+            core_frag, core_name = min(
+                seen_smiles.values(),
+                key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+            )
+        else:
+            # All fragments look like acids -- pick the most senior as core
+            seen_smiles = {}
+            for f, n in named_fragments:
+                if f["smiles"] not in seen_smiles:
+                    seen_smiles[f["smiles"]] = (f, n)
+            core_frag, core_name = min(
+                seen_smiles.values(),
+                key=lambda pair: score_fragment_seniority(pair[0]["smiles"]),
+            )
+
     if not core_name:
         return None
 
     # Collect acyl prefixes from non-core fragments
     acyl_names: List[str] = []
-    for frag in fragments:
-        if frag["smiles"] == core_smiles:
+    for frag, name in named_fragments:
+        if frag is core_frag:
             continue
-        acid_name = fragment_names.get(frag["smiles"])
-        if not acid_name:
-            continue
-        acyl = _acid_to_acyl(acid_name)
-        if acyl:
+        acyl = _acid_to_acyl(name)
+        if acyl:  # Per D-11: None from _acid_to_acyl is skipped
             acyl_names.append(acyl)
 
     if not acyl_names:

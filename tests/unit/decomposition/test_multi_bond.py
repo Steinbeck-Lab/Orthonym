@@ -509,17 +509,13 @@ class TestMultiEsterAssembly:
 
     def test_identical_acid_names_use_multiplicative_prefix(self):
         """Identical acid names produce multiplicative prefix (e.g., triacetate)."""
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None
         result_lower = result.lower()
         assert "triacetate" in result_lower, (
@@ -531,17 +527,12 @@ class TestMultiEsterAssembly:
 
     def test_different_acid_names_list_positionally(self):
         """Different acid names should be listed individually."""
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
-            {"smiles": "CCC(=O)O", "side": "acid"},      # propanoic acid
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CCC(=O)O", "side": "acid"}, "propanoic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-            "CC(=O)O": "acetic acid",
-            "CCC(=O)O": "propanoic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None
         result_lower = result.lower()
         assert "glycerol" in result_lower
@@ -556,16 +547,12 @@ class TestMultiEsterAssembly:
         Uses acetic acid (4 HA) as non-core so glycerol (6 HA) passes the
         core-size guard (Phase 099-05).
         """
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol (6 HA)
-            {"smiles": "CC(=O)O", "side": "acid"},      # acetic acid (4 HA)
-            {"smiles": "CC(=O)O", "side": "acid"},      # acetic acid (4 HA)
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None
         # Glycerol should be the core (parent), not the acid
         assert result.lower().startswith("glycerol"), (
@@ -574,40 +561,29 @@ class TestMultiEsterAssembly:
 
     def test_returns_none_when_core_empty(self):
         """Returns None when core fragment name is empty."""
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},
-            {"smiles": "CC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, ""),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "",  # Empty core name
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is None
 
     def test_returns_none_when_no_acid_fragments(self):
         """Returns None when no non-core fragment names available."""
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is None
 
     def test_diacetate_with_two_acids(self):
         """Two identical acids produce diacetate."""
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None
         assert "diacetate" in result.lower(), (
             f"Two identical acids should produce 'diacetate', got: {result}"
@@ -615,18 +591,14 @@ class TestMultiEsterAssembly:
 
     def test_tetracetate_multiplicative(self):
         """Four identical acids produce tetraacetate."""
-        fragments = [
-            {"smiles": "OCC(O)(CO)CO", "side": "middle"},  # erythritol-like
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "OCC(O)(CO)CO", "side": "middle"}, "erythritol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)(CO)CO": "erythritol",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None
         assert "tetraacetate" in result.lower() or "tetra" in result.lower(), (
             f"Four identical acids should use 'tetra' prefix, got: {result}"
@@ -635,27 +607,17 @@ class TestMultiEsterAssembly:
     def test_core_size_guard_rejects_small_core(self):
         """Core-size guard rejects when core HA < max non-core HA (Phase 099-05).
 
-        Scenario: core has 2 HA (ethanol-like), non-core has 4 HA (acetic acid).
+        Scenario: core has 2 HA (ethanol-like), non-core has 6 HA (butanoic acid).
         The guard should reject because the core is smaller than a non-core fragment,
         indicating a pathological split where the ring system was lost.
         """
-        # Mock score_fragment_seniority so that "CO" (methanol, 2 HA) is chosen as core
-        # and "CCCC(=O)O" (butanoic acid, 6 HA) is the non-core acid
-        fragments = [
-            {"smiles": "CO", "side": "middle"},       # methanol: 2 HA
-            {"smiles": "CCCC(=O)O", "side": "acid"},  # butanoic acid: 6 HA
-            {"smiles": "CCCC(=O)O", "side": "acid"},  # butanoic acid: 6 HA
+        named_fragments = [
+            ({"smiles": "CO", "side": "middle"}, "methanol"),
+            ({"smiles": "CCCC(=O)O", "side": "acid"}, "butanoic acid"),
+            ({"smiles": "CCCC(=O)O", "side": "acid"}, "butanoic acid"),
         ]
-        fragment_names = {
-            "CO": "methanol",
-            "CCCC(=O)O": "butanoic acid",
-        }
-        # Patch seniority so methanol is "most senior" (lowest score = core)
-        with patch(
-            "orthonym.decomposition.fragment_ranker.score_fragment_seniority",
-            side_effect=lambda s: 0 if s == "CO" else 10,
-        ):
-            result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        # Middle fragment (methanol) is core; core HA (2) < non-core HA (6)
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is None, (
             "Core-size guard should reject when core HA (2) < max non-core HA (6), "
             f"but got: {result}"
@@ -667,17 +629,13 @@ class TestMultiEsterAssembly:
         Scenario: glycerol (6 HA) core, acetic acid (4 HA) non-core.
         The guard should allow because the core is larger.
         """
-        fragments = [
-            {"smiles": "OCC(O)CO", "side": "middle"},  # glycerol: 6 HA
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+        named_fragments = [
+            ({"smiles": "OCC(O)CO", "side": "middle"}, "glycerol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "OCC(O)CO": "glycerol",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None, (
             "Core-size guard should allow when core HA (6) > non-core HA (4)"
         )
@@ -689,25 +647,13 @@ class TestMultiEsterAssembly:
         Scenario: both core and non-core have 4 HA. Edge case: no rejection
         on equal sizes.
         """
-        # Use butanediol (4 C + 2 O = 6 HA) as core and butanoic acid (4 C + 2 O = 6 HA)
-        # Actually let's use precise HA counts. propan-1-ol "CCCO" = 4 HA, propionic acid "CCC(=O)O" = 5 HA
-        # For exact equal: ethanol "CCO" = 3 HA vs propanol "CCCO" = 4 HA ... no.
-        # Let's just use mock to control: both at 4 HA. E.g. "CCCO" (4 HA) and "CC(=O)O" (4 HA)
-        fragments = [
-            {"smiles": "CCCO", "side": "middle"},       # propan-1-ol: 4 HA
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid: 4 HA
+        named_fragments = [
+            ({"smiles": "CCCO", "side": "middle"}, "propan-1-ol"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "CCCO": "propan-1-ol",
-            "CC(=O)O": "acetic acid",
-        }
-        # Patch seniority so propan-1-ol is core
-        with patch(
-            "orthonym.decomposition.fragment_ranker.score_fragment_seniority",
-            side_effect=lambda s: 0 if s == "CCCO" else 10,
-        ):
-            result = _assemble_multi_ester(fragments, fragment_names, "pin")
+        # Middle fragment (propan-1-ol) is core; core HA (4) == non-core HA (4)
+        result = _assemble_multi_ester(named_fragments, "pin")
         assert result is not None, (
             "Core-size guard should allow when core HA (4) == max non-core HA (4), "
             f"but got None"
@@ -970,16 +916,12 @@ class TestMultiGlycosideAssembly:
     def test_two_sugars_one_aglycone(self):
         """2 sugar fragments + 1 aglycone produces multi-glycosyloxy pattern."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
-        fragments = [
-            {"smiles": "Oc1ccccc1", "side": "alkyl"},         # phenol (aglycone)
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose-like
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose-like
+        named_fragments = [
+            ({"smiles": "Oc1ccccc1", "side": "alkyl"}, "phenol"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
         ]
-        fragment_names = {
-            "Oc1ccccc1": "phenol",
-            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
-        }
-        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None, "Should produce a multi-glycoside name"
         result_lower = result.lower()
         # Should contain glycosyloxy prefix and phenol
@@ -993,16 +935,12 @@ class TestMultiGlycosideAssembly:
     def test_returns_none_when_all_systematic(self):
         """Returns None when all sugar fragments have systematic (no retained) names."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
-        fragments = [
-            {"smiles": "Oc1ccccc1", "side": "alkyl"},
-            {"smiles": "OC1CCOCC1", "side": "acid"},  # tetrahydropyran-like (no sugar)
-            {"smiles": "OC1CCOCC1", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "Oc1ccccc1", "side": "alkyl"}, "phenol"),
+            ({"smiles": "OC1CCOCC1", "side": "acid"}, "tetrahydro-2H-pyran-2-ol"),
+            ({"smiles": "OC1CCOCC1", "side": "acid"}, "tetrahydro-2H-pyran-2-ol"),
         ]
-        fragment_names = {
-            "Oc1ccccc1": "phenol",
-            "OC1CCOCC1": "tetrahydro-2H-pyran-2-ol",  # systematic, no "oxy"
-        }
-        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is None, (
             f"Should return None when no sugar retained names, got: {result}"
         )
@@ -1010,16 +948,12 @@ class TestMultiGlycosideAssembly:
     def test_identifies_core_by_seniority(self):
         """Core fragment (non-sugar) is identified as most senior."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
-        fragments = [
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose
-            {"smiles": "OC(=O)c1ccccc1", "side": "alkyl"},        # benzoic acid (aglycone)
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},  # glucose
+        named_fragments = [
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC(=O)c1ccccc1", "side": "alkyl"}, "benzoic acid"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
         ]
-        fragment_names = {
-            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
-            "OC(=O)c1ccccc1": "benzoic acid",
-        }
-        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None
         # The core should be benzoic acid
         assert "benzoic acid" in result.lower(), (
@@ -1029,16 +963,12 @@ class TestMultiGlycosideAssembly:
     def test_identical_sugars_use_multiplicative_prefix(self):
         """Identical sugar fragments should use multiplicative prefix (bis/di)."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_glycoside
-        fragments = [
-            {"smiles": "Oc1ccccc1", "side": "alkyl"},
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},
-            {"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "Oc1ccccc1", "side": "alkyl"}, "phenol"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
+            ({"smiles": "OC1OC(CO)C(O)C(O)C1O", "side": "acid"}, "beta-D-glucopyranosyloxy"),
         ]
-        fragment_names = {
-            "Oc1ccccc1": "phenol",
-            "OC1OC(CO)C(O)C(O)C1O": "beta-D-glucopyranosyloxy",
-        }
-        result = _assemble_multi_glycoside(fragments, fragment_names, "pin")
+        result = _assemble_multi_glycoside(named_fragments, "pin")
         assert result is not None
         result_lower = result.lower()
         # Identical sugars -> multiplicative prefix
@@ -1054,18 +984,13 @@ class TestMultiAmideAssembly:
     def test_two_acyl_one_amine(self):
         """2 acyl fragments + 1 amine core produces 'N-acyl1-N-acyl2-amine' pattern."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
-        fragments = [
-            {"smiles": "NC1CCCCC1", "side": "alkyl"},  # cyclohexanamine (amine core)
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
-            {"smiles": "CC(=O)O", "side": "acid"},       # acetic acid
-            {"smiles": "CCC(=O)O", "side": "acid"},      # propanoic acid
+        named_fragments = [
+            ({"smiles": "NC1CCCCC1", "side": "alkyl"}, "cyclohexanamine"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CCC(=O)O", "side": "acid"}, "propanoic acid"),
         ]
-        fragment_names = {
-            "NC1CCCCC1": "cyclohexanamine",
-            "CC(=O)O": "acetic acid",
-            "CCC(=O)O": "propanoic acid",
-        }
-        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        result = _assemble_multi_amide(named_fragments, "pin")
         assert result is not None, "Should produce a multi-amide name"
         result_lower = result.lower()
         # Should contain N-acyl prefix and amine
@@ -1079,17 +1004,13 @@ class TestMultiAmideAssembly:
     def test_returns_none_when_core_name_empty(self):
         """Returns None when core fragment name is empty."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
-        fragments = [
-            {"smiles": "NC1CCCCC1", "side": "alkyl"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "NC1CCCCC1", "side": "alkyl"}, ""),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "NC1CCCCC1": "",  # Empty core name
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        result = _assemble_multi_amide(named_fragments, "pin")
         assert result is None, (
             f"Should return None when core name is empty, got: {result}"
         )
@@ -1097,17 +1018,13 @@ class TestMultiAmideAssembly:
     def test_identical_acyls_use_multiplicative_prefix(self):
         """Identical acyl fragments should use N,N-di... grouping."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
-        fragments = [
-            {"smiles": "NC1CCCCC1", "side": "alkyl"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "CC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "NC1CCCCC1", "side": "alkyl"}, "cyclohexanamine"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
         ]
-        fragment_names = {
-            "NC1CCCCC1": "cyclohexanamine",
-            "CC(=O)O": "acetic acid",
-        }
-        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        result = _assemble_multi_amide(named_fragments, "pin")
         assert result is not None
         result_lower = result.lower()
         # Identical acyls -> N,N,N-triacetyl pattern
@@ -1122,19 +1039,13 @@ class TestMultiAmideAssembly:
     def test_core_identified_as_amine(self):
         """Core fragment is the amine (most senior), non-core are acids."""
         from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
-        fragments = [
-            {"smiles": "CC(=O)O", "side": "acid"},
-            {"smiles": "NC1CCCCC1", "side": "alkyl"},
-            {"smiles": "CCC(=O)O", "side": "acid"},
-            {"smiles": "CCCC(=O)O", "side": "acid"},
+        named_fragments = [
+            ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid"),
+            ({"smiles": "NC1CCCCC1", "side": "alkyl"}, "cyclohexanamine"),
+            ({"smiles": "CCC(=O)O", "side": "acid"}, "propanoic acid"),
+            ({"smiles": "CCCC(=O)O", "side": "acid"}, "butanoic acid"),
         ]
-        fragment_names = {
-            "NC1CCCCC1": "cyclohexanamine",
-            "CC(=O)O": "acetic acid",
-            "CCC(=O)O": "propanoic acid",
-            "CCCC(=O)O": "butanoic acid",
-        }
-        result = _assemble_multi_amide(fragments, fragment_names, "pin")
+        result = _assemble_multi_amide(named_fragments, "pin")
         assert result is not None
         # Core should be cyclohexanamine
         assert "cyclohexanamine" in result.lower(), (

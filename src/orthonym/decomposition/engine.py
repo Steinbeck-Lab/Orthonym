@@ -1075,7 +1075,8 @@ def _try_multi_bond_decompose(
     fragments.sort(key=_frag_sort_key)
 
     # Name each fragment (sugar intercept for glycosidic)
-    fragment_names = {}
+    # DECO-17: use list-of-tuples to preserve identical SMILES duplicates
+    named_fragments = []  # List[Tuple[Dict, str]] -- preserves all including duplicates
     for frag in fragments:
         frag_name = None
 
@@ -1089,15 +1090,15 @@ def _try_multi_bond_decompose(
         if not frag_name or "unknown" in frag_name.lower():
             return None  # Truly unnameable -- abort
 
-        fragment_names[frag["smiles"]] = frag_name
+        named_fragments.append((frag, frag_name))
 
     # Dispatch to bond-type-specific multi-fragment assembler
     if bond_type == "ester":
-        result = _assemble_multi_ester(fragments, fragment_names, style)
+        result = _assemble_multi_ester(named_fragments, style)
     elif bond_type == "glycosidic":
-        result = _assemble_multi_glycoside(fragments, fragment_names, style)
+        result = _assemble_multi_glycoside(named_fragments, style)
     elif bond_type == "amide":
-        result = _assemble_multi_amide(fragments, fragment_names, style)
+        result = _assemble_multi_amide(named_fragments, style)
     else:
         return None
 
@@ -1207,28 +1208,29 @@ def _try_iterative_mixed_decompose(
             break
 
     # Name each fragment (Phase 127: D-01 fallback)
-    fragment_names = {}
+    # DECO-17/Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
+    named_fragments = []
     for frag in all_fragments:
         frag_name = _name_sugar_fragment(frag["smiles"])
         if not frag_name:
             frag_name = _name_fragment_with_fallback(frag["smiles"])
         if not frag_name or "unknown" in frag_name.lower():
             return None  # Truly unnameable -- abort
-        fragment_names[frag["smiles"]] = frag_name
+        named_fragments.append((frag, frag_name))
 
     # Simple assembly: join fragment names
-    # Sort fragments by size (largest first = parent)
-    sorted_frags = sorted(
-        all_fragments,
-        key=lambda f: len(fragment_names.get(f["smiles"], "")),
+    # Sort fragments by name length (longest first = parent)
+    sorted_named = sorted(
+        named_fragments,
+        key=lambda pair: len(pair[1]),  # Sort by name length
         reverse=True,
     )
 
     # Use the largest-named fragment as the base and prefix others
-    if len(sorted_frags) <= 1:
+    if len(sorted_named) <= 1:
         return None
 
-    parts = [fragment_names[f["smiles"]] for f in sorted_frags]
+    parts = [name for _, name in sorted_named]
     # Join with space (functional class style)
     assembled = " ".join(parts)
 
