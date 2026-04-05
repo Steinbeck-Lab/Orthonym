@@ -1094,6 +1094,63 @@ def _alcohol_to_alkoxy(name: str) -> Optional[str]:
 
 
 # ============================================================================
+# Pre-validation helpers (D-09 through D-12)
+# ============================================================================
+
+def _looks_like_acid_name(name: str) -> bool:
+    """Check if a name looks like it could be an acid name.
+
+    Returns True for names containing recognizable acid patterns:
+    - Ends in " acid" (systematic or trivial acid names)
+    - Ends in "oic" (stem of systematic acid, e.g., "propanoic")
+    - Ends in "ic" and len > 4 (stem of trivial acid, e.g., "acetic")
+    - Ends in "carboxylic" (ring-attached acid)
+    - Is in the trivial acid lookup table
+
+    Per D-09: used as pre-validation before any suffix transformation.
+    """
+    n = name.strip().lower()
+    if n.endswith(" acid"):
+        return True
+    if n.endswith("oic") or n.endswith("carboxylic"):
+        return True
+    if n.endswith("ic") and len(n) > 4:
+        return True
+    # Check trivial lookup (handles names like "acetic", "formic", "propionic")
+    try:
+        if n in TRIVIAL_ACID_TO_ACYLATE:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _looks_like_convertible_name(name: str) -> bool:
+    """Check if a name can be converted to an acyl form.
+
+    Broader than _looks_like_acid_name: also accepts amide names
+    ("benzamide", "propanamide") and ester names ("propanoate", "acetate")
+    since _acid_to_acyl handles all three input types.
+
+    Per Open Question 3 in RESEARCH.md: _acid_to_acyl has a broader input
+    contract than the other three transformation functions.
+    """
+    if _looks_like_acid_name(name):
+        return True
+    n = name.strip().lower()
+    # Amide patterns
+    if n.endswith("amide"):
+        return True
+    # Ester patterns
+    if n.endswith("ate") and " acid" not in n:
+        return True
+    # N-substituted amide (e.g., "N-methylbenzamide")
+    if "amide" in n:
+        return True
+    return False
+
+
+# ============================================================================
 # Name transformation helpers
 # ============================================================================
 
