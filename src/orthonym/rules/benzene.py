@@ -1536,7 +1536,8 @@ def name_substituted_benzene(
     mol,
     ring_atoms: Tuple[int, ...],
     oriented_ring: List[int],
-    substituents: Dict[int, List[Dict]]
+    substituents: Dict[int, List[Dict]],
+    detected_fgs: Optional[Dict] = None,
 ) -> str:
     """
     Generate systematic name for substituted benzene.
@@ -1602,9 +1603,21 @@ def name_substituted_benzene(
     # _identify_oxygen_group always returns hydroxy as prefix. When hydroxyl is
     # the principal group (no higher-seniority suffix FG detected), move it to
     # suffix_groups so it routes to the phenol/ol naming path.
-    if 'hydroxy' in prefix_groups and not suffix_groups:
-        # No other suffix FGs detected -- hydroxyl IS the principal group.
-        # Move from prefix to suffix.
+    # Guard: also check detected_fgs for FGs that use functional class naming
+    # (isocyanate, azide, etc.). These FGs are not in _SUFFIX_PRIORITY, so
+    # suffix_groups would be empty even though OH may not be the true principal
+    # group. Blacklist approach: only block known functional-class-naming FGs.
+    _FUNCTIONAL_CLASS_FGS = {'isocyanate', 'isothiocyanate', 'azide', 'diazo',
+                              'cyanate', 'thiocyanate', 'selenocyanate'}
+    has_competing_fg = False
+    if detected_fgs:
+        for fg_name in detected_fgs:
+            if fg_name in _FUNCTIONAL_CLASS_FGS:
+                has_competing_fg = True
+                break
+    if 'hydroxy' in prefix_groups and not suffix_groups and not has_competing_fg:
+        # No other suffix FGs detected and no competing FGs -- hydroxyl IS
+        # the principal group. Move from prefix to suffix.
         suffix_groups['ol'] = prefix_groups.pop('hydroxy')
     # When suffix_groups is non-empty (acid, aldehyde, etc.), hydroxyl stays
     # as prefix "hydroxy" -- correct per IUPAC seniority rules.

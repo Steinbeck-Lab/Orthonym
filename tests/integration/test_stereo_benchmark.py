@@ -57,7 +57,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('OC[C@@H]1O[C@@](O)(CO)[C@@H](O)[C@@H]1O', '(2S,3S,4S,5S)-2,3,4-trihydroxy-2,5-dimethyloxolane'),
     ('C[C@H](CC(=O)[O-])OC(=O)C[C@@H](C)O', '(3R)-3-(butanoyloxy)-hydroxybutanoate'),
     ('C[C@@H]1Cc2cc(O)cc(O)c2CO1', '(3R)-6,8-dihydroxy-3-methylisochromane'),  # NEWLY_RT
-    ('O=P([O-])([O-])OC[C@@H](O)[C@H](O)[C@@H](O)CO', '(2S,3R,4R)-1-hydroxy-2,3,4-trihydroxy-5-phosphonooxypentanephosphonic acid'),  # P80-01 phosphonooxy prefix now generated
+    ('O=P([O-])([O-])OC[C@@H](O)[C@H](O)[C@@H](O)CO', '(2S,3R,4R)-1,2,3,4-tetrahydroxy-5-phosphonooxypentanephosphonic acid'),  # P80-01 phosphonooxy prefix; P131 ASML-12 merges hydroxy prefixes
     ('O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]', '(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate'),  # NEWLY_RT
     ('N[C@@H](COC(=O)CCC(=O)O)C(=O)O', 'butanedioic acid'),  # MISSING_STEREO - wrong parent
     ('C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O', '(octanoyloxy)-2-pyrrolidinylprop-2-enimide'),  # MISSING_STEREO - wrong parent; depth-independent naming v11

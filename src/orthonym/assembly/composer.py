@@ -2184,7 +2184,8 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     oriented_ring = orient_benzene(mol, ring_atoms, substituents)
 
     # Generate systematic name
-    return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
+    detected_fgs = getattr(features, 'functional_groups', None) or {}
+    return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs)
 
 
 def _assemble_polycyclic_name(features: Any, style: str) -> str:
