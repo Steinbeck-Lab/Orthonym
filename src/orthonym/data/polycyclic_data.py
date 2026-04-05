@@ -48,8 +48,12 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         #     5  4
         # Maps canonical atom index -> IUPAC position (1-indexed)
         # Note: This mapping is determined empirically based on RDKit's canonical ordering
+        # Empirically derived from RDKit canonical SMILES 'c1ccc2ccccc2c1':
+        # Rings: [0,9,8,3,2,1] and [4,5,6,7,8,3]. Fusion: idx 3, idx 8.
+        # Peripheral path: 9->0->1->2->[3]->4->5->6->7->[8]
+        # IUPAC: 1->2->3->4->[4a]->5->6->7->8->[8a]
         'iupac_numbering': {
-            0: 1, 1: 2, 2: 3, 3: 4, 4: 4.5, 5: 5, 6: 6, 7: 7, 8: 8, 9: 8.5
+            9: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: 8, 8: '8a'
         },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],  # Allowed positions
         'num_rings': 2,
@@ -59,7 +63,15 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1ccc2cc3ccccc3cc2c1',
         'num_atoms': 14,
         # IUPAC numbering for anthracene (linear tricyclic)
-        'iupac_numbering': {},  # Will be populated by matching
+        # Empirically derived from RDKit canonical SMILES 'c1ccc2cc3ccccc3cc2c1':
+        # Rings: [0,13,12,3,2,1], [4,5,10,11,12,3], [6,7,8,9,10,5]
+        # Fusion: idx 3(=4a), 5(=8a), 10(=9a), 12(=10a)
+        # Peripheral path: 13->0->1->2->[3]->4->[5]->6->7->8->9->[10]->11->[12]
+        # IUPAC: 1->2->3->4->[4a]->5->[8a]->6->7->8->9->[9a]->10->[10a]
+        'iupac_numbering': {
+            13: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: '8a',
+            6: 6, 7: 7, 8: 8, 9: 9, 10: '9a', 11: 10, 12: '10a'
+        },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 3,
     },
@@ -68,7 +80,17 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'smarts': 'c1ccc2c(c1)ccc1ccccc12',
         'num_atoms': 14,
         # IUPAC numbering for phenanthrene (angular tricyclic)
-        'iupac_numbering': {},  # Will be populated by matching
+        # Empirically derived from RDKit canonical SMILES 'c1ccc2c(c1)ccc1ccccc12':
+        # Rings: [0,5,4,3,2,1], [6,7,8,13,3,4], [9,10,11,12,13,8]
+        # Fusion: idx 3(=4a), 4(=10a), 8(=8a), 13(=4b)
+        # Ring A(R0): 5->0->1->2 peripheral, Ring C(R1): 6->7 peripheral,
+        # Ring B(R2): 12->11->10->9 peripheral
+        # IUPAC: 1->2->3->4->[4a]->[10a]->10->9->[8a]->[4b]->5->6->7->8
+        'iupac_numbering': {
+            5: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a',
+            6: 10, 7: 9, 8: '8a', 13: '4b',
+            12: 5, 11: 6, 10: 7, 9: 8
+        },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 3,
     },
@@ -76,8 +98,17 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'smarts': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'num_atoms': 16,
-        # IUPAC numbering for pyrene (condensed tetracyclic)
-        'iupac_numbering': {},
+        # IUPAC numbering for pyrene (peri-condensed tetracyclic)
+        # Empirically derived from RDKit canonical SMILES 'c1cc2ccc3cccc4ccc(c1)c2c34':
+        # Rings: [0,13,12,14,2,1], [3,4,5,15,14,2], [6,7,8,9,15,5], [10,11,12,14,15,9]
+        # Fusion: idx 2(=3a), 5(=5a), 9(=8a), 12(=10b)
+        # Peri: idx 14(=3b, in R0/R1/R3), idx 15(=10a, in R1/R2/R3)
+        # IUPAC: 1->2->3->[3a]->4->5->[5a]->6->7->8->[8a]->9->10->[10b]->[3b]->[10a]
+        'iupac_numbering': {
+            13: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: '5a',
+            6: 6, 7: 7, 8: 8, 9: '8a', 10: 9, 11: 10, 12: '10b',
+            14: '3b', 15: '10a'
+        },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 4,
     },
