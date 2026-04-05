@@ -553,28 +553,9 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         if bonds and heavy_atoms > 15 and coverage_ratio < 0.8:
             distinct_bond_types = set(b["type"] for b in bonds)
             if len(distinct_bond_types) >= 2:
-                # Token mapping: what name tokens indicate each bond type.
-                # Amide tokens include acyl prefixes (anoyl, enoyl, oyl)
-                # since N-acyl naming IS amide naming (IUPAC P-66.6.3).
-                _BOND_TYPE_TOKENS = {
-                    "ester": {"ester", "oate", "ate", "oyloxy",
-                              "acetyloxy", "benzoyloxy", "acetyl",
-                              "benzoyl"},
-                    "amide": {"amide", "amino", "amido", "acetamid",
-                              "formamid", "carbamoyl", "anilino",
-                              "anoyl", "enoyl", "oyl", "acyl"},
-                    "glycosidic": {"glycos", "pyranosyl", "furanosyl",
-                                   "glucos", "galactos", "mannos", "rhamn",
-                                   "fucos", "sugar", "osyl"},
-                    "phosphodiester": {"phosph", "nucleotid"},
-                    "thioester": {"thio"},
-                    "sulfonamide": {"sulfonamid", "sulfamid"},
-                    "carbamate": {"carbamat", "urethane"},
-                    # Ethers are common and don't always produce distinct
-                    # name tokens (ether O becomes "oxa" or is absorbed
-                    # into alkoxy prefixes). Don't penalize.
-                    "ether": set(),
-                }
+                # Use module-level boundary-aware token matching (Phase 132)
+                # instead of substring matching to prevent false positives
+                # like "polyester" triggering "ester" token.
                 name_lower = name.lower()
                 represented_types = 0
                 for bt in distinct_bond_types:
@@ -583,7 +564,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                         # ether: give benefit of doubt
                         represented_types += 1
                         continue
-                    if any(tok in name_lower for tok in tokens):
+                    if _token_matches_name(name_lower, _COMPILED_TOKEN_PATTERNS, bt):
                         represented_types += 1
                 # If less than half of distinct bond types are represented,
                 # the name is partial -- reject it
