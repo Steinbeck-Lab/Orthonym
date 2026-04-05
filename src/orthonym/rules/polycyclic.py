@@ -2194,7 +2194,26 @@ def name_polycyclic_complete(mol, features=None):
     if mol is None:
         return None
 
+    # Check retained names for polycyclic/tricyclic compounds FIRST.
+    # Only applies to bare (unsubstituted, all-carbon) ring systems:
+    # if every heavy atom is in a ring, we can use retained names directly.
+    canonical = Chem.MolToSmiles(mol, canonical=True)
     ri = mol.GetRingInfo()
+    ring_atoms_all = set()
+    for ring in ri.AtomRings():
+        ring_atoms_all.update(ring)
+    all_heavy = {a.GetIdx() for a in mol.GetAtoms()}
+    if all_heavy == ring_atoms_all:
+        # Pure ring system -- check retained name lookups
+        from ..data.bicyclo_systems import get_retained_bicyclo_name
+        retained = get_retained_bicyclo_name(canonical)
+        if not retained:
+            from .tricyclo import get_retained_tricyclo_name
+            retained = get_retained_tricyclo_name(canonical)
+        if retained:
+            atom_to_locant = {idx: idx + 1 for idx in sorted(ring_atoms_all)}
+            return (retained, ring_atoms_all, atom_to_locant, True)
+
     ring_atoms = set()
     for ring in ri.AtomRings():
         ring_atoms.update(ring)

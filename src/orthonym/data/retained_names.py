@@ -61,7 +61,7 @@ RETAINED_NAMES = {
     "O=Cc1ccccc1": "benzaldehyde",
     
     # === KETONES ===
-    "CC(C)=O": "acetone",
+    # NOTE: acetone removed -- IUPAC 2013 P-31.1.3 PIN is "propan-2-one"
     "CC(=O)c1ccccc1": "acetophenone",
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",
     
@@ -74,9 +74,8 @@ RETAINED_NAMES = {
     
     # === PHENOLS ===
     "Oc1ccccc1": "phenol",
-    "Cc1ccc(O)cc1": "4-cresol",
-    "Cc1ccccc1O": "2-cresol",
-    "Cc1cccc(O)c1": "3-cresol",
+    # NOTE: cresol isomers removed -- IUPAC 2013 PINs are "2-methylphenol",
+    # "3-methylphenol", "4-methylphenol" (produced by systematic naming pipeline)
     "Oc1ccc(O)cc1": "hydroquinone",
     "Oc1cccc(O)c1": "resorcinol",
     "Oc1ccccc1O": "catechol",
@@ -279,9 +278,9 @@ RETAINED_NAMES = {
     "CCCCCCCCCCCCCCCCCC(=O)O": "octadecanoic acid",
 
     # === BRANCHED CARBOXYLIC ACIDS (Phase 8 expansion) ===
-    "CC(C)C(=O)O": "isobutyric acid",
-    "CC(C)CC(=O)O": "isovaleric acid",
-    "CC(C)(C)C(=O)O": "pivalic acid",
+    # NOTE: isobutyric acid removed -- PIN is "2-methylpropanoic acid"
+    # NOTE: isovaleric acid removed -- PIN is "3-methylbutanoic acid"
+    # NOTE: pivalic acid removed -- PIN is "2,2-dimethylpropanoic acid"
 
     # === UNSATURATED ACIDS (Phase 8 expansion) ===
     "CC=CC(=O)O": "crotonic acid",
