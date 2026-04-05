@@ -278,73 +278,91 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # Carbazole: dibenzo[b,d]pyrrole
     # IUPAC peripheral numbering: 1-2-3-4-4a-4b-5-6-7-8-8a-9-9a (13 positions)
     # Canonical: c1ccc2c(c1)[nH]c1ccccc12
+    # Empirically verified: N(idx 6)=9, Ring A peripheral: 2,1,0,5 -> 1,2,3,4
+    # Ring B peripheral: 8,9,10,11 -> 5,6,7,8. Fusion: 4(=4a),3(=9a),7(=4b),12(=8a)
     'c1ccc2c(c1)[nH]c1ccccc12': {
         'name': '9H-carbazole',
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '9a', 6: 9, 7: '4b', 12: '8a', 8: 5, 9: 6, 10: 7, 11: 8},
     },
 
     # Acridine: dibenzo[b,e]pyridine
-    # IUPAC peripheral numbering: 1-2-3-4-4a-9-9a-10-10a-5-6-7-8-8a (14 positions)
+    # IUPAC peripheral numbering: 1-2-3-4-4a-10(N)-10a-5-8a-6-7-8-9-9a (14 positions)
     # Canonical: c1ccc2nc3ccccc3cc2c1
+    # Empirically verified: N(idx 4)=10. Ring A: 2,1,0,13 -> 1,2,3,4
+    # Ring C: 9,8,7,6 -> 6,7,8,9. Fusion: 12(=4a),3(=10a),5(=9a),10(=8a)
     'c1ccc2nc3ccccc3cc2c1': {
         'name': 'acridine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: 9, 5: '8a', 6: 8, 7: 7, 8: 6, 9: 5, 10: '10a', 11: 10, 12: '4a', 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 13: 4, 12: '4a', 3: '10a', 4: 10, 11: 5, 5: '9a', 10: '8a', 9: 6, 8: 7, 7: 8, 6: 9},
     },
 
     # Phenazine: dibenzo[b,e]pyrazine
     # Canonical: c1ccc2nc3ccccc3nc2c1
+    # Empirically verified: N(idx 4)=10, N(idx 11)=5. Ring A: 2,1,0,13 -> 1,2,3,4
+    # Ring B: 9,8,7,6 -> 6,7,8,9. Fusion: 12(=4a),3(=10a),5(=9a),10(=5a)
     'c1ccc2nc3ccccc3nc2c1': {
         'name': 'phenazine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: 10, 5: '4a', 6: 4, 7: 5, 8: 6, 9: 7, 10: '5a', 11: 9, 12: '9a', 13: 8},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 13: 4, 12: '4a', 3: '10a', 4: 10, 11: 5, 5: '9a', 10: '5a', 9: 6, 8: 7, 7: 8, 6: 9},
     },
 
     # Phenoxazine: dibenzo[b,e][1,4]oxazine
     # Canonical: c1ccc2c(c1)Nc1ccccc1O2
+    # Empirically verified: N(idx 6)=10, O(idx 13)=5. Same topology as phenothiazine.
+    # Ring A: 2,1,0,5 -> 1,2,3,4. Ring B: 8,9,10,11 -> 6,7,8,9
+    # Fusion: 4(=4a),3(=10a),7(=5a),12(=9a)
     'c1ccc2c(c1)Nc1ccccc1O2': {
         'name': '10H-phenoxazine',
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 10, 6: '5a', 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '10a', 6: 10, 13: 5, 7: '5a', 12: '9a', 8: 6, 9: 7, 10: 8, 11: 9},
     },
 
     # Phenothiazine: dibenzo[b,e][1,4]thiazine
     # Canonical: c1ccc2c(c1)Nc1ccccc1S2
+    # Empirically verified: N(idx 6)=10, S(idx 13)=5. Same topology as phenoxazine.
+    # Ring A: 2,1,0,5 -> 1,2,3,4. Ring B: 8,9,10,11 -> 6,7,8,9
+    # Fusion: 4(=4a),3(=10a),7(=5a),12(=9a)
     'c1ccc2c(c1)Nc1ccccc1S2': {
         'name': '10H-phenothiazine',
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 10, 6: '5a', 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '10a', 6: 10, 13: 5, 7: '5a', 12: '9a', 8: 6, 9: 7, 10: 8, 11: 9},
     },
 
     # Xanthene: dibenzo[b,e]pyran (9H-xanthene)
     # Canonical: c1ccc2c(c1)Cc1ccccc1O2
+    # Empirically verified: O(idx 13) at position 5 (oxygen bridge), C(idx 6)=9.
+    # Same angular tricyclic topology. Ring A: 2,1,0,5 -> 1,2,3,4
+    # Ring B: 8,9,10,11 -> 5,6,7,8. Fusion: 4(=4a),3(=9a),7(=4b),12(=8a)
     'c1ccc2c(c1)Cc1ccccc1O2': {
         'name': '9H-xanthene',
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 10, 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '9a', 6: 9, 7: '4b', 12: '8a', 8: 5, 9: 6, 10: 7, 11: 8, 13: 10},
     },
 
     # Thianthrene: dibenzo[b,e][1,4]dithiine
     # Canonical: c1ccc2c(c1)Sc1ccccc1S2
+    # Empirically verified: S(idx 6)=10, S(idx 13)=5. Same topology as phenothiazine.
+    # Ring A: 2,1,0,5 -> 1,2,3,4. Ring B: 8,9,10,11 -> 6,7,8,9
+    # Fusion: 4(=4a),3(=10a),7(=5a),12(=9a)
     'c1ccc2c(c1)Sc1ccccc1S2': {
         'name': 'thianthrene',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 10, 6: '5a', 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '10a', 6: 10, 13: 5, 7: '5a', 12: '9a', 8: 6, 9: 7, 10: 8, 11: 9},
     },
 
     # =========================================================================
@@ -922,12 +940,13 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # 9H-beta-Carboline: pyrido[3,4-b]indole - tricyclic, same topology as carbazole
     # IUPAC numbering: 1-2-3-4-4a-4b-5-6-7-8-8a-9-9a (13 atoms, 2N)
     # Canonical: c1ccc2c(c1)[nH]c1cnccc12
+    # Empirically verified: N(idx 6)=9, N(idx 9)=6. Same topology as carbazole.
     'c1ccc2c(c1)[nH]c1cnccc12': {
         'name': '9H-beta-carboline',
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '9a', 6: 9, 7: '4b', 12: '8a', 8: 5, 9: 6, 10: 7, 11: 8},
     },
 
     # Acridone: acridin-9(10H)-one - tricyclic, exocyclic =O at C-9, NH at pos 10
@@ -1113,14 +1132,15 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # Thioxanthene: dibenzo[b,e]thiopyran (9H-thioxanthene) - S analogue of xanthene
-    # IUPAC numbering: same as xanthene but S at 10a position
+    # IUPAC numbering: same as xanthene but S at position 10 (bridge)
     # Canonical: c1ccc2c(c1)Cc1ccccc1S2
+    # Empirically verified: S(idx 13)=10, C(idx 6)=9(CH2). Same topology as xanthene.
     'c1ccc2c(c1)Cc1ccccc1S2': {
         'name': '9H-thioxanthene',
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 9, 6: '4b', 7: 5, 8: 6, 9: 7, 10: 8, 11: '8a', 12: 10, 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '9a', 6: 9, 7: '4b', 12: '8a', 8: 5, 9: 6, 10: 7, 11: 8, 13: 10},
     },
 
     # =========================================================================
@@ -1421,13 +1441,14 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {8: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: '8a'},
     },
-    # Phenoxathiin
+    # Phenoxathiin: dibenzo[b,e][1,4]oxathiine
+    # Empirically verified: O(idx 6)=10, S(idx 13)=5. Same topology as phenothiazine.
     'c1ccc2c(c1)Oc1ccccc1S2': {
         'name': 'phenoxathiin',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 10, 6: '5a', 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 4},
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '10a', 6: 10, 13: 5, 7: '5a', 12: '9a', 8: 6, 9: 7, 10: 8, 11: 9},
     },
     # Furo[3,2-b]quinoline
     'c1ccc2c(c1)oc1cccnc12': {
