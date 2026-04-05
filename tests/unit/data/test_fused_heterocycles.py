@@ -1242,3 +1242,187 @@ class TestPhase101ComprehensiveCanonicalConsistency:
         assert len(FUSED_HETEROCYCLE_DATA) >= 80, (
             f"Expected >= 80 entries, got {len(FUSED_HETEROCYCLE_DATA)}"
         )
+
+
+# ============================================================================
+# IUPAC Locant Validation Tests (DATA-09)
+# Atom-by-atom verification of heteroatom positions for 15 fused heterocycles
+# ============================================================================
+
+@pytest.mark.unit
+class TestIupacLocantValidation:
+    """Validate iupac_locants correctness for 15 fused heterocycle entries.
+
+    Each test verifies that heteroatom positions in the locant dict match
+    the IUPAC 2013 standard numbering by checking element symbols at the
+    atom indices mapped to specific locant positions.
+    """
+
+    def _get_heteroatom_locants(self, smiles: str):
+        """Helper: collect heteroatom locants from a FUSED_HETEROCYCLE_DATA entry."""
+        data = FUSED_HETEROCYCLE_DATA[smiles]
+        mol = Chem.MolFromSmiles(smiles)
+        locants = data['iupac_locants']
+        het_locants = {}
+        for atom_idx, locant in locants.items():
+            atom = mol.GetAtomWithIdx(atom_idx)
+            sym = atom.GetSymbol()
+            if sym != 'C':
+                if sym not in het_locants:
+                    het_locants[sym] = set()
+                het_locants[sym].add(locant)
+        return het_locants
+
+    def test_indole_locant_validation(self):
+        """Indole: N must be at IUPAC position 1."""
+        het = self._get_heteroatom_locants('c1ccc2[nH]ccc2c1')
+        assert het.get('N') == {1}, f"Indole N should be at position 1, got {het.get('N')}"
+
+    def test_benzimidazole_locant_validation(self):
+        """Benzimidazole: N must be at IUPAC positions 1 and 3."""
+        het = self._get_heteroatom_locants('c1ccc2[nH]cnc2c1')
+        assert het.get('N') == {1, 3}, (
+            f"Benzimidazole N should be at positions {{1, 3}}, got {het.get('N')}"
+        )
+
+    def test_quinoline_locant_validation(self):
+        """Quinoline: N must be at IUPAC position 1."""
+        het = self._get_heteroatom_locants('c1ccc2ncccc2c1')
+        assert het.get('N') == {1}, f"Quinoline N should be at position 1, got {het.get('N')}"
+
+    def test_isoquinoline_locant_validation(self):
+        """Isoquinoline: N must be at IUPAC position 2."""
+        het = self._get_heteroatom_locants('c1ccc2cnccc2c1')
+        assert het.get('N') == {2}, (
+            f"Isoquinoline N should be at position 2, got {het.get('N')}"
+        )
+
+    def test_benzofuran_locant_validation(self):
+        """Benzofuran: O must be at IUPAC position 1."""
+        het = self._get_heteroatom_locants('c1ccc2occc2c1')
+        assert het.get('O') == {1}, f"Benzofuran O should be at position 1, got {het.get('O')}"
+
+    def test_benzothiophene_locant_validation(self):
+        """Benzothiophene: S must be at IUPAC position 1."""
+        het = self._get_heteroatom_locants('c1ccc2sccc2c1')
+        assert het.get('S') == {1}, (
+            f"Benzothiophene S should be at position 1, got {het.get('S')}"
+        )
+
+    def test_purine_locant_validation(self):
+        """Purine: N must be at IUPAC positions 1, 3, 7, 9."""
+        het = self._get_heteroatom_locants('c1ncc2nc[nH]c2n1')
+        assert het.get('N') == {1, 3, 7, 9}, (
+            f"Purine N should be at positions {{1, 3, 7, 9}}, got {het.get('N')}"
+        )
+
+    def test_carbazole_locant_validation(self):
+        """Carbazole: N must be at IUPAC position 9."""
+        het = self._get_heteroatom_locants('c1ccc2c(c1)[nH]c1ccccc12')
+        assert het.get('N') == {9}, f"Carbazole N should be at position 9, got {het.get('N')}"
+
+    def test_acridine_locant_validation(self):
+        """Acridine: N must be at IUPAC position 10."""
+        het = self._get_heteroatom_locants('c1ccc2nc3ccccc3cc2c1')
+        assert het.get('N') == {10}, f"Acridine N should be at position 10, got {het.get('N')}"
+
+    def test_phenazine_locant_validation(self):
+        """Phenazine: N must be at IUPAC positions 5 and 10."""
+        het = self._get_heteroatom_locants('c1ccc2nc3ccccc3nc2c1')
+        assert het.get('N') == {5, 10}, (
+            f"Phenazine N should be at positions {{5, 10}}, got {het.get('N')}"
+        )
+
+    def test_phenothiazine_locant_validation(self):
+        """Phenothiazine: N must be at position 10, S at position 5."""
+        het = self._get_heteroatom_locants('c1ccc2c(c1)Nc1ccccc1S2')
+        assert het.get('N') == {10}, (
+            f"Phenothiazine N should be at position 10, got {het.get('N')}"
+        )
+        assert het.get('S') == {5}, (
+            f"Phenothiazine S should be at position 5, got {het.get('S')}"
+        )
+
+    def test_chromene_locant_validation(self):
+        """2H-Chromene: O must be at IUPAC position 1."""
+        het = self._get_heteroatom_locants('C1=Cc2ccccc2OC1')
+        assert het.get('O') == {1}, f"Chromene O should be at position 1, got {het.get('O')}"
+
+    def test_isobenzofuran_locant_validation(self):
+        """Isobenzofuran (benzo[c]furan): O must be at IUPAC position 2."""
+        het = self._get_heteroatom_locants('c1ccc2cocc2c1')
+        assert het.get('O') == {2}, (
+            f"Isobenzofuran O should be at position 2, got {het.get('O')}"
+        )
+
+    def test_indazole_locant_validation(self):
+        """Indazole: N must be at IUPAC positions 1 and 2."""
+        het = self._get_heteroatom_locants('c1ccc2[nH]ncc2c1')
+        assert het.get('N') == {1, 2}, (
+            f"Indazole N should be at positions {{1, 2}}, got {het.get('N')}"
+        )
+
+    def test_benzoxazole_locant_validation(self):
+        """Benzoxazole: O must be at position 1, N at position 3."""
+        het = self._get_heteroatom_locants('c1ccc2ocnc2c1')
+        assert het.get('O') == {1}, (
+            f"Benzoxazole O should be at position 1, got {het.get('O')}"
+        )
+        assert het.get('N') == {3}, (
+            f"Benzoxazole N should be at position 3, got {het.get('N')}"
+        )
+
+    # ------------------------------------------------------------------
+    # Structural validation for ALL entries
+    # ------------------------------------------------------------------
+
+    def test_all_locant_counts_match_parent_atoms(self):
+        """Every iupac_locants dict must have exactly parent_atoms entries."""
+        mismatches = []
+        for smi, data in FUSED_HETEROCYCLE_DATA.items():
+            locants = data.get('iupac_locants', {})
+            parent_atoms = data.get('parent_atoms', 0)
+            if locants and len(locants) != parent_atoms:
+                mismatches.append(
+                    f"{data['name']}: {len(locants)} locants vs {parent_atoms} parent_atoms"
+                )
+        assert not mismatches, "Locant count mismatches:\n" + "\n".join(mismatches)
+
+    def test_all_atom_indices_valid(self):
+        """Every atom index in iupac_locants must be valid (0 <= idx < parent_atoms)."""
+        invalid = []
+        for smi, data in FUSED_HETEROCYCLE_DATA.items():
+            locants = data.get('iupac_locants', {})
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                continue
+            num_atoms = mol.GetNumAtoms()
+            for atom_idx in locants.keys():
+                if atom_idx < 0 or atom_idx >= num_atoms:
+                    invalid.append(
+                        f"{data['name']}: atom idx {atom_idx} out of range [0, {num_atoms})"
+                    )
+        assert not invalid, "Invalid atom indices:\n" + "\n".join(invalid)
+
+    def test_all_locant_values_correct_type(self):
+        """Locant values must be int (peripheral) or str matching r'^\\d+[a-z]$' (fusion)."""
+        import re
+        bad_types = []
+        for smi, data in FUSED_HETEROCYCLE_DATA.items():
+            locants = data.get('iupac_locants', {})
+            for atom_idx, locant in locants.items():
+                if isinstance(locant, float):
+                    bad_types.append(f"{data['name']}: idx {atom_idx} has float {locant}")
+                elif isinstance(locant, str):
+                    # Allow fusion pattern (e.g., '3a', '10b'), special labels (e.g., 'N6', 'O2'),
+                    # and oxo labels (e.g., '=O' for ketone/lactone oxygens)
+                    if not (re.match(r'^\d+[a-z]$', locant) or re.match(r'^[A-Z]\d+$', locant) or re.match(r'^=[A-Z]$', locant)):
+                        bad_types.append(
+                            f"{data['name']}: idx {atom_idx} has string '{locant}' "
+                            f"not matching fusion or special label pattern"
+                        )
+                elif not isinstance(locant, int):
+                    bad_types.append(
+                        f"{data['name']}: idx {atom_idx} has {type(locant).__name__} {locant}"
+                    )
+        assert not bad_types, "Bad locant types:\n" + "\n".join(bad_types)
