@@ -137,6 +137,101 @@ _RING_SYSTEM_TOKENS = frozenset({
 })
 
 
+# ---------------------------------------------------------------------------
+# Bond-type token matching for quality gate (Phase 132 - DECO-20)
+# ---------------------------------------------------------------------------
+
+# Token mapping: what name tokens indicate each bond type.
+# Amide tokens include acyl prefixes (anoyl, enoyl, oyl)
+# since N-acyl naming IS amide naming (IUPAC P-66.6.3).
+# Moved to module level from _name_quality_is_acceptable() for testability.
+_BOND_TYPE_TOKENS = {
+    "ester": {"ester", "oate", "ate", "oyloxy",
+              "acetyloxy", "benzoyloxy", "acetyl",
+              "benzoyl"},
+    "amide": {"amide", "amino", "amido", "acetamid",
+              "formamid", "carbamoyl", "anilino",
+              "anoyl", "enoyl", "oyl", "acyl"},
+    "glycosidic": {"glycos", "pyranosyl", "furanosyl",
+                   "glucos", "galactos", "mannos", "rhamn",
+                   "fucos", "sugar", "osyl"},
+    "phosphodiester": {"phosph", "nucleotid"},
+    "thioester": {"thio"},
+    "sulfonamide": {"sulfonamid", "sulfamid"},
+    "carbamate": {"carbamat", "urethane"},
+    # Ethers are common and don't always produce distinct
+    # name tokens (ether O becomes "oxa" or is absorbed
+    # into alkoxy prefixes). Don't penalize.
+    "ether": set(),
+}
+
+
+def _compile_token_patterns(token_dict):
+    """Build regex patterns for IUPAC morpheme-aware token matching.
+
+    Per D-14: tokens match at IUPAC nomenclature boundaries (after hyphen,
+    after opening paren, at start of name, before closing paren, at end of name).
+    Per D-15: short suffix tokens ('ate', 'oyl') match at word/morpheme end only,
+    to prevent false positives from common English words.
+    Per D-16: known false positive patterns ('polyester', 'polyamide', etc.) are
+    excluded via a separate false-positive check BEFORE regex matching.
+
+    Token matching strategy:
+    - Short suffix tokens ('ate', 'oyl'): match at morpheme end only
+    - Longer IUPAC morphemes (>= 4 chars): substring match is safe because
+      these morphemes are specific enough. False positives from polymer names
+      are handled by the _FALSE_POSITIVES exclusion list.
+    """
+    _SUFFIX_ONLY_TOKENS = {"ate", "oyl"}
+    _FALSE_POSITIVES = {"polyester", "polyamide", "polyurethane", "polycarbonate"}
+
+    compiled = {}
+    for bond_type, tokens in token_dict.items():
+        patterns = []
+        for tok in tokens:
+            escaped = re.escape(tok)
+            if tok in _SUFFIX_ONLY_TOKENS:
+                # Short suffix: match at morpheme end only to avoid
+                # "calculate" matching "ate", "royal" matching "oyl"
+                patterns.append(re.compile(
+                    rf'{escaped}(?:$|[-)\s,])', re.IGNORECASE
+                ))
+            else:
+                # Longer IUPAC morphemes: substring match is safe.
+                # False positives from polymer names handled by exclusion list.
+                patterns.append(re.compile(
+                    rf'{escaped}', re.IGNORECASE
+                ))
+        compiled[bond_type] = patterns
+    compiled["_false_positives"] = _FALSE_POSITIVES
+    return compiled
+
+
+# Pre-compiled patterns for use by quality gate
+_COMPILED_TOKEN_PATTERNS = _compile_token_patterns(_BOND_TYPE_TOKENS)
+
+
+def _token_matches_name(name_lower, token_patterns, bond_type):
+    """Check if any token for this bond type matches in the name.
+
+    Per D-16: first checks for false positive patterns.
+    Per D-17: never raises -- returns True on any exception (benefit of doubt).
+    """
+    try:
+        false_pos = token_patterns.get("_false_positives", set())
+        for fp in false_pos:
+            if fp in name_lower:
+                return False
+
+        patterns = token_patterns.get(bond_type, [])
+        if not patterns:
+            return True  # Empty token set (e.g., ether): benefit of doubt
+        return any(p.search(name_lower) for p in patterns)
+    except Exception:
+        return True  # Guard: never crash the quality gate
+
+
+
 def _name_has_ring_system_token(name: str) -> bool:
     """Check if a name contains a recognized ring-system token.
 

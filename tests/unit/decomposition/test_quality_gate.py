@@ -570,3 +570,168 @@ class TestNameSizeCoverage:
         assert ha > 30, f"Need large molecule, got HA={ha}"
         # Name covers only the steroid, not the sugar
         assert _name_covers_molecule("(22E)-stigmasta-7,22-diene", mol) is False
+
+
+class TestBoundaryAwareTokenMatching:
+    """Tests for IUPAC morpheme-aware boundary token matching in quality gate.
+
+    Per D-13/D-14: tokens should match at IUPAC nomenclature boundaries
+    (after hyphen, after paren, at start/end of name), not as arbitrary
+    substrings. Per D-16: known polymer names like "polyester" must NOT
+    match bond-type tokens.
+    """
+
+    @pytest.mark.unit
+    def test_polyester_does_not_match_ester(self):
+        """'polyester' must NOT trigger ester bond type token (D-16)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("polyester", patterns, "ester") is False
+
+    @pytest.mark.unit
+    def test_polyamide_does_not_match_amide(self):
+        """'polyamide' must NOT trigger amide bond type token (D-16)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("polyamide", patterns, "amide") is False
+
+    @pytest.mark.unit
+    def test_acetate_matches_ester(self):
+        """'methyl acetate' MUST trigger ester bond type token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("methyl acetate", patterns, "ester") is True
+
+    @pytest.mark.unit
+    def test_propanamide_matches_amide(self):
+        """'propanamide' MUST trigger amide bond type token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("propanamide", patterns, "amide") is True
+
+    @pytest.mark.unit
+    def test_propanoate_matches_ester(self):
+        """'ethyl propanoate' MUST trigger ester bond type token ('ate' at word end)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("ethyl propanoate", patterns, "ester") is True
+
+    @pytest.mark.unit
+    def test_benzoyloxy_matches_ester(self):
+        """'benzoyloxycyclohexane' MUST trigger ester bond type token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("benzoyloxycyclohexane", patterns, "ester") is True
+
+    @pytest.mark.unit
+    def test_amino_after_hyphen_matches_amide(self):
+        """'2-aminoethanol' MUST trigger amide bond type token (after hyphen)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("2-aminoethanol", patterns, "amide") is True
+
+    @pytest.mark.unit
+    def test_phosph_at_start_matches(self):
+        """'phosphoric acid' MUST trigger phosphodiester token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("phosphoric acid", patterns, "phosphodiester") is True
+
+    @pytest.mark.unit
+    def test_oyl_as_suffix_matches(self):
+        """'propanoyl chloride' MUST trigger amide bond type token ('oyl' at boundary)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("propanoyl chloride", patterns, "amide") is True
+
+    @pytest.mark.unit
+    def test_empty_token_set_passes(self):
+        """Ether bond type (empty token set) always returns True."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("anything at all", patterns, "ether") is True
+
+    @pytest.mark.unit
+    def test_polycarbonate_does_not_match_carbamate(self):
+        """'polycarbonate' must NOT trigger carbamate token (D-16)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("polycarbonate", patterns, "carbamate") is False
+
+    @pytest.mark.unit
+    def test_polyurethane_does_not_match(self):
+        """'polyurethane' must NOT trigger carbamate token (D-16)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("polyurethane", patterns, "carbamate") is False
+
+    @pytest.mark.unit
+    def test_unusual_input_no_crash(self):
+        """Token matching never raises an exception even with unusual input (D-17)."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        # Empty string
+        try:
+            _token_matches_name("", patterns, "ester")
+        except Exception as e:
+            pytest.fail(f"Raised exception on empty string: {e}")
+        # Unicode characters
+        try:
+            _token_matches_name("\u00e9th\u00e8r-\u00e4mide", patterns, "amide")
+        except Exception as e:
+            pytest.fail(f"Raised exception on unicode: {e}")
+        # Very long string
+        try:
+            _token_matches_name("a" * 10000, patterns, "ester")
+        except Exception as e:
+            pytest.fail(f"Raised exception on long string: {e}")
+        # Unknown bond type
+        try:
+            result = _token_matches_name("test", patterns, "unknown_type")
+            assert result is True  # empty patterns = benefit of doubt
+        except Exception as e:
+            pytest.fail(f"Raised exception on unknown bond type: {e}")
+
+    @pytest.mark.unit
+    def test_carbamate_at_start_matches(self):
+        """'carbamate ester' MUST trigger carbamate bond type token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("carbamate ester", patterns, "carbamate") is True
+
+    @pytest.mark.unit
+    def test_sulfonamide_matches(self):
+        """'N-methylbenzenesulfonamide' MUST trigger sulfonamide token."""
+        from orthonym.decomposition.engine import (
+            _compile_token_patterns, _token_matches_name, _BOND_TYPE_TOKENS,
+        )
+        patterns = _compile_token_patterns(_BOND_TYPE_TOKENS)
+        assert _token_matches_name("N-methylbenzenesulfonamide", patterns, "sulfonamide") is True
