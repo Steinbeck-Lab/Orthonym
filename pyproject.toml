@@ -33,6 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "rdkit>=2023.03.1",
+    "rapidfuzz>=3.14.0",
 ]
 
 [project.optional-dependencies]
