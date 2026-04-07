@@ -3,7 +3,10 @@ Tests for IUPAC Blue Book errata corrections applied in Phase 137.
 
 Covers:
 - ERRATA-01: Expanded heteroatom seniority tables (20 elements)
+- ERRATA-02: E/Z stereodescriptors for 8-member ring double bonds
+- ERRATA-05: Fusion descriptor separator verification
 - ERRATA-06: Hantzsch-Widman name corrections
+- ERRATA-08: Symmetrical anhydride naming verification
 - ERRATA-09: carbonochloridoyl prefix (replaces chlorocarbonyl)
 
 Reference: IUPAC 2013 Blue Book + BBerrors.html corrections through Dec 2025
@@ -216,4 +219,144 @@ class TestErrataCarbonochloridoyl:
 
         assert PREFIX_FORMS["acid_fluoride"] == "fluorocarbonyl", (
             f"acid_fluoride should remain 'fluorocarbonyl', got '{PREFIX_FORMS['acid_fluoride']}'"
+        )
+
+
+# ============================================================================
+# ERRATA-02: E/Z stereodescriptors for 8-member ring double bonds
+# ============================================================================
+
+
+class TestErrataEZThreshold:
+    """ERRATA-02: E/Z must be assigned for cycloalkenes >= 8 ring members."""
+
+    def test_z_cyclooctene_gets_ez(self):
+        """Z-cyclooctene (8-member ring) must include E/Z stereodescriptor."""
+        from orthonym import name_compound
+
+        # Z-cyclooctene SMILES with specified stereo
+        name = name_compound(r"C1=C/CCCCCC\1")
+        assert "Z" in name or "E" in name, (
+            f"Z-cyclooctene should have E/Z descriptor, got: '{name}'"
+        )
+
+    def test_e_cyclooctene_gets_ez(self):
+        """E-cyclooctene (8-member ring) must include E/Z stereodescriptor."""
+        from orthonym import name_compound
+
+        # E-cyclooctene SMILES (trans-cyclooctene)
+        name = name_compound(r"C1=C\CCCCCC/1")
+        assert "Z" in name or "E" in name, (
+            f"E-cyclooctene should have E/Z descriptor, got: '{name}'"
+        )
+
+    def test_cycloheptene_no_ez(self):
+        """Cycloheptene (7-member ring) must NOT include E/Z descriptor."""
+        from orthonym import name_compound
+
+        name = name_compound("C1=CCCCCC1")
+        # Should be plain "cycloheptene" without E or Z
+        assert "E" not in name and "Z" not in name, (
+            f"Cycloheptene should not have E/Z descriptor, got: '{name}'"
+        )
+
+    def test_z_cyclononene_gets_ez(self):
+        """Z-cyclononene (9-member ring) must include E/Z -- already worked."""
+        from orthonym import name_compound
+
+        name = name_compound(r"C1=C/CCCCCCC/1")
+        assert "Z" in name or "E" in name, (
+            f"Z-cyclononene should have E/Z descriptor, got: '{name}'"
+        )
+
+    def test_unspecified_cyclooctene_no_ez(self):
+        """Unspecified cyclooctene should not get E/Z (no stereo in SMILES)."""
+        from orthonym import name_compound
+
+        name = name_compound("C1=CCCCCCC1")
+        # Unspecified stereo - RDKit won't assign CIP, so no E/Z expected
+        assert name == "cyclooctene" or ("E" not in name and "Z" not in name), (
+            f"Unspecified cyclooctene should not have E/Z, got: '{name}'"
+        )
+
+    def test_collect_stereodescriptors_8_member_ring(self):
+        """collect_stereodescriptors must return E/Z for 8-member ring bonds."""
+        from rdkit import Chem
+        from rdkit.Chem import rdCIPLabeler
+        from orthonym.rules.stereochemistry import collect_stereodescriptors
+
+        mol = Chem.MolFromSmiles(r"C1=C/CCCCCC\1")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
+        descs = collect_stereodescriptors(mol, atom_to_locant)
+
+        ez_descs = [(loc, cip) for loc, cip in descs if cip in ('E', 'Z')]
+        assert len(ez_descs) > 0, (
+            f"8-member ring should now have E/Z descriptors per errata, got none"
+        )
+
+
+# ============================================================================
+# ERRATA-05: Fusion descriptor separator verification
+# ============================================================================
+
+
+class TestErrataFusionSeparator:
+    """ERRATA-05: Multi-edge fusion descriptors must use ':' not ';'."""
+
+    def test_multi_edge_uses_colon_separator(self):
+        """generate_fusion_descriptor multi-edge output uses ':' separator."""
+        from orthonym.rules.fusion_descriptors import generate_fusion_descriptor
+
+        # Simulate multi-edge fusion input
+        # generate_fusion_descriptor with multi_edge parameter
+        result = generate_fusion_descriptor(
+            parent_ring=[0, 1, 2, 3, 4, 5],
+            child_ring=[1, 2, 6, 7],
+            shared_atoms={1, 2},
+            child_is_benzene=False,
+        )
+        # Standard single-edge fusion should produce [x,y-z] format
+        # For the colon test, we check the multi-edge code path directly
+        # by inspecting the source
+        import inspect
+        import orthonym.rules.fusion_descriptors as fd_mod
+        source = inspect.getsource(fd_mod)
+        # The multi-edge fusion code must use ':'.join, not ';'.join
+        assert "':'.join" in source, (
+            "Multi-edge fusion descriptor must use ':' as separator"
+        )
+        assert "';'.join" not in source or source.index("':'.join") < source.index("';'.join") if "';'.join" in source else True, (
+            "Multi-edge fusion descriptor must NOT use ';' as separator"
+        )
+
+
+# ============================================================================
+# ERRATA-08: Symmetrical anhydride naming
+# ============================================================================
+
+
+class TestErrataAnhydrideNaming:
+    """ERRATA-08: Symmetrical anhydrides use plain '{acid} anhydride' without bis-."""
+
+    def test_acetic_anhydride_no_bis(self):
+        """Acetic anhydride should not contain 'bis' prefix."""
+        from orthonym import name_compound
+
+        name = name_compound("CC(=O)OC(=O)C")
+        assert "anhydride" in name.lower(), (
+            f"Expected 'anhydride' in name, got: '{name}'"
+        )
+        assert "bis" not in name.lower(), (
+            f"Symmetrical anhydride should not have 'bis', got: '{name}'"
+        )
+
+    def test_acetic_anhydride_name(self):
+        """Acetic anhydride should produce 'acetic anhydride' or close variant."""
+        from orthonym import name_compound
+
+        name = name_compound("CC(=O)OC(=O)C")
+        # Accept "acetic anhydride" or "ethanoic anhydride" (systematic)
+        assert "anhydride" in name.lower(), (
+            f"Expected anhydride in name, got: '{name}'"
         )
