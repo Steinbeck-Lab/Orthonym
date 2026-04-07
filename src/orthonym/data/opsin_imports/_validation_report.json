@@ -1,0 +1,1114 @@
+{
+  "generated_at": "2026-04-07T08:47:52Z",
+  "files_parsed": 40,
+  "per_file_stats": {
+    "arylGroups.xml": {
+      "tokens": 403,
+      "accepted": 370,
+      "rejected": 10,
+      "stereo_flagged": 0
+    },
+    "simpleGroups.xml": {
+      "tokens": 462,
+      "accepted": 424,
+      "rejected": 1,
+      "stereo_flagged": 3
+    },
+    "carboxylicAcids.xml": {
+      "tokens": 295,
+      "accepted": 254,
+      "rejected": 1,
+      "stereo_flagged": 6
+    },
+    "simpleSubstituents.xml": {
+      "tokens": 493,
+      "accepted": 404,
+      "rejected": 16,
+      "stereo_flagged": 1
+    },
+    "substituents.xml": {
+      "tokens": 12,
+      "accepted": 12,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "aminoAcids.xml": {
+      "tokens": 241,
+      "accepted": 232,
+      "rejected": 1,
+      "stereo_flagged": 3
+    },
+    "carbohydrates.xml": {
+      "tokens": 137,
+      "accepted": 112,
+      "rejected": 21,
+      "stereo_flagged": 0
+    },
+    "carbohydrateSuffixes.xml": {
+      "tokens": 39,
+      "accepted": 23,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "naturalProducts.xml": {
+      "tokens": 117,
+      "accepted": 115,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "simpleCyclicGroups.xml": {
+      "tokens": 155,
+      "accepted": 163,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "cyclicUnsaturableHydrocarbon.xml": {
+      "tokens": 13,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "suffixRules.xml": {
+      "tokens": 146,
+      "accepted": 146,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "suffixApplicability.xml": {
+      "tokens": 271,
+      "accepted": 271,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "wordRules.xml": {
+      "tokens": 60,
+      "accepted": 60,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "functionalTerms.xml": {
+      "tokens": 136,
+      "accepted": 107,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "fusionComponents.xml": {
+      "tokens": 146,
+      "accepted": 132,
+      "rejected": 5,
+      "stereo_flagged": 0
+    },
+    "arylSubstituents.xml": {
+      "tokens": 116,
+      "accepted": 116,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "multiRadicalSubstituents.xml": {
+      "tokens": 108,
+      "accepted": 108,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "nonCarboxylicAcids.xml": {
+      "tokens": 217,
+      "accepted": 217,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "alkanes.xml": {
+      "tokens": 53,
+      "accepted": 53,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "hwHeteroAtoms.xml": {
+      "tokens": 112,
+      "accepted": 112,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "hwSuffixes.xml": {
+      "tokens": 50,
+      "accepted": 50,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "heteroAtoms.xml": {
+      "tokens": 293,
+      "accepted": 293,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "elementaryAtoms.xml": {
+      "tokens": 182,
+      "accepted": 182,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "multipliers.xml": {
+      "tokens": 117,
+      "accepted": 117,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "suffixes.xml": {
+      "tokens": 100,
+      "accepted": 100,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "inlineSuffixes.xml": {
+      "tokens": 45,
+      "accepted": 45,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "inlineChargeSuffixes.xml": {
+      "tokens": 5,
+      "accepted": 5,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "infixes.xml": {
+      "tokens": 28,
+      "accepted": 28,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "unsaturators.xml": {
+      "tokens": 3,
+      "accepted": 3,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "suffixPrefix.xml": {
+      "tokens": 10,
+      "accepted": 10,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "atomHydrides.xml": {
+      "tokens": 29,
+      "accepted": 29,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "groupStemsAllowingAllSuffixes.xml": {
+      "tokens": 4,
+      "accepted": 4,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "groupStemsAllowingInlineSuffixes.xml": {
+      "tokens": 44,
+      "accepted": 44,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "miscTokens.xml": {
+      "tokens": 85,
+      "accepted": 85,
+      "rejected": 0,
+      "stereo_flagged": 0
+    },
+    "germanTokens.xml": {
+      "tokens": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0,
+      "status": "deferred"
+    },
+    "chargeAndOxidationNumberSpecifiers.xml": {
+      "tokens": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0,
+      "status": "deferred"
+    },
+    "regexes.xml": {
+      "tokens": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0,
+      "status": "deferred"
+    },
+    "regexTokens.xml": {
+      "tokens": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0,
+      "status": "deferred"
+    },
+    "index.xml": {
+      "tokens": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "stereo_flagged": 0,
+      "status": "deferred"
+    }
+  },
+  "totals": {
+    "total_parsed": 4727,
+    "parsed": 4727,
+    "accepted": 4414,
+    "rejected": 55,
+    "stereo_flagged": 13,
+    "duplicates": 0
+  },
+  "rejected_entries": [
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1cccc2c3ccc4cc5ccccc5nc4c3nc12",
+      "names": [
+        "acrindolin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1cccc2oc3ccccc3[sbH]c12",
+      "names": [
+        "phenoxastibinin",
+        "phenoxantimonin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1ccc2cccc3nc4c5ccccc5cn4c1c23",
+      "names": [
+        "phthaloperin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "[nH]1ccccc1",
+      "names": [
+        "picolin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1cccc2cccc12",
+      "names": [
+        "pyrinden",
+        "pyrindin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1cccc2nc3c4ccccc4nc3cc12",
+      "names": [
+        "quindolin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "c1cccc2nc3nc4ccccc4c3cc12",
+      "names": [
+        "quinindolin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "[cH-]1ccc[cH-]ccc1.[cH-]1ccc[cH-]ccc1.[U+4]",
+      "names": [
+        "uranocen"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2cnc3c(o)[nH]c(N)nc23",
+      "names": [
+        "guanosin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "arylGroups.xml",
+      "smiles": "[nH]1cccc1cc2ccc(n2)cc3ccc(n3)cc4cccn4",
+      "names": [
+        "bilin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleGroups.xml",
+      "smiles": "nitrolic acid",
+      "names": [
+        "nitrolic acid",
+        "nitrolicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carboxylicAcids.xml",
+      "smiles": "[nH]1ccccc1",
+      "names": [
+        "picol"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-[F|3]=O",
+      "names": [
+        "fluorosyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Br=O",
+      "names": [
+        "bromosyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Cl=O",
+      "names": [
+        "chlorosyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Cl=O",
+      "names": [
+        "chloroso"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-[F|5](=O)(=O)",
+      "names": [
+        "fluoryl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Br(=O)(=O)",
+      "names": [
+        "bromyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Cl(=O)(=O)",
+      "names": [
+        "chloryl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Cl(=O)(=O)",
+      "names": [
+        "chloroxy"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-[F|7](=O)(=O)(=O)",
+      "names": [
+        "perfluoryl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Br(=O)(=O)(=O)",
+      "names": [
+        "perbromyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-Cl(=O)(=O)(=O)",
+      "names": [
+        "perchloryl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "-I(=O)(=O)(=O)",
+      "names": [
+        "periodyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "=[P|5]=O",
+      "names": [
+        "phosphinylidene",
+        "phosphinyliden"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "=[P|5]=S",
+      "names": [
+        "phosphinothioylidene",
+        "phosphinothioyliden"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "=[As|5]=O",
+      "names": [
+        "arsinylidene",
+        "arsinyliden"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "simpleSubstituents.xml",
+      "smiles": "=[As|5]=S",
+      "names": [
+        "arsinothioylidene",
+        "arsinothioyliden"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "aminoAcids.xml",
+      "smiles": "NC(c1nnnn1)C(=O)O",
+      "names": [
+        "tetrazolylglycine",
+        "tetrazolylglycin"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "3",
+      "names": [
+        "oxir"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "4",
+      "names": [
+        "oxet"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "5",
+      "names": [
+        "furan"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "6",
+      "names": [
+        "pyran"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "7",
+      "names": [
+        "septan"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "8",
+      "names": [
+        "octan"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r",
+      "names": [
+        "glycero"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/r",
+      "names": [
+        "erythro"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/r",
+      "names": [
+        "threo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/r/r",
+      "names": [
+        "ribo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/r/r",
+      "names": [
+        "arabino"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/l/r",
+      "names": [
+        "xylo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/l/r",
+      "names": [
+        "lyxo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/r/r/r",
+      "names": [
+        "allo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/r/r/r",
+      "names": [
+        "altro"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/l/r/r",
+      "names": [
+        "gluco"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/l/r/r",
+      "names": [
+        "manno"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/r/l/r",
+      "names": [
+        "gulo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/r/l/r",
+      "names": [
+        "ido"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "r/l/l/r",
+      "names": [
+        "galacto"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrates.xml",
+      "smiles": "l/l/l/r",
+      "names": [
+        "talo"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "glycoside",
+      "names": [
+        "ide",
+        "id"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronamide",
+      "names": [
+        "uronamide",
+        "uronamid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronate",
+      "names": [
+        "uronate",
+        "uronat"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uronic acid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uronicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "urononitrile",
+      "names": [
+        "urononitrile",
+        "urononitril"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonamide",
+      "names": [
+        "onamide",
+        "onamid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonate",
+      "names": [
+        "onate",
+        "onat"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonic acid",
+      "names": [
+        "onic acid",
+        "onicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osononitrile",
+      "names": [
+        "ononitrile",
+        "ononitril"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "ose",
+      "names": [
+        "ose",
+        "os"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "arate",
+      "names": [
+        "arate",
+        "arat",
+        "arate(2-)",
+        "arat(2-)"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "aric acid",
+      "names": [
+        "aric acid",
+        "aricacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "onamide",
+      "names": [
+        "onamide",
+        "onamid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "onate",
+      "names": [
+        "onate",
+        "onat"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "onic acid",
+      "names": [
+        "onic acid",
+        "onicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "ononitrile",
+      "names": [
+        "ononitrile",
+        "ononitril"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonamide",
+      "names": [
+        "osonamide",
+        "osonamid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonate",
+      "names": [
+        "osonate",
+        "osonat"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonic acid",
+      "names": [
+        "osonic acid",
+        "osonicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osononitrile",
+      "names": [
+        "osononitrile",
+        "osononitril"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronamide",
+      "names": [
+        "uronamide",
+        "uronamid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronate",
+      "names": [
+        "uronate",
+        "uronat"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uronic acid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uronicacid"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "urononitrile",
+      "names": [
+        "urononitrile",
+        "urononitril"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonic acid",
+      "names": [
+        "on"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uron"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "aric acid",
+      "names": [
+        "ar"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "onic acid",
+      "names": [
+        "on"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osonic acid",
+      "names": [
+        "oson"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronic acid",
+      "names": [
+        "uron"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "dialdose",
+      "names": [
+        "odiald"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "itol",
+      "names": [
+        "itol"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "ulose",
+      "names": [
+        "ul"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "osulose",
+      "names": [
+        "ul"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "yl",
+      "names": [
+        "yl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "onoyl",
+      "names": [
+        "onoyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "carbohydrateSuffixes.xml",
+      "smiles": "uronoyl",
+      "names": [
+        "uronoyl"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "ester",
+      "names": [
+        "ester"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "salt",
+      "names": [
+        "salt"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "=N[Se|2]",
+      "names": [
+        "selenoxime",
+        "selenoxim",
+        "selenooxime",
+        "selenooxim",
+        "seleno-oxime",
+        "seleno-oxim"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "=N[Te|2]",
+      "names": [
+        "telluroxime",
+        "telluroxim",
+        "tellurooxime",
+        "tellurooxim",
+        "telluro-oxime",
+        "telluro-oxim"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "S,S",
+      "names": [
+        "mercaptal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "O,O",
+      "names": [
+        "acetal",
+        "ketal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "S,S",
+      "names": [
+        "hemimercaptal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "O,O",
+      "names": [
+        "hemiacetal",
+        "hemiketal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "S,O",
+      "names": [
+        "hemithioacetal",
+        "hemithioketal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "S,S",
+      "names": [
+        "hemidithioacetal",
+        "hemidithioketal"
+      ],
+      "reason": "RDKit returned None"
+    },
+    {
+      "file": "functionalTerms.xml",
+      "smiles": "oligo",
+      "names": [
+        "oligo"
+      ],
+      "reason": "RDKit returned None"
+    }
+  ],
+  "deferred_files": [
+    "germanTokens.xml",
+    "chargeAndOxidationNumberSpecifiers.xml",
+    "regexes.xml",
+    "regexTokens.xml",
+    "index.xml"
+  ]
+}
