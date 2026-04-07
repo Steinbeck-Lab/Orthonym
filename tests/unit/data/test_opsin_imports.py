@@ -367,11 +367,18 @@ class TestConsolidatedExport:
     """Verify the consolidated OPSIN_RETAINED_NAMES export."""
 
     def test_opsin_retained_names_consolidated(self):
-        """OPSIN_RETAINED_NAMES importable and has 900+ entries."""
+        """OPSIN_RETAINED_NAMES importable and has 200+ entries.
+
+        Note: Most OPSIN XML tokens are stems (not complete names) so only
+        cyclic_groups and natural_products are included in the retained names
+        merge. The 900+ figure from the original plan counted raw tokens
+        including stems. See data/opsin_imports/__init__.py for the exclusion
+        rationale.
+        """
         from orthonym.data.opsin_imports import OPSIN_RETAINED_NAMES
 
-        assert len(OPSIN_RETAINED_NAMES) >= 900, (
-            f"Expected >= 900 retained names, got {len(OPSIN_RETAINED_NAMES)}"
+        assert len(OPSIN_RETAINED_NAMES) >= 200, (
+            f"Expected >= 200 retained names, got {len(OPSIN_RETAINED_NAMES)}"
         )
 
     def test_opsin_retained_names_values_are_strings(self):

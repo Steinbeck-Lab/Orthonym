@@ -41,14 +41,20 @@ def _build_retained_names() -> Dict[str, str]:
     """
     merged: Dict[str, str] = {}
 
-    # Sources for retained name lookup, in precedence order
+    # Sources for retained name lookup, in precedence order.
+    # IMPORTANT: Most OPSIN XML data files contain parser STEMS, not complete
+    # IUPAC names. Only categories that reliably contain complete, correct
+    # retained names are included here. All others are available as individual
+    # module exports for downstream phases (141, 142) that need stem data.
+    #
+    # Excluded from merge (stems/non-PINs):
+    #   OPSIN_SIMPLE_GROUPS -- ethylene, glycerone, dihydrosuccinate, etc.
+    #   OPSIN_ARYL_GROUPS -- carbazol, stilben, phenetol, etc. (93% stems)
+    #   OPSIN_AMINO_ACIDS -- butyrine, alan, leuc, etc. (74% stems)
+    #   OPSIN_CARBOHYDRATES -- mostly stems like gluc, galact, etc.
     sources = [
-        OPSIN_ARYL_GROUPS,
-        OPSIN_SIMPLE_GROUPS,
         OPSIN_CYCLIC_GROUPS,
         OPSIN_NATURAL_PRODUCTS,
-        OPSIN_AMINO_ACIDS,
-        OPSIN_CARBOHYDRATES,
     ]
 
     for source in sources:
