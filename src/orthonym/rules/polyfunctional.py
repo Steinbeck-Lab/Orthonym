@@ -1508,7 +1508,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
 
             # Skip substituent branches entirely covered by a single non-principal
             # FG match ONLY for FG types whose prefix form includes the carbon
-            # (carbamoyl, carboxy, chlorocarbonyl, etc.).  These are the FG itself
+            # (carbamoyl, carboxy, carbonochloridoyl, etc.).  These are the FG itself
             # (e.g., -C(=O)NH2 for amide) and are emitted as FG prefixes by the
             # FG prefix loop above.  Processing them here would produce incorrect
             # compound substituent names like "(aminomethyl)".

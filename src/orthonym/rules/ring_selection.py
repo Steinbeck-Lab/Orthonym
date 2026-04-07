@@ -59,23 +59,39 @@ class RingSystemType(IntEnum):
 # ============================================================================
 
 # Higher value = more senior. Used negated in scoring tuple so min() wins.
+# P-44.2.1 ring selection uses P-18(b) heteroatom order plus halogens.
+# Expanded per IUPAC 2013 errata (BBerrors.html) to include all 20 elements
+# that can appear as heteroatoms in ring systems.
 _HETEROATOM_SENIORITY = {
-    'N': 10,
-    'F': 9,
-    'Cl': 8,
-    'Br': 7,
-    'I': 6,
-    'O': 5,
-    'S': 4,
-    'Se': 3,
-    'Te': 2,
-    'P': 1,
+    'N': 20,     # Most senior heteroatom per P-18(b)
+    'F': 19,     # Halogen (P-44.2.1 ring comparison)
+    'Cl': 18,    # Halogen
+    'Br': 17,    # Halogen
+    'I': 16,     # Halogen
+    'O': 15,     # P-18(b) Group 16
+    'S': 14,
+    'Se': 13,
+    'Te': 12,
+    'P': 11,     # P-18(b) Group 15
+    'As': 10,    # Per P-18(b) errata
+    'Sb': 9,
+    'Bi': 8,
+    'Si': 7,     # Group 14
+    'Ge': 6,
+    'Sn': 5,
+    'Pb': 4,
+    'B': 3,      # Group 13
+    'Al': 2,
+    'Ga': 1,
 }
 
 # Seniority order for P-44.2.1(g) term-by-term variety comparison.
 # Tuple position i represents the count of element _HETEROATOM_VARIETY_ORDER[i].
 # Negated counts so min() selects ring with MORE of senior element.
-_HETEROATOM_VARIETY_ORDER = ['N', 'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P']
+_HETEROATOM_VARIETY_ORDER = [
+    'N', 'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te',
+    'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga'
+]
 
 
 # ============================================================================
@@ -359,7 +375,7 @@ def ring_system_score(
         -num_rings,                         # P-44.2.1(d): more rings = senior
         -num_skeletal_atoms,                # P-44.2.1(e): more atoms = senior
         -num_heteroatoms,                   # P-44.2.1(f): more heteroatoms
-        *heteroatom_variety_tuple,          # P-44.2.1(g): 10 elements, term-by-term
+        *heteroatom_variety_tuple,          # P-44.2.1(g): 20 elements, term-by-term
         type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
     )
 

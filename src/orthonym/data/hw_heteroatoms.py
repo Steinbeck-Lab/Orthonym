@@ -80,9 +80,11 @@ HETEROATOM_PRIORITY: Dict[str, int] = {
 
     # Group 13 (lowest priority)
     'B': 14,
+    'Al': 15,
+    'Ga': 16,
 
     # Additional
-    'Hg': 15,
+    'Hg': 17,
 }
 
 

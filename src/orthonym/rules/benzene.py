@@ -62,7 +62,7 @@ _SUFFIX_TO_PREFIX = {
     'carboxylic acid': 'carboxy',
     'sulfonic acid': 'sulfo',
     'sulfonamide': 'sulfamoyl',
-    'carbonyl chloride': 'chlorocarbonyl',
+    'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',

@@ -254,7 +254,7 @@ PREFIX_FORMS = {
     "nitroso": "nitroso",
     "azido": "azido",
     # Acid halides as non-principal group prefix (IUPAC P-65.5.1.4)
-    "acid_chloride": "chlorocarbonyl",
+    "acid_chloride": "carbonochloridoyl",
     "acid_bromide": "bromocarbonyl",
     "acid_fluoride": "fluorocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)

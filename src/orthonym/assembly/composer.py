@@ -5112,7 +5112,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
         # Guard 3b: Skip substituent branches entirely covered by a single
         # non-principal FG match ONLY for FG types whose prefix form includes
-        # the carbon (carbamoyl, carboxy, chlorocarbonyl, etc.).
+        # the carbon (carbamoyl, carboxy, carbonochloridoyl, etc.).
         # These branches ARE the FG and should be emitted as FG prefixes
         # by _generate_prefixes(), NOT as alkyl compound substituents.
         # IUPAC P-66.1(c): non-principal amide = carbamoyl prefix.

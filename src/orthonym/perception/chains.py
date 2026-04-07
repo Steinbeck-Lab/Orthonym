@@ -259,7 +259,7 @@ def _get_non_principal_terminal_carbons(
     including its carbon are excluded from chain enumeration:
     - carbamoyl (-C(=O)NH2): prefix includes C
     - carboxy (-COOH): prefix includes C (when non-principal acid)
-    - chlorocarbonyl (-C(=O)Cl): prefix includes C
+    - carbonochloridoyl (-C(=O)Cl): prefix includes C
 
     FGs where the prefix represents only the heteroatom attachment are NOT excluded:
     - cyano (#N on chain C): nitrile C IS a chain member
