@@ -1,0 +1,25 @@
+{
+  "names_tested": 50,
+  "names_skipped_stems": 25,
+  "roundtrip_match": 45,
+  "roundtrip_mismatch": 2,
+  "opsin_parse_failure": 3,
+  "mismatches": [
+    {
+      "name": "piperazine-2,5-dione",
+      "expected_smiles": "O=C1CNCC(=O)N1",
+      "opsin_smiles": "N1C(CNC(C1)=O)=O"
+    },
+    {
+      "name": "diethyl phosphate",
+      "expected_smiles": "CCOP(=O)(O)OCC",
+      "opsin_smiles": "P(=O)(OCC)(OCC)[O-]"
+    }
+  ],
+  "parse_failures": [
+    "4-hydroxyacetophenone",
+    "cellobiose",
+    "sesamol"
+  ],
+  "generated_at": "2026-04-07T12:23:28.818644+00:00"
+}
