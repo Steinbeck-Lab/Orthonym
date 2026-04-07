@@ -69,7 +69,7 @@ class TestPhosphinicAcidE2E:
 
     def test_ethylmethylphosphinic_acid(self):
         """CCP(C)(=O)O -> ethylmethylphosphinic acid"""
-        assert name_compound("CCP(C)(=O)O") == "ethylmethylphosphinic acid"
+        assert name_compound("CCP(C)(=O)O") == "ethyl(methyl)phosphinic acid"
 
 
 class TestPhosphateEsterE2E:

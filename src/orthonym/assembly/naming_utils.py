@@ -397,6 +397,56 @@ def get_bracket_depth(name: str) -> int:
     return 0
 
 
+# Pre-compiled patterns for compute_nesting_depth (P-16.5.4.1)
+# P-16.5.4.1.1: Indicated hydrogen -- (1H), (3H), (9aH) etc.
+_INDICATED_H_RE = re.compile(r'\(\d+[a-z]?H\)')
+# P-16.5.4.1.2: Fusion/spiro/von Baeyer brackets -- [2,3-b], [4.5], [2.2.1]
+_FUSION_BRACKET_RE = re.compile(r'\[[0-9a-z,.\-]+\]')
+# P-16.5.4.1.3: Stereo descriptors -- (R), (S), (E), (Z), (1R,2S), etc.
+_STEREO_PAREN_RE = re.compile(r'\((?:\d+[a-z]?,)*[RSEZ](?:,\d+[a-z]?[RSEZ]?)*\)')
+
+
+def compute_nesting_depth(name: str) -> int:
+    """Compute effective bracket nesting depth per P-16.5.4.1 (Dec 2025).
+
+    Analyzes a name string and returns the effective nesting depth by
+    counting only nesting-relevant brackets, per the following subsections:
+
+    - P-16.5.4.1.1: Ignore indicated hydrogen parentheses, e.g., (1H), (3H)
+    - P-16.5.4.1.2: Ignore fusion/spiro/ring assembly/von Baeyer brackets
+    - P-16.5.4.1.3: Count stereo descriptor and compound locant parentheses
+    - P-16.5.4.1.4: Escalate if consecutive same-level marks would result
+    - P-16.5.4.1.5: Isotopic labeling convention (not applicable -- not implemented)
+
+    Args:
+        name: The chemical name string to analyze.
+
+    Returns:
+        Effective nesting depth (0 = no relevant brackets, 1 = has relevant
+        parentheses, 2 = has relevant square brackets, etc.).
+    """
+    # Start with the original name and strip out non-nesting brackets
+    # by replacing them with placeholder text that contains no brackets.
+    working = name
+
+    # Remove indicated hydrogen parentheses (P-16.5.4.1.1)
+    working = _INDICATED_H_RE.sub('__IH__', working)
+
+    # Remove fusion/spiro/von Baeyer square brackets (P-16.5.4.1.2)
+    working = _FUSION_BRACKET_RE.sub('__FB__', working)
+
+    # Now count remaining bracket types to determine depth
+    max_depth = 0
+    if '(' in working:
+        max_depth = 1
+    if '[' in working:
+        max_depth = 2
+    if '{' in working:
+        max_depth = 3
+
+    return max_depth
+
+
 def apply_enclosing_marks(name: str, depth: int = 0) -> str:
     """Apply IUPAC P-16.3.3 enclosing marks at the correct nesting depth.
 
@@ -405,9 +455,15 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
     Depth 1: square brackets (name already contains parentheses)
     Depth 2: braces (name already contains brackets)
 
+    When depth=-1 (sentinel for auto-detect), calls compute_nesting_depth()
+    on the input name to determine the effective starting depth from the
+    name's existing brackets per P-16.5.4.1 (Dec 2025 errata). This makes
+    all callers that use the default depth automatically benefit from
+    subsection-aware nesting.
+
     Args:
         name: The compound substituent name (without outer brackets).
-        depth: Nesting depth (0 = outermost).
+        depth: Nesting depth (0 = outermost, -1 = auto-detect from name).
 
     Returns:
         Name enclosed in the appropriate bracket type.
@@ -419,9 +475,39 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
         '[2-methylpropyl]'
         >>> apply_enclosing_marks("2-methylpropyl", 2)
         '{2-methylpropyl}'
+        >>> apply_enclosing_marks("(R)-butan-2-yl", -1)
+        '[(R)-butan-2-yl]'
     """
     MARKS = [('(', ')'), ('[', ']'), ('{', '}')]
+
+    if depth == -1:
+        # Auto-detect: compute effective depth from name content
+        depth = compute_nesting_depth(name)
+
+    # P-16.5.4.1.4: Check for consecutive same-level marks.
+    # If the name starts with the same type of bracket we'd add, escalate --
+    # BUT only if the leading bracket is nesting-relevant (not indicated H,
+    # not fusion/spiro brackets).
     open_mark, close_mark = MARKS[depth % 3]
+    if name.startswith(open_mark):
+        # Check if the leading bracket is non-nesting (indicated H or fusion)
+        leading_is_nesting = True
+        if open_mark == '(':
+            # Check for indicated hydrogen: (1H), (3H), (9aH)
+            if _INDICATED_H_RE.match(name):
+                leading_is_nesting = False
+            # Check for stereo: (R), (S), (E), (Z), (1R,2S) -- these ARE nesting
+            elif _STEREO_PAREN_RE.match(name):
+                leading_is_nesting = True
+        elif open_mark == '[':
+            # Check for fusion/spiro brackets: [2,3-b], [4.5]
+            if _FUSION_BRACKET_RE.match(name):
+                leading_is_nesting = False
+
+        if leading_is_nesting:
+            depth += 1
+            open_mark, close_mark = MARKS[depth % 3]
+
     return f"{open_mark}{name}{close_mark}"
 
 

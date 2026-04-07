@@ -53,14 +53,15 @@ class TestPhosphineNaming:
         """CPCC -> ethylmethylphosphane (asymmetric secondary)"""
         mol = Chem.MolFromSmiles("CPCC")  # methyl and ethyl on P
         result = name_phosphine(mol, 1)
-        assert result == "ethylmethylphosphane"
+        assert result == "ethyl(methyl)phosphane"
 
     def test_dimethylethylphosphane(self):
-        """CCP(C)C -> ethyldimethylphosphane (asymmetric tertiary, with multiplier)"""
+        """CCP(C)C -> ethyl(dimethyl)phosphane (asymmetric tertiary, with multiplier)
+        Per P-16.5.1.3 errata: first substituent no marks, second+ in parens."""
         mol = Chem.MolFromSmiles("CCP(C)C")
         result = name_phosphine(mol, 2)
         # Alphabetical: ethyl + dimethyl (multiplier for identical groups)
-        assert result == "ethyldimethylphosphane"
+        assert result == "ethyl(dimethyl)phosphane"
 
     def test_parent_phosphane(self):
         """Pure phosphane (PH3)"""
@@ -96,7 +97,7 @@ class TestPhosphineOxideNaming:
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
         # Two methyl + one ethyl: ethyldimethylphosphane oxide (with multiplier)
         assert "phosphane oxide" in result
-        assert result == "ethyldimethylphosphane oxide"
+        assert result == "ethyl(dimethyl)phosphane oxide"
 
 
 class TestPhosphonicAcidNaming:
@@ -146,7 +147,7 @@ class TestPhosphinicAcidNaming:
         """CCP(C)(=O)O -> ethylmethylphosphinic acid"""
         mol = Chem.MolFromSmiles("CCP(C)(=O)O")
         result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
-        assert result == "ethylmethylphosphinic acid"
+        assert result == "ethyl(methyl)phosphinic acid"
 
     def test_dipropylphosphinic_acid(self):
         """CCCP(CCC)(=O)O -> dipropylphosphinic acid"""
@@ -425,7 +426,7 @@ class TestArylPhosphineNaming:
         # "methyl" vs "phenyl": m < p, so methyl first.
         assert "methyl" in result
         assert "phenyl" in result
-        assert result == "methyldiphenylphosphane"
+        assert result == "methyl(diphenyl)phosphane"
 
     def test_phenylphosphane(self):
         """PhPH2 -> phenylphosphane (primary phosphine with phenyl)"""
@@ -458,7 +459,7 @@ class TestArylPhosphineNaming:
                 p_idx = i
                 break
         result = name_phosphine(mol, p_idx)
-        assert result == "ethyldiphenylphosphane"
+        assert result == "ethyl(diphenyl)phosphane"
 
 
 class TestArylPhosphineOxideNaming:
@@ -477,13 +478,13 @@ class TestArylPhosphineOxideNaming:
         assert "methyl" in result
         assert "phenyl" in result
         assert "phosphane oxide" in result
-        assert result == "methyldiphenylphosphane oxide"
+        assert result == "methyl(diphenyl)phosphane oxide"
 
     def test_ethyldiphenylphosphane_oxide(self):
         """O=P(Et)Ph2 -> ethyldiphenylphosphane oxide"""
         mol = Chem.MolFromSmiles("O=P(CC)(c1ccccc1)c2ccccc2")
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
-        assert result == "ethyldiphenylphosphane oxide"
+        assert result == "ethyl(diphenyl)phosphane oxide"
 
 
 class TestArylPhosphinicAcid:
@@ -499,13 +500,13 @@ class TestArylPhosphinicAcid:
         """MePhP(O)(OH) -> methylphenylphosphinic acid (alphabetical)"""
         mol = Chem.MolFromSmiles("O=P(O)(C)c1ccccc1")
         result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
-        assert result == "methylphenylphosphinic acid"
+        assert result == "methyl(phenyl)phosphinic acid"
 
     def test_ethylphenylphosphinic_acid(self):
         """EtPhP(O)(OH) -> ethylphenylphosphinic acid"""
         mol = Chem.MolFromSmiles("O=P(O)(CC)c1ccccc1")
         result = name_phosphinic_acid(mol, tuple(range(mol.GetNumAtoms())))
-        assert result == "ethylphenylphosphinic acid"
+        assert result == "ethyl(phenyl)phosphinic acid"
 
 
 class TestPhosphanylPrefix:
@@ -569,4 +570,4 @@ class TestPhosphanylPrefix:
                 p_idx = i
                 break
         result = get_phosphanyl_prefix(mol, p_idx)
-        assert result == "methyldiphenylphosphanyl"
+        assert result == "methyl(diphenyl)phosphanyl"

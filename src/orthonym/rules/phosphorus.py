@@ -146,24 +146,41 @@ def _build_substituent_string(names: List[str]) -> str:
     Build a substituent prefix string from a list of substituent names.
 
     Handles multipliers (di-, tri-) for identical groups, and alphabetical ordering.
+
+    Per P-16.5.1.3 (May 2021 errata): For mononuclear parent hydrides with
+    2+ DIFFERENT substituent groups, the first alphabetically-sorted unique
+    substituent gets NO enclosing marks, and subsequent unique substituents
+    are wrapped in parentheses.
+
     Examples:
         ["methyl", "methyl", "methyl"] -> "trimethyl"
-        ["ethyl", "methyl", "methyl"] -> "ethyldimethyl"
+        ["butyl", "ethyl", "methyl", "propyl"] -> "butyl(ethyl)(methyl)(propyl)"
+        ["ethyl", "methyl", "methyl"] -> "ethyl(dimethyl)"
+        ["ethyl", "phenyl", "phenyl"] -> "ethyl(diphenyl)"
         ["phenyl", "phenyl"] -> "diphenyl"
-        ["methyl", "phenyl", "phenyl"] -> "diphenylmethyl"
+        ["methyl", "phenyl", "phenyl"] -> "methyl(diphenyl)"
 
     Note: IUPAC alphabetical ordering ignores multiplicative prefixes (di, tri).
     """
     counts = Counter(names)
-    multiplier_map = {1: "", 2: "di", 3: "tri"}
+    multiplier_map = {1: "", 2: "di", 3: "tri", 4: "tetra"}
 
     # Sort unique names alphabetically
     sorted_unique = sorted(counts.keys())
 
     parts = []
-    for name in sorted_unique:
-        multiplier = multiplier_map.get(counts[name], "")
-        parts.append(f"{multiplier}{name}")
+    for i, name in enumerate(sorted_unique):
+        count = counts[name]
+        multiplier = multiplier_map.get(count, "")
+        if len(sorted_unique) >= 2 and i > 0:
+            # P-16.5.1.3: second+ different substituents get parentheses
+            if count > 1:
+                parts.append(f"({multiplier}{name})")
+            else:
+                parts.append(f"({name})")
+        else:
+            # First substituent or only unique substituent: no enclosing marks
+            parts.append(f"{multiplier}{name}")
 
     return "".join(parts)
 

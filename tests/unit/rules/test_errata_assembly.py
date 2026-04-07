@@ -146,8 +146,8 @@ class TestBuildSubstituentStringErrata10:
 
     def test_trimethylphosphane_unchanged(self):
         """Trimethylphosphane should be unchanged (single unique substituent)."""
-        from orthonym import name_molecule
-        result = name_molecule("CP(C)C")
+        from orthonym.namer import name_compound
+        result = name_compound("CP(C)C")
         assert result == "trimethylphosphane"
 
     def test_two_unique_substituents_diphenyl_methyl(self):
