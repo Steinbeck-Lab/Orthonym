@@ -91,7 +91,9 @@ class TestHeteroatomPriority:
         ('Sn', 12),
         ('Pb', 13),
         ('B', 14),
-        ('Hg', 15),
+        ('Al', 15),   # ERRATA-01: added per P-18(b) expansion
+        ('Ga', 16),   # ERRATA-01: added per P-18(b) expansion
+        ('Hg', 17),   # Renumbered after Al/Ga insertion
     ])
     def test_heteroatom_priority_lookup(self, element, expected_priority):
         """Test priority value for each heteroatom."""

@@ -176,10 +176,12 @@ class TestHeteroatomVarietyTermByTerm:
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol)
         score = ring_system_score(mol, rs[0])
-        assert len(score) == 17, f"Expected 17-element tuple, got {len(score)}"
+        # 6 fixed fields + 20 heteroatom variety elements + 1 type_rank = 27
+        assert len(score) == 27, f"Expected 27-element tuple, got {len(score)}"
 
     def test_empty_system_sentinel_length(self):
-        """Empty system sentinel should match score tuple length (17)."""
+        """Empty system sentinel should match score tuple length (27)."""
         mol = Chem.MolFromSmiles("C")
         score = ring_system_score(mol, set())
-        assert len(score) == 17, f"Expected 17-element sentinel, got {len(score)}"
+        # 6 fixed fields + 20 heteroatom variety elements + 1 type_rank = 27
+        assert len(score) == 27, f"Expected 27-element sentinel, got {len(score)}"

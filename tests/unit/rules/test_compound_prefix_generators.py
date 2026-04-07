@@ -138,8 +138,9 @@ class TestAcidHalidePrefixForms:
 
     @pytest.mark.unit
     def test_acid_chloride_prefix(self):
-        assert PREFIX_FORMS.get('acid_chloride') == 'chlorocarbonyl', \
-            f"Expected 'chlorocarbonyl', got '{PREFIX_FORMS.get('acid_chloride')}'"
+        # ERRATA-09 (P-29.1.2): chlorocarbonyl -> carbonochloridoyl
+        assert PREFIX_FORMS.get('acid_chloride') == 'carbonochloridoyl', \
+            f"Expected 'carbonochloridoyl', got '{PREFIX_FORMS.get('acid_chloride')}'"
 
     @pytest.mark.unit
     def test_acid_bromide_prefix(self):

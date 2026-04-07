@@ -149,9 +149,14 @@ class TestRingEZFilter:
         # Main check: no spurious ring E/Z
         assert 'cyclohex' not in name.lower() or 'E' not in name.split('-')[0]
 
-    def test_8_member_ring_no_ez(self):
-        """8-membered ring double bond should be filtered."""
-        smiles = 'C1=CCCCCCC1'  # cyclooctene
+    def test_8_member_ring_gets_ez(self):
+        """8-membered ring double bond SHOULD get E/Z per P-31.1.3 errata (Sep 2024).
+
+        Previously filtered at <= 8 threshold. Errata corrects to < 8,
+        so 8-member rings (cyclooctene) now get E/Z descriptors.
+        """
+        # Use stereo-specified SMILES -- unspecified won't get CIP labels
+        smiles = r'C1=C/CCCCCC\1'  # stereo-specified cyclooctene
         mol = Chem.MolFromSmiles(smiles)
         rdCIPLabeler.AssignCIPLabels(mol)
 
@@ -159,8 +164,8 @@ class TestRingEZFilter:
         descs = collect_stereodescriptors(mol, atom_to_locant)
 
         ez_descs = [(loc, cip) for loc, cip in descs if cip in ('E', 'Z')]
-        assert len(ez_descs) == 0, (
-            f"8-membered ring should not have E/Z descriptors, got: {ez_descs}"
+        assert len(ez_descs) > 0, (
+            f"8-membered ring should NOW have E/Z descriptors per errata, got none"
         )
 
 
