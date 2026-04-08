@@ -683,3 +683,89 @@ class TestTransformationFallbackSafety:
     def test_acid_to_thioate_valid_systematic(self):
         """Regression: valid systematic acid still converts."""
         assert _acid_to_thioate("propanoic acid") == "propanethioate"
+
+
+# ============================================================================
+# OPSIN expanded acid stem transformation tests (DECO-26)
+# ============================================================================
+
+
+class TestOpsinAcidStemAteConversion:
+    """Tests for _acid_to_ate with OPSIN-expanded trivial acid stems."""
+
+    def test_opsin_acid_stem_ate_conversion(self):
+        """OPSIN stems: palmitic acid -> palmitate, etc."""
+        assert _acid_to_ate("palmitic acid") == "palmitate"
+        assert _acid_to_ate("lauric acid") == "laurate"
+        assert _acid_to_ate("myristic acid") == "myristate"
+        assert _acid_to_ate("stearic acid") == "stearate"
+        assert _acid_to_ate("oleic acid") == "oleate"
+
+    def test_systematic_acid_no_regression(self):
+        """Systematic -oic acid -> -oate still works after OPSIN expansion."""
+        assert _acid_to_ate("propanoic acid") == "propanoate"
+        assert _acid_to_ate("butanoic acid") == "butanoate"
+        assert _acid_to_ate("pentanoic acid") == "pentanoate"
+
+
+class TestOpsinAcidStemAmideConversion:
+    """Tests for _acid_to_amide with OPSIN-expanded trivial acid stems."""
+
+    def test_opsin_acid_stem_amide_conversion(self):
+        """OPSIN stems: palmitic acid -> palmitamide, etc."""
+        assert _acid_to_amide("palmitic acid") == "palmitamide"
+        assert _acid_to_amide("lauric acid") == "lauramide"
+        assert _acid_to_amide("myristic acid") == "myristamide"
+        assert _acid_to_amide("stearic acid") == "stearamide"
+
+    def test_benzoic_acid_amide_no_regression(self):
+        """Existing trivial: benzoic acid -> benzamide (verify no regression)."""
+        assert _acid_to_amide("benzoic acid") == "benzamide"
+
+
+class TestOpsinAcidStemAcylConversion:
+    """Tests for _acid_to_acyl with OPSIN-expanded trivial acid stems."""
+
+    def test_opsin_acid_stem_acyl_conversion(self):
+        """OPSIN stems: stearic acid -> stearoyl (ylForYl subType)."""
+        assert _acid_to_acyl("stearic acid") == "stearoyl"
+        assert _acid_to_acyl("palmitic acid") == "palmitoyl"
+
+    def test_opsin_acyl_yl_for_acyl_subtype(self):
+        """OPSIN stems with ylForAcyl subtype: formic acid -> formyl."""
+        # formic acid is ylForAcyl, so stem + "yl"
+        assert _acid_to_acyl("formic acid") == "formyl"
+        assert _acid_to_acyl("acetic acid") == "acetyl"
+
+
+class TestAssemblyTokenValidation:
+    """Tests for _validate_assembly_tokens (DECO-27)."""
+
+    def test_all_fragments_represented(self):
+        """Assembly containing tokens from all fragments passes validation."""
+        from orthonym.decomposition.engine import _validate_assembly_tokens
+        assert _validate_assembly_tokens(
+            "ethyl propanoate",
+            ["ethanol", "propanoic acid"],
+        ) is True
+
+    def test_missing_fragment_fails_validation(self):
+        """Assembly missing a fragment's tokens fails validation."""
+        from orthonym.decomposition.engine import _validate_assembly_tokens
+        assert _validate_assembly_tokens(
+            "ethyl propanoate",
+            ["ethanol", "propanoic acid", "hexadecanoic acid"],
+        ) is False
+
+    def test_single_fragment_passes(self):
+        """Single fragment name always passes."""
+        from orthonym.decomposition.engine import _validate_assembly_tokens
+        assert _validate_assembly_tokens(
+            "propanoic acid",
+            ["propanoic acid"],
+        ) is True
+
+    def test_empty_fragments_pass(self):
+        """Empty fragment list passes."""
+        from orthonym.decomposition.engine import _validate_assembly_tokens
+        assert _validate_assembly_tokens("anything", []) is True

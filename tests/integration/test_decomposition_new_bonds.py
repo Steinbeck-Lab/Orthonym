@@ -502,3 +502,116 @@ class TestDecompositionRegressionGuard:
         bonds = find_cleavable_bonds(mol)
         # Just verify it runs without error
         assert isinstance(bonds, list)
+
+
+# ============================================================================
+# Thioether and secondary amine bond detection tests (DECO-27 / D-03)
+# ============================================================================
+
+
+@pytest.mark.integration
+class TestThioetherBondDetection:
+    """Test thioether bond detection in bond_cleavage.py."""
+
+    def test_thioether_bond_detected(self):
+        """Thioether SMARTS matches C-S-C in non-ring, non-carbonyl context.
+
+        phenylthioacetic acid: c1ccc(SCC(=O)O)cc1
+        Should detect the C-S bond between phenyl and CH2.
+        """
+        mol = _mol("c1ccc(SCC(=O)O)cc1")
+        bonds = find_cleavable_bonds(mol)
+        thioether_bonds = [b for b in bonds if b.get("type") == "thioether"]
+        assert len(thioether_bonds) >= 1, (
+            f"Should detect thioether bond, got types: "
+            f"{[b['type'] for b in bonds]}"
+        )
+
+    def test_thioether_excludes_thioester(self):
+        """C(=O)-S-C should NOT be detected as thioether (it's a thioester)."""
+        mol = _mol("CC(=O)SCC")  # S-ethyl thioacetate
+        bonds = find_cleavable_bonds(mol)
+        thioether_bonds = [b for b in bonds if b.get("type") == "thioether"]
+        assert len(thioether_bonds) == 0, (
+            "Thioester should not be detected as thioether"
+        )
+
+    def test_thioether_smarts_simple(self):
+        """Direct SMARTS match test: CSCC matches thioether pattern."""
+        from orthonym.decomposition.bond_cleavage import _THIOETHER_SMARTS
+        mol = _mol("CSCC")
+        matches = mol.GetSubstructMatches(_THIOETHER_SMARTS)
+        assert len(matches) > 0, "CSCC should match thioether SMARTS"
+
+    def test_thioether_smarts_excludes_carbonyl(self):
+        """Thioester C(=O)-S-C should NOT match thioether SMARTS."""
+        from orthonym.decomposition.bond_cleavage import _THIOETHER_SMARTS
+        mol = _mol("CC(=O)SC")
+        matches = mol.GetSubstructMatches(_THIOETHER_SMARTS)
+        assert len(matches) == 0, "C(=O)-S-C should not match thioether SMARTS"
+
+
+@pytest.mark.integration
+class TestSecAmineDetection:
+    """Test secondary amine bond detection in bond_cleavage.py."""
+
+    def test_sec_amine_bond_detected(self):
+        """Secondary amine SMARTS matches C-NH-C in non-ring, non-carbonyl context.
+
+        N-methylbenzylamine: c1ccc(CNCc2ccccc2)cc1 -- large enough for min HA
+        """
+        mol = _mol("c1ccc(CNCC(=O)O)cc1")
+        bonds = find_cleavable_bonds(mol)
+        sec_amine_bonds = [b for b in bonds if b.get("type") == "sec_amine"]
+        assert len(sec_amine_bonds) >= 1, (
+            f"Should detect secondary amine bond, got types: "
+            f"{[b['type'] for b in bonds]}"
+        )
+
+    def test_sec_amine_excludes_amide(self):
+        """C(=O)-N should NOT be detected as secondary amine (it's an amide)."""
+        mol = _mol("CC(=O)NCC")  # N-ethylacetamide
+        bonds = find_cleavable_bonds(mol)
+        sec_amine_bonds = [b for b in bonds if b.get("type") == "sec_amine"]
+        assert len(sec_amine_bonds) == 0, (
+            "Amide should not be detected as secondary amine"
+        )
+
+    def test_sec_amine_smarts_simple(self):
+        """Direct SMARTS match: CNCC matches secondary amine pattern."""
+        from orthonym.decomposition.bond_cleavage import _SEC_AMINE_SMARTS
+        mol = _mol("CNCC")
+        matches = mol.GetSubstructMatches(_SEC_AMINE_SMARTS)
+        assert len(matches) > 0, "CNCC should match secondary amine SMARTS"
+
+    def test_sec_amine_smarts_excludes_amide(self):
+        """Amide C(=O)-N should NOT match secondary amine SMARTS."""
+        from orthonym.decomposition.bond_cleavage import _SEC_AMINE_SMARTS
+        mol = _mol("CC(=O)NC")
+        matches = mol.GetSubstructMatches(_SEC_AMINE_SMARTS)
+        assert len(matches) == 0, "Amide should not match sec amine SMARTS"
+
+
+@pytest.mark.integration
+class TestEtherMinimumHALowered:
+    """Test that ether minimum heavy atom threshold lowered from 5 to 3."""
+
+    def test_ether_minimum_ha_lowered(self):
+        """Ether detection with fragments of 3-4 HA should now work.
+
+        diethyl ether: CCOCC (3 HA each side after excluding O)
+        Previously required 5, now requires 3.
+        """
+        mol = _mol("CCOCC")
+        bonds = find_cleavable_bonds(mol)
+        ether_bonds = [b for b in bonds if b.get("type") == "ether"]
+        # With lowered threshold (3), diethyl ether should be detectable
+        # Each side has 2 HA (CC) -- still below 3, so not detectable
+        # Use propyl-ethyl ether: CCCOCCC (3 each side)
+        mol2 = _mol("CCCOCCC")
+        bonds2 = find_cleavable_bonds(mol2)
+        ether_bonds2 = [b for b in bonds2 if b.get("type") == "ether"]
+        assert len(ether_bonds2) >= 1, (
+            "Propyl-ethyl ether (3 HA per side) should be detected "
+            f"with lowered threshold, got types: {[b['type'] for b in bonds2]}"
+        )
