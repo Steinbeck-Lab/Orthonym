@@ -9,8 +9,8 @@ Assembly order:
 """
 
 import logging
-from typing import Optional, List, Dict, Any
-from dataclasses import dataclass
+from typing import Optional, List, Dict, Any, Set
+from dataclasses import dataclass, field
 from collections import defaultdict, deque, namedtuple
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,27 @@ ComplexRingResult = namedtuple(
     'ComplexRingResult',
     ['name', 'ring_atoms', 'atom_to_locant', 'substituents_included']
 )
+
+
+@dataclass
+class HandlerResult:
+    """Observational coverage metric for naming handlers (Phase 139 ARCH-06).
+
+    Tracks what fraction of the molecule's heavy atoms are accounted for
+    in the generated name. Low coverage indicates potential substituent drops.
+    This is OBSERVATIONAL ONLY -- does not affect naming behavior.
+    """
+    name: str
+    handler_id: str
+    parent_atoms: Set[int] = field(default_factory=set)
+    accounted_atoms: Set[int] = field(default_factory=set)
+    total_heavy_atoms: int = 0
+
+    @property
+    def coverage(self) -> float:
+        """Return fraction of heavy atoms accounted for (0.0 to 1.0)."""
+        return len(self.accounted_atoms) / self.total_heavy_atoms if self.total_heavy_atoms > 0 else 0.0
+
 
 from ..rules.seniority import get_suffix, get_prefix
 from ..rules.locants import get_functional_group_locants, get_bond_locants
@@ -233,9 +254,26 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
         exclude_atoms=exclude_atoms,
     )
 
-    if prefix_str:
-        return f"{prefix_str}{base_name}"
-    return base_name
+    enriched_name = f"{prefix_str}{base_name}" if prefix_str else base_name
+
+    # Observational coverage logging (ARCH-06)
+    if logger.isEnabledFor(logging.DEBUG):
+        total_ha = features.mol.GetNumHeavyAtoms()
+        accounted = set(parent_atoms) | exclude_atoms
+        hr = HandlerResult(
+            name=enriched_name,
+            handler_id=handler_id,
+            parent_atoms=set(parent_atoms),
+            accounted_atoms=accounted,
+            total_heavy_atoms=total_ha,
+        )
+        logger.debug(
+            "HANDLER_COVERAGE: handler=%s coverage=%.2f accounted=%d/%d name=%s",
+            hr.handler_id, hr.coverage, len(hr.accounted_atoms),
+            hr.total_heavy_atoms, hr.name[:60],
+        )
+
+    return enriched_name
 
 
 def _find_attach_idx_in_frag(mol, sub_info, parent_atoms):
@@ -1225,6 +1263,28 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     # Assemble in correct order
     assembled = _assemble_fragments(fragments, style)
+
+    # Observational coverage logging for fallback chain/ring path (ARCH-06)
+    if logger.isEnabledFor(logging.DEBUG):
+        _fb_total_ha = features.mol.GetNumHeavyAtoms()
+        _fb_parent = set(features.principal_chain or []) | set(getattr(features, 'principal_ring', None) or [])
+        _fb_accounted = set(_fb_parent)
+        # Include FG atoms
+        for _fb_fg_matches in getattr(features, 'functional_groups', {}).values():
+            for _fb_m in _fb_fg_matches:
+                _fb_accounted.update(_fb_m)
+        _fb_hr = HandlerResult(
+            name=assembled,
+            handler_id="fallback_chain_ring",
+            parent_atoms=_fb_parent,
+            accounted_atoms=_fb_accounted,
+            total_heavy_atoms=_fb_total_ha,
+        )
+        logger.debug(
+            "HANDLER_COVERAGE: handler=%s coverage=%.2f accounted=%d/%d name=%s",
+            _fb_hr.handler_id, _fb_hr.coverage, len(_fb_hr.accounted_atoms),
+            _fb_hr.total_heavy_atoms, _fb_hr.name[:60],
+        )
 
     # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
     # Guarded by logger level check so there is no performance impact in production.
