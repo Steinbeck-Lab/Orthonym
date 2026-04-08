@@ -350,7 +350,8 @@ SMALL_STEREO_PARENT_BASELINE = [
     ),
     pytest.param(
         "CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",
-        "amide",
+        # Phase 139.1-01: decomposition now produces acyl prefix form
+        "heptanoyl",
         id="ster04-pyrrolizinone-amide",
     ),
     pytest.param(

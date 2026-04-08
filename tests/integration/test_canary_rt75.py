@@ -791,7 +791,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         r"CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",  # Sentinel: fragment_loss - heptanoyl pyrrolidinone
-        "heptanamide",
+        # Phase 139.1-01: decomposition now produces more complete fragment name
+        "N-heptanoyl(2S)-5-amino-3-oxoazole",
     ),
     # Failure taxonomy sentinels: stereo_mismatch (2 compounds)
     (
@@ -1477,6 +1478,10 @@ _OPSIN_LIMITATIONS: dict[str, str] = {
     "(2R)-2-phenylethan-1-ol": (
         "PERC-06: diol reclassified as non-polyfunctional (same parent class). "
         "Non-polyfunctional path drops second OH — Phase 131 assembly fix needed."
+    ),
+    "N-heptanoyl(2S)-5-amino-3-oxoazole": (
+        "Phase 139.1-01: middle fragment OH capping produces decomposed name for "
+        "heptanoyl-pyrrolidinone compound. OPSIN may not parse this format."
     ),
 }
 

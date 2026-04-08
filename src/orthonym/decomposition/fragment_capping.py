@@ -150,8 +150,10 @@ def cleave_and_cap(mol, bond_infos: List[Dict], acid_side_oh: bool = True) -> Li
             if atom.GetAtomicNum() == 0:
                 iso = atom.GetIsotope()
 
-                # Alkyl-side dummy (label 2) on an acid fragment -> cap with OH or H
-                if iso == 2 and acid_side_oh and side == "acid":
+                # Alkyl-side dummy (label 2) on acid or middle fragment -> cap with OH or H
+                # Middle fragments (between two cleavage points) get OH on label-2
+                # to reconstruct the acid-side functional group (DECO-21).
+                if iso == 2 and acid_side_oh and side in ("acid", "middle"):
                     atom.SetAtomicNum(8)  # Oxygen
                     atom.SetIsotope(0)
                     atom.SetNoImplicit(False)
