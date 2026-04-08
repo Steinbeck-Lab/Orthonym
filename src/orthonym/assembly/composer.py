@@ -786,6 +786,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.acid_halides import name_acid_halide
         halide_name = name_acid_halide(features)
         if halide_name:
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "acid_halide", _ha, halide_name[:60],
+                )
             return _inject_stereo_if_missing(features, halide_name, atom_to_locant=None)
 
     # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
@@ -797,6 +803,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.anhydrides import name_anhydride
         anhydride_name = name_anhydride(features)
         if anhydride_name:
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "anhydride", _ha, anhydride_name[:60],
+                )
             return _inject_stereo_if_missing(features, anhydride_name, atom_to_locant=None)
 
     # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
@@ -817,6 +829,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if ring_size > 8 or total_heavy <= ring_size + 8:
             lactone_name = name_monocyclic_lactone(features.mol)
             if lactone_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "lactone", _ha, lactone_name[:60],
+                    )
                 # Lactone handler already includes stereo with correct ring locants.
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
                 return _inject_stereo_if_missing(features, lactone_name, atom_to_locant=None)
@@ -835,6 +853,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if ring_size > 8 or total_heavy <= ring_size + 8:
             lactam_name = name_monocyclic_lactam(features.mol)
             if lactam_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "lactam", _ha, lactam_name[:60],
+                    )
                 # Lactam handler already includes stereo with correct ring locants.
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
                 return _inject_stereo_if_missing(features, lactam_name, atom_to_locant=None)
@@ -852,6 +876,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if exocyclic and not _is_complex_ring_system(features.mol):
             ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
             if ring_ester_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "ring_ester", _ha, ring_ester_name[:60],
+                    )
                 return _inject_stereo_if_missing(features, ring_ester_name)
 
     # ASML-10 complete: Polyfunctional handler (polyfunctional.py) uses
@@ -861,6 +891,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.polyfunctional import name_polyfunctional
         poly_name = name_polyfunctional(features)
         if poly_name:
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "polyfunctional", _ha, poly_name[:60],
+                )
             return poly_name
         # If name_polyfunctional returns None, fall through to normal handling
         # (by-design: specialized handlers produce correct names via fallthrough)
@@ -879,14 +915,32 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if ester_type == "dicarboxylic_diester":
                 diester_name = name_dicarboxylic_diester(features.mol, all_esters)
                 if diester_name:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        _ha = features.mol.GetNumHeavyAtoms()
+                        logger.debug(
+                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                            "multi_ester", _ha, diester_name[:60],
+                        )
                     return diester_name
             elif ester_type == "polyol_polyester":
                 polyol_name = name_polyol_polyester(features.mol, all_esters)
                 if polyol_name:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        _ha = features.mol.GetNumHeavyAtoms()
+                        logger.debug(
+                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                            "multi_ester", _ha, polyol_name[:60],
+                        )
                     return polyol_name
             elif ester_type == "independent":
                 indep_name = name_independent_esters(features.mol, all_esters)
                 if indep_name:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        _ha = features.mol.GetNumHeavyAtoms()
+                        logger.debug(
+                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                            "multi_ester", _ha, indep_name[:60],
+                        )
                     return indep_name
                 # If returns None, fall through to single ester or decomposition
 
@@ -901,6 +955,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # Stereo: handled by name_ester() (collects acid-fragment stereo internally)
             ester_name = name_ester(features.mol, ester_match)
             if ester_name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "ester", _ha, ester_name[:60],
+                    )
                 return ester_name
         # If name_ester returns None (lactone or complex), fall through
 
@@ -959,6 +1019,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if matches:
             name = name_phosphine_oxide(features.mol, matches[0])
             if name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "phosphine_oxide", _ha, name[:60],
+                    )
                 return _inject_stereo_if_missing(features, name)
 
     # Handle phosphate esters
@@ -973,6 +1039,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 if atom.GetSymbol() == 'P':
                     name = name_phosphate_ester(features.mol, idx)
                     if name:
+                        if logger.isEnabledFor(logging.DEBUG):
+                            _ha = features.mol.GetNumHeavyAtoms()
+                            logger.debug(
+                                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                                "phosphate_ester", _ha, name[:60],
+                            )
                         return _inject_stereo_if_missing(features, name)
                     break
 
@@ -1012,6 +1084,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 if atom.GetSymbol() == 'P':
                     name = name_phosphine(features.mol, idx)
                     if name:
+                        if logger.isEnabledFor(logging.DEBUG):
+                            _ha = features.mol.GetNumHeavyAtoms()
+                            logger.debug(
+                                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                                "phosphine", _ha, name[:60],
+                            )
                         return _inject_stereo_if_missing(features, name)
                     break
 
@@ -1022,6 +1100,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if matches:
             name = name_phosphinic_acid(features.mol, matches[0])
             if name:
+                if logger.isEnabledFor(logging.DEBUG):
+                    _ha = features.mol.GetNumHeavyAtoms()
+                    logger.debug(
+                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                        "phosphinic_acid", _ha, name[:60],
+                    )
                 return _inject_stereo_if_missing(features, name)
 
     # ASML-10 complete: Boronic acid handler calls _name_r_group() (Phase 125
@@ -1042,6 +1126,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         from ..rules.ring_assemblies import name_ring_assembly
         assembly_name = name_ring_assembly(features.mol, assembly_info, features)
         if assembly_name:
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "ring_assembly", _ha, assembly_name[:60],
+                )
             return _inject_stereo_if_missing(features, assembly_name)
 
     # --- Candidate collection block ---
@@ -1108,6 +1198,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             # Includes suffix groups and prefix groups with proper PAH numbering.
             # No enrichment needed -- verified complete by design.
             # Stereo: handled by name_substituted_polycyclic() internally
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "polycyclic", _ha, (polycyclic_name or "")[:60],
+                )
             return _assemble_polycyclic_name(features, style)
 
         # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
@@ -1180,6 +1276,11 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         total_heavy = features.mol.GetNumHeavyAtoms()
         if total_heavy <= 15 or best.factors.get('ratio', 0) >= (_MIN_RATIO_ACCEPT / 1.5):
             # Stereo: handled by individual handlers (complex_ring, heterocycle, benzene)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    best.handler, total_heavy, best.name[:60],
+                )
             return best.name
         # Low ratio: fall through but store metadata for debugging
         logger.debug(
@@ -1192,7 +1293,14 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # ASML-10 complete: Ring nitrile handler uses _assemble_ring_nitrile_name()
     # which includes ring substituent prefixes in the name.
     if features.principal_group == 'nitrile' and features.is_cyclic and not getattr(features, 'chain_is_parent', False):
-        return _inject_stereo_if_missing(features, _assemble_ring_nitrile_name(features, style))
+        _rn_name = _assemble_ring_nitrile_name(features, style)
+        if logger.isEnabledFor(logging.DEBUG):
+            _ha = features.mol.GetNumHeavyAtoms()
+            logger.debug(
+                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                "ring_nitrile", _ha, _rn_name[:60],
+            )
+        return _inject_stereo_if_missing(features, _rn_name)
 
     # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
     # N-substituent prefixes and chain/ring substituent discovery.
@@ -1203,7 +1311,14 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
         pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
         if pg_count == 1:
-            return _assemble_amide_name(features, style)
+            _amide_name = _assemble_amide_name(features, style)
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "amide", _ha, (_amide_name or "")[:60],
+                )
+            return _amide_name
 
     # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
     # N-alkyl prefixes and generates chain/ring substituent prefixes.
@@ -1211,6 +1326,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group in ('secondary_amine', 'tertiary_amine'):
         amine_name = _assemble_amine_name(features, style)
         if amine_name:
+            if logger.isEnabledFor(logging.DEBUG):
+                _ha = features.mol.GetNumHeavyAtoms()
+                logger.debug(
+                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
+                    "amine", _ha, amine_name[:60],
+                )
             return amine_name
 
     # Handle simple cases
