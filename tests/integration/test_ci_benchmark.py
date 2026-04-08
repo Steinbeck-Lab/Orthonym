@@ -241,7 +241,7 @@ CI_BENCHMARK = [
         "CCCCCc1oc(CCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC"
         "[N+](C)(C)C)OC(=O)CCC/C=C\\C[C@H]2[C@@H](O)CC(O)O"
         "[C@@H]2/C=C/[C@@H](O)CCCCC)c(C)c1C",
-        "1-phosphonooxy-2-(propylamino)ethanephosphonic acid (5Z)-(arachidoyloxy)-7-oxanylhept-5-enediol 13-furyltridecanoic acid",
+        "13-furyltridecanoic acid (5Z)-(arachidoyloxy)-7-oxanylhept-5-enediyl 1-phosphonooxy-2-(propylamino)ethanephosphonic acid",
     ),
     (
         "CC(=O)N[C@H]1C(O)O[C@H](CO)[C@@H](O)[C@@H]1O[C@H](C)"
