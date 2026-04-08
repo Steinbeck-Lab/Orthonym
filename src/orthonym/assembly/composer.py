@@ -908,7 +908,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # and alkyl groups. No enrichment needed.
     # Ring assemblies are separate identical ring systems connected by single bonds
     assembly_info = getattr(features, 'ring_assembly_info', None)
-    if assembly_info:
+    if assembly_info and not getattr(features, 'chain_is_parent', False):
         from ..rules.ring_assemblies import name_ring_assembly
         assembly_name = name_ring_assembly(features.mol, assembly_info, features)
         if assembly_name:
@@ -938,7 +938,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # These take precedence over simple heterocyclic/benzene classification
     # because fused heterocycles (indole, purine) contain benzene/heterocycle parts
     # that would otherwise trigger early exit to wrong naming path
-    if features.is_cyclic and _is_complex_ring_system(features.mol):
+    if features.is_cyclic and not getattr(features, 'chain_is_parent', False) and _is_complex_ring_system(features.mol):
         complex_result = _assemble_complex_ring_name(features.mol, features)
         if complex_result:
             complex_name = complex_result.name
@@ -970,7 +970,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # Skip if complex_ring already identified the system with adequate
     # confidence (it provides a more complete VB/fused name for systems
     # that also have a simpler polycyclic_name or partial_sat match).
-    if not _complex_ring_accepted:
+    if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         polycyclic_name = getattr(features, 'polycyclic_name', None)
         if polycyclic_name:
             # Stereo: handled by name_substituted_polycyclic() internally
@@ -980,7 +980,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # Check BEFORE benzene since they contain benzene substructure
         # NOT gated -- direct return
         # Stereo: handled by _assemble_partially_saturated_carbocycle_name() internally
-        if features.is_cyclic:
+        if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
                 return partial_sat_name
@@ -989,9 +989,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # produce a high-confidence result. This preserves the handler priority
     # cascade: fused/complex ring names should not compete with simpler
     # monocyclic names when the fused name is adequate.
-    if not _complex_ring_accepted:
+    if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
-        # Only reached if not a complex fused system
+        # Only reached if not a complex fused system and ring is actual parent
         ring_type = getattr(features, 'ring_type', None)
         if ring_type and ring_type.startswith('heterocyclic'):
             # Safety net: check if this heterocycle is actually a lactone
@@ -1049,7 +1049,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     # ASML-10 complete: Ring nitrile handler uses _assemble_ring_nitrile_name()
     # which includes ring substituent prefixes in the name.
-    if features.principal_group == 'nitrile' and features.is_cyclic:
+    if features.principal_group == 'nitrile' and features.is_cyclic and not getattr(features, 'chain_is_parent', False):
         return _inject_stereo_if_missing(features, _assemble_ring_nitrile_name(features, style))
 
     # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
@@ -3950,12 +3950,15 @@ def _generate_prefixes(features: Any) -> List[NameFragment]:
         prefixes.extend(alkyl_prefixes)
 
     # --- Handle ring substituents from features.ring_substituents ---
+    # Skip when chain_is_parent: ring is a substituent of the chain, not the parent.
+    # Ring substituent data was populated for ring-as-substituent naming but should
+    # not be used for prefix generation on the chain parent (Phase 139 ARCH-01).
     ring_substituents = getattr(features, 'ring_substituents', None)
     oriented_ring = getattr(features, 'oriented_ring', None)
     # DROP-07 fix: track FG atoms handled by ring alkyl prefixes to prevent
     # double-emission in the global FG loop below
     handled_ring_fg_atoms = frozenset()
-    if ring_substituents and features.mol and oriented_ring:
+    if ring_substituents and features.mol and oriented_ring and not getattr(features, 'chain_is_parent', False):
         ring_prefixes, handled_ring_fg_atoms = _generate_ring_alkyl_prefixes(features)
         prefixes.extend(ring_prefixes)
 

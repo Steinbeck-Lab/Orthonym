@@ -113,7 +113,8 @@ def resolve_parent(features: Any, mol: Any) -> ParentInfo:
 
     # --- 2. Complex ring system (bicyclo, spiro, fused, polycyclic-bridged) ---
     is_cyclic = getattr(features, 'is_cyclic', False)
-    if is_cyclic and _check_complex_ring_system(mol):
+    chain_is_parent = getattr(features, 'chain_is_parent', False)
+    if is_cyclic and not chain_is_parent and _check_complex_ring_system(mol):
         atom_count = _get_complex_ring_atom_count(mol)
         atom_to_locant = _extract_atom_to_locant(features)
 
@@ -157,7 +158,7 @@ def resolve_parent(features: Any, mol: Any) -> ParentInfo:
         )
 
     # --- 5. Cycloalkane / cycloalkene ring ---
-    if is_cyclic and ring_type in ('cycloalkane', 'cycloalkene', 'aromatic'):
+    if is_cyclic and not chain_is_parent and ring_type in ('cycloalkane', 'cycloalkene', 'aromatic'):
         atom_count = _get_ring_atom_count(features, mol)
         atom_to_locant = _extract_ring_locant_map(features)
         # Build a label like "cyclohexane" from ring size + type

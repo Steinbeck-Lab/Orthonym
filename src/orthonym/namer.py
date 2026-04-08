@@ -727,12 +727,10 @@ class Orthonym:
                     )
 
                     if selection.parent_type == 'chain':
-                        # Chain wins - switch from ring naming to chain naming
                         features.chain_is_parent = True
-                        features.is_cyclic = False  # Disable ring naming path
+                        # is_cyclic stays True -- ring data needed for ring-as-substituent naming (Phase 139 ARCH-01)
                         features.principal_chain = selection.parent_atoms
                         features.ring_substituents_as_groups = selection.substituent_rings
-                        # Continue with chain classification below (is_cyclic is now False)
 
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
@@ -744,7 +742,8 @@ class Orthonym:
                 assembly_info = detect_ring_assembly(features.mol, features.ring_systems)
                 if assembly_info:
                     features.ring_assembly_info = assembly_info
-                    return  # Skip other ring classification for assemblies
+                    if not features.chain_is_parent:
+                        return  # Skip other ring classification for assemblies
 
             # Check for polycyclic aromatics FIRST (naphthalene, anthracene, etc.)
             # These take precedence over single-ring classification
@@ -757,7 +756,8 @@ class Orthonym:
                 )
                 # Set ring type for consistency
                 features.ring_type = 'aromatic'
-                return  # Skip other ring classification for PAHs
+                if not features.chain_is_parent:
+                    return  # Skip other ring classification for PAHs
 
             ring_info = get_ring_info(features.mol)
             atom_rings = ring_info['atom_rings']
@@ -945,9 +945,9 @@ class Orthonym:
                                 locants.append(min(pos1, pos2) + 1)
                             features.ring_double_bond_locants = sorted(locants)
 
-        # Find principal chain (for acyclic molecules)
+        # Find principal chain (for acyclic molecules or chain-is-parent cyclic molecules)
         # Skip if chain was already set by parent selection (chain_is_parent = True)
-        if not features.is_cyclic:
+        if not features.is_cyclic or features.chain_is_parent:
             if not features.chain_is_parent:
                 # Normal acyclic molecule - find principal chain
                 # Guard: exclude ring atoms even in "acyclic" path (defensive)

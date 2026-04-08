@@ -1087,7 +1087,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # - Only monocyclic (1 ring) -- fused/polycyclic have specialized handlers
         # - Only fully saturated rings -- unsaturated rings need -ene/-yne handling
         # - No aromatic rings -- benzene/pyridine/etc. have retained name handlers
-        if getattr(features, 'is_cyclic', False) and principal_group:
+        if getattr(features, 'is_cyclic', False) and not getattr(features, 'chain_is_parent', False) and principal_group:
             ring_info = mol.GetRingInfo()
             n_rings = ring_info.NumRings()
             if n_rings == 1:
@@ -1385,7 +1385,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 except ValueError:
                     pass
 
-        is_ring = getattr(features, 'is_cyclic', False)
+        is_ring = getattr(features, 'is_cyclic', False) and not getattr(features, 'chain_is_parent', False)
         if prefix_locant_groups:
             collisions = detect_locant_collisions(
                 suffix_locants,

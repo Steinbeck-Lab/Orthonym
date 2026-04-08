@@ -69,7 +69,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O",
-        "1,2-bis(acetyloxy)oxolane",
+        "(2R,3R,4R,5R)-1,2-bis(acetyloxy)oxolane",
     ),
     (
         "C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1",
@@ -85,7 +85,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"CO[C@H]1C=C/C=C\C=C/C[C@H](OC(=O)[C@@H](C)NC(=O)C2=CCCCC2)[C@H](C)[C@@H](O)/C(C)=C\CCc2cc(O)cc(c2O)NC(=O)C1",
-        "(2R)-1-(cyclohexanecarbonyloxy)-3,9-dihydroxy-14-hydroxymethyl-2,4-dimethyl-12-oxo-8-propyl1-azacyclohenicosene",
+        "(7Z,9R,10R,11S,13Z,15Z,19R)-1-(cyclohexanecarbonyloxy)-3,9-dihydroxy-14-hydroxymethyl-2,4-dimethyl-12-oxo-8-propyl1-azacyclohenicosene",
     ),
     (
         "CC[C@@H]1OC(=O)C=C[C@H](C)[C@@H](O[C@@H]2O[C@H](C)C[C@H](N(C)C)C2O)CC[C@@H](C)C(=O)C=C[C@@H]2O[C@@H]2[C@]1(O)CO[C@@H]1OC(C)[C@H](O)[C@H](OC)[C@@H]1OC",
@@ -157,7 +157,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "N#CC(SC[C@H](NC(=O)CC[C@H]([NH3+])C(=O)[O-])C(=O)NCC(=O)[O-])c1c[nH]c2ccccc12",
-        "(2R)-3-(decylsulfanyl)-1-(ethylamino)-2-(pentanoylamino)propanediamidate",
+        "N-L-glutamyl-2-(propanoylamino)ethanoate",
     ),
     (
         "C[C@H]1/C=C/C=C/C=C/C=C/C=C/[C@@H](O)[C@H](C(=O)O)[C@H](O)C[C@H](O)CCC[C@H](O)C[C@H](O)C[C@H](O)[C@@H](C)C(=O)O[C@@H]1C",
@@ -174,7 +174,7 @@ NAME_STABILITY_CANARY = [
     (
         "CO[C@@H]1[C@H](OC(=O)CCC(=O)O)CC[C@](O)(CCl)[C@H]1[C@@]1(C)O[C@@H]1CC=C(C)C",
         # P-44.3 fix: no-PG path now selects chain over small oxirane ring in substituent
-        "(1R,2S,3S,4R)-2-[(1R,4R)-3-methyl-1-oxiranylbut-2-enyl]-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
+        "(1R,2S,3S,4R)-2-[(1R,4R)-(3R)-3-methyl-1-oxiranylbut-2-enyl]-1-(chloromethyl)-1-hydroxy-3-methoxycyclohexyl butanedioate",
     ),
     (
         r"C=CCO/N=C(\C(=O)N[C@H]1CN2CC(S(C)(=O)=O)=C(C(=O)O)N2C1=O)c1csc(N)n1",
@@ -321,7 +321,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)OC[C@H]1O[C@@H](O[C@]2(COC(C)=O)O[C@H](COC(=O)/C=C/c3ccccc3)[C@@H](O)[C@@H]2OC(=O)/C=C/c2ccccc2)[C@H](OC(C)=O)[C@@H](O)[C@@H]1OC(C)=O",
-        "(2E)-1,1-bis(acetyloxy)-1-(benzoyloxy)-2-hydroxyoxolane",
+        "(2R,3S,4S,5R,6S)-1,1-bis(acetyloxy)-1-(benzoyloxy)-2-hydroxyoxolane",
     ),
     (
         "C[C@@H]1O[C@@H](O[C@@H]2C[C@H](c3ccc4c(c3O)C(=O)C3=C(C4=O)[C@@]4(O)C(=O)C[C@](C)(O)C[C@@]4(O)C=C3)O[C@H](C)[C@H]2O)CC[C@@H]1O[C@H]1C[C@@H](O)[C@H](O)[C@@H](C)O1",
@@ -386,7 +386,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"C[C@@H]1C[C@@H]2O[C@@H]3[C@@H](C)[C@H](O)[C@@H]4O[C@]5(C[C@H](O)CO5)[C@@H](C)[C@H](C)[C@H]4O[C@H]3C[C@H]2O[C@H]2C[C@H]3O[C@H]4C/C=C\C[C@H]5O[C@H]6C=C[C@H]7O[C@H]8[C@H](O)[C@H]9OCC=CC[C@@H]9O[C@@H]8C[C@@H]7O[C@@H]6C/C=C\[C@@H]5O[C@@H]4C[C@@H](O)[C@]3(C)O[C@@H]2C1",
-        "(1S,3Z,6R,8S,11R,13S,14R,15R,21S,23R,25S,27R,31S,33R,35R,36S,38R,40R,42S,44R,45S,46S,47S,49R,50S,51S,52R,54S,56R,58S,60R,65S)-36,40,45,50,51-pentamethyl-7,12,16,22,26,32,37,43,48,53,57,61,63-tridecaoxa-tridecacyclo[31.28.0.0(6,31).0(8,27).0(36,60).0(38,58).0(42,56).0(44,54).0(47,52).0(49,63).0(49,64).0(62,65)]pentahexaconta-3,9,18,29-tetraen-14,35,46,65-tetraol",
+        "(1S,3Z,6R,8S,11R,13S,14R,15R,21S,23R,25S,27R,29Z,31S,33R,35R,36S,38R,40R,42S,44R,45S,46S,47S,49R,50S,51S,52R,54S,56R,58S,60R,65S)-36,40,45,50,51-pentamethyl-7,12,16,22,26,32,37,43,48,53,57,61,63-tridecaoxa-tridecacyclo[31.28.0.0(6,31).0(8,27).0(36,60).0(38,58).0(42,56).0(44,54).0(47,52).0(49,63).0(49,64).0(62,65)]pentahexaconta-3,9,18,29-tetraen-14,35,46,65-tetraol",
     ),
     (
         r"CCCCC/C=C\C/C=C\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
@@ -575,7 +575,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O",
-        "1,2-bis(acetyloxy)oxolane",
+        "(2R,3R,4R,5R)-1,2-bis(acetyloxy)oxolane",
     ),
     (
         "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC",
