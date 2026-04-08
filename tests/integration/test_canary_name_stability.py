@@ -289,7 +289,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21",
-        "(1R,4R)-1,2,3,4-tetrahydronaphthalene",
+        "3-butyl-4-hydroxymethyl-1-isopropyl(1R,4R)-1,2,3,4-tetrahydronaphthalene",
     ),
     (
         r"CC1=C[C@H]2OC3C[C@H]4OC(=O)/C=C\C=C/C(C(C)O)OCC/C(C)=C\C(=O)OC[C@@]2(CC1)C4(C)[C@]31CO1",

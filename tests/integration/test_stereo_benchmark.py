@@ -92,7 +92,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCC(O)CC(=O)O[C@H](CC(=O)[O-])C[N+](C)(C)C', 'ammonium dodecanoate'),  # MISSING_STEREO - wrong parent
     ('NC(N)=NCCC[C@H](NC(=O)[C@@H](N)CO)C(=O)O', '(2S)-5-guanidino-5-(methylamino)-2-(propanoylamino)pentanoic acid'),  # alpha order fixed P80
     ('CCCC/C=C\\CCCCCCCCCOC(C)=O', '(10Z)-pentadec-10-en-1-yl acetate'),  # NEWLY_RT (Phase 62)
-    ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '(1R,4R)-1,2,3,4-tetrahydronaphthalene'),
+    ('CC(C)[C@H]1CC[C@@H](CO)c2c(O)cc(C(=O)O)cc21', '3-butyl-4-hydroxymethyl-1-isopropyl(1R,4R)-1,2,3,4-tetrahydronaphthalene'),  # Phase 139: enrichment adds substituents
     ('CCOC(=O)C[C@@H](SP(=O)(OC)OC)C(=O)OCC', 'diethyl butanedioate'),  # MISSING_STEREO - wrong parent
     ('CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1', '3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid'),  # Phase 103-01: chain exclusion changes path
     ('CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C', '(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol'),

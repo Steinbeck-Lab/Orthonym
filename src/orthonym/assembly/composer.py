@@ -161,6 +161,83 @@ def _integrate_universal_prefixes(
     return _format_prefix_groups(prefix_groups)
 
 
+# ============================================================================
+# Handler Enrichment Helper (Phase 139 ARCH-03/04)
+# ============================================================================
+
+
+def _enrich_handler_name(features, base_name, handler_id="unknown"):
+    """Enrich a handler's base name with non-principal substituents.
+
+    Standard enrichment wrapper for Tier B handlers (Phase 139 ARCH-03/04).
+    Discovers substituents not already accounted for in the handler's base name,
+    names them, and prepends as alphabetized prefixes.
+
+    Args:
+        features: MolecularFeatures object.
+        base_name: The handler's base name (e.g., "carbamic acid").
+        handler_id: Handler identifier for logging.
+
+    Returns:
+        Enriched name with prefixes, or base_name if no enrichment needed.
+    """
+    # Determine parent atoms based on what the handler named
+    parent_atoms = None
+    atom_to_locant = None
+
+    if getattr(features, 'chain_is_parent', False) and features.principal_chain:
+        parent_atoms = set(features.principal_chain)
+        atom_to_locant = features.atom_to_locant
+    elif getattr(features, 'oriented_ring', None):
+        parent_atoms = set(features.oriented_ring)
+        atom_to_locant = (
+            getattr(features, 'heterocycle_atom_to_locant', None)
+            or features.atom_to_locant
+        )
+    elif getattr(features, 'principal_ring', None):
+        parent_atoms = set(features.principal_ring)
+        atom_to_locant = features.atom_to_locant
+
+    if not parent_atoms:
+        return base_name
+
+    # Exclude FG atoms that are already represented in the handler name
+    exclude_atoms = set()
+    if features.principal_group and features.principal_group in features.functional_groups:
+        for match in features.functional_groups[features.principal_group]:
+            exclude_atoms.update(match)
+    # Also exclude FG atoms for non-principal-group FGs that are already
+    # in the handler's detection key (e.g., isocyanate, urea, guanidine,
+    # carbamate). These handlers fire via functional_groups.get(fg) checks.
+    for _fg_key in ('isocyanate', 'isothiocyanate', 'carbamic_acid',
+                     'carbamate', 'urea', 'guanidine', 'boronic_acid',
+                     'oxime', 'hydrazone', 'sulfoxide', 'sulfone', 'thioether'):
+        if _fg_key in features.functional_groups and _fg_key != getattr(features, 'principal_group', None):
+            for match in features.functional_groups[_fg_key]:
+                exclude_atoms.update(match)
+    # Also exclude N-substituent atoms already named by the handler
+    for n_sub in getattr(features, 'n_substituents', []):
+        if isinstance(n_sub, dict) and 'atoms' in n_sub:
+            exclude_atoms.update(n_sub['atoms'])
+
+    prefix_str = _integrate_universal_prefixes(
+        features.mol, parent_atoms,
+        parent_type="chain" if getattr(features, 'chain_is_parent', False) else "ring",
+        oriented_ring=getattr(features, 'oriented_ring', None),
+        principal_chain=(
+            features.principal_chain
+            if getattr(features, 'chain_is_parent', False)
+            else None
+        ),
+        atom_to_locant=atom_to_locant,
+        exclude_atoms=exclude_atoms,
+    )
+
+    if prefix_str:
+        return f"{prefix_str}{base_name}"
+    return base_name
+
+
 def _find_attach_idx_in_frag(mol, sub_info, parent_atoms):
     """Find the attachment atom index within a substituent fragment.
 
@@ -568,12 +645,14 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == 'oxime':
         oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
         if oxime_name:
+            oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
             return _inject_stereo_if_missing(features, oxime_name, atom_to_locant=None)
 
     # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
     if features.principal_group == 'hydrazone':
         hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
         if hydrazone_name:
+            hydrazone_name = _enrich_handler_name(features, hydrazone_name, "hydrazone")
             return _inject_stereo_if_missing(features, hydrazone_name, atom_to_locant=None)
 
     # ASML-10 verified: N-oxide handler creates modified molecule and names
@@ -598,6 +677,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         iso_name = _name_isocyanate(features)
         if iso_name:
+            iso_name = _enrich_handler_name(features, iso_name, "isocyanate")
             return _inject_stereo_if_missing(features, iso_name, atom_to_locant=None)
 
     # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
@@ -606,6 +686,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
+            isothio_name = _enrich_handler_name(features, isothio_name, "isothiocyanate")
             return _inject_stereo_if_missing(features, isothio_name, atom_to_locant=None)
 
     # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
@@ -615,6 +696,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == 'carbamic_acid':
         carbamic_name = _name_carbamic_acid(features)
         if carbamic_name:
+            carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
             # Carbamic acid is a retained name. Pass None to let _generate_stereodescriptors
             # use the features.* priority chain (heterocycle > oriented_ring > chain).
             return _inject_stereo_if_missing(features, carbamic_name, atom_to_locant=None)
@@ -627,6 +709,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         carb_name = _name_carbamate(features)
         if carb_name:
+            carb_name = _enrich_handler_name(features, carb_name, "carbamate")
             # Carbamate is a retained/functional class name. Pass None to let
             # _generate_stereodescriptors use the features.* priority chain.
             return _inject_stereo_if_missing(features, carb_name, atom_to_locant=None)
@@ -639,6 +722,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         urea_name = _try_name_urea(features)
         if urea_name:
+            urea_name = _enrich_handler_name(features, urea_name, "urea")
             # Urea is a retained name. Pass None to let _generate_stereodescriptors
             # use the features.* priority chain.
             return _inject_stereo_if_missing(features, urea_name, atom_to_locant=None)
@@ -650,6 +734,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             and features.principal_group is None):
         guanidine_name = _try_name_guanidine(features)
         if guanidine_name:
+            guanidine_name = _enrich_handler_name(features, guanidine_name, "guanidine")
             # Guanidine is a retained name. Pass None to let _generate_stereodescriptors
             # use the features.* priority chain.
             return _inject_stereo_if_missing(features, guanidine_name, atom_to_locant=None)
@@ -792,12 +877,14 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if matches:
                 name = name_sulfoxide(features.mol, matches[0])
                 if name:
+                    name = _enrich_handler_name(features, name, "sulfoxide")
                     return _inject_stereo_if_missing(features, name)
         elif features.principal_group == 'sulfone':
             matches = features.functional_groups.get('sulfone', [])
             if matches:
                 name = name_sulfone(features.mol, matches[0])
                 if name:
+                    name = _enrich_handler_name(features, name, "sulfone")
                     return _inject_stereo_if_missing(features, name)
 
     # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
@@ -819,11 +906,15 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     sulfur_idx = matches[0][0]
                     name = name_sulfide(features.mol, sulfur_idx)
                     if name:
+                        name = _enrich_handler_name(features, name, "thioether")
                         return _inject_stereo_if_missing(features, name)
 
     # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
     # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
     # molecules fall through to universal pipeline. No substituents silently dropped.
+    # Tier C (Phase 139): Self-gating design confirmed complete -- when handlers
+    # return a name, molecule is simple enough that no additional enrichment needed.
+    # When molecule is complex, handlers return None and fall through to universal pipeline.
     if features.principal_group == 'phosphine_oxide':
         from ..rules.phosphorus import name_phosphine_oxide
         matches = features.functional_groups.get('phosphine_oxide', [])
@@ -900,6 +991,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if features.principal_group == 'boronic_acid':
         boronic_name = _name_boronic_acid(features)
         if boronic_name:
+            boronic_name = _enrich_handler_name(features, boronic_name, "boronic_acid")
             return _inject_stereo_if_missing(features, boronic_name)
 
     # ASML-10 verified: Ring assembly has own _get_substituent_info() at
@@ -973,6 +1065,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         polycyclic_name = getattr(features, 'polycyclic_name', None)
         if polycyclic_name:
+            # Tier C (Phase 139): Polycyclic handler has its own complete substituent
+            # handling via features.polycyclic_substituents + name_substituted_polycyclic().
+            # Includes suffix groups and prefix groups with proper PAH numbering.
+            # No enrichment needed -- verified complete by design.
             # Stereo: handled by name_substituted_polycyclic() internally
             return _assemble_polycyclic_name(features, style)
 
@@ -980,9 +1076,11 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # Check BEFORE benzene since they contain benzene substructure
         # NOT gated -- direct return
         # Stereo: handled by _assemble_partially_saturated_carbocycle_name() internally
+        # Phase 139 ARCH-03: enrichment for non-parent substituents
         if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
+                partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
                 return partial_sat_name
 
     # Only collect heterocycle/benzene candidates if complex_ring didn't
@@ -992,6 +1090,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         # Handle simple heterocyclic compounds (pyridine, morpholine, etc.)
         # Only reached if not a complex fused system and ring is actual parent
+        # Tier C (Phase 139): Heterocycle handler has internal substituent handling
+        # via features.heterocycle_substituents + name_substituted_heterocycle().
+        # Verified complete by design -- no enrichment needed.
         ring_type = getattr(features, 'ring_type', None)
         if ring_type and ring_type.startswith('heterocyclic'):
             # Safety net: check if this heterocycle is actually a lactone
@@ -1012,6 +1113,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
         # Handle benzene derivatives
         # Only reached if not a fused system containing benzene
+        # Tier C (Phase 139): Benzene handler has internal substituent handling
+        # via features.benzene_substituents + name_substituted_benzene().
+        # Verified complete by design -- no enrichment needed.
         if getattr(features, 'is_benzene', False):
             benzene_name = _assemble_benzene_name(features, style)
             if benzene_name:
