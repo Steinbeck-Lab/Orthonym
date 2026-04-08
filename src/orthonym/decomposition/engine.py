@@ -382,6 +382,16 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
         return False
 
+    # D-04: chars/HA check for medium molecules (15-30 HA)
+    # Catches names like "quinoline" (0.39 chars/HA) for a 23 HA molecule.
+    # Does NOT lower the HA <= 20 bypass in _name_covers_molecule() -- orthogonal check.
+    # Threshold 0.65 (lowered from initial 0.7 to avoid rejecting valid names like
+    # "2-methylicosane" at 0.68 for a 22 HA molecule). Will be calibrated in Plan 03.
+    if 15 < heavy_atoms <= 30:
+        chars_per_ha = len(name) / heavy_atoms
+        if chars_per_ha < 0.65:
+            return False
+
     # For very large molecules, an adequate name should have at least
     # 0.45 characters per heavy atom (locants, prefixes, parent name)
     if heavy_atoms > 25 and len(name) / heavy_atoms < 0.45:

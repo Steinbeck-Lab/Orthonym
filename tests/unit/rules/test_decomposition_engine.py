@@ -96,29 +96,29 @@ class TestNameQualityGate:
         assert _name_quality_is_acceptable("do-co-sane", large_mol) is False
 
     def test_name_with_digits_for_large_molecule(self):
-        """A name with digits for a large molecule is acceptable."""
+        """A name with digits for a large molecule is acceptable (if chars/HA adequate)."""
         large_mol = _mol("CCCCCCCCCCCCCCCCCCCCCC")  # 22 heavy atoms
-        assert _name_quality_is_acceptable("compound123", large_mol) is True
+        # "2-methyldocosane-1" (18 chars) / 22 HA = 0.82 > 0.65 -> passes chars/HA gate
+        assert _name_quality_is_acceptable("2-methyldocosane-1", large_mol) is True
 
     # -- DECO-24: chars/HA quality gate for 15-30 HA range --
 
     def test_quality_gate_chars_per_ha_rejects_low_ratio(self):
-        """A name with chars/HA < 0.7 for a 23 HA molecule should be rejected.
+        """A name with chars/HA < 0.65 for a 23 HA molecule should be rejected.
 
-        Example: "5-chloroquinoline" (17 chars) for a 23 HA molecule -> 0.74 chars/HA.
-        Use a shorter name to clearly trigger: "quinoline" (9 chars) / 23 HA = 0.39.
+        D-04: chars/HA check for medium molecules (15-30 HA).
+        "chloroethene" (12 chars) for a 23 HA molecule -> 12/23 = 0.52 < 0.65.
+        Note: name must not be in _RETAINED_CORE_NAMES to test the new gate.
         """
         # 23 heavy atoms
         mol_23 = _mol("c1ccc2ncccc2c1CCCCCCCCCCCCCl")
-        # "quinoline" has 9 chars, 9/23 = 0.39 < 0.7 -> should be rejected
-        assert _name_quality_is_acceptable("quinoline", mol_23) is False
+        # "chloroethene" is 12 chars, 12/23 = 0.52 < 0.65 -> should be rejected
+        assert _name_quality_is_acceptable("chloroethene", mol_23) is False
 
     def test_quality_gate_chars_per_ha_accepts_good_ratio(self):
         """A name with adequate chars/HA for an 18 HA molecule should be accepted.
 
-        "heptanamide" (11 chars) for 18 HA = 0.61 < 0.7 ... but HA=18 > 15.
-        Need to test with a molecule where chars/HA >= 0.7.
-        Use "octadecanamide" (14 chars) / 18 HA = 0.78 -> passes.
+        "octadecanamide" (14 chars) / 18 HA = 0.78 > 0.7 -> passes.
         """
         # 18 heavy atoms
         mol_18 = _mol("CCCCCCCCCCCCCCCC(N)=O")
@@ -129,22 +129,21 @@ class TestNameQualityGate:
         """Molecules with HA > 30 should NOT be affected by the 15-30 HA check.
 
         The existing HA > 25 check (0.45 threshold) handles those.
+        A name with chars/HA between 0.45 and 0.7 should pass for HA > 30
+        because the stricter 15-30 check doesn't apply.
         """
         # 35 heavy atoms
         mol_35 = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")
-        # "some-name-1" (11 chars) / 35 HA = 0.31 < 0.7
-        # But HA > 30, so the 15-30 check doesn't apply.
-        # The HA > 25 check uses 0.45 threshold: 11/35 = 0.31 < 0.45 -> rejected by THAT check.
-        # Use a name with 16 chars / 35 HA = 0.46 > 0.45 (passes >25 gate)
-        # but 0.46 < 0.7 (would fail 15-30 gate if it applied)
+        # "1-methyltetracontane" (20 chars) / 35 HA = 0.57 > 0.45 (passes >25 gate)
+        # but 0.57 < 0.7 (would fail 15-30 gate if it applied -- but HA > 30)
         assert _name_quality_is_acceptable(
-            "1-methyltetracontane", mol_35  # 20 chars, 20/35=0.57 > 0.45
+            "1-methyltetracontane", mol_35
         ) is True
 
     def test_quality_gate_chars_per_ha_accepts_adequate_name(self):
-        """A name with digits/hyphens and adequate chars/HA for 22 HA should pass.
+        """A name with adequate chars/HA for 22 HA should pass.
 
-        "1-hydroxy-2-methoxybenzene" (25 chars) / 22 HA = 1.14 -> passes.
+        "1-hydroxy-2-methoxybenzene" (25 chars) / 22 HA = 1.14 > 0.7 -> passes.
         """
         mol_22 = _mol("CCCCCCCCCCCCCCCCCCCCCC")  # 22 heavy atoms
         assert _name_quality_is_acceptable(

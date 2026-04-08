@@ -573,6 +573,29 @@ class Orthonym:
                     )
                     return decomp_name
 
+            # D-01: atom_coverage secondary gate -- catches quality-gate false
+            # positives where retained ring names inflate character-based
+            # confidence but atom coverage reveals only partial molecule
+            # description.
+            if (conf_score is not None
+                    and conf_handler != 'unknown'
+                    and conf_handler != 'retained_name'):
+                atom_cov = conf_data.get('factors', {}).get('atom_coverage', 1.0)
+                if atom_cov < 0.55:
+                    # Verify molecule has cleavable bonds before triggering
+                    from .decomposition.bond_cleavage import find_cleavable_bonds
+                    if find_cleavable_bonds(mol):
+                        from .decomposition import try_decompose
+                        decomp_name = try_decompose(mol, style=self.style)
+                        if decomp_name and decomp_name != assembled:
+                            logger.info(
+                                "Atom coverage gate: rejecting low-coverage "
+                                "name (atom_cov=%.4f < 0.55), using "
+                                "decomposition fallback",
+                                atom_cov,
+                            )
+                            return decomp_name
+
         return assembled
     
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
