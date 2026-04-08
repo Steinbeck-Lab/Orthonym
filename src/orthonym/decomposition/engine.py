@@ -1226,7 +1226,13 @@ def _try_iterative_mixed_decompose(
         return None
 
     used_bond_types = {best_bond["type"]}
-    all_fragments = list(initial_frags)
+
+    # Track bond type metadata on fragments (DECO-23)
+    all_fragments = []
+    for frag in initial_frags:
+        frag['parent_bond_type'] = best_bond['type']
+        all_fragments.append(frag)
+
     parent_heavy = mol.GetNumHeavyAtoms()
 
     # Iterative decomposition across levels (Phase 127: D-04 conditional levels)
@@ -1260,6 +1266,9 @@ def _try_iterative_mixed_decompose(
                     for sf in sub_frags
                 )
                 if all_smaller:
+                    # Tag new fragments with their bond type (DECO-23)
+                    for sf in sub_frags:
+                        sf['parent_bond_type'] = sub_best['type']
                     new_fragments.extend(sub_frags)
                     used_bond_types.add(sub_best["type"])
                     changed = True
@@ -1282,21 +1291,38 @@ def _try_iterative_mixed_decompose(
             return None  # Truly unnameable -- abort
         named_fragments.append((frag, frag_name))
 
-    # Simple assembly: join fragment names
-    # Sort fragments by name length (longest first = parent)
-    sorted_named = sorted(
-        named_fragments,
-        key=lambda pair: len(pair[1]),  # Sort by name length
-        reverse=True,
-    )
+    # Bond-type-aware assembly (DECO-23): route fragment pairs through
+    # bond-type-specific assemblers instead of naive space-join
+    from .fragment_assembly import _assemble_by_bond_type
 
-    # Use the largest-named fragment as the base and prefix others
-    if len(sorted_named) <= 1:
-        return None
+    assembled = _assemble_by_bond_type(named_fragments, used_bond_types, style)
 
-    parts = [name for _, name in sorted_named]
-    # Join with space (functional class style)
-    assembled = " ".join(parts)
+    if not assembled:
+        # Fallback: join with spaces (functional class style)
+        sorted_named = sorted(
+            named_fragments,
+            key=lambda pair: len(pair[1]),
+            reverse=True,
+        )
+        if len(sorted_named) <= 1:
+            return None
+        parts = [name for _, name in sorted_named]
+        assembled = " ".join(parts)
+
+    # Token validation (DECO-27): reject if assembly lost a fragment
+    fragment_names = [name for _, name in named_fragments]
+    if not _validate_assembly_tokens(assembled, fragment_names):
+        # Bond-type assembly lost a fragment -- try space-join fallback
+        sorted_named = sorted(
+            named_fragments,
+            key=lambda pair: len(pair[1]),
+            reverse=True,
+        )
+        parts = [name for _, name in sorted_named]
+        assembled = " ".join(parts)
+        # Re-validate the fallback
+        if not _validate_assembly_tokens(assembled, fragment_names):
+            return None  # Assembly lost a fragment -- reject
 
     # Quality gate: the assembled name must be acceptable
     if not _name_quality_is_acceptable(assembled, mol):

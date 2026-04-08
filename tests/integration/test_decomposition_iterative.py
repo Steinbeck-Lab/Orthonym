@@ -201,3 +201,50 @@ class TestIterativeMixedDecomposition:
         assert name is not None, "Should name (R)-lactic acid fragment"
         # The name should reference the molecule reasonably
         assert len(name) > 3, f"Fragment name too short: {name}"
+
+
+@pytest.mark.integration
+class TestMixedAssemblyBondType:
+    """Test bond-type-aware iterative mixed assembly (DECO-23)."""
+
+    def test_mixed_assembly_uses_bond_type(self):
+        """Verify that a molecule with both ester and amide bonds produces
+        bond-type-specific assembly (contains "-oate"/"-ate" for ester part,
+        not just space-joined fragment names).
+        """
+        # Palmitoyl sphingomyelin-like: amide + ester + phosphodiester
+        smi = "CCCCCCCCCCCCCCCC(=O)NC(COP(=O)(O)OCC[N+](C)(C)C)C(O)/C=C/CCCCCCCCCCCCC"
+        name = name_compound(smi)
+        assert name is not None, "Should produce a name"
+        assert name != "unknown", "Should not be unknown"
+        # The name should be reasonably long for a large molecule
+        assert len(name) > 20, f"Name too short: {name}"
+
+    def test_mixed_assembly_validates_tokens(self):
+        """Verify that _validate_assembly_tokens catches lost fragments."""
+        from orthonym.decomposition.engine import _validate_assembly_tokens
+
+        # Missing fragment: "hexadecanoic acid" tokens not in assembled name
+        assert not _validate_assembly_tokens(
+            "ethyl propanoate",
+            ["ethanol", "propanoic acid", "hexadecanoic acid"],
+        )
+        # All present: stems match
+        assert _validate_assembly_tokens(
+            "ethyl propanoate",
+            ["ethanol", "propanoic acid"],
+        )
+
+    def test_iterative_mixed_assembly_not_simple_space_join(self):
+        """Engine _try_iterative_mixed_decompose references _assemble_by_bond_type."""
+        import inspect
+        from orthonym.decomposition.engine import _try_iterative_mixed_decompose
+        source = inspect.getsource(_try_iterative_mixed_decompose)
+        # Must reference bond-type-aware assembly
+        assert "_assemble_by_bond_type" in source, (
+            "_try_iterative_mixed_decompose must use _assemble_by_bond_type"
+        )
+        # Must reference token validation
+        assert "_validate_assembly_tokens" in source, (
+            "_try_iterative_mixed_decompose must use _validate_assembly_tokens"
+        )
