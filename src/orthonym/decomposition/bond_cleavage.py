@@ -47,6 +47,20 @@ _ETHER_SMARTS = Chem.MolFromSmarts(
     "[#6;!$(C=O);!$(C([OX2;R])[OX2;!R])]-[OX2;!R]-[#6;!$(C=O)]"
 )
 
+# Thioether: C-S-C where S is divalent, NOT in a ring, and neither C
+# is a carbonyl carbon. Excludes thioesters (C(=O)-S), thiolactones (ring S),
+# and sulfides within ring systems.
+_THIOETHER_SMARTS = Chem.MolFromSmarts(
+    "[#6;!$(C=O);!$(C([SX2;R])[SX2;!R])]-[SX2;!R]-[#6;!$(C=O)]"
+)
+
+# Secondary amine: C-NH-C where N is trivalent with 1 H, NOT in a ring,
+# and neither C is a carbonyl carbon. Excludes amides (C(=O)-N), lactams
+# (ring N), imines (C=N), and guanidines.
+_SEC_AMINE_SMARTS = Chem.MolFromSmarts(
+    "[#6;!$(C=O);!$(C=N)]-[NX3H1;!R]-[#6;!$(C=O);!$(C=N)]"
+)
+
 
 def _atoms_in_same_ring(mol, atom1: int, atom2: int) -> bool:
     """Check if two atoms share a ring membership."""
@@ -76,6 +90,31 @@ def _is_skeletal_ether(mol, o_idx: int) -> bool:
     for nbr in o_atom.GetNeighbors():
         for nbr2 in nbr.GetNeighbors():
             if (nbr2.GetIdx() != o_idx
+                    and nbr2.GetSymbol() in ('O', 'N', 'S')
+                    and not nbr2.IsInRing()):
+                return True
+    return False
+
+
+def _is_skeletal_thioether(mol, s_idx: int) -> bool:
+    """Check if a thioether sulfur is part of a skeletal replacement chain.
+
+    Returns True if either neighbor of the sulfur has another non-ring
+    heteroatom (O, N, S) neighbor (excluding the sulfur itself), indicating
+    a polythioether or thia-chain that should use skeletal replacement naming
+    rather than thioether bond cleavage.
+
+    Args:
+        mol: RDKit Mol object.
+        s_idx: Atom index of the thioether sulfur.
+
+    Returns:
+        True if the sulfur is part of a skeletal replacement chain.
+    """
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    for nbr in s_atom.GetNeighbors():
+        for nbr2 in nbr.GetNeighbors():
+            if (nbr2.GetIdx() != s_idx
                     and nbr2.GetSymbol() in ('O', 'N', 'S')
                     and not nbr2.IsInRing()):
                 return True
@@ -524,8 +563,9 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             side1 = _bfs_heavy_atoms(mol, carbon1, excluded={oxygen})
             side2 = _bfs_heavy_atoms(mol, carbon2, excluded={oxygen})
 
-            # Minimum fragment size guard: skip if either side < 5 heavy atoms
-            if len(side1) < 5 or len(side2) < 5:
+            # Minimum fragment size guard: skip if either side < 3 heavy atoms
+            # (D-03: lowered from 5 to 3 to detect smaller ethers)
+            if len(side1) < 3 or len(side2) < 3:
                 continue
 
             # Assign roles using P-44.1.1 seniority: the more senior side
@@ -547,6 +587,94 @@ def find_cleavable_bonds(mol) -> List[Dict]:
                     "type": "ether",
                     "acid_atom": acid_atom,
                     "alkyl_atom": alkyl_atom,
+                    "match": match,
+                    "roles_swapped": False,
+                })
+
+    # --- Step 9: Detect thioether bonds (C-S-C, not thioester/ring) ---
+    if _THIOETHER_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_THIOETHER_SMARTS):
+            carbon1 = match[0]
+            sulfur = match[1]
+            carbon2 = match[2]
+
+            # Ring guard: skip if either carbon and the sulfur are in the
+            # same ring (thiolane, etc.)
+            if _atoms_in_same_ring(mol, carbon1, sulfur):
+                continue
+            if _atoms_in_same_ring(mol, carbon2, sulfur):
+                continue
+
+            # Skeletal replacement guard: skip if the sulfur is part of a
+            # chain with multiple heteroatoms (thia-naming applies instead)
+            if _is_skeletal_thioether(mol, sulfur):
+                continue
+
+            # Use BFS to count heavy atoms on each side (excluding sulfur)
+            side1 = _bfs_heavy_atoms(mol, carbon1, excluded={sulfur})
+            side2 = _bfs_heavy_atoms(mol, carbon2, excluded={sulfur})
+
+            # Minimum fragment size guard: 3 HA per side (D-03)
+            if len(side1) < 3 or len(side2) < 3:
+                continue
+
+            # Assign roles using P-44.1.1 seniority (same logic as ether)
+            acid_atom, alkyl_atom = _assign_ether_roles_by_seniority(
+                mol, carbon1, carbon2, side1, side2
+            )
+
+            # Cleavage bond = bond between parent-side carbon and sulfur
+            bond = mol.GetBondBetweenAtoms(acid_atom, sulfur)
+
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "thioether",
+                    "acid_atom": acid_atom,
+                    "alkyl_atom": alkyl_atom,
+                    "match": match,
+                    "roles_swapped": False,
+                })
+
+    # --- Step 10: Detect secondary amine bonds (C-NH-C, not amide/ring) ---
+    if _SEC_AMINE_SMARTS is not None:
+        for match in mol.GetSubstructMatches(_SEC_AMINE_SMARTS):
+            carbon1 = match[0]
+            nitrogen = match[1]
+            carbon2 = match[2]
+
+            # Ring guard: skip if either carbon and the nitrogen are in the
+            # same ring (pyrrolidine, piperidine, etc.)
+            if _atoms_in_same_ring(mol, carbon1, nitrogen):
+                continue
+            if _atoms_in_same_ring(mol, carbon2, nitrogen):
+                continue
+
+            # Use BFS to count heavy atoms on each side (excluding nitrogen)
+            side1 = _bfs_heavy_atoms(mol, carbon1, excluded={nitrogen})
+            side2 = _bfs_heavy_atoms(mol, carbon2, excluded={nitrogen})
+
+            # Minimum fragment size guard: 3 HA per side (D-03)
+            if len(side1) < 3 or len(side2) < 3:
+                continue
+
+            # Assign roles: more senior side = acid_atom (parent),
+            # less senior side = amine_atom
+            acid_atom, amine_atom = _assign_ether_roles_by_seniority(
+                mol, carbon1, carbon2, side1, side2
+            )
+
+            # Cleavage bond = bond between parent-side carbon and nitrogen
+            bond = mol.GetBondBetweenAtoms(acid_atom, nitrogen)
+
+            if bond and bond.GetIdx() not in seen_bond_indices:
+                seen_bond_indices.add(bond.GetIdx())
+                cleavable.append({
+                    "bond_idx": bond.GetIdx(),
+                    "type": "sec_amine",
+                    "acid_atom": acid_atom,
+                    "amine_atom": amine_atom,
                     "match": match,
                     "roles_swapped": False,
                 })

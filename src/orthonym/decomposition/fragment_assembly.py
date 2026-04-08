@@ -123,6 +123,54 @@ _TRIVIAL_ACID_TO_ACYL = {
     "benzoic acid": "benzoyl",
 }
 
+# ---------------------------------------------------------------------------
+# OPSIN-expanded acid transformation tables (DECO-26)
+# ---------------------------------------------------------------------------
+
+def _build_opsin_acid_lookups():
+    """Build expanded acid transformation lookups from OPSIN carboxylicAcids.xml stems.
+
+    OPSIN stems are short forms (e.g., 'form', 'acet', 'palmit') that need
+    expansion to full acid name -> transformed form:
+    - stem + "ic acid" -> stem + "ate" (trivial acids)
+    - stem + "ic acid" -> stem + "amide" (trivial amides)
+    - stem + "ic acid" -> stem + "oyl" or stem + "yl" (trivial acyl)
+
+    Returns:
+        Tuple of (ate_map, amide_map, acyl_map) dicts.
+    """
+    from ..data.opsin_imports.carboxylic_acids_opsin import OPSIN_ACID_STEMS
+
+    ate_map = {}
+    amide_map = {}
+    acyl_map = {}
+
+    for smiles, entry in OPSIN_ACID_STEMS.items():
+        sub_type = entry.get('subType', '')
+        for stem in entry['names']:
+            # Build full acid name: stem + "ic acid"
+            acid_name = f"{stem}ic acid"
+
+            # ate form: stem + "ate"
+            ate_map[acid_name] = f"{stem}ate"
+
+            # amide form: stem + "amide"
+            amide_map[acid_name] = f"{stem}amide"
+
+            # acyl form depends on subType
+            if sub_type == 'ylForAcyl':
+                acyl_map[acid_name] = f"{stem}yl"
+            else:
+                # ylForYl and ylForNothing both use "oyl" suffix
+                acyl_map[acid_name] = f"{stem}oyl"
+
+    return ate_map, amide_map, acyl_map
+
+
+# Build at module load time (cached)
+_OPSIN_ATE, _OPSIN_AMIDE, _OPSIN_ACYL = _build_opsin_acid_lookups()
+
+
 # Alcohol -> alkyl prefix (for trivial/common names)
 _TRIVIAL_ALCOHOL_TO_ALKYL = {
     "methanol": "methyl",
@@ -207,6 +255,8 @@ def assemble_fragment_name(
         "thioester": _assemble_thioester,
         "phosphodiester": _assemble_phosphodiester,
         "sulfonamide": _assemble_sulfonamide,
+        "thioether": _assemble_thioether,
+        "sec_amine": _assemble_sec_amine,
     }
 
     assembler = assemblers.get(bond_type)
@@ -214,6 +264,92 @@ def assemble_fragment_name(
         return None
 
     return assembler(fragment_names, style)
+
+
+def _assemble_by_bond_type(
+    named_fragments: List[Tuple],
+    used_bond_types: set,
+    style: str = "pin",
+) -> Optional[str]:
+    """Assemble named fragments using bond-type-specific assemblers.
+
+    Routes each fragment pair through the appropriate assembler based on
+    the bond type that connected them. This replaces the naive space-join
+    in _try_iterative_mixed_decompose().
+
+    Args:
+        named_fragments: List of (frag_dict, name_str) tuples.
+            Each frag_dict may have 'parent_bond_type' and 'role' keys.
+        used_bond_types: Set of bond types used during cleavage.
+        style: Naming style.
+
+    Returns:
+        Assembled name string, or None if assembly fails.
+    """
+    if not named_fragments or len(named_fragments) < 2:
+        return None
+
+    # Group fragments by their parent bond type
+    typed_frags = {}  # bond_type -> list of (frag, name)
+    untyped = []
+    for frag, name in named_fragments:
+        bt = frag.get('parent_bond_type', '')
+        if bt:
+            typed_frags.setdefault(bt, []).append((frag, name))
+        else:
+            untyped.append((frag, name))
+
+    # If no typed fragments, return None (caller uses fallback)
+    if not typed_frags:
+        return None
+
+    # For each bond type group, try to assemble using the type-specific assembler
+    assembled_parts = []
+    for bt, frags in typed_frags.items():
+        if len(frags) < 2:
+            # Single fragment for this bond type -- just use its name
+            assembled_parts.append(frags[0][1])
+            continue
+
+        # Sort by role: acid/parent first, then alkyl/amine
+        acid_frags = [f for f in frags if f[0].get('role') == 'acid']
+        alkyl_frags = [f for f in frags if f[0].get('role') in ('alkyl', 'amine')]
+
+        if not acid_frags:
+            # Guess: longest name is probably the parent
+            sorted_by_len = sorted(frags, key=lambda x: len(x[1]), reverse=True)
+            acid_frags = [sorted_by_len[0]]
+            alkyl_frags = sorted_by_len[1:]
+
+        for acid_frag, acid_name in acid_frags:
+            for alk_frag, alk_name in alkyl_frags:
+                # Build fragment_names dict matching what assemblers expect
+                if bt in ("amide", "sulfonamide", "sec_amine"):
+                    fn = {"acid": acid_name, "amine": alk_name}
+                elif bt == "glycosidic":
+                    fn = {"sugar": acid_name, "aglycone": alk_name}
+                else:
+                    fn = {"acid": acid_name, "alkyl": alk_name}
+
+                result = assemble_fragment_name(bt, fn, style)
+                if result:
+                    assembled_parts.append(result)
+                else:
+                    # Fall back: space-join this pair
+                    assembled_parts.append(f"{alk_name} {acid_name}")
+
+    # Add any untyped fragments
+    for _, name in untyped:
+        assembled_parts.append(name)
+
+    if not assembled_parts:
+        return None
+
+    if len(assembled_parts) == 1:
+        return assembled_parts[0]
+
+    # Join multiple assembled parts with space (functional class style)
+    return " ".join(assembled_parts)
 
 
 # ============================================================================
@@ -632,6 +768,61 @@ def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]
         return None
 
     return _join_components(alkoxy, parent_name)
+
+
+def _assemble_thioether(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble thioether name as 'alkylthio + parent' (IUPAC P-63.6.2).
+
+    The smaller fragment (alkyl side, retaining the sulfur as a thiol)
+    is converted to an alkylthio prefix. The larger fragment (acid side)
+    is the parent compound.
+
+    Args:
+        fragment_names: {"acid": parent_name, "alkyl": alkyl_name}
+            where alkyl_name may be a thiol (the S stayed with it).
+        style: Naming style.
+
+    Returns:
+        Thioether name like "methylthiobenzene", or None.
+    """
+    parent_name = fragment_names.get("acid")
+    alkyl_name = fragment_names.get("alkyl")
+
+    if not parent_name or not alkyl_name:
+        return None
+
+    alkylthio = _alcohol_to_alkylthio(alkyl_name)
+    if not alkylthio:
+        return None
+
+    return _join_components(alkylthio, parent_name)
+
+
+def _assemble_sec_amine(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+    """Assemble secondary amine name as 'alkylamino + parent' (IUPAC P-62.2.3).
+
+    The smaller fragment (amine side) is converted to an alkylamino prefix.
+    The larger fragment (acid side) is the parent compound.
+
+    Args:
+        fragment_names: {"acid": parent_name, "amine": amine_name}
+            where amine_name is the N-bearing fragment.
+        style: Naming style.
+
+    Returns:
+        Secondary amine name like "methylaminobenzoic acid", or None.
+    """
+    parent_name = fragment_names.get("acid")
+    amine_name = fragment_names.get("amine") or fragment_names.get("alkyl")
+
+    if not parent_name or not amine_name:
+        return None
+
+    amino_prefix = _amine_to_prefix(amine_name)
+    if not amino_prefix:
+        return None
+
+    return _join_components(amino_prefix, parent_name)
 
 
 def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
@@ -1120,6 +1311,45 @@ def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     return None
 
 
+def _alcohol_to_alkylthio(name: str) -> Optional[str]:
+    """Convert a thiol or fragment name to its alkylthio prefix form.
+
+    For thioether naming, the smaller fragment (which retains the sulfur)
+    is converted to an alkylthio prefix: "methanethiol" -> "methylthio",
+    "ethanol" -> "ethylthio" (if S stayed with this fragment).
+
+    Args:
+        name: Thiol or fragment name (e.g., "methanethiol", "ethanethiol",
+              "methanol" for cases where fragment was named as alcohol).
+
+    Returns:
+        Alkylthio prefix (e.g., "methylthio", "ethylthio"), or None.
+    """
+    stripped = name.strip().lower()
+
+    # Direct thiol conversions
+    if stripped.endswith("anethiol"):
+        base = stripped[:-len("anethiol")]
+        if base:
+            return f"{base}ylthio"
+
+    if stripped.endswith("thiol"):
+        base = stripped[:-5]
+        if base and base.endswith("ane"):
+            return f"{base[:-3]}ylthio"
+        if base and base.endswith("an"):
+            return f"{base[:-2]}ylthio"
+        if base:
+            return f"{base}ylthio"
+
+    # Fallback: convert via alkyl form
+    alkyl = _alcohol_to_alkyl(name)
+    if alkyl and alkyl.endswith("yl"):
+        return f"{alkyl}thio"
+
+    return None
+
+
 # ============================================================================
 # Pre-validation helpers (D-09 through D-12)
 # ============================================================================
@@ -1229,6 +1459,10 @@ def _acid_to_ate(acid_name: str) -> Optional[str]:
     if stem.lower() in TRIVIAL_ACID_TO_ACYLATE:
         return TRIVIAL_ACID_TO_ACYLATE[stem.lower()]
 
+    # OPSIN expanded lookup (DECO-26)
+    if name.lower() in _OPSIN_ATE:
+        return _OPSIN_ATE[name.lower()]
+
     # Systematic: "-oic acid" -> "-oate"
     if stem.endswith("oic"):
         return stem[:-2] + "ate"  # propanoic -> propanoate
@@ -1278,6 +1512,10 @@ def _acid_to_amide(acid_name: str) -> Optional[str]:
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_AMIDE:
         return _TRIVIAL_ACID_TO_AMIDE[name.lower()]
+
+    # OPSIN expanded lookup (DECO-26)
+    if name.lower() in _OPSIN_AMIDE:
+        return _OPSIN_AMIDE[name.lower()]
 
     # Handle "carboxylic acid" -> "carboxamide"
     if name.endswith("carboxylic acid"):
@@ -1339,6 +1577,10 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_ACID_TO_ACYL:
         return _TRIVIAL_ACID_TO_ACYL[name.lower()]
+
+    # OPSIN expanded lookup (DECO-26)
+    if name.lower() in _OPSIN_ACYL:
+        return _OPSIN_ACYL[name.lower()]
 
     # Per D-10: pre-validate that input looks like a convertible name
     # (acid, amide, or ester). Place AFTER trivial lookup to preserve shortcut.

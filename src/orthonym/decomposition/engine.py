@@ -163,6 +163,10 @@ _BOND_TYPE_TOKENS = {
     # name tokens (ether O becomes "oxa" or is absorbed
     # into alkoxy prefixes). Don't penalize.
     "ether": set(),
+    # Thioethers produce "thio" prefix in substitutive names
+    "thioether": {"thio", "sulfanyl"},
+    # Secondary amines produce "amino" prefix
+    "sec_amine": {"amino"},
 }
 
 
@@ -752,7 +756,57 @@ _BOND_TYPE_PRIORITY = {
     "sulfonamide": 6,
     "carbamate": 7,
     "ether": 8,
+    "thioether": 9,
+    "sec_amine": 10,
 }
+
+
+def _validate_assembly_tokens(assembled: str, fragment_names: list) -> bool:
+    """Validate assembled name references tokens from ALL input fragment names.
+
+    Per D-02: Each input fragment should contribute at least one morpheme
+    (word token) to the assembled result. If a fragment's tokens are entirely
+    absent, the assembly lost that fragment.
+
+    Uses stem-level matching: for each fragment token, checks if a stem
+    (first 3+ chars) appears in the assembled name. This handles IUPAC
+    suffix transformations (e.g., "hexadecanoic" -> "hexadecanoate" shares
+    stem "hexadecano", "ethanol" -> "ethyl" shares stem "eth").
+
+    Args:
+        assembled: The assembled IUPAC name string.
+        fragment_names: List of individual fragment name strings.
+
+    Returns:
+        True if all fragments are represented in the assembly.
+    """
+    assembled_lower = assembled.lower()
+    for name in fragment_names:
+        # Extract significant tokens (>= 4 chars to skip locants/prefixes)
+        tokens = [t for t in re.split(r'[-\s,()]+', name.lower()) if len(t) >= 4]
+        if not tokens:
+            continue  # Short-token-only fragments pass by default
+        # Check if any token or its stem is present in the assembled name.
+        # Uses progressively shorter stems to handle IUPAC suffix transformations
+        # (e.g., "ethanol" -> "eth" stem in "ethyl", "propanoic" -> "propan" in "propanoate")
+        found = False
+        for tok in tokens:
+            # Full token first
+            if tok in assembled_lower:
+                found = True
+                break
+            # Stem match: try stems of decreasing length down to 3 chars
+            # (3-char stems like "eth" are safe for IUPAC roots: eth/meth/prop/etc.)
+            for stem_len in range(len(tok) - 1, 2, -1):
+                stem = tok[:stem_len]
+                if stem in assembled_lower:
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            return False
+    return True
 
 
 def _name_sugar_fragment(smiles: str) -> Optional[str]:
