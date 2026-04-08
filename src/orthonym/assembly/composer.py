@@ -1797,6 +1797,44 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
                 if len(next_c_nbrs) == 2:
                     return "isobutyl"
 
+    # Phase 139 gap closure: detect chain-FG oxygen/sulfur in fragment
+    # BEFORE simple alkyl path.  Oxygen and sulfur on chains indicate
+    # functional groups (=O -> "oxo", -OH -> "hydroxy", =S -> "thioxo")
+    # that get_alkyl_name() would silently ignore.
+    # Scope limited to O/S only:
+    #   - Nitrogen is excluded because N atoms in fragments are typically
+    #     part of functional class patterns (urea, guanidine, amide) that
+    #     are handled by dedicated naming paths, not chain FG prefixes.
+    #   - Ring heteroatoms are excluded (structural ring members).
+    #   - Exocyclic heteroatoms bonded ONLY to ring atoms (C=O on a ring
+    #     carbon in fused ureas/lactams) are excluded (ring decorations).
+    # A non-ring O/S qualifies as a chain FG indicator only when at least
+    # one of its fragment-neighbors is also NOT in a ring (chain context).
+    def _is_chain_fg_heteroatom(idx):
+        atom = mol.GetAtomWithIdx(idx)
+        # Only oxygen (8) and sulfur (16) -- not nitrogen or others
+        if atom.GetAtomicNum() not in (8, 16):
+            return False
+        if atom.IsInRing():
+            return False
+        # Non-ring O/S: check if any of its fragment-neighbors is also
+        # non-ring (chain context) vs all ring (exocyclic decoration)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in frag_set and not nbr.IsInRing():
+                return True
+        return False
+
+    heteroatom_in_frag = any(_is_chain_fg_heteroatom(i) for i in frag_atoms)
+    if heteroatom_in_frag:
+        try:
+            from .substituent_enumerator import name_substituent as _ns_r
+            prefix = _ns_r(mol, set(frag_atoms), start_idx)
+            if prefix and prefix != "substituent":
+                return prefix
+        except Exception:
+            pass
+        # Fall through to simple alkyl if name_substituent failed
+
     # Default: linear alkyl name
     try:
         return get_alkyl_name(carbon_count)
