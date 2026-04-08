@@ -61,6 +61,16 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     # Heterocyclic saturated (3-membered)
     'oxirane': 'oxiranyl',
     'aziridine': 'aziridinyl',
+
+    # Fused heterocyclic (Phase 139 ARCH-02)
+    'indole': 'indolyl',
+    'quinoline': 'quinolinyl',
+    'isoquinoline': 'isoquinolinyl',
+    'benzofuran': 'benzofuranyl',
+    'benzothiophene': 'benzothienyl',
+    'benzimidazole': 'benzimidazolyl',
+    'purine': 'purinyl',
+    'carbazole': 'carbazolyl',
 }
 
 # Rings that need position-specific names based on attachment point
@@ -74,6 +84,24 @@ POSITION_SPECIFIC_RINGS: Dict[str, Dict[int, str]] = {
         2: '2-pyridyl',
         3: '3-pyridyl',
         4: '4-pyridyl',
+    },
+    'quinoline': {
+        2: '2-quinolinyl',
+        3: '3-quinolinyl',
+        4: '4-quinolinyl',
+        5: '5-quinolinyl',
+        6: '6-quinolinyl',
+        7: '7-quinolinyl',
+        8: '8-quinolinyl',
+    },
+    'isoquinoline': {
+        1: '1-isoquinolinyl',
+        3: '3-isoquinolinyl',
+        4: '4-isoquinolinyl',
+        5: '5-isoquinolinyl',
+        6: '6-isoquinolinyl',
+        7: '7-isoquinolinyl',
+        8: '8-isoquinolinyl',
     },
 }
 
@@ -327,13 +355,29 @@ def _get_ring_position_for_attachment(
 
         return best_pos
 
-    # For naphthalene: uses standard IUPAC peripheral numbering
-    # Position 1 is adjacent to fusion, position 2 is farther
-    # This is complex; for now, return based on simple heuristics
+    # For naphthalene: determine alpha (1,4,5,8) vs beta (2,3,6,7) position
+    # Alpha positions are adjacent to the fusion bond; beta are farther
     if ring_name == 'naphthalene':
-        # Simplified: check if atom is alpha (1,4,5,8) or beta (2,3,6,7)
-        # This would require more sophisticated analysis
-        # For now, return None to use generic naphthyl
+        ring_set = set(ring_atoms)
+        # Find fusion atoms: ring atoms bonded to 3 other ring atoms
+        # (shared atoms between the two 6-membered rings in naphthalene)
+        fusion_atoms = set()
+        for idx in ring_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            ring_nbr_count = sum(
+                1 for nbr in atom.GetNeighbors() if nbr.GetIdx() in ring_set
+            )
+            if ring_nbr_count == 3:
+                fusion_atoms.add(idx)
+        if len(fusion_atoms) == 2 and attachment_atom in ring_set:
+            # Alpha positions: atoms adjacent to a fusion atom (but not fusion atoms themselves)
+            is_alpha = any(
+                mol.GetBondBetweenAtoms(attachment_atom, fa) is not None
+                for fa in fusion_atoms
+            )
+            if attachment_atom in fusion_atoms:
+                return None  # Fusion atom itself: use generic naphthyl
+            return 1 if is_alpha else 2  # 1-naphthyl (alpha) or 2-naphthyl (beta)
         return None
 
     return None
