@@ -70,6 +70,50 @@ class TestCarbamicAcidEnrichment:
         assert result is not None
         assert "carbamic" in result.lower() or "carbam" in result.lower()
 
+    def test_carbamic_acid_with_ketone_includes_oxo(self):
+        """Carbamic acid with ketone in N-substituent chain must include 'oxo' prefix.
+
+        OC(=O)NCCCC(=O)C = N-(4-oxopentyl)carbamic acid
+        The ketone (=O) within the N-substituent chain must NOT be silently dropped.
+        Phase 139 gap closure: SC4.
+        """
+        from orthonym import name_compound
+        result = name_compound("OC(=O)NCCCC(=O)C")
+        assert result is not None
+        assert "oxo" in result.lower(), (
+            f"Expected 'oxo' (ketone prefix) in N-substituent but got: {result}"
+        )
+
+    def test_carbamic_acid_with_hydroxy_includes_hydroxy(self):
+        """Carbamic acid with alcohol in N-substituent chain must include 'hydroxy' prefix.
+
+        OC(=O)NCC(O)C = N-(2-hydroxypropyl)carbamic acid
+        The alcohol (-OH) within the N-substituent chain must NOT be silently dropped.
+        Phase 139 gap closure: SC4.
+        """
+        from orthonym import name_compound
+        result = name_compound("OC(=O)NCC(O)C")
+        assert result is not None
+        assert "hydroxy" in result.lower(), (
+            f"Expected 'hydroxy' (alcohol prefix) in N-substituent but got: {result}"
+        )
+
+    def test_simple_n_alkyl_carbamic_acid_no_regression(self):
+        """Simple N-alkyl carbamic acid unchanged -- no regression from heteroatom fix.
+
+        OC(=O)NCC = N-ethylcarbamic acid
+        Pure alkyl N-substituent should still produce 'ethyl' and 'carbamic'.
+        """
+        from orthonym import name_compound
+        result = name_compound("OC(=O)NCC")
+        assert result is not None
+        assert "ethyl" in result.lower(), (
+            f"Expected 'ethyl' in simple N-alkyl carbamic acid but got: {result}"
+        )
+        assert "carbamic" in result.lower(), (
+            f"Expected 'carbamic' in simple N-alkyl carbamic acid but got: {result}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Test 4: Boronic acid enrichment
