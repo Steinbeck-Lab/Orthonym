@@ -92,6 +92,169 @@ def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
     return name
 
 
+# ---------------------------------------------------------------------------
+# Compound class pre-routing (Phase 141, CLASS-06)
+# ---------------------------------------------------------------------------
+
+# Pre-compiled SMARTS for sugar ring detection
+_PYRANOSE_SMARTS = None
+_FURANOSE_SMARTS = None
+_RING_OH_SMARTS = None
+
+
+def _get_sugar_smarts():
+    """Lazy-initialize SMARTS patterns for sugar ring detection."""
+    global _PYRANOSE_SMARTS, _FURANOSE_SMARTS, _RING_OH_SMARTS
+    if _PYRANOSE_SMARTS is None:
+        # 6-membered ring with 1 O and 5 C (pyranose)
+        _PYRANOSE_SMARTS = Chem.MolFromSmarts("[OX2;r6]1[CX4][CX4][CX4][CX4][CX4]1")
+        # 5-membered ring with 1 O and 4 C (furanose)
+        _FURANOSE_SMARTS = Chem.MolFromSmarts("[OX2;r5]1[CX4][CX4][CX4][CX4]1")
+        # OH group on a ring carbon
+        _RING_OH_SMARTS = Chem.MolFromSmarts("[C;r]([OX2H])")
+    return _PYRANOSE_SMARTS, _FURANOSE_SMARTS, _RING_OH_SMARTS
+
+
+def _has_sugar_ring_pattern(mol) -> bool:
+    """Detect pyranose/furanose ring with minimum 2 OH groups.
+
+    Uses SMARTS matching to identify sugar-like rings:
+    - Pyranose: 6-membered ring with 1 O and 5 C
+    - Furanose: 5-membered ring with 1 O and 4 C
+    - Requires at least 2 hydroxyl groups on ring carbons
+      (2 not 3, to handle deoxy sugars)
+
+    Args:
+        mol: RDKit Mol object.
+
+    Returns:
+        True if molecule has a sugar ring pattern.
+    """
+    if mol is None:
+        return False
+
+    pyranose, furanose, ring_oh = _get_sugar_smarts()
+
+    has_sugar_ring = False
+    if pyranose is not None and mol.HasSubstructMatch(pyranose):
+        has_sugar_ring = True
+    elif furanose is not None and mol.HasSubstructMatch(furanose):
+        has_sugar_ring = True
+
+    if not has_sugar_ring:
+        return False
+
+    # Count OH groups on ring carbons
+    if ring_oh is not None:
+        oh_matches = mol.GetSubstructMatches(ring_oh)
+        if len(oh_matches) >= 2:
+            return True
+
+    return False
+
+
+def classify_compound_class(mol, canonical_smiles: str) -> Optional[str]:
+    """Classify molecule into compound class for pre-routing.
+
+    Returns class label or None for general routing.
+    Classification order per D-01:
+        steroid -> alkaloid -> terpene -> peptide -> amino_acid -> carbohydrate -> general
+
+    Args:
+        mol: RDKit Mol object.
+        canonical_smiles: Canonical SMILES string.
+
+    Returns:
+        One of 'steroid', 'alkaloid', 'terpene', 'carbohydrate', or None.
+    """
+    if mol is None:
+        return None
+
+    # Sugar detection: check sugar lookup table first
+    from .data.sugar_names import lookup_sugar
+    if lookup_sugar(canonical_smiles) is not None:
+        return "carbohydrate"
+
+    # Pyranose/furanose SMARTS for sugars not in lookup
+    if _has_sugar_ring_pattern(mol):
+        return "carbohydrate"
+
+    # NP detection handles steroid/alkaloid/terpene via scaffold matching
+    from .perception.natural_products import detect_natural_product
+    np_info = detect_natural_product(mol)
+    if np_info is not None:
+        return np_info.get("scaffold_class")  # "steroid", "alkaloid", "terpene"
+
+    # Check exact derivative lookup -- some derivatives (e.g. alpha-pinene)
+    # don't match a scaffold via substructure but ARE in the derivatives dict.
+    # Infer class from the derivative name patterns.
+    from .data.natural_products import get_natural_product_name
+    deriv_name = get_natural_product_name(canonical_smiles)
+    if deriv_name is not None:
+        return _infer_class_from_derivative_name(deriv_name)
+
+    return None  # General routing
+
+
+# Terpene-related name patterns for class inference from derivative names
+_TERPENE_KEYWORDS = frozenset([
+    "pinene", "pinane", "bornane", "camphor", "limonene",
+    "terpineol", "terpinene", "carotene", "lycopene", "menthane",
+    "thujane", "pinanol", "borneol", "fenchone",
+])
+
+# Steroid-related name patterns
+_STEROID_KEYWORDS = frozenset([
+    "cholesterol", "testosterone", "progesterone", "estradiol",
+    "androstane", "pregnane", "cholestane", "estrane", "gonane",
+    "campestanol", "ergostane", "stigmastane",
+    "androstenedione", "androstanediol", "androstenediol",
+    "androstenol", "androstenone", "estratetraenol",
+    "androstadienone", "cardenolide", "cardanolide",
+    "bufanolide", "bufadienolide",
+])
+
+# Alkaloid-related name patterns
+_ALKALOID_KEYWORDS = frozenset([
+    "morphine", "codeine", "diamorphine", "hydromorphone",
+    "hydrocodone", "oxycodone", "lysergic", "lysergamide",
+    "lysergol", "tropane", "morphinan", "aporphine",
+    "dihydromorphine", "dihydrocodeine", "codeinone",
+    "morphinone",
+])
+
+# Flavonoid / other
+_FLAVONOID_KEYWORDS = frozenset([
+    "flavone", "flavanone", "isoflavone", "chromanone", "chromone",
+])
+
+
+def _infer_class_from_derivative_name(name: str) -> Optional[str]:
+    """Infer compound class from a derivative's trivial name.
+
+    Args:
+        name: Trivial/retained name of the derivative.
+
+    Returns:
+        Class label or None if class cannot be inferred.
+    """
+    name_lower = name.lower().replace("-", "")
+    # Check terpene keywords
+    for kw in _TERPENE_KEYWORDS:
+        if kw in name_lower:
+            return "terpene"
+    # Check steroid keywords
+    for kw in _STEROID_KEYWORDS:
+        if kw in name_lower:
+            return "steroid"
+    # Check alkaloid keywords
+    for kw in _ALKALOID_KEYWORDS:
+        if kw in name_lower:
+            return "alkaloid"
+    # Beta-lactam and flavonoid are not routed to specific class handlers
+    return None
+
+
 @dataclass
 class MolecularFeatures:
     """Container for perceived molecular features."""
@@ -544,6 +707,26 @@ class Orthonym:
         mult_name = name_multiplicative(mol)
         if mult_name is not None:
             return mult_name
+
+        # COMPOUND CLASS PRE-ROUTING (Phase 141)
+        # Classify into compound class for routing. Sugar detection handles
+        # carbohydrates that were previously missing from the main cascade.
+        compound_class = classify_compound_class(mol, canonical_smiles)
+
+        # Direct sugar routing: carbohydrates found via sugar lookup
+        if compound_class == "carbohydrate":
+            from .data.sugar_names import lookup_sugar
+            sugar_info = lookup_sugar(canonical_smiles)
+            if sugar_info is not None:
+                anomer, config, base_name = sugar_info
+                parts = []
+                if anomer:
+                    parts.append(anomer)
+                if config:
+                    parts.append(config)
+                parts.append(base_name)
+                return "-".join(parts)
+            # If SMARTS matched but no lookup hit, fall through to systematic
 
         # NATURAL PRODUCT DETECTION
         # Check before retained names because NP detection uses substructure matching

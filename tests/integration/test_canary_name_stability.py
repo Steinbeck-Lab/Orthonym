@@ -29,7 +29,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O",
-        "(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)ethanamide",
+        "(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)alpha-D-2-(acetylamino)-2-deoxy-galactopyranose",
     ),
     (
         "[Cl-].[Cl-].[Cl-].[Yb+3]",

@@ -509,7 +509,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1OC(O)C(O)C(O)C1O",
-        "3,4,5,6-tetrahydroxy-2-methyloxane",
+        "rhamnopyranose",
     ),
     (
         r"CCC/C=C\C/C=C\CCCCCCCC(=O)O",
