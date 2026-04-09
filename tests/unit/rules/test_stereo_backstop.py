@@ -1,10 +1,16 @@
 """Tests for the universal stereo backstop function in namer.py.
 
 Phase 140 Plan 01: STER-16 -- ensure every naming path includes stereodescriptors.
-The _final_stereo_check function is a safety net that catches gaps in
-handler-specific stereo injection.
+The _final_stereo_check function is a safety net that DETECTS gaps in
+handler-specific stereo injection and logs them for targeted fixes.
+
+Design choice: the backstop does NOT inject stereo with raw atom-index locants
+because they don't correspond to IUPAC numbering.  It logs a WARNING to
+identify handler gaps.  Handler-specific _inject_stereo_if_missing() remains
+the primary stereo injection mechanism.
 """
 
+import logging
 import pytest
 import re
 from rdkit import Chem
@@ -31,13 +37,22 @@ class TestFinalStereoCheck:
         result = _final_stereo_check(mol, "propane")
         assert result == "propane"
 
-    def test_stereo_added_when_missing_from_name(self):
-        """Name missing stereo for a chiral molecule should get stereo prefix."""
+    def test_gap_detected_when_stereo_missing_from_name(self, caplog):
+        """Backstop detects stereo gap and logs warning but does not modify name.
+
+        The backstop returns name unchanged because injecting stereo with raw
+        atom-index locants would produce incorrect IUPAC names.
+        """
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        result = _final_stereo_check(mol, "butan-2-ol")
-        assert re.match(r'\(\d*[RS]\)-', result), f"Expected stereo prefix, got: {result}"
-        assert "butan-2-ol" in result
+        with caplog.at_level(logging.WARNING):
+            result = _final_stereo_check(mol, "butan-2-ol")
+        # Name unchanged -- backstop is detection-only
+        assert result == "butan-2-ol"
+        # But WARNING was logged identifying the gap
+        assert any("Stereo backstop" in rec.message for rec in caplog.records), (
+            "Expected WARNING about stereo gap"
+        )
 
     def test_name_unchanged_for_empty_string(self):
         """Empty string and 'unknown' should be returned unchanged."""
@@ -46,12 +61,16 @@ class TestFinalStereoCheck:
         assert _final_stereo_check(mol, "") == ""
         assert _final_stereo_check(mol, "unknown") == "unknown"
 
-    def test_ez_descriptor_added_when_missing(self):
-        """E/Z molecule with name missing stereo should get E/Z prefix."""
+    def test_ez_gap_detected_when_missing(self, caplog):
+        """Backstop detects E/Z gap and logs warning but does not modify name."""
         mol = Chem.MolFromSmiles("C/C=C/C")
         rdCIPLabeler.AssignCIPLabels(mol)
-        result = _final_stereo_check(mol, "but-2-ene")
-        assert re.match(r'\(\d*[EZ]\)-', result), f"Expected E/Z prefix, got: {result}"
+        with caplog.at_level(logging.WARNING):
+            result = _final_stereo_check(mol, "but-2-ene")
+        # Name unchanged
+        assert result == "but-2-ene"
+        # WARNING logged
+        assert any("Stereo backstop" in rec.message for rec in caplog.records)
 
     def test_complex_stereo_prefix_not_duplicated(self):
         """Name that already has a multi-descriptor prefix should not be modified."""
@@ -64,3 +83,39 @@ class TestFinalStereoCheck:
         """If mol is None, name should be returned unchanged."""
         result = _final_stereo_check(None, "propane")
         assert result == "propane"
+
+    def test_no_warning_when_stereo_already_present(self, caplog):
+        """No warning should be logged when stereo is already in name."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            _final_stereo_check(mol, "(2R)-butan-2-ol")
+        stereo_warnings = [r for r in caplog.records if "Stereo backstop" in r.message]
+        assert len(stereo_warnings) == 0, "Should not warn when stereo already present"
+
+    def test_no_warning_when_no_stereo_in_molecule(self, caplog):
+        """No warning should be logged for achiral molecules."""
+        mol = Chem.MolFromSmiles("CCC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            _final_stereo_check(mol, "propane")
+        stereo_warnings = [r for r in caplog.records if "Stereo backstop" in r.message]
+        assert len(stereo_warnings) == 0, "Should not warn for achiral molecule"
+
+    def test_stereo_embedded_in_name_body_not_flagged(self):
+        """Names with stereo descriptors inside (not just prefix) are not flagged."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # Stereo embedded in a parenthetical group within the name
+        result = _final_stereo_check(mol, "something-(2R)-else")
+        # The embedded (2R) should be detected and name returned unchanged
+        assert result == "something-(2R)-else"
+
+    def test_carbohydrate_stereo_not_flagged(self):
+        """Names with alpha/beta-D/L carbohydrate notation are not flagged."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        result = _final_stereo_check(mol, "alpha-D-glucopyranose")
+        assert result == "alpha-D-glucopyranose"
+        result2 = _final_stereo_check(mol, "beta-L-mannose")
+        assert result2 == "beta-L-mannose"

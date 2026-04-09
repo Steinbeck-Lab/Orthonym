@@ -10,6 +10,7 @@ This is the inverse of OPSIN's pipeline:
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
@@ -22,11 +23,72 @@ from .perception.ions import detect_species_type, get_ion_sites, get_radical_sit
 from .perception.functional_groups import detect_functional_groups
 from .perception.chains import find_principal_chain
 from .perception.rings import get_ring_systems, get_ring_info, is_aromatic_ring, classify_ring, get_complete_ring_atom_set
-from .perception.stereo import get_stereocenters, get_double_bond_stereo, _CIP_ASSIGNED_PROP
+from .perception.stereo import get_stereocenters, get_double_bond_stereo, _CIP_ASSIGNED_PROP, assign_stereochemistry
 from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
+from .rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 from .assembly.composer import assemble_name
 from .data.retained_names import RETAINED_NAMES
+
+
+# ---------------------------------------------------------------------------
+# Universal stereo backstop (Phase 140, STER-16)
+# ---------------------------------------------------------------------------
+
+
+def _final_stereo_check(mol, name: str) -> str:
+    """Universal stereo backstop: detect missing stereodescriptors in name.
+
+    Runs AFTER all handler-specific stereo injection. Only activates when
+    a handler missed stereo. Logs WARNING to flag handler gaps for future fixes.
+
+    This is an architectural safety net per Phase 140 D-02.  It does NOT
+    inject stereo with raw atom-index locants because those don't correspond
+    to IUPAC numbering for the named parent structure -- injecting them would
+    produce incorrect names.  Handler-specific injection via
+    _inject_stereo_if_missing() remains the primary stereo injection mechanism.
+
+    Args:
+        mol: RDKit Mol object (with stereo info from original SMILES)
+        name: Generated IUPAC name (may or may not contain stereo)
+
+    Returns:
+        Original name unchanged.  Logs WARNING if stereo gap detected.
+    """
+    if mol is None or not name or name == 'unknown':
+        return name
+
+    # Already has stereo prefix? Use same regex as _inject_stereo_if_missing
+    if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
+        return name
+
+    # Check if stereo descriptors appear ANYWHERE in the name (e.g., already
+    # embedded by a handler within the name body).  Pattern: digit(s) followed
+    # by R/S/E/Z inside parentheses -- matches (2R), (3S,5R), (E), etc.
+    if re.search(r'\(\d*[RSEZrsez](,\d*[RSEZrsez])*\)', name):
+        return name
+
+    # Names using traditional carbohydrate/amino acid stereo notation
+    # (alpha/beta, D-/L-) already convey stereochemistry -- don't flag.
+    if re.search(r'(alpha|beta|alfa)-[DL]-', name, re.IGNORECASE):
+        return name
+
+    # Does molecule have stereo?
+    assign_stereochemistry(mol)
+    has_atom_stereo = any(a.HasProp('_CIPCode') for a in mol.GetAtoms())
+    has_bond_stereo = any(b.HasProp('_CIPCode') for b in mol.GetBonds())
+    if not has_atom_stereo and not has_bond_stereo:
+        return name
+
+    # Log the handler gap for future fixes.
+    n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
+    n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
+    logger.warning(
+        "Stereo backstop: '%s' has %d R/S + %d E/Z but name lacks descriptors. "
+        "Handler gap -- fix handler to include stereo natively.",
+        name[:50], n_atom_stereo, n_bond_stereo
+    )
+    return name
 
 
 @dataclass
@@ -210,10 +272,18 @@ class Orthonym:
             ValueError: If SMILES is invalid
         """
         # Start runtime fragment cache session (only at top-level depth)
-        from .assembly.fragment_naming import start_naming_session, end_naming_session
+        from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         start_naming_session()
         try:
-            return self._name_impl(smiles)
+            result = self._name_impl(smiles)
+            # Universal stereo backstop (Phase 140, STER-16)
+            # Only apply at top level -- decomposition fragments handle stereo
+            # through their own naming paths.
+            if is_top_level_naming():
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is not None:
+                    result = _final_stereo_check(mol, result)
+            return result
         finally:
             end_naming_session()
 
@@ -232,12 +302,17 @@ class Orthonym:
         Raises:
             ValueError: If SMILES is invalid
         """
-        from .assembly.fragment_naming import start_naming_session, end_naming_session
+        from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
         start_naming_session()
         clear_confidence()
         try:
             name = self._name_impl(smiles)
+            # Universal stereo backstop (Phase 140, STER-16)
+            if is_top_level_naming():
+                mol = Chem.MolFromSmiles(smiles)
+                if mol is not None:
+                    name = _final_stereo_check(mol, name)
             metadata = retrieve_confidence()
             # If no candidate was scored (early return path), build minimal metadata
             if not metadata['name']:
