@@ -374,3 +374,45 @@ class TestFragmentCappingStereo:
         assert cip_count >= 2, (
             f"Expected 2+ stereocenters in fragment, got {cip_count}"
         )
+
+
+# ===========================================================================
+# Phase 140: End-to-end decomposition stereo via name_compound
+# ===========================================================================
+
+import re as _re
+
+
+@pytest.mark.unit
+class TestDecompositionStereoEndToEnd:
+    """Verify stereo survives the full decomposition+assembly pipeline via name_compound."""
+
+    @pytest.mark.parametrize("smiles,desc", [
+        ("O=C(OCC)[C@@H](O)C", "ethyl (S)-2-hydroxypropanoate -- ester with R/S"),
+        ("O=C(OC)[C@H](N)CC", "methyl aminobutanoate -- ester with amino stereo"),
+        ("CC(=O)O[C@H](C)CC", "1-methylpropyl acetate -- alcohol-side stereo"),
+        ("O=C(NC)[C@@H](O)CC", "amide with hydroxyl stereo"),
+        ("O=C(OCC)/C=C/C", "ethyl but-2-enoate -- ester with E/Z"),
+        ("O=C(OCCC)[C@@H](CC)O", "propyl 2-hydroxypentanoate -- longer chain ester"),
+        ("CC(=O)N[C@@H](CC)C(=O)O", "amide with amino acid stereo"),
+        ("O=C(OCC)[C@@H](O)[C@H](O)CC", "diester with two stereocenters"),
+        ("O=C(OC(C)C)[C@H](C)O", "isopropyl ester with tertiary stereo"),
+        ("O=C(O[C@@H]1CCCC1)[C@@H](O)C", "cyclopentyl ester with ring fragment stereo"),
+    ])
+    def test_decomposition_preserves_stereo(self, smiles, desc):
+        from orthonym import name_compound
+        name = name_compound(smiles)
+        # Check that at least one stereodescriptor appears in the output
+        assert _re.search(r'\([^)]*[RSEZrsez][^)]*\)', name), (
+            f"Decomposed name '{name}' for {desc} (SMILES: {smiles}) "
+            f"is missing stereodescriptors"
+        )
+
+    def test_no_stereo_compound_no_false_stereo(self):
+        """Compounds without stereo input should NOT get stereo in decomposed name."""
+        from orthonym import name_compound
+        name = name_compound("O=C(OCC)CCC")  # ethyl butanoate, no stereo
+        # Should not have R/S/E/Z descriptors
+        assert not _re.search(r'\(\d*[RSEZrsez](,\d*[RSEZrsez])*\)-', name), (
+            f"Non-stereo compound got false stereo: {name}"
+        )
