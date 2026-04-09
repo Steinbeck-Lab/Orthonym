@@ -7,6 +7,7 @@ Tests cover:
 - Non-stereo fallback lookup
 - Glycosyloxy prefix formatting for various sugar types
 - Edge cases (unknown SMILES, empty inputs)
+- OPSIN carbohydrate integration (Phase 141 Plan 03)
 """
 
 import pytest
@@ -157,3 +158,117 @@ class TestDataCompleteness:
         for smiles, value in all_names.items():
             assert isinstance(value, tuple), f"Value for {smiles} is not a tuple"
             assert len(value) == 3, f"Value for {smiles} has {len(value)} elements"
+
+
+# ============================================================================
+# OPSIN carbohydrate integration tests (Phase 141, Plan 03)
+# ============================================================================
+
+class TestOpsinCarbohydrateIntegration:
+    """Tests for OPSIN carbohydrate data integration into sugar lookup."""
+
+    def test_opsin_carbohydrate_integration_meglumine(self):
+        """Meglumine (OPSIN simpleGroup) is lookupable via lookup_sugar."""
+        from rdkit import Chem
+        smi = "CNC[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        result = lookup_sugar(can)
+        assert result is not None, f"meglumine not found in sugar lookup (canonical: {can})"
+        assert "meglumine" in result[2].lower() or "meglumin" in result[2].lower()
+
+    def test_opsin_carbohydrate_integration_glucamine(self):
+        """Glucamine (OPSIN simpleGroup) is lookupable via lookup_sugar."""
+        from rdkit import Chem
+        smi = "NC[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        result = lookup_sugar(can)
+        assert result is not None, f"glucamine not found in sugar lookup (canonical: {can})"
+        assert "glucamine" in result[2].lower() or "glucamin" in result[2].lower()
+
+    def test_opsin_carbohydrate_integration_sorbitol(self):
+        """Sorbitol (OPSIN simpleGroup) is lookupable via lookup_sugar."""
+        from rdkit import Chem
+        smi = "OC[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        result = lookup_sugar(can)
+        assert result is not None, f"sorbitol not found in sugar lookup (canonical: {can})"
+        assert "sorbitol" in result[2].lower()
+
+    def test_opsin_ring_carbohydrate_garosamine(self):
+        """Garosamine (OPSIN ring entry, monosaccharide) is lookupable via lookup_sugar."""
+        from rdkit import Chem
+        smi = "CN[C@@H]1[C@@H](O)C(O)OC[C@]1(C)O"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        result = lookup_sugar(can)
+        assert result is not None, f"garosamine not found in sugar lookup (canonical: {can})"
+        assert "garosamine" in result[2].lower()
+
+    def test_disaccharides_excluded(self):
+        """Disaccharides (2+ rings) are excluded to avoid decomposition interference."""
+        from rdkit import Chem
+        from orthonym.data.sugar_names import ALL_SUGAR_NAMES
+        rutinose_smi = "C[C@@H]1O[C@@H](OC[C@H]2O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]2O)[C@H](O)[C@H](O)[C@H]1O"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(rutinose_smi))
+        assert can not in ALL_SUGAR_NAMES, "Disaccharide rutinose should not be in sugar lookup"
+
+    def test_opsin_ring_carbohydrate_ascorbic_acid(self):
+        """Ascorbic acid (OPSIN ring entry) is lookupable via lookup_sugar."""
+        from rdkit import Chem
+        smi = "O=C1O[C@H]([C@@H](O)CO)C(O)=C1O"
+        can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+        result = lookup_sugar(can)
+        assert result is not None, f"ascorbic acid not found in sugar lookup (canonical: {can})"
+        assert "ascorbic acid" in result[2].lower()
+
+    def test_existing_sugars_preserved(self):
+        """All original 56 hand-curated sugar entries still return correct tuples."""
+        from orthonym.data.sugar_names import ALL_SUGAR_NAMES
+        originals = {
+            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "glucopyranose"),
+            "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("beta", "D", "glucopyranose"),
+            "OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@H]1O": ("alpha", "D", "galactopyranose"),
+            "C[C@@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@H]1O": ("alpha", "L", "rhamnopyranose"),
+            "C[C@@H]1O[C@@H](O)[C@@H](O)[C@H](O)[C@@H]1O": ("alpha", "L", "fucopyranose"),
+            "OC[C@H]1O[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "mannopyranose"),
+        }
+        for smi, expected in originals.items():
+            result = ALL_SUGAR_NAMES.get(smi)
+            assert result == expected, f"Original entry changed: {smi} -> {result} (expected {expected})"
+
+    def test_sugar_count_expanded(self):
+        """ALL_SUGAR_NAMES has at least 70 entries after OPSIN integration."""
+        from orthonym.data.sugar_names import ALL_SUGAR_NAMES
+        assert len(ALL_SUGAR_NAMES) >= 70, f"Expected >= 70 sugar entries, got {len(ALL_SUGAR_NAMES)}"
+
+    def test_sugar_main_cascade(self):
+        """name_compound() on beta-D-glucopyranose SMILES returns a sugar name."""
+        from orthonym import name_compound
+        result = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+        assert "glucopyranose" in result.lower(), f"Expected sugar name, got: {result}"
+
+    def test_nonstereo_sugar_fallback_expanded(self):
+        """Non-stereo glucose SMILES still returns a sugar name after expansion."""
+        from rdkit import Chem
+        stereo_smi = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        mol = Chem.MolFromSmiles(stereo_smi)
+        Chem.RemoveStereochemistry(mol)
+        nonstereo = Chem.MolToSmiles(mol)
+        result = lookup_sugar(nonstereo)
+        assert result is not None, f"Non-stereo glucose fallback broken after expansion"
+        assert "glucopyranose" in result[2]
+
+    def test_carbohydrate_suffix_rules_cataloged(self):
+        """Carbohydrate suffix rules dict is populated."""
+        from orthonym.data.sugar_names import CARBOHYDRATE_SUFFIX_RULES
+        assert len(CARBOHYDRATE_SUFFIX_RULES) >= 10, \
+            f"Expected >= 10 suffix rules, got {len(CARBOHYDRATE_SUFFIX_RULES)}"
+        assert "ose" in CARBOHYDRATE_SUFFIX_RULES
+        assert "itol" in CARBOHYDRATE_SUFFIX_RULES
+
+    def test_hand_curated_wins_on_conflict(self):
+        """Hand-curated entries take precedence over OPSIN entries on conflict."""
+        from orthonym.data.sugar_names import ALL_SUGAR_NAMES
+        smi = "N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
+        result = ALL_SUGAR_NAMES.get(smi)
+        assert result is not None
+        assert result == ("alpha", "D", "glucosamine")
