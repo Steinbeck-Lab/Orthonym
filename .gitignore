@@ -55,3 +55,4 @@ benchmark_graded_results.json
 *.local
 .env
 
+stereo_gap_trace_results.json

@@ -46,13 +46,13 @@ class TestFinalStereoCheck:
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
         with caplog.at_level(logging.WARNING):
-            result = _final_stereo_check(mol, "butan-2-ol")
+            result = _final_stereo_check(mol, "butan-2-ol", handler="test_handler")
         # Name unchanged -- backstop is detection-only
         assert result == "butan-2-ol"
-        # But WARNING was logged identifying the gap
-        assert any("Stereo backstop" in rec.message for rec in caplog.records), (
-            "Expected WARNING about stereo gap"
-        )
+        # But WARNING was logged identifying the gap with handler attribution
+        warning_msgs = [rec.message for rec in caplog.records if "Stereo backstop" in rec.message]
+        assert len(warning_msgs) >= 1, "Expected WARNING about stereo gap"
+        assert "test_handler" in warning_msgs[0], "WARNING should include handler name"
 
     def test_name_unchanged_for_empty_string(self):
         """Empty string and 'unknown' should be returned unchanged."""
@@ -119,3 +119,25 @@ class TestFinalStereoCheck:
         assert result == "alpha-D-glucopyranose"
         result2 = _final_stereo_check(mol, "beta-L-mannose")
         assert result2 == "beta-L-mannose"
+
+    def test_warning_includes_handler_name(self, caplog):
+        """WARNING log should include handler attribution."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            result = _final_stereo_check(mol, "butan-2-ol", handler="polyfunctional_chain")
+        assert result == "butan-2-ol"
+        warning_msgs = [r.message for r in caplog.records if "Stereo backstop" in r.message]
+        assert len(warning_msgs) == 1
+        assert "polyfunctional_chain" in warning_msgs[0]
+
+    def test_handler_defaults_to_unknown(self, caplog):
+        """Calling without handler parameter should still work."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            result = _final_stereo_check(mol, "butan-2-ol")
+        assert result == "butan-2-ol"
+        warning_msgs = [r.message for r in caplog.records if "Stereo backstop" in r.message]
+        assert len(warning_msgs) == 1
+        assert "unknown" in warning_msgs[0]

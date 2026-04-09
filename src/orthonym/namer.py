@@ -36,7 +36,7 @@ from .data.retained_names import RETAINED_NAMES
 # ---------------------------------------------------------------------------
 
 
-def _final_stereo_check(mol, name: str) -> str:
+def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
     """Universal stereo backstop: detect missing stereodescriptors in name.
 
     Runs AFTER all handler-specific stereo injection. Only activates when
@@ -51,6 +51,7 @@ def _final_stereo_check(mol, name: str) -> str:
     Args:
         mol: RDKit Mol object (with stereo info from original SMILES)
         name: Generated IUPAC name (may or may not contain stereo)
+        handler: Name of the handler that produced this name (for attribution)
 
     Returns:
         Original name unchanged.  Logs WARNING if stereo gap detected.
@@ -84,9 +85,9 @@ def _final_stereo_check(mol, name: str) -> str:
     n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
     n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
     logger.warning(
-        "Stereo backstop: '%s' has %d R/S + %d E/Z but name lacks descriptors. "
-        "Handler gap -- fix handler to include stereo natively.",
-        name[:50], n_atom_stereo, n_bond_stereo
+        "Stereo backstop: '%s' (handler: %s) has %d R/S + %d E/Z but name lacks "
+        "descriptors. Fix handler to include stereo natively.",
+        name[:50], handler, n_atom_stereo, n_bond_stereo
     )
     return name
 
@@ -282,7 +283,9 @@ class Orthonym:
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
                 if mol is not None:
-                    result = _final_stereo_check(mol, result)
+                    from .assembly.coverage_scoring import retrieve_confidence
+                    handler = retrieve_confidence().get('handler', 'unknown')
+                    result = _final_stereo_check(mol, result, handler=handler)
             return result
         finally:
             end_naming_session()
@@ -312,7 +315,8 @@ class Orthonym:
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
                 if mol is not None:
-                    name = _final_stereo_check(mol, name)
+                    handler = retrieve_confidence().get('handler', 'unknown')
+                    name = _final_stereo_check(mol, name, handler=handler)
             metadata = retrieve_confidence()
             # If no candidate was scored (early return path), build minimal metadata
             if not metadata['name']:
