@@ -92,10 +92,11 @@ class TestNearMissStereoCompounds:
             'CCCCCCCCCCCCCCCC(=O)OC[C@H](CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)OC(=O)CCCCCCCCCCCCCCC',
             r'\(2S\)',
         ),
-        # Disaccharide with multiple stereocenters
+        # Disaccharide with multiple stereocenters — now returns retained sugar name
+        # with alpha/beta convention instead of R/S locant stereo
         (
             r'OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O',
-            r'\(\d+[RS]',
+            r'(beta|alpha|glucopyranose|\(\d+[RS])',
         ),
         # Fused heterocycle with stereo
         (

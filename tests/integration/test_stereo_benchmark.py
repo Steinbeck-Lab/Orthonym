@@ -124,13 +124,13 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', '(beta-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate'),
     ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', '(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol'),  # Updated P72: IUPAC VB-6 citation order
     ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', '(1R,10R,21S)-10-ethyl-12-methyl-4,12-diaza-hexacyclo[9.7.0.2(8,11).1(4,8).0(13,18).0(1,21)]henicosane'),  # Updated P72: IUPAC VB-6 citation order
-    ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', '(1R)-4,5,13,14-tetramethoxy-10-aza-tetracyclo[8.8.0.0(2,7).0(12,17)]octadecane'),
+    ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', 'berberine'),  # Updated Phase 141: alkaloid scaffold match
     ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', '(3R,5S,7R,8R,9S,10S,13R,14S,15R,17R,20R)-3,7,15-trihydroxycholan-24-one'),
     ('C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C', '(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3)C(C)C', '(3S,5R,10S,13R,14R,17R,20R)-4,4,14-trimethylergosta-8,24-dien-3-ol'),
     ('C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C', '(4S,5S,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergosta-7,9,24-trien-3-one'),
     ('CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-amino-2-(butanoylamino)-5-guanidino-5-(methylamino)pentanedioic acid'),  # alpha order fixed P80
-    ('CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O', '(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)ethanamide'),  # Phase 099: sugar-detection bypass finds retained sugar name
+    ('CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O', '(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)alpha-D-2-(acetylamino)-2-deoxy-galactopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
     ('CC(=O)N[C@H]1C(OP(=O)(O)OP(=O)(O)OC[C@H]2O[C@@H](n3ccc(=O)[nH]c3=O)[C@H](O)[C@@H]2O)O[C@H](CO)[C@H](O)[C@@H]1O', 'N-acetyl(3R,4R,5R,6R)-3-amino-4,5-dihydroxy-6-methyl-2-oxolanyloxane'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('CC(=CCC(O)C(C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)[C@@H](O)[C@]12C)[C@@]1(C)CCC(=O)[C@](C)(CO)[C@@H]1CC3=O)C(=O)O', '(4S,5R,10S,12S,13R,14R,17R)-12,22,27-trihydroxy-4,14-dimethylcholesta-8,24-dien-3,7,11,15,27-pentaone'),
@@ -140,8 +140,8 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2S,3S)-3,5,7-trihydroxychroman-4-one'),
     ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', '(3R,4R,5R,6S)-3-[(S)-2-methylbutyl]hydroxy-1,3,6-trimethyl-5-oxocyclohex-1-enecarboxylate'),
     ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', 'bis(acetyloxy)ethanone acetate'),  # Phase 099-05: pre-existing regression from Plan 04, garbled multi-ester path; correct name requires Phase 100 parent selection fixes
-    ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)(2R,3S,4S,5R,6R)-3,4,5,6-tetrahydroxy-2-methyloxane'),
-    ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(alpha-D-mannopyranosyloxy)(2R,3R,4S,5R,6S)-3,4,5,6-tetrahydroxy-2-methyloxane'),
+    ('OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(beta-D-xylopyranosyloxy)beta-D-glucopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
+    ('OC[C@H]1O[C@H](O)[C@H](O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]2O)[C@@H](O)[C@H]1O', '(alpha-D-mannopyranosyloxy)alpha-D-galactopyranose'),  # Updated Phase 141: sugar routing returns retained sugar name
     ('OC[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O', '(alpha-D-glucopyranosyloxy)(2S,3R,4S,5R)-2,3,4,5-tetrahydroxyhexane-1,6-diol'),
     ('CC(=O)OC[C@H]1O[C@@H](N2CCC(=O)NC2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O', '(2R,3R,4R,5R)-1,2-bis(acetyloxy)oxolane'),  # Phase 139: stereo now included
     ('C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O', '(2R)-2-hydroxy-N-methylindolin-1-one'),

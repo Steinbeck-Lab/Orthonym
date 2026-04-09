@@ -81,10 +81,10 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     # NOTE: Menthane (CC1CCC(C(C)C)CC1) intentionally NOT in scaffolds --
     # too generic (matches any substituted cyclohexane, causes false positives
     # on steroids). Kept as derivative entry only.
-    # Prostane scaffold (OPSIN)
-    "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": {
-        "name": "prostane", "stem": "prost", "class": "terpene",
-    },
+    # NOTE: Prostane (CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC) intentionally NOT
+    # in scaffolds -- too generic (cyclopentane + long chains matches many
+    # non-prostanoid compounds like prostaglandins, steroids). Kept as
+    # derivative entry only.
 }
 
 

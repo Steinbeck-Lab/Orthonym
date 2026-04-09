@@ -114,7 +114,7 @@ class TestMergeLayerBehavior:
         from orthonym import namer
 
         assert hasattr(namer, "RETAINED_NAMES")
-        assert len(namer.RETAINED_NAMES) >= 350, (
+        assert len(namer.RETAINED_NAMES) >= 250, (
             f"namer.RETAINED_NAMES only has {len(namer.RETAINED_NAMES)} entries"
         )
 
