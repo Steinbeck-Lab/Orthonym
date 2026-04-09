@@ -207,3 +207,41 @@ class TestRoundTripCanaries:
             f"  Expected: {expected}\n"
             f"  Got:      {name}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Section 5: Phase 139.1 Plan 03 -- recovered compounds via DECO-22/25
+# Ester threshold lowered to 2 (enables diester decomposition) and
+# partial assembly (recovers names when 2/3+ fragments succeed).
+# ---------------------------------------------------------------------------
+
+DECO_22_25_CANARIES = [
+    # Diester decomposition (DECO-22: ester threshold 2)
+    ("COC(=O)CC(=O)OC", "dimethyl propanedioate"),
+    ("CCOC(=O)CCC(=O)OCC", "diethyl butanedioate"),
+    ("COC(=O)CCCCC(=O)OC", "dimethyl hexanedioate"),
+    ("COC(=O)CC(=O)OCC", "ethyl methyl propanedioate"),
+    ("COC(=O)CCCC(=O)OC", "dimethyl pentanedioate"),
+    # Triester via multi-bond ester cleavage
+    ("CC(=O)OCC(COC(C)=O)OC(C)=O", "1,2,3-tris(acetyloxy)propane"),
+]
+
+
+class TestDeco22And25Canaries:
+    """Compounds recovered by DECO-22 (ester threshold 2) and DECO-25 (partial assembly).
+    These must not regress in future phases."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        DECO_22_25_CANARIES,
+        ids=[f"deco-{i}" for i in range(len(DECO_22_25_CANARIES))],
+    )
+    def test_deco_canary(self, smiles, expected):
+        name = name_compound(smiles)
+        assert name == expected, (
+            f"DECOMPOSITION REGRESSION (DECO-22/25): {smiles}\n"
+            f"  Expected: {expected}\n"
+            f"  Got:      {name}\n"
+            f"  DECO-22 (ester threshold 2) or DECO-25 (partial assembly) may have regressed."
+        )
