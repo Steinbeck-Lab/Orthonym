@@ -359,3 +359,99 @@ class TestOPSINSimpleGroupAminoAcids:
         assert "abrine" in NON_STANDARD_AMINO_ACIDS.values(), (
             "Expected 'abrine' in NON_STANDARD_AMINO_ACIDS values"
         )
+
+
+class TestExpandedAminoAcidPipeline:
+    """Test expanded amino acids through full naming pipeline (141-02 Task 2)."""
+
+    def test_name_compound_new_amino_acid(self):
+        """OPSIN simpleGroup amino acid is reachable via name_compound()."""
+        # abrine is a new OPSIN simpleGroup entry
+        result = name_compound("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O")
+        assert result is not None
+        assert "abrine" in result, f"Expected 'abrine' in result, got: {result}"
+
+    def test_name_compound_creatine(self):
+        """Creatine (non-alpha amino acid) found via SMILES lookup."""
+        result = name_compound("CN(CC(=O)O)C(=N)N")
+        assert result is not None
+        assert "creatine" in result.lower(), f"Expected 'creatine', got: {result}"
+
+    def test_name_compound_taurine(self):
+        """Taurine (sulfonic acid amino) found via SMILES lookup."""
+        result = name_compound("NCCS(=O)(=O)O")
+        assert result is not None
+        assert "taurine" in result.lower(), f"Expected 'taurine', got: {result}"
+
+    def test_pin_mode_returns_systematic(self):
+        """systematic mode bypasses trivial name lookup for amino acids."""
+        # Alanine in systematic mode should NOT return "alanine"
+        result = name_compound("CC(N)C(=O)O", style="systematic")
+        assert result is not None
+        assert "amino" in result.lower(), (
+            f"Expected systematic name with 'amino', got: {result}"
+        )
+        assert result != "alanine", (
+            f"systematic mode should not return trivial name 'alanine'"
+        )
+
+    def test_pin_mode_new_amino_acid(self):
+        """systematic mode produces systematic name for new amino acid entries."""
+        # butyrine in systematic mode should return "2-aminobutanoic acid"
+        result = name_compound("CCC(N)C(=O)O", style="systematic")
+        assert result is not None
+        assert result != "butyrine", (
+            f"systematic mode should not return trivial name 'butyrine'"
+        )
+        assert "amino" in result.lower(), (
+            f"Expected systematic name with 'amino', got: {result}"
+        )
+
+    def test_default_mode_returns_trivial(self):
+        """Default (pin) mode returns trivial names for new amino acid entries."""
+        result = name_compound("CCC(N)C(=O)O")
+        assert result == "butyrine", (
+            f"Expected trivial name 'butyrine', got: {result}"
+        )
+
+    def test_peptide_acyl_name_expansion(self):
+        """Expanded acyl names are available for peptide naming support."""
+        from orthonym.data.amino_acids import get_amino_acid_acyl_name
+
+        # New entries should have acyl names
+        assert get_amino_acid_acyl_name("creatine") is not None
+        assert get_amino_acid_acyl_name("taurine") is not None
+        assert get_amino_acid_acyl_name("abrine") is not None
+        # Existing entries still work
+        assert get_amino_acid_acyl_name("glycine") == "glycyl"
+        assert get_amino_acid_acyl_name("proline") == "prolyl"
+
+    def test_all_proteinogenic_via_name_compound(self):
+        """All 20 proteinogenic amino acids work through full pipeline."""
+        proteinogenic = [
+            ("NCC(=O)O", "glycine"),
+            ("CC(N)C(=O)O", "alanine"),
+            ("CC(C)C(N)C(=O)O", "valine"),
+            ("CC(C)CC(N)C(=O)O", "leucine"),
+            ("CCC(C)C(N)C(=O)O", "isoleucine"),
+            ("NC(CO)C(=O)O", "serine"),
+            ("CC(O)C(N)C(=O)O", "threonine"),
+            ("NC(CS)C(=O)O", "cysteine"),
+            ("CSCC(N)C(=O)O", "methionine"),
+            ("NC(CC(=O)O)C(=O)O", "aspartic acid"),
+            ("NC(CCC(=O)O)C(=O)O", "glutamic acid"),
+            ("NC(CC(N)=O)C(=O)O", "asparagine"),
+            ("NC(CCC(N)=O)C(=O)O", "glutamine"),
+            ("NCCCCC(N)C(=O)O", "lysine"),
+            ("NC(CCCNC(N)=N)C(=O)O", "arginine"),
+            ("NC(Cc1cnc[nH]1)C(=O)O", "histidine"),
+            ("NC(Cc1ccccc1)C(=O)O", "phenylalanine"),
+            ("NC(Cc1ccc(O)cc1)C(=O)O", "tyrosine"),
+            ("NC(Cc1c[nH]c2ccccc12)C(=O)O", "tryptophan"),
+            ("OC(=O)C1CCCN1", "proline"),
+        ]
+        for smiles, expected_name in proteinogenic:
+            result = name_compound(smiles)
+            assert result == expected_name, (
+                f"Expected {expected_name!r} for {smiles}, got {result!r}"
+            )

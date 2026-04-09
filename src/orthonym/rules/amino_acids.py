@@ -160,6 +160,10 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     For standard amino acids, returns trivial name.
     For non-standard, returns systematic name.
 
+    Phase 141-02: SMILES lookup is checked BEFORE the alpha-amino acid SMARTS
+    gate. This allows non-alpha amino acids (taurine, creatine, etc.) that are
+    in the OPSIN vocabulary to be named correctly via direct SMILES lookup.
+
     Peptide guard: if the molecule contains peptide bonds (-C(=O)-NH-),
     it is NOT a simple amino acid. Returns None so the molecule falls
     through to the general naming pipeline (or returns None for
@@ -172,20 +176,15 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     Returns:
         Amino acid name, or None if not an amino acid or is a peptide
     """
-    # Check if it's an amino acid at all
-    if not detect_amino_acid(mol):
-        return None
-
     # PEPTIDE GUARD: check for peptide bonds before naming as amino acid
-    # Molecules with peptide bonds are peptides, not simple amino acids
+    # Must run before SMILES lookup to prevent peptides with amino acid substrings
     n_peptide_bonds = count_peptide_bonds(mol)
     if n_peptide_bonds >= 1:
-        # This is a peptide (di-, tri-, or polypeptide)
-        # Return None to let it fall through to general naming pipeline
-        # For 2+ peptide bonds (tripeptide+), these are beyond current scope
         return None
 
-    # Try trivial name lookup first
+    # 141-02: Try SMILES lookup BEFORE the SMARTS pattern gate.
+    # Many OPSIN amino acid entries (taurine, creatine, etc.) don't match the
+    # alpha-amino acid SMARTS but are still valid amino acid trivial names.
     trivial = get_amino_acid_name(canonical_smiles)
     if trivial:
         # STER-09 / D-03: Inject stereo for trivial names (IUPAC P-91)
@@ -198,6 +197,10 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
             stereo_prefix = format_stereodescriptor_string(descriptors)
             return f"{stereo_prefix}{trivial}"
         return trivial
+
+    # Check if it matches the alpha-amino acid pattern for systematic naming
+    if not detect_amino_acid(mol):
+        return None
 
     # Generate systematic name
     return _name_amino_acid_systematic(mol)
