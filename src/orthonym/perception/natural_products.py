@@ -152,18 +152,28 @@ def detect_natural_product(mol) -> Optional[Dict]:
         logger.warning("No scaffold patterns compiled")
         return None
 
-    # Collect all matches, track the largest
+    # Collect all matches. When multiple scaffolds match, prefer by class
+    # priority (steroid > alkaloid > terpene), then by size within same class.
+    # This prevents large terpene scaffolds (prostane: 20 atoms) from
+    # outranking smaller but more specific steroid scaffolds (estrane: 18).
+    _CLASS_PRIORITY = {"steroid": 0, "alkaloid": 1, "terpene": 2}
     best_match = None
     best_match_size = 0
     best_smiles = None
+    best_class_priority = 99
 
     for smiles, query_mol in patterns.items():
         if mol.HasSubstructMatch(query_mol):
             match = mol.GetSubstructMatch(query_mol)
-            if len(match) > best_match_size:
+            scaffold_info = NATURAL_PRODUCT_SCAFFOLDS[smiles]
+            cls_priority = _CLASS_PRIORITY.get(scaffold_info["class"], 50)
+            # Prefer higher-priority class; within same class, prefer larger
+            if (cls_priority < best_class_priority or
+                    (cls_priority == best_class_priority and len(match) > best_match_size)):
                 best_match = match
                 best_match_size = len(match)
                 best_smiles = smiles
+                best_class_priority = cls_priority
 
     if best_match is None:
         return None
