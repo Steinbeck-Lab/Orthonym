@@ -78,7 +78,7 @@ SMALL_STEREO_COMPOUNDS = [
     ('CCC(C)C1=C2C(=O)OC[C@H]2[C@@H](C)[C@H](C)O1', '(2S,3R,4S)-6-(sec-butyl)-2,3-dimethyl-3,4-dihydro-2H-pyran'),  # Fixed: fabricated diethyl from ring boundary leak
     ('COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2', '(7aS)-2,3a-dichloro-3-methoxy-7a-methyl-2,3-dihydro-1-benzofuran-6-carboxylic acid'),  # MISSING_STEREO - wrong parent
     ('C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O', '3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole'),  # MISSING_STEREO - wrong parent
-    ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'heptanamide'),  # MISSING_STEREO - wrong parent
+    ('CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12', 'N-heptanoyl(2S)-5-amino-3-oxoazole'),  # Phase 139 improved: was heptanamide (MISSING_STEREO - wrong parent)
     ('C/C=C1\\[C@H]2C=C(C)C[C@]1([NH3+])c1ccc(=O)[nH]c1C2', '(2R,6R,13E)-4-methyl-9-aza-tricyclo[6.4.0.1(2,6)]tridec-4-en-10-one'),
     ('CO[C@@H]1[C@H](O)[C@@H](CO)O[C@H]1n1ccc(=O)[nH]c1=O', '(2R,3R,4R,5R)-4-hydroxy-3,5-dimethyl-2-pyrimidinyloxolane'),
     ('CCCCC[C@@H](O)[C@@H](O)c1cc(OC)cc(=O)o1', '(1R,2R)-1-cyclohexylheptane-1,2-diol'),

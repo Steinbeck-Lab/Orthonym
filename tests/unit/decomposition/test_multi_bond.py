@@ -902,11 +902,11 @@ class TestMultiBondThresholds:
     """Tests for bond-type-specific multi-bond thresholds (Phase 099-04)."""
 
     def test_threshold_dict_has_correct_values(self):
-        """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=3."""
+        """_MULTI_BOND_THRESHOLD has glycosidic=2, amide=3, ester=2 (DECO-22)."""
         from orthonym.decomposition.engine import _MULTI_BOND_THRESHOLD
         assert _MULTI_BOND_THRESHOLD["glycosidic"] == 2
         assert _MULTI_BOND_THRESHOLD["amide"] == 3
-        assert _MULTI_BOND_THRESHOLD["ester"] == 3
+        assert _MULTI_BOND_THRESHOLD["ester"] == 2  # DECO-22: lowered from 3 to enable diester decomposition
 
 
 @pytest.mark.unit

@@ -109,8 +109,9 @@ class TestNameQualityGate:
         D-04: chars/HA check for medium molecules (15-30 HA).
         "chloroethene" (12 chars) for a 23 HA molecule -> 12/23 = 0.52 < 0.65.
         Note: name must not be in _RETAINED_CORE_NAMES to test the new gate.
+        Requires cleavable bonds to trigger rejection (Plan 03 calibration).
         """
-        # 23 heavy atoms
+        # 23 heavy atoms -- has a ring system with cleavable bonds
         mol_23 = _mol("c1ccc2ncccc2c1CCCCCCCCCCCCCl")
         # "chloroethene" is 12 chars, 12/23 = 0.52 < 0.65 -> should be rejected
         assert _name_quality_is_acceptable("chloroethene", mol_23) is False
@@ -662,14 +663,15 @@ class TestPartialAssembly:
                 return "ethanol"
             return None  # Third fragment fails
 
-        with patch('orthonym.decomposition.engine.cleave_and_cap',
-                   return_value=mock_frags) as mock_cleave:
-            # Patch at the call site in the function
+        with patch('orthonym.decomposition.fragment_capping.cleave_and_cap',
+                   return_value=mock_frags):
             with patch('orthonym.decomposition.engine._name_fragment_with_fallback',
                        side_effect=mock_name_frag):
                 with patch('orthonym.decomposition.engine._name_sugar_fragment',
                            return_value=None):
-                    result = _try_multi_bond_decompose(mol, bonds)
+                    with patch('orthonym.decomposition.fragment_assembly._assemble_multi_ester',
+                               return_value="ethyl acetate"):
+                        result = _try_multi_bond_decompose(mol, bonds)
 
         # Should NOT be None -- partial assembly should produce a name
         assert result is not None, (
@@ -703,7 +705,7 @@ class TestPartialAssembly:
                 return "acetic acid"
             return None  # Others fail
 
-        with patch('orthonym.decomposition.engine.cleave_and_cap',
+        with patch('orthonym.decomposition.fragment_capping.cleave_and_cap',
                    return_value=mock_frags):
             with patch('orthonym.decomposition.engine._name_fragment_with_fallback',
                        side_effect=mock_name_frag):
@@ -742,7 +744,7 @@ class TestPartialAssembly:
                 return "methanol"
             return None
 
-        with patch('orthonym.decomposition.engine.cleave_and_cap',
+        with patch('orthonym.decomposition.fragment_capping.cleave_and_cap',
                    return_value=mock_frags):
             with patch('orthonym.decomposition.engine._name_fragment_with_fallback',
                        side_effect=mock_name_frag):
@@ -797,7 +799,7 @@ class TestPartialAssembly:
                 return False
             return True
 
-        with patch('orthonym.decomposition.engine.cleave_and_cap',
+        with patch('orthonym.decomposition.fragment_capping.cleave_and_cap',
                    return_value=mock_frags):
             with patch('orthonym.decomposition.engine._name_fragment_with_fallback',
                        side_effect=mock_name_frag):

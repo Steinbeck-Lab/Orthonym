@@ -88,7 +88,7 @@ _FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate"
 # Ester/amide: threshold 3 (2-bond molecules better handled by single-bond).
 # Phase 099-02 confirmed count>=2 causes regressions on 2-ester phospholipids.
 _MULTI_BOND_THRESHOLD = {
-    "ester": 3,
+    "ester": 2,       # Lowered from 3 per DECO-22/D-07: enables diester decomposition
     "glycosidic": 2,
     "amide": 3,
 }
@@ -389,12 +389,19 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # D-04: chars/HA check for medium molecules (15-30 HA)
     # Catches names like "quinoline" (0.39 chars/HA) for a 23 HA molecule.
     # Does NOT lower the HA <= 20 bypass in _name_covers_molecule() -- orthogonal check.
-    # Threshold 0.65 (lowered from initial 0.7 to avoid rejecting valid names like
-    # "2-methylicosane" at 0.68 for a 22 HA molecule). Will be calibrated in Plan 03.
+    # Threshold 0.65 (lowered from 0.7 to avoid rejecting "2-methylicosane" at 0.68).
+    # Cleavable-bond bypass: only reject if decomposition is actually possible.
+    # "hexadecane" (0.625) for 16 HA has no cleavable bonds -> no point rejecting.
     if 15 < heavy_atoms <= 30:
         chars_per_ha = len(name) / heavy_atoms
         if chars_per_ha < 0.65:
-            return False
+            from .bond_cleavage import find_cleavable_bonds
+            try:
+                bonds = find_cleavable_bonds(mol)
+                if bonds:
+                    return False  # Low ratio + cleavable bonds -> try decomposition
+            except Exception:
+                return False  # On error, still reject
 
     # For very large molecules, an adequate name should have at least
     # 0.45 characters per heavy atom (locants, prefixes, parent name)
@@ -1140,7 +1147,12 @@ def _try_multi_bond_decompose(
 
     # Name each fragment (sugar intercept for glycosidic)
     # DECO-17: use list-of-tuples to preserve identical SMILES duplicates
+    # DECO-25: partial assembly -- collect successful fragments, track failures
+    import logging
+    logger = logging.getLogger(__name__)
+
     named_fragments = []  # List[Tuple[Dict, str]] -- preserves all including duplicates
+    failed_count = 0
     for frag in fragments:
         frag_name = None
 
@@ -1152,9 +1164,39 @@ def _try_multi_bond_decompose(
             frag_name = _name_fragment_with_fallback(frag["smiles"])
 
         if not frag_name or "unknown" in frag_name.lower():
-            return None  # Truly unnameable -- abort
+            # DECO-25: track failure but don't abort yet
+            failed_count += 1
+            logger.debug("Fragment naming failed for %s (side=%s)",
+                         frag["smiles"], frag.get("side", "?"))
+            continue
+
+        # D-05: Fragment naming size validation -- reject names that cover
+        # less than 60% of the fragment's heavy atoms.
+        # Bypass for retained core names (adenine, purine, etc.) which correctly
+        # identify the key structural feature even when the fragment includes
+        # additional atoms (e.g., adenosine-phosphate fragment named "adenine").
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        if frag_mol:
+            frag_ha = frag_mol.GetNumHeavyAtoms()
+            is_retained_core = frag_name.lower() in _RETAINED_CORE_NAMES
+            if (frag_ha > 5
+                    and not is_retained_core
+                    and not _name_covers_molecule(frag_name, frag_mol)):
+                logger.debug("Fragment name '%s' rejected: poor coverage for %s (%d HA)",
+                             frag_name, frag["smiles"], frag_ha)
+                failed_count += 1
+                continue
 
         named_fragments.append((frag, frag_name))
+
+    # DECO-25: require at least 2 named fragments for assembly
+    if len(named_fragments) < 2:
+        return None  # Not enough fragments to assemble
+
+    # Log partial assembly if some fragments failed
+    if failed_count > 0:
+        logger.info("Partial assembly: %d/%d fragments named (%d failed)",
+                    len(named_fragments), len(fragments), failed_count)
 
     # Dispatch to bond-type-specific multi-fragment assembler
     if bond_type == "ester":
@@ -1282,14 +1324,41 @@ def _try_iterative_mixed_decompose(
 
     # Name each fragment (Phase 127: D-01 fallback)
     # DECO-17/Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
+    # DECO-25: partial assembly -- collect successful fragments, track failures
     named_fragments = []
+    failed_count = 0
     for frag in all_fragments:
         frag_name = _name_sugar_fragment(frag["smiles"])
         if not frag_name:
             frag_name = _name_fragment_with_fallback(frag["smiles"])
         if not frag_name or "unknown" in frag_name.lower():
-            return None  # Truly unnameable -- abort
+            # DECO-25: track failure but don't abort yet
+            failed_count += 1
+            logger.debug("Mixed-decomp fragment naming failed for %s", frag["smiles"])
+            continue
+
+        # D-05: Fragment naming size validation (with retained core name bypass)
+        frag_mol = Chem.MolFromSmiles(frag["smiles"])
+        if frag_mol:
+            frag_ha = frag_mol.GetNumHeavyAtoms()
+            is_retained_core = frag_name.lower() in _RETAINED_CORE_NAMES
+            if (frag_ha > 5
+                    and not is_retained_core
+                    and not _name_covers_molecule(frag_name, frag_mol)):
+                logger.debug("Mixed-decomp fragment name '%s' rejected: poor coverage for %s (%d HA)",
+                             frag_name, frag["smiles"], frag_ha)
+                failed_count += 1
+                continue
+
         named_fragments.append((frag, frag_name))
+
+    # DECO-25: require at least 2 named fragments for assembly
+    if len(named_fragments) < 2:
+        return None  # Not enough fragments to assemble
+
+    if failed_count > 0:
+        logger.info("Mixed-decomp partial assembly: %d/%d fragments named (%d failed)",
+                    len(named_fragments), len(all_fragments), failed_count)
 
     # Bond-type-aware assembly (DECO-23): route fragment pairs through
     # bond-type-specific assemblers instead of naive space-join
