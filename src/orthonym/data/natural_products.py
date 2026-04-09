@@ -48,7 +48,7 @@ NATURAL_PRODUCT_SCAFFOLDS = {
         "name": "gonane", "stem": "gon", "class": "steroid",
     },
 
-    # ---- Alkaloids (5 scaffolds) ----
+    # ---- Alkaloids (8 scaffolds) ----
     "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13": {
         "name": "morphinan", "stem": "morphin", "class": "alkaloid",
     },
@@ -64,6 +64,27 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     "c1cc2c3c(c[nH]c3c1)C[C@H]1NCCC[C@H]21": {
         "name": "ergoline", "stem": "ergolin", "class": "alkaloid",
     },
+    # Aconitane scaffold (Phase 141 -- OPSIN entry)
+    "C1C[C@H]2CN[C@@H]3[C@@H]4C[C@H]2[C@@]3(C1)[C@@H]1C[C@@H]2CC[C@H]4[C@H]1C2": {
+        "name": "aconitane", "stem": "aconit", "class": "alkaloid",
+    },
+    # Berberine scaffold (Phase 141 -- OPSIN entry)
+    "c1ccc2c(c1)CC1c3ccccc3CCN1C2": {
+        "name": "berberine", "stem": "berbin", "class": "alkaloid",
+    },
+    # Ajmaline scaffold (Phase 141 -- OPSIN entry)
+    "CC[C@@H]1CN2[C@H]3C[C@]45C[C@H]3[C@H]1C[C@H]2[C@@H]4N(C)c1ccccc15": {
+        "name": "ajmaline", "stem": "ajmal", "class": "alkaloid",
+    },
+
+    # ---- Terpene scaffolds ----
+    # NOTE: Menthane (CC1CCC(C(C)C)CC1) intentionally NOT in scaffolds --
+    # too generic (matches any substituted cyclohexane, causes false positives
+    # on steroids). Kept as derivative entry only.
+    # Prostane scaffold (OPSIN)
+    "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": {
+        "name": "prostane", "stem": "prost", "class": "terpene",
+    },
 }
 
 
@@ -76,6 +97,45 @@ NATURAL_PRODUCT_DERIVATIVES = {
     # ---- Steroid derivatives ----
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C":
         "cholesterol",
+    # Progesterone (exact lookup -- avoids gonane scaffold mismatch)
+    "CC(=O)[C@H]1CC[C@H]2[C@H]3CCC4=CC(=O)CC[C@]4(C)[C@H]3CC[C@@H]21":
+        "progesterone",
+    # Androstenedione (OPSIN)
+    "C[C@]12CCC(=O)CC1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12":
+        "androstenedione",
+    # Androstanediol (OPSIN)
+    "C[C@]12CCC(O)C[C@@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@@H](O)CC[C@@H]12":
+        "androstanediol",
+    # Androstenediol (OPSIN)
+    "C[C@]12CC[C@H]3[C@@H](CCC4C[C@@H](O)CC[C@@]43C)[C@@H]1CC[C@@H]2O":
+        "androstenediol",
+    # Androstenol (OPSIN)
+    "C[C@]12CC[C@@H](O)C[C@@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C=CC[C@@H]12":
+        "androstenol",
+    # Androstenone (OPSIN)
+    "C[C@]12CCC(=O)C[C@@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C=CC[C@@H]12":
+        "androstenone",
+    # Androstadienone (OPSIN)
+    "C[C@@]12C=CC[C@H]1[C@@H]1CCC3=CC(=O)CC[C@]3(C)[C@H]1CC2":
+        "androstadienone",
+    # Estratetraenol (OPSIN)
+    "C[C@@]12C=CC[C@H]1[C@@H]1CCc3cc(O)ccc3[C@H]1CC2":
+        "estratetraenol",
+    # Campestanol (OPSIN)
+    "CC(C)[C@H](C)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C":
+        "campestanol",
+    # Cardenolide (OPSIN)
+    "C[C@]12CC[C@H]3[C@@H](CCC4CCCC[C@@]43C)[C@H]1CC[C@@H]2C1=CC(=O)OC1":
+        "cardenolide",
+    # Cardanolide (OPSIN)
+    "C[C@]12CC[C@H]3[C@@H](CCC4CCCC[C@@]43C)[C@H]1CC[C@@H]2[C@@H]1COC(=O)C1":
+        "cardanolide",
+    # Bufanolide (OPSIN)
+    "C[C@]12CC[C@H]3[C@@H](CCC4CCCC[C@@]43C)[C@H]1CC[C@@H]2[C@H]1CCC(=O)OC1":
+        "bufanolide",
+    # Bufadienolide (OPSIN)
+    "C[C@]12CC[C@H]3[C@@H](CCC4CCCC[C@@]43C)[C@H]1CC[C@@H]2c1ccc(=O)oc1":
+        "bufadienolide",
 
     # ---- Opioid derivatives ----
     "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5":
@@ -90,6 +150,51 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "oxycodone",
     "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)CC[C@H]3[C@H]1C5":
         "hydromorphone",
+    # Morphinone (OPSIN)
+    "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)C=C[C@H]3[C@H]1C5":
+        "morphinone",
+    # Dihydromorphine (OPSIN)
+    "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)CC[C@H]3[C@H]1C5":
+        "dihydromorphine",
+    # Codeinone (OPSIN)
+    "COc1ccc2c3c1O[C@H]1C(=O)C=C[C@H]4[C@@H](C2)N(C)CC[C@]314":
+        "codeinone",
+    # Dihydrocodeine (OPSIN)
+    "COc1ccc2c3c1O[C@H]1[C@@H](O)CC[C@H]4[C@@H](C2)N(C)CC[C@@]341":
+        "dihydrocodeine",
+    # Heroin / diacetylmorphine (OPSIN -- alternate entry to diamorphine)
+    "CC(=O)Oc1ccc2c3c1O[C@H]1[C@@H](OC(C)=O)C=C[C@H]4[C@@H](C2)N(C)CC[C@@]341":
+        "diamorphine",
+    # Dihydroheroin (OPSIN)
+    "CC(=O)Oc1ccc2c3c1O[C@H]1[C@@H](OC(C)=O)CC[C@H]4[C@@H](C2)N(C)CC[C@@]341":
+        "dihydroheroin",
+
+    # ---- Ergoline / lysergic acid derivatives (OPSIN) ----
+    "CN1C[C@H](C(=O)O)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "lysergic acid",
+    "CN1C[C@H](C(=O)O)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydrolysergic acid",
+    "CN1C[C@H](C(N)=O)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "lysergamide",
+    "CN1C[C@H](C(N)=O)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydrolysergamide",
+    "CN1C[C@H](CO)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "lysergol",
+    "CN1C[C@H](CO)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydrolysergol",
+    # Isolysergic acid and derivatives (OPSIN)
+    "CN1C[C@@H](C(=O)O)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "isolysergic acid",
+    "CN1C[C@@H](C(=O)O)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydroisolysergic acid",
+    "CN1C[C@@H](C(N)=O)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "isolysergamide",
+    "CN1C[C@@H](C(N)=O)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydroisolysergamide",
+    "CN1C[C@@H](CO)C=C2c3cccc4[nH]cc(c34)C[C@H]21":
+        "isolysergol",
+    "CN1C[C@@H](CO)CC2c3cccc4[nH]cc(c34)C[C@H]21":
+        "dihydroisolysergol",
 
     # ---- Terpenoid derivatives ----
     "CC12CCC(CC1=O)C2(C)C":
@@ -106,6 +211,24 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "beta-terpineol",
     "C=CCC(O)CC=C(C)C":
         "gamma-terpineol",
+    # 4-terpineol (OPSIN)
+    "CC1=CCC(O)(C(C)C)CC1":
+        "4-terpineol",
+    # Gamma-terpineol (OPSIN -- alternate SMILES from OPSIN entry)
+    "CC(C)=C1CCC(C)(O)CC1":
+        "gamma-terpineol",
+    # Alpha-terpinene (OPSIN stem with -ene suffix)
+    "CC1=CC=C(C(C)C)CC1":
+        "alpha-terpinene",
+    # Beta-terpinene (OPSIN stem with -ene suffix)
+    "C=C1CC=C(C(C)C)CC1":
+        "beta-terpinene",
+    # Gamma-terpinene (OPSIN stem with -ene suffix)
+    "CC1=CCC(C(C)C)=CC1":
+        "gamma-terpinene",
+    # Delta-terpinene (OPSIN stem with -ene suffix)
+    "CC1=CCC(=C(C)C)CC1":
+        "delta-terpinene",
 
     # ---- Carotenoid derivatives ----
     "CC1=C(/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(C)/C=C/C2=C(C)CCC2(C)C)C(C)(C)CCC1":
@@ -113,11 +236,25 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC(C)=CC=CC(C)=CC=C/C(C)=C/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)C":
         "lycopene",
 
-    # ---- Beta-lactam scaffolds ----
+    # ---- Beta-lactam scaffolds (OPSIN) ----
     "O=C(O)C1CSC2CC(=O)N21":
         "penam",
     "O=C(O)C1CSCC2CC(=O)N21":
         "cepham",
+    # Beta-lactam ring systems without carboxylic acid (OPSIN)
+    "O=C1C[C@H]2SCCN12":
+        "penam",
+    "O=C1C[C@H]2SCCCN12":
+        "cepham",
+    # Penems and cephems (OPSIN)
+    "O=C1C[C@H]2C=CCN12":
+        "1-carbapen-1-em",
+    "O=C1C[C@H]2SC=CCN12":
+        "ceph-2-em",
+    "O=C1C[C@H]2SC=CN12":
+        "pen-2-em",
+    "O=C1C[C@H]2SCC=CN12":
+        "ceph-3-em",
 
     # ---- Flavonoid / chromene derivatives (Phase 89) ----
     "O=c1cc(-c2ccccc2)oc2ccccc12":
@@ -132,9 +269,6 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "chromone",
 
     # ---- Ergostane derivatives with non-standard ring perception ----
-    # RDKit perceives (5,6,5,6) ring topology instead of (5,6,6,6) for these
-    # compounds, preventing scaffold substructure match against ergostane.
-    # Added as exact derivative entries (same pattern as cholesterol, morphine).
     "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C":
         "ergosta-7,24(28)-dien-3-ol",
 
@@ -143,6 +277,9 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "pinane",
     "CC12CCC(CC1)C2(C)C":
         "bornane",
+    # Menthane scaffold (monoterpene parent)
+    "CC1CCC(C(C)C)CC1":
+        "menthane",
 }
 
 

@@ -200,7 +200,7 @@ def classify_compound_class(mol, canonical_smiles: str) -> Optional[str]:
 _TERPENE_KEYWORDS = frozenset([
     "pinene", "pinane", "bornane", "camphor", "limonene",
     "terpineol", "terpinene", "carotene", "lycopene", "menthane",
-    "thujane", "pinanol", "borneol", "fenchone",
+    "thujane", "pinanol", "borneol", "fenchone", "prostane",
 ])
 
 # Steroid-related name patterns
