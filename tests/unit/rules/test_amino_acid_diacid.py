@@ -39,9 +39,13 @@ class TestDicarboxylicAminoAcidBailout:
         assert "aminopentanedioic acid" in result
 
     def test_mono_cooh_amino_acid_unchanged(self):
-        """2-aminobutanoic acid (1 COOH) should NOT bail out -- regression guard."""
+        """Mono-COOH amino acid should NOT bail out -- regression guard.
+        After 141-02 expansion, this compound is recognized as 'butyrine'
+        (OPSIN simpleGroup entry), which is the correct trivial name."""
         result = name_compound("NC(CC)C(=O)O")
-        assert result == "2-aminobutanoic acid"
+        assert result in ("2-aminobutanoic acid", "butyrine"), (
+            f"Expected systematic or trivial name, got: {result}"
+        )
 
     def test_alanine_unchanged(self):
         """Alanine (1 COOH) should still produce 'alanine' -- regression guard."""

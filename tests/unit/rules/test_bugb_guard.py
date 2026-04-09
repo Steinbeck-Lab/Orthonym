@@ -192,10 +192,11 @@ class TestPolyfunctionalCompleteness:
         )
 
     def test_amino_plus_acid(self):
-        """Molecule with amine + carboxylic acid on chain."""
+        """Molecule with amine + carboxylic acid on chain.
+        After 141-02, this is recognized as 'butyrine' (OPSIN trivial name)."""
         result = name_compound("NC(CC)C(=O)O")
-        assert "amino" in result.lower(), (
-            f"Amino prefix missing: {result}"
+        assert "amino" in result.lower() or result == "butyrine", (
+            f"Expected amino prefix or trivial name 'butyrine': {result}"
         )
 
     def test_hydroxy_on_ring_plus_acid(self):

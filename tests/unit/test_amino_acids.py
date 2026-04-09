@@ -285,7 +285,7 @@ class TestOPSINSimpleGroupAminoAcids:
             ("CN(CC(=O)O)C(=N)N", "creatine"),
             ("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O", "abrine"),
             ("CSCCCN", "methioninamine"),
-            ("NCCC(=O)O", "beta-alanine"),
+            ("NCCS(=O)(=O)O", "taurine"),
         ]
 
         for smiles, expected_name in test_cases:
