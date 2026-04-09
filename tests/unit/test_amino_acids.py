@@ -264,3 +264,98 @@ class TestIntegrationWithNameCompound:
         assert name_compound("CC(=O)O") == "acetic acid"
         # Simple amine
         assert name_compound("CCN") == "ethylamine"
+
+
+class TestOPSINSimpleGroupAminoAcids:
+    """Test OPSIN simpleGroup amino acid integration (141-02)."""
+
+    def test_opsin_simplegroup_amino_acids(self):
+        """10 representative simpleGroup entries are lookupable by canonical SMILES."""
+        from orthonym.data.amino_acids import get_amino_acid_name
+        from rdkit import Chem
+
+        # 10 representative simpleGroup entries from OPSIN_AMINO_ACIDS
+        test_cases = [
+            ("CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)NCCS", "pantetheine"),
+            ("CC(C)(CO)[C@@H](O)C(=O)NCCCO", "pantothenol"),
+            ("CC(C)C[C@H](N)[C@@H](O)CC(=O)O", "statine"),
+            ("CC(NC(C)C(=O)O)C(=O)O", "alanopine"),
+            ("CC(NCC(=O)O)C(=O)O", "strombine"),
+            ("CCC(N)C(=O)O", "butyrine"),
+            ("CN(CC(=O)O)C(=N)N", "creatine"),
+            ("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O", "abrine"),
+            ("CSCCCN", "methioninamine"),
+            ("NCCC(=O)O", "beta-alanine"),
+        ]
+
+        for smiles, expected_name in test_cases:
+            can_smiles = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+            result = get_amino_acid_name(can_smiles)
+            assert result == expected_name, (
+                f"Expected {expected_name!r} for {can_smiles}, got {result!r}"
+            )
+
+    def test_existing_amino_acids_preserved(self):
+        """All 20 proteinogenic amino acids still return correct names."""
+        from orthonym.data.amino_acids import get_amino_acid_name
+
+        proteinogenic = {
+            "NCC(=O)O": "glycine",
+            "CC(N)C(=O)O": "alanine",
+            "CC(C)C(N)C(=O)O": "valine",
+            "CC(C)CC(N)C(=O)O": "leucine",
+            "CCC(C)C(N)C(=O)O": "isoleucine",
+            "NC(CO)C(=O)O": "serine",
+            "CC(O)C(N)C(=O)O": "threonine",
+            "NC(CS)C(=O)O": "cysteine",
+            "CSCC(N)C(=O)O": "methionine",
+            "NC(CC(=O)O)C(=O)O": "aspartic acid",
+            "NC(CCC(=O)O)C(=O)O": "glutamic acid",
+            "NC(CC(N)=O)C(=O)O": "asparagine",
+            "NC(CCC(N)=O)C(=O)O": "glutamine",
+            "NCCCCC(N)C(=O)O": "lysine",
+            "NC(CCCNC(N)=N)C(=O)O": "arginine",
+            "NC(Cc1cnc[nH]1)C(=O)O": "histidine",
+            "NC(Cc1ccccc1)C(=O)O": "phenylalanine",
+            "NC(Cc1ccc(O)cc1)C(=O)O": "tyrosine",
+            "NC(Cc1c[nH]c2ccccc12)C(=O)O": "tryptophan",
+            "OC(=O)C1CCCN1": "proline",
+        }
+        for smiles, expected_name in proteinogenic.items():
+            result = get_amino_acid_name(smiles)
+            assert result == expected_name, (
+                f"Expected {expected_name!r} for {smiles}, got {result!r}"
+            )
+
+    def test_amino_acid_count_expanded(self):
+        """Total amino acid entries should be >= 90 after OPSIN integration."""
+        from orthonym.data.amino_acids import STANDARD_AMINO_ACIDS, NON_STANDARD_AMINO_ACIDS
+
+        total = len(STANDARD_AMINO_ACIDS) + len(NON_STANDARD_AMINO_ACIDS)
+        assert total >= 90, f"Expected >= 90 amino acid entries, got {total}"
+
+    def test_acyl_names_expanded(self):
+        """AMINO_ACID_ACYL_NAMES should have >= 50 entries after expansion."""
+        from orthonym.data.amino_acids import AMINO_ACID_ACYL_NAMES
+
+        assert len(AMINO_ACID_ACYL_NAMES) >= 50, (
+            f"Expected >= 50 acyl name entries, got {len(AMINO_ACID_ACYL_NAMES)}"
+        )
+
+    def test_acyl_name_for_new_entry(self):
+        """New amino acids should have acyl name entries."""
+        from orthonym.data.amino_acids import get_amino_acid_acyl_name
+
+        # abrine -> abrinyl (standard -ine -> -inyl pattern doesn't apply,
+        # but -ine -> -yl should work)
+        result = get_amino_acid_acyl_name("abrine")
+        assert result is not None, "Expected acyl name for 'abrine'"
+
+    def test_abrine_in_data(self):
+        """abrine should be present in expanded amino acid data."""
+        from orthonym.data.amino_acids import NON_STANDARD_AMINO_ACIDS
+
+        # Check that 'abrine' appears as a value in NON_STANDARD_AMINO_ACIDS
+        assert "abrine" in NON_STANDARD_AMINO_ACIDS.values(), (
+            "Expected 'abrine' in NON_STANDARD_AMINO_ACIDS values"
+        )
