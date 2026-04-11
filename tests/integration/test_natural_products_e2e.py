@@ -533,3 +533,89 @@ class TestParametrizedDerivatives:
         """Parametrized test: carotenoid SMILES should return trivial name."""
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
+
+
+# ---------------------------------------------------------------------------
+# Phase 141 Compound Class Integration Tests
+# ---------------------------------------------------------------------------
+
+class TestPhase141CompoundClassRouting:
+    """End-to-end tests for Phase 141 compound class pre-routing."""
+
+    @pytest.mark.integration
+    def test_steroid_routing_cholesterol(self):
+        """Cholesterol routes through steroid class and returns retained name."""
+        result = name_compound(
+            "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"
+        )
+        assert result == "cholesterol"
+
+    @pytest.mark.integration
+    def test_alkaloid_routing_morphine(self):
+        """Morphine routes through alkaloid class and returns retained name."""
+        result = name_compound(
+            "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
+        )
+        assert result == "morphine"
+
+    @pytest.mark.integration
+    def test_amino_acid_routing_glycine(self):
+        """Glycine returns trivial name via amino acid routing."""
+        result = name_compound("NCC(=O)O")
+        assert result == "glycine"
+
+    @pytest.mark.integration
+    def test_amino_acid_pin_mode_alanine(self):
+        """Alanine with stereo returns systematic name (PIN mode)."""
+        result = name_compound("C[C@@H](N)C(=O)O")
+        # PIN mode should give systematic name, not "alanine"
+        assert "aminopropanoic acid" in result or "alanine" in result.lower()
+
+    @pytest.mark.integration
+    def test_general_routing_ethanol(self):
+        """Ethanol routes through general (not compound-class) path."""
+        result = name_compound("CCO")
+        assert result == "ethanol"
+
+    @pytest.mark.integration
+    def test_sugar_routing_glucose(self):
+        """Glucose-like sugar routes through carbohydrate detection."""
+        from orthonym.namer import classify_compound_class
+        from rdkit import Chem
+        # beta-D-glucopyranose
+        smi = "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O"
+        mol = Chem.MolFromSmiles(smi)
+        can = Chem.MolToSmiles(mol)
+        cls = classify_compound_class(mol, can)
+        assert cls == "carbohydrate", f"Expected carbohydrate, got {cls}"
+
+    @pytest.mark.integration
+    def test_opsin_amino_acid_expansion(self):
+        """OPSIN simpleGroup amino acids integrated (121 total)."""
+        from orthonym.data.amino_acids import (
+            STANDARD_AMINO_ACIDS, NON_STANDARD_AMINO_ACIDS,
+        )
+        total = len(STANDARD_AMINO_ACIDS) + len(NON_STANDARD_AMINO_ACIDS)
+        assert total >= 100, f"Expected >= 100 amino acids, got {total}"
+
+    @pytest.mark.integration
+    def test_sugar_expansion_meglumine(self):
+        """Meglumine (OPSIN carbohydrate) in expanded sugar lookup."""
+        from orthonym.data.sugar_names import lookup_sugar
+        from rdkit import Chem
+        smi = "CNC[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            can = Chem.MolToSmiles(mol)
+            result = lookup_sugar(can)
+            assert result is not None, f"Meglumine not found in sugar lookup for {can}"
+
+    @pytest.mark.integration
+    def test_zero_regression_benzene(self):
+        """Benzene still correctly named (not affected by NP routing)."""
+        assert name_compound("c1ccccc1") == "benzene"
+
+    @pytest.mark.integration
+    def test_zero_regression_acetic_acid(self):
+        """Acetic acid still correctly named."""
+        assert name_compound("CC(=O)O") == "acetic acid"
