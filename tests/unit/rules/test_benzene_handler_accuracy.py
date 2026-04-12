@@ -19,12 +19,12 @@ import pytest
 from orthonym.namer import name_compound
 
 
-# === Benzaldehyde retained base ===
-# These currently produce "benzenecarbaldehyde" instead of "benzaldehyde"
-# because _assemble_benzene_with_suffix() lacks a carbaldehyde routing path.
+# === Benzaldehyde retained base (Phase 142-01 fix) ===
+# These previously produced "benzenecarbaldehyde" instead of "benzaldehyde".
+# Fixed by adding carbaldehyde routing in _assemble_benzene_with_suffix().
 
 BENZALDEHYDE_CASES = [
-    # Unsubstituted benzaldehyde (retained name lookup -- already works)
+    # Unsubstituted benzaldehyde (retained name lookup)
     ("O=Cc1ccccc1", "benzaldehyde"),
     # Halogenated benzaldehydes
     ("O=Cc1ccc(Cl)cc1", "4-chlorobenzaldehyde"),
@@ -38,8 +38,14 @@ BENZALDEHYDE_CASES = [
     ("O=Cc1ccccc1O", "2-hydroxybenzaldehyde"),
     ("O=Cc1ccc(O)c(O)c1", "3,4-dihydroxybenzaldehyde"),
     ("O=Cc1cc(O)c(O)c(O)c1", "3,4,5-trihydroxybenzaldehyde"),
-    # Alkyl substituted
-    ("CC(C)c1ccc(C=O)cc1", "4-(propan-2-yl)benzaldehyde"),
+    # Alkyl substituted -- benzaldehyde base is correct, substituent naming
+    # gives "isopropyl" instead of "propan-2-yl" (separate issue from retained base)
+    pytest.param(
+        "CC(C)c1ccc(C=O)cc1", "4-(propan-2-yl)benzaldehyde",
+        marks=pytest.mark.xfail(
+            reason="Substituent naming: isopropyl vs propan-2-yl (not a benzaldehyde base issue)"
+        ),
+    ),
 ]
 
 # === Phenol, benzoic acid, and other retained bases (regression checks) ===
@@ -60,11 +66,22 @@ RETAINED_BASE_REGRESSION_CASES = [
 # === Multi-OH benzene: systematic naming ===
 
 MULTI_OH_CASES = [
-    # These use systematic naming (not retained like hydroquinone/pyrogallol)
-    # per IUPAC 2013 P-63.1.1.1, benzene-X,Y-diol is the preferred IUPAC name
-    # OPSIN parses both; current code returns retained names (hydroquinone, pyrogallol)
-    ("Oc1ccc(O)cc1", "benzene-1,4-diol"),
-    ("Oc1cccc(O)c1O", "benzene-1,2,3-triol"),
+    # Per IUPAC 2013 P-63.1.1.1, benzene-X,Y-diol is the preferred IUPAC name.
+    # OPSIN parses both systematic and retained forms.
+    # Current code returns retained names (hydroquinone, pyrogallol) from lookup.
+    # These are acceptable names but not the IUPAC PIN.
+    pytest.param(
+        "Oc1ccc(O)cc1", "benzene-1,4-diol",
+        marks=pytest.mark.xfail(
+            reason="Returns retained name 'hydroquinone' instead of systematic PIN"
+        ),
+    ),
+    pytest.param(
+        "Oc1cccc(O)c1O", "benzene-1,2,3-triol",
+        marks=pytest.mark.xfail(
+            reason="Returns retained name 'pyrogallol' instead of systematic PIN"
+        ),
+    ),
 ]
 
 # Combine all cases for the main parametrized test
@@ -75,23 +92,6 @@ BENZENE_ACCURACY_CASES = (
 )
 
 
-def _currently_fails(smiles, expected):
-    """Check if a test case currently fails (for xfail marking)."""
-    try:
-        result = name_compound(smiles)
-        return result != expected
-    except Exception:
-        return True
-
-
-# Build xfail set at import time so xfail markers are static
-_XFAIL_SET = {
-    (smiles, expected)
-    for smiles, expected in BENZENE_ACCURACY_CASES
-    if _currently_fails(smiles, expected)
-}
-
-
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", BENZENE_ACCURACY_CASES)
 def test_benzene_handler_accuracy(smiles, expected):
@@ -100,7 +100,5 @@ def test_benzene_handler_accuracy(smiles, expected):
     Covers benzaldehyde, phenol, benzoic acid, aniline, and acetophenone
     compound classes. Expected names verified against OPSIN 2.9.0.
     """
-    if (smiles, expected) in _XFAIL_SET:
-        pytest.xfail("Phase 142 benzene handler fix pending")
     result = name_compound(smiles)
     assert result == expected, f"Got '{result}' for {smiles}"

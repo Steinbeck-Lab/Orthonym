@@ -1832,6 +1832,14 @@ def _assemble_benzene_with_suffix(
             atom_to_locant, oriented_ring
         )
 
+    # Single carbaldehyde: delegate to benzaldehyde retained name path
+    # "benzaldehyde" is an IUPAC retained name (P-66.6.3.1.1)
+    if chosen_suffix == 'carbaldehyde' and chosen_count == 1:
+        return _name_substituted_benzaldehyde(
+            remaining_prefix_groups, chosen_locants[0],
+            atom_to_locant, oriented_ring
+        )
+
     # General suffix assembly for multi-suffix or non-retained cases
     # Build suffix part: benzene-{locants}-{multiplier}{suffix}
     multiplier = get_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
@@ -2001,6 +2009,41 @@ def _name_substituted_benzenesulfonamide(
     prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
 
     return f"{prefix_part}benzenesulfonamide"
+
+
+def _name_substituted_benzaldehyde(
+    prefix_groups: Dict[str, List[int]],
+    aldehyde_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Name substituted benzaldehyde derivatives.
+
+    Uses 'benzaldehyde' as retained base per IUPAC P-66.6.3.1.1.
+    Position 1 = CHO-bearing carbon.
+
+    Pattern follows _name_substituted_benzoic_acid().
+
+    Args:
+        prefix_groups: Non-aldehyde substituent groups
+        aldehyde_locant: Locant of the aldehyde in original numbering
+        atom_to_locant: Mapping from atom index to locant
+        oriented_ring: The oriented ring
+
+    Returns:
+        IUPAC name like "4-chlorobenzaldehyde"
+    """
+    if not prefix_groups:
+        return "benzaldehyde"
+
+    # Renumber relative to aldehyde position (aldehyde = position 1)
+    renumbered_groups = _renumber_relative_to(prefix_groups, aldehyde_locant)
+
+    # Build prefixes
+    prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+
+    return f"{prefix_part}benzaldehyde"
 
 
 def _renumber_relative_to(
