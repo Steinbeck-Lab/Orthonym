@@ -32,6 +32,7 @@ from ..data.xanthine_derivatives import (
     get_xanthine_name,
     is_xanthine_derivative,
 )
+from ..data import get_retained_name as _get_global_retained_name
 from ..perception.rings import (
     get_ring_info,
     get_ring_systems,
@@ -488,6 +489,20 @@ def name_fused_heterocycle(mol):
     # Try substructure matching for substituted fused heterocycles
     core_result = match_fused_heterocycle_core(mol)
     if core_result is None:
+        # Check global retained names as fallback (catches nucleobases and
+        # other retained heterocycles that may not have exact SMILES keys in
+        # FUSED_HETEROCYCLE_DATA due to tautomerism). Only for multi-ring
+        # heterocyclic systems (has heteroatom in ring) to avoid catching
+        # monocyclics (pyridine) or carbocyclics (naphthalene).
+        has_ring_heteroatom = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() != 'C'
+            for idx in ring_atoms
+        )
+        if ri.NumRings() >= 2 and has_ring_heteroatom:
+            canonical_smi = Chem.MolToSmiles(mol, canonical=True)
+            global_retained = _get_global_retained_name(canonical_smi)
+            if global_retained:
+                return (global_retained, ring_atoms, {}, True)
         # Try algorithmic systematic fusion naming (IUPAC P-25.1 to P-25.3)
         # for 2-component ortho-fused systems not in the dictionary
         algorithmic_name = _try_algorithmic_fusion_name(mol)
