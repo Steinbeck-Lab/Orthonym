@@ -756,7 +756,7 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: substituent_loss (3 compounds)
     (
         "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C",  # Sentinel: substituent_loss - terpene cyclopentane
-        "(3R)-9-(1,3-dioxolan-1-yl)-3,7-dimethylnona-1,6-dien-3-ol",
+        "(3R)-9-(1,3-dioxolan-5-yl)-3,7-dimethylnona-1,6-dien-3-ol",
     ),
     (
         "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1",  # Sentinel: substituent_loss - phenoxy maleimide
@@ -1483,7 +1483,7 @@ _OPSIN_LIMITATIONS: dict[str, str] = {
         "Phase 139.1-01: middle fragment OH capping produces decomposed name for "
         "heptanoyl-pyrrolidinone compound. OPSIN may not parse this format."
     ),
-    "(3R)-9-(1,3-dioxolan-1-yl)-3,7-dimethylnona-1,6-dien-3-ol": (
+    "(3R)-9-(1,3-dioxolan-5-yl)-3,7-dimethylnona-1,6-dien-3-ol": (
         "Phase 142-03: dioxolane ring correctly identified (was wrongly named as "
         "cyclopentyl). OPSIN cannot parse dioxolanyl substituent prefix."
     ),

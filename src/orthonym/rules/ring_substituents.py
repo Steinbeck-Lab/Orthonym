@@ -364,9 +364,76 @@ def _get_polycyclic_attachment_locant(
     except ImportError:
         pass
 
-    # For polycyclic aromatics without explicit IUPAC numbering data,
+    # For monocyclic heterocycles with retained names (e.g. 1,3-dioxolane),
+    # use proper IUPAC numbering: start from highest-priority heteroatom,
+    # go in direction giving lowest locant set for remaining heteroatoms.
+    # For all-carbon rings or polycyclic aromatics without explicit data,
+    # fall back to sorted atom order.
+    ring_set = set(ring_atoms)
+
+    # Collect heteroatoms in the ring
+    het_indices = []
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            het_indices.append(idx)
+
+    if het_indices and len(ring_atoms) <= 8:
+        # Monocyclic heterocycle: build a ring traversal path and number
+        # according to IUPAC Hantzsch-Widman rules (heteroatom gets pos 1,
+        # direction chosen to give lowest locant set for other heteroatoms).
+
+        # Build adjacency within ring
+        ring_adj: dict = {idx: [] for idx in ring_atoms}
+        for idx in ring_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            for nbr in atom.GetNeighbors():
+                nidx = nbr.GetIdx()
+                if nidx in ring_set:
+                    ring_adj[idx].append(nidx)
+
+        # Heteroatom priority: O > S > N (Hantzsch-Widman)
+        _het_priority = {'O': 0, 'S': 1, 'Se': 2, 'N': 3}
+        het_indices_sorted = sorted(
+            het_indices,
+            key=lambda i: _het_priority.get(mol.GetAtomWithIdx(i).GetSymbol(), 99)
+        )
+        start_atom = het_indices_sorted[0]  # Highest priority heteroatom = position 1
+
+        # Try both directions around the ring from start_atom
+        def _traverse_ring(start, first_next, adj, ring_size):
+            """Walk around ring from start via first_next, return ordered path."""
+            path = [start, first_next]
+            while len(path) < ring_size:
+                prev = path[-2]
+                curr = path[-1]
+                nexts = [n for n in adj[curr] if n != prev and n in ring_set]
+                if not nexts:
+                    break
+                path.append(nexts[0])
+            return path
+
+        neighbors_of_start = ring_adj[start_atom]
+        best_path = None
+        best_het_locants = None
+
+        for next_atom in neighbors_of_start:
+            path = _traverse_ring(start_atom, next_atom, ring_adj, len(ring_atoms))
+            if len(path) != len(ring_atoms):
+                continue
+            # Compute heteroatom locant set (excluding position 1 which is always a het)
+            het_locs = tuple(sorted(
+                path.index(hi) + 1 for hi in het_indices if hi != start_atom
+            ))
+            if best_het_locants is None or het_locs < best_het_locants:
+                best_het_locants = het_locs
+                best_path = path
+
+        if best_path and attachment_atom in best_path:
+            return best_path.index(attachment_atom) + 1  # 1-indexed
+
+    # Fallback for all-carbon rings or polycyclic systems:
     # use the canonical atom order within the ring system.
-    # Sort ring atoms to get a canonical ordering, then find position.
     ring_list = sorted(ring_atoms)
     if attachment_atom in ring_list:
         return ring_list.index(attachment_atom) + 1  # 1-indexed
