@@ -178,7 +178,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"C=CCO/N=C(\C(=O)N[C@H]1CN2CC(S(C)(=O)=O)=C(C(=O)O)N2C1=O)c1csc(N)n1",
-        "N-2-amino-2-cyclopentylethanoyl-4-methyl-1,2-diazole-5-carboxylic acid",
+        "N-[2-amino-2-(thiazol-1-yl)ethanoyl]-4-methyl-1,2-diazole-5-carboxylic acid",
     ),
     (
         "C=CC(=O)Nc1ccc2ncnc(Nc3ccc(-c4ccccc4)cc3)c2c1",
@@ -787,7 +787,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1(C)SC(C(NC(=O)COc2ccccc2)C(=O)O)NC1C(=O)O",
-        "3-cyclopentyl-6-phenoxy-7-phenylheptanedioic acid",
+        "6-phenoxy-7-phenyl-3-(thiazolidin-3-yl)heptanedioic acid",
     ),
     (
         "O=C1O/C(=C/c2ccccc2)C(Cc2ccccc2)=C1Cc1ccccc1",

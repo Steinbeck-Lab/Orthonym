@@ -25,6 +25,11 @@ RING_SUBSTITUENT_NAMES: Dict[str, str] = {
     'naphthalene': 'naphthyl',  # Position-specific: 1-naphthyl, 2-naphthyl
     'anthracene': 'anthryl',
     'phenanthrene': 'phenanthryl',
+    'pyrene': 'pyrenyl',
+    'fluorene': 'fluorenyl',
+    'acenaphthylene': 'acenaphthylenyl',
+    'chrysene': 'chrysenyl',
+    'fluoranthene': 'fluoranthenyl',
 
     # Carbocyclic saturated (cycloalkanes)
     'cyclopropane': 'cyclopropyl',
@@ -270,6 +275,31 @@ def get_ring_substituent_name(
     ring_name = identify_ring_system(mol, ring_atoms)
 
     if ring_name is None:
+        # Multi-ring system (fused polycyclic): check retained names
+        # identify_ring_system() only handles single rings (up to 8 atoms).
+        # For multi-ring systems (naphthalene=10, anthracene=14, etc.),
+        # extract the fragment SMILES and look up retained names.
+        from rdkit import Chem
+        frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
+        if frag_smi:
+            from ..data import get_retained_name
+            retained = get_retained_name(frag_smi)
+            if retained:
+                # Convert retained name to substituent form:
+                # naphthalene -> naphthalen-{locant}-yl
+                # anthracene -> anthracen-{locant}-yl
+                # phenanthrene -> phenanthren-{locant}-yl
+                # General rule: drop trailing 'e', add '-yl'
+                stem = retained.rstrip('e') if retained.endswith('e') else retained
+                # Determine attachment locant for position-specific naming
+                if attachment_point is not None:
+                    attach_locant = _get_polycyclic_attachment_locant(
+                        mol, ring_atoms, attachment_point
+                    )
+                    if attach_locant is not None:
+                        return f'{stem}-{attach_locant}-yl'
+                return f'{stem}-yl'
+
         # Unknown ring - generate generic cycloXyl name
         ring_size = len(ring_atoms)
         prefix = _get_chain_prefix(ring_size)
@@ -298,6 +328,50 @@ def get_ring_substituent_name(
         return ring_name[:-1] + 'yl'  # pyridine -> pyridinyl
 
     return ring_name + 'yl'
+
+
+def _get_polycyclic_attachment_locant(
+    mol,
+    ring_atoms: Tuple[int, ...],
+    attachment_atom: int
+) -> Optional[int]:
+    """
+    Determine the IUPAC locant for an attachment point on a polycyclic ring system.
+
+    Uses the retained name's canonical IUPAC numbering. For polycyclic aromatics,
+    we use the IUPAC numbering by checking the fused_heterocycles data or by
+    using the RDKit canonical atom ordering as a proxy.
+
+    Args:
+        mol: RDKit Mol object
+        ring_atoms: Tuple of atom indices in the ring system
+        attachment_atom: The ring atom that connects to the chain
+
+    Returns:
+        IUPAC locant (1-indexed), or None if cannot determine
+    """
+    from rdkit import Chem
+
+    # Try to get IUPAC numbering from fused heterocycle data
+    frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
+    try:
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        if frag_smi in FUSED_HETEROCYCLE_DATA:
+            entry = FUSED_HETEROCYCLE_DATA[frag_smi]
+            iupac_locants = entry.get('iupac_locants', {})
+            if iupac_locants and attachment_atom in iupac_locants:
+                return iupac_locants[attachment_atom]
+    except ImportError:
+        pass
+
+    # For polycyclic aromatics without explicit IUPAC numbering data,
+    # use the canonical atom order within the ring system.
+    # Sort ring atoms to get a canonical ordering, then find position.
+    ring_list = sorted(ring_atoms)
+    if attachment_atom in ring_list:
+        return ring_list.index(attachment_atom) + 1  # 1-indexed
+
+    return None
 
 
 def _get_ring_position_for_attachment(

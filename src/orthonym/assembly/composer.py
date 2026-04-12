@@ -5021,8 +5021,44 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                         continue
         # --- End Phase 78 fused het detection ---
 
+        # Find ring attachment atom for position-specific naming
+        _ring_attach_atom = None
+        for ra in ring_atoms:
+            atom = features.mol.GetAtomWithIdx(ra)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in chain_set:
+                    _ring_attach_atom = ra
+                    break
+            if _ring_attach_atom is not None:
+                break
+        # Also check expanded ring system atoms
+        if _ring_attach_atom is None:
+            for ra in ring_atom_set:
+                atom = features.mol.GetAtomWithIdx(ra)
+                for nbr in atom.GetNeighbors():
+                    if nbr.GetIdx() in chain_set:
+                        _ring_attach_atom = ra
+                        break
+                if _ring_attach_atom is not None:
+                    break
+
         # Get base substituent name (phenyl, cyclohexyl, etc.)
-        base_name = get_ring_substituent_name(features.mol, ring_atoms)
+        # For multi-ring systems, try the full fused system first for retained name
+        # lookup (naphthalene, anthracene), but fall back to the SSSR ring if no
+        # retained name is found (to avoid renaming a 5-membered pyrrole ring in
+        # a porphyrin as "cyclononacosyl").
+        if len(ring_atom_set) > len(ring_atoms):
+            _full_ring = tuple(sorted(ring_atom_set))
+            _full_name = get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom)
+            # Accept the full-system name only if it produced a retained name
+            # (not a generic cyclo-name)
+            if not _full_name.startswith('cyclo') or _full_name in ('cyclohexyl', 'cyclopentyl', 'cyclopropyl', 'cyclobutyl', 'cycloheptyl', 'cyclooctyl'):
+                base_name = _full_name
+            else:
+                # Full system produced generic cyclo-name; use original SSSR ring
+                base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
+        else:
+            base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
 
         # Detect substituents on the ring itself
         sub_name = _build_substituted_ring_name(
