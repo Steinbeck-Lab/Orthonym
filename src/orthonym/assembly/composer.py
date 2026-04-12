@@ -276,6 +276,36 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
     return enriched_name
 
 
+def _confidence_gate(name: str, handler_id: str, features) -> bool:
+    """Check if a Tier B handler name meets the confidence threshold.
+
+    Computes confidence score for the handler's output and returns True
+    if the name is acceptable (confidence >= CONFIDENCE_GATE_THRESHOLD),
+    False if the handler should fall through to the next handler.
+
+    This gates Tier B handlers to prevent low-quality names from being
+    returned when the handler only covers a small fraction of the molecule.
+
+    Args:
+        name: The handler's output name (after enrichment).
+        handler_id: Handler identifier (e.g., 'boronic_acid', 'urea').
+        features: MolecularFeatures object.
+
+    Returns:
+        True if name should be accepted, False if handler should fall through.
+    """
+    from .coverage_scoring import compute_confidence, CONFIDENCE_GATE_THRESHOLD
+
+    cand = compute_confidence(name, handler_id, features)
+    if cand.confidence < CONFIDENCE_GATE_THRESHOLD:
+        logger.debug(
+            "CONFIDENCE_GATE: %s rejected (%.2f < %.2f) name=%s",
+            handler_id, cand.confidence, CONFIDENCE_GATE_THRESHOLD, name[:60],
+        )
+        return False
+    return True
+
+
 def _find_attach_idx_in_frag(mol, sub_info, parent_atoms):
     """Find the attachment atom index within a substituent fragment.
 
@@ -684,14 +714,18 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
         if oxime_name:
             oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
-            return _inject_stereo_if_missing(features, oxime_name, atom_to_locant=None)
+            if _confidence_gate(oxime_name, "oxime", features):
+                return _inject_stereo_if_missing(features, oxime_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
     if features.principal_group == 'hydrazone':
         hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
         if hydrazone_name:
             hydrazone_name = _enrich_handler_name(features, hydrazone_name, "hydrazone")
-            return _inject_stereo_if_missing(features, hydrazone_name, atom_to_locant=None)
+            if _confidence_gate(hydrazone_name, "hydrazone", features):
+                return _inject_stereo_if_missing(features, hydrazone_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 verified: N-oxide handler creates modified molecule and names
     # recursively via name_compound(). The recursive call handles substituents
@@ -716,7 +750,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         iso_name = _name_isocyanate(features)
         if iso_name:
             iso_name = _enrich_handler_name(features, iso_name, "isocyanate")
-            return _inject_stereo_if_missing(features, iso_name, atom_to_locant=None)
+            if _confidence_gate(iso_name, "isocyanate", features):
+                return _inject_stereo_if_missing(features, iso_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
     # as isocyanate -- Phase 125 fix applies. Same gating as isocyanate above.
@@ -725,7 +761,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
             isothio_name = _enrich_handler_name(features, isothio_name, "isothiocyanate")
-            return _inject_stereo_if_missing(features, isothio_name, atom_to_locant=None)
+            if _confidence_gate(isothio_name, "isothiocyanate", features):
+                return _inject_stereo_if_missing(features, isothio_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
     # the Phase 125 fix for substituted aromatic R-groups.
@@ -735,9 +773,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         carbamic_name = _name_carbamic_acid(features)
         if carbamic_name:
             carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
-            # Carbamic acid is a retained name. Pass None to let _generate_stereodescriptors
-            # use the features.* priority chain (heterocycle > oriented_ring > chain).
-            return _inject_stereo_if_missing(features, carbamic_name, atom_to_locant=None)
+            if _confidence_gate(carbamic_name, "carbamic_acid", features):
+                return _inject_stereo_if_missing(features, carbamic_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
     # for both N- and O-substituent naming.
@@ -748,9 +786,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         carb_name = _name_carbamate(features)
         if carb_name:
             carb_name = _enrich_handler_name(features, carb_name, "carbamate")
-            # Carbamate is a retained/functional class name. Pass None to let
-            # _generate_stereodescriptors use the features.* priority chain.
-            return _inject_stereo_if_missing(features, carb_name, atom_to_locant=None)
+            if _confidence_gate(carb_name, "carbamate", features):
+                return _inject_stereo_if_missing(features, carb_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
@@ -761,9 +799,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         urea_name = _try_name_urea(features)
         if urea_name:
             urea_name = _enrich_handler_name(features, urea_name, "urea")
-            # Urea is a retained name. Pass None to let _generate_stereodescriptors
-            # use the features.* priority chain.
-            return _inject_stereo_if_missing(features, urea_name, atom_to_locant=None)
+            if _confidence_gate(urea_name, "urea", features):
+                return _inject_stereo_if_missing(features, urea_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
@@ -773,9 +811,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         guanidine_name = _try_name_guanidine(features)
         if guanidine_name:
             guanidine_name = _enrich_handler_name(features, guanidine_name, "guanidine")
-            # Guanidine is a retained name. Pass None to let _generate_stereodescriptors
-            # use the features.* priority chain.
-            return _inject_stereo_if_missing(features, guanidine_name, atom_to_locant=None)
+            if _confidence_gate(guanidine_name, "guanidine", features):
+                return _inject_stereo_if_missing(features, guanidine_name, atom_to_locant=None)
+            # Low confidence: fall through to next handler
 
     # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
     # chain/ring parent naming with suffix. Substituents handled via normal
@@ -976,14 +1014,18 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 name = name_sulfoxide(features.mol, matches[0])
                 if name:
                     name = _enrich_handler_name(features, name, "sulfoxide")
-                    return _inject_stereo_if_missing(features, name)
+                    if _confidence_gate(name, "sulfoxide", features):
+                        return _inject_stereo_if_missing(features, name)
+                    # Low confidence: fall through
         elif features.principal_group == 'sulfone':
             matches = features.functional_groups.get('sulfone', [])
             if matches:
                 name = name_sulfone(features.mol, matches[0])
                 if name:
                     name = _enrich_handler_name(features, name, "sulfone")
-                    return _inject_stereo_if_missing(features, name)
+                    if _confidence_gate(name, "sulfone", features):
+                        return _inject_stereo_if_missing(features, name)
+                    # Low confidence: fall through
 
     # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
     # None for complex R-groups. Falls through to universal pipeline. No silent drop.
@@ -1005,7 +1047,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     name = name_sulfide(features.mol, sulfur_idx)
                     if name:
                         name = _enrich_handler_name(features, name, "thioether")
-                        return _inject_stereo_if_missing(features, name)
+                        if _confidence_gate(name, "thioether", features):
+                            return _inject_stereo_if_missing(features, name)
+                        # Low confidence: fall through
 
     # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
     # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
@@ -1114,7 +1158,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         boronic_name = _name_boronic_acid(features)
         if boronic_name:
             boronic_name = _enrich_handler_name(features, boronic_name, "boronic_acid")
-            return _inject_stereo_if_missing(features, boronic_name)
+            if _confidence_gate(boronic_name, "boronic_acid", features):
+                return _inject_stereo_if_missing(features, boronic_name)
+            # Low confidence: fall through to next handler
 
     # ASML-10 verified: Ring assembly has own _get_substituent_info() at
     # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
@@ -1215,7 +1261,9 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
                 partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
-                return partial_sat_name
+                if _confidence_gate(partial_sat_name, "partial_sat", features):
+                    return partial_sat_name
+                # Low confidence: fall through to next handler
 
     # Only collect heterocycle/benzene candidates if complex_ring didn't
     # produce a high-confidence result. This preserves the handler priority

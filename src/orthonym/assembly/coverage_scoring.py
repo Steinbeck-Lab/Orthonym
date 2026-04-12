@@ -47,11 +47,48 @@ class CandidateName:
 
 # Handler priority for tiebreaking (higher = more specific)
 HANDLER_PRIORITY: Dict[str, int] = {
+    # Ring handlers (Tier A: use candidate collection + select_best_candidate)
     'complex_ring': 4,
     'heterocycle': 3,
     'benzene': 2,
     'chain': 1,
+    # Tier B specialized handlers (use confidence gating before return)
+    'oxime': 5,
+    'hydrazone': 5,
+    'isocyanate': 5,
+    'isothiocyanate': 5,
+    'carbamic_acid': 5,
+    'carbamate': 5,
+    'urea': 5,
+    'guanidine': 5,
+    'sulfoxide': 5,
+    'sulfone': 5,
+    'thioether': 5,
+    'boronic_acid': 5,
+    'partial_sat': 4,
+    # Direct-return handlers (no gating needed: self-gating or retained names)
+    'polycyclic': 6,
+    'acid_halide': 5,
+    'anhydride': 5,
+    'lactone': 5,
+    'lactam': 5,
+    'ring_ester': 5,
+    'polyfunctional': 4,
+    'ester': 5,
+    'multi_ester': 5,
+    'phosphine_oxide': 5,
+    'phosphate_ester': 5,
+    'phosphine': 5,
+    'phosphinic_acid': 5,
+    'ring_assembly': 5,
+    'ring_nitrile': 5,
+    'amide': 5,
 }
+
+# Confidence threshold for Tier B handler gating.
+# Handlers producing names with confidence below this threshold fall through
+# to the next handler in the cascade. Calibrated in Phase 81 on ChEBI 500.
+CONFIDENCE_GATE_THRESHOLD: float = 0.40
 
 # Calibrated weights for multi-factor confidence scoring
 # Derivation: 
