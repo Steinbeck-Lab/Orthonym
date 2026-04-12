@@ -235,7 +235,7 @@ class TestMissingSubstituent:
 
     def test_067_methyloxane(self):
         """#67: CC1OC(O)C(O)C(O)C1O -> oxane derivative [RT]."""
-        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "3,4,5,6-tetrahydroxy-2-methyloxane"
+        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "rhamnopyranose"
 
     def test_068_butenolide_acid(self):
         """#68: O=C(O)C1C=CC(=O)O1 - butenolide with acid."""

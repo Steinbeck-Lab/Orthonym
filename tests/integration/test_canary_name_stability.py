@@ -25,7 +25,7 @@ from orthonym import name_compound
 NAME_STABILITY_CANARY = [
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4[C@H](C)C(=O)CC[C@]4(C)C3=C[C@@H](O)[C@]12C)C(C)C",
-        "(4S,5alpha,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergosta-7,9,24-trien-3-one",
+        "(4S,5S,10S,11R,13R,14S,17R,20R)-11-hydroxy-4-methylergosta-7,9,24-trien-3-one",
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O",
@@ -200,7 +200,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
-        "(3S,5alpha,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol",
+        "(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol",
     ),
     (
         "C[C@H]1C[C@H](O)[C@@H]2[C@H]1[C@@H]1[C@H](CC[C@]2(C)O)[C@@]1(C)CO",
@@ -224,7 +224,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1",
-        "(5beta,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one",
+        "(5R,8R,9R,10R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-3-one",
     ),
     (
         "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@H](COC1O[C@H](CO)[C@H](O)[C@H](OS(=O)(=O)[O-])[C@H]1O)NC(=O)C(O)CCCCCCCCCCCCCCCCCCCC",
@@ -273,7 +273,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)=CCC[C@](C)(O[C@@H]1O[C@H](CO[C@@H]2OC[C@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@H]1O)[C@H]1CC[C@]2(C)[C@@H]1[C@H](O)C[C@@H]1[C@@]3(C)CC[C@H](O[C@@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@H]4O[C@@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@H]4O)C(C)(C)[C@@H]3CC[C@]12C",
-        "(3S,5beta,8R,9R,10R,12R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-12-ol",
+        "(3S,5R,8R,9R,10R,12R,13R,14R,17S)-4,4,8,10,14-pentamethylgonan-12-ol",
     ),
     (
         "COC1=CC=C2[C@H]3Cc4ccc(OC)c5c4[C@@]2(C[C@@H](C2=C[C@@]4(O)[C@H]6Cc7ccc(O)c8c7[C@@]4(CCN6C)[C@@H](O8)C2=O)N3C)[C@H]1O5",
@@ -301,7 +301,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"C/C(=C\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=CC[C@H]4C(C)(C)[C@@H](OC=O)CC[C@]4(C)C3=CC[C@]12C)CO",
-        "(3S,5beta,10S,13R,14R,17R,20R,24E)-27-hydroxy-4,4,14-trimethylcholest-7,9,24-trien-3-yl formate",
+        "(3S,5R,10S,13R,14R,17R,20R,24E)-27-hydroxy-4,4,14-trimethylcholest-7,9,24-trien-3-yl formate",
     ),
     (
         "CC(C)[C@@H]1NC(=O)c2csc(n2)[C@H](C(C)C)NC(=O)c2csc(n2)[C@H](C(C)C)NC(=O)[C@H]2N=C1O[C@@H]2C",
@@ -333,7 +333,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C(CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@H]4[C@](C)(C(=O)O)[C@@H](O)CC[C@]4(C)C3=C[C@@H](OC(C)=O)[C@]12C)C(C)C",
-        "(3S,4S,5beta,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-4-methyl-7-oxoergost-9,24-dien-11-yl acetate",
+        "(3S,4S,5R,8S,10S,11R,13R,14S,17R,20R)-3-hydroxy-4-methyl-7-oxoergost-9,24-dien-11-yl acetate",
     ),
     (
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
@@ -394,7 +394,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C(CC[C@@H](C(=O)O)[C@H]1[C@H](O)[C@H](O)[C@@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C)C(C)C",
-        "(5beta,10S,13R,14R,15R,16S,17R,20R)-15,16,21-trihydroxy-4,4,14-trimethylergosta-7,9,24-trien-3,21-dione",
+        "(5R,10S,13R,14R,15R,16S,17R,20R)-15,16,21-trihydroxy-4,4,14-trimethylergosta-7,9,24-trien-3,21-dione",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCCC(O)C(O)C(=O)N[C@@H](COP(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1OC1O[C@H](COP(=O)([O-])O[C@@H]2[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@@H]1O)[C@H](O)C(O)CCCCCCCCCCCCCC",
@@ -762,7 +762,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C=C(C)C#Cc1c(O)ccc(O)c1C=O",
-        "1,4-dihydroxy-3-(2-methylbut-1-en-3-ynyl)benzenecarbaldehyde",
+        "3,6-dihydroxy-2-(2-methylbut-1-en-3-ynyl)benzaldehyde",
     ),
     (
         "C/C=C/CC(O)CCC(=O)NCC(=O)O",

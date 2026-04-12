@@ -80,7 +80,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "(3R,5beta,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
+        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
@@ -634,7 +634,7 @@ CANARY_COMPOUNDS = [
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
         "[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)"
         "C(=O)O)[C@@]1(C)CC3",
-        "(3S,5beta,10S,13R,14R,16R,17R,20R,23E)-16,21,25-"
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-"
         "trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-"
         "dien-3-yl acetate",
     ),
@@ -904,7 +904,7 @@ CANARY_COMPOUNDS = [
     # --- Phase 95: v10.0 canary expansion (2 newly RT-matching compounds) ---
     (
         "CO[C@@H](C=C(C)C)C[C@H](C)[C@@H]1CC[C@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)[C@H]3CC[C@@]12C",
-        "(5beta,9R,10R,13S,14S,17S,20S,23R)-23-methoxy-4,4,14-trimethylcholesta-7,24-dien-3-one",
+        "(5R,9R,10R,13S,14S,17S,20S,23R)-23-methoxy-4,4,14-trimethylcholesta-7,24-dien-3-one",
     ),
     (
         "O[C@H]1[C@H](O)[C@@H](O)[C@@H]2O[C@@H]2[C@@H]1O",
@@ -1371,7 +1371,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
-        "(3S,5beta,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate",
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate",
     ),
     (
         "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",

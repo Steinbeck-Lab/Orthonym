@@ -400,6 +400,15 @@ RETAINED_NAMES = {
     "Nc1cc[nH]c(=O)n1": "cytosine",
     "Nc1ncnc2[nH]cnc12": "adenine",
     "Nc1nc2[nH]cnc2c(=O)[nH]1": "guanine",
+    "Nc1nc(=O)c2[nH]cnc2[nH]1": "guanine",  # alternate tautomer (Phase 142)
+
+    # === PURINE DERIVATIVES (Phase 142 expansion) ===
+    "O=c1[nH]c(=O)c2[nH]cnc2[nH]1": "xanthine",  # 3,7-dihydro-1H-purine-2,6-dione
+    "O=c1[nH]c(=O)c2nc[nH]c2[nH]1": "xanthine",  # alternate tautomer
+    "O=c1[nH]cnc2[nH]cnc12": "hypoxanthine",  # 1,9-dihydro-6H-purine-6-one
+    "O=c1[nH]cnc2nc[nH]c12": "hypoxanthine",  # alternate tautomer
+    "O=C(O)c1cc(=O)[nH]c(=O)[nH]1": "orotic acid",  # pyrimidine-2,4(1H,3H)-dione-6-carboxylic acid
+    "c1ccc2nc3ccccc3cc2c1": "acridine",  # dibenzo[b,e]pyridine
 
     # === LONG-CHAIN DIACIDS (Phase 109 expansion) ===
     "O=C(O)CCCCCCC(=O)O": "suberic acid",   # octanedioic acid

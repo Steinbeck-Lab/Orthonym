@@ -1231,10 +1231,21 @@ class TestPhase101ComprehensiveCanonicalConsistency:
 
     @pytest.mark.unit
     def test_no_duplicate_names(self):
-        """No two entries should have the same name."""
+        """No two entries should have the same name (except tautomeric forms).
+
+        Tautomeric forms of the same compound (e.g., xanthine, guanine,
+        adenine, hypoxanthine) have multiple SMILES keys mapping to the
+        same retained name. This is intentional for canonicalization
+        robustness (Phase 142).
+        """
+        # Intentional tautomer duplicates (same molecule, different SMILES key)
+        allowed_duplicates = {
+            'xanthine', 'guanine', 'adenine', 'hypoxanthine',
+        }
         names = [data['name'] for data in FUSED_HETEROCYCLE_DATA.values()]
-        duplicates = [n for n in names if names.count(n) > 1]
-        assert not duplicates, f"Duplicate names found: {set(duplicates)}"
+        duplicates = {n for n in names if names.count(n) > 1}
+        unexpected = duplicates - allowed_duplicates
+        assert not unexpected, f"Unexpected duplicate names found: {unexpected}"
 
     @pytest.mark.unit
     def test_dictionary_has_at_least_80_entries(self):

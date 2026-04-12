@@ -547,6 +547,15 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'is_retained_name': True,
         'iupac_locants': {0: 'N6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
     },
+    # Adenine alternate tautomer (Phase 142: matches retained_names.py key)
+    'Nc1ncnc2[nH]cnc12': {
+        'name': 'adenine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 10,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'N6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 9, 6: 8, 7: 7, 8: 5, 9: 4},
+    },
 
     # Hypoxanthine: 6-oxopurine (retained name)
     # Canonical: O=c1[nH]cnc2nc[nH]c12
@@ -558,6 +567,36 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'is_retained_name': True,
         'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
+    },
+    # Hypoxanthine alternate tautomer (Phase 142)
+    'O=c1[nH]cnc2[nH]cnc12': {
+        'name': 'hypoxanthine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 10,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 9, 6: 8, 7: 7, 8: 5, 9: 4},
+    },
+
+    # Guanine: 2-amino-1,9-dihydro-6H-purine-6-one (retained name)
+    # Canonical: Nc1nc2[nH]cnc2c(=O)[nH]1
+    # Note: 11 atoms including the amino and oxo groups
+    'Nc1nc2[nH]cnc2c(=O)[nH]1': {
+        'name': 'guanine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 11,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'N2', 1: 2, 2: 3, 3: 9, 4: 8, 5: 7, 6: 5, 7: 6, 8: 'O6', 9: 1, 10: 4},
+    },
+    # Guanine alternate tautomer (Phase 142)
+    'Nc1nc(=O)c2[nH]cnc2[nH]1': {
+        'name': 'guanine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 11,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'N2', 1: 2, 2: 6, 3: 'O6', 4: 5, 5: 9, 6: 8, 7: 7, 8: 4, 9: 3, 10: 1},
     },
 
     # =========================================================================
@@ -1482,6 +1521,15 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 11,
         'is_retained_name': True,
         'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 'O2', 5: 5, 6: 7, 7: 8, 8: 9, 9: 4, 10: 3},
+    },
+    # Xanthine alternate tautomer (Phase 142: canonical form from common SMILES input)
+    'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': {
+        'name': 'xanthine',
+        'tautomer_locant': None,
+        'ring_system': 'purine',
+        'parent_atoms': 11,
+        'is_retained_name': True,
+        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 'O2', 5: 3, 6: 9, 7: 8, 8: 7, 9: 5, 10: 4},
     },
     # Alloxazine (benzo[g]pteridine-2,4(1H,3H)-dione)
     'O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1': {

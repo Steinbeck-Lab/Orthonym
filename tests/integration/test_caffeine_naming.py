@@ -129,8 +129,8 @@ class TestXanthineFamily:
         ('Cn1cnc2c1c(=O)[nH]c(=O)n2C', '3,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'theobromine'),
         # Paraxanthine
         ('Cn1c(=O)[nH]c(=O)c2ncn(C)c12', '1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'paraxanthine'),
-        # Xanthine (parent)
-        ('O=c1[nH]c(=O)c2[nH]cnc2[nH]1', '3,7-dihydro-1H-purine-2,6-dione', 'xanthine'),
+        # Xanthine (parent) - IUPAC retained name per P-25.3
+        ('O=c1[nH]c(=O)c2[nH]cnc2[nH]1', 'xanthine', 'xanthine'),
     ])
     def test_xanthine_derivatives(self, smiles, expected_name, common_name):
         """Test all xanthine derivatives are named correctly."""

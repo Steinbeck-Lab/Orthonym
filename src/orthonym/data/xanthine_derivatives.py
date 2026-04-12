@@ -28,6 +28,7 @@ XANTHINE_DERIVATIVES: Dict[str, Dict[str, Any]] = {
     'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': {
         'systematic_name': '3,7-dihydro-1H-purine-2,6-dione',
         'common_name': 'xanthine',
+        'retained_name': 'xanthine',  # IUPAC retained name (P-25.3)
         'n_positions': [],
         'n_substituents': [],
         'indicated_h': '1H',
@@ -191,16 +192,25 @@ def get_xanthine_name(mol: Chem.Mol, use_common: bool = False) -> Optional[str]:
     """
     Get the IUPAC name for a xanthine derivative.
 
+    IUPAC retained names (e.g., 'xanthine', 'hypoxanthine') always take
+    priority over systematic names. These are PINs per IUPAC 2013 P-25.3.
+    For named derivatives like caffeine, theophylline: these are common
+    names (not IUPAC retained), so the systematic name is correct for PIN.
+
     Args:
         mol: RDKit molecule object
         use_common: If True, return common name (caffeine, theophylline, etc.)
-                   If False, return systematic IUPAC name
+                   If False, return systematic IUPAC name (unless retained
+                   name exists, which always takes priority)
 
     Returns:
         IUPAC systematic or common name for the xanthine derivative,
         None if molecule is not a known xanthine.
 
     Examples:
+        >>> mol = Chem.MolFromSmiles('O=c1[nH]c(=O)c2[nH]cnc2[nH]1')  # xanthine
+        >>> get_xanthine_name(mol)
+        'xanthine'
         >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C')  # caffeine
         >>> get_xanthine_name(mol)
         '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione'
@@ -212,6 +222,10 @@ def get_xanthine_name(mol: Chem.Mol, use_common: bool = False) -> Optional[str]:
         return None
 
     data = XANTHINE_DERIVATIVES[key]
+    # IUPAC retained names always take priority (e.g., xanthine, hypoxanthine)
+    retained = data.get('retained_name')
+    if retained:
+        return retained
     if use_common:
         return data.get('common_name')
     return data.get('systematic_name')

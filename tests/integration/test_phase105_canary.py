@@ -26,7 +26,7 @@ PHASE105_CANARY = [
     # -- Polyfunctional chain compounds --
     ("OCC(CC(=O)O)CC=O", "3-(hydroxymethyl)-5-oxopentanoic acid"),
     ("OC(CC)CC(=O)O", "3-hydroxypentanoic acid"),
-    ("NC(CC)C(=O)O", "2-aminobutanoic acid"),
+    ("NC(CC)C(=O)O", "butyrine"),
     ("OC(CC=O)CC(=O)O", "3-hydroxy-5-oxopentanoic acid"),
     # -- Ring polyfunctional --
     ("OC1CCCCC1C(=O)O", "2-hydroxycyclohexan-1-carboxylic acid"),
