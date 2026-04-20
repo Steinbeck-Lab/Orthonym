@@ -56,3 +56,7 @@ benchmark_graded_results.json
 .env
 
 stereo_gap_trace_results.json
+
+# Phase 145: raw corpus caches (too large to commit)
+
+
