@@ -39,6 +39,18 @@ class CandidateName:
     factors: Dict[str, float] = field(default_factory=dict)
     # factors keys: 'ratio', 'atom_coverage', 'fg_recognition',
     #               'substituent_completeness'
+    # New in Phase 145.1: parent atom indices populated POST-HOC by
+    # CandidatePool.add() (see candidate_pool.py). Used by
+    # ParentCorrectnessScorer to compare against OPSIN-extracted
+    # reference parent. None when handler doesn't report parent atoms
+    # (most direct-return handlers; benzene/heterocycle/complex_ring
+    # populate via features.benzene_ring / features.principal_ring /
+    # ring atoms from _assemble_complex_ring_name()).
+    # CRITICAL: this field is set AFTER compute_confidence() returns.
+    # Do NOT pass it as a positional arg to compute_confidence — that
+    # changes atom_coverage and breaks byte-identical (see RESEARCH §9.1
+    # Risk 3 / PATTERNS Risk 1).
+    parent_atom_indices: Optional[set] = None
 
 
 # ---------------------------------------------------------------------------

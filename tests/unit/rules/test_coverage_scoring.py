@@ -257,3 +257,33 @@ def test_log_confidence_levels(caplog):
         log_confidence(low)
     assert any("low-confidence" in r.message and r.levelno == logging.WARNING
                for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Phase 145.1: parent_atom_indices field extension (SC-1)
+# ---------------------------------------------------------------------------
+
+def test_candidate_name_has_parent_atom_indices_field():
+    """Phase 145.1: CandidateName dataclass exposes parent_atom_indices."""
+    c = CandidateName(name="ethanol", handler="chain")
+    assert hasattr(c, "parent_atom_indices")
+    assert c.parent_atom_indices is None
+
+
+def test_candidate_name_parent_atom_indices_accepts_set():
+    """Phase 145.1: parent_atom_indices stores a set of atom indices."""
+    c = CandidateName(
+        name="ethanol", handler="chain",
+        parent_atom_indices={0, 1, 2},
+    )
+    assert c.parent_atom_indices == {0, 1, 2}
+
+
+def test_candidate_name_default_factory_unchanged():
+    """Phase 145.1 regression: factors default_factory still works."""
+    c = CandidateName(name="x", handler="h")
+    assert c.factors == {}
+    # Mutating one instance must not affect another
+    c.factors['ratio'] = 0.5
+    c2 = CandidateName(name="y", handler="h")
+    assert c2.factors == {}
