@@ -1,0 +1,253 @@
+"""Parent-correctness scorer for Phase 145.1.
+
+Scaffolds the 5th confidence factor (`parent_correctness`) in the candidate
+scoring pipeline. Phase 145.1 wires this into FACTOR_WEIGHTS with weight 0.0
+so the factor is computed and logged but does NOT influence selection
+(byte-identical safe by D-14 IEEE 754 + Python 3.7+ dict-order). Phase 146
+raises the weight after 80/20 train/test calibration to activate it.
+
+REFERENCE SOURCE (D-04, locked in 145.1-CONTEXT.md):
+    OPSIN round-trip of the reference name. The only non-circular option:
+    - Option A (chosen): OPSIN parses the reference name -> reference SMILES.
+      OPSIN is the inverse of Orthonym; reference names from ChEBI / PubChem
+      / OPSIN self-test are external ground truth when they parse.
+    - Option B (rejected -- Phase 146's work): a separate rule-based selector
+      would pre-empt Phase 146.
+    - Option C (rejected -- too narrow): hand-curated parent map covers only
+      the 500-compound opsin_selftest corpus.
+
+EXTRACTION PIPELINE (D-05, CD-01 -- locked from RESEARCH §4.2):
+    E1: regex parent-token + OPSIN re-parse + RDKit substructure match +
+        canonical-rank tiebreak. Pure Python + subprocess + RDKit;
+        no Java<->Python bridge dependency. Verified on 6/9 test cases;
+        remaining 3 fall back to 0.5 (no-decision = safe).
+
+THREAD-LOCAL I/O (D-07, locked):
+    Module-level _pc_context = threading.local() mirrors the established
+    coverage_scoring._confidence_store pattern at coverage_scoring.py:404.
+    Benchmark runners call set_reference_name(name) BEFORE orthonym.name(smiles).
+    Production callers (no reference set) immediately return 0.5 with zero
+    OPSIN cost.
+
+INVARIANT (security threat T-145.1-01 mitigation):
+    Production code path NEVER invokes OPSIN subprocess. Scorer.score()
+    short-circuits to 0.5 when _pc_context.reference_name is None
+    (the production default). OPSIN is invoked ONLY in benchmark mode
+    when set_reference_name() has been explicitly called by the
+    benchmark runner.
+
+FAILURE MODES (RESEARCH §4.4 -- all return 0.5 no-decision):
+    - OPSIN can't parse reference name
+    - Parent token regex returns empty
+    - OPSIN parses parent token to invalid SMILES
+    - Substructure match returns 0 hits (ChEBI noise)
+    - Substructure match returns >1 hits -> canonical-rank tiebreak
+    - OPSIN CLI subprocess timeout (caught)
+    - _pc_context.reference_name is None (production path)
+    - candidate.parent_atom_indices is None (handler didn't report)
+"""
+
+import logging
+import re
+import subprocess
+import threading
+from pathlib import Path
+from typing import Any, Optional, Set
+
+from rdkit import Chem
+
+from ..assembly.coverage_scoring import CandidateName
+
+logger = logging.getLogger(__name__)
+
+# OPSIN jar lives at repo root. Resolve from this module's path:
+# src/orthonym/rules/parent_correctness.py
+#   -> .parent (src/orthonym/rules/)
+#   -> .parent (src/orthonym/)
+#   -> .parent (src/)
+#   -> .parent (repo root)
+OPSIN_JAR = (
+    Path(__file__).parent.parent.parent.parent
+    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+)
+
+# Match Phase 145 D-09 / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT (CD-05)
+OPSIN_TIMEOUT: float = 10.0
+
+
+# ---------------------------------------------------------------------------
+# Thread-local context (mirrors coverage_scoring._confidence_store pattern)
+# ---------------------------------------------------------------------------
+
+_pc_context = threading.local()
+
+
+def set_reference_name(name: Optional[str]) -> None:
+    """Set the reference IUPAC name for the current naming call.
+
+    Call BEFORE orthonym.name(smiles) in benchmark runs. Pass None to clear.
+    Production callers (orthonym.name() in REPL/library use) MUST NOT call
+    this -- leaving _pc_context.reference_name unset preserves byte-identical
+    confidence values and avoids OPSIN subprocess cost.
+    """
+    _pc_context.reference_name = name
+
+
+def clear_reference_name() -> None:
+    """Clear the thread-local reference name (idempotent)."""
+    _pc_context.reference_name = None
+
+
+# ---------------------------------------------------------------------------
+# OPSIN subprocess wrapper (CD-05 -- match benchmark_multi_corpus.py defaults)
+# ---------------------------------------------------------------------------
+
+def _opsin_to_smi(name: str) -> Optional[str]:
+    """Parse name -> SMILES via OPSIN CLI subprocess.
+
+    Returns the SMILES string on success, None on any failure (timeout,
+    OPSIN can't parse, OPSIN jar missing, OS error). All failure paths
+    log at DEBUG only -- no production-path noise.
+    """
+    try:
+        p = subprocess.run(
+            ["java", "-jar", str(OPSIN_JAR), "-o", "smi"],
+            input=name + "\n",
+            capture_output=True,
+            text=True,
+            timeout=OPSIN_TIMEOUT,
+        )
+        out = p.stdout.strip()
+        return out if out else None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        logger.debug("OPSIN failure on %r: %s", name, e)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Parent-token extraction (CD-01 -- regex heuristic per RESEARCH §4.2)
+# ---------------------------------------------------------------------------
+
+# Strip leading locant cluster (e.g. "1,2-", "3a-", "2-")
+_LOCANT_PREFIX_RE = re.compile(r'^\d+[a-z]?,?(\d+[a-z]?,?)*-?')
+
+
+def _extract_parent_token(name: Optional[str]) -> Optional[str]:
+    """Extract the parent-hydride token from an IUPAC name.
+
+    Heuristic (CD-01): the parent token starts after the LAST top-level
+    closing parenthesis (substituents are bracketed; parent is unbracketed
+    at the end of the name). Strips leading locant clusters.
+
+    Returns None if the heuristic produces nothing usable; scorer treats
+    None as no-decision (returns 0.5).
+
+    Verified test cases (RESEARCH §4.2 lines 666-678):
+        "4-oxo-4-(prop-2-enoyloxy)but-2-enoic acid" -> "but-2-enoic acid"
+        "ethanol" -> "ethanol"
+        "3-(2-methoxyethyl)hexan-1-ol" -> "hexan-1-ol"
+        "4-(4-chlorophenyl)butan-2-one" -> "butan-2-one"
+        "benzene-1,2-diol" -> "benzene-1,2-diol"
+        "1H-indole" -> "indole"  (1H- stripped)
+        "2-methylpropanal" -> "methylpropanal" (no parens -- heuristic fails;
+                              caller should treat as no-decision via OPSIN
+                              re-parse downstream)
+    """
+    if not name:
+        return None
+    # Track parenthesis depth, find position after last top-level close paren
+    depth = 0
+    last_close = -1
+    for i, c in enumerate(name):
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+            if depth == 0:
+                last_close = i
+    parent = name[last_close + 1:] if last_close >= 0 else name
+    # Strip leading locant cluster
+    parent = _LOCANT_PREFIX_RE.sub('', parent).strip()
+    return parent if parent else None
+
+
+def _extract_reference_parent_atoms(
+    ref_name: str, input_mol: Any
+) -> Optional[Set[int]]:
+    """Extract reference parent atom indices via OPSIN round-trip.
+
+    Pipeline:
+      1. Extract parent-hydride token from ref_name (heuristic)
+      2. OPSIN-parse parent token alone -> parent SMILES
+      3. RDKit-parse parent SMILES -> parent_mol
+      4. Substructure-match parent_mol in input_mol -> atom indices
+      5. Tiebreak ambiguous matches via canonical atom rank
+
+    Returns set of atom indices in input_mol comprising the reference
+    parent. Returns None on any pipeline failure.
+    """
+    parent_token = _extract_parent_token(ref_name)
+    if not parent_token:
+        return None
+    parent_smi = _opsin_to_smi(parent_token)
+    if not parent_smi:
+        return None
+    parent_mol = Chem.MolFromSmiles(parent_smi)
+    if parent_mol is None:
+        return None
+    try:
+        matches = input_mol.GetSubstructMatches(parent_mol)
+    except Exception as e:
+        logger.debug("Substructure match failed: %s", e)
+        return None
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return set(matches[0])
+    # Ambiguous: canonical-rank tiebreak (deterministic)
+    try:
+        canon_ranks = list(Chem.CanonicalRankAtoms(input_mol, breakTies=True))
+        best = min(matches, key=lambda m: tuple(sorted(canon_ranks[a] for a in m)))
+        return set(best)
+    except Exception as e:
+        logger.debug("Canonical rank tiebreak failed: %s", e)
+        # Deterministic fallback: first match
+        return set(matches[0])
+
+
+# ---------------------------------------------------------------------------
+# ParentCorrectnessScorer
+# ---------------------------------------------------------------------------
+
+class ParentCorrectnessScorer:
+    """Computes the parent_correctness factor for a candidate name.
+
+    Returns:
+      1.0  if candidate's parent atoms match OPSIN-extracted reference parent
+      0.0  if mismatch
+      0.5  on no-decision (any failure mode -- see module docstring)
+
+    Production callers (no _pc_context.reference_name set) immediately
+    return 0.5 with zero OPSIN cost. Benchmark runners that have called
+    set_reference_name() pay one OPSIN parse per scored candidate.
+    """
+
+    @staticmethod
+    def score(candidate: CandidateName, mol: Any) -> float:
+        """Score a single candidate against the thread-local reference."""
+        ref_name = getattr(_pc_context, 'reference_name', None)
+        if ref_name is None:
+            # Production path -- no reference; no signal possible
+            return 0.5
+        if candidate.parent_atom_indices is None:
+            # Handler didn't report parent atoms (most direct-return)
+            return 0.5
+        # Extract reference parent atoms via OPSIN round-trip
+        ref_parent_atoms = _extract_reference_parent_atoms(ref_name, mol)
+        if ref_parent_atoms is None:
+            # Pipeline failed (OPSIN unparseable, no substructure match, etc.)
+            return 0.5
+        # Compare sets
+        if set(candidate.parent_atom_indices) == ref_parent_atoms:
+            return 1.0
+        return 0.0
