@@ -75,6 +75,7 @@ from .coverage_scoring import (
     log_confidence,
     CandidateName,
 )
+from .candidate_pool import get_current_pool, clear_pool
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -673,6 +674,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     # Clear confidence store at start of each naming call
     clear_confidence()
 
+    # Phase 145.1: reset thread-local pool for this naming call (D-09 lifecycle)
+    # MUST appear next to clear_confidence() to guarantee per-call state
+    # isolation between consecutive orthonym.name() calls (T-145.1-02
+    # mitigation, verified by tests/integration/test_pool_state_isolation.py).
+    clear_pool()
+
     # INST: Assembly dispatch trace
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
@@ -685,6 +692,26 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     # Check for ionic/radical species first - route to specialized assembly
     species_type = getattr(features, 'species_type', 'neutral')
+
+    # =====================================================================
+    # ION / SALT / RADICAL ROUTING — Phase 145.1 PRE-POOL INTENTIONAL BYPASS
+    # =====================================================================
+    # The four return statements at lines 694, 699, 708, 710 (assemble_ion_name
+    # and composed_name) execute BEFORE pool.add() is called for this molecule.
+    # They are EXCLUDED from pool dispatch by design per RESEARCH §9.2 + ISS-001
+    # enumeration:
+    #
+    # - salt/zwitterion (L694), radical (L699), ion fallback (L710): route to
+    #   assemble_ion_name() which uses IUPAC P-73 functional class naming with
+    #   completely different semantics from the cascading direct-return /
+    #   Tier B / Tier A handlers. They have NO entry in HANDLER_POLICIES and
+    #   never participate in candidate competition.
+    # - composed_name (L708): early product of _try_ion_aspect_composition()
+    #   for ion aspects (multi-component salts). Same exclusion as above.
+    #
+    # Phase 146 does NOT change this exclusion (ions stay outside the pool;
+    # the pool is for neutral-molecule competition only).
+    # =====================================================================
 
     # ASML-10 by-design: Salt/zwitterion handlers use functional class naming
     # (IUPAC P-73). Ions have no detachable prefixes -- the ion composition

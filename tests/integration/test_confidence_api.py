@@ -44,7 +44,14 @@ class TestNameWithConfidence:
             namer.name_with_confidence("INVALID_SMILES_XYZ")
 
     def test_complex_molecule_has_factors(self):
-        """Complex molecule returns all 4 factor keys."""
+        """Complex molecule returns all 5 factor keys.
+
+        Phase 145.1 ISS-004 update: 'parent_correctness' is the 5th factor
+        added at LAST position in FACTOR_WEIGHTS (Plan 02 D-14). It must be
+        present in the factors dict — value is 0.5 in production path
+        (FACTOR_WEIGHTS['parent_correctness']=0.0 zeros its contribution to
+        confidence aggregation, preserving byte-identical behavior).
+        """
         namer = Orthonym()
         # Substituted quinoline -- goes through candidate collection
         result = namer.name_with_confidence(
@@ -52,7 +59,8 @@ class TestNameWithConfidence:
         )
         assert isinstance(result['factors'], dict)
         expected_keys = {'ratio', 'atom_coverage',
-                         'fg_recognition', 'substituent_completeness'}
+                         'fg_recognition', 'substituent_completeness',
+                         'parent_correctness'}
         assert set(result['factors'].keys()) == expected_keys
 
 
