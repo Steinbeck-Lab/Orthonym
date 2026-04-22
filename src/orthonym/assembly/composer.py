@@ -1474,7 +1474,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                 "ring_nitrile", _ha, _rn_name[:60],
             )
-        return _inject_stereo_if_missing(features, _rn_name)
+        # Phase 145.1: route through pool.add() — direct_return handler.
+        pool = get_current_pool()
+        pool.add(_rn_name, "ring_nitrile", features)
+        return _inject_stereo_if_missing(features, pool.best().name)
 
     # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
     # N-substituent prefixes and chain/ring substituent discovery.
@@ -1492,7 +1495,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "amide", _ha, (_amide_name or "")[:60],
                 )
-            return _amide_name
+            # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(_amide_name, "amide", features)
+            return pool.best().name
 
     # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
     # N-alkyl prefixes and generates chain/ring substituent prefixes.
@@ -1506,7 +1512,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "amine", _ha, amine_name[:60],
                 )
-            return amine_name
+            # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(amine_name, "amine", features)
+            return pool.best().name
 
     # Handle simple cases
     # Stereo: not applicable (single atom / very simple molecules have no stereocenters)
