@@ -1100,18 +1100,24 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 name = name_sulfoxide(features.mol, matches[0])
                 if name:
                     name = _enrich_handler_name(features, name, "sulfoxide")
-                    if _confidence_gate(name, "sulfoxide", features):
-                        return _inject_stereo_if_missing(features, name)
-                    # Low confidence: fall through
+                    # Phase 145.1: route through pool.add() — returns None on gate-fail.
+                    pool = get_current_pool()
+                    cand = pool.add(name, "sulfoxide", features)
+                    if cand is not None:
+                        return _inject_stereo_if_missing(features, cand.name)
+                    # Low confidence: pool.add returned None, fall through
         elif features.principal_group == 'sulfone':
             matches = features.functional_groups.get('sulfone', [])
             if matches:
                 name = name_sulfone(features.mol, matches[0])
                 if name:
                     name = _enrich_handler_name(features, name, "sulfone")
-                    if _confidence_gate(name, "sulfone", features):
-                        return _inject_stereo_if_missing(features, name)
-                    # Low confidence: fall through
+                    # Phase 145.1: route through pool.add() — returns None on gate-fail.
+                    pool = get_current_pool()
+                    cand = pool.add(name, "sulfone", features)
+                    if cand is not None:
+                        return _inject_stereo_if_missing(features, cand.name)
+                    # Low confidence: pool.add returned None, fall through
 
     # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
     # None for complex R-groups. Falls through to universal pipeline. No silent drop.
@@ -1133,9 +1139,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     name = name_sulfide(features.mol, sulfur_idx)
                     if name:
                         name = _enrich_handler_name(features, name, "thioether")
-                        if _confidence_gate(name, "thioether", features):
-                            return _inject_stereo_if_missing(features, name)
-                        # Low confidence: fall through
+                        # Phase 145.1: route through pool.add() — returns None on gate-fail.
+                        pool = get_current_pool()
+                        cand = pool.add(name, "thioether", features)
+                        if cand is not None:
+                            return _inject_stereo_if_missing(features, cand.name)
+                        # Low confidence: pool.add returned None, fall through
 
     # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
     # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
