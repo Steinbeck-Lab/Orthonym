@@ -1006,7 +1006,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "polyfunctional", _ha, poly_name[:60],
                 )
-            return poly_name
+            # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(poly_name, "polyfunctional", features)
+            return pool.best().name
         # If name_polyfunctional returns None, fall through to normal handling
         # (by-design: specialized handlers produce correct names via fallthrough)
         logger.debug(
@@ -1030,7 +1033,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                             "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                             "multi_ester", _ha, diester_name[:60],
                         )
-                    return diester_name
+                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+                    pool = get_current_pool()
+                    pool.add(diester_name, "multi_ester", features)
+                    return pool.best().name
             elif ester_type == "polyol_polyester":
                 polyol_name = name_polyol_polyester(features.mol, all_esters)
                 if polyol_name:
@@ -1040,7 +1046,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                             "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                             "multi_ester", _ha, polyol_name[:60],
                         )
-                    return polyol_name
+                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+                    pool = get_current_pool()
+                    pool.add(polyol_name, "multi_ester", features)
+                    return pool.best().name
             elif ester_type == "independent":
                 indep_name = name_independent_esters(features.mol, all_esters)
                 if indep_name:
@@ -1050,7 +1059,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                             "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                             "multi_ester", _ha, indep_name[:60],
                         )
-                    return indep_name
+                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+                    pool = get_current_pool()
+                    pool.add(indep_name, "multi_ester", features)
+                    return pool.best().name
                 # If returns None, fall through to single ester or decomposition
 
     # ASML-10 complete: Ester handler (esters.py) names acid and alkyl
@@ -1070,7 +1082,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                         "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                         "ester", _ha, ester_name[:60],
                     )
-                return ester_name
+                # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(ester_name, "ester", features)
+                return pool.best().name
         # If name_ester returns None (lactone or complex), fall through
 
     # ASML-10 self-gating: Sulfoxide/sulfone handlers use _count_alkyl_carbons()
