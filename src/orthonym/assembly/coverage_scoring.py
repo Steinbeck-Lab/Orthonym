@@ -132,6 +132,26 @@ FACTOR_WEIGHTS: Dict[str, float] = {
     'atom_coverage': 0.20,
     'fg_recognition': 0.35,
     'substituent_completeness': 0.25,
+    # Phase 145.1 scaffolding (D-14 byte-identical proof -- see comment below).
+    # Phase 146 raises this weight after 80/20 train/test calibration on
+    # the multi-corpus benchmark. The factor is computed by
+    # ParentCorrectnessScorer (src/orthonym/rules/parent_correctness.py)
+    # and recorded on cand.factors POST-HOC by CandidatePool.add()
+    # (src/orthonym/assembly/candidate_pool.py).
+    #
+    # BYTE-IDENTICAL PROOF (D-14):
+    # - Python 3.7+ dict iteration is insertion-order-deterministic.
+    # - compute_confidence's sum-loop at lines 324-326 iterates
+    #   FACTOR_WEIGHTS in insertion order.
+    # - This key MUST be inserted at the LAST position so the existing
+    #   4 weighted-sum terms accumulate first; the 5th term (0.0 * factor)
+    #   contributes exactly 0.0 by IEEE 754 (x + 0.0 = x for finite x).
+    # - Therefore confidence values are byte-identical to current code.
+    #
+    # RISK 2 (PATTERNS Risk 2): inserting this key in the MIDDLE would
+    # change weighted-sum order; floating-point summation is non-associative,
+    # so the rounded result may differ in the 5th decimal. DO NOT REORDER.
+    'parent_correctness': 0.0,  # DELETE 0.0 IN PHASE 146 (calibrate to ~0.35)
 }
 
 # Confidence bands for structured logging
@@ -342,6 +362,12 @@ def compute_confidence(
         'atom_coverage': round(min(atom_cov, 1.0), 4),
         'fg_recognition': round(fg_recognition, 4),
         'substituent_completeness': round(sub_completeness, 4),
+        # Phase 145.1: placeholder set to 0.0 so the sum-loop at lines 324-326
+        # doesn't raise KeyError on the new FACTOR_WEIGHTS key. CandidatePool.add()
+        # overwrites this POST-HOC with the real ParentCorrectnessScorer.score()
+        # result. With FACTOR_WEIGHTS['parent_correctness'] = 0.0, the placeholder
+        # contributes exactly 0.0 to confidence (IEEE 754) -- byte-identical safe.
+        'parent_correctness': 0.0,
     }
 
     # Weighted linear combination

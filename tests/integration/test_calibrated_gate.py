@@ -23,8 +23,23 @@ def test_weights_sum_to_one():
 
 @pytest.mark.integration
 def test_weights_all_positive():
-    """All 4 factor weights must be > 0."""
+    """All calibrated factor weights must be > 0.
+
+    Phase 145.1 ISS-004 update: 'parent_correctness' is the 5th factor
+    (scaffolded with weight=0.0 for byte-identical safety per D-14;
+    Phase 146 raises it to ~0.35 after train/test calibration). The
+    scaffolding weight is excluded from this positivity check until
+    Phase 146 calibrates it.
+    """
     for key, val in FACTOR_WEIGHTS.items():
+        if key == 'parent_correctness':
+            # Phase 145.1 scaffolding key (weight=0.0 by D-14 byte-identical
+            # contract). Phase 146 calibrates and removes this exception.
+            assert val == 0.0, (
+                f"parent_correctness must be exactly 0.0 in Phase 145.1 "
+                f"scaffolding (D-14 byte-identical proof); got {val}"
+            )
+            continue
         assert val > 0, f"Weight '{key}' is {val}, must be > 0"
 
 
@@ -39,9 +54,18 @@ def test_weights_have_derivation_comment():
 
 
 @pytest.mark.integration
-def test_weights_have_four_keys():
-    """FACTOR_WEIGHTS must have exactly 4 keys."""
-    expected = {'ratio', 'atom_coverage', 'fg_recognition', 'substituent_completeness'}
+def test_weights_have_five_keys():
+    """FACTOR_WEIGHTS must have exactly 5 keys after Phase 145.1 scaffolding.
+
+    Phase 145.1 ISS-004 update: 5th key 'parent_correctness' added at LAST
+    position (Risk 2 mitigation -- preserves dict iteration order in
+    compute_confidence's sum-loop; weight=0.0 keeps confidence values
+    byte-identical per D-14).
+    """
+    expected = {
+        'ratio', 'atom_coverage', 'fg_recognition',
+        'substituent_completeness', 'parent_correctness',
+    }
     assert set(FACTOR_WEIGHTS.keys()) == expected
 
 

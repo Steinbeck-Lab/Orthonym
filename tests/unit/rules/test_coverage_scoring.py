@@ -287,3 +287,102 @@ def test_candidate_name_default_factory_unchanged():
     c.factors['ratio'] = 0.5
     c2 = CandidateName(name="y", handler="h")
     assert c2.factors == {}
+
+
+# ---------------------------------------------------------------------------
+# Phase 145.1: FACTOR_WEIGHTS extension + byte-identical proof (SC-3, D-14)
+# ---------------------------------------------------------------------------
+
+def test_factor_weights_includes_parent_correctness():
+    """SC-3: FACTOR_WEIGHTS contains parent_correctness key with value 0.0."""
+    from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
+    assert 'parent_correctness' in FACTOR_WEIGHTS
+    assert FACTOR_WEIGHTS['parent_correctness'] == 0.0
+
+
+def test_factor_weights_parent_correctness_is_last_key():
+    """Risk 2 (PATTERNS): parent_correctness MUST be inserted at LAST position
+    to preserve dict iteration order in compute_confidence's sum-loop."""
+    from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
+    keys = list(FACTOR_WEIGHTS.keys())
+    assert keys[-1] == 'parent_correctness', (
+        f"parent_correctness must be LAST key for byte-identical safety; "
+        f"actual order: {keys}"
+    )
+
+
+def test_factor_weights_total_5_keys():
+    """SC-3: FACTOR_WEIGHTS has exactly 5 keys after extension."""
+    from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
+    assert len(FACTOR_WEIGHTS) == 5
+
+
+def test_factor_weights_existing_keys_unchanged():
+    """Risk 2: existing 4 keys preserved in their original order."""
+    from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
+    keys = list(FACTOR_WEIGHTS.keys())
+    assert keys[:4] == [
+        'ratio', 'atom_coverage', 'fg_recognition', 'substituent_completeness'
+    ], f"Existing key order changed; actual: {keys}"
+
+
+def test_factor_weights_existing_values_unchanged():
+    """Risk 2: existing factor weights preserved (calibration unchanged)."""
+    from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
+    assert FACTOR_WEIGHTS['ratio'] == 0.20
+    assert FACTOR_WEIGHTS['atom_coverage'] == 0.20
+    assert FACTOR_WEIGHTS['fg_recognition'] == 0.35
+    assert FACTOR_WEIGHTS['substituent_completeness'] == 0.25
+
+
+def test_byte_identical_confidence_with_zero_weight_factor():
+    """D-14 BYTE-IDENTICAL PROOF: adding parent_correctness=0.0 does NOT
+    change compute_confidence's output value.
+
+    Strategy: compute confidence via the live FACTOR_WEIGHTS (5 keys);
+    then patch FACTOR_WEIGHTS to remove the 5th key; recompute; assert
+    equal to 4-decimal precision. IEEE 754 + dict-order guarantees this.
+    """
+    import orthonym.assembly.coverage_scoring as cs
+    from orthonym.assembly.coverage_scoring import compute_confidence
+    # Use a representative molecule (benzaldehyde -- non-trivial confidence)
+    features = _make_features(
+        "O=Cc1ccccc1",
+        functional_groups={'aldehyde': [(1, 0)]},
+        principal_group='aldehyde',
+        principal_group_atoms=[(1, 0)],
+    )
+    # Compute with the live (5-key) FACTOR_WEIGHTS
+    cand_5key = compute_confidence("benzaldehyde", "benzene", features)
+    confidence_5key = cand_5key.confidence
+
+    # Save and patch to a 4-key dict (omits parent_correctness)
+    original = cs.FACTOR_WEIGHTS
+    cs.FACTOR_WEIGHTS = {
+        'ratio': 0.20,
+        'atom_coverage': 0.20,
+        'fg_recognition': 0.35,
+        'substituent_completeness': 0.25,
+    }
+    try:
+        cand_4key = compute_confidence("benzaldehyde", "benzene", features)
+        confidence_4key = cand_4key.confidence
+    finally:
+        cs.FACTOR_WEIGHTS = original
+
+    # IEEE 754: x + 0.0 = x (for finite x); rounded to 4 decimals must match
+    assert confidence_5key == confidence_4key, (
+        f"BYTE-IDENTICAL VIOLATION: 5-key confidence={confidence_5key:.6f} "
+        f"!= 4-key confidence={confidence_4key:.6f}. D-14 invariant broken."
+    )
+
+
+def test_handler_priority_extended_with_iss002_entries():
+    """ISS-002 REGRESSION: HANDLER_PRIORITY contains the entries Plan 01's
+    HANDLER_POLICIES needs. Single source of truth -- no hardcoded literals
+    in candidate_pool.py."""
+    from orthonym.assembly.coverage_scoring import HANDLER_PRIORITY
+    assert HANDLER_PRIORITY['n_oxide'] == 5, "n_oxide must be 5 (matches direct-return peers)"
+    assert HANDLER_PRIORITY['amine'] == 5, "amine must be 5 (matches direct-return peers)"
+    assert HANDLER_PRIORITY['simple_molecule'] == 1, "simple_molecule must be 1 (terminal fallback)"
+    assert HANDLER_PRIORITY['polyfunctional'] == 4, "polyfunctional already present, must be 4"
