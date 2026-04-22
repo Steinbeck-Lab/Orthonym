@@ -741,18 +741,26 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
         if oxime_name:
             oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
-            if _confidence_gate(oxime_name, "oxime", features):
-                return _inject_stereo_if_missing(features, oxime_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            # Pool's gate_threshold=0.40 (HANDLER_POLICIES['oxime']) reproduces
+            # the deleted _confidence_gate() check bit-for-bit.
+            pool = get_current_pool()
+            cand = pool.add(oxime_name, "oxime", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
     if features.principal_group == 'hydrazone':
         hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
         if hydrazone_name:
             hydrazone_name = _enrich_handler_name(features, hydrazone_name, "hydrazone")
-            if _confidence_gate(hydrazone_name, "hydrazone", features):
-                return _inject_stereo_if_missing(features, hydrazone_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(hydrazone_name, "hydrazone", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 verified: N-oxide handler creates modified molecule and names
     # recursively via name_compound(). The recursive call handles substituents
@@ -777,9 +785,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         iso_name = _name_isocyanate(features)
         if iso_name:
             iso_name = _enrich_handler_name(features, iso_name, "isocyanate")
-            if _confidence_gate(iso_name, "isocyanate", features):
-                return _inject_stereo_if_missing(features, iso_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(iso_name, "isocyanate", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
     # as isocyanate -- Phase 125 fix applies. Same gating as isocyanate above.
@@ -788,9 +799,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         isothio_name = _name_isothiocyanate(features)
         if isothio_name:
             isothio_name = _enrich_handler_name(features, isothio_name, "isothiocyanate")
-            if _confidence_gate(isothio_name, "isothiocyanate", features):
-                return _inject_stereo_if_missing(features, isothio_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(isothio_name, "isothiocyanate", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
     # the Phase 125 fix for substituted aromatic R-groups.
@@ -800,9 +814,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         carbamic_name = _name_carbamic_acid(features)
         if carbamic_name:
             carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
-            if _confidence_gate(carbamic_name, "carbamic_acid", features):
-                return _inject_stereo_if_missing(features, carbamic_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(carbamic_name, "carbamic_acid", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
     # for both N- and O-substituent naming.
@@ -813,9 +830,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         carb_name = _name_carbamate(features)
         if carb_name:
             carb_name = _enrich_handler_name(features, carb_name, "carbamate")
-            if _confidence_gate(carb_name, "carbamate", features):
-                return _inject_stereo_if_missing(features, carb_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(carb_name, "carbamate", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
@@ -826,9 +846,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         urea_name = _try_name_urea(features)
         if urea_name:
             urea_name = _enrich_handler_name(features, urea_name, "urea")
-            if _confidence_gate(urea_name, "urea", features):
-                return _inject_stereo_if_missing(features, urea_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(urea_name, "urea", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
@@ -838,9 +861,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         guanidine_name = _try_name_guanidine(features)
         if guanidine_name:
             guanidine_name = _enrich_handler_name(features, guanidine_name, "guanidine")
-            if _confidence_gate(guanidine_name, "guanidine", features):
-                return _inject_stereo_if_missing(features, guanidine_name, atom_to_locant=None)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(guanidine_name, "guanidine", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
     # chain/ring parent naming with suffix. Substituents handled via normal
