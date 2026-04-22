@@ -1293,25 +1293,52 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             pool.add(assembly_name, "ring_assembly", features)
             return _inject_stereo_if_missing(features, pool.best().name)
 
-    # --- Candidate collection block ---
-    # Collect scored candidates from the three coverage-gated handlers
-    # (complex_ring, heterocycle, benzene). Non-gated handlers (polycyclic,
-    # partial_sat) keep their direct returns between the collection parts.
+    # =========================================================================
+    # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool
+    # =========================================================================
     #
-    # Handler priority cascade: complex_ring > heterocycle > benzene.
-    # When a higher-priority handler produces a candidate with confidence
-    # above the cascade threshold, lower-priority handlers are skipped (they
-    # would produce simpler/incorrect names for fused systems).
-    # The cascade uses the raw RATIO factor (name-length / heavy-atoms,
-    # normalised to 0-1) rather than the aggregate confidence.  This makes
-    # the cascade decision weight-independent: a complex_ring name that
-    # describes a significant portion of the molecule (high ratio) protects
-    # the handler cascade, while a name covering only a small fragment
-    # (low ratio, e.g. "1H-indole" for a 24-atom piperazinedione) allows
-    # other handlers to compete.
-    _CASCADE_RATIO_MIN = 0.40  # raw ratio factor threshold
-    _gate_candidates = []
+    # PHASE 146 PRESERVE — DO NOT remove this comment block when Phase 146
+    # deletes the cascade gates. The Tier A subset slicing pattern below
+    # (`_tier_a_pool.all_candidates()[_tier_a_pool_count_before_complex:]`)
+    # MUST survive Phase 146's gate deletion. Why:
+    #
+    # In selection_mode='first_applicable' (145.1) the pool's ordering reflects
+    # the dispatch order. The pool already contains candidates from earlier
+    # Tier B / direct-return handlers (those handlers add to pool BEFORE
+    # returning their direct result). When Tier A reaches its final dispatch,
+    # we MUST select the best candidate from JUST the Tier A subset — not
+    # from the whole pool — otherwise an earlier Tier B candidate (e.g. a
+    # gate-rejected oxime that didn't return) would pollute Tier A selection.
+    #
+    # In Phase 146's selection_mode='score_based', this slicing pattern is
+    # ALSO necessary: Tier A handlers compete via select_best_candidate on
+    # the Tier A subset; non-Tier-A candidates (chain, direct-return) compete
+    # via the FINAL pool.best() call after fall-through. The two competitions
+    # are SEPARATE by design — Tier A picks the best ring; chain decides
+    # later whether to override. Mixing them here would cause chain to win
+    # over benzene on small rings, breaking IUPAC P-44.1 cascade order.
+    #
+    # PHASE 146 CHANGES: cascade_ratio_min=0.40 (L1199) becomes None, the
+    # _MIN_RATIO_ACCEPT/1.5 exit gate becomes always-true, but the SLICING
+    # PATTERN remains. Reviewer of Phase 146's diff: verify the
+    # `[_tier_a_pool_count_before_complex:]` slice is preserved.
+    # =========================================================================
+
+    # Tier A ring competition — Phase 145.1 routes through CandidatePool
+    # (selection_mode='first_applicable'). Cascade short-circuit
+    # (_complex_ring_accepted) is preserved; cascade_ratio_min = 0.40 lives
+    # in HANDLER_POLICIES['complex_ring'].cascade_ratio_min.
+    # DELETE IN PHASE 146: cascade_ratio_min, _complex_ring_accepted gating,
+    # _MIN_RATIO_ACCEPT/1.5 exit gate. All become None when policy fields
+    # are nulled out.
+    _CASCADE_RATIO_MIN = 0.40  # DELETE IN PHASE 146 — mirrors HANDLER_POLICIES['complex_ring'].cascade_ratio_min
     _complex_ring_accepted = False
+    # _gate_candidates was the in-line prototype of CandidatePool. The real
+    # pool from get_current_pool() is now the source of truth. We keep a
+    # local reference for readability and so the pool.add() calls below have
+    # an obvious target (the pool is also used by Tier B handlers above).
+    _tier_a_pool = get_current_pool()  # same thread-local pool used by Tier B
+    _tier_a_pool_count_before_complex = len(_tier_a_pool.all_candidates())
 
     # Handle complex ring systems FIRST (bicyclo, spiro, fused heterocycles)
     # These take precedence over simple heterocyclic/benzene classification
@@ -1335,11 +1362,15 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     complex_result.atom_to_locant,
                 )
 
-            _complex_cand = compute_confidence(complex_name, 'complex_ring', features)
-            _gate_candidates.append(_complex_cand)
+            # Pool.add() is byte-identical to the previous _gate_candidates.append:
+            # it calls compute_confidence(complex_name, 'complex_ring', features)
+            # internally and stores the candidate. Tier A handlers have
+            # direct_return=False (pool decides via best()), so .add() does NOT
+            # short-circuit pool.best() to this candidate.
+            _complex_cand = _tier_a_pool.add(complex_name, 'complex_ring', features)
             # If complex_ring covers enough of the molecule (ratio factor),
             # skip lower-priority handlers to preserve handler cascade.
-            if _complex_cand.factors.get('ratio', 0) >= _CASCADE_RATIO_MIN:
+            if _complex_cand is not None and _complex_cand.factors.get('ratio', 0) >= _CASCADE_RATIO_MIN:
                 _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
@@ -1411,12 +1442,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     pool = get_current_pool()
                     pool.add(lactone_name, "lactone", features)
                     return pool.best().name
-            # Collect heterocycle candidate
+            # Collect heterocycle candidate via pool.add()
             hetero_name = _assemble_heterocycle_name(features, style)
             if hetero_name:
-                _gate_candidates.append(
-                    compute_confidence(hetero_name, 'heterocycle', features)
-                )
+                _tier_a_pool.add(hetero_name, 'heterocycle', features)
             # If heterocycle naming fails, fall through
 
         # Handle benzene derivatives
@@ -1427,17 +1456,28 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         if getattr(features, 'is_benzene', False):
             benzene_name = _assemble_benzene_name(features, style)
             if benzene_name:
-                _gate_candidates.append(
-                    compute_confidence(benzene_name, 'benzene', features)
-                )
+                _tier_a_pool.add(benzene_name, 'benzene', features)
             # If benzene naming fails, fall through
 
-    # --- Select best candidate if any were collected ---
-    if _gate_candidates:
-        best = select_best_candidate(_gate_candidates)
+    # --- Select best Tier A candidate if any were collected ---
+    # PHASE 146 PRESERVE: the slicing pattern below MUST survive Phase 146's
+    # gate deletion (see comment block at top of this section).
+    _tier_a_candidates_added = _tier_a_pool.all_candidates()[_tier_a_pool_count_before_complex:]
+    if _tier_a_candidates_added:
+        # In first_applicable mode, pool.best() returns the FIRST added candidate
+        # in the pool overall. That may be a Tier B / direct-return candidate from
+        # earlier handlers if any fired. Those handlers all return immediately
+        # on success, so reaching this point means none of them fired -- the
+        # _tier_a_candidates_added list is the only set of candidates in the pool
+        # for the molecule's ring system. Use select_best_candidate over THAT
+        # subset to preserve current "Tier A wins on confidence within Tier A"
+        # behavior.
+        best = select_best_candidate(_tier_a_candidates_added)
         log_confidence(best)
         # Only store confidence at top-level depth (not during recursive
         # fragment naming) to prevent overwriting top-level metadata.
+        # Risk 3 (PATTERNS): preserve store_confidence so name_with_confidence()
+        # continues returning factor data via retrieve_confidence().
         from .fragment_naming import is_top_level_naming
         if is_top_level_naming():
             store_confidence(best)
@@ -1446,8 +1486,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         # old binary gate's acceptance criterion. When the ratio is too low,
         # the handler only captured a small substructure and chain naming
         # may produce a more complete name.
-        _MIN_RATIO_ACCEPT = 0.30  # Matches old gate threshold for HA <= 20
+        _MIN_RATIO_ACCEPT = 0.30  # DELETE IN PHASE 146 — mirrors HANDLER_POLICIES min_ratio_accept
         total_heavy = features.mol.GetNumHeavyAtoms()
+        # Subtle: the / 1.5 divisor is preserved exactly. Comment for Phase 146:
+        # the actual threshold is 0.30 / 1.5 = 0.20 (effective ratio gate).
+        # When Phase 146 nulls min_ratio_accept, this whole if-block becomes
+        # `if total_heavy <= 15 or True:` -> always taken -> always return best.name.
         if total_heavy <= 15 or best.factors.get('ratio', 0) >= (_MIN_RATIO_ACCEPT / 1.5):
             # Stereo: handled by individual handlers (complex_ring, heterocycle, benzene)
             if logger.isEnabledFor(logging.DEBUG):
@@ -1462,6 +1506,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             "to chain naming. best_handler=%s best_confidence=%.4f ratio=%.4f",
             best.handler, best.confidence, best.factors.get('ratio', 0),
         )
+        # BYTE-IDENTICAL FIX: Tier A candidates were rejected by the ratio gate.
+        # Truncate them from the pool so subsequent direct-return handlers
+        # (ring_nitrile, amide, amine) and the chain fallback don't see them
+        # via pool.best() (which returns _candidates[0] in first_applicable mode).
+        # Without this truncation, the chain fallback at the end of assemble_name
+        # would return the rejected Tier A candidate's name (e.g. "1H-indole" for
+        # a 35-atom indole peptide) instead of the chain assembly. DELETE IN
+        # PHASE 146 when score_based mode is enabled — score-based selection
+        # naturally lets chain win over a low-ratio ring candidate.
+        del _tier_a_pool._candidates[_tier_a_pool_count_before_complex:]
     # else: no ring candidates -- fall through to chain/simple naming
 
     # ASML-10 complete: Ring nitrile handler uses _assemble_ring_nitrile_name()
