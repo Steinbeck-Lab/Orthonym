@@ -60,3 +60,7 @@ stereo_gap_trace_results.json
 # Phase 145: raw corpus caches (too large to commit)
 
 
+
+# Phase 145.1-04: byte-identical verification output dirs (ISS-006)
+tmp_byte_identical_subset/
+tmp_byte_identical_full/
