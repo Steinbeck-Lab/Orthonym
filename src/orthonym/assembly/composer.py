@@ -1618,7 +1618,16 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                 missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
             )
 
-    return assembled
+    # Phase 145.1: route chain-naming through pool.
+    # In first_applicable mode, pool.best() returns the FIRST added
+    # candidate. If a higher-priority handler already added one above,
+    # pool.best() is that one (chain naming computed but not returned).
+    # If no other handler fired (this is the only candidate), pool.best()
+    # is the chain candidate. D-02: chain has priority=fallback in 145.1
+    # (preserves byte-identical); Phase 146 raises priority for competition.
+    pool = get_current_pool()
+    pool.add(assembled, "chain", features)
+    return pool.best().name
 
 
 def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
