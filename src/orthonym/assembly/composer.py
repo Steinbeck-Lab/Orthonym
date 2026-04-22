@@ -1363,7 +1363,11 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "polycyclic", _ha, (polycyclic_name or "")[:60],
                 )
-            return _assemble_polycyclic_name(features, style)
+            # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
+            poly_assembled = _assemble_polycyclic_name(features, style)
+            pool = get_current_pool()
+            pool.add(poly_assembled, "polycyclic", features)
+            return pool.best().name
 
         # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
         # Check BEFORE benzene since they contain benzene substructure
@@ -1374,9 +1378,13 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
                 partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
-                if _confidence_gate(partial_sat_name, "partial_sat", features):
-                    return partial_sat_name
-                # Low confidence: fall through to next handler
+                # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
+                # NOTE: partial_sat returns cand.name DIRECTLY (no _inject_stereo wrapper).
+                pool = get_current_pool()
+                cand = pool.add(partial_sat_name, "partial_sat", features)
+                if cand is not None:
+                    return cand.name
+                # Low confidence: pool.add returned None, fall through to next handler
 
     # Only collect heterocycle/benzene candidates if complex_ring didn't
     # produce a high-confidence result. This preserves the handler priority
@@ -1397,7 +1405,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
             if lactone_info:
                 lactone_name = name_monocyclic_lactone(features.mol)
                 if lactone_name:
-                    return lactone_name
+                    # Phase 145.1 ISS-001: Tier A safety net (DIFFERENT from primary
+                    # lactone at L878). Route through pool.add() — direct_return.
+                    # Same handler_id "lactone" — same handler, different code path.
+                    pool = get_current_pool()
+                    pool.add(lactone_name, "lactone", features)
+                    return pool.best().name
             # Collect heterocycle candidate
             hetero_name = _assemble_heterocycle_name(features, style)
             if hetero_name:
