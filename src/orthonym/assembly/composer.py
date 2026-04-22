@@ -772,7 +772,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     if n_oxide_name:
         # N-oxide names the heterocycle with N-oxide. Use heterocycle locant map if available.
         _noxide_locant_map = getattr(features, 'heterocycle_atom_to_locant', None) or features.atom_to_locant
-        return _inject_stereo_if_missing(features, n_oxide_name, atom_to_locant=_noxide_locant_map)
+        # Phase 145.1: route through pool.add() — direct_return handler.
+        pool = get_current_pool()
+        pool.add(n_oxide_name, "n_oxide", features)
+        return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=_noxide_locant_map)
 
     # ASML-10 complete: Isocyanate handler calls _name_r_group() which uses
     # the Phase 125 non_ring_heavy fix and name_substituent() fallback for
@@ -883,7 +886,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "acid_halide", _ha, halide_name[:60],
                 )
-            return _inject_stereo_if_missing(features, halide_name, atom_to_locant=None)
+            # Phase 145.1: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(halide_name, "acid_halide", features)
+            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
 
     # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
     # component naming. Substituents handled within the module.
@@ -900,7 +906,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "anhydride", _ha, anhydride_name[:60],
                 )
-            return _inject_stereo_if_missing(features, anhydride_name, atom_to_locant=None)
+            # Phase 145.1: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(anhydride_name, "anhydride", features)
+            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
 
     # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
     # for exocyclic substituent discovery (Phase 86 wired, lactones.py).
@@ -928,7 +937,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     )
                 # Lactone handler already includes stereo with correct ring locants.
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
-                return _inject_stereo_if_missing(features, lactone_name, atom_to_locant=None)
+                # Phase 145.1: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(lactone_name, "lactone", features)
+                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
 
     # ASML-10 complete: Lactam handler calls _integrate_universal_prefixes()
     # for exocyclic substituent discovery (parallel to lactones).
@@ -952,7 +964,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     )
                 # Lactam handler already includes stereo with correct ring locants.
                 # Pass None -- regex guard detects existing stereo prefix and returns early.
-                return _inject_stereo_if_missing(features, lactam_name, atom_to_locant=None)
+                # Phase 145.1: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(lactam_name, "lactam", features)
+                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
 
     # ASML-10 complete: Ring-attached ester handler uses
     # _assemble_ring_with_ester_prefixes() which generates acyloxy prefixes
@@ -973,7 +988,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                         "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                         "ring_ester", _ha, ring_ester_name[:60],
                     )
-                return _inject_stereo_if_missing(features, ring_ester_name)
+                # Phase 145.1: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(ring_ester_name, "ring_ester", features)
+                return _inject_stereo_if_missing(features, pool.best().name)
 
     # ASML-10 complete: Polyfunctional handler (polyfunctional.py) uses
     # _integrate_universal_prefixes() for substituent discovery on both
