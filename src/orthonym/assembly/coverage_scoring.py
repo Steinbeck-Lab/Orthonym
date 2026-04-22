@@ -95,6 +95,18 @@ HANDLER_PRIORITY: Dict[str, int] = {
     'ring_assembly': 5,
     'ring_nitrile': 5,
     'amide': 5,
+    # Phase 145.1 ADDS (ISS-002 remediation): single source of truth for
+    # candidate_pool.HANDLER_POLICIES. Plan 01's HANDLER_POLICIES dict pulls
+    # every priority from this dict; missing entries break with KeyError.
+    # n_oxide and amine handlers exist at composer.py:740 and composer.py:1383
+    # respectively; both have direct-return semantics with priority 5
+    # (matches their Tier B / direct-return peers). simple_molecule is the
+    # terminal fallback at composer.py:1389; priority 1 matches chain
+    # (lowest priority — only wins when nothing else fires). polyfunctional
+    # is ALREADY present above with priority 4.
+    'n_oxide': 5,
+    'amine': 5,
+    'simple_molecule': 1,
 }
 
 # Confidence threshold for Tier B handler gating.
