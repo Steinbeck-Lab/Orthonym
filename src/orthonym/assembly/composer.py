@@ -1265,9 +1265,12 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         boronic_name = _name_boronic_acid(features)
         if boronic_name:
             boronic_name = _enrich_handler_name(features, boronic_name, "boronic_acid")
-            if _confidence_gate(boronic_name, "boronic_acid", features):
-                return _inject_stereo_if_missing(features, boronic_name)
-            # Low confidence: fall through to next handler
+            # Phase 145.1: route through pool.add() — returns None on gate-fail.
+            pool = get_current_pool()
+            cand = pool.add(boronic_name, "boronic_acid", features)
+            if cand is not None:
+                return _inject_stereo_if_missing(features, cand.name)
+            # Low confidence: pool.add returned None, fall through to next handler
 
     # ASML-10 verified: Ring assembly has own _get_substituent_info() at
     # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
