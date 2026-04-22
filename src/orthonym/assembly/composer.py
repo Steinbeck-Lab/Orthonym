@@ -1164,7 +1164,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                         "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                         "phosphine_oxide", _ha, name[:60],
                     )
-                return _inject_stereo_if_missing(features, name)
+                # Phase 145.1: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(name, "phosphine_oxide", features)
+                return _inject_stereo_if_missing(features, pool.best().name)
 
     # Handle phosphate esters
     if features.principal_group in ('phosphate_triester', 'phosphate_diester', 'phosphate_monoester'):
@@ -1184,7 +1187,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                                 "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                                 "phosphate_ester", _ha, name[:60],
                             )
-                        return _inject_stereo_if_missing(features, name)
+                        # Phase 145.1: route through pool.add() — direct_return handler.
+                        pool = get_current_pool()
+                        pool.add(name, "phosphate_ester", features)
+                        return _inject_stereo_if_missing(features, pool.best().name)
                     break
 
     # Handle phosphines (tertiary, secondary, primary)
@@ -1229,7 +1235,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                                 "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                                 "phosphine", _ha, name[:60],
                             )
-                        return _inject_stereo_if_missing(features, name)
+                        # Phase 145.1: route through pool.add() — direct_return handler.
+                        pool = get_current_pool()
+                        pool.add(name, "phosphine", features)
+                        return _inject_stereo_if_missing(features, pool.best().name)
                     break
 
     # Handle phosphinic acid (suffix naming, but needs special assembly)
@@ -1245,7 +1254,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                         "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                         "phosphinic_acid", _ha, name[:60],
                     )
-                return _inject_stereo_if_missing(features, name)
+                # Phase 145.1: route through pool.add() — direct_return handler.
+                pool = get_current_pool()
+                pool.add(name, "phosphinic_acid", features)
+                return _inject_stereo_if_missing(features, pool.best().name)
 
     # ASML-10 complete: Boronic acid handler calls _name_r_group() (Phase 125
     # fix) for R-group naming. Substituted aromatic R-groups correctly named.
@@ -1273,7 +1285,10 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "ring_assembly", _ha, assembly_name[:60],
                 )
-            return _inject_stereo_if_missing(features, assembly_name)
+            # Phase 145.1: route through pool.add() — direct_return handler.
+            pool = get_current_pool()
+            pool.add(assembly_name, "ring_assembly", features)
+            return _inject_stereo_if_missing(features, pool.best().name)
 
     # --- Candidate collection block ---
     # Collect scored candidates from the three coverage-gated handlers
