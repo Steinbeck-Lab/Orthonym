@@ -1,0 +1,6 @@
+source_chebi_id,smiles,reference_name,compound_classes,primary_class,size_bucket,heavy_atoms
+CHEBI:16236,CCO,ethanol,"acyclic,small",acyclic,small,3
+CHEBI:15377,O,oxidane,"acyclic,small",acyclic,small,1
+CHEBI:16001,CC(=O)O,acetic acid,"acyclic,small",acyclic,small,4
+CHEBI:17578,CCCC,butane,"acyclic,small",acyclic,small,4
+CHEBI:27780,c1ccccc1,benzene,"aromatic,small",aromatic,small,6

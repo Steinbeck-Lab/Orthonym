@@ -1,0 +1,6 @@
+chebi_id,smiles,reference_name,name_index,name_type,compound_classes,primary_class,size_bucket,heavy_atoms
+CHEBI:16236,CCO,ethanol,0,trivial,acyclic;small,acyclic,small,3
+CHEBI:15377,O,water,0,trivial,acyclic;small,acyclic,small,1
+CHEBI:16001,CC(=O)O,acetic acid,0,systematic,acyclic;small,acyclic,small,4
+CHEBI:17578,CCCC,butane,0,systematic,acyclic;small,acyclic,small,4
+CHEBI:27780,c1ccccc1,benzene,0,trivial,aromatic;small,aromatic,small,6

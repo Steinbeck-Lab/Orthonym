@@ -1,0 +1,6 @@
+cid,smiles,reference_name,compound_classes,primary_class,size_bucket,heavy_atoms
+702,CCO,ethanol,"acyclic,small",acyclic,small,3
+241,c1ccccc1,benzene,"aromatic,small",aromatic,small,6
+6342,CCC(=O)O,propanoic acid,"acyclic,small",acyclic,small,5
+6344,CC(C)O,propan-2-ol,"acyclic,small",acyclic,small,4
+7836,CCCC,butane,"acyclic,small",acyclic,small,4
