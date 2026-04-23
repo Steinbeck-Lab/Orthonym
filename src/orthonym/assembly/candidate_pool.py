@@ -315,27 +315,104 @@ class CandidatePool:
 
 
 # ---------------------------------------------------------------------------
-# Thread-local pool store (mirrors coverage_scoring._confidence_store)
+# Thread-local pool stack (per-molecule cascade scoping per IUPAC P-44.0)
+#
+# IUPAC 2013 Blue Book P-44.0 mandates that "the selection of a preferred
+# parent structure is based on the seniority of classes" — applied per-molecule,
+# single-pass. Each invocation of assemble_name() represents one molecule's
+# parent-selection cascade.
+#
+# assemble_name() is called recursively from at least 6 sites:
+#   - composer.py:766 (N-oxide handler)
+#   - composer.py:1691, 1834 (composition / decomposition handlers)
+#   - assembly/fragment_naming.py:323, 334 (substituent fragment naming)
+#   - assembly/substituent_enumerator.py:871, 1091 (nested substituents)
+#   - decomposition/engine.py:46 (decomposition fallback)
+#
+# A single-slot thread-local pool would let a recursive substituent's cascade
+# pollute its outer molecule's cascade (the inner candidate becomes pool[0]
+# from the outer's perspective, and selection_mode='first_applicable' returns
+# the wrong winner). This violates P-44.0 per-molecule scoping.
+#
+# Fix: thread-local STACK. Each assemble_name() prologue calls push_pool() to
+# push a fresh pool; the body's existing handler dispatch reads/writes the top
+# of stack via get_current_pool(); the epilogue (try/finally) calls pop_pool()
+# to restore the previous pool. Recursion-safe to arbitrary depth.
 # ---------------------------------------------------------------------------
 
 _pool_store = threading.local()
 
 
-def get_current_pool() -> CandidatePool:
-    """Return thread-local pool, creating one on first access.
+def _ensure_stack() -> List[CandidatePool]:
+    """Initialize the per-thread pool stack on first access.
 
-    Lazy-init pattern mirrors getattr(_confidence_store, 'last_candidate', None)
-    at coverage_scoring.py:418. Pool defaults to selection_mode='first_applicable'
-    (Phase 145.1 behavior). Phase 146 will instantiate with 'score_based'.
+    Each thread has its own stack (via threading.local()), so concurrent
+    benchmark runners ( uses ThreadPoolExecutor)
+    have independent pool stacks with no cross-thread leakage.
     """
-    pool = getattr(_pool_store, 'pool', None)
-    if pool is None:
-        pool = CandidatePool(selection_mode='first_applicable')
-        _pool_store.pool = pool
-    return pool
+    if not hasattr(_pool_store, 'stack'):
+        _pool_store.stack = []
+    return _pool_store.stack
+
+
+def push_pool() -> CandidatePool:
+    """Push a fresh pool onto the per-thread stack and return it.
+
+    Called by assemble_name() prologue (composer.py). MUST be paired with
+    pop_pool() in a finally clause so the pool is popped on every exit path
+    (normal return, exception, early return statements).
+
+    Returns the new pool that is now the active cascade scope for the
+    currently-executing assemble_name() call.
+    """
+    stack = _ensure_stack()
+    new_pool = CandidatePool(selection_mode='first_applicable')
+    stack.append(new_pool)
+    return new_pool
+
+
+def pop_pool() -> None:
+    """Pop the top pool from the per-thread stack.
+
+    Called by assemble_name() epilogue (composer.py, in finally clause).
+    Safe to call when the stack is empty (no-op) — defensive against any
+    code path that pops without a matching push.
+    """
+    stack = _ensure_stack()
+    if stack:
+        stack.pop()
+
+
+def get_current_pool() -> CandidatePool:
+    """Return the top of the per-thread pool stack — the active cascade
+    for the currently-executing assemble_name() call.
+
+    Auto-pushes a fresh pool if the stack is empty. This covers two cases:
+    (1) a handler called get_current_pool() outside an assemble_name() scope
+    (e.g., from a unit test that invokes pool.add() directly), and
+    (2) backward compatibility with any legacy caller that expected the
+    pre-fix lazy-init behavior.
+    """
+    stack = _ensure_stack()
+    if not stack:
+        return push_pool()
+    return stack[-1]
 
 
 def clear_pool() -> None:
-    """Reset thread-local pool. Called at assemble_name() prologue
-    (composer.py:674 next to existing clear_confidence() call)."""
-    _pool_store.pool = CandidatePool(selection_mode='first_applicable')
+    """BACKWARD-COMPAT: replace the top of the stack with a fresh pool.
+
+    Pre-fix code (Plan 03) called clear_pool() in assemble_name()'s prologue
+    to reset state. Post-fix, push_pool() is the right primitive (the wrapping
+    try/finally handles pop). This alias preserves the call-site signature
+    so any handler still calling clear_pool() directly does not break.
+
+    Behavior: if the stack is empty, push a fresh pool (same as pre-fix
+    lazy init); if non-empty, replace the top so the current cascade restarts
+    cleanly without affecting outer cascades on the stack.
+    """
+    stack = _ensure_stack()
+    if stack:
+        stack[-1] = CandidatePool(selection_mode='first_applicable')
+    else:
+        push_pool()
