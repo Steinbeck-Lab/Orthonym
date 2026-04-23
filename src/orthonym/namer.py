@@ -1571,14 +1571,28 @@ def _descriptive_fallback(smiles: str) -> str:
         if has_wildcard:
             return "compound with wildcard atoms (not supported)"
 
-        # Check for non-organic elements
-        elements = set(a.GetSymbol() for a in mol.GetAtoms())
-        non_organic = elements - _ORGANIC_ELEMENTS
+        # Check for non-organic elements.
+        # IMPORTANT: iterate atoms in atom-index order to ensure deterministic
+        # output across runs. A previous implementation iterated over a set()
+        # of element symbols, which under Python's randomized hash returned a
+        # different metal name on every run for multi-metal compounds — that
+        # broke byte-identical reproducibility. Atom-index order is stable
+        # (defined by canonical SMILES) and semantically intuitive: the
+        # fallback names the molecule after the first metal encountered in
+        # the structure, mirroring how a chemist reading the formula would.
+        non_organic_in_order: list = []
+        seen: set = set()
+        for atom in mol.GetAtoms():
+            sym = atom.GetSymbol()
+            if sym in _ORGANIC_ELEMENTS or sym in seen:
+                continue
+            seen.add(sym)
+            non_organic_in_order.append(sym)
 
-        if non_organic:
-            # Find the most prominent metal/inorganic element
+        if non_organic_in_order:
+            # Find the first metal in atom-index order
             metal_name = None
-            for elem in non_organic:
+            for elem in non_organic_in_order:
                 if elem in _METAL_NAMES:
                     metal_name = _METAL_NAMES[elem]
                     break
