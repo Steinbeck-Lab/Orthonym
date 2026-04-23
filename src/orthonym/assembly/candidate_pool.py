@@ -297,14 +297,41 @@ class CandidatePool:
         return cand
 
     def best(self) -> Optional[CandidateName]:
-        """Select winning candidate per selection_mode."""
+        """Select winning candidate per selection_mode.
+
+        BYTE-IDENTICAL CONTRACT (Phase 145.1 drift fix, 2026-04-23):
+
+        In `selection_mode='first_applicable'`, the original (pre-Plan-01)
+        composer.py used an `if X applies: return X` cascade where each
+        direct-return handler short-circuited the entire dispatch. The
+        Plan-03 refactor preserved this intent by tracking
+        `_direct_return_winner` (set by add() when a `direct_return=True`
+        handler fires), but the original Plan 01 implementation of best()
+        ignored this field and just returned `_candidates[0]`. This caused
+        a byte-identical drift on CHEBI:85380 (`COc1cc...c4ccc1c2c43`):
+        the Tier A `complex_ring` handler (direct_return=False) added
+        `1-methoxypyrene` first, then the polycyclic handler
+        (direct_return=True) added the correct `2-methoxypyrene`, but
+        best() returned `_candidates[0]` = the wrong-locant complex_ring
+        candidate.
+
+        FIX: when a direct-return handler has fired, return ITS candidate
+        (matches the pre-Plan-01 "if X applies: return X" semantics).
+        Otherwise, return the first added candidate (Tier A subset
+        compete-by-position for first_applicable).
+
+        Phase 146 will flip selection_mode to 'score_based' and the
+        _direct_return_winner short-circuit no longer applies — full
+        candidate set competes via select_best_candidate() per D-08.
+        """
         if not self._candidates:
             return None
         if self.selection_mode == 'first_applicable':
-            # 145.1: first added wins. The cascade order IS the handler
-            # dispatch order in composer.assemble_name(). When the first
-            # added candidate is a direct_return handler, that's the
-            # winner — pool.best() returns it.
+            # If any direct_return=True handler fired, IT wins (semantic
+            # equivalent to the original "if X applies: return X" pattern).
+            # Otherwise, first-added wins (Tier A subset semantics).
+            if self._direct_return_winner is not None:
+                return self._direct_return_winner
             return self._candidates[0]
         # Phase 146 path: score-based selection over the full pool.
         return select_best_candidate(self._candidates)
