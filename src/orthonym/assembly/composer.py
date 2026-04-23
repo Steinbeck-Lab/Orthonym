@@ -75,7 +75,7 @@ from .coverage_scoring import (
     log_confidence,
     CandidateName,
 )
-from .candidate_pool import get_current_pool, clear_pool
+from .candidate_pool import get_current_pool, clear_pool, push_pool, pop_pool
 
 # Ion/radical naming imports - deferred to avoid circular imports
 # These are imported inside functions that need them
@@ -658,8 +658,24 @@ def _try_ion_aspect_composition(features, style='pin'):
 
 
 def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = False) -> str:
-    """
-    Assemble complete IUPAC name from molecular features.
+    """Assemble complete IUPAC name from molecular features.
+
+    PUBLIC API + RECURSION-SAFE WRAPPER (Phase 145.1 drift fix, 2026-04-23).
+
+    Each invocation gets its own CandidatePool scope per IUPAC P-44.0
+    "selection of a preferred parent structure is based on the seniority
+    of classes" — applied per-molecule, single-pass. The wrapper pushes a
+    fresh pool on the per-thread stack before delegating to the body, and
+    pops it in a finally clause so every exit path (normal return, early
+    return, exception) restores the previous pool for the calling frame.
+
+    This fixes the byte-identical drift discovered in Plan 04 where
+    recursive name_compound() calls (N-oxide handler, fragment naming,
+    substituent enumeration, decomposition fallback) shared a single
+    thread-local pool with the outer molecule, causing inner candidates
+    to pollute pool[0] and beat the outer molecule's correct candidate
+    under selection_mode='first_applicable'. See:
+    .
 
     Args:
         features: MolecularFeatures object with extracted features
@@ -670,6 +686,21 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
 
     Returns:
         Complete IUPAC name string
+    """
+    push_pool()
+    try:
+        return _assemble_name_impl(features, style, _composing_ion)
+    finally:
+        pop_pool()
+
+
+def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool = False) -> str:
+    """Implementation body of assemble_name(). Do NOT call directly — call
+    assemble_name() instead so the per-call pool scope is set up correctly.
+
+    Split out from assemble_name() in 2026-04-23 to add the push_pool /
+    pop_pool wrapper without indenting the original 1000+ line body.
+    Behavior is unchanged from the pre-fix assemble_name() body.
     """
     # Clear confidence store at start of each naming call
     clear_confidence()
