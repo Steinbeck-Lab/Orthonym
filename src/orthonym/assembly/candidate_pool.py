@@ -53,7 +53,7 @@ PERFORMANCE (ISS-005 remediation):
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from .coverage_scoring import (
     CandidateName,
@@ -97,6 +97,28 @@ logger = logging.getLogger(__name__)
 # strong enough to catch adversarial / pathological garbage during Phase 146
 # competitive selection.
 RATIO_REJECT_FLOOR: float = 0.10
+
+
+# ---------------------------------------------------------------------------
+# Phase 146 D-02: P-44.1.2 element seniority for parent-hydride selection.
+# SEPARATE from rules/seniority.py SENIORITY_ORDER (which is principal-GROUP
+# seniority for P-41/P-42 acid/ester/amide ordering). Lower index = more senior.
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.2
+# ---------------------------------------------------------------------------
+P_44_1_2_ELEMENT_SENIORITY: List[str] = [
+    'N', 'P', 'As', 'Sb', 'Bi',
+    'Si', 'Ge', 'Sn', 'Pb',
+    'B', 'Al', 'Ga', 'In', 'Tl',
+    'O', 'S', 'Se', 'Te',
+    'C',
+]
+# Pre-computed lookup: element symbol -> seniority index (lower = senior).
+# Elements not in the list (e.g., 'F', 'Cl', 'H') get rank len(list)
+# (sentinel "least senior") via the dict-get default below.
+P_44_1_2_ELEMENT_RANK: Dict[str, int] = {
+    sym: idx for idx, sym in enumerate(P_44_1_2_ELEMENT_SENIORITY)
+}
+_P_44_1_2_SENTINEL_RANK: int = len(P_44_1_2_ELEMENT_SENIORITY)
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +243,259 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
 
 
 # ---------------------------------------------------------------------------
+# Phase 146 helper: PCG counter (CD-01 resolution per RESEARCH §2.3).
+# ---------------------------------------------------------------------------
+
+def _count_pcgs_in_parent(
+    candidate: 'CandidateName',
+    features: Any,
+) -> int:
+    """Count principal characteristic groups attached to or inside the parent.
+
+    CD-01 resolution per RESEARCH §2.3: a PCG counts when its attachment atom
+    is inside parent_atom_indices OR bonded to an atom inside parent_atom_indices.
+    Substituent PCGs (e.g. nitrile on a substituent chain) do NOT count.
+
+    Returns 0 (no-decision sentinel) when:
+      - candidate.parent_atom_indices is None
+      - features.principal_group is None / falsy
+      - features.principal_group_atoms is missing or empty
+      - features.mol is None
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    """
+    if candidate.parent_atom_indices is None:
+        return 0  # no-decision -> count as 0 -> loses cascade step 1
+    parent_set = set(candidate.parent_atom_indices)
+    principal_group = getattr(features, 'principal_group', None)
+    if not principal_group:
+        return 0
+    pg_atoms = getattr(features, 'principal_group_atoms', None) or []
+    mol = getattr(features, 'mol', None)
+    if mol is None:
+        return 0
+    count = 0
+    for pg_tuple in pg_atoms:
+        if not pg_tuple:
+            continue
+        attach = pg_tuple[0]
+        if attach in parent_set:
+            count += 1
+            continue
+        # Indirect: any neighbor of attach is in parent
+        try:
+            atom = mol.GetAtomWithIdx(attach)
+            if any(nbr.GetIdx() in parent_set for nbr in atom.GetNeighbors()):
+                count += 1
+        except Exception:
+            continue
+    return count
+
+
+def _count_multiple_bonds_in_atom_set(mol: Any, atom_set: Set[int]) -> int:
+    """Count double + triple bonds where both endpoints are in atom_set.
+
+    Adapted from rules/parent_selection.py:193-209 _count_multiple_bonds.
+    Used by Tier-1 filter step 5 (P-44.4.1.2) AND the multiple_bond_count factor
+    wired into coverage_scoring.py by Plan 03.
+
+    Duplicated here (rather than imported) to avoid a circular dependency
+    between assembly/ and rules/ modules.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    """
+    if mol is None or not atom_set:
+        return 0
+    from rdkit import Chem
+    count = 0
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in atom_set
+                and bond.GetEndAtomIdx() in atom_set):
+            bt = bond.GetBondType()
+            if bt == Chem.BondType.DOUBLE or bt == Chem.BondType.TRIPLE:
+                count += 1
+    return count
+
+
+# ---------------------------------------------------------------------------
+# Phase 146 Tier-1 cascade filters (D-01, D-02).
+# Each filter has signature (List[CandidateName]) -> List[CandidateName].
+# NEVER returns empty list — if all candidates tie, all are returned.
+# ---------------------------------------------------------------------------
+
+def _filter_max_pcg_count(candidates: List['CandidateName']) -> List['CandidateName']:
+    """P-44.1.1: max principal characteristic group count wins.
+
+    Reads candidate.parent_pcg_count (set POST-HOC by pool.add via
+    _count_pcgs_in_parent). Candidates with parent_pcg_count==None are
+    treated as 0 (no-decision -> loses cascade step 1).
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    """
+    if not candidates:
+        return candidates
+    counts = [
+        c.parent_pcg_count if c.parent_pcg_count is not None else 0
+        for c in candidates
+    ]
+    max_count = max(counts)
+    return [c for c, n in zip(candidates, counts) if n == max_count]
+
+
+def _filter_senior_heteroatom_class(
+    candidates: List['CandidateName'],
+) -> List['CandidateName']:
+    """P-44.1.2: senior heteroatom class wins (N > P > ... > C).
+
+    For each candidate, the senior element in its parent atom set is the one
+    with the LOWEST index in P_44_1_2_ELEMENT_SENIORITY. Empty parent atoms
+    treated as having only C (least senior).
+
+    Reads `mol` from features stashed on the candidate (Plan 03 wiring) or
+    from the `_features_mol` test attribute used by Plan 02 isolated tests.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.2
+    """
+    if not candidates:
+        return candidates
+
+    def _senior_rank(cand: 'CandidateName') -> int:
+        atoms = cand.parent_atom_indices
+        if not atoms:
+            return _P_44_1_2_SENTINEL_RANK
+        # Production wiring (Plan 03+): pool.add() will stash features.mol
+        # on the candidate via a `features` attribute. For Plan 02 unit
+        # tests we read mol from a stashed `_features_mol` attr that the
+        # test fixture sets directly.
+        mol = getattr(getattr(cand, 'features', None), 'mol', None)
+        if mol is None:
+            mol = getattr(cand, '_features_mol', None)
+        if mol is None:
+            return _P_44_1_2_SENTINEL_RANK
+        best = _P_44_1_2_SENTINEL_RANK
+        for idx in atoms:
+            try:
+                sym = mol.GetAtomWithIdx(idx).GetSymbol()
+            except Exception:
+                continue
+            rank = P_44_1_2_ELEMENT_RANK.get(sym, _P_44_1_2_SENTINEL_RANK)
+            if rank < best:
+                best = rank
+        return best
+
+    ranks = [_senior_rank(c) for c in candidates]
+    best_rank = min(ranks)
+    return [c for c, r in zip(candidates, ranks) if r == best_rank]
+
+
+def _filter_ring_over_chain_on_tie(
+    candidates: List['CandidateName'],
+) -> List['CandidateName']:
+    """P-52.2.8 / P-44.1.2.2: ring beats chain on tie. If any ring candidate
+    exists in the input, drop all chain candidates. Else identity.
+
+    Reads HANDLER_POLICIES[c.handler].tier; tier=='chain' is the chain class.
+    Unknown handler (no entry in HANDLER_POLICIES) is treated as non-chain
+    (defensive default — keeps the candidate in the result).
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P5.html P-52.2.8
+    """
+    if not candidates:
+        return candidates
+    non_chain = [
+        c for c in candidates
+        if (HANDLER_POLICIES.get(c.handler) is None
+            or HANDLER_POLICIES[c.handler].tier != 'chain')
+    ]
+    if non_chain and len(non_chain) < len(candidates):
+        return non_chain
+    return candidates
+
+
+def _filter_max_skeletal_atoms(
+    candidates: List['CandidateName'],
+) -> List['CandidateName']:
+    """P-44.4.1.1: max number of skeletal atoms in the parent wins.
+
+    Reads len(candidate.parent_atom_indices); None counts as 0.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.1
+    """
+    if not candidates:
+        return candidates
+    sizes = [
+        len(c.parent_atom_indices) if c.parent_atom_indices else 0
+        for c in candidates
+    ]
+    max_size = max(sizes)
+    return [c for c, n in zip(candidates, sizes) if n == max_size]
+
+
+def _filter_max_multiple_bonds(
+    candidates: List['CandidateName'],
+) -> List['CandidateName']:
+    """P-44.4.1.2: max (double + triple bonds in parent) wins.
+
+    Reads the multiple_bond_count factor (wired into compute_confidence by
+    Plan 03). For Plan 02 isolated unit tests, the factor must be set on
+    the candidate explicitly via cand.factors['multiple_bond_count'] = N.
+    Missing key treated as 0.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    """
+    if not candidates:
+        return candidates
+    counts = [c.factors.get('multiple_bond_count', 0) for c in candidates]
+    max_count = max(counts)
+    return [c for c, n in zip(candidates, counts) if n == max_count]
+
+
+def _filter_lowest_locants(
+    candidates: List['CandidateName'],
+) -> List['CandidateName']:
+    """P-44.4.1.4+: lowest locants for principal groups, then heteroatoms, etc.
+
+    STUB for Phase 146. Phase 147 implements via authoritative iupac_locants.
+    In Phase 146, this filter should NEVER be invoked because _has_iupac_locants
+    returns False (no candidates have iupac_locants populated). The stub returns
+    candidates unchanged so callers fall through to Tier 2.
+
+    TODO(phase147): implement via _build_ring_pos with authoritative locants.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4 — P-44.4.1.12
+    """
+    return candidates  # Identity: no filtering until Phase 147 lands
+
+
+def _has_iupac_locants(candidates: List['CandidateName']) -> bool:
+    """D-02 / D-19 safe probe: True iff ALL candidates have iupac_locants populated.
+
+    In Phase 146, no candidate populates iupac_locants (only ortho-fused does
+    per namer.py:998-1002, and ortho-fused doesn't go through pool dispatch).
+    Therefore this returns False in Phase 146 -> Tier-1 step 6 is a no-op.
+
+    Phase 147 populates iupac_locants on more ring types -> step 6 activates.
+    """
+    for cand in candidates:
+        ri = getattr(cand, 'ring_info', None) or {}
+        if not ri.get('iupac_locants'):
+            return False
+    return True
+
+
+# Module-level cascade order (P-44.1 lexicographic).
+# Step 6 (locant criteria) is gated separately inside _best_two_tier
+# via _has_iupac_locants per D-02.
+_TIER1_FILTERS: List[Callable[[List['CandidateName']], List['CandidateName']]] = [
+    _filter_max_pcg_count,            # P-44.1.1
+    _filter_senior_heteroatom_class,  # P-44.1.2
+    _filter_ring_over_chain_on_tie,   # P-52.2.8 / P-44.1.2.2
+    _filter_max_skeletal_atoms,       # P-44.4.1.1
+    _filter_max_multiple_bonds,       # P-44.4.1.2
+]
+
+
+# ---------------------------------------------------------------------------
 # CandidatePool class — collects scored candidates from one assemble_name() call
 # ---------------------------------------------------------------------------
 
@@ -306,6 +581,11 @@ class CandidatePool:
                 return None
         # Set parent_atom_indices POST-HOC (Risk 1)
         cand.parent_atom_indices = parent_atom_indices
+        # Phase 146 CD-01: populate parent_pcg_count POST-HOC.
+        # Same Risk 1 mitigation as parent_atom_indices: NEVER passed into
+        # compute_confidence (would break byte-identical guarantees).
+        # See _count_pcgs_in_parent above for the algorithm.
+        cand.parent_pcg_count = _count_pcgs_in_parent(cand, features)
         # Inline parent_correctness scoring (D-10).
         # ISS-005 REMEDIATION: reference the MODULE-LEVEL ParentCorrectnessScorer
         # binding (set at module load via try/except ImportError). Avoids
@@ -368,6 +648,52 @@ class CandidatePool:
     def all_candidates(self) -> List[CandidateName]:
         """Return all collected candidates (for logging/diagnostics)."""
         return list(self._candidates)
+
+    def _best_two_tier(self) -> Optional[CandidateName]:
+        """Phase 146 Tier-1 lexicographic cascade + Tier-2 weighted-sum tiebreak.
+
+        Implements Blue Book P-44.1 per CONTEXT.md <domain>:
+          Step 1: P-44.1.1   max PCG suffix count
+          Step 2: P-44.1.2   senior heteroatom class (N > P > ... > C)
+          Step 3: P-52.2.8   ring-over-chain on tie
+          Step 4: P-44.4.1.1 max skeletal atoms
+          Step 5: P-44.4.1.2 max multiple bonds
+          Step 6: P-44.4.1.4+ locant criteria (gated on iupac_locants per D-02)
+
+        Tier 2: when Tier 1 leaves >1 candidate, defer to weighted-sum tiebreak
+        via existing select_best_candidate() — which uses calibrated FACTOR_WEIGHTS,
+        EPSILON=0.01 ties, and HANDLER_PRIORITY fallback.
+
+        NOT YET WIRED INTO best() — Plan 05 replaces the score_based branch
+        in best() with a call to this method. In Phase 146 Wave 1, this method
+        is callable by unit tests but unreachable from production code paths.
+
+        Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+        """
+        if not self._candidates:
+            return None
+
+        candidates = list(self._candidates)
+
+        # Tier 1 — lexicographic filters (short-circuit on single-winner).
+        for filter_fn in _TIER1_FILTERS:
+            if len(candidates) <= 1:
+                break
+            candidates = filter_fn(candidates)
+
+        # Step 6 — gated on iupac_locants per D-02.
+        # Phase 146: _has_iupac_locants returns False -> step 6 is no-op.
+        # Phase 147: populates iupac_locants -> step 6 activates.
+        if len(candidates) > 1 and _has_iupac_locants(candidates):
+            candidates = _filter_lowest_locants(candidates)
+
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # Tier 2 — weighted-sum tiebreak (existing infrastructure).
+        # Import locally to avoid any circular-import surprises at module load.
+        from orthonym.assembly.coverage_scoring import select_best_candidate
+        return select_best_candidate(candidates)
 
 
 # ---------------------------------------------------------------------------

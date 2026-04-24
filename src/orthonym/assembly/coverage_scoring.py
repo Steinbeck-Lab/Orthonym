@@ -51,6 +51,15 @@ class CandidateName:
     # changes atom_coverage and breaks byte-identical (see RESEARCH §9.1
     # Risk 3 / PATTERNS Risk 1).
     parent_atom_indices: Optional[set] = None
+    # Phase 146 CD-01: principal-characteristic-group count for the parent
+    # structure. Populated POST-HOC by CandidatePool.add() via
+    # _count_pcgs_in_parent. Same Risk 1 mitigation as parent_atom_indices:
+    # NEVER passed into compute_confidence() — that would break the
+    # byte-identical guarantee. Used by Tier-1 cascade filter
+    # _filter_max_pcg_count (P-44.1.1).
+    # Default None means "not yet computed" (the cascade treats None as 0).
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    parent_pcg_count: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
