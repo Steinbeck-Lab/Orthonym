@@ -2951,7 +2951,7 @@ def test_canary_rt312(smiles, expected_name):
 # Single JVM invocation for all 202 canary names (batch mode)
 # ---------------------------------------------------------------------------
 
-_OPSIN_JAR = Path(__file__).resolve().parents[2] / "opsin-cli-2.8.0-jar-with-dependencies.jar"
+_OPSIN_JAR = Path(__file__).resolve().parents[2] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 
 def _opsin_available() -> bool:

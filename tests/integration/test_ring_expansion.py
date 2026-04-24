@@ -18,7 +18,9 @@ from orthonym.namer import name_compound
 # Helpers
 # ---------------------------------------------------------------------------
 
-OPSIN_JAR = "/home/kohulan/OpenSTOUT/Orthonym/opsin-cli-2.8.0-jar-with-dependencies.jar"
+OPSIN_JAR = str(
+    Path(__file__).resolve().parents[2] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+)
 
 
 def _opsin_parse(name: str) -> str | None:
