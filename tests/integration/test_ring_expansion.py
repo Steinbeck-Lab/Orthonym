@@ -6,6 +6,9 @@ SMILES should produce retained names, not VB notation.
 """
 
 import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from rdkit import Chem
 from orthonym.namer import name_compound
@@ -189,13 +192,13 @@ class TestCanaryStability:
     def test_canary_suite_passes(self):
         """Run canary tests and verify 0 failures."""
         result = subprocess.run(
-            ["python3", "-m", "pytest",
+            [sys.executable, "-m", "pytest",
              "tests/integration/test_canary_rt75.py",
              "-x", "-q", "--tb=line"],
             capture_output=True,
             text=True,
             timeout=600,
-            cwd="/home/kohulan/OpenSTOUT/Orthonym",
+            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable, replaces hardcoded /home/kohulan path per REVIEWS §Plan 03 HIGH #2
         )
         # Check that no failures occurred
         assert result.returncode == 0, (

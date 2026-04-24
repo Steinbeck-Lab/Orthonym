@@ -1,5 +1,8 @@
 """End-to-end tests for phosphorus compound naming."""
 
+import sys
+from pathlib import Path
+
 import pytest
 from orthonym import name_compound
 
@@ -222,10 +225,10 @@ class TestCanaryRegression:
         """All 88 canary compounds should still pass after phosphanyl changes."""
         import subprocess
         result = subprocess.run(
-            ["python3", "-m", "pytest",
+            [sys.executable, "-m", "pytest",
              "tests/integration/test_canary_rt75.py", "-x", "-q"],
             capture_output=True, text=True, timeout=120,
-            cwd="/home/kohulan/OpenSTOUT/Orthonym"
+            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable, replaces hardcoded /home/kohulan path per REVIEWS §Plan 03 HIGH #2
         )
         assert result.returncode == 0, (
             f"Canary regression detected:\n{result.stdout}\n{result.stderr}"
