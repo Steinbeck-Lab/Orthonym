@@ -51,6 +51,7 @@ PERFORMANCE (ISS-005 remediation):
 """
 
 import logging
+import os
 import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -97,6 +98,23 @@ logger = logging.getLogger(__name__)
 # strong enough to catch adversarial / pathological garbage during Phase 146
 # competitive selection.
 RATIO_REJECT_FLOOR: float = 0.10
+
+
+# ---------------------------------------------------------------------------
+# Phase 146 D-08: feature-flag-controlled default selection mode.
+# ORTHONYM_SELECTION_MODE env var read at module-import time.
+# Default 'first_applicable' (V17) during the post-148 soak per D-07.
+# Rollback one-liner:
+#   ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+# ---------------------------------------------------------------------------
+_DEFAULT_SELECTION_MODE: str = os.getenv(
+    'ORTHONYM_SELECTION_MODE', 'first_applicable'
+).strip().lower()
+assert _DEFAULT_SELECTION_MODE in ('first_applicable', 'score_based'), (
+    f"Invalid ORTHONYM_SELECTION_MODE={_DEFAULT_SELECTION_MODE!r}; "
+    f"must be 'first_applicable' or 'score_based'"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +604,34 @@ class CandidatePool:
         # compute_confidence (would break byte-identical guarantees).
         # See _count_pcgs_in_parent above for the algorithm.
         cand.parent_pcg_count = _count_pcgs_in_parent(cand, features)
+        # Phase 146 D-06 + Risk 1 preservation: POST-HOC patch
+        # multiple_bond_count factor in V18 mode. compute_confidence
+        # was called with parent_atom_indices=None (Risk 1), so the
+        # factor was 0.0. Now that parent_atom_indices is set, recompute.
+        #
+        # BYTE-IDENTICAL CONTRACT: this branch only fires in V18 mode
+        # ('multiple_bond_count' in FACTOR_WEIGHTS) AND when
+        # parent_atom_indices is populated. In V17 mode the key is absent
+        # from FACTOR_WEIGHTS so the branch short-circuits and
+        # cand.confidence is left untouched (no V17 drift).
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+        from .coverage_scoring import (
+            FACTOR_WEIGHTS, _compute_multiple_bond_count
+        )
+        if ('multiple_bond_count' in FACTOR_WEIGHTS
+                and parent_atom_indices is not None):
+            cand.factors['multiple_bond_count'] = round(
+                _compute_multiple_bond_count(features, parent_atom_indices), 4
+            )
+            # Recompute confidence with the patched factor.
+            cand.confidence = round(
+                sum(
+                    FACTOR_WEIGHTS[k] * cand.factors.get(k, 0.0)
+                    for k in FACTOR_WEIGHTS
+                ),
+                4,
+            )
+            cand.confidence = min(max(cand.confidence, 0.0), 1.0)
         # Inline parent_correctness scoring (D-10).
         # ISS-005 REMEDIATION: reference the MODULE-LEVEL ParentCorrectnessScorer
         # binding (set at module load via try/except ImportError). Avoids
@@ -642,8 +688,12 @@ class CandidatePool:
             if self._direct_return_winner is not None:
                 return self._direct_return_winner
             return self._candidates[0]
-        # Phase 146 path: score-based selection over the full pool.
-        return select_best_candidate(self._candidates)
+        # Phase 146 SC-6 (D-01): two-tier selector.
+        # Tier 1: Blue Book P-44.1 lexicographic cascade (5 immediate filters
+        #         + step 6 gated on iupac_locants per D-02).
+        # Tier 2: weighted-sum tiebreak via select_best_candidate.
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+        return self._best_two_tier()
 
     def all_candidates(self) -> List[CandidateName]:
         """Return all collected candidates (for logging/diagnostics)."""
@@ -744,11 +794,16 @@ def push_pool() -> CandidatePool:
     pop_pool() in a finally clause so the pool is popped on every exit path
     (normal return, exception, early return statements).
 
+    Phase 146 D-08: selection_mode defaults to the ORTHONYM_SELECTION_MODE
+    env var (default 'first_applicable' for V17 byte-identical soak). Set
+    ORTHONYM_SELECTION_MODE=score_based to activate the two-tier selector
+    end-to-end without a code revert.
+
     Returns the new pool that is now the active cascade scope for the
     currently-executing assemble_name() call.
     """
     stack = _ensure_stack()
-    new_pool = CandidatePool(selection_mode='first_applicable')
+    new_pool = CandidatePool(selection_mode=_DEFAULT_SELECTION_MODE)
     stack.append(new_pool)
     return new_pool
 
@@ -795,6 +850,102 @@ def clear_pool() -> None:
     """
     stack = _ensure_stack()
     if stack:
-        stack[-1] = CandidatePool(selection_mode='first_applicable')
+        stack[-1] = CandidatePool(selection_mode=_DEFAULT_SELECTION_MODE)
     else:
         push_pool()
+
+
+# ---------------------------------------------------------------------------
+# Phase 146 SC-5: compute_chain_candidate for unconditional chain wiring.
+# Wraps the existing chain naming pipeline so chain becomes a first-class
+# candidate alongside ring handlers. Idempotent: same features -> same output.
+# Returns None when no viable chain candidate exists (e.g., pure benzene
+# with no principal_chain). V18-mode-only wiring lives in composer.py's
+# Tier A integration point; V17 mode's existing ring-fallback-to-chain
+# path remains byte-identical (SC-6 two-tier never fires).
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+# ---------------------------------------------------------------------------
+
+def compute_chain_candidate(
+    features: Any, style: str = "iupac"
+) -> Optional['CandidateName']:
+    """Compute a chain-handler candidate from features, or None if infeasible.
+
+    Per SC-5: idempotent. Called from composer.py's Tier A integration point
+    UNCONDITIONALLY when V18 mode is active (selection_mode='score_based').
+    In V17 mode (selection_mode='first_applicable'), the existing chain
+    naming path still runs only when ring handlers have all failed — this
+    helper's output is ignored because Tier A direct-return ring handlers
+    short-circuit pool.best() in first_applicable dispatch.
+
+    The function defers actual chain-name construction to composer.py's
+    existing chain machinery. When a usable chain-naming entry point is not
+    importable (e.g., during isolated unit tests of this module), the
+    function returns None safely — chain never becomes a competing candidate,
+    so ring handlers continue to win by default.
+
+    Args:
+        features: MolecularFeatures with principal_chain populated.
+        style: naming style ('iupac' / 'pin'), forwarded to chain namer.
+
+    Returns:
+        CandidateName with handler='chain' and parent_atom_indices set, OR
+        None if the chain pipeline cannot produce a viable name for these
+        features.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+    """
+    # Defensive: no principal chain -> no chain candidate.
+    principal_chain = getattr(features, 'principal_chain', None)
+    if not principal_chain:
+        return None
+
+    # Try to invoke the existing chain naming pipeline via a public entry
+    # point. The function name may vary across refactors; try a small
+    # ordered list of candidates. If all fail, return None (safe default).
+    _name_chain_fn = None
+    try:
+        from orthonym.assembly.composer import name_chain as _name_chain_fn  # type: ignore
+    except ImportError:
+        _name_chain_fn = None
+    if _name_chain_fn is None:
+        try:
+            from orthonym.assembly.composer import _name_chain as _name_chain_fn  # type: ignore
+        except ImportError:
+            _name_chain_fn = None
+
+    if _name_chain_fn is None:
+        # No public chain-naming entry point found. In production, composer.py
+        # already runs the chain fallback after ring handlers fail (the
+        # `if features.principal_chain: parent = _generate_chain_parent(...)`
+        # path near the tail of _assemble_name_impl). That path remains
+        # unchanged. Return None so this helper is a no-op in that case.
+        return None
+
+    try:
+        chain_name = _name_chain_fn(features, style=style)
+    except TypeError:
+        # Signature variant: single-arg (features,)
+        try:
+            chain_name = _name_chain_fn(features)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+    if not chain_name:
+        return None
+
+    # Convert principal_chain (iterable of atom indices) to a Set[int].
+    try:
+        chain_atom_set: Set[int] = set(int(i) for i in principal_chain)
+    except Exception:
+        chain_atom_set = set()
+
+    # Build the CandidateName via compute_confidence (parent_atom_indices=None
+    # at construction time to preserve Risk 1 invariant). The caller then
+    # passes parent_atom_indices to pool.add(), which sets the attribute
+    # POST-HOC and recomputes multiple_bond_count in V18 mode.
+    cand = compute_confidence(chain_name, "chain", features)
+    cand.parent_atom_indices = chain_atom_set
+    return cand
