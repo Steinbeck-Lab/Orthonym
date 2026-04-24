@@ -247,7 +247,9 @@ class TestCandidatePoolAdd:
 
         compute_confidence MUST NOT receive parent_atom_indices as a
         kwarg/positional arg, because doing so changes atom_coverage
-        (coverage_scoring.py:284-287) and breaks byte-identical for
+        (the ``parent_atom_indices is not None`` branch of
+        ``compute_confidence`` in ``coverage_scoring.py`` — currently
+        lines 328-329, subject to drift) and breaks byte-identical for
         handlers that previously passed None.
         """
         features = _make_features("CCO")
