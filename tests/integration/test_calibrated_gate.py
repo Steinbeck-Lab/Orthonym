@@ -16,20 +16,37 @@ from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
 
 @pytest.mark.integration
 def test_weights_sum_to_one():
-    """FACTOR_WEIGHTS must sum to 1.0 (within floating point tolerance)."""
+    """FACTOR_WEIGHTS must sum to the remaining-calibration target.
+
+    Phase 145.2 D-09-a.1 update: 'ratio' is demoted to 0.0 (zero IUPAC
+    Blue Book justification). Remaining four active weights sum to 0.80.
+    Phase 146 SC-4 recalibrates; byte-identical preserved until then via
+    position-based pool.best() selection (candidate_pool.py:329-335).
+    Phase 145.1 carried a 1.0 target under the original 4-factor
+    calibration; after ratio demotion, the expected value is the sum of
+    the surviving non-zero weights.
+    """
     total = sum(FACTOR_WEIGHTS.values())
-    assert abs(total - 1.0) < 0.01, f"FACTOR_WEIGHTS sum to {total}, expected 1.0"
+    # 0.0 (ratio) + 0.20 (atom_cov) + 0.35 (fg_rec) + 0.25 (sub_comp)
+    # + 0.0 (parent_correctness, Phase 145.1 scaffolding) = 0.80
+    expected = 0.80
+    assert abs(total - expected) < 0.01, (
+        f"FACTOR_WEIGHTS sum to {total}, expected {expected} "
+        f"(post-ratio-demotion Phase 145.2 D-09-a.1)"
+    )
 
 
 @pytest.mark.integration
 def test_weights_all_positive():
-    """All calibrated factor weights must be > 0.
+    """All calibrated factor weights must be >= 0 (with documented zeros).
 
     Phase 145.1 ISS-004 update: 'parent_correctness' is the 5th factor
     (scaffolded with weight=0.0 for byte-identical safety per D-14;
-    Phase 146 raises it to ~0.35 after train/test calibration). The
-    scaffolding weight is excluded from this positivity check until
-    Phase 146 calibrates it.
+    Phase 146 raises it to ~0.35 after train/test calibration).
+    Phase 145.2 D-09-a.1 update: 'ratio' is demoted to 0.0 because the
+    name-length/HA heuristic has zero IUPAC Blue Book justification.
+    Both zero-weight keys are documented exceptions; all other weights
+    remain strictly positive until Phase 146 SC-4 recalibrates.
     """
     for key, val in FACTOR_WEIGHTS.items():
         if key == 'parent_correctness':
@@ -38,6 +55,15 @@ def test_weights_all_positive():
             assert val == 0.0, (
                 f"parent_correctness must be exactly 0.0 in Phase 145.1 "
                 f"scaffolding (D-14 byte-identical proof); got {val}"
+            )
+            continue
+        if key == 'ratio':
+            # Phase 145.2 D-09-a.1 demotion (zero IUPAC justification).
+            # Position-based pool.best() keeps byte-identical. Phase 146
+            # SC-4 may recalibrate or permanently remove.
+            assert val == 0.0, (
+                f"ratio must be exactly 0.0 per Phase 145.2 D-09-a.1 "
+                f"demotion; got {val}"
             )
             continue
         assert val > 0, f"Weight '{key}' is {val}, must be > 0"

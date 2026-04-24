@@ -327,9 +327,16 @@ def test_factor_weights_existing_keys_unchanged():
 
 
 def test_factor_weights_existing_values_unchanged():
-    """Risk 2: existing factor weights preserved (calibration unchanged)."""
+    """Risk 2: non-demoted factor weights preserved at Phase 145.1 calibration.
+
+    Phase 145.2 D-09-a.1 update: the 'ratio' factor is demoted to 0.0 because
+    it has zero IUPAC Blue Book justification (name-length/HA is a heuristic,
+    not a naming rule). Byte-identical preserved via position-based
+    pool.best() selection. The other three weights remain at their Phase 81
+    calibration values until Phase 146 SC-4 recalibrates.
+    """
     from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS
-    assert FACTOR_WEIGHTS['ratio'] == 0.20
+    assert FACTOR_WEIGHTS['ratio'] == 0.0  # Phase 145.2 D-09-a.1 demotion
     assert FACTOR_WEIGHTS['atom_coverage'] == 0.20
     assert FACTOR_WEIGHTS['fg_recognition'] == 0.35
     assert FACTOR_WEIGHTS['substituent_completeness'] == 0.25
@@ -338,6 +345,14 @@ def test_factor_weights_existing_values_unchanged():
 def test_byte_identical_confidence_with_zero_weight_factor():
     """D-14 BYTE-IDENTICAL PROOF: adding parent_correctness=0.0 does NOT
     change compute_confidence's output value.
+
+    Phase 145.2 D-09-a.1 update: 'ratio' is ALSO demoted to 0.0 as a
+    separate invariant (zero IUPAC justification). The 4-key "control"
+    dict used in this test must mirror the live FACTOR_WEIGHTS values
+    (sans the 5th parent_correctness key) so that the test remains a
+    clean proof of D-14's "last-position 0.0 key insertion is a no-op"
+    claim. If ratio's live value changes in a future phase (Phase 146
+    recalibration), update the control dict to match.
 
     Strategy: compute confidence via the live FACTOR_WEIGHTS (5 keys);
     then patch FACTOR_WEIGHTS to remove the 5th key; recompute; assert
@@ -356,10 +371,12 @@ def test_byte_identical_confidence_with_zero_weight_factor():
     cand_5key = compute_confidence("benzaldehyde", "benzene", features)
     confidence_5key = cand_5key.confidence
 
-    # Save and patch to a 4-key dict (omits parent_correctness)
+    # Save and patch to a 4-key dict (omits parent_correctness).
+    # Phase 145.2 D-09-a.1: 'ratio' mirrors its demoted value (0.0) so
+    # this test isolates the D-14 "5th-key-as-no-op" invariant.
     original = cs.FACTOR_WEIGHTS
     cs.FACTOR_WEIGHTS = {
-        'ratio': 0.20,
+        'ratio': 0.0,   # Phase 145.2 D-09-a.1 demotion
         'atom_coverage': 0.20,
         'fg_recognition': 0.35,
         'substituent_completeness': 0.25,

@@ -37,7 +37,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
-        "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",  # Phase 126: was 'cycloane' (garbled); now returns SMILES for unnameable polycyclic
+        "unknown organic compound",  # Phase 145.2: RATIO_REJECT_FLOOR=0.10 rejects 'ane' garbage chain name (ratio=0.05 for 4-naphthyl fused system). Falls through to generic "unknown" fallback — semantically equivalent "couldn't name" signal as the Phase 126 SMILES-passthrough.
     ),
     (
         "NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O",
@@ -57,7 +57,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*N[C@@H](CC(=O)NC1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H]4O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)[C@@H]4O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@H](O)[C@H]1NC(C)=O)C(*)=O",
-        "(3S)-butanetriamide",
+        "compound with wildcard atoms (not supported)",  # Phase 145.2: RATIO_REJECT_FLOOR=0.10 rejects '(3S)-butanetriamide' as truncated garbage (ratio=0.094 on 100+ atom glycan w/ wildcards). Correct routing: wildcard-atom detection branch, which was always the right semantic for this SMILES.
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCCCNC(=O)CCl)NC(=O)[C@H](CC(=O)O)NC(C)=O)[C@@H](C)O)C(=O)NCC(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O)C(C)C",
@@ -1785,7 +1785,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@@H](CO[C@@H]2O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]2O)O[C@H]1O",  # heterocycle,large,carbohydrate
-        "N,N,N,N-tetraacetyl(2S,3S,4R,5S,6R)-3,4,5-trihydroxy-2-methyl-6-oxanyloxane",
+        "(alpha-L-fucopyranosyloxy)(beta-D-mannopyranosyloxy)(alpha-D-mannopyranosyloxy)(beta-D-galactopyranosyloxy)(alpha-D-mannopyranosyloxy)(beta-D-galactopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)beta-D-2-(acetylamino)-2-deoxy-glucopyranose",  # Phase 145.2: RATIO_REJECT_FLOOR=0.10 rejects 'ethanediamide' fragment (ratio=0.07 on 122 HA). Full-coverage sugar cascade now wins; name is substantively correct for this decasaccharide.
     ),
     (
         "O=C(O)CCN(C1(C(=O)NO)CCCC1)S(=O)(=O)c1ccc(Oc2ccc(F)cc2)cc1",  # aromatic,polyfunctional,large
