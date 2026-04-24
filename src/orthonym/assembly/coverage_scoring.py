@@ -128,7 +128,7 @@ CONFIDENCE_GATE_THRESHOLD: float = 0.40
 #   ratio (0.042) = atom_coverage (0.042)
 # Pre-calibration baseline: ratio=0.30, atom_cov=0.30, fg=0.25, sub=0.15
 FACTOR_WEIGHTS: Dict[str, float] = {
-    'ratio': 0.20,
+    'ratio': 0.0,  # Phase 145.2 D-09-a.1 — demoted (zero IUPAC justification per Blue Book grep). Key retained to avoid KeyError in downstream consumers; 0.0 * factor = 0.0 by IEEE 754 so byte-identical preserved.
     'atom_coverage': 0.20,
     'fg_recognition': 0.35,
     'substituent_completeness': 0.25,
