@@ -255,3 +255,40 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: Full 100k validation suite"
     )
+
+
+# ============================================================================
+# Phase 146 RESEARCH §8.4 — thread-local cleanup auto-fixture.
+# Prevents state leakage when later plans introduce monkeypatch.setenv
+# + importlib.reload patterns for V17/V18 parametrized testing
+# (test_feature_flag.py, test_score_based_mode.py).
+# ============================================================================
+@pytest.fixture(autouse=True)
+def _phase146_clear_thread_locals():
+    """Auto-clear the three thread-local stores after each test.
+
+    Stores covered:
+      - orthonym.assembly.coverage_scoring._confidence_store
+      - orthonym.assembly.candidate_pool._pool_store
+      - orthonym.rules.parent_correctness._pc_context.reference_name
+
+    The clear_* helpers are imported lazily and wrapped in try/except so
+    a missing import (during partial module reloads) never breaks an
+    otherwise-passing test. Reference: 146-RESEARCH.md §8.4.
+    """
+    yield
+    try:
+        from orthonym.assembly.coverage_scoring import clear_confidence
+        clear_confidence()
+    except Exception:
+        pass
+    try:
+        from orthonym.assembly.candidate_pool import clear_pool
+        clear_pool()
+    except Exception:
+        pass
+    try:
+        from orthonym.rules.parent_correctness import clear_reference_name
+        clear_reference_name()
+    except Exception:
+        pass
