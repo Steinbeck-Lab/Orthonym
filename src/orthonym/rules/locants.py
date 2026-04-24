@@ -18,9 +18,52 @@ IUPAC 2013 chain orientation criteria (applied in order):
 Reference: IUPAC 2013 Blue Book, P-14.4, P-14.6, P-14.7
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
+
+# Phase 147 D-01/D-02: locant type system extension.
+# Locants may be plain ints (e.g. 4) or (int_base, str_suffix) tuples for
+# fusion atoms (e.g. '4a' -> (4, 'a')). The empty string '' sorts
+# lexicographically before any letter, so (4, '') < (4, 'a') < (5, ''),
+# matching the IUPAC convention that locant 4 is "lower" than 4a.
+_Locant = Union[int, Tuple[int, str]]
+
+
+def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
+    """Raise ValueError if ``locants`` contains a mix of int and tuple types.
+
+    Per Phase 146 D-19: after coercion, a locant list must be uniformly
+    int OR uniformly tuple. Mixed types indicate a caller bug (e.g.,
+    ring_info populated only partially) and would cause Python's
+    ``sorted()`` / ``min()`` to raise ``TypeError`` on mixed int/tuple
+    comparison.
+
+    Empty lists are vacuously homogeneous and return silently.
+
+    Args:
+        locants: List of int or (int, str) tuple locants.
+
+    Raises:
+        ValueError: if ``locants`` contains both int and tuple values.
+                    The message includes the first offending int and the
+                    first offending tuple to aid debugging.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.7
+            (locant set comparison semantics)
+    Source: Phase 146 D-19 (locant type safety lock-in)
+    """
+    has_int = any(isinstance(x, int) for x in locants)
+    has_tuple = any(isinstance(x, tuple) for x in locants)
+    if has_int and has_tuple:
+        first_int = next(x for x in locants if isinstance(x, int))
+        first_tuple = next(x for x in locants if isinstance(x, tuple))
+        raise ValueError(
+            f"Locant list contains mixed int and tuple types: "
+            f"{first_int!r} and {first_tuple!r}. "
+            f"Coerce all to tuples or all to ints before passing to "
+            f"compare_locant_sets."
+        )
 
 
 def build_atom_to_locant(principal_chain: List[int]) -> Dict[int, int]:
@@ -50,7 +93,10 @@ def build_atom_to_locant(principal_chain: List[int]) -> Dict[int, int]:
     return {atom_idx: locant for locant, atom_idx in enumerate(principal_chain, 1)}
 
 
-def compare_locant_sets(set_a: List[int], set_b: List[int]) -> int:
+def compare_locant_sets(
+    set_a: List[_Locant],
+    set_b: List[_Locant],
+) -> int:
     """
     Compare two locant sets using IUPAC first-point-of-difference rule.
 
@@ -61,9 +107,19 @@ def compare_locant_sets(set_a: List[int], set_b: List[int]) -> int:
     If all compared elements are equal, the shorter set wins (fewer locants
     needed means simpler name). If completely identical, returns 0.
 
+    Phase 147 extension (D-01, D-02): also accepts ``List[Tuple[int, str]]``
+    with first-point-of-difference semantics for fusion atoms. When one
+    list contains tuples and the other contains ints, all ints are coerced
+    to ``(n, '')`` tuples internally — empty string sorts before any
+    letter, preserving the IUPAC convention that locant ``4`` is "lower"
+    than locant ``4a``. Truly heterogeneous lists are rejected by
+    ``_assert_homogeneous_locants`` (raises ``ValueError``).
+
     Args:
-        set_a: First locant set (unsorted or sorted).
-        set_b: Second locant set (unsorted or sorted).
+        set_a: First locant set (unsorted or sorted). Elements are int
+               or ``(int, str)`` tuples; mixed allowed only if all ints
+               can be coerced via the ``(n, '')`` padding.
+        set_b: Second locant set (same type contract as set_a).
 
     Returns:
         -1 if set_a is preferred (lower at first difference)
@@ -77,9 +133,32 @@ def compare_locant_sets(set_a: List[int], set_b: List[int]) -> int:
         1
         >>> compare_locant_sets([2, 3], [2, 3])
         0
+        >>> compare_locant_sets([(4, ''), (5, '')], [(4, 'a'), (5, '')])
+        -1
+        >>> compare_locant_sets([(4, 'a'), (5, '')], [(4, 'b'), (5, '')])
+        -1
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
+    Source: Phase 146 D-19 (locant type safety); Phase 147 D-01/D-02
     """
-    a_sorted = sorted(set_a)
-    b_sorted = sorted(set_b)
+    # Phase 147: tuple-coercion entry path. If either list contains a
+    # tuple locant, coerce all ints to (n, '') tuples in BOTH lists so
+    # Python's sorted()/comparison operators stay type-safe. Pure-int
+    # lists fall through to the back-compat fast path unchanged.
+    any_tuple = (
+        any(isinstance(x, tuple) for x in set_a)
+        or any(isinstance(x, tuple) for x in set_b)
+    )
+    if any_tuple:
+        a_coerced = [(x, '') if isinstance(x, int) else x for x in set_a]
+        b_coerced = [(x, '') if isinstance(x, int) else x for x in set_b]
+        _assert_homogeneous_locants(a_coerced)
+        _assert_homogeneous_locants(b_coerced)
+        a_sorted = sorted(a_coerced)
+        b_sorted = sorted(b_coerced)
+    else:
+        a_sorted = sorted(set_a)
+        b_sorted = sorted(set_b)
 
     for a, b in zip(a_sorted, b_sorted):
         if a < b:
