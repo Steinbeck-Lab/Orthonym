@@ -17,10 +17,11 @@ assemble_name() returns without changing its str return type.
 """
 
 import logging
+import os
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -136,32 +137,67 @@ CONFIDENCE_GATE_THRESHOLD: float = 0.40
 #   fg_recognition (0.062) > substituent_completeness (0.047) >
 #   ratio (0.042) = atom_coverage (0.042)
 # Pre-calibration baseline: ratio=0.30, atom_cov=0.30, fg=0.25, sub=0.15
-FACTOR_WEIGHTS: Dict[str, float] = {
-    'ratio': 0.0,  # Phase 145.2 D-09-a.1 — demoted (zero IUPAC justification per Blue Book grep). Key retained to avoid KeyError in downstream consumers; 0.0 * factor = 0.0 by IEEE 754 so byte-identical preserved.
+#
+# Phase 146 (D-07): two dicts FACTOR_WEIGHTS_V17 and FACTOR_WEIGHTS_V18 are
+# declared; FACTOR_WEIGHTS is bound to one or the other at module-import time
+# based on the ORTHONYM_USE_V18_WEIGHTS env var (default 'false' = V17).
+# The V18 dict adds the multiple_bond_count factor (D-06, P-44.4.1.2).
+# Calibrated weight values are written by Plan 04 grid search.
+#
+# ----------------------------------------------------------------
+# Phase 146 D-07/D-08: feature-flag-controlled FACTOR_WEIGHTS dispatch.
+# ORTHONYM_USE_V18_WEIGHTS env var read at module-import time.
+# Default 'false' (V17 active) during the post-148 soak week per D-07.
+# Rollback one-liner:
+#   ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1, P-44.4.1.2
+# ----------------------------------------------------------------
+_USE_V18 = os.getenv('ORTHONYM_USE_V18_WEIGHTS', 'false').strip().lower() == 'true'
+
+# V17 weights (Phase 145.1 + 145.2 baseline — byte-identical preserved).
+# ratio=0.0 from 145.2 D-09-a.1 (zero IUPAC justification per Blue Book grep).
+# parent_correctness=0.0 from 145.1 D-10 (scaffolded; raised to calibrated value in V18).
+#
+# BYTE-IDENTICAL PROOF (D-14):
+# - Python 3.7+ dict iteration is insertion-order-deterministic.
+# - compute_confidence's sum-loop iterates FACTOR_WEIGHTS in insertion order.
+# - parent_correctness inserted LAST so the existing 4 weighted-sum terms
+#   accumulate first; the 5th term (0.0 * factor) contributes exactly 0.0
+#   by IEEE 754 (x + 0.0 = x for finite x).
+# - Therefore confidence values are byte-identical to pre-145.1 code.
+#
+# RISK 2 (PATTERNS Risk 2): inserting parent_correctness in the MIDDLE would
+# change weighted-sum order; floating-point summation is non-associative,
+# so the rounded result may differ in the 5th decimal. DO NOT REORDER.
+FACTOR_WEIGHTS_V17: Dict[str, float] = {
+    'ratio': 0.0,
     'atom_coverage': 0.20,
     'fg_recognition': 0.35,
     'substituent_completeness': 0.25,
-    # Phase 145.1 scaffolding (D-14 byte-identical proof -- see comment below).
-    # Phase 146 raises this weight after 80/20 train/test calibration on
-    # the multi-corpus benchmark. The factor is computed by
-    # ParentCorrectnessScorer (src/orthonym/rules/parent_correctness.py)
-    # and recorded on cand.factors POST-HOC by CandidatePool.add()
-    # (src/orthonym/assembly/candidate_pool.py).
-    #
-    # BYTE-IDENTICAL PROOF (D-14):
-    # - Python 3.7+ dict iteration is insertion-order-deterministic.
-    # - compute_confidence's sum-loop at lines 324-326 iterates
-    #   FACTOR_WEIGHTS in insertion order.
-    # - This key MUST be inserted at the LAST position so the existing
-    #   4 weighted-sum terms accumulate first; the 5th term (0.0 * factor)
-    #   contributes exactly 0.0 by IEEE 754 (x + 0.0 = x for finite x).
-    # - Therefore confidence values are byte-identical to current code.
-    #
-    # RISK 2 (PATTERNS Risk 2): inserting this key in the MIDDLE would
-    # change weighted-sum order; floating-point summation is non-associative,
-    # so the rounded result may differ in the 5th decimal. DO NOT REORDER.
-    'parent_correctness': 0.0,  # DELETE 0.0 IN PHASE 146 (calibrate to ~0.35)
+    'parent_correctness': 0.0,
 }
+
+# V18 weights (Phase 146 calibrated by grid search in Plan 04).
+# PLACEHOLDER values below; Plan 04 commits the calibrated values into this dict
+# via overwrite-in-place during the calibration script's epilogue.
+# multiple_bond_count is the NEW factor per D-06 (P-44.4.1.2).
+# Insertion order: multiple_bond_count is APPENDED LAST per D-14 IEEE 754
+# invariant (when V17 loop encounters this dict via reload, the 6th term
+# is added LAST so prior 5 sums are byte-identical to V17).
+# Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+FACTOR_WEIGHTS_V18: Dict[str, float] = {
+    'ratio': 0.0,                       # permanent 0.0 (Phase 145.2)
+    'atom_coverage': 0.15,              # PLACEHOLDER — Plan 04 calibrates
+    'fg_recognition': 0.25,             # PLACEHOLDER
+    'substituent_completeness': 0.15,   # PLACEHOLDER
+    'parent_correctness': 0.35,         # PLACEHOLDER (raised from 0.0)
+    'multiple_bond_count': 0.10,        # PLACEHOLDER (NEW factor per D-06)
+}
+
+# Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
+FACTOR_WEIGHTS: Dict[str, float] = (
+    FACTOR_WEIGHTS_V18 if _USE_V18 else FACTOR_WEIGHTS_V17
+)
 
 # Confidence bands for structured logging
 CONFIDENCE_HIGH: float = 0.75    # DEBUG level
@@ -304,6 +340,48 @@ def _compute_substituent_completeness(name: str, features: Any) -> float:
     return min(named_subs / total_expected, 1.0)
 
 
+def _compute_multiple_bond_count(
+    features: Any,
+    parent_atom_indices: Optional[Set[int]],
+) -> float:
+    """Count (double + triple) bonds where both endpoints are in parent_atom_indices.
+
+    Phase 146 D-06: parent atoms ONLY (NOT entire molecule), per P-44.4.1.2
+    which says "ring system or chain" = the parent skeleton. Substituent
+    multiple bonds (e.g. a nitrile substituent's C#N triple bond) do NOT
+    contribute because the bond's endpoints are not both in parent_atom_indices.
+
+    Returns a numeric count (e.g., 0, 1, 2, 3) as a float. The weighted-sum
+    in compute_confidence multiplies by FACTOR_WEIGHTS_V18['multiple_bond_count']
+    and clamps the final confidence to [0, 1] — so a parent with 3 multiple
+    bonds and a 0.10 weight contributes 0.30 to confidence (capped if total > 1).
+
+    Note: This helper is functionally identical to
+    candidate_pool._count_multiple_bonds_in_atom_set; the duplication is
+    intentional to avoid a coverage_scoring <-> candidate_pool circular import
+    (candidate_pool imports compute_confidence from coverage_scoring, so the
+    reverse direction is forbidden). See RESEARCH §2.5.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    """
+    mol = getattr(features, 'mol', None)
+    if mol is None or not parent_atom_indices:
+        return 0.0
+    try:
+        from rdkit import Chem
+    except ImportError:
+        return 0.0
+    atom_set = set(parent_atom_indices)
+    count = 0
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in atom_set
+                and bond.GetEndAtomIdx() in atom_set):
+            bt = bond.GetBondType()
+            if bt == Chem.BondType.DOUBLE or bt == Chem.BondType.TRIPLE:
+                count += 1
+    return float(count)
+
+
 # ---------------------------------------------------------------------------
 # Main scoring function
 # ---------------------------------------------------------------------------
@@ -312,7 +390,7 @@ def compute_confidence(
     name: str,
     handler: str,
     features: Any,
-    parent_atom_indices: Optional[set] = None,
+    parent_atom_indices: Optional[Set[int]] = None,
 ) -> CandidateName:
     """Score a candidate name on the 4 confidence factors.
 
@@ -378,6 +456,16 @@ def compute_confidence(
         # contributes exactly 0.0 to confidence (IEEE 754) -- byte-identical safe.
         'parent_correctness': 0.0,
     }
+    # Phase 146 D-06: multiple_bond_count factor (V18-only).
+    # Guard ensures V17 path (where the key is absent from FACTOR_WEIGHTS)
+    # produces byte-identical factors dict. POST-HOC overwrite in pool.add()
+    # for V18 mode handles the case where this is initially 0.0
+    # (parent_atom_indices=None at compute_confidence call time per Risk 1).
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
+    if 'multiple_bond_count' in FACTOR_WEIGHTS:
+        factors['multiple_bond_count'] = round(
+            _compute_multiple_bond_count(features, parent_atom_indices), 4
+        )
 
     # Weighted linear combination
     confidence = sum(
