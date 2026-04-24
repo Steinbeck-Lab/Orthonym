@@ -36,41 +36,73 @@ logger = logging.getLogger(__name__)
 def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
     """Build atom-to-locant map using IUPAC ring numbering.
 
-    Per ASML-19 / D-10: Uses actual IUPAC ring numbering when available,
-    instead of sorted atom index positional proxy.
+    Per ASML-19 / D-10 / Phase 147 D-01: uses actual IUPAC ring numbering
+    when available, instead of sorted atom index positional proxy.
+
+    Phase 147 extension: accepts both int locants and ``(int, str)`` tuple
+    locants (for fusion atoms like ``'4a' -> (4, 'a')``). When ANY tuple
+    value is present, ALL int values are coerced to ``(n, '')`` tuples
+    so the returned dict is homogeneous — this is REQUIRED because
+    ``_compare_multiple_bond_locants`` (line ~416 below) does
+    ``min(ring_pos[a], ring_pos[b])``, which raises ``TypeError`` on
+    mixed int+tuple comparison in Python 3 (RESEARCH §3 Risk 3).
 
     Priority:
-    1. iupac_locants from fused heterocycle data (authoritative IUPAC numbering)
+    1. iupac_locants from ring_info (authoritative IUPAC numbering,
+       either pure-int or homogeneously-coerced tuple)
     2. Fallback: sorted atom indices mapped to 1-indexed positions
        (correct for carbocyclic rings where any consistent numbering
-        produces equivalent comparison results due to ring symmetry)
+        produces equivalent comparison results due to ring symmetry,
+        preserved for back-compat with pre-147 callers per D-09)
 
     Args:
         ring_set: Set of atom indices in the ring system
         ring_info: Optional dict with 'iupac_locants' key mapping
-                   atom_idx -> IUPAC locant (int or str like '3a').
-                   May contain atoms outside ring_set; only ring atoms
-                   with integer locants are used.
+                   atom_idx -> locant. Value may be int or ``(int, str)``
+                   tuple locant (for fusion atoms). Legacy string locants
+                   (e.g. ``'3a'``) are filtered out and trigger sorted
+                   fallback if coverage becomes incomplete. May contain
+                   atoms outside ring_set; only ring atoms with int-
+                   or tuple-typed locants are used.
 
     Returns:
-        Dict mapping atom_idx -> IUPAC locant position (int)
+        Dict mapping atom_idx -> locant. The dict is HOMOGENEOUS: either
+        all int values or all ``(int, str)`` tuple values. Partial
+        coverage falls through to sorted-int fallback (back-compat).
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
+    Source: Phase 147 CONTEXT D-01 (tuple encoding), D-09 (back-compat),
+            RESEARCH §3 Risk 3 (min() hazard at :416 site).
     """
     if ring_info and ring_info.get("iupac_locants"):
         iupac = ring_info["iupac_locants"]
-        # Only include atoms that are in ring_set, filter string locants
+        # Only include atoms that are in ring_set; accept int OR tuple
+        # locants (Phase 147). Other types (e.g. legacy strings like '3a')
+        # are filtered and may trigger the sorted fallback below.
         ring_pos = {}
         for atom_idx in ring_set:
             if atom_idx in iupac:
                 locant = iupac[atom_idx]
-                if isinstance(locant, int):
+                if isinstance(locant, (int, tuple)):
                     ring_pos[atom_idx] = locant
-        # If we got positions for all ring atoms, use them
+        # Use authoritative locants only when coverage is complete.
         if len(ring_pos) == len(ring_set):
+            # Phase 147: enforce homogeneity invariant. If any tuple
+            # locant is present, coerce all int values to (n, '') tuples
+            # so downstream min()/sort() operations on ring_pos values
+            # never TypeError on mixed int/tuple comparison.
+            if any(isinstance(v, tuple) for v in ring_pos.values()):
+                ring_pos = {
+                    k: (v, '') if isinstance(v, int) else v
+                    for k, v in ring_pos.items()
+                }
             return ring_pos
-        # If partial coverage (e.g., string locants for fusion atoms),
-        # fall through to sorted fallback
+        # Partial coverage -> sorted fallback (back-compat with pre-147
+        # callers; cascade step 6 in candidate_pool.py gates on complete
+        # coverage via _has_iupac_locants per Phase 146 D-02).
 
-    # Fallback: sorted atom indices (correct for carbocyclic rings)
+    # Fallback: sorted atom indices (correct for carbocyclic rings).
     ring_sorted = sorted(ring_set)
     return {atom_idx: i + 1 for i, atom_idx in enumerate(ring_sorted)}
 
