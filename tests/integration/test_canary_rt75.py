@@ -2906,6 +2906,26 @@ CANARY_COMPOUNDS = [
         "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
         "L-glutamyl-L-alanyl-L-tryptophan",
     ),
+    # --- Phase 145.2 D-09-a.3: HA=7 Tier A canaries ---
+    # Cover the _MIN_RATIO_ACCEPT/1.5 coverage fallback at composer.py:1526
+    # (D-10 hard preservation). One canary per Tier A handler. HA=7 is the
+    # minimum geometrically feasible for complex_ring + benzene + heterocycle
+    # with at least one substituent — HA≤5 is geometrically IMPOSSIBLE for
+    # these handler classes (a substituted benzene already has HA=7: 6 ring
+    # atoms + 1 substituent). HA=7 satisfies D-09-a.3 spirit per RESEARCH.md
+    # §Q1: all HA<<15, well inside the rescue branch.
+    (
+        "C1CC2CC1CC2",
+        "norbornane",
+    ),  # complex_ring handler, HA=7, ratio=0.9524 (non-boosted)
+    (
+        "Fc1ccccc1",
+        "fluorobenzene",
+    ),  # benzene handler, HA=7, retained-scaffold boost → ratio=1.0
+    (
+        "Clc1ccncc1",
+        "4-chloropyridine",
+    ),  # heterocycle handler, HA=7, retained-scaffold boost → ratio=1.0
 ]
 
 # Build test IDs from expected names (first 40 chars, sanitized for pytest)
