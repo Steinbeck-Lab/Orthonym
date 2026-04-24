@@ -82,6 +82,24 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# RATIO_REJECT_FLOOR — Phase 145.2 D-09-a.2 sanity gate
+# ---------------------------------------------------------------------------
+# Minimum `ratio` factor required for a candidate to be added to the pool.
+# Catches obvious-garbage candidates (e.g., a 1-character name on a 30-HA
+# molecule → ratio = 1/30/1.5 ≈ 0.022 < 0.10 → rejected).
+#
+# This is DISTINCT from FACTOR_WEIGHTS['ratio'] (demoted to 0.0 in Plan 01
+# Task 1) and distinct from _MIN_RATIO_ACCEPT at composer.py:1520 (preserved
+# per D-10). See 145.2-CONTEXT.md §Plan 01 for the three-ratio disambiguation.
+#
+# Floor value 0.10 chosen so the reject condition is rare in practice (no
+# real Tier A candidate on the 7,500-row baseline has ratio < 0.10) but
+# strong enough to catch adversarial / pathological garbage during Phase 146
+# competitive selection.
+RATIO_REJECT_FLOOR: float = 0.10
+
+
+# ---------------------------------------------------------------------------
 # HandlerPolicy dataclass — declarative per-handler pool participation rules
 # ---------------------------------------------------------------------------
 
@@ -270,6 +288,17 @@ class CandidatePool:
         policy = HANDLER_POLICIES.get(handler_id)
         # Compute confidence WITHOUT parent_atom_indices (Risk 1 mitigation)
         cand = compute_confidence(name, handler_id, features)
+        # RATIO_REJECT_FLOOR sanity gate (Phase 145.2 D-09-a.2). Rejects
+        # obvious-garbage candidates regardless of handler tier. Missing
+        # 'ratio' factor treated as "not garbage" (defensive default).
+        ratio_val = cand.factors.get('ratio')
+        if ratio_val is not None and ratio_val < RATIO_REJECT_FLOOR:
+            logger.debug(
+                "candidate rejected by RATIO_REJECT_FLOOR: "
+                "handler=%s name=%r ratio=%.3f < floor=%.3f",
+                handler_id, name, ratio_val, RATIO_REJECT_FLOOR,
+            )
+            return None
         # Tier B gate enforcement (preserves _confidence_gate behavior)
         if policy is not None and policy.gate_threshold is not None:
             if cand.confidence < policy.gate_threshold:
