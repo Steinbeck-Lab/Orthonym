@@ -157,15 +157,24 @@ class TestV17V18DictShape:
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
         assert FACTOR_WEIGHTS_V18['ratio'] == 0.0
 
-    def test_v18_parent_correctness_above_zero(self):
-        """V18 raises parent_correctness from 0.0 (V17 scaffold) to > 0.
+    def test_v18_parent_correctness_calibrated(self):
+        """V18 parent_correctness holds the Plan 04 grid-calibrated value.
 
-        Placeholder value committed by Plan 03 is 0.35; Plan 04 grid search
-        overwrites with the calibrated value. The only invariant enforced
-        here is > 0.0 — both placeholder and calibrated values must satisfy.
+        Plan 03 shipped a PLACEHOLDER of 0.35. Plan 04's grid search (2026-04-24,
+        52 configs with anti-overfit delta=0.0) honored Plan 01's CD-03 decision
+        to DROP the factor from the grid (std=0.0 in the production path because
+        `ParentCorrectnessScorer.score()` short-circuits to 0.5 when
+        `_pc_context.reference_name is None` — every candidate gets the same
+        0.5 today). CD-03 pinned the grid dimension at 0.0, so the chosen
+        config also landed at 0.0.
+
+        Phase 148 will activate the scorer by deleting `_should_bypass_fused_guard`
+        and wiring `features.parent_selection_result`. At that point a follow-up
+        calibration (or Plan 06 cleanup) can raise this weight. Until then, the
+        calibrated-and-committed invariant is parent_correctness == 0.0.
         """
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
-        assert FACTOR_WEIGHTS_V18['parent_correctness'] > 0.0
+        assert FACTOR_WEIGHTS_V18['parent_correctness'] == 0.0
 
     def test_v18_multiple_bond_count_placeholder_above_zero(self):
         """Plan 03 placeholder for multiple_bond_count weight is > 0.

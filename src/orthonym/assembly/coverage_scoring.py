@@ -178,21 +178,26 @@ FACTOR_WEIGHTS_V17: Dict[str, float] = {
 }
 
 # V18 weights (Phase 146 calibrated by grid search in Plan 04).
-# PLACEHOLDER values below; Plan 04 commits the calibrated values into this dict
-# via overwrite-in-place during the calibration script's epilogue.
-# multiple_bond_count is the NEW factor per D-06 (P-44.4.1.2).
+# CALIBRATED by Plan 04 grid search (2026-04-24, 52 configs, anti-overfit delta=0.0).
+# Grid: 5^5 with sum-to-1.0 constraint; parent_correctness DROPPED per CD-03
+# (std=0.0 until Phase 148 wires features.parent_selection_result); 52 surviving
+# configs evaluated over ~2.5 hrs wall-clock on 4 workers.
+# multiple_bond_count is the NEW factor per D-06 (P-44.4.1.2) — calibration
+# retained it at 0.25 (D-20 NOT triggered; factor has meaningful discriminative
+# signal even under CD-03's production path).
 # Insertion order: multiple_bond_count is APPENDED LAST per D-14 IEEE 754
 # invariant (when V17 loop encounters this dict via reload, the 6th term
 # is added LAST so prior 5 sums are byte-identical to V17).
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
 FACTOR_WEIGHTS_V18: Dict[str, float] = {
-    'ratio': 0.0,                       # permanent 0.0 (Phase 145.2)
-    'atom_coverage': 0.15,              # PLACEHOLDER — Plan 04 calibrates
-    'fg_recognition': 0.25,             # PLACEHOLDER
-    'substituent_completeness': 0.15,   # PLACEHOLDER
-    'parent_correctness': 0.35,         # PLACEHOLDER (raised from 0.0)
-    'multiple_bond_count': 0.10,        # PLACEHOLDER (NEW factor per D-06)
+    'ratio': 0.0,                       # permanent 0.0 (Phase 145.2 D-09-a.1)
+    'atom_coverage': 0.10,              # CALIBRATED via Plan 04 grid search
+    'fg_recognition': 0.40,             # CALIBRATED (highest signal)
+    'substituent_completeness': 0.25,   # CALIBRATED
+    'parent_correctness': 0.00,         # CALIBRATED (CD-03: no discrimination until Phase 148)
+    'multiple_bond_count': 0.25,        # CALIBRATED (D-20 NOT triggered; factor retained per D-06)
 }
+# Sum = 1.00 (0.00 + 0.10 + 0.40 + 0.25 + 0.00 + 0.25); sum-to-1.0 constraint satisfied.
 
 # Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
 FACTOR_WEIGHTS: Dict[str, float] = (
