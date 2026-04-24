@@ -334,6 +334,164 @@ class MolecularFeatures:
     total_charge: int = 0  # Net formal charge of the molecule
 
 
+def compute_features(mol, smiles: Optional[str] = None) -> MolecularFeatures:
+    """Phase 147 BL-1: thin module-level wrapper around Orthonym()._perceive.
+
+    Provides a public-API perception entry for tests and downstream
+    callers. Mirrors what name_compound() does internally before naming.
+
+    Args:
+        mol: RDKit Mol object.
+        smiles: Optional input SMILES; if None, derived via Chem.MolToSmiles(mol).
+
+    Returns:
+        MolecularFeatures populated by Orthonym()._perceive.
+
+    Source: Phase 147 Plan 02 BL-1 fix (public-API perception entry).
+    """
+    if smiles is None:
+        smiles = Chem.MolToSmiles(mol)
+    canonical_smiles = Chem.CanonSmiles(smiles)
+    return Orthonym()._perceive(mol, smiles, canonical_smiles)
+
+
+def _collect_ring_substituent_positions(features, ring_atoms):
+    """Set of ring atom indices that bear an off-ring (non-H) substituent.
+
+    Used by Phase 147 dispatch helper branch 4 (simple heterocycle) to feed
+    ``orient_heterocycle_with_substituents``.
+    """
+    ring_set = set(ring_atoms)
+    positions = set()
+    for atom_idx in ring_atoms:
+        atom = features.mol.GetAtomWithIdx(atom_idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in ring_set and nbr.GetSymbol() != 'H':
+                positions.add(atom_idx)
+                break
+    return positions
+
+
+def _build_ring_info_for_parent_selection(features):
+    """Phase 147 D-03: dispatch on ring type and produce authoritative IUPAC locants.
+
+    7-branch cascade (order per 147-CONTEXT.md D-03 with W-1 fix):
+      1. Fused-heterocycle (match_fused_heterocycle_core) — preserve D-09
+         byte-identical path; runs first.
+      2. Polycyclic aromatic (identify_polycyclic + get_polycyclic_iupac_locants)
+         — runs for ANY ring system with a PAH match, NOT gated on fused_type
+         (W-1 fix: pyrene is ortho-peri-fused but must still flow here).
+      3. Benzene-only single ring (orient_benzene with canonical
+         get_benzene_substituents helper — BL-2 fix).
+      4. Simple heterocycle single ring (orient_heterocycle_with_substituents).
+      5. Spiro detection -> {"iupac_locants": None} stub (Phase 151 fills).
+      6. Bridged/VB detection -> {"iupac_locants": None} stub (Phase 151 fills).
+      7. Else -> None (carbocyclic monocycle / hydrocarbon polycycle:
+         sorted fallback in _build_ring_pos preserves back-compat per D-09).
+
+    Returns None for acyclic molecules.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+    Source: Phase 147 CONTEXT D-03, D-04, D-06, D-09; Plan 02 W-1, W-2, BL-2.
+    """
+    if not features.is_cyclic:
+        return None
+
+    # Match namer.py top-level relative-import style (W-2 fix).
+    from .rules.fused_rings import classify_fused_system
+    from .data.fused_heterocycles import match_fused_heterocycle_core
+    from .rules.polycyclics import (
+        identify_polycyclic,
+        get_polycyclic_iupac_locants,
+    )
+    from .rules.benzene import orient_benzene, get_benzene_substituents
+    from .rules.heterocycles import orient_heterocycle_with_substituents
+    from .perception.rings import get_spiro_atoms
+    from .rules.bridged_fused import is_bridged_fused
+
+    mol = features.mol
+
+    # Branch 1: fused-heterocycle (preserve D-09 byte-identical path for
+    # ACTUAL heterocycles — indole/quinoline/etc.). Skip when the matched
+    # core has no heteroatoms (e.g., pyrene also lives in
+    # FUSED_HETEROCYCLES registry incidentally; PAHs must flow to branch 2
+    # so their tuple-locant numbering is used per W-1 fix).
+    fused_type = classify_fused_system(mol)
+    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+        het_match = match_fused_heterocycle_core(mol)
+        if het_match is not None:
+            _, atom_mapping, _ = het_match
+            core_atom_indices = list(atom_mapping.keys())
+            has_heteroatom_in_core = any(
+                mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
+                for idx in core_atom_indices
+            )
+            if has_heteroatom_in_core:
+                return {"iupac_locants": atom_mapping}
+
+    # Branch 2: PAH (W-1 fix — runs for ANY ring system with a PAH match,
+    # not gated on the fused-only block above). Pyrene/anthracene/phenanthrene
+    # are ortho-peri-fused; naphthalene is ortho-fused. All four flow through
+    # here when not a fused-heterocycle.
+    pah_name = identify_polycyclic(mol)
+    if pah_name is not None:
+        pah_locants = get_polycyclic_iupac_locants(mol, pah_name)
+        if pah_locants is not None:
+            return {"iupac_locants": pah_locants}
+
+    ring_systems = features.ring_systems
+    if len(ring_systems) == 1:
+        ring_atoms = tuple(ring_systems[0])
+        ring_mol_atoms = [mol.GetAtomWithIdx(i) for i in ring_atoms]
+
+        # Branch 3: benzene-only (single 6-aromatic-C ring).
+        # BL-2 fix: use the canonical get_benzene_substituents helper
+        # (returns Dict[int, List[Dict]] with real substituent entries),
+        # NOT a {idx: []} placeholder — the latter would yield arbitrary
+        # orientation because orient_benzene checks ``if atom_idx in
+        # substituents:`` and every dict key matches an empty-list value.
+        if (len(ring_atoms) == 6
+                and all(a.GetIsAromatic() and a.GetSymbol() == 'C'
+                        for a in ring_mol_atoms)):
+            try:
+                substituents = get_benzene_substituents(mol, ring_atoms)
+                oriented = orient_benzene(mol, ring_atoms, substituents)
+                atom_to_locant = {
+                    atom_idx: i + 1
+                    for i, atom_idx in enumerate(oriented)
+                }
+                return {"iupac_locants": atom_to_locant}
+            except Exception:
+                pass  # Defensive: fall through on handler edge case.
+
+        # Branch 4: simple heterocycle (single ring with >=1 heteroatom).
+        has_heteroatom = any(
+            a.GetSymbol() not in ('C', 'H') for a in ring_mol_atoms
+        )
+        if has_heteroatom:
+            substituent_positions = _collect_ring_substituent_positions(
+                features, ring_atoms,
+            )
+            try:
+                _, atom_to_locant = orient_heterocycle_with_substituents(
+                    mol, ring_atoms, substituent_positions,
+                )
+                return {"iupac_locants": atom_to_locant}
+            except Exception:
+                pass
+
+    # Branch 5: spiro stub (Phase 151 fills).
+    if bool(get_spiro_atoms(mol)):
+        return {"iupac_locants": None}
+
+    # Branch 6: bridged / Von Baeyer stub (Phase 151 fills).
+    if is_bridged_fused(mol):
+        return {"iupac_locants": None}
+
+    # Branch 7: else -> sorted fallback in _build_ring_pos.
+    return None
+
+
 def _should_bypass_fused_guard(features, core_match):
     """Check if chain should be parent despite fused heterocycle presence.
 
@@ -990,16 +1148,11 @@ class Orthonym:
 
                 # Only do parent selection if we found a meaningful chain (>= 2 carbons)
                 if potential_chain and len(potential_chain) >= 2:
-                    # ASML-19: Build ring_info for IUPAC ring numbering
-                    # When a fused heterocycle core was matched (but guard was
-                    # bypassed), use its iupac_locants for correct locant
-                    # comparison in parent selection cascade.
-                    _ring_info = None
-                    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
-                        het_match = match_fused_heterocycle_core(features.mol)
-                        if het_match is not None:
-                            _, atom_mapping, _ = het_match
-                            _ring_info = {"iupac_locants": atom_mapping}
+                    # Phase 147 D-03: delegate ring-type dispatch to helper.
+                    # Replaces the prior inline fused-hetero-only block; new
+                    # helper covers fused-hetero / PAH / benzene / simple-
+                    # hetero / spiro-stub / VB-stub / else->None per D-03.
+                    _ring_info = _build_ring_info_for_parent_selection(features)
 
                     # Pass pre-computed chain to select_parent
                     selection = select_parent(
