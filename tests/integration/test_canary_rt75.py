@@ -2973,13 +2973,25 @@ def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:
         tmp_path = tmp.name
 
     try:
-        result = subprocess.run(
-            ["java", "-jar", str(_OPSIN_JAR), "-osmi"],
-            stdin=open(tmp_path),
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        # WR-01: wrap stdin in `with open(...)` so the fd closes deterministically
+        # on all paths (including subprocess.run raising). `subprocess.run` does
+        # not take ownership of file objects passed as stdin.
+        with open(tmp_path) as stdin_f:
+            result = subprocess.run(
+                ["java", "-jar", str(_OPSIN_JAR), "-osmi"],
+                stdin=stdin_f,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        # WR-03: fail loudly if OPSIN exits non-zero (JVM crash, classpath
+        # error, OOM) so regressions are distinguishable from parse failures.
+        # Mirrors the peer helper at test_deterministic_output.py:263.
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"OPSIN batch invocation failed (returncode={result.returncode}): "
+                f"stderr={result.stderr!r}"
+            )
         output_lines = result.stdout.splitlines()
     finally:
         os.unlink(tmp_path)
