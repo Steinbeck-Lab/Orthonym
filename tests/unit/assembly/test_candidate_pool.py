@@ -357,3 +357,96 @@ class TestModuleLevelImportBinding:
         assert 'ParentCorrectnessScorer' in src, (
             "pool.add() must reference ParentCorrectnessScorer (module-level binding)"
         )
+
+
+# ---------------------------------------------------------------------------
+# RATIO_REJECT_FLOOR sanity gate tests (Phase 145.2 D-09-a.2)
+# ---------------------------------------------------------------------------
+
+import logging
+
+
+class TestRatioRejectFloor:
+    """Phase 145.2 D-09-a.2: RATIO_REJECT_FLOOR sanity gate in pool.add()."""
+
+    def test_floor_constant_value(self):
+        """RATIO_REJECT_FLOOR module-level constant equals 0.10."""
+        from orthonym.assembly.candidate_pool import RATIO_REJECT_FLOOR
+        assert RATIO_REJECT_FLOOR == 0.10
+
+    def test_below_floor_rejected(self, caplog):
+        """Candidate with ratio=0.022 (1-char name, 30-HA molecule) is rejected."""
+        from orthonym.assembly.candidate_pool import RATIO_REJECT_FLOOR  # noqa: F401
+        pool = CandidatePool(selection_mode='first_applicable')
+        features = _make_features("CCO")
+        garbage_cand = CandidateName(
+            name="C", handler="benzene", confidence=0.4,
+            factors={'ratio': 0.022, 'atom_coverage': 0.0,
+                     'fg_recognition': 0.0, 'substituent_completeness': 0.0,
+                     'parent_correctness': 0.5},
+        )
+        with patch(
+            'orthonym.assembly.candidate_pool.compute_confidence',
+            return_value=garbage_cand,
+        ):
+            with caplog.at_level(logging.DEBUG,
+                                 logger='orthonym.assembly.candidate_pool'):
+                result = pool.add(name="C", handler_id="benzene", features=features)
+        assert result is None, "Below-floor candidate must be rejected"
+        assert len(pool._candidates) == 0, "Rejected candidate must not be appended"
+        assert any("RATIO_REJECT_FLOOR" in rec.message
+                   for rec in caplog.records), \
+            "Rejection must emit DEBUG log mentioning RATIO_REJECT_FLOOR"
+
+    def test_exactly_at_floor_accepted(self):
+        """Candidate with ratio=0.10 (exactly at floor) is accepted (strict less-than)."""
+        pool = CandidatePool(selection_mode='first_applicable')
+        features = _make_features("CCO")
+        cand = CandidateName(
+            name="methane", handler="chain", confidence=0.5,
+            factors={'ratio': 0.10, 'atom_coverage': 1.0,
+                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
+                     'parent_correctness': 0.5},
+        )
+        with patch(
+            'orthonym.assembly.candidate_pool.compute_confidence',
+            return_value=cand,
+        ):
+            result = pool.add(name="methane", handler_id="chain", features=features)
+        assert result is not None
+        assert len(pool._candidates) == 1
+
+    def test_above_floor_accepted(self):
+        """Candidate with ratio=0.67 (well above floor) is accepted."""
+        pool = CandidatePool(selection_mode='first_applicable')
+        features = _make_features("CCO")
+        cand = CandidateName(
+            name="ethanol", handler="chain", confidence=0.7,
+            factors={'ratio': 0.67, 'atom_coverage': 1.0,
+                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
+                     'parent_correctness': 0.5},
+        )
+        with patch(
+            'orthonym.assembly.candidate_pool.compute_confidence',
+            return_value=cand,
+        ):
+            result = pool.add(name="ethanol", handler_id="chain", features=features)
+        assert result is not None
+
+    def test_missing_ratio_accepted(self):
+        """Missing 'ratio' key treated as 'not garbage' (defensive default)."""
+        pool = CandidatePool(selection_mode='first_applicable')
+        features = _make_features("CCO")
+        cand = CandidateName(
+            name="hybrid", handler="chain", confidence=0.5,
+            factors={'atom_coverage': 1.0, 'fg_recognition': 1.0,
+                     'substituent_completeness': 1.0,
+                     'parent_correctness': 0.5},
+        )
+        with patch(
+            'orthonym.assembly.candidate_pool.compute_confidence',
+            return_value=cand,
+        ):
+            # Must not KeyError — .get('ratio') returns None → accepted
+            result = pool.add(name="hybrid", handler_id="chain", features=features)
+        assert result is not None
