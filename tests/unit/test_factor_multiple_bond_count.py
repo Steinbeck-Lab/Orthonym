@@ -5,11 +5,19 @@ where BOTH endpoints are in parent_atom_indices (parent atoms ONLY, NOT
 entire molecule). Substituent multiple bonds (e.g., a nitrile substituent's
 C#N triple) must NOT contribute.
 
+**Test strategy note:** The V18/V17 integration tests (scenarios 12, 13)
+run in a subprocess to avoid importlib.reload()-induced class-identity
+leakage (``isinstance(cand, CandidateName)`` fails in downstream tests if
+the module is reloaded mid-suite — the reloaded class is a new object).
+The pure-factor unit tests (scenarios 1-11) run in-process; they never
+touch FACTOR_WEIGHTS and therefore don't trigger the leakage.
+
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
 """
 
-import importlib
-import os
+import subprocess
+import sys
+import textwrap
 
 import pytest
 from types import SimpleNamespace
@@ -23,6 +31,24 @@ def _features(smiles):
     """Minimal features object compatible with the helper's `mol` access."""
     mol = Chem.MolFromSmiles(smiles) if smiles else None
     return SimpleNamespace(mol=mol)
+
+
+def _run_with_env(env_overrides: dict, snippet: str) -> str:
+    """Run ``snippet`` in a fresh interpreter with env vars overridden."""
+    import os as _os
+    env = _os.environ.copy()
+    env.pop("ORTHONYM_USE_V18_WEIGHTS", None)
+    env.pop("ORTHONYM_SELECTION_MODE", None)
+    env.update(env_overrides)
+    proc = subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(snippet)],
+        env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert proc.returncode == 0, (
+        f"subprocess failed (rc={proc.returncode})\n"
+        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
+    )
+    return proc.stdout.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -191,48 +217,55 @@ def test_none_mol_returns_zero():
 
 # ---------------------------------------------------------------------------
 # Integration scenario 12: V18 mode includes the factor via compute_confidence
+# (runs in subprocess to avoid in-process reload leaking CandidateName identity)
 # ---------------------------------------------------------------------------
-def test_v18_mode_includes_factor(monkeypatch):
+def test_v18_mode_includes_factor():
     """With V18 env flag active, compute_confidence populates the new factor.
 
     The factor is computed from parent_atom_indices and appears in
     CandidateName.factors['multiple_bond_count'] with a numeric count.
+
+    Subprocess isolation: reloading coverage_scoring in-process would
+    invalidate the CandidateName class identity held by other test modules,
+    causing their isinstance() checks to fail (Rule 1 bug). Running under a
+    fresh interpreter avoids that contamination.
     """
-    monkeypatch.setenv("ORTHONYM_USE_V18_WEIGHTS", "true")
-    from orthonym.assembly import coverage_scoring as cs
-    importlib.reload(cs)
-    try:
-        features = _features("C=CC")
+    out = _run_with_env({"ORTHONYM_USE_V18_WEIGHTS": "true"}, """
+        from types import SimpleNamespace
+        from rdkit import Chem
+        from orthonym.assembly import coverage_scoring as cs
+        mol = Chem.MolFromSmiles("C=CC")
+        features = SimpleNamespace(mol=mol)
         cand = cs.compute_confidence(
             "propene", "chain", features, parent_atom_indices={0, 1, 2}
         )
-        assert 'multiple_bond_count' in cand.factors
-        assert cand.factors['multiple_bond_count'] == pytest.approx(1.0)
-    finally:
-        # Restore default V17 state for subsequent tests.
-        monkeypatch.delenv("ORTHONYM_USE_V18_WEIGHTS", raising=False)
-        importlib.reload(cs)
+        print('multiple_bond_count' in cand.factors)
+        print(cand.factors.get('multiple_bond_count'))
+    """)
+    lines = out.splitlines()
+    assert lines[0] == "True"
+    assert float(lines[1]) == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
-# Integration scenario 13: V17 mode excludes the factor
+# Integration scenario 13: V17 mode excludes the factor (subprocess isolated)
 # ---------------------------------------------------------------------------
-def test_v17_mode_excludes_factor(monkeypatch):
+def test_v17_mode_excludes_factor():
     """With V17 env flag (default), the factors dict must NOT contain the key.
 
     Byte-identical semantics require V17 path to produce an unchanged factors
     dict — the V18 guard `if 'multiple_bond_count' in FACTOR_WEIGHTS` ensures
     the key is never inserted when V17 is active.
     """
-    monkeypatch.setenv("ORTHONYM_USE_V18_WEIGHTS", "false")
-    from orthonym.assembly import coverage_scoring as cs
-    importlib.reload(cs)
-    try:
-        features = _features("C=CC")
+    out = _run_with_env({"ORTHONYM_USE_V18_WEIGHTS": "false"}, """
+        from types import SimpleNamespace
+        from rdkit import Chem
+        from orthonym.assembly import coverage_scoring as cs
+        mol = Chem.MolFromSmiles("C=CC")
+        features = SimpleNamespace(mol=mol)
         cand = cs.compute_confidence(
             "propene", "chain", features, parent_atom_indices={0, 1, 2}
         )
-        assert 'multiple_bond_count' not in cand.factors
-    finally:
-        monkeypatch.delenv("ORTHONYM_USE_V18_WEIGHTS", raising=False)
-        importlib.reload(cs)
+        print('multiple_bond_count' in cand.factors)
+    """)
+    assert out == "False"
