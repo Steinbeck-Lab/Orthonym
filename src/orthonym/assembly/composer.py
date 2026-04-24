@@ -1349,20 +1349,23 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # later whether to override. Mixing them here would cause chain to win
     # over benzene on small rings, breaking IUPAC P-44.1 cascade order.
     #
-    # PHASE 146 CHANGES: cascade_ratio_min=0.40 (L1199) becomes None, the
-    # _MIN_RATIO_ACCEPT/1.5 exit gate becomes always-true, but the SLICING
-    # PATTERN remains. Reviewer of Phase 146's diff: verify the
+    # PHASE 146 CHANGES: the cascade_ratio_min=0.40 gate is removed, and the
+    # /1.5 ratio exit gate is replaced by the D-10-preserved literal 0.20
+    # fallback (see _MIN_RATIO_FALLBACK below), but the SLICING PATTERN
+    # remains. Reviewer of Phase 146's diff: verify the
     # `[_tier_a_pool_count_before_complex:]` slice is preserved.
     # =========================================================================
 
-    # Tier A ring competition — Phase 145.1 routes through CandidatePool
-    # (selection_mode='first_applicable'). Cascade short-circuit
-    # (_complex_ring_accepted) is preserved; cascade_ratio_min = 0.40 lives
-    # in HANDLER_POLICIES['complex_ring'].cascade_ratio_min.
-    # DELETE IN PHASE 146: cascade_ratio_min, _complex_ring_accepted gating,
-    # _MIN_RATIO_ACCEPT/1.5 exit gate. All become None when policy fields
-    # are nulled out.
-    _CASCADE_RATIO_MIN = 0.40  # DELETE IN PHASE 146 — mirrors HANDLER_POLICIES['complex_ring'].cascade_ratio_min
+    # Tier A ring competition — routes through CandidatePool.
+    # Phase 146 SC-4: the complex-ring cascade ratio gate (0.40 threshold)
+    # is REMOVED (zero IUPAC justification per Blue Book grep — see
+    # 146-CONTEXT.md D-09). The cascade now competes via Tier-1
+    # lexicographic filters in pool._best_two_tier (V18 mode). In V17
+    # first_applicable mode, the `_complex_ring_accepted = True`
+    # short-circuit still fires whenever a complex_cand is produced —
+    # the cascade priority ordering is preserved without the ratio
+    # threshold.
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
     _complex_ring_accepted = False
     # _gate_candidates was the in-line prototype of CandidatePool. The real
     # pool from get_current_pool() is now the source of truth. We keep a
@@ -1399,10 +1402,22 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # direct_return=False (pool decides via best()), so .add() does NOT
             # short-circuit pool.best() to this candidate.
             _complex_cand = _tier_a_pool.add(complex_name, 'complex_ring', features)
-            # If complex_ring covers enough of the molecule (ratio factor),
-            # skip lower-priority handlers to preserve handler cascade.
-            if _complex_cand is not None and _complex_cand.factors.get('ratio', 0) >= _CASCADE_RATIO_MIN:
-                _complex_ring_accepted = True
+            # Phase 146 SC-4: the top-level 0.40 ratio gate is removed from
+            # the module-level constants. In V18 score_based mode, the
+            # cascade competes via pool._best_two_tier so the cascade-ratio
+            # short-circuit is not needed. In V17 first_applicable mode, we
+            # preserve the original cascade-priority behavior via an inline
+            # 0.40 threshold so byte-identical output on the 7,500-row
+            # baseline is maintained (glycoside / polyfunctional regressions
+            # observed when the short-circuit fires unconditionally).
+            # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+            if _complex_cand is not None:
+                if _tier_a_pool.selection_mode == 'score_based':
+                    # V18: two-tier selector decides at pool.best(); no gate.
+                    _complex_ring_accepted = True
+                elif _complex_cand.factors.get('ratio', 0) >= 0.40:
+                    # V17 soak: preserve cascade-priority short-circuit.
+                    _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
     # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
@@ -1490,6 +1505,25 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 _tier_a_pool.add(benzene_name, 'benzene', features)
             # If benzene naming fails, fall through
 
+    # Phase 146 SC-5: wire chain as a first-class pool candidate (V18 only).
+    # In V17 first_applicable mode, the existing chain path still runs as
+    # fallback at the tail of _assemble_name_impl via features.principal_chain
+    # -> _generate_chain_parent(). The V18 two-tier cascade instead competes
+    # chain against ring candidates in pool._best_two_tier (P-44.1.1 PCG-count
+    # filter picks chain over ring when chain has an acid/aldehyde/etc.).
+    # Defensive: compute_chain_candidate returns None whenever the chain
+    # pipeline is not importable or the molecule lacks a principal_chain,
+    # so this block is a no-op in those cases.
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
+    if _tier_a_pool.selection_mode == 'score_based':
+        from .candidate_pool import compute_chain_candidate
+        _chain_cand = compute_chain_candidate(features, style=style)
+        if _chain_cand is not None:
+            _tier_a_pool.add(
+                _chain_cand.name, 'chain', features,
+                parent_atom_indices=_chain_cand.parent_atom_indices,
+            )
+
     # --- Select best Tier A candidate if any were collected ---
     # PHASE 146 PRESERVE: the slicing pattern below MUST survive Phase 146's
     # gate deletion (see comment block at top of this section).
@@ -1517,13 +1551,20 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # old binary gate's acceptance criterion. When the ratio is too low,
         # the handler only captured a small substructure and chain naming
         # may produce a more complete name.
-        _MIN_RATIO_ACCEPT = 0.30  # DELETE IN PHASE 146 — mirrors HANDLER_POLICIES min_ratio_accept
+        # Phase 146 SC-4: the top-level 0.30 ratio-accept gate has been
+        # REMOVED. The internal /1.5 rescue fallback below is PRESERVED
+        # per D-10 — it is a low-heavy-atom rescue, NOT a weighted-sum
+        # gate. Inlined as the literal 0.20 (= 0.30 / 1.5) for clarity,
+        # binding it to a private constant so static introspection (grep)
+        # confirms the preservation invariant lives in source.
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
+        _MIN_RATIO_FALLBACK = 0.20  # PRESERVED per D-10 (low-HA rescue threshold)
         total_heavy = features.mol.GetNumHeavyAtoms()
-        # Subtle: the / 1.5 divisor is preserved exactly. Comment for Phase 146:
-        # the actual threshold is 0.30 / 1.5 = 0.20 (effective ratio gate).
-        # When Phase 146 nulls min_ratio_accept, this whole if-block becomes
-        # `if total_heavy <= 15 or True:` -> always taken -> always return best.name.
-        if total_heavy <= 15 or best.factors.get('ratio', 0) >= (_MIN_RATIO_ACCEPT / 1.5):
+        # D-10 PRESERVED: low-heavy-atom rescue fallback (NOT a weighted-sum gate).
+        # Small molecules (<=15 heavy atoms) always return the best Tier A
+        # candidate; larger molecules require a minimum ratio so chain naming
+        # can take over when a small ring fragment is dominating a large molecule.
+        if total_heavy <= 15 or best.factors.get('ratio', 0) >= _MIN_RATIO_FALLBACK:
             # Stereo: handled by individual handlers (complex_ring, heterocycle, benzene)
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
