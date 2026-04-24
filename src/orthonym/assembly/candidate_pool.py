@@ -501,14 +501,17 @@ def _filter_lowest_locants(
 def _has_iupac_locants(candidates: List['CandidateName']) -> bool:
     """D-02 / D-19 safe probe: True iff ALL candidates have iupac_locants populated.
 
-    In Phase 146, no candidate populates iupac_locants (only ortho-fused does
-    per namer.py:998-1002, and ortho-fused doesn't go through pool dispatch).
-    Therefore this returns False in Phase 146 -> Tier-1 step 6 is a no-op.
+    Phase 147: ring_info is now a first-class CandidateName field (no longer
+    getattr-defensive). Returns False when any candidate has ring_info=None
+    OR ring_info['iupac_locants'] is None/empty (spiro/VB stubs per D-06).
 
-    Phase 147 populates iupac_locants on more ring types -> step 6 activates.
+    Phase 146 mode: no candidate populates ring_info -> returns False ->
+    Tier-1 step 6 is a no-op.
+    Phase 147 mode: benzene/simple-hetero/PAH/fused-hetero candidates populate
+    iupac_locants -> step 6 activates.
     """
     for cand in candidates:
-        ri = getattr(cand, 'ring_info', None) or {}
+        ri = cand.ring_info or {}
         if not ri.get('iupac_locants'):
             return False
     return True
@@ -571,6 +574,7 @@ class CandidatePool:
         handler_id: str,
         features: Any,
         parent_atom_indices: Optional[Set[int]] = None,
+        ring_info: Optional[Dict[str, Any]] = None,
     ) -> Optional[CandidateName]:
         """Score and add a candidate. Returns the candidate, or None if
         gate-rejected (Tier B handlers only).
@@ -620,6 +624,10 @@ class CandidatePool:
                 return None
         # Set parent_atom_indices POST-HOC (Risk 1)
         cand.parent_atom_indices = parent_atom_indices
+        # Phase 147 D-03: attach ring_info POST-HOC (Risk 1 pattern).
+        # NEVER passed into compute_confidence() — that would break the
+        # byte-identical guarantee per Phase 146 D-19.
+        cand.ring_info = ring_info
         # Phase 146 CD-01: populate parent_pcg_count POST-HOC.
         # Same Risk 1 mitigation as parent_atom_indices: NEVER passed into
         # compute_confidence (would break byte-identical guarantees).

@@ -61,6 +61,17 @@ class CandidateName:
     # Default None means "not yet computed" (the cascade treats None as 0).
     # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
     parent_pcg_count: Optional[int] = None
+    # Phase 147 D-03: ring-type authoritative IUPAC locants used by
+    # Tier-1 cascade step 6 (_filter_lowest_locants) per P-44.4.1.4+.
+    # Populated POST-HOC by CandidatePool.add() — same Risk 1 mitigation
+    # as parent_atom_indices: NEVER passed into compute_confidence()
+    # (would break byte-identical guarantee).
+    # Shape: {"iupac_locants": {atom_idx: int | (int, str) tuple}} or None.
+    # None means "no authoritative locants available" (spiro/VB stubs
+    # per D-06, or unsupported ring type) — cascade step 6 short-circuits
+    # via _has_iupac_locants probe at candidate_pool.py:501-514.
+    # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
+    ring_info: Optional[Dict[str, Any]] = None
 
 
 # ---------------------------------------------------------------------------
