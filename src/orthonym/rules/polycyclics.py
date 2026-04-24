@@ -382,6 +382,87 @@ def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[
     return best_mapping if best_mapping else {atom_idx: i + 1 for i, atom_idx in enumerate(peripheral_atoms)}
 
 
+def get_polycyclic_iupac_locants(
+    mol,
+    pah_name: str,
+) -> Optional[Dict[int, Any]]:
+    """Phase 147: return authoritative IUPAC locants for a cataloged PAH.
+
+    Reads ``POLYCYCLIC_DATA[pah_name]['iupac_numbering']`` (canonical-SMILES
+    keyed) and translates canonical-atom indices to mol-atom indices via
+    RDKit substructure match. String fusion locants ('4a', '10b', ...)
+    are converted to ``(int, str)`` tuples at this boundary per Phase 147
+    Decision D-01 (compare_locant_sets tuple-aware after Plan 01).
+
+    Returns a dict covering ALL ring atoms of the PAH, mixing plain int
+    locants (peripheral) with ``(int, str)`` tuple locants (fusion atoms).
+    Suitable for ``ring_info["iupac_locants"]`` in the cascade step 6 gate.
+
+    The 4 populated PAHs in v17 are: naphthalene (10 keys, 2 fusion tuples),
+    anthracene (14 keys, 4 fusion tuples), phenanthrene (14 keys, 4 fusion
+    tuples), pyrene (16 keys, 6 fusion tuples). Other entries with empty
+    ``iupac_numbering`` (fluorene, acenaphthene, ...) return None — Phase 151
+    audit candidates.
+
+    Args:
+        mol: RDKit Mol object.
+        pah_name: Canonical PAH name (key in POLYCYCLIC_DATA).
+
+    Returns:
+        ``Dict[int, int | (int, str)]`` when ``pah_name`` is a populated PAH.
+        ``None`` when ``pah_name`` is not in POLYCYCLIC_DATA, its
+        ``iupac_numbering`` is empty, or the substructure match fails.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25 (PAH numbering
+        is FIXED, not reoriented per substituents — match data directly).
+    Source: Phase 147 CONTEXT D-01 (tuple encoding); CD-03 (function form).
+    """
+    import re
+
+    entry = POLYCYCLIC_DATA.get(pah_name)
+    if entry is None:
+        return None
+    canonical_numbering = entry.get('iupac_numbering') or {}
+    if not canonical_numbering:
+        return None
+
+    canonical_smiles = entry.get('canonical_smiles')
+    if not canonical_smiles:
+        return None
+    canonical_mol = Chem.MolFromSmiles(canonical_smiles)
+    if canonical_mol is None:
+        return None
+
+    match = mol.GetSubstructMatch(canonical_mol)
+    if not match or len(match) != canonical_mol.GetNumAtoms():
+        return None
+
+    # Anchored regex: parse 'NN' or 'NNa' / 'NNb' style locants.
+    # Two-digit base critical for pyrene's '10b' (must yield (10, 'b'),
+    # NOT (1, '0b')).
+    locant_re = re.compile(r'^(\d+)([a-z]*)$')
+    result: Dict[int, Any] = {}
+    for canonical_idx, locant in canonical_numbering.items():
+        if canonical_idx >= len(match):
+            continue
+        mol_idx = match[canonical_idx]
+        if isinstance(locant, int):
+            result[mol_idx] = locant
+        elif isinstance(locant, str):
+            m = locant_re.match(locant)
+            if m is None:
+                # Malformed locant — skip defensively (should never fire
+                # for the 4 known entries: naphthalene/anthracene/
+                # phenanthrene/pyrene).
+                continue
+            base = int(m.group(1))
+            suffix = m.group(2)
+            result[mol_idx] = (base, suffix) if suffix else base
+        # Any other type silently skipped (defensive).
+
+    return result
+
+
 def _build_peripheral_order(
     start: int,
     peripheral_atoms: List[int],
