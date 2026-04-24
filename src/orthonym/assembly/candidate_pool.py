@@ -58,6 +58,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from .coverage_scoring import (
     CandidateName,
+    CONFIDENCE_GATE_THRESHOLD,
     HANDLER_PRIORITY,
     compute_confidence,
     log_confidence,
@@ -148,26 +149,26 @@ class HandlerPolicy:
     """Declarative policy for one handler's pool participation.
 
     Fields:
-        handler_id:        Handler name (matches HANDLER_PRIORITY keys).
-        tier:              'ring_a' | 'ring_b' | 'chain' | 'direct_return'.
-        priority:          Tiebreak priority (pulled from HANDLER_PRIORITY).
-        min_ratio_accept:  DELETE IN PHASE 146 — composer.py:1323 ratio gate
-                           for Tier A pool exit (0.30 / 1.5 = 0.20 effective).
-        cascade_ratio_min: DELETE IN PHASE 146 — composer.py:1199 cascade
-                           threshold for complex_ring early-accept (0.40).
-        gate_threshold:    DELETE IN PHASE 146 — Tier B _confidence_gate
-                           threshold (0.40, mirrors CONFIDENCE_GATE_THRESHOLD).
-        direct_return:     True for Tier B and direct-return handlers
-                           (first-applicable wins); False for Tier A pool
-                           handlers (compete via select_best_candidate)
-                           and chain (fallback in 145.1).
+        handler_id:    Handler name (matches HANDLER_PRIORITY keys).
+        tier:          'ring_a' | 'ring_b' | 'chain' | 'direct_return'.
+        priority:      Tiebreak priority (pulled from HANDLER_PRIORITY).
+        direct_return: True for Tier B and direct-return handlers
+                       (first-applicable wins); False for Tier A pool
+                       handlers (compete via select_best_candidate)
+                       and chain (now first-class peer of ring_a per
+                       Phase 146 SC-5).
+
+    Phase 146 SC-8: cascade_ratio_min, min_ratio_accept, gate_threshold
+    fields REMOVED. Cascade competition is now handled by
+    `_best_two_tier` (D-01 two-tier selector) and the inline V17 gate at
+    composer.py preserves byte-identical V17 soak behavior. Tier B
+    handlers no longer carry a per-handler gate threshold; the
+    confidence gate is enforced by the handler-internal call to
+    `_confidence_gate` against `CONFIDENCE_GATE_THRESHOLD`.
     """
     handler_id: str
     tier: str
     priority: int
-    min_ratio_accept:  Optional[float] = None  # DELETE IN PHASE 146
-    cascade_ratio_min: Optional[float] = None  # DELETE IN PHASE 146
-    gate_threshold:    Optional[float] = None  # DELETE IN PHASE 146 (Tier B gate)
     direct_return: bool = False
 
 
@@ -175,14 +176,25 @@ class HandlerPolicy:
 # HANDLER_POLICIES — single source of truth for per-handler pool metadata
 #
 # Populated VERBATIM from composer.py current constants (verified against
-# main HEAD per 145.1-RESEARCH.md §2.2). Phase 146 sets gate fields to None
-# and flips chain.priority to equal ring_a handlers.
+# main HEAD per 145.1-RESEARCH.md §2.2). Phase 146 SC-8 cleanup:
+# - Removed cascade_ratio_min / min_ratio_accept / gate_threshold kwargs
+#   (fields deleted from HandlerPolicy). Cascade competition is now
+#   handled by _best_two_tier; Tier B gate enforcement stays inside
+#   each handler's call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
+# - Raised chain policy priority to 4 (ring_a-peer) per SC-5 so chain
+#   competes as a first-class pool candidate in V18 score_based mode.
+#   HANDLER_PRIORITY['chain'] remains 1 so V17 select_best_candidate
+#   tiebreak behavior is byte-identical (the policy-level priority is
+#   only consumed by the two-tier selector, not by V17's cascade).
 #
 # PRIORITY SOURCE (ISS-002 remediation): every entry pulls priority from
 # HANDLER_PRIORITY (the single source of truth). Plan 02 Task 2 extends
 # HANDLER_PRIORITY with the missing 'n_oxide', 'amine', 'simple_molecule'
 # entries (with priorities 5, 5, 1 respectively) so this dict can pull from
-# HANDLER_PRIORITY[*] without hardcoded literals.
+# HANDLER_PRIORITY[*] without hardcoded literals. The sole intentional
+# exception is 'chain', whose policy-level priority is promoted to 4
+# (ring_a-peer) for Phase 146 SC-5 while HANDLER_PRIORITY['chain']
+# stays at 1 to preserve V17 byte-identical tiebreak semantics.
 #
 # SCOPE NOTE: salt / ion / radical / simple_molecule handlers are EXCLUDED
 # from this dict per 145.1-RESEARCH.md §9.2 item 3 + ISS-001 enumeration:
@@ -193,23 +205,25 @@ class HandlerPolicy:
 # ---------------------------------------------------------------------------
 
 HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
-    # --- Tier B: 13 handlers using _confidence_gate (gate_threshold=0.40) ---
+    # --- Tier B: 13 handlers using _confidence_gate (CONFIDENCE_GATE_THRESHOLD=0.40) ---
     # Each runs gate check before return; on gate-fail, falls through to
     # next handler. Pool reproduces by returning None from add() on
     # gate-fail; caller checks `if cand is not None: return ...`.
-    'oxime':           HandlerPolicy('oxime',           'ring_b', priority=HANDLER_PRIORITY['oxime'],           gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'hydrazone':       HandlerPolicy('hydrazone',       'ring_b', priority=HANDLER_PRIORITY['hydrazone'],       gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'isocyanate':      HandlerPolicy('isocyanate',      'ring_b', priority=HANDLER_PRIORITY['isocyanate'],      gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'isothiocyanate':  HandlerPolicy('isothiocyanate',  'ring_b', priority=HANDLER_PRIORITY['isothiocyanate'],  gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'carbamic_acid':   HandlerPolicy('carbamic_acid',   'ring_b', priority=HANDLER_PRIORITY['carbamic_acid'],   gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'carbamate':       HandlerPolicy('carbamate',       'ring_b', priority=HANDLER_PRIORITY['carbamate'],       gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'urea':            HandlerPolicy('urea',            'ring_b', priority=HANDLER_PRIORITY['urea'],            gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'guanidine':       HandlerPolicy('guanidine',       'ring_b', priority=HANDLER_PRIORITY['guanidine'],       gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'sulfoxide':       HandlerPolicy('sulfoxide',       'ring_b', priority=HANDLER_PRIORITY['sulfoxide'],       gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'sulfone':         HandlerPolicy('sulfone',         'ring_b', priority=HANDLER_PRIORITY['sulfone'],         gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'thioether':       HandlerPolicy('thioether',       'ring_b', priority=HANDLER_PRIORITY['thioether'],       gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'boronic_acid':    HandlerPolicy('boronic_acid',    'ring_b', priority=HANDLER_PRIORITY['boronic_acid'],    gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
-    'partial_sat':     HandlerPolicy('partial_sat',     'ring_b', priority=HANDLER_PRIORITY['partial_sat'],     gate_threshold=0.40, direct_return=True),  # DELETE IN PHASE 146 (gate)
+    # Phase 146 SC-8: gate_threshold kwarg removed from every entry; the
+    # gate is enforced by the handler-internal _confidence_gate call.
+    'oxime':           HandlerPolicy('oxime',           'ring_b', priority=HANDLER_PRIORITY['oxime'],           direct_return=True),
+    'hydrazone':       HandlerPolicy('hydrazone',       'ring_b', priority=HANDLER_PRIORITY['hydrazone'],       direct_return=True),
+    'isocyanate':      HandlerPolicy('isocyanate',      'ring_b', priority=HANDLER_PRIORITY['isocyanate'],      direct_return=True),
+    'isothiocyanate':  HandlerPolicy('isothiocyanate',  'ring_b', priority=HANDLER_PRIORITY['isothiocyanate'],  direct_return=True),
+    'carbamic_acid':   HandlerPolicy('carbamic_acid',   'ring_b', priority=HANDLER_PRIORITY['carbamic_acid'],   direct_return=True),
+    'carbamate':       HandlerPolicy('carbamate',       'ring_b', priority=HANDLER_PRIORITY['carbamate'],       direct_return=True),
+    'urea':            HandlerPolicy('urea',            'ring_b', priority=HANDLER_PRIORITY['urea'],            direct_return=True),
+    'guanidine':       HandlerPolicy('guanidine',       'ring_b', priority=HANDLER_PRIORITY['guanidine'],       direct_return=True),
+    'sulfoxide':       HandlerPolicy('sulfoxide',       'ring_b', priority=HANDLER_PRIORITY['sulfoxide'],       direct_return=True),
+    'sulfone':         HandlerPolicy('sulfone',         'ring_b', priority=HANDLER_PRIORITY['sulfone'],         direct_return=True),
+    'thioether':       HandlerPolicy('thioether',       'ring_b', priority=HANDLER_PRIORITY['thioether'],       direct_return=True),
+    'boronic_acid':    HandlerPolicy('boronic_acid',    'ring_b', priority=HANDLER_PRIORITY['boronic_acid'],    direct_return=True),
+    'partial_sat':     HandlerPolicy('partial_sat',     'ring_b', priority=HANDLER_PRIORITY['partial_sat'],     direct_return=True),
 
     # --- Direct-return: 18 handlers, no gate ---
     # These return the first non-None name produced; no candidate competition.
@@ -235,28 +249,27 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
     'amine':           HandlerPolicy('amine',           'direct_return', priority=HANDLER_PRIORITY['amine'],           direct_return=True),
 
     # --- Tier A: 3 ring handlers competing via select_best_candidate ---
-    # complex_ring has BOTH cascade_ratio_min (early-accept short-circuit
-    # of subsequent ring handlers) AND min_ratio_accept (pool exit gate).
-    # heterocycle and benzene only have min_ratio_accept (set on the
-    # pool-exit-gate check, not on individual handler add).
-    'complex_ring':    HandlerPolicy('complex_ring',    'ring_a', priority=HANDLER_PRIORITY['complex_ring'],
-                                      cascade_ratio_min=0.40,  # DELETE IN PHASE 146 (composer.py:1199)
-                                      min_ratio_accept=0.30,   # DELETE IN PHASE 146 (composer.py:1323)
-                                      direct_return=False),
-    'heterocycle':     HandlerPolicy('heterocycle',     'ring_a', priority=HANDLER_PRIORITY['heterocycle'],
-                                      min_ratio_accept=0.30,   # DELETE IN PHASE 146 (composer.py:1323)
-                                      direct_return=False),
-    'benzene':         HandlerPolicy('benzene',         'ring_a', priority=HANDLER_PRIORITY['benzene'],
-                                      min_ratio_accept=0.30,   # DELETE IN PHASE 146 (composer.py:1323)
-                                      direct_return=False),
+    # Phase 146 SC-8 cleanup: cascade_ratio_min and min_ratio_accept
+    # kwargs removed. Cascade competition between complex_ring,
+    # heterocycle, and benzene is now decided by `_best_two_tier`
+    # (D-01 two-tier selector). V17 byte-identical preservation of
+    # the 0.40 complex_ring short-circuit is enforced inline in
+    # composer.py via a selection_mode-gated guard (see 146-05 SUMMARY).
+    'complex_ring':    HandlerPolicy('complex_ring',    'ring_a', priority=HANDLER_PRIORITY['complex_ring'], direct_return=False),
+    'heterocycle':     HandlerPolicy('heterocycle',     'ring_a', priority=HANDLER_PRIORITY['heterocycle'],  direct_return=False),
+    'benzene':         HandlerPolicy('benzene',         'ring_a', priority=HANDLER_PRIORITY['benzene'],      direct_return=False),
 
-    # --- Chain: fallback in 145.1; raised to equal in 146 ---
-    # priority=1 (HANDLER_PRIORITY['chain']) — wins only when pool is
-    # otherwise empty or all higher-priority handlers gate-rejected.
-    # PHASE 146: raise priority to 4 to enable chain-vs-ring competition
-    # per IUPAC P-44.1 cascade (chain length is criterion (c)).
-    'chain':           HandlerPolicy('chain',           'chain',  priority=HANDLER_PRIORITY['chain'],  # DELETE IN PHASE 146 (raise to ring_a equal)
-                                      direct_return=False),
+    # --- Chain: first-class peer of ring_a handlers (Phase 146 SC-5) ---
+    # Phase 146 SC-5 / SC-8: chain policy-level priority raised from
+    # HANDLER_PRIORITY['chain']=1 to 4 so chain competes as a first-
+    # class candidate against ring_a handlers in the two-tier selector
+    # (IUPAC P-44.1 cascade — chain length is criterion P-44.1.1/c).
+    # HANDLER_PRIORITY['chain']=1 is UNCHANGED: select_best_candidate
+    # in coverage_scoring.py consumes HANDLER_PRIORITY directly for V17
+    # tiebreak byte-identical behavior. The policy-level priority (4)
+    # is consumed only by the two-tier selector's ring_a-peer logic,
+    # so V17 soak remains bit-for-bit stable.
+    'chain':           HandlerPolicy('chain',           'chain',  priority=4, direct_return=False),
 }
 
 
@@ -534,8 +547,11 @@ class CandidatePool:
     is recorded but does NOT influence cand.confidence (IEEE 754: x+0.0=x).
 
     Tier B gate semantics (preserves _confidence_gate at composer.py:279):
-      policy.gate_threshold=0.40 → if cand.confidence < 0.40, pool.add()
-      returns None (gate-rejected); caller falls through to next handler.
+      tier='ring_b' handlers → if cand.confidence < CONFIDENCE_GATE_THRESHOLD
+      (0.40), pool.add() returns None (gate-rejected); caller falls
+      through to next handler. Post Phase 146 SC-8, the gate threshold
+      is read from module-level CONFIDENCE_GATE_THRESHOLD (not the
+      deleted policy.gate_threshold field).
 
     Direct-return handlers: pool.add() ALSO sets self._direct_return_winner
     to short-circuit pool.best() (CD-02: store all + early-exit flag —
@@ -576,7 +592,8 @@ class CandidatePool:
 
         Returns:
             The added CandidateName on success.
-            None if Tier B gate rejected (cand.confidence < gate_threshold).
+            None if Tier B gate rejected (cand.confidence <
+            CONFIDENCE_GATE_THRESHOLD).
         """
         policy = HANDLER_POLICIES.get(handler_id)
         # Compute confidence WITHOUT parent_atom_indices (Risk 1 mitigation)
@@ -592,9 +609,13 @@ class CandidatePool:
                 handler_id, name, ratio_val, RATIO_REJECT_FLOOR,
             )
             return None
-        # Tier B gate enforcement (preserves _confidence_gate behavior)
-        if policy is not None and policy.gate_threshold is not None:
-            if cand.confidence < policy.gate_threshold:
+        # Tier B gate enforcement (preserves _confidence_gate behavior).
+        # Phase 146 SC-8: the gate threshold is read from the module-level
+        # CONFIDENCE_GATE_THRESHOLD (0.40) rather than the now-deleted
+        # policy.gate_threshold field. Tier B membership is determined by
+        # policy.tier == 'ring_b' (13 handlers: oxime/.../partial_sat).
+        if policy is not None and policy.tier == 'ring_b':
+            if cand.confidence < CONFIDENCE_GATE_THRESHOLD:
                 # Gate rejected — return None so caller falls through
                 return None
         # Set parent_atom_indices POST-HOC (Risk 1)

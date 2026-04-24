@@ -52,15 +52,24 @@ def _make_features(smiles, functional_groups=None, principal_group=None):
 
 class TestHandlerPolicy:
     def test_handler_policy_creation(self):
-        """Test 1: HandlerPolicy dataclass instantiation with defaults."""
+        """Test 1: HandlerPolicy dataclass instantiation with defaults.
+
+        Phase 146 SC-8: cascade_ratio_min, min_ratio_accept, gate_threshold
+        fields REMOVED from the dataclass. Only handler_id / tier /
+        priority / direct_return remain.
+        """
         p = HandlerPolicy(handler_id='x', tier='ring_a', priority=4)
         assert p.handler_id == 'x'
         assert p.tier == 'ring_a'
         assert p.priority == 4
-        assert p.min_ratio_accept is None
-        assert p.cascade_ratio_min is None
-        assert p.gate_threshold is None
         assert p.direct_return is False
+        # Phase 146 SC-8: the three gate fields must no longer exist on
+        # the dataclass (removed from HandlerPolicy definition).
+        from dataclasses import fields
+        field_names = {f.name for f in fields(HandlerPolicy)}
+        assert 'cascade_ratio_min' not in field_names, "SC-8: cascade_ratio_min must be removed"
+        assert 'min_ratio_accept' not in field_names, "SC-8: min_ratio_accept must be removed"
+        assert 'gate_threshold' not in field_names, "SC-8: gate_threshold must be removed"
 
     def test_handler_policies_dict_populated(self):
         """Test 2: HANDLER_POLICIES contains all expected handler IDs."""
@@ -78,49 +87,77 @@ class TestHandlerPolicy:
         missing = expected_handlers - set(HANDLER_POLICIES.keys())
         assert not missing, f"Missing handlers: {missing}"
 
-    def test_handler_policies_complex_ring_gates_match_composer(self):
-        """Test 3: complex_ring carries BOTH gates verbatim from composer.py."""
+    def test_handler_policies_complex_ring_is_tier_a(self):
+        """Test 3: complex_ring is Tier A with correct tier/priority/direct_return.
+
+        Phase 146 SC-8: cascade_ratio_min and min_ratio_accept fields removed
+        from HandlerPolicy; the 0.40/0.30 constants no longer live on the
+        policy. Their V17-soak semantics are preserved via an inline guard
+        in composer.py (selection_mode-gated). Tier A membership assertions
+        remain as the post-cleanup invariant.
+        """
         p = HANDLER_POLICIES['complex_ring']
-        assert p.cascade_ratio_min == 0.40, "composer.py:1199 _CASCADE_RATIO_MIN"
-        assert p.min_ratio_accept == 0.30, "composer.py:1323 _MIN_RATIO_ACCEPT"
         assert p.direct_return is False, "Tier A — pool decides"
         assert p.tier == 'ring_a'
+        assert p.priority == HANDLER_PRIORITY['complex_ring']
 
     @pytest.mark.parametrize("handler_id", [
         'oxime', 'hydrazone', 'isocyanate', 'isothiocyanate',
         'carbamic_acid', 'carbamate', 'urea', 'guanidine',
         'sulfoxide', 'sulfone', 'thioether', 'boronic_acid', 'partial_sat',
     ])
-    def test_handler_policies_tier_b_gates_match_composer(self, handler_id):
-        """Test 4: All 13 Tier B handlers carry gate_threshold=0.40."""
+    def test_handler_policies_tier_b_shape(self, handler_id):
+        """Test 4: All 13 Tier B handlers are direct-return with tier='ring_b'.
+
+        Phase 146 SC-8: gate_threshold field removed from HandlerPolicy; the
+        0.40 confidence-gate threshold is now enforced only via the
+        handler-internal call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
+        Per-policy assertions collapse to tier/direct_return membership.
+        """
         p = HANDLER_POLICIES[handler_id]
-        assert p.gate_threshold == 0.40, f"{handler_id}: must mirror CONFIDENCE_GATE_THRESHOLD"
-        assert p.gate_threshold == CONFIDENCE_GATE_THRESHOLD, \
-            f"{handler_id}: must equal coverage_scoring.CONFIDENCE_GATE_THRESHOLD"
+        # CONFIDENCE_GATE_THRESHOLD is unchanged (still 0.40) — retain the
+        # imported symbol reference so test coverage of the module-level
+        # constant survives the SC-8 cleanup.
+        assert CONFIDENCE_GATE_THRESHOLD == 0.40, (
+            "CONFIDENCE_GATE_THRESHOLD must remain 0.40 post-SC-8"
+        )
         assert p.direct_return is True, f"{handler_id}: Tier B is first-applicable"
         assert p.tier == 'ring_b'
 
-    def test_handler_policies_chain_priority_one(self):
-        """Test 5: chain has priority=1 (D-02 fallback; Phase 146 raises)."""
+    def test_handler_policies_chain_priority_raised_to_ring_a_equal(self):
+        """Test 5: chain policy-priority raised to 4 (ring_a-peer) per SC-5.
+
+        Phase 146 SC-5: chain becomes a first-class peer of ring_a handlers
+        in the two-tier selector. HANDLER_PRIORITY['chain']=1 is UNCHANGED
+        (so V17 select_best_candidate tiebreak stays byte-identical); only
+        the HANDLER_POLICIES-level priority is promoted to 4 for the
+        two-tier selector's ring_a-peer logic.
+        """
         p = HANDLER_POLICIES['chain']
-        assert p.priority == 1
+        assert p.priority == 4, "SC-5: chain policy-priority raised to ring_a-peer (4)"
         assert p.tier == 'chain'
         assert p.direct_return is False
-        # Gate fields must all be None (no chain gate in current composer)
-        assert p.cascade_ratio_min is None
-        assert p.min_ratio_accept is None
-        assert p.gate_threshold is None
+        # HANDLER_PRIORITY['chain'] remains 1 (V17 byte-identical invariant).
+        assert HANDLER_PRIORITY['chain'] == 1, (
+            "HANDLER_PRIORITY['chain'] must stay 1 for V17 byte-identical "
+            "select_best_candidate tiebreak"
+        )
 
     @pytest.mark.parametrize("handler_id", [
-        'complex_ring', 'heterocycle', 'benzene', 'chain', 'oxime',
+        # 'chain' intentionally EXCLUDED per Phase 146 SC-5: its policy-level
+        # priority is promoted to 4 while HANDLER_PRIORITY['chain'] remains 1.
+        'complex_ring', 'heterocycle', 'benzene', 'oxime',
         'polycyclic', 'n_oxide', 'amine', 'polyfunctional',
     ])
     def test_handler_policies_priority_pulled_from_handler_priority(self, handler_id):
-        """Test 18 (ISS-002 REGRESSION): every priority pulled from HANDLER_PRIORITY.
+        """Test 18 (ISS-002 REGRESSION): every priority pulled from HANDLER_PRIORITY
+        EXCEPT chain (intentional SC-5 divergence).
 
         Includes n_oxide, amine, polyfunctional which Plan 02 Task 2 added to
         HANDLER_PRIORITY. Proves single-source-of-truth invariant — no
-        hardcoded priority literals in HANDLER_POLICIES."""
+        hardcoded priority literals in HANDLER_POLICIES except the intentional
+        chain=4 promotion documented in Phase 146 SC-5.
+        """
         assert HANDLER_POLICIES[handler_id].priority == HANDLER_PRIORITY[handler_id]
 
     def test_handler_policies_excludes_ion_classes(self):
