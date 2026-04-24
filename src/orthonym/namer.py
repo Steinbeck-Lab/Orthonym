@@ -1153,6 +1153,12 @@ class Orthonym:
                     # helper covers fused-hetero / PAH / benzene / simple-
                     # hetero / spiro-stub / VB-stub / else->None per D-03.
                     _ring_info = _build_ring_info_for_parent_selection(features)
+                    # Phase 147: stash on features so downstream pool.add()
+                    # call sites can read it without a signature change at
+                    # every composer.py call site (transient runtime
+                    # attribute; not a MolecularFeatures dataclass field
+                    # per D-08; safe because the dataclass is not frozen).
+                    features._ring_info = _ring_info
 
                     # Pass pre-computed chain to select_parent
                     selection = select_parent(

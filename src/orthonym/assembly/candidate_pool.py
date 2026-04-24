@@ -484,18 +484,141 @@ def _filter_max_multiple_bonds(
 def _filter_lowest_locants(
     candidates: List['CandidateName'],
 ) -> List['CandidateName']:
-    """P-44.4.1.4+: lowest locants for principal groups, then heteroatoms, etc.
+    """P-44.4.1.4+: lowest locants for principal groups, then multiple bonds, then substituents.
 
-    STUB for Phase 146. Phase 147 implements via authoritative iupac_locants.
-    In Phase 146, this filter should NEVER be invoked because _has_iupac_locants
-    returns False (no candidates have iupac_locants populated). The stub returns
-    candidates unchanged so callers fall through to Tier 2.
+    Phase 147 implementation (replaces Phase 146 stub). For each candidate
+    in the pool, extracts feature-specific locant lists (PG attachment
+    positions, multiple-bond positions, substituent positions) using the
+    same atom-walk patterns as ``parent_selection.py``:
+    ``_compare_pg_locants`` / ``_compare_multiple_bond_locants`` /
+    ``_compare_substituent_locants``. Each cascade step partitions the
+    pool into winners (lowest locant set) and losers via
+    ``compare_locant_sets`` (tuple-aware per Plan 01); winners advance,
+    losers are dropped.
 
-    TODO(phase147): implement via _build_ring_pos with authoritative locants.
+    Reuses (does NOT duplicate) the canonical comparison semantics from
+    ``parent_selection.py`` — the comparators there are chain-vs-ring
+    framed and cannot be called directly on a candidate pool, but their
+    locant-extraction patterns at lines ~327-340 / 402-417 / 466-482 are
+    reused inline. Per Phase 147 BL-3 / D-04: a parallel comparison
+    engine would violate "reuse > rebuild".
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4 — P-44.4.1.12
+    Precondition: ``_has_iupac_locants(candidates)`` must return True
+    before this function is invoked (enforced at ``_best_two_tier``
+    step-6 dispatch). Defensive fall-through: if any candidate lacks
+    ``parent_atom_indices``, ``_mol_ref``, or has incomplete ring_info,
+    returns candidates unchanged (Tier-2 takes over).
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4 - P-44.4.1.12
+    Source: ``src/orthonym/rules/parent_selection.py:292-490`` (canonical
+        P-44.1(f)/(g)/(i) implementations whose locant-extraction patterns
+        are reused).
+    Source: Phase 147 CONTEXT D-02, D-06, BL-3.
     """
-    return candidates  # Identity: no filtering until Phase 147 lands
+    from orthonym.rules.parent_selection import _build_ring_pos
+    from orthonym.rules.locants import compare_locant_sets
+    from rdkit import Chem
+
+    if len(candidates) <= 1:
+        return list(candidates)
+
+    # Cascade extractor: returns (cand, pg_locants, mbond_locants, sub_locants)
+    # for one candidate. Each list is the feature-locant list on that
+    # candidate's parent. Returns None if the candidate lacks the data
+    # required for cascade comparison (defensive bail-out).
+    def _extract_locant_lists(cand):
+        if cand.parent_atom_indices is None or not cand.ring_info:
+            return None
+        mol = getattr(cand, '_mol_ref', None)
+        if mol is None:
+            return None
+        parent_set = set(cand.parent_atom_indices)
+        if not parent_set:
+            return None
+        ring_pos = _build_ring_pos(parent_set, cand.ring_info)
+        # Confirm ring_pos covers all parent atoms; if any are missing,
+        # fall through (sorted fallback already handled inside
+        # _build_ring_pos for partial coverage but the cascade requires
+        # complete authoritative numbering).
+        if any(idx not in ring_pos for idx in parent_set):
+            return None
+
+        # PG attachment locants (pattern: parent_selection.py:327-340).
+        pg_atoms_list = getattr(cand, '_principal_group_atoms', None) or []
+        pg_locants = []
+        for pg_atoms in pg_atoms_list:
+            if not pg_atoms:
+                continue
+            attachment = pg_atoms[0]
+            if attachment in parent_set:
+                pg_locants.append(ring_pos[attachment])
+            else:
+                atom = mol.GetAtomWithIdx(attachment)
+                for nbr in atom.GetNeighbors():
+                    if nbr.GetIdx() in parent_set:
+                        pg_locants.append(ring_pos[nbr.GetIdx()])
+                        break
+
+        # Multiple-bond locants on parent (pattern: parent_selection.py:402-417).
+        mbond_locants = []
+        for bond in mol.GetBonds():
+            bt = bond.GetBondType()
+            if bt != Chem.BondType.DOUBLE and bt != Chem.BondType.TRIPLE:
+                continue
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a in parent_set and b in parent_set:
+                mbond_locants.append(min(ring_pos[a], ring_pos[b]))
+
+        # Substituent locants on parent (pattern: parent_selection.py:466-482).
+        sub_locants = []
+        for idx in sorted(parent_set):
+            atom = mol.GetAtomWithIdx(idx)
+            for nbr in atom.GetNeighbors():
+                if (nbr.GetIdx() not in parent_set
+                        and nbr.GetSymbol() != 'H'):
+                    sub_locants.append(ring_pos[idx])
+                    break
+
+        return (cand, sorted(pg_locants), sorted(mbond_locants),
+                sorted(sub_locants))
+
+    extracted = []
+    for cand in candidates:
+        row = _extract_locant_lists(cand)
+        if row is None:
+            # Defensive: incomplete data on any candidate -> bail out.
+            return list(candidates)
+        extracted.append(row)
+
+    def _select_lowest(rows, locant_idx):
+        """Partition rows by lowest locant-set at the given cascade step.
+
+        rows: list of (cand, pg, mb, sub).
+        locant_idx: 1=pg, 2=mb, 3=sub.
+        """
+        best = [rows[0]]
+        best_locants = rows[0][locant_idx]
+        for row in rows[1:]:
+            cmp = compare_locant_sets(row[locant_idx], best_locants)
+            if cmp < 0:
+                best = [row]
+                best_locants = row[locant_idx]
+            elif cmp == 0:
+                best.append(row)
+            # cmp > 0: drop
+        return best
+
+    # Step 1: P-44.4.1.4 / P-44.1(f) PG locants.
+    winners = _select_lowest(extracted, 1)
+    if len(winners) == 1:
+        return [winners[0][0]]
+    # Step 2: P-44.1(g) multiple-bond locants.
+    winners = _select_lowest(winners, 2)
+    if len(winners) == 1:
+        return [winners[0][0]]
+    # Step 3: P-44.1(i) substituent locants.
+    winners = _select_lowest(winners, 3)
+    return [row[0] for row in winners]
 
 
 def _has_iupac_locants(candidates: List['CandidateName']) -> bool:
@@ -628,6 +751,20 @@ class CandidatePool:
         # NEVER passed into compute_confidence() — that would break the
         # byte-identical guarantee per Phase 146 D-19.
         cand.ring_info = ring_info
+        # Phase 147 fallback: if ring_info wasn't passed explicitly, read
+        # the transient attribute set by namer.py:_classify (allows existing
+        # composer.py call sites to flow ring_info through without a
+        # signature change at every site).
+        if cand.ring_info is None:
+            cand.ring_info = getattr(features, '_ring_info', None)
+        # Stash mol reference for _filter_lowest_locants atom walks.
+        # Transient runtime attribute; not a CandidateName field.
+        cand._mol_ref = features.mol
+        # Stash principal_group_atoms for PG-locant cascade extraction
+        # (used by Tier-1 step 6 / _filter_lowest_locants).
+        cand._principal_group_atoms = list(
+            getattr(features, 'principal_group_atoms', None) or []
+        )
         # Phase 146 CD-01: populate parent_pcg_count POST-HOC.
         # Same Risk 1 mitigation as parent_atom_indices: NEVER passed into
         # compute_confidence (would break byte-identical guarantees).
