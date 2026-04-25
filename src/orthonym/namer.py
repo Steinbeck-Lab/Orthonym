@@ -525,19 +525,27 @@ def _should_bypass_fused_guard(features, core_match):
     if non_ring_heavy <= len(core_atoms):
         return False
 
-    # Count PGs on fused ring core (directly on ring or bonded to ring atom)
+    # Count PGs on fused ring core (directly on ring or bonded to ring atom).
+    # IM-01: per-FG attachment indices via _pg_attachment_atoms — for
+    # multi-atom PGs (disulfide), an instance counts as on-ring if ANY
+    # attachment atom (or its neighbour) is in the core.
+    from .rules.parent_selection import _pg_attachment_atoms
     ring_pg = 0
     total_pg = 0
     for pg_atoms in features.principal_group_atoms:
         if not pg_atoms:
             continue
         total_pg += 1
-        attach = pg_atoms[0]
-        if attach in core_atoms:
-            ring_pg += 1
-            continue
-        atom = features.mol.GetAtomWithIdx(attach)
-        if any(nbr.GetIdx() in core_atoms for nbr in atom.GetNeighbors()):
+        on_ring = False
+        for attach in _pg_attachment_atoms(features.principal_group, pg_atoms):
+            if attach in core_atoms:
+                on_ring = True
+                break
+            atom = features.mol.GetAtomWithIdx(attach)
+            if any(nbr.GetIdx() in core_atoms for nbr in atom.GetNeighbors()):
+                on_ring = True
+                break
+        if on_ring:
             ring_pg += 1
 
     chain_pg = total_pg - ring_pg
@@ -1256,7 +1264,8 @@ class Orthonym:
                     if features.principal_group_atoms:
                         pg_on_default = is_principal_group_on_ring(
                             features.mol, default_system,
-                            features.principal_group_atoms
+                            features.principal_group_atoms,
+                            features.principal_group,
                         )
 
                     if size_ok and not pg_on_default:

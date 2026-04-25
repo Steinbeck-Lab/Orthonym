@@ -8,6 +8,31 @@ all other groups become prefixes.
 
 from typing import Optional, Tuple, List, Dict
 
+
+# IM-01 (2026-04-25): per-FG SMARTS attachment atom override.
+#
+# Most functional-group SMARTS lead with the locant-bearing atom (the C of
+# -COOH in [CX3](=O)[OX2H1]; the C of -OH in [CX4][OX2H1]). Parent-selection
+# locant comparators historically used SMARTS-match index 0 as the canonical
+# attachment for that FG instance.
+#
+# For PGs whose SMARTS leads with a flanking (non-locant-bearing) atom, this
+# heuristic is wrong. The motivating case is ``disulfide`` (``[#6][SX2][SX2][#6]``):
+# atom 0 is a flanking carbon, but IUPAC P-31.1.4 says the locant set for a
+# multi-atom PG uses the heteroatoms (S, S). When a disulfide lives in a ring,
+# using the flanking C's locant produces a wrong ring-vs-chain decision in
+# the P-44.1(f) cascade, silently dropping the ring sulfurs from the name.
+#
+# Each entry maps FG name -> list of SMARTS-match indices to use as
+# locant-bearing atoms. When the helper sees multiple indices, downstream
+# comparators take ``min(locants)`` to match P-31.1.4. Default for any FG
+# not present is ``[0]`` (preserves existing behaviour).
+#
+# Source: 
+PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
+    "disulfide": [1, 2],  # [#6][SX2][SX2][#6] -- the two S sulfurs
+}
+
 # Functional group seniority order (highest priority first)
 # Groups in this list can be expressed as suffixes when principal
 SENIORITY_ORDER = [

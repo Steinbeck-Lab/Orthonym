@@ -29,8 +29,49 @@ from ..perception.chains import find_longest_skeletal_chain
 from ..perception.natural_products import detect_natural_product
 from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
+from .seniority import PG_ATTACHMENT_INDICES
 
 logger = logging.getLogger(__name__)
+
+
+def _pg_attachment_atoms(
+    fg_name: Optional[str], pg_atoms: Tuple[int, ...]
+) -> List[int]:
+    """Return molecular atom indices that bear the IUPAC locant for ``fg_name``.
+
+    Most FG SMARTS lead with the locant-bearing atom (e.g. the C of -COOH in
+    ``[CX3](=O)[OX2H1]``). For those, this returns ``[pg_atoms[0]]``.
+
+    Some FG SMARTS lead with a flanking atom; ``PG_ATTACHMENT_INDICES``
+    overrides the SMARTS atom indices to use. The motivating case is
+    ``disulfide`` (SMARTS ``[#6][SX2][SX2][#6]``): atom 0 is a flanking C,
+    but IUPAC P-31.1.4 says the locant set uses the heteroatoms (S, S);
+    ``PG_ATTACHMENT_INDICES["disulfide"] = [1, 2]`` restores correct
+    behaviour. Downstream comparators take ``min(locants)`` over the
+    returned atoms when the FG spans multiple positions.
+
+    Args:
+        fg_name: Functional group name from SENIORITY_ORDER. ``None`` is
+                 treated as default (back-compat for callers that don't
+                 thread the name through).
+        pg_atoms: SMARTS-match tuple of molecular atom indices.
+
+    Returns:
+        List of molecular atom indices (always non-empty for a valid
+        ``pg_atoms``). Order is the SMARTS-index order from the override.
+
+    Source: IM-01 fix; agent-5-regression-class.md root cause analysis.
+    """
+    if not pg_atoms:
+        return []
+    indices = PG_ATTACHMENT_INDICES.get(fg_name) if fg_name else None
+    if indices is None:
+        return [pg_atoms[0]]
+    # Filter out any indices that exceed the SMARTS match length (defensive
+    # against malformed SMARTS / future overrides). At minimum return atom 0
+    # so the comparator never sees an empty locant set for a present PG.
+    out = [pg_atoms[i] for i in indices if i < len(pg_atoms)]
+    return out if out else [pg_atoms[0]]
 
 
 def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
@@ -126,7 +167,8 @@ class ParentSelectionResult:
 def is_principal_group_on_ring(
     mol,
     ring_atoms: Set[int],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    principal_group: Optional[str] = None,
 ) -> bool:
     """
     Check if the principal functional group is directly attached to the ring.
@@ -142,6 +184,8 @@ def is_principal_group_on_ring(
         mol: RDKit Mol object
         ring_atoms: Set of atom indices in the ring
         principal_group_atoms: List of tuples, each tuple is a SMARTS match
+        principal_group: Optional FG name; when provided, attachment lookup
+                         honours ``PG_ATTACHMENT_INDICES`` (IM-01).
 
     Returns:
         True if principal group is directly attached to ring
@@ -155,21 +199,20 @@ def is_principal_group_on_ring(
         if not pg_atoms:
             continue
 
-        # The attachment point is typically the first atom in SMARTS match
-        # For [CX3](=O)[OX2H1] (carboxylic acid): atom 0 is carbonyl C
-        # For [CX4][OX2H1] (alcohol): atom 0 is C bearing OH
-        attachment_atom = pg_atoms[0]
-
-        # Self-check: attachment atom itself may be a ring atom
-        # (mirrors is_principal_group_on_chain which has this at L132)
-        if attachment_atom in ring_atoms_set:
-            return True
-
-        # Check if attachment atom is directly bonded to a ring atom
-        atom = mol.GetAtomWithIdx(attachment_atom)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() in ring_atoms_set:
+        # IM-01: per-FG attachment indices instead of literal pg_atoms[0].
+        # For most FGs returns [pg_atoms[0]]; for ``disulfide`` returns
+        # the two S atoms so a ring-bound S-S is correctly recognised as
+        # "on ring" via the heteroatoms, not a flanking carbon.
+        for attachment_atom in _pg_attachment_atoms(principal_group, pg_atoms):
+            # Self-check: attachment atom itself may be a ring atom
+            if attachment_atom in ring_atoms_set:
                 return True
+
+            # Check if attachment atom is directly bonded to a ring atom
+            atom = mol.GetAtomWithIdx(attachment_atom)
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in ring_atoms_set:
+                    return True
 
     return False
 
@@ -177,7 +220,8 @@ def is_principal_group_on_ring(
 def is_principal_group_on_chain(
     mol,
     chain_atoms: List[int],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    principal_group: Optional[str] = None,
 ) -> bool:
     """
     Check if the principal functional group is on the chain.
@@ -189,6 +233,8 @@ def is_principal_group_on_chain(
         mol: RDKit Mol object
         chain_atoms: List of atom indices in the principal chain
         principal_group_atoms: List of tuples, each tuple is a SMARTS match
+        principal_group: Optional FG name; when provided, attachment lookup
+                         honours ``PG_ATTACHMENT_INDICES`` (IM-01).
 
     Returns:
         True if principal group is on the chain
@@ -202,22 +248,19 @@ def is_principal_group_on_chain(
         if not pg_atoms:
             continue
 
-        # The attachment point is typically the first atom in SMARTS match
-        # For [CX3](=O)[OX2H1] (carboxylic acid): atom 0 is carbonyl C
-        # For [CX4][OX2H1] (alcohol): atom 0 is C bearing OH
-        attachment_atom = pg_atoms[0]
-
-        # Check if attachment atom is in the chain
-        if attachment_atom in chain_set:
-            return True
-
-        # Also check if attachment atom is bonded to chain
-        # (for cases where FG is terminal, e.g., -CH2-COOH)
-        atom = mol.GetAtomWithIdx(attachment_atom)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() in chain_set:
-                # The attachment point is bonded to chain
+        # IM-01: per-FG attachment indices (see _pg_attachment_atoms docstring).
+        for attachment_atom in _pg_attachment_atoms(principal_group, pg_atoms):
+            # Check if attachment atom is in the chain
+            if attachment_atom in chain_set:
                 return True
+
+            # Also check if attachment atom is bonded to chain
+            # (for cases where FG is terminal, e.g., -CH2-COOH)
+            atom = mol.GetAtomWithIdx(attachment_atom)
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in chain_set:
+                    # The attachment point is bonded to chain
+                    return True
 
     return False
 
@@ -324,7 +367,8 @@ def _compare_double_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
 def _compare_pg_locants(
     mol, chain: List[int], ring_set: Set[int],
     principal_group_atoms: List[tuple],
-    ring_info: dict = None
+    ring_info: dict = None,
+    principal_group: Optional[str] = None,
 ) -> int:
     """P-44.1(f): Lowest locants for principal groups.
 
@@ -337,12 +381,19 @@ def _compare_pg_locants(
     - Ring: IUPAC ring numbering when available (via ring_info), otherwise
       sorted atom indices mapped to 1-indexed positions as fallback.
 
+    For multi-atom PGs (e.g. ``disulfide`` whose locant atoms are two
+    sulfurs), the per-instance locant is ``min`` over the FG's attachment
+    atoms, matching IUPAC P-31.1.4 ("lowest locant rule applies to the PG
+    as a set of attachments"). See ``_pg_attachment_atoms``.
+
     Args:
         mol: RDKit Mol object
         chain: Ordered list of atom indices forming the principal chain
         ring_set: Set of atom indices in the ring system
         principal_group_atoms: List of tuples of atom indices from SMARTS matches
         ring_info: Optional dict with 'iupac_locants' for IUPAC ring numbering
+        principal_group: Optional FG name; when provided, attachment lookup
+                         honours ``PG_ATTACHMENT_INDICES`` (IM-01).
 
     Returns:
         1 if chain has lower PG locants (chain wins)
@@ -355,35 +406,46 @@ def _compare_pg_locants(
     chain_pos = {atom_idx: i + 1 for i, atom_idx in enumerate(chain)}
     ring_pos = _build_ring_pos(ring_set, ring_info=ring_info)
 
+    def _instance_locant(attachments: List[int], pos_map: dict, scaffold_set):
+        """Lowest locant over FG attachment atoms reaching ``scaffold_set``.
+
+        For each attachment atom: if the atom itself is in the scaffold
+        (chain or ring), the locant is ``pos_map[atom]``. Else if it has
+        a neighbour in the scaffold, take that neighbour's locant. Returns
+        the ``min`` over all attachments that hit, or ``None`` if none do.
+        """
+        candidates = []
+        for attachment in attachments:
+            if attachment in scaffold_set:
+                candidates.append(pos_map[attachment])
+                continue
+            atom = mol.GetAtomWithIdx(attachment)
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in scaffold_set:
+                    candidates.append(pos_map[nbr.GetIdx()])
+                    break
+        return min(candidates) if candidates else None
+
     # Get PG locants on chain (1-indexed IUPAC locants)
     chain_pg_locants = []
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
-        attachment = pg_atoms[0]
-        if attachment in chain_set:
-            chain_pg_locants.append(chain_pos[attachment])
-        else:
-            atom = mol.GetAtomWithIdx(attachment)
-            for nbr in atom.GetNeighbors():
-                if nbr.GetIdx() in chain_set:
-                    chain_pg_locants.append(chain_pos[nbr.GetIdx()])
-                    break
+        # IM-01: per-FG attachment indices, then min over attachments.
+        attachments = _pg_attachment_atoms(principal_group, pg_atoms)
+        loc = _instance_locant(attachments, chain_pos, chain_set)
+        if loc is not None:
+            chain_pg_locants.append(loc)
 
     # Get PG locants on ring (1-indexed positional proxy)
     ring_pg_locants = []
     for pg_atoms in principal_group_atoms:
         if not pg_atoms:
             continue
-        attachment = pg_atoms[0]
-        if attachment in ring_set:
-            ring_pg_locants.append(ring_pos[attachment])
-        else:
-            atom = mol.GetAtomWithIdx(attachment)
-            for nbr in atom.GetNeighbors():
-                if nbr.GetIdx() in ring_set:
-                    ring_pg_locants.append(ring_pos[nbr.GetIdx()])
-                    break
+        attachments = _pg_attachment_atoms(principal_group, pg_atoms)
+        loc = _instance_locant(attachments, ring_pos, ring_set)
+        if loc is not None:
+            ring_pg_locants.append(loc)
 
     if not chain_pg_locants and not ring_pg_locants:
         return 0
@@ -627,7 +689,7 @@ def select_parent(
     np_info = detect_natural_product(mol)
     if np_info is not None:
         best_ring, other_rings = _select_best_ring_system(
-            mol, ring_systems, principal_group_atoms
+            mol, ring_systems, principal_group_atoms, principal_group
         )
         other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
         return ParentSelectionResult(
@@ -662,8 +724,12 @@ def select_parent(
             )
 
     # Check where principal group is located
-    pg_on_ring = is_principal_group_on_ring(mol, all_ring_atoms, principal_group_atoms)
-    pg_on_chain = is_principal_group_on_chain(mol, principal_chain, principal_group_atoms)
+    pg_on_ring = is_principal_group_on_ring(
+        mol, all_ring_atoms, principal_group_atoms, principal_group
+    )
+    pg_on_chain = is_principal_group_on_chain(
+        mol, principal_chain, principal_group_atoms, principal_group
+    )
 
     # Decision logic per IUPAC P-44.1
 
@@ -679,7 +745,7 @@ def select_parent(
     # P-44.1(a): PG on ring only -> ring is parent
     if pg_on_ring and not pg_on_chain:
         best_ring, other_rings = _select_best_ring_system(
-            mol, ring_systems, principal_group_atoms
+            mol, ring_systems, principal_group_atoms, principal_group
         )
         other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
         return ParentSelectionResult(
@@ -691,8 +757,12 @@ def select_parent(
 
     if pg_on_ring and pg_on_chain:
         # P-44.1(b): Compare PG count on ring vs chain
-        pg_count_on_ring = _count_pg_on_ring(mol, all_ring_atoms, principal_group_atoms)
-        pg_count_on_chain = _count_pg_on_chain(mol, principal_chain, principal_group_atoms)
+        pg_count_on_ring = _count_pg_on_ring(
+            mol, all_ring_atoms, principal_group_atoms, principal_group
+        )
+        pg_count_on_chain = _count_pg_on_chain(
+            mol, principal_chain, principal_group_atoms, principal_group
+        )
 
         if pg_count_on_chain > pg_count_on_ring:
             # P-44.1(b): Chain has more PGs -> chain wins
@@ -705,7 +775,7 @@ def select_parent(
         elif pg_count_on_ring > pg_count_on_chain:
             # P-44.1(b): Ring has more PGs -> ring wins
             best_ring, other_rings = _select_best_ring_system(
-                mol, ring_systems, principal_group_atoms
+                mol, ring_systems, principal_group_atoms, principal_group
             )
             other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
             return ParentSelectionResult(
@@ -717,7 +787,7 @@ def select_parent(
 
         # PG counts tied -> apply P-44.1 cascade criteria (c) through (i)
         best_ring, other_rings = _select_best_ring_system(
-            mol, ring_systems, principal_group_atoms
+            mol, ring_systems, principal_group_atoms, principal_group
         )
         # P-44.3(a): Use total ring system atom count for ring-vs-chain comparison
         ring_size = len(best_ring)
@@ -734,7 +804,9 @@ def select_parent(
         if (skeletal_chain
                 and len(skeletal_chain) > len(principal_chain)
                 and principal_group_atoms
-                and is_principal_group_on_chain(mol, skeletal_chain, principal_group_atoms)
+                and is_principal_group_on_chain(
+                    mol, skeletal_chain, principal_group_atoms, principal_group
+                )
                 and _has_bridging_heteroatom(mol, skeletal_chain)):
             candidate_chain = skeletal_chain
             logger.debug(
@@ -754,7 +826,8 @@ def select_parent(
         if cascade_result == 0:
             cascade_result = _compare_pg_locants(
                 mol, candidate_chain, best_ring, principal_group_atoms,
-                ring_info=ring_info)                                              # P-44.1(f)
+                ring_info=ring_info,
+                principal_group=principal_group)                                  # P-44.1(f)
         if cascade_result == 0:
             cascade_result = _compare_multiple_bond_locants(
                 mol, candidate_chain, best_ring,
@@ -807,12 +880,16 @@ def select_parent(
 def _count_pg_on_ring(
     mol,
     ring_atoms: Set[int],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    principal_group: Optional[str] = None,
 ) -> int:
     """Count how many distinct principal group instances are on the ring.
 
     PSEL-01: Deduplicates by match tuple to avoid counting the same
     physical FG instance multiple times from overlapping SMARTS matches.
+
+    IM-01: Multi-atom PGs (e.g. disulfide) count as ON the ring when ANY
+    attachment atom (or its neighbour) is in the ring.
     """
     seen_matches = set()
     count = 0
@@ -823,16 +900,19 @@ def _count_pg_on_ring(
         if key in seen_matches:
             continue
         seen_matches.add(key)
-        attachment = pg_atoms[0]
-        # Self-check: attachment atom itself may be a ring atom
-        # (mirrors _count_pg_on_chain which has this at L768)
-        if attachment in ring_atoms:
-            count += 1
-            continue
-        atom = mol.GetAtomWithIdx(attachment)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() in ring_atoms:
+        for attachment in _pg_attachment_atoms(principal_group, pg_atoms):
+            # Self-check: attachment atom itself may be a ring atom
+            if attachment in ring_atoms:
                 count += 1
+                break
+            atom = mol.GetAtomWithIdx(attachment)
+            hit = False
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in ring_atoms:
+                    count += 1
+                    hit = True
+                    break
+            if hit:
                 break
     return count
 
@@ -840,12 +920,16 @@ def _count_pg_on_ring(
 def _count_pg_on_chain(
     mol,
     chain_atoms: List[int],
-    principal_group_atoms: List[tuple]
+    principal_group_atoms: List[tuple],
+    principal_group: Optional[str] = None,
 ) -> int:
     """Count how many distinct principal group instances are on the chain.
 
     PSEL-01: Deduplicates by match tuple to avoid counting the same
     physical FG instance multiple times from overlapping SMARTS matches.
+
+    IM-01: Multi-atom PGs (e.g. disulfide) count as ON the chain when ANY
+    attachment atom (or its neighbour) is in the chain.
     """
     chain_set = set(chain_atoms)
     seen_matches = set()
@@ -857,14 +941,18 @@ def _count_pg_on_chain(
         if key in seen_matches:
             continue
         seen_matches.add(key)
-        attachment = pg_atoms[0]
-        if attachment in chain_set:
-            count += 1
-            continue
-        atom = mol.GetAtomWithIdx(attachment)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() in chain_set:
+        for attachment in _pg_attachment_atoms(principal_group, pg_atoms):
+            if attachment in chain_set:
                 count += 1
+                break
+            atom = mol.GetAtomWithIdx(attachment)
+            hit = False
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetIdx() in chain_set:
+                    count += 1
+                    hit = True
+                    break
+            if hit:
                 break
     return count
 
@@ -872,7 +960,8 @@ def _count_pg_on_chain(
 def _select_best_ring_system(
     mol,
     ring_systems: List[set],
-    principal_group_atoms: Optional[List[tuple]] = None
+    principal_group_atoms: Optional[List[tuple]] = None,
+    principal_group: Optional[str] = None,
 ) -> Tuple[set, List[set]]:
     """Select the most senior ring system from multiple candidates.
 
@@ -887,6 +976,8 @@ def _select_best_ring_system(
         mol: RDKit Mol object
         ring_systems: List of sets of atom indices for each ring system
         principal_group_atoms: Optional list of FG atom tuples for tiebreaking
+        principal_group: Optional FG name; when provided, attachment lookup
+                         honours ``PG_ATTACHMENT_INDICES`` (IM-01).
 
     Returns:
         Tuple of (best_ring_system_atoms, other_ring_systems)
@@ -908,17 +999,21 @@ def _select_best_ring_system(
             for pg_atoms in principal_group_atoms:
                 if not pg_atoms:
                     continue
-                attachment = pg_atoms[0]
-                # Direct: PG atom itself is a ring atom (e.g., ring ketone C=O where C is in ring)
-                if attachment in system:
-                    pg_attachments += 2
-                    continue
-                # Adjacent: PG atom bonded to a ring atom (e.g., -COOH where C(=O) is bonded to ring C)
-                atom = mol.GetAtomWithIdx(attachment)
-                for neighbor in atom.GetNeighbors():
-                    if neighbor.GetIdx() in system:
-                        pg_attachments += 1
-                        break
+                # IM-01: weight per FG instance is the MAX over its
+                # attachment atoms (direct=2, adjacent=1, neither=0).
+                instance_weight = 0
+                for attachment in _pg_attachment_atoms(
+                    principal_group, pg_atoms
+                ):
+                    if attachment in system:
+                        instance_weight = max(instance_weight, 2)
+                        continue
+                    atom = mol.GetAtomWithIdx(attachment)
+                    for neighbor in atom.GetNeighbors():
+                        if neighbor.GetIdx() in system:
+                            instance_weight = max(instance_weight, 1)
+                            break
+                pg_attachments += instance_weight
 
         # Append negative pg_attachments so min() prefers more attachments
         scored.append((score, -pg_attachments, i))

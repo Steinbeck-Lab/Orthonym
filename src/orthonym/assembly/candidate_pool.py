@@ -515,7 +515,9 @@ def _filter_lowest_locants(
         are reused).
     Source: Phase 147 CONTEXT D-02, D-06, BL-3.
     """
-    from orthonym.rules.parent_selection import _build_ring_pos
+    from orthonym.rules.parent_selection import (
+        _build_ring_pos, _pg_attachment_atoms,
+    )
     from orthonym.rules.locants import compare_locant_sets
     from rdkit import Chem
 
@@ -544,20 +546,28 @@ def _filter_lowest_locants(
             return None
 
         # PG attachment locants (pattern: parent_selection.py:327-340).
+        # IM-01: per-FG attachment indices via _pg_attachment_atoms; for
+        # multi-atom PGs (disulfide), the per-instance locant is min over
+        # the FG's attachment atoms (matches IUPAC P-31.1.4).
         pg_atoms_list = getattr(cand, '_principal_group_atoms', None) or []
+        fg_name = getattr(cand, '_principal_group', None)
         pg_locants = []
         for pg_atoms in pg_atoms_list:
             if not pg_atoms:
                 continue
-            attachment = pg_atoms[0]
-            if attachment in parent_set:
-                pg_locants.append(ring_pos[attachment])
-            else:
+            attachments = _pg_attachment_atoms(fg_name, pg_atoms)
+            instance_locants = []
+            for attachment in attachments:
+                if attachment in parent_set:
+                    instance_locants.append(ring_pos[attachment])
+                    continue
                 atom = mol.GetAtomWithIdx(attachment)
                 for nbr in atom.GetNeighbors():
                     if nbr.GetIdx() in parent_set:
-                        pg_locants.append(ring_pos[nbr.GetIdx()])
+                        instance_locants.append(ring_pos[nbr.GetIdx()])
                         break
+            if instance_locants:
+                pg_locants.append(min(instance_locants))
 
         # Multiple-bond locants on parent (pattern: parent_selection.py:402-417).
         mbond_locants = []
@@ -765,6 +775,11 @@ class CandidatePool:
         cand._principal_group_atoms = list(
             getattr(features, 'principal_group_atoms', None) or []
         )
+        # IM-01: stash FG name so the cascade can route through
+        # ``_pg_attachment_atoms`` (per-FG attachment override). Without
+        # this the disulfide bug (flanking-C as attachment) would persist
+        # in the candidate-pool path even after parent_selection.py is fixed.
+        cand._principal_group = getattr(features, 'principal_group', None)
         # Phase 146 CD-01: populate parent_pcg_count POST-HOC.
         # Same Risk 1 mitigation as parent_atom_indices: NEVER passed into
         # compute_confidence (would break byte-identical guarantees).
