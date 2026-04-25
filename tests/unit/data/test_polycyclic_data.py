@@ -438,3 +438,77 @@ class TestIupacNumberingCorrectness:
                     f"{name}: iupac_numbering has {len(numbering)} entries "
                     f"but num_atoms is {data['num_atoms']}"
                 )
+
+
+# ============================================================================
+# Phase 147 CD-04 Drift Parity Test
+# ============================================================================
+
+@pytest.mark.parametrize("pah_name", [
+    "naphthalene", "anthracene", "phenanthrene", "pyrene",
+])
+def test_iupac_numbering_matches_canonical(pah_name):
+    """Phase 147 CD-04 defensive drift test for the 4 populated PAHs.
+
+    Each populated PAH entry's hardcoded ``iupac_numbering`` mapping
+    (canonical atom index -> IUPAC locant) is parsed by the live
+    ``get_polycyclic_iupac_locants(mol, name)`` wrapper. On the canonical
+    molecule, ``mol.GetSubstructMatch(canonical_mol)`` is the identity
+    permutation, so the wrapper's returned dict keys ARE canonical atom
+    indices. Each value must equal the stored ``iupac_numbering`` value
+    after string '4a' -> tuple (4, 'a') normalization (Phase 147 D-01).
+
+    Catches the latent failure mode: a future RDKit version reorders
+    canonical atom indices for one of the 4 populated PAH canonical_smiles,
+    silently breaking the hardcoded mapping while leaving every other test
+    green. By comparing wrapper output to stored data on the canonical mol
+    itself, this test fails LOUDLY the moment that drift occurs.
+
+    Source: Phase 147 CONTEXT CD-04 (RDKit canonical-drift guard).
+    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25 (PAH numbering FIXED).
+    Source: Phase 147 D-01 (string fusion locant -> (int, str) tuple at boundary).
+    """
+    import re
+    from orthonym.data.polycyclic_data import POLYCYCLIC_DATA
+    from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
+
+    entry = POLYCYCLIC_DATA[pah_name]
+    mol = Chem.MolFromSmiles(entry['canonical_smiles'])
+    assert mol is not None, f"Invalid canonical_smiles for {pah_name}"
+
+    result = get_polycyclic_iupac_locants(mol, pah_name)
+    assert result is not None, (
+        f"get_polycyclic_iupac_locants returned None for {pah_name} on its "
+        f"own canonical SMILES — substructure match likely failed."
+    )
+
+    stored = entry['iupac_numbering']
+    assert len(result) == len(stored), (
+        f"{pah_name}: result has {len(result)} entries, stored has "
+        f"{len(stored)}"
+    )
+
+    locant_re = re.compile(r'^(\d+)([a-z]*)$')
+    for canonical_idx, stored_locant in stored.items():
+        # On the canonical mol, GetSubstructMatch is identity, so the
+        # wrapper's result keys ARE canonical indices.
+        got = result[canonical_idx]
+        if isinstance(stored_locant, int):
+            assert got == stored_locant, (
+                f"{pah_name}: canonical idx {canonical_idx}: "
+                f"wrapper returned {got}, stored {stored_locant}"
+            )
+        else:
+            # Stored is a string like '4a'; wrapper returns tuple (4, 'a').
+            m = locant_re.match(stored_locant)
+            assert m is not None, (
+                f"{pah_name}: malformed stored locant {stored_locant!r}"
+            )
+            base = int(m.group(1))
+            suffix = m.group(2)
+            expected = (base, suffix) if suffix else base
+            assert got == expected, (
+                f"{pah_name}: canonical idx {canonical_idx}: "
+                f"wrapper returned {got}, stored {stored_locant!r} "
+                f"(expected {expected})"
+            )
