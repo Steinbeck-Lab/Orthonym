@@ -47,6 +47,7 @@ FAILURE MODES (RESEARCH §4.4 -- all return 0.5 no-decision):
     - candidate.parent_atom_indices is None (handler didn't report)
 """
 
+import glob
 import logging
 import re
 import subprocess
@@ -60,16 +61,28 @@ from ..assembly.coverage_scoring import CandidateName
 
 logger = logging.getLogger(__name__)
 
-# OPSIN jar lives at repo root. Resolve from this module's path:
-# src/orthonym/rules/parent_correctness.py
-#   -> .parent (src/orthonym/rules/)
-#   -> .parent (src/orthonym/)
-#   -> .parent (src/)
-#   -> .parent (repo root)
-OPSIN_JAR = (
-    Path(__file__).parent.parent.parent.parent
-    / "opsin-cli-2.9.0-jar-with-dependencies.jar"
-)
+# OPSIN jar lives at repo root. Resolve via glob so any version
+# (e.g., opsin-cli-2.9.0..., opsin-cli-2.10.0...) is picked up.
+# IM-07: previously hardcoded to 2.9.0, breaking when a newer JAR
+# replaced it. Pattern matches validation/atom_coverage.py:62.
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
+
+def _resolve_opsin_jar() -> Path:
+    """Return path to the first matching OPSIN CLI JAR at repo root.
+
+    Falls back to the canonical 2.9.0 filename if no match is found, so
+    the FileNotFoundError raised by ``_opsin_to_smi`` (caught at line 122)
+    still names a meaningful path in logs.
+    """
+    candidates = sorted(glob.glob(
+        str(_REPO_ROOT / "opsin-cli-*-jar-with-dependencies.jar")
+    ))
+    if candidates:
+        # Prefer highest-versioned (sort by name, take last).
+        return Path(candidates[-1])
+    return _REPO_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
+
+OPSIN_JAR = _resolve_opsin_jar()
 
 # Match Phase 145 D-09 / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT (CD-05)
 OPSIN_TIMEOUT: float = 10.0
