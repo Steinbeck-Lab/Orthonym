@@ -233,7 +233,7 @@ def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
 
 
 def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[int, int]:
-    """
+    r"""
     Map PAH atom indices to IUPAC position numbers.
 
     For naphthalene, IUPAC numbering is:
