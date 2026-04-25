@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 from rdkit import Chem
 
+from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
+
 from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority, get_hw_prefix
 from ..data.hw_stems import get_hw_stem
 from ..data.retained_names import get_retained_name
@@ -423,33 +425,6 @@ def _get_other_heteroatom_locants(
             locants.append(pos_map[atom_idx])
 
     return sorted(locants)
-
-
-def _compare_locant_sets(set_a: List[int], set_b: List[int]) -> int:
-    """
-    Compare two locant sets using first-point-of-difference rule.
-
-    Returns:
-        -1 if set_a is preferred (lower at first difference)
-         0 if sets are equal
-         1 if set_b is preferred
-    """
-    a_sorted = sorted(set_a)
-    b_sorted = sorted(set_b)
-
-    for a, b in zip(a_sorted, b_sorted):
-        if a < b:
-            return -1
-        if a > b:
-            return 1
-
-    # All compared elements equal - shorter set wins
-    if len(a_sorted) < len(b_sorted):
-        return -1
-    if len(a_sorted) > len(b_sorted):
-        return 1
-
-    return 0
 
 
 # ---------------------------------------------------------------------------

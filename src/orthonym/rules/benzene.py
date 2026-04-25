@@ -21,6 +21,7 @@ from typing import Dict, List, Tuple, Optional, Set
 from collections import defaultdict, deque
 from rdkit import Chem
 
+from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
 from ..assembly.naming_utils import (
     get_alkyl_name,
     get_multiplier_prefix,
@@ -1509,27 +1510,6 @@ def _calculate_locants(
             locants.append(i + 1)  # Locants are 1-indexed
 
     return sorted(locants)
-
-
-def _compare_locant_sets(a: List[int], b: List[int]) -> int:
-    """
-    Compare two locant sets using first-point-of-difference.
-
-    Returns:
-        < 0 if a is preferred (lower)
-        > 0 if b is preferred
-        0 if equal
-    """
-    for i in range(max(len(a), len(b))):
-        val_a = a[i] if i < len(a) else float('inf')
-        val_b = b[i] if i < len(b) else float('inf')
-
-        if val_a < val_b:
-            return -1
-        if val_a > val_b:
-            return 1
-
-    return 0
 
 
 def name_substituted_benzene(

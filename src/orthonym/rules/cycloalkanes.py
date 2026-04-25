@@ -19,6 +19,7 @@ from collections import defaultdict, deque
 from rdkit import Chem
 
 from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name as _canonical_get_alkyl_name
+from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
 
 
 
@@ -455,27 +456,6 @@ def _build_oriented_ring(
         oriented.append(ring_list[idx])
 
     return oriented
-
-
-def _compare_locant_sets(a: List[int], b: List[int]) -> int:
-    """
-    Compare two locant sets using first-point-of-difference.
-
-    Returns:
-        < 0 if a is preferred (lower)
-        > 0 if b is preferred
-        0 if equal
-    """
-    for i in range(max(len(a), len(b))):
-        val_a = a[i] if i < len(a) else float('inf')
-        val_b = b[i] if i < len(b) else float('inf')
-
-        if val_a < val_b:
-            return -1
-        if val_a > val_b:
-            return 1
-
-    return 0
 
 
 def _get_alkyl_name(carbon_count: int) -> Optional[str]:

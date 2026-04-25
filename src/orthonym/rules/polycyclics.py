@@ -34,6 +34,7 @@ from typing import Dict, List, Optional, Tuple, Set, Any
 from collections import defaultdict, deque
 from rdkit import Chem
 
+from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
 from ..data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
@@ -511,27 +512,6 @@ def _build_peripheral_order(
             break
 
     return order
-
-
-def _compare_locant_sets(a: List[int], b: List[int]) -> int:
-    """
-    Compare two locant sets using first-point-of-difference.
-
-    Returns:
-        < 0 if a is preferred (lower)
-        > 0 if b is preferred
-        0 if equal
-    """
-    for i in range(max(len(a), len(b))):
-        val_a = a[i] if i < len(a) else float('inf')
-        val_b = b[i] if i < len(b) else float('inf')
-
-        if val_a < val_b:
-            return -1
-        if val_a > val_b:
-            return 1
-
-    return 0
 
 
 def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Optional[Dict]:
