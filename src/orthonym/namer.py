@@ -500,66 +500,6 @@ def _build_ring_info_for_parent_selection(features):
     return None
 
 
-def _should_bypass_fused_guard(features, core_match):
-    """Check if chain should be parent despite fused heterocycle presence.
-
-    Per IUPAC P-44.1.1: chain wins when it has STRICTLY MORE principal
-    characteristic groups than the fused ring system.
-    Per IUPAC P-52.2.8: ring wins when PG counts are equal.
-
-    Only applies when the matched fused core is the dominant ring system.
-    Molecules with substantial additional ring systems beyond the matched
-    core are too complex for simple chain-as-parent bypass.
-
-    Returns True to bypass (chain should be parent), False to keep guard.
-    """
-    if not features.principal_group or not features.principal_group_atoms:
-        return False  # No PG -> ring is parent (P-44.1.2.2)
-
-    core_atoms = set(core_match[1].keys())  # Mol atom indices in fused core
-
-    # Guard 1: if molecule has substantial ring structure beyond the matched
-    # core, it's a complex polycyclic — don't bypass the fused guard.
-    all_ring_atoms = set()
-    for ring in features.mol.GetRingInfo().AtomRings():
-        all_ring_atoms.update(ring)
-    extra_ring_atoms = len(all_ring_atoms - core_atoms)
-    if extra_ring_atoms > 4:
-        return False
-
-    # Guard 2: chain must be longer than ring core (P-52.2.8 ring preference
-    # for equal size). Non-ring heavy atoms must exceed core atom count.
-    non_ring_heavy = features.mol.GetNumHeavyAtoms() - len(all_ring_atoms)
-    if non_ring_heavy <= len(core_atoms):
-        return False
-
-    # Count PGs on fused ring core (directly on ring or bonded to ring atom).
-    # IM-01: per-FG attachment indices via _pg_attachment_atoms — for
-    # multi-atom PGs (disulfide), an instance counts as on-ring if ANY
-    # attachment atom (or its neighbour) is in the core.
-    from .rules.parent_selection import _pg_attachment_atoms
-    ring_pg = 0
-    total_pg = 0
-    for pg_atoms in features.principal_group_atoms:
-        if not pg_atoms:
-            continue
-        total_pg += 1
-        on_ring = False
-        for attach in _pg_attachment_atoms(features.principal_group, pg_atoms):
-            if attach in core_atoms:
-                on_ring = True
-                break
-            atom = features.mol.GetAtomWithIdx(attach)
-            if any(nbr.GetIdx() in core_atoms for nbr in atom.GetNeighbors()):
-                on_ring = True
-                break
-        if on_ring:
-            ring_pg += 1
-
-    chain_pg = total_pg - ring_pg
-    return chain_pg > ring_pg  # STRICT inequality per P-52.2.8
-
-
 # Confidence threshold below which the quality gate rejects a name as
 # truncated/incomplete and falls back to decomposition naming.
 # Calibrated against 500-compound ChEBI benchmark: 0.30 catches
@@ -1120,77 +1060,60 @@ class Orthonym:
                 features.functional_groups, features.principal_group
             )
 
-        # Parent selection for molecules with ring AND functionalized chain (IUPAC P-44.1)
-        # This must happen BEFORE ring classification to potentially redirect to chain naming
-        # EXCEPTION: Skip parent selection for known fused heterocycles (indole, quinoline, etc.)
-        # UNLESS chain has strictly more principal groups than ring (P-44.1.1 override)
-        # P-44.1.2.2: Ring vs chain comparison applies to ALL molecules,
-        # including hydrocarbons. select_parent() handles no-PG case.
+        # Parent selection for ALL cyclic molecules (Phase 148: no fused-heterocycle bypass).
+        # P-44.1 cascade runs whenever a meaningful chain exists; cascade itself
+        # enforces P-31.1.3.4 NP override (parent_selection.py:688-700) and
+        # P-52.2.8 ring-on-tie tiebreaker (parent_selection.py:862-869).
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html  P-44.1
+        # Source: https://iupac.qmul.ac.uk/BlueBook/P5.html  P-52.2.8
+        # Source: HERITAGE 1990 §4 (full seniority cascade on ALL structures).
         if features.is_cyclic:
             from .rules.parent_selection import select_parent
-            from .rules.fused_rings import classify_fused_system
-            from .data.fused_heterocycles import match_fused_heterocycle_core
 
-            # Check if this is a known fused heterocycle
-            fused_type = classify_fused_system(features.mol)
-            is_known_fused_heterocycle = False
+            # Get ring atoms to exclude when finding chain
+            all_ring_atoms = set()
+            for ring in features.ring_systems:
+                all_ring_atoms.update(ring)
 
-            if fused_type in ('ortho-fused', 'ortho-peri-fused'):
-                core_match = match_fused_heterocycle_core(features.mol)
-                if core_match is not None:
-                    # P-44.1.1 / P-52.2.8: bypass guard when chain has
-                    # strictly more principal groups than the fused ring
-                    if _should_bypass_fused_guard(features, core_match):
-                        is_known_fused_heterocycle = False
-                    else:
-                        is_known_fused_heterocycle = True
+            # Find potential principal chain (excluding ring atoms)
+            # IMPORTANT: namer.py does the chain finding, then passes result to select_parent()
+            potential_chain = find_principal_chain(
+                features.mol,
+                features.functional_groups,
+                features.principal_group,
+                exclude_atoms=all_ring_atoms
+            )
 
-            # Only do parent selection for non-fused systems or unknown fused systems
-            if not is_known_fused_heterocycle:
-                # Get ring atoms to exclude when finding chain
-                all_ring_atoms = set()
-                for ring in features.ring_systems:
-                    all_ring_atoms.update(ring)
+            # Only do parent selection if we found a meaningful chain (>= 2 carbons)
+            if potential_chain and len(potential_chain) >= 2:
+                # Phase 147 D-03: delegate ring-type dispatch to helper.
+                # Replaces the prior inline fused-hetero-only block; new
+                # helper covers fused-hetero / PAH / benzene / simple-
+                # hetero / spiro-stub / VB-stub / else->None per D-03.
+                _ring_info = _build_ring_info_for_parent_selection(features)
+                # Phase 147: stash on features so downstream pool.add()
+                # call sites can read it without a signature change at
+                # every composer.py call site (transient runtime
+                # attribute; not a MolecularFeatures dataclass field
+                # per D-08; safe because the dataclass is not frozen).
+                features._ring_info = _ring_info
 
-                # Find potential principal chain (excluding ring atoms)
-                # IMPORTANT: namer.py does the chain finding, then passes result to select_parent()
-                potential_chain = find_principal_chain(
-                    features.mol,
-                    features.functional_groups,
-                    features.principal_group,
-                    exclude_atoms=all_ring_atoms
+                # Pass pre-computed chain to select_parent
+                selection = select_parent(
+                    mol=features.mol,
+                    ring_systems=features.ring_systems,
+                    principal_chain=potential_chain,
+                    principal_group=features.principal_group,
+                    principal_group_atoms=features.principal_group_atoms,
+                    ring_info=_ring_info
                 )
+                features.parent_selection_result = selection  # Phase 148 D-02 (V18 Appendix A.5)
 
-
-                # Only do parent selection if we found a meaningful chain (>= 2 carbons)
-                if potential_chain and len(potential_chain) >= 2:
-                    # Phase 147 D-03: delegate ring-type dispatch to helper.
-                    # Replaces the prior inline fused-hetero-only block; new
-                    # helper covers fused-hetero / PAH / benzene / simple-
-                    # hetero / spiro-stub / VB-stub / else->None per D-03.
-                    _ring_info = _build_ring_info_for_parent_selection(features)
-                    # Phase 147: stash on features so downstream pool.add()
-                    # call sites can read it without a signature change at
-                    # every composer.py call site (transient runtime
-                    # attribute; not a MolecularFeatures dataclass field
-                    # per D-08; safe because the dataclass is not frozen).
-                    features._ring_info = _ring_info
-
-                    # Pass pre-computed chain to select_parent
-                    selection = select_parent(
-                        mol=features.mol,
-                        ring_systems=features.ring_systems,
-                        principal_chain=potential_chain,
-                        principal_group=features.principal_group,
-                        principal_group_atoms=features.principal_group_atoms,
-                        ring_info=_ring_info
-                    )
-
-                    if selection.parent_type == 'chain':
-                        features.chain_is_parent = True
-                        # is_cyclic stays True -- ring data needed for ring-as-substituent naming (Phase 139 ARCH-01)
-                        features.principal_chain = selection.parent_atoms
-                        features.ring_substituents_as_groups = selection.substituent_rings
+                if selection.parent_type == 'chain':
+                    features.chain_is_parent = True
+                    # is_cyclic stays True -- ring data needed for ring-as-substituent naming (Phase 139 ARCH-01)
+                    features.principal_chain = selection.parent_atoms
+                    features.ring_substituents_as_groups = selection.substituent_rings
 
         # For cyclic molecules, identify principal ring and its type
         if features.is_cyclic:
