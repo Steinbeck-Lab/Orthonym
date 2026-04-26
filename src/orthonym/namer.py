@@ -333,6 +333,14 @@ class MolecularFeatures:
     radical_sites: List[Dict] = field(default_factory=list)  # From get_radical_sites()
     total_charge: int = 0  # Net formal charge of the molecule
 
+    # Phase 148 D-09 / V18 Appendix A.5: parent-selection result for downstream
+    # coverage_scoring readers. Populated by _classify when select_parent()
+    # runs for a cyclic+chain molecule (chain_len >= 2). Phase 149 / IM-11
+    # will recalibrate FACTOR_WEIGHTS_V18['parent_correctness'] against the
+    # discrimination this slot provides.
+    # Source: V18_MILESTONE_PLAN Appendix A.5.
+    parent_selection_result: Optional[Any] = None
+
 
 def compute_features(mol, smiles: Optional[str] = None) -> MolecularFeatures:
     """Phase 147 BL-1: thin module-level wrapper around Orthonym()._perceive.
