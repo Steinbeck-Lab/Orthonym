@@ -731,13 +731,25 @@ class TestFunctionalizedSubstituents:
 
     @pytest.mark.unit
     def test_indole_acetonitrile_e2e(self):
-        """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'."""
+        """N#CCc1c[nH]c2ccccc12 (indole-3-acetonitrile) should contain 'indol'.
+
+        Phase 148 Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        chain as parent (chain bears nitrile PG). The chain-as-parent name is
+        `2-(1H-indol-3-yl)ethanenitrile` ('ethanenitrile' suffix instead of
+        the v17 'cyanomethyl'/'acetonitrile' prefix). Both renderings are
+        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), v18 is
+        chain-as-parent (P-44.1 compliant). Updated assertion to accept the
+        post-148 form per ./skills/fix-methodology.md.
+        """
         from orthonym import name_compound
 
         result = name_compound('N#CCc1c[nH]c2ccccc12')
         assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
-        assert 'cyanomethyl' in result.lower() or 'acetonitrile' in result.lower(), \
-            f"Expected 'cyanomethyl' or 'acetonitrile' in name, got: {result}"
+        assert (
+            'cyanomethyl' in result.lower()
+            or 'acetonitrile' in result.lower()
+            or 'ethanenitrile' in result.lower()  # Phase 148 P-44.1(a) chain-as-parent
+        ), f"Expected 'cyanomethyl' or 'acetonitrile' or 'ethanenitrile' in name, got: {result}"
 
     @pytest.mark.unit
     def test_indole_acetonitrile_direct_fused_naming(self):
@@ -750,13 +762,25 @@ class TestFunctionalizedSubstituents:
 
     @pytest.mark.unit
     def test_indole_acetic_acid_e2e(self):
-        """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'."""
+        """OC(=O)Cc1c[nH]c2ccccc12 (indole-3-acetic acid) should contain 'indol'.
+
+        Phase 148 Plan 02 Task 03: post-148 cascade per P-44.1(a) selects the
+        chain as parent (chain bears acid PG). The chain-as-parent name is
+        `2-(1H-indol-3-yl)ethanoic acid` ('ethanoic acid' suffix instead of
+        the v17 'carboxymethyl'/'acetic' prefix). Both renderings are
+        IUPAC-acceptable; v17 was ring-as-parent (P-44.1 violation), v18 is
+        chain-as-parent (P-44.1 compliant). Updated assertion to accept the
+        post-148 form per ./skills/fix-methodology.md.
+        """
         from orthonym import name_compound
 
         result = name_compound('OC(=O)Cc1c[nH]c2ccccc12')
         assert 'indol' in result.lower(), f"Expected 'indol' in name, got: {result}"
-        assert 'carboxymethyl' in result.lower() or 'acetic' in result.lower(), \
-            f"Expected 'carboxymethyl' or 'acetic' in name, got: {result}"
+        assert (
+            'carboxymethyl' in result.lower()
+            or 'acetic' in result.lower()
+            or 'ethanoic' in result.lower()  # Phase 148 P-44.1(a) chain-as-parent
+        ), f"Expected 'carboxymethyl' or 'acetic' or 'ethanoic' in name, got: {result}"
 
     @pytest.mark.unit
     def test_indole_acetic_acid_direct_fused_naming(self):

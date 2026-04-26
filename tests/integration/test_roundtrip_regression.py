@@ -65,8 +65,12 @@ ROUNDTRIP_VERIFIED = [
     ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  # ASML-13: phenol suffix routing
     ("CN(C)c1ccc(N)cc1", "1-amino-4-(N,N-dimethylamino)benzene"),
 
-    # Fused aromatic
-    ("O=C(O)Cc1c[nH]c2ccc(Cl)cc12", "3-carboxymethyl-5-chloro-1H-indole"),
+    # Fused aromatic — Phase 148 Plan 02 Task 03: P-44.1(a) cascade unblock.
+    # Pre-148 ring-as-parent (`3-carboxymethyl-5-chloro-1H-indole`) placed acid
+    # PG on ring-substituent prefix (P-44.1 violation); post-148 cascade picks
+    # chain (acid PG); indole rendered as `1H-indol-3-yl` substituent.
+    # Acceptable churn — new name OPSIN-roundtrip-verified.
+    ("O=C(O)Cc1c[nH]c2ccc(Cl)cc12", "2-(5-chloro-1H-indol-3-yl)ethanoic acid"),  # P-44.1(a) chain wins (acid PG)
 
     # Heterocyclic
     ("C1=CN1", "azirene"),
@@ -578,10 +582,13 @@ PHASE24_PARSE_FIXES = [
         "1-chloro-4-(hydroxymethyl)benzene",
         "bracket-chloro-hydroxymethyl",
     ),
-    # A3: Retained name carboxymethyl on indole (from existing roundtrip)
+    # A3: P-44.1(a) chain-as-parent on indole (Phase 148 Plan 02 Task 03)
+    # Pre-148 was `3-carboxymethyl-5-chloro-1H-indole` (ring-as-parent w/
+    # acid prefix; P-44.1 violation); post-148 cascade picks chain (acid
+    # PG); OPSIN-roundtrip-verified.
     (
         "OC(=O)Cc1c[nH]c2ccc(Cl)cc12",
-        "3-carboxymethyl-5-chloro-1H-indole",
+        "2-(5-chloro-1H-indol-3-yl)ethanoic acid",  # P-44.1(a) chain wins (acid PG)
         "bracket-carboxymethyl-indole",
     ),
 

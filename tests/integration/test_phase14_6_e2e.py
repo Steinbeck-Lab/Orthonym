@@ -74,20 +74,41 @@ class TestBug3FusedHeterocycleSubstituents:
     """BUG-3: Fused heterocycle substituent dropping."""
 
     def test_indole_acetonitrile(self):
-        """Critical success criteria #3 from CONTEXT.md"""
+        """Critical success criteria #3 from CONTEXT.md.
+
+        Phase 148 Plan 02 Task 03: post-148 P-44.1(a) chain-as-parent yields
+        `2-(1H-indol-3-yl)ethanenitrile` (suffix form) instead of v17
+        ring-as-parent `cyanomethyl/acetonitrile` prefix. Both are
+        IUPAC-acceptable; v18 is correct per P-44.1(a).
+        """
         result = name_compound('N#CCc1c[nH]c2ccccc12')
-        # Should contain indol AND cyanomethyl/acetonitrile in some form
+        # Should contain indol AND cyanomethyl/acetonitrile/ethanenitrile in some form
         result_lower = result.lower()
         has_indol = 'indol' in result_lower
-        has_cyanomethyl = 'cyanomethyl' in result_lower or 'acetonitrile' in result_lower
-        assert has_indol and has_cyanomethyl, f"Expected indol and cyanomethyl, got {result}"
+        has_nitrile_token = (
+            'cyanomethyl' in result_lower
+            or 'acetonitrile' in result_lower
+            or 'ethanenitrile' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+        )
+        assert has_indol and has_nitrile_token, (
+            f"Expected indol and nitrile token (cyanomethyl/acetonitrile/ethanenitrile), got {result}"
+        )
 
     def test_indole_acetic_acid(self):
+        """Phase 148 Plan 02 Task 03: post-148 chain-as-parent suffix
+        `ethanoic acid` accepted alongside v17 `carboxymethyl/acetic` prefix.
+        """
         result = name_compound('OC(=O)Cc1c[nH]c2ccccc12')
         result_lower = result.lower()
         has_indol = 'indol' in result_lower
-        has_carboxymethyl = 'carboxymethyl' in result_lower or 'acetic' in result_lower
-        assert has_indol and has_carboxymethyl, f"Expected indol and carboxymethyl, got {result}"
+        has_acid_token = (
+            'carboxymethyl' in result_lower
+            or 'acetic' in result_lower
+            or 'ethanoic' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+        )
+        assert has_indol and has_acid_token, (
+            f"Expected indol and acid token (carboxymethyl/acetic/ethanoic), got {result}"
+        )
 
     def test_plain_indole(self):
         """Ensure plain indole still works."""
@@ -177,11 +198,22 @@ class TestAllSuccessCriteria:
         assert result == 'benzonitrile'
 
     def test_success_criteria_3_indole_acetonitrile(self):
-        """SC-3: indole-3-acetonitrile contains indol and acetonitrile."""
+        """SC-3: indole-3-acetonitrile contains indol and a nitrile token.
+
+        Phase 148 Plan 02 Task 03: post-148 P-44.1(a) chain-as-parent yields
+        `2-(1H-indol-3-yl)ethanenitrile` (suffix form). Accepting all three
+        renderings (v17 cyanomethyl/acetonitrile prefix + v18 ethanenitrile
+        suffix) preserves the spirit of SC-3 while accommodating the
+        IUPAC-correct cascade.
+        """
         result = name_compound('N#CCc1c[nH]c2ccccc12')
         result_lower = result.lower()
         assert 'indol' in result_lower
-        assert 'cyanomethyl' in result_lower or 'acetonitrile' in result_lower
+        assert (
+            'cyanomethyl' in result_lower
+            or 'acetonitrile' in result_lower
+            or 'ethanenitrile' in result_lower  # Phase 148 P-44.1(a) chain-as-parent
+        )
 
     def test_success_criteria_4_coumarin(self):
         """SC-4: coumarin or chromen-2-one names correctly."""

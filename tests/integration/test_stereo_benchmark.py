@@ -110,7 +110,11 @@ SMALL_STEREO_COMPOUNDS = [
 # ---------------------------------------------------------------------------
 MEDIUM_STEREO_COMPOUNDS = [
     ('Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O', '(2R,3S,4R)-3,4,7-trihydroxychromane'),
-    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estra-1,2,4-trien-3,15,16,17-tetraol'),
+    # Phase 148 Plan 02 Task 03: estra ring locant correction 1,2,4 → 1,3,5
+    # (canonical estra-1,3,5-triene numbering for aromatic A-ring per
+    # P-31.1.5; per Plan 01 SUMMARY this is "unrelated to Phase 148"
+    # incidental locant correction). Acceptable churn.
+    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estra-1,3,5-trien-3,15,16,17-tetraol'),
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(4S,6S)-4,6,14-trihydroxy-12-methoxy-6-methyl-tricyclo[8.4.0.0(3,8)]tetradec-3-en-2,9-dione'),
     ('C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)C/C=C\\C(=O)O1', '(4R,7Z,10S,13Z,15R,16S)-15-hydroxy-4,10,16-trimethyl-6,12-dioxooxacyclohexadecan-2-one'),
     ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', '(1S,13S,14S,20S)-20-hydroxy-15-methyl-2,7,9-trioxa-15-aza-pentacyclo[11.7.0.0(4,12).0(6,10).0(14,18)]icos-18-en-3-one'),  # Updated P72: IUPAC VB-6 citation order
@@ -148,7 +152,11 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('C[C@H]1C=C[C@H]2C[C@@H](O)CC[C@H]2[C@@H]1c1cc(N)c(C=O)c(=O)o1', '(3S,4R,5R,6R)-6-[(S)-2-hydroxy(2R)-butyl]amino-6-hydroxy-3-methylcyclohex-1-enecarbaldehyde'),  # Fixed: ring boundary fix changed substituent/locant assignment
     ('CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O', '(11S,12R)-12-(6E)-2,6-dimethylnona-2,6-dienyl-8,11-dihydroxy-12-methyl-4-pentyl-4-aza-tricyclo[7.4.0.0(2,6)]tridecan-5-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
-    ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-3-(2-aminoethyl)-1H-indole'),  # depth-independent naming v11; N-bracket fix v15
+    # Phase 148 Plan 02 Task 03: indole+peptide chain. Pre-148 ring-as-parent
+    # (`-3-(2-aminoethyl)-1H-indole` suffix); post-148 cascade per P-44.1(a)
+    # selects propanamide chain as parent with indole as `1H-indol-3-yl`
+    # substituent. Acceptable churn (cascade decision IUPAC-correct).
+    ('CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\\c1c[nH]c2ccccc12', 'N-acetyl(2S)-1-(amino(4Z)-2-(1H-indol-3-yl)eth-1-en-1-yl)-2-(hexanoylamino)-3-phenylpropanamide'),  # Phase 148 cascade unblock; depth-independent naming v11; N-bracket fix v15
     ('O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1', '(8R,9S,15S)-8-dodecyl-8-hydroxy-1,10-diaza-tetracyclo[7.7.0.0(2,7).0(10,15)]hexadecan-16-one'),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', '(1S,5R,7R,10S,12S)-5-dodecyl-7,12-dihydroxy-1,5-dimethyl-15-oxa-tricyclo[8.4.0.1(7,10)]pentadec-8-en-2,6-dione'),
     ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', '(6S)-4,21-dihydroxy-15-methoxy-6,17-dimethyl-7-oxa-pentacyclo[11.8.0.0(3,11).0(5,9).0(14,19)]henicosan-2,8,12-trione'),  # Updated P72: IUPAC VB-6 citation order
