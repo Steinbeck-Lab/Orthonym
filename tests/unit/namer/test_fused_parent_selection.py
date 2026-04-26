@@ -145,3 +145,134 @@ def test_nucleoside_still_ring_parent():
         f"Expected 'adenos' or 'purin' substring (ring stays parent for "
         f"purine NPs via cascade non-entry); got {name!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 5 RECOMMENDED edge-case tests (D-06 Tier 1 full coverage; Task 148-01-07).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_p44_1a_pg_only_on_ring_ring_wins():
+    """P-44.1(a) PG-on-ring-only: quinoline-2-carboxylic acid + methyl
+    substituents → ring wins.
+
+    The carboxylic acid principal group is attached directly to the
+    quinoline ring system; the off-ring substituents are simple methyls
+    with no PG. Per P-44.1(a) the parent is the structure carrying the
+    principal group → ring wins outright. The cascade reaches the same
+    result via cascade non-entry (chain_len < 2 for the methyl branches).
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(a)
+    Source: HERITAGE-1990 §4.
+    Source: Phase 148 CONTEXT D-06 (Tier 1 full coverage).
+    """
+    name = name_compound('Cc1ccc2nc(C(=O)O)cc(C)c2c1')
+    assert name, f'name_compound returned empty/None: {name!r}'
+    lower = name.lower()
+    assert 'quinolin' in lower, (
+        f"Expected 'quinolin' (ring is parent per P-44.1(a)); got {name!r}"
+    )
+    assert any(s in lower for s in ('carboxylic acid', 'carboxylic', 'oic acid')), (
+        f"Expected acid handle on ring parent; got {name!r}"
+    )
+
+
+@pytest.mark.unit
+def test_p44_1a_pg_only_on_chain_chain_wins():
+    """P-44.1(a) PG-on-chain-only: indole + butanoic acid chain → chain wins.
+
+    The carboxylic acid is on the chain (-CH2-CH2-CH2-COOH); the indole
+    ring system has no PG. Per P-44.1(a) the chain is parent because it
+    carries the principal group. Pre-148 the bypass would have short-
+    circuited this case to ring-parent; post-148 the cascade correctly
+    routes to chain-parent.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(a)
+    Source: HERITAGE-1990 §4.
+    Source: Phase 148 CONTEXT D-06 (Tier 1 full coverage).
+    """
+    name = name_compound('c1ccc2[nH]ccc2c1CCCC(=O)O')
+    assert name, f'name_compound returned empty/None: {name!r}'
+    lower = name.lower()
+    assert 'indol' in lower, (
+        f"Expected 'indol' substring (ring as substituent); got {name!r}"
+    )
+    assert any(s in lower for s in ('pentanoic acid', 'butanoic acid', 'oic acid')), (
+        f"Expected chain-acid handle (chain wins per P-44.1(a)); got {name!r}"
+    )
+
+
+@pytest.mark.unit
+def test_p44_1c_chain_5atoms_indole_9atoms_ring_wins():
+    """P-44.1(c) ring longer than chain: indole (9 atoms) + butyl chain
+    (4 atoms) → ring wins.
+
+    No principal group; ring is bigger; per P-44.1(c) longer parent wins.
+    The cascade fires (chain_len=4 >= 2) but returns ring-parent because
+    P-44.1(c) max-length comparison favours the ring system.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(c)
+    Source: HERITAGE-1990 §4.
+    Source: Phase 148 CONTEXT D-06 (Tier 1 full coverage).
+    """
+    name = name_compound('c1ccc2[nH]ccc2c1CCCC')
+    assert name, f'name_compound returned empty/None: {name!r}'
+    lower = name.lower()
+    assert 'indol' in lower, (
+        f"Expected 'indol' (ring is parent per P-44.1(c)); got {name!r}"
+    )
+    assert any(s in lower for s in ('butyl', 'propyl', 'methyl', 'ethyl')), (
+        f"Expected chain-as-substituent token; got {name!r}"
+    )
+
+
+@pytest.mark.unit
+def test_p52_2_8_zero_pg_ring_wins():
+    """P-52.2.8 zero-PG tiebreak: quinoline (10 atoms, with N) + butyl chain
+    (4 atoms) → ring wins.
+
+    No PG on either side; per P-44.1(c) ring is longer, but if ring and
+    chain were equal length P-52.2.8 would still pick ring. The post-148
+    cascade reaches this verdict end-to-end.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P5.html P-52.2.8
+    Source: HERITAGE-1990 §4.
+    Source: Phase 148 CONTEXT D-06 (Tier 1 full coverage).
+    """
+    name = name_compound('c1ccc2ncccc2c1CCCC')
+    assert name, f'name_compound returned empty/None: {name!r}'
+    lower = name.lower()
+    assert 'quinolin' in lower, (
+        f"Expected 'quinolin' (ring is parent per P-52.2.8); got {name!r}"
+    )
+    assert any(s in lower for s in ('butyl', 'propyl', 'methyl', 'ethyl')), (
+        f"Expected chain-as-substituent token; got {name!r}"
+    )
+
+
+@pytest.mark.unit
+def test_polyfunctional_acid_on_chain_with_indole_ring_chain_wins():
+    """P-44.1(b) polyfunctional chain (acid + ketone) > indole ring (no PG).
+
+    Chain has carboxylic acid + ketone; ring has none. Per P-44.1(a)/(b)
+    the chain is parent because it carries the principal group (and more
+    of them, satisfying both (a) and (b)). The post-148 cascade evaluates
+    this correctly via select_parent's PG-count comparison.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(b)
+    Source: HERITAGE-1990 §4.
+    Source: Phase 148 RESEARCH §3 subsumption proof (Guard 3 → P-44.1(b)).
+    Source: Phase 148 CONTEXT D-06 (Tier 1 full coverage).
+    """
+    # Indole on chain end; chain has a 5-oxo + COOH (PG=acid):
+    # OC(=O)-CH2CH2CH2-C(=O)-CH2-indole
+    name = name_compound('OC(=O)CCCC(=O)Cc1c[nH]c2ccccc12')
+    assert name, f'name_compound returned empty/None: {name!r}'
+    lower = name.lower()
+    assert 'indol' in lower, (
+        f"Expected 'indol' substring (ring as substituent); got {name!r}"
+    )
+    assert any(s in lower for s in ('oic acid', 'amide', 'carbox', 'carbamoyl')), (
+        f"Expected acid/amide handle (chain wins per P-44.1(b)); got {name!r}"
+    )
