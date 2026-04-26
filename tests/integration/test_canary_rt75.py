@@ -820,13 +820,19 @@ CANARY_COMPOUNDS = [
     # 1 from Phase 82 (multi-ring substituent expression)
     # 2 benchmark regression anchors (newly passing in v9.0 benchmark)
     # Phase 78: Fused heterocycle prefix generation
+    # Phase 148 D-05 / P-44.1(a) cascade unblock: chain has principal
+    # characteristic group (carboxylic acid / ketone) — chain wins as parent
+    # per https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1(a). Pre-148 the
+    # deleted `_should_bypass_fused_guard` short-circuited fused heterocycles
+    # to ring-as-parent producing IUPAC-incorrect prefix names. Both new
+    # names OPSIN-roundtrip-verified (commit 148-02-03).
     (
         "OC(=O)CCc1cccc2cccnc12",
-        "8-(2-carboxyethyl)quinoline",
+        "3-(quinolin-8-yl)propanoic acid",  # P-44.1(a) chain wins (acid PG)
     ),
     (
         "CC(=O)c1ccc2[nH]ccc2c1",
-        "5-acetyl-1H-indole",
+        "1-(1H-indol-5-yl)ethan-1-one",  # P-44.1(a) chain wins (ketone PG)
     ),
     (
         "OC(=O)c1cc2ccccc2[nH]1",
