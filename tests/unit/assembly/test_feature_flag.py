@@ -168,10 +168,12 @@ class TestV17V18DictShape:
         0.5 today). CD-03 pinned the grid dimension at 0.0, so the chosen
         config also landed at 0.0.
 
-        Phase 148 will activate the scorer by deleting `_should_bypass_fused_guard`
-        and wiring `features.parent_selection_result`. At that point a follow-up
-        calibration (or Plan 06 cleanup) can raise this weight. Until then, the
-        calibrated-and-committed invariant is parent_correctness == 0.0.
+        Phase 148 has shipped: `_should_bypass_fused_guard` is deleted
+        and `features.parent_selection_result` is now populated by `_classify`. The
+        weight remains 0.00 per Phase 148 D-12 lock; Phase 149 / IM-11 will
+        recalibrate against the discrimination this slot provides on the post-148
+        7,500-row benchmark. Until then, the calibrated-and-committed invariant
+        is parent_correctness == 0.0.
         """
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
         assert FACTOR_WEIGHTS_V18['parent_correctness'] == 0.0
