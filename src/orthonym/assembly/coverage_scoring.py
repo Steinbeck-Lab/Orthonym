@@ -202,13 +202,16 @@ FACTOR_WEIGHTS_V17: Dict[str, float] = {
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
 FACTOR_WEIGHTS_V18: Dict[str, float] = {
     'ratio': 0.0,                       # permanent 0.0 (Phase 145.2 D-09-a.1)
-    'atom_coverage': 0.10,              # CALIBRATED via Plan 04 grid search
-    'fg_recognition': 0.40,             # CALIBRATED (highest signal)
-    'substituent_completeness': 0.25,   # CALIBRATED
-    'parent_correctness': 0.00,         # CALIBRATED (CD-03: no discrimination until Phase 148)
-    'multiple_bond_count': 0.25,        # CALIBRATED (D-20 NOT triggered; factor retained per D-06)
+    'atom_coverage': 0.10,              # RECALIBRATED via Phase 148.1 partial grid
+    'fg_recognition': 0.20,             # RECALIBRATED (post-148 cascade unblock shifts optimum)
+    'substituent_completeness': 0.25,   # RECALIBRATED
+    'parent_correctness': 0.25,         # RECALIBRATED (Phase 148 D-02 wired the slot; 148.1 IM-11 extracts signal)
+    'multiple_bond_count': 0.20,        # RECALIBRATED
 }
-# Sum = 1.00 (0.00 + 0.10 + 0.40 + 0.25 + 0.00 + 0.25); sum-to-1.0 constraint satisfied.
+# Sum = 1.00 (0.00 + 0.10 + 0.20 + 0.25 + 0.25 + 0.20); sum-to-1.0 constraint satisfied.
+# Phase 148.1 partial (100/260 configs; D-07 5-hr abort): Wilson-95-LB winner;
+# CD-02 BOUNDARY EXTENSION TRIGGERED: parent_correctness=0.25 is at upper grid corner;
+# Phase 148.2 will sweep [0.30, 0.50] to verify the true optimum.
 
 # Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
 FACTOR_WEIGHTS: Dict[str, float] = (
