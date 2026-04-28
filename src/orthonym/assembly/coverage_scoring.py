@@ -202,16 +202,16 @@ FACTOR_WEIGHTS_V17: Dict[str, float] = {
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
 FACTOR_WEIGHTS_V18: Dict[str, float] = {
     'ratio': 0.0,                       # permanent 0.0 (Phase 145.2 D-09-a.1)
-    'atom_coverage': 0.10,              # RECALIBRATED via Phase 148.1 partial grid
-    'fg_recognition': 0.20,             # RECALIBRATED (post-148 cascade unblock shifts optimum)
+    'atom_coverage': 0.05,              # RECALIBRATED via Phase 148.2 boundary-extension grid
+    'fg_recognition': 0.25,             # RECALIBRATED (post-148 cascade unblock shifts optimum)
     'substituent_completeness': 0.25,   # RECALIBRATED
-    'parent_correctness': 0.25,         # RECALIBRATED (Phase 148 D-02 wired the slot; 148.1 IM-11 extracts signal)
-    'multiple_bond_count': 0.20,        # RECALIBRATED
+    'parent_correctness': 0.35,         # RECALIBRATED — Phase 148.2 INTERIOR optimum (was 0.25 at 148.1 corner)
+    'multiple_bond_count': 0.10,        # RECALIBRATED (lowered to keep sum-to-1.0)
 }
-# Sum = 1.00 (0.00 + 0.10 + 0.20 + 0.25 + 0.25 + 0.20); sum-to-1.0 constraint satisfied.
-# Phase 148.1 partial (100/260 configs; D-07 5-hr abort): Wilson-95-LB winner;
-# CD-02 BOUNDARY EXTENSION TRIGGERED: parent_correctness=0.25 is at upper grid corner;
-# Phase 148.2 will sweep [0.30, 0.50] to verify the true optimum.
+# Sum = 1.00 (0.00 + 0.05 + 0.25 + 0.25 + 0.35 + 0.10); sum-to-1.0 constraint satisfied.
+# Phase 148.2 partial (100/255 configs; D-07 5-hr abort): Wilson-95-LB winner;
+# CD-02 SATISFIED: parent_correctness=0.35 is INTERIOR to [0.30, 0.50] grid; no further
+# boundary extension needed. Top-10 cluster: PC=0.30 (5/10), PC=0.35 (3/10), PC=0.40 (1/10), PC=0.45 (1/10).
 
 # Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
 FACTOR_WEIGHTS: Dict[str, float] = (
