@@ -97,3 +97,57 @@ def test_step6_dispatch_in_best_two_tier_skipped_for_spiro():
     # is also defensive at the function body level.
     out = _filter_lowest_locants([a_stub, b_stub])
     assert len(out) == 2
+
+
+def test_step6_skipped_for_branch_6_5_base_component_atoms_key():
+    """Phase 149 D-09 / SC-7: Branch 6.5 emits 'base_component_atoms' key,
+    NOT 'iupac_locants'. _has_iupac_locants returns False -> cascade
+    step 6 stays GATED for non-cataloged fused systems.
+
+    This is the carry-forward lock from Phase 147 D-06 (cascade step 6
+    conservative gate) extended to Phase 149's new dict key.
+
+    Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
+    Source: 149-CONTEXT.md D-09; SC-7.
+    Source: 147-CONTEXT.md D-06.
+    """
+    from orthonym.assembly.coverage_scoring import CandidateName
+    from orthonym.assembly.candidate_pool import _has_iupac_locants
+    a = CandidateName(
+        name='non_cataloged_fused',
+        handler='complex_ring',
+        ring_info={'base_component_atoms': frozenset({0, 1, 2})},
+    )
+    b = CandidateName(
+        name='b',
+        handler='benzene',
+        ring_info={'iupac_locants': {0: 1}},
+    )
+    # _has_iupac_locants checks for the 'iupac_locants' key specifically;
+    # Branch 6.5's new key is invisible to it. Cascade step 6 stays GATED.
+    assert _has_iupac_locants([a, b]) is False, (
+        "Phase 149 SC-7: Branch 6.5's 'base_component_atoms' key MUST NOT "
+        "satisfy _has_iupac_locants gate; cascade step 6 must stay GATED "
+        "for non-cataloged fused systems"
+    )
+
+
+def test_step6_skipped_when_only_branch_6_5_candidate():
+    """Phase 149 D-09: even if every candidate has 'base_component_atoms',
+    cascade step 6 stays GATED because none has 'iupac_locants'.
+
+    Source: 149-CONTEXT.md D-09; SC-7.
+    """
+    from orthonym.assembly.coverage_scoring import CandidateName
+    from orthonym.assembly.candidate_pool import _has_iupac_locants
+    a = CandidateName(
+        name='a',
+        handler='complex_ring',
+        ring_info={'base_component_atoms': frozenset({0, 1, 2})},
+    )
+    b = CandidateName(
+        name='b',
+        handler='complex_ring',
+        ring_info={'base_component_atoms': frozenset({3, 4, 5, 6})},
+    )
+    assert _has_iupac_locants([a, b]) is False
