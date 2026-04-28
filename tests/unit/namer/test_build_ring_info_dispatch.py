@@ -194,3 +194,65 @@ def test_else_cyclohexane_branch():
     # cyclohexane: not benzene (not aromatic), no heteroatom, not spiro,
     # not bridged -> None per branch 7.
     assert actual is None
+
+
+def test_branch_6_5_non_cataloged_fused_emits_base_component_atoms():
+    """Branch 6.5 (Phase 149 D-09): non-cataloged ortho-fused system
+    emits {'base_component_atoms': frozenset(...)} NOT 'iupac_locants'.
+
+    Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
+    Source: 149-CONTEXT.md D-09; SC-2; SC-7.
+    """
+    from orthonym.namer import (
+        compute_features, _build_ring_info_for_parent_selection,
+    )
+    from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
+    from orthonym.rules.polycyclics import identify_polycyclic
+    # 9,10-dihydrophenanthrene: 3 components, ortho-fused, NOT in
+    # FUSED_HETEROCYCLE_DATA, NOT in PAH catalog (verified at planning).
+    # Alternates: any 3-ring system that matches NEITHER catalog.
+    smi = 'C1Cc2ccccc2-c2ccccc21'
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        pytest.skip(f"SMILES {smi!r} did not parse")
+    if match_fused_heterocycle_core(mol) is not None:
+        pytest.skip(f"{smi} is in FUSED_HETEROCYCLE_DATA — cataloged path")
+    if identify_polycyclic(mol) is not None:
+        pytest.skip(f"{smi} matched PAH catalog — Branch 2 path")
+    feats = compute_features(mol)
+    actual = _build_ring_info_for_parent_selection(feats)
+    assert actual is not None, "Branch 6.5 must produce ring_info, not None"
+    assert 'base_component_atoms' in actual, (
+        f"Branch 6.5 must emit 'base_component_atoms' key per D-09; "
+        f"got {actual!r}"
+    )
+    assert 'iupac_locants' not in actual, (
+        f"Branch 6.5 MUST NOT emit 'iupac_locants' key per SC-7; "
+        f"got {actual!r}"
+    )
+    assert isinstance(actual['base_component_atoms'], frozenset), (
+        f"CD-04: base_component_atoms must be frozenset; "
+        f"got {type(actual['base_component_atoms']).__name__}"
+    )
+
+
+def test_branch_6_5_skipped_for_cataloged_compounds():
+    """D-11: cataloged compounds (indole) flow through Branch 1.
+
+    Source: 149-CONTEXT.md D-11; SC-9.
+    """
+    from orthonym.namer import (
+        compute_features, _build_ring_info_for_parent_selection,
+    )
+    mol = Chem.MolFromSmiles('Cc1cc2ccccc2[nH]1')  # 2-methylindole, cataloged
+    feats = compute_features(mol)
+    actual = _build_ring_info_for_parent_selection(feats)
+    assert actual is not None
+    assert 'iupac_locants' in actual, (
+        f"Branch 1 (catalog) must emit 'iupac_locants' for cataloged "
+        f"compound; got {actual!r}"
+    )
+    assert 'base_component_atoms' not in actual, (
+        f"D-11 byte-identical: cataloged compound MUST NOT route "
+        f"through Branch 6.5; got {actual!r}"
+    )

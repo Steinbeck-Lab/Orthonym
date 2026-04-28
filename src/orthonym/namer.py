@@ -496,6 +496,36 @@ def _build_ring_info_for_parent_selection(features):
     if is_bridged_fused(mol):
         return {"iupac_locants": None}
 
+    # Branch 6.5 (Phase 149 D-09): non-cataloged fused systems.
+    # Cataloged compounds reach Branches 1 (fused-heterocycle catalog) and
+    # 2 (PAH) first. If they didn't, but the system is ortho-fused or
+    # ortho-peri-fused, route base-component selection through FR-2.3.
+    #
+    # CRITICAL: emits `base_component_atoms` (NEW key), NOT `iupac_locants`.
+    # Cascade step 6 in candidate_pool._has_iupac_locants checks
+    # specifically for `iupac_locants` — Branch 6.5's new key is invisible
+    # to that gate, so cascade step 6 stays GATED for non-cataloged fused
+    # systems (Phase 147 D-06 + Phase 149 SC-7 lock).
+    #
+    # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
+    # Source: 149-CONTEXT.md D-09; SC-2; SC-7.
+    # Source: 147-CONTEXT.md D-06 (cascade step 6 gate carry-forward).
+    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+        # Branch 1 (catalog) and Branch 2 (PAH) already missed (control
+        # flow reached this point — Branch 1 returns earlier on
+        # heterocycle match; Branch 2 returns earlier on pah_locants).
+        from .rules.fused_ring_selection import (
+            select_base_component,
+            _enumerate_components,
+        )
+        components = _enumerate_components(mol)
+        if len(components) >= 2:
+            try:
+                base_atoms, _ = select_base_component(mol, components)
+                return {"base_component_atoms": frozenset(base_atoms)}
+            except (ValueError, Exception):
+                pass  # Fall through to Branch 7
+
     # Branch 7: else -> sorted fallback in _build_ring_pos.
     return None
 
