@@ -425,6 +425,11 @@ def identify_parent_and_child(
         Tuple of (parent_name, child_name, parent_ring_list, child_ring_list)
         Returns ('', '', [], []) if rings cannot be identified
     """
+    # Phase 149 D-07: route base-component decision through FR-2.3 cascade.
+    # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
+    # Source: 149-CONTEXT.md D-07, D-15.
+    from .fused_ring_selection import select_base_component
+
     # Convert sets to lists for ordered operations
     ring_a_list = list(ring_a)
     ring_b_list = list(ring_b)
@@ -436,21 +441,22 @@ def identify_parent_and_child(
     if not name_a and not name_b:
         return ('', '', [], [])
 
-    # Get seniority values (lower = more senior = preferred as parent)
+    # Phase 149 primary: FR-2.3 cascade (D-07).
+    # The returned base_atoms determines parent/child ordering.
+    base_atoms, _others = select_base_component(mol, [set(ring_a), set(ring_b)])
+    if base_atoms == set(ring_a):
+        return (name_a, name_b, ring_a_list, ring_b_list)
+    elif base_atoms == set(ring_b):
+        return (name_b, name_a, ring_b_list, ring_a_list)
+
+    # Total tie under FR-2.3 (a)-(f) — fall back to numeric seniority
+    # (D-07 preserves get_component_seniority as last-resort tiebreaker;
+    # D-15 reuse-not-rebuild discipline).
     seniority_a = get_component_seniority(name_a) if name_a else 999
     seniority_b = get_component_seniority(name_b) if name_b else 999
-
-    # More senior ring (lower seniority value) is parent
-    if seniority_a < seniority_b:
+    if seniority_a <= seniority_b:
         return (name_a, name_b, ring_a_list, ring_b_list)
-    elif seniority_b < seniority_a:
-        return (name_b, name_a, ring_b_list, ring_a_list)
-    else:
-        # Same seniority -- use ring size as tiebreaker (larger = parent)
-        if len(ring_a) >= len(ring_b):
-            return (name_a, name_b, ring_a_list, ring_b_list)
-        else:
-            return (name_b, name_a, ring_b_list, ring_a_list)
+    return (name_b, name_a, ring_b_list, ring_a_list)
 
 
 def _hetero_gap(mol, ring_atoms: List[int], hetero_indices: List[int]) -> int:
