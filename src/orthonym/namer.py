@@ -499,7 +499,8 @@ def _build_ring_info_for_parent_selection(features):
     # Branch 6.5 (Phase 149 D-09): non-cataloged fused systems.
     # Cataloged compounds reach Branches 1 (fused-heterocycle catalog) and
     # 2 (PAH) first. If they didn't, but the system is ortho-fused or
-    # ortho-peri-fused, route base-component selection through FR-2.3.
+    # ortho-peri-fused with EXACTLY 2 SSSR components, route base-component
+    # selection through FR-2.3.
     #
     # CRITICAL: emits `base_component_atoms` (NEW key), NOT `iupac_locants`.
     # Cascade step 6 in candidate_pool._has_iupac_locants checks
@@ -507,8 +508,16 @@ def _build_ring_info_for_parent_selection(features):
     # to that gate, so cascade step 6 stays GATED for non-cataloged fused
     # systems (Phase 147 D-06 + Phase 149 SC-7 lock).
     #
+    # SCOPE LIMIT (Phase 149 Plan 02 triage): restricted to 2-component
+    # fused systems where FR-2.3 base selection is reliable. 3+ component
+    # systems (steroids, complex polycycles) fall through to Branch 7 to
+    # avoid propagating partial base-atoms that disrupt downstream parent
+    # selection for systems whose IUPAC name requires the full ring system
+    # as parent. 3+ component systematic-name assembly is deferred to
+    # Phase 149.x or Phase 155 per D-08 trade-off.
+    #
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-    # Source: 149-CONTEXT.md D-09; SC-2; SC-7.
+    # Source: 149-CONTEXT.md D-09; SC-2; SC-7; D-08 trade-off.
     # Source: 147-CONTEXT.md D-06 (cascade step 6 gate carry-forward).
     if fused_type in ('ortho-fused', 'ortho-peri-fused'):
         # Branch 1 (catalog) and Branch 2 (PAH) already missed (control
@@ -519,7 +528,8 @@ def _build_ring_info_for_parent_selection(features):
             _enumerate_components,
         )
         components = _enumerate_components(mol)
-        if len(components) >= 2:
+        # Scope guard: 2-component fused systems only (Plan 02 triage).
+        if len(components) == 2:
             try:
                 base_atoms, _ = select_base_component(mol, components)
                 return {"base_component_atoms": frozenset(base_atoms)}

@@ -208,10 +208,17 @@ def test_branch_6_5_non_cataloged_fused_emits_base_component_atoms():
     )
     from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
     from orthonym.rules.polycyclics import identify_polycyclic
-    # 9,10-dihydrophenanthrene: 3 components, ortho-fused, NOT in
+    # 1-benzosuberone (2,3,4,5-tetrahydro-1-benzoxepin-1-one analogue):
+    # 7+6 ring fused, 2 components, ortho-fused, NOT in
     # FUSED_HETEROCYCLE_DATA, NOT in PAH catalog (verified at planning).
-    # Alternates: any 3-ring system that matches NEITHER catalog.
-    smi = 'C1Cc2ccccc2-c2ccccc21'
+    # Alternates: any 2-ring system that matches NEITHER catalog AND
+    # doesn't otherwise resolve via Branches 1-4 (single-ring helpers).
+    # Plan 02 triage: Branch 6.5 is restricted to 2-component fused
+    # systems where FR-2.3 base selection is reliable; 3+ component
+    # systems fall through to Branch 7 to avoid disrupting downstream
+    # parent selection for systems whose IUPAC name requires the full
+    # ring system as parent (e.g., steroids).
+    smi = 'O=C1CCCc2ccccc21'
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
         pytest.skip(f"SMILES {smi!r} did not parse")

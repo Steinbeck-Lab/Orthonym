@@ -59,8 +59,15 @@ ALGORITHMIC_FUSION_CASES = [
     # 6. isothiazolo[4,5-c]pyridine: isothiazole fused at edge c of pyridine
     ('c1cc2sncc2cn1', 'isothiazolo[4,5-c]pyridine'),
 
-    # 7. pyrido[3,4-d]pyrazole: pyridine fused at pyrazole
-    ('c1cc2n[nH]cc2cn1', 'pyrido[3,4-d]pyrazole'),
+    # 7. pyrazolo[4,5-c]pyridine: pyrazole fused to pyridine
+    # Phase 149 D-07 update: FR-2.3 V18 (Appendix A.6) picks larger ring
+    # (pyridine, 6-membered) as base when both rings have senior
+    # heteroatom (N). Original test expectation was pyrido[3,4-d]pyrazole
+    # which embeds older numeric-seniority preference for smaller
+    # heteroatom-rich ring; per V18 plan + IUPAC P-25.3.2.4, FR-2.3(c)
+    # "Larger ring at first point of difference" supersedes. Both names
+    # round-trip via OPSIN.
+    ('c1cc2n[nH]cc2cn1', 'pyrazolo[4,5-c]pyridine'),
 
     # 8. pyrrolo[4,3-d]pyrimidine: pyrrole fused to pyrimidine
     ('c1ncc2c[nH]cc2n1', 'pyrrolo[4,3-d]pyrimidine'),
@@ -68,8 +75,11 @@ ALGORITHMIC_FUSION_CASES = [
     # 9. pyrido[3,4-d]pyrimidine: pyridine fused to pyrimidine
     ('c1cc2cncnc2cn1', 'pyrido[3,4-d]pyrimidine'),
 
-    # 10. pyrido[3,4-d]imidazole: pyridine fused to imidazole
-    ('c1cc2[nH]cnc2cn1', 'pyrido[3,4-d]imidazole'),
+    # 10. imidazo[4,5-c]pyridine: imidazole fused to pyridine
+    # Phase 149 D-07 update: same FR-2.3 V18 rationale as case 7.
+    # Original test expectation was pyrido[3,4-d]imidazole; FR-2.3(c)
+    # picks larger ring (pyridine) as base.
+    ('c1cc2[nH]cnc2cn1', 'imidazo[4,5-c]pyridine'),
 
     # 11. thieno[4,3-d]pyrimidine: thiophene fused to pyrimidine (alt edge)
     ('c1ncc2cscc2n1', 'thieno[4,3-d]pyrimidine'),
