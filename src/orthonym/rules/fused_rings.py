@@ -157,9 +157,29 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     ri = mol.GetRingInfo()
     atom_rings = ri.AtomRings()
 
-    # Gate: exactly 2 rings in SSSR
-    if len(atom_rings) != 2:
+    # Gate: must have at least 2 rings in SSSR (D-08 broadening — was != 2)
+    if len(atom_rings) < 2:
         return None
+
+    # Phase 149 D-08: route base decision through select_base_component
+    # for any N>=2. The naming engine remains 2-ring-only.
+    #
+    # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
+    # Source: 149-CONTEXT.md D-08.
+    from .fused_ring_selection import select_base_component, _enumerate_components
+    components = _enumerate_components(mol)
+    base_atoms, _others = select_base_component(mol, components)
+
+    if len(atom_rings) != 2:
+        # 3+ component case (D-08 trade-off): emit decision-only.
+        # base_atoms is consumed by namer.Branch 6.5 (Task 02-03) via
+        # features.parent_selection_result; full systematic-name assembly
+        # deferred to 149.x or Phase 155.
+        logger.debug(
+            "FR-2.3 base decision for 3+ component system %s: %s",
+            Chem.MolToSmiles(mol), base_atoms,
+        )
+        return None  # Decision-only; full name assembly deferred
 
     ring1, ring2 = atom_rings[0], atom_rings[1]
     shared = get_shared_atoms(mol, ring1, ring2)
