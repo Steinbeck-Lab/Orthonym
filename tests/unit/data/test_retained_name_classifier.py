@@ -204,13 +204,19 @@ class TestThreeSignalGate:
 
     @pytest.mark.unit
     def test_promotable_provisional_mode_active(self):
-        """Plan 01 leaves _phase150_validation.json absent on disk.
+        """Plan 02 graduates the classifier out of provisional mode.
 
-        The classifier therefore runs in provisional mode (S1 OR S2),
-        deferring Signal 3 until Plan 02. Per CONTEXT D-04 + D-07.
+        Plan 01 left _phase150_validation.json absent on disk so the
+        classifier ran in provisional mode (S1 OR S2). Plan 02 ships
+         and the validator JSON output
+        at src/orthonym/data/opsin_imports/_phase150_validation.json,
+        which graduates the gate to full (S1 OR S2) AND S3.
+
+        Per CONTEXT D-04 + D-07. Plan 02 acceptance criterion (Task
+        02-03) requires _PROVISIONAL_MODE is False post-graduation.
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
         """
-        assert _PROVISIONAL_MODE is True
+        assert _PROVISIONAL_MODE is False
 
     @pytest.mark.unit
     def test_promotable_signal_3_deferred_in_provisional(self):

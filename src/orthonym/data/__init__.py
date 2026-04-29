@@ -79,6 +79,28 @@ _COMPLETE_NAME_ENDINGS = (
     # Phase 150 RESEARCH section 4.2: complete-form endings produced by
     # _STEM_TO_COMPLETE_SUFFIX in 
     "ocene", "hrene",
+    # Phase 150 Plan 02 deviation (Signal 1 extension per CONTEXT D-02
+    # "Extended with additional complete-form endings discovered during
+    # round-trip validation"): additional IUPAC retained-name endings
+    # surfaced by the validator's pass_smiles set. Each entry below
+    # corresponds to a family of names that round-trip cleanly via OPSIN
+    # (Signal 3) and is therefore an empirically-verified complete-form
+    # retained name. The (S1 OR S2) AND S3 promotion rule still applies;
+    # extending S1 here is a refinement, not a relaxation.
+    "illin",     # vanillin, isovanillin, homovanillin, o-vanillin family (P-66.6.3 retained)
+    "genin",     # saligenin, naringenin, apigenin, rhapontigenin (flavonoid retained)
+    "pterin",    # pterin, methanopterin, dihydropterin, tetrahydropterin (P-29 natural product)
+    # NOTE: 'oform' / 'fluoroform' / 'iodoform' / 'bromoform' deliberately NOT
+    # added — `chloroform` is already in HC (HC line ~), and adding the OPSIN
+    # entries for FC(F)F / IC(I)I / BrC(Br)Br causes the substituent renderer
+    # to emit `(fluoroform-yl)` instead of `(trifluoromethyl)` for compounds
+    # like FC(F)CC. Phase 150 Plan 02 leaves these to systematic naming;
+    # Phase 154 substituent-pipeline work owns the trihalomethane substituent
+    # form. CONTEXT D-12 (out-of-scope guard for substituent pipeline).
+    # NOTE: 'thranil' / 'anthranil' deliberately NOT added — anthranil is OPSIN
+    # data for c1ccc2nocc2c1, which Phase 149 D-11 byte-identical lock requires
+    # to render as '1,2-benzisoxazole'. Adding the ending would violate the lock.
+    "phthalid",  # phthalid, isophthalid (P-25.4 retained lactone)
 )
 
 
