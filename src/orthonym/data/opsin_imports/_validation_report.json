@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-07T08:47:52Z",
+  "generated_at": "2026-04-29T07:58:14Z",
   "files_parsed": 40,
   "per_file_stats": {
     "arylGroups.xml": {
@@ -10,8 +10,8 @@
     },
     "simpleGroups.xml": {
       "tokens": 462,
-      "accepted": 424,
-      "rejected": 1,
+      "accepted": 423,
+      "rejected": 5,
       "stereo_flagged": 3
     },
     "carboxylicAcids.xml": {
@@ -251,8 +251,8 @@
   "totals": {
     "total_parsed": 4727,
     "parsed": 4727,
-    "accepted": 4414,
-    "rejected": 55,
+    "accepted": 4413,
+    "rejected": 59,
     "stereo_flagged": 13,
     "duplicates": 0
   },

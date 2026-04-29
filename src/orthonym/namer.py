@@ -28,7 +28,7 @@ from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
 from .rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 from .assembly.composer import assemble_name
-from .data.retained_names import RETAINED_NAMES
+from .data import ALL_RETAINED_NAMES as RETAINED_NAMES
 
 
 # ---------------------------------------------------------------------------

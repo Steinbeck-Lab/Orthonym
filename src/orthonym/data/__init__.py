@@ -76,6 +76,9 @@ _COMPLETE_NAME_ENDINGS = (
     "thiin", "oxathiin", "dithiin",
     # Specific complete retained names that don't fit patterns
     "urea", "thiourea",
+    # Phase 150 RESEARCH section 4.2: complete-form endings produced by
+    # _STEM_TO_COMPLETE_SUFFIX in 
+    "ocene", "hrene",
 )
 
 
@@ -101,28 +104,96 @@ def _is_complete_name(name: str) -> bool:
     return any(name_lower.endswith(ending) for ending in _COMPLETE_NAME_ENDINGS)
 
 
-# OPSIN names that are acceptable but NOT IUPAC 2013 PINs for simple compounds.
-# These would override correct systematic naming. Exclude them so the naming
-# algorithm produces the PIN (e.g., "ethene" not "ethylene").
-_OPSIN_NON_PIN_EXCLUSIONS = {
-    "ethylene", "propylene", "acetylene",  # PINs: ethene, propene, ethyne
-    "isobutylene",  # PIN: 2-methylpropene
-    "trimethylene",  # not a PIN
-    "tetramethylene",  # not a PIN
-    "pentamethylene",  # not a PIN
-}
+# Phase 150 D-06: load IUPAC 2013 PIN allow-list (single source of truth).
+# Single canonical store: src/orthonym/data/iupac_2013_pin_list.json.
+# Replaces the previous hard-coded _OPSIN_NON_PIN_EXCLUSIONS frozenset
+# (CD-02 promotion to JSON allow-list with citation per entry).
+import json
+from pathlib import Path
 
-# Filter OPSIN names to only complete names (not stems) and exclude non-PINs
+_PIN_LIST_PATH = Path(__file__).parent / "iupac_2013_pin_list.json"
+try:
+    with open(_PIN_LIST_PATH) as f:
+        _PIN_LIST = json.load(f)
+    _PIN_ALLOW = frozenset(
+        e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is True
+    )
+    _PIN_DENY = frozenset(
+        e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is False
+    )
+except FileNotFoundError:
+    _PIN_ALLOW = frozenset()
+    _PIN_DENY = frozenset()
+    logger.warning(
+        "iupac_2013_pin_list.json not found at %s; "
+        "classifier degrades to Signal 1 only", _PIN_LIST_PATH
+    )
+
+# Phase 150 D-04: load round-trip cache (Plan 02 produces this)
+_ROUNDTRIP_CACHE_PATH = (
+    Path(__file__).parent / "opsin_imports" / "_phase150_validation.json"
+)
+_PROVISIONAL_MODE = not _ROUNDTRIP_CACHE_PATH.exists()
+if not _PROVISIONAL_MODE:
+    try:
+        with open(_ROUNDTRIP_CACHE_PATH) as f:
+            _ROUNDTRIP_DATA = json.load(f)
+        _ROUNDTRIP_PASS = frozenset(_ROUNDTRIP_DATA.get("pass_smiles", []))
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.warning("Failed to load _phase150_validation.json: %s", e)
+        _ROUNDTRIP_PASS = frozenset()
+        _PROVISIONAL_MODE = True
+else:
+    _ROUNDTRIP_PASS = frozenset()
+    logger.info(
+        "Phase 150 round-trip cache absent; classifier in PROVISIONAL mode "
+        "(Signal 3 deferred until Plan 02 validator runs)"
+    )
+
+
+def _is_promotable(smiles: str, name: str) -> bool:
+    """3-signal AND gate per Phase 150 CONTEXT D-02 - pure function.
+
+    Signal 1: _is_complete_name heuristic.
+    Signal 2: data/iupac_2013_pin_list.json allow-list (PIN authority).
+    Signal 3: per-entry OPSIN round-trip via InChI L1 (Plan 02).
+
+    Promotion rule: (S1 OR S2) AND S3.
+    Special case: explicit DENY in Signal 2 always REJECTS (overrides S1, S3).
+    Provisional mode (Plan 01 before validator runs): (S1 OR S2) only.
+
+    Source: 150-CONTEXT.md D-02 + D-06.
+    Source: 150-RESEARCH.md section 4.1.
+    """
+    name_lower = name.lower().strip()
+    if name_lower in _PIN_DENY:
+        return False
+    s1 = _is_complete_name(name)
+    s2 = name_lower in _PIN_ALLOW
+    if _PROVISIONAL_MODE:
+        return s1 or s2
+    s3 = smiles in _ROUNDTRIP_PASS
+    return (s1 or s2) and s3
+
+
+# Phase 150 CD-02: _OPSIN_NON_PIN_EXCLUSIONS DERIVED from JSON allow-list
+# (single source of truth). Preserved as frozenset alias for backward-compat
+# with downstream readers.
+_OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
+
+
+# Phase 150 D-02: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
 _OPSIN_NAMES: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
-    if _is_complete_name(name) and name.lower() not in _OPSIN_NON_PIN_EXCLUSIONS
+    if _is_promotable(smi, name)
 }
 
 _stem_count = len(_OPSIN_NAMES_RAW) - len(_OPSIN_NAMES)
 if _stem_count > 0:
     logger.debug(
-        "OPSIN imports: %d complete names included, %d stems filtered out",
-        len(_OPSIN_NAMES), _stem_count
+        "OPSIN imports: %d entries promoted, %d stems/non-PINs filtered "
+        "(provisional_mode=%s)",
+        len(_OPSIN_NAMES), _stem_count, _PROVISIONAL_MODE
     )
 
 # Merge: OPSIN first, then hand-curated overwrites (D-11: hand-curated wins)
@@ -152,8 +223,9 @@ _conflict_count = sum(1 for k in _OPSIN_NAMES if k in _HAND_CURATED_NAMES)
 if _conflict_count > 0:
     logger.info(
         "Retained names merged: %d hand-curated + %d OPSIN imports "
-        "(%d conflicts, hand-curated wins)",
-        len(_HAND_CURATED_NAMES), len(_OPSIN_NAMES), _conflict_count
+        "(%d conflicts, hand-curated wins; provisional_mode=%s)",
+        len(_HAND_CURATED_NAMES), len(_OPSIN_NAMES), _conflict_count,
+        _PROVISIONAL_MODE
     )
 
 __all__ = ["RETAINED_NAMES", "ALL_RETAINED_NAMES", "get_retained_name",
