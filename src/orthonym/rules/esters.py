@@ -197,7 +197,7 @@ def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
     # For fused/complex ring systems with COOH, try to get the ring system name
     # and append "-carboxylic"
     # Build a sub-molecule from just the ring atoms to identify
-    from ..data.retained_names import RETAINED_NAMES
+    from ..data import ALL_RETAINED_NAMES as RETAINED_NAMES
     from ..rules.polycyclics import identify_polycyclic
 
     # Try identifying as a polycyclic aromatic

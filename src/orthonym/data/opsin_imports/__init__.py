@@ -27,44 +27,60 @@ from .functional_terms import OPSIN_FUNCTIONAL_TERMS
 from .fusion_components_opsin import OPSIN_FUSION_COMPONENTS
 
 
+def _select_primary_name(names):
+    """Per RESEARCH Pitfall 5 + ADDITION 3: prefer longest space-containing name.
+
+    OPSIN stores names in parser-preference order (shortest/most-common
+    first), NOT IUPAC-output order. Token like CC(=O)O>acetic|acetic acid|
+    aceticacid has 'acetic' first; we want 'acetic acid' as the IUPAC
+    output.
+
+    Source: 150-RESEARCH.md Pitfall 5 + ADDITION 3.
+    """
+    spaced = [n for n in names if " " in n]
+    if spaced:
+        return max(spaced, key=len)
+    return names[0]
+
+
 def _build_retained_names() -> Dict[str, str]:
-    """Build consolidated SMILES-to-name lookup from multiple OPSIN sources.
+    """Build consolidated SMILES-to-name lookup from 4 OPSIN sources.
 
-    Merges aryl_groups, simple_groups, cyclic_groups, natural_products,
-    amino_acids, and carbohydrates into a single dict.
+    Phase 150 D-02: broadened from 2 sources (cyclic + NP) to 4
+    (adds aryl + simple). Stem-vs-PIN classification + round-trip gate
+    happens DOWNSTREAM in data/__init__.py:_is_promotable (Phase 150's
+    3-signal AND classifier).
 
-    For entries with composite keys (containing '||' separator for
-    structural variants), the base SMILES is extracted.
-
-    Returns:
-        Dict mapping canonical SMILES to the first (primary) name variant.
+    Source: 150-CONTEXT.md D-02.
+    Source: 150-RESEARCH.md section 4.3.
     """
     merged: Dict[str, str] = {}
 
-    # Sources for retained name lookup, in precedence order.
-    # IMPORTANT: Most OPSIN XML data files contain parser STEMS, not complete
-    # IUPAC names. Only categories that reliably contain complete, correct
-    # retained names are included here. All others are available as individual
-    # module exports for downstream phases (141, 142) that need stem data.
-    #
-    # Excluded from merge (stems/non-PINs):
-    #   OPSIN_SIMPLE_GROUPS -- ethylene, glycerone, dihydrosuccinate, etc.
-    #   OPSIN_ARYL_GROUPS -- carbazol, stilben, phenetol, etc. (93% stems)
-    #   OPSIN_AMINO_ACIDS -- butyrine, alan, leuc, etc. (74% stems)
-    #   OPSIN_CARBOHYDRATES -- mostly stems like gluc, galact, etc.
+    # 4-source merge per CONTEXT D-02 (Phase 150 broadens from 2 to 4
+    # sources). Cyclic + NP first (higher-quality data); aryl + simple
+    # appended.
     sources = [
         OPSIN_CYCLIC_GROUPS,
         OPSIN_NATURAL_PRODUCTS,
+        OPSIN_ARYL_GROUPS,           # NEW per D-02
+        OPSIN_SIMPLE_GROUPS,         # NEW per D-02
     ]
 
     for source in sources:
         for key, meta in source.items():
-            # Extract base SMILES from composite keys
-            smiles = meta.get("smiles", key.split("||")[0] if "||" in key else key)
+            # RESEARCH Pitfall 3 + R5: skip saltComponent / chalcogenide
+            # entries. These are not retained-name PINs in the parent-name
+            # sense.
+            if meta.get("subType") in ("saltComponent", "chalcogenide"):
+                continue
+            # Composite-key extraction (handles addGroup discriminator
+            # entries).
+            smiles = meta.get(
+                "smiles", key.split("||")[0] if "||" in key else key
+            )
             names = meta.get("names", [])
             if names and smiles not in merged:
-                # Use first name variant as the primary name
-                merged[smiles] = names[0]
+                merged[smiles] = _select_primary_name(names)
 
     return merged
 

@@ -239,9 +239,9 @@ def _is_retained_scaffold_name(name: str) -> bool:
     """
     name_lower = name.lower()
 
-    # Check RETAINED_NAMES
+    # Check RETAINED_NAMES (Phase 150 D-05: consult merged ALL_RETAINED_NAMES)
     try:
-        from ..data.retained_names import RETAINED_NAMES
+        from ..data import ALL_RETAINED_NAMES as RETAINED_NAMES
         for _smi, retained in RETAINED_NAMES.items():
             if retained.lower() == name_lower:
                 return True

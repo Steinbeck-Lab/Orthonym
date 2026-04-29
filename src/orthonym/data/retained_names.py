@@ -465,27 +465,43 @@ RETAINED_NAMES = {
 def get_retained_name(canonical_smiles: str) -> Optional[str]:
     """
     Get retained name for a canonical SMILES if one exists.
-    
+
+    Phase 150 D-05 + RESEARCH ADDITION 1 root-cause fix: consults the
+    merged ALL_RETAINED_NAMES dict via late binding (avoids circular
+    import at module load time). Resolves 2 function-import consumers
+    in one edit: ring_assemblies.py:296, heterocycles.py:36.
+
     Args:
         canonical_smiles: Canonical SMILES string (must be canonicalized!)
-        
+
     Returns:
         Retained name string, or None if not found
     """
-    return RETAINED_NAMES.get(canonical_smiles)
+    try:
+        from orthonym.data import ALL_RETAINED_NAMES
+        return ALL_RETAINED_NAMES.get(canonical_smiles)
+    except ImportError:
+        return RETAINED_NAMES.get(canonical_smiles)
 
 
 def is_retained_name_compound(canonical_smiles: str) -> bool:
     """
     Check if compound has a retained name.
-    
+
+    Phase 150 D-05 + RESEARCH ADDITION 1 root-cause fix: consults
+    merged ALL_RETAINED_NAMES via late binding.
+
     Args:
         canonical_smiles: Canonical SMILES string
-        
+
     Returns:
         True if compound has a retained name
     """
-    return canonical_smiles in RETAINED_NAMES
+    try:
+        from orthonym.data import ALL_RETAINED_NAMES
+        return canonical_smiles in ALL_RETAINED_NAMES
+    except ImportError:
+        return canonical_smiles in RETAINED_NAMES
 
 
 def add_retained_name(canonical_smiles: str, name: str) -> None:
