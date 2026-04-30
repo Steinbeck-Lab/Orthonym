@@ -1,0 +1,158 @@
+[
+  {
+    "fixture_id": "vb_blue_book_cubane",
+    "smiles": "C12C3C4C1C5C3C4C25",
+    "expected_name": "pentacyclo[4.2.0.0^{2,5}.0^{3,8}.0^{4,7}]octane",
+    "compound_class": "vb-pentacyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "Canonical IUPAC PIN form. VonBaeyerAnalyzer emits constitutionally-equivalent pentacyclo[3.2.1.0(2,6).0(3,8).0(4,7)]octane; both round-trip to InChI=1S/C8H8 via OPSIN. Per 151-AUDIT-A.md row 1, the differing form is wrong-numbering (P-23.2.5(a) tiebreak) but not algorithmically incorrect.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 cubane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_basketane",
+    "smiles": "C1C2C3C4C1C5C2C3C45",
+    "expected_name": "pentacyclo[4.2.1.0^{2,5}.0^{3,8}.0^{4,7}]nonane",
+    "compound_class": "vb-pentacyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "9-atom pentacyclic cage. VonBaeyerAnalyzer emits same descriptor cardinality matching this form.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 basketane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_homocubane",
+    "smiles": "C1C2C3C4C2C5C3C(C1)C45",
+    "expected_name": "pentacyclo[4.3.1.0^{4,7}.0^{5,9}.0^{8,10}]decane",
+    "compound_class": "vb-pentacyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "10-atom pentacyclic cage; VonBaeyerAnalyzer audit row 3 (151-AUDIT-A.md).",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 homocubane variant",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_quadricyclane",
+    "smiles": "C1C2C3C1C1C2C31",
+    "expected_name": "tetracyclo[2.2.1.0^{2,6}.0^{3,5}]heptane",
+    "compound_class": "vb-tetracyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "7-atom tetracyclic cage from pyrolysis of norbornadiene. VonBaeyerAnalyzer (audit row 4) emits tetracyclo[2.2.1.0(3,6).0(5,7)] — same cardinality + bridge-length set, different starting bridgehead per P-23.2.5(a) tiebreak.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 quadricyclane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_iceane",
+    "smiles": "C1C2CC3CC4CC1C2C34",
+    "expected_name": "tetracyclo[5.2.1.0^{3,9}.0^{5,8}]decane",
+    "compound_class": "vb-tetracyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "Iceane: 10-atom tetracyclic diamondoid. Audit row 5 confirms VonBaeyerAnalyzer descriptor.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 iceane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_diamantane",
+    "smiles": "C1C2CC3CC4CC1C1CC2(CC4)C31",
+    "expected_name": "pentacyclo[6.5.1.0^{2,5}.0^{3,10}.0^{5,12}]tetradecane",
+    "compound_class": "vb-pentacyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "Congressane / diamantane: 14-atom pentacyclic diamondoid. Audit row 9.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 diamantane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_trishomocubane",
+    "smiles": "C1C2CC3CC4(C2)C1C2C3CC42",
+    "expected_name": "pentacyclo[6.3.1.0^{3,10}.0^{4,7}.0^{5,10}]dodecane",
+    "compound_class": "vb-pentacyclic",
+    "blue_book_section": "P-23.3",
+    "notes": "Trishomocubane backbone: 12-atom pentacyclic cage. Audit row 8.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 trishomocubane example",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_tetracyclic_dioxa",
+    "smiles": "O1CC2CC3CC2(O1)C1CCC31",
+    "expected_name": null,
+    "compound_class": "vb-tetracyclic-hetero",
+    "blue_book_section": "P-25.2",
+    "notes": "Heteroatom variant: 1,4-dioxa tetracyclic. Audit row 7. Expected name reserved for v19 (heteroatom-prefix wiring is delegated to tricyclo._generate_heteroatom_prefix; cardinality-only check used here).",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-25.2 hetero VB-4 heuristic",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_adamantane_retained",
+    "smiles": "C1C2CC3CC1CC(C2)C3",
+    "expected_name": "adamantane",
+    "compound_class": "tricyclic-retained",
+    "blue_book_section": "P-23.3 retained-name table",
+    "notes": "RETAINED NAME (D-08): adamantane = tricyclo[3.3.1.1^{3,7}]decane. Phase 151 module returns this via tricyclo.get_retained_tricyclo_name passthrough; analyzer is bypassed.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.3 retained-name table",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_norbornane_anticanary",
+    "smiles": "C1CC2CCC1C2",
+    "expected_name": null,
+    "compound_class": "bicyclic-anticanary",
+    "blue_book_section": "P-23.2",
+    "notes": "ANTI-CANARY (D-04): norbornane = bicyclo[2.2.1]heptane. is_higher_polycyclo MUST return False; bicyclo.py keeps authority.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.2 norbornane anti-canary",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_bicyclo_222_octane_anticanary",
+    "smiles": "C1CC2CCC1CC2",
+    "expected_name": null,
+    "compound_class": "bicyclic-anticanary",
+    "blue_book_section": "P-23.2",
+    "notes": "ANTI-CANARY (D-04): bicyclo[2.2.2]octane. is_higher_polycyclo MUST return False; bicyclo.py keeps authority.",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-23.2 bicyclo[2.2.2]octane anti-canary",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_blue_book_naphthalene_anticanary",
+    "smiles": "c1ccc2ccccc2c1",
+    "expected_name": null,
+    "compound_class": "aromatic-anticanary",
+    "blue_book_section": "P-25.3",
+    "notes": "ANTI-CANARY: naphthalene routes to polycyclics.py PAH path; is_higher_polycyclo MUST return False (no aromatic ring atoms allowed).",
+    "corpus_provenance": {
+      "corpus": "blue_book_p23",
+      "row_id": "P-25.3 naphthalene anti-canary",
+      "added_phase": "151-01"
+    }
+  }
+]

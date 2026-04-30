@@ -1,0 +1,475 @@
+[
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:10213",
+    "smiles": "C[C@H]1[C@H](C)CC[C@]2(C)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@H]12",
+    "expected_name": "(3beta)-urs-12-en-3-ol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:10213",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:10221",
+    "smiles": "CC1=CC[C@H]2[C@H]3C1[C@@]2(C)CC[C@H]3C(C)C",
+    "expected_name": "(1S,6S,7S,8S)-1,3-dimethyl-8-(propan-2-yl)-tricyclo[4.4.0.0(2,7)]dec-3-ene",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:10221",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:132342",
+    "smiles": "CO[C@@H]1C=C2[C@@H]3[C@@H](C)[C@H](C)CC[C@]3(C)CC[C@@]2(C)[C@]2(C)CC[C@H]3C(C)(C)[C@@H](O)CC[C@]3(C)[C@@H]12",
+    "expected_name": "(3beta,11alpha)-11-methoxyurs-12-en-3-ol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:132342",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:132374",
+    "smiles": "C[C@H]1C(=O)CC[C@@H]2[C@]1(C)CC[C@H]1[C@@]2(C)CC[C@@]2(C)[C@@H]3C[C@](C)(CO)CC[C@]3(C)CC[C@]12C",
+    "expected_name": "(4R,4aS,6aS,6bR,8aS,11R,12aR,12bS,14aS,14bS)-11-(hydroxymethyl)-4,4a,6b,8a,11,12b,14a-heptamethylicosahydropicen-3(2H)-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:132374",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:132463",
+    "smiles": "C[C@@H]1CC(C)(C)[C@@H]2CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@]2(C)C1",
+    "expected_name": "2beta-methylgammaceran-21alpha-ol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:132463",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:132864",
+    "smiles": "C=C(C)[C@@H]1[C@H]2OC(=O)[C@@H]1[C@]1(O)[C@H]3O[C@H]3[C@]3(O)CO[C@H]2[C@]13C",
+    "expected_name": "(2aS,3R,6S,6aR,6bS,7aR,7bR,7cR,8R)-6a,7b-dihydroxy-7c-methyl-8-(prop-1-en-2-yl)octahydro-3,6-methano-2,4,7-trioxacyclopenta[cd]cyclopropa[a]azulen-5(1H)-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:132864",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:142005",
+    "smiles": "C=C1[C@@H](O)[C@]23C[C@@]1(O)CC[C@H]2[C@@]12CCC[C@@](C)(C(=O)O1)[C@H]2[C@@H]3C(=O)O",
+    "expected_name": "(1R,4aR,4bR,7S,9S,9aR,10S,10aR)-7,9-dihydroxy-1-methyl-8-methylidene-13-oxododecahydro-4a,1-(epoxymethano)-7,9a-methanobenzo[a]azulene-10-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:142005",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:142026",
+    "smiles": "C=C1C[C@]23C[C@@]1(O)CC[C@H]2[C@]1(C)CC[C@H](O)[C@@](C)(C(=O)O)[C@H]1[C@@H]3C(=O)O",
+    "expected_name": "2beta,7-dihydroxy-1alpha,4aalpha-dimethyl-8-methylidenegibbane-1alpha,10beta-dicarboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:142026",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:15610",
+    "smiles": "C=C1C[C@]23C[C@H]1CC[C@H]2[C@]1(C)CCC[C@@](C)(C(=O)O)[C@H]1[C@@H]3C=O",
+    "expected_name": "(1R,2S,3S,4R,8S,9S,12R)-2-formyl-4,8-dimethyl-13-methylidenetetracyclo[10.2.1.0(1,9).0(3,8)]pentadecane-4-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:15610",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:156196",
+    "smiles": "C[C@@]1(C(=O)O)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)[C@@](C)(CO)C5CC[C@]43C)[C@H]2C1",
+    "expected_name": "(2R,4aR,6aR,6aS,6bR,9R,10S,12aR,14bR)-10-hydroxy-9-(hydroxymethyl)-2,6a,6b,9,12a-pentamethyl-1,3,4,5,6,6a,7,8,8a,10,11,12,13,14b-tetradecahydropicene-2,4a-dicarboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:156196",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:156497",
+    "smiles": "C=CC1=CC[C@H]2[C@@H](C[C@@H](O)[C@@]3(O)[C@@]4(C)C(=O)O[C@H]4CC[C@]23C)[C@H]1C",
+    "expected_name": "13-ethenyl-5,6beta-dihydroxy-14alpha-methyl-3beta-3,15-epoxypodocarp-12-en-15-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:156497",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:166813",
+    "smiles": "CC(C)CCC[C@@H](C)[C@H]1CCC2C3C(C=O)[C@]4(O)C[C@@H](O)CC[C@]4(C)C3CC[C@@]21C",
+    "expected_name": "(3R,3aR,5bR,8S,9aR,10R)-8,9a-dihydroxy-3a,5b-dimethyl-3-[(2R)-6-methylheptan-2-yl]-2,3,4,5,5a,6,7,8,9,10,10a,10b-dodecahydro-1H-cyclopenta[a]luorene-10-carbaldehyde",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:166813",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:167985",
+    "smiles": "COC(=O)[C@]1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)C[C@H](O)[C@H](O)C(C)(C)C5CC[C@]43C)[C@H]2C1",
+    "expected_name": "(2R,4aR,6aR,6aS,6bR,10R,11S,12aR,14bR)-10,11-dihydroxy-2-methoxycarbonyl-2,6a,6b,9,9,12a-hexamethyl-1,3,4,5,6,6a,7,8,8a,10,11,12,13,14b-tetradecahydropicene-4a-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:167985",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:168151",
+    "smiles": "CC1(C)C2CC[C@]3(C)C(C(=O)C=C4[C@@H]5C[C@@](C)(C(=O)O)[C@H]6C[C@]5(C)[C@@H](C[C@]43C)O6)[C@@]2(C)CC[C@@H]1O",
+    "expected_name": "(1R,3S,4R,9S,12S,17S,19R,20R,22S)-9-hydroxy-3,4,8,8,12,19,22-heptamethyl-14-oxo-23-oxahexacyclo[18.2.1.03,16.04,13.07,12.017,22]tricos-15-ene-19-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:168151",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_chebi_5000_CHEBI:168366",
+    "smiles": "CC1(C)[C@@H](O)CC[C@]2(C)[C@H]3CC=C4[C@@H]5C[C@@](C)(CO)CC[C@]5(C(=O)O)CC[C@@]4(C)[C@]3(C)CC[C@@H]12",
+    "expected_name": "(2S,4aR,6aR,6aS,6bR,8aR,10S,12aR,14bS)-10-hydroxy-2-(hydroxymethyl)-2,6a,6b,9,9,12a-hexamethyl-1,3,4,5,6,6a,7,8,8a,10,11,12,13,14b-tetradecahydropicene-4a-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:168366",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_36012",
+    "smiles": "CC(CC12CC3CC(CC(C3)C1)C2)NCCO",
+    "expected_name": "2-[1-(1-adamantyl)propan-2-ylamino]ethanol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "36012",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_64550",
+    "smiles": "O.O=P(O)(O)SCCNC12CC3CC(CC(C3)C1)C2",
+    "expected_name": "2-(1-adamantylamino)ethylsulfanylphosphonic acid;hydrate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "64550",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_196281",
+    "smiles": "COC(=O)C1CC(=O)[C@@H]2CC[C@H]3[C@@H]4CC[C@H]([C@H](C)CCCC(C)C)[C@@]4(C)CC[C@@H]3[C@@]12C",
+    "expected_name": "methyl (3aR,3bS,5aR,6R,8aS,8bS,10aR)-3a,5a-dimethyl-6-[(2R)-6-methylheptan-2-yl]-1-oxo-3,3b,4,5,6,7,8,8a,8b,9,10,10a-dodecahydro-2H-indeno[6,7-e]indene-3-carboxylate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "196281",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_287616",
+    "smiles": "CC12CCC(O)CC1CCC1C3CCCC(=O)C3CCC12",
+    "expected_name": "8-hydroxy-10a-methyl-2,3,4,4a,4b,5,6,6a,7,8,9,10,10b,11,12,12a-hexadecahydrochrysen-1-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "287616",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_288237",
+    "smiles": "O=C(O)C1=C(C(=O)O)C2C3CC4C(C13)C42",
+    "expected_name": "tetracyclo[4.3.0.02,4.03,7]non-8-ene-8,9-dicarboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "288237",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_371825",
+    "smiles": "Cl.NC12CC3CC(C1)CC(Cl)(C3)C2",
+    "expected_name": "3-chloroadamantan-1-amine;hydrochloride",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "371825",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_487707",
+    "smiles": "C[C@@]12CCC[C@]3(C)C4=CC(=O)OC(O)[C@]45O[C@@H]5C(OC1=O)[C@@H]23",
+    "expected_name": "(2R,4S,10S,14S,17R)-5-hydroxy-10,14-dimethyl-3,6,16-trioxapentacyclo[8.6.1.02,4.04,9.014,17]heptadec-8-ene-7,15-dione",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "487707",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_584581",
+    "smiles": "CCCCCCCCCCCC(C)OC(=O)C12CC3CC(CC(C3)C1)C2",
+    "expected_name": "tridecan-2-yl adamantane-1-carboxylate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "584581",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_585179",
+    "smiles": "O=C(CCl)OCC12CC3CC(CC(C3)C1)C2",
+    "expected_name": "1-adamantylmethyl 2-chloroacetate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "585179",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_2836030",
+    "smiles": "CNC(C)C(=O)C12CC3CC(CC(C3)C1)C2",
+    "expected_name": "1-(1-adamantyl)-2-(methylamino)propan-1-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "2836030",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_4486612",
+    "smiles": "CC1CCC2N(C1)CC1C(C(O)C(O)C3(O)C1CC14OC5(O)C(O)CCC1(C)C5CCC34)C2(C)O",
+    "expected_name": "6,10,19-trimethyl-24-oxa-4-azaheptacyclo[12.12.0.02,11.04,9.015,25.018,23.019,25]hexacosane-10,12,13,14,22,23-hexol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "4486612",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_4576209",
+    "smiles": "CC12CC3(C(=O)[O-])C1CCC23C",
+    "expected_name": "2,6-dimethyltricyclo[3.2.0.02,6]heptane-1-carboxylate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "4576209",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_4617078",
+    "smiles": "CC=CC=CC(=O)OCC(=O)NC12CC3CC(CC(C3)C1)C2",
+    "expected_name": "[2-(1-adamantylamino)-2-oxoethyl] hexa-2,4-dienoate",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "4617078",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_4868274",
+    "smiles": "CC1CC2C(CC1C)C1C34C56C2C53C164",
+    "expected_name": "10,11-dimethylheptacyclo[6.4.0.02,4.03,5.03,6.04,6.05,7]dodecane",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "4868274",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_pubchem_2000_5036051",
+    "smiles": "CC1=CC(=O)C(O)C2(C)C1CC1OC(=O)C(O)C3C(C)C(O)C4(O)OCC13C42",
+    "expected_name": "4,5,8,17-tetrahydroxy-6,14,18-trimethyl-3,10-dioxapentacyclo[9.8.0.01,7.04,19.013,18]nonadec-14-ene-9,16-dione",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "5036051",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:132341",
+    "smiles": "CC1(C)CC[C@]2(C)CC[C@]3(C)C(=C2C1)C[C@@H](O)[C@@H]1[C@@]2(C)CC[C@H](O)C(C)(C)[C@@H]2CC[C@]13C",
+    "expected_name": "(1S,2R,5R,7S,10S,11R,12R,20R)-1,2,6,6,10,17,17,20-octamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-14-en-7,12-diol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:132341",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:167518",
+    "smiles": "CC1=C2C[C@]3(C)CC[C@@H](C(C)C)[C@H]3C[C@@H]2[C@@]23CC[C@@H](C)[C@@H]2CC[C@@]13C",
+    "expected_name": "(3R,6S,7R,10R,11S,13R,14S,17S)-14-isopropyl-2,3,7,17-tetramethyl-pentacyclo[9.7.0.0(3,10).0(6,10).0(13,17)]octadec-1-ene",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:167518",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:172737",
+    "smiles": "CC12CC3OC(=O)C1COC14OC5(C2C1=O)C(O)(CCC1C4C(O)CC2(O)CC=CC(=O)C12C)C(=O)OC35C",
+    "expected_name": "3,5,10-trihydroxy-6,13,16-trimethyl-12,19,23,24-tetraoxa-octacyclo[12.9.1.4(5,6).1(1,15).0(2,7).0(10,14).0(13,18).0(16,21)]nonacos-27-en-11,20,25,26-tetraone",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:172737",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:204252",
+    "smiles": "CC1=C2CC[C@]2(C)[C@]23OC[C@](C)(C[C@@H]2C1=O)[C@@H]3O",
+    "expected_name": "(1R,2S,8S,10S,13S)-13-hydroxy-2,6,10-trimethyl-12-oxa-tetracyclo[6.4.0.1(1,10).0(2,5)]tridec-5-en-7-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:204252",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:205621",
+    "smiles": "C[C@@]12[C@H](O)C=C[C@]3(C)C(=O)O[C@H](C=C4COC(=O)C[C@@H]41)[C@H]23",
+    "expected_name": "(1R,2S,9R,12S,15R,16R)-15-hydroxy-1,12-dimethyl-5,10-dioxa-tetracyclo[7.6.1.0(2,7).0(12,16)]hexadeca-7,13-dien-4,11-dione",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:205621",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:209241",
+    "smiles": "C[C@H]1CC[C@@H]2[C@@H]3[C@H]1CC[C@]1(C)CCC[C@](C)(C[C@]2(C)O)[C@@H]31",
+    "expected_name": "(1S,4S,5S,8R,9S,11R,15S,16R)-1,5,9,11-tetramethyl-tetracyclo[9.3.1.1(4,8).0(15,16)]hexadecan-9-ol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:209241",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:211048",
+    "smiles": "CC(C)C[C@@H]1NC(=O)[C@H]2CCCNN2C(=O)[C@H](C)N(C)C(=O)[C@H]2CCCNN2C(=O)[C@@H]2CCCNN2C(=O)[C@@H](C(C)C)NC1=O",
+    "expected_name": "(1R,4S,7R,14S,21R,24S)-4-isobutyl-7-isopropyl-23,24-dimethyl-3,6,9,10,16,17,23,26,27-nonaaza-tetracyclo[24.4.0.0(9,14).0(16,21)]triacontan-2,5,8,15,22,25-hexaone",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:211048",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:214644",
+    "smiles": "CO[C@H]1O[C@H]2OC(=O)C3=CC[C@H]4C(C)(C)CCC[C@@]14[C@H]32",
+    "expected_name": "(4S,9R,10S,12S,15R)-10-methoxy-5,5-dimethyl-11,13-dioxa-tetracyclo[7.5.1.0(4,9).0(12,15)]pentadec-1-en-14-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:214644",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:219929",
+    "smiles": "CC1=C2C(=O)C[C@@]2(C)[C@@H]2C[C@@H]3CC[C@@H](C)[C@@]2(CC1)C3(C)C",
+    "expected_name": "(1S,2S,9R,10R,13S)-2,6,10,15,15-pentamethyl-tetracyclo[7.5.0.1(9,13).0(2,5)]pentadec-5-en-4-one",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:219929",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:224727",
+    "smiles": "C[C@@]1(C(=O)O)[C@H](O)CC[C@@]2(C)[C@H]1CC[C@H]1C[C@@H]3C[C@@]12CC[C@]3(O)C(=O)O",
+    "expected_name": "(1S,4R,5S,6R,9S,10S,13R,14R)-6,13-dihydroxy-5,9-dimethyl-tetracyclo[8.5.0.1(10,14).0(4,9)]hexadecane-5,13-dicarboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:224727",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:66682",
+    "smiles": "CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)C[C@@H](O)[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1",
+    "expected_name": "(1S,2R,5R,7R,8R,10R,11R,15S,20S)-7,8-dihydroxy-1,2,6,6,10,17,17-heptamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:66682",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:69219",
+    "smiles": "CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC=C4[C@@]5(C)CC[C@@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1",
+    "expected_name": "(1R,2S,5R,7R,10S,15S,20S)-7-hydroxy-1,2,6,6,10,17,17-heptamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docosa-11,13-diene-20-carboxylic acid",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:69219",
+      "added_phase": "151-01"
+    }
+  },
+  {
+    "fixture_id": "vb_opsin_selftest_500_CHEBI:79776",
+    "smiles": "CC1(C)CC[C@]23CC[C@]4(C)[C@H](CC[C@@H]5[C@@]6(C)CC[C@H](O)C(C)(C)[C@@H]6CC[C@]54C)[C@H]2[C@@H]1OC3",
+    "expected_name": "(1R,2R,5R,7S,10R,11R,14R,15R,16S,20R)-1,2,6,6,10,17,17-heptamethyl-24-oxa-hexacyclo[12.8.0.2(16,20).0(2,11).0(5,10).0(15,20)]tetracosan-7-ol",
+    "compound_class": "vb-higher",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:79776",
+      "added_phase": "151-01"
+    }
+  }
+]
