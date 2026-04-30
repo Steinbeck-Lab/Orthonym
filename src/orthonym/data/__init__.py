@@ -236,7 +236,15 @@ def has_retained_name(canonical_smiles: str) -> bool:
 
 
 def register_retained_name(canonical_smiles: str, name: str):
-    """Register a retained name at runtime (for testing/dynamic use)."""
+    """Register a retained name at runtime (for testing/dynamic use).
+
+    Phase 150 REVIEW WR-04: this is the CANONICAL runtime registration
+    API. The legacy ``data.retained_names.add_retained_name`` is a
+    deprecated alias that now delegates here (per CR-01 fix) so both
+    APIs keep ``ALL_RETAINED_NAMES`` and the HC dict in sync.
+
+    Source: 150-REVIEW.md WR-04 + CR-01.
+    """
     ALL_RETAINED_NAMES[canonical_smiles] = name
 
 
