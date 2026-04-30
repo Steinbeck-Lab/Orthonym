@@ -73,11 +73,27 @@ def _build_retained_names() -> Dict[str, str]:
             # sense.
             if meta.get("subType") in ("saltComponent", "chalcogenide"):
                 continue
-            # Composite-key extraction (handles addGroup discriminator
-            # entries).
-            smiles = meta.get(
-                "smiles", key.split("||")[0] if "||" in key else key
-            )
+            # Phase 150 REVIEW CR-02 root-cause fix: skip composite-key
+            # entries. The "||" discriminator records OPSIN parser-side
+            # transformations (addGroup / addBond / addHeteroAtom) that
+            # would need the full OPSIN parser to materialise the actual
+            # canonical SMILES of the modified molecule. Without that, the
+            # base SMILES extracted from key.split("||")[0] does NOT
+            # represent the molecular structure the discriminated name
+            # refers to (e.g., 'acenaphthoquinone' is keyed on the
+            # acenaphthylene SMILES + '=O locant 1;=O locant 2'; the base
+            # SMILES alone is acenaphthylene). Storing the discriminated
+            # name against the base SMILES would mis-attribute the name
+            # to the wrong structure. Skipping is the conservative
+            # data-source-correct choice; 26 such entries (21 aryl + 2
+            # simple + 3 cyclic + 0 NP) are excluded. Aryl-side rendering
+            # of acenaphthoquinone et al. falls back to systematic naming
+            # until a future phase implements OPSIN-style addGroup
+            # materialisation. Source: 150-REVIEW.md CR-02 +
+            # the contributor guide fix-methodology.md (root-cause-only fixes).
+            if "||" in key:
+                continue
+            smiles = meta.get("smiles", key)
             names = meta.get("names", [])
             if names and smiles not in merged:
                 merged[smiles] = _select_primary_name(names)
