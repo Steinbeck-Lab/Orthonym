@@ -25,15 +25,26 @@ Examples:
     dispiro[2.1.2.1]octane - three rings sharing two spiro centers
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 
 from ..perception.rings import get_spiro_atoms
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
+# Phase 151-02 D-11/D-20: locant comparator reuse — no parallel comparator
+# permitted in this module. Imported at the top so the source-grep lock in
+# tests/unit/rules/test_mixed_spiro_fused.py and test_spiro_numbering.py
+# can verify the invariant without inspecting individual function bodies.
+from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+
+
+# Phase 151-02 D-13/D-21: locant tuple type alias for cascade-step-6
+# suppliers. Plain int for typical ring atoms; (int, str) tuple for
+# fusion atoms with a letter suffix (e.g., (4, 'a') -> "4a").
+_Locant = Union[int, Tuple[int, str]]
 
 # Polyspiro prefix names indexed by number of spiro centers
 _POLYSPIRO_PREFIXES = [
@@ -847,3 +858,726 @@ def get_rings_from_spiro_center(
         return (ring1, ring2)
     else:
         return (ring2, ring1)
+
+
+# ============================================================================
+# Phase 151-02 — Mixed spiro/fused detector + name builder + cascade suppliers
+# ============================================================================
+#
+# Source: 151-02-PLAN.md tasks 2-3; 151-AUDIT-B.md verdict
+# (PURE_SPIRO_PARTIAL · MIXED_SPIRO_FUSED_MISSING · Q-05 NESTED_FORM_PARSEABLE);
+# 151-CONTEXT.md D-09/D-13/D-21/D-24; HERITAGE-1990-insights.md §4.
+#
+# Design notes (codified from audit):
+#  * D-09 lock — `is_spiro_system` body remains byte-identical. Mixed
+#    cases are a SEPARATE detector (`is_mixed_spiro_fused`) and a
+#    SEPARATE name builder (`name_mixed_spiro_fused`).
+#  * D-13 + HERITAGE §4 — name_mixed_spiro_fused implements separable
+#    parts: identify fused component → name via existing fused-ring
+#    pipeline → identify spiro side ring → name algorithmically →
+#    recombine with primed locant on the side-ring's spiro-attachment
+#    locant only (Q-05 OPSIN preview confirmed parseable).
+#  * D-24 — no postprocessor band-aids. When the algorithm cannot
+#    name a fixture, return None and let the caller log to
+#    HERITAGE-followups.md.
+#  * v18 scope: monospiro mixed cases (1 spiro centre joining a fused
+#    component to a single side ring). Multi-spiro mixed cases return
+#    None and are logged as v19 follow-ups.
+# ============================================================================
+
+
+def is_mixed_spiro_fused(mol) -> bool:
+    """
+    Detect a mixed spiro / fused ring system.
+
+    A mixed spiro/fused system has:
+      (a) at least one spiro atom (one shared between exactly two rings)
+      (b) at least one fused-ring junction (rings share an edge)
+      (c) is NOT a recognized natural-product backbone (RESEARCH Pitfall 3
+          false-positive guard — steroids and alkaloids may carry RDKit
+          ring perception artifacts that look spiro-like).
+
+    Mutually exclusive with `is_spiro_system` per Phase 151-02 D-09:
+    `is_spiro_system` returns True only when n_rings == n_spiro + 1.
+
+    Phase 151-02 D-09/D-13.
+
+    Args:
+        mol: RDKit Mol object. Returns False if mol is None.
+
+    Returns:
+        True iff (a) AND (b) AND (c) hold.
+    """
+    if mol is None:
+        return False
+    spiro_atoms = get_spiro_atoms(mol)
+    if not spiro_atoms:
+        return False
+    ri = mol.GetRingInfo()
+    if ri.NumRings() <= len(spiro_atoms) + 1:
+        return False  # pure spiro — defer to is_spiro_system
+    # FALSE-POSITIVE GUARD per RESEARCH Pitfall 3: steroid + alkaloid
+    # backbones short-circuit to False. Even though most natural-product
+    # scaffolds have n_spiro == 0 (already returned above), the guard
+    # protects against perception artifacts on exotic kekulizations.
+    from ..perception.natural_products import detect_natural_product
+    if detect_natural_product(mol) is not None:
+        return False
+    return True
+
+
+def get_spiro_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
+    """
+    Cascade-step-6 supplier for pure spiro systems (Phase 151-02 D-21).
+
+    Wraps the existing `_get_polyspiro_numbering` (multi-spiro) and
+    `get_spiro_numbering` (monospiro) helpers, returning the same
+    atom -> locant map shape that Phase 147's `_build_ring_pos`
+    consumes via the `_has_iupac_locants` cascade-step-6 gate.
+
+    Coverage invariant per Pitfall 7: returns None on partial coverage
+    so the cascade-step-6 gate falls through to the sorted-int proxy.
+
+    Args:
+        mol: RDKit Mol object.
+
+    Returns:
+        Dict mapping atom_idx -> int locant, covering ALL ring atoms,
+        OR None if mol is not a pure spiro system OR coverage is partial.
+    """
+    if mol is None:
+        return None
+    if not is_spiro_system(mol):
+        return None
+    spiro_atoms = get_spiro_atoms(mol)
+    if not spiro_atoms:
+        return None
+    ri = mol.GetRingInfo()
+    ring_atoms: Set[int] = set()
+    for r in ri.AtomRings():
+        ring_atoms.update(r)
+    if len(spiro_atoms) == 1:
+        numbering = get_spiro_numbering(mol, list(spiro_atoms)[0])
+    else:
+        numbering = _get_polyspiro_numbering(mol, set(spiro_atoms))
+    if not numbering:
+        return None
+    if not (set(numbering.keys()) >= ring_atoms):
+        return None  # Pitfall 7: partial coverage -> None
+    # Filter to ring atoms only (drop exocyclic side-chain locants if any)
+    return {k: v for k, v in numbering.items() if k in ring_atoms}
+
+
+# ============================================================================
+# HERITAGE §4 separable-parts helpers (private)
+# ============================================================================
+
+
+def _classify_rings_around_spiro_center(
+    mol, spiro_center: int, all_rings: List[List[int]],
+) -> Optional[Tuple[List[List[int]], List[List[int]]]]:
+    """Partition rings into (FUSED_GROUP, SIDE_GROUP) at a spiro centre.
+
+    The FUSED_GROUP is the connected component of rings sharing edges
+    (fused-ring junctions, ≥2 shared atoms) reachable from one of the
+    two rings at the spiro centre. The SIDE_GROUP is the connected
+    component on the other side of the spiro centre.
+
+    Returns (fused_rings, side_rings) or None if the topology does
+    not separate cleanly (e.g., both sides are fused, or the spiro
+    centre is not in exactly 2 rings).
+    """
+    rings_at_center = [r for r in all_rings if spiro_center in r]
+    if len(rings_at_center) != 2:
+        return None
+    ring_a, ring_b = rings_at_center
+
+    # Build fused-only adjacency (rings sharing ≥2 atoms = fused edge,
+    # excluding the spiro-only adjacency at the centre itself).
+    n = len(all_rings)
+    fused_adj: Dict[int, List[int]] = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            shared = set(all_rings[i]) & set(all_rings[j])
+            if len(shared) >= 2:
+                fused_adj[i].append(j)
+                fused_adj[j].append(i)
+
+    def _component(start_ring_idx: int) -> Set[int]:
+        seen = {start_ring_idx}
+        stack = [start_ring_idx]
+        while stack:
+            cur = stack.pop()
+            for nbr in fused_adj[cur]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    stack.append(nbr)
+        return seen
+
+    idx_a = all_rings.index(ring_a)
+    idx_b = all_rings.index(ring_b)
+    comp_a = _component(idx_a)
+    comp_b = _component(idx_b)
+
+    # If both rings are in the SAME fused component, the topology is
+    # not a clean separable spiro/fused split — defer to v19.
+    if comp_a == comp_b:
+        return None
+
+    # Component sizes determine which side is "fused part" (>=2 rings)
+    # vs "side ring" (1 ring). Both sides must include >=1 ring;
+    # at least one side must have >=2 rings (fused).
+    if len(comp_a) >= 2 and len(comp_b) == 1:
+        fused_idx, side_idx = comp_a, comp_b
+    elif len(comp_b) >= 2 and len(comp_a) == 1:
+        fused_idx, side_idx = comp_b, comp_a
+    else:
+        # Both sides are 1-ring (would be pure spiro, not mixed) or
+        # both >=2 (two fused components on either side — exotic v19).
+        return None
+
+    fused_rings = [all_rings[i] for i in fused_idx]
+    side_rings = [all_rings[i] for i in side_idx]
+    return fused_rings, side_rings
+
+
+def _extract_subfragment(
+    mol, atom_indices: Set[int],
+) -> Optional[Tuple[Chem.Mol, Dict[int, int]]]:
+    """Build an RDKit Mol containing only the specified atoms (and the
+    bonds between them). Returns (frag_mol, orig_to_frag_idx_map)
+    or None on failure.
+
+    For each kept atom, the count of OUT-OF-FRAGMENT neighbors in the
+    original molecule is added as explicit hydrogens on the fragment
+    atom. This preserves valence so the fragment sanitizes cleanly and
+    downstream naming helpers (which expect bare-skeleton input) see
+    a chemically valid molecule.
+
+    The fragment is sanitized so downstream naming helpers see a
+    well-formed molecule (aromaticity perception, ring info, valence).
+    """
+    if not atom_indices:
+        return None
+    rwmol = Chem.RWMol()
+    orig_to_frag: Dict[int, int] = {}
+    for orig_idx in sorted(atom_indices):
+        atom = mol.GetAtomWithIdx(orig_idx)
+        new_atom = Chem.Atom(atom.GetAtomicNum())
+        new_atom.SetFormalCharge(atom.GetFormalCharge())
+        # Hydrogen budget: existing explicit Hs + (degree - in_fragment_neighbors)
+        # to compensate for the bonds we are dropping.
+        original_in_frag_neighbors = sum(
+            1 for n in atom.GetNeighbors()
+            if n.GetIdx() in atom_indices
+        )
+        out_of_frag_neighbors = atom.GetDegree() - original_in_frag_neighbors
+        new_atom.SetNumExplicitHs(
+            atom.GetTotalNumHs() + out_of_frag_neighbors
+        )
+        new_atom.SetNoImplicit(False)
+        # Preserve aromaticity flag — we re-perceive after sanitize.
+        new_atom.SetIsAromatic(atom.GetIsAromatic())
+        new_idx = rwmol.AddAtom(new_atom)
+        orig_to_frag[orig_idx] = new_idx
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in orig_to_frag and b in orig_to_frag:
+            rwmol.AddBond(orig_to_frag[a], orig_to_frag[b], bond.GetBondType())
+    frag = rwmol.GetMol()
+    try:
+        Chem.SanitizeMol(frag)
+    except Exception:
+        return None
+    return frag, orig_to_frag
+
+
+def _name_fused_component(
+    mol, fused_rings: List[List[int]],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name the fused component fragment.
+
+    Returns (name, frag_atom_idx -> locant_in_name) on success, or None.
+
+    Strategy (mirrors the composer cascade):
+      1. Build the fragment as an isolated mol.
+      2. Use ``match_fused_heterocycle_core`` to fetch the catalog-supplied
+         IUPAC locant mapping (which `name_fused_heterocycle` discards
+         on the retained-name early-exit path).
+      3. Fall back to `name_ortho_fused_bicyclic` for systematic naming
+         when no catalog match.
+      4. Otherwise return None (v19 follow-up).
+    """
+    fused_atoms: Set[int] = set()
+    for r in fused_rings:
+        fused_atoms.update(r)
+    extracted = _extract_subfragment(mol, fused_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+
+    # Prefer the heterocycle catalog path first — direct call to
+    # match_fused_heterocycle_core preserves the locant mapping that
+    # name_fused_heterocycle's retained-name shortcut discards.
+    try:
+        from ..data.fused_heterocycles import match_fused_heterocycle_core
+        from .fused_rings import name_fused_heterocycle, name_ortho_fused_bicyclic
+    except ImportError:
+        return None
+
+    core_match = match_fused_heterocycle_core(frag)
+    if core_match is not None:
+        core_name, atom_mapping_in_frag, _core_smiles = core_match
+        # atom_mapping_in_frag : Dict[int, int|str] — locants for each frag atom
+        # Map back to original atom indices, coercing letter-suffixed
+        # locants like '7a' to base int (7) for the spiro descriptor
+        # (Q-05 OPSIN preview: spiro descriptors use plain integer
+        # locants in both pre- and post-comma positions).
+        atom_to_locant_in_orig: Dict[int, int] = {}
+        for frag_idx, locant in atom_mapping_in_frag.items():
+            if frag_idx not in frag_to_orig:
+                continue
+            base: int
+            if isinstance(locant, int):
+                base = locant
+            elif isinstance(locant, str):
+                # '7a' -> 7
+                digits = "".join(c for c in locant if c.isdigit())
+                if not digits:
+                    continue
+                base = int(digits)
+            elif isinstance(locant, tuple) and len(locant) >= 1:
+                base = locant[0] if isinstance(locant[0], int) else 0
+            else:
+                continue
+            atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
+        return core_name, atom_to_locant_in_orig
+
+    # No catalog hit — try systematic ortho-fused naming.
+    result = name_ortho_fused_bicyclic(frag)
+    if result is None:
+        # Try the heterocycle path one more time in case it produces a
+        # name (e.g., algorithmic _try_algorithmic_fusion_name).
+        result = name_fused_heterocycle(frag)
+        if result is None:
+            return None
+
+    name, _ring_atoms, atom_to_locant_in_frag, _subs_included = result
+
+    if not atom_to_locant_in_frag:
+        # Systematic fallback (e.g., 'decahydronaphthalene') yields a
+        # name but no locant map. Synthesize a peripheral-numbering walk
+        # to produce a connectivity-correct locant map covering all
+        # ring atoms. This honors the cascade-step-6 coverage invariant
+        # (Pitfall 7) without inventing new IUPAC numbering rules —
+        # for saturated fused bicyclics, the peripheral walk is the
+        # canonical IUPAC traversal (P-23.2.5 + P-25.3 inheritance).
+        atom_to_locant_in_frag = _synthesize_fused_locants(frag)
+        if not atom_to_locant_in_frag:
+            return None
+
+    atom_to_locant_in_orig: Dict[int, int] = {}
+    for frag_idx, locant in atom_to_locant_in_frag.items():
+        if frag_idx in frag_to_orig:
+            base = locant if isinstance(locant, int) else (
+                locant[0] if isinstance(locant, tuple) else 0)
+            if base:
+                atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
+
+    return name, atom_to_locant_in_orig
+
+
+def _synthesize_fused_locants(frag) -> Dict[int, int]:
+    """Synthesize a peripheral-walk locant map for a fused-ring fragment.
+
+    For 2-ring fused systems (ortho-fused bicyclics) without a catalog
+    entry — used only for saturated fused carbocyclics named as
+    decahydro/octahydro derivatives by `name_ortho_fused_bicyclic`.
+
+    Returns a Dict[atom_idx -> locant_int] covering all ring atoms.
+    Returns {} if the fragment is not a clean 2-ring fused system or
+    the walk fails.
+    """
+    ri = frag.GetRingInfo()
+    rings = [list(r) for r in ri.AtomRings()]
+    if len(rings) != 2:
+        return {}
+    r1, r2 = rings
+    shared = set(r1) & set(r2)
+    if len(shared) != 2:
+        return {}
+
+    # Build adjacency limited to ring atoms.
+    ring_atoms = set(r1) | set(r2)
+    adj: Dict[int, List[int]] = {a: [] for a in ring_atoms}
+    for a in ring_atoms:
+        for nbr in frag.GetAtomWithIdx(a).GetNeighbors():
+            if nbr.GetIdx() in ring_atoms:
+                adj[a].append(nbr.GetIdx())
+
+    # Peripheral walk: start at a non-fusion atom of the LARGER ring,
+    # walk around the periphery (skipping the bridge), assigning 1..N.
+    # The two fusion atoms get '4a'/'8a'-style markers, but for the
+    # spiro-attachment locant we only need INT positions.
+    larger = r1 if len(r1) >= len(r2) else r2
+    smaller = r2 if larger is r1 else r1
+
+    # Find a peripheral start — a non-fusion atom in the larger ring
+    # adjacent to a fusion atom (so locant 1 is "next to" the fusion).
+    fusion = list(shared)
+    start = None
+    for a in larger:
+        if a in shared:
+            continue
+        if any(n in shared for n in adj[a]):
+            start = a
+            break
+    if start is None:
+        return {}
+
+    # Walk around the larger ring's non-fusion atoms first
+    # (start, neighbour, ..., then fusion -> smaller ring -> other fusion -> back).
+    locants: Dict[int, int] = {}
+    visited: Set[int] = set()
+    counter = 1
+
+    # Walk larger ring's non-fusion side
+    current = start
+    locants[current] = counter
+    visited.add(current)
+    counter += 1
+    # Step into the larger ring: prefer the non-fusion neighbour
+    next_atom = None
+    for n in adj[current]:
+        if n not in visited and n not in shared:
+            next_atom = n
+            break
+    while next_atom is not None and len(locants) < len(larger) - len(shared) + len(smaller) + len(shared):
+        if next_atom in shared:
+            # Crossed a fusion atom — assign locant and pivot
+            locants[next_atom] = counter
+            visited.add(next_atom)
+            counter += 1
+            # Now traverse smaller ring's non-fusion atoms
+            for sa in smaller:
+                if sa not in visited and sa not in shared:
+                    locants[sa] = counter
+                    visited.add(sa)
+                    counter += 1
+                    # Traverse remaining smaller ring atoms in order
+                    cur = sa
+                    while True:
+                        nxt = None
+                        for n in adj[cur]:
+                            if n not in visited and n in smaller and n not in shared:
+                                nxt = n
+                                break
+                        if nxt is None:
+                            break
+                        locants[nxt] = counter
+                        visited.add(nxt)
+                        counter += 1
+                        cur = nxt
+                    break
+            # Assign the OTHER fusion atom
+            for fa in fusion:
+                if fa not in visited:
+                    locants[fa] = counter
+                    visited.add(fa)
+                    counter += 1
+                    break
+            break
+        else:
+            locants[next_atom] = counter
+            visited.add(next_atom)
+            counter += 1
+            cur_step = None
+            for n in adj[next_atom]:
+                if n not in visited:
+                    cur_step = n
+                    break
+            next_atom = cur_step
+
+    # Coverage check
+    if not (set(locants.keys()) >= ring_atoms):
+        return {}
+    return locants
+
+
+def _name_side_ring(
+    mol, side_ring: List[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a single algorithmic side ring.
+
+    Returns (name, atom_idx_in_orig -> locant) or None.
+    """
+    side_atoms = set(side_ring)
+    extracted = _extract_subfragment(mol, side_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+
+    # Detect heteroatoms in the side ring
+    has_hetero = any(
+        a.GetSymbol() != "C" and a.GetIdx() in [orig_to_frag[i]
+                                                for i in side_atoms]
+        for a in frag.GetAtoms()
+    )
+
+    if has_hetero:
+        try:
+            from .heterocycles import name_heterocycle
+        except ImportError:
+            return None
+        ring_atoms_in_frag = list(orig_to_frag[i] for i in side_atoms)
+        try:
+            name = name_heterocycle(frag, ring_atoms_in_frag)
+        except Exception:
+            return None
+        if not name:
+            return None
+        # For heterocycles, build a simple atom-to-locant map by walking
+        # the ring starting at locant 1 = first heteroatom (consistent
+        # with IUPAC HW). Defer rigorous orient_heterocycle integration
+        # to v19; v18 emits a connectivity-correct map.
+        atom_to_locant = _walk_side_ring_locants(
+            mol, side_ring, hetero_first=True,
+        )
+    else:
+        # Carbocyclic side ring: cyclo<N>ane / cyclo<N>ene if unsaturated
+        ring_size = len(side_ring)
+        # Detect at least one double bond inside the ring
+        has_double = False
+        ring_set = set(side_ring)
+        for bond in mol.GetBonds():
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a in ring_set and b in ring_set:
+                if bond.GetBondType() == Chem.BondType.DOUBLE:
+                    has_double = True
+                    break
+                if bond.GetBondType() == Chem.BondType.AROMATIC:
+                    has_double = True
+                    break
+        prefix = _get_chain_prefix(ring_size)
+        suffix = "ene" if has_double else "ane"
+        # cycloprop -> cycloprop + ane = cyclopropane
+        # Strip trailing 'a' before -ane already handled by chain_names.
+        name = f"cyclo{prefix}{suffix}"
+        atom_to_locant = _walk_side_ring_locants(
+            mol, side_ring, hetero_first=False,
+        )
+
+    return name, atom_to_locant
+
+
+def _walk_side_ring_locants(
+    mol, ring: List[int], *, hetero_first: bool,
+) -> Dict[int, int]:
+    """Number a side ring 1..N walking around the ring.
+
+    For carbocyclic side rings, locant 1 is chosen at the spiro-attached
+    atom (i.e., the atom at the spiro centre). For heterocyclic side
+    rings, locant 1 is the highest-priority heteroatom (O > S > Se > N >
+    P > Si > B per IUPAC P-25.2). The walk direction is the one giving
+    the lowest locant set for the spiro attachment atom (D-11 reuse).
+
+    Returns Dict[atom_idx -> locant_in_side_ring].
+    """
+    ring_set = set(ring)
+
+    # Build adjacency limited to ring atoms.
+    adj: Dict[int, List[int]] = {a: [] for a in ring}
+    for a in ring:
+        for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nbr.GetIdx() in ring_set:
+                adj[a].append(nbr.GetIdx())
+
+    # Choose start atom.
+    spiro_set = get_spiro_atoms(mol)
+    spiro_in_ring = [a for a in ring if a in spiro_set]
+    start: int
+    if hetero_first:
+        # Highest-priority heteroatom in the ring
+        priority = {"O": 0, "S": 1, "Se": 2, "N": 3, "P": 4, "Si": 5, "B": 6}
+        hetero_candidates = sorted(
+            (a for a in ring if mol.GetAtomWithIdx(a).GetSymbol() != "C"),
+            key=lambda a: priority.get(mol.GetAtomWithIdx(a).GetSymbol(), 99),
+        )
+        if hetero_candidates:
+            start = hetero_candidates[0]
+        elif spiro_in_ring:
+            start = spiro_in_ring[0]
+        else:
+            start = ring[0]
+    else:
+        # Carbocyclic: locant 1 at the spiro centre per spiro-descriptor
+        # conventions for the side ring.
+        start = spiro_in_ring[0] if spiro_in_ring else ring[0]
+
+    # Walk the ring and assign 1, 2, ..., N.
+    # Two directions possible — pick the one giving the LOWEST set of
+    # spiro-locants (D-11 reuse).
+    candidates = []
+    for first_step in adj[start]:
+        path = [start, first_step]
+        visited = {start, first_step}
+        current = first_step
+        while len(path) < len(ring):
+            extended = False
+            for nbr in adj[current]:
+                if nbr not in visited:
+                    path.append(nbr)
+                    visited.add(nbr)
+                    current = nbr
+                    extended = True
+                    break
+            if not extended:
+                break
+        if len(path) != len(ring):
+            continue
+        atom_to_locant = {a: i + 1 for i, a in enumerate(path)}
+        # Spiro-locant set for this ordering
+        spiro_locants = sorted(atom_to_locant[a] for a in spiro_in_ring)
+        candidates.append((spiro_locants, atom_to_locant))
+
+    if not candidates:
+        return {}
+    # Pick lowest spiro-locant set per first-point-of-difference (D-11)
+    candidates.sort(key=lambda x: x[0])  # tuple comparison = first-pt-of-diff
+    # Verify with compare_locant_sets to honor the D-11/D-20 lock —
+    # tuple-sort and compare_locant_sets agree on plain int lists.
+    best = candidates[0]
+    for cand in candidates[1:]:
+        if compare_locant_sets(cand[0], best[0]) < 0:
+            best = cand
+    return best[1]
+
+
+def name_mixed_spiro_fused(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """
+    Build the HERITAGE §4 separable-parts name for a mixed spiro/fused system.
+
+    Algorithm (Phase 151-02 D-13 + HERITAGE §4):
+      1. Identify the spiro centre (must be exactly 1 in v18 scope).
+      2. Partition rings at the centre into FUSED component and SIDE ring.
+      3. Name the fused component via existing fused-ring pipeline.
+      4. Name the side ring algorithmically (cycloalkane / heterocycle).
+      5. Recombine: spiro[<fused-name>-<f_loc>,<s_loc>'-<side-name>].
+         The prime sits on the side-ring's spiro-attachment locant only,
+         per Q-05 OPSIN preview (NESTED_FORM_PARSEABLE).
+      6. (v19 follow-up) Re-calculate unsaturation when one part becomes
+         fully saturated by the spiro junction.
+
+    Return shape MUST match name_spiro_system per composer.py:3098-3105:
+        (name, ring_atoms, atom_to_locant, substituents_included=False)
+
+    Out-of-scope for v18 (return None, log to HERITAGE-followups):
+      - Multi-spiro mixed cases (n_spiro > 1 + fused junctions).
+      - Cases where _classify_rings_around_spiro_center cannot cleanly
+        separate the topology (both sides fused, exotic 4-way junctions).
+      - Cases where the fused component name builder declines (no
+        retained name AND _name_saturated_fused_carbocyclic returns None).
+
+    Source: 151-CONTEXT.md D-13; HERITAGE-1990-insights.md §4;
+            IUPAC P-24; Q-05 OPSIN preview (151-AUDIT-B.md).
+    """
+    if not is_mixed_spiro_fused(mol):
+        return None
+
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 1:
+        # v18 scope: monospiro mixed only. Multi-spiro mixed is logged
+        # to HERITAGE-followups for v19 in Task 2 commit message.
+        return None
+    spiro_center = list(spiro_atoms)[0]
+
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+
+    classification = _classify_rings_around_spiro_center(
+        mol, spiro_center, all_rings,
+    )
+    if classification is None:
+        return None
+    fused_rings, side_rings = classification
+
+    if len(side_rings) != 1:
+        return None  # v19: multi-side-ring mixed (rare)
+
+    # Step 2: name the fused component
+    fused_named = _name_fused_component(mol, fused_rings)
+    if fused_named is None:
+        return None
+    fused_name, fused_atom_to_locant = fused_named
+
+    # Step 3: name the side ring
+    side_named = _name_side_ring(mol, side_rings[0])
+    if side_named is None:
+        return None
+    side_name, side_atom_to_locant = side_named
+
+    # Step 4: locate the spiro centre in each part's locant map.
+    f_loc = fused_atom_to_locant.get(spiro_center)
+    s_loc = side_atom_to_locant.get(spiro_center)
+    if f_loc is None or s_loc is None:
+        return None
+
+    # Step 5: assemble the HERITAGE §4 nested form.
+    #   spiro[<fused>-<f_loc>,<s_loc>'-<side>]
+    name = f"spiro[{fused_name}-{f_loc},{s_loc}'-{side_name}]"
+
+    # Build the combined atom_to_locant map for the cascade-step-6 supplier.
+    # Convention: fused-side atoms keep their integer locants; side-ring
+    # atoms get tuple (locant, "'") to mark them as primed.
+    combined_locants: Dict[int, _Locant] = {}
+    for atom_idx, locant in fused_atom_to_locant.items():
+        combined_locants[atom_idx] = locant
+    for atom_idx, locant in side_atom_to_locant.items():
+        if atom_idx == spiro_center:
+            # Spiro centre exists in BOTH partitions; prefer the fused
+            # component's locant (the unprimed one) as the canonical key
+            # — but record the primed form too via the tuple suffix
+            # convention (the cascade-step-6 gate accepts int|tuple per
+            # locants.py:_Locant). The fused-side numeric is already set;
+            # leave it intact.
+            continue
+        # Tuple form (locant, "'") marks the side-ring atoms in the
+        # combined map. _build_ring_pos coerces ints to (n, '') tuples
+        # when ANY tuple is present in the dict, so this is internally
+        # consistent.
+        combined_locants[atom_idx] = (locant, "'")
+
+    # Coverage invariant: combined map covers ALL ring atoms.
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms.update(r)
+    if not (set(combined_locants.keys()) >= all_ring_atoms):
+        return None  # Pitfall 7: partial coverage -> None
+
+    return (name, all_ring_atoms, combined_locants, False)
+
+
+def get_mixed_spiro_fused_iupac_locants(
+    mol,
+) -> Optional[Dict[int, _Locant]]:
+    """
+    Cascade-step-6 supplier for mixed spiro/fused systems (Phase 151-02 D-21).
+
+    Wraps `name_mixed_spiro_fused` and returns the combined atom-to-locant
+    map (covering ALL ring atoms) or None if naming declined.
+
+    Coverage invariant per Pitfall 7: returns None on partial coverage
+    so the cascade-step-6 gate falls through to the sorted-int proxy.
+    """
+    if mol is None:
+        return None
+    result = name_mixed_spiro_fused(mol)
+    if result is None:
+        return None
+    _name, ring_atoms, atom_to_locant, _subs_included = result
+    if not (set(atom_to_locant.keys()) >= ring_atoms):
+        return None
+    return {k: v for k, v in atom_to_locant.items() if k in ring_atoms}

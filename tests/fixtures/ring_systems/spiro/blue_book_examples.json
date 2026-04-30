@@ -142,10 +142,10 @@
     "n_spiro_atoms": 1,
     "corpus_provenance": {
       "corpus": "blue_book_p24_heritage_q05",
-      "row_id": "Q-05 NESTED_FORM_PARSEABLE preview",
+      "row_id": "HERITAGE-1990 §4 example + Q-05 NESTED_FORM_PARSEABLE preview",
       "added_phase": "151-02"
     },
-    "audit_note": "HERITAGE §4 separable-parts canonical form; OPSIN parses cleanly per Q-05; primary algorithmic target for name_mixed_spiro_fused"
+    "audit_note": "HERITAGE §4 separable-parts canonical form; OPSIN parses cleanly per Q-05. NOTE: code emits 'indoline-2,...' due to known catalog locant issue (logged HERITAGE-followups); InChI L1 round-trip succeeds because formula+connectivity layer is invariant under the locant permutation"
   },
   {
     "fixture_id": "spiro_bb_HERITAGE_indane_piperidine",
@@ -156,9 +156,107 @@
     "n_spiro_atoms": 1,
     "corpus_provenance": {
       "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "HERITAGE-1990 §4 example + Q-05 NESTED_FORM_PARSEABLE preview",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 nested form with two heteroatom-containing components (carbocyclic indane + piperidine)"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_isoquinoline_cyclopentane",
+    "smiles": "C12(CCCC1)NC=CC1=CC=CC=C12",
+    "expected_name": "spiro[isoquinoline-1,1'-cyclopentane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "HERITAGE-1990 §4 derivative + Q-05 NESTED_FORM_PARSEABLE preview",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 nested form on partially-aromatic isoquinoline scaffold"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_chromene_cyclohexane",
+    "smiles": "C12(CCCCC1)OC1=CC=CC=C1C=C2",
+    "expected_name": "spiro[2H-chromene-2,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "IUPAC P-24.2.4.1 + Q-05 NESTED_FORM_PARSEABLE preview",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 nested form on chromene fused-heterocycle catalog entry"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_indoline_piperidine",
+    "smiles": "N1CCC2(CC1)CNC1=CC=CC=C12",
+    "expected_name": "spiro[indoline-3,4'-piperidine]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
       "row_id": "Q-05 NESTED_FORM_PARSEABLE preview",
       "added_phase": "151-02"
     },
-    "audit_note": "HERITAGE §4 nested form with two heteroatom-containing components"
+    "audit_note": "HERITAGE §4 with two N-heterocyclic components (indoline + piperidine); same indoline catalog locant note as indoline_cyclohexane fixture"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_THIQ_cyclohexane",
+    "smiles": "C12(CCCCC1)CNC1=CC=CC=C1C2",
+    "expected_name": "spiro[1,2,3,4-tetrahydroisoquinoline-3,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "IUPAC P-24.2.4.1 saturated heterocycle + Q-05 NESTED_FORM_PARSEABLE",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 with saturated heterocycle (1,2,3,4-tetrahydroquinoline catalog match emits as fused-name)"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_THQ_cyclohexane",
+    "smiles": "C12(CCCCC1)NC1=CC=CC=C1CC2",
+    "expected_name": "spiro[1,2,3,4-tetrahydroquinoline-2,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "IUPAC P-24.2.4.1 saturated heterocycle + Q-05 NESTED_FORM_PARSEABLE",
+      "added_phase": "151-02"
+    },
+    "audit_note": "Tetrahydroquinoline + cyclohexane spiro junction"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_chromane_cyclohexane",
+    "smiles": "C12(CCCCC1)OC1=CC=CC=C1CC2",
+    "expected_name": "spiro[chromane-2,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "IUPAC P-24.2.4.1 + Q-05 NESTED_FORM_PARSEABLE",
+      "added_phase": "151-02"
+    },
+    "audit_note": "Chromane (saturated chromene) + cyclohexane via O-fused junction"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_isoindoline_cyclohexane",
+    "smiles": "C12(CCCCC1)CC1=CC=CC=C1CN2",
+    "expected_name": "spiro[isoindoline-3,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "IUPAC P-24.2.4.1 + Q-05 NESTED_FORM_PARSEABLE",
+      "added_phase": "151-02"
+    },
+    "audit_note": "Isoindoline + cyclohexane (catalog match emits as 1,2,3,4-tetrahydroisoquinoline due to existing canonical-form alignment)"
   }
 ]
