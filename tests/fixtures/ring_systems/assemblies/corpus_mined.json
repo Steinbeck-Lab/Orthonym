@@ -1,0 +1,16 @@
+[
+  {
+    "fixture_id": "ra_corpus_pubchem_3cyclohexyl_chain",
+    "smiles": "CCCCCCCC1CCC(CC1)(C#N)C2CCC(CC2)C3CCC(CC3)CC",
+    "expected_name": null,
+    "expected_assembly_count": 3,
+    "expected_ring_type": "carbocyclic",
+    "compound_class": "ring-assembly-ter-cyclohexane-cyano-substituted",
+    "note": "Corpus has only 1 ≥3-ring assembly cpd per RESEARCH §Risk Landmines line 615. expected_name omitted because the canonical IUPAC name for this substituted tercyclohexane chain is upstream of plan 151-03 scope (substituent + suffix detection bugs are out of scope per 151-AUDIT-C.md 'Out-of-scope follow-ups'). The fixture is included so detect_ring_assembly count + path-topology + supplier coverage invariant can be exercised on a real corpus row.",
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "pubchem_2000_3cyclohexyl_carbonitrile",
+      "added_phase": "151-03"
+    }
+  }
+]
