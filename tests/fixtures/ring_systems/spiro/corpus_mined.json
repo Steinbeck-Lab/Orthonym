@@ -1,0 +1,353 @@
+[
+  {
+    "fixture_id": "spiro-pure_chebi_5000_CHEBI:65368",
+    "smiles": "CCCCCCCCCCCCC[C@@H]1C[C@@H](O)C[C@@]2(CC[C@]3(C=CC(=O)C[C@@H]3O)O2)O1",
+    "expected_name": null,
+    "compound_class": "spiro-pure",
+    "n_rings": 3,
+    "n_spiro_atoms": 2,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:65368",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-pure_pubchem_2000_18633597",
+    "smiles": "CCCCCCCOC1CCC2(CC1)C(=O)C3(C2(Cl)Cl)CCC(CC3)OCCCCCCC",
+    "expected_name": null,
+    "compound_class": "spiro-pure",
+    "n_rings": 3,
+    "n_spiro_atoms": 2,
+    "corpus_provenance": {
+      "corpus": "pubchem_2000",
+      "row_id": "18633597",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:136451",
+    "smiles": "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CC[N+]3([O-])CC=C(COC(=O)[C@]1(C)O)[C@H]23",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 4,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:136451",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:145163",
+    "smiles": "C=C(C[C@@]12C[C@@H](C)C[C@@H](O1)[C@H]1O[C@]3(C[C@H]1O2)NC[C@H](C)C[C@@H]3C)[C@H]1O[C@@](O)([C@H](O)[C@@H]2C[C@H]3O[C@@]4(CC[C@]5(CC(C)=C[C@@H](/C=C/C(O)CC(=O)O)O5)O4)[C@H](C)C[C@H]3O2)CC[C@@H]1C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 9,
+    "n_spiro_atoms": 3,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:145163",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:156301",
+    "smiles": "CC1OC(O[C@@H]2C(=O)C[C@@H](C)O[C@@]23O[C@@H]2CC(=O)O[C@@H]2C2=C3C(=O)c3c(O)cccc3C2=O)CCC1N(C)C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 6,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:156301",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:175015",
+    "smiles": "COc1cc2c(cc1O)C1(COc3cc(O)cc(O)c3C1=O)C2",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 4,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:175015",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:183935",
+    "smiles": "C[C@@H]1CCC2C(C)(C)[C@H](O)CC[C@]2(C)[C@@]12Cc1c(O)cc3c(c1O2)CN(CCO)C3=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:183935",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:184091",
+    "smiles": "CC1=C2C(=O)[C@H]3[C@@H](CC=C4C[C@@H](O[C@@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)CC[C@@]43C)[C@@H]2CC[C@]12O[C@@H]1C[C@H](C)CN[C@H]1[C@H]2C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 7,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:184091",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:194426",
+    "smiles": "C[C@@H]1[O][Pt]2([NH]C[C@H]3CC[C@@H]3C[NH]2)[O]C1=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:194426",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:198239",
+    "smiles": "O=C1C[C@@H](O)C2(Oc3cccc4cccc(c34)O2)[C@H]2C1=CC=C[C@H]2O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:198239",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:199170",
+    "smiles": "COc1cc(O)c2c(O)c3c(c4c2c1C1(C4)C(C)=CCCC1(C)C)C1(O)OC12CC(=O)C(C(N)=O)=C(O)C2(O)C3=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 7,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:199170",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:199259",
+    "smiles": "C[C@H]1O[C@@H]2C[C@]3(C=CC(=O)O3)O[C@@H]2[C@H]1O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:199259",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:199866",
+    "smiles": "C/C=C(\\C)C(=O)OCC1=C[C@H]2C(=O)O[C@H]3C[C@@H](C/C=C(\\C)C[C@@H](C)/C=C/C=C4\\CO[C@H]([C@@H]1O)[C@@]42O)O[C@@]1(CC[C@H](C)[C@@H](CC)O1)C3",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:199866",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:200875",
+    "smiles": "Cc1cc(O)c(=O)cc2c1C[C@@H](C)[C@]1(OC[C@@H](C)[C@H]1O)O2",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:200875",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:201415",
+    "smiles": "CCC(C(=O)[O-])C1CCC(C)C(C(C)C(O)C(C)C(=O)C(CC)C2OC3(C=CC(O)C4(CCC(C)(C5CCC(O)(CC)C(C)O5)O4)O3)C(C)CC2C)O1.[Na+]",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 2,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:201415",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:202688",
+    "smiles": "CC[C@@]1([C@@H]2O[C@@H]([C@H]3O[C@@](O)(CO)[C@H](C)C[C@@H]3C)C[C@@H]2C)CC[C@H]([C@]2(C)CCC3(C[C@H](O)[C@@H](C)[C@@H]([C@@H](C)[C@H](CC(=O)O)OC)O3)O2)O1",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:202688",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:206769",
+    "smiles": "COc1ccc2c3c1C(=O)CC(C)(C)N3C(=O)[C@]21C[C@]2([N+](=O)[O-])CN3CCC[C@H]3C[C@@H]2C1(C)C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 6,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:206769",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:207697",
+    "smiles": "C=C(C)/C=C1C(=C2\\C[C@H](O)[C@@H]3O[C@]3(CC=C(C)C)[C@@H]2O)/C=C(C)C[C@@]/12C[C@H](O)[C@@H]1O[C@]1(CC=C(C)C)C2=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 5,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:207697",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:208966",
+    "smiles": "COCC1=CC[C@]2([C@H]3[C@H](C)COC(=O)[C@H]3O[C@@]2(C)OC)[C@H](O)C1=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:208966",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:209803",
+    "smiles": "CC(C)(O)[C@H]1O[C@H]2CC[C@@]3(C)[C@@](O)(CC[C@H]4C[C@]5(OCNc6ccccc65)C(=O)[C@@]43C)C2=CC1=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 6,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:209803",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:210958",
+    "smiles": "CC(=O)O[C@@H](c1nc2ccccc2c(=O)n1[C@@H]1C[C@]2(OC1=O)c1ccccc1N1C(=O)C(C)(C)N(O)[C@H]12)C(C)C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 6,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:210958",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:211371",
+    "smiles": "Cc1c(O)cc2c(c1O)CO[C@]1(C2)O[C@@H](C)CC[C@@H]1O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:211371",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:211632",
+    "smiles": "CC(C)C(C)/C=C/[C@@H](C)[C@H]1CCC2C[C@@]3(C[C@@]21C)C(=O)[C@@]1(C)CC[C@H](O)C[C@@]1(O)[C@@H]3C=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 4,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:211632",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:213002",
+    "smiles": "CCCCC(=O)OCC1OC(OC2C(CO)OC3(OCc4cc(O)cc(O)c43)C(O)C2OC(=O)/C=C/C=C/CC(O)C(C)CCC/C=C/C(C)CC)C(O)C(O)C1O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 4,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:213002",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:213023",
+    "smiles": "CC(=O)O[C@H]1CC[C@H](C)O[C@@]12OCC1=C(C[C@H](O)[C@@](C)(O)C1=O)[C@@H]2C",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:213023",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:216628",
+    "smiles": "C=C1CCC(=O)[C@]12CCC1=C(CCC1=O)C2",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:216628",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro-mixed-fused_chebi_5000_CHEBI:217556",
+    "smiles": "NCC[C@H](O)C[C@H]1NC(=O)[C@H](CO)NC(=O)[C@@H]2C[C@@H](O)CN2C(=O)C2(CC2)NC(=O)[C@H](CO)NC(=O)[C@@H](CO)NC(=O)CCNC1=O",
+    "expected_name": null,
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:217556",
+      "added_phase": "151-02"
+    }
+  }
+]
