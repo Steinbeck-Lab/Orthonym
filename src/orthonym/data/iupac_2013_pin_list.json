@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 101,
+  "total_entries": 99,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},

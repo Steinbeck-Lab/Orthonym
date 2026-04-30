@@ -254,6 +254,13 @@ class TestJSONAllowListSchema:
             assert key in data, f"missing top-level key: {key}"
         assert isinstance(data["entries"], list)
         assert len(data["entries"]) >= 57
+        # Phase 150 REVIEW CR-03: tighten schema to catch total_entries
+        # drift; the previous '>= 57' threshold let the field disagree
+        # with the actual array length silently.
+        assert data["total_entries"] == len(data["entries"]), (
+            f"total_entries={data['total_entries']} but "
+            f"len(entries)={len(data['entries'])}"
+        )
 
     @pytest.mark.unit
     def test_pin_list_entries_have_required_fields(self):
