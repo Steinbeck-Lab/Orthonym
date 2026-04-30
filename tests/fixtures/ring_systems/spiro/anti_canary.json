@@ -1,0 +1,132 @@
+[
+  {
+    "fixture_id": "anti_canary_steroid_androstane",
+    "smiles": "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@]3(C)[C@H]1CC2",
+    "compound_class": "anti-canary-steroid",
+    "natural_product_class": "steroid",
+    "natural_product_name": "androstane",
+    "reason": "Steroid backbone — RDKit ring perception MUST NOT produce a spiro atom; even if a kekulization exposes one, detect_natural_product short-circuits is_mixed_spiro_fused per RESEARCH Pitfall 3.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/androstane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_steroid_estrane",
+    "smiles": "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@@H]3[C@H]1CC2",
+    "compound_class": "anti-canary-steroid",
+    "natural_product_class": "steroid",
+    "natural_product_name": "estrane",
+    "reason": "Steroid backbone (estrane); detect_natural_product short-circuit guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/estrane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_steroid_pregnane",
+    "smiles": "CC[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",
+    "compound_class": "anti-canary-steroid",
+    "natural_product_class": "steroid",
+    "natural_product_name": "pregnane",
+    "reason": "Steroid backbone (pregnane); detect_natural_product short-circuit guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/pregnane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_steroid_cholestane",
+    "smiles": "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",
+    "compound_class": "anti-canary-steroid",
+    "natural_product_class": "steroid",
+    "natural_product_name": "cholestane",
+    "reason": "Steroid backbone (cholestane); 4 fused rings, no spiro centres in canonical perception.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/cholestane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_steroid_gonane",
+    "smiles": "C1CC[C@H]2C(C1)CC[C@H]1[C@@H]3CCC[C@H]3CC[C@@H]12",
+    "compound_class": "anti-canary-steroid",
+    "natural_product_class": "steroid",
+    "natural_product_name": "gonane",
+    "reason": "Gonane (parent steroid skeleton); explicit RESEARCH Pitfall 3 target — must NOT trip is_mixed_spiro_fused.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/gonane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_alkaloid_morphinan",
+    "smiles": "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13",
+    "compound_class": "anti-canary-alkaloid",
+    "natural_product_class": "alkaloid",
+    "natural_product_name": "morphinan",
+    "reason": "Morphinan alkaloid — fused tetracyclic backbone with no canonical spiro centre; detect_natural_product guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/morphinan",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_alkaloid_cinchonane",
+    "smiles": "C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12",
+    "compound_class": "anti-canary-alkaloid",
+    "natural_product_class": "alkaloid",
+    "natural_product_name": "cinchonane",
+    "reason": "Quinine/cinchonidine scaffold; detect_natural_product guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/cinchonane",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_alkaloid_aporphine",
+    "smiles": "CN1CCc2cccc3c2C1Cc1ccccc1-3",
+    "compound_class": "anti-canary-alkaloid",
+    "natural_product_class": "alkaloid",
+    "natural_product_name": "aporphine",
+    "reason": "Aporphine isoquinoline alkaloid; detect_natural_product guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/aporphine",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_alkaloid_ergoline",
+    "smiles": "c1cc2c3c(c[nH]c3c1)C[C@H]1NCCC[C@H]21",
+    "compound_class": "anti-canary-alkaloid",
+    "natural_product_class": "alkaloid",
+    "natural_product_name": "ergoline",
+    "reason": "Ergoline alkaloid; detect_natural_product guard.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/ergoline",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "anti_canary_alkaloid_aconitane",
+    "smiles": "C1C[C@H]2CN[C@@H]3[C@@H]4C[C@H]2[C@@]3(C1)[C@@H]1C[C@@H]2CC[C@H]4[C@H]1C2",
+    "compound_class": "anti-canary-alkaloid",
+    "natural_product_class": "alkaloid",
+    "natural_product_name": "aconitane",
+    "reason": "Aconitane alkaloid hexacyclic — RDKit perception may show spiro-like junctions; detect_natural_product is the second-line guard per RESEARCH Pitfall 3.",
+    "corpus_provenance": {
+      "corpus": "anti_canary",
+      "row_id": "natural_product_scaffolds_registry/aconitane",
+      "added_phase": "151-02"
+    }
+  }
+]

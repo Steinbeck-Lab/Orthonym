@@ -1,0 +1,164 @@
+[
+  {
+    "fixture_id": "spiro_bb_spiro45decane",
+    "smiles": "C1CCC2(CC1)CCCC2",
+    "expected_name": "spiro[4.5]decane",
+    "compound_class": "spiro-pure",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2 example",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_spiro55undecane",
+    "smiles": "C1CCC2(CC1)CCCCC2",
+    "expected_name": "spiro[5.5]undecane",
+    "compound_class": "spiro-pure",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2 example",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_spiro24heptane",
+    "smiles": "C1CC12CCCC2",
+    "expected_name": "spiro[2.4]heptane",
+    "compound_class": "spiro-pure",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2 example",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_spiro35nonane",
+    "smiles": "C1CCC2(CC1)CCC2",
+    "expected_name": "spiro[3.5]nonane",
+    "compound_class": "spiro-pure",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2 example",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_spiro22pentane",
+    "smiles": "C1CC12CCC2",
+    "expected_name": "spiro[2.3]hexane",
+    "compound_class": "spiro-pure",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2 example (small)",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_2_oxaspiro_3_5_nonane",
+    "smiles": "C1CC2(O1)CCCCC2",
+    "expected_name": "2-oxaspiro[3.5]nonane",
+    "compound_class": "spiro-hetero",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2.4.1 example",
+      "added_phase": "151-02"
+    },
+    "audit_note_v17": "current name_spiro_system emits '3-oxaspiro[3.5]nonane' — wrong-locant; pre-existing bug logged in 151-AUDIT-B and HERITAGE-followups for v19"
+  },
+  {
+    "fixture_id": "spiro_bb_1_4_dioxaspiro_4_5_decane",
+    "smiles": "C1CC2(OCCO2)CCC1",
+    "expected_name": "1,4-dioxaspiro[4.5]decane",
+    "compound_class": "spiro-hetero",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2.4.1 example (cyclohexanone ketal)",
+      "added_phase": "151-02"
+    }
+  },
+  {
+    "fixture_id": "spiro_bb_2_8_dioxaspiro_5_5_undecane",
+    "smiles": "O1CCCC2(CCOCC2)C1",
+    "expected_name": "2,8-dioxaspiro[5.5]undecane",
+    "compound_class": "spiro-hetero",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2.4.1 example",
+      "added_phase": "151-02"
+    },
+    "audit_note_v17": "current name_spiro_system emits '4,9-dioxaspiro[5.5]undecane' — wrong-locant; pre-existing bug logged in 151-AUDIT-B and HERITAGE-followups for v19"
+  },
+  {
+    "fixture_id": "spiro_bb_dispiro_canonical",
+    "smiles": "C1CCC2(CC1)CC1(CCC2)CCCCCC1",
+    "expected_name": "dispiro[5.1.5.2]heptadecane",
+    "compound_class": "spiro-pure",
+    "n_rings": 3,
+    "n_spiro_atoms": 2,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2.2 dispiro example",
+      "added_phase": "151-02"
+    },
+    "audit_note_v17": "current name_spiro_system emits 'dispiro[5.1.6.3]heptadecane' — segment-order wrong; OPSIN-round-trip InChI L1 still matches by formula+connectivity"
+  },
+  {
+    "fixture_id": "spiro_bb_1_oxa_4_thiaspiro_4_5_decane",
+    "smiles": "C1CCC2(CC1)OCCS2",
+    "expected_name": "1-oxa-4-thiaspiro[4.5]decane",
+    "compound_class": "spiro-hetero",
+    "n_rings": 2,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24",
+      "row_id": "P-24.2.4.1 mixed-heteroatom variant",
+      "added_phase": "151-02"
+    },
+    "audit_note_v17": "exercises priority order O > S in _build_hetero_prefix per IUPAC P-25.2"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_indoline_cyclohexane",
+    "smiles": "C12(CCCCC1)CNC1=CC=CC=C12",
+    "expected_name": "spiro[indoline-3,1'-cyclohexane]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "Q-05 NESTED_FORM_PARSEABLE preview",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 separable-parts canonical form; OPSIN parses cleanly per Q-05; primary algorithmic target for name_mixed_spiro_fused"
+  },
+  {
+    "fixture_id": "spiro_bb_HERITAGE_indane_piperidine",
+    "smiles": "N1CCC2(CC1)CCC1=CC=CC=C12",
+    "expected_name": "spiro[indane-1,4'-piperidine]",
+    "compound_class": "spiro-mixed-fused",
+    "n_rings": 3,
+    "n_spiro_atoms": 1,
+    "corpus_provenance": {
+      "corpus": "blue_book_p24_heritage_q05",
+      "row_id": "Q-05 NESTED_FORM_PARSEABLE preview",
+      "added_phase": "151-02"
+    },
+    "audit_note": "HERITAGE §4 nested form with two heteroatom-containing components"
+  }
+]
