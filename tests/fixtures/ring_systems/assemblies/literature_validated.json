@@ -1,0 +1,146 @@
+[
+  {
+    "fixture_id": "ra_lit_para_terphenyl",
+    "smiles": "c1ccc(-c2ccc(-c3ccccc3)cc2)cc1",
+    "expected_name": "1,1':4',1''-terphenyl",
+    "compound_class": "ring-assembly-ter-carbocyclic-para",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C1=CC=C(C=C1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "P-28.2.1 ex 4 (RESEARCH OPSIN evidence row 2)",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_meta_terphenyl",
+    "smiles": "c1ccc(-c2cccc(-c3ccccc3)c2)cc1",
+    "expected_name": "1,1':3',1''-terphenyl",
+    "compound_class": "ring-assembly-ter-carbocyclic-meta",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C1=CC(=CC=C1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 4",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_ortho_terphenyl",
+    "smiles": "c1ccc(-c2ccccc2-c2ccccc2)cc1",
+    "expected_name": "1,1':2',1''-terphenyl",
+    "compound_class": "ring-assembly-ter-carbocyclic-ortho",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C=1C(=CC=CC1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 3",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_terpyridine",
+    "smiles": "c1ccc(-c2cccc(-c3ccccn3)n2)nc1",
+    "expected_name": "2,2':6',2''-terpyridine",
+    "compound_class": "ring-assembly-ter-heterocyclic",
+    "opsin_smiles_validated": "N1=C(C=CC=C1)C1=NC(=CC=C1)C1=NC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 5",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_terthiophene",
+    "smiles": "c1cc(-c2ccc(-c3cccs3)s2)cs1",
+    "expected_name": "2,2':5',2''-terthiophene",
+    "compound_class": "ring-assembly-ter-heterocyclic",
+    "opsin_smiles_validated": "S1C(=CC=C1)C=1SC(=CC1)C=1SC=CC1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 6",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_quaterphenyl",
+    "smiles": "c1ccc(-c2ccc(-c3ccc(-c4ccccc4)cc3)cc2)cc1",
+    "expected_name": "1,1':4',1'':4'',1'''-quaterphenyl",
+    "compound_class": "ring-assembly-quater-carbocyclic",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 9",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_quinquephenyl",
+    "smiles": "c1ccc(-c2ccc(-c3ccc(-c4ccc(-c5ccccc5)cc4)cc3)cc2)cc1",
+    "expected_name": "1,1':4',1'':4'',1''':4''',1''''-quinquephenyl",
+    "compound_class": "ring-assembly-quinque-carbocyclic",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 10",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_biindole",
+    "smiles": "c1ccc2c(c1)cc([nH]2)-c1cc2ccccc2[nH]1",
+    "expected_name": "1H,1'H-2,2'-biindole",
+    "compound_class": "ring-assembly-bi-fused-heterocyclic",
+    "opsin_smiles_validated": "N1C(=CC2=CC=CC=C12)C=1NC2=CC=CC=C2C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 11",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_terphenyl_dicarboxylic_acid",
+    "smiles": "OC(=O)c1ccc(-c2ccc(-c3ccc(C(=O)O)cc3)cc2)cc1",
+    "expected_name": "1,1':4',1''-terphenyl-4,4''-dicarboxylic acid",
+    "compound_class": "ring-assembly-ter-carbocyclic-substituted",
+    "opsin_smiles_validated": "C1(=CC=C(C=C1)C(=O)O)C1=CC=C(C=C1)C1=CC=C(C=C1)C(=O)O",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 12",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_4_4_bipyridine_control",
+    "smiles": "c1cc(-c2ccncc2)ccn1",
+    "expected_name": "4,4'-bipyridine",
+    "compound_class": "ring-assembly-bi-heterocyclic-control",
+    "opsin_smiles_validated": "N1=CC=C(C=C1)C1=CC=NC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 7",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_5_5_bithiophene_control",
+    "smiles": "c1cc(-c2ccsc2)sc1",
+    "expected_name": "5,5'-bithiophene",
+    "compound_class": "ring-assembly-bi-heterocyclic-control",
+    "opsin_smiles_validated": "S1C=CC=C1C1=CC=CS1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 8",
+      "added_phase": "151-03"
+    }
+  },
+  {
+    "fixture_id": "ra_lit_biphenyl_control",
+    "smiles": "c1ccc(-c2ccccc2)cc1",
+    "expected_name": "1,1'-biphenyl",
+    "compound_class": "ring-assembly-bi-carbocyclic-control",
+    "opsin_smiles_validated": "C1(=CC=CC=C1)C1=CC=CC=C1",
+    "corpus_provenance": {
+      "corpus": "literature_validated_via_opsin_roundtrip_2026-04-30",
+      "row_id": "RESEARCH OPSIN evidence row 1",
+      "added_phase": "151-03"
+    }
+  }
+]

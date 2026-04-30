@@ -525,3 +525,97 @@ class TestMixedSpiroFused:
             f"composer classify returned {ring_type!r} on a pure spiro — "
             f"D-09 dispatch order disturbed"
         )
+
+
+# ============================================================================
+# Test 11 — Ring Assembly 3+ (Phase 151-03 D-21)
+# ============================================================================
+class TestRingAssembly:
+    """Phase 151-03 D-15 / D-21: cascade-step-6 fires for ring assemblies
+    of size 3+ via Branch 7 in _build_ring_info_for_parent_selection.
+
+    Source: 151-CONTEXT.md D-15 / D-21; 151-03-PLAN.md task 2.
+    """
+
+    @pytest.mark.unit
+    def test_terphenyl_cascade_step_6_fires(self):
+        """Para-terphenyl: Branch 7 supplies full ring-atom coverage."""
+        mol = Chem.MolFromSmiles('c1ccc(-c2ccc(-c3ccccc3)cc2)cc1')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None
+        ri = mol.GetRingInfo()
+        ring_atoms: set = set()
+        for r in ri.AtomRings():
+            ring_atoms.update(r)
+        assert set(ring_info["iupac_locants"].keys()) >= ring_atoms
+
+    @pytest.mark.unit
+    def test_quaterphenyl_cascade_step_6_fires(self):
+        mol = Chem.MolFromSmiles(
+            'c1ccc(-c2ccc(-c3ccc(-c4ccccc4)cc3)cc2)cc1'
+        )
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None
+        ri = mol.GetRingInfo()
+        ring_atoms: set = set()
+        for r in ri.AtomRings():
+            ring_atoms.update(r)
+        assert set(ring_info["iupac_locants"].keys()) >= ring_atoms
+
+    @pytest.mark.unit
+    def test_135_triphenylbenzene_does_not_fire(self):
+        """D-15 anti-canary: branched arrangement does NOT engage Branch 7."""
+        mol = Chem.MolFromSmiles(
+            'c1cc(-c2ccccc2)cc(-c2ccccc2)c1-c1ccccc1'
+        )
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        # Branch 7 returns None (or some other branch fires); regardless,
+        # iupac_locants from Branch 7 must NOT be present.
+        if ring_info is not None and ring_info.get("iupac_locants") is not None:
+            # If a different branch supplied locants (e.g. branch 6.5
+            # base_component_atoms — different key), still acceptable.
+            # The assertion is: ring-assembly Branch 7 must reject.
+            from orthonym.rules.ring_assemblies import detect_ring_assembly
+            from orthonym.perception.rings import get_ring_systems
+            rs = get_ring_systems(mol, include_spiro=False)
+            info = detect_ring_assembly(mol, rs)
+            assert info is None, (
+                "D-15: 1,3,5-triphenylbenzene wrongly accepted as a ring "
+                "assembly — path-topology check missing"
+            )
+
+    @pytest.mark.unit
+    def test_4prime_methylbiphenyl_does_not_fire_branch_7(self):
+        """RESEARCH Pitfall 4: control case still gets a benzene/biphenyl
+        branch (NOT Branch 7) since it is a 2-ring assembly, not 3+."""
+        mol = Chem.MolFromSmiles('Cc1ccc(-c2ccccc2)cc1')
+        features = compute_features(mol)
+        # 2-ring assembly should not engage Branch 7 (>=3 gate).
+        # We can't directly observe which branch fired, but we can assert
+        # the existing biphenyl naming path is preserved.
+        from orthonym import name_compound
+        name = name_compound('Cc1ccc(-c2ccccc2)cc1')
+        assert name is not None
+        assert "biphenyl" in name
+        assert "^" not in name  # D-16 carat not emitted
+
+    @pytest.mark.unit
+    def test_phenyl_pyridyl_chain_does_not_fire_branch_7(self):
+        """D-14: heterogeneous chain falls through to substituent naming."""
+        mol = Chem.MolFromSmiles('c1ccc(-c2ccncc2)cc1-c1ccccc1')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        # Branch 7 must NOT supply locants for a heterogeneous chain.
+        # If ring_info is not None, it must come from a different branch
+        # (e.g., Branch 6.5 fused-base or a single-ring branch).
+        # The strict invariant is: detect_ring_assembly returns None.
+        from orthonym.rules.ring_assemblies import detect_ring_assembly
+        from orthonym.perception.rings import get_ring_systems
+        rs = get_ring_systems(mol, include_spiro=False)
+        info = detect_ring_assembly(mol, rs)
+        assert info is None
