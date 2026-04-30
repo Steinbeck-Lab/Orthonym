@@ -608,28 +608,40 @@ def _ring_path_length(ring: Tuple[int, ...], bh1: int, bh2: int) -> int:
 def name_polycyclo_system(mol) -> Optional[str]:
     """
     Generate IUPAC name for any bridged polycyclic system.
-    
+
     Routes to appropriate naming function based on ring count.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         IUPAC name or None
     """
     classification = classify_bridged_system(mol)
-    
+
     if classification == 'bicyclo':
         from .bicyclo import name_bicyclo_system
         return name_bicyclo_system(mol)
-    
+
     if classification == 'tricyclo':
         return name_tricyclo_system(mol)
-    
-    # For higher systems, generate full name with heteroatoms
+
+    # Phase 151 D-04 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
+    # systems delegate to the dedicated polycyclic_von_baeyer module which
+    # owns is_higher_polycyclo + name_higher_polycyclo + the
+    # cascade-step-6 supplier. See 151-AUDIT-A.md verdict THIN_WRAPPER.
+    # Lazy import avoids circular-import risk with the new module.
+    if classification not in (None, 'bicyclo', 'tricyclo'):
+        from .polycyclic_von_baeyer import name_higher_polycyclo
+        result = name_higher_polycyclo(mol)
+        if result is not None:
+            return result
+
+    # Fallback to legacy in-module higher-polycyclo helper if the new
+    # module returns None (e.g., on degenerate or detector-rejected cases).
     if classification:
         return _name_higher_polycyclo_system(mol, classification)
-    
+
     return None
 
 
