@@ -26,6 +26,7 @@ from orthonym.data import (
     _PIN_ALLOW,
     _PIN_DENY,
     _PROVISIONAL_MODE,
+    _ROUNDTRIP_CACHE_PATH,
     _is_complete_name,
     _is_promotable,
 )
@@ -186,11 +187,21 @@ class TestPINDenyOverrides:
 
 
 class TestThreeSignalGate:
-    """Combined classifier gate semantics in Provisional mode.
+    """Combined classifier gate semantics post-Plan-02 graduation.
+
+    Plan 01 ran the classifier in PROVISIONAL mode (S1 OR S2) because
+    Signal 3 is sourced from
+    src/orthonym/data/opsin_imports/_phase150_validation.json which
+    Plan 02's validator produces. Plan 02 ships that JSON, which
+    graduates the gate to full (S1 OR S2) AND S3.
+
+    These tests assert the post-graduation behaviour. See WR-09 fix
+    in test_promotable_provisional_mode_active for self-explanatory
+    failure handling when the validation JSON is missing.
 
     See https://iupac.qmul.ac.uk/BlueBook/P2.html.
-    Per CONTEXT D-02: provisional mode (Plan 01) uses (S1 OR S2) only;
-    Signal 3 is deferred until Plan 02 round-trip validator runs.
+    Source: 150-CONTEXT.md D-02 + D-04 + D-07.
+    Source: 150-REVIEW.md WR-09 + IN-01.
     """
 
     @pytest.mark.unit
@@ -215,7 +226,19 @@ class TestThreeSignalGate:
         Per CONTEXT D-04 + D-07. Plan 02 acceptance criterion (Task
         02-03) requires _PROVISIONAL_MODE is False post-graduation.
         See https://iupac.qmul.ac.uk/BlueBook/P2.html.
+
+        Phase 150 REVIEW WR-09: emit a self-explanatory failure if
+        the validation JSON is missing on disk (e.g., a fresh
+        checkout that strips files starting with '_'). Without this
+        the test fails as a bare 'False is False' assertion with no
+        actionable next step.
         """
+        if _PROVISIONAL_MODE:
+            pytest.fail(
+                "Phase 150 SC-3: classifier in PROVISIONAL mode means "
+                f"{_ROUNDTRIP_CACHE_PATH} is missing or unreadable. "
+                "Run  to regenerate."
+            )
         assert _PROVISIONAL_MODE is False
 
     @pytest.mark.unit
