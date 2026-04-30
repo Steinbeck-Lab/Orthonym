@@ -1189,7 +1189,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1",  # aromatic,large
-        "4',5,4'',3''-tetrahydroxy-3,2-dimethoxy-3'-2-methylbut-2-enyl-1,1':1,1''-terphenyl",
+        # Phase 151-03 D-15/D-18/D-19 fix: previous "1,1':1,1''-terphenyl"
+        # was the audit-flagged WRONG_2ND_LOCANT bug (151-AUDIT-C.md row
+        # "1,1':4',1''-terphenyl-para"). Post-fix, the connection-string
+        # builder correctly emits middle-ring locant 4 for para-attachment.
+        "4',5,4'',3''-tetrahydroxy-3,2-dimethoxy-3'-2-methylbut-2-enyl-1,1':4,1''-terphenyl",
     ),
     (
         "COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.O=C(O)/C=C/C(=O)O",  # aromatic,polyfunctional,salt,large
