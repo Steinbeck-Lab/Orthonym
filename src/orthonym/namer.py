@@ -419,13 +419,21 @@ def _build_ring_info_for_parent_selection(features):
 
     mol = features.mol
 
+    # Phase 151-02 D-09: skip Branch 1 (fused-heterocycle catalog) when
+    # the input is mixed-spiro/fused — Branch 5b owns that dispatch.
+    # Without this guard, the catalog returns a PARTIAL locant map
+    # (only the fused component's atoms; missing the spiro side ring),
+    # which violates the cascade-step-6 coverage invariant downstream.
+    from .rules.spiro import is_mixed_spiro_fused as _phase151_is_mixed_spiro_fused
+    _is_mixed_spiro_fused_input = _phase151_is_mixed_spiro_fused(mol)
+
     # Branch 1: fused-heterocycle (preserve D-09 byte-identical path for
     # ACTUAL heterocycles — indole/quinoline/etc.). Skip when the matched
     # core has no heteroatoms (e.g., pyrene also lives in
     # FUSED_HETEROCYCLES registry incidentally; PAHs must flow to branch 2
     # so their tuple-locant numbering is used per W-1 fix).
     fused_type = classify_fused_system(mol)
-    if fused_type in ('ortho-fused', 'ortho-peri-fused'):
+    if not _is_mixed_spiro_fused_input and fused_type in ('ortho-fused', 'ortho-peri-fused'):
         het_match = match_fused_heterocycle_core(mol)
         if het_match is not None:
             _, atom_mapping, _ = het_match
@@ -488,8 +496,44 @@ def _build_ring_info_for_parent_selection(features):
             except Exception:
                 pass
 
-    # Branch 5: spiro stub (Phase 151-02 fills).
-    if bool(get_spiro_atoms(mol)):
+    # Branch 5 (Phase 151-02 D-21): pure spiro + mixed spiro/fused
+    # cascade-step-6 suppliers.
+    #
+    # Pure spiro: is_spiro_system True iff n_rings == n_spiro + 1 (D-09 lock).
+    # Wraps existing get_spiro_numbering / _get_polyspiro_numbering with
+    # the cascade-step-6 coverage invariant (Pitfall 7).
+    #
+    # Mixed spiro/fused: is_mixed_spiro_fused True iff ≥1 spiro atom AND
+    # n_rings > n_spiro + 1 AND detect_natural_product is None (Pitfall 3
+    # false-positive guard) AND the topology is HERITAGE §4 separable AND
+    # the fused part has a catalog name (D-22(b) canary-stability guard).
+    #
+    # If neither supplier returns full coverage (None), fall through to
+    # Branch 6 (Phase 151-01 VB) and onwards.
+    #
+    # Source: 151-CONTEXT.md D-09 / D-13 / D-21; 151-AUDIT-B.md verdict
+    # MIXED_SPIRO_FUSED_MISSING + Q-05 NESTED_FORM_PARSEABLE.
+    from .rules.spiro import (
+        is_spiro_system,
+        is_mixed_spiro_fused,
+        get_spiro_iupac_locants,
+        get_mixed_spiro_fused_iupac_locants,
+    )
+    if is_spiro_system(mol):
+        sl = get_spiro_iupac_locants(mol)
+        if sl is not None:
+            return {"iupac_locants": sl}
+        # Else: spiro system but supplier declined coverage — fall through
+        # to the existing get_spiro_atoms-True stub return so other
+        # downstream branches don't attempt to take over.
+        return {"iupac_locants": None}
+    if is_mixed_spiro_fused(mol):
+        msfl = get_mixed_spiro_fused_iupac_locants(mol)
+        if msfl is not None:
+            return {"iupac_locants": msfl}
+        # Mixed-spiro/fused but supplier declined — emit None so the
+        # cascade-step-6 gate falls through to the sorted-int proxy
+        # rather than mis-routing to Branch 6 (VB).
         return {"iupac_locants": None}
 
     # Branch 6 (Phase 151-01 D-21): Von Baeyer ≥4-ring authoritative locants.

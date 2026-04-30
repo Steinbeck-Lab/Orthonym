@@ -170,7 +170,7 @@ class TestIsMixedSpiroFusedTruePositives:
     def test_minimal_spiro_indane_is_mixed(self):
         """Spiro-indane (pure-aromatic fused part attached via spiro): MIXED."""
         is_mixed_spiro_fused = _import_or_skip("is_mixed_spiro_fused")
-        mol = Chem.MolFromSmiles("C1CCC2(CC1)Cc1ccccc12")
+        mol = Chem.MolFromSmiles("C1CCC2(CC1)CCc1ccccc12")
         # 3 rings: cyclohexane spiro to 5-membered C-ring fused to benzene.
         # n_spiro=1, n_rings=3, n_rings > n_spiro+1 -> mixed.
         assert is_mixed_spiro_fused(mol) is True
@@ -248,7 +248,7 @@ class TestPureSpiroContractPreserved:
         """Confirms is_spiro_system continues to reject mixed inputs."""
         from orthonym.rules.spiro import is_spiro_system
         # spiro-indane: 3 rings, 1 spiro -> n_rings > n_spiro+1
-        mol = Chem.MolFromSmiles("C1CCC2(CC1)Cc1ccccc12")
+        mol = Chem.MolFromSmiles("C1CCC2(CC1)CCc1ccccc12")
         assert is_spiro_system(mol) is False
 
 

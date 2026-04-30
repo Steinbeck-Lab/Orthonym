@@ -2908,6 +2908,13 @@ def _is_complex_ring_system(mol) -> bool:
     if is_bicyclo_system(mol):
         return True
 
+    # Phase 151-02 D-09: mixed-spiro-fused recognized as complex BEFORE
+    # the pure-spiro and polycyclic-bridged checks (mirrors the dispatch
+    # order in _classify_complex_ring).
+    from ..rules.spiro import is_mixed_spiro_fused as _is_mixed_spiro_fused
+    if _is_mixed_spiro_fused(mol):
+        return True
+
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
     # to return True. Spiro check must precede polycyclic to avoid misrouting.
@@ -2967,6 +2974,14 @@ def _classify_complex_ring(mol) -> str:
     if is_bicyclo_system(mol):
         return 'bicyclo'
 
+    # Phase 151-02 D-09: skip the fused-heterocycle catalog block when
+    # the input is mixed-spiro/fused. Without this guard the catalog
+    # match (matching the fused PART of the molecule, e.g., indoline)
+    # returns 'ortho-fused' for the WHOLE molecule and the
+    # mixed-spiro-fused branch never fires.
+    from ..rules.spiro import is_mixed_spiro_fused as _phase151_is_mixed_spiro_fused
+    _phase151_input_is_mixed = _phase151_is_mixed_spiro_fused(mol)
+
     # Check known fused heterocycles BEFORE polycyclic-bridged check.
     # Prevents tricyclic fused heterocycles (xanthene, phenothiazine,
     # phenoxazine, thianthrene) from being misclassified as VB polycyclics.
@@ -2979,7 +2994,7 @@ def _classify_complex_ring(mol) -> str:
     # is the largest ring system (nucleotide cofactors: adenine + ribose),
     # use only the core's ring system atom count.
     from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
-    core_match = match_fused_heterocycle_core(mol)
+    core_match = None if _phase151_input_is_mixed else match_fused_heterocycle_core(mol)
     if core_match is not None:
         core_smiles = core_match[2]
         core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
@@ -3017,6 +3032,15 @@ def _classify_complex_ring(mol) -> str:
             fused_type = classify_fused_system(mol)
             if fused_type in ('ortho-fused', 'ortho-peri-fused'):
                 return fused_type
+
+    # Phase 151-02 D-09: mixed-spiro-fused MUST come BEFORE both pure-spiro
+    # AND polycyclic-bridged. Mixed inputs have ≥1 spiro atom AND ≥1 fused
+    # junction (n_rings > n_spiro + 1) — they would otherwise route to
+    # polycyclic-bridged (and be misnamed as pure VB systems) or to the
+    # ortho-fused branch (and lose the spiro junction).
+    from ..rules.spiro import is_mixed_spiro_fused
+    if is_mixed_spiro_fused(mol):
+        return 'mixed-spiro-fused'
 
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()

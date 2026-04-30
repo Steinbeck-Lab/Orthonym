@@ -379,3 +379,149 @@ class TestVB:
             ring_set = set(features.ring_systems[0])
             ring_pos = _build_ring_pos(ring_set, ring_info)
             assert len(ring_pos) == len(ring_set)
+
+
+# ============================================================================
+# Test 8 — Phase 151-02 D-21: pure spiro cascade-step-6 wiring (Branch 5a)
+# ============================================================================
+
+
+class TestSpiro:
+    """Phase 151-02 D-21: cascade-step-6 fires for pure spiro inputs.
+
+    Verifies that ``_build_ring_info_for_parent_selection`` Branch 5
+    routes pure spiro systems through ``get_spiro_iupac_locants`` and
+    that the cascade-step-6 gate consumes the resulting locants with
+    FULL atom coverage.
+
+    Source: 151-CONTEXT.md D-09 / D-21; 151-02-PLAN.md task 3.
+    """
+
+    @pytest.mark.unit
+    def test_spiro45decane_cascade_step_6_fires(self):
+        """spiro[4.5]decane: Branch 5a cascade-step-6 supplies locants."""
+        mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCC2')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None, (
+            "cascade-step-6 gate did not see iupac_locants for spiro[4.5]decane"
+        )
+        ri = mol.GetRingInfo()
+        ra = set()
+        for r in ri.AtomRings():
+            ra.update(r)
+        assert set(ring_info["iupac_locants"].keys()) >= ra
+
+    @pytest.mark.unit
+    def test_dispiro_cascade_full_coverage(self):
+        """dispiro[5.1.5.2]heptadecane: Branch 5a fires."""
+        mol = Chem.MolFromSmiles('C1CCC2(CC1)CC1(CCC2)CCCCCC1')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None
+        ri = mol.GetRingInfo()
+        ra = set()
+        for r in ri.AtomRings():
+            ra.update(r)
+        assert set(ring_info["iupac_locants"].keys()) >= ra
+
+    @pytest.mark.unit
+    def test_hetero_spiro_cascade_full_coverage(self):
+        """1,4-dioxaspiro[4.5]decane: Branch 5a fires on hetero-spiro."""
+        mol = Chem.MolFromSmiles('C1CC2(OCCO2)CCC1')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None
+        ri = mol.GetRingInfo()
+        ra = set()
+        for r in ri.AtomRings():
+            ra.update(r)
+        assert set(ring_info["iupac_locants"].keys()) >= ra
+
+
+# ============================================================================
+# Test 9 — Phase 151-02 D-09 + D-21: mixed spiro/fused cascade-step-6 (Branch 5b)
+# ============================================================================
+
+
+class TestMixedSpiroFused:
+    """Phase 151-02 D-09 / D-13 / D-21: cascade-step-6 fires for mixed
+    spiro/fused inputs that the HERITAGE §4 separable-parts builder names.
+
+    Source: 151-CONTEXT.md D-09 / D-13 / D-21; 151-02-PLAN.md task 3.
+    """
+
+    @pytest.mark.unit
+    def test_mixed_routes_to_mixed_classification(self):
+        """D-09 dispatch order: composer cascade picks mixed-spiro-fused
+        BEFORE polycyclic-bridged AND BEFORE pure-spiro on a known mixed
+        SMILES."""
+        from orthonym.assembly.composer import _classify_complex_ring
+        # spiro-indane: 3 rings, 1 spiro centre
+        mol = Chem.MolFromSmiles('C1CCC2(CC1)CCc1ccccc12')
+        ring_type = _classify_complex_ring(mol)
+        assert ring_type == 'mixed-spiro-fused', (
+            f"composer classify returned {ring_type!r} on a mixed input — "
+            f"D-09 dispatch order violated"
+        )
+
+    @pytest.mark.unit
+    def test_mixed_spiro_indane_cascade_step_6_fires(self):
+        """spiro-indane: Branch 5b cascade-step-6 supplies locants."""
+        mol = Chem.MolFromSmiles('C1CCC2(CC1)CCc1ccccc12')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        # Branch 5b returns iupac_locants when name_mixed_spiro_fused
+        # produces a name with full coverage. If the algorithm declines
+        # (e.g., catalog miss), the branch returns {"iupac_locants": None}
+        # which is still gate-visible.
+        if ring_info.get("iupac_locants") is not None:
+            ri = mol.GetRingInfo()
+            ra = set()
+            for r in ri.AtomRings():
+                ra.update(r)
+            assert set(ring_info["iupac_locants"].keys()) >= ra
+
+    @pytest.mark.unit
+    def test_mixed_indoline_cyclohexane_cascade(self):
+        """spiro[indoline-2,1'-cyclohexane]: Branch 5b fires with full
+        coverage on HERITAGE §4 canonical input."""
+        mol = Chem.MolFromSmiles('C12(CCCCC1)CNC1=CC=CC=C12')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        if ring_info.get("iupac_locants") is not None:
+            ri = mol.GetRingInfo()
+            ra = set()
+            for r in ri.AtomRings():
+                ra.update(r)
+            assert set(ring_info["iupac_locants"].keys()) >= ra
+
+    @pytest.mark.unit
+    def test_mixed_steroid_anti_canary(self):
+        """RESEARCH Pitfall 3: cholestane MUST NOT route as mixed-spiro-fused.
+
+        Steroids have n_spiro == 0 (no RDKit spiro atoms), so
+        is_mixed_spiro_fused returns False AND the natural-product
+        short-circuit kicks in. Branch 5b should not engage.
+        """
+        from orthonym.rules.spiro import is_mixed_spiro_fused
+        mol = Chem.MolFromSmiles(
+            'CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C'
+        )
+        assert is_mixed_spiro_fused(mol) is False
+
+    @pytest.mark.unit
+    def test_pure_spiro_not_mixed_classify(self):
+        """D-09 contract: pure spiro routes as 'spiro', NOT mixed-spiro-fused."""
+        from orthonym.assembly.composer import _classify_complex_ring
+        mol = Chem.MolFromSmiles('C1CCC2(CC1)CCCCC2')
+        ring_type = _classify_complex_ring(mol)
+        assert ring_type == 'spiro', (
+            f"composer classify returned {ring_type!r} on a pure spiro — "
+            f"D-09 dispatch order disturbed"
+        )

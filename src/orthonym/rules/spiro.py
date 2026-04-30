@@ -888,40 +888,87 @@ def get_rings_from_spiro_center(
 
 def is_mixed_spiro_fused(mol) -> bool:
     """
-    Detect a mixed spiro / fused ring system.
+    Detect a mixed spiro / fused ring system AMENABLE TO HERITAGE §4 NAMING.
 
     A mixed spiro/fused system has:
-      (a) at least one spiro atom (one shared between exactly two rings)
+      (a) exactly ONE spiro atom (v18 scope; multi-spiro mixed → v19)
       (b) at least one fused-ring junction (rings share an edge)
-      (c) is NOT a recognized natural-product backbone (RESEARCH Pitfall 3
+      (c) the spiro centre cleanly separates the ring graph into
+          a FUSED component (≥2 rings sharing edges) on one side AND
+          a SINGLE algorithmic side ring on the other — i.e.,
+          ``_classify_rings_around_spiro_center`` succeeds.
+      (d) is NOT a recognized natural-product backbone (RESEARCH Pitfall 3
           false-positive guard — steroids and alkaloids may carry RDKit
           ring perception artifacts that look spiro-like).
 
     Mutually exclusive with `is_spiro_system` per Phase 151-02 D-09:
     `is_spiro_system` returns True only when n_rings == n_spiro + 1.
 
-    Phase 151-02 D-09/D-13.
+    Topology constraint (c) is critical for canary stability: hexacyclic
+    natural-product variants (e.g., aconitane derivatives with one spiro
+    centre between two multi-ring fused components) must NOT route to
+    Branch 5b — they belong to the polycyclic-bridged Von Baeyer branch.
+    Logged as v19 follow-up #7 for both-sides-fused topology.
+
+    Phase 151-02 D-09 / D-13 / D-22(b).
 
     Args:
         mol: RDKit Mol object. Returns False if mol is None.
 
     Returns:
-        True iff (a) AND (b) AND (c) hold.
+        True iff (a) AND (b) AND (c) AND (d) hold.
     """
     if mol is None:
         return False
     spiro_atoms = get_spiro_atoms(mol)
     if not spiro_atoms:
         return False
+    if len(spiro_atoms) != 1:
+        return False  # v18 scope: monospiro mixed only.
     ri = mol.GetRingInfo()
     if ri.NumRings() <= len(spiro_atoms) + 1:
         return False  # pure spiro — defer to is_spiro_system
     # FALSE-POSITIVE GUARD per RESEARCH Pitfall 3: steroid + alkaloid
-    # backbones short-circuit to False. Even though most natural-product
-    # scaffolds have n_spiro == 0 (already returned above), the guard
-    # protects against perception artifacts on exotic kekulizations.
+    # backbones short-circuit to False.
     from ..perception.natural_products import detect_natural_product
     if detect_natural_product(mol) is not None:
+        return False
+    # CANARY-STABILITY GUARD per Phase 151-02 D-22(b): only claim
+    # mixed-spiro-fused when the HERITAGE §4 separable topology applies
+    # AND we can actually name the fused part. This restricts the new
+    # branch to canonical Q-05 OPSIN-validated forms (indoline, isoquinoline,
+    # chromane, indane, tetrahydroquinoline, etc.) and lets exotic
+    # large polycyclic natural products (palytoxin-class, aconitane-class)
+    # continue to flow through the polycyclic-bridged Von Baeyer branch
+    # they were on before Plan 151-02. v19 Follow-up #7 + #8 lift these
+    # restrictions once both-sides-fused / multi-spiro-mixed naming is
+    # implemented.
+    spiro_center = list(spiro_atoms)[0]
+    all_rings = [list(r) for r in ri.AtomRings()]
+    classification = _classify_rings_around_spiro_center(
+        mol, spiro_center, all_rings,
+    )
+    if classification is None:
+        return False
+    fused_rings, side_rings = classification
+    if len(side_rings) != 1:
+        return False
+    # Cap the fused-component size at 2 rings. HERITAGE §4 separable form
+    # was conceived for benzo-5-saturated, benzo-6-saturated, and similar
+    # 2-ring fused components — the catalog (FUSED_HETEROCYCLE_DATA) covers
+    # exactly that surface. Larger fused parts (3+) require either
+    # systematic ortho-fused naming (which the catalog miss case in
+    # _name_fused_component falls through to a generic synthesis that
+    # rarely produces a roundtrippable name) OR Von Baeyer treatment
+    # (better preserved by the existing polycyclic-bridged dispatch).
+    if len(fused_rings) > 2:
+        return False
+    # Verify the fused component has a CATALOG name BEFORE claiming the
+    # input as mixed-spiro-fused. Without this guard the dispatch hijacks
+    # molecules whose fused part is uncategorized (e.g., 12-ring fused
+    # natural-product backbones) and produces partial names.
+    fused_named = _name_fused_component(mol, fused_rings)
+    if fused_named is None:
         return False
     return True
 
