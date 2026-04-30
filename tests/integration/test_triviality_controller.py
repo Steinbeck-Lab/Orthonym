@@ -212,9 +212,18 @@ class TestMultiplierAlphabetization:
         name = name_compound(smiles)
         assert name is not None, f"name_compound returned None for {smiles!r}"
         lower = name.lower()
+        # Phase 150 REVIEW WR-03 root-cause fix: previously this test
+        # silently passed when the output omitted either substring
+        # (e.g., a pipeline regression returning 'unknown' or an
+        # unrelated retained name would no-op the alphabetization
+        # check). Assert both substrings are present so a regression
+        # actually fails the suite.
+        assert "acet" in lower and "brom" in lower, (
+            f"P-14.5 + WR-03: expected both 'acet' and 'brom' in "
+            f"'{name}' (regression silently passed before WR-03 fix)"
+        )
         # Find positions of 'acet' and 'brom' substrings (tolerant of
         # 'diacetoxy' vs 'bis(acetyloxy)' vs 'acetate' surface forms).
-        if "acet" in lower and "brom" in lower:
-            assert lower.index("acet") < lower.index("brom"), (
-                f"P-14.5: acet- ('a') must precede brom- ('b') in '{name}'"
-            )
+        assert lower.index("acet") < lower.index("brom"), (
+            f"P-14.5: acet- ('a') must precede brom- ('b') in '{name}'"
+        )
