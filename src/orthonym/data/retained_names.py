@@ -505,11 +505,24 @@ def is_retained_name_compound(canonical_smiles: str) -> bool:
 
 
 def add_retained_name(canonical_smiles: str, name: str) -> None:
-    """
-    Add a new retained name to the lookup.
-    
+    """DEPRECATED: prefer ``orthonym.data.register_retained_name``.
+
+    Phase 150 D-05 + REVIEW CR-01 root-cause fix: ``ALL_RETAINED_NAMES``
+    is built once at import time (``data/__init__.py``); runtime mutators
+    must keep the HC dict and the merged dict synchronised so the public
+    ``get_retained_name`` lookup sees new entries.
+
+    This wrapper updates BOTH the hand-curated ``RETAINED_NAMES`` dict
+    (for legacy callers that read it directly) and delegates to
+    ``register_retained_name`` (which mutates ``ALL_RETAINED_NAMES``).
+
     Args:
         canonical_smiles: Canonical SMILES string
         name: Retained IUPAC name
     """
     RETAINED_NAMES[canonical_smiles] = name
+    try:
+        from orthonym.data import register_retained_name
+        register_retained_name(canonical_smiles, name)
+    except ImportError:
+        pass
