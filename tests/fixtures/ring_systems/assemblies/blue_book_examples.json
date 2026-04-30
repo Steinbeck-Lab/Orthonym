@@ -25,7 +25,7 @@
   },
   {
     "fixture_id": "ra_blue_book_5_5_bithiophene",
-    "smiles": "c1cc(-c2ccsc2)sc1",
+    "smiles": "S1C=CC=C1C1=CC=CS1",
     "expected_name": "5,5'-bithiophene",
     "compound_class": "ring-assembly-bi-heterocyclic",
     "opsin_smiles_validated_in_research": "S1C=CC=C1C1=CC=CS1",
@@ -85,7 +85,7 @@
   },
   {
     "fixture_id": "ra_blue_book_terthiophene",
-    "smiles": "c1cc(-c2ccc(-c3cccs3)s2)cs1",
+    "smiles": "S1C(=CC=C1)C=1SC(=CC1)C=1SC=CC1",
     "expected_name": "2,2':5',2''-terthiophene",
     "compound_class": "ring-assembly-ter-heterocyclic",
     "opsin_smiles_validated_in_research": "S1C(=CC=C1)C=1SC(=CC1)C=1SC=CC1",

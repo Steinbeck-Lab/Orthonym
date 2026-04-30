@@ -16,12 +16,19 @@ Example outputs:
   - 4-chlorobiphenyl SMILES -> "4-chloro-1,1'-biphenyl"
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from collections import Counter
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 from rdkit.Chem import rdchem
 
 from ..perception.rings import get_ring_info, is_aromatic_ring
+
+# Phase 151-03 D-21 type alias: cascade-step-6 supplier returns int|tuple
+# locants. Tuples are reserved for fusion-atom locants like (8, 'a');
+# ring assemblies use plain ints because primes are name-format-layer only
+# (per 151-PATTERNS.md Pattern S-3 and CONTEXT D-19/D-20).
+_Locant = Union[int, Tuple[int, str]]
 
 
 # Assembly multiplier prefixes (IUPAC P-28.2)
@@ -148,6 +155,39 @@ def _check_all_connected(
     return len(roots) == 1
 
 
+def _check_path_topology(
+    num_systems: int, connections: List[Tuple[int, int, int, int]]
+) -> bool:
+    """Phase 151-03 D-15: linear-path requirement for ring assemblies.
+
+    Every system must have degree <= 2 in the inter-system bond graph.
+    Branched arrangements (e.g., 1,3,5-triphenylbenzene where the central
+    benzene has degree 3) are NOT ring assemblies per IUPAC P-28.2; they
+    fall through to substituent-based naming.
+
+    Args:
+        num_systems: number of ring systems.
+        connections: list of (atom_a, atom_b, system_a, system_b) tuples
+            from ``_find_inter_system_bonds``.
+
+    Returns:
+        True iff every system index appears at most twice across
+        ``connections`` (a linear path / single bond ring assembly);
+        False otherwise.
+
+    Source: 151-CONTEXT.md D-15.
+    Source: 151-RESEARCH.md §"Code Examples" Example 4.
+    Source: HERITAGE-1990 §5; IUPAC Blue Book P-28.2.
+    """
+    if num_systems <= 1:
+        return True
+    deg: Counter = Counter()
+    for _, _, s1, s2 in connections:
+        deg[s1] += 1
+        deg[s2] += 1
+    return all(d <= 2 for d in deg.values())
+
+
 def detect_ring_assembly(
     mol, ring_systems: List[Set[int]]
 ) -> Optional[Dict]:
@@ -178,6 +218,12 @@ def detect_ring_assembly(
 
     # Check that all systems are connected
     if not _check_all_connected(len(ring_systems), connections):
+        return None
+
+    # Phase 151-03 D-15: linear-path requirement (every system degree <= 2).
+    # Rejects branched arrangements like 1,3,5-triphenylbenzene where the
+    # central system has degree 3. HERITAGE-1990 §5 + IUPAC P-28.2.
+    if not _check_path_topology(len(ring_systems), connections):
         return None
 
     # Compare signatures -- all must be identical
@@ -390,6 +436,235 @@ def _get_connection_locant(
     # For substituted, we need to number from connection point to give lowest
     # locants. Start with connection = 1.
     return 1
+
+
+def _number_carbocyclic_from_anchor(
+    mol, system_atoms: Set[int], anchor_atom: int,
+    other_inter_system_atoms: Set[int],
+) -> Optional[Dict[int, int]]:
+    """Phase 151-03 D-18 / D-19: per-ring numbering for a carbocyclic
+    assembly component anchored at ``anchor_atom`` (which becomes locant 1).
+
+    Numbers the ring atoms in the direction that gives the lowest locant
+    set for the OTHER inter-system bond atoms (D-19 first-point-of-difference
+    via ``compare_locant_sets``). Used by ``_compute_per_system_ring_locants``
+    to produce the per-system IUPAC locant maps that drive name emission
+    AND the cascade-step-6 supplier.
+
+    Args:
+        mol: RDKit Mol object.
+        system_atoms: atoms forming this ring system.
+        anchor_atom: atom that becomes locant 1 (the inter-system bond
+            attaching this ring to the previous chain ring; for terminal
+            rings, the only inter-system bond atom).
+        other_inter_system_atoms: other inter-system bond atoms in this
+            same ring system (e.g., for the middle ring of terphenyl,
+            this is the singleton {atom-bonded-to-ring-2}).
+
+    Returns:
+        Dict mapping atom_idx -> int locant covering all ring atoms in
+        the (single-)ring system. Returns None for multi-ring systems
+        (those use absolute numbering via _get_ring_parent_name). For
+        single-ring systems, the lowest-locant direction wins per D-19.
+
+    Source: 151-CONTEXT.md D-18, D-19, D-20.
+    Source: HERITAGE-1990 §3 (criterion order — lowest-locant tiebreak).
+    Source: IUPAC Blue Book P-28.2.1.
+    """
+    from .locants import compare_locant_sets
+
+    ri = mol.GetRingInfo()
+    rings = [ring for ring in ri.AtomRings() if set(ring) <= system_atoms]
+    if len(rings) != 1:
+        return None  # multi-ring fused systems use absolute numbering
+    ring_list = list(rings[0])
+    n = len(ring_list)
+    if anchor_atom not in ring_list:
+        return None
+    start_pos = ring_list.index(anchor_atom)
+
+    best_locants: Optional[Dict[int, int]] = None
+    best_other_set: Optional[List[int]] = None
+
+    for direction in (1, -1):
+        # Build oriented sequence: anchor_atom -> locant 1, walking direction
+        oriented = [
+            ring_list[(start_pos + direction * i) % n] for i in range(n)
+        ]
+        atom_to_locant = {a: i + 1 for i, a in enumerate(oriented)}
+        if not other_inter_system_atoms:
+            # Terminal ring: any direction equally valid; pick deterministically
+            # (direction +1 first; later substituent tiebreak handled elsewhere)
+            return atom_to_locant
+        other_set = sorted(
+            atom_to_locant[a]
+            for a in other_inter_system_atoms
+            if a in atom_to_locant
+        )
+        if not other_set:
+            continue
+        if best_other_set is None or compare_locant_sets(
+            other_set, best_other_set
+        ) < 0:
+            best_other_set = other_set
+            best_locants = atom_to_locant
+
+    return best_locants
+
+
+def _compute_per_system_ring_locants(
+    mol, assembly_info: Dict,
+) -> Optional[List[Dict[int, int]]]:
+    """Phase 151-03 D-18 / D-21: per-system IUPAC locant maps for a ring
+    assembly. Each entry is a Dict[int, int] mapping atom_idx -> locant
+    (within that system's own numbering).
+
+    For carbocyclic single-ring components: locant 1 = the inter-system
+    bond atom going TOWARDS the lower-indexed neighbour ring; the second
+    bond atom (if present) gets the lowest-locant ring-walk distance per
+    D-19 ``compare_locant_sets`` tiebreak.
+
+    For heterocyclic components: heteroatom-priority numbering via
+    ``_get_connection_locant`` (existing logic, D-18 own-numbering).
+
+    For multi-ring fused components (e.g., biindole): absolute numbering
+    by per-component canonical SMILES lookup is delegated to
+    ``_get_connection_locant`` (which falls through to fused-heterocycle
+    catalog via ``name_heterocycle``).
+
+    Args:
+        mol: RDKit Mol object.
+        assembly_info: dict from detect_ring_assembly.
+
+    Returns:
+        List of per-system Dict[int, int] locant maps, indexed by system
+        position (matching assembly_info['ring_systems'] order). Returns
+        None if any system cannot be numbered fully.
+
+    Source: 151-CONTEXT.md D-18, D-19, D-21.
+    Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier).
+    """
+    ring_systems = assembly_info["ring_systems"]
+    connections = assembly_info["connections"]
+
+    # Build per-system bond inventory: for each system idx, the list of
+    # (own_atom, other_system_idx) pairs. The "anchor" for numbering is
+    # the bond going TOWARDS the lower-indexed neighbour system; for the
+    # leftmost terminal (sys 0), this is just its single bond.
+    bonds_per_sys: Dict[int, List[Tuple[int, int]]] = {
+        i: [] for i in range(len(ring_systems))
+    }
+    for a1, a2, s1, s2 in connections:
+        bonds_per_sys[s1].append((a1, s2))
+        bonds_per_sys[s2].append((a2, s1))
+
+    result: List[Dict[int, int]] = []
+    for sys_idx, sys_atoms in enumerate(ring_systems):
+        my_bonds = bonds_per_sys[sys_idx]
+        # Pick anchor = bond to the lower-indexed neighbour system.
+        # If ``sys_idx == 0`` there is no lower neighbour — pick its
+        # single bond's own-atom as the anchor.
+        anchor_atom: Optional[int] = None
+        other_atoms: Set[int] = set()
+        for own_atom, other_sys in my_bonds:
+            if other_sys < sys_idx:
+                anchor_atom = own_atom
+            else:
+                other_atoms.add(own_atom)
+        if anchor_atom is None and my_bonds:
+            # Sys 0 (no lower neighbour): use its only own-atom as anchor.
+            anchor_atom = my_bonds[0][0]
+            other_atoms = {a for a, _ in my_bonds[1:]}
+
+        ri = mol.GetRingInfo()
+        sys_rings = [r for r in ri.AtomRings() if set(r) <= sys_atoms]
+
+        # Determine if single-ring carbocyclic vs everything else.
+        if len(sys_rings) == 1 and anchor_atom is not None:
+            ring = sys_rings[0]
+            has_hetero = any(
+                mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ring
+            )
+            if not has_hetero:
+                # Carbocyclic single ring: number from anchor with D-19
+                # lowest-locant tiebreak on other_atoms.
+                m = _number_carbocyclic_from_anchor(
+                    mol, sys_atoms, anchor_atom, other_atoms
+                )
+                if m is not None and set(m.keys()) == set(ring):
+                    result.append(m)
+                    continue
+
+        # Heterocyclic single-ring: number the ring with heteroatom-priority
+        # IUPAC P-25 absolute numbering (heteroatom = locant 1). Walking
+        # direction is chosen to give the LOWEST locant set to the
+        # inter-system bond atoms (P-28.2.1 connection-locant lowest-locant
+        # rule + D-19 first-point-of-difference via compare_locant_sets).
+        sys_map: Dict[int, int] = {}
+        if len(sys_rings) == 1:
+            ring = sys_rings[0]
+            n = len(ring)
+            ring_list = list(ring)
+            from .heterocycles import classify_heterocycle
+            from ..data.hw_heteroatoms import get_heteroatom_priority
+            from .locants import compare_locant_sets
+
+            try:
+                info_het = classify_heterocycle(mol, ring_list)
+                heteroatoms = info_het.get("heteroatoms", [])
+            except Exception:
+                heteroatoms = []
+
+            if heteroatoms:
+                sorted_ha = sorted(
+                    heteroatoms,
+                    key=lambda x: get_heteroatom_priority(x[1]),
+                )
+                start_idx = sorted_ha[0][0]
+                start_pos = ring_list.index(start_idx)
+                conn_atoms = (
+                    ([anchor_atom] if anchor_atom is not None else [])
+                    + sorted(other_atoms)
+                )
+                best_map: Optional[Dict[int, int]] = None
+                best_locant_set: Optional[List[int]] = None
+                for direction in (1, -1):
+                    oriented = [
+                        ring_list[(start_pos + direction * i) % n]
+                        for i in range(n)
+                    ]
+                    cand_map = {a: i + 1 for i, a in enumerate(oriented)}
+                    cand_set = sorted(cand_map[a] for a in conn_atoms if a in cand_map)
+                    if not cand_set:
+                        continue
+                    if best_locant_set is None or compare_locant_sets(
+                        cand_set, best_locant_set
+                    ) < 0:
+                        best_locant_set = cand_set
+                        best_map = cand_map
+                if best_map is not None:
+                    sys_map = best_map
+            if not sys_map:
+                # No heteroatoms classified or numbering failed — fall
+                # back to anchor-based carbocyclic numbering.
+                if anchor_atom is not None and anchor_atom in ring:
+                    fallback = _number_carbocyclic_from_anchor(
+                        mol, sys_atoms, anchor_atom, other_atoms
+                    )
+                    if fallback is not None:
+                        sys_map = fallback
+            result.append(sys_map)
+        else:
+            # Multi-ring fused: defer to absolute numbering via
+            # _get_connection_locant per atom. Coverage may be partial
+            # for some catalogue entries; the supplier checks coverage
+            # downstream and returns None if incomplete.
+            for atom_idx in sys_atoms:
+                loc = _get_connection_locant(mol, atom_idx, sys_atoms)
+                sys_map[atom_idx] = loc
+            result.append(sys_map)
+
+    return result
 
 
 def _get_substituent_locant(
@@ -741,22 +1016,40 @@ def name_ring_assembly(
     if ring_name is None:
         return None
 
-    # Build connection locant string
-    # Sort connections by system indices to ensure consistent ordering
+    # Build connection locant string per IUPAC P-28.2.1.
+    # Phase 151-03 D-18 / D-19: use per-system numbering so ter-/quater-
+    # assemblies emit the correct middle-ring back-attachment locant
+    # (4 for para-terphenyl, 6 for terpyridine, 5 for terthiophene).
+    # The pre-151-03 path called _get_connection_locant per pair, which
+    # always returned 1 for carbocyclic atoms — yielding the buggy
+    # "1,1':1',1''-terphenyl" output captured in 151-AUDIT-C.md.
+    per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
+
+    def _lookup_locant(per_system, sys_idx, atom_idx, sys_atoms):
+        """Locant lookup with safe fallback to legacy single-bond helper."""
+        if (
+            per_system is not None
+            and 0 <= sys_idx < len(per_system)
+            and atom_idx in per_system[sys_idx]
+        ):
+            return per_system[sys_idx][atom_idx]
+        return _get_connection_locant(mol, atom_idx, sys_atoms)
+
+    # Sort connections by system indices to ensure consistent ordering.
     # For bi- assemblies: one connection -> "X,X'"
     # For ter- assemblies: two connections -> "X,X':X',X''"
     connection_parts = []
+    sorted_connections = []
     for a1, a2, s1, s2 in connections:
-        # Ensure s1 < s2 for consistent ordering
         if s1 > s2:
             a1, a2, s1, s2 = a2, a1, s2, s1
-
-        loc1 = _get_connection_locant(mol, a1, ring_systems[s1])
-        loc2 = _get_connection_locant(mol, a2, ring_systems[s2])
-
+        sorted_connections.append((a1, a2, s1, s2))
+    sorted_connections.sort(key=lambda c: (c[2], c[3]))
+    for a1, a2, s1, s2 in sorted_connections:
+        loc1 = _lookup_locant(per_system_locants, s1, a1, ring_systems[s1])
+        loc2 = _lookup_locant(per_system_locants, s2, a2, ring_systems[s2])
         prime1 = _format_prime(s1)
         prime2 = _format_prime(s2)
-
         connection_parts.append(f"{loc1}{prime1},{loc2}{prime2}")
 
     connection_str = ":".join(connection_parts)
@@ -1050,3 +1343,71 @@ def name_mixed_ring_prefix(
     else:
         # General case: stem-attach_locant-yl
         return f"({connection_locant}-{sub_display}{parent_stem}-{attach_locant}-yl)"
+
+
+# ============================================================================
+# Phase 151-03 D-21: cascade-step-6 supplier (get_ring_assembly_iupac_locants)
+# ============================================================================
+
+def get_ring_assembly_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
+    """Phase 151-03 D-21 cascade-step-6 supplier for ring assemblies size >= 2.
+
+    Returns the per-system IUPAC numbering of every ring atom merged into a
+    single ``Dict[int, int]`` covering ALL ring atoms in the assembly.
+    Primes are NAME-format-layer concerns only (in ``_format_prime``), so
+    the supplier emits plain integer locants — the comparator in
+    ``compare_locant_sets`` and ``_build_ring_pos`` sees the integer base.
+
+    Coverage invariant per Pitfall 7: returns ``None`` when partial
+    coverage would otherwise leak into the cascade-step-6 gate. The gate
+    in ``candidate_pool.py:634::_has_iupac_locants`` checks dict
+    truthiness only; a partial map would silently mis-rank candidates.
+
+    Args:
+        mol: RDKit Mol object.
+
+    Returns:
+        Dict mapping atom_idx -> int locant covering all ring atoms in
+        every system of the assembly. Returns ``None`` when:
+          * the molecule is not a ring assembly per ``detect_ring_assembly``
+            (size < 2, mixed signatures, branched topology, oversize, etc.),
+          * any system's per-ring numbering produces partial coverage.
+
+    Source: 151-CONTEXT.md D-18, D-19, D-21.
+    Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier contract).
+    Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 named cases).
+    """
+    from ..perception.rings import get_ring_systems
+
+    if mol is None:
+        return None
+    ring_systems = get_ring_systems(mol, include_spiro=False)
+    if len(ring_systems) < 2:
+        return None
+
+    info = detect_ring_assembly(mol, ring_systems)
+    if info is None:
+        return None
+
+    per_system = _compute_per_system_ring_locants(mol, info)
+    if per_system is None:
+        return None
+
+    # Merge per-system maps into a single atom_idx -> locant map.
+    merged: Dict[int, int] = {}
+    for sys_map in per_system:
+        for atom_idx, loc in sys_map.items():
+            merged[atom_idx] = loc
+
+    # Coverage invariant (Pitfall 7): every ring atom in the assembly
+    # must be covered. Partial coverage returns None so the cascade
+    # falls through to the sorted-int proxy (no silent mis-ranking).
+    ri = mol.GetRingInfo()
+    all_ring_atoms: Set[int] = set()
+    for r in ri.AtomRings():
+        all_ring_atoms.update(r)
+    if not (set(merged.keys()) >= all_ring_atoms):
+        return None
+
+    # Filter to ring atoms only (cascade-step-6 contract; no acyclic atoms).
+    return {k: v for k, v in merged.items() if k in all_ring_atoms}

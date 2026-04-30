@@ -561,6 +561,27 @@ def _build_ring_info_for_parent_selection(features):
     if is_bridged_fused(mol):
         return {"iupac_locants": None}
 
+    # Branch 7 (Phase 151-03 D-21): ring assembly size 3+ supplier.
+    # Wires get_ring_assembly_iupac_locants per 151-AUDIT-C.md verdict
+    # SUPPLIER_MISSING + 151-PATTERNS.md Pattern S-3. Path-topology check
+    # added to detect_ring_assembly per D-15 rejects branched arrangements
+    # (1,3,5-triphenylbenzene) so Branch 7 only fires on linear chains.
+    # 2-system bi- assemblies are NOT routed here (covered by existing
+    # naming pipeline + the >=3 gate keeps blast-radius minimal).
+    #
+    # Source: 151-CONTEXT.md D-15 / D-18 / D-19 / D-21; 151-AUDIT-C.md
+    # composite verdict; Pitfall 7 (full coverage or None).
+    if hasattr(features, 'ring_systems') and len(features.ring_systems) >= 3:
+        from .rules.ring_assemblies import (
+            detect_ring_assembly as _phase151_detect_ring_assembly,
+            get_ring_assembly_iupac_locants as _phase151_get_ra_locants,
+        )
+        info = _phase151_detect_ring_assembly(mol, features.ring_systems)
+        if info is not None and info.get("count", 0) >= 3:
+            ral = _phase151_get_ra_locants(mol)
+            if ral is not None:
+                return {"iupac_locants": ral}
+
     # Branch 6.5 (Phase 149 D-09): non-cataloged fused systems.
     # Cataloged compounds reach Branches 1 (fused-heterocycle catalog) and
     # 2 (PAH) first. If they didn't, but the system is ortho-fused or
