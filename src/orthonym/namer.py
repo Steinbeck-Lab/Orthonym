@@ -488,11 +488,32 @@ def _build_ring_info_for_parent_selection(features):
             except Exception:
                 pass
 
-    # Branch 5: spiro stub (Phase 151 fills).
+    # Branch 5: spiro stub (Phase 151-02 fills).
     if bool(get_spiro_atoms(mol)):
         return {"iupac_locants": None}
 
-    # Branch 6: bridged / Von Baeyer stub (Phase 151 fills).
+    # Branch 6 (Phase 151-01 D-21): Von Baeyer ≥4-ring authoritative locants.
+    # Routes tetracyclic / pentacyclic / higher non-cataloged bridged systems
+    # to the new polycyclic_von_baeyer module. Anti-canary lock D-04 inside
+    # is_higher_polycyclo guarantees bicyclo / tricyclo / aromatic / steroid
+    # / mixed cases skip this branch and fall through to is_bridged_fused
+    # below or downstream branches.
+    #
+    # Source: 151-CONTEXT.md D-04 / D-06 / D-21; 151-AUDIT-A.md verdict
+    # THIN_WRAPPER; Phase 147 cascade-step-6 gate (candidate_pool.py:634).
+    from .rules.polycyclic_von_baeyer import (
+        get_higher_polycyclo_iupac_locants,
+        is_higher_polycyclo,
+    )
+    if is_higher_polycyclo(mol):
+        vbl = get_higher_polycyclo_iupac_locants(mol)
+        if vbl is not None:
+            return {"iupac_locants": vbl}
+
+    # Branch 6 (existing): residual bridged / Von Baeyer stub for cases the
+    # new module did NOT handle (e.g., bicyclic / tricyclic / aromatic
+    # bridged systems caught by is_bridged_fused). Phase 151-02 / 03 wire
+    # spiro and ring-assembly suppliers here.
     if is_bridged_fused(mol):
         return {"iupac_locants": None}
 

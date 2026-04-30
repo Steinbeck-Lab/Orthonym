@@ -277,3 +277,105 @@ def test_indole_fused_hetero_atom_mapping():
     # Branch 1 preserves the heterocycle atom_mapping byte-identical
     # (heteroatom guard returns the exact dict).
     assert ring_info == {"iupac_locants": expected_mapping}, ring_info
+
+
+# ============================================================================
+# Test 7 — Phase 151-01 D-21: VB ≥4-ring cascade-step-6 wiring
+# ============================================================================
+
+
+class TestVB:
+    """Phase 151 D-21: cascade-step-6 fires for VB tetracyclo+ inputs.
+
+    Verifies that ``_build_ring_info_for_parent_selection`` Branch 6 routes
+    >=4-ring non-cataloged bridged systems through the new
+    ``polycyclic_von_baeyer.get_higher_polycyclo_iupac_locants`` supplier and
+    that the cascade-step-6 gate (`candidate_pool._has_iupac_locants`)
+    consumes the resulting locants with FULL atom coverage.
+
+    Source: 151-CONTEXT.md D-04 / D-06 / D-21; 151-AUDIT-A.md verdict
+    THIN_WRAPPER; Phase 147 cascade-step-6 gate.
+    """
+
+    @pytest.mark.unit
+    def test_cubane_cascade_step_6_fires(self):
+        """Cubane: pentacyclo[4.2.0.0^{2,5}.0^{3,8}.0^{4,7}]octane."""
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C3C4C25')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None, (
+            "Branch 6 must fire on cubane; got None"
+        )
+        assert ring_info.get("iupac_locants") is not None, (
+            "cascade-step-6 gate did not see iupac_locants for cubane"
+        )
+        ring_set = set(features.ring_systems[0])
+        ring_pos = _build_ring_pos(ring_set, ring_info)
+        assert len(ring_pos) == len(ring_set), (
+            f"partial coverage: {len(ring_pos)} entries for "
+            f"{len(ring_set)} ring atoms (Pitfall 7 violation)"
+        )
+
+    @pytest.mark.unit
+    def test_adamantane_anticanary_predicate_false(self):
+        """D-08 lock: adamantane is tricyclic, is_higher_polycyclo False."""
+        from orthonym.rules.polycyclic_von_baeyer import is_higher_polycyclo
+        mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')
+        assert is_higher_polycyclo(mol) is False
+
+    @pytest.mark.unit
+    def test_bicyclo222_octane_anticanary(self):
+        """D-04 anti-canary: bicyclo[2.2.2]octane retains bicyclo.py auth."""
+        from orthonym.rules.polycyclic_von_baeyer import (
+            get_higher_polycyclo_iupac_locants,
+            is_higher_polycyclo,
+        )
+        mol = Chem.MolFromSmiles('C1CC2CCC1CC2')
+        assert is_higher_polycyclo(mol) is False
+        assert get_higher_polycyclo_iupac_locants(mol) is None
+
+    @pytest.mark.unit
+    def test_norbornane_anticanary(self):
+        """D-04 anti-canary: norbornane (bicyclo[2.2.1]heptane)."""
+        from orthonym.rules.polycyclic_von_baeyer import (
+            get_higher_polycyclo_iupac_locants,
+            is_higher_polycyclo,
+        )
+        mol = Chem.MolFromSmiles('C1CC2CCC1C2')
+        assert is_higher_polycyclo(mol) is False
+        assert get_higher_polycyclo_iupac_locants(mol) is None
+
+    @pytest.mark.unit
+    def test_naphthalene_anticanary(self):
+        """Aromatic guard: PAHs route via polycyclics.py (Branch 2)."""
+        from orthonym.rules.polycyclic_von_baeyer import (
+            get_higher_polycyclo_iupac_locants,
+            is_higher_polycyclo,
+        )
+        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
+        assert is_higher_polycyclo(mol) is False
+        assert get_higher_polycyclo_iupac_locants(mol) is None
+
+    @pytest.mark.unit
+    def test_blue_book_diamantane_cascade_step_6_fires(self):
+        """Diamantane (pentacyclic 14-atom diamondoid): Branch 6 fires."""
+        mol = Chem.MolFromSmiles('C1C2CC3CC4CC1C1CC2(CC4)C31')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        assert ring_info is not None
+        assert ring_info.get("iupac_locants") is not None
+        ring_set = set(features.ring_systems[0])
+        ring_pos = _build_ring_pos(ring_set, ring_info)
+        assert len(ring_pos) == len(ring_set)
+
+    @pytest.mark.unit
+    def test_quadricyclane_predicate_decides_routing(self):
+        """Quadricyclane: VB-supplier OR fallthrough — must NOT corrupt
+        parent selection."""
+        mol = Chem.MolFromSmiles('C1C2C3C1C1C2C31')
+        features = compute_features(mol)
+        ring_info = _build_ring_info_for_parent_selection(features)
+        if ring_info is not None and ring_info.get("iupac_locants"):
+            ring_set = set(features.ring_systems[0])
+            ring_pos = _build_ring_pos(ring_set, ring_info)
+            assert len(ring_pos) == len(ring_set)
