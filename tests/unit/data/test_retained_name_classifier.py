@@ -286,3 +286,16 @@ class TestJSONAllowListSchema:
                 f"entry {i} citation {entry['citation']!r} "
                 f"does not start with P-"
             )
+        # Phase 150 REVIEW WR-07: classifier is name-keyed (the
+        # _PIN_ALLOW / _PIN_DENY frozensets are built from
+        # entry["name"].lower()), so duplicate names would silently
+        # collapse into a single classifier slot whose pin flag is
+        # whichever entry the iterator visits last. Duplicate SMILES
+        # are intentional (e.g., benzene + [6]annulene share
+        # c1ccccc1) and not a bug; duplicate NAMES are a data error.
+        names_lower = [e["name"].lower() for e in data["entries"]]
+        dups = sorted({n for n in names_lower if names_lower.count(n) > 1})
+        assert not dups, (
+            f"duplicate names in PIN list: {dups}; classifier is "
+            f"name-keyed so duplicates collapse silently."
+        )
