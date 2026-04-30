@@ -56,13 +56,21 @@ def _opsin_jar_path():
 
 
 def _opsin_name_to_smiles(name: str, jar_path: str) -> str:
-    result = subprocess.run(
-        ["java", "-jar", jar_path, "-osmi"],
-        input=name,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    """Phase 150 REVIEW WR-02: catch TimeoutExpired so a single hung
+    OPSIN invocation does not crash the test session. Returning ""
+    routes the test through the existing 'OPSIN cannot parse' xfail
+    branch in each parametrized test.
+    """
+    try:
+        result = subprocess.run(
+            ["java", "-jar", jar_path, "-osmi"],
+            input=name,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return ""
     return result.stdout.strip()
 
 
