@@ -134,6 +134,15 @@ import json
 from pathlib import Path
 
 _PIN_LIST_PATH = Path(__file__).parent / "iupac_2013_pin_list.json"
+# Phase 150 REVIEW WR-06: standardise on a broad except clause for both
+# JSON loaders. Previously the PIN list loader caught only
+# FileNotFoundError, while the round-trip cache loader caught
+# (json.JSONDecodeError, KeyError) -- same JSON, two different failure
+# modes for the same kind of corruption (and TypeError from
+# frozenset-of-non-hashables was uncaught in either path). Standardise
+# on (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) so
+# any malformed file degrades gracefully rather than crashing import.
+# Source: 150-REVIEW.md WR-06.
 try:
     with open(_PIN_LIST_PATH) as f:
         _PIN_LIST = json.load(f)
@@ -143,12 +152,12 @@ try:
     _PIN_DENY = frozenset(
         e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is False
     )
-except FileNotFoundError:
+except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as e:
     _PIN_ALLOW = frozenset()
     _PIN_DENY = frozenset()
     logger.warning(
-        "iupac_2013_pin_list.json not found at %s; "
-        "classifier degrades to Signal 1 only", _PIN_LIST_PATH
+        "PIN list load failed at %s: %s; classifier degrades to "
+        "Signal 1 only", _PIN_LIST_PATH, e
     )
 
 # Phase 150 D-04: load round-trip cache (Plan 02 produces this)
@@ -161,7 +170,7 @@ if not _PROVISIONAL_MODE:
         with open(_ROUNDTRIP_CACHE_PATH) as f:
             _ROUNDTRIP_DATA = json.load(f)
         _ROUNDTRIP_PASS = frozenset(_ROUNDTRIP_DATA.get("pass_smiles", []))
-    except (json.JSONDecodeError, KeyError) as e:
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as e:
         logger.warning("Failed to load _phase150_validation.json: %s", e)
         _ROUNDTRIP_PASS = frozenset()
         _PROVISIONAL_MODE = True
