@@ -35,9 +35,12 @@ Naming-collision note (CONTEXT D-06 deviation; RESEARCH Q-01):
 """
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional, Tuple, Union
 
 from rdkit import Chem
+
+logger = logging.getLogger(__name__)
 
 # D-07 reuse — single canonical comparator across the project (no parallel
 # locant ranking ever introduced). This import is kept even though the
@@ -179,7 +182,15 @@ def name_higher_polycyclo(mol) -> Optional[str]:
             )
             return f"{prefix}{descriptor}{parent_name}"
         return f"{descriptor}{parent_name}"
-    except Exception:
+    except (ValueError, KeyError, IndexError) as e:
+        # Phase 151-04 WR-10: narrowed exception clause per the contributor guide /
+        # ./skills/fix-methodology.md. Real bugs (AttributeError,
+        # TypeError) propagate so they surface during testing instead
+        # of being silently masked.
+        logger.debug(
+            "name_higher_polycyclo declined %s: %s",
+            Chem.MolToSmiles(mol, canonical=True), e,
+        )
         return None
 
 
@@ -219,7 +230,13 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
         # Filter to ring atoms only (analyzer may include non-ring entries
         # for some downstream uses; the cascade gate cares about ring set).
         return {idx: numbering[idx] for idx in ring_atoms if idx in numbering}
-    except Exception:
+    except (ValueError, KeyError, IndexError) as e:
+        # Phase 151-04 WR-10: narrowed exception clause per the contributor guide /
+        # ./skills/fix-methodology.md.
+        logger.debug(
+            "get_higher_polycyclo_iupac_locants declined %s: %s",
+            Chem.MolToSmiles(mol, canonical=True), e,
+        )
         return None
 
 
