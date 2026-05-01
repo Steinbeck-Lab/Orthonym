@@ -542,3 +542,48 @@ class TestRoundTripViaOPSIN:
         assert rt is not None
         # Round-trip the OPSIN output to verify InChI computability.
         assert Chem.MolToInchi(rt).startswith("InChI=")
+
+
+class TestHeteroatomSeniorityWR01:
+    """Phase 151-04 WR-01: side-ring heteroatom seniority must include
+    halogens per IUPAC P-25.3.1.3."""
+
+    @pytest.mark.unit
+    def test_no_local_priority_dict_in_walk_side_ring_locants(self):
+        """The local priority dict at spiro.py:1449 must be removed in
+        favor of get_heteroatom_priority. A grep over the function source
+        confirms the regression is closed."""
+        from orthonym.rules import spiro
+        # Find the function (private; access through module globals)
+        walker = getattr(spiro, "_walk_side_ring_locants", None)
+        if walker is None:
+            pytest.skip("_walk_side_ring_locants is no longer a module attribute")
+        src = inspect.getsource(walker)
+        non_comment = "\n".join(
+            L for L in src.split("\n") if not L.strip().startswith("#")
+        )
+        # WR-01 lock: the literal local-priority-dict pattern must NOT
+        # appear in the function body.
+        assert 'priority = {"O": 0' not in non_comment, (
+            "WR-01 regression: local priority dict reintroduced in "
+            "_walk_side_ring_locants. Use get_heteroatom_priority instead."
+        )
+        # AND the canonical helper IS used.
+        assert "get_heteroatom_priority" in non_comment, (
+            "WR-01: get_heteroatom_priority must be referenced in "
+            "_walk_side_ring_locants for halogen-aware seniority."
+        )
+
+    @pytest.mark.unit
+    def test_get_heteroatom_priority_orders_halogens_above_oxygen(self):
+        """Sanity: confirm the canonical helper ranks F senior to O.
+        If this ever flips, the WR-01 fix's correctness premise is gone."""
+        from orthonym.data.hw_heteroatoms import get_heteroatom_priority
+        assert get_heteroatom_priority("F") < get_heteroatom_priority("O"), (
+            "IUPAC P-25.3.1.3: F is more senior than O. If this assertion "
+            "fails, hw_heteroatoms.py's ordering has changed and WR-01 "
+            "needs re-review."
+        )
+        assert get_heteroatom_priority("Cl") < get_heteroatom_priority("O")
+        assert get_heteroatom_priority("Br") < get_heteroatom_priority("O")
+        assert get_heteroatom_priority("I") < get_heteroatom_priority("O")

@@ -57,9 +57,19 @@ HW_PREFIXES: Dict[str, str] = {
 
 # Heteroatom priority for ring numbering
 # Lower number = higher priority (gets position 1)
-# IUPAC order: O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B
+# IUPAC order: F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B
+# Phase 151-04 WR-01: halogens included per IUPAC P-25.3.1.3 (skeletal
+# replacement nomenclature priority). Negative values keep them strictly
+# more senior than O without renumbering downstream callers that depend
+# on the relative ordering of O..B established before halogens were added.
 HETEROATOM_PRIORITY: Dict[str, int] = {
-    # Group 16 (highest priority)
+    # Group 17 (halogens — most senior per IUPAC P-25.3.1.3)
+    'F': -4,
+    'Cl': -3,
+    'Br': -2,
+    'I': -1,
+
+    # Group 16 (highest priority among non-halogens)
     'O': 1,
     'S': 2,
     'Se': 3,

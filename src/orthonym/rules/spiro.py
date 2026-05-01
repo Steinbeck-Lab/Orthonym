@@ -31,6 +31,8 @@ from rdkit import Chem
 
 from ..perception.rings import get_spiro_atoms
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
+# Phase 151-04 WR-01: shared IUPAC P-25.3.1.3 heteroatom priority (halogen-aware).
+from ..data.hw_heteroatoms import get_heteroatom_priority
 # Phase 151-02 D-11/D-20: locant comparator reuse — no parallel comparator
 # permitted in this module. Imported at the top so the source-grep lock in
 # tests/unit/rules/test_mixed_spiro_fused.py and test_spiro_numbering.py
@@ -1445,11 +1447,15 @@ def _walk_side_ring_locants(
     spiro_in_ring = [a for a in ring if a in spiro_set]
     start: int
     if hetero_first:
-        # Highest-priority heteroatom in the ring
-        priority = {"O": 0, "S": 1, "Se": 2, "N": 3, "P": 4, "Si": 5, "B": 6}
+        # Phase 151-04 WR-01: use canonical IUPAC P-25 priority from
+        # data.hw_heteroatoms (which includes halogens F < Cl < Br < I <
+        # O < S < ... per P-25.3.1.3). The previous local dict was
+        # missing halogen entries, causing F/Cl/Br/I ring atoms to fall
+        # through to default priority 99 (least senior) when IUPAC
+        # P-25.3.1.3 requires them to be MOST senior.
         hetero_candidates = sorted(
             (a for a in ring if mol.GetAtomWithIdx(a).GetSymbol() != "C"),
-            key=lambda a: priority.get(mol.GetAtomWithIdx(a).GetSymbol(), 99),
+            key=lambda a: get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()),
         )
         if hetero_candidates:
             start = hetero_candidates[0]
