@@ -3128,6 +3128,20 @@ def _assemble_complex_ring_name(mol, features):
             logging.warning("Spiro naming failed for molecule")
             return None
 
+        elif ring_type == 'mixed-spiro-fused':
+            # Phase 151 D-09 + D-13: HERITAGE §4 separable-parts naming for
+            # mixed spiro/fused systems (e.g., spiro[indoline-3,1'-cyclohexane]).
+            # The classifier tags this at line ~3043; the dispatcher must
+            # invoke name_mixed_spiro_fused or the entire HERITAGE §4 path is
+            # dead code from name_compound (151-04 BLK-01 closure).
+            from ..rules.spiro import name_mixed_spiro_fused
+            result = name_mixed_spiro_fused(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Mixed-spiro-fused naming failed for molecule")
+            return None
+
         elif ring_type in ('ortho-fused', 'ortho-peri-fused'):
             # Fused ring naming - try heterocycle first, then carbocyclic
             # Heterocycles have retained names like indole, quinoline
