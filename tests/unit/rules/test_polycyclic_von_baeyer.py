@@ -464,3 +464,59 @@ class TestRoundTripViaOPSIN:
             f"InChI L1 mismatch on {fixture['fixture_id']}: "
             f"input={inchi_in!r} rt={inchi_rt!r} via name={name!r}"
         )
+
+
+class TestNarrowExceptionsWR10:
+    """Phase 151-04 WR-10: bare except Exception eliminated per
+    the contributor guide / ./skills/fix-methodology.md no-band-aid policy."""
+
+    @pytest.mark.unit
+    def test_no_bare_except_exception_in_module(self):
+        """Source-grep: bare 'except Exception:' must not appear in
+        polycyclic_von_baeyer.py. Real bugs (AttributeError, TypeError)
+        should propagate; only EXPECTED conditions are caught."""
+        import inspect
+        from orthonym.rules import polycyclic_von_baeyer
+        src = inspect.getsource(polycyclic_von_baeyer)
+        non_comment = "\n".join(
+            L for L in src.split("\n") if not L.strip().startswith("#")
+        )
+        # WR-10 lock — bare except Exception is forbidden
+        assert "except Exception:" not in non_comment, (
+            "WR-10 regression: bare 'except Exception:' reintroduced in "
+            "polycyclic_von_baeyer.py. Use narrow exceptions per "
+            "the contributor guide / ./skills/fix-methodology.md."
+        )
+
+    @pytest.mark.unit
+    def test_narrow_exception_tuple_present(self):
+        """The replacement form (ValueError, KeyError, IndexError)
+        tuple must appear at least twice — once per the two locations
+        that previously held bare except Exception."""
+        import inspect
+        from orthonym.rules import polycyclic_von_baeyer
+        src = inspect.getsource(polycyclic_von_baeyer)
+        non_comment = "\n".join(
+            L for L in src.split("\n") if not L.strip().startswith("#")
+        )
+        count = non_comment.count("except (ValueError, KeyError, IndexError)")
+        assert count >= 2, (
+            f"WR-10: expected >= 2 narrow except clauses, got {count}. "
+            f"Both name_higher_polycyclo and "
+            f"get_higher_polycyclo_iupac_locants must use the narrow form."
+        )
+
+    @pytest.mark.unit
+    def test_logger_debug_on_decline(self):
+        """The decline path must emit logger.debug — silent fall-through
+        without logging is a band-aid even if the except is narrow."""
+        import inspect
+        from orthonym.rules import polycyclic_von_baeyer
+        src = inspect.getsource(polycyclic_von_baeyer)
+        non_comment = "\n".join(
+            L for L in src.split("\n") if not L.strip().startswith("#")
+        )
+        assert "logger.debug" in non_comment, (
+            "WR-10: decline paths must log via logger.debug to prevent "
+            "silent failure-masking."
+        )
