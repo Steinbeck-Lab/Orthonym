@@ -1189,11 +1189,19 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1",  # aromatic,large
-        # Phase 151-03 D-15/D-18/D-19 fix: previous "1,1':1,1''-terphenyl"
-        # was the audit-flagged WRONG_2ND_LOCANT bug (151-AUDIT-C.md row
-        # "1,1':4',1''-terphenyl-para"). Post-fix, the connection-string
-        # builder correctly emits middle-ring locant 4 for para-attachment.
-        "4',5,4'',3''-tetrahydroxy-3,2-dimethoxy-3'-2-methylbut-2-enyl-1,1':4,1''-terphenyl",
+        # Phase 151-04 BLK-02 Scenario A fix: previous frozen string had an
+        # unprimed back-attachment locant on the middle ring (the connection
+        # string was emitted with the second pair lacking a prime on its
+        # first element). Per IUPAC P-28.2.1 the middle ring of a
+        # ter-assembly is in the single-prime namespace; both connection
+        # locants on the middle ring must be primed. The root-cause fix in
+        # ring_assemblies.py (_order_systems_along_path) walks the
+        # inter-system bond graph from a terminal end so the middle ring
+        # lands at index 1 (single-prime namespace), restoring the canonical
+        # 1,1':4',1''-terphenyl connection-string and re-anchoring
+        # substituent locants to the path-ordered systems.
+        # See 151-04-DIAGNOSTIC.md for the captured pre-fix emission.
+        "4,5',4'',3''-tetrahydroxy-3',2'-dimethoxy-3-2-methylbut-2-enyl-1,1':4',1''-terphenyl",
     ),
     (
         "COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.O=C(O)/C=C/C(=O)O",  # aromatic,polyfunctional,salt,large

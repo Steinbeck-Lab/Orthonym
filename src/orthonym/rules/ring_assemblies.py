@@ -188,6 +188,84 @@ def _check_path_topology(
     return all(d <= 2 for d in deg.values())
 
 
+def _order_systems_along_path(
+    num_systems: int,
+    connections: List[Tuple[int, int, int, int]],
+) -> Optional[List[int]]:
+    """Phase 151-04 BLK-02 Scenario A root-cause fix.
+
+    Given a linear-path inter-system bond graph (verified by
+    ``_check_path_topology``), return the system indices in path order
+    starting from one terminal end.
+
+    For a path A—B—C, returns ``[A, B, C]`` where A and C are the
+    terminal systems (degree 1 in the inter-system graph) and B is the
+    middle system (degree 2). This is the canonical IUPAC P-28.2.1
+    ordering: terminal rings get unprimed and double-primed namespaces,
+    middle rings get the single-prime namespace.
+
+    Without this reordering, ``get_ring_systems`` returns ring systems
+    in atom-traversal order — the middle ring of a substituted terphenyl
+    can land at index 0, causing the connection-string emission to drop
+    the prime on the middle ring's back-attachment locant
+    (e.g., emitting ``1,1':4,1''-terphenyl`` instead of the canonical
+    ``1,1':4',1''-terphenyl``). This was the BLK-02 defect captured at
+    151-04-DIAGNOSTIC.md.
+
+    Args:
+        num_systems: number of ring systems.
+        connections: list of (atom_a, atom_b, system_a, system_b) tuples
+            from ``_find_inter_system_bonds``.
+
+    Returns:
+        List of system indices in path order, or None if a unique linear
+        ordering cannot be determined (caller should fall through).
+
+    Source: IUPAC Blue Book P-28.2.1 (single-prime namespace = middle ring).
+    Source: 151-04-PLAN.md Task 3 Scenario A.
+    """
+    if num_systems <= 1:
+        return list(range(num_systems))
+
+    # Build adjacency map (system -> set of neighbor systems)
+    adj: Dict[int, Set[int]] = {i: set() for i in range(num_systems)}
+    for _, _, s1, s2 in connections:
+        adj[s1].add(s2)
+        adj[s2].add(s1)
+
+    # Tree-shape gate: linear path => exactly two terminals (degree 1).
+    # If 0 terminals, graph is a cycle (rejected by _check_path_topology
+    # tree-shape gate). If >2 terminals, branched (also rejected).
+    terminals = [i for i, neighbors in adj.items() if len(neighbors) == 1]
+    if len(terminals) != 2:
+        return None
+
+    # Pick the lower-indexed terminal as the start to make the ordering
+    # deterministic. Walking from the OTHER terminal would give the
+    # reversed path, but per IUPAC P-28.2.1 lowest-locant the symmetric
+    # case is handled downstream by compare_locant_sets in
+    # _compute_per_system_ring_locants.
+    start = min(terminals)
+
+    order: List[int] = [start]
+    seen: Set[int] = {start}
+    current = start
+    while len(order) < num_systems:
+        next_neighbors = adj[current] - seen
+        if not next_neighbors:
+            # Disconnected — should not happen given _check_all_connected
+            return None
+        # Linear-path invariant: at most one unseen neighbor.
+        if len(next_neighbors) > 1:
+            return None
+        nxt = next(iter(next_neighbors))
+        order.append(nxt)
+        seen.add(nxt)
+        current = nxt
+
+    return order
+
+
 def detect_ring_assembly(
     mol, ring_systems: List[Set[int]]
 ) -> Optional[Dict]:
@@ -236,6 +314,25 @@ def detect_ring_assembly(
     # For true ring assemblies, the inter-ring bond is direct (no linker).
     # This is already ensured by _find_inter_system_bonds checking that
     # both atoms are IN ring systems.
+
+    # Phase 151-04 BLK-02 Scenario A root-cause fix: reorder ring_systems
+    # along the inter-system path so the middle ring of a ter-/quater-/
+    # quinque- assembly lands at the correct primed-namespace index.
+    # Without this reordering, ``get_ring_systems`` returns systems in
+    # atom-traversal order — for substituted ring assemblies the middle
+    # ring can land at index 0, causing the connection-string to drop
+    # the prime on the middle ring's back-attachment locant
+    # (emitting ``1,1':4,1''-terphenyl`` instead of canonical
+    # ``1,1':4',1''-terphenyl``). See 151-04-DIAGNOSTIC.md.
+    path_order = _order_systems_along_path(len(ring_systems), connections)
+    if path_order is not None and path_order != list(range(len(ring_systems))):
+        # Build remapping: old_idx -> new_idx
+        new_index_of = {old: new for new, old in enumerate(path_order)}
+        ring_systems = [ring_systems[old] for old in path_order]
+        connections = [
+            (a1, a2, new_index_of[s1], new_index_of[s2])
+            for a1, a2, s1, s2 in connections
+        ]
 
     # Determine ring type
     elements = signatures[0][0]
