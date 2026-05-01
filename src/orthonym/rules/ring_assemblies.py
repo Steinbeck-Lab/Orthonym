@@ -185,7 +185,16 @@ def _check_path_topology(
     for _, _, s1, s2 in connections:
         deg[s1] += 1
         deg[s2] += 1
-    return all(d <= 2 for d in deg.values())
+    if not all(d <= 2 for d in deg.values()):
+        return False
+    # Phase 151-04 WR-02: reject cyclic ring-system arrangements.
+    # A linear path of N systems has exactly N-1 inter-system bonds.
+    # A cycle has N (every node degree 2 — passes the degree check).
+    # IUPAC P-28.2 requires a linear path; a cyclic arrangement is a
+    # different topology (would be a fused/bridged macrocyclic system).
+    if len(connections) != num_systems - 1:
+        return False
+    return True
 
 
 def _order_systems_along_path(

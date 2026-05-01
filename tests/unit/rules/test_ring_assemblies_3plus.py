@@ -528,3 +528,61 @@ class TestRoundTripViaOPSIN:
             f"  parsed:   {parsed}\n"
             f"  expected: {expected!r}\n"
         )
+
+
+class TestCyclicRejectionWR02:
+    """Phase 151-04 WR-02: a cyclic arrangement of 3+ ring systems where
+    each system has degree 2 must be REJECTED — it is not a linear-path
+    ring assembly per IUPAC P-28.2."""
+
+    @pytest.mark.unit
+    def test_cyclic_three_system_arrangement_rejected(self):
+        """Three ring systems each bonded to the other two: each system
+        has degree 2 (degree check passes) but len(connections) == 3 == N
+        != N-1 == 2. The new tree-shape check rejects it."""
+        from orthonym.rules.ring_assemblies import _check_path_topology
+
+        # Synthetic: 3 ring systems, each connected to the other two.
+        # Tuples are (atom_a, atom_b, system_a, system_b) per
+        # _find_inter_system_bonds output shape.
+        cyclic_connections = [
+            (0, 6, 0, 1),   # system 0 - system 1
+            (5, 12, 1, 2),  # system 1 - system 2
+            (11, 1, 2, 0),  # system 2 - system 0  (closes the cycle)
+        ]
+        assert _check_path_topology(3, cyclic_connections) is False
+
+    @pytest.mark.unit
+    def test_linear_three_system_path_accepted(self):
+        """Sanity: a linear path of 3 systems still passes (N=3,
+        connections=2 = N-1, all degrees <= 2)."""
+        from orthonym.rules.ring_assemblies import _check_path_topology
+
+        linear_connections = [
+            (0, 6, 0, 1),
+            (5, 12, 1, 2),
+        ]
+        assert _check_path_topology(3, linear_connections) is True
+
+    @pytest.mark.unit
+    def test_branched_arrangement_rejected_by_degree(self):
+        """Sanity: branched arrangements (e.g., star — one system
+        bonded to 3 others) are STILL rejected by the existing
+        degree<=2 check, regardless of edge count."""
+        from orthonym.rules.ring_assemblies import _check_path_topology
+
+        star_connections = [
+            (0, 6, 0, 1),
+            (1, 12, 0, 2),
+            (2, 18, 0, 3),
+        ]
+        # Center system has degree 3 -> rejected
+        assert _check_path_topology(4, star_connections) is False
+
+    @pytest.mark.unit
+    def test_two_system_linear_assembly_unaffected(self):
+        """The smallest ring assembly (biphenyl shape: 2 systems, 1
+        connection) passes both gates: N-1 = 1 = len(connections), all
+        degrees == 1."""
+        from orthonym.rules.ring_assemblies import _check_path_topology
+        assert _check_path_topology(2, [(0, 6, 0, 1)]) is True
