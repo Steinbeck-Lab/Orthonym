@@ -406,3 +406,65 @@ class TestEndToEnd:
     def test_dithiahexane_e2e(self):
         """name_compound('CSCCSC') -> '2,5-dithiahexane'"""
         assert name_compound('CSCCSC') == '2,5-dithiahexane'
+
+
+# ============================================================================
+# Phase 154.A D-07: cyclic skeletal replacement size-class regression tests
+# ============================================================================
+
+@pytest.mark.unit
+class TestCyclicReplacement:
+    """D-07: confirm _try_cyclic_replacement_name covers >= 7-member hetero rings.
+
+    Pulls the audit-verified fixtures from 154-AUDIT-A.md §6 (4 corpus +
+    2 Blue Book = 6 cyclic-large fixtures spanning ring sizes 9, 12, 14, 18).
+    These ALL pass OPSIN-RT InChI L1 match per the audit; this regression
+    guard ensures `_try_cyclic_replacement_name` never silently regresses
+    on these size classes.
+
+    Rings 4-6 stay routed to Hantzsch-Widman per P-22.2.1 (verified by
+    test_hantzsch_widman.py); the 4 small-ring reject tests here confirm
+    gate 1 at skeletal_replacement.py:115-117 keeps rejecting <7-member.
+
+    Source: 154-CONTEXT.md D-07; 154-RESEARCH.md §3.6; 154-AUDIT-A.md §6.
+    """
+
+    @pytest.mark.parametrize("smiles,expected_name,ring_size", [
+        # Audit-verified Blue Book + corpus examples per 154-AUDIT-A.md §6
+        # Blue Book fixtures (BB_4, BB_7)
+        ("O1CCOCCOCC1", "1,4,7-trioxacyclononane", 9),
+        ("O1CCOCCOCCOCC1", "1,4,7,10-tetraoxacyclododecane", 12),
+        # Corpus fixtures (audit §6 rows 3-6)
+        ("C1CNCCNCCCNCCNC1", "1,4,8,11-tetraazacyclotetradecane", 14),
+        ("C1CNCCNCCN1", "1,4,7-triazacyclononane", 9),
+        ("C1COCCOCCNCCOCCOCCN1",
+         "1,10-diaza-4,7,13,16-tetraoxacyclooctadecane", 18),
+        ("C1COCCOCCOCCOCCOCCO1",
+         "1,4,7,10,13,16-hexaoxacyclooctadecane", 18),
+    ])
+    def test_cyclic_replacement_size_class(self, smiles, expected_name, ring_size):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        result = try_skeletal_replacement_name(mol)
+        assert result == expected_name, (
+            f"ring_size={ring_size}, smiles={smiles}, "
+            f"expected={expected_name!r}, got={result!r}"
+        )
+
+    @pytest.mark.parametrize("smiles", [
+        # 4-6-member heterocycles MUST route to Hantzsch-Widman, NOT
+        # _try_cyclic_replacement_name. Confirm gate 1 at lines 115-117 rejects.
+        "C1CCNCC1",  # piperidine (6-mem -- HW owns)
+        "C1CNCCO1",  # morpholine (6-mem -- HW owns)
+        "C1CCOC1",   # tetrahydrofuran (5-mem -- HW owns)
+        "C1COC1",    # oxetane (4-mem -- HW owns)
+    ])
+    def test_small_rings_rejected_by_gate1(self, smiles):
+        """4-6 member heterocycles: gate 1 rejects -- HW handler owns."""
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        result = try_skeletal_replacement_name(mol)
+        # For 4-6 member rings, expect None (gate 1 reject for ring < 7).
+        assert result is None, (
+            f"gate 1 should reject ring size <7: smiles={smiles}, got {result!r}"
+        )
