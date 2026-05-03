@@ -141,3 +141,116 @@ class TestFinalStereoCheck:
         warning_msgs = [r.message for r in caplog.records if "Stereo backstop" in r.message]
         assert len(warning_msgs) == 1
         assert "unknown" in warning_msgs[0]
+
+    # ------------------------------------------------------------------
+    # Phase 152 D-04 invariants -- backstop refactor regression contracts.
+    # ------------------------------------------------------------------
+
+    def test_predicate_backstop_parity(self, caplog):
+        """SC-3 / D-04: needs_stereo_injection(mol, name) must agree with
+        whether _final_stereo_check would log a 'Stereo backstop' WARNING
+        for the same (mol, name) pair.  Panel of 6 cases covering all
+        regex branches + bond stereo + empty/unknown name guards."""
+        from orthonym.rules.stereochemistry import needs_stereo_injection
+
+        m_ster = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(m_ster)
+        m_no_ster = Chem.MolFromSmiles("CCO")
+        rdCIPLabeler.AssignCIPLabels(m_no_ster)
+        m_ez = Chem.MolFromSmiles("C/C=C/C")
+        rdCIPLabeler.AssignCIPLabels(m_ez)
+
+        panel = [
+            (m_ster, "butan-2-ol", True),                     # (a) atom stereo missing
+            (m_ster, "(2R)-butan-2-ol", False),               # (b) prefix present
+            (m_no_ster, "ethanol", False),                    # (c) no stereo
+            (m_no_ster, "unknown", False),                    # (d) unknown name
+            (m_no_ster, "", False),                           # (e) empty name
+            (m_ez, "but-2-ene", True),                        # (f) bond stereo missing
+        ]
+        for mol, name, expected in panel:
+            caplog.clear()
+            with caplog.at_level(logging.WARNING):
+                _final_stereo_check(mol, name, handler="parity_test")
+            warned = any(
+                "Stereo backstop" in r.message for r in caplog.records
+            )
+            predicate = needs_stereo_injection(mol, name)
+            assert warned == expected, (
+                f"backstop warned={warned} for ({Chem.MolToSmiles(mol)}, {name!r}); "
+                f"expected {expected}"
+            )
+            assert predicate == expected, (
+                f"predicate={predicate} for ({Chem.MolToSmiles(mol)}, {name!r}); "
+                f"expected {expected}"
+            )
+            assert warned == predicate, (
+                f"backstop/predicate disagreement for ({Chem.MolToSmiles(mol)}, "
+                f"{name!r}): warned={warned} predicate={predicate}"
+            )
+
+    def test_warning_message_byte_identical(self, caplog):
+        """Post-refactor WARNING text must be byte-identical to pre-refactor
+        message format.  Locked: 'Stereo backstop: %r (handler: %s) has %d
+        R/S + %d E/Z but name lacks descriptors. Fix handler to include
+        stereo natively.'"""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            _final_stereo_check(mol, "butan-2-ol", handler="locked_handler")
+        msgs = [
+            r.message for r in caplog.records if "Stereo backstop" in r.message
+        ]
+        assert len(msgs) == 1
+        msg = msgs[0]
+        assert "Stereo backstop:" in msg
+        assert "'butan-2-ol'" in msg
+        assert "(handler: locked_handler)" in msg
+        assert "1 R/S" in msg
+        assert "0 E/Z" in msg
+        assert "Fix handler to include stereo natively." in msg
+
+    def test_warning_still_fires_for_unwired_handlers(self, caplog):
+        """SC-3: backstop must continue to flag handlers that are NOT
+        wired in Phase 152 (complex_ring, polycyclic, retained-name fallback,
+        decomposition fragments).  The refactor must not gate WARNING on
+        handler name -- predicate is a function of (mol, name) only."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        for unwired in (
+            "complex_ring", "polycyclic", "retained_name_fallback",
+            "decomposition_fragment", "unknown",
+        ):
+            caplog.clear()
+            with caplog.at_level(logging.WARNING):
+                _final_stereo_check(mol, "butan-2-ol", handler=unwired)
+            msgs = [
+                r.message for r in caplog.records
+                if "Stereo backstop" in r.message
+            ]
+            assert len(msgs) == 1, (
+                f"WARNING should fire for unwired handler={unwired!r}; "
+                f"got {len(msgs)} messages"
+            )
+            assert unwired in msgs[0], (
+                f"handler={unwired!r} not in WARNING msg: {msgs[0]!r}"
+            )
+
+    def test_warning_suppressed_after_injection(self, caplog):
+        """SC-3: if a handler successfully injected stereo (name now
+        starts with `(...)`-), the backstop predicate is False and no
+        WARNING fires.  This is what Phase 152 commits 3/4/5 will
+        produce."""
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.WARNING):
+            result = _final_stereo_check(
+                mol, "(2R)-butan-2-ol", handler="heterocycle"
+            )
+        assert result == "(2R)-butan-2-ol"
+        msgs = [
+            r.message for r in caplog.records if "Stereo backstop" in r.message
+        ]
+        assert msgs == [], (
+            f"WARNING must not fire for already-injected name; got {msgs}"
+        )
