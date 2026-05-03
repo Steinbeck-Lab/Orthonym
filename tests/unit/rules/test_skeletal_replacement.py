@@ -69,6 +69,83 @@ class TestReplacementTerms:
 
 
 # ============================================================================
+# Phase 154.A D-03: PIN-trigger function (P-15.4.1.2)
+# ============================================================================
+
+@pytest.mark.unit
+class TestPinTrigger:
+    """D-03: strict IUPAC P-15.4.1.2 PIN trigger function tests.
+
+    Tests `_qualifies_for_pin_skeletal_replacement(backbone, mol)` which
+    replaces the legacy single-hetero chain-len < 6 inline reject with
+    explicit branch labels per IUPAC Blue Book P-15.4.1.2.
+
+    Source: 154-CONTEXT.md D-03; 154-RESEARCH.md §3.2; 154-AUDIT-A.md §7.
+    Source: IUPAC Blue Book 2013 P-15.4.1.2.
+    """
+
+    @pytest.mark.parametrize("smiles,backbone_indices,expected_qualifies,expected_branch", [
+        # Branch (a): >= 4 same-kind heteroatoms
+        # COCOCOCOC: positions 0=C, 1=O, 2=C, 3=O, 4=C, 5=O, 6=C, 7=O, 8=C
+        # Embedded (skip 0 and 8): O O O O at positions 1,3,5,7 -- 4 same-kind
+        ("COCOCOCOC", [0, 1, 2, 3, 4, 5, 6, 7, 8], True, ">=4-same-kind"),
+        # Branch (b): >= 3 mixed-kind heteroatoms
+        # CSCNCOC: 0=C, 1=S, 2=C, 3=N, 4=C, 5=O, 6=C  (S+N+O = 3 distinct)
+        ("CSCNCOC", [0, 1, 2, 3, 4, 5, 6], True, ">=3-mixed-kind"),
+        # Single hetero long chain (legacy gate-5 accept):
+        # CCCOCCCC: 0..7, embedded O at index 3, len=8 >= 6
+        ("CCCOCCCC", [0, 1, 2, 3, 4, 5, 6, 7], True, "single-hetero-long-chain"),
+        # Single hetero short chain (legacy gate-5 reject):
+        # COC: 0=C, 1=O, 2=C, embedded O at index 1, len=3 < 6
+        ("COC", [0, 1, 2], False, "single-hetero-short-chain"),
+        # No heteroatoms in embedded positions:
+        # CCCCC: 0=C, 1=C, 2=C, 3=C, 4=C
+        ("CCCCC", [0, 1, 2, 3, 4], False, "no-heteroatoms"),
+    ])
+    def test_branch_assignment(self, smiles, backbone_indices, expected_qualifies, expected_branch):
+        from orthonym.rules.skeletal_replacement import _qualifies_for_pin_skeletal_replacement
+        mol = Chem.MolFromSmiles(smiles)
+        qualifies, branch = _qualifies_for_pin_skeletal_replacement(backbone_indices, mol)
+        assert qualifies == expected_qualifies, (
+            f"smiles={smiles}, expected_qualifies={expected_qualifies}, got={qualifies}, branch={branch}"
+        )
+        assert branch == expected_branch, (
+            f"smiles={smiles}, expected_branch={expected_branch}, got={branch}"
+        )
+
+
+@pytest.mark.unit
+class TestPinTriggerEndToEnd:
+    """D-03 end-to-end: confirm helper is wired into try_skeletal_replacement_name.
+
+    Verifies the helper is called from the gate-5 position in
+    `try_skeletal_replacement_name` (replacing the inline reject) and that
+    the existing happy-path semantics are preserved.
+    """
+
+    @pytest.mark.parametrize("smiles,expected_name", [
+        # branch (a) >= 4 same-kind oxygens
+        ("COCOCOCOC", "2,4,6,8-tetraoxanonane"),
+        # two-hetero accept path with terminal-OH suffix
+        ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
+    ])
+    def test_accepts(self, smiles, expected_name):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) == expected_name
+
+    @pytest.mark.parametrize("smiles", [
+        "COC",     # single-hetero-short-chain reject
+        "CCC",     # no-heteroatoms reject
+        "CCCCC",   # no-heteroatoms reject (longer)
+    ])
+    def test_rejects(self, smiles):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) is None
+
+
+# ============================================================================
 # Unsaturated large heterocyclic ring replacement naming
 # ============================================================================
 
@@ -329,3 +406,65 @@ class TestEndToEnd:
     def test_dithiahexane_e2e(self):
         """name_compound('CSCCSC') -> '2,5-dithiahexane'"""
         assert name_compound('CSCCSC') == '2,5-dithiahexane'
+
+
+# ============================================================================
+# Phase 154.A D-07: cyclic skeletal replacement size-class regression tests
+# ============================================================================
+
+@pytest.mark.unit
+class TestCyclicReplacement:
+    """D-07: confirm _try_cyclic_replacement_name covers >= 7-member hetero rings.
+
+    Pulls the audit-verified fixtures from 154-AUDIT-A.md §6 (4 corpus +
+    2 Blue Book = 6 cyclic-large fixtures spanning ring sizes 9, 12, 14, 18).
+    These ALL pass OPSIN-RT InChI L1 match per the audit; this regression
+    guard ensures `_try_cyclic_replacement_name` never silently regresses
+    on these size classes.
+
+    Rings 4-6 stay routed to Hantzsch-Widman per P-22.2.1 (verified by
+    test_hantzsch_widman.py); the 4 small-ring reject tests here confirm
+    gate 1 at skeletal_replacement.py:115-117 keeps rejecting <7-member.
+
+    Source: 154-CONTEXT.md D-07; 154-RESEARCH.md §3.6; 154-AUDIT-A.md §6.
+    """
+
+    @pytest.mark.parametrize("smiles,expected_name,ring_size", [
+        # Audit-verified Blue Book + corpus examples per 154-AUDIT-A.md §6
+        # Blue Book fixtures (BB_4, BB_7)
+        ("O1CCOCCOCC1", "1,4,7-trioxacyclononane", 9),
+        ("O1CCOCCOCCOCC1", "1,4,7,10-tetraoxacyclododecane", 12),
+        # Corpus fixtures (audit §6 rows 3-6)
+        ("C1CNCCNCCCNCCNC1", "1,4,8,11-tetraazacyclotetradecane", 14),
+        ("C1CNCCNCCN1", "1,4,7-triazacyclononane", 9),
+        ("C1COCCOCCNCCOCCOCCN1",
+         "1,10-diaza-4,7,13,16-tetraoxacyclooctadecane", 18),
+        ("C1COCCOCCOCCOCCOCCO1",
+         "1,4,7,10,13,16-hexaoxacyclooctadecane", 18),
+    ])
+    def test_cyclic_replacement_size_class(self, smiles, expected_name, ring_size):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        result = try_skeletal_replacement_name(mol)
+        assert result == expected_name, (
+            f"ring_size={ring_size}, smiles={smiles}, "
+            f"expected={expected_name!r}, got={result!r}"
+        )
+
+    @pytest.mark.parametrize("smiles", [
+        # 4-6-member heterocycles MUST route to Hantzsch-Widman, NOT
+        # _try_cyclic_replacement_name. Confirm gate 1 at lines 115-117 rejects.
+        "C1CCNCC1",  # piperidine (6-mem -- HW owns)
+        "C1CNCCO1",  # morpholine (6-mem -- HW owns)
+        "C1CCOC1",   # tetrahydrofuran (5-mem -- HW owns)
+        "C1COC1",    # oxetane (4-mem -- HW owns)
+    ])
+    def test_small_rings_rejected_by_gate1(self, smiles):
+        """4-6 member heterocycles: gate 1 rejects -- HW handler owns."""
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        result = try_skeletal_replacement_name(mol)
+        # For 4-6 member rings, expect None (gate 1 reject for ring < 7).
+        assert result is None, (
+            f"gate 1 should reject ring size <7: smiles={smiles}, got {result!r}"
+        )
