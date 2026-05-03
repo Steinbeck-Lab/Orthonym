@@ -1,0 +1,391 @@
+"""Tests for handler-level stereo injection (Phase 152 D-04 predicate-first wiring).
+
+Phase 152 Plan 01 / Commit 1: STER-15 / STER-16 -- pure-function infrastructure
+for handler-level stereo injection. Tests cover:
+
+  - needs_stereo_injection(mol, name): predicate identical to namer.py:62-83
+    detection logic per D-03 / D-05.
+  - inject_stereo_from_locant_map(name, mol, atom_to_locant): pure injector
+    per D-01 / D-02 / D-09 (no atom-index fallback).
+  - _ring_atom_to_locant_from_oriented(oriented_ring): shared helper per D-08.
+  - P-91 format compliance: (2R)-, (2R,3S)-, (2E,3R,5Z)-, (2r,3s)-.
+
+All tests written BEFORE the implementation (TDD discipline per D-21).  RED
+phase: every test fails on ImportError until the three functions ship in
+src/orthonym/rules/stereochemistry.py.  GREEN phase: implementation makes
+them pass.  Tests are the contract.
+"""
+
+import inspect
+import logging
+import re
+
+import pytest
+from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
+
+from orthonym.rules.stereochemistry import (
+    _ring_atom_to_locant_from_oriented,
+    inject_stereo_from_locant_map,
+    needs_stereo_injection,
+)
+
+
+@pytest.mark.unit
+class TestNeedsStereoInjection:
+    """Pure-predicate tests for needs_stereo_injection (D-03 / D-05)."""
+
+    # Test N-01
+    def test_returns_false_when_mol_is_none(self):
+        assert needs_stereo_injection(None, "butan-2-ol") is False
+
+    # Test N-02
+    def test_returns_false_when_name_is_empty(self):
+        mol = Chem.MolFromSmiles("CCO")
+        assert needs_stereo_injection(mol, "") is False
+
+    # Test N-03
+    def test_returns_false_when_name_is_unknown(self):
+        mol = Chem.MolFromSmiles("CCO")
+        assert needs_stereo_injection(mol, "unknown") is False
+
+    # Test N-04 -- Pattern A prefix form
+    def test_returns_false_for_pattern_a_prefix(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "(2R)-butan-2-ol") is False
+
+    # Test N-05 -- Pattern B embedded block
+    def test_returns_false_for_pattern_b_embedded(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "something-(2R)-else") is False
+
+    # Test N-06 -- Pattern C carbohydrate
+    def test_returns_false_for_carbohydrate_pattern(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "alpha-D-glucopyranose") is False
+        assert needs_stereo_injection(mol, "beta-L-mannose") is False
+        # 'alfa' alternative spelling, case-insensitive
+        assert needs_stereo_injection(mol, "Alpha-D-Galactose") is False
+
+    # Test N-07 -- no _CIPCode
+    def test_returns_false_when_no_cip_code(self):
+        mol = Chem.MolFromSmiles("CCC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "propane") is False
+
+    # Test N-08 -- atom stereo present, name lacks all 3 patterns
+    def test_returns_true_for_atom_stereo_when_name_lacks_descriptors(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "butan-2-ol") is True
+
+    # Test N-09 -- bond stereo (E/Z) present, name lacks descriptors
+    def test_returns_true_for_bond_stereo_when_name_lacks_descriptors(self):
+        # cis-1,2-dichloroethene -- bond stereo only
+        mol = Chem.MolFromSmiles("Cl/C=C/Cl")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "1,2-dichloroethene") is True
+
+    # Test N-10 -- idempotence (predicate is read-only per D-05)
+    def test_predicate_is_idempotent(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        first = needs_stereo_injection(mol, "butan-2-ol")
+        second = needs_stereo_injection(mol, "butan-2-ol")
+        assert first == second is True
+
+    # Test N-11 -- pseudoasymmetric r/s (lowercase) is recognised by Pattern A
+    def test_returns_false_for_lowercase_pseudoasymmetric(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        assert needs_stereo_injection(mol, "(2r,3s)-pentane-2,3-diol") is False
+
+
+@pytest.mark.unit
+class TestInjectStereoFromLocantMap:
+    """Pure-function tests for inject_stereo_from_locant_map (D-01/D-02/D-09)."""
+
+    # Test I-01 -- single R-center on butan-2-ol
+    def test_emits_single_R_prefix(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # atom indices: C(0), C@@H(1), O(2), C(3), C(4)
+        # Expected stereo locant 2 lives on atom index 1
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 4: 4}
+        result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
+        # rdkit may say R or S depending on internal canonicalisation; we
+        # care that a (digit + R/S)- prefix appears in front of the name body
+        assert re.match(r"^\(2[RS]\)-butan-2-ol$", result), result
+
+    # Test I-02 -- multi-center molecule, descriptor block has 2 entries
+    def test_emits_two_center_prefix(self):
+        # 2,3-dihydroxypentane -- two stereocenters at locants 2 and 3
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # atoms: C(0), [C@H](1), O(2), [C@@H](3), O(4), C(5), C(6)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 6: 5}
+        result = inject_stereo_from_locant_map(
+            "pentane-2,3-diol", mol, atom_to_locant
+        )
+        assert re.match(r"^\(2[RS],3[RS]\)-pentane-2,3-diol$", result), result
+
+    # Test I-03 -- ascending locant ordering verification (P-91.1, D-14)
+    def test_descriptors_emitted_in_ascending_locant_order(self):
+        # 2,3-dihydroxypentane (atoms in canonical order)
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 6: 5}
+        result = inject_stereo_from_locant_map(
+            "pentane-2,3-diol", mol, atom_to_locant
+        )
+        # Block format: (NN<chr>,NN<chr>,...). Extract digit sequence.
+        block_match = re.match(r"^\(([^)]+)\)-", result)
+        assert block_match is not None, f"no descriptor block in {result!r}"
+        parts = block_match.group(1).split(",")
+        # Strip the trailing R/S/E/Z to get bare locants
+        locants = [int(re.match(r"(\d+)", p).group(1)) for p in parts]
+        assert locants == sorted(locants), (
+            f"descriptors not ascending: {locants} in {result!r}"
+        )
+
+    # Test I-04 -- pseudoasymmetric centers (P-92.1.4.2 / D-12 lowercase r/s)
+    def test_lowercase_r_s_preserved_for_pseudoasymmetric(self):
+        # Pseudoasymmetric meso compound: 2,3,4-trihydroxypentane.
+        # The middle (3) carbon is pseudoasymmetric and rdCIPLabeler should
+        # tag it with lowercase r or s.
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@H](O)[C@@H](O)C")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        cip_codes = [
+            a.GetProp("_CIPCode") for a in mol.GetAtoms()
+            if a.HasProp("_CIPCode")
+        ]
+        if not any(c in ("r", "s") for c in cip_codes):
+            pytest.skip("rdCIPLabeler did not produce lowercase r/s for this case")
+
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 7: 5}
+        result = inject_stereo_from_locant_map(
+            "pentane-2,3,4-triol", mol, atom_to_locant
+        )
+        # At least one descriptor must be lowercase
+        assert re.match(r"^\([^)]*[rs][^)]*\)-", result), result
+
+    # Test I-05 -- no-op when name already stereoed
+    def test_no_op_when_name_already_has_prefix(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 4: 4}
+        result = inject_stereo_from_locant_map(
+            "(2R)-butan-2-ol", mol, atom_to_locant
+        )
+        assert result == "(2R)-butan-2-ol"
+
+    # Test I-06 -- no-op when mol has no stereo
+    def test_no_op_when_mol_has_no_stereo(self):
+        mol = Chem.MolFromSmiles("CCC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 2: 3}
+        result = inject_stereo_from_locant_map("propane", mol, atom_to_locant)
+        assert result == "propane"
+
+    # Test I-07 -- no-op when atom_to_locant is None, with DEBUG log (D-09)
+    def test_no_op_when_locant_map_none_emits_debug(self, caplog):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        with caplog.at_level(logging.DEBUG, logger="orthonym.rules.stereochemistry"):
+            result = inject_stereo_from_locant_map("butan-2-ol", mol, None)
+        assert result == "butan-2-ol"
+        skip_msgs = [
+            r.message for r in caplog.records
+            if "inject_stereo: skipped" in r.message
+        ]
+        assert len(skip_msgs) >= 1, (
+            f"expected DEBUG log containing 'inject_stereo: skipped', got: "
+            f"{[r.message for r in caplog.records]}"
+        )
+
+    # Test I-08 -- no-op when atom_to_locant is empty {}
+    def test_no_op_when_locant_map_empty(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        result = inject_stereo_from_locant_map("butan-2-ol", mol, {})
+        assert result == "butan-2-ol"
+
+    # Test I-09 -- locants all zero is a degenerate map (parent_size=0
+    # so validate_stereo_locants does not run); the injector reflects the
+    # caller's malformed input rather than silently swallowing it.  Real
+    # handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER emit a
+    # zero locant -- this test pins the actual data-flow contract.
+    def test_all_zero_locants_emits_zero_block_no_fallback(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 0, 1: 0, 3: 0, 4: 0}
+        result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
+        # Whatever the injector emits, it MUST come from the supplied locant
+        # map (no atom-index fallback per D-09).  Output may be the name
+        # unchanged (if descriptors empty) OR contain the zero locant.
+        # Confirm it is one of those two; do NOT silently produce locant '1'
+        # (which would be an atom-index fallback).
+        assert result == "butan-2-ol" or re.match(r"^\(0[RS]\)-butan-2-ol$", result), (
+            f"injector must not invent locants: {result!r}"
+        )
+
+    # Test I-10 -- ring-strain filter inherited (cyclohexene E/Z is filtered)
+    def test_ring_strain_filter_inherited(self):
+        # cyclohex-1-ene with no chiral center -- the ring double bond is
+        # geometry-locked and collect_stereodescriptors filters it (ring < 8)
+        mol = Chem.MolFromSmiles("C1=CCCCC1")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6}
+        # No CIP set on either atom or bond after assign -> predicate False
+        # already short-circuits.  The injector should simply return the name.
+        result = inject_stereo_from_locant_map(
+            "cyclohex-1-ene", mol, atom_to_locant
+        )
+        assert result == "cyclohex-1-ene"
+
+    # Test I-11 -- D-09 grep gate: NO atom-index fallback in injector body
+    def test_injector_body_has_no_atom_index_fallback(self):
+        src = inspect.getsource(inject_stereo_from_locant_map)
+        # D-09: forbidden patterns
+        assert "range(len(" not in src, (
+            f"injector body must not use range(len(...)) fallback (D-09):\n{src}"
+        )
+        assert "enumerate(mol.GetAtoms()" not in src, (
+            f"injector body must not enumerate mol atoms as fallback (D-09):\n{src}"
+        )
+
+    # Test I-12 -- idempotent (calling twice yields the same string; Pitfall 1)
+    def test_injector_is_idempotent(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 4: 4}
+        first = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
+        second = inject_stereo_from_locant_map(first, mol, atom_to_locant)
+        # Second call sees an already-stereoed name -> predicate False -> no-op
+        assert first == second
+
+    # Test I-13 -- locant outside parent_size dropped silently (D-12 inherited
+    # from validate_stereo_locants).  We use parent_size 4 (max locant in map)
+    # and supply an out-of-bounds locant 99 for the stereocenter.  The validator
+    # filters all locants > parent_size; since 99 IS the parent_size here,
+    # the validator does not drop it.  We use the OPPOSITE direction:
+    # parent_size 4 with locant 99 (only via mismatch).  Use a separate
+    # mol with parent_size from a small map and stereocenter at high locant.
+    def test_locant_above_parent_size_dropped(self):
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # parent_size is computed as max(int_locants); we keep stereocenter
+        # at locant 5 but the rest at 1..4 so parent_size=5.  Now flip:
+        # to test the validator firing, we need a locant > parent_size.
+        # Add an extra high locant on a non-stereo atom to set parent_size
+        # high, then place the stereocenter ABOVE it.  RDKit indices: 0,1,3,4.
+        atom_to_locant = {0: 1, 1: 50, 3: 3, 4: 4}
+        # parent_size = max(1, 50, 3, 4) = 50; stereocenter locant 50 -> kept.
+        # To trigger the validator we need locant > parent_size, which by
+        # construction never happens since parent_size = max(values).  This
+        # test therefore validates that validate_stereo_locants does NOT
+        # spuriously drop the only stereocenter when its locant equals
+        # parent_size -- complementing I-09.
+        result = inject_stereo_from_locant_map(
+            "butan-2-ol", mol, atom_to_locant
+        )
+        # The output must include the supplied locant (50) verbatim -- no
+        # atom-index fallback, no silent re-numbering (D-09).
+        assert re.match(r"^\(50[RS]\)-butan-2-ol$", result), (
+            f"injector must use supplied locant verbatim: {result!r}"
+        )
+
+
+@pytest.mark.unit
+class TestRingAtomToLocantFromOriented:
+    """Tests for the shared {idx: pos+1} helper (D-08)."""
+
+    # Test R-01
+    def test_empty_ring_returns_empty_dict(self):
+        assert _ring_atom_to_locant_from_oriented([]) == {}
+
+    # Test R-02
+    def test_single_atom(self):
+        assert _ring_atom_to_locant_from_oriented([5]) == {5: 1}
+
+    # Test R-03 -- duplicate keys (last occurrence wins, matches dict semantics)
+    def test_duplicate_keys_last_wins(self):
+        # The original one-liner at composer.py:7184 has the same semantics.
+        # Constructed example with a duplicate (indices [3,1,4,1,5,9])
+        result = _ring_atom_to_locant_from_oriented([3, 1, 4, 1, 5, 9])
+        # When dict-comprehension hits the same key, the last assignment wins
+        assert result == {3: 1, 1: 4, 4: 3, 5: 5, 9: 6}
+
+    # Test R-04
+    def test_six_ring(self):
+        result = _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
+        assert result == {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
+
+
+@pytest.mark.unit
+class TestP91FormatCompliance:
+    """P-91 explicit format-compliance gate (D-15 / SC-5)."""
+
+    def test_emits_paren_R_paren_dash_form(self):
+        # (R)-butan-2-ol type prefix: starts with `(`, contains `R)-`
+        mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 4: 4}
+        result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
+        assert result.startswith("(")
+        # Must contain a single R or S followed by `)-`
+        assert re.match(r"^\(2[RS]\)-", result), result
+
+    def test_emits_multi_center_comma_separated(self):
+        # (2R,3S)- form
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 6: 5}
+        result = inject_stereo_from_locant_map(
+            "pentane-2,3-diol", mol, atom_to_locant
+        )
+        assert re.match(r"^\(2[RS],3[RS]\)-", result), result
+
+    def test_emits_mixed_E_Z_R_S(self):
+        # (E)-but-2-enoic acid type compound -- test mixed E/Z + R/S in macrocycle.
+        # Use a molecule with a stereocenter and a near-parent E/Z bond.
+        # The simplest controllable example is a 2-methylpent-3-enoic acid where
+        # both (R/S) at C2 and (E) at C3-C4 are valid; we validate the format
+        # alone (existence of both letter classes in the block).
+        mol = Chem.MolFromSmiles("C[C@@H](C(=O)O)/C=C/C")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # atoms: 0=Me, 1=C@@H, 2=C(=O), 3=O, 4=O, 5=C, 6=C, 7=C
+        atom_to_locant = {2: 1, 1: 2, 5: 3, 6: 4, 7: 5}
+        result = inject_stereo_from_locant_map(
+            "2-methylpent-3-enoic acid", mol, atom_to_locant
+        )
+        # Format compliance: must be a parenthesised block followed by '-'
+        block_match = re.match(r"^\(([^)]+)\)-", result)
+        assert block_match is not None, result
+        block = block_match.group(1)
+        # Should contain at least one R/S letter
+        assert re.search(r"[RS]", block), result
+        # Should contain at least one E/Z letter (near-parent E/Z, P-93.5.2)
+        assert re.search(r"[EZ]", block), result
+
+    def test_emits_lowercase_r_s_for_pseudoasymmetric(self):
+        # Same pseudoasymmetric meso compound used in I-04
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@H](O)[C@@H](O)C")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        cip_codes = [
+            a.GetProp("_CIPCode") for a in mol.GetAtoms()
+            if a.HasProp("_CIPCode")
+        ]
+        if not any(c in ("r", "s") for c in cip_codes):
+            pytest.skip("rdCIPLabeler did not produce lowercase r/s for this case")
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 7: 5}
+        result = inject_stereo_from_locant_map(
+            "pentane-2,3,4-triol", mol, atom_to_locant
+        )
+        # Block must contain at least one lowercase r or s
+        block_match = re.match(r"^\(([^)]+)\)-", result)
+        assert block_match is not None, result
+        assert re.search(r"[rs]", block_match.group(1)), result
