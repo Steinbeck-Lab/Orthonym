@@ -304,6 +304,8 @@ def inject_stereo_from_locant_map(
     name: str,
     mol,
     atom_to_locant: Optional[Dict[int, int]],
+    *,
+    include_near_parent_ez: bool = True,
 ) -> str:
     """Prepend a P-91 stereo descriptor block to *name* using authoritative locants.
 
@@ -321,6 +323,15 @@ def inject_stereo_from_locant_map(
         atom_to_locant: Authoritative {atom_idx: 1-indexed locant} map from
             the handler's own perception (heterocycle / benzene / cycloalkane
             / cycloalkene). Must NOT be derived from raw atom indices (D-09).
+        include_near_parent_ez: When True (default -- preserves benzene /
+            heterocycle Tier-A behaviour), exocyclic E/Z bonds one hop from
+            the parent are attributed to the lowest neighbouring locant per
+            P-93.5.2. When False (cycloalkane / cycloalkene caller post-
+            BL-02 fix), exocyclic E/Z bonds are NOT attributed to ring
+            locants; only ring-atom R/S and ring-bond E/Z are emitted. This
+            is the conservative gate per D-09 ("better a missing stereo
+            block than a wrong one") for handlers where exocyclic E/Z can
+            be mis-attributed via include_near_parent_ez=True.
 
     Returns:
         name unchanged (predicate False / no locant map / no descriptors)
@@ -343,10 +354,13 @@ def inject_stereo_from_locant_map(
         )
         return name
 
-    # D-11: include_near_parent_ez=True for P-93.5.2 compliance (top-level only;
-    # is_top_level_naming guard at the call site enforces this).
+    # D-11: include_near_parent_ez defaults to True for P-93.5.2 compliance
+    # (top-level only; is_top_level_naming guard at the call site enforces
+    # this). BL-02 fix (Phase 152-02, 2026-05-03): cycloalkane / cycloalkene
+    # caller passes include_near_parent_ez=_ring_is_whole_molecule so chain-
+    # side exocyclic E/Z is NOT attributed to ring locants.
     descriptors = collect_stereodescriptors(
-        mol, atom_to_locant, include_near_parent_ez=True
+        mol, atom_to_locant, include_near_parent_ez=include_near_parent_ez,
     )
     if not descriptors:
         return name

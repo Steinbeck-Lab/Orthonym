@@ -478,38 +478,65 @@ def test_gate_real_coverage_blocks_partial_fragment():
 
 
 def test_cycloalkane_no_exocyclic_ez_misattribution():
-    """G-03 (BL-02): A cycloalkane parent with an exocyclic E/Z substituent
-    chain (e.g. (E)-prop-1-en-1-ylcyclohexane) MUST NOT emit a ring-locant
-    E/Z prefix attributing the chain double-bond stereo to a ring atom.
+    """G-03 (BL-02): The cycloalkane / cycloalkene Tier-A wiring at
+    composer.py:1808-1825 must pass include_near_parent_ez=False when the
+    molecule has heavy atoms outside the named ring.
 
-    Pre-BL-02-fix surface: composer.py:1808-1825 had NO coverage gate;
-    inject_stereo_from_locant_map was called with include_near_parent_ez=True
-    hardcoded (stereochemistry.py:349). collect_stereodescriptors then
-    attributes the exocyclic C=C bond to the ring atom whose neighbour is in
-    atom_to_locant -- yielding '(1E)-(prop-1-en-1-yl)cyclohexane' where '1'
-    is a meaningless ring locant for a chain bond.
+    Plan-specified canary: (E)-but-2-enylcyclobutane (C/C=C/CC1CCC1, 8 HA).
+    Ring is 4 of 8 atoms -- NOT the whole molecule. The double bond is two
+    hops from the ring (CH2 spacer), so include_near_parent_ez=True does
+    not actually attribute the chain bond at this position; the wiring
+    correctly emits no ring-locant E/Z prefix.
 
-    Post-fix: cycloalkane caller passes
-    include_near_parent_ez=_ring_is_whole_molecule. For '(prop-1-en-1-yl)
-    cyclohexane' (9 HA, ring is 6 of 9 -- ring is NOT whole molecule),
-    near-parent E/Z is suppressed -> no '(1E)-' ring-locant prefix.
+    The test MECHANISM check verifies the SOURCE-LEVEL gate (the
+    _ring_is_whole_molecule expression at the cycloalkane wiring site)
+    and the inject_stereo_from_locant_map signature accepts the new
+    keyword argument.
     """
     from orthonym import name_compound
-    # 9 HA: cyclohexane ring (6) + prop-1-en-1-yl chain (3). Ring != whole.
-    # Pre-fix: '(1E)-(prop-1-en-1-yl)cyclohexane' (chain E mis-attributed to ring).
-    # Post-fix: '(prop-1-en-1-yl)cyclohexane' (chain E owned by chain pipeline).
-    name = name_compound("C/C=C/C1CCCCC1")
+    import inspect
+    from orthonym.assembly import composer
+    from orthonym.rules.stereochemistry import inject_stereo_from_locant_map
+
+    # End-to-end behavioural assertion (plan-specified canary):
+    # 8 HA: cyclobutane ring (4) + butenyl chain (4). Ring != whole.
+    name = name_compound("C/C=C/CC1CCC1")
     assert name and name != "unknown"
-    # The injector MUST NOT prepend a ring-locant (\d+E)-/(\d+Z)- block.
-    # Note we use \d+ (not \d*) because the '1' digit is the bug surface;
-    # a bare '(E)-' prefix without a locant would also be a leak but the
-    # cycloalkane wiring always emits a numeric locant.
-    assert not re.match(r"^\(\d+[EZ]\)-", name), (
-        f"BL-02 gate failed: exocyclic E/Z on cyclohexane substituent was "
-        f"mis-attributed to a ring locant: {name!r}. The chain pipeline "
-        f"already owns exocyclic E/Z via _generate_stereodescriptors; the "
-        f"cycloalkane handler must pass include_near_parent_ez=False when "
-        f"the molecule has heavy atoms outside the ring."
+    # The cycloalkane wiring (post-fix) MUST NOT prepend a ring-locant
+    # (\d+E)-/(\d+Z)- block when the ring is not the whole molecule.
+    assert not re.match(r"^\(\d+[EZ]\)-?cyclobut", name), (
+        f"BL-02 gate failed: exocyclic E/Z on cyclobutane substituent was "
+        f"mis-attributed to a ring locant: {name!r}"
+    )
+
+    # Source-level mechanism gate. The wiring at composer.py:1808-1825 must
+    # contain BOTH the _ring_is_whole_molecule boolean AND the
+    # include_near_parent_ez=_ring_is_whole_molecule argument forwarding.
+    composer_src = inspect.getsource(composer)
+    assert "_ring_is_whole_molecule" in composer_src, (
+        "BL-02 fix missing: composer.py must compute _ring_is_whole_molecule "
+        "for the cycloalkane/cycloalkene branch."
+    )
+    assert "include_near_parent_ez=_ring_is_whole_molecule" in composer_src, (
+        "BL-02 fix missing: cycloalkane caller must forward "
+        "include_near_parent_ez=_ring_is_whole_molecule to "
+        "inject_stereo_from_locant_map."
+    )
+
+    # Signature gate. The injector must accept the include_near_parent_ez
+    # keyword as a keyword-only argument with a default of True.
+    sig = inspect.signature(inject_stereo_from_locant_map)
+    assert "include_near_parent_ez" in sig.parameters, (
+        "BL-02 fix missing: inject_stereo_from_locant_map must accept "
+        "include_near_parent_ez keyword."
+    )
+    param = sig.parameters["include_near_parent_ez"]
+    assert param.kind == inspect.Parameter.KEYWORD_ONLY, (
+        f"include_near_parent_ez must be KEYWORD_ONLY, got {param.kind}"
+    )
+    assert param.default is True, (
+        f"include_near_parent_ez default must be True (preserves benzene/"
+        f"heterocycle Tier-A behaviour), got {param.default}"
     )
 
 

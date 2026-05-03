@@ -1818,20 +1818,16 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     candidate_name = pool.best().name
 
     # Phase 152 D-04 / D-08: cycloalkane + cycloalkene handler-level stereo
-    # injection at the chain-fragment fallback return.  Gated on
-    # features.ring_type in {'cycloalkane', 'cycloalkene'} AND
-    # features.oriented_ring populated.  Per D-09, no atom-index fallback;
-    # if oriented_ring is missing, the backstop logs WARNING in namer.py
-    # and we return the name unchanged.  Per D-11 (top-level only) and the
-    # auto-deviation Rule 1 atom-coverage gate from Task 4, we also restrict
-    # to top-level naming and gate near-parent E/Z leakage by skipping when
-    # the molecule has heavy atoms outside the parent ring (the cycloalkane/
-    # cycloalkene parent IS the named ring; if the molecule has substituent
-    # chains beyond the ring with E/Z bonds, the chain-pipeline is already
-    # responsible for those via _generate_stereodescriptors).  The 33+
-    # existing call sites of _inject_stereo_if_missing are PRESERVED (per
-    # PATTERNS MODIFY 5); this wiring is the FIRST injection on the
-    # cycloalkane/cycloalkene tail return path.
+    # injection at the chain-fragment fallback return.  Per D-09, no atom-
+    # index fallback; if oriented_ring is missing, the backstop logs WARNING
+    # and we return the name unchanged.  Per D-11 (top-level only) we restrict
+    # to top-level naming.  BL-02 FIX (Phase 152-02, 2026-05-03 -- see
+    # 152-VERIFICATION.md + 152-REVIEW.md): pass include_near_parent_ez=False
+    # unless the molecule's heavy atoms ARE exactly the ring (the cycloalkane/
+    # cycloalkene parent IS the named ring), so exocyclic E/Z on substituent
+    # chains is NOT mis-attributed to ring locants. The chain pipeline already
+    # owns exocyclic E/Z via _generate_stereodescriptors. The 33+ existing
+    # call sites of _inject_stereo_if_missing are PRESERVED.
     _ring_type = getattr(features, 'ring_type', None)
     if _ring_type in ('cycloalkane', 'cycloalkene'):
         from .fragment_naming import is_top_level_naming
@@ -1847,8 +1843,20 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _ring_atom_to_locant_from_oriented(_oriented)
                     if _oriented else None
                 )
+                # BL-02 FIX (2026-05-03): only attribute exocyclic E/Z to
+                # ring locants when the molecule is ENTIRELY its ring (no
+                # atoms outside _oriented). For molecules with substituent
+                # chains, disable include_near_parent_ez so the chain
+                # pipeline owns exocyclic E/Z (per D-09: missing > wrong).
+                _ring_atom_set = set(_oriented) if _oriented else set()
+                _all_heavy = features.mol.GetNumHeavyAtoms()
+                _ring_is_whole_molecule = (
+                    bool(_ring_atom_set)
+                    and len(_ring_atom_set) == _all_heavy
+                )
                 candidate_name = inject_stereo_from_locant_map(
                     candidate_name, features.mol, atom_to_locant,
+                    include_near_parent_ez=_ring_is_whole_molecule,
                 )
     return candidate_name
 
