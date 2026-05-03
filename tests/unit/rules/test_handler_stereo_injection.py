@@ -389,3 +389,64 @@ class TestP91FormatCompliance:
         block_match = re.match(r"^\(([^)]+)\)-", result)
         assert block_match is not None, result
         assert re.search(r"[rs]", block_match.group(1)), result
+
+
+# ----------------------------------------------------------------------
+# Phase 152-02 BL-01 gap closure -- real-coverage gate tests
+# ----------------------------------------------------------------------
+
+def test_gate_real_coverage_blocks_partial_fragment():
+    """G-01 (BL-01): When the chosen benzene Tier-A candidate covers fewer
+    than 99% of heavy atoms (partial fragment), the BL-01 real-coverage gate
+    must block stereo injection so that a chain-side exocyclic E/Z bond is
+    NOT mis-attributed to a ring locant via include_near_parent_ez=True.
+
+    Pre-fix surface: best.factors['atom_coverage'] returned the ratio_score
+    fallback (a name-length proxy), which trivially exceeded 0.99 for short
+    candidate names like '4-(but-1-en-1-yl)phenol' on an 11-HA molecule even
+    though real coverage was 10/11 = 0.909. The result: a spurious leading
+    '(1E)-' prefix where the '1' is a ring locant and the 'E' belongs to a
+    chain bond outside the named fragment -- a D-09 violation.
+
+    Post-fix: real coverage = len(parent_atom_indices) / mol.GetNumHeavyAtoms()
+    is computed POST-HOC from the CandidateName's parent_atom_indices set,
+    populated by _ring_handler_parent_atom_indices(features, 'benzene').
+    Coverage 10/11 < 0.99 -> injection skipped -> no spurious ring-locant
+    E/Z prefix.
+    """
+    from rdkit import Chem
+    from orthonym import name_compound
+    # 11-HA partial-coverage canary: phenol(7) + but-1-en-1-yl(4) = 11.
+    # Named atoms when benzene wins: ring(6) + but-1-en-1-yl chain(4) = 10.
+    # OH is not in the substituent BFS for benzene-handler naming purposes;
+    # real coverage = 10/11 = 0.909 < 0.99 -> injection BLOCKED post-fix.
+    smiles = "Oc1ccc(/C=C/CC)cc1"
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, "canary SMILES must parse"
+    name = name_compound(smiles)
+    assert name and name != "unknown"
+    # The injector MUST NOT prepend a ring-locant (\d+E)- block when the
+    # chain double bond is exocyclic and real coverage < 0.99. The ring
+    # locant '1' (or any digit) on a leading E/Z prefix is the bug surface.
+    assert not re.match(r"^\(\d+[EZ]\)-", name), (
+        f"BL-01 gate failed: partial-fragment benzene candidate received a "
+        f"ring-locant E/Z prefix from atoms outside the named fragment: "
+        f"{name!r} for SMILES {smiles!r}. Coverage = 10/11 = 0.909 should "
+        f"be blocked by the >= 0.99 gate."
+    )
+
+
+def test_gate_real_coverage_allows_full_name():
+    """G-02: When the chosen Tier-A candidate covers all heavy atoms of the
+    molecule (e.g., D-proline / pyrrolidine-2-carboxylic acid, 8 heavy atoms,
+    all covered by ring + carboxylic-acid substituent), the BL-01 real-coverage
+    gate must allow the predicate-first injector to run."""
+    from orthonym import name_compound
+    # CHEBI:16313 -- D-proline. 8 heavy atoms; pyrrolidine ring (5) + COOH (3).
+    name = name_compound("O=C(O)[C@H]1CCCN1")
+    assert name and name != "unknown"
+    import re
+    assert re.match(r"^\(2[RS]\)-", name), (
+        f"BL-01 gate over-blocked: full-coverage heterocycle did not receive "
+        f"its expected (2R/S)- prefix: {name!r}"
+    )
