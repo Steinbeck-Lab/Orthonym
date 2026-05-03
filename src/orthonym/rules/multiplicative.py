@@ -611,55 +611,131 @@ def _name_parent(canon_smiles: str) -> Optional[str]:
 def _get_bridge_locant(
     mol, bridge_idx: int, ring_conn_idx: int, ring_atoms: set
 ) -> int:
-    """Determine the IUPAC locant of the bridge attachment point in the parent ring.
+    """Phase 154.B D-12: query Phase 151 cascade for IUPAC ring locants.
 
-    For benzene-based systems, the locant is the position of the attachment
-    point relative to the principal group (which is position 1).
+    Replaces the legacy "ring shortest-path from principal group"
+    heuristic (which defaulted to 4 / para on failure -- the
+    architectural debt this edit clears) with a query against the
+    existing handler's IUPAC locant map (Phase 151 cascade --
+    heterocycle / fused / VB / spiro / ring-assembly locants).
+
+    Falls back to the legacy shortest-path heuristic
+    (_shortest_path_heuristic_locant) only when the cascade returns None
+    for the target ring -- preserves current behavior on cascade misses.
+    The legacy hard-default-4 branches at lines 501 and 511 are GONE per
+    154-AUDIT-B.md §7.
 
     Args:
         mol: RDKit Mol object.
-        bridge_idx: Index of the bridge atom.
-        ring_conn_idx: Index of the ring atom connected to the bridge.
-        ring_atoms: Set of all ring atom indices.
+        bridge_idx: index of the bridge atom.
+        ring_conn_idx: index of the ring atom connected to the bridge.
+        ring_atoms: set of all ring atom indices.
 
     Returns:
         Locant number (1-indexed).
+
+    Source: 154-CONTEXT.md D-12; rules/parent_selection.py:_build_ring_pos:77;
+            namer.py:_build_ring_info_for_parent_selection:372;
+            rules/locants.py:compare_locant_sets:96.
     """
-    # Find which ring the connection atom belongs to
+    from .parent_selection import _build_ring_pos
+
+    # 1. Find the target ring set containing ring_conn_idx
+    ring_info = mol.GetRingInfo()
+    target_ring = None
+    for ring in ring_info.AtomRings():
+        if ring_conn_idx in ring:
+            target_ring = set(ring)
+            break
+    if target_ring is None:
+        # No ring contains the connection atom -- fall back to legacy
+        # heuristic.  Defensive guard: should never hit because callers
+        # assert ring_conn_idx is in ring_atoms.
+        return _shortest_path_heuristic_locant(
+            mol, bridge_idx, ring_conn_idx, ring_atoms
+        )
+
+    # 2. Build ring_info dict via Phase 151 cascade (fused-hetero, PAH,
+    #    benzene, heterocycle, spiro, mixed-spiro/fused, VB, ring-assembly).
+    handler_ring_info = None
+    try:
+        from ..namer import _build_ring_info_for_parent_selection, compute_features
+
+        features = compute_features(mol)
+        handler_ring_info = _build_ring_info_for_parent_selection(features)
+    except Exception:
+        # Cascade unavailable for this molecule shape -- fall back gracefully.
+        return _shortest_path_heuristic_locant(
+            mol, bridge_idx, ring_conn_idx, ring_atoms
+        )
+
+    # 3. Phase 151 cascade locants (authoritative IUPAC numbering when available)
+    try:
+        ring_pos = _build_ring_pos(target_ring, ring_info=handler_ring_info)
+    except Exception:
+        return _shortest_path_heuristic_locant(
+            mol, bridge_idx, ring_conn_idx, ring_atoms
+        )
+    locant = ring_pos.get(ring_conn_idx) if ring_pos else None
+
+    if locant is None:
+        # Cascade returned no locant for this atom -- fall back to heuristic
+        # (preserves current behavior on cascade misses; documented as
+        # "remaining heuristic share" in 154-VERIFICATION.md per Q-B5).
+        return _shortest_path_heuristic_locant(
+            mol, bridge_idx, ring_conn_idx, ring_atoms
+        )
+
+    # Tuple-coercion: tuple locants like (4, 'a') reduce to int (Phase 147 D-01)
+    if isinstance(locant, tuple):
+        return locant[0]
+    return locant
+
+
+def _shortest_path_heuristic_locant(
+    mol, bridge_idx: int, ring_conn_idx: int, ring_atoms: set
+) -> int:
+    """Legacy ring-shortest-path-from-PG heuristic (D-12 fallback path).
+
+    Preserved as the fallback when the Phase 151 cascade returns None for
+    the target ring.  The legacy "default to 4" branches at the previous
+    lines 501 and 511 are GONE -- this function returns the heuristic
+    distance + 1 even on edge cases; if the heuristic itself fails (no
+    PG atom found), it returns 1 (top-of-ring) instead of silently
+    emitting 4 / para.
+
+    Source: 154-CONTEXT.md D-12 (fallback path); legacy
+            multiplicative.py:475-526 pre-Plan-02.
+    """
     ring_info = mol.GetRingInfo()
     target_ring = None
     for ring in ring_info.AtomRings():
         if ring_conn_idx in ring:
             target_ring = ring
             break
-
     if target_ring is None:
-        return 4  # Default to 4 (most common para position)
+        return 1
 
-    # Find the principal group atom in this ring
-    # The principal group is typically an atom connected to a non-ring,
-    # non-bridge functional group atom (N for aniline, C(=O) for acid, O for phenol)
     pg_atom_idx = _find_principal_group_atom_in_ring(
         mol, target_ring, ring_atoms, bridge_idx
     )
-
     if pg_atom_idx is None:
-        return 4  # Default
+        # NOT 4 anymore -- legacy default removed per D-12.  Returning 1
+        # makes cascade misses observably wrong rather than silently
+        # right-ish (since 1 is rarely the correct bridge locant).
+        return 1
 
-    # Calculate the shortest path distance in the ring between pg_atom and conn_atom
-    # The locant is this distance + 1 (since pg is position 1)
     ring_list = list(target_ring)
-
-    # Find positions in ring
-    pg_pos = ring_list.index(pg_atom_idx)
-    conn_pos = ring_list.index(ring_conn_idx)
+    try:
+        pg_pos = ring_list.index(pg_atom_idx)
+        conn_pos = ring_list.index(ring_conn_idx)
+    except ValueError:
+        return 1
 
     ring_size = len(ring_list)
-    # Shortest ring distance
     dist = abs(conn_pos - pg_pos)
     dist = min(dist, ring_size - dist)
-
-    return dist + 1  # 1-indexed (pg is at position 1)
+    return dist + 1  # 1-indexed (PG is at position 1)
 
 
 def _find_principal_group_atom_in_ring(
