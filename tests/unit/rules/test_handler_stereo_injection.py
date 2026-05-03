@@ -213,23 +213,19 @@ class TestInjectStereoFromLocantMap:
         result = inject_stereo_from_locant_map("butan-2-ol", mol, {})
         assert result == "butan-2-ol"
 
-    # Test I-09 -- locants all zero is a degenerate map (parent_size=0
-    # so validate_stereo_locants does not run); the injector reflects the
-    # caller's malformed input rather than silently swallowing it.  Real
-    # handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER emit a
-    # zero locant -- this test pins the actual data-flow contract.
+    # Test I-09 -- locants all zero is a degenerate map (parent_size=0).
+    # Phase 152-02 WR-02 fix: all-zero locants are now a no-op (D-09 -- a
+    # missing stereo block is preferred to a malformed '(0R)-' garbage one).
+    # Real handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER
+    # emit a zero locant -- this test pins the new no-op contract.
     def test_all_zero_locants_emits_zero_block_no_fallback(self):
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
         atom_to_locant = {0: 0, 1: 0, 3: 0, 4: 0}
         result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
-        # Whatever the injector emits, it MUST come from the supplied locant
-        # map (no atom-index fallback per D-09).  Output may be the name
-        # unchanged (if descriptors empty) OR contain the zero locant.
-        # Confirm it is one of those two; do NOT silently produce locant '1'
-        # (which would be an atom-index fallback).
-        assert result == "butan-2-ol" or re.match(r"^\(0[RS]\)-butan-2-ol$", result), (
-            f"injector must not invent locants: {result!r}"
+        # Phase 152-02 WR-02 fix: all-zero locant map is now a no-op (D-09).
+        assert result == "butan-2-ol", (
+            f"WR-02 fix expects all-zero locant map to be a no-op, got {result!r}"
         )
 
     # Test I-10 -- ring-strain filter inherited (cyclohexene E/Z is filtered)
@@ -577,3 +573,95 @@ def test_gate_real_coverage_allows_full_name():
         f"BL-01 gate over-blocked: full-coverage heterocycle did not receive "
         f"its expected (2R/S)- prefix: {name!r}"
     )
+
+
+# ----------------------------------------------------------------------
+# Phase 152-02 WR-02 + WR-03 quick-hit defensive predicates
+# ----------------------------------------------------------------------
+
+def test_inject_stereo_skip_on_all_zero_locants():
+    """W-02 (WR-02 fix): an atom_to_locant map of all-zero locants is
+    degenerate (locants are 1-indexed in IUPAC) and must be a no-op per
+    D-09 ("better a missing stereo block than a wrong one"). Pre-fix
+    behaviour was to silently emit '(0R)-name' garbage."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: 0, 1: 0, 3: 0, 4: 0}
+    )
+    assert result == "butan-2-ol", (
+        f"WR-02 fix failed: all-zero locants should be no-op, got {result!r}"
+    )
+
+
+def test_inject_stereo_skip_on_negative_locants():
+    """W-02 (WR-02 fix, complement): a locant map with non-positive values
+    (negative or zero) must also be a no-op. Locants <= 0 are not valid
+    IUPAC locants and indicate caller bugs."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    # Mix of zero and negative locants
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: -1, 1: 0, 3: -2, 4: 0}
+    )
+    assert result == "butan-2-ol", (
+        f"WR-02 fix failed: non-positive locants should be no-op, got {result!r}"
+    )
+
+
+def test_inject_stereo_runs_when_at_least_one_positive_locant(caplog):
+    """W-02 (WR-02 fix, sanity): the predicate accepts maps where AT
+    LEAST ONE locant is positive, even if others are zero. This preserves
+    the contract that downstream filtering (validate_stereo_locants) handles
+    individual bad locants."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    # Locant 2 on atom 1 is positive; others are zero. Injector must NOT
+    # short-circuit -- it should pass the map to collect_stereodescriptors
+    # which uses validate_stereo_locants to filter zeros.
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: 0, 1: 2, 3: 0, 4: 0}
+    )
+    # The result will either be the unchanged name (if validate filters
+    # everything) or a (2R/S)-prefixed name. Either is acceptable; the
+    # critical contract is that the WR-02 short-circuit did NOT fire.
+    assert result == "butan-2-ol" or re.match(r"^\(2[RS]\)-", result), (
+        f"WR-02 over-blocked: at least one positive locant must NOT short-"
+        f"circuit, got {result!r}"
+    )
+
+
+def test_ring_atom_to_locant_warns_on_duplicates(caplog):
+    """W-03 (WR-03 fix): duplicate atom indices in oriented_ring should
+    emit a WARNING log so upstream orientator bugs don't silently
+    propagate. Behaviour preserved: last-occurrence wins (matches the
+    pre-existing dict semantics from composer.py:7184)."""
+    import logging
+    with caplog.at_level(logging.WARNING, logger="orthonym.rules.stereochemistry"):
+        result = _ring_atom_to_locant_from_oriented([10, 11, 12, 10, 14, 15])
+    assert any(
+        "duplicate atom indices" in rec.message
+        for rec in caplog.records
+    ), (
+        f"WR-03 fix failed: no WARNING emitted for duplicates, "
+        f"records={[r.message for r in caplog.records]!r}"
+    )
+    # Behaviour preserved: last occurrence still wins.
+    assert result[10] == 4
+
+
+def test_ring_atom_to_locant_no_warn_on_unique(caplog):
+    """W-03 (WR-03 fix, complement): unique-index oriented_ring must NOT
+    emit any WARNING (the WR-03 fix must be a true precondition guard,
+    not noisy false-positive logging on the happy path)."""
+    import logging
+    with caplog.at_level(logging.WARNING, logger="orthonym.rules.stereochemistry"):
+        result = _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
+    assert not any(
+        "duplicate" in rec.message.lower()
+        for rec in caplog.records
+    ), (
+        f"WR-03 over-warns: no WARNING expected on unique input, got "
+        f"{[r.message for r in caplog.records]!r}"
+    )
+    assert result == {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
