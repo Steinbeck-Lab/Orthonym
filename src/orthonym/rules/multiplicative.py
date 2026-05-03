@@ -675,6 +675,31 @@ def _get_bridge_locant(
         )
 
     # 3. Phase 151 cascade locants (authoritative IUPAC numbering when available)
+    #
+    # IMPORTANT: only trust the cascade when handler_ring_info contains an
+    # `iupac_locants` dict covering EVERY atom of target_ring.  When the
+    # cascade has no IUPAC numbering for this ring shape (e.g. functional-
+    # group-anchored cyclohexane-1,3-dione where the locants come from the
+    # PG positions, not from the ring-system handler), `_build_ring_pos`
+    # falls back to atom-sorted positional integers -- which are NOT the
+    # IUPAC locants the caller needs.  Detect this case via the
+    # `iupac_locants` presence + complete-coverage check and fall through
+    # to the heuristic, which IS PG-anchored.  This preserves the v17
+    # heuristic correctness on functional-group-anchored rings while
+    # adopting the cascade's authoritative numbering on Hantzsch-Widman /
+    # fused / PAH / spiro / VB / ring-assembly handler-controlled rings.
+    iupac_locants = (
+        handler_ring_info.get("iupac_locants") if handler_ring_info else None
+    )
+    cascade_covers_ring = (
+        iupac_locants
+        and all(a in iupac_locants for a in target_ring)
+    )
+    if not cascade_covers_ring:
+        return _shortest_path_heuristic_locant(
+            mol, bridge_idx, ring_conn_idx, ring_atoms
+        )
+
     try:
         ring_pos = _build_ring_pos(target_ring, ring_info=handler_ring_info)
     except Exception:
