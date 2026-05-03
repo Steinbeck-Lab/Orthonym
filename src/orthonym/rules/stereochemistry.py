@@ -289,9 +289,21 @@ def format_stereodescriptor_string(
 
 # D-03: detection regex set REUSED VERBATIM from namer.py:62-75. DO NOT BROADEN.
 # Pattern A — prefix form (already-stereoed name; matched against name start)
-_STEREO_PREFIX_RE = re.compile(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-')
+_STEREO_PREFIX_RE = re.compile(
+    # Phase 153 D-03 / Pitfall 8: accept composite locants like '7a', '3a'
+    # in addition to plain digits, so an already-stereoed name like
+    # `(7aS)-2,3a-dichloro-...benzofuran-...` is correctly recognized as
+    # already-stereoed and the injector does not double-emit the prefix.
+    # Compatible with the existing `(2R)-` / `(R)-` / `(E)-` / `(2R,3S)-`
+    # / `(2r,3s)-` matches (the locant prefix is optional via \d*).
+    r'\(\d*[a-z]?[RSrsEZez](,\d*[a-z]?[RSrsEZez])*\)-'
+)
 # Pattern B — embedded block (descriptor block anywhere in the name body)
-_STEREO_EMBEDDED_RE = re.compile(r'\(\d*[RSEZrsez](,\d*[RSEZrsez])*\)')
+_STEREO_EMBEDDED_RE = re.compile(
+    # Phase 153 D-03: also accept composite locants like '7a', '3a' in
+    # embedded blocks (e.g., 'something-(3aR,7aS)-else').
+    r'\(\d*[a-z]?[RSEZrsez](,\d*[a-z]?[RSEZrsez])*\)'
+)
 # Pattern C — carbohydrate / amino-acid traditional notation
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa)-[DL]-', re.IGNORECASE)
 

@@ -1596,8 +1596,13 @@ NAME_STABILITY_CANARY = [
         "(1R,2S,4S,5R,9S,10S,13R)-2-hydroxy-5,9-dimethyl-tetracyclo[8.5.0.1(1,13).0(4,9)]hexadecane-5-carboxylic acid",
     ),
     (
+        # Phase 153 SC-1 / D-13 commit 2/5: complex_ring stereo injection
+        # now emits R/S prefix where Phase 152 returned bare name. The
+        # carry-over compound `stereo_gap_post_commit_5.txt` row 3 drops
+        # out of the Phase 153 backstop trace per D-15 gold-standard
+        # validation (3 carry-over compounds, >= 2 must drop -- this is one).
         "CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O",  # medium
-        "10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane",
+        "(5S,6R,9R,10R)-10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane",
     ),
     (
         "OC[C@@H]1O[C@@](O)(CO)[C@@H](O)[C@@H]1O",  # heterocycle,small,carbohydrate
@@ -1720,8 +1725,10 @@ NAME_STABILITY_CANARY = [
         "6-amino-5-methyl-2-oxo-N-oxolanylpyrimidine",
     ),
     (
+        # Phase 153 SC-1 / D-13 commit 2/5: spiro stereo injection now
+        # correctly emits R/S prefix.
         "C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2",  # small
-        "4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane",
+        "(1S,4R,5R)-4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane",
     ),
     (
         "COc1cc(/C=C\\c2ccc(OC)c(O)c2)cc(OC)c1",  # aromatic,medium

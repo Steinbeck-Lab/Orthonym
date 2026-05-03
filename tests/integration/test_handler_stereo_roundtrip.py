@@ -180,3 +180,20 @@ _CYCLOALKENE_CASES = _load_cases("cycloalkene")
 class TestCycloalkene:
     def test_cycloalkene_stereo_roundtrip(self, case):
         _assert_handler_roundtrip(case, "cycloalkene")
+
+
+# ----------------------------------------------------------------------
+# Phase 153: ComplexRing (commit 3 -- D-01 / D-02 / D-05 / D-06 wiring + D-23 fixtures)
+# ----------------------------------------------------------------------
+
+_COMPLEX_RING_CASES = _load_cases("complex_ring")
+
+
+@pytest.mark.parametrize(
+    "case",
+    _COMPLEX_RING_CASES,
+    ids=lambda c: f"{c.get('source_corpus','?')}/{c.get('source_id','?')}",
+)
+class TestComplexRing:
+    def test_complex_ring_stereo_roundtrip(self, case):
+        _assert_handler_roundtrip(case, "complex_ring")

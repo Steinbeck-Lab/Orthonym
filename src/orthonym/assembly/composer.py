@@ -1417,7 +1417,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # accepts complex_ring identically to benzene/heterocycle.
             _complex_cand = _tier_a_pool.add(
                 complex_name, 'complex_ring', features,
-                parent_atom_indices=_complex_ring_parent_atom_indices(complex_result),
+                parent_atom_indices=_complex_ring_parent_atom_indices(
+                    complex_result, features.mol,
+                ),
             )
             # Phase 146 SC-4: the top-level 0.40 ratio gate is removed from
             # the module-level constants. In V18 score_based mode, the
@@ -2917,15 +2919,30 @@ def _name_simple_molecule(features: Any) -> str:
     return "unknown"
 
 
-def _complex_ring_parent_atom_indices(complex_result: Any) -> Optional[Set[int]]:
+def _complex_ring_parent_atom_indices(
+    complex_result: Any,
+    mol: Optional[Any] = None,
+) -> Optional[Set[int]]:
     """Compute the set of heavy-atom indices the complex_ring name accounts for.
 
     Phase 153 D-05 mirror of Phase 152 BL-01 (_ring_handler_parent_atom_indices,
-    below). For complex_ring, the ring_atoms field of ComplexRingResult is
-    the authoritative atom set (the 6 leaf functions in
-    _assemble_complex_ring_name populate it from ring perception, and
-    _enrich_complex_ring_with_subs already includes substituent atoms when
-    substituents_included=False).
+    below). For complex_ring, the atom set is::
+
+        ring_atoms ∪ {substituent atoms reachable from ring_atoms in `mol`}
+
+    The substituent walk MUST be included because complex_ring substituent
+    discovery happens AT THE TIER-A return site via _enrich_complex_ring_with_subs
+    (composer.py:1393-1397) using discover_substituents(); without including
+    those off-ring atoms in the gate's coverage denominator, every
+    substituted complex_ring (e.g. natural-product spiro/bicyclo) has
+    coverage < 0.99 and the >= 0.99 gate at composer.py:1623 rejects
+    injection. Mirrors the benzene/heterocycle BL-01 pattern at
+    _ring_handler_parent_atom_indices.
+
+    `mol` is OPTIONAL for backwards compatibility with code that passes
+    only the complex_result; when None, the bare ring_atoms set is
+    returned (used by old callers; the gate consumer at
+    composer.py:1404 always passes mol).
 
     Returns None when ring_atoms is empty/missing -- caller treats as
     "no real coverage measurement available" and skips injection per D-09
@@ -2933,7 +2950,32 @@ def _complex_ring_parent_atom_indices(complex_result: Any) -> Optional[Set[int]]
     """
     if not complex_result or not getattr(complex_result, 'ring_atoms', None):
         return None
-    return {int(i) for i in complex_result.ring_atoms}
+    ring_set: Set[int] = {int(i) for i in complex_result.ring_atoms}
+    if mol is None:
+        return ring_set
+    # Walk all heavy atoms reachable from any ring atom (BFS over non-ring
+    # atoms; stops at the next ring atom). This covers exocyclic substituent
+    # trees of arbitrary depth -- matching what discover_substituents finds
+    # from oriented_ring.
+    accounted: Set[int] = set(ring_set)
+    visited: Set[int] = set(ring_set)
+    queue = list(ring_set)
+    while queue:
+        idx = queue.pop()
+        try:
+            atom = mol.GetAtomWithIdx(idx)
+        except Exception:
+            continue
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in visited:
+                continue
+            if nbr_idx in ring_set:
+                continue
+            visited.add(nbr_idx)
+            accounted.add(nbr_idx)
+            queue.append(nbr_idx)
+    return accounted
 
 
 def _ring_is_whole_molecule_for_complex(
