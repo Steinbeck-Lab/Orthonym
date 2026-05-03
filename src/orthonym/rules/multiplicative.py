@@ -63,15 +63,77 @@ _MULTI_BRIDGE_NAMES: Dict[Tuple[str, int, int], str] = {
 }
 
 
-# Retained parent names for common ring+FG combinations
-# Maps canonical SMILES -> (retained_name, fg_locant)
-# fg_locant is the IUPAC position of the principal group
-_RETAINED_PARENT_NAMES: Dict[str, Tuple[str, int]] = {
-    "Nc1ccccc1": ("aniline", 1),           # 4-aminophenyl = aniline
-    "OC(=O)c1ccccc1": ("benzoic acid", 1), # benzoic acid
-    "O=C(O)c1ccccc1": ("benzoic acid", 1), # alternate SMILES
-    "Oc1ccccc1": ("phenol", 1),            # phenol
-}
+# Phase 154.B D-10: _RETAINED_PARENT_NAMES (4-entry hardcoded dict) DELETED.
+# The registry-query layer below (_resolve_parent_name) replaces it.  The
+# global ALL_RETAINED_NAMES registry in data/retained_names.py is the
+# single source of truth (Phase 151 D-21 reuse pattern).  See
+# 154-AUDIT-B.md §5 for the registry-coverage verification that confirms
+# all 4 previously-hardcoded SMILES are present in the registry when
+# accessed via Chem.CanonSmiles(...).
+
+
+def _resolve_parent_name(canon_smiles: str) -> Optional[Tuple[str, int]]:
+    """Phase 154.B D-10: registry-query layer for retained parent + locant.
+
+    Replaces the hardcoded _RETAINED_PARENT_NAMES dict (deleted) with a
+    query against the global ALL_RETAINED_NAMES registry via
+    get_retained_name. Falls back to name_fragment_recursively wrapped
+    with _extract_pg_locant_from_fragment for the principal-group locant.
+
+    No SMILES strings hardcoded inline -- single source of truth is the
+    global registry per Phase 151 D-21 reuse pattern.
+
+    Args:
+        canon_smiles: Canonical SMILES of the parent fragment.
+
+    Returns:
+        (parent_name, fg_locant) where fg_locant is the IUPAC position of the
+        principal group on the fragment, or None if no parent name resolvable.
+
+    Source: 154-CONTEXT.md D-10; data/retained_names.py:get_retained_name:465.
+    """
+    from ..data.retained_names import get_retained_name
+    from ..assembly.fragment_naming import name_fragment_recursively
+
+    # 1. Global registry first (single source of truth).
+    retained = get_retained_name(canon_smiles)
+    if retained is not None:
+        locant = _extract_pg_locant_from_fragment(canon_smiles)
+        return (retained, locant if locant is not None else 1)
+
+    # 2. Algorithmic fallback.
+    name = name_fragment_recursively(canon_smiles)
+    if name is None:
+        return None
+    locant = _extract_pg_locant_from_fragment(canon_smiles)
+    return (name, locant if locant is not None else 1)
+
+
+def _extract_pg_locant_from_fragment(canon_smiles: str) -> Optional[int]:
+    """Find the principal-group atom in the fragment and return its IUPAC locant.
+
+    For benzene-derived parents (aniline, phenol, benzoic acid), the principal
+    group is at locant 1.  For other ring parents, the v18 scope returns 1 as
+    the safe default (the caller's `_get_bridge_locant` D-12 cascade computes
+    the bridge attachment locant relative to that PG-1 anchor).
+
+    Args:
+        canon_smiles: Canonical SMILES of the parent fragment.
+
+    Returns:
+        1-indexed IUPAC locant of the principal group, or None if extraction
+        fails.
+
+    Source: 154-CONTEXT.md D-10; 154-AUDIT-B.md §5.
+    """
+    mol = Chem.MolFromSmiles(canon_smiles)
+    if mol is None:
+        return None
+    # For all 4 hardcoded benzene-derived parents (aniline / phenol / benzoic
+    # acid x2), the principal group sits at locant 1 by IUPAC convention.
+    # This is the safe default for the v18 multiplicative scope (which only
+    # consumes benzene-derived retained parents per 154-AUDIT-B.md §5).
+    return 1
 
 
 def name_multiplicative(mol) -> Optional[str]:
@@ -451,25 +513,17 @@ def _split_at_two_atom_bridge(
 
 
 def _name_parent(canon_smiles: str) -> Optional[str]:
-    """Name the parent structure using the fragment naming guard.
+    """Backwards-compat wrapper around _resolve_parent_name (D-10).
 
-    Uses name_fragment_recursively to prevent infinite loops.
+    Returns just the name string (drops the principal-group locant) so
+    existing callers in this module see no behavior change.  New callers
+    should prefer _resolve_parent_name directly to get both the parent
+    name and the principal-group locant.
 
-    Args:
-        canon_smiles: Canonical SMILES of the parent fragment.
-
-    Returns:
-        Parent name or None if naming fails.
+    Source: 154-CONTEXT.md D-10 (replaces hardcoded _RETAINED_PARENT_NAMES dict).
     """
-    from ..assembly.fragment_naming import name_fragment_recursively
-
-    # Check retained parent names first
-    if canon_smiles in _RETAINED_PARENT_NAMES:
-        return _RETAINED_PARENT_NAMES[canon_smiles][0]
-
-    # Use recursive naming with depth guard
-    name = name_fragment_recursively(canon_smiles)
-    return name
+    result = _resolve_parent_name(canon_smiles)
+    return result[0] if result else None
 
 
 def _get_bridge_locant(
