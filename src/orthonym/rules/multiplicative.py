@@ -51,6 +51,9 @@ _TWO_ATOM_BRIDGES = [
     # (element1, element2, h_count1, h_count2, bridge_name)
     ("C", "C", 2, 2, "ethylene"),     # CH2-CH2
     ("C", "C", 1, 1, "vinylene"),     # CH=CH (rare)
+    # Phase 154.B D-09 audit-driven adds (154-AUDIT-B.md §3 ranks 1-2):
+    ("O", "O", 0, 0, "peroxy"),       # O-O; IUPAC P-29; OPSIN multiRadicalSubstituents.xml line 53; 154-AUDIT-B.md §3 #1
+    ("S", "S", 0, 0, "disulfanediyl"),# S-S; IUPAC P-29; OPSIN multiRadicalSubstituents.xml; 154-AUDIT-B.md §3 #2
 ]
 
 # Multi-atom bridge names: (element, H_count, ring_neighbor_count) -> bridge_name
@@ -60,6 +63,8 @@ _MULTI_BRIDGE_NAMES: Dict[Tuple[str, int, int], str] = {
     ("N", 0, 3): "nitrilo",           # N connecting 3 rings (trivalent)
     ("C", 1, 3): "methylidyne",       # CH connecting 3 rings (trivalent)
     ("C", 0, 4): "methanetetrayl",    # C connecting 4 rings (tetravalent)
+    # Phase 154.B D-09 audit-driven add (154-AUDIT-B.md §3 rank 3):
+    ("P", 0, 3): "phosphinidyne",     # P connecting 3 rings (trivalent); IUPAC P-68; OPSIN multiRadicalSubstituents.xml line 47; 154-AUDIT-B.md §3 #3
 }
 
 
