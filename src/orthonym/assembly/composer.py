@@ -1367,6 +1367,13 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # threshold.
     # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
     _complex_ring_accepted = False
+    # Phase 153 D-02 / Pitfall 1: hoist a stable reference to the
+    # ComplexRingResult so the Tier-A injection block at composer.py:1614+
+    # can read it. The local `complex_result` at line ~1382 is set inside
+    # an `if features.is_cyclic and ...` guard and may be UNBOUND when the
+    # handler does not fire; this hoist makes the reference safe to read
+    # from the injection block regardless of which path executed.
+    _complex_result_for_injection: Optional[Any] = None
     # _gate_candidates was the in-line prototype of CandidatePool. The real
     # pool from get_current_pool() is now the source of truth. We keep a
     # local reference for readability and so the pool.add() calls below have
@@ -1396,12 +1403,22 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     complex_result.atom_to_locant,
                 )
 
+            # Phase 153 D-02 / Pitfall 1: stash a reference for the Tier-A
+            # injection block at composer.py:1614+ to consume.
+            _complex_result_for_injection = complex_result
+
             # Pool.add() is byte-identical to the previous _gate_candidates.append:
             # it calls compute_confidence(complex_name, 'complex_ring', features)
             # internally and stores the candidate. Tier A handlers have
             # direct_return=False (pool decides via best()), so .add() does NOT
             # short-circuit pool.best() to this candidate.
-            _complex_cand = _tier_a_pool.add(complex_name, 'complex_ring', features)
+            # Phase 153 D-05: pass parent_atom_indices via the new helper so
+            # the existing real-coverage gate at composer.py:1617-1623
+            # accepts complex_ring identically to benzene/heterocycle.
+            _complex_cand = _tier_a_pool.add(
+                complex_name, 'complex_ring', features,
+                parent_atom_indices=_complex_ring_parent_atom_indices(complex_result),
+            )
             # Phase 146 SC-4: the top-level 0.40 ratio gate is removed from
             # the module-level constants. In V18 score_based mode, the
             # cascade competes via pool._best_two_tier so the cascade-ratio
@@ -1612,7 +1629,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # the 0.99 threshold. Cycloalkane / cycloalkene wiring lives at
             # the chain-fragment fallback (~line 1808) with its own gate.
             candidate_name = best.name
-            if best.handler in ('benzene', 'heterocycle'):
+            if best.handler in ('benzene', 'heterocycle', 'complex_ring'):  # D-01: extend set
                 from .fragment_naming import is_top_level_naming
                 _parent_set = best.parent_atom_indices
                 _real_coverage = (
@@ -1625,13 +1642,36 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                         needs_stereo_injection, inject_stereo_from_locant_map,
                     )
                     if needs_stereo_injection(features.mol, candidate_name):
-                        atom_to_locant = (
-                            getattr(features, 'benzene_atom_to_locant', None)
-                            if best.handler == 'benzene'
-                            else getattr(features, 'heterocycle_atom_to_locant', None)
-                        )
+                        # D-01 / D-06: per-handler atom_to_locant + include_near_parent_ez
+                        # resolution. benzene/heterocycle keep Phase 152's
+                        # default include_near_parent_ez=True (BL-02 already
+                        # locked them via the inline gate further down at
+                        # ~line 1846). complex_ring computes per-molecule
+                        # via D-06 helper -- the new wiring DOES NOT inherit
+                        # the composer.py:7305 hardcoded =True anti-pattern
+                        # (preserved per D-21 for the older path).
+                        if best.handler == 'benzene':
+                            atom_to_locant = getattr(
+                                features, 'benzene_atom_to_locant', None,
+                            )
+                            _inpe = True
+                        elif best.handler == 'heterocycle':
+                            atom_to_locant = getattr(
+                                features, 'heterocycle_atom_to_locant', None,
+                            )
+                            _inpe = True
+                        else:  # complex_ring (Phase 153 D-01 / D-06)
+                            atom_to_locant = (
+                                _complex_result_for_injection.atom_to_locant
+                                if _complex_result_for_injection is not None
+                                else None
+                            )
+                            _inpe = _ring_is_whole_molecule_for_complex(
+                                _complex_result_for_injection, features.mol,
+                            )
                         candidate_name = inject_stereo_from_locant_map(
                             candidate_name, features.mol, atom_to_locant,
+                            include_near_parent_ez=_inpe,
                         )
             return candidate_name
         # Low ratio: fall through but store metadata for debugging
@@ -2875,6 +2915,45 @@ def _name_simple_molecule(features: Any) -> str:
         # Add more as needed
 
     return "unknown"
+
+
+def _complex_ring_parent_atom_indices(complex_result: Any) -> Optional[Set[int]]:
+    """Compute the set of heavy-atom indices the complex_ring name accounts for.
+
+    Phase 153 D-05 mirror of Phase 152 BL-01 (_ring_handler_parent_atom_indices,
+    below). For complex_ring, the ring_atoms field of ComplexRingResult is
+    the authoritative atom set (the 6 leaf functions in
+    _assemble_complex_ring_name populate it from ring perception, and
+    _enrich_complex_ring_with_subs already includes substituent atoms when
+    substituents_included=False).
+
+    Returns None when ring_atoms is empty/missing -- caller treats as
+    "no real coverage measurement available" and skips injection per D-09
+    (missing > wrong).
+    """
+    if not complex_result or not getattr(complex_result, 'ring_atoms', None):
+        return None
+    return {int(i) for i in complex_result.ring_atoms}
+
+
+def _ring_is_whole_molecule_for_complex(
+    complex_result: Any, mol: Any,
+) -> bool:
+    """Mirror of the cycloalkane/cycloalkene BL-02 flag at composer.py:1851-1856.
+
+    Returns True iff the complex_ring's atom set IS exactly the molecule's
+    heavy atoms. When True, exocyclic E/Z attribution to ring locants is
+    safe (because there are no exocyclic atoms). When False, the chain
+    pipeline owns exocyclic E/Z and we must pass include_near_parent_ez=False.
+
+    Phase 153 D-06 -- per D-09 (missing > wrong) when in doubt, suppress.
+    The new wiring at composer.py:1614+ DOES NOT inherit the
+    composer.py:7305 hardcoded `include_near_parent_ez=True` anti-pattern
+    (D-21 -- that path is composer.py-decomposition territory / IM-22 / v19).
+    """
+    if not complex_result or not getattr(complex_result, 'ring_atoms', None):
+        return False
+    return len(set(complex_result.ring_atoms)) == mol.GetNumHeavyAtoms()
 
 
 def _ring_handler_parent_atom_indices(features: Any, handler: str) -> Optional[Set[int]]:

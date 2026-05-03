@@ -797,3 +797,77 @@ class TestStereoBackstopRegressionInvariant:
         atom_to_locant = {0: 1, 1: 2, 2: 3}
         result = collect_stereodescriptors(mol, atom_to_locant)
         assert result == []
+
+
+# ============================================================================
+# Phase 153 commit 2/5: complex_ring Tier-A wiring (D-01 / D-05 / D-06)
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestComplexRingHelpers:
+    """Phase 153 D-05 / D-06: two pure helpers in composer.py mirror the
+    Phase 152 BL-01 / BL-02 patterns for the complex_ring handler.
+    """
+
+    def test_complex_ring_parent_atom_indices_returns_set_of_ring_atoms(self):
+        import types
+        from orthonym.assembly.composer import _complex_ring_parent_atom_indices
+        cr = types.SimpleNamespace(ring_atoms=(0, 1, 2, 3, 4))
+        assert _complex_ring_parent_atom_indices(cr) == {0, 1, 2, 3, 4}
+
+    def test_complex_ring_parent_atom_indices_returns_None_for_empty(self):
+        import types
+        from orthonym.assembly.composer import _complex_ring_parent_atom_indices
+        assert _complex_ring_parent_atom_indices(None) is None
+        assert _complex_ring_parent_atom_indices(
+            types.SimpleNamespace(ring_atoms=())
+        ) is None
+
+    def test_ring_is_whole_molecule_for_complex_True_when_ring_eq_mol(self):
+        import types
+        from orthonym.assembly.composer import _ring_is_whole_molecule_for_complex
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene 10 HA
+        cr = types.SimpleNamespace(ring_atoms=tuple(range(10)))
+        assert _ring_is_whole_molecule_for_complex(cr, mol) is True
+
+    def test_ring_is_whole_molecule_for_complex_False_when_substituent_present(self):
+        import types
+        from orthonym.assembly.composer import _ring_is_whole_molecule_for_complex
+        mol = Chem.MolFromSmiles("Cc1ccc2ccccc2c1")  # methylnaphthalene 11 HA
+        cr = types.SimpleNamespace(ring_atoms=tuple(range(10)))
+        assert _ring_is_whole_molecule_for_complex(cr, mol) is False
+
+
+@pytest.mark.unit
+class TestComplexRingTierAWiring:
+    """Static-source verifications for D-01 / D-05 / D-06 wiring (commit 2/5)."""
+
+    def test_complex_ring_in_handler_set(self):
+        with open("src/orthonym/assembly/composer.py") as f:
+            src = f.read()
+        # Find the Tier-A injection block by anchoring on the handler tuple.
+        assert "best.handler in ('benzene', 'heterocycle', 'complex_ring')" in src, (
+            "D-01: Tier-A injection block must include complex_ring in handler set"
+        )
+
+    def test_complex_ring_pool_add_passes_parent_atom_indices(self):
+        with open("src/orthonym/assembly/composer.py") as f:
+            src = f.read()
+        # The pool.add at line ~1404 must pass parent_atom_indices=
+        assert "parent_atom_indices=_complex_ring_parent_atom_indices(" in src, (
+            "D-05: pool.add for complex_ring must pass parent_atom_indices "
+            "via the new helper"
+        )
+
+    def test_complex_ring_uses_per_molecule_include_near_parent_ez(self):
+        with open("src/orthonym/assembly/composer.py") as f:
+            src = f.read()
+        # D-06: the new wiring must call _ring_is_whole_molecule_for_complex
+        # to compute include_near_parent_ez per-molecule. (The composer.py:7305
+        # hardcoded include_near_parent_ez=True anti-pattern is preserved at
+        # the OLDER path per D-21; the NEW path computes per-molecule.)
+        assert "_ring_is_whole_molecule_for_complex(" in src, (
+            "D-06: new wiring must use _ring_is_whole_molecule_for_complex "
+            "(per-molecule include_near_parent_ez)"
+        )
