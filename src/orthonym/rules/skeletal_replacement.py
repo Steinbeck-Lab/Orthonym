@@ -127,13 +127,6 @@ def _qualifies_for_pin_skeletal_replacement(
     return (True, "two-hetero-substitutive-equivalent")
 
 
-# Phase 154.A D-05: terminal -amine / -thiol support DEFERRED to v19.
-# 154-AUDIT-A.md §4 corpus tally: amine eligible=2, thiol eligible=0
-# (threshold 5); both below threshold => v19 follow-up
-# IM-154-D05-amine / IM-154-D05-thiol.
-# Source: 154-CONTEXT.md D-05; 154-AUDIT-A.md §4.
-
-
 # IUPAC P-15.4.3.1: Order of citation for replacement terms
 # When different heteroatom groups have the same lowest locant,
 # alphabetical order of the replacement term breaks the tie.
@@ -380,6 +373,19 @@ def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
         return terminal_ohs[0]
 
     return None
+
+
+# Phase 154.A D-05: terminal -amine / -thiol support DEFERRED to v19.
+# 154-AUDIT-A.md §4 corpus tally:
+#   acyclic-terminal-amine candidates: 275 mined, 2 eligible (no priority FG)
+#   acyclic-terminal-thiol candidates: 25 mined, 0 eligible (no priority FG)
+# Threshold per CONTEXT D-05 is 5 corpus compounds per FG; both below
+# threshold => v19 follow-ups IM-154-D05-amine / IM-154-D05-thiol.
+# Effective true-positive count is 0 cpd benefit because the 2 amine
+# candidates also carry phosphate priority FGs that gate-2 already rejects;
+# extending gate-3 with `_detect_terminal_amine` / `_detect_terminal_thiol`
+# does not unblock any v18 RT failures.
+# Source: 154-CONTEXT.md D-05; 154-AUDIT-A.md §4.
 
 
 def _has_terminal_functional_group(
