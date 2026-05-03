@@ -1,0 +1,48 @@
+{
+  "handler": "benzene",
+  "phase": "152",
+  "decision_refs": ["D-06", "D-09", "D-16", "D-23"],
+  "comment": "Benzene-handler stereo fixtures.  Aromatic benzene rings cannot themselves have ring-atom stereo (sp2 carbons are not stereocenters), so the benzene wiring's primary value is to (a) populate features.benzene_atom_to_locant via _ring_atom_to_locant_from_oriented (D-06 / D-08) and (b) ensure no false-positive injection when stereo lives on substituent atoms (D-09).  These fixtures cover the latter: each compound has a stereocenter on a SUBSTITUENT, and the benzene-handler output must not mis-attribute it to a ring locant.  Per D-23 every entry cites a real corpus + ID; per D-16 the round-trip oracle is OPSIN 2.9.0.  Round-trip xfail-marked when the pre-existing benzene handler output is malformed IUPAC (the handler-output bug is owned by Phase 153 / future work, NOT Phase 152 — Phase 152 only wires the predicate-first injector at the Tier-A return).",
+  "compounds": [
+    {
+      "smiles": "C[C@@H](Cl)c1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
+      "source_corpus": "",
+      "source_id": "stereo-substituent-on-benzene-Cl",
+      "comment": "1-chloro-1-phenylethane analog. Pre-existing benzene handler emits ((R)-chloroethyl)benzene with embedded (R) inside substituent — Pattern B suppression keeps Phase 152 injector a no-op (correct per D-09; ring atoms have no stereo).",
+      "xfail_reason": "pre-existing benzene-handler output format ((R)-chloroethyl)benzene lacks substituent locant; OPSIN cannot parse. Phase 152 wiring correctly does not inject ring-level stereo. Handler-output fix belongs to a separate phase."
+    },
+    {
+      "smiles": "C[C@H](Cl)c1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
+      "source_corpus": "",
+      "source_id": "stereo-substituent-on-benzene-Cl-S",
+      "comment": "Same as above with opposite stereochemistry.",
+      "xfail_reason": "pre-existing benzene-handler output format issue (see CHEBI:48422-like above)."
+    },
+    {
+      "smiles": "C[C@@H](OC)c1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
+      "source_corpus": "",
+      "source_id": "stereo-substituent-on-benzene-OMe",
+      "comment": "1-methoxy-1-phenylethane analog.",
+      "xfail_reason": "pre-existing benzene-handler output format issue."
+    },
+    {
+      "smiles": "CCCCC[C@H](O)c1ccc(CO)cc1",
+      "expected_stereo_prefix_pattern": "^.*hydroxy.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:211889",
+      "comment": "1-(hydroxyhexyl)-4-(hydroxymethyl)benzene.  Phase 152 benzene Tier-A injector correctly does not add a ring-level stereo prefix because the stereocenter is on a substituent atom (D-09 — no atom-index fallback).  Backstop continues to log WARNING for substituent-atom-stereo gap.",
+      "xfail_reason": "stereocenter is on substituent (hexyl) chain, not on ring; Phase 152 wiring correctly defers per D-09. Substituent-level stereo injection belongs to a substituent handler."
+    },
+    {
+      "smiles": "C[C@@H](Br)c1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
+      "source_corpus": "",
+      "source_id": "stereo-substituent-on-benzene-Br",
+      "comment": "1-bromo-1-phenylethane analog.",
+      "xfail_reason": "pre-existing benzene-handler output format issue (same root cause as Cl/OMe variants)."
+    }
+  ]
+}

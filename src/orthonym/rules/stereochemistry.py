@@ -20,10 +20,14 @@ caller (computed during chain/ring classification). It does NOT fall back to
 atom indices as those are NOT valid IUPAC locants.
 """
 
+import logging
+import re
 from typing import Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry, detect_axial_chirality
+
+logger = logging.getLogger(__name__)
 
 
 def collect_stereodescriptors(
@@ -240,6 +244,138 @@ def format_stereodescriptor_string(
     parts = [f"{locant}{cip}" for locant, cip in descriptors]
 
     return f"({','.join(parts)})-"
+
+
+# ---------------------------------------------------------------------------
+# Phase 152: Handler-level stereo injection (D-01 / D-04 predicate-first wiring)
+# ---------------------------------------------------------------------------
+
+# D-03: detection regex set REUSED VERBATIM from namer.py:62-75. DO NOT BROADEN.
+# Pattern A — prefix form (already-stereoed name; matched against name start)
+_STEREO_PREFIX_RE = re.compile(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-')
+# Pattern B — embedded block (descriptor block anywhere in the name body)
+_STEREO_EMBEDDED_RE = re.compile(r'\(\d*[RSEZrsez](,\d*[RSEZrsez])*\)')
+# Pattern C — carbohydrate / amino-acid traditional notation
+_CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa)-[DL]-', re.IGNORECASE)
+
+
+def needs_stereo_injection(mol, name: str) -> bool:
+    """Return True iff *mol* carries CIP stereo not represented in *name*.
+
+    Pure read-only predicate (D-05) used both by the namer.py backstop
+    (after Phase 152 refactor) and by inject_stereo_from_locant_map.
+
+    Per D-03, the three name-side detection patterns are byte-identical to
+    namer.py:_final_stereo_check lines 62-75. Per D-20, do NOT broaden.
+
+    Args:
+        mol: RDKit Mol object (may be None).
+        name: Generated IUPAC name string (may be empty / 'unknown').
+
+    Returns:
+        True iff (a) mol is not None and name is non-empty and != 'unknown'
+        AND (b) name does NOT match any of the three stereo-detection patterns
+        AND (c) mol has at least one atom or bond with _CIPCode set after
+        idempotent assign_stereochemistry.
+    """
+    if mol is None or not name or name == 'unknown':
+        return False
+
+    # Pattern A — prefix form (already-stereoed name; D-03)
+    if _STEREO_PREFIX_RE.match(name):
+        return False
+    # Pattern B — embedded block
+    if _STEREO_EMBEDDED_RE.search(name):
+        return False
+    # Pattern C — carbohydrate / amino acid traditional notation
+    if _CARBOHYDRATE_STEREO_RE.search(name):
+        return False
+
+    # Idempotent CIP assignment (D-05 read-only — assign_stereochemistry uses
+    # _Orthonym_CIPAssigned marker so re-entry is cheap and side-effect free
+    # beyond what RDKit's CIP labeler already does).
+    assign_stereochemistry(mol)
+    has_atom_stereo = any(a.HasProp('_CIPCode') for a in mol.GetAtoms())
+    has_bond_stereo = any(b.HasProp('_CIPCode') for b in mol.GetBonds())
+    return has_atom_stereo or has_bond_stereo
+
+
+def inject_stereo_from_locant_map(
+    name: str,
+    mol,
+    atom_to_locant: Optional[Dict[int, int]],
+) -> str:
+    """Prepend a P-91 stereo descriptor block to *name* using authoritative locants.
+
+    Per IUPAC P-91 / P-91.1, prepends a `(R/S/E/Z)-` block built from
+    collect_stereodescriptors + format_stereodescriptor_string.
+
+    Per D-09, **no atom-index fallback**: when atom_to_locant is None, empty,
+    or all-zero (degenerate), returns *name* unchanged and emits a single
+    DEBUG log line. The backstop in namer.py will still log WARNING in this
+    case so handler attribution is preserved.
+
+    Args:
+        name: The candidate IUPAC name from a handler.
+        mol: RDKit Mol object with stereo info.
+        atom_to_locant: Authoritative {atom_idx: 1-indexed locant} map from
+            the handler's own perception (heterocycle / benzene / cycloalkane
+            / cycloalkene). Must NOT be derived from raw atom indices (D-09).
+
+    Returns:
+        name unchanged (predicate False / no locant map / no descriptors)
+        OR  prefix + name where prefix is e.g. '(2R)-', '(2R,3S)-',
+        '(2E,3R,5Z)-', '(2r,3s)-' per P-91.
+
+    Example:
+        >>> mol = Chem.MolFromSmiles('C[C@@H](O)CC')
+        >>> rdCIPLabeler.AssignCIPLabels(mol)
+        >>> inject_stereo_from_locant_map('butan-2-ol', mol, {1: 2})
+        '(2R)-butan-2-ol'
+    """
+    if not needs_stereo_injection(mol, name):
+        return name
+
+    # D-09: hard precondition — no atom-index fallback.
+    if not atom_to_locant:
+        logger.debug(
+            "inject_stereo: skipped, no locant map (name=%r)", name[:50]
+        )
+        return name
+
+    # D-11: include_near_parent_ez=True for P-93.5.2 compliance (top-level only;
+    # is_top_level_naming guard at the call site enforces this).
+    descriptors = collect_stereodescriptors(
+        mol, atom_to_locant, include_near_parent_ez=True
+    )
+    if not descriptors:
+        return name
+
+    prefix = format_stereodescriptor_string(descriptors)
+    return f"{prefix}{name}"
+
+
+def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, int]:
+    """Build atom-idx → 1-indexed locant map from oriented_ring.
+
+    Single source of truth for the {idx: pos+1} formula previously inlined
+    at composer.py:7184. Used by benzene / cycloalkane / cycloalkene
+    handler wiring per D-08.
+
+    Args:
+        oriented_ring: List of atom indices in IUPAC ring-position order
+            (position 1 first).
+
+    Returns:
+        Dict mapping each atom idx to its 1-indexed locant. When duplicate
+        atom indices appear, the LAST occurrence wins (matches dict semantics
+        of the original one-liner at composer.py:7184).
+
+    Example:
+        >>> _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
+        {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
+    """
+    return {idx: pos + 1 for pos, idx in enumerate(oriented_ring)}
 
 
 def collect_ring_stereodescriptors(

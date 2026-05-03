@@ -1571,7 +1571,42 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     best.handler, total_heavy, best.name[:60],
                 )
-            return best.name
+            # Phase 152 D-04: predicate-first handler-level stereo injection
+            # for benzene + heterocycle Tier-A candidates.  Per D-09, no atom-
+            # index fallback.  Per D-11, restrict to top-level naming so
+            # substituent decomposition fragments (e.g. thiazolyl substituent
+            # on a macrocyclic lactone) do NOT inject near-parent E/Z that
+            # belongs to the parent's frame, not the fragment's frame.
+            #
+            # Atom-coverage guard (auto-deviation Rule 1, 2026-05-03): only
+            # inject when the chosen candidate's name covers ~all heavy
+            # atoms.  Low-coverage candidates are PARTIAL fragment names
+            # (e.g. the benzene handler returning "3-methoxyphenol" for a
+            # complex polyketide); injecting stereo for atoms outside the
+            # named fragment would attach the wrong locants (near-parent
+            # E/Z leak from neighbouring chains).  Per D-09 / D-21, prefer
+            # a missing stereo block over a wrong one.
+            #
+            # Cycloalkane / cycloalkene wiring lands in commit 5 at the
+            # chain-fragment fallback (composer.py:1756).
+            candidate_name = best.name
+            if best.handler in ('benzene', 'heterocycle'):
+                from .fragment_naming import is_top_level_naming
+                _coverage = best.factors.get('atom_coverage', 0.0)
+                if is_top_level_naming() and _coverage >= 0.99:
+                    from ..rules.stereochemistry import (
+                        needs_stereo_injection, inject_stereo_from_locant_map,
+                    )
+                    if needs_stereo_injection(features.mol, candidate_name):
+                        atom_to_locant = (
+                            getattr(features, 'benzene_atom_to_locant', None)
+                            if best.handler == 'benzene'
+                            else getattr(features, 'heterocycle_atom_to_locant', None)
+                        )
+                        candidate_name = inject_stereo_from_locant_map(
+                            candidate_name, features.mol, atom_to_locant,
+                        )
+            return candidate_name
         # Low ratio: fall through but store metadata for debugging
         logger.debug(
             "Coverage gate: best candidate ratio too low, falling through "
@@ -1753,7 +1788,42 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # (preserves byte-identical); Phase 146 raises priority for competition.
     pool = get_current_pool()
     pool.add(assembled, "chain", features)
-    return pool.best().name
+    candidate_name = pool.best().name
+
+    # Phase 152 D-04 / D-08: cycloalkane + cycloalkene handler-level stereo
+    # injection at the chain-fragment fallback return.  Gated on
+    # features.ring_type in {'cycloalkane', 'cycloalkene'} AND
+    # features.oriented_ring populated.  Per D-09, no atom-index fallback;
+    # if oriented_ring is missing, the backstop logs WARNING in namer.py
+    # and we return the name unchanged.  Per D-11 (top-level only) and the
+    # auto-deviation Rule 1 atom-coverage gate from Task 4, we also restrict
+    # to top-level naming and gate near-parent E/Z leakage by skipping when
+    # the molecule has heavy atoms outside the parent ring (the cycloalkane/
+    # cycloalkene parent IS the named ring; if the molecule has substituent
+    # chains beyond the ring with E/Z bonds, the chain-pipeline is already
+    # responsible for those via _generate_stereodescriptors).  The 33+
+    # existing call sites of _inject_stereo_if_missing are PRESERVED (per
+    # PATTERNS MODIFY 5); this wiring is the FIRST injection on the
+    # cycloalkane/cycloalkene tail return path.
+    _ring_type = getattr(features, 'ring_type', None)
+    if _ring_type in ('cycloalkane', 'cycloalkene'):
+        from .fragment_naming import is_top_level_naming
+        if is_top_level_naming():
+            from ..rules.stereochemistry import (
+                needs_stereo_injection,
+                inject_stereo_from_locant_map,
+                _ring_atom_to_locant_from_oriented,
+            )
+            if needs_stereo_injection(features.mol, candidate_name):
+                _oriented = getattr(features, 'oriented_ring', None)
+                atom_to_locant = (
+                    _ring_atom_to_locant_from_oriented(_oriented)
+                    if _oriented else None
+                )
+                candidate_name = inject_stereo_from_locant_map(
+                    candidate_name, features.mol, atom_to_locant,
+                )
+    return candidate_name
 
 
 def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
@@ -2823,6 +2893,13 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
 
     # Orient the ring for lowest locants
     oriented_ring = orient_benzene(mol, ring_atoms, substituents)
+
+    # Phase 152 D-06: mirror features.heterocycle_atom_to_locant convention so
+    # the Tier-A return injector at composer.py:1574 can consume an authoritative
+    # benzene locant map.  Single source of truth via _ring_atom_to_locant_from_oriented
+    # (D-08).
+    from ..rules.stereochemistry import _ring_atom_to_locant_from_oriented
+    features.benzene_atom_to_locant = _ring_atom_to_locant_from_oriented(oriented_ring)
 
     # Generate systematic name
     detected_fgs = getattr(features, 'functional_groups', None) or {}

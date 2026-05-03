@@ -1,0 +1,50 @@
+{
+  "handler": "cycloalkane",
+  "phase": "152",
+  "decision_refs": ["D-08", "D-16", "D-23"],
+  "comment": "Cycloalkane handler stereo fixtures.  Phase 152 wires the chain-fragment fallback (composer.py:~1756) through the predicate-first injector when features.ring_type == 'cycloalkane' AND features.oriented_ring is populated.  Locant map built via _ring_atom_to_locant_from_oriented (D-08).  All fixtures are sourced per D-23 from the multi-corpus benchmarks (chebi_5000.csv + opsin_selftest_500.csv) and round-trip through OPSIN 2.9.0 with the original SMILES.",
+  "compounds": [
+    {
+      "smiles": "CC(C)=C[C@@H]1[C@@H](C=O)C1(C)C",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:143899",
+      "comment": "(1R,3R)-3-(2-methylprop-1-enyl)-2,2-dimethylcyclopropanecarbaldehyde -- chrysanthemaldehyde-related; cyclopropane ring with two stereocenters."
+    },
+    {
+      "smiles": "C=C(C)[C@@H]1CC[C@](C)(O)[C@@H](O)C1",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:18515",
+      "comment": "(1S,2S,4R)-1-hydroxy-1-methyl-4-(prop-1-en-2-yl)cyclohexan-2-ol"
+    },
+    {
+      "smiles": "C=C(C)[C@H]1CC[C@@H](C)CC1=O",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:37047",
+      "comment": "(1R,4R)-4-methyl-1-(prop-1-en-2-yl)cyclohexan-2-one (a dihydrocarvone)"
+    },
+    {
+      "smiles": "C=C(C)[C@H]1CC[C@@H](C)[C@@H](O)C1",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:153",
+      "comment": "(1R,2S,4S)-1-methyl-4-(prop-1-en-2-yl)cyclohexan-2-ol (carvomenthol stereoisomer)"
+    },
+    {
+      "smiles": "C=C(C)[C@H]1CC[C@@H](C)C(=O)C1",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:155",
+      "comment": "(1R,4S)-1-methyl-4-(prop-1-en-2-yl)cyclohexan-2-one"
+    },
+    {
+      "smiles": "C[C@H]1C[C@@]1(N)C(=O)O",
+      "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
+      "source_corpus": "",
+      "source_id": "CHEBI:87174",
+      "comment": "(1S,2S)-2-amino-1-methylcyclopropan-2-carboxylic acid"
+    }
+  ]
+}

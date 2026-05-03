@@ -42,11 +42,20 @@ def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
     Runs AFTER all handler-specific stereo injection. Only activates when
     a handler missed stereo. Logs WARNING to flag handler gaps for future fixes.
 
-    This is an architectural safety net per Phase 140 D-02.  It does NOT
-    inject stereo with raw atom-index locants because those don't correspond
-    to IUPAC numbering for the named parent structure -- injecting them would
-    produce incorrect names.  Handler-specific injection via
-    _inject_stereo_if_missing() remains the primary stereo injection mechanism.
+    This is an architectural safety net per Phase 140 D-02 + Phase 152 D-04.
+    Detection is delegated to rules.stereochemistry.needs_stereo_injection
+    so that the new handler-level injector and this backstop share one
+    predicate. Behavior is byte-identical to pre-152: backstop continues to
+    fire WARNING for any handler that did NOT inject stereo (e.g.
+    complex_ring, polycyclic, retained-name, decomposition fragments).
+
+    It does NOT inject stereo with raw atom-index locants (Phase 140 D-02 +
+    Phase 152 D-09) because those don't correspond to IUPAC numbering for
+    the named parent structure -- injecting them would produce incorrect
+    names. Handler-specific injection (Phase 152: benzene / heterocycle /
+    cycloalkane / cycloalkene via inject_stereo_from_locant_map; legacy:
+    _inject_stereo_if_missing for 33+ direct-return sites) remains the
+    primary stereo injection mechanism.
 
     Args:
         mol: RDKit Mol object (with stereo info from original SMILES)
@@ -56,32 +65,12 @@ def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
     Returns:
         Original name unchanged.  Logs WARNING if stereo gap detected.
     """
-    if mol is None or not name or name == 'unknown':
+    from .rules.stereochemistry import needs_stereo_injection
+
+    if not needs_stereo_injection(mol, name):
         return name
 
-    # Already has stereo prefix? Use same regex as _inject_stereo_if_missing
-    if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
-        return name
-
-    # Check if stereo descriptors appear ANYWHERE in the name (e.g., already
-    # embedded by a handler within the name body).  Pattern: digit(s) followed
-    # by R/S/E/Z inside parentheses -- matches (2R), (3S,5R), (E), etc.
-    if re.search(r'\(\d*[RSEZrsez](,\d*[RSEZrsez])*\)', name):
-        return name
-
-    # Names using traditional carbohydrate/amino acid stereo notation
-    # (alpha/beta, D-/L-) already convey stereochemistry -- don't flag.
-    if re.search(r'(alpha|beta|alfa)-[DL]-', name, re.IGNORECASE):
-        return name
-
-    # Does molecule have stereo?
-    assign_stereochemistry(mol)
-    has_atom_stereo = any(a.HasProp('_CIPCode') for a in mol.GetAtoms())
-    has_bond_stereo = any(b.HasProp('_CIPCode') for b in mol.GetBonds())
-    if not has_atom_stereo and not has_bond_stereo:
-        return name
-
-    # Log the handler gap for future fixes.
+    # Predicate said True -> stereo was needed but not injected.  Log gap.
     n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
     n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
     logger.warning(
