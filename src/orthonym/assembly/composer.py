@@ -1788,7 +1788,42 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # (preserves byte-identical); Phase 146 raises priority for competition.
     pool = get_current_pool()
     pool.add(assembled, "chain", features)
-    return pool.best().name
+    candidate_name = pool.best().name
+
+    # Phase 152 D-04 / D-08: cycloalkane + cycloalkene handler-level stereo
+    # injection at the chain-fragment fallback return.  Gated on
+    # features.ring_type in {'cycloalkane', 'cycloalkene'} AND
+    # features.oriented_ring populated.  Per D-09, no atom-index fallback;
+    # if oriented_ring is missing, the backstop logs WARNING in namer.py
+    # and we return the name unchanged.  Per D-11 (top-level only) and the
+    # auto-deviation Rule 1 atom-coverage gate from Task 4, we also restrict
+    # to top-level naming and gate near-parent E/Z leakage by skipping when
+    # the molecule has heavy atoms outside the parent ring (the cycloalkane/
+    # cycloalkene parent IS the named ring; if the molecule has substituent
+    # chains beyond the ring with E/Z bonds, the chain-pipeline is already
+    # responsible for those via _generate_stereodescriptors).  The 33+
+    # existing call sites of _inject_stereo_if_missing are PRESERVED (per
+    # PATTERNS MODIFY 5); this wiring is the FIRST injection on the
+    # cycloalkane/cycloalkene tail return path.
+    _ring_type = getattr(features, 'ring_type', None)
+    if _ring_type in ('cycloalkane', 'cycloalkene'):
+        from .fragment_naming import is_top_level_naming
+        if is_top_level_naming():
+            from ..rules.stereochemistry import (
+                needs_stereo_injection,
+                inject_stereo_from_locant_map,
+                _ring_atom_to_locant_from_oriented,
+            )
+            if needs_stereo_injection(features.mol, candidate_name):
+                _oriented = getattr(features, 'oriented_ring', None)
+                atom_to_locant = (
+                    _ring_atom_to_locant_from_oriented(_oriented)
+                    if _oriented else None
+                )
+                candidate_name = inject_stereo_from_locant_map(
+                    candidate_name, features.mol, atom_to_locant,
+                )
+    return candidate_name
 
 
 def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:

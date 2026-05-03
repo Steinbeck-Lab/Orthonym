@@ -133,4 +133,35 @@ class TestBenzene:
         _assert_handler_roundtrip(case, "benzene")
 
 
-# Cycloalkane + cycloalkene classes are added in commit 5.
+# ----------------------------------------------------------------------
+# Cycloalkane (commit 5)
+# ----------------------------------------------------------------------
+
+_CYCLOALKANE_CASES = _load_cases("cycloalkane")
+
+
+@pytest.mark.parametrize(
+    "case",
+    _CYCLOALKANE_CASES,
+    ids=lambda c: f"{c.get('source_corpus','?')}/{c.get('source_id','?')}",
+)
+class TestCycloalkane:
+    def test_cycloalkane_stereo_roundtrip(self, case):
+        _assert_handler_roundtrip(case, "cycloalkane")
+
+
+# ----------------------------------------------------------------------
+# Cycloalkene (commit 5)
+# ----------------------------------------------------------------------
+
+_CYCLOALKENE_CASES = _load_cases("cycloalkene")
+
+
+@pytest.mark.parametrize(
+    "case",
+    _CYCLOALKENE_CASES,
+    ids=lambda c: f"{c.get('source_corpus','?')}/{c.get('source_id','?')}",
+)
+class TestCycloalkene:
+    def test_cycloalkene_stereo_roundtrip(self, case):
+        _assert_handler_roundtrip(case, "cycloalkene")
