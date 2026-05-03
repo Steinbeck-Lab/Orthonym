@@ -304,6 +304,8 @@ def inject_stereo_from_locant_map(
     name: str,
     mol,
     atom_to_locant: Optional[Dict[int, int]],
+    *,
+    include_near_parent_ez: bool = True,
 ) -> str:
     """Prepend a P-91 stereo descriptor block to *name* using authoritative locants.
 
@@ -321,6 +323,15 @@ def inject_stereo_from_locant_map(
         atom_to_locant: Authoritative {atom_idx: 1-indexed locant} map from
             the handler's own perception (heterocycle / benzene / cycloalkane
             / cycloalkene). Must NOT be derived from raw atom indices (D-09).
+        include_near_parent_ez: When True (default -- preserves benzene /
+            heterocycle Tier-A behaviour), exocyclic E/Z bonds one hop from
+            the parent are attributed to the lowest neighbouring locant per
+            P-93.5.2. When False (cycloalkane / cycloalkene caller post-
+            BL-02 fix), exocyclic E/Z bonds are NOT attributed to ring
+            locants; only ring-atom R/S and ring-bond E/Z are emitted. This
+            is the conservative gate per D-09 ("better a missing stereo
+            block than a wrong one") for handlers where exocyclic E/Z can
+            be mis-attributed via include_near_parent_ez=True.
 
     Returns:
         name unchanged (predicate False / no locant map / no descriptors)
@@ -337,16 +348,26 @@ def inject_stereo_from_locant_map(
         return name
 
     # D-09: hard precondition — no atom-index fallback.
-    if not atom_to_locant:
+    # WR-02 fix (Phase 152-02, 2026-05-03): also reject all-zero / non-positive
+    # locant maps. A locant of 0 or negative is IUPAC-malformed (locants are
+    # 1-indexed); accepting it would emit '(0R)-name' or '(-1R)-name' garbage.
+    # Per D-09 ("missing > wrong"), skip injection.
+    if not atom_to_locant or not any(
+        isinstance(v, int) and v > 0 for v in atom_to_locant.values()
+    ):
         logger.debug(
-            "inject_stereo: skipped, no locant map (name=%r)", name[:50]
+            "inject_stereo: skipped, no locant map / all-zero locants (name=%r)",
+            name[:50],
         )
         return name
 
-    # D-11: include_near_parent_ez=True for P-93.5.2 compliance (top-level only;
-    # is_top_level_naming guard at the call site enforces this).
+    # D-11: include_near_parent_ez defaults to True for P-93.5.2 compliance
+    # (top-level only; is_top_level_naming guard at the call site enforces
+    # this). BL-02 fix (Phase 152-02, 2026-05-03): cycloalkane / cycloalkene
+    # caller passes include_near_parent_ez=_ring_is_whole_molecule so chain-
+    # side exocyclic E/Z is NOT attributed to ring locants.
     descriptors = collect_stereodescriptors(
-        mol, atom_to_locant, include_near_parent_ez=True
+        mol, atom_to_locant, include_near_parent_ez=include_near_parent_ez,
     )
     if not descriptors:
         return name
@@ -369,12 +390,21 @@ def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, in
     Returns:
         Dict mapping each atom idx to its 1-indexed locant. When duplicate
         atom indices appear, the LAST occurrence wins (matches dict semantics
-        of the original one-liner at composer.py:7184).
+        of the original one-liner at composer.py:7184). WR-03 fix
+        (Phase 152-02, 2026-05-03): also emits a WARNING log when duplicates
+        are present so a buggy upstream orientator does not silently produce
+        a wrong locant map.
 
     Example:
         >>> _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
         {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
     """
+    if oriented_ring and len(set(oriented_ring)) != len(oriented_ring):
+        logger.warning(
+            "_ring_atom_to_locant_from_oriented: duplicate atom indices in "
+            "oriented_ring=%r -- last position wins (upstream orientator may have a bug)",
+            oriented_ring,
+        )
     return {idx: pos + 1 for pos, idx in enumerate(oriented_ring)}
 
 

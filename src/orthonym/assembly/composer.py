@@ -1491,7 +1491,18 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # Collect heterocycle candidate via pool.add()
             hetero_name = _assemble_heterocycle_name(features, style)
             if hetero_name:
-                _tier_a_pool.add(hetero_name, 'heterocycle', features)
+                # BL-01 FIX (Phase 152-02, 2026-05-03): pass real parent atom
+                # indices so the Tier-A injection guard at line ~1593 can
+                # measure REAL atom coverage (POST-HOC on CandidateName) rather
+                # than the ratio_score name-length proxy (coverage_scoring.py
+                # line 437). Helper returns None if ring data is not yet
+                # populated; gate then treats coverage as 0.0 and skips per D-09.
+                _tier_a_pool.add(
+                    hetero_name, 'heterocycle', features,
+                    parent_atom_indices=_ring_handler_parent_atom_indices(
+                        features, 'heterocycle'
+                    ),
+                )
             # If heterocycle naming fails, fall through
 
         # Handle benzene derivatives
@@ -1502,7 +1513,17 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         if getattr(features, 'is_benzene', False):
             benzene_name = _assemble_benzene_name(features, style)
             if benzene_name:
-                _tier_a_pool.add(benzene_name, 'benzene', features)
+                # BL-01 FIX (Phase 152-02, 2026-05-03): same as heterocycle
+                # branch above -- pass real parent atom indices for the Tier-A
+                # injection guard. _assemble_benzene_name has already populated
+                # features.benzene_atom_to_locant by the time we get here, so
+                # the helper sees the correct ring + substituent atom set.
+                _tier_a_pool.add(
+                    benzene_name, 'benzene', features,
+                    parent_atom_indices=_ring_handler_parent_atom_indices(
+                        features, 'benzene'
+                    ),
+                )
             # If benzene naming fails, fall through
 
     # Phase 146 SC-5: wire chain as a first-class pool candidate (V18 only).
@@ -1572,28 +1593,34 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     best.handler, total_heavy, best.name[:60],
                 )
             # Phase 152 D-04: predicate-first handler-level stereo injection
-            # for benzene + heterocycle Tier-A candidates.  Per D-09, no atom-
-            # index fallback.  Per D-11, restrict to top-level naming so
-            # substituent decomposition fragments (e.g. thiazolyl substituent
-            # on a macrocyclic lactone) do NOT inject near-parent E/Z that
-            # belongs to the parent's frame, not the fragment's frame.
+            # for benzene + heterocycle Tier-A candidates. Per D-09, no atom-
+            # index fallback. Per D-11, restrict to top-level naming so
+            # substituent decomposition fragments do NOT inject near-parent
+            # E/Z that belongs to the parent's frame.
             #
-            # Atom-coverage guard (auto-deviation Rule 1, 2026-05-03): only
-            # inject when the chosen candidate's name covers ~all heavy
-            # atoms.  Low-coverage candidates are PARTIAL fragment names
-            # (e.g. the benzene handler returning "3-methoxyphenol" for a
-            # complex polyketide); injecting stereo for atoms outside the
-            # named fragment would attach the wrong locants (near-parent
-            # E/Z leak from neighbouring chains).  Per D-09 / D-21, prefer
-            # a missing stereo block over a wrong one.
-            #
-            # Cycloalkane / cycloalkene wiring lands in commit 5 at the
-            # chain-fragment fallback (composer.py:1756).
+            # BL-01 FIX (Phase 152-02, 2026-05-03 -- see 152-VERIFICATION.md
+            # + 152-REVIEW.md): the previous gate read
+            # best.factors['atom_coverage'] but that factor is the
+            # ratio_score fallback (name-length proxy) per
+            # coverage_scoring.py:434-437 because pool.add() does NOT forward
+            # parent_atom_indices into compute_confidence (Risk 1 mitigation
+            # in candidate_pool.py:715-718). We now compute REAL atom
+            # coverage from the POST-HOC parent_atom_indices stored on the
+            # CandidateName (set by _ring_handler_parent_atom_indices at
+            # the pool.add() call sites above). Skip injection (D-09:
+            # missing > wrong) when real coverage is unavailable or below
+            # the 0.99 threshold. Cycloalkane / cycloalkene wiring lives at
+            # the chain-fragment fallback (~line 1808) with its own gate.
             candidate_name = best.name
             if best.handler in ('benzene', 'heterocycle'):
                 from .fragment_naming import is_top_level_naming
-                _coverage = best.factors.get('atom_coverage', 0.0)
-                if is_top_level_naming() and _coverage >= 0.99:
+                _parent_set = best.parent_atom_indices
+                _real_coverage = (
+                    len(_parent_set) / max(features.mol.GetNumHeavyAtoms(), 1)
+                    if _parent_set
+                    else 0.0
+                )
+                if is_top_level_naming() and _real_coverage >= 0.99:
                     from ..rules.stereochemistry import (
                         needs_stereo_injection, inject_stereo_from_locant_map,
                     )
@@ -1791,20 +1818,16 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     candidate_name = pool.best().name
 
     # Phase 152 D-04 / D-08: cycloalkane + cycloalkene handler-level stereo
-    # injection at the chain-fragment fallback return.  Gated on
-    # features.ring_type in {'cycloalkane', 'cycloalkene'} AND
-    # features.oriented_ring populated.  Per D-09, no atom-index fallback;
-    # if oriented_ring is missing, the backstop logs WARNING in namer.py
-    # and we return the name unchanged.  Per D-11 (top-level only) and the
-    # auto-deviation Rule 1 atom-coverage gate from Task 4, we also restrict
-    # to top-level naming and gate near-parent E/Z leakage by skipping when
-    # the molecule has heavy atoms outside the parent ring (the cycloalkane/
-    # cycloalkene parent IS the named ring; if the molecule has substituent
-    # chains beyond the ring with E/Z bonds, the chain-pipeline is already
-    # responsible for those via _generate_stereodescriptors).  The 33+
-    # existing call sites of _inject_stereo_if_missing are PRESERVED (per
-    # PATTERNS MODIFY 5); this wiring is the FIRST injection on the
-    # cycloalkane/cycloalkene tail return path.
+    # injection at the chain-fragment fallback return.  Per D-09, no atom-
+    # index fallback; if oriented_ring is missing, the backstop logs WARNING
+    # and we return the name unchanged.  Per D-11 (top-level only) we restrict
+    # to top-level naming.  BL-02 FIX (Phase 152-02, 2026-05-03 -- see
+    # 152-VERIFICATION.md + 152-REVIEW.md): pass include_near_parent_ez=False
+    # unless the molecule's heavy atoms ARE exactly the ring (the cycloalkane/
+    # cycloalkene parent IS the named ring), so exocyclic E/Z on substituent
+    # chains is NOT mis-attributed to ring locants. The chain pipeline already
+    # owns exocyclic E/Z via _generate_stereodescriptors. The 33+ existing
+    # call sites of _inject_stereo_if_missing are PRESERVED.
     _ring_type = getattr(features, 'ring_type', None)
     if _ring_type in ('cycloalkane', 'cycloalkene'):
         from .fragment_naming import is_top_level_naming
@@ -1820,8 +1843,20 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _ring_atom_to_locant_from_oriented(_oriented)
                     if _oriented else None
                 )
+                # BL-02 FIX (2026-05-03): only attribute exocyclic E/Z to
+                # ring locants when the molecule is ENTIRELY its ring (no
+                # atoms outside _oriented). For molecules with substituent
+                # chains, disable include_near_parent_ez so the chain
+                # pipeline owns exocyclic E/Z (per D-09: missing > wrong).
+                _ring_atom_set = set(_oriented) if _oriented else set()
+                _all_heavy = features.mol.GetNumHeavyAtoms()
+                _ring_is_whole_molecule = (
+                    bool(_ring_atom_set)
+                    and len(_ring_atom_set) == _all_heavy
+                )
                 candidate_name = inject_stereo_from_locant_map(
                     candidate_name, features.mol, atom_to_locant,
+                    include_near_parent_ez=_ring_is_whole_molecule,
                 )
     return candidate_name
 
@@ -2840,6 +2875,66 @@ def _name_simple_molecule(features: Any) -> str:
         # Add more as needed
 
     return "unknown"
+
+
+def _ring_handler_parent_atom_indices(features: Any, handler: str) -> Optional[Set[int]]:
+    """Compute the set of heavy-atom indices accounted for by the chosen
+    ring-handler name (BL-01 fix, 2026-05-03; see 152-VERIFICATION.md).
+
+    Returns None when the data is not yet populated (caller treats None as
+    "no real coverage measurement available" and skips injection per D-09:
+    "better a missing stereo block than a wrong one").
+
+    handler must be 'benzene' or 'heterocycle'. The atom set is::
+
+        ring_atoms ∪ {atom_idx for sub_list in substituents.values()
+                      for atom_idx in sub_list}
+
+    The substituents dict on features stores per-ring-position lists of
+    substituent info dicts (Dict[int, List[Dict]] for benzene/heterocycle;
+    the inner Dict carries 'atoms' / 'atom_indices' / 'substituent_atoms'
+    field naming inherited from get_benzene_substituents /
+    get_heterocycle_substituents). Defensively handles list-of-int,
+    list-of-dict-with-'atoms', and list-of-tuple shapes so that future
+    substituent-shape evolution (T-152-02-01) cannot silently break the gate.
+    """
+    if handler == 'benzene':
+        ring_atoms = getattr(features, 'benzene_ring', None)
+        substituents = getattr(features, 'benzene_substituents', None) or {}
+    elif handler == 'heterocycle':
+        ring_atoms = (
+            getattr(features, 'heterocycle_ring', None)
+            or getattr(features, 'principal_ring', None)
+        )
+        substituents = getattr(features, 'heterocycle_substituents', None) or {}
+    else:
+        return None
+    if not ring_atoms:
+        return None
+    accounted: Set[int] = set(int(i) for i in ring_atoms)
+    # substituents is a Dict[ring_pos, List[...]]. Each inner item is either a
+    # dict with 'atoms' / 'atom_indices', a list of int, or a single int.
+    if isinstance(substituents, dict):
+        sub_iter = substituents.values()
+    else:
+        sub_iter = [substituents]
+    for sub_entry in sub_iter:
+        if not sub_entry:
+            continue
+        for sub in sub_entry:
+            if isinstance(sub, dict):
+                atoms = (
+                    sub.get('atoms')
+                    or sub.get('atom_indices')
+                    or sub.get('substituent_atoms')
+                    or []
+                )
+                accounted.update(int(a) for a in atoms)
+            elif isinstance(sub, (list, tuple, set)):
+                accounted.update(int(a) for a in sub)
+            elif isinstance(sub, int):
+                accounted.add(sub)
+    return accounted
 
 
 def _assemble_benzene_name(features: Any, style: str) -> str:

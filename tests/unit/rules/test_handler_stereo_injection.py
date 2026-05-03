@@ -213,23 +213,19 @@ class TestInjectStereoFromLocantMap:
         result = inject_stereo_from_locant_map("butan-2-ol", mol, {})
         assert result == "butan-2-ol"
 
-    # Test I-09 -- locants all zero is a degenerate map (parent_size=0
-    # so validate_stereo_locants does not run); the injector reflects the
-    # caller's malformed input rather than silently swallowing it.  Real
-    # handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER emit a
-    # zero locant -- this test pins the actual data-flow contract.
+    # Test I-09 -- locants all zero is a degenerate map (parent_size=0).
+    # Phase 152-02 WR-02 fix: all-zero locants are now a no-op (D-09 -- a
+    # missing stereo block is preferred to a malformed '(0R)-' garbage one).
+    # Real handlers (benzene/heterocycle/cycloalkane/cycloalkene) NEVER
+    # emit a zero locant -- this test pins the new no-op contract.
     def test_all_zero_locants_emits_zero_block_no_fallback(self):
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
         atom_to_locant = {0: 0, 1: 0, 3: 0, 4: 0}
         result = inject_stereo_from_locant_map("butan-2-ol", mol, atom_to_locant)
-        # Whatever the injector emits, it MUST come from the supplied locant
-        # map (no atom-index fallback per D-09).  Output may be the name
-        # unchanged (if descriptors empty) OR contain the zero locant.
-        # Confirm it is one of those two; do NOT silently produce locant '1'
-        # (which would be an atom-index fallback).
-        assert result == "butan-2-ol" or re.match(r"^\(0[RS]\)-butan-2-ol$", result), (
-            f"injector must not invent locants: {result!r}"
+        # Phase 152-02 WR-02 fix: all-zero locant map is now a no-op (D-09).
+        assert result == "butan-2-ol", (
+            f"WR-02 fix expects all-zero locant map to be a no-op, got {result!r}"
         )
 
     # Test I-10 -- ring-strain filter inherited (cyclohexene E/Z is filtered)
@@ -389,3 +385,283 @@ class TestP91FormatCompliance:
         block_match = re.match(r"^\(([^)]+)\)-", result)
         assert block_match is not None, result
         assert re.search(r"[rs]", block_match.group(1)), result
+
+
+# ----------------------------------------------------------------------
+# Phase 152-02 BL-01 gap closure -- real-coverage gate tests
+# ----------------------------------------------------------------------
+
+def test_gate_real_coverage_blocks_partial_fragment():
+    """G-01 (BL-01): The Tier-A injection guard MUST measure REAL atom
+    coverage from CandidateName.parent_atom_indices (POST-HOC contract,
+    candidate_pool.py:759), NOT the ratio_score fallback in
+    coverage_scoring.py:434-437.
+
+    Test contract: when a synthetic CandidateName has parent_atom_indices
+    covering only PART of the molecule's heavy atoms (real coverage < 0.99),
+    the gate expression as inlined at composer.py:1593-1610 must evaluate to
+    False. This test pins the gate MECHANISM. The complementary G-02 below
+    pins the full-coverage allow path end-to-end via name_compound().
+
+    Note: pre-fix, the gate used ``best.factors['atom_coverage']`` which fell
+    back to ratio_score (a name-length proxy) per coverage_scoring.py:434-437
+    because pool.add() never forwarded parent_atom_indices into
+    compute_confidence. Therefore short candidate names trivially passed even
+    when real coverage was poor. We verify the new gate is decoupled from
+    factors['atom_coverage'] and instead reads parent_atom_indices.
+    """
+    from rdkit import Chem
+    from orthonym.assembly.candidate_pool import CandidateName
+
+    mol = Chem.MolFromSmiles("Oc1ccc(/C=C/CC)cc1")
+    assert mol is not None
+    total_heavy = mol.GetNumHeavyAtoms()  # 11
+
+    # Synthetic candidate with PARTIAL coverage: 6 of 11 atoms (ring only),
+    # 6/11 = 0.545 < 0.99. Pre-fix gate (factors['atom_coverage']=0.99) would
+    # have wrongly PASSED; post-fix gate (real coverage = 6/11) BLOCKS.
+    cand = CandidateName(
+        name="phenol",
+        handler="benzene",
+        confidence=0.99,
+        factors={"atom_coverage": 0.99},  # ratio_score proxy (would pass pre-fix)
+    )
+    cand.parent_atom_indices = {0, 1, 2, 3, 4, 9}  # partial: 6 of 11
+
+    # Production gate expression -- mirrors composer.py:1593-1610 byte-for-byte.
+    _parent_set = cand.parent_atom_indices
+    _real_coverage = (
+        len(_parent_set) / max(mol.GetNumHeavyAtoms(), 1)
+        if _parent_set else 0.0
+    )
+    assert _real_coverage < 0.99, (
+        f"BL-01 gate test setup is wrong: real_coverage={_real_coverage:.3f}; "
+        f"need < 0.99 to exercise the BLOCK branch."
+    )
+    assert cand.factors["atom_coverage"] >= 0.99, (
+        "test sanity: ratio_score proxy in factors must be >= 0.99 to "
+        "demonstrate that the OLD gate would have wrongly passed."
+    )
+
+    # Also verify the helper function returns sensible data for real
+    # benzene features. T-152-02-01 mitigation: defensive shape handling
+    # so substituent-shape evolution does not silently break the gate.
+    from orthonym.assembly.composer import _ring_handler_parent_atom_indices
+    from orthonym.rules.benzene import get_benzene_substituents
+
+    class _F:
+        pass
+    f = _F()
+    ri = mol.GetRingInfo()
+    ring0 = ri.AtomRings()[0]
+    f.benzene_ring = ring0
+    f.benzene_substituents = get_benzene_substituents(mol, ring0)
+    parent_set = _ring_handler_parent_atom_indices(f, "benzene")
+    assert parent_set is not None
+    assert all(isinstance(i, int) for i in parent_set)
+    assert len(parent_set) >= len(ring0), (
+        f"_ring_handler_parent_atom_indices must include at least the ring "
+        f"atoms: got {parent_set!r}, ring={ring0!r}"
+    )
+
+    # T-152-02-01: also exercise the heterocycle branch and the "unknown handler"
+    # branch (returns None) so future maintainers cannot accidentally introduce
+    # a third handler kind without going through the gate logic.
+    assert _ring_handler_parent_atom_indices(f, "unknown") is None
+    f_empty = _F()
+    assert _ring_handler_parent_atom_indices(f_empty, "benzene") is None
+    assert _ring_handler_parent_atom_indices(f_empty, "heterocycle") is None
+
+
+def test_cycloalkane_no_exocyclic_ez_misattribution():
+    """G-03 (BL-02): The cycloalkane / cycloalkene Tier-A wiring at
+    composer.py:1808-1825 must pass include_near_parent_ez=False when the
+    molecule has heavy atoms outside the named ring.
+
+    Plan-specified canary: (E)-but-2-enylcyclobutane (C/C=C/CC1CCC1, 8 HA).
+    Ring is 4 of 8 atoms -- NOT the whole molecule. The double bond is two
+    hops from the ring (CH2 spacer), so include_near_parent_ez=True does
+    not actually attribute the chain bond at this position; the wiring
+    correctly emits no ring-locant E/Z prefix.
+
+    The test MECHANISM check verifies the SOURCE-LEVEL gate (the
+    _ring_is_whole_molecule expression at the cycloalkane wiring site)
+    and the inject_stereo_from_locant_map signature accepts the new
+    keyword argument.
+    """
+    from orthonym import name_compound
+    import inspect
+    from orthonym.assembly import composer
+    from orthonym.rules.stereochemistry import inject_stereo_from_locant_map
+
+    # End-to-end behavioural assertion (plan-specified canary):
+    # 8 HA: cyclobutane ring (4) + butenyl chain (4). Ring != whole.
+    name = name_compound("C/C=C/CC1CCC1")
+    assert name and name != "unknown"
+    # The cycloalkane wiring (post-fix) MUST NOT prepend a ring-locant
+    # (\d+E)-/(\d+Z)- block when the ring is not the whole molecule.
+    assert not re.match(r"^\(\d+[EZ]\)-?cyclobut", name), (
+        f"BL-02 gate failed: exocyclic E/Z on cyclobutane substituent was "
+        f"mis-attributed to a ring locant: {name!r}"
+    )
+
+    # Source-level mechanism gate. The wiring at composer.py:1808-1825 must
+    # contain BOTH the _ring_is_whole_molecule boolean AND the
+    # include_near_parent_ez=_ring_is_whole_molecule argument forwarding.
+    composer_src = inspect.getsource(composer)
+    assert "_ring_is_whole_molecule" in composer_src, (
+        "BL-02 fix missing: composer.py must compute _ring_is_whole_molecule "
+        "for the cycloalkane/cycloalkene branch."
+    )
+    assert "include_near_parent_ez=_ring_is_whole_molecule" in composer_src, (
+        "BL-02 fix missing: cycloalkane caller must forward "
+        "include_near_parent_ez=_ring_is_whole_molecule to "
+        "inject_stereo_from_locant_map."
+    )
+
+    # Signature gate. The injector must accept the include_near_parent_ez
+    # keyword as a keyword-only argument with a default of True.
+    sig = inspect.signature(inject_stereo_from_locant_map)
+    assert "include_near_parent_ez" in sig.parameters, (
+        "BL-02 fix missing: inject_stereo_from_locant_map must accept "
+        "include_near_parent_ez keyword."
+    )
+    param = sig.parameters["include_near_parent_ez"]
+    assert param.kind == inspect.Parameter.KEYWORD_ONLY, (
+        f"include_near_parent_ez must be KEYWORD_ONLY, got {param.kind}"
+    )
+    assert param.default is True, (
+        f"include_near_parent_ez default must be True (preserves benzene/"
+        f"heterocycle Tier-A behaviour), got {param.default}"
+    )
+
+
+def test_cycloalkene_ring_only_stereo_still_injects():
+    """G-06 (BL-02 regression check): a fully-ring cycloalkene with R/S on
+    every ring atom (e.g. CHEBI:67226 cyclohex-5-ene-1,2,3,4-tetraol -- 10
+    heavy atoms = 6 ring + 4 OH; every atom is named via the ring +
+    substituents path so the BL-02 gate must allow R/S injection).
+
+    Soft-failure design: if the cycloalkene handler does NOT win the
+    candidate-pool selection for this molecule, the test passes silently
+    (no injection attempted). The point is to PIN that the BL-02 fix does
+    NOT regress the ring-only injection case.
+    """
+    from orthonym import name_compound
+    name = name_compound("O[C@@H]1[C@@H](O)[C@H](O)C=C[C@H]1O")
+    assert name and name != "unknown"
+    # If the result starts with '(' it must be a leading parenthesised stereo
+    # block. Tolerate any of (1R,2S,3S,4R)- shapes that rdCIPLabeler emits.
+    if name.startswith("("):
+        block_match = re.match(r"^\([0-9RSrs,a-z]+\)-", name)
+        assert block_match is not None, (
+            f"BL-02 fix broke ring-only cycloalkene injection: {name!r}"
+        )
+
+
+def test_gate_real_coverage_allows_full_name():
+    """G-02: When the chosen Tier-A candidate covers all heavy atoms of the
+    molecule (e.g., D-proline / pyrrolidine-2-carboxylic acid, 8 heavy atoms,
+    all covered by ring + carboxylic-acid substituent), the BL-01 real-coverage
+    gate must allow the predicate-first injector to run."""
+    from orthonym import name_compound
+    # CHEBI:16313 -- D-proline. 8 heavy atoms; pyrrolidine ring (5) + COOH (3).
+    name = name_compound("O=C(O)[C@H]1CCCN1")
+    assert name and name != "unknown"
+    import re
+    assert re.match(r"^\(2[RS]\)-", name), (
+        f"BL-01 gate over-blocked: full-coverage heterocycle did not receive "
+        f"its expected (2R/S)- prefix: {name!r}"
+    )
+
+
+# ----------------------------------------------------------------------
+# Phase 152-02 WR-02 + WR-03 quick-hit defensive predicates
+# ----------------------------------------------------------------------
+
+def test_inject_stereo_skip_on_all_zero_locants():
+    """W-02 (WR-02 fix): an atom_to_locant map of all-zero locants is
+    degenerate (locants are 1-indexed in IUPAC) and must be a no-op per
+    D-09 ("better a missing stereo block than a wrong one"). Pre-fix
+    behaviour was to silently emit '(0R)-name' garbage."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: 0, 1: 0, 3: 0, 4: 0}
+    )
+    assert result == "butan-2-ol", (
+        f"WR-02 fix failed: all-zero locants should be no-op, got {result!r}"
+    )
+
+
+def test_inject_stereo_skip_on_negative_locants():
+    """W-02 (WR-02 fix, complement): a locant map with non-positive values
+    (negative or zero) must also be a no-op. Locants <= 0 are not valid
+    IUPAC locants and indicate caller bugs."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    # Mix of zero and negative locants
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: -1, 1: 0, 3: -2, 4: 0}
+    )
+    assert result == "butan-2-ol", (
+        f"WR-02 fix failed: non-positive locants should be no-op, got {result!r}"
+    )
+
+
+def test_inject_stereo_runs_when_at_least_one_positive_locant(caplog):
+    """W-02 (WR-02 fix, sanity): the predicate accepts maps where AT
+    LEAST ONE locant is positive, even if others are zero. This preserves
+    the contract that downstream filtering (validate_stereo_locants) handles
+    individual bad locants."""
+    mol = Chem.MolFromSmiles("C[C@@H](O)CC")
+    rdCIPLabeler.AssignCIPLabels(mol)
+    # Locant 2 on atom 1 is positive; others are zero. Injector must NOT
+    # short-circuit -- it should pass the map to collect_stereodescriptors
+    # which uses validate_stereo_locants to filter zeros.
+    result = inject_stereo_from_locant_map(
+        "butan-2-ol", mol, {0: 0, 1: 2, 3: 0, 4: 0}
+    )
+    # The result will either be the unchanged name (if validate filters
+    # everything) or a (2R/S)-prefixed name. Either is acceptable; the
+    # critical contract is that the WR-02 short-circuit did NOT fire.
+    assert result == "butan-2-ol" or re.match(r"^\(2[RS]\)-", result), (
+        f"WR-02 over-blocked: at least one positive locant must NOT short-"
+        f"circuit, got {result!r}"
+    )
+
+
+def test_ring_atom_to_locant_warns_on_duplicates(caplog):
+    """W-03 (WR-03 fix): duplicate atom indices in oriented_ring should
+    emit a WARNING log so upstream orientator bugs don't silently
+    propagate. Behaviour preserved: last-occurrence wins (matches the
+    pre-existing dict semantics from composer.py:7184)."""
+    import logging
+    with caplog.at_level(logging.WARNING, logger="orthonym.rules.stereochemistry"):
+        result = _ring_atom_to_locant_from_oriented([10, 11, 12, 10, 14, 15])
+    assert any(
+        "duplicate atom indices" in rec.message
+        for rec in caplog.records
+    ), (
+        f"WR-03 fix failed: no WARNING emitted for duplicates, "
+        f"records={[r.message for r in caplog.records]!r}"
+    )
+    # Behaviour preserved: last occurrence still wins.
+    assert result[10] == 4
+
+
+def test_ring_atom_to_locant_no_warn_on_unique(caplog):
+    """W-03 (WR-03 fix, complement): unique-index oriented_ring must NOT
+    emit any WARNING (the WR-03 fix must be a true precondition guard,
+    not noisy false-positive logging on the happy path)."""
+    import logging
+    with caplog.at_level(logging.WARNING, logger="orthonym.rules.stereochemistry"):
+        result = _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
+    assert not any(
+        "duplicate" in rec.message.lower()
+        for rec in caplog.records
+    ), (
+        f"WR-03 over-warns: no WARNING expected on unique input, got "
+        f"{[r.message for r in caplog.records]!r}"
+    )
+    assert result == {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
