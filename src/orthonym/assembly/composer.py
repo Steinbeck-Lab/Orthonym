@@ -1571,7 +1571,28 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     best.handler, total_heavy, best.name[:60],
                 )
-            return best.name
+            # Phase 152 D-04: predicate-first handler-level stereo injection
+            # for heterocycle Tier-A candidates.  Per D-09, no atom-index
+            # fallback.  Per D-11, restrict to top-level naming so substituent
+            # decomposition fragments (e.g. thiazolyl substituent on a macro-
+            # cyclic lactone) do NOT inject near-parent E/Z that belongs to
+            # the parent's frame, not the fragment's frame.  Benzene wiring
+            # lands in commit 4 (commit 3 here ships heterocycle only); both
+            # share this Tier-A return point.
+            candidate_name = best.name
+            if best.handler == 'heterocycle':
+                from .fragment_naming import is_top_level_naming
+                if is_top_level_naming():
+                    from ..rules.stereochemistry import (
+                        needs_stereo_injection, inject_stereo_from_locant_map,
+                    )
+                    if needs_stereo_injection(features.mol, candidate_name):
+                        candidate_name = inject_stereo_from_locant_map(
+                            candidate_name,
+                            features.mol,
+                            getattr(features, 'heterocycle_atom_to_locant', None),
+                        )
+            return candidate_name
         # Low ratio: fall through but store metadata for debugging
         logger.debug(
             "Coverage gate: best candidate ratio too low, falling through "
