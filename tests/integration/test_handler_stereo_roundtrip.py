@@ -116,4 +116,21 @@ class TestHeterocycle:
         _assert_handler_roundtrip(case, "heterocycle")
 
 
-# Benzene + cycloalkane + cycloalkene classes are added in commits 4 and 5.
+# ----------------------------------------------------------------------
+# Benzene (commit 4)
+# ----------------------------------------------------------------------
+
+_BENZENE_CASES = _load_cases("benzene")
+
+
+@pytest.mark.parametrize(
+    "case",
+    _BENZENE_CASES,
+    ids=lambda c: f"{c.get('source_corpus','?')}/{c.get('source_id','?')}",
+)
+class TestBenzene:
+    def test_benzene_stereo_roundtrip(self, case):
+        _assert_handler_roundtrip(case, "benzene")
+
+
+# Cycloalkane + cycloalkene classes are added in commit 5.
