@@ -1,5 +1,5 @@
-CIP Validation Suite Results -- 2026-05-03 16:49:26 UTC
-RDKit rdCIPLabeler.AssignCIPLabels()
+CIP Validation Suite Results -- 2026-05-03 19:11:05 UTC
+RDKit rdCIPLabeler.AssignCIPLabels() (RDKit 2025.09.3)
 
   Total compounds:       300
   With expected labels:  290

@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pytest
 from rdkit import Chem
+from rdkit import __version__ as RDKIT_VERSION
 from rdkit.Chem import rdCIPLabeler
 
 # ---------------------------------------------------------------------------
@@ -198,7 +199,7 @@ def write_results_file(
 
     lines = [
         f"CIP Validation Suite Results -- {timestamp}",
-        f"RDKit rdCIPLabeler.AssignCIPLabels()",
+        f"RDKit rdCIPLabeler.AssignCIPLabels() (RDKit {RDKIT_VERSION})",
         "",
         f"  Total compounds:       {total}",
         f"  With expected labels:  {total - no_expected_count}",
