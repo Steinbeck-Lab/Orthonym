@@ -348,9 +348,16 @@ def inject_stereo_from_locant_map(
         return name
 
     # D-09: hard precondition — no atom-index fallback.
-    if not atom_to_locant:
+    # WR-02 fix (Phase 152-02, 2026-05-03): also reject all-zero / non-positive
+    # locant maps. A locant of 0 or negative is IUPAC-malformed (locants are
+    # 1-indexed); accepting it would emit '(0R)-name' or '(-1R)-name' garbage.
+    # Per D-09 ("missing > wrong"), skip injection.
+    if not atom_to_locant or not any(
+        isinstance(v, int) and v > 0 for v in atom_to_locant.values()
+    ):
         logger.debug(
-            "inject_stereo: skipped, no locant map (name=%r)", name[:50]
+            "inject_stereo: skipped, no locant map / all-zero locants (name=%r)",
+            name[:50],
         )
         return name
 
@@ -383,12 +390,21 @@ def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, in
     Returns:
         Dict mapping each atom idx to its 1-indexed locant. When duplicate
         atom indices appear, the LAST occurrence wins (matches dict semantics
-        of the original one-liner at composer.py:7184).
+        of the original one-liner at composer.py:7184). WR-03 fix
+        (Phase 152-02, 2026-05-03): also emits a WARNING log when duplicates
+        are present so a buggy upstream orientator does not silently produce
+        a wrong locant map.
 
     Example:
         >>> _ring_atom_to_locant_from_oriented([10, 11, 12, 13, 14, 15])
         {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
     """
+    if oriented_ring and len(set(oriented_ring)) != len(oriented_ring):
+        logger.warning(
+            "_ring_atom_to_locant_from_oriented: duplicate atom indices in "
+            "oriented_ring=%r -- last position wins (upstream orientator may have a bug)",
+            oriented_ring,
+        )
     return {idx: pos + 1 for pos, idx in enumerate(oriented_ring)}
 
 
