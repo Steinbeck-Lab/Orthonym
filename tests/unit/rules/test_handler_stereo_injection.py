@@ -871,3 +871,52 @@ class TestComplexRingTierAWiring:
             "D-06: new wiring must use _ring_is_whole_molecule_for_complex "
             "(per-molecule include_near_parent_ez)"
         )
+
+
+# ============================================================================
+# Phase 153 commit 4/5: ring strain filter regression guard (D-07 / D-08)
+# ============================================================================
+
+
+from orthonym.rules.stereochemistry import collect_stereodescriptors
+
+
+@pytest.mark.unit
+class TestRingStrainFilter:
+    """Phase 153 D-07: parametrized verification of the existing E/Z
+    ring-strain filter at rules/stereochemistry.py:85-95. The filter
+    REJECTS ring sizes < 8 and ACCEPTS ring sizes >= 8 (P-31.1.3 Sep 2024
+    errata makes E/Z mandatory for >= 8). Phase 153 ships TESTS, not new
+    filter code (D-07 -- the existing filter is correct).
+    """
+
+    @pytest.mark.parametrize("smiles,ring_size,expect_ez", [
+        # ring_size 6 -- rejected (filter says < 8 -> skip)
+        ("C1CC=CCC1", 6, False),                  # cyclohex-1-ene
+        # ring_size 7 -- rejected
+        ("C1CCC=CCC1", 7, False),                 # cyclohept-1-ene
+        # ring_size 8 -- ACCEPTED (errata threshold)
+        ("C1CC/C=C/CCC1", 8, True),               # (E)-cyclooct-1-ene
+        # ring_size 9 -- accepted
+        ("C1CCC/C=C\\CCC1", 9, True),             # cyclonon-1-ene with explicit Z
+        # ring_size 12 -- accepted (errata canonical example)
+        ("C1CCC/C=C\\CC/C=C\\CC1", 12, True),     # cyclododeca-1,5-diene
+    ])
+    def test_strain_filter_per_ring_size(self, smiles, ring_size, expect_ez):
+        mol = Chem.MolFromSmiles(smiles)
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # Verify the test fixture has the ring size we claim (sanity check
+        # so a stray SMILES typo cannot quietly bypass the gate).
+        ring_sizes = [len(r) for r in mol.GetRingInfo().AtomRings()]
+        assert ring_size in ring_sizes, (
+            f"fixture mis-sized: claimed {ring_size}, actual {ring_sizes}"
+        )
+        # Build atom_to_locant from the chosen ring's atom order.
+        ring = next(r for r in mol.GetRingInfo().AtomRings() if len(r) == ring_size)
+        atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(ring)}
+        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        has_ez = any(d[1] in ('E', 'Z') for d in descriptors)
+        assert has_ez == expect_ez, (
+            f"ring_size={ring_size} expect_ez={expect_ez} got descriptors="
+            f"{descriptors} (filter at rules/stereochemistry.py:85-95)"
+        )

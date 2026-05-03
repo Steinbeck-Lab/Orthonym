@@ -197,3 +197,34 @@ _COMPLEX_RING_CASES = _load_cases("complex_ring")
 class TestComplexRing:
     def test_complex_ring_stereo_roundtrip(self, case):
         _assert_handler_roundtrip(case, "complex_ring")
+
+
+# ----------------------------------------------------------------------
+# Phase 153: Cycloalkene >= 8 mandatory E/Z (commit 4 -- P-31.1.3 errata)
+# ----------------------------------------------------------------------
+
+_CYCLOALKENE_8PLUS_CASES = _load_cases("cycloalkene_8plus")
+
+
+@pytest.mark.parametrize(
+    "case",
+    _CYCLOALKENE_8PLUS_CASES,
+    ids=lambda c: f"{c.get('source_corpus','?')}/{c.get('source_id','?')}-r{c.get('ring_size','?')}",
+)
+class TestCycloalkene8PlusMandatory:
+    def test_cycloalkene_8plus_emits_ez_block(self, case):
+        # First the standard 2-stage gates (name + P-91 prefix + OPSIN
+        # round-trip per BL-04 split-stage assertion).
+        _assert_handler_roundtrip(case, "cycloalkene_8plus")
+        # Phase 153 D-07 / D-15: in addition, the prefix MUST contain
+        # an [EZ] descriptor, located anywhere in the leading P-91 block
+        # (the regex tolerates names like '(4S,7Z,...)' where R/S
+        # descriptors precede the E/Z one).
+        import re as _re
+        smiles = case["smiles"]
+        name = name_compound(smiles)
+        assert _re.search(r"^\([^)]*[0-9][EZ]", name), (
+            f"P-31.1.3 mandatory E/Z block missing for ring_size="
+            f"{case.get('ring_size')} name={name!r} (handler=cycloalkene_8plus, "
+            f"source={case.get('source_corpus')}/{case.get('source_id')})"
+        )
