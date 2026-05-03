@@ -69,6 +69,83 @@ class TestReplacementTerms:
 
 
 # ============================================================================
+# Phase 154.A D-03: PIN-trigger function (P-15.4.1.2)
+# ============================================================================
+
+@pytest.mark.unit
+class TestPinTrigger:
+    """D-03: strict IUPAC P-15.4.1.2 PIN trigger function tests.
+
+    Tests `_qualifies_for_pin_skeletal_replacement(backbone, mol)` which
+    replaces the legacy single-hetero chain-len < 6 inline reject with
+    explicit branch labels per IUPAC Blue Book P-15.4.1.2.
+
+    Source: 154-CONTEXT.md D-03; 154-RESEARCH.md §3.2; 154-AUDIT-A.md §7.
+    Source: IUPAC Blue Book 2013 P-15.4.1.2.
+    """
+
+    @pytest.mark.parametrize("smiles,backbone_indices,expected_qualifies,expected_branch", [
+        # Branch (a): >= 4 same-kind heteroatoms
+        # COCOCOCOC: positions 0=C, 1=O, 2=C, 3=O, 4=C, 5=O, 6=C, 7=O, 8=C
+        # Embedded (skip 0 and 8): O O O O at positions 1,3,5,7 -- 4 same-kind
+        ("COCOCOCOC", [0, 1, 2, 3, 4, 5, 6, 7, 8], True, ">=4-same-kind"),
+        # Branch (b): >= 3 mixed-kind heteroatoms
+        # CSCNCOC: 0=C, 1=S, 2=C, 3=N, 4=C, 5=O, 6=C  (S+N+O = 3 distinct)
+        ("CSCNCOC", [0, 1, 2, 3, 4, 5, 6], True, ">=3-mixed-kind"),
+        # Single hetero long chain (legacy gate-5 accept):
+        # CCCOCCCC: 0..7, embedded O at index 3, len=8 >= 6
+        ("CCCOCCCC", [0, 1, 2, 3, 4, 5, 6, 7], True, "single-hetero-long-chain"),
+        # Single hetero short chain (legacy gate-5 reject):
+        # COC: 0=C, 1=O, 2=C, embedded O at index 1, len=3 < 6
+        ("COC", [0, 1, 2], False, "single-hetero-short-chain"),
+        # No heteroatoms in embedded positions:
+        # CCCCC: 0=C, 1=C, 2=C, 3=C, 4=C
+        ("CCCCC", [0, 1, 2, 3, 4], False, "no-heteroatoms"),
+    ])
+    def test_branch_assignment(self, smiles, backbone_indices, expected_qualifies, expected_branch):
+        from orthonym.rules.skeletal_replacement import _qualifies_for_pin_skeletal_replacement
+        mol = Chem.MolFromSmiles(smiles)
+        qualifies, branch = _qualifies_for_pin_skeletal_replacement(backbone_indices, mol)
+        assert qualifies == expected_qualifies, (
+            f"smiles={smiles}, expected_qualifies={expected_qualifies}, got={qualifies}, branch={branch}"
+        )
+        assert branch == expected_branch, (
+            f"smiles={smiles}, expected_branch={expected_branch}, got={branch}"
+        )
+
+
+@pytest.mark.unit
+class TestPinTriggerEndToEnd:
+    """D-03 end-to-end: confirm helper is wired into try_skeletal_replacement_name.
+
+    Verifies the helper is called from the gate-5 position in
+    `try_skeletal_replacement_name` (replacing the inline reject) and that
+    the existing happy-path semantics are preserved.
+    """
+
+    @pytest.mark.parametrize("smiles,expected_name", [
+        # branch (a) >= 4 same-kind oxygens
+        ("COCOCOCOC", "2,4,6,8-tetraoxanonane"),
+        # two-hetero accept path with terminal-OH suffix
+        ("OCCOCCOCC", "3,6-dioxaoctan-1-ol"),
+    ])
+    def test_accepts(self, smiles, expected_name):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) == expected_name
+
+    @pytest.mark.parametrize("smiles", [
+        "COC",     # single-hetero-short-chain reject
+        "CCC",     # no-heteroatoms reject
+        "CCCCC",   # no-heteroatoms reject (longer)
+    ])
+    def test_rejects(self, smiles):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) is None
+
+
+# ============================================================================
 # Unsaturated large heterocyclic ring replacement naming
 # ============================================================================
 

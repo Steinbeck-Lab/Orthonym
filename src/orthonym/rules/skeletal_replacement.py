@@ -48,6 +48,92 @@ REPLACEMENT_TERMS: Dict[str, str] = {
     'B': 'bora',
 }
 
+
+def _qualifies_for_pin_skeletal_replacement(
+    backbone: List[int], mol,
+) -> Tuple[bool, str]:
+    """Phase 154.A D-03: lock PIN trigger to strict IUPAC P-15.4.1.2.
+
+    Three accept branches per IUPAC Blue Book P-15.4.1.2:
+      (a) >= 4 same-kind embedded heteroatoms in the chain backbone
+      (b) >= 3 mixed-kind embedded heteroatoms (>= 2 distinct elements)
+      (c) substitutive expression would require >= 5 prefix units
+          ("undue complexity"; conservative threshold for v18 -- equivalent
+          to >= 5 embedded heteroatoms total regardless of kind diversity)
+
+    Falls through to the legacy gate-5 semantics: a single embedded heteroatom
+    in a backbone of length < 6 is REJECTED (substitutive form preferred:
+    methoxymethane / ethoxyethane / etc.). A single embedded heteroatom in a
+    backbone of length >= 6 is ACCEPTED (substitutive form becomes awkward).
+
+    Two-heteroatom cases that do not trip branches (a/b/c) are ACCEPTED
+    (preserves the legacy "diether and similar" behavior for compounds like
+    3,6-dioxaoctan-1-ol).
+
+    Args:
+        backbone: ordered list of atom indices forming the principal chain
+                  (output of _find_replacement_chain).
+        mol: RDKit Mol object.
+
+    Returns:
+        (True, branch_label) where branch_label in
+            {">=4-same-kind", ">=3-mixed-kind", "undue-complexity",
+             "single-hetero-long-chain", "two-hetero-substitutive-equivalent"}
+        (False, reason) where reason in
+            {"no-heteroatoms", "single-hetero-short-chain"}.
+
+    Source: IUPAC Blue Book 2013 P-15.4.1.2.
+    Source: 154-CONTEXT.md D-03; 154-AUDIT-A.md gap inventory; 154-RESEARCH.md §3.2.
+    """
+    from collections import Counter
+    embedded = []
+    for i, atom_idx in enumerate(backbone):
+        if i == 0 or i == len(backbone) - 1:
+            continue  # skip terminal positions
+        symbol = mol.GetAtomWithIdx(atom_idx).GetSymbol()
+        if symbol in REPLACEMENT_TERMS:
+            embedded.append(symbol)
+
+    if not embedded:
+        return (False, "no-heteroatoms")
+
+    counts = Counter(embedded)
+    same_kind_max = max(counts.values())
+    distinct_kinds = len(counts)
+    total = sum(counts.values())
+
+    # Branch (a): >= 4 same-kind heteroatoms
+    if same_kind_max >= 4:
+        return (True, ">=4-same-kind")
+
+    # Branch (b): >= 3 mixed-kind heteroatoms
+    if distinct_kinds >= 2 and total >= 3:
+        return (True, ">=3-mixed-kind")
+
+    # Branch (c): "undue complexity" -- conservative >= 5 total threshold
+    if total >= 5:
+        return (True, "undue-complexity")
+
+    # Fall-through: single heteroatom -- preserve legacy gate-5 semantics.
+    if total == 1 and len(backbone) < 6:
+        return (False, "single-hetero-short-chain")
+
+    # Single heteroatom in a long chain (>= 6): accept (legacy gate-5 behavior).
+    if total == 1:
+        return (True, "single-hetero-long-chain")
+
+    # Two heteroatoms not covered by branches (a/b/c): accept (preserves
+    # current behavior for diethers, etc. -- e.g., 3,6-dioxaoctan-1-ol).
+    return (True, "two-hetero-substitutive-equivalent")
+
+
+# Phase 154.A D-05: terminal -amine / -thiol support DEFERRED to v19.
+# 154-AUDIT-A.md §4 corpus tally: amine eligible=2, thiol eligible=0
+# (threshold 5); both below threshold => v19 follow-up
+# IM-154-D05-amine / IM-154-D05-thiol.
+# Source: 154-CONTEXT.md D-05; 154-AUDIT-A.md §4.
+
+
 # IUPAC P-15.4.3.1: Order of citation for replacement terms
 # When different heteroatom groups have the same lowest locant,
 # alphabetical order of the replacement term breaks the tie.
@@ -202,12 +288,20 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     if len(embedded_heteroatoms) == 0:
         return None
 
-    # For single heteroatom: only apply if chain is long enough (>= 6)
-    # Short/moderate chains (COC=3, COCC=4, CCOCC=5) use substitutive naming
-    # (methoxymethane, ethoxyethane, etc.). Replacement names preferred for
-    # longer chains where substitutive names become awkward.
-    if len(embedded_heteroatoms) == 1 and len(backbone) < 6:
+    # ----------------------------------------------------------------
+    # Gate 5 (Phase 154.A D-03): strict IUPAC P-15.4.1.2 PIN trigger.
+    # Replaces the legacy single-hetero chain-len < 6 reject with explicit
+    # branch labels. Rationale string is for debug logging + 154-AUDIT-A.md
+    # evidence trail.
+    # ----------------------------------------------------------------
+    qualifies, _rationale = _qualifies_for_pin_skeletal_replacement(backbone, mol)
+    if not qualifies:
         return None
+    # NOTE: _rationale (">=4-same-kind", ">=3-mixed-kind", "undue-complexity",
+    # "single-hetero-long-chain", "two-hetero-substitutive-equivalent") is
+    # currently unused but available for debug logging via:
+    # logger.debug("skeletal_replacement: trigger_branch=%s smiles=%s",
+    #              _rationale, Chem.MolToSmiles(mol))
 
     # ----------------------------------------------------------------
     # Number the chain: for -ol suffix, the OH end gets locant 1.
