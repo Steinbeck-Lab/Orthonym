@@ -1,48 +1,47 @@
 {
   "handler": "benzene",
   "phase": "152",
+  "plan": "152-03",
   "decision_refs": ["D-06", "D-09", "D-16", "D-23"],
-  "comment": "Benzene-handler stereo fixtures.  Aromatic benzene rings cannot themselves have ring-atom stereo (sp2 carbons are not stereocenters), so the benzene wiring's primary value is to (a) populate features.benzene_atom_to_locant via _ring_atom_to_locant_from_oriented (D-06 / D-08) and (b) ensure no false-positive injection when stereo lives on substituent atoms (D-09).  These fixtures cover the latter: each compound has a stereocenter on a SUBSTITUENT, and the benzene-handler output must not mis-attribute it to a ring locant.  Per D-23 every entry cites a real corpus + ID; per D-16 the round-trip oracle is OPSIN 2.9.0.  Round-trip xfail-marked when the pre-existing benzene handler output is malformed IUPAC (the handler-output bug is owned by Phase 153 / future work, NOT Phase 152 — Phase 152 only wires the predicate-first injector at the Tier-A return).",
+  "comment": "Benzene-handler stereo fixtures (BL-03 gap closure, 2026-05-03). All entries are sourced from real benchmark CSV rows per D-23. Aromatic benzene rings cannot themselves carry ring-atom stereo (sp2 carbons are not stereocenters), so the benzene wiring's primary value is to (a) populate features.benzene_atom_to_locant via _ring_atom_to_locant_from_oriented (D-06 / D-08) and (b) ensure no false-positive injection when stereo lives on substituent atoms (D-09). The OPSIN round-trip (D-16) is xfail-marked per-fixture only when a known handler-output-format bug or OPSIN-side parsing limitation is in play; the P-91 format-compliance check (Task 1 refactor) ALWAYS runs.",
   "compounds": [
-    {
-      "smiles": "C[C@@H](Cl)c1ccccc1",
-      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
-      "source_corpus": "",
-      "source_id": "stereo-substituent-on-benzene-Cl",
-      "comment": "1-chloro-1-phenylethane analog. Pre-existing benzene handler emits ((R)-chloroethyl)benzene with embedded (R) inside substituent — Pattern B suppression keeps Phase 152 injector a no-op (correct per D-09; ring atoms have no stereo).",
-      "xfail_reason": "pre-existing benzene-handler output format ((R)-chloroethyl)benzene lacks substituent locant; OPSIN cannot parse. Phase 152 wiring correctly does not inject ring-level stereo. Handler-output fix belongs to a separate phase."
-    },
-    {
-      "smiles": "C[C@H](Cl)c1ccccc1",
-      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
-      "source_corpus": "",
-      "source_id": "stereo-substituent-on-benzene-Cl-S",
-      "comment": "Same as above with opposite stereochemistry.",
-      "xfail_reason": "pre-existing benzene-handler output format issue (see CHEBI:48422-like above)."
-    },
-    {
-      "smiles": "C[C@@H](OC)c1ccccc1",
-      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
-      "source_corpus": "",
-      "source_id": "stereo-substituent-on-benzene-OMe",
-      "comment": "1-methoxy-1-phenylethane analog.",
-      "xfail_reason": "pre-existing benzene-handler output format issue."
-    },
     {
       "smiles": "CCCCC[C@H](O)c1ccc(CO)cc1",
       "expected_stereo_prefix_pattern": "^.*hydroxy.*",
       "source_corpus": "",
       "source_id": "CHEBI:211889",
-      "comment": "1-(hydroxyhexyl)-4-(hydroxymethyl)benzene.  Phase 152 benzene Tier-A injector correctly does not add a ring-level stereo prefix because the stereocenter is on a substituent atom (D-09 — no atom-index fallback).  Backstop continues to log WARNING for substituent-atom-stereo gap.",
-      "xfail_reason": "stereocenter is on substituent (hexyl) chain, not on ring; Phase 152 wiring correctly defers per D-09. Substituent-level stereo injection belongs to a substituent handler."
+      "comment": "1-[4-(hydroxymethyl)phenyl]hexan-1-ol — benzene with chiral substituent. Phase 152 benzene Tier-A injector correctly does not add a ring-level stereo prefix (D-09 — stereocenter is on substituent, not ring).",
+      "xfail_reason": "stereocenter is on substituent (hexyl) chain, not on ring; Phase 152 wiring correctly defers per D-09."
     },
     {
-      "smiles": "C[C@@H](Br)c1ccccc1",
-      "expected_stereo_prefix_pattern": "^.*\\([RS]\\)-",
+      "smiles": "CCCC[C@H](O)c1cccc(O)c1",
+      "expected_stereo_prefix_pattern": "^.*hydroxy.*|^.*phenol",
       "source_corpus": "",
-      "source_id": "stereo-substituent-on-benzene-Br",
-      "comment": "1-bromo-1-phenylethane analog.",
-      "xfail_reason": "pre-existing benzene-handler output format issue (same root cause as Cl/OMe variants)."
+      "source_id": "CHEBI:204880",
+      "comment": "3-(1-hydroxypentyl)phenol — meta-phenol with chiral pentyl-OH substituent. Same D-09 deferral as CHEBI:211889; second corpus point.",
+      "xfail_reason": "stereocenter is on substituent (pentyl) chain; Phase 152 correctly defers per D-09."
+    },
+    {
+      "smiles": "O=C(O)[C@H](O)c1ccc(O)cc1",
+      "expected_stereo_prefix_pattern": "^.*hydroxy.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:32803",
+      "comment": "(2R)-hydroxy(4-hydroxyphenyl)acetic acid — para-hydroxyphenyl with chiral COOH-CH(OH) substituent. Acid-bearing benzene with stereocenter on alpha-carbon of principal chain.",
+      "xfail_reason": "stereocenter is on the principal-chain alpha carbon (substituent of benzene); Phase 152 benzene wiring defers per D-09."
+    },
+    {
+      "smiles": "NC(=O)/C=C\\c1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*phenyl.*|^\\([0-9EZ,]+\\)-.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:76321",
+      "comment": "(2Z)-3-phenylprop-2-enamide — benzene with E/Z near-parent double bond (cinnamic-acid-amide style). Real corpus row from opsin_selftest_500.csv (canonical OPSIN-parseable name). NOT xfail-marked — this fixture exercises the benzene Tier-A injection path through to OPSIN round-trip per BL-04 gap closure."
+    },
+    {
+      "smiles": "O=C(/C=C/C=C/c1ccccc1)CCc1ccccc1",
+      "expected_stereo_prefix_pattern": "^.*phenyl.*|^\\([0-9EZ,]+\\)-.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:174465",
+      "comment": "(4E,6E)-1,7-diphenylhepta-4,6-dien-3-one — chain ketone with two phenyl substituents and two E double bonds. Real opsin_selftest_500.csv row. NOT xfail-marked — second non-xfail benzene fixture per BL-04 gap closure (need >=2 cases that reach the OPSIN round-trip step)."
     }
   ]
 }
