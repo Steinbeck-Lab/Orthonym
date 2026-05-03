@@ -67,25 +67,40 @@ def _load_cases(handler: str):
 
 
 def _assert_handler_roundtrip(case: dict, handler: str):
-    if case.get("xfail_reason"):
-        pytest.xfail(case["xfail_reason"])
+    """Assert handler stereo correctness in two stages.
+
+    BL-04 FIX (2026-05-03 — see 152-VERIFICATION.md + 152-REVIEW.md):
+    Previously this function called pytest.xfail() before ANY assertion,
+    making xfail-marked fixtures execute zero asserts. Now the assertion
+    pipeline is split:
+      (1) ALWAYS-RUN GATES: name_compound() returns non-empty AND
+          P-91 prefix matches `expected_stereo_prefix_pattern`. These run
+          for every fixture, regardless of xfail_reason. They detect
+          regressions in the Phase 152 wiring contract independently of
+          OPSIN's parsing capability.
+      (2) CONDITIONAL OPSIN ROUND-TRIP: name -> OPSIN -> canonical SMILES
+          -> compare. Only THIS step is xfail-able when the fixture's
+          `xfail_reason` indicates a known OPSIN-side or
+          handler-output-format issue tracked outside Phase 152.
+    """
+    import re as _re
     smiles = case["smiles"]
     name = name_compound(smiles)
+
+    # ---- ALWAYS-RUN GATES (BL-04 fix) ----
     assert name and name != "unknown", (
         f"name_compound returned empty/unknown for {smiles} "
         f"(handler={handler}, source={case.get('source_corpus')}/{case.get('source_id')})"
     )
-
-    # 1. Format compliance (P-91): expected_stereo_prefix_pattern is a regex.
-    import re as _re
     pat = case["expected_stereo_prefix_pattern"]
     assert _re.match(pat, name), (
         f"P-91 prefix mismatch: pattern={pat!r} name={name!r} "
         f"(handler={handler}, source={case.get('source_corpus')}/{case.get('source_id')})"
     )
 
-    # 2. OPSIN round-trip (D-16): name -> SMILES -> canonicalize, compare with
-    #    original canonical SMILES (preserving stereo).
+    # ---- CONDITIONAL OPSIN ROUND-TRIP (still xfail-able) ----
+    if case.get("xfail_reason"):
+        pytest.xfail(case["xfail_reason"])
     opsin_smiles = opsin_parse(name)
     assert opsin_smiles, (
         f"OPSIN could not parse name {name!r} (handler={handler}, "
