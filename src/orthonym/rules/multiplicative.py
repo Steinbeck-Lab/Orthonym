@@ -723,6 +723,49 @@ def _build_primed_locant_str(locant: int, unit_count: int) -> str:
     return ",".join(parts)
 
 
+def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
+    r"""Phase 154.B D-08: select between SIMPLE_MULTIPLIERS (P-14.2.1) and COMPLEX_MULTIPLIERS (P-14.2.2).
+
+    Per IUPAC Blue Book:
+      - P-14.2.1 (simple): di / tri / tetra default for clean parent names.
+      - P-14.2.2 (group):  bis / tris / tetrakis fire when the parent name
+        contains a comma-separated locant pattern that would make di+name
+        parse ambiguously (e.g., "1,3-thiazole" -> "bis(1,3-thiazole)"
+        instead of the unparseable "di-1,3-thiazole").
+      - P-14.2.3 (ring-assembly): bi / ter / quater for identical rings
+        joined by single bonds -- Phase 151's territory
+        (rules.ring_assemblies.ASSEMBLY_MULTIPLIERS); NOT touched here.
+
+    Heuristic (R-154-NEW-7 refinement): trigger COMPLEX_MULTIPLIERS only
+    when parent_name contains a comma-separated locant pattern (\d+,\d).
+    Bare digits without commas (e.g., "but-2-ene") use SIMPLE_MULTIPLIERS;
+    those don't create di+name parse ambiguity.
+
+    Args:
+        parent_name: name of the parent fragment.
+        unit_count: number of identical parent units (2, 3, 4, ...).
+
+    Returns:
+        The multiplier prefix string (e.g., "di", "bis"), or None if
+        unit_count is unsupported by both tables.
+
+    Source: 154-CONTEXT.md D-08; 154-AUDIT-B.md §4;
+            IUPAC Blue Book P-14.2.1, P-14.2.2;
+            OPSIN multipliers.xml type="basic" / type="group".
+    """
+    import re
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
+
+    # P-14.2.2 trigger: parent name contains a comma-separated locant
+    # pattern.  Match at least one ",N" where N is a digit (e.g. "1,3-",
+    # "2,4,6-").  Bare digits without commas do NOT trigger.
+    if re.search(r"\d+,\d", parent_name):
+        return COMPLEX_MULTIPLIERS.get(unit_count)
+
+    # P-14.2.1 default for clean parent names.
+    return SIMPLE_MULTIPLIERS.get(unit_count)
+
+
 def _assemble_multiplicative_name(
     locant: int, bridge_name: str, parent_name: str, unit_count: int = 2
 ) -> Optional[str]:
@@ -730,9 +773,10 @@ def _assemble_multiplicative_name(
 
     Format: [locants]-[bridge][multiplier][parent]
     Examples:
-        4,4'-methylenedianiline (2 units)
-        4,4',4''-nitrilotriphenol (3 units)
-        4,4',4'',4'''-methanetetrayltetraphenol (4 units)
+        4,4'-methylenedianiline (2 units; P-14.2.1)
+        4,4',4''-nitrilotriphenol (3 units; P-14.2.1)
+        4,4',4'',4'''-methanetetrayltetraphenol (4 units; P-14.2.1)
+        4,4'-bis(1,3-thiazole)... (P-14.2.2 group multiplier)
 
     For acid names with spaces (like "benzoic acid"), the multiplier prefix
     goes before the base name: 4,4'-oxydibenzoic acid
@@ -751,7 +795,8 @@ def _assemble_multiplicative_name(
 
     Returns:
         Complete multiplicative name, or None if the parent name has a
-        saturation prefix that would produce unparseable multiplier+prefix output.
+        saturation prefix that would produce unparseable multiplier+prefix
+        output OR the multiplier table has no entry for unit_count.
     """
     # Check for saturation/modification prefixes in the parent name
     # that would produce unparseable "di+prefix" concatenation
@@ -759,8 +804,9 @@ def _assemble_multiplicative_name(
     if any(parent_lower.startswith(p) for p in SATURATION_PREFIXES):
         return None
 
-    # Get multiplier from SIMPLE_MULTIPLIERS (di, tri, tetra, etc.)
-    multiplier = SIMPLE_MULTIPLIERS.get(unit_count, "")
+    # Phase 154.B D-08: P-14.2.1 / P-14.2.2 three-way split (P-14.2.3
+    # belongs to ring_assemblies.py and is NOT touched here).
+    multiplier = _select_multiplier(parent_name, unit_count)
     if not multiplier:
         return None
 
