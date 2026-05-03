@@ -1,0 +1,452 @@
+[
+  {
+    "fixture_id": "mult_bb_BB_1",
+    "smiles": "Nc1ccc(Cc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-methylenedianiline",
+    "compound_class": "single-atom-bridge",
+    "subclass": "methylene",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Blue Book P-51.3 ex.1 (canary)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 ex.1",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_2",
+    "smiles": "OC(=O)c1ccc(Oc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-oxydibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "oxy",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Blue Book P-14.5.2 ex.1",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5.2 ex.1",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_3",
+    "smiles": "OC(=O)c1ccc(Sc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-thiodibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "thio",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Blue Book P-51.3 (thio variant)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 thio",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_4",
+    "smiles": "OC(=O)c1ccc(Nc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-iminodibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "imino",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Blue Book P-51.3 (imino variant)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 imino",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_5",
+    "smiles": "Nc1ccc(CCc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-ethylenedianiline",
+    "compound_class": "two-atom-bridge",
+    "subclass": "ethylene",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Blue Book P-51.3 (ethylene variant)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 ethylene",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_6",
+    "smiles": "Oc1ccc(N(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "4,4',4''-nitrilotriphenol",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "nitrilo",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "Blue Book P-14.5 (3-unit nitrilo)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 nitrilotriphenol",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_7",
+    "smiles": "Oc1ccc(C(c2ccc(O)cc2)(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "4,4',4'',4'''-methanetetrayltetraphenol",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "methanetetrayl",
+    "unit_count": 4,
+    "is_symmetric": true,
+    "note": "Blue Book P-14.5 (4-unit methanetetrayl)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 methanetetrayltetraphenol",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_8",
+    "smiles": "OC(=O)c1ccc(OOc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-peroxydibenzoic acid",
+    "compound_class": "two-atom-bridge",
+    "subclass": "peroxy",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "D-09 candidate; bridge currently MISSING",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-29 peroxy / OPSIN multiRadicalSubstituents.xml line 53",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_9",
+    "smiles": "OC(=O)c1ccc(SSc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-disulfanediyldibenzoic acid",
+    "compound_class": "two-atom-bridge",
+    "subclass": "disulfanediyl",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "D-09 candidate; bridge currently MISSING",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-29 disulfanediyl",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_10",
+    "smiles": "Nc1ccc(Oc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-oxydianiline",
+    "compound_class": "single-atom-bridge",
+    "subclass": "oxy",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-14.5.2 oxydianiline (canary; common)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5.2 oxydianiline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_11",
+    "smiles": "Nc1ccc(Sc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-thiodianiline",
+    "compound_class": "single-atom-bridge",
+    "subclass": "thio",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-51.3 thiodianiline",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 thiodianiline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_12",
+    "smiles": "OC(=O)c1ccc(Cc2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-methylenedibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "methylene",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-51.3 methylene+benzoic acid",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 methylenedibenzoic",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_13",
+    "smiles": "Nc1ccc(C(c2ccc(N)cc2)c2ccc(N)cc2)cc1",
+    "expected_name": "4,4',4''-methylidynetrianiline",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "methylidyne",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "P-14.5 methylidyne+aniline",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 methylidynetrianiline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_14",
+    "smiles": "Nc1ccc(C(c2ccc(N)cc2)(c2ccc(N)cc2)c2ccc(N)cc2)cc1",
+    "expected_name": "4,4',4'',4'''-methanetetrayltetraaniline",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "methanetetrayl",
+    "unit_count": 4,
+    "is_symmetric": true,
+    "note": "P-14.5 methanetetrayl+aniline (4 units)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 methanetetrayltetraaniline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_15",
+    "smiles": "Oc1ccc(Sc2ccc(O)cc2)cc1",
+    "expected_name": "4,4'-thiodiphenol",
+    "compound_class": "single-atom-bridge",
+    "subclass": "thio",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-51.3 thiodiphenol",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 thiodiphenol",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_16",
+    "smiles": "Oc1ccc(Oc2ccc(O)cc2)cc1",
+    "expected_name": "4,4'-oxydiphenol",
+    "compound_class": "single-atom-bridge",
+    "subclass": "oxy",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-14.5 oxydiphenol",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 oxydiphenol",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_17",
+    "smiles": "Oc1ccc(Cc2ccc(O)cc2)cc1",
+    "expected_name": "4,4'-methylenediphenol",
+    "compound_class": "single-atom-bridge",
+    "subclass": "methylene",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-51.3 methylenediphenol",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 methylenediphenol",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_18",
+    "smiles": "Nc1ccc(Cc2ccc(Cc3ccc(N)cc3)cc2)cc1",
+    "expected_name": "4,4',4''-methylenedi(aniline)-related-trimer",
+    "compound_class": "two-atom-bridge",
+    "subclass": "methylene-chain",
+    "unit_count": 2,
+    "is_symmetric": false,
+    "note": "Asymmetric 3-ring methylene chain; OPSIN-RT may decline; tracked for behavior diff",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-51.3 chain variant",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_19",
+    "smiles": "OC(=O)c1ccc(C(=O)c2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-carbonyldibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "carbonyl",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-66.6 carbonyl bridge (out of v18 single-bridge dict; tracked)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-66.6 carbonyldibenzoic",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_20",
+    "smiles": "Oc1ccc(N(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "4,4',4''-nitrilotriphenol",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "nitrilo",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "Duplicate of BB_6 listed under multi-atom for stratification count",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 nitrilotriphenol (dup for strat)",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_21",
+    "smiles": "OC(=O)c1ccc(N(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4',4''-nitrilotribenzoic acid",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "nitrilo",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "P-14.5 3-unit nitrilo + benzoic acid",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 nitrilotribenzoic",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_22",
+    "smiles": "Oc1ccc(P(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "4,4',4''-phosphinidynetriphenol",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "phosphinidyne",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "OPSIN multiRadicalSubstituents.xml line 47 phosphinidyne; D-09 candidate",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "OPSIN multiRadicalSubstituents.xml phosphinidyne",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_23",
+    "smiles": "Nc1ccc(C(=O)c2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-carbonyldianiline",
+    "compound_class": "single-atom-bridge",
+    "subclass": "carbonyl",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "P-66.6 carbonyl bridge variant; tracked",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-66.6 carbonyldianiline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_24",
+    "smiles": "OC(=O)c1ccc(C(C)(C)c2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4'-(propane-2,2-diyl)dibenzoic acid",
+    "compound_class": "single-atom-bridge",
+    "subclass": "propane-2,2-diyl",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "Bisphenol A-like backbone; out of single-atom dict; tracked",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-29 propane-2,2-diyl",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_25",
+    "smiles": "OC(=O)c1ccc(C(c2ccc(C(=O)O)cc2)(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4',4'',4'''-methanetetrayltetrabenzoic acid",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "methanetetrayl",
+    "unit_count": 4,
+    "is_symmetric": true,
+    "note": "P-14.5 4-unit methanetetrayl + benzoic acid",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 methanetetrayltetrabenzoic",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_26",
+    "smiles": "Oc1ccc(P(c2ccc(O)cc2)(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "4,4',4'',4'''-methanetetrayltetraphenol-P-variant",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "phosphoranetetrayl",
+    "unit_count": 4,
+    "is_symmetric": true,
+    "note": "P-tetravalent variant; tracked, may decline",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-68 phosphoranetetrayl",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_27",
+    "smiles": "Nc1ccc(SSc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-disulfanediyldianiline",
+    "compound_class": "two-atom-bridge",
+    "subclass": "disulfanediyl",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "D-09 disulfanediyl + aniline",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-29 disulfanediyl variant",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_28",
+    "smiles": "Nc1ccc(OOc2ccc(N)cc2)cc1",
+    "expected_name": "4,4'-peroxydianiline",
+    "compound_class": "two-atom-bridge",
+    "subclass": "peroxy",
+    "unit_count": 2,
+    "is_symmetric": true,
+    "note": "D-09 peroxy + aniline",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-29 peroxy + aniline",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_29",
+    "smiles": "Oc1ccc(C(c2ccc(O)cc2)(c2ccc(O)cc2)C(c2ccc(O)cc2)c2ccc(O)cc2)cc1",
+    "expected_name": "5-unit phenol cluster (synthetic)",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "synthetic-5-unit",
+    "unit_count": 5,
+    "is_symmetric": false,
+    "note": "Synthetic 5-aryl shape; expected to decline; tracked for behavior diff",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "synthetic 5-unit stratification",
+      "added_phase": "154-02"
+    }
+  },
+  {
+    "fixture_id": "mult_bb_BB_30",
+    "smiles": "OC(=O)c1ccc(N(c2ccc(C(=O)O)cc2)c2ccc(C(=O)O)cc2)cc1",
+    "expected_name": "4,4',4''-nitrilotribenzoic acid",
+    "compound_class": "multi-atom-bridge",
+    "subclass": "nitrilo",
+    "unit_count": 3,
+    "is_symmetric": true,
+    "note": "Duplicate of BB_21 to bolster 3-unit stratification",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-14.5 nitrilotribenzoic (dup)",
+      "added_phase": "154-02"
+    }
+  }
+]

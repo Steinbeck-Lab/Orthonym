@@ -1,0 +1,758 @@
+[
+  {
+    "opsin_value": "C",
+    "opsin_name": "methylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CC",
+    "opsin_name": "ethylene",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": true
+  },
+  {
+    "opsin_value": "CCC",
+    "opsin_name": "propylene",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCC",
+    "opsin_name": "butylene",
+    "out_ids": "1,4",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCC",
+    "opsin_name": "pentylene",
+    "out_ids": "1,5",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCCC",
+    "opsin_name": "hexylene",
+    "out_ids": "1,6",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCCCC",
+    "opsin_name": "heptylene",
+    "out_ids": "1,7",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCCCCC",
+    "opsin_name": "octylene",
+    "out_ids": "1,8",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCCCCCC",
+    "opsin_name": "nonylene",
+    "out_ids": "1,9",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CCCCCCCCCCC",
+    "opsin_name": "undecylene",
+    "out_ids": "1,11",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C",
+    "opsin_name": "carbene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=C",
+    "opsin_name": "vinylene",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "CC(C)(C)C",
+    "opsin_name": "neopentylene",
+    "out_ids": "1,3",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "c1c(C)c(C)cc(C)c1C",
+    "opsin_name": "durylene",
+    "out_ids": "1,6",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "c1ccccc1",
+    "opsin_name": "phenylene",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=Cc1c2cccc1.C2=",
+    "opsin_name": "phthalylidene",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=Cc1cc2ccc1.C2=",
+    "opsin_name": "isophthalylidene",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=Cc1ccc2cc1.C2=",
+    "opsin_name": "terephthalylidene",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "Cc1ccccc1",
+    "opsin_name": "tolylene",
+    "out_ids": "3,5",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "NNC(=O)N",
+    "opsin_name": "semicarbazono",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[SiH3]O",
+    "opsin_name": "siloxane",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "NC(=O)N",
+    "opsin_name": "ureylene",
+    "out_ids": "1,4",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "c1ccccc1",
+    "opsin_name": "xylylene",
+    "out_ids": "7,8",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "NN",
+    "opsin_name": "hydrazo",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=NN=",
+    "opsin_name": "azino",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N=N",
+    "opsin_name": "azo",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[NH+]([O-])=N",
+    "opsin_name": "azoxy",
+    "out_ids": "1,3",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N=[NH+][O-]",
+    "opsin_name": "nno-azoxy",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[NH+]([O-])=N",
+    "opsin_name": "non-azoxy",
+    "out_ids": "1,3",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[NH+]([O-])=N",
+    "opsin_name": "onn-azoxy",
+    "out_ids": "1,3",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "NN=N",
+    "opsin_name": "diazoamino",
+    "out_ids": "1,3",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N",
+    "opsin_name": "nitrene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N",
+    "opsin_name": "imino",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[NH4+]",
+    "opsin_name": "iminio",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N",
+    "opsin_name": "nitrilo",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": true
+  },
+  {
+    "opsin_value": "[NH4+]",
+    "opsin_name": "nitrilio",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[P|3]",
+    "opsin_name": "phosphinidyne",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[As|3]",
+    "opsin_name": "arsinidyne",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[Sb|3]",
+    "opsin_name": "stibylidyne",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[Bi|3]",
+    "opsin_name": "bismuthylidyne",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[P|4+]",
+    "opsin_name": "phosphinidenio",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[As|4+]",
+    "opsin_name": "arsinidenio",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[P|5](=O)(O)",
+    "opsin_name": "phosphinico",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[As|5](=O)(O)",
+    "opsin_name": "arsinico",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[Sb|5](=O)(O)",
+    "opsin_name": "stibinico",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "OO",
+    "opsin_name": "peroxy",
+    "out_ids": "1,2",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[NH3+][O-]",
+    "opsin_name": "nitroryl",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[P|5](=O)[O-]",
+    "opsin_name": "phosphinato",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[As|5](=O)[O-]",
+    "opsin_name": "arsinato",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[Sb|5](=O)[O-]",
+    "opsin_name": "stibinato",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[SiH4]",
+    "opsin_name": "silylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[GeH4]",
+    "opsin_name": "germylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[SnH4]",
+    "opsin_name": "stannylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[PbH4]",
+    "opsin_name": "plumbylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "B",
+    "opsin_name": "borylene",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "O",
+    "opsin_name": "oxy",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": true
+  },
+  {
+    "opsin_value": "[SH2|2]",
+    "opsin_name": "thio",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[SeH2|2]",
+    "opsin_name": "seleno",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "[TeH2|2]",
+    "opsin_name": "telluro",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=S",
+    "opsin_name": "carbothioyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=[Se]",
+    "opsin_name": "carboselenoyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=[Te]",
+    "opsin_name": "carbotelluroyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=NN",
+    "opsin_name": "carbohydrazonoyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=N",
+    "opsin_name": "carboimidoyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "C=NO",
+    "opsin_name": "carbohydroximoyl",
+    "out_ids": "1,1",
+    "arity": 2,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-C=C-",
+    "opsin_name": "etheno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-C=CC-",
+    "opsin_name": "prop[1]eno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-C=CCC-",
+    "opsin_name": "but[1]eno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-CC=CC-",
+    "opsin_name": "but[2]eno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-C=CC=C-",
+    "opsin_name": "buta[1,3]dieno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-O-",
+    "opsin_name": "epoxy",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OO-",
+    "opsin_name": "epidioxy",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OOO-",
+    "opsin_name": "epitrioxy",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-S-",
+    "opsin_name": "epithio",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[S|4]-",
+    "opsin_name": "lambda4-sulfano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[S|6]-",
+    "opsin_name": "lambda6-sulfano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-SS-",
+    "opsin_name": "epidithio",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[SeH2]-",
+    "opsin_name": "episeleno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[TeH2]-",
+    "opsin_name": "epitelluro",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-N-",
+    "opsin_name": "epimino",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-NN-",
+    "opsin_name": "diazano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-N=N-",
+    "opsin_name": "diazeno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-N=NN-",
+    "opsin_name": "triaz[1]eno",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-P-",
+    "opsin_name": "phosphano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[AsH]-",
+    "opsin_name": "arsano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[SbH]-",
+    "opsin_name": "stibano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[SiH2]-",
+    "opsin_name": "silano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[GeH2]-",
+    "opsin_name": "germano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-[SnH2]-",
+    "opsin_name": "stannano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-B-",
+    "opsin_name": "borano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-c-",
+    "opsin_name": "(metheno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-n-",
+    "opsin_name": "(azeno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-p-",
+    "opsin_name": "(phospheno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-CC=",
+    "opsin_name": "(ethanylylidene)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=CC=",
+    "opsin_name": "(ethanediylidene)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-CCC=",
+    "opsin_name": "(propan[1]yl[3]ylidene)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-C=CC=",
+    "opsin_name": "(prop[1]en[1]yl[3]ylidene)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "=NN=",
+    "opsin_name": "(diazanediylidene)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OC-",
+    "opsin_name": "(epoxymethano)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-NCC-",
+    "opsin_name": "(epiminoethano)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OC=CC-",
+    "opsin_name": "(epoxyprop[1]eno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OCC=C-",
+    "opsin_name": "(epoxyprop[2]eno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-CCNC-",
+    "opsin_name": "(ethanoiminomethano)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-CNCC-",
+    "opsin_name": "[2]azabutano",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-COC=",
+    "opsin_name": "(methanooxymetheno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OCN=C-",
+    "opsin_name": "(epoxymethanoazenometheno)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "-OC=NC-",
+    "opsin_name": "(epoxymethenoazenomethano)",
+    "out_ids": "",
+    "arity": 1,
+    "is_in_orthonym": false
+  },
+  {
+    "opsin_value": "N",
+    "opsin_name": "amine",
+    "out_ids": "1,1,1",
+    "arity": 3,
+    "is_in_orthonym": true
+  }
+]
