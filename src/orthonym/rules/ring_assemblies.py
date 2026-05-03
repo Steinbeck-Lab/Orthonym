@@ -294,6 +294,24 @@ def detect_ring_assembly(
           - connections: list of (atom_A, atom_B, system_A, system_B) tuples
           - count: number of identical ring systems
           - ring_type: 'carbocyclic' or 'heterocyclic'
+
+    Phase 154.B D-11 cross-handler contract:
+        Ring-assembly detection (this function) and multiplicative naming
+        (rules.multiplicative.name_multiplicative) are MUTUALLY EXCLUSIVE
+        by topology.  Ring assemblies = identical rings joined directly by
+        a single bond (no bridge atom).  Multiplicative = identical parent
+        units joined by 1+ bridge atoms (oxy / methylene / nitrilo / ...).
+        The split is enforced symmetrically:
+          - this function rejects atom-bridged cases via
+            _find_inter_system_bonds (which only matches ring-to-ring
+            single bonds; bridge atoms are NOT in rings, so atom-bridged
+            cases never produce inter-system bonds)
+          - name_multiplicative rejects single-bond-only cases via
+            _is_pure_single_bond_assembly at the entry point (D-11 guard)
+        Cross-handler regression test:
+        tests/integration/test_assembly_vs_multiplicative_dispatch.py.
+
+    Source: 154-CONTEXT.md D-11; 151-CONTEXT.md D-15 (path-topology contract).
     """
     if len(ring_systems) < 2:
         return None

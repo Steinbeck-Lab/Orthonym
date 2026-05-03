@@ -136,6 +136,78 @@ def _extract_pg_locant_from_fragment(canon_smiles: str) -> Optional[int]:
     return 1
 
 
+def _is_pure_single_bond_assembly(mol) -> bool:
+    """Phase 154.B D-11: detect single-bond-joined identical rings (ring_assemblies territory).
+
+    True iff every inter-ring-system connection in the molecule is a single
+    bond directly between two ring atoms with NO bridge atom.  In that
+    case the multiplicative path returns None and the cascade falls
+    through to detect_ring_assembly (Phase 151's path).
+
+    The contract is symmetric: this guard is the multiplicative-side
+    enforcer; ring_assemblies._find_inter_system_bonds (lines 77-124) is
+    the ring-assembly-side enforcer (only counts ring-to-ring single
+    bonds; bridge atoms are not in rings, so atom-bridged cases never
+    produce inter-system bonds there).
+
+    Cross-handler regression test:
+    tests/integration/test_assembly_vs_multiplicative_dispatch.py.
+
+    Source: 154-CONTEXT.md D-11; ring_assemblies.py:_find_inter_system_bonds:77.
+    Source: 154-RESEARCH.md §4.5.
+    """
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumRings() < 2:
+        return False
+
+    # Build ring_atoms set.
+    atom_rings = ring_info.AtomRings()
+    ring_atoms = set()
+    for r in atom_rings:
+        ring_atoms.update(r)
+
+    # Use perception.rings.get_ring_systems to cluster fused rings.
+    from ..perception.rings import get_ring_systems
+    ring_systems = get_ring_systems(mol)
+    # ring_systems is a list of sets of atom indices, one per fused ring system.
+    if len(ring_systems) < 2:
+        # Only one ring system (e.g., naphthalene) -- multiplicative does not apply.
+        return False
+
+    atom_to_system: Dict[int, int] = {}
+    for sys_idx, atoms in enumerate(ring_systems):
+        for a in atoms:
+            atom_to_system[a] = sys_idx
+
+    # Look for inter-ring-system bonds (single bond, both atoms in distinct systems).
+    has_single_bond_inter_system = False
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a1 in ring_atoms and a2 in ring_atoms:
+            sys1 = atom_to_system.get(a1)
+            sys2 = atom_to_system.get(a2)
+            if sys1 is not None and sys2 is not None and sys1 != sys2:
+                if bond.GetBondTypeAsDouble() == 1.0:
+                    has_single_bond_inter_system = True
+
+    # Detect bridge atoms (non-ring atoms touching >= 2 distinct ring systems).
+    has_bridge_atom = False
+    for atom in mol.GetAtoms():
+        if atom.GetIdx() in ring_atoms:
+            continue
+        touched_systems = set()
+        for nbr in atom.GetNeighbors():
+            nbr_sys = atom_to_system.get(nbr.GetIdx())
+            if nbr_sys is not None:
+                touched_systems.add(nbr_sys)
+        if len(touched_systems) >= 2:
+            has_bridge_atom = True
+            break
+
+    # Pure single-bond assembly = inter-system single bond present AND no bridge atom.
+    return has_single_bond_inter_system and not has_bridge_atom
+
+
 def name_multiplicative(mol) -> Optional[str]:
     """Detect and name multiplicative nomenclature cases.
 
@@ -152,6 +224,16 @@ def name_multiplicative(mol) -> Optional[str]:
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() < 2:
         return None
+
+    # Phase 154.B D-11: topology guard for ring-assembly mutual exclusion.
+    # If every inter-fragment connection is a single bond between two ring
+    # atoms with NO bridge atom, return None and let the cascade fall
+    # through to detect_ring_assembly (Phase 151's path).  Cross-handler
+    # regression test: tests/integration/test_assembly_vs_multiplicative_dispatch.py.
+    #
+    # Source: 154-CONTEXT.md D-11; ring_assemblies.py:_find_inter_system_bonds:77.
+    if _is_pure_single_bond_assembly(mol):
+        return None  # ring_assemblies.py owns this case
 
     # Collect ring atom indices
     ring_atoms = set()
