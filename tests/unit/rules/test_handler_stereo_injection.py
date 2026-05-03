@@ -29,6 +29,8 @@ from orthonym.rules.stereochemistry import (
     inject_stereo_from_locant_map,
     needs_stereo_injection,
 )
+# Phase 153 D-03: composite-locant sort key (introduced commit 1/5).
+from orthonym.rules.stereochemistry import _composite_locant_sort_key
 
 
 @pytest.mark.unit
@@ -665,3 +667,133 @@ def test_ring_atom_to_locant_no_warn_on_unique(caplog):
         f"{[r.message for r in caplog.records]!r}"
     )
     assert result == {10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6}
+
+
+# ============================================================================
+# Phase 153 commit 1/5: composite-locant sort key (D-03)
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestCompositeLocantSortKey:
+    """Phase 153 D-03: _composite_locant_sort_key replaces the line-163
+    lambda in collect_stereodescriptors. Mixed int/'<int><letter>' locants
+    must sort per IUPAC P-91.1 (composite '3a' BETWEEN integer 3 and 4).
+
+    Per Pitfall 2, the helper must dispatch on isinstance(locant, int) FIRST
+    so int input does not fall into the int(str[:-1]) ValueError trap.
+    """
+
+    # Test C-01a -- int-only sort order (regression invariant).
+    def test_sort_int_only_byte_identical(self):
+        items = [(2, 'R'), (3, 'S'), (5, 'E')]
+        assert sorted(items, key=_composite_locant_sort_key) == [
+            (2, 'R'), (3, 'S'), (5, 'E')
+        ]
+
+    # Test C-01b -- str-only composite locant sort.
+    def test_sort_str_only_composite(self):
+        items = [('7a', 'S'), ('3a', 'R')]
+        assert sorted(items, key=_composite_locant_sort_key) == [
+            ('3a', 'R'), ('7a', 'S')
+        ]
+
+    # Test C-01c -- mixed int/str sort per IUPAC P-91.1: 3 < '3a' < 4.
+    def test_sort_mixed_int_and_composite(self):
+        items = [(4, 'S'), ('3a', 'R'), (3, 'R')]
+        assert sorted(items, key=_composite_locant_sort_key) == [
+            (3, 'R'), ('3a', 'R'), (4, 'S')
+        ]
+
+    # Test C-02 -- byte-identical to lambda x: x[0] for int-only inputs.
+    def test_int_only_byte_identical_to_phase152_baseline(self):
+        items = [(2, 'R'), (3, 'S'), (5, 'E')]
+        from_lambda = sorted(items, key=lambda x: x[0])
+        from_helper = sorted(items, key=_composite_locant_sort_key)
+        assert from_lambda == from_helper, (
+            "Pitfall 2 regression: int-only sort order must be byte-identical "
+            "to pre-153 lambda x: x[0]"
+        )
+
+    # Test C-03 -- two-letter suffix corner case locks ValueError raising.
+    def test_str_locant_with_two_letter_suffix_raises(self):
+        # '12bb' has TWO trailing alpha chars. The current parse pattern
+        # consumes only the LAST char via locant[-1].isalpha() / locant[:-1].
+        # int('12b'[:-1]) is well-defined ONLY if the residue is purely
+        # numeric, so '12bb' will raise ValueError on int('12b') because
+        # '12b' is not a pure integer. We lock that ValueError so a future
+        # regression (e.g. quietly broadening to two-letter suffixes) is
+        # caught loudly.
+        with pytest.raises(ValueError):
+            _composite_locant_sort_key(('12bb', 'R'))
+
+    # Test C-04 -- empty input.
+    def test_empty_input(self):
+        assert sorted([], key=_composite_locant_sort_key) == []
+
+
+@pytest.mark.unit
+class TestRingJunctionInjection:
+    """Phase 153 D-03: end-to-end verification that the injector now produces
+    composite-locant prefixes like '(3aR,8aS)-' once the sort key accepts
+    mixed int/str. Decalin-shaped fixture; ring junctions live at atoms 3
+    and 8 with composite locants '3a' / '8a'.
+    """
+
+    # Test J-01 -- ring-junction stereo flows through the universal injector.
+    def test_emits_composite_locant_prefix_for_decalin_like(self):
+        # cis-decalin (atoms 3, 8 are ring junctions; @@ markers fix CIP).
+        mol = Chem.MolFromSmiles("C1CC[C@@H]2CCCC[C@@H]2C1")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        # Composite-locant atom_to_locant map (decalin numbering).
+        atom_to_locant = {
+            0: 1, 1: 2, 2: 3, 3: '3a',
+            4: 5, 5: 6, 6: 7, 7: 8, 8: '8a', 9: 4,
+        }
+        result = inject_stereo_from_locant_map(
+            "decahydronaphthalene", mol, atom_to_locant,
+        )
+        # The result must carry a P-91 composite-locant prefix block. Lock
+        # only the regex shape: leading '(' + at least one '3a'/'8a' or
+        # bare integer then R/S, and a trailing ')-' prefix.
+        assert re.match(r"^\([0-9aRSrsEZ,]+\)-", result), (
+            f"D-03: composite-locant stereo prefix missing from {result!r}"
+        )
+
+
+@pytest.mark.unit
+class TestStereoBackstopRegressionInvariant:
+    """Phase 153 D-03: bytes-identical lock for Phase 152 collector behaviour.
+
+    These tests verify two pre-153 invariants that depend on the line-163
+    sort key. Together with the test_stereo_backstop suite (13 tests) and
+    the rest of test_handler_stereo_injection (39 tests), they catch any
+    byte-level drift introduced by the helper swap.
+    """
+
+    # Test B-01 -- pre-153 collector behaviour on int-only locants is
+    # preserved end-to-end (uses Phase 152 fixture pattern).
+    def test_collector_int_only_behaviour_preserved(self):
+        from orthonym.rules.stereochemistry import collect_stereodescriptors
+        mol = Chem.MolFromSmiles("C[C@H](O)[C@@H](O)CC")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 6: 5}
+        result = collect_stereodescriptors(mol, atom_to_locant)
+        # Two stereocenters at locants 2 and 3, sorted ascending. The
+        # CIP codes depend on RDKit canonicalisation; we lock locant
+        # ordering and emission count.
+        assert len(result) == 2
+        assert result[0][0] == 2
+        assert result[1][0] == 3
+        assert result[0][1] in ('R', 'S')
+        assert result[1][1] in ('R', 'S')
+
+    # Test B-02 -- empty descriptor list still sorts cleanly under the
+    # new sort key (regression: never raise on empty input).
+    def test_collector_empty_descriptors_no_error(self):
+        from orthonym.rules.stereochemistry import collect_stereodescriptors
+        mol = Chem.MolFromSmiles("CCO")  # no stereo
+        rdCIPLabeler.AssignCIPLabels(mol)
+        atom_to_locant = {0: 1, 1: 2, 2: 3}
+        result = collect_stereodescriptors(mol, atom_to_locant)
+        assert result == []

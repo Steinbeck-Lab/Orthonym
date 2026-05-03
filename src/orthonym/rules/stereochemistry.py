@@ -30,6 +30,37 @@ from ..perception.stereo import assign_stereochemistry, detect_axial_chirality
 logger = logging.getLogger(__name__)
 
 
+def _composite_locant_sort_key(
+    item: Tuple[Union[int, str], str],
+) -> Tuple[int, str]:
+    """Sort key for descriptor lists that may mix int and '<int><letter>' locants.
+
+    Mirrors _junction_locant_sort_key (line ~727, Phase 130) so that the
+    universal collector (collect_stereodescriptors, line ~33) and the
+    ring-junction collector (collect_ring_junction_stereo, line ~680) share
+    one sort discipline.
+
+    Per IUPAC P-91.1, composite locants like '3a' sort BETWEEN integer 3
+    and integer 4 (after 3 because '' < 'a' in tuple-lex comparison).
+
+    Phase 153 D-03 -- single source of truth for descriptor ordering. Per
+    Pitfall 2, branches on isinstance(locant, int) FIRST so int input does
+    NOT fall into the int('3'[:-1]) = int('') ValueError trap.
+
+    Behaviour on existing int-only locants (regression invariant):
+    byte-identical sort order to lambda x: x[0]. Verified by
+    TestStereoBackstopRegressionInvariant in
+    tests/unit/rules/test_handler_stereo_injection.py.
+    """
+    locant = item[0]
+    if isinstance(locant, int):
+        return (locant, '')
+    # str path -- '3a' / '7a' / '12b'
+    if locant and locant[-1].isalpha():
+        return (int(locant[:-1]), locant[-1])
+    return (int(locant), '')
+
+
 def collect_stereodescriptors(
     mol,
     atom_to_locant: Dict[int, int],
@@ -159,8 +190,14 @@ def collect_stereodescriptors(
         # If locant_atom not in atom_to_locant, the axial chirality element
         # is not on the principal chain/ring -- skip (same filtering as R/S)
 
-    # Sort by locant ascending
-    descriptors.sort(key=lambda x: x[0])
+    # Sort by locant ascending. D-03: use the composite-locant safe key so
+    # mixed int / '<int><letter>' (e.g. '3a', '7a' from ComplexRingResult.
+    # atom_to_locant per fused_rings.py:317) sort per IUPAC P-91.1
+    # ('3a' BETWEEN integer 3 and 4). Byte-identical to the pre-153
+    # `lambda x: x[0]` for int-only inputs (locked by
+    # TestStereoBackstopRegressionInvariant in tests/unit/rules/
+    # test_handler_stereo_injection.py).
+    descriptors.sort(key=_composite_locant_sort_key)
 
     # Filter out stereo descriptors with invalid locants (locant 0 or > parent size)
     if descriptors and atom_to_locant:
