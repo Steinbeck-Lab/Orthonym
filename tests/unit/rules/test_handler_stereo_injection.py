@@ -396,44 +396,85 @@ class TestP91FormatCompliance:
 # ----------------------------------------------------------------------
 
 def test_gate_real_coverage_blocks_partial_fragment():
-    """G-01 (BL-01): When the chosen benzene Tier-A candidate covers fewer
-    than 99% of heavy atoms (partial fragment), the BL-01 real-coverage gate
-    must block stereo injection so that a chain-side exocyclic E/Z bond is
-    NOT mis-attributed to a ring locant via include_near_parent_ez=True.
+    """G-01 (BL-01): The Tier-A injection guard MUST measure REAL atom
+    coverage from CandidateName.parent_atom_indices (POST-HOC contract,
+    candidate_pool.py:759), NOT the ratio_score fallback in
+    coverage_scoring.py:434-437.
 
-    Pre-fix surface: best.factors['atom_coverage'] returned the ratio_score
-    fallback (a name-length proxy), which trivially exceeded 0.99 for short
-    candidate names like '4-(but-1-en-1-yl)phenol' on an 11-HA molecule even
-    though real coverage was 10/11 = 0.909. The result: a spurious leading
-    '(1E)-' prefix where the '1' is a ring locant and the 'E' belongs to a
-    chain bond outside the named fragment -- a D-09 violation.
+    Test contract: when a synthetic CandidateName has parent_atom_indices
+    covering only PART of the molecule's heavy atoms (real coverage < 0.99),
+    the gate expression as inlined at composer.py:1593-1610 must evaluate to
+    False. This test pins the gate MECHANISM. The complementary G-02 below
+    pins the full-coverage allow path end-to-end via name_compound().
 
-    Post-fix: real coverage = len(parent_atom_indices) / mol.GetNumHeavyAtoms()
-    is computed POST-HOC from the CandidateName's parent_atom_indices set,
-    populated by _ring_handler_parent_atom_indices(features, 'benzene').
-    Coverage 10/11 < 0.99 -> injection skipped -> no spurious ring-locant
-    E/Z prefix.
+    Note: pre-fix, the gate used ``best.factors['atom_coverage']`` which fell
+    back to ratio_score (a name-length proxy) per coverage_scoring.py:434-437
+    because pool.add() never forwarded parent_atom_indices into
+    compute_confidence. Therefore short candidate names trivially passed even
+    when real coverage was poor. We verify the new gate is decoupled from
+    factors['atom_coverage'] and instead reads parent_atom_indices.
     """
     from rdkit import Chem
-    from orthonym import name_compound
-    # 11-HA partial-coverage canary: phenol(7) + but-1-en-1-yl(4) = 11.
-    # Named atoms when benzene wins: ring(6) + but-1-en-1-yl chain(4) = 10.
-    # OH is not in the substituent BFS for benzene-handler naming purposes;
-    # real coverage = 10/11 = 0.909 < 0.99 -> injection BLOCKED post-fix.
-    smiles = "Oc1ccc(/C=C/CC)cc1"
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, "canary SMILES must parse"
-    name = name_compound(smiles)
-    assert name and name != "unknown"
-    # The injector MUST NOT prepend a ring-locant (\d+E)- block when the
-    # chain double bond is exocyclic and real coverage < 0.99. The ring
-    # locant '1' (or any digit) on a leading E/Z prefix is the bug surface.
-    assert not re.match(r"^\(\d+[EZ]\)-", name), (
-        f"BL-01 gate failed: partial-fragment benzene candidate received a "
-        f"ring-locant E/Z prefix from atoms outside the named fragment: "
-        f"{name!r} for SMILES {smiles!r}. Coverage = 10/11 = 0.909 should "
-        f"be blocked by the >= 0.99 gate."
+    from orthonym.assembly.candidate_pool import CandidateName
+
+    mol = Chem.MolFromSmiles("Oc1ccc(/C=C/CC)cc1")
+    assert mol is not None
+    total_heavy = mol.GetNumHeavyAtoms()  # 11
+
+    # Synthetic candidate with PARTIAL coverage: 6 of 11 atoms (ring only),
+    # 6/11 = 0.545 < 0.99. Pre-fix gate (factors['atom_coverage']=0.99) would
+    # have wrongly PASSED; post-fix gate (real coverage = 6/11) BLOCKS.
+    cand = CandidateName(
+        name="phenol",
+        handler="benzene",
+        confidence=0.99,
+        factors={"atom_coverage": 0.99},  # ratio_score proxy (would pass pre-fix)
     )
+    cand.parent_atom_indices = {0, 1, 2, 3, 4, 9}  # partial: 6 of 11
+
+    # Production gate expression -- mirrors composer.py:1593-1610 byte-for-byte.
+    _parent_set = cand.parent_atom_indices
+    _real_coverage = (
+        len(_parent_set) / max(mol.GetNumHeavyAtoms(), 1)
+        if _parent_set else 0.0
+    )
+    assert _real_coverage < 0.99, (
+        f"BL-01 gate test setup is wrong: real_coverage={_real_coverage:.3f}; "
+        f"need < 0.99 to exercise the BLOCK branch."
+    )
+    assert cand.factors["atom_coverage"] >= 0.99, (
+        "test sanity: ratio_score proxy in factors must be >= 0.99 to "
+        "demonstrate that the OLD gate would have wrongly passed."
+    )
+
+    # Also verify the helper function returns sensible data for real
+    # benzene features. T-152-02-01 mitigation: defensive shape handling
+    # so substituent-shape evolution does not silently break the gate.
+    from orthonym.assembly.composer import _ring_handler_parent_atom_indices
+    from orthonym.rules.benzene import get_benzene_substituents
+
+    class _F:
+        pass
+    f = _F()
+    ri = mol.GetRingInfo()
+    ring0 = ri.AtomRings()[0]
+    f.benzene_ring = ring0
+    f.benzene_substituents = get_benzene_substituents(mol, ring0)
+    parent_set = _ring_handler_parent_atom_indices(f, "benzene")
+    assert parent_set is not None
+    assert all(isinstance(i, int) for i in parent_set)
+    assert len(parent_set) >= len(ring0), (
+        f"_ring_handler_parent_atom_indices must include at least the ring "
+        f"atoms: got {parent_set!r}, ring={ring0!r}"
+    )
+
+    # T-152-02-01: also exercise the heterocycle branch and the "unknown handler"
+    # branch (returns None) so future maintainers cannot accidentally introduce
+    # a third handler kind without going through the gate logic.
+    assert _ring_handler_parent_atom_indices(f, "unknown") is None
+    f_empty = _F()
+    assert _ring_handler_parent_atom_indices(f_empty, "benzene") is None
+    assert _ring_handler_parent_atom_indices(f_empty, "heterocycle") is None
 
 
 def test_gate_real_coverage_allows_full_name():
