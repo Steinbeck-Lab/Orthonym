@@ -1,0 +1,134 @@
+[
+  {
+    "fixture_id": "skel_bb_BB_1",
+    "smiles": "OCCOCCOCC",
+    "expected_name": "3,6-dioxaoctan-1-ol",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.4 -- terminal -OH with replacement chain (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.4.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_2",
+    "smiles": "COCCOCCOC",
+    "expected_name": "2,5,8-trioxanonane",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.1 -- 3 same-kind oxygens triggering branch (a)/(b) per P-15.4.1.2 (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.1.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_3",
+    "smiles": "CCOCCNCCC",
+    "expected_name": "5-oxa-2-azanonane",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.3.1 -- mixed O+N citation order per P-15.4.2 (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.3.1.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_4",
+    "smiles": "O1CCOCCOCC1",
+    "expected_name": "1,4,7-trioxonane",
+    "compound_class": "blue-book-cyclic",
+    "note": "Blue Book P-22.1.3 -- 9-mem cyclic, 3 oxygens (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-22.1.3.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_5",
+    "smiles": "COCOCOCOC",
+    "expected_name": "2,4,6,8-tetraoxanonane",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.1.2 (a) -- >=4 same-kind oxygens, branch (a) accept (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.1.2.a.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_6",
+    "smiles": "CSCNCSC",
+    "expected_name": "2,6-dithia-4-azaheptane",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.1.2 (b) -- >=3 mixed-kind heteroatoms (S+N) branch (b) accept (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.1.2.b.ex1",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_7",
+    "smiles": "O1CCOCCOCCOCC1",
+    "expected_name": "1,4,7,10-tetraoxacyclododecane",
+    "compound_class": "blue-book-cyclic",
+    "note": "Blue Book P-22.1.3 -- 12-mem cyclic, 4 oxygens (verified OPSIN RT MATCH)",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-22.1.3.ex2",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_8",
+    "smiles": "[SiH3]O[SiH3]",
+    "expected_name": "disiloxane",
+    "compound_class": "blue-book-uncertain",
+    "note": "Blue Book P-23 retained name (disiloxane H6OSi2). Marked 'blue-book-uncertain' so test_skeletal_replacement_corpus.py skips OPSIN-RT comparison per Phase 154 plan-checker WN-05 (-- this compound has only 3 atoms total, gate 1 ring-info-NumRings==0 path, gate 4 expected_atoms != mol.GetNumAtoms() rejects; v18 routes via fallback handlers, not skeletal_replacement).",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-23.disiloxane",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_9",
+    "smiles": "OCCOCCO",
+    "expected_name": "3-oxapentane-1,5-diol",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.4 -- terminal-OH polyol with replacement chain (verified OPSIN RT MATCH). Diethylene glycol IUPAC name.",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.4.ex2",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_10",
+    "smiles": "OCCOCCOCCO",
+    "expected_name": "3,6-dioxaoctane-1,8-diol",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.4 -- triethylene-glycol-style terminal-OH polyol (verified OPSIN RT MATCH).",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.4.ex3",
+      "added_phase": "154-01"
+    }
+  },
+  {
+    "fixture_id": "skel_bb_BB_11",
+    "smiles": "COCNCSC",
+    "expected_name": "2-oxa-4-aza-6-thiaheptane",
+    "compound_class": "blue-book-pin",
+    "note": "Blue Book P-15.4.2 citation order (O before aza before thia by ascending locant) -- 3 distinct heteroatoms branch (b) (verified OPSIN RT MATCH).",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-15.4.2.ex1",
+      "added_phase": "154-01"
+    }
+  }
+]
