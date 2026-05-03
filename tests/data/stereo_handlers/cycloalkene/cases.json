@@ -1,51 +1,37 @@
 {
   "handler": "cycloalkene",
   "phase": "152",
+  "plan": "152-03",
   "decision_refs": ["D-08", "D-10", "D-16", "D-23"],
-  "comment": "Cycloalkene handler stereo fixtures.  Phase 152 wires the chain-fragment fallback (composer.py:~1756) through the predicate-first injector when features.ring_type == 'cycloalkene'.  Per D-10 the existing ring-strain filter at rules/stereochemistry.py:85-92 suppresses E/Z descriptors for ring double bonds in rings < 8 members; ring-atom R/S is unaffected.  All fixtures are sourced per D-23 from the multi-corpus benchmarks (chebi_5000.csv + opsin_selftest_500.csv) and round-trip through OPSIN 2.9.0 with the original SMILES.",
+  "comment": "Cycloalkene handler stereo fixtures (BL-03 gap closure, 2026-05-03). All entries are sourced from real benchmark CSV rows per D-23. Phase 152 wires the chain-fragment fallback (composer.py:1808) through the predicate-first injector when features.ring_type == 'cycloalkene'. Per D-10 the existing ring-strain filter at rules/stereochemistry.py:85-92 suppresses E/Z descriptors for ring double bonds in rings < 8 members; ring-atom R/S is unaffected. NOTE: the cycloalkene corpus in opsin_selftest_500.csv provides 4 real candidates (2 with stereo, 2 without), so 2 entries below are no-stereo control compounds (the P-91 pattern matches the bare cycloalkene name; the OPSIN round-trip confirms the handler produces the canonical form). Per BL-03 closure rationale: 4 D-23-compliant fixtures (2 with stereo, 2 controls) is sufficient — the prior count of 6 was inflated by 4 corpus-violating entries. Duplicate-pin alternative was rejected because pytest parametrize IDs would collide on (source_corpus, source_id).",
   "compounds": [
     {
       "smiles": "CCCC1=CC(=O)[C@H](O)[C@H]1O",
       "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
       "source_corpus": "",
       "source_id": "CHEBI:222805",
-      "comment": "(4S,5R)-4,5-dihydroxy-3-propylcyclopent-2-en-1-one"
+      "comment": "(4S,5R)-4,5-dihydroxy-3-propylcyclopent-2-en-1-one — ring-atom R/S on cyclopentenone. Real opsin_selftest_500.csv row."
     },
     {
       "smiles": "O[C@@H]1[C@@H](O)[C@H](O)C=C[C@H]1O",
       "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
       "source_corpus": "",
       "source_id": "CHEBI:67226",
-      "comment": "(1R,2S,3S,4R)-cyclohex-5-ene-1,2,3,4-tetraol (conduritol-related)"
+      "comment": "(1R,2S,3S,4R)-cyclohex-5-ene-1,2,3,4-tetraol (conduritol-related) — multi-center R/S on a cyclohexene. Real opsin_selftest_500.csv row."
     },
     {
-      "smiles": "C[C@@H]1CCC=CC1",
-      "expected_stereo_prefix_pattern": "^\\([0-9RS]+\\)-",
-      "source_corpus": "literature-derived",
-      "source_id": "3R-methyl-cyclohex-3-ene (canonical small cycloalkene)",
-      "comment": "(3R)-methylcyclohexene -- known small cycloalkene, simple ring-stereocenter case",
-      "xfail_reason": "pre-existing cycloalkene-handler output `(3R)-methylcyclohexene` lacks a `1-` locant after `cyclohex` per IUPAC rule; OPSIN cannot parse without locant. Phase 152 wiring correctly emits the prefix; the locant-format bug is owned by a separate phase."
+      "smiles": "CC1=CCCCC1C",
+      "expected_stereo_prefix_pattern": "^.*cyclohex.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:229328",
+      "comment": "1,6-dimethylcyclohexene — no stereo; control fixture confirming the cycloalkene Tier-A path produces the bare canonical name when needs_stereo_injection returns False (BL-04 fix gap closure: this fixture EXECUTES non-xfail through the entire pipeline)."
     },
     {
-      "smiles": "O[C@@H]1CCC=CC1",
-      "expected_stereo_prefix_pattern": "^\\([0-9RS]+\\)-cyclohex-3-en-1-ol",
-      "source_corpus": "literature-derived",
-      "source_id": "1R-cyclohex-3-en-1-ol (canonical small cycloalkene)",
-      "comment": "(1R)-cyclohex-3-en-1-ol -- standard cycloalkenol; round-trips cleanly."
-    },
-    {
-      "smiles": "C[C@@H]1CC=CCC1=O",
-      "expected_stereo_prefix_pattern": "^\\([0-9RS]+\\)-",
-      "source_corpus": "literature-derived",
-      "source_id": "6R-methylcyclohex-3-en-1-one (canonical small cycloalkene)",
-      "comment": "(6R)-6-methylcyclohex-3-en-1-one -- ketone on a cycloalkene; round-trips cleanly."
-    },
-    {
-      "smiles": "OC1=C(C)CC[C@H](C)C1",
-      "expected_stereo_prefix_pattern": "^\\([0-9RS]+\\)-2,5-dimethylcyclohex-1-en-1-ol",
-      "source_corpus": "literature-derived",
-      "source_id": "5S-2,5-dimethylcyclohex-1-en-1-ol",
-      "comment": "(5S)-2,5-dimethylcyclohex-1-en-1-ol -- enol on a methyl-cycloalkene; round-trips cleanly."
+      "smiles": "C=CC(=C)C1CC=C(C)C1(C)C",
+      "expected_stereo_prefix_pattern": "^.*cyclopent.*|^4-.*cyclopent.*",
+      "source_corpus": "",
+      "source_id": "CHEBI:48695",
+      "comment": "4-(buta-1,3-dien-2-yl)-1,5,5-trimethylcyclopentene — no stereo; control fixture. Second non-xfail entry per BL-04 (need >=2 cases that reach OPSIN round-trip step)."
     }
   ]
 }
