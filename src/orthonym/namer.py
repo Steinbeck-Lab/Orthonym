@@ -996,6 +996,17 @@ class Orthonym:
         if skel_name:
             return skel_name
 
+        # Cyclic phane nomenclature (IUPAC P-26.4)
+        # Detect ring-bridged ring-bearing molecules where 2+ disjoint small rings
+        # are connected by acyclic chain segments of length >= 2 atoms
+        # (e.g., [2.2]paracyclophane). Topology gate (D-03 / D-16) ensures mutual
+        # exclusion vs ring-assembly, multiplicative, spiro/fused/bridged-fused.
+        # Source: 155-CONTEXT.md D-26; ring_selection.py:48 enum.
+        from .rules.phane import name_cyclophane
+        phane_name = name_cyclophane(mol)
+        if phane_name is not None:
+            return phane_name
+
         # DECOMPOSITION ENGINE (v4.0 Phase 39)
         # For complex molecules with ester/amide/glycosidic bonds, try cleaving
         # at functional bonds and naming fragments individually.

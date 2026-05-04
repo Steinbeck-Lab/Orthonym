@@ -1,0 +1,101 @@
+[
+  {
+    "fixture_id": "corpus_para_2_2",
+    "smiles": "c1cc2ccc1CCc1ccc(cc1)CC2",
+    "expected_name": "[2.2]paracyclophane",
+    "alt_names": [],
+    "sub_class": "PARACYCLOPHANE",
+    "blue_book_section": "P-26.4(a)",
+    "blue_book_page": null,
+    "opsin_rt_verified": false,
+    "opsin_rt_note": "OPSIN 2.9.0 unparsable; D-15 quarantine + Phase 156 hand-off.",
+    "inchi_l1_input": "InChI=1S/C16H16",
+    "source": "hand_curated (Wikipedia)",
+    "corpus_provenance": {
+      "corpus": "hand_curated",
+      "row_id": null,
+      "name_index": null,
+      "source_note": "Corpus survey returned 0 cyclophane refs in 7,500-row benchmark per CONTEXT D-25; hand-curated supplement."
+    }
+  },
+  {
+    "fixture_id": "corpus_meta_2_2",
+    "smiles": "c1cc2cc(c1)CCc1cccc(c1)CC2",
+    "expected_name": "[2.2]metacyclophane",
+    "alt_names": [],
+    "sub_class": "METACYCLOPHANE",
+    "blue_book_section": "P-26.4(a)",
+    "blue_book_page": null,
+    "opsin_rt_verified": false,
+    "opsin_rt_note": "OPSIN 2.9.0 unparsable; D-15 quarantine.",
+    "inchi_l1_input": "InChI=1S/C16H16",
+    "source": "hand_curated (Wikipedia)",
+    "corpus_provenance": {
+      "corpus": "hand_curated",
+      "row_id": null,
+      "name_index": null,
+      "source_note": "D-25 hand-curated supplement."
+    }
+  },
+  {
+    "fixture_id": "corpus_para_3_3",
+    "smiles": "c1cc2ccc1CCCc1ccc(cc1)CCC2",
+    "expected_name": "[3.3]paracyclophane",
+    "alt_names": [],
+    "sub_class": "PARACYCLOPHANE",
+    "blue_book_section": "P-26.4(a)",
+    "blue_book_page": null,
+    "opsin_rt_verified": false,
+    "opsin_rt_note": "OPSIN 2.9.0 unparsable; D-15 quarantine.",
+    "inchi_l1_input": "InChI=1S/C18H20",
+    "source": "hand_curated (Wikipedia)",
+    "corpus_provenance": {
+      "corpus": "hand_curated",
+      "row_id": null,
+      "name_index": null,
+      "source_note": "D-25 hand-curated supplement."
+    }
+  },
+  {
+    "fixture_id": "corpus_para_aza_2_2",
+    "smiles": "c1cc2ccc1CNc1ccc(cc1)CN2",
+    "expected_name": "[2.2]paracyclophane",
+    "alt_names": ["aza-bridged paracyclophane"],
+    "sub_class": "PARACYCLOPHANE",
+    "blue_book_section": "P-26.4(b)",
+    "blue_book_page": null,
+    "opsin_rt_verified": false,
+    "opsin_rt_note": "OPSIN 2.9.0 unparsable + R3 deferred.",
+    "inchi_l1_input": "InChI=1S/C14H14N2",
+    "source": "hand_curated (Blue Book P-26.4(b))",
+    "corpus_provenance": {
+      "corpus": "hand_curated",
+      "row_id": null,
+      "name_index": null,
+      "source_note": "D-25 hand-curated supplement; heterocyclic-bridge variant for R3 risk coverage."
+    },
+    "integration_quarantine": true,
+    "quarantine_reason": "R3 (heterocyclic bridge); is_cyclophane gate accepts but name composition deferred."
+  },
+  {
+    "fixture_id": "corpus_para_oxa_2_2",
+    "smiles": "c1cc2ccc1COc1ccc(cc1)CO2",
+    "expected_name": "[2.2]paracyclophane",
+    "alt_names": ["oxa-bridged paracyclophane (crown-ether style)"],
+    "sub_class": "PARACYCLOPHANE",
+    "blue_book_section": "P-26.4(b)",
+    "blue_book_page": null,
+    "opsin_rt_verified": false,
+    "opsin_rt_note": "OPSIN 2.9.0 unparsable + R3 deferred.",
+    "inchi_l1_input": "InChI=1S/C14H12O2",
+    "source": "hand_curated (Blue Book P-26.4(b))",
+    "corpus_provenance": {
+      "corpus": "hand_curated",
+      "row_id": null,
+      "name_index": null,
+      "source_note": "D-25 hand-curated supplement; oxa-bridge variant for R3 risk coverage."
+    },
+    "integration_quarantine": true,
+    "quarantine_reason": "R3 (heterocyclic bridge)"
+  }
+]
