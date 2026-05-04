@@ -588,8 +588,16 @@ def name_cyclophane(mol: Optional[Chem.Mol]) -> Optional[str]:
     if not bridge_lengths:
         return None
     # De-duplicate symmetric chains: each chain is counted once per anchor; for
-    # paracyclophane the two anchors yield the same chain; collapse.
-    bridge_lengths = sorted(set(bridge_lengths), reverse=True) if len(bridge_lengths) <= 1 else _collapse_bridge_count(bridge_lengths, mol, small_rings)
+    # paracyclophane the two anchors yield the same chain; collapse via the
+    # distinct-paths walk. Run unconditionally — the prior `<= 1` fast-path
+    # silently passed through a single anchor-pair entry as `[X]<base>`, a
+    # structurally invalid one-bridge cyclophane (a cyclophane requires >= 2
+    # bridges; one bridge between two disjoint rings cannot close a macrocycle).
+    # A < 2-bridge result indicates the topology gate let through a non-
+    # cyclophane and we fail closed by returning None (155-REVIEW.md WR-03).
+    bridge_lengths = _collapse_bridge_count(bridge_lengths, mol, small_rings)
+    if len(bridge_lengths) < 2:
+        return None
     bridge_lengths.sort(reverse=True)
 
     bracket_prefix = "[" + ".".join(str(b) for b in bridge_lengths) + "]"
