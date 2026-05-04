@@ -156,6 +156,25 @@ def classify_ring_system_type(
     if spiro_in_system:
         return RingSystemType.SPIRO
 
+    # Phase 155.A D-03 + D-26: Cyclophane classification fires after spiro and
+    # before bridged-fused (P-44.2.2 hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
+    # Source: 155-CONTEXT.md D-03, D-20, D-26; ring_selection.py:48 enum.
+    # NOTE (D-20 root-cause-only, ISS-005): narrow exception scope to ImportError
+    # only -- circular-import-safe lazy import idiom (matches multiplicative.py
+    # lazy-import pattern). Runtime errors from is_cyclophane MUST bubble up;
+    # do NOT swallow them. is_cyclophane already returns False (not raises) for
+    # non-cyclophane mol per D-03 topology gate, so the try/except handles
+    # ONLY the bootstrap ImportError case.
+    try:
+        from .phane import is_cyclophane
+    except ImportError:
+        pass
+    else:
+        if is_cyclophane(mol):
+            all_systems = get_ring_systems(mol)
+            if any(ring_system_atoms == s for s in all_systems):
+                return RingSystemType.CYCLIC_PHANE
+
     # Classification priority (adapted from _classify_complex_ring in composer.py):
     # 1. bridged-fused (detect_bridged_fused) FIRST
     # 2. bicyclo (is_bicyclo_system) -- pure 2-ring bridged
