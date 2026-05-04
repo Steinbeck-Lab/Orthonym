@@ -241,8 +241,12 @@ def _shortest_chain_path(
                 continue
             if ni in ring_b:
                 # Direct ring_a -> ring_b bond = ring assembly territory; no
-                # intermediate atoms on the chain.
-                return []
+                # intermediate atoms on the chain. Return None (not []) so
+                # callers that distinguish "no chain found" from "empty chain
+                # found" treat direct adjacency as a non-cyclophane signal
+                # (matches _shortest_chain_path_via_anchor's contract;
+                # 155-REVIEW.md WR-02).
+                return None
             if ni not in visited:
                 visited.add(ni)
                 parent[ni] = None  # sentinel: came from ring_a
@@ -687,7 +691,13 @@ def _shortest_chain_path_via_anchor(
         if ni in ring_a or ni in ring_b:
             continue
         if ni == anchor_b:
-            return []
+            # Direct anchor-to-anchor adjacency = no intermediate chain atoms,
+            # which is ring-assembly territory (P-28), not cyclophane.
+            # Return None (not []) so _collapse_bridge_count's
+            # `if path is None: continue` guard correctly drops the degenerate
+            # entry instead of recording it as a 0-length bridge that would
+            # later emit `[0.X]paracyclophane` (155-REVIEW.md WR-02).
+            return None
         if ni not in visited:
             visited.add(ni)
             parent[ni] = None  # came from anchor_a directly
