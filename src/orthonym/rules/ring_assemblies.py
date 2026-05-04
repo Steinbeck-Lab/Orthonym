@@ -1340,16 +1340,42 @@ def name_ring_assembly_prefix(
         )
     attach_prime = _format_prime(attach_system_idx)
 
-    # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
-    # (IUPAC P-31.1.3.4: terminal 'e' dropped before '-yl')
-    display_name = ring_name
-    if display_name.endswith('e'):
-        display_name = display_name[:-1]
+    # Phase 155.B D-09: indicated-H placement subset for ring-assembly
+    # SUBSTITUENT prefix path. Mirrors the parent-path replication in
+    # `name_ring_assembly` (line 1201-1212) so a biindole-bearing
+    # substituent emits `[1H,1'H-2,2'-biindol]-5-yl` instead of the pre-fix
+    # buggy form `[2,2'-bi1H-indol]-5-yl`. Both call sites now agree on
+    # the replication contract -- a biindole-bearing molecule names
+    # consistently whether the assembly is parent or substituent.
+    # Source: 155-REVIEW.md WR-01; HERITAGE-followups.md Follow-up 12
+    #         placement subset; IUPAC P-31.1.4.  Reuses _format_prime
+    #         and _INDICATED_H_RE.
+    indicated_h_match = _INDICATED_H_RE.match(ring_name)
+    if indicated_h_match:
+        locant_int, ring_stem = (
+            indicated_h_match.group(1),
+            indicated_h_match.group(2),
+        )
+        indicated_h_replicated = ",".join(
+            f"{locant_int}{_format_prime(i)}H" for i in range(count)
+        ) + "-"
+        # Vowel elision for the -yl form: "indole" -> "indol".
+        display_stem = ring_stem[:-1] if ring_stem.endswith('e') else ring_stem
+        # Assembly base: "1H,1'H-2,2'-biindol"
+        assembly_base = (
+            f"{indicated_h_replicated}{connection_str}-{multiplier}{display_stem}"
+        )
+    else:
+        # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
+        # (IUPAC P-31.1.3.4: terminal 'e' dropped before '-yl')
+        display_name = ring_name
+        if display_name.endswith('e'):
+            display_name = display_name[:-1]
 
-    # Assembly base: "1,1'-biphenyl" or "2,2'-bipyridin"
-    assembly_base = f"{connection_str}-{multiplier}{display_name}"
+        # Assembly base: "1,1'-biphenyl" or "2,2'-bipyridin"
+        assembly_base = f"{connection_str}-{multiplier}{display_name}"
 
-    # Full prefix: "[1,1'-biphenyl]-4-yl"
+    # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
     return f"[{assembly_base}]-{attach_locant}{attach_prime}-yl"
 
 
