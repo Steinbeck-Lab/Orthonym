@@ -1,0 +1,182 @@
+[
+  {
+    "fixture_id": "blue_book_benzo_b_furan",
+    "smiles": "c1ccc2occc2c1",
+    "expected_name": "1-benzofuran",
+    "fusion_subclass": "benzo[b]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex1",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H6O",
+    "opsin_rt_smi": "O1C=CC2=C1C=CC=C2"
+  },
+  {
+    "fixture_id": "blue_book_isobenzofuran",
+    "smiles": "c1cc2cocc2cc1",
+    "expected_name": "isobenzofuran",
+    "fusion_subclass": "benzo[c]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex2",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H6O",
+    "opsin_rt_smi": "C=1OC=C2C=CC=CC12"
+  },
+  {
+    "fixture_id": "blue_book_benzo_b_thiophene",
+    "smiles": "c1ccc2sccc2c1",
+    "expected_name": "1-benzothiophene",
+    "fusion_subclass": "benzo[b]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex3",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H6S",
+    "opsin_rt_smi": "S1C=CC2=C1C=CC=C2"
+  },
+  {
+    "fixture_id": "blue_book_indole",
+    "smiles": "c1ccc2[nH]ccc2c1",
+    "expected_name": "1H-indole",
+    "fusion_subclass": "benzo[b]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex4",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H7N",
+    "opsin_rt_smi": "N1C=CC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "blue_book_isoindole",
+    "smiles": "c1ccc2c[nH]cc2c1",
+    "expected_name": "2H-isoindole",
+    "fusion_subclass": "benzo[c]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex5",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H7N",
+    "opsin_rt_smi": "C=1NC=C2C=CC=CC12"
+  },
+  {
+    "fixture_id": "blue_book_1H_benzimidazole",
+    "smiles": "c1ccc2[nH]cnc2c1",
+    "expected_name": "1H-benzimidazole",
+    "fusion_subclass": "benzo[d]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex6",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C7H6N2",
+    "opsin_rt_smi": "N1C=NC2=C1C=CC=C2"
+  },
+  {
+    "fixture_id": "blue_book_1_3_benzothiazole",
+    "smiles": "c1ccc2scnc2c1",
+    "expected_name": "1,3-benzothiazole",
+    "fusion_subclass": "benzo[d]",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex7",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C7H5NS",
+    "opsin_rt_smi": "S1C=NC2=C1C=CC=C2"
+  },
+  {
+    "fixture_id": "blue_book_quinoline",
+    "smiles": "c1ccc2ncccc2c1",
+    "expected_name": "quinoline",
+    "fusion_subclass": "pyrido-benzo",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex8",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C9H7N",
+    "opsin_rt_smi": "N1=CC=CC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "blue_book_isoquinoline",
+    "smiles": "c1ccc2cnccc2c1",
+    "expected_name": "isoquinoline",
+    "fusion_subclass": "pyrido-benzo",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex9",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C9H7N",
+    "opsin_rt_smi": "C1=NC=CC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "blue_book_pyrido_2_3_b_pyridine",
+    "smiles": "c1cnc2cccnc2c1",
+    "expected_name": "pyrido[2,3-b]pyridine",
+    "fusion_subclass": "pyrido-pyrido",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex10",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H6N2",
+    "opsin_rt_smi": "N1=CC=CC=2C1=NC=CC2"
+  },
+  {
+    "fixture_id": "blue_book_imidazo_1_2_a_pyridine",
+    "smiles": "c1ccn2ccnc2c1",
+    "expected_name": "imidazo[1,2-a]pyridine",
+    "fusion_subclass": "imidazo-pyrido",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.2.2.4_ex11",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C7H6N2",
+    "opsin_rt_smi": "N=1C=CN2C1C=CC=C2"
+  },
+  {
+    "fixture_id": "chebi_5000_furo_3_2_c_pyran",
+    "smiles": "O=C1C=C2COC(O)C=C2O1",
+    "expected_name": "6-hydroxy-4H-furo[3,2-c]pyran-2(6H)-one",
+    "fusion_subclass": "furo-pyran",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:145111",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C7H6O4",
+    "opsin_rt_smi": "OC1C=C2C(CO1)=CC(O2)=O"
+  }
+]

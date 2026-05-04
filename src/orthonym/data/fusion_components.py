@@ -100,7 +100,16 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 3],   # 1,3-diazole
-        'seniority': 47,
+        # Phase 155.C D-11: seniority corrected from 47 -> 50 per P-25.2.2.4
+        # Jan 2022 errata. 155-AUDIT-C.md row 7: classification WRONG-tier
+        # (expected 50-59 = 5-mem N-het band, was 47 in 6-mem N-het band
+        # 40-49). Cross-check Phase 149 fused_ring_selection.py:
+        # select_base_component still picks IUPAC-preferred base after
+        # change (FR-2.3 (a)-(f) decides before this last-resort tiebreaker
+        # is consulted — verified by 8-case P-25.2.2.4 regression matrix
+        # in 155-AUDIT-C.md). Preserves imidazole < pyrrole(55) — i.e.
+        # 5-mem 2N more senior than 5-mem 1N when FR-2.3 ties.
+        'seniority': 50,
         'aromatic': True,
     },
     'pyrazole': {
@@ -108,7 +117,13 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'N'],
         'hetero_positions': [1, 2],   # 1,2-diazole
-        'seniority': 48,
+        # Phase 155.C D-11: seniority corrected from 48 -> 51 per P-25.2.2.4
+        # Jan 2022 errata. 155-AUDIT-C.md row 8: classification WRONG-tier
+        # (expected 50-59 = 5-mem N-het band, was 48 in 6-mem N-het band
+        # 40-49). Preserves pyrazole < pyrrole(55) and pyrazole > imidazole(50)
+        # ordering — 1,2-diazole and 1,3-diazole both 5-mem 2N; FR-2.3
+        # (a)-(f) decides ordering before this fallback fires.
+        'seniority': 51,
         'aromatic': True,
     },
 
@@ -136,7 +151,14 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 3],   # S at 1, N at 3
-        'seniority': 77,
+        # Phase 155.C D-11: seniority corrected from 77 -> 80 per P-25.2.2.4
+        # Jan 2022 errata. 155-AUDIT-C.md row 11: classification WRONG-tier
+        # (expected 80-89 = S/N+S-het band, was 77 in O-het band 70-79).
+        # Cross-check: thiazole stays MORE senior than thiophene(85) under
+        # this tiebreaker — i.e. 5-mem N+S more senior than 5-mem 1×S when
+        # FR-2.3 ties. FR-2.3 (a) heteroatom-priority N > O > S already
+        # decides thiazole vs furan/pyran without consulting this field.
+        'seniority': 80,
         'aromatic': True,
     },
     'isothiazole': {
@@ -144,7 +166,13 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'ring_size': 5,
         'heteroatoms': ['N', 'S'],
         'hetero_positions': [1, 2],   # S at 1, N at 2
-        'seniority': 78,
+        # Phase 155.C D-11: seniority corrected from 78 -> 81 per P-25.2.2.4
+        # Jan 2022 errata. 155-AUDIT-C.md row 12: classification WRONG-tier
+        # (expected 80-89 = S/N+S-het band, was 78 in O-het band 70-79).
+        # Preserves isothiazole < thiophene(85) and isothiazole > thiazole(80)
+        # ordering — both 5-mem N+S; 1,3-isomer (thiazole) more senior than
+        # 1,2-isomer (isothiazole) per FR-2.3 (h) lower-locant cascade.
+        'seniority': 81,
         'aromatic': True,
     },
 
