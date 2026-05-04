@@ -1,0 +1,272 @@
+[
+  {
+    "fixture_id": "chebi_5000_1H_0_1H_quinazoline_2_4_dione",
+    "smiles": "O=c1[nH]c(=O)c2ccccc2[nH]1",
+    "expected_name": "1H-quinazoline-2,4-dione",
+    "indicated_h_subclass": "1H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:198582",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H6N2O2",
+    "opsin_rt_smi": "N1C(NC(C2=CC=CC=C12)=O)=O"
+  },
+  {
+    "fixture_id": "chebi_5000_1H_1_1H_indol_3_ylacetate",
+    "smiles": "O=C([O-])Cc1c[nH]c2ccccc12",
+    "expected_name": "1H-indol-3-ylacetate",
+    "indicated_h_subclass": "1H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:30854",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C10H9NO2",
+    "opsin_rt_smi": "N1C=C(C2=CC=CC=C12)CC(=O)[O-]"
+  },
+  {
+    "fixture_id": "chebi_5000_1H_2_1H_indazole",
+    "smiles": "c1ccc2[nH]ncc2c1",
+    "expected_name": "1H-indazole",
+    "indicated_h_subclass": "1H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:36669",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C7H6N2",
+    "opsin_rt_smi": "N1N=CC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "chebi_5000_4H_0_4H_indene",
+    "smiles": "C1=CCC2=CC=CC2=C1",
+    "expected_name": "4H-indene",
+    "indicated_h_subclass": "4H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:33055",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C9H8",
+    "opsin_rt_smi": "C1=CC=C2CC=CC=C12"
+  },
+  {
+    "fixture_id": "chebi_5000_4H_1_4H_indol_4_one",
+    "smiles": "O=C1C=CC=C2N=CC=C12",
+    "expected_name": "4H-indol-4-one",
+    "indicated_h_subclass": "4H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:51631",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H5NO",
+    "opsin_rt_smi": "N1=CC=C2C(C=CC=C12)=O"
+  },
+  {
+    "fixture_id": "chebi_5000_9H_0_9H_purin_2_amine",
+    "smiles": "Nc1ncc2nc[nH]c2n1",
+    "expected_name": "9H-purin-2-amine",
+    "indicated_h_subclass": "9H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:479072",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C5H5N5",
+    "opsin_rt_smi": "N1=C(N=C2NC=NC2=C1)N"
+  },
+  {
+    "fixture_id": "opsin_selftest_500_9H_1_9H_purine",
+    "smiles": "c1ncc2nc[nH]c2n1",
+    "expected_name": "9H-purine",
+    "indicated_h_subclass": "9H",
+    "corpus_provenance": {
+      "corpus": "opsin_selftest_500",
+      "row_id": "CHEBI:35589",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C5H4N4",
+    "opsin_rt_smi": "N1=CN=C2NC=NC2=C1"
+  },
+  {
+    "fixture_id": "chebi_5000_embedded_0_2aS_3R_6S_6aR_6bS_7aR_7bR_7cR",
+    "smiles": "C=C(C)[C@@H]1[C@H]2OC(=O)[C@@H]1[C@]1(O)[C@H]3O[C@H]3[C@]3(O)CO[C@H]2[C@]13C",
+    "expected_name": "(2aS,3R,6S,6aR,6bS,7aR,7bR,7cR,8R)-6a,7b-dihydroxy-7c-methyl-8-(prop-1-en-2-yl)octahydro-3,6-methano-2,4,7-trioxacyclopenta[cd]cyclopropa[a]azulen-5(1H)-one",
+    "indicated_h_subclass": "embedded",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:132864",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C15H18O6",
+    "opsin_rt_smi": "O[C@@]12[C@H]3C(O[C@@H]([C@@H]4[C@]2([C@]([C@H]2[C@@H]1O2)(CO4)O)C)[C@H]3C(=C)C)=O"
+  },
+  {
+    "fixture_id": "chebi_5000_embedded_1_5_hydroxy_8_methoxy_4_phenylis",
+    "smiles": "COc1ccc(O)c2c(-c3ccccc3)c[nH]c(=O)c12",
+    "expected_name": "5-hydroxy-8-methoxy-4-phenylisoquinolin-1(2H)-one",
+    "indicated_h_subclass": "embedded",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:141354",
+      "primary_class": "aromatic",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C16H13NO3",
+    "opsin_rt_smi": "OC1=C2C(=CNC(C2=C(C=C1)OC)=O)C1=CC=CC=C1"
+  },
+  {
+    "fixture_id": "chebi_5000_embedded_2_2R_4R_5S_6R_6_heptyl_4_5_dihy",
+    "smiles": "CCCCCCC[C@H]1OC2=C(C(=O)[C@@H](C)O2)[C@@H](O)[C@]1(C)O",
+    "expected_name": "(2R,4R,5S,6R)-6-heptyl-4,5-dihydroxy-2,5-dimethyl-5,6-dihydro-4H-furo[2,3-b]pyran-3(2H)-one",
+    "indicated_h_subclass": "embedded",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:141361",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C16H26O5",
+    "opsin_rt_smi": "C(CCCCCC)[C@@H]1[C@@]([C@@H](C2=C(O1)O[C@@H](C2=O)C)O)(C)O"
+  },
+  {
+    "fixture_id": "chebi_5000_no-H_0_1S_6S_7S_8S_1_3_dimethyl_8_pr",
+    "smiles": "CC1=CC[C@H]2[C@H]3C1[C@@]2(C)CC[C@H]3C(C)C",
+    "expected_name": "(1S,6S,7S,8S)-1,3-dimethyl-8-(propan-2-yl)-tricyclo[4.4.0.0(2,7)]dec-3-ene",
+    "indicated_h_subclass": "no-H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:10221",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C15H24",
+    "opsin_rt_smi": "C[C@]12C3C(=CC[C@H]2[C@@H]3[C@@H](CC1)C(C)C)C"
+  },
+  {
+    "fixture_id": "chebi_5000_no-H_1_3aS_3bR_4S_7R_7aR_3_7_dimethy",
+    "smiles": "CC1=CC[C@@]23[C@@H]([C@@H]12)[C@H](C(C)C)CC[C@H]3C",
+    "expected_name": "(3aS,3bR,4S,7R,7aR)-3,7-dimethyl-4-(propan-2-yl)-3a,3b,4,5,6,7-hexahydro-1H-cyclopenta[1,3]cyclopropa[1,2]benzene",
+    "indicated_h_subclass": "no-H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:10224",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C15H24",
+    "opsin_rt_smi": "CC1=CC[C@@]23[C@@H](CC[C@H]([C@@H]2[C@H]31)C(C)C)C"
+  },
+  {
+    "fixture_id": "chebi_5000_no-H_2_1R_4E_9S_4_11_11_trimethyl_8",
+    "smiles": "C=C1CC/C=C(\\C)CC[C@@H]2[C@@H]1CC2(C)C",
+    "expected_name": "(1R,4E,9S)-4,11,11-trimethyl-8-methylidenebicyclo[7.2.0]undec-4-ene",
+    "indicated_h_subclass": "no-H",
+    "corpus_provenance": {
+      "corpus": "chebi_5000",
+      "row_id": "CHEBI:10357",
+      "primary_class": "fused-ring",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C15H24",
+    "opsin_rt_smi": "C/C=1/CC[C@H]2C(C[C@@H]2C(CC/C1)=C)(C)C"
+  },
+  {
+    "fixture_id": "bluebook_2H_2H_pyran",
+    "smiles": "C1=COC=CC1",
+    "expected_name": "2H-pyran",
+    "indicated_h_subclass": "2H",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.3 / P-31.1.4 \u2014 2H-pyran",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C5H6O",
+    "opsin_rt_smi": "O1CC=CC=C1"
+  },
+  {
+    "fixture_id": "bluebook_2H_2H_chromene",
+    "smiles": "C1=Cc2ccccc2OC1",
+    "expected_name": "2H-chromene",
+    "indicated_h_subclass": "2H",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.3 / P-31.1.4 \u2014 2H-chromene",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C9H8O",
+    "opsin_rt_smi": "O1CC=CC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "bluebook_3H_3H_indole",
+    "smiles": "C1=Nc2ccccc2C1",
+    "expected_name": "3H-indole",
+    "indicated_h_subclass": "3H",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.3 / P-31.1.4 \u2014 3H-indole",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C8H7N",
+    "opsin_rt_smi": "N1=CCC2=CC=CC=C12"
+  },
+  {
+    "fixture_id": "bluebook_3H_3H_imidazo45_cpyridine",
+    "smiles": "c1cc2nc[nH]cc-2n1",
+    "expected_name": "3H-imidazo[4,5-c]pyridine",
+    "indicated_h_subclass": "3H",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.3 / P-31.1.4 \u2014 3H-imidazo[4,5-c]pyridine",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C6H5N3",
+    "opsin_rt_smi": "N1=CNC=2C=NC=CC21"
+  },
+  {
+    "fixture_id": "bluebook_3H_3H_pyrrole",
+    "smiles": "C1=CCN=C1",
+    "expected_name": "3H-pyrrole",
+    "indicated_h_subclass": "3H",
+    "corpus_provenance": {
+      "corpus": "blue_book",
+      "row_id": "P-25.3 / P-31.1.4 \u2014 3H-pyrrole",
+      "primary_class": "heterocycle",
+      "salt_class": false
+    },
+    "opsin_rt_verified": true,
+    "inchi_l1_input": "InChI=1S/C4H5N",
+    "opsin_rt_smi": "N1=CCC=C1"
+  }
+]
