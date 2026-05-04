@@ -16,6 +16,7 @@ Example outputs:
   - 4-chlorobiphenyl SMILES -> "4-chloro-1,1'-biphenyl"
 """
 
+import re
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -23,6 +24,15 @@ from rdkit import Chem
 from rdkit.Chem import rdchem
 
 from ..perception.rings import get_ring_info, is_aromatic_ring
+
+
+# Phase 155.B D-09: detect indicated-H prefix in a ring stem name like
+# "1H-indole" so name_ring_assembly can replicate the descriptor across
+# all primed rings ("1H,1'H-2,2'-biindole") instead of leaving it embedded
+# as a substring of a single ring name ("2,2'-bi1H-indole").
+# Source: 155-CONTEXT.md D-09; HERITAGE-followups.md Follow-up 12 placement
+#         subset; IUPAC P-31.1.4.
+_INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 
 # Phase 151-03 D-21 type alias: cascade-step-6 supplier returns int|tuple
 # locants. Tuples are reserved for fusion-atom locants like (8, 'a');
@@ -1178,8 +1188,30 @@ def name_ring_assembly(
 
     connection_str = ":".join(connection_parts)
 
-    # Build assembly base name
-    base_name = f"{connection_str}-{multiplier}{ring_name}"
+    # Phase 155.B D-09: indicated-H placement subset for ring assemblies.
+    # If ring_name carries an indicated-H prefix like "1H-indole", emit the
+    # descriptor once per primed ring ("1H,1'H-2,2'-biindole") instead of
+    # leaving it embedded inside the multiplied stem ("2,2'-bi1H-indole",
+    # the buggy pre-fix output).  The deeper assembly-builder rewrite
+    # (per-ring indicated-H locants generically threaded into the assembly
+    # base-name for biindole-class assemblies) stays in Phase 151's deferred-
+    # warnings backlog (Follow-up 12 main thread).
+    # Source: 155-CONTEXT.md D-09; HERITAGE-followups.md Follow-up 12 placement
+    #         subset; IUPAC P-31.1.4.  Reuses _format_prime above.
+    indicated_h_match = _INDICATED_H_RE.match(ring_name)
+    if indicated_h_match:
+        locant_int, ring_stem = (
+            indicated_h_match.group(1),
+            indicated_h_match.group(2),
+        )
+        indicated_h_replicated = ",".join(
+            f"{locant_int}{_format_prime(i)}H" for i in range(count)
+        ) + "-"
+        base_name = (
+            f"{indicated_h_replicated}{connection_str}-{multiplier}{ring_stem}"
+        )
+    else:
+        base_name = f"{connection_str}-{multiplier}{ring_name}"
 
     # Find substituents
     substituent_list = _get_substituent_info(mol, ring_systems, connections)
