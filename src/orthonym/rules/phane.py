@@ -161,13 +161,18 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
                 # multiplicative territory; 0-atom = ring_assembly).
                 continue
             # (4) chain belongs to a macro ring => closes a macrocycle.
+            # Require the full chain to be a subset of some macro SSSR ring.
+            # `chain_atoms` already excludes the linker-ring endpoints (per
+            # `_shortest_chain_path` which never crosses ring_a / ring_b
+            # atoms), so a genuine cyclophane chain lies entirely inside the
+            # macrocyclic SSSR ring. The previous `chain_atoms & macro`
+            # partial-overlap fallback admitted false positives where one
+            # chain atom happened to belong to some unrelated macro ring at
+            # random; without a Blue Book P-26.4 fixture demonstrating the
+            # partial-overlap necessity, the looser test risks accepting
+            # non-cyclophane topologies (155-REVIEW.md WR-04).
             for macro in macro_rings:
                 if chain_atoms <= macro:
-                    return True
-                if chain_atoms & macro:
-                    # Partial overlap is enough -- the chain is part of a
-                    # macrocyclic ring (the macro ring may include linker-ring
-                    # atoms at its boundary).
                     return True
     return False
 
