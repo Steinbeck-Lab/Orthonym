@@ -34,6 +34,18 @@ from ..perception.rings import get_ring_info, is_aromatic_ring
 #         subset; IUPAC P-31.1.4.
 _INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 
+# Phase 155 WR-05: detect embedded P-31.1.4.4 indicated-H descriptors inside
+# a ring stem name like "phenanthridin-6(5H)-one" or "acridin-9(10H)-one".
+# The placement-replication logic in `_INDICATED_H_RE` only covers the
+# leading "<n>H-" prefix form; embedded "(<n>H)" descriptors require a
+# different per-ring threading strategy (deferred to Phase 151 Follow-up
+# 12's deeper assembly-builder rewrite). Until that rewrite lands, ring
+# assemblies whose component stem carries an embedded descriptor fail
+# closed (return None) rather than emit the buggy mid-string `bi...`
+# token (e.g., the pre-fix `2,2'-biphenanthridin-6(5H)-one` form).
+# Source: 155-REVIEW.md WR-05; IUPAC P-31.1.4.4.
+_INDICATED_H_EMBEDDED_RE = re.compile(r"\(\d+H\)")
+
 # Phase 151-03 D-21 type alias: cascade-step-6 supplier returns int|tuple
 # locants. Tuples are reserved for fusion-atom locants like (8, 'a');
 # ring assemblies use plain ints because primes are name-format-layer only
@@ -1150,6 +1162,15 @@ def name_ring_assembly(
     if ring_name is None:
         return None
 
+    # Phase 155 WR-05: ring stems carrying an embedded P-31.1.4.4 indicated-H
+    # descriptor (e.g. "phenanthridin-6(5H)-one", "acridin-9(10H)-one") need a
+    # per-ring threading strategy the placement-subset fix doesn't implement;
+    # fail closed (return None) so a higher-level fallback can attempt naming
+    # rather than emit the buggy mid-string `2,2'-biphenanthridin-6(5H)-one`
+    # form. Deeper rewrite is Phase 151 Follow-up 12 main-thread territory.
+    if _INDICATED_H_EMBEDDED_RE.search(ring_name):
+        return None
+
     # Build connection locant string per IUPAC P-28.2.1.
     # Phase 151-03 D-18 / D-19: use per-system numbering so ter-/quater-
     # assemblies emit the correct middle-ring back-attachment locant
@@ -1290,6 +1311,11 @@ def name_ring_assembly_prefix(
 
     ring_name = _get_ring_parent_name(mol, ring_systems[0])
     if ring_name is None:
+        return None
+
+    # Phase 155 WR-05: same fail-closed as in `name_ring_assembly` for embedded
+    # P-31.1.4.4 descriptors. Both call sites must agree on the contract.
+    if _INDICATED_H_EMBEDDED_RE.search(ring_name):
         return None
 
     # Build connection locant string (reuse existing logic from name_ring_assembly)
