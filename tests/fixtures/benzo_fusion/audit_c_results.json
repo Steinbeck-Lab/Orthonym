@@ -1,0 +1,192 @@
+[
+  {
+    "actual_seniority": 200,
+    "classification": "CORRECT-tier",
+    "expected_hi": 200,
+    "expected_lo": 200,
+    "heteroatoms": [],
+    "name": "cyclopentadiene",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 200,
+    "classification": "CORRECT-tier",
+    "expected_hi": 200,
+    "expected_lo": 200,
+    "heteroatoms": [],
+    "name": "benzene",
+    "ring_size": 6
+  },
+  {
+    "actual_seniority": 200,
+    "classification": "CORRECT-tier",
+    "expected_hi": 200,
+    "expected_lo": 200,
+    "heteroatoms": [],
+    "name": "cycloheptadiene",
+    "ring_size": 7
+  },
+  {
+    "actual_seniority": 71,
+    "classification": "CORRECT-tier",
+    "expected_hi": 79,
+    "expected_lo": 70,
+    "heteroatoms": [
+      "O"
+    ],
+    "name": "furan",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 85,
+    "classification": "CORRECT-tier",
+    "expected_hi": 89,
+    "expected_lo": 80,
+    "heteroatoms": [
+      "S"
+    ],
+    "name": "thiophene",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 55,
+    "classification": "CORRECT-tier",
+    "expected_hi": 59,
+    "expected_lo": 50,
+    "heteroatoms": [
+      "N"
+    ],
+    "name": "pyrrole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 47,
+    "classification": "WRONG-tier",
+    "expected_hi": 59,
+    "expected_lo": 50,
+    "heteroatoms": [
+      "N",
+      "N"
+    ],
+    "name": "imidazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 48,
+    "classification": "WRONG-tier",
+    "expected_hi": 59,
+    "expected_lo": 50,
+    "heteroatoms": [
+      "N",
+      "N"
+    ],
+    "name": "pyrazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 63,
+    "classification": "CORRECT-tier",
+    "expected_hi": 69,
+    "expected_lo": 60,
+    "heteroatoms": [
+      "N",
+      "O"
+    ],
+    "name": "oxazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 64,
+    "classification": "CORRECT-tier",
+    "expected_hi": 69,
+    "expected_lo": 60,
+    "heteroatoms": [
+      "N",
+      "O"
+    ],
+    "name": "isoxazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 77,
+    "classification": "WRONG-tier",
+    "expected_hi": 89,
+    "expected_lo": 80,
+    "heteroatoms": [
+      "N",
+      "S"
+    ],
+    "name": "thiazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 78,
+    "classification": "WRONG-tier",
+    "expected_hi": 89,
+    "expected_lo": 80,
+    "heteroatoms": [
+      "N",
+      "S"
+    ],
+    "name": "isothiazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 49,
+    "classification": "CORRECT-tier",
+    "expected_hi": 49,
+    "expected_lo": 40,
+    "heteroatoms": [
+      "N"
+    ],
+    "name": "pyridine",
+    "ring_size": 6
+  },
+  {
+    "actual_seniority": 72,
+    "classification": "CORRECT-tier",
+    "expected_hi": 79,
+    "expected_lo": 70,
+    "heteroatoms": [
+      "O"
+    ],
+    "name": "pyran",
+    "ring_size": 6
+  },
+  {
+    "actual_seniority": 43,
+    "classification": "CORRECT-tier",
+    "expected_hi": 49,
+    "expected_lo": 40,
+    "heteroatoms": [
+      "N",
+      "N"
+    ],
+    "name": "pyrimidine",
+    "ring_size": 6
+  },
+  {
+    "actual_seniority": 45,
+    "classification": "CORRECT-tier",
+    "expected_hi": 49,
+    "expected_lo": 40,
+    "heteroatoms": [
+      "N",
+      "N"
+    ],
+    "name": "pyrazine",
+    "ring_size": 6
+  },
+  {
+    "actual_seniority": 44,
+    "classification": "CORRECT-tier",
+    "expected_hi": 49,
+    "expected_lo": 40,
+    "heteroatoms": [
+      "N",
+      "N"
+    ],
+    "name": "pyridazine",
+    "ring_size": 6
+  }
+]
