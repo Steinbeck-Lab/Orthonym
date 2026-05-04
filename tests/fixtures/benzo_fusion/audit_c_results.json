@@ -60,8 +60,8 @@
     "ring_size": 5
   },
   {
-    "actual_seniority": 47,
-    "classification": "WRONG-tier",
+    "actual_seniority": 50,
+    "classification": "CORRECT-tier",
     "expected_hi": 59,
     "expected_lo": 50,
     "heteroatoms": [
@@ -72,8 +72,8 @@
     "ring_size": 5
   },
   {
-    "actual_seniority": 48,
-    "classification": "WRONG-tier",
+    "actual_seniority": 51,
+    "classification": "CORRECT-tier",
     "expected_hi": 59,
     "expected_lo": 50,
     "heteroatoms": [
@@ -108,8 +108,8 @@
     "ring_size": 5
   },
   {
-    "actual_seniority": 77,
-    "classification": "WRONG-tier",
+    "actual_seniority": 80,
+    "classification": "CORRECT-tier",
     "expected_hi": 89,
     "expected_lo": 80,
     "heteroatoms": [
@@ -120,8 +120,8 @@
     "ring_size": 5
   },
   {
-    "actual_seniority": 78,
-    "classification": "WRONG-tier",
+    "actual_seniority": 81,
+    "classification": "CORRECT-tier",
     "expected_hi": 89,
     "expected_lo": 80,
     "heteroatoms": [

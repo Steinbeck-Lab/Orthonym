@@ -941,3 +941,135 @@ class TestEnumerateComponents:
         assert components == [], (
             f"acyclic mol must yield empty list; got {components}"
         )
+
+
+# ============================================================================
+# Phase 155.C — P-25.2.2.4 Benzo-Fusion Regression Cases (D-13)
+# ============================================================================
+
+
+def _ring_contains_symbol(sym: str):
+    """Return a predicate ``(mol, ring) -> bool`` true iff ``ring`` contains
+    at least one atom whose element symbol is ``sym``."""
+    def _pred(mol: Chem.Mol, ring) -> bool:
+        return any(mol.GetAtomWithIdx(i).GetSymbol() == sym for i in ring)
+    return _pred
+
+
+def _ring_is_pure_carbocycle():
+    """Return a predicate ``(mol, ring) -> bool`` true iff every atom in the
+    ring is carbon (no heteroatoms)."""
+    def _pred(mol: Chem.Mol, ring) -> bool:
+        return all(mol.GetAtomWithIdx(i).GetSymbol() == "C" for i in ring)
+    return _pred
+
+
+class TestP25224BenzoFusion:
+    """Phase 155.C D-13 regression: P-25.2.2.4 Jan 2022 errata benzo-fusion
+    base-selection cases.
+
+    Eight canonical regression cases verify that Phase 149's FR-2.3 cascade
+    ((a)-(f) live, (g)-(j) deterministic stubs) selects the IUPAC-preferred
+    base component WITHOUT consulting MONOCYCLIC_COMPONENTS.seniority (the
+    last-resort numeric tiebreaker).
+
+    Per 155-AUDIT-C.md §"D-13 Activation Verdict": every case below picks the
+    HETEROCYCLIC ring (or in the homo-N pyrido-pyrido case the lower-locant
+    pyridine ring), never the pure-carbocyclic benzene ring. Phase 149's
+    FR-2.3 cascade is therefore sufficient — no `fused_ring_selection.py`
+    edit ships in sub-phase 155.C.
+
+    Source: 155-CONTEXT.md D-13.
+    Source: 155-AUDIT-C.md "P-25.2.2.4 Regression Cases (D-13 cross-check)".
+    Source: IUPAC P-25.2.2.4 Jan 2022 errata.
+    """
+
+    @pytest.mark.parametrize(
+        "smiles,base_predicate,case_label,expected_size",
+        [
+            # benzo[b]furan — base must be furan (5-ring containing O), NOT
+            # benzene (6-ring pure carbocycle).
+            ("c1ccc2occc2c1", _ring_contains_symbol("O"), "benzo[b]furan", 5),
+            # benzo[c]furan / isobenzofuran — base must be furan ring.
+            ("c1cc2cocc2cc1", _ring_contains_symbol("O"), "isobenzofuran", 5),
+            # 1H-indole — base must be pyrrole (5-ring containing N).
+            ("c1ccc2[nH]ccc2c1", _ring_contains_symbol("N"), "1H-indole", 5),
+            # 2H-isoindole — base must be pyrrole ring.
+            ("c1ccc2c[nH]cc2c1", _ring_contains_symbol("N"), "2H-isoindole", 5),
+            # 1H-benzimidazole — base must be imidazole (5-ring containing N).
+            ("c1ccc2[nH]cnc2c1", _ring_contains_symbol("N"), "1H-benzimidazole", 5),
+            # 1,3-benzothiazole — base must be thiazole (5-ring containing N
+            # — N is more senior than S in FR-2.3 (a)).
+            ("c1ccc2scnc2c1", _ring_contains_symbol("N"), "1,3-benzothiazole", 5),
+            # pyrido[2,3-b]pyridine — both 6-rings contain N; FR-2.3 still
+            # picks one canonical ring (verified deterministic).
+            ("c1cnc2cccnc2c1", _ring_contains_symbol("N"), "pyrido[2,3-b]pyridine", 6),
+            # pyrido[3,2-b]pyridine — homo-N case; FR-2.3 picks one ring.
+            ("c1cnc2ncccc2c1", _ring_contains_symbol("N"), "pyrido[3,2-b]pyridine", 6),
+        ],
+    )
+    def test_benzo_fusion_base_is_heterocyclic(
+        self, smiles, base_predicate, case_label, expected_size
+    ):
+        """FR-2.3 cascade selects the heterocyclic base for every benzo-fusion
+        regression case in 155-AUDIT-C.md (8 canonical P-25.2.2.4 examples)."""
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"RDKit failed to parse {smiles!r}"
+        components = [set(c) for c in _enumerate_components(mol)]
+        assert len(components) >= 2, (
+            f"{case_label}: expected >=2 SSSR rings; got {len(components)}"
+        )
+        base, _others = select_base_component(mol, components)
+        # Base ring contains the expected senior heteroatom.
+        assert base_predicate(mol, base), (
+            f"{case_label}: FR-2.3 picked base ring {sorted(base)} but it "
+            f"does not satisfy the base-predicate (expected senior heteroatom)"
+        )
+        # Base ring has the expected size (5 for benzo-fused 5-mem; 6 for
+        # pyrido-pyrido).
+        assert len(base) == expected_size, (
+            f"{case_label}: FR-2.3 picked base of size {len(base)}; "
+            f"expected {expected_size}"
+        )
+
+    def test_benzo_b_furan_base_is_NOT_benzene(self):
+        """Explicit anti-regression: for benzo[b]furan, FR-2.3 must NEVER pick
+        the pure-carbocyclic 6-ring as the base (would yield wrong PIN)."""
+        mol = Chem.MolFromSmiles("c1ccc2occc2c1")
+        components = [set(c) for c in _enumerate_components(mol)]
+        base, _ = select_base_component(mol, components)
+        # base must NOT be the all-carbon 6-ring
+        is_pure_carbocycle = all(
+            mol.GetAtomWithIdx(i).GetSymbol() == "C" for i in base
+        )
+        assert not is_pure_carbocycle, (
+            f"FR-2.3 picked benzene as base for benzo[b]furan "
+            f"(atoms {sorted(base)}) — violates P-25.2.2.4. The "
+            f"heterocyclic component must be senior over benzene."
+        )
+
+    def test_d13_no_op_dataclass_defaults_unchanged(self):
+        """D-13 NO-OP guard: ComponentRank (g)-(j) stubs MUST stay at
+        dataclass defaults — Phase 155.C did NOT edit fused_ring_selection.py
+        per 155-AUDIT-C.md §"D-13 Activation Verdict"."""
+        # Get default values for the (g)-(j) stub fields by constructing
+        # ComponentRank with only the (a)-(f) required positional args.
+        rank = ComponentRank(
+            senior_het_neg=0,
+            ring_count_neg=0,
+            ring_sizes_neg=(),
+            het_count_neg=0,
+            het_variety_neg=0,
+        )
+        assert rank.orient_stub == 0, (
+            "D-13 NO-OP violated: orient_stub default changed from 0"
+        )
+        assert rank.het_locants_stub == (), (
+            "D-13 NO-OP violated: het_locants_stub default changed from ()"
+        )
+        assert rank.het_type_locants_stub == (), (
+            "D-13 NO-OP violated: het_type_locants_stub default changed"
+        )
+        assert rank.bridgehead_locants_stub == (), (
+            "D-13 NO-OP violated: bridgehead_locants_stub default changed"
+        )
