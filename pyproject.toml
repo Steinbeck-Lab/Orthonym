@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-benchmark>=5.0",  # NEW per Phase 156 D-16 < 50ms p99 hard gate
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
     "black>=23.0",
@@ -66,6 +67,7 @@ markers = [
     "integration: Compound class integration tests",
     "roundtrip: Round-trip validation with OPSIN",
     "slow: Full validation suite (100k+ compounds)",
+    "benchmark: Performance benchmark tests (pytest-benchmark)",
 ]
 addopts = "-v --tb=short"
 

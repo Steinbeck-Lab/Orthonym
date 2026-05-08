@@ -82,6 +82,69 @@ def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
 
 
 # ---------------------------------------------------------------------------
+# Universal OPSIN-grammar backstop (Phase 156)
+# ---------------------------------------------------------------------------
+
+
+def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
+                         grammar, stats: Dict[str, int]) -> str:
+    """Universal OPSIN-grammar backstop: validate + (round-trip-gated) repair.
+
+    Mirrors the `_final_stereo_check` shape (Phase 152 D-04 pattern).
+    Single chokepoint per CONTEXT.md D-13 — never per-handler-exit
+    (AP-6). On unrepairable failure, log WARNING and return ORIGINAL
+    name (D-11, D-15). Never silently mutate.
+
+    Args:
+        name: The assembled IUPAC name (post stereo backstop).
+        smiles: Original SMILES the name was generated from. Forwarded
+            to `OpsinGrammar.suggest_fix` for the round-trip gate per
+            CONTEXT.md D-09 / D-10. May be None on cold paths; the
+            grammar layer documents the degraded-path contract.
+        handler: Handler attribution string (per Phase 152 D-04
+            pattern); used in WARNING logs only.
+        grammar: An `OpsinGrammar` instance (or None when the
+            `_disable_grammar_validation` kwarg was passed at
+            construction time per D-14).
+        stats: The per-instance counter dict (D-17 / AP-19) shared by
+            reference with the grammar instance. Mutated in-place.
+
+    Returns:
+        Either the validated name (happy path), the round-trip-gated
+        repair (on validate-fail + successful repair), or the
+        original name (on validate-fail + no repair). Never raises.
+    """
+    if grammar is None or not name:
+        return name
+
+    if grammar.validate(name):
+        stats["validate_passed"] = stats.get("validate_passed", 0) + 1
+        return name
+
+    # validate() rejected — try suggest_fix (D-09 round-trip-gated).
+    # D-10 LOCKED signature: name FIRST, source_smiles SECOND.
+    repaired, repair_class = grammar.suggest_fix(name, source_smiles=smiles)
+
+    if repaired is not None and repaired != name:
+        # The grammar layer already incremented the matching
+        # `repair_succeeded_<class>` bucket internally per D-17.
+        logger.warning(
+            "OPSIN grammar repair: handler=%s class=%s original=%r repaired=%r",
+            handler, repair_class, name[:50], repaired[:50],
+        )
+        return repaired
+
+    # validate() rejected and no class produced a round-trip-passing
+    # candidate. Log unrepairable WARNING and fall back to ORIGINAL
+    # name per D-11 + D-15 (never silently mutate).
+    logger.warning(
+        "OPSIN grammar validation failed: handler=%s name=%r",
+        handler, name[:50],
+    )
+    return name
+
+
+# ---------------------------------------------------------------------------
 # Compound class pre-routing (Phase 141, CLASS-06)
 # ---------------------------------------------------------------------------
 
@@ -639,18 +702,47 @@ class Orthonym:
         'acetic acid'
     """
     
-    def __init__(self, style: str = "pin"):
+    def __init__(self, style: str = "pin", *,
+                 _disable_grammar_validation: bool = False):
         """
         Initialize namer.
-        
+
         Args:
             style: Naming style
                 - "pin": Preferred IUPAC Names (IUPAC 2013)
                 - "general": General IUPAC (more flexible)
                 - "cas": CAS-style naming
+            _disable_grammar_validation: Phase 156 escape hatch (D-14).
+                When True, the OPSIN grammar pre-validation layer is
+                disabled (`self._grammar` is None). ON by default in
+                production; OFF only for unit tests inspecting raw
+                handler output.
         """
         self.style = style
-    
+        # Phase 156 D-17 + AP-19: per-instance counter dict, NEVER
+        # module-global. Pre-seed all seven buckets so callers see a
+        # complete histogram even before any name() invocation.
+        from .validation.opsin_grammar import OpsinGrammar
+        self._grammar_stats: Dict[str, int] = {
+            k: 0 for k in OpsinGrammar.STAT_KEYS
+        }
+        if _disable_grammar_validation:
+            self._grammar = None
+        else:
+            # Share the dict by reference per D-17: the grammar
+            # instance increments the same dict the Orthonym instance
+            # exposes via `get_validation_stats()`.
+            self._grammar = OpsinGrammar(stats=self._grammar_stats)
+
+    def get_validation_stats(self) -> Dict[str, int]:
+        """Return a defensive copy of the per-instance grammar counters.
+
+        Phase 156 D-17 telemetry accessor. Buckets are pre-seeded in
+        `__init__`; counters are mutated in-place by the underlying
+        `OpsinGrammar` instance via the shared-by-reference dict.
+        """
+        return dict(self._grammar_stats)
+
     def name(self, smiles: str) -> str:
         """
         Generate IUPAC name from SMILES.
@@ -678,6 +770,14 @@ class Orthonym:
                     from .assembly.coverage_scoring import retrieve_confidence
                     handler = retrieve_confidence().get('handler', 'unknown')
                     result = _final_stereo_check(mol, result, handler=handler)
+                    # Universal OPSIN-grammar backstop (Phase 156, D-13).
+                    # Order: stereo-backstop -> grammar-backstop. Stereo
+                    # may have repositioned descriptors that grammar
+                    # then re-validates.
+                    result = _final_grammar_check(
+                        result, smiles, handler,
+                        self._grammar, self._grammar_stats,
+                    )
             return result
         finally:
             end_naming_session()
@@ -709,6 +809,11 @@ class Orthonym:
                 if mol is not None:
                     handler = retrieve_confidence().get('handler', 'unknown')
                     name = _final_stereo_check(mol, name, handler=handler)
+                    # Universal OPSIN-grammar backstop (Phase 156, D-13).
+                    name = _final_grammar_check(
+                        name, smiles, handler,
+                        self._grammar, self._grammar_stats,
+                    )
             metadata = retrieve_confidence()
             # If no candidate was scored (early return path), build minimal metadata
             if not metadata['name']:
