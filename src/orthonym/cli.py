@@ -64,6 +64,17 @@ def main(args: List[str] = None) -> int:
         help="Show confidence metadata alongside the name"
     )
 
+    # Phase 156 Plan-03 Task 4 (CONTEXT.md D-17 telemetry):
+    # Print the OPSIN-grammar pre-validation seven-bucket counter
+    # histogram to stderr after naming. Always goes through the
+    # `Orthonym(...).get_validation_stats()` accessor — never reads
+    # a module-global counter (AP-19).
+    parser.add_argument(
+        "--validation-stats",
+        action="store_true",
+        help="Print OPSIN grammar validation counters (D-17 telemetry) to stderr"
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
@@ -77,6 +88,20 @@ def main(args: List[str] = None) -> int:
         return 1
 
     try:
+        # Phase 156 Plan-03 Task 4: --validation-stats branch goes
+        # through Orthonym(...).get_validation_stats() per AP-19
+        # (never read a module-global counter). Branch is taken BEFORE
+        # the existing default `print(name)` so the histogram is the
+        # only stderr output path when the flag is on.
+        if parsed.validation_stats:
+            from orthonym.namer import Orthonym
+            namer = Orthonym(style=parsed.style)
+            name = namer.name(parsed.smiles)
+            print(name)
+            stats = namer.get_validation_stats()
+            print(f"Validation stats: {stats}", file=sys.stderr)
+            return 0
+
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
                                    include_confidence=True)
