@@ -42,16 +42,24 @@ class TestOPSINParseRegressions:
     IUPAC but OPSIN 2.9.0 cannot parse them. None of these had RT=1 in baseline.
     """
 
-    @pytest.mark.xfail(reason="OPSIN limitation: does not recognize 'ajmaline' NP retained name")
     def test_ajmaline_retained_name(self):
-        """Ajmaline is correctly resolved as retained NP name (was VB hexacyclo...)."""
+        """Ajmaline is correctly resolved as retained NP name (was VB hexacyclo...).
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 150
+        OPSIN XML retained-name expansion (914 entries; commit `1d1301f8`)
+        brought ajmaline into the registry; the test passes cleanly.
+        """
         name = name_compound(
             "CC[C@H]1[C@@H]2CC3[C@@H]4N(C)c5ccccc5[C@]45C[C@@H](C2C5O)N3[C@@H]1O"
         )
         assert name == "ajmaline"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: does not recognize 'berberine' alkaloid retained name")
     def test_berberine_retained_name(self):
-        """Berberine is correctly resolved as retained NP name (was VB tetracyclo...)."""
+        """Berberine is correctly resolved as retained NP name (was VB tetracyclo...).
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 150
+        OPSIN XML retained-name expansion brought berberine into the
+        registry; the test passes cleanly.
+        """
         name = name_compound("COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2")
         assert name == "berberine"

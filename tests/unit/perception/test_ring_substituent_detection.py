@@ -188,9 +188,13 @@ class TestEndToEndRingSubstituents:
         # Should contain pyrrolidin or related name, not butyl
         assert 'butyl' not in result.lower(), f'Should not be butyl, got {result}'
 
-    @pytest.mark.xfail(reason="Morpholine substituent naming needs retained name lookup")
     def test_morpholinyl_substituent(self):
-        """Morpholinyl substituent should be detected."""
+        """Morpholinyl substituent should be detected.
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 142
+        retained-name expansion + Phase 150 OPSIN XML import shipped
+        morpholine retained-name lookup; the test passes cleanly.
+        """
         result = name_compound('c1ccc(C2COCCN2)cc1')  # phenyl with morpholine
         # Should contain morpholin, not be named as alkyl
         assert 'morpholin' in result.lower() or 'oxazin' in result.lower(), \
@@ -200,18 +204,26 @@ class TestEndToEndRingSubstituents:
 class TestEdgeCases:
     """Test edge cases and complex scenarios."""
 
-    @pytest.mark.xfail(reason="Fused ring (naphthalene) substituent naming needs special handling")
     def test_fused_ring_substituent(self):
-        """Test that fused ring systems are handled."""
+        """Test that fused ring systems are handled.
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 142
+        ring-as-substituent naming (naphthalene → naphthalen-1-yl)
+        shipped; the test passes cleanly.
+        """
         # Naphthalene as substituent
         mol = Chem.MolFromSmiles('c1ccc2ccccc2c1CC(=O)O')  # naphthylacetic acid
         result = name_compound('c1ccc2ccccc2c1CC(=O)O')
         # Should recognize naphthyl, not decyl (10 carbons)
         assert 'decyl' not in result.lower(), f'Should not be decyl, got {result}'
 
-    @pytest.mark.xfail(reason="Ring-ring parent selection (benzene vs cyclohexane) needs special handling")
     def test_multiple_ring_substituents(self):
-        """Test multiple ring substituents on same parent."""
+        """Test multiple ring substituents on same parent.
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail. Phase 147
+        IUPAC P-44.1 cascade with locants ships ring-ring parent
+        selection; the test passes cleanly.
+        """
         result = name_compound('c1ccc(C2CCCCC2)cc1')  # cyclohexylbenzene
         assert 'cyclohexyl' in result.lower() or 'phenyl' in result.lower(), \
             f'Expected ring names, got {result}'
