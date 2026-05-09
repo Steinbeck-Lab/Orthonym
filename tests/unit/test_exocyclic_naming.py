@@ -340,7 +340,7 @@ class TestExocyclicEndToEnd:
 # OPSIN round-trip tests (Task 2)
 # =============================================================================
 
-OPSIN_JAR = "opsin/opsin-cli-2.8.0-jar-with-dependencies.jar"
+OPSIN_JAR = "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 
 def _opsin_name_to_smiles(name):

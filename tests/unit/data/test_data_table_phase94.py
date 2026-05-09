@@ -34,7 +34,7 @@ from orthonym.data.bicyclo_systems import BICYCLO_RETAINED_NAMES
 
 JAVA_AVAILABLE = shutil.which("java") is not None
 OPSIN_JAR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "opsin-cli-2.8.0-jar-with-dependencies.jar")
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "opsin-cli-2.9.0-jar-with-dependencies.jar")
 )
 OPSIN_AVAILABLE = JAVA_AVAILABLE and os.path.isfile(OPSIN_JAR)
 

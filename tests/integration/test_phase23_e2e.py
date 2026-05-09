@@ -248,7 +248,7 @@ class TestPhase23Regressions:
 
 JAVA_AVAILABLE = shutil.which("java") is not None
 OPSIN_JAR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "opsin-cli-2.8.0-jar-with-dependencies.jar"
+    os.path.dirname(__file__), "..", "..", "opsin-cli-2.9.0-jar-with-dependencies.jar"
 )
 OPSIN_JAR = os.path.normpath(OPSIN_JAR)
 OPSIN_AVAILABLE = JAVA_AVAILABLE and os.path.isfile(OPSIN_JAR)

@@ -317,7 +317,7 @@ class TestFattyAcidIdentification:
             r"(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\C/C=C\CCCCC"
         )
         name = name_compound(smiles)
-        jar = "/home/kohulan/OpenSTOUT/Orthonym/opsin-cli-2.8.0-jar-with-dependencies.jar"
+        jar = "/home/kohulan/OpenSTOUT/Orthonym/opsin-cli-2.9.0-jar-with-dependencies.jar"
         result = subprocess.run(
             ["java", "-jar", jar, "-osmi"],
             input=name,

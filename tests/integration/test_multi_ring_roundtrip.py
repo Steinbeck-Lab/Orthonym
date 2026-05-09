@@ -19,7 +19,7 @@ from orthonym import name_compound
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.8.0-jar-with-dependencies.jar"
+OPSIN_JAR = PROJECT_ROOT / "opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 
 def _opsin_available() -> bool:

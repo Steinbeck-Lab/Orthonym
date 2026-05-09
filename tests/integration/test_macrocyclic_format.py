@@ -11,17 +11,32 @@ from orthonym.namer import name_compound
 
 
 def opsin_parse(name: str) -> str | None:
-    """Parse IUPAC name through OPSIN, return SMILES or None."""
+    """Parse IUPAC name through OPSIN, return SMILES or None.
+
+    Phase 157 cleanup: routed through `_find_opsin_jar()` (Phase 138 D-22
+    canonical helper). The hardcoded `opsin-cli-2.8.0-...jar` was dead
+    since the project upgraded to opsin-cli-2.9.0.
+    """
+    from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+
+    opsin_jar = _find_opsin_jar()
+    if opsin_jar is None:
+        return None
     try:
         result = subprocess.run(
-            ["java", "-jar", "opsin-cli-2.8.0-jar-with-dependencies.jar", "-osmi"],
+            ["java", "-jar", opsin_jar, "-osmi"],
             input=name,
             capture_output=True,
             text=True,
             timeout=30,
         )
-        smiles = result.stdout.strip()
-        return smiles if smiles and smiles != "" else None
+        # OPSIN prints the prompt + result; take last non-empty line
+        lines = [l.strip() for l in result.stdout.split("\n") if l.strip()]
+        smiles = lines[-1] if lines else ""
+        # Filter out the prompt line that doesn't have parseable SMILES
+        if "help" in smiles.lower() or not smiles:
+            return None
+        return smiles
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
 

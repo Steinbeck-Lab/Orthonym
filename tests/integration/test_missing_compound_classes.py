@@ -23,7 +23,7 @@ from orthonym import name_compound
 # Helper: OPSIN round-trip
 # ---------------------------------------------------------------------------
 
-OPSIN_JAR = "opsin-cli-2.8.0-jar-with-dependencies.jar"
+OPSIN_JAR = "opsin-cli-2.9.0-jar-with-dependencies.jar"
 
 
 def _opsin_name_to_smiles(name: str) -> str | None:
@@ -151,11 +151,21 @@ class TestCLS02Disulfides:
 
     @pytest.mark.integration
     def test_diphenyl_disulfide(self):
-        """Aromatic disulfide: PhSSPh -- names via sulfanyl prefix."""
+        """Aromatic disulfide: PhSSPh -- names via sulfanyl/disulfanediyl prefix.
+
+        Phase 157 cleanup: extended the substring check to accept the
+        multiplicative `disulfanediyl` connector form (IUPAC P-25.3.1.3 /
+        P-66.6.3 valid PIN) in addition to the substitutive `sulfanyl`
+        and functional-class `disulfide` forms. The current v18 output
+        `1,1'-disulfanediyldibenzene` uses the multiplicative form per
+        P-14.5 — equally valid for symmetric aromatic disulfides.
+        """
         name = name_compound("c1ccc(SSc2ccccc2)cc1")
-        # At minimum should contain 'sulfanyl' or 'disulfide'
-        assert "sulfanyl" in name or "disulfide" in name, (
-            f"Expected 'sulfanyl' or 'disulfide' in '{name}'"
+        # PhSSPh names: 'sulfanyl' (substitutive), 'disulfanediyl'
+        # (multiplicative connector, P-25.3.1.3), or 'disulfide'
+        # (functional class). All are valid IUPAC PIN forms.
+        assert "sulfan" in name or "disulfide" in name, (
+            f"Expected 'sulfan*' or 'disulfide' in '{name}'"
         )
 
     @pytest.mark.integration

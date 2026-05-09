@@ -235,7 +235,7 @@ class TestEndToEndFusedRouting:
         """OPSIN should parse decahydronaphthalene successfully."""
         try:
             result = subprocess.run(
-                ['java', '-jar', 'opsin-cli-2.8.0-jar-with-dependencies.jar', '-osmi'],
+                ['java', '-jar', 'opsin-cli-2.9.0-jar-with-dependencies.jar', '-osmi'],
                 input='decahydronaphthalene',
                 capture_output=True,
                 text=True,
@@ -260,7 +260,7 @@ class TestEndToEndFusedRouting:
         """OPSIN should parse octahydropentalene successfully."""
         try:
             result = subprocess.run(
-                ['java', '-jar', 'opsin-cli-2.8.0-jar-with-dependencies.jar', '-osmi'],
+                ['java', '-jar', 'opsin-cli-2.9.0-jar-with-dependencies.jar', '-osmi'],
                 input='octahydropentalene',
                 capture_output=True,
                 text=True,
