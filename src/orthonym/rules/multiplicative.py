@@ -441,6 +441,50 @@ def _classify_multi_bridge(atom, ring_nbr_count: int) -> Optional[str]:
     return _MULTI_BRIDGE_NAMES.get((sym, h, ring_nbr_count))
 
 
+def _all_fragments_are_simple_carbocycles(mol, bridge_idx: int) -> bool:
+    """Check whether removing the bridge atom yields only simple carbocyclic
+    fragments (rings with no principal characteristic group / no heteroatoms
+    in the parent ring).
+
+    Phase 157 cleanup helper: the substitutive-PIN guard in
+    `_try_multi_atom_bridges` invokes this function to distinguish:
+      - Plain benzene fragments (e.g., (Ph)3P -> triphenylphosphane PIN)
+      - Phenol-like fragments with -OH (e.g., (HOPh)3P -> 4,4',4''-
+        phosphinidynetriphenol multiplicative PIN per P-14.5)
+
+    A fragment is "simple carbocyclic" if every atom is a ring carbon
+    OR an explicit hydrogen — no heteroatoms (O/N/S/etc.) AND no
+    extra-ring substituent atoms. Plain benzene `c1ccccc1` qualifies;
+    phenol `Oc1ccccc1` does NOT (has the hydroxyl O).
+
+    Args:
+        mol: the original RDKit Mol.
+        bridge_idx: atom index of the bridge to remove.
+
+    Returns:
+        True if every fragment after bridge removal is a simple
+        carbocycle with no principal characteristic group; False
+        otherwise (in which case multiplicative may be preferred).
+    """
+    emol = RWMol(Chem.RWMol(mol))
+    emol.RemoveAtom(bridge_idx)
+    try:
+        Chem.SanitizeMol(emol)
+    except Exception:
+        return False
+    frag_mols = Chem.GetMolFrags(emol.GetMol(), asMols=True, sanitizeFrags=True)
+    for frag in frag_mols:
+        for atom in frag.GetAtoms():
+            # Heteroatom in or out of ring -> NOT simple carbocyclic
+            if atom.GetAtomicNum() != 6 and atom.GetAtomicNum() != 1:
+                return False
+            # Extra-ring carbon (e.g., methyl substituent) -> still
+            # carbocyclic but has a substituent; out of "simple" scope.
+            if not atom.IsInRing() and atom.GetAtomicNum() == 6:
+                return False
+    return True
+
+
 def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
     """Try to find star-topology bridges connecting 3+ identical ring systems.
 
@@ -451,7 +495,32 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         N connecting 3 phenol rings -> nitrilotriphenol
         CH connecting 3 phenol rings -> methylidynetriphenol
         C connecting 4 phenol rings -> methanetetrayltetraphenol
+
+    Phase 157 cleanup substitutive-PIN guard:
+        For mononuclear parent hydrides (NH3, PH3, AsH3, SiH4, GeH4, SnH4,
+        PbH4, BH3, plus the multivalent CH4 case) substituted with 3+
+        IDENTICAL SIMPLE-RING groups, IUPAC P-66.6.1.1.3 / P-67.1.1.1 /
+        P-68 mandate the SUBSTITUTIVE form (e.g., `triphenylphosphane`,
+        `triphenylamine`, `triphenylmethane`) as PIN — not the
+        multiplicative form (`1,1',1''-phosphinidynetribenzene` etc.).
+        See `cleanup-deferred-items.md` D-157-11 for the full bug
+        provenance and IUPAC rule citations.
     """
+    # Mononuclear-parent-hydride elements where the SUBSTITUTIVE form is
+    # PIN over the multiplicative form ONLY when the substituent rings
+    # are SIMPLE (no principal characteristic group). Per IUPAC P-14.5,
+    # multiplicative is preferred when the parent ring has a principal
+    # characteristic group (e.g., 4,4',4''-nitrilotriphenol uses
+    # `triphenol` parent with a `nitrilo` bridge). When the parent ring
+    # has NO principal characteristic group (e.g., plain benzene), the
+    # substitutive form on the mononuclear parent hydride is PIN per
+    # P-66.6.1.1.3 / P-67.1.1.1 / P-66.1.1.1: `triphenylamine`,
+    # `triphenylphosphane`, `triphenylmethane`.
+    _SUBSTITUTIVE_PIN_CENTERS = frozenset({
+        'B', 'C', 'N', 'P', 'As', 'Sb', 'Bi',
+        'Si', 'Ge', 'Sn', 'Pb', 'S', 'Se', 'Te',
+    })
+
     for atom in mol.GetAtoms():
         idx = atom.GetIdx()
         if idx in ring_atoms:
@@ -471,6 +540,19 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # All heavy neighbors must be ring atoms (no non-ring non-H substituents)
         if len(heavy_neighbors) != ring_nbr_count:
             continue
+
+        # Phase 157 cleanup substitutive-PIN guard: when the bridge atom
+        # is a mononuclear-parent-hydride element AND the substituent
+        # rings are simple carbocycles with no principal characteristic
+        # group, defer to substitutive nomenclature. This honors IUPAC
+        # P-66.6.1.1.3 / P-67.1.1.1 / P-66.1.1.1 PIN preference for
+        # triphenylamine / triphenylphosphane / triphenylmethane while
+        # leaving the multiplicative path active for cases where the
+        # parent ring has a principal characteristic group (e.g.,
+        # 4,4',4''-nitrilotriphenol per P-14.5).
+        if atom.GetSymbol() in _SUBSTITUTIVE_PIN_CENTERS:
+            if _all_fragments_are_simple_carbocycles(mol, idx):
+                continue
 
         # Classify the bridge
         bridge_name = _classify_multi_bridge(atom, ring_nbr_count)
