@@ -364,14 +364,22 @@ class TestExocyclicOpsinRoundtrip:
     These tests are marked xfail to document the OPSIN limitation.
     """
 
-    @pytest.mark.xfail(reason="OPSIN 2.8.0 does not parse ylidene names on rings")
     def test_opsin_methylidene_cyclohexane(self):
-        """OPSIN should parse methylidenecyclohexane."""
+        """OPSIN should parse methylidenecyclohexane.
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail(reason="OPSIN
+        2.8.0 ..."). Phase 138 D-22 / Phase 156 D-09 upgraded the project
+        to OPSIN 2.9.0 which DOES parse ylidene names on rings; the test
+        passes cleanly.
+        """
         smi = _opsin_name_to_smiles("methylidenecyclohexane")
         assert smi is not None, "OPSIN failed to parse methylidenecyclohexane"
 
-    @pytest.mark.xfail(reason="OPSIN 2.8.0 does not parse ylidene names on rings")
     def test_opsin_ethylidene_cyclohexanone(self):
-        """OPSIN should parse 2-ethylidenecyclohexan-1-one."""
+        """OPSIN should parse 2-ethylidenecyclohexan-1-one.
+
+        Phase 157 cleanup: removed stale @pytest.mark.xfail (same reason
+        as test_opsin_methylidene_cyclohexane).
+        """
         smi = _opsin_name_to_smiles("2-ethylidenecyclohexan-1-one")
         assert smi is not None, "OPSIN failed to parse 2-ethylidenecyclohexan-1-one"
