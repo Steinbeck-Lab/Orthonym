@@ -93,13 +93,22 @@ class TestIsoindolineIndex200:
         """Index 200: corrected name is OPSIN-parseable."""
         import subprocess
 
+        from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+
+        # Phase 157 cleanup: route through the canonical _find_opsin_jar
+        # helper instead of hardcoded "opsin-cli-2.8.0-...jar". Phase 138
+        # D-22 + Phase 156 D-09 establish opsin-cli-2.9.0 as the project's
+        # primary oracle JAR; the hardcoded 2.8.0 path was dead since the
+        # JAR was upgraded. Helper falls back gracefully if a JAR is
+        # absent, and pytest skips rather than emits a misleading parse
+        # failure.
+        opsin_jar = _find_opsin_jar()
+        if opsin_jar is None:
+            pytest.skip("OPSIN JAR not available — skipping parse check")
+
         name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
         result = subprocess.run(
-            [
-                "java", "-jar",
-                "opsin-cli-2.8.0-jar-with-dependencies.jar",
-                "-osmi",
-            ],
+            ["java", "-jar", opsin_jar, "-osmi"],
             input=name,
             capture_output=True,
             text=True,

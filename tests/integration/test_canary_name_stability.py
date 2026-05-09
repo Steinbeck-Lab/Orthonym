@@ -1009,7 +1009,15 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC[C@@H]2SC[C@@H]3NC(=O)N[C@@H]32)[C@@H](O)[C@H]1O",  # aromatic,heterocycle,fused-ring,polyfunctional,large,carbohydrate
-        "adenosine (4R,5S)-2-oxo-1,3-diazolidine",
+        # Phase 157 cleanup: PIN rebaselined per IUPAC P-22.2.1 Table 2.3.
+        # The saturated 5-mem ring with 2 nitrogens at 1,3 is the retained
+        # name "imidazolidine" (PIN), not the systematic Hantzsch-Widman
+        # "1,3-diazolidine". Source-of-truth: data/iupac_2013_pin_list.json
+        # line 50 ({"name": "imidazolidine", "smiles": "C1CNCN1", "pin":
+        # true, "citation": "P-22.2.1 Table 2.3"}). The pre-Phase-150
+        # canary expectation was captured before OPSIN XML retained-name
+        # expansion brought imidazolidine into the registry.
+        "adenosine (4R,5S)-2-oxoimidazolidine",
     ),
     (
         "C/C=C/C(=O)O[C@H]1/C=C\\C(=O)[C@@H](O)CCC(=O)O[C@@H]1C",  # heterocycle,polyfunctional,medium
@@ -1732,7 +1740,16 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(/C=C\\c2ccc(OC)c(O)c2)cc(OC)c1",  # aromatic,medium
-        "1-ethenyl-3,5-dimethoxybenzene",
+        # Phase 157 cleanup: stereo descriptor rebaselined per Phase 137
+        # ERRATA-02 (P-31.1.3 / P-44.4.1, Sep 2024). The SMILES specifies
+        # (1Z) cis-double-bond stereochemistry via /C=C\, and the v18
+        # stereo pipeline correctly emits the (1Z)- prefix per IUPAC P-91
+        # mandatory descriptor rules for stereodefined double bonds. Live
+        # behavior verified at src/orthonym/rules/stereochemistry.py:126
+        # (Phase 137 ERRATA-02 deliverable preserved).
+        # Note: both forms drop the second methoxy-substituted phenyl (a
+        # separate Phase 145 fragment-naming bug, deferred to v19).
+        "(1Z)-1-ethenyl-3,5-dimethoxybenzene",
     ),
     (
         "CCCC/C=C\\CCCCCCCC(=O)O[C@H](COC(=O)CCC/C=C\\C/C=C\\C/C=C\\CCCCCCCC)COC(=O)CCCCCCCCC/C=C\\CCCCCC",  # acyclic,large

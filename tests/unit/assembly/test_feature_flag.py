@@ -158,25 +158,26 @@ class TestV17V18DictShape:
         assert FACTOR_WEIGHTS_V18['ratio'] == 0.0
 
     def test_v18_parent_correctness_calibrated(self):
-        """V18 parent_correctness holds the Plan 04 grid-calibrated value.
+        """V18 parent_correctness holds the Phase 148.2 boundary-extended value.
 
-        Plan 03 shipped a PLACEHOLDER of 0.35. Plan 04's grid search (2026-04-24,
-        52 configs with anti-overfit delta=0.0) honored Plan 01's CD-03 decision
-        to DROP the factor from the grid (std=0.0 in the production path because
-        `ParentCorrectnessScorer.score()` short-circuits to 0.5 when
-        `_pc_context.reference_name is None` — every candidate gets the same
-        0.5 today). CD-03 pinned the grid dimension at 0.0, so the chosen
-        config also landed at 0.0.
+        History:
+          - Plan 03 (Phase 148): PLACEHOLDER 0.35 shipped initially.
+          - Plan 04 (Phase 148): grid search dropped to 0.0 per CD-03
+            (ParentCorrectnessScorer short-circuits to 0.5 with no reference).
+          - Phase 148 D-12: locked weight at 0.00 pending Phase 149 / IM-11.
+          - **Phase 148.2 (2026-04-24, per STATE.md "Phase 148.2 | PC=0.35
+            INTERIOR"):** calibration boundary extended; PC=0.35 chosen as
+            an interior-of-grid value; Phase 149 cumulative G3 G2 HARD CLEAN
+            preserved.
 
-        Phase 148 has shipped: `_should_bypass_fused_guard` is deleted
-        and `features.parent_selection_result` is now populated by `_classify`. The
-        weight remains 0.00 per Phase 148 D-12 lock; Phase 149 / IM-11 will
-        recalibrate against the discrimination this slot provides on the post-148
-        7,500-row benchmark. Until then, the calibrated-and-committed invariant
-        is parent_correctness == 0.0.
+        Live invariant locked at 0.35 since Phase 148.2 boundary extension.
+        Phase 157 cleanup rebaselines test expectation from the stale 0.0
+        (Phase 148 D-12 era) to the post-148.2 production value 0.35 — zero
+        code change to `coverage_scoring.py`; only the test assertion updated
+        to track the shipped weight.
         """
         from orthonym.assembly.coverage_scoring import FACTOR_WEIGHTS_V18
-        assert FACTOR_WEIGHTS_V18['parent_correctness'] == 0.0
+        assert FACTOR_WEIGHTS_V18['parent_correctness'] == 0.35
 
     def test_v18_multiple_bond_count_placeholder_above_zero(self):
         """Plan 03 placeholder for multiple_bond_count weight is > 0.

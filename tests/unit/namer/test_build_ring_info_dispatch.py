@@ -162,11 +162,20 @@ def test_simple_heterocycle_pyridine_branch():
     )
 
 
-def test_spiro_stub_branch():
-    """Branch 5: spiro[4.4]nonane returns ``{'iupac_locants': None}`` stub.
+def test_spiro_branch_post_phase151():
+    """Branch 5: spiro[4.4]nonane returns a populated ``iupac_locants`` map.
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-24.2
-    Source: Phase 147 CONTEXT D-06 (Phase 151 fills the real numbering).
+    Source: Phase 147 CONTEXT D-06 (originally a stub; **Phase 151 shipped
+            the real spiro numbering** per Phase 151 D-15 + the live
+            spiro registry).
+
+    Phase 157 cleanup: rebaselines the assertion from the stale "stub
+    returns None" expectation (Phase 147 era) to the post-Phase-151
+    behavior where `_build_ring_info_for_parent_selection` returns the
+    canonical spiro IUPAC locant map. The map starts at locant 1 on a
+    ring atom adjacent to the spiro atom and proceeds around both
+    rings per P-24.2.4.
     """
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
@@ -175,7 +184,19 @@ def test_spiro_stub_branch():
     feats = compute_features(mol)
     actual = _build_ring_info_for_parent_selection(feats)
     assert actual is not None
-    assert actual["iupac_locants"] is None
+    # Phase 151 populates iupac_locants for spiro systems. The locants
+    # must be a {atom_idx: int} mapping covering all 9 atoms with the
+    # contiguous 1..9 range required by P-24.2.
+    locants = actual["iupac_locants"]
+    assert isinstance(locants, dict), (
+        f"Phase 151 should populate iupac_locants for spiro; got {locants!r}"
+    )
+    assert len(locants) == 9, (
+        f"spiro[4.4]nonane has 9 atoms; got {len(locants)} in {locants!r}"
+    )
+    assert sorted(locants.values()) == list(range(1, 10)), (
+        f"locants must be 1..9 contiguous; got {sorted(locants.values())!r}"
+    )
 
 
 def test_else_cyclohexane_branch():

@@ -24,11 +24,20 @@ from orthonym.rules.polycyclic import (
     _get_largest_connected_ring_component,
 )
 
-OPSIN_JAR = "opsin-cli-2.8.0-jar-with-dependencies.jar"
+# Phase 157 cleanup: route through the canonical _find_opsin_jar helper
+# (Phase 138 D-22 + Phase 156 D-09 establish opsin-cli-2.9.0 as primary).
+# The hardcoded "opsin-cli-2.8.0-jar-with-dependencies.jar" was dead since
+# the project upgraded to 2.9.0; the helper falls back gracefully if no
+# JAR is available, and tests skip rather than emit misleading parse errors.
+from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+
+OPSIN_JAR = _find_opsin_jar()
 
 
 def _opsin_parse(name: str) -> str:
     """Parse an IUPAC name via OPSIN CLI. Returns SMILES or empty string on failure."""
+    if OPSIN_JAR is None:
+        return ""
     try:
         result = subprocess.run(
             ["java", "-jar", OPSIN_JAR, "-osmi"],
