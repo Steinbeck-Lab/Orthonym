@@ -69,7 +69,11 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl', '(2S)-2-amino-6-(ethylamino)-iminohexanoic acid'),  # alpha order fixed P80
     ('C/C=C/CC(O)CCC(=O)NCC(=O)O', 'hydroxy-2-(octanoylamino)ethanoic acid'),  # alpha order fixed P80
     ('CCC[C@@H]1OCc2c(O)cccc2[C@H]1O', '(3S,4R)-4,8-dihydroxy-3-propylisochromane'),  # NEWLY_RT
-    ('C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2', '4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane'),  # P119-02: subs discovered
+    # Phase 157 cleanup: stereo descriptor `(1S,4R,5R)-` rebaselined per
+    # Phase 153 D-22 spiro stereo injection + IUPAC P-91 mandatory rules
+    # for stereodefined sp3 centers. The pre-Phase-153 expectation lacked
+    # the descriptor; v18 stereo pipeline correctly emits it.
+    ('C=C(C)[C@@H]1CC[C@@H](C)[C@@]12CC=C(C)CC2', '(1S,4R,5R)-4,8-dimethyl-1-prop-1-en-2-ylspiro[4.5]decane'),  # P119-02: subs discovered; Phase 153 stereo
     ('NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O', '(6S)-2,6-diamino-3-(hydroxymethyl)heptanetrioic acid'),
     ('COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O', '(3S)-6,7-dihydroxy-8-methoxy-3-methylisochroman-4-one'),  # NEWLY_RT
     ('O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1', '(2E)-3-(4-(sulfooxy)phenyl)prop-2-enoic acid'),  # NEWLY_RT
@@ -86,7 +90,10 @@ SMALL_STEREO_COMPOUNDS = [
     ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'N-[(2S)-2-(pentanoylamino)propanoyl](2S)-2-aminopropanoic acid'),  # Phase 130: STER-09 stereo on parent chain
     ('CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O', '(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-hydroxymethylcyclohex-2-en-1-one'),
     ('CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21', '1-cyclodecanylethan-1-one'),  # MISSING_STEREO - wrong parent
-    ('CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O', '10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane'),  # P119-02: subs discovered
+    # Phase 157 cleanup: stereo descriptor `(5S,6R,9R,10R)-` rebaselined
+    # per Phase 153 D-22 spiro stereo injection (same rationale as the
+    # spiro entry above).
+    ('CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O', '(5S,6R,9R,10R)-10-hydroxy-9-isopropyl-3,6-dimethyl-2-oxospiro[4.5]decane'),  # P119-02: subs discovered; Phase 153 stereo
     ('COCC1=C2[C@@H]3CC(C)(C)C[C@@H]3C[C@@]2(O)CC1=O', '(2R,6R,8R)-11-ethyl-8-hydroxy-4,4-dimethyl-tricyclo[6.3.0.0(2,6)]undec-1-en-10-one'),
     ('O=C([O-])C(=O)C[C@@H](O)[C@H](O)[C@H](O)COP(=O)([O-])[O-]', '(4R,5S,6R)-4,5,6-trihydroxy-2-oxophosphono-7-phosphonooxyheptanoate'),  # P80-01 phosphonooxy prefix now generated
     ('CCC(O)CC(=O)O[C@H](CC(=O)[O-])C[N+](C)(C)C', 'ammonium dodecanoate'),  # MISSING_STEREO - wrong parent
