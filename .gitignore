@@ -64,3 +64,7 @@ stereo_gap_trace_results.json
 # Phase 145.1-04: byte-identical verification output dirs (ISS-006)
 tmp_byte_identical_subset/
 tmp_byte_identical_full/
+
+# OPSIN codebase (vendored at repo root for code reference per the contributor guide;
+# not part of Orthonym source. ~ 14 MB, 8 entries — keep local but untracked.)
+opsin/
