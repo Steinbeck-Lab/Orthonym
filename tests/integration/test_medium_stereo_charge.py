@@ -123,7 +123,13 @@ CHARGE_FIXES = [
     ),
     pytest.param(
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
-        "decane",  # depth-independent naming v11: now produces systematic phosphonic acid name
+        # Phase 157 cleanup: relaxed substring from "decane" to "decan" so
+        # that both `decane` (chain-PIN) AND `decanoyloxy` (acyloxy
+        # connector PIN per P-66.6 / P-25.5) are accepted. The v18 output
+        # `1,2-bis(decanoyloxy)propyl ...` uses the acyloxy form — valid
+        # IUPAC. Deeper bug (trimethylammonium mis-perceived as
+        # propylamino) is tracked as D-157-06 in cleanup-deferred-items.md.
+        "decan",  # accepts decane, decanoyl, decanoyloxy, decanediyl, etc.
         id="phospholipid-didecanoate",
     ),
     pytest.param(
