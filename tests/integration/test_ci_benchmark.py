@@ -338,7 +338,14 @@ CI_BENCHMARK = [
     ),
     (
         "CN1CCCN=C1/C=C/c1cccs1",
-        "N-methyl-2-thienyl-1,3-diazine",
+        # Phase 157 cleanup: stereo descriptor rebaselined per ERRATA-02
+        # (P-31.1.3 / P-91 mandatory E/Z for stereodefined acyclic
+        # double bonds). The SMILES specifies (2E) trans-double-bond
+        # stereo via /C=C/, and the v18 stereo pipeline correctly emits
+        # `(2E)-` per IUPAC P-91 rules. Live behavior verified at
+        # src/orthonym/rules/stereochemistry.py (Phase 137 ERRATA-02
+        # deliverable preserved).
+        "(2E)-N-methyl-2-thienyl-1,3-diazine",
     ),
     (
         "CC/C=C/CCCC(=O)CCCCCC(=O)O",
