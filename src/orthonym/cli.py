@@ -75,6 +75,18 @@ def main(args: List[str] = None) -> int:
         help="Print OPSIN grammar validation counters (D-17 telemetry) to stderr"
     )
 
+    # Phase 158 Plan-03 Task 9 (CONTEXT.md D-16 telemetry):
+    # Print the CFR class-first dispatch counter histogram to stderr
+    # after naming. Default-OFF (additive; existing CLI behavior
+    # unchanged). Goes through Orthonym(...).get_dispatch_stats()
+    # accessor per CONTEXT D-16 + AP-6 (never reads a module-global
+    # counter). Stderr-only emission keeps stdout clean for piped use.
+    parser.add_argument(
+        "--dispatch-stats",
+        action="store_true",
+        help="Print CFR dispatch counters (Phase 158 D-16 telemetry) to stderr"
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
@@ -100,6 +112,30 @@ def main(args: List[str] = None) -> int:
             print(name)
             stats = namer.get_validation_stats()
             print(f"Validation stats: {stats}", file=sys.stderr)
+            return 0
+
+        # Phase 158 Plan-03 Task 9: --dispatch-stats branch goes through
+        # Orthonym(...).get_dispatch_stats() per CONTEXT D-16 + AP-6
+        # (never read a module-global counter). Default-OFF; stderr-only.
+        # Histogram is sorted by count descending for readability; StoutClass
+        # members print by .name (uppercase identifier).
+        if parsed.dispatch_stats:
+            from orthonym.namer import Orthonym
+            from orthonym.routing.dispatch_table import StoutClass
+            namer = Orthonym(style=parsed.style)
+            name = namer.name(parsed.smiles)
+            print(name)
+            stats = namer.get_dispatch_stats()
+            print("\n--- CFR Dispatch Stats ---", file=sys.stderr)
+            # Sort by count descending; tie-break by class_id.value for determinism
+            for class_id, count in sorted(
+                stats.items(),
+                key=lambda kv: (-kv[1], getattr(kv[0], "value", str(kv[0]))),
+            ):
+                class_name = (
+                    class_id.name if isinstance(class_id, StoutClass) else str(class_id)
+                )
+                print(f"  {class_name}: {count}", file=sys.stderr)
             return 0
 
         if parsed.confidence:
