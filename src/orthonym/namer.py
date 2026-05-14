@@ -30,6 +30,16 @@ from .rules.stereochemistry import collect_stereodescriptors, format_stereodescr
 from .assembly.composer import assemble_name
 from .data import ALL_RETAINED_NAMES as RETAINED_NAMES
 
+# Phase 158 NEW: routing substrate. `StoutClass` + `ClassDispatchResult`
+# are imported eagerly at module-load time so `_name_impl`'s
+# cascade-continuation + GENERAL fallback can reference them by name. The
+# `routing` sub-package is callable-only (no callbacks back into namer)
+# so this is NOT a circular import — the predicate factories + handler
+# shims inside `routing/dispatch_table.py` use lazy imports for
+# `orthonym.rules.*` and `orthonym.namer.Orthonym` per
+# PATTERNS § 3 + namer.py:853 lazy-import precedent.
+from .routing.dispatch_table import StoutClass, ClassDispatchResult
+
 
 # ---------------------------------------------------------------------------
 # Universal stereo backstop (Phase 140, STER-16)
@@ -734,6 +744,41 @@ class Orthonym:
             # exposes via `get_validation_stats()`.
             self._grammar = OpsinGrammar(stats=self._grammar_stats)
 
+        # Phase 158 D-14 NEW: instantiate CFR router (default-ON; no opt-out
+        # flag per CONTEXT D-14 + AP-2 + AP-19). Per audit § 3.6 RL-4
+        # fresh-instance invariant: each Orthonym() carries its OWN router
+        # with empty dispatch_stats; recursive `Orthonym(...)` calls produce
+        # fresh routers, and the byte-identical contract is on NAME OUTPUT
+        # only, NOT on per-call dispatch_stats.
+        from .routing import ClassFirstRouter
+        self._cfr_router = ClassFirstRouter()
+
+        # Phase 158 RL-7 option (b) NEW: skip-decomposition flag threading.
+        # `_name_impl(_skip_decomposition=True)` (called by
+        # `name_pipeline_only()`) sets this on entry; the
+        # DECOMPOSITION_PRE_GENERAL predicate factory reads from kwargs
+        # passed by `dispatch()`.
+        self._skip_decomposition: bool = False
+
+    def get_dispatch_stats(self) -> Dict[Any, int]:
+        """Phase 158 D-16: per-instance CFR dispatch histogram.
+
+        Returns a defensive copy of the (StoutClass -> int) histogram
+        recorded by the CFR router on every dispatch. Per CONTEXT D-16 +
+        AP-6 the counter lives on the Orthonym instance via the CFR
+        router; reset on demand via `reset_dispatch_stats()`.
+
+        The return type is `Dict[Any, int]` (not `Dict[StoutClass, int]`)
+        to avoid eager `from .routing import StoutClass` at module-load
+        time, which would create a circular import. Callers that need
+        the StoutClass type can import it directly from `orthonym.routing`.
+        """
+        return self._cfr_router.get_dispatch_stats()
+
+    def reset_dispatch_stats(self) -> None:
+        """Phase 158 D-16: explicit reset for batch-run boundaries."""
+        self._cfr_router.reset_dispatch_stats()
+
     def get_validation_stats(self) -> Dict[str, int]:
         """Return a defensive copy of the per-instance grammar counters.
 
@@ -835,7 +880,26 @@ class Orthonym:
             clear_confidence()
 
     def _name_impl(self, smiles: str, _skip_decomposition: bool = False) -> str:
-        """Internal naming implementation (wrapped by session management)."""
+        """Internal naming implementation (wrapped by session management).
+
+        Phase 158 substrate: the v18 implicit cascade at lines 853-1115 is
+        REPLACED by a single ``self._cfr_router.dispatch(...)`` call. Per
+        audit § 3.5 RL-3 option (c) the zwitterion-character in-place
+        mutation (v18 lines 1000-1034) lives INLINE here BEFORE the dispatch
+        call — preserves D-26 predicate-purity invariant cleanly. Per
+        Task 158-02-01 design choice (a) the GENERAL handler shim returns
+        None to signal that ``_name_impl`` runs the legacy ``_perceive ->
+        _classify -> assemble_name`` pipeline INLINE — keeps ``routing/``
+        decoupled from ``composer.py`` (D-19 boundary). Quality-gate
+        post-checks at v18 lines 1129-1207 are PRESERVED VERBATIM after
+        the dispatch call.
+        """
+        # Phase 158 RL-7 option (b): thread `_skip_decomposition` through
+        # the instance attribute so the DECOMPOSITION_PRE_GENERAL predicate
+        # factory + handler shim can read it from kwargs forwarded by
+        # `dispatch()`.
+        self._skip_decomposition = _skip_decomposition
+
         # Parse SMILES
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -844,168 +908,42 @@ class Orthonym:
         # Get canonical SMILES for consistent processing
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
 
-        # EARLY SPECIES DETECTION - before retained names check
-        # This routes ionic/radical species to specialized naming paths
-        species_type = detect_species_type(mol)
-
-        # Route to specialized naming for ionic/radical species
-        if species_type == 'salt':
-            from .rules.salts import name_salt
-            return name_salt(mol, style=self.style)
-        elif species_type == 'radical':
-            from .rules.radicals import name_radical
-            return name_radical(mol, style=self.style)
-        elif species_type == 'zwitterion':
-            from .rules.salts import name_zwitterion
-            return name_zwitterion(mol, style=self.style)
-        elif species_type == 'ion':
-            # Single-component ion: check retained names first, then fall through
-            from .rules.ions import name_anion, name_cation
-
-            sites = get_ion_sites(mol)
-
-            # Check retained ion names first (acetate, benzoate, etc.)
-            if sites['anions'] and not sites['cations']:
-                result = name_anion(mol, style=self.style, retained_only=True)
-                if result:
-                    return result
-            elif sites['cations'] and not sites['anions']:
-                result = name_cation(mol, style=self.style, retained_only=True)
-                if result:
-                    return result
-
-            # No retained ion name found.
-            # For SINGLE anions in small/medium molecules (HA <= 25), use the
-            # dedicated ion naming pipeline (handles aromatic carboxylates like
-            # benzoate/naphthoate correctly). For larger molecules, fall through
-            # to the neutral naming pipeline which produces more complete names.
-            if (len(sites['anions']) == 1 and not sites['cations']
-                    and mol.GetNumHeavyAtoms() <= 25):
-                # Try the existing ion pipeline first
-                ion_result = name_anion(mol, style=self.style)
-                if ion_result:
-                    return ion_result
-                # Ion pipeline returned empty -- try neutralize-then-name
-                try:
-                    from rdkit.Chem import RWMol
-                    from .rules.ions import classify_anion, _acid_name_to_carboxylate
-                    from .perception.ions import _get_internal_charge_atoms
-                    anion_type = classify_anion(mol, sites['anions'][0])
-                    if anion_type == 'carboxylate':
-                        internal_charge_atoms = _get_internal_charge_atoms(mol)
-                        rwmol = RWMol(mol)
-                        for atom in rwmol.GetAtoms():
-                            if (atom.GetSymbol() == 'O'
-                                    and atom.GetFormalCharge() == -1
-                                    and atom.GetIdx() not in internal_charge_atoms):
-                                atom.SetFormalCharge(0)
-                                atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
-                        neutral_mol = rwmol.GetMol()
-                        neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
-                        neutral_namer = Orthonym(style=self.style)
-                        neutral_name = neutral_namer.name(neutral_smi)
-                        if neutral_name:
-                            anion_name = _acid_name_to_carboxylate(
-                                neutral_name, 1
-                            )
-                            if anion_name:
-                                return anion_name
-                except Exception:
-                    pass  # Fall through to normal pipeline
-
-            # For POLY-anionic species (2+ anionic sites, e.g., dicarboxylate),
-            # try neutralize-then-name: convert [O-] -> OH so carboxylic acid
-            # SMARTS can match, then name the neutral form. This prevents
-            # empty-string results for polycarboxylate anions where the FG
-            # detection only recognizes protonated acids.
-            if len(sites['anions']) >= 2 and not sites['cations']:
-                try:
-                    from rdkit.Chem import RWMol
-                    from .rules.ions import classify_anion, _acid_name_to_carboxylate
-                    from .perception.ions import _get_internal_charge_atoms
-                    internal_charge_atoms = _get_internal_charge_atoms(mol)
-                    rwmol = RWMol(mol)
-                    neutralized = False
-                    for atom in rwmol.GetAtoms():
-                        if (atom.GetSymbol() == 'O'
-                                and atom.GetFormalCharge() == -1
-                                and atom.GetIdx() not in internal_charge_atoms):
-                            atom.SetFormalCharge(0)
-                            atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
-                            neutralized = True
-                    if neutralized:
-                        neutral_mol = rwmol.GetMol()
-                        neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
-                        neutral_namer = Orthonym(style=self.style)
-                        neutral_name = neutral_namer.name(neutral_smi)
-                        if neutral_name:
-                            # IUPAC P-72.2.1: Convert acid suffix to carboxylate
-                            # for deprotonated carboxylate sites
-                            carboxylate_count = sum(
-                                1 for a in sites['anions']
-                                if classify_anion(mol, a) == 'carboxylate'
-                            )
-                            if carboxylate_count > 0:
-                                anion_name = _acid_name_to_carboxylate(
-                                    neutral_name, carboxylate_count
-                                )
-                                if anion_name:
-                                    return anion_name
-                            return neutral_name
-                except Exception:
-                    pass  # Fall through to normal pipeline
-
-        # Continue with normal neutral molecule naming
-
-        # NEUTRAL DOT-DISCONNECTED SMILES: cocrystals, solvates, neutral mixtures
-        # These have '.' in SMILES but no formal charges (species_type == 'neutral').
-        # Salts/ions/zwitterions are already routed above this point.
-        # Split into components, name each independently, join with space.
-        # Only activates when there are 2+ multi-atom (nameable) fragments.
-        # Single-atom fragments (Cl, Br, I, O) are not true mixture components
-        # and their presence means the original pipeline should handle the molecule.
-        if '.' in canonical_smiles and species_type == 'neutral':
-            frags = canonical_smiles.split('.')
-            if len(frags) >= 2:
-                # Parse all fragments and filter out single-atom fragments
-                frag_mols = []
-                for frag_smi in frags:
-                    frag_mol = Chem.MolFromSmiles(frag_smi)
-                    if frag_mol:
-                        ha = frag_mol.GetNumHeavyAtoms()
-                        frag_mols.append((frag_smi, ha))
-
-                # Only split when 2+ multi-atom fragments exist.
-                # Single-atom dots (e.g., .Cl.Cl) are non-molecular entities
-                # that the normal pipeline handles better as part of the whole mol.
-                multi_atom_frags = [(s, ha) for s, ha in frag_mols if ha >= 2]
-                if len(multi_atom_frags) >= 2:
-                    # Sort by descending heavy atom count for consistent output
-                    frag_mols.sort(key=lambda x: -x[1])
-                    component_names = []
-                    for frag_smi, _ in frag_mols:
-                        try:
-                            frag_namer = Orthonym(style=self.style)
-                            frag_name = frag_namer.name(frag_smi)
-                            if frag_name and frag_name != "unknown":
-                                component_names.append(frag_name)
-                        except Exception:
-                            pass  # Skip unnamed fragments
-
-                    if component_names:
-                        return ' '.join(component_names)
-                # If fewer than 2 multi-atom fragments, or no names produced,
-                # fall through to normal pipeline
-
-        # CHARGE NEUTRALIZATION for large zwitterions reclassified as 'neutral'
-        # by the HA>20 + quaternary-N guard in detect_species_type().
-        # These molecules still carry formal charges (P-O-, N+) that prevent
-        # FG detection SMARTS from matching (e.g., [OX2H] for COOH).
-        # Neutralize O- to OH; leave quaternary N+ (no H) charged to
-        # preserve valid valence. ONLY applies to molecules that have true
-        # zwitterion character -- NOT to molecules with internal charges
-        # (nitro [N+](=O)[O-], azide, N-oxide) which are normal functional groups.
-        if Chem.GetFormalCharge(mol) == 0:
+        # ============================================================
+        # Pre-dispatch: zwitterion-character in-place mutation (RL-3 (c))
+        # ============================================================
+        # Phase 158 audit § 3.5 RL-3 option (c) lock: the v18 cascade at
+        # namer.py:1000-1034 MUTATED `mol` and `canonical_smiles` in-place
+        # for downstream cascade consumption. CFR's predicate-handler model
+        # does NOT support "mutate state, continue cascade" patterns
+        # natively. Per the audit's UNANIMOUS decision, the mutation lives
+        # INLINE here BEFORE CFR.dispatch — preserves D-26 hard invariant
+        # (every entry's `side_effect_inventory == ()`) cleanly.
+        #
+        # CRITICAL byte-identical gate: in the v18 cascade the mutation at
+        # line 1000-1034 was only REACHED when ALL of the prior branches
+        # (salt/radical/zwitterion/ion at 852-956 + multi-component-neutral
+        # at 967-998) had already declined to handle the molecule. Those
+        # branches return early on success, so the mutation effectively
+        # only ran on `species_type == 'neutral'` molecules that were not
+        # multi-component cocrystals. To preserve byte-identical behavior
+        # we MUST gate the inline pre-dispatch mutation on
+        # `species_type == 'neutral'`; otherwise salts like `[Ag+].[Cl-]`
+        # (which DO satisfy `_has_true_zwitterion_character` because they
+        # have both + and - atoms) get mutated before SALT routing fires
+        # and salt detection fails downstream.
+        # [Rule 1 - Bug] Found during Task 158-02-07 canary investigation.
+        #
+        # CHARGE NEUTRALIZATION for large zwitterions reclassified as
+        # 'neutral' by the HA>20 + quaternary-N guard in
+        # `detect_species_type()`. These molecules still carry formal
+        # charges (P-O-, N+) that prevent FG detection SMARTS from matching
+        # (e.g., [OX2H] for COOH). Neutralize O- to OH; leave quaternary
+        # N+ (no H) charged to preserve valid valence. ONLY applies to
+        # molecules that have true zwitterion character -- NOT to molecules
+        # with internal charges (nitro [N+](=O)[O-], azide, N-oxide) which
+        # are normal functional groups.
+        _zwitter_species_type = detect_species_type(mol)
+        if _zwitter_species_type == 'neutral' and Chem.GetFormalCharge(mol) == 0:
             from .perception.ions import _has_true_zwitterion_character
             if _has_true_zwitterion_character(mol):
                 try:
@@ -1033,108 +971,117 @@ class Orthonym:
                 except Exception:
                     pass  # If neutralization fails, continue with original mol
 
-        # MULTIPLICATIVE NOMENCLATURE (IUPAC P-51.3)
-        # Detect symmetric molecules with bridge atoms linking identical parent
-        # structures (e.g., 4,4'-methylenedianiline). Must come before NP detection
-        # and retained names to catch these before half the molecule is dropped.
-        from .rules.multiplicative import name_multiplicative
-        mult_name = name_multiplicative(mol)
-        if mult_name is not None:
-            return mult_name
+        # ============================================================
+        # CFR dispatch — replaces v18 cascade lines 853-1115
+        # ============================================================
+        # Phase 158 D-13 single chokepoint integration: CFR routes input
+        # mol; backstops (Phase 152 + 156) wrap output name at
+        # `Orthonym.name()` line 654. The CFR dispatcher walks
+        # DISPATCH_TABLE in priority order; the first predicate that
+        # matches wins; the result's handler is invoked here.
+        #
+        # The audit § 1 DISPATCH_TABLE has 17 outer-cascade rows + GENERAL
+        # catch-all = 18 entries. Several handler shims (ANION_SMALL,
+        # POLY_ANION, MULTI_COMPONENT_NEUTRAL, DECOMPOSITION_PRE_GENERAL)
+        # may return None to signal "no match — continue cascade", in
+        # which case we re-dispatch with the matched class excluded so the
+        # next priority entry runs. This mirrors the v18 cascade's
+        # fall-through behavior (e.g., namer.py:913-914 + 955-956).
+        #
+        # `_skip_decomposition` is threaded via kwargs per RL-7 option (b);
+        # `style` is threaded via kwargs so the RETAINED_NAME and
+        # AMINO_ACID predicates can read it without binding `self`.
+        result = self._cfr_router.dispatch(
+            mol, smiles, canonical_smiles,
+            _skip_decomposition=self._skip_decomposition,
+            _style=self.style,
+        )
+        name = result.handler(
+            mol, smiles, canonical_smiles,
+            features=None,
+            style=self.style,
+            _skip_decomposition=self._skip_decomposition,
+        )
 
-        # COMPOUND CLASS PRE-ROUTING (Phase 141)
-        # Classify into compound class for routing. Sugar detection handles
-        # carbohydrates that were previously missing from the main cascade.
-        compound_class = classify_compound_class(mol, canonical_smiles)
+        # Cascade-continuation when a handler returns None (audit § 1 row
+        # notes for ANION_SMALL / POLY_ANION / MULTI_COMPONENT_NEUTRAL /
+        # DECOMPOSITION_PRE_GENERAL). The v18 cascade falls through to the
+        # next sibling; mirror that here by re-running dispatch with
+        # progressively higher priority floors.
+        if name is None and result.class_id != StoutClass.GENERAL:
+            from .routing.dispatch_table import DISPATCH_TABLE
+            current_priority = DISPATCH_TABLE[result.class_id].priority
+            for entry in sorted(DISPATCH_TABLE.values(), key=lambda e: e.priority):
+                if entry.priority <= current_priority:
+                    continue
+                # Predicate signature: (mol, smiles, canonical_smiles, features, **kwargs)
+                try:
+                    matched = entry.predicate(
+                        mol, smiles, canonical_smiles, None,
+                        _skip_decomposition=self._skip_decomposition,
+                        _style=self.style,
+                    )
+                except TypeError:
+                    matched = entry.predicate(mol, smiles, canonical_smiles, None)
+                if not matched:
+                    continue
+                self._cfr_router._dispatch_stats[entry.class_id] += 1
+                name = entry.handler(
+                    mol, smiles, canonical_smiles,
+                    features=None,
+                    style=self.style,
+                    _skip_decomposition=self._skip_decomposition,
+                )
+                result = ClassDispatchResult(
+                    class_id=entry.class_id,
+                    handler=entry.handler,
+                    audit_record={},
+                    tier=entry.tier,
+                )
+                if name is not None or entry.class_id == StoutClass.GENERAL:
+                    break
 
-        # Direct sugar routing: carbohydrates found via sugar lookup
-        if compound_class == "carbohydrate":
-            from .data.sugar_names import lookup_sugar
-            sugar_info = lookup_sugar(canonical_smiles)
-            if sugar_info is not None:
-                anomer, config, base_name = sugar_info
-                parts = []
-                if anomer:
-                    parts.append(anomer)
-                if config:
-                    parts.append(config)
-                parts.append(base_name)
-                return "-".join(parts)
-            # If SMARTS matched but no lookup hit, fall through to systematic
+        # ============================================================
+        # GENERAL pipeline fallback — Task 158-02-01 design choice (a)
+        # ============================================================
+        # The GENERAL handler shim returns None to signal that
+        # `_name_impl` runs the legacy `_perceive -> _classify ->
+        # assemble_name` pipeline inline. This avoids coupling
+        # `routing/` to `composer.py` (D-19 boundary). The check below
+        # mirrors the v18 cascade's GENERAL pipeline at namer.py:1124-1131.
+        if name is None and result.class_id == StoutClass.GENERAL:
+            features = self._perceive(mol, smiles, canonical_smiles)
+            self._classify(features)
+            assembled = assemble_name(features, style=self.style)
+            name = assembled
 
-        # NATURAL PRODUCT DETECTION
-        # Check before retained names because NP detection uses substructure matching
-        # while retained names use exact SMILES matching.
-        # Even with style="systematic", NP names are returned (IUPAC 2013 has no
-        # systematic PIN for natural products - see P-10).
-        from .rules.natural_products import name_natural_product
-        np_name = name_natural_product(mol)
-        if np_name is not None:
-            return np_name
-
-        # PEPTIDE DETECTION
-        # Check before retained names and amino acids to prevent peptides from
-        # being flattened to single amino acid names. Must come after NP detection.
-        from .rules.amino_acids import is_peptide as _is_peptide
-        if _is_peptide(mol):
-            from .rules.peptides import name_peptide
-            peptide_name = name_peptide(mol)
-            if peptide_name:
-                return peptide_name
-
-        # Check retained names first (benzene, methanol, etc.) unless systematic style requested
-        if self.style != "systematic":
-            if canonical_smiles in RETAINED_NAMES:
-                return RETAINED_NAMES[canonical_smiles]
-
-            # Check for amino acids (standard amino acids use trivial names)
-            from .rules.amino_acids import name_amino_acid
-            aa_name = name_amino_acid(mol, canonical_smiles)
-            if aa_name:
-                return aa_name
-
-        # Skeletal replacement nomenclature (IUPAC P-15.4)
-        # Detect chains where heteroatoms are embedded in the backbone (C-O-C, C-N-C, C-S-C)
-        # Must come BEFORE perception to override substitutive naming (ether/amine prefix)
-        from .rules.skeletal_replacement import try_skeletal_replacement_name
-        skel_name = try_skeletal_replacement_name(mol)
-        if skel_name:
-            return skel_name
-
-        # Cyclic phane nomenclature (IUPAC P-26.4)
-        # Detect ring-bridged ring-bearing molecules where 2+ disjoint small rings
-        # are connected by acyclic chain segments of length >= 2 atoms
-        # (e.g., [2.2]paracyclophane). Topology gate (D-03 / D-16) ensures mutual
-        # exclusion vs ring-assembly, multiplicative, spiro/fused/bridged-fused.
-        # Source: 155-CONTEXT.md D-26; ring_selection.py:48 enum.
-        from .rules.phane import name_cyclophane
-        phane_name = name_cyclophane(mol)
-        if phane_name is not None:
-            return phane_name
-
-        # DECOMPOSITION ENGINE (v4.0 Phase 39)
-        # For complex molecules with ester/amide/glycosidic bonds, try cleaving
-        # at functional bonds and naming fragments individually.
-        if not _skip_decomposition:
-            from .decomposition import try_decompose
-            decomposed_name = try_decompose(mol, style=self.style)
-            if decomposed_name is not None:
-                return decomposed_name
-
-        # Perceive molecular features
-        features = self._perceive(mol, smiles, canonical_smiles)
-
-        # Classify: determine naming strategy and principal group
-        self._classify(features)
-
-        # Assemble: build final name from fragments
-        assembled = assemble_name(features, style=self.style)
-
-        # Final quality gate: if composer produced a garbled name
-        # (e.g., "cycloanedicarboxamide" for a multi-amide molecule),
-        # fall back to decomposition directly. Does NOT recurse into
-        # name_fragment_recursively to avoid circular feedback loops.
-        if not _skip_decomposition and assembled and mol.GetNumHeavyAtoms() > 15:
+        # ============================================================
+        # Post-dispatch quality gates — preserved VERBATIM from v18
+        # lines 1129-1207. CFR is the dispatch substrate; these gates
+        # run on the GENERAL pipeline's assembled name AFTER dispatch,
+        # NOT on outputs from class-specific handlers.
+        #
+        # [Rule 1 - Bug] Found during Task 158-02 verification: gating
+        # on ANY non-None name (the original implementation) caused
+        # PEPTIDE / SALT / etc. handler outputs to be re-checked
+        # against the GENERAL pipeline's confidence store, which is
+        # populated by `assemble_name()` and may still hold stale data
+        # from the PREVIOUS call (the `_confidence_store` is thread-
+        # local and persists across `Orthonym.name()` invocations; see
+        # `assembly/coverage_scoring.py:_confidence_store`). Pre-CFR
+        # the gate only ran on `assembled = assemble_name(...)` output
+        # at the very end of the cascade — handler early-returns
+        # (e.g. peptide / salt / amino_acid) bypassed it entirely.
+        # Restrict the gate to GENERAL-pipeline outputs to preserve
+        # CFR-04 byte-identical canary. Honest-fail-on-data per
+        # CONTEXT D-29: the fix is upstream (gate scope), NOT a
+        # threshold relaxation or postprocessor band-aid.
+        # ============================================================
+        if (not _skip_decomposition
+                and name
+                and result.class_id == StoutClass.GENERAL
+                and mol.GetNumHeavyAtoms() > 15):
+            assembled = name  # local alias for v18-byte-identical body
             _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
             assembled_lower = assembled.lower()
             is_garbled = any(tok in assembled_lower for tok in _GARBLED_TOKENS)
@@ -1203,7 +1150,7 @@ class Orthonym:
                             )
                             return decomp_name
 
-        return assembled
+        return name
     
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
         """
