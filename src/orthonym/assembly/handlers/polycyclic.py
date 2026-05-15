@@ -48,7 +48,7 @@ def _is_polycyclic(features: Any) -> bool:
     captured by the legacy inline fallback at composer.py later in the
     cascade.
     """
-    from ..composer import _is_complex_ring_system
+    from ._handler_shared import cached_is_complex_ring_system
 
     if getattr(features, 'polycyclic_name', None) is None:
         return False
@@ -57,7 +57,8 @@ def _is_polycyclic(features: Any) -> bool:
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
-    if _is_complex_ring_system(mol):
+    # WR-02: shared memoization with partial_sat / ring_ester predicates.
+    if cached_is_complex_ring_system(features):
         return False
     return True
 

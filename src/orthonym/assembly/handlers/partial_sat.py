@@ -30,8 +30,15 @@ from ..name_tree import NamingResult
 
 
 def _is_partial_sat(features: Any) -> bool:
-    """Predicate: is_cyclic AND not chain_is_parent AND not complex ring system."""
-    from ..composer import _is_complex_ring_system
+    """Predicate: is_cyclic AND not chain_is_parent AND not complex ring system.
+
+    WR-02: the ``_is_complex_ring_system`` SMARTS check is memoized on the
+    features object via ``cached_is_complex_ring_system`` so partial_sat,
+    polycyclic, and ring_ester predicates share one evaluation per dispatch
+    instead of three. CONTEXT D-25 predicate purity is preserved — the cache
+    is per-features-instance state owned by features itself.
+    """
+    from ._handler_shared import cached_is_complex_ring_system
 
     if not getattr(features, 'is_cyclic', False):
         return False
@@ -40,7 +47,7 @@ def _is_partial_sat(features: Any) -> bool:
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
-    if _is_complex_ring_system(mol):
+    if cached_is_complex_ring_system(features):
         return False
     return True
 

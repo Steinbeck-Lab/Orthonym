@@ -109,7 +109,40 @@ def name_r_group(
     return _name_r_group(mol, start_idx, exclude_atoms)
 
 
+def cached_is_complex_ring_system(features: Any) -> bool:
+    """WR-02: per-features memoization of composer._is_complex_ring_system.
+
+    The SMARTS-based complex-ring check is heavy; predicates that call it
+    inside the dispatch loop violate the spirit of CONTEXT D-25 (predicates
+    are pure read-only over already-perceived state). Cache the result on
+    the features object as a private attribute so partial_sat / polycyclic /
+    ring_ester predicates share a single SMARTS evaluation per features
+    instance instead of running it three times per dispatch.
+
+    The cache is per-features-instance state owned by features itself; the
+    predicate remains pure with respect to shared/global state.
+
+    Args:
+        features: MolecularFeatures-like object with a ``mol`` attribute.
+
+    Returns:
+        True iff the molecule is a complex ring system per the SMARTS check.
+    """
+    cached = getattr(features, "_cached_complex_ring_system_result", None)
+    if cached is not None:
+        return cached
+    from ..composer import _is_complex_ring_system
+    result = bool(_is_complex_ring_system(features.mol))
+    try:
+        features._cached_complex_ring_system_result = result
+    except (AttributeError, TypeError):
+        # Frozen / immutable features: fall back to per-call computation.
+        pass
+    return result
+
+
 __all__ = [
     "name_iso_x_cyanate",
     "name_r_group",
+    "cached_is_complex_ring_system",
 ]

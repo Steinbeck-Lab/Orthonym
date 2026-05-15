@@ -52,12 +52,13 @@ def _is_ring_ester(features: Any) -> bool:
     if mol is None:
         return False
     from ...rules.esters import detect_exocyclic_esters
-    from ..composer import _is_complex_ring_system
+    from ._handler_shared import cached_is_complex_ring_system
 
     exocyclic = detect_exocyclic_esters(mol)
     if not exocyclic:
         return False
-    if _is_complex_ring_system(mol):
+    # WR-02: shared memoization with partial_sat / polycyclic predicates.
+    if cached_is_complex_ring_system(features):
         return False
     return True
 
