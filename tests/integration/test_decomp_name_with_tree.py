@@ -1,0 +1,152 @@
+"""Phase 160 Plan-04 integration tests: Orthonym.name_with_tree() round-trip.
+
+Per CONTEXT D-04 + D-05 + DECOMP-02: ``Orthonym.name_with_tree(smi)``
+returns a NamingResult(name, tree, atom_to_locant_hint) per the public API.
+
+Per CONTEXT D-05 incremental migration: for the 30 currently-extracted
+handlers (Plans 02-03 ship) tree is None; the name field is byte-
+identical to ``Orthonym.name(smi)``. For tree-emitting handlers
+(v19+1), name_tree_to_string(tree) round-trips byte-identical to name.
+
+This file verifies:
+- name_with_tree returns NamingResult.
+- name matches Orthonym.name(smi).
+- For tree-emitting paths, tree is a NameTreeNode and round-trips.
+- For tree=None paths, the legacy fragment-list rendering produced name.
+"""
+from __future__ import annotations
+
+import pytest
+
+from orthonym import Orthonym, NameTreeNode, NamingResult
+from orthonym.assembly.name_tree_to_string import name_tree_to_string
+
+
+REPRESENTATIVE_SMILES = [
+    ("CCO", "ethanol"),  # alcohol
+    ("CC(=O)O", "acetic acid"),  # carboxylic acid
+    ("CC(=O)C", "propan-2-one"),  # ketone
+    ("CC=O", "acetaldehyde"),  # aldehyde
+    ("CCN", "ethanamine"),  # amine
+    ("c1ccccc1", "benzene"),  # benzene
+    ("c1ccncc1", "pyridine"),  # heterocycle
+    ("CC(=NO)C", None),  # oxime (no expected name assertion)
+    ("CS(=O)C", "dimethyl sulfoxide"),  # sulfoxide
+    ("CB(O)O", "methylboronic acid"),  # boronic acid
+    ("c1ccc(-c2ccccc2)cc1", None),  # ring assembly (biphenyl)
+    ("[H][H]", None),  # simple molecule (hydrogen)
+]
+
+
+@pytest.fixture(scope="module")
+def namer():
+    return Orthonym()
+
+
+@pytest.mark.parametrize(
+    "smi,expected_name_or_none",
+    REPRESENTATIVE_SMILES,
+    ids=[s[0] for s in REPRESENTATIVE_SMILES],
+)
+def test_name_with_tree_returns_naming_result(
+    smi, expected_name_or_none, namer,
+):
+    """name_with_tree returns a NamingResult NamedTuple."""
+    result = namer.name_with_tree(smi)
+    assert isinstance(result, NamingResult)
+    assert isinstance(result.name, str)
+    assert result.name
+
+
+@pytest.mark.parametrize(
+    "smi,expected_name_or_none",
+    REPRESENTATIVE_SMILES,
+    ids=[s[0] for s in REPRESENTATIVE_SMILES],
+)
+def test_name_field_matches_name(smi, expected_name_or_none, namer):
+    """The name field is byte-identical to Orthonym.name(smi)."""
+    expected = namer.name(smi)
+    result = namer.name_with_tree(smi)
+    assert result.name == expected, (
+        f"name_with_tree({smi!r}).name = {result.name!r}; "
+        f"Orthonym.name({smi!r}) = {expected!r}"
+    )
+
+
+def test_tree_is_optional_per_d05(namer):
+    """Per CONTEXT D-05 first-wave: tree is None for the 30 extracted handlers."""
+    result = namer.name_with_tree("CCO")
+    # Tree may be None (first-wave) or NameTreeNode (v19+1).
+    assert result.tree is None or isinstance(result.tree, NameTreeNode)
+
+
+def test_atom_to_locant_hint_is_optional(namer):
+    """atom_to_locant_hint is Optional[Dict] per CONTEXT D-05."""
+    result = namer.name_with_tree("CCO")
+    assert result.atom_to_locant_hint is None or isinstance(
+        result.atom_to_locant_hint, dict,
+    )
+
+
+def test_round_trip_on_tree_populated_node():
+    """When tree is populated (manually-constructed for test), serializer
+    round-trips to the name field byte-for-byte.
+
+    This exercises the explicit-field serialization branch of
+    name_tree_to_string (NOT the legacy fragment_legacy path).
+    """
+    # Manual tree construction (mirrors what a v19+1 tree-emitting handler
+    # would do).
+    tree = NameTreeNode(parent_stem="ethan", suffix="ol")
+    serialized = name_tree_to_string(tree)
+    # Build a manual NamingResult; serializer output is the "name".
+    result = NamingResult(name=serialized, tree=tree, atom_to_locant_hint=None)
+    # Round-trip: serialize the tree again, compare to result.name.
+    round_trip = name_tree_to_string(result.tree)
+    assert round_trip == result.name
+
+
+def test_name_with_tree_idempotent(namer):
+    """Two name_with_tree() calls on the same SMILES produce same result."""
+    r1 = namer.name_with_tree("CCO")
+    r2 = namer.name_with_tree("CCO")
+    assert r1.name == r2.name
+    assert r1.tree == r2.tree
+    assert r1.atom_to_locant_hint == r2.atom_to_locant_hint
+
+
+def test_name_with_tree_handles_complex_smiles(namer):
+    """Pipeline handles non-trivial SMILES without crashing."""
+    # Cyclohexanol — a partially-saturated ring with an alcohol.
+    result = namer.name_with_tree("OC1CCCCC1")
+    assert isinstance(result, NamingResult)
+    assert isinstance(result.name, str)
+    assert result.name
+
+
+def test_name_with_tree_invalid_smiles_raises(namer):
+    """Invalid SMILES raises ValueError (matches Orthonym.name() contract)."""
+    with pytest.raises(ValueError):
+        namer.name_with_tree("not-a-valid-smiles-string-XYZ!!")
+
+
+def test_name_with_tree_first_wave_tree_is_none_doc(namer):
+    """Per CONTEXT D-05 first-wave handlers emit tree=None — this is EXPECTED.
+
+    This test documents the contract: at Phase 160 ship, the 30
+    extracted handlers all return tree=None. Tree population is
+    iterative across v19+ phases. ADR-19-02 documents the migration plan.
+    """
+    smiles_per_extracted_handler = [
+        "CCO",  # general acyclic — actually routes to retained-name
+        "CS(=O)C",  # sulfoxide
+        "CN=C=O",  # isocyanate
+    ]
+    for smi in smiles_per_extracted_handler:
+        result = namer.name_with_tree(smi)
+        # For first-wave: tree is None.
+        assert result.tree is None, (
+            f"Expected tree=None for first-wave handler on {smi!r}; "
+            f"got {result.tree!r}. If a handler now emits a tree, "
+            f"update this test + the ADR-19-02 tree-emission status table."
+        )

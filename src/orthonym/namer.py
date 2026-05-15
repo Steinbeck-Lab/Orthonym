@@ -776,8 +776,83 @@ class Orthonym:
         return self._cfr_router.get_dispatch_stats()
 
     def reset_dispatch_stats(self) -> None:
-        """Phase 158 D-16: explicit reset for batch-run boundaries."""
+        """Phase 158 D-16 + Phase 160 D-18: explicit reset for batch-run boundaries.
+
+        Resets BOTH the Phase 158 outer-CFR (per-instance) counter AND the
+        Phase 160 inner-dispatch (module-level) counter. The inner-dispatch
+        counter is module-level today (see assembly/inner_dispatch.py
+        :_INNER_DISPATCH_STATS) which means it is shared across Orthonym
+        instances — calling ``reset_dispatch_stats()`` on one instance
+        resets the shared inner counter visible to all instances.
+        """
         self._cfr_router.reset_dispatch_stats()
+        # Phase 160 D-18: also reset the inner-dispatch counter.
+        from .assembly.inner_dispatch import reset_inner_dispatch_stats
+        reset_inner_dispatch_stats()
+
+    def get_inner_dispatch_stats(self) -> Dict[str, int]:
+        """Phase 160 D-18: inner-dispatch per-handler-id counters.
+
+        Returns a defensive copy of the (handler_id -> int) histogram
+        recorded by ``assembly/inner_dispatch.dispatch_inner`` on every
+        match. Inner-dispatch is the second stage of the Phase 158 +
+        Phase 160 dispatch pipeline: outer CFR routes to a StoutClass;
+        for the GENERAL class, inner-dispatch then routes to one of the
+        30 handlers in ``INNER_DISPATCH_TABLE``.
+
+        Per CONTEXT D-18: companion to ``get_dispatch_stats()``; CLI
+        ``--dispatch-stats`` flag prints both together. Per AP-160-13 the
+        underlying counter is module-level (shared across instances)
+        because inner-dispatch is a pure-function call site — adding
+        per-instance threading would require touching every handler entry
+        point. The counter is reset via ``reset_dispatch_stats()`` (which
+        clears BOTH outer + inner counters).
+
+        Returns:
+            Dict mapping handler_id (str) to dispatch count (int). Empty
+            dict if no inner-dispatch calls have happened yet.
+        """
+        from .assembly.inner_dispatch import get_inner_dispatch_stats as _stats
+        return _stats()
+
+    def name_with_tree(self, smiles: str):
+        """Phase 160 DECOMP-02 public API: return NamingResult(name, tree, hint).
+
+        Phase 160 ships the NameTreeNode IR substrate alongside the legacy
+        ``assemble_name`` path; first-wave handlers (Plans 02-03 ship)
+        return ``NamingResult(name=<final string>, tree=None, ...)`` per
+        CONTEXT D-05 incremental migration. The ``tree`` field is None for
+        the 30 currently-extracted handlers; tree population is a v19+
+        follow-up phase. The ``name`` field is byte-identical to
+        ``Orthonym.name(smiles)``.
+
+        For tree-emitting handlers (v19+1 onwards), this method returns a
+        NamingResult whose ``tree`` is a NameTreeNode and where
+        ``name_tree_to_string(tree)`` round-trips to ``name`` byte-for-byte.
+
+        Args:
+            smiles: SMILES string to convert to IUPAC name.
+
+        Returns:
+            NamingResult NamedTuple with fields:
+              - name: str (byte-identical to Orthonym.name(smiles))
+              - tree: Optional[NameTreeNode] (None for first-wave handlers)
+              - atom_to_locant_hint: Optional[Dict[int, int]]
+
+        Raises:
+            ValueError: If SMILES is invalid.
+        """
+        # Lazy import to avoid composer.py -> name_tree -> namer.py cycle
+        # at module-load time.
+        from .assembly.name_tree import NamingResult
+        # For Plan-04 first-wave: surface the name via the production path
+        # (Orthonym.name) and wrap as NamingResult with tree=None per
+        # CONTEXT D-05. The handler tree-emission is iterative across v19+
+        # phases; until then this is the deterministic byte-identical-name
+        # path that downstream consumers (--dump-tree CLI, tree
+        # round-trip tests) can rely on.
+        name = self.name(smiles)
+        return NamingResult(name=name, tree=None, atom_to_locant_hint=None)
 
     def get_validation_stats(self) -> Dict[str, int]:
         """Return a defensive copy of the per-instance grammar counters.

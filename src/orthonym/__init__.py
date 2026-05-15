@@ -16,5 +16,12 @@ __version__ = "0.1.0"
 __author__ = "Kohulan Rajan"
 
 from .namer import name_compound, Orthonym
+from .assembly.name_tree import NameTreeNode, NamingResult
 
-__all__ = ["name_compound", "Orthonym", "__version__"]
+__all__ = [
+    "name_compound",
+    "Orthonym",
+    "NameTreeNode",
+    "NamingResult",
+    "__version__",
+]
