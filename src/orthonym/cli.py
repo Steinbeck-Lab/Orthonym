@@ -87,6 +87,27 @@ def main(args: List[str] = None) -> int:
         help="Print CFR dispatch counters (Phase 158 D-16 telemetry) to stderr"
     )
 
+    # Phase 160 Plan-04 (CONTEXT D-19): --dump-tree emits the NameTreeNode
+    # IR for the given SMILES. Default format is "text" (chemist-readable
+    # indented tree); --format json emits dataclasses.asdict() JSON for
+    # machine consumption. The CLI invokes Orthonym.name_with_tree(smi)
+    # which returns NamingResult(name, tree, atom_to_locant_hint). For
+    # first-wave handlers (Plans 02-03 ship) tree is None — the dump shows
+    # the legacy ``fragment_legacy`` field; for tree-emitting handlers
+    # (v19+1) tree is a NameTreeNode and the dump shows the full IR.
+    parser.add_argument(
+        "--dump-tree",
+        action="store_true",
+        help="Dump the NameTreeNode IR for the given SMILES (Phase 160 DECOMP-04)"
+    )
+
+    parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Output format for --dump-tree (default: text)"
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
@@ -114,11 +135,13 @@ def main(args: List[str] = None) -> int:
             print(f"Validation stats: {stats}", file=sys.stderr)
             return 0
 
-        # Phase 158 Plan-03 Task 9: --dispatch-stats branch goes through
-        # Orthonym(...).get_dispatch_stats() per CONTEXT D-16 + AP-6
-        # (never read a module-global counter). Default-OFF; stderr-only.
-        # Histogram is sorted by count descending for readability; StoutClass
-        # members print by .name (uppercase identifier).
+        # Phase 158 Plan-03 Task 9 + Phase 160 D-18: --dispatch-stats
+        # branch goes through Orthonym(...).get_dispatch_stats() AND
+        # Orthonym(...).get_inner_dispatch_stats() per CONTEXT D-16 +
+        # D-18 + AP-6 (never read a module-global counter). Default-OFF;
+        # stderr-only. Histogram is sorted by count descending for
+        # readability; StoutClass members print by .name (uppercase
+        # identifier). Inner handler_ids print as-is (lowercase snake_case).
         if parsed.dispatch_stats:
             from orthonym.namer import Orthonym
             from orthonym.routing.dispatch_table import StoutClass
@@ -126,7 +149,7 @@ def main(args: List[str] = None) -> int:
             name = namer.name(parsed.smiles)
             print(name)
             stats = namer.get_dispatch_stats()
-            print("\n--- CFR Dispatch Stats ---", file=sys.stderr)
+            print("\n--- CFR Dispatch Stats (Phase 158 outer) ---", file=sys.stderr)
             # Sort by count descending; tie-break by class_id.value for determinism
             for class_id, count in sorted(
                 stats.items(),
@@ -136,6 +159,43 @@ def main(args: List[str] = None) -> int:
                     class_id.name if isinstance(class_id, StoutClass) else str(class_id)
                 )
                 print(f"  {class_name}: {count}", file=sys.stderr)
+            # Phase 160 D-18: also print inner-dispatch counters.
+            inner_stats = namer.get_inner_dispatch_stats()
+            print("\n--- Inner Dispatch Stats (Phase 160 inner) ---", file=sys.stderr)
+            if not inner_stats:
+                print("  (no inner-dispatch hits; molecule routed via CFR fast-path)",
+                      file=sys.stderr)
+            else:
+                for handler_id, count in sorted(
+                    inner_stats.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                ):
+                    print(f"  {handler_id}: {count}", file=sys.stderr)
+            return 0
+
+        # Phase 160 Plan-04 (CONTEXT D-19): --dump-tree dispatches BEFORE
+        # the default print(name) branch so the IR is the sole stdout
+        # emission. Default format is "text" (chemist-readable indented
+        # tree); --format json emits dataclasses.asdict() JSON.
+        if parsed.dump_tree:
+            from orthonym.namer import Orthonym
+            namer = Orthonym(style=parsed.style)
+            result = namer.name_with_tree(parsed.smiles)
+            if parsed.format == "json":
+                import dataclasses
+                import json
+                if result.tree is not None:
+                    tree_dict = dataclasses.asdict(result.tree)
+                else:
+                    tree_dict = None
+                payload = {
+                    "name": result.name,
+                    "tree": tree_dict,
+                    "atom_to_locant_hint": result.atom_to_locant_hint,
+                }
+                print(json.dumps(payload, indent=2, default=str))
+            else:
+                _print_tree_text(result)
             return 0
 
         if parsed.confidence:
@@ -219,6 +279,63 @@ def _process_batch(input_file: str, output_file: str, style: str,
                   file=sys.stderr)
 
     return 0 if errors == 0 else 1
+
+
+def _print_tree_text(result) -> None:
+    """Phase 160 D-19 text-format renderer for ``--dump-tree``.
+
+    Renders a ``NamingResult`` as an indented, chemist-readable tree using
+    box-drawing-style ASCII connectors. Mirrors the CONTEXT D-19 reference
+    example::
+
+        NameTree: ethanol  (class_id=general_acyclic)
+        |- parent_stem: "ethan"
+        |- locants: (1,)
+        |- suffix: "-ol"
+        ...
+        +- prefixes: []
+
+    Per CONTEXT D-05 incremental migration: for the 30 currently-extracted
+    handlers (Plans 02-03 ship) the tree is None and we print the
+    flat ``NameTree: <name>  (tree=None)`` line plus a note that the
+    legacy ``fragment_legacy`` field carried the rendering. For
+    tree-emitting handlers (v19+1) the full IR is rendered.
+    """
+    # Header line: name + class_id (or tree-None indicator).
+    if result.tree is None:
+        print(f"NameTree: {result.name}  (tree=None; first-wave handler per CONTEXT D-05)")
+        print("|- name: {!r}".format(result.name))
+        if result.atom_to_locant_hint is not None:
+            print(f"|- atom_to_locant_hint: {result.atom_to_locant_hint!r}")
+        print("+- note: tree=None is EXPECTED for first-wave handlers")
+        print("        (30 of 38 handlers extracted at Phase 160 ship per Plans 02-03);")
+        print("        the legacy fragment-list rendering produced this name byte-for-byte")
+        print("        via composer.py:_assemble_fragments. Tree population is iterative")
+        print("        across v19+ phases per CONTEXT D-05.")
+        return
+
+    # Tree-populated branch (v19+1 path; not exercised by first-wave handlers).
+    tree = result.tree
+    print(f"NameTree: {result.name}  (class_id={tree.class_id or 'unspecified'})")
+    print(f"|- parent_stem: {tree.parent_stem!r}")
+    print(f"|- locants: {tree.locants}")
+    print(f"|- suffix: {tree.suffix!r}")
+    print(f"|- stereo: {tree.stereo!r}")
+    print(f"|- indicated_h: {tree.indicated_h}")
+    print(f"|- unsaturation_locants: {tree.unsaturation_locants}")
+    print(f"|- multiplicative_prefix: {tree.multiplicative_prefix!r}")
+    print(f"|- parenthesization_hint: {tree.parenthesization_hint}")
+    print(f"|- iupac_section_cite: {tree.iupac_section_cite!r}")
+    if tree.fragment_legacy is not None:
+        print(f"|- fragment_legacy: <NameFragment object id={id(tree.fragment_legacy):#x}>")
+    else:
+        print("|- fragment_legacy: None")
+    if tree.prefixes:
+        print(f"+- prefixes: ({len(tree.prefixes)} subtree(s))")
+        for i, sub in enumerate(tree.prefixes):
+            print(f"   [{i}] parent_stem={sub.parent_stem!r}, locants={sub.locants}")
+    else:
+        print("+- prefixes: []")
 
 
 if __name__ == "__main__":
