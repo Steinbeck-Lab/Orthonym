@@ -483,6 +483,21 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-13: lactone (Tier-1.5 SHIM with coverage gate; audit
+#     § 1 + § 2.13). Coverage gate (ring_size > 8 OR total_heavy <= ring_size + 8)
+#     preserved verbatim from composer.py:828-834.
+from .handlers.lactone import _is_lactone, name_lactone  # noqa: E402
+
+_register_inner(
+    handler_id="lactone",
+    priority=1300,
+    predicate=_is_lactone,
+    handler=name_lactone,
+    iupac_section="P-66.6.3",
+    description="Monocyclic lactone (cyclic ester) naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

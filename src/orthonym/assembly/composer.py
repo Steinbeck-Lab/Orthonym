@@ -816,36 +816,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: anhydride dispatched via inner_dispatch as of commit 02-12]
 
-    # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
-    # for exocyclic substituent discovery (Phase 86 wired, lactones.py).
-    # Lactones are cyclic esters named as heterocyclic ketones.
-    # Must come before polyfunctional because lactones trigger polyfunctional detection
-    # Coverage guard: if molecule is much larger than the lactone ring, the bare
-    # lactone name is incomplete and we should fall through to a handler that
-    # can include substituents (e.g., benzene handler, polyfunctional handler).
-    from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
-    lactone_info = is_monocyclic_lactone(features.mol)
-    if lactone_info:
-        total_heavy = features.mol.GetNumHeavyAtoms()
-        ring_size = lactone_info.get('ring_size', 0)
-        # Only use bare lactone naming when molecule is not much larger than ring
-        # Ring atoms + carbonyl O + up to 8 exocyclic heavy atoms = ring_size + 8
-        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 8:
-            lactone_name = name_monocyclic_lactone(features.mol)
-            if lactone_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "lactone", _ha, lactone_name[:60],
-                    )
-                # Lactone handler already includes stereo with correct ring locants.
-                # Pass None -- regex guard detects existing stereo prefix and returns early.
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(lactone_name, "lactone", features)
-                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # [removed: lactone dispatched via inner_dispatch as of commit 02-13]
 
     # ASML-10 complete: Lactam handler calls _integrate_universal_prefixes()
     # for exocyclic substituent discovery (parallel to lactones).
