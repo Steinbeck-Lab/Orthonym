@@ -542,6 +542,20 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-17: thioether (Tier-1.5 SHIM; audit § 1 + § 2.21;
+#     cyclic + fused-heterocycle skip guards mirrored from inline branch).
+from .handlers.thioether import _is_thioether, name_thioether  # noqa: E402
+
+_register_inner(
+    handler_id="thioether",
+    priority=2000,
+    predicate=_is_thioether,
+    handler=name_thioether,
+    iupac_section="P-66.5.2.4",
+    description="Sulfide / thioether functional class naming (Tier B)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

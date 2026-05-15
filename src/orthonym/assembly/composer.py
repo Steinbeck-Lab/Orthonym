@@ -963,33 +963,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
     #  to Plan-03 per deferred-items.md)]
     # [removed: sulfone dispatched via inner_dispatch as of commit 02-16]
-
-    # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
-    # None for complex R-groups. Falls through to universal pipeline. No silent drop.
-    # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
-    if features.principal_group == 'thioether':
-        ring_type = getattr(features, 'ring_type', None)
-        if not (ring_type and ring_type.startswith('heterocyclic')):
-            # Guard: skip known fused heterocycles (phenothiazine, thianthrene)
-            # These contain S atoms that match thioether SMARTS but should use
-            # their retained fused heterocycle names, not functional class sulfide naming.
-            from ..data.fused_heterocycles import match_fused_heterocycle_core
-            if match_fused_heterocycle_core(features.mol) is None:
-                from ..rules.sulfur import name_sulfide
-                # Find sulfur atom index
-                matches = features.functional_groups.get('thioether', [])
-                if matches:
-                    # SMARTS match gives (S, C, C) - sulfur is first
-                    sulfur_idx = matches[0][0]
-                    name = name_sulfide(features.mol, sulfur_idx)
-                    if name:
-                        name = _enrich_handler_name(features, name, "thioether")
-                        # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                        pool = get_current_pool()
-                        cand = pool.add(name, "thioether", features)
-                        if cand is not None:
-                            return _inject_stereo_if_missing(features, cand.name)
-                        # Low confidence: pool.add returned None, fall through
+    # [removed: thioether dispatched via inner_dispatch as of commit 02-17]
 
     # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
     # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
