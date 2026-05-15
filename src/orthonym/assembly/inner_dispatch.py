@@ -457,6 +457,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-11: acid_halide (Tier-1.5 SHIM; audit § 1 + § 2.11).
+from .handlers.acid_halide import _is_acid_halide, name_acid_halide  # noqa: E402
+
+_register_inner(
+    handler_id="acid_halide",
+    priority=1100,
+    predicate=_is_acid_halide,
+    handler=name_acid_halide,
+    iupac_section="P-66.5",
+    description="Acyl halide functional class naming (ethanoyl chloride etc.)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

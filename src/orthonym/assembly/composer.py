@@ -812,25 +812,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: urea dispatched via inner_dispatch as of commit 02-08]
     # [removed: guanidine dispatched via inner_dispatch as of commit 02-09]
 
-    # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
-    # chain/ring parent naming with suffix. Substituents handled via normal
-    # prefix generation in the dedicated rule module.
-    # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
-    # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
-    if features.principal_group in ('acid_chloride', 'acid_bromide', 'acid_fluoride'):
-        from ..rules.acid_halides import name_acid_halide
-        halide_name = name_acid_halide(features)
-        if halide_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "acid_halide", _ha, halide_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(halide_name, "acid_halide", features)
-            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # [removed: acid_halide dispatched via inner_dispatch as of commit 02-11]
 
     # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
     # component naming. Substituents handled within the module.
