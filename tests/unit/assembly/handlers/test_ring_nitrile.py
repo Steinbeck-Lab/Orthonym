@@ -110,3 +110,69 @@ class TestNameRingNitrile:
         except Exception:
             pytest.skip("representative SMILES exercises a non-handler error path")
         assert n1 == n2
+
+
+# ---------------------------------------------------------------------------
+# CR-03 regression: name_ring_nitrile guards None before pool.add
+# ---------------------------------------------------------------------------
+
+
+def test_ring_nitrile_returns_none_on_assembler_failure():
+    """CR-03 regression: name_ring_nitrile does not call pool.add(None, ...)
+    when _assemble_ring_nitrile_name returns None."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+
+    FakeFeatures.mol.GetNumHeavyAtoms = MagicMock(return_value=6)
+
+    pool_add_calls = []
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            pool_add_calls.append((name, hid))
+            return None
+
+        def best(self):
+            raise AssertionError("pool.best should not be called when add was skipped")
+
+    with patch("orthonym.assembly.composer._assemble_ring_nitrile_name", return_value=None), \
+         patch("orthonym.assembly.candidate_pool.get_current_pool", return_value=FakePool()):
+        result = name_ring_nitrile(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert result is None
+        assert pool_add_calls == []
+
+
+def test_ring_nitrile_routes_through_pool_on_success():
+    """Regression: name_ring_nitrile pool.add + _inject_stereo_if_missing path
+    unchanged when assembler returns a valid name."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+
+    FakeFeatures.mol.GetNumHeavyAtoms = MagicMock(return_value=6)
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            return None
+
+        def best(self):
+            class B:
+                name = "benzonitrile"
+            return B()
+
+    with patch(
+        "orthonym.assembly.composer._assemble_ring_nitrile_name",
+        return_value="benzonitrile",
+    ), patch(
+        "orthonym.assembly.candidate_pool.get_current_pool",
+        return_value=FakePool(),
+    ), patch(
+        "orthonym.assembly.composer._inject_stereo_if_missing",
+        side_effect=lambda f, n, **kw: n,
+    ):
+        result = name_ring_nitrile(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert isinstance(result, NamingResult)
+        assert result.name == "benzonitrile"

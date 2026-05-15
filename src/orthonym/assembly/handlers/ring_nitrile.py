@@ -58,6 +58,12 @@ def name_ring_nitrile(
     from ..composer import _assemble_ring_nitrile_name, _inject_stereo_if_missing
 
     _rn_name = _assemble_ring_nitrile_name(features, style)
+    if not _rn_name:
+        # CR-03: matches sibling ring_ester handler pattern. pool.add(None, ...)
+        # would violate the `name: str` contract per CONTEXT D-05;
+        # _inject_stereo_if_missing at the next step would then receive
+        # None or a wrong handler's name from pool.best().
+        return None
     if logger.isEnabledFor(logging.DEBUG):
         _ha = features.mol.GetNumHeavyAtoms()
         logger.debug(
