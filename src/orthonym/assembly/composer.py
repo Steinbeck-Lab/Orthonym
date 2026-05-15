@@ -1332,20 +1332,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         del _tier_a_pool._candidates[_tier_a_pool_count_before_complex:]
     # else: no ring candidates -- fall through to chain/simple naming
 
-    # ASML-10 complete: Ring nitrile handler uses _assemble_ring_nitrile_name()
-    # which includes ring substituent prefixes in the name.
-    if features.principal_group == 'nitrile' and features.is_cyclic and not getattr(features, 'chain_is_parent', False):
-        _rn_name = _assemble_ring_nitrile_name(features, style)
-        if logger.isEnabledFor(logging.DEBUG):
-            _ha = features.mol.GetNumHeavyAtoms()
-            logger.debug(
-                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                "ring_nitrile", _ha, _rn_name[:60],
-            )
-        # Phase 145.1: route through pool.add() — direct_return handler.
-        pool = get_current_pool()
-        pool.add(_rn_name, "ring_nitrile", features)
-        return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: ring_nitrile dispatched via inner_dispatch as of commit 03-01]
 
     # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
     # N-substituent prefixes and chain/ring substituent discovery.

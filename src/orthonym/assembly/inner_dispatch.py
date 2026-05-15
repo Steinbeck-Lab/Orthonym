@@ -710,6 +710,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-03 commit 03-01: ring_nitrile (Tier-2 mid-tier; audit § 1 + § 3).
+#     Predicate: principal_group == 'nitrile' AND is_cyclic AND not chain_is_parent.
+#     Body lift: composer.py:4537-4605 (_assemble_ring_nitrile_name, 69 LOC).
+#     Inline branch composer.py:1337-1348 REMOVED at this commit.
+from .handlers.ring_nitrile import _is_ring_nitrile, name_ring_nitrile  # noqa: E402
+
+_register_inner(
+    handler_id="ring_nitrile",
+    priority=5100,
+    predicate=_is_ring_nitrile,
+    handler=name_ring_nitrile,
+    iupac_section="P-66.5.1",
+    description="Ring-nitrile (cyclic carbonitrile) direct-return handler",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
