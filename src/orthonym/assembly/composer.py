@@ -1108,22 +1108,17 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             pool.add(poly_assembled, "polycyclic", features)
             return pool.best().name
 
-        # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
-        # Check BEFORE benzene since they contain benzene substructure
-        # NOT gated -- direct return
-        # Stereo: handled by _assemble_partially_saturated_carbocycle_name() internally
-        # Phase 139 ARCH-03: enrichment for non-parent substituents
+        # [removed: partial_sat dispatched via inner_dispatch as of commit 02-24
+        #  for the (not _is_complex_ring_system) fast-path; the post-complex_ring
+        #  rejection fallback remains via the inline partial_sat block below.]
         if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
                 partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
-                # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
-                # NOTE: partial_sat returns cand.name DIRECTLY (no _inject_stereo wrapper).
                 pool = get_current_pool()
                 cand = pool.add(partial_sat_name, "partial_sat", features)
                 if cand is not None:
                     return cand.name
-                # Low confidence: pool.add returned None, fall through to next handler
 
     # Only collect heterocycle/benzene candidates if complex_ring didn't
     # produce a high-confidence result. This preserves the handler priority

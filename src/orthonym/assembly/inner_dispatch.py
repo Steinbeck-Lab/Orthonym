@@ -653,6 +653,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-24: partial_sat (Tier-1.5 SHIM with same complex_ring
+#     mutex pattern as polycyclic; audit § 1 + § 2.27. Predicate gates on
+#     (is_cyclic AND not chain_is_parent AND not _is_complex_ring_system);
+#     post-complex_ring rejection fallback retained in inline block.
+from .handlers.partial_sat import _is_partial_sat, name_partial_sat  # noqa: E402
+
+_register_inner(
+    handler_id="partial_sat",
+    priority=2700,
+    predicate=_is_partial_sat,
+    handler=name_partial_sat,
+    iupac_section="P-25.3",
+    description="Partially saturated carbocycle naming (Tier B; tetralin-shape)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
