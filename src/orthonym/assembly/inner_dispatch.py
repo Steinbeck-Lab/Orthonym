@@ -498,6 +498,20 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-14: lactam (Tier-1.5 SHIM with coverage gate;
+#     parallel to lactone; audit § 1 + § 2.14).
+from .handlers.lactam import _is_lactam, name_lactam  # noqa: E402
+
+_register_inner(
+    handler_id="lactam",
+    priority=1400,
+    predicate=_is_lactam,
+    handler=name_lactam,
+    iupac_section="P-66.6.3",
+    description="Monocyclic lactam (cyclic amide) naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

@@ -818,32 +818,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: lactone dispatched via inner_dispatch as of commit 02-13]
 
-    # ASML-10 complete: Lactam handler calls _integrate_universal_prefixes()
-    # for exocyclic substituent discovery (parallel to lactones).
-    # Lactams are cyclic amides named as heterocyclic ketones.
-    # e.g., azetidin-2-one, pyrrolidin-2-one, piperidin-2-one
-    # Same coverage guard as lactones above.
-    from ..rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
-    lactam_info = is_monocyclic_lactam(features.mol)
-    if lactam_info:
-        total_heavy = features.mol.GetNumHeavyAtoms()
-        ring_size = lactam_info.get('ring_size', 0)
-        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 8:
-            lactam_name = name_monocyclic_lactam(features.mol)
-            if lactam_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "lactam", _ha, lactam_name[:60],
-                    )
-                # Lactam handler already includes stereo with correct ring locants.
-                # Pass None -- regex guard detects existing stereo prefix and returns early.
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(lactam_name, "lactam", features)
-                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # [removed: lactam dispatched via inner_dispatch as of commit 02-14]
 
     # ASML-10 complete: Ring-attached ester handler uses
     # _assemble_ring_with_ester_prefixes() which generates acyloxy prefixes
