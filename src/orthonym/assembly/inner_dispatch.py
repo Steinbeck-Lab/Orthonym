@@ -331,6 +331,21 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-02: hydrazone (Tier-1 LIFT; composer.py:785-794
+#     inline branch removed; shared body with oxime at composer.py:1906-2042;
+#     audit § 1 row 'hydrazone' + § 2.3 predicate purity proof).
+from .handlers.hydrazone import _is_hydrazone, name_hydrazone  # noqa: E402
+
+_register_inner(
+    handler_id="hydrazone",
+    priority=200,
+    predicate=_is_hydrazone,
+    handler=name_hydrazone,
+    iupac_section="P-66.6",
+    description="Hydrazone functional class naming; e.g. propan-2-one hydrazone",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

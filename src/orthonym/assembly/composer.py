@@ -802,18 +802,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # cases not yet extracted to handlers/ (Plan-02 boundary).
 
     # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
-
-    # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
-    if features.principal_group == 'hydrazone':
-        hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
-        if hydrazone_name:
-            hydrazone_name = _enrich_handler_name(features, hydrazone_name, "hydrazone")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(hydrazone_name, "hydrazone", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: hydrazone dispatched via inner_dispatch as of commit 02-02]
 
     # ASML-10 verified: N-oxide handler creates modified molecule and names
     # recursively via name_compound(). The recursive call handles substituents
