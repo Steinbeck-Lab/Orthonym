@@ -528,6 +528,188 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-16: sulfone (Tier-1.5 SHIM; audit § 1 + § 2.20;
+#     parallel to sulfoxide via principal_group string mutex).
+from .handlers.sulfone import _is_sulfone, name_sulfone  # noqa: E402
+
+_register_inner(
+    handler_id="sulfone",
+    priority=1900,
+    predicate=_is_sulfone,
+    handler=name_sulfone,
+    iupac_section="P-66.5.2.4",
+    description="Sulfone functional class naming (Tier B; e.g. dimethyl sulfone)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-17: thioether (Tier-1.5 SHIM; audit § 1 + § 2.21;
+#     cyclic + fused-heterocycle skip guards mirrored from inline branch).
+from .handlers.thioether import _is_thioether, name_thioether  # noqa: E402
+
+_register_inner(
+    handler_id="thioether",
+    priority=2000,
+    predicate=_is_thioether,
+    handler=name_thioether,
+    iupac_section="P-66.5.2.4",
+    description="Sulfide / thioether functional class naming (Tier B)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-18: phosphine_oxide (Tier-1.5 SHIM; audit § 1 + § 2.22;
+#     direct-return; pool.add() + _inject_stereo_if_missing).
+from .handlers.phosphine_oxide import (  # noqa: E402
+    _is_phosphine_oxide, name_phosphine_oxide,
+)
+
+_register_inner(
+    handler_id="phosphine_oxide",
+    priority=2100,
+    predicate=_is_phosphine_oxide,
+    handler=name_phosphine_oxide,
+    iupac_section="P-68.3",
+    description="Phosphine oxide functional class naming (direct-return)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-19: phosphate_ester (Tier-1.5 SHIM; audit § 1 + § 2.23;
+#     direct-return; principal_group in {phosphate_triester/diester/monoester}).
+from .handlers.phosphate_ester import (  # noqa: E402
+    _is_phosphate_ester, name_phosphate_ester,
+)
+
+_register_inner(
+    handler_id="phosphate_ester",
+    priority=2200,
+    predicate=_is_phosphate_ester,
+    handler=name_phosphate_ester,
+    iupac_section="P-68.3.1",
+    description="Phosphate ester (mono / di / triester) naming",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-20: phosphine (Tier-1.5 SHIM; audit § 1 + § 2.24;
+#     covers tertiary/secondary/primary phosphine variants with benzene-parent
+#     skip guard).
+from .handlers.phosphine import _is_phosphine, name_phosphine  # noqa: E402
+
+_register_inner(
+    handler_id="phosphine",
+    priority=2300,
+    predicate=_is_phosphine,
+    handler=name_phosphine,
+    iupac_section="P-68.3.1.2",
+    description="Phosphine (tertiary / secondary / primary) functional naming",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-21: phosphinic_acid (Tier-1.5 SHIM; audit § 1 + § 2.25;
+#     direct-return; pool.add() + _inject_stereo_if_missing).
+from .handlers.phosphinic_acid import (  # noqa: E402
+    _is_phosphinic_acid, name_phosphinic_acid,
+)
+
+_register_inner(
+    handler_id="phosphinic_acid",
+    priority=2400,
+    predicate=_is_phosphinic_acid,
+    handler=name_phosphinic_acid,
+    iupac_section="P-68.3.1.2.2",
+    description="Phosphinic acid functional class naming (direct-return)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-22: ring_assembly (Tier-1.5 SHIM; audit § 1 + § 2.24;
+#     direct-return; predicate = ring_assembly_info AND not chain_is_parent;
+#     fires BEFORE complex_ring per composer.py:979 dispatch ordering).
+from .handlers.ring_assembly import (  # noqa: E402
+    _is_ring_assembly, name_ring_assembly,
+)
+
+_register_inner(
+    handler_id="ring_assembly",
+    priority=2500,
+    predicate=_is_ring_assembly,
+    handler=name_ring_assembly,
+    iupac_section="P-28",
+    description="Ring assembly / biaryl naming (direct-return)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-23: polycyclic (Tier-1.5 SHIM with mutex; audit § 1 +
+#     § 2.26; predicate gates on (polycyclic_name AND not chain_is_parent AND
+#     not _is_complex_ring_system) to mirror inline gate semantics. Cases that
+#     fall through complex_ring rejection are captured by the inline fallback
+#     block still present at composer.py:1116+ in Plan-02 (closed in Plan-03).
+from .handlers.polycyclic import _is_polycyclic, name_polycyclic  # noqa: E402
+
+_register_inner(
+    handler_id="polycyclic",
+    priority=2600,
+    predicate=_is_polycyclic,
+    handler=name_polycyclic,
+    iupac_section="P-25",
+    description="Polycyclic aromatic (retained name) naming (direct-return)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-24: partial_sat (Tier-1.5 SHIM with same complex_ring
+#     mutex pattern as polycyclic; audit § 1 + § 2.27. Predicate gates on
+#     (is_cyclic AND not chain_is_parent AND not _is_complex_ring_system);
+#     post-complex_ring rejection fallback retained in inline block.
+from .handlers.partial_sat import _is_partial_sat, name_partial_sat  # noqa: E402
+
+_register_inner(
+    handler_id="partial_sat",
+    priority=2700,
+    predicate=_is_partial_sat,
+    handler=name_partial_sat,
+    iupac_section="P-25.3",
+    description="Partially saturated carbocycle naming (Tier B; tetralin-shape)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-25: simple_molecule (LIFT; audit § 1 + § 2.34).
+#     Predicate `not principal_chain and not ring_systems` is mutually
+#     exclusive with all other Plan-02 handlers (atom-only molecules); safe
+#     to fire at any priority. Priority 2800 per audit.
+from .handlers.simple_molecule import (  # noqa: E402
+    _is_simple_molecule, name_simple_molecule,
+)
+
+_register_inner(
+    handler_id="simple_molecule",
+    priority=2800,
+    predicate=_is_simple_molecule,
+    handler=name_simple_molecule,
+    iupac_section="P-14",
+    description="Single-atom / noble-gas / simple-molecule naming",
+    side_effect_inventory=(),
+)
+
+# --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
+#     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
+#     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS
+#     unchanged. This inner-dispatch entry exists for architectural
+#     uniformity (so all HANDLER_POLICIES + Phase 160 additions appear in
+#     the table) but is structurally unreachable: the inline bypass at
+#     composer.py:751-768 returns BEFORE control reaches dispatch_inner.
+#     Priority 50 places ion_dispatch first in priority order per the
+#     audit (lowest priority = first iteration).
+from .handlers.ion_dispatch import (  # noqa: E402
+    _is_ion_dispatch, name_ion_dispatch,
+)
+
+_register_inner(
+    handler_id="ion_dispatch",
+    priority=50,
+    predicate=_is_ion_dispatch,
+    handler=name_ion_dispatch,
+    iupac_section="P-15.6/P-15.7/P-72/P-73/P-74",
+    description="Ion / salt / zwitterion / radical pre-pool bypass (D-09)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

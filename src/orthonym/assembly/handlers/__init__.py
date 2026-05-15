@@ -66,6 +66,17 @@ from .anhydride import name_anhydride  # commit 02-12
 from .lactone import name_lactone  # commit 02-13
 from .lactam import name_lactam  # commit 02-14
 from .sulfoxide import name_sulfoxide  # commit 02-15 (renumbered; polyfunctional deferred)
+from .sulfone import name_sulfone  # commit 02-16
+from .thioether import name_thioether  # commit 02-17
+from .phosphine_oxide import name_phosphine_oxide  # commit 02-18
+from .phosphate_ester import name_phosphate_ester  # commit 02-19
+from .phosphine import name_phosphine  # commit 02-20
+from .phosphinic_acid import name_phosphinic_acid  # commit 02-21
+from .ring_assembly import name_ring_assembly  # commit 02-22
+from .polycyclic import name_polycyclic  # commit 02-23
+from .partial_sat import name_partial_sat  # commit 02-24
+from .simple_molecule import name_simple_molecule  # commit 02-25
+from .ion_dispatch import name_ion_dispatch  # commit 02-26
 
 __all__ = [
     "NameTreeNode",
@@ -90,5 +101,16 @@ __all__ = [
     "name_lactone",  # 02-13
     "name_lactam",  # 02-14
     "name_sulfoxide",  # 02-15 (renumbered)
+    "name_sulfone",  # 02-16
+    "name_thioether",  # 02-17
+    "name_phosphine_oxide",  # 02-18
+    "name_phosphate_ester",  # 02-19
+    "name_phosphine",  # 02-20
+    "name_phosphinic_acid",  # 02-21
+    "name_ring_assembly",  # 02-22
+    "name_polycyclic",  # 02-23
+    "name_partial_sat",  # 02-24
+    "name_simple_molecule",  # 02-25
+    "name_ion_dispatch",  # 02-26
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]

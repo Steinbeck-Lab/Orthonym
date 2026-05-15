@@ -962,183 +962,15 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: sulfoxide dispatched via inner_dispatch as of commit 02-15
     #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
     #  to Plan-03 per deferred-items.md)]
-    # ASML-10 self-gating: sulfone handler (still inline; extracted commit 02-16).
-    if features.principal_group == 'sulfone':
-        from ..rules.sulfur import name_sulfone
-        matches = features.functional_groups.get('sulfone', [])
-        if matches:
-            name = name_sulfone(features.mol, matches[0])
-            if name:
-                name = _enrich_handler_name(features, name, "sulfone")
-                # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                pool = get_current_pool()
-                cand = pool.add(name, "sulfone", features)
-                if cand is not None:
-                    return _inject_stereo_if_missing(features, cand.name)
-                # Low confidence: pool.add returned None, fall through
-
-    # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
-    # None for complex R-groups. Falls through to universal pipeline. No silent drop.
-    # Skip cyclic thioethers (1,3-dithiane, thiane, etc.) - they are named as heterocycles
-    if features.principal_group == 'thioether':
-        ring_type = getattr(features, 'ring_type', None)
-        if not (ring_type and ring_type.startswith('heterocyclic')):
-            # Guard: skip known fused heterocycles (phenothiazine, thianthrene)
-            # These contain S atoms that match thioether SMARTS but should use
-            # their retained fused heterocycle names, not functional class sulfide naming.
-            from ..data.fused_heterocycles import match_fused_heterocycle_core
-            if match_fused_heterocycle_core(features.mol) is None:
-                from ..rules.sulfur import name_sulfide
-                # Find sulfur atom index
-                matches = features.functional_groups.get('thioether', [])
-                if matches:
-                    # SMARTS match gives (S, C, C) - sulfur is first
-                    sulfur_idx = matches[0][0]
-                    name = name_sulfide(features.mol, sulfur_idx)
-                    if name:
-                        name = _enrich_handler_name(features, name, "thioether")
-                        # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                        pool = get_current_pool()
-                        cand = pool.add(name, "thioether", features)
-                        if cand is not None:
-                            return _inject_stereo_if_missing(features, cand.name)
-                        # Low confidence: pool.add returned None, fall through
-
-    # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
-    # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
-    # molecules fall through to universal pipeline. No substituents silently dropped.
-    # Tier C (Phase 139): Self-gating design confirmed complete -- when handlers
-    # return a name, molecule is simple enough that no additional enrichment needed.
-    # When molecule is complex, handlers return None and fall through to universal pipeline.
-    if features.principal_group == 'phosphine_oxide':
-        from ..rules.phosphorus import name_phosphine_oxide
-        matches = features.functional_groups.get('phosphine_oxide', [])
-        if matches:
-            name = name_phosphine_oxide(features.mol, matches[0])
-            if name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "phosphine_oxide", _ha, name[:60],
-                    )
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(name, "phosphine_oxide", features)
-                return _inject_stereo_if_missing(features, pool.best().name)
-
-    # Handle phosphate esters
-    if features.principal_group in ('phosphate_triester', 'phosphate_diester', 'phosphate_monoester'):
-        from ..rules.phosphorus import name_phosphate_ester
-        fg_key = features.principal_group
-        matches = features.functional_groups.get(fg_key, [])
-        if matches:
-            # Find phosphorus atom index from SMARTS match
-            for idx in matches[0]:
-                atom = features.mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'P':
-                    name = name_phosphate_ester(features.mol, idx)
-                    if name:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            _ha = features.mol.GetNumHeavyAtoms()
-                            logger.debug(
-                                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                                "phosphate_ester", _ha, name[:60],
-                            )
-                        # Phase 145.1: route through pool.add() — direct_return handler.
-                        pool = get_current_pool()
-                        pool.add(name, "phosphate_ester", features)
-                        return _inject_stereo_if_missing(features, pool.best().name)
-                    break
-
-    # Handle phosphines (tertiary, secondary, primary)
-    if features.principal_group in ('tertiary_phosphine', 'secondary_phosphine', 'primary_phosphine'):
-        from ..rules.phosphorus import name_phosphine
-        fg_key = features.principal_group
-        matches = features.functional_groups.get(fg_key, [])
-
-        # When molecule is a benzene derivative with P on the ring alongside
-        # other substituents (or multiple P atoms), prefer benzene-as-parent naming.
-        # The P will be expressed as a phosphanyl prefix on benzene.
-        _skip_for_benzene = False
-        if getattr(features, 'is_benzene', False) and matches:
-            if len(matches) > 1:
-                # Multiple phosphine groups -> ring should be parent
-                _skip_for_benzene = True
-            else:
-                # Single phosphine -- check if any benzene ring atom has
-                # non-P, non-ring substituent neighbors
-                _bz_ring = getattr(features, 'benzene_ring', None)
-                if _bz_ring:
-                    _bz_set = set(_bz_ring)
-                    for _ra in _bz_ring:
-                        _ra_atom = features.mol.GetAtomWithIdx(_ra)
-                        for _nbr in _ra_atom.GetNeighbors():
-                            if _nbr.GetIdx() not in _bz_set and _nbr.GetSymbol() != 'P':
-                                _skip_for_benzene = True
-                                break
-                        if _skip_for_benzene:
-                            break
-
-        if not _skip_for_benzene and matches:
-            # Find phosphorus atom index
-            for idx in matches[0]:
-                atom = features.mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'P':
-                    name = name_phosphine(features.mol, idx)
-                    if name:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            _ha = features.mol.GetNumHeavyAtoms()
-                            logger.debug(
-                                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                                "phosphine", _ha, name[:60],
-                            )
-                        # Phase 145.1: route through pool.add() — direct_return handler.
-                        pool = get_current_pool()
-                        pool.add(name, "phosphine", features)
-                        return _inject_stereo_if_missing(features, pool.best().name)
-                    break
-
-    # Handle phosphinic acid (suffix naming, but needs special assembly)
-    if features.principal_group == 'phosphinic_acid':
-        from ..rules.phosphorus import name_phosphinic_acid
-        matches = features.functional_groups.get('phosphinic_acid', [])
-        if matches:
-            name = name_phosphinic_acid(features.mol, matches[0])
-            if name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "phosphinic_acid", _ha, name[:60],
-                    )
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(name, "phosphinic_acid", features)
-                return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: sulfone dispatched via inner_dispatch as of commit 02-16]
+    # [removed: thioether dispatched via inner_dispatch as of commit 02-17]
+    # [removed: phosphine_oxide dispatched via inner_dispatch as of commit 02-18]
+    # [removed: phosphate_ester dispatched via inner_dispatch as of commit 02-19]
+    # [removed: phosphine dispatched via inner_dispatch as of commit 02-20]
+    # [removed: phosphinic_acid dispatched via inner_dispatch as of commit 02-21]
 
     # [removed: boronic_acid dispatched via inner_dispatch as of commit 02-10]
-
-    # ASML-10 verified: Ring assembly has own _get_substituent_info() at
-    # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
-    # Verified: ring assembly substituent discovery covers halogens, hydroxy, amino,
-    # and alkyl groups. No enrichment needed.
-    # Ring assemblies are separate identical ring systems connected by single bonds
-    assembly_info = getattr(features, 'ring_assembly_info', None)
-    if assembly_info and not getattr(features, 'chain_is_parent', False):
-        from ..rules.ring_assemblies import name_ring_assembly
-        assembly_name = name_ring_assembly(features.mol, assembly_info, features)
-        if assembly_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "ring_assembly", _ha, assembly_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(assembly_name, "ring_assembly", features)
-            return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: ring_assembly dispatched via inner_dispatch as of commit 02-22]
 
     # =========================================================================
     # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool
@@ -1255,20 +1087,15 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
-    # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
-    # Check before benzene since substituted PAHs have benzene substructures
-    # NOT gated -- direct return (no coverage quality ambiguity)
-    # Skip if complex_ring already identified the system with adequate
-    # confidence (it provides a more complete VB/fused name for systems
-    # that also have a simpler polycyclic_name or partial_sat match).
+    # [removed: polycyclic dispatched via inner_dispatch as of commit 02-23
+    #  for the (not _is_complex_ring_system) fast-path; the post-complex_ring
+    #  rejection fallback remains via the inline polycyclic block below for
+    #  complex-ring molecules where complex_ring fires-and-rejects.]
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         polycyclic_name = getattr(features, 'polycyclic_name', None)
         if polycyclic_name:
             # Tier C (Phase 139): Polycyclic handler has its own complete substituent
             # handling via features.polycyclic_substituents + name_substituted_polycyclic().
-            # Includes suffix groups and prefix groups with proper PAH numbering.
-            # No enrichment needed -- verified complete by design.
-            # Stereo: handled by name_substituted_polycyclic() internally
             if logger.isEnabledFor(logging.DEBUG):
                 _ha = features.mol.GetNumHeavyAtoms()
                 logger.debug(
@@ -1281,22 +1108,17 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             pool.add(poly_assembled, "polycyclic", features)
             return pool.best().name
 
-        # Handle partially saturated carbocycles (tetrahydronaphthalene, etc.)
-        # Check BEFORE benzene since they contain benzene substructure
-        # NOT gated -- direct return
-        # Stereo: handled by _assemble_partially_saturated_carbocycle_name() internally
-        # Phase 139 ARCH-03: enrichment for non-parent substituents
+        # [removed: partial_sat dispatched via inner_dispatch as of commit 02-24
+        #  for the (not _is_complex_ring_system) fast-path; the post-complex_ring
+        #  rejection fallback remains via the inline partial_sat block below.]
         if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
             partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
             if partial_sat_name:
                 partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
-                # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
-                # NOTE: partial_sat returns cand.name DIRECTLY (no _inject_stereo wrapper).
                 pool = get_current_pool()
                 cand = pool.add(partial_sat_name, "partial_sat", features)
                 if cand is not None:
                     return cand.name
-                # Low confidence: pool.add returned None, fall through to next handler
 
     # Only collect heterocycle/benzene candidates if complex_ring didn't
     # produce a high-confidence result. This preserves the handler priority
@@ -1563,11 +1385,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             pool.add(amine_name, "amine", features)
             return pool.best().name
 
-    # Handle simple cases
-    # Stereo: not applicable (single atom / very simple molecules have no stereocenters)
-    if not features.principal_chain and not features.ring_systems:
-        # Single atom or very simple molecule
-        return _name_simple_molecule(features)
+    # [removed: simple_molecule dispatched via inner_dispatch as of commit 02-25]
 
     fragments = []
 
