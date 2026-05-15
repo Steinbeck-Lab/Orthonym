@@ -56,6 +56,7 @@ from .hydrazone import name_hydrazone  # commit 02-02
 from .n_oxide import name_n_oxide  # commit 02-03
 from .isocyanate import name_isocyanate  # commit 02-04
 from .isothiocyanate import name_isothiocyanate  # commit 02-05
+from .carbamic_acid import name_carbamic_acid  # commit 02-06
 
 __all__ = [
     "NameTreeNode",
@@ -70,5 +71,6 @@ __all__ = [
     "name_n_oxide",  # 02-03
     "name_isocyanate",  # 02-04
     "name_isothiocyanate",  # 02-05
+    "name_carbamic_acid",  # 02-06
     # ... (29 total at Plan-02 end; 39 at Plan-03 end)
 ]

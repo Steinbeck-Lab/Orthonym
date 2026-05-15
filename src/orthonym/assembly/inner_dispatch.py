@@ -389,6 +389,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-06: carbamic_acid (Tier-1 LIFT; audit § 1 row + § 2.7).
+from .handlers.carbamic_acid import _is_carbamic_acid, name_carbamic_acid  # noqa: E402
+
+_register_inner(
+    handler_id="carbamic_acid",
+    priority=600,
+    predicate=_is_carbamic_acid,
+    handler=name_carbamic_acid,
+    iupac_section="P-66.5.5",
+    description="Carbamic acid retained name with N-substitution",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

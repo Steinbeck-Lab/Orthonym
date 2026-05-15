@@ -807,21 +807,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: isocyanate dispatched via inner_dispatch as of commit 02-04]
     # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
-
-    # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
-    # the Phase 125 fix for substituted aromatic R-groups.
-    # Retained name with N-substitution (IUPAC P-65.2.3)
-    # N-C(=O)-OH -> "carbamic acid", "N-methylcarbamic acid", etc.
-    if features.principal_group == 'carbamic_acid':
-        carbamic_name = _name_carbamic_acid(features)
-        if carbamic_name:
-            carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(carbamic_name, "carbamic_acid", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
 
     # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
     # for both N- and O-substituent naming.
