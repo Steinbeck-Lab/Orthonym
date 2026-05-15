@@ -485,3 +485,54 @@ class TestInnerDispatchTypeErrorWrapping:
         # Should NOT raise; either None (no match) or a real dispatch result.
         result = dispatch_inner(FakeFeatures())
         assert result is None or hasattr(result, "handler_id")
+
+
+class TestInnerDispatchSortCache:
+    """WR-01 regression: dispatch_inner uses cached sorted tuple, not per-call sort."""
+
+    def test_sort_cache_is_populated_after_first_dispatch(self):
+        from orthonym.assembly import inner_dispatch as ind
+
+        class FakeFeatures:
+            species_type = "neutral"
+            principal_chain = None
+            ring_systems = None
+            principal_group = None
+            is_polyfunctional = False
+            is_cyclic = False
+            chain_is_parent = False
+            mol = None
+
+        ind.dispatch_inner(FakeFeatures())
+        assert ind._SORTED_ENTRIES_CACHE is not None
+        priorities = [e.priority for e in ind._SORTED_ENTRIES_CACHE]
+        assert priorities == sorted(priorities)
+
+    def test_dispatch_inner_does_not_call_sorted_per_call(self, monkeypatch):
+        """Performance regression guard: sorted() is called at most once
+        on cache rebuild, not per dispatch."""
+        from orthonym.assembly import inner_dispatch as ind
+
+        ind._SORTED_ENTRIES_CACHE = None
+        sort_call_count = [0]
+        real_sorted = sorted
+
+        def counting_sorted(*args, **kwargs):
+            sort_call_count[0] += 1
+            return real_sorted(*args, **kwargs)
+
+        monkeypatch.setattr("builtins.sorted", counting_sorted)
+
+        class FakeFeatures:
+            species_type = "neutral"
+            principal_chain = None
+            ring_systems = None
+            principal_group = None
+            is_polyfunctional = False
+            is_cyclic = False
+            chain_is_parent = False
+            mol = None
+
+        for _ in range(10):
+            ind.dispatch_inner(FakeFeatures())
+        assert sort_call_count[0] <= 1

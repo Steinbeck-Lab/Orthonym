@@ -126,6 +126,14 @@ class InnerDispatchResult:
 # Tier-1/Tier-1.5 + 1 general_acyclic catch-all).
 INNER_DISPATCH_TABLE: "OrderedDict[str, InnerDispatchEntry]" = OrderedDict()
 
+# WR-01: cache priority-sorted entries at module-load time so dispatch_inner
+# does NOT re-sort on every call. Invalidated on every _register_inner; first
+# dispatch after registration rebuilds and freezes the tuple. The registration
+# order does NOT match priority order (priorities are not monotonically
+# increasing across the _register_inner calls), so we cannot iterate
+# INNER_DISPATCH_TABLE.values() directly without breaking dispatch.
+_SORTED_ENTRIES_CACHE: "Optional[Tuple[InnerDispatchEntry, ...]]" = None
+
 # Registration-freezing sentinel per CONTEXT D-10. Plan-04 may toggle this
 # to True after Plan-03 commit 03-10 (composer.py thinning) to lock the
 # table against runtime modification. Plan-02/03 keeps it False so each
@@ -208,6 +216,10 @@ def _register_inner(
         description=description,
         side_effect_inventory=side_effect_inventory,
     )
+    # WR-01: invalidate the priority-sorted cache. First dispatch_inner
+    # call after registration rebuilds it once and reuses thereafter.
+    global _SORTED_ENTRIES_CACHE  # noqa: PLW0603
+    _SORTED_ENTRIES_CACHE = None
 
 
 def freeze_inner_table() -> None:
@@ -248,14 +260,16 @@ def dispatch_inner(features: Any) -> Optional[InnerDispatchResult]:
     around the predicate call (PATTERNS § Error Handling) handles the case
     where a predicate doesn't accept the kwarg-less call shape.
     """
-    # Iterate in priority order. OrderedDict preserves insertion order;
-    # _register_inner inserts in priority-sorted call order (Plan-02/03
-    # atomic commits register in the audit § 3 dependency-graph topology
-    # order, which IS the priority order).
-    for entry in sorted(
-        INNER_DISPATCH_TABLE.values(),
-        key=lambda e: e.priority,
-    ):
+    # WR-01: use cached priority-sorted tuple instead of re-sorting per call.
+    # The cache is invalidated by _register_inner; once frozen by
+    # freeze_inner_table(), the cache is stable. Cost: O(n log n) once;
+    # O(n) per dispatch thereafter (vs prior O(n log n) per dispatch).
+    global _SORTED_ENTRIES_CACHE  # noqa: PLW0603
+    if _SORTED_ENTRIES_CACHE is None:
+        _SORTED_ENTRIES_CACHE = tuple(
+            sorted(INNER_DISPATCH_TABLE.values(), key=lambda e: e.priority)
+        )
+    for entry in _SORTED_ENTRIES_CACHE:
         try:
             matched = entry.predicate(features)
         except TypeError as exc:
