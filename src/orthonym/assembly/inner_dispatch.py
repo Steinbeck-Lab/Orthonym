@@ -669,6 +669,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-25: simple_molecule (LIFT; audit § 1 + § 2.34).
+#     Predicate `not principal_chain and not ring_systems` is mutually
+#     exclusive with all other Plan-02 handlers (atom-only molecules); safe
+#     to fire at any priority. Priority 2800 per audit.
+from .handlers.simple_molecule import (  # noqa: E402
+    _is_simple_molecule, name_simple_molecule,
+)
+
+_register_inner(
+    handler_id="simple_molecule",
+    priority=2800,
+    predicate=_is_simple_molecule,
+    handler=name_simple_molecule,
+    iupac_section="P-14",
+    description="Single-atom / noble-gas / simple-molecule naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

@@ -1385,11 +1385,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             pool.add(amine_name, "amine", features)
             return pool.best().name
 
-    # Handle simple cases
-    # Stereo: not applicable (single atom / very simple molecules have no stereocenters)
-    if not features.principal_chain and not features.ring_systems:
-        # Single atom or very simple molecule
-        return _name_simple_molecule(features)
+    # [removed: simple_molecule dispatched via inner_dispatch as of commit 02-25]
 
     fragments = []
 
