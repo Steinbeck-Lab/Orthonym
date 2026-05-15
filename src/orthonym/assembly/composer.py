@@ -805,6 +805,17 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     if _inner_result is not None:
         _inner_naming = _inner_result.handler(features, features.mol, style=style)
         if _inner_naming is not None:
+            # CR-04 part B + W7: capture the inner-dispatch NamingResult
+            # for name_with_tree() consumers via contextvars.ContextVar
+            # (PEP 567). The slot is installed by Orthonym.name_with_tree()
+            # before invoking self.name(); when absent (default=None), this
+            # is a no-op for the regular Orthonym.name() path. ContextVar
+            # is thread-local AND asyncio-task-local — safe under
+            # concurrent invocation from multiple threads / tasks.
+            from ..namer import _name_with_tree_capture
+            _slot = _name_with_tree_capture.get()
+            if _slot is not None:
+                _slot["naming"] = _inner_naming
             # Per CONTEXT D-13 + the comment above: the handler's
             # NamingResult.name is the FINAL byte-identical string. No
             # post-processing here. Handlers that need _inject_stereo_if_missing

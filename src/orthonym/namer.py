@@ -9,6 +9,7 @@ This is the inverse of OPSIN's pipeline:
     Orthonym: Structure → Perceive → Classify → Assemble Name
 """
 
+import contextvars
 import logging
 import re
 from dataclasses import dataclass, field
@@ -18,6 +19,17 @@ from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
 logger = logging.getLogger(__name__)
+
+# CR-04 part B + W7: per-call NamingResult capture slot for name_with_tree.
+# ContextVar provides thread-local AND asyncio-task-local isolation per PEP 567;
+# safer than a module-global dict against concurrent Orthonym().name_with_tree()
+# calls. The slot is installed by Orthonym.name_with_tree() before invoking
+# self.name(); composer._assemble_name_impl writes the inner-dispatch
+# NamingResult into the slot when present (default=None makes the regular
+# Orthonym.name() path a no-op).
+_name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
+    contextvars.ContextVar("name_with_tree_capture", default=None)
+)
 
 from .perception.ions import detect_species_type, get_ion_sites, get_radical_sites
 from .perception.functional_groups import detect_functional_groups
@@ -845,14 +857,22 @@ class Orthonym:
         # Lazy import to avoid composer.py -> name_tree -> namer.py cycle
         # at module-load time.
         from .assembly.name_tree import NamingResult
-        # For Plan-04 first-wave: surface the name via the production path
-        # (Orthonym.name) and wrap as NamingResult with tree=None per
-        # CONTEXT D-05. The handler tree-emission is iterative across v19+
-        # phases; until then this is the deterministic byte-identical-name
-        # path that downstream consumers (--dump-tree CLI, tree
-        # round-trip tests) can rely on.
-        name = self.name(smiles)
-        return NamingResult(name=name, tree=None, atom_to_locant_hint=None)
+        # CR-04 part B + W7: install a per-call capture slot via
+        # contextvars.ContextVar (PEP 567) so composer._assemble_name_impl
+        # can write the inner-dispatch NamingResult into it without
+        # changing the public assemble_name return type. ContextVar is
+        # thread-local AND asyncio-task-local — safe under concurrent
+        # invocation from multiple threads / tasks.
+        token = _name_with_tree_capture.set({"naming": None})
+        try:
+            name = self.name(smiles)
+            slot = _name_with_tree_capture.get()
+            captured = slot["naming"] if slot else None
+            tree = captured.tree if captured is not None else None
+            hint = captured.atom_to_locant_hint if captured is not None else None
+        finally:
+            _name_with_tree_capture.reset(token)
+        return NamingResult(name=name, tree=tree, atom_to_locant_hint=hint)
 
     def get_validation_stats(self) -> Dict[str, int]:
         """Return a defensive copy of the per-instance grammar counters.
@@ -1785,6 +1805,23 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 
     return fg
 
+
+
+def name_with_tree(smiles: str, style: str = "pin"):
+    """Module-level convenience wrapper for Orthonym(style).name_with_tree(smiles).
+
+    CR-04 part A (BLOCKER): downstream consumers expect
+    ``from orthonym import name_with_tree`` to work analogously to
+    ``name_compound``.
+
+    Args:
+        smiles: SMILES string to name.
+        style: 'pin' (preferred) | 'systematic' | 'cas'. Default 'pin'.
+
+    Returns:
+        NamingResult(name, tree, atom_to_locant_hint).
+    """
+    return Orthonym(style=style).name_with_tree(smiles)
 
 
 def name_compound(smiles: str, style: str = "pin",

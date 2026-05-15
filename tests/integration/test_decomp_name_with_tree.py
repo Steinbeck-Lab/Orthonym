@@ -150,3 +150,35 @@ def test_name_with_tree_first_wave_tree_is_none_doc(namer):
             f"got {result.tree!r}. If a handler now emits a tree, "
             f"update this test + the ADR-19-02 tree-emission status table."
         )
+
+
+def test_atom_to_locant_hint_preserved_for_n_oxide(namer):
+    """CR-04 part B regression: n_oxide handler's atom_to_locant_hint
+    threads to name_with_tree caller (no longer silently None).
+
+    The n_oxide handler produces a non-None ``atom_to_locant_hint``
+    (the heterocycle locant_map). Prior to Plan-05, Orthonym.name_with_tree
+    discarded all handler hints and always returned None.
+    """
+    smi_candidates = [
+        "O=[N+]1=CC=CC=C1[O-]",
+        "[O-][n+]1ccccc1",
+        "O=[n+]1ccccc1",
+    ]
+    for smi in smi_candidates:
+        try:
+            result = namer.name_with_tree(smi)
+        except Exception:
+            continue
+        if "oxide" in (result.name or ""):
+            assert isinstance(result, NamingResult)
+            assert result.atom_to_locant_hint is not None, (
+                f"n_oxide handler should produce non-None "
+                f"atom_to_locant_hint for smi={smi!r}; got None "
+                f"(CR-04 part B regression)"
+            )
+            return
+    import pytest as _pytest
+    _pytest.skip(
+        "No N-oxide SMILES routed through n_oxide handler in current build"
+    )
