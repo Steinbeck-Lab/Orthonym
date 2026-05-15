@@ -726,6 +726,29 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-03 commit 03-02: amide (Tier-2 mid-tier with polyfunctional + Tier-A
+#     mutex; audit § 1 + § 3). Predicate:
+#       principal_group in {primary_amide, secondary_amide, tertiary_amide}
+#       AND pg_count == 1
+#       AND NOT is_polyfunctional (mutex with polyfunctional inline branch at
+#           composer.py:870, which fires BEFORE amide in inline cascade order)
+#       AND (NOT is_cyclic OR chain_is_parent) (Tier-A mutex — same pattern
+#           as partial_sat handler in Plan-02 commit 02-24)
+#     Body lift: composer.py:4154-4295 (_assemble_amide_name, 142 LOC).
+#     Inline branch composer.py:1343-1356 RETAINED as Tier-A-rejection fallback
+#     (composer.py thinning in commit 03-10 consolidates this).
+from .handlers.amide import _is_amide, name_amide  # noqa: E402
+
+_register_inner(
+    handler_id="amide",
+    priority=5200,
+    predicate=_is_amide,
+    handler=name_amide,
+    iupac_section="P-66.5.3",
+    description="Amide (primary/secondary/tertiary, single-group; non-cyclic non-polyfunctional fast-path)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

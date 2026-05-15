@@ -78,6 +78,7 @@ from .partial_sat import name_partial_sat  # commit 02-24
 from .simple_molecule import name_simple_molecule  # commit 02-25
 from .ion_dispatch import name_ion_dispatch  # commit 02-26
 from .ring_nitrile import name_ring_nitrile  # commit 03-01
+from .amide import name_amide  # commit 03-02
 
 __all__ = [
     "NameTreeNode",
@@ -114,5 +115,6 @@ __all__ = [
     "name_simple_molecule",  # 02-25
     "name_ion_dispatch",  # 02-26
     "name_ring_nitrile",  # 03-01
+    "name_amide",  # 03-02
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]
