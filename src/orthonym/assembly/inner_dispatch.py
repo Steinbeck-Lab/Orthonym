@@ -636,6 +636,23 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-23: polycyclic (Tier-1.5 SHIM with mutex; audit § 1 +
+#     § 2.26; predicate gates on (polycyclic_name AND not chain_is_parent AND
+#     not _is_complex_ring_system) to mirror inline gate semantics. Cases that
+#     fall through complex_ring rejection are captured by the inline fallback
+#     block still present at composer.py:1116+ in Plan-02 (closed in Plan-03).
+from .handlers.polycyclic import _is_polycyclic, name_polycyclic  # noqa: E402
+
+_register_inner(
+    handler_id="polycyclic",
+    priority=2600,
+    predicate=_is_polycyclic,
+    handler=name_polycyclic,
+    iupac_section="P-25",
+    description="Polycyclic aromatic (retained name) naming (direct-return)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

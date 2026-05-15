@@ -1087,20 +1087,15 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _complex_ring_accepted = True
         # If complex ring naming fails, fall through to simpler handling
 
-    # Handle polycyclic aromatics (naphthalene, anthracene, etc.)
-    # Check before benzene since substituted PAHs have benzene substructures
-    # NOT gated -- direct return (no coverage quality ambiguity)
-    # Skip if complex_ring already identified the system with adequate
-    # confidence (it provides a more complete VB/fused name for systems
-    # that also have a simpler polycyclic_name or partial_sat match).
+    # [removed: polycyclic dispatched via inner_dispatch as of commit 02-23
+    #  for the (not _is_complex_ring_system) fast-path; the post-complex_ring
+    #  rejection fallback remains via the inline polycyclic block below for
+    #  complex-ring molecules where complex_ring fires-and-rejects.]
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
         polycyclic_name = getattr(features, 'polycyclic_name', None)
         if polycyclic_name:
             # Tier C (Phase 139): Polycyclic handler has its own complete substituent
             # handling via features.polycyclic_substituents + name_substituted_polycyclic().
-            # Includes suffix groups and prefix groups with proper PAH numbering.
-            # No enrichment needed -- verified complete by design.
-            # Stereo: handled by name_substituted_polycyclic() internally
             if logger.isEnabledFor(logging.DEBUG):
                 _ha = features.mol.GetNumHeavyAtoms()
                 logger.debug(

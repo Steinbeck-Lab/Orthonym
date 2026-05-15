@@ -73,6 +73,7 @@ from .phosphate_ester import name_phosphate_ester  # commit 02-19
 from .phosphine import name_phosphine  # commit 02-20
 from .phosphinic_acid import name_phosphinic_acid  # commit 02-21
 from .ring_assembly import name_ring_assembly  # commit 02-22
+from .polycyclic import name_polycyclic  # commit 02-23
 
 __all__ = [
     "NameTreeNode",
@@ -104,5 +105,6 @@ __all__ = [
     "name_phosphine",  # 02-20
     "name_phosphinic_acid",  # 02-21
     "name_ring_assembly",  # 02-22
+    "name_polycyclic",  # 02-23
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]
