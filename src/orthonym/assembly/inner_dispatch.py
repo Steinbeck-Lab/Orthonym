@@ -415,6 +415,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-08: urea (Tier-1 LIFT; audit § 1 row + § 2.9).
+from .handlers.urea import _is_urea, name_urea  # noqa: E402
+
+_register_inner(
+    handler_id="urea",
+    priority=800,
+    predicate=_is_urea,
+    handler=name_urea,
+    iupac_section="P-66.6",
+    description="Urea retained name with N-substitution",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

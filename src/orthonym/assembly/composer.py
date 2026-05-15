@@ -809,22 +809,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
     # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
     # [removed: carbamate dispatched via inner_dispatch as of commit 02-07]
-
-    # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
-    # for N-substituent naming. Retained name with N-substitution.
-    # "urea", "N-methylurea", "N,N-dimethylurea", "N,N'-dimethylurea"
-    # Must detect BEFORE polyfunctional handler to prevent garbled output
-    if (features.functional_groups.get('urea')
-            and features.principal_group is None):
-        urea_name = _try_name_urea(features)
-        if urea_name:
-            urea_name = _enrich_handler_name(features, urea_name, "urea")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(urea_name, "urea", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: urea dispatched via inner_dispatch as of commit 02-08]
 
     # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
