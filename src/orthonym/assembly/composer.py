@@ -774,8 +774,20 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # populated by per-handler atomic commits 02-01..02-29 (Plan-02) +
     # 03-01..03-09 (Plan-03). Each registered handler's predicate is
     # checked in priority order (first-match-wins); on match, the handler
-    # produces a NamingResult routed through _inject_stereo_if_missing for
-    # stereo-injection parity with the previous inline cascade.
+    # produces a NamingResult containing the FINAL name string (per
+    # CONTEXT D-05 + DECOMP-03 byte-identical contract).
+    #
+    # CRITICAL byte-identical preservation rule (CONTEXT D-13 layering):
+    # the handler is responsible for ANY post-naming processing required
+    # to match the legacy inline-branch behavior. Handlers that originally
+    # called ``_inject_stereo_if_missing(...)`` in their inline branch MUST
+    # call it themselves and place the result in ``NamingResult.name``.
+    # Handlers that originally returned ``pool.best().name`` DIRECTLY
+    # (e.g., polyfunctional, multi_ester, ester at composer.py:863, 943,
+    # 980, 1043, 1070, 1096) MUST NOT inject stereo — those handlers
+    # internally produce stereo-included names per their rule modules.
+    # This caller treats ``NamingResult.name`` as the FINAL string —
+    # no post-processing.
     #
     # Plan-02 wave: dispatch_inner returns None on no-match because the
     # catch-all general_acyclic handler is registered in Plan-03 commit
@@ -793,10 +805,18 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     if _inner_result is not None:
         _inner_naming = _inner_result.handler(features, features.mol, style=style)
         if _inner_naming is not None:
-            return _inject_stereo_if_missing(
-                features, _inner_naming.name,
-                atom_to_locant=_inner_naming.atom_to_locant_hint,
-            )
+            # Per CONTEXT D-13 + the comment above: the handler's
+            # NamingResult.name is the FINAL byte-identical string. No
+            # post-processing here. Handlers that need _inject_stereo_if_missing
+            # call it themselves (oxime, hydrazone, n_oxide, isocyanate,
+            # isothiocyanate, carbamic_acid, carbamate, urea, guanidine,
+            # boronic_acid, acid_halide, anhydride, lactone, lactam, sulfoxide,
+            # sulfone, thioether, phosphine_oxide, phosphate_ester, phosphine,
+            # phosphinic_acid, ring_assembly, polycyclic, partial_sat);
+            # handlers that do NOT inject stereo are polyfunctional,
+            # multi_ester, ester, simple_molecule (final string is direct
+            # from pool.best().name in their inline branches).
+            return _inner_naming.name
         # Handler matched but returned None (gate-fail / not-applicable).
         # Fall through to the inline cascade below for the residual
         # cases not yet extracted to handlers/ (Plan-02 boundary).

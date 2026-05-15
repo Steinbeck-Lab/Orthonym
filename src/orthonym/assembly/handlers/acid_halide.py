@@ -40,6 +40,7 @@ def name_acid_halide(
     import-time graph (Phase 158 D-22 + PATTERNS § Lazy Import).
     """
     from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
     from ...rules.acid_halides import name_acid_halide as _name_acid_halide
 
     halide_name = _name_acid_halide(features)
@@ -55,8 +56,12 @@ def name_acid_halide(
 
     pool = get_current_pool()
     pool.add(halide_name, "acid_halide", features)
+    # composer.py:923 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, atom_to_locant=None,
+    )
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=final_name, tree=None, atom_to_locant_hint=None,
     )
 
 

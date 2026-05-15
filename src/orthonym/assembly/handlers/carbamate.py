@@ -29,7 +29,9 @@ def name_carbamate(
 ) -> Optional[NamingResult]:
     """Phase 160 Tier-B carbamate handler."""
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_carbamate, _enrich_handler_name
+    from ..composer import (
+        _name_carbamate, _enrich_handler_name, _inject_stereo_if_missing,
+    )
 
     carb_name = _name_carbamate(features)
     if not carb_name:
@@ -42,7 +44,8 @@ def name_carbamate(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_carbamate", "_is_carbamate"]

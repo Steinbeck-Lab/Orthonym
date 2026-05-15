@@ -80,14 +80,14 @@ def name_n_oxide(
     """
     # Lazy imports per PATTERNS § Lazy Import.
     from ..candidate_pool import get_current_pool
-    from ..composer import _try_name_n_oxide
+    from ..composer import _try_name_n_oxide, _inject_stereo_if_missing
 
     n_oxide_name = _try_name_n_oxide(features)
     if not n_oxide_name:
         return None
 
     # The heterocycle locant map (composer.py:816) becomes the
-    # atom_to_locant_hint forwarded to _inject_stereo_if_missing.
+    # atom_to_locant for _inject_stereo_if_missing.
     locant_map = (
         getattr(features, 'heterocycle_atom_to_locant', None)
         or features.atom_to_locant
@@ -98,8 +98,13 @@ def name_n_oxide(
     pool = get_current_pool()
     pool.add(n_oxide_name, "n_oxide", features)
 
+    # Per composer.py:820 inline branch: wrap in _inject_stereo_if_missing
+    # with the heterocycle locant_map for byte-identical preservation.
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, atom_to_locant=locant_map,
+    )
     return NamingResult(
-        name=pool.best().name,
+        name=final_name,
         tree=None,
         atom_to_locant_hint=locant_map,
     )

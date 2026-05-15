@@ -40,7 +40,9 @@ def name_boronic_acid(
     to _inject_stereo_if_missing (default None). We mirror that here.
     """
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_boronic_acid, _enrich_handler_name
+    from ..composer import (
+        _name_boronic_acid, _enrich_handler_name, _inject_stereo_if_missing,
+    )
 
     boronic_name = _name_boronic_acid(features)
     if not boronic_name:
@@ -53,7 +55,10 @@ def name_boronic_acid(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    # composer.py:1213 inline branch: _inject_stereo_if_missing(features, cand.name)
+    # — no explicit atom_to_locant kwarg (defaults to None).
+    final_name = _inject_stereo_if_missing(features, cand.name)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_boronic_acid", "_is_boronic_acid"]

@@ -30,6 +30,7 @@ def name_anhydride(
 ) -> Optional[NamingResult]:
     """Direct-return anhydride handler."""
     from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
     from ...rules.anhydrides import name_anhydride as _name_anhydride
 
     anhydride_name = _name_anhydride(features)
@@ -45,8 +46,12 @@ def name_anhydride(
 
     pool = get_current_pool()
     pool.add(anhydride_name, "anhydride", features)
+    # composer.py:943 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, atom_to_locant=None,
+    )
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=final_name, tree=None, atom_to_locant_hint=None,
     )
 
 

@@ -35,6 +35,7 @@ def name_lactam(
 ) -> Optional[NamingResult]:
     """Direct-return lactam handler with coverage guard."""
     from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
     from ...rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
 
     lactam_info = is_monocyclic_lactam(features.mol)
@@ -61,8 +62,12 @@ def name_lactam(
 
     pool = get_current_pool()
     pool.add(lactam_name, "lactam", features)
+    # composer.py:852 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, atom_to_locant=None,
+    )
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=final_name, tree=None, atom_to_locant_hint=None,
     )
 
 

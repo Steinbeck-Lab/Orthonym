@@ -31,7 +31,9 @@ def name_carbamic_acid(
     Verbatim semantics of composer.py:855-863.
     """
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_carbamic_acid, _enrich_handler_name
+    from ..composer import (
+        _name_carbamic_acid, _enrich_handler_name, _inject_stereo_if_missing,
+    )
 
     carbamic_name = _name_carbamic_acid(features)
     if not carbamic_name:
@@ -44,7 +46,8 @@ def name_carbamic_acid(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_carbamic_acid", "_is_carbamic_acid"]

@@ -40,7 +40,10 @@ def name_hydrazone(
     """
     # Lazy imports per PATTERNS § Lazy Import.
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_oxime_or_hydrazone, _enrich_handler_name
+    from ..composer import (
+        _name_oxime_or_hydrazone, _enrich_handler_name,
+        _inject_stereo_if_missing,
+    )
 
     hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
     if not hydrazone_name:
@@ -53,7 +56,10 @@ def name_hydrazone(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    # Per composer.py:793 inline branch: wrap in _inject_stereo_if_missing
+    # with atom_to_locant=None for byte-identical preservation per CONTEXT D-13.
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_hydrazone", "_is_hydrazone"]

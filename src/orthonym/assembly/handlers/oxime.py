@@ -74,7 +74,10 @@ def name_oxime(
     # Lazy imports per PATTERNS § Lazy Import (avoid composer.py -> handlers
     # -> composer.py cycle at module load).
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_oxime_or_hydrazone, _enrich_handler_name
+    from ..composer import (
+        _name_oxime_or_hydrazone, _enrich_handler_name,
+        _inject_stereo_if_missing,
+    )
 
     oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
     if not oxime_name:
@@ -83,23 +86,22 @@ def name_oxime(
     oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
 
     # Phase 145.1: route through pool.add() — returns None on gate-fail.
-    # Pool's gate_threshold=0.40 (HANDLER_POLICIES['oxime']) reproduces
-    # the deleted _confidence_gate() check bit-for-bit. This is identical
-    # to composer.py:778-781.
     pool = get_current_pool()
     cand = pool.add(oxime_name, "oxime", features)
     if cand is None:
-        # Low confidence: pool.add returned None; signal "fall through" by
-        # returning None so the dispatch loop tries the next entry (or in
-        # Plan-02 wave, falls through to inline composer.py branches).
         return None
 
-    # Per CONTEXT D-05: NamingResult carries the final name + atom_to_locant_hint.
-    # The inline branch at composer.py:781 passes atom_to_locant=None to
-    # _inject_stereo_if_missing — we mirror that here so the caller's
-    # _inject_stereo_if_missing call receives atom_to_locant_hint=None.
+    # Per CONTEXT D-13 layering: this handler's inline branch at
+    # composer.py:781 wrapped the name in _inject_stereo_if_missing — we
+    # preserve that byte-identical behavior here. The NamingResult.name
+    # field is the FINAL name (post-stereo-injection); the dispatch caller
+    # returns it directly without further processing per the Plan-02
+    # dispatch contract.
+    final_name = _inject_stereo_if_missing(
+        features, cand.name, atom_to_locant=None,
+    )
     return NamingResult(
-        name=cand.name,
+        name=final_name,
         tree=None,
         atom_to_locant_hint=None,
     )

@@ -29,7 +29,9 @@ def name_guanidine(
 ) -> Optional[NamingResult]:
     """Phase 160 Tier-B guanidine handler."""
     from ..candidate_pool import get_current_pool
-    from ..composer import _try_name_guanidine, _enrich_handler_name
+    from ..composer import (
+        _try_name_guanidine, _enrich_handler_name, _inject_stereo_if_missing,
+    )
 
     guanidine_name = _try_name_guanidine(features)
     if not guanidine_name:
@@ -42,7 +44,8 @@ def name_guanidine(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_guanidine", "_is_guanidine"]

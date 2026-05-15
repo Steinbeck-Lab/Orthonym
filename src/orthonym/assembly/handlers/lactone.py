@@ -53,6 +53,7 @@ def name_lactone(
     name would be incomplete).
     """
     from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
     from ...rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
 
     lactone_info = is_monocyclic_lactone(features.mol)
@@ -81,8 +82,12 @@ def name_lactone(
 
     pool = get_current_pool()
     pool.add(lactone_name, "lactone", features)
+    # composer.py:848 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, atom_to_locant=None,
+    )
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=final_name, tree=None, atom_to_locant_hint=None,
     )
 
 

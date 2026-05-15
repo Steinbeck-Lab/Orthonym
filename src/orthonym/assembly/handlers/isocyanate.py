@@ -39,7 +39,9 @@ def name_isocyanate(
     Verbatim semantics of composer.py:828-836 (inline branch).
     """
     from ..candidate_pool import get_current_pool
-    from ..composer import _name_isocyanate, _enrich_handler_name
+    from ..composer import (
+        _name_isocyanate, _enrich_handler_name, _inject_stereo_if_missing,
+    )
 
     iso_name = _name_isocyanate(features)
     if not iso_name:
@@ -52,7 +54,9 @@ def name_isocyanate(
     if cand is None:
         return None
 
-    return NamingResult(name=cand.name, tree=None, atom_to_locant_hint=None)
+    # composer.py:836 inline branch wraps in _inject_stereo_if_missing (atom_to_locant=None).
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
 
 
 __all__ = ["name_isocyanate", "_is_isocyanate"]
