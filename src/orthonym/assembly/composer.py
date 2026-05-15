@@ -803,21 +803,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
     # [removed: hydrazone dispatched via inner_dispatch as of commit 02-02]
-
-    # ASML-10 verified: N-oxide handler creates modified molecule and names
-    # recursively via name_compound(). The recursive call handles substituents
-    # through whatever handler matches the base compound. Verified: "4-methylpyridine
-    # 1-oxide" correctly includes methyl via recursive path. No enrichment needed.
-    # Must detect early because N-oxides have internal charges that could
-    # confuse other routing (they are classified as 'neutral' by ions.py)
-    n_oxide_name = _try_name_n_oxide(features)
-    if n_oxide_name:
-        # N-oxide names the heterocycle with N-oxide. Use heterocycle locant map if available.
-        _noxide_locant_map = getattr(features, 'heterocycle_atom_to_locant', None) or features.atom_to_locant
-        # Phase 145.1: route through pool.add() — direct_return handler.
-        pool = get_current_pool()
-        pool.add(n_oxide_name, "n_oxide", features)
-        return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=_noxide_locant_map)
+    # [removed: n_oxide dispatched via inner_dispatch as of commit 02-03]
 
     # ASML-10 complete: Isocyanate handler calls _name_r_group() which uses
     # the Phase 125 non_ring_heavy fix and name_substituent() fallback for

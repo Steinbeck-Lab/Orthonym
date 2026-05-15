@@ -346,6 +346,21 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-03: n_oxide (Tier-1 LIFT; composer.py:813-820 inline
+#     branch removed; composer.py:2044-2174 body stays; audit § 1 row 'n_oxide'
+#     + § 2.4 predicate purity proof (recursive name_compound permitted).
+from .handlers.n_oxide import _is_n_oxide, name_n_oxide  # noqa: E402
+
+_register_inner(
+    handler_id="n_oxide",
+    priority=300,
+    predicate=_is_n_oxide,
+    handler=name_n_oxide,
+    iupac_section="P-62.5",
+    description="N-oxide functional class naming; e.g. pyridine 1-oxide",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
