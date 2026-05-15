@@ -806,20 +806,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: n_oxide dispatched via inner_dispatch as of commit 02-03]
 
     # [removed: isocyanate dispatched via inner_dispatch as of commit 02-04]
-
-    # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
-    # as isocyanate -- Phase 125 fix applies. Same gating as isocyanate above.
-    if (features.functional_groups.get('isothiocyanate')
-            and features.principal_group is None):
-        isothio_name = _name_isothiocyanate(features)
-        if isothio_name:
-            isothio_name = _enrich_handler_name(features, isothio_name, "isothiocyanate")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(isothio_name, "isothiocyanate", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
 
     # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
     # the Phase 125 fix for substituted aromatic R-groups.

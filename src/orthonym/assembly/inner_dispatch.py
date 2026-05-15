@@ -375,6 +375,20 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-05: isothiocyanate (Tier-1 LIFT; composer.py:842-850
+#     inline branch removed; audit § 1 row 'isothiocyanate' + § 2.6 purity).
+from .handlers.isothiocyanate import _is_isothiocyanate, name_isothiocyanate  # noqa: E402
+
+_register_inner(
+    handler_id="isothiocyanate",
+    priority=500,
+    predicate=_is_isothiocyanate,
+    handler=name_isothiocyanate,
+    iupac_section="P-66.5.4.3",
+    description="Isothiocyanate functional class naming; e.g. methyl isothiocyanate",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
