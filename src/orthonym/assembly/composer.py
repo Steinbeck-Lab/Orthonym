@@ -814,25 +814,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: acid_halide dispatched via inner_dispatch as of commit 02-11]
 
-    # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
-    # component naming. Substituents handled within the module.
-    # Anhydrides use functional class naming: "ethanoic anhydride" (two-word)
-    # Must come before lactone because cyclic anhydrides (O=C1CCC(=O)O1) would
-    # otherwise be misidentified as lactones
-    if features.principal_group == 'anhydride':
-        from ..rules.anhydrides import name_anhydride
-        anhydride_name = name_anhydride(features)
-        if anhydride_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "anhydride", _ha, anhydride_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(anhydride_name, "anhydride", features)
-            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # [removed: anhydride dispatched via inner_dispatch as of commit 02-12]
 
     # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
     # for exocyclic substituent discovery (Phase 86 wired, lactones.py).

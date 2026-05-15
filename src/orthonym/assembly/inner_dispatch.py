@@ -470,6 +470,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-12: anhydride (Tier-1.5 SHIM; audit § 1 + § 2.12).
+from .handlers.anhydride import _is_anhydride, name_anhydride  # noqa: E402
+
+_register_inner(
+    handler_id="anhydride",
+    priority=1200,
+    predicate=_is_anhydride,
+    handler=name_anhydride,
+    iupac_section="P-66.6.3",
+    description="Acid anhydride functional class naming (ethanoic anhydride)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

@@ -62,6 +62,7 @@ from .urea import name_urea  # commit 02-08
 from .guanidine import name_guanidine  # commit 02-09
 from .boronic_acid import name_boronic_acid  # commit 02-10
 from .acid_halide import name_acid_halide  # commit 02-11
+from .anhydride import name_anhydride  # commit 02-12
 
 __all__ = [
     "NameTreeNode",
@@ -82,5 +83,6 @@ __all__ = [
     "name_guanidine",  # 02-09
     "name_boronic_acid",  # 02-10
     "name_acid_halide",  # 02-11
+    "name_anhydride",  # 02-12
     # ... (29 total at Plan-02 end; 39 at Plan-03 end)
 ]
