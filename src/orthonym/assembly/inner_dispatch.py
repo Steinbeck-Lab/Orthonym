@@ -687,6 +687,29 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
+#     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
+#     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS
+#     unchanged. This inner-dispatch entry exists for architectural
+#     uniformity (so all HANDLER_POLICIES + Phase 160 additions appear in
+#     the table) but is structurally unreachable: the inline bypass at
+#     composer.py:751-768 returns BEFORE control reaches dispatch_inner.
+#     Priority 50 places ion_dispatch first in priority order per the
+#     audit (lowest priority = first iteration).
+from .handlers.ion_dispatch import (  # noqa: E402
+    _is_ion_dispatch, name_ion_dispatch,
+)
+
+_register_inner(
+    handler_id="ion_dispatch",
+    priority=50,
+    predicate=_is_ion_dispatch,
+    handler=name_ion_dispatch,
+    iupac_section="P-15.6/P-15.7/P-72/P-73/P-74",
+    description="Ion / salt / zwitterion / radical pre-pool bypass (D-09)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

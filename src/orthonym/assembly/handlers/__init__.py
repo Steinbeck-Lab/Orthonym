@@ -76,6 +76,7 @@ from .ring_assembly import name_ring_assembly  # commit 02-22
 from .polycyclic import name_polycyclic  # commit 02-23
 from .partial_sat import name_partial_sat  # commit 02-24
 from .simple_molecule import name_simple_molecule  # commit 02-25
+from .ion_dispatch import name_ion_dispatch  # commit 02-26
 
 __all__ = [
     "NameTreeNode",
@@ -110,5 +111,6 @@ __all__ = [
     "name_polycyclic",  # 02-23
     "name_partial_sat",  # 02-24
     "name_simple_molecule",  # 02-25
+    "name_ion_dispatch",  # 02-26
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]
