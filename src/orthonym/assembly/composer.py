@@ -1200,18 +1200,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 pool.add(name, "phosphinic_acid", features)
                 return _inject_stereo_if_missing(features, pool.best().name)
 
-    # ASML-10 complete: Boronic acid handler calls _name_r_group() (Phase 125
-    # fix) for R-group naming. Substituted aromatic R-groups correctly named.
-    if features.principal_group == 'boronic_acid':
-        boronic_name = _name_boronic_acid(features)
-        if boronic_name:
-            boronic_name = _enrich_handler_name(features, boronic_name, "boronic_acid")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(boronic_name, "boronic_acid", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: boronic_acid dispatched via inner_dispatch as of commit 02-10]
 
     # ASML-10 verified: Ring assembly has own _get_substituent_info() at
     # ring_assemblies.py which discovers substituents via BFS + _name_substituent().

@@ -441,6 +441,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-10: boronic_acid (Tier-1 LIFT; audit § 1 row + § 2.23).
+#     Note: source inline branch is at composer.py:1205-1214 (far below the
+#     other Tier-1 leaves). Cross-predicate mutex via principal_group string
+#     guarantees byte-identical preservation regardless of priority position.
+from .handlers.boronic_acid import _is_boronic_acid, name_boronic_acid  # noqa: E402
+
+_register_inner(
+    handler_id="boronic_acid",
+    priority=1000,
+    predicate=_is_boronic_acid,
+    handler=name_boronic_acid,
+    iupac_section="P-66.6.4",
+    description="Boronic acid retained name (Tier B; e.g. methylboronic acid)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
