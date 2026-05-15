@@ -512,6 +512,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-15 (renumbered; original plan's 02-15 was
+#     polyfunctional, deferred to Plan-03 per deferred-items.md): sulfoxide
+#     (Tier-1.5 SHIM; audit § 1 + § 2.19; predicate mutex with ester via
+#     principal_group string; safe to extract before ring_ester).
+from .handlers.sulfoxide import _is_sulfoxide, name_sulfoxide  # noqa: E402
+
+_register_inner(
+    handler_id="sulfoxide",
+    priority=1800,
+    predicate=_is_sulfoxide,
+    handler=name_sulfoxide,
+    iupac_section="P-66.5.2.4",
+    description="Sulfoxide functional class naming (Tier B; e.g. dimethyl sulfoxide)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
