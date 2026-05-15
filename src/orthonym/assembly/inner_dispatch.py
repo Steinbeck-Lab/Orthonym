@@ -588,6 +588,21 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-20: phosphine (Tier-1.5 SHIM; audit § 1 + § 2.24;
+#     covers tertiary/secondary/primary phosphine variants with benzene-parent
+#     skip guard).
+from .handlers.phosphine import _is_phosphine, name_phosphine  # noqa: E402
+
+_register_inner(
+    handler_id="phosphine",
+    priority=2300,
+    predicate=_is_phosphine,
+    handler=name_phosphine,
+    iupac_section="P-68.3.1.2",
+    description="Phosphine (tertiary / secondary / primary) functional naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

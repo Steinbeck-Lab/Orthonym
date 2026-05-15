@@ -966,54 +966,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: thioether dispatched via inner_dispatch as of commit 02-17]
     # [removed: phosphine_oxide dispatched via inner_dispatch as of commit 02-18]
     # [removed: phosphate_ester dispatched via inner_dispatch as of commit 02-19]
-
-    # Handle phosphines (tertiary, secondary, primary)
-    if features.principal_group in ('tertiary_phosphine', 'secondary_phosphine', 'primary_phosphine'):
-        from ..rules.phosphorus import name_phosphine
-        fg_key = features.principal_group
-        matches = features.functional_groups.get(fg_key, [])
-
-        # When molecule is a benzene derivative with P on the ring alongside
-        # other substituents (or multiple P atoms), prefer benzene-as-parent naming.
-        # The P will be expressed as a phosphanyl prefix on benzene.
-        _skip_for_benzene = False
-        if getattr(features, 'is_benzene', False) and matches:
-            if len(matches) > 1:
-                # Multiple phosphine groups -> ring should be parent
-                _skip_for_benzene = True
-            else:
-                # Single phosphine -- check if any benzene ring atom has
-                # non-P, non-ring substituent neighbors
-                _bz_ring = getattr(features, 'benzene_ring', None)
-                if _bz_ring:
-                    _bz_set = set(_bz_ring)
-                    for _ra in _bz_ring:
-                        _ra_atom = features.mol.GetAtomWithIdx(_ra)
-                        for _nbr in _ra_atom.GetNeighbors():
-                            if _nbr.GetIdx() not in _bz_set and _nbr.GetSymbol() != 'P':
-                                _skip_for_benzene = True
-                                break
-                        if _skip_for_benzene:
-                            break
-
-        if not _skip_for_benzene and matches:
-            # Find phosphorus atom index
-            for idx in matches[0]:
-                atom = features.mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'P':
-                    name = name_phosphine(features.mol, idx)
-                    if name:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            _ha = features.mol.GetNumHeavyAtoms()
-                            logger.debug(
-                                "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                                "phosphine", _ha, name[:60],
-                            )
-                        # Phase 145.1: route through pool.add() — direct_return handler.
-                        pool = get_current_pool()
-                        pool.add(name, "phosphine", features)
-                        return _inject_stereo_if_missing(features, pool.best().name)
-                    break
+    # [removed: phosphine dispatched via inner_dispatch as of commit 02-20]
 
     # Handle phosphinic acid (suffix naming, but needs special assembly)
     if features.principal_group == 'phosphinic_acid':
