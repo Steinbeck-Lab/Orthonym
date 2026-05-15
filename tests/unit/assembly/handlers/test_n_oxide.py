@@ -110,3 +110,91 @@ class TestNameNOxide:
         except Exception:
             pytest.skip("representative SMILES exercises a non-handler error path")
         assert n1 == n2
+
+
+# ---------------------------------------------------------------------------
+# WR-03 regression: name_n_oxide uses pool.add() return value
+# ---------------------------------------------------------------------------
+
+
+def test_n_oxide_uses_cand_when_pool_add_succeeds():
+    """WR-03 regression: name_n_oxide uses the candidate returned by
+    pool.add() instead of pool.best().name when pool.add accepts."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+        heterocycle_atom_to_locant = None
+        atom_to_locant = {0: 1}
+
+    class FakeCand:
+        name = "pyridine 1-oxide"
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            return FakeCand()
+
+        def best(self):
+            class B:
+                name = "WRONG_HANDLER_NAME"
+            return B()
+
+    captured = {}
+
+    def fake_inject(features, name, atom_to_locant=None):
+        captured["name"] = name
+        return name
+
+    with patch(
+        "orthonym.assembly.composer._try_name_n_oxide",
+        return_value="pyridine 1-oxide",
+    ), patch(
+        "orthonym.assembly.candidate_pool.get_current_pool",
+        return_value=FakePool(),
+    ), patch(
+        "orthonym.assembly.composer._inject_stereo_if_missing",
+        side_effect=fake_inject,
+    ):
+        result = name_n_oxide(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert captured["name"] == "pyridine 1-oxide"
+        assert isinstance(result, NamingResult)
+        assert result.name == "pyridine 1-oxide"
+
+
+def test_n_oxide_uses_n_oxide_name_when_pool_add_returns_none():
+    """WR-03 regression: when pool.add returns None (gate-fail),
+    name_n_oxide falls back to the locally computed n_oxide_name
+    instead of pool.best()."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+        heterocycle_atom_to_locant = None
+        atom_to_locant = {0: 1}
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            return None
+
+        def best(self):
+            raise AssertionError("pool.best should NOT be called when add returns None")
+
+    captured = {}
+
+    def fake_inject(features, name, atom_to_locant=None):
+        captured["name"] = name
+        return name
+
+    with patch(
+        "orthonym.assembly.composer._try_name_n_oxide",
+        return_value="pyridine 1-oxide",
+    ), patch(
+        "orthonym.assembly.candidate_pool.get_current_pool",
+        return_value=FakePool(),
+    ), patch(
+        "orthonym.assembly.composer._inject_stereo_if_missing",
+        side_effect=fake_inject,
+    ):
+        result = name_n_oxide(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert captured["name"] == "pyridine 1-oxide"
+        assert isinstance(result, NamingResult)

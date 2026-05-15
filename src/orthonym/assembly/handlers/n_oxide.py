@@ -96,12 +96,18 @@ def name_n_oxide(
     # Phase 145.1: direct_return handler routes through pool.add()
     # (composer.py:818-819 inline equivalent).
     pool = get_current_pool()
-    pool.add(n_oxide_name, "n_oxide", features)
+    cand = pool.add(n_oxide_name, "n_oxide", features)
+    # WR-03: use the candidate returned by pool.add() instead of pool.best()
+    # to prevent silently returning a DIFFERENT handler's name when this
+    # handler's candidate is rejected by the gate. Matches sibling pattern
+    # in oxime.py. Per CONTEXT D-13: handlers own the name string they
+    # place in NamingResult.name.
+    name_to_inject = cand.name if cand is not None else n_oxide_name
 
     # Per composer.py:820 inline branch: wrap in _inject_stereo_if_missing
     # with the heterocycle locant_map for byte-identical preservation.
     final_name = _inject_stereo_if_missing(
-        features, pool.best().name, atom_to_locant=locant_map,
+        features, name_to_inject, atom_to_locant=locant_map,
     )
     return NamingResult(
         name=final_name,
