@@ -86,6 +86,12 @@ def name_amide(
     from ..composer import _assemble_amide_name
 
     _amide_name = _assemble_amide_name(features, style)
+    if not _amide_name:
+        # CR-02: matches sibling name_amine pattern. pool.add(None, ...)
+        # would violate the `name: str` contract per CONTEXT D-05 and
+        # silently produce wrong output (the inline equivalent at
+        # composer.py:1334 has implicit truthiness check via the if-block).
+        return None
     if logger.isEnabledFor(logging.DEBUG):
         _ha = features.mol.GetNumHeavyAtoms()
         logger.debug(

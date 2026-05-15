@@ -110,3 +110,64 @@ class TestNameAmide:
         except Exception:
             pytest.skip("representative SMILES exercises a non-handler error path")
         assert n1 == n2
+
+
+# ---------------------------------------------------------------------------
+# CR-02 regression: name_amide guards None before pool.add
+# ---------------------------------------------------------------------------
+
+
+def test_amide_returns_none_on_assembler_failure():
+    """CR-02 regression: name_amide does not call pool.add(None, ...) when
+    _assemble_amide_name returns None."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+        principal_group = "primary_amide"
+        principal_group_atoms = [(0,)]
+
+    FakeFeatures.mol.GetNumHeavyAtoms = MagicMock(return_value=5)
+
+    pool_add_calls = []
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            pool_add_calls.append((name, hid))
+            return None
+
+        def best(self):
+            raise AssertionError("pool.best should not be called when add was skipped")
+
+    with patch("orthonym.assembly.composer._assemble_amide_name", return_value=None), \
+         patch("orthonym.assembly.candidate_pool.get_current_pool", return_value=FakePool()):
+        result = name_amide(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert result is None
+        assert pool_add_calls == []
+
+
+def test_amide_routes_through_pool_on_success():
+    """Regression: name_amide pool.add path unchanged when assembler returns a valid name."""
+    from unittest.mock import MagicMock, patch
+
+    class FakeFeatures:
+        mol = MagicMock()
+        principal_group = "primary_amide"
+        principal_group_atoms = [(0,)]
+
+    FakeFeatures.mol.GetNumHeavyAtoms = MagicMock(return_value=5)
+
+    class FakePool:
+        def add(self, name, hid, feats):
+            return None
+
+        def best(self):
+            class B:
+                name = "acetamide"
+            return B()
+
+    with patch("orthonym.assembly.composer._assemble_amide_name", return_value="acetamide"), \
+         patch("orthonym.assembly.candidate_pool.get_current_pool", return_value=FakePool()):
+        result = name_amide(FakeFeatures(), mol=FakeFeatures.mol, style="pin")
+        assert isinstance(result, NamingResult)
+        assert result.name == "acetamide"
