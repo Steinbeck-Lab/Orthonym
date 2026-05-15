@@ -69,6 +69,7 @@ from .sulfoxide import name_sulfoxide  # commit 02-15 (renumbered; polyfunctiona
 from .sulfone import name_sulfone  # commit 02-16
 from .thioether import name_thioether  # commit 02-17
 from .phosphine_oxide import name_phosphine_oxide  # commit 02-18
+from .phosphate_ester import name_phosphate_ester  # commit 02-19
 
 __all__ = [
     "NameTreeNode",
@@ -96,5 +97,6 @@ __all__ = [
     "name_sulfone",  # 02-16
     "name_thioether",  # 02-17
     "name_phosphine_oxide",  # 02-18
+    "name_phosphate_ester",  # 02-19
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]

@@ -572,6 +572,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-19: phosphate_ester (Tier-1.5 SHIM; audit § 1 + § 2.23;
+#     direct-return; principal_group in {phosphate_triester/diester/monoester}).
+from .handlers.phosphate_ester import (  # noqa: E402
+    _is_phosphate_ester, name_phosphate_ester,
+)
+
+_register_inner(
+    handler_id="phosphate_ester",
+    priority=2200,
+    predicate=_is_phosphate_ester,
+    handler=name_phosphate_ester,
+    iupac_section="P-68.3.1",
+    description="Phosphate ester (mono / di / triester) naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
