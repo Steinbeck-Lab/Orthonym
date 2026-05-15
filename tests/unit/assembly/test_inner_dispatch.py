@@ -419,3 +419,69 @@ class TestDeferredHandlerGap:
         assert len(missing) == 8, (
             f"Expected exactly 8 deferred handlers; got {missing!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Class 7 — CR-01 regression: dispatch_inner TypeError wrapping
+# ---------------------------------------------------------------------------
+
+
+class TestInnerDispatchTypeErrorWrapping:
+    """CR-01 regression: dispatch_inner wraps predicate TypeError as RuntimeError."""
+
+    def test_predicate_typeerror_wraps_with_runtime(self):
+        """A predicate raising TypeError surfaces as RuntimeError with handler_id."""
+        from dataclasses import replace
+        first_handler_id = next(iter(INNER_DISPATCH_TABLE))
+        first_entry = INNER_DISPATCH_TABLE[first_handler_id]
+
+        def bad_predicate(features):
+            raise TypeError("synthetic: NoneType has no attribute foo")
+
+        INNER_DISPATCH_TABLE[first_handler_id] = replace(
+            first_entry, predicate=bad_predicate,
+        )
+        try:
+            with pytest.raises(RuntimeError) as excinfo:
+                dispatch_inner(object())
+            assert first_handler_id in str(excinfo.value)
+            assert "TypeError" in str(excinfo.value)
+            assert "synthetic" in str(excinfo.value)
+        finally:
+            INNER_DISPATCH_TABLE[first_handler_id] = first_entry
+
+    def test_predicate_typeerror_chains_original_via_cause(self):
+        """The wrapping RuntimeError has __cause__ set to the original TypeError."""
+        from dataclasses import replace
+        first_handler_id = next(iter(INNER_DISPATCH_TABLE))
+        first_entry = INNER_DISPATCH_TABLE[first_handler_id]
+        original = TypeError("original-cause")
+
+        def bad_predicate(features):
+            raise original
+
+        INNER_DISPATCH_TABLE[first_handler_id] = replace(
+            first_entry, predicate=bad_predicate,
+        )
+        try:
+            with pytest.raises(RuntimeError) as excinfo:
+                dispatch_inner(object())
+            assert excinfo.value.__cause__ is original
+        finally:
+            INNER_DISPATCH_TABLE[first_handler_id] = first_entry
+
+    def test_predicate_returning_false_works_unchanged(self):
+        """Regression: non-raising predicates returning False continue to work."""
+        class FakeFeatures:
+            species_type = "neutral"
+            principal_chain = None
+            ring_systems = None
+            principal_group = None
+            is_polyfunctional = False
+            is_cyclic = False
+            chain_is_parent = False
+            mol = None
+
+        # Should NOT raise; either None (no match) or a real dispatch result.
+        result = dispatch_inner(FakeFeatures())
+        assert result is None or hasattr(result, "handler_id")

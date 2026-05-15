@@ -258,12 +258,18 @@ def dispatch_inner(features: Any) -> Optional[InnerDispatchResult]:
     ):
         try:
             matched = entry.predicate(features)
-        except TypeError:
-            # Defensive per PATTERNS § Error Handling: predicate may have
-            # a strict signature (no kwargs); call directly and surface
-            # the error explicitly. Per CONTEXT D-27 honest-fail-on-data:
-            # we do NOT silently swallow — re-raise on a second TypeError.
-            matched = entry.predicate(features)
+        except TypeError as exc:
+            # Per CONTEXT D-27 honest-fail-on-data + CR-01: do NOT silently
+            # re-execute or swallow. A TypeError from a predicate is almost
+            # always a real bug (e.g., NoneType attribute access), not a
+            # signature mismatch. Surface the bug at the PREDICATE source
+            # line with context, chaining the original exception via __cause__.
+            raise RuntimeError(
+                f"dispatch_inner: predicate for handler_id "
+                f"{entry.handler_id!r} raised TypeError: {exc}. "
+                f"Fix the predicate (CONTEXT D-25: predicates are pure "
+                f"read-only; AP-160-26)."
+            ) from exc
 
         if matched:
             # Increment per-instance stats per CONTEXT D-18 + AP-160-13.
