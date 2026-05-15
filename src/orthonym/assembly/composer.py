@@ -962,20 +962,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: sulfoxide dispatched via inner_dispatch as of commit 02-15
     #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
     #  to Plan-03 per deferred-items.md)]
-    # ASML-10 self-gating: sulfone handler (still inline; extracted commit 02-16).
-    if features.principal_group == 'sulfone':
-        from ..rules.sulfur import name_sulfone
-        matches = features.functional_groups.get('sulfone', [])
-        if matches:
-            name = name_sulfone(features.mol, matches[0])
-            if name:
-                name = _enrich_handler_name(features, name, "sulfone")
-                # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                pool = get_current_pool()
-                cand = pool.add(name, "sulfone", features)
-                if cand is not None:
-                    return _inject_stereo_if_missing(features, cand.name)
-                # Low confidence: pool.add returned None, fall through
+    # [removed: sulfone dispatched via inner_dispatch as of commit 02-16]
 
     # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
     # None for complex R-groups. Falls through to universal pipeline. No silent drop.

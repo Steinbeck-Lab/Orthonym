@@ -528,6 +528,20 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-16: sulfone (Tier-1.5 SHIM; audit § 1 + § 2.20;
+#     parallel to sulfoxide via principal_group string mutex).
+from .handlers.sulfone import _is_sulfone, name_sulfone  # noqa: E402
+
+_register_inner(
+    handler_id="sulfone",
+    priority=1900,
+    predicate=_is_sulfone,
+    handler=name_sulfone,
+    iupac_section="P-66.5.2.4",
+    description="Sulfone functional class naming (Tier B; e.g. dimethyl sulfone)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
