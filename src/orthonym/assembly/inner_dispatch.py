@@ -402,6 +402,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-07: carbamate (Tier-1 LIFT; audit § 1 row + § 2.8).
+from .handlers.carbamate import _is_carbamate, name_carbamate  # noqa: E402
+
+_register_inner(
+    handler_id="carbamate",
+    priority=700,
+    predicate=_is_carbamate,
+    handler=name_carbamate,
+    iupac_section="P-66.5.5.1",
+    description="Carbamate functional class naming",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

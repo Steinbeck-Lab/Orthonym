@@ -808,22 +808,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: isocyanate dispatched via inner_dispatch as of commit 02-04]
     # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
     # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
-
-    # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
-    # for both N- and O-substituent naming.
-    # Must detect BEFORE generic ester to prevent N loss.
-    # Only when carbamate is the primary FG (no higher-seniority principal group).
-    if (features.functional_groups.get('carbamate')
-            and features.principal_group is None):
-        carb_name = _name_carbamate(features)
-        if carb_name:
-            carb_name = _enrich_handler_name(features, carb_name, "carbamate")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(carb_name, "carbamate", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: carbamate dispatched via inner_dispatch as of commit 02-07]
 
     # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
     # for N-substituent naming. Retained name with N-substitution.
