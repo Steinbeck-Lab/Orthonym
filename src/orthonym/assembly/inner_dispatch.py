@@ -749,6 +749,25 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
+#     mutex; audit § 1 + § 3). Predicate:
+#       principal_group in {secondary_amine, tertiary_amine}
+#       AND NOT is_polyfunctional
+#       AND (NOT is_cyclic OR chain_is_parent) (Tier-A mutex)
+#     Body lift: composer.py:4296-4536 (_assemble_amine_name, 241 LOC).
+#     Inline branch composer.py:1374-1386 RETAINED as Tier-A-rejection fallback.
+from .handlers.amine import _is_amine, name_amine  # noqa: E402
+
+_register_inner(
+    handler_id="amine",
+    priority=5300,
+    predicate=_is_amine,
+    handler=name_amine,
+    iupac_section="P-66.6.1",
+    description="Amine (secondary/tertiary; non-cyclic non-polyfunctional fast-path)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
