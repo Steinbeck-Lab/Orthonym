@@ -428,6 +428,19 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-09: guanidine (Tier-1 LIFT; audit § 1 row + § 2.10).
+from .handlers.guanidine import _is_guanidine, name_guanidine  # noqa: E402
+
+_register_inner(
+    handler_id="guanidine",
+    priority=900,
+    predicate=_is_guanidine,
+    handler=name_guanidine,
+    iupac_section="P-66.6",
+    description="Guanidine retained name with N-substitution",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

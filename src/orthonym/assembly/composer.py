@@ -810,21 +810,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
     # [removed: carbamate dispatched via inner_dispatch as of commit 02-07]
     # [removed: urea dispatched via inner_dispatch as of commit 02-08]
-
-    # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
-    # for N-substituent naming. Retained name with N-substitution.
-    # "guanidine", "N-methylguanidine", "N,N-dimethylguanidine"
-    if (features.functional_groups.get('guanidine')
-            and features.principal_group is None):
-        guanidine_name = _try_name_guanidine(features)
-        if guanidine_name:
-            guanidine_name = _enrich_handler_name(features, guanidine_name, "guanidine")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(guanidine_name, "guanidine", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: guanidine dispatched via inner_dispatch as of commit 02-09]
 
     # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
     # chain/ring parent naming with suffix. Substituents handled via normal

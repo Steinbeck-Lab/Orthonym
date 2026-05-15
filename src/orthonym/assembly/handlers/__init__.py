@@ -59,6 +59,7 @@ from .isothiocyanate import name_isothiocyanate  # commit 02-05
 from .carbamic_acid import name_carbamic_acid  # commit 02-06
 from .carbamate import name_carbamate  # commit 02-07
 from .urea import name_urea  # commit 02-08
+from .guanidine import name_guanidine  # commit 02-09
 
 __all__ = [
     "NameTreeNode",
@@ -76,5 +77,6 @@ __all__ = [
     "name_carbamic_acid",  # 02-06
     "name_carbamate",  # 02-07
     "name_urea",  # 02-08
+    "name_guanidine",  # 02-09
     # ... (29 total at Plan-02 end; 39 at Plan-03 end)
 ]
