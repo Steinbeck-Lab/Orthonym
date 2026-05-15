@@ -840,29 +840,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: lactam dispatched via inner_dispatch as of commit 02-14]
 
-    # ASML-10 complete: Ring-attached ester handler uses
-    # _assemble_ring_with_ester_prefixes() which generates acyloxy prefixes
-    # on the ring parent. Ring substituents handled via ring naming path.
-    # Ring-attached esters (e.g., cyclohexyl acetate, phenyl acetate) should
-    # use acyloxy prefix naming on ring parent, not polyfunctional naming
-    # BUT: skip for polycyclic/complex ring systems -- those need the complex
-    # ring naming path which handles substituents (including esters) properly
-    if features.principal_group == "ester":
-        from ..rules.esters import detect_exocyclic_esters
-        exocyclic = detect_exocyclic_esters(features.mol)
-        if exocyclic and not _is_complex_ring_system(features.mol):
-            ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
-            if ring_ester_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "ring_ester", _ha, ring_ester_name[:60],
-                    )
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(ring_ester_name, "ring_ester", features)
-                return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: ring_ester dispatched via inner_dispatch as of commit 03-04]
 
     # ASML-10 complete: Polyfunctional handler (polyfunctional.py) uses
     # _integrate_universal_prefixes() for substituent discovery on both

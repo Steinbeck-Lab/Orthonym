@@ -768,6 +768,30 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-03 commit 03-04: ring_ester (Tier-2 mid-tier direct-return; audit
+#     § 1 + § 3). Predicate:
+#       principal_group == 'ester'
+#       AND exocyclic_esters from rules.esters.detect_exocyclic_esters(mol)
+#       AND NOT _is_complex_ring_system(mol)
+#     ring_ester fires BEFORE polyfunctional + ester-family + Tier-A in the
+#     inline cascade order (composer.py:850), AND BEFORE partial_sat (which
+#     can match cyclic-ester molecules and return None, blocking ring_ester).
+#     Priority 1450 places ring_ester between lactam (1400) and the reserved
+#     polyfunctional slot (1500), preserving inline cascade order.
+#     Body lift: composer.py:3204-3455 (_assemble_ring_with_ester_prefixes, 254 LOC).
+#     Inline branch composer.py:850-865 REMOVED at this commit.
+from .handlers.ring_ester import _is_ring_ester, name_ring_ester  # noqa: E402
+
+_register_inner(
+    handler_id="ring_ester",
+    priority=1450,
+    predicate=_is_ring_ester,
+    handler=name_ring_ester,
+    iupac_section="P-66.6.3",
+    description="Ring-attached ester with acyloxy prefix on ring parent",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
