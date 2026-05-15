@@ -361,6 +361,20 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-04: isocyanate (Tier-1 LIFT; composer.py:828-836
+#     inline branch removed; audit § 1 row 'isocyanate' + § 2.5 purity proof).
+from .handlers.isocyanate import _is_isocyanate, name_isocyanate  # noqa: E402
+
+_register_inner(
+    handler_id="isocyanate",
+    priority=400,
+    predicate=_is_isocyanate,
+    handler=name_isocyanate,
+    iupac_section="P-66.5.4.3",
+    description="Isocyanate functional class naming; e.g. methyl isocyanate",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

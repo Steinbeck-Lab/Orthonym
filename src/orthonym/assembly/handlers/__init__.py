@@ -54,6 +54,7 @@ from ..name_tree_to_string import name_tree_to_string
 from .oxime import name_oxime  # commit 02-01
 from .hydrazone import name_hydrazone  # commit 02-02
 from .n_oxide import name_n_oxide  # commit 02-03
+from .isocyanate import name_isocyanate  # commit 02-04
 
 __all__ = [
     "NameTreeNode",
@@ -66,5 +67,6 @@ __all__ = [
     "name_oxime",  # 02-01
     "name_hydrazone",  # 02-02
     "name_n_oxide",  # 02-03
+    "name_isocyanate",  # 02-04
     # ... (29 total at Plan-02 end; 39 at Plan-03 end)
 ]
