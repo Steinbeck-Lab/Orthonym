@@ -970,27 +970,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # [removed: phosphinic_acid dispatched via inner_dispatch as of commit 02-21]
 
     # [removed: boronic_acid dispatched via inner_dispatch as of commit 02-10]
-
-    # ASML-10 verified: Ring assembly has own _get_substituent_info() at
-    # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
-    # Verified: ring assembly substituent discovery covers halogens, hydroxy, amino,
-    # and alkyl groups. No enrichment needed.
-    # Ring assemblies are separate identical ring systems connected by single bonds
-    assembly_info = getattr(features, 'ring_assembly_info', None)
-    if assembly_info and not getattr(features, 'chain_is_parent', False):
-        from ..rules.ring_assemblies import name_ring_assembly
-        assembly_name = name_ring_assembly(features.mol, assembly_info, features)
-        if assembly_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "ring_assembly", _ha, assembly_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(assembly_name, "ring_assembly", features)
-            return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: ring_assembly dispatched via inner_dispatch as of commit 02-22]
 
     # =========================================================================
     # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool

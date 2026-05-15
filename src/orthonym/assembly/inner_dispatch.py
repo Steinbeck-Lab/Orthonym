@@ -619,6 +619,23 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-22: ring_assembly (Tier-1.5 SHIM; audit § 1 + § 2.24;
+#     direct-return; predicate = ring_assembly_info AND not chain_is_parent;
+#     fires BEFORE complex_ring per composer.py:979 dispatch ordering).
+from .handlers.ring_assembly import (  # noqa: E402
+    _is_ring_assembly, name_ring_assembly,
+)
+
+_register_inner(
+    handler_id="ring_assembly",
+    priority=2500,
+    predicate=_is_ring_assembly,
+    handler=name_ring_assembly,
+    iupac_section="P-28",
+    description="Ring assembly / biaryl naming (direct-return)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
