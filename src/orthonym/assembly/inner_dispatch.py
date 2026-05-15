@@ -710,6 +710,88 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-03 commit 03-01: ring_nitrile (Tier-2 mid-tier; audit § 1 + § 3).
+#     Predicate: principal_group == 'nitrile' AND is_cyclic AND not chain_is_parent.
+#     Body lift: composer.py:4537-4605 (_assemble_ring_nitrile_name, 69 LOC).
+#     Inline branch composer.py:1337-1348 REMOVED at this commit.
+from .handlers.ring_nitrile import _is_ring_nitrile, name_ring_nitrile  # noqa: E402
+
+_register_inner(
+    handler_id="ring_nitrile",
+    priority=5100,
+    predicate=_is_ring_nitrile,
+    handler=name_ring_nitrile,
+    iupac_section="P-66.5.1",
+    description="Ring-nitrile (cyclic carbonitrile) direct-return handler",
+    side_effect_inventory=(),
+)
+
+# --- Plan-03 commit 03-02: amide (Tier-2 mid-tier with polyfunctional + Tier-A
+#     mutex; audit § 1 + § 3). Predicate:
+#       principal_group in {primary_amide, secondary_amide, tertiary_amide}
+#       AND pg_count == 1
+#       AND NOT is_polyfunctional (mutex with polyfunctional inline branch at
+#           composer.py:870, which fires BEFORE amide in inline cascade order)
+#       AND (NOT is_cyclic OR chain_is_parent) (Tier-A mutex — same pattern
+#           as partial_sat handler in Plan-02 commit 02-24)
+#     Body lift: composer.py:4154-4295 (_assemble_amide_name, 142 LOC).
+#     Inline branch composer.py:1343-1356 RETAINED as Tier-A-rejection fallback
+#     (composer.py thinning in commit 03-10 consolidates this).
+from .handlers.amide import _is_amide, name_amide  # noqa: E402
+
+_register_inner(
+    handler_id="amide",
+    priority=5200,
+    predicate=_is_amide,
+    handler=name_amide,
+    iupac_section="P-66.5.3",
+    description="Amide (primary/secondary/tertiary, single-group; non-cyclic non-polyfunctional fast-path)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
+#     mutex; audit § 1 + § 3). Predicate:
+#       principal_group in {secondary_amine, tertiary_amine}
+#       AND NOT is_polyfunctional
+#       AND (NOT is_cyclic OR chain_is_parent) (Tier-A mutex)
+#     Body lift: composer.py:4296-4536 (_assemble_amine_name, 241 LOC).
+#     Inline branch composer.py:1374-1386 RETAINED as Tier-A-rejection fallback.
+from .handlers.amine import _is_amine, name_amine  # noqa: E402
+
+_register_inner(
+    handler_id="amine",
+    priority=5300,
+    predicate=_is_amine,
+    handler=name_amine,
+    iupac_section="P-66.6.1",
+    description="Amine (secondary/tertiary; non-cyclic non-polyfunctional fast-path)",
+    side_effect_inventory=(),
+)
+
+# --- Plan-03 commit 03-04: ring_ester (Tier-2 mid-tier direct-return; audit
+#     § 1 + § 3). Predicate:
+#       principal_group == 'ester'
+#       AND exocyclic_esters from rules.esters.detect_exocyclic_esters(mol)
+#       AND NOT _is_complex_ring_system(mol)
+#     ring_ester fires BEFORE polyfunctional + ester-family + Tier-A in the
+#     inline cascade order (composer.py:850), AND BEFORE partial_sat (which
+#     can match cyclic-ester molecules and return None, blocking ring_ester).
+#     Priority 1450 places ring_ester between lactam (1400) and the reserved
+#     polyfunctional slot (1500), preserving inline cascade order.
+#     Body lift: composer.py:3204-3455 (_assemble_ring_with_ester_prefixes, 254 LOC).
+#     Inline branch composer.py:850-865 REMOVED at this commit.
+from .handlers.ring_ester import _is_ring_ester, name_ring_ester  # noqa: E402
+
+_register_inner(
+    handler_id="ring_ester",
+    priority=1450,
+    predicate=_is_ring_ester,
+    handler=name_ring_ester,
+    iupac_section="P-66.6.3",
+    description="Ring-attached ester with acyloxy prefix on ring parent",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
