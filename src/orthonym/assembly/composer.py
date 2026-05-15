@@ -964,29 +964,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     #  to Plan-03 per deferred-items.md)]
     # [removed: sulfone dispatched via inner_dispatch as of commit 02-16]
     # [removed: thioether dispatched via inner_dispatch as of commit 02-17]
-
-    # ASML-10 self-gating: Phosphorus handlers use _characterize_substituent()
-    # which returns None for non-phenyl/non-simple-alkyl R-groups. Complex
-    # molecules fall through to universal pipeline. No substituents silently dropped.
-    # Tier C (Phase 139): Self-gating design confirmed complete -- when handlers
-    # return a name, molecule is simple enough that no additional enrichment needed.
-    # When molecule is complex, handlers return None and fall through to universal pipeline.
-    if features.principal_group == 'phosphine_oxide':
-        from ..rules.phosphorus import name_phosphine_oxide
-        matches = features.functional_groups.get('phosphine_oxide', [])
-        if matches:
-            name = name_phosphine_oxide(features.mol, matches[0])
-            if name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "phosphine_oxide", _ha, name[:60],
-                    )
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(name, "phosphine_oxide", features)
-                return _inject_stereo_if_missing(features, pool.best().name)
+    # [removed: phosphine_oxide dispatched via inner_dispatch as of commit 02-18]
 
     # Handle phosphate esters
     if features.principal_group in ('phosphate_triester', 'phosphate_diester', 'phosphate_monoester'):

@@ -556,6 +556,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-18: phosphine_oxide (Tier-1.5 SHIM; audit § 1 + § 2.22;
+#     direct-return; pool.add() + _inject_stereo_if_missing).
+from .handlers.phosphine_oxide import (  # noqa: E402
+    _is_phosphine_oxide, name_phosphine_oxide,
+)
+
+_register_inner(
+    handler_id="phosphine_oxide",
+    priority=2100,
+    predicate=_is_phosphine_oxide,
+    handler=name_phosphine_oxide,
+    iupac_section="P-68.3",
+    description="Phosphine oxide functional class naming (direct-return)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",
