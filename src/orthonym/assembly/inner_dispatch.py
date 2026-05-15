@@ -603,6 +603,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Plan-02 commit 02-21: phosphinic_acid (Tier-1.5 SHIM; audit § 1 + § 2.25;
+#     direct-return; pool.add() + _inject_stereo_if_missing).
+from .handlers.phosphinic_acid import (  # noqa: E402
+    _is_phosphinic_acid, name_phosphinic_acid,
+)
+
+_register_inner(
+    handler_id="phosphinic_acid",
+    priority=2400,
+    predicate=_is_phosphinic_acid,
+    handler=name_phosphinic_acid,
+    iupac_section="P-68.3.1.2.2",
+    description="Phosphinic acid functional class naming (direct-return)",
+    side_effect_inventory=(),
+)
+
 
 __all__ = [
     "InnerDispatchEntry",

@@ -71,6 +71,7 @@ from .thioether import name_thioether  # commit 02-17
 from .phosphine_oxide import name_phosphine_oxide  # commit 02-18
 from .phosphate_ester import name_phosphate_ester  # commit 02-19
 from .phosphine import name_phosphine  # commit 02-20
+from .phosphinic_acid import name_phosphinic_acid  # commit 02-21
 
 __all__ = [
     "NameTreeNode",
@@ -100,5 +101,6 @@ __all__ = [
     "name_phosphine_oxide",  # 02-18
     "name_phosphate_ester",  # 02-19
     "name_phosphine",  # 02-20
+    "name_phosphinic_acid",  # 02-21
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]
