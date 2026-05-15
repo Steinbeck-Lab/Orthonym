@@ -767,238 +767,78 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # Fallback to existing ion naming if composition fails
         return assemble_ion_name(features, features.mol, style)
 
-    # Handle oximes - functional class naming: "propan-2-one oxime"
-    if features.principal_group == 'oxime':
-        oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
-        if oxime_name:
-            oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            # Pool's gate_threshold=0.40 (HANDLER_POLICIES['oxime']) reproduces
-            # the deleted _confidence_gate() check bit-for-bit.
-            pool = get_current_pool()
-            cand = pool.add(oxime_name, "oxime", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # =========================================================================
+    # PHASE 160 INNER DISPATCH (DECOMP-01 + CONTEXT D-08 + D-10)
+    # =========================================================================
+    # The inner-dispatch table at orthonym.assembly.inner_dispatch is
+    # populated by per-handler atomic commits 02-01..02-29 (Plan-02) +
+    # 03-01..03-09 (Plan-03). Each registered handler's predicate is
+    # checked in priority order (first-match-wins); on match, the handler
+    # produces a NamingResult containing the FINAL name string (per
+    # CONTEXT D-05 + DECOMP-03 byte-identical contract).
+    #
+    # CRITICAL byte-identical preservation rule (CONTEXT D-13 layering):
+    # the handler is responsible for ANY post-naming processing required
+    # to match the legacy inline-branch behavior. Handlers that originally
+    # called ``_inject_stereo_if_missing(...)`` in their inline branch MUST
+    # call it themselves and place the result in ``NamingResult.name``.
+    # Handlers that originally returned ``pool.best().name`` DIRECTLY
+    # (e.g., polyfunctional, multi_ester, ester at composer.py:863, 943,
+    # 980, 1043, 1070, 1096) MUST NOT inject stereo — those handlers
+    # internally produce stereo-included names per their rule modules.
+    # This caller treats ``NamingResult.name`` as the FINAL string —
+    # no post-processing.
+    #
+    # Plan-02 wave: dispatch_inner returns None on no-match because the
+    # catch-all general_acyclic handler is registered in Plan-03 commit
+    # 03-09. When dispatch_inner returns None, control falls through to
+    # the inline mid-tier + root branches still present at composer.py:
+    # 1501-1903 (per CONTEXT D-01 + D-08 Plan-02 boundary).
+    #
+    # Byte-identical lock per CONTEXT D-21 (DECOMP-03): the per-handler
+    # atomic commit canary delta (
+    # --mode delta`) gates every commit at zero diff vs the frozen baseline
+    # `tests/canary/canary_pre_decomp_160.csv`.
+    # =========================================================================
+    from .inner_dispatch import dispatch_inner
+    _inner_result = dispatch_inner(features)
+    if _inner_result is not None:
+        _inner_naming = _inner_result.handler(features, features.mol, style=style)
+        if _inner_naming is not None:
+            # Per CONTEXT D-13 + the comment above: the handler's
+            # NamingResult.name is the FINAL byte-identical string. No
+            # post-processing here. Handlers that need _inject_stereo_if_missing
+            # call it themselves (oxime, hydrazone, n_oxide, isocyanate,
+            # isothiocyanate, carbamic_acid, carbamate, urea, guanidine,
+            # boronic_acid, acid_halide, anhydride, lactone, lactam, sulfoxide,
+            # sulfone, thioether, phosphine_oxide, phosphate_ester, phosphine,
+            # phosphinic_acid, ring_assembly, polycyclic, partial_sat);
+            # handlers that do NOT inject stereo are polyfunctional,
+            # multi_ester, ester, simple_molecule (final string is direct
+            # from pool.best().name in their inline branches).
+            return _inner_naming.name
+        # Handler matched but returned None (gate-fail / not-applicable).
+        # Fall through to the inline cascade below for the residual
+        # cases not yet extracted to handlers/ (Plan-02 boundary).
 
-    # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
-    if features.principal_group == 'hydrazone':
-        hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
-        if hydrazone_name:
-            hydrazone_name = _enrich_handler_name(features, hydrazone_name, "hydrazone")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(hydrazone_name, "hydrazone", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
+    # [removed: hydrazone dispatched via inner_dispatch as of commit 02-02]
+    # [removed: n_oxide dispatched via inner_dispatch as of commit 02-03]
 
-    # ASML-10 verified: N-oxide handler creates modified molecule and names
-    # recursively via name_compound(). The recursive call handles substituents
-    # through whatever handler matches the base compound. Verified: "4-methylpyridine
-    # 1-oxide" correctly includes methyl via recursive path. No enrichment needed.
-    # Must detect early because N-oxides have internal charges that could
-    # confuse other routing (they are classified as 'neutral' by ions.py)
-    n_oxide_name = _try_name_n_oxide(features)
-    if n_oxide_name:
-        # N-oxide names the heterocycle with N-oxide. Use heterocycle locant map if available.
-        _noxide_locant_map = getattr(features, 'heterocycle_atom_to_locant', None) or features.atom_to_locant
-        # Phase 145.1: route through pool.add() — direct_return handler.
-        pool = get_current_pool()
-        pool.add(n_oxide_name, "n_oxide", features)
-        return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=_noxide_locant_map)
+    # [removed: isocyanate dispatched via inner_dispatch as of commit 02-04]
+    # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
+    # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
+    # [removed: carbamate dispatched via inner_dispatch as of commit 02-07]
+    # [removed: urea dispatched via inner_dispatch as of commit 02-08]
+    # [removed: guanidine dispatched via inner_dispatch as of commit 02-09]
 
-    # ASML-10 complete: Isocyanate handler calls _name_r_group() which uses
-    # the Phase 125 non_ring_heavy fix and name_substituent() fallback for
-    # substituted aromatic R-groups. Substituted phenyl correctly named.
-    # Only when isocyanate is the sole FG (principal_group is None because
-    # isocyanate is not in SENIORITY_ORDER). When another FG is principal,
-    # isocyanate becomes prefix "isocyanato" via the polyfunctional handler.
-    if (features.functional_groups.get('isocyanate')
-            and features.principal_group is None):
-        iso_name = _name_isocyanate(features)
-        if iso_name:
-            iso_name = _enrich_handler_name(features, iso_name, "isocyanate")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(iso_name, "isocyanate", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: acid_halide dispatched via inner_dispatch as of commit 02-11]
 
-    # ASML-10 complete: Isothiocyanate handler uses same _name_r_group() path
-    # as isocyanate -- Phase 125 fix applies. Same gating as isocyanate above.
-    if (features.functional_groups.get('isothiocyanate')
-            and features.principal_group is None):
-        isothio_name = _name_isothiocyanate(features)
-        if isothio_name:
-            isothio_name = _enrich_handler_name(features, isothio_name, "isothiocyanate")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(isothio_name, "isothiocyanate", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: anhydride dispatched via inner_dispatch as of commit 02-12]
 
-    # ASML-10 complete: Carbamic acid handler calls _name_r_group() which uses
-    # the Phase 125 fix for substituted aromatic R-groups.
-    # Retained name with N-substitution (IUPAC P-65.2.3)
-    # N-C(=O)-OH -> "carbamic acid", "N-methylcarbamic acid", etc.
-    if features.principal_group == 'carbamic_acid':
-        carbamic_name = _name_carbamic_acid(features)
-        if carbamic_name:
-            carbamic_name = _enrich_handler_name(features, carbamic_name, "carbamic_acid")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(carbamic_name, "carbamic_acid", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: lactone dispatched via inner_dispatch as of commit 02-13]
 
-    # ASML-10 complete: Carbamate handler calls _name_r_group() (Phase 125 fix)
-    # for both N- and O-substituent naming.
-    # Must detect BEFORE generic ester to prevent N loss.
-    # Only when carbamate is the primary FG (no higher-seniority principal group).
-    if (features.functional_groups.get('carbamate')
-            and features.principal_group is None):
-        carb_name = _name_carbamate(features)
-        if carb_name:
-            carb_name = _enrich_handler_name(features, carb_name, "carbamate")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(carb_name, "carbamate", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
-
-    # ASML-10 complete: Urea handler calls _name_r_group() (Phase 125 fix)
-    # for N-substituent naming. Retained name with N-substitution.
-    # "urea", "N-methylurea", "N,N-dimethylurea", "N,N'-dimethylurea"
-    # Must detect BEFORE polyfunctional handler to prevent garbled output
-    if (features.functional_groups.get('urea')
-            and features.principal_group is None):
-        urea_name = _try_name_urea(features)
-        if urea_name:
-            urea_name = _enrich_handler_name(features, urea_name, "urea")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(urea_name, "urea", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
-
-    # ASML-10 complete: Guanidine handler calls _name_r_group() (Phase 125 fix)
-    # for N-substituent naming. Retained name with N-substitution.
-    # "guanidine", "N-methylguanidine", "N,N-dimethylguanidine"
-    if (features.functional_groups.get('guanidine')
-            and features.principal_group is None):
-        guanidine_name = _try_name_guanidine(features)
-        if guanidine_name:
-            guanidine_name = _enrich_handler_name(features, guanidine_name, "guanidine")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(guanidine_name, "guanidine", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
-
-    # ASML-10 complete: Acid halide handler (acid_halides.py) uses its own
-    # chain/ring parent naming with suffix. Substituents handled via normal
-    # prefix generation in the dedicated rule module.
-    # Acid halides use functional class naming: "ethanoyl chloride" (two-word)
-    # Must come before polyfunctional because acid_chloride + chloro triggers polyfunctional
-    if features.principal_group in ('acid_chloride', 'acid_bromide', 'acid_fluoride'):
-        from ..rules.acid_halides import name_acid_halide
-        halide_name = name_acid_halide(features)
-        if halide_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "acid_halide", _ha, halide_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(halide_name, "acid_halide", features)
-            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
-
-    # ASML-10 complete: Anhydride handler (anhydrides.py) uses its own
-    # component naming. Substituents handled within the module.
-    # Anhydrides use functional class naming: "ethanoic anhydride" (two-word)
-    # Must come before lactone because cyclic anhydrides (O=C1CCC(=O)O1) would
-    # otherwise be misidentified as lactones
-    if features.principal_group == 'anhydride':
-        from ..rules.anhydrides import name_anhydride
-        anhydride_name = name_anhydride(features)
-        if anhydride_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "anhydride", _ha, anhydride_name[:60],
-                )
-            # Phase 145.1: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(anhydride_name, "anhydride", features)
-            return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
-
-    # ASML-10 complete: Lactone handler calls _integrate_universal_prefixes()
-    # for exocyclic substituent discovery (Phase 86 wired, lactones.py).
-    # Lactones are cyclic esters named as heterocyclic ketones.
-    # Must come before polyfunctional because lactones trigger polyfunctional detection
-    # Coverage guard: if molecule is much larger than the lactone ring, the bare
-    # lactone name is incomplete and we should fall through to a handler that
-    # can include substituents (e.g., benzene handler, polyfunctional handler).
-    from ..rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
-    lactone_info = is_monocyclic_lactone(features.mol)
-    if lactone_info:
-        total_heavy = features.mol.GetNumHeavyAtoms()
-        ring_size = lactone_info.get('ring_size', 0)
-        # Only use bare lactone naming when molecule is not much larger than ring
-        # Ring atoms + carbonyl O + up to 8 exocyclic heavy atoms = ring_size + 8
-        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 8:
-            lactone_name = name_monocyclic_lactone(features.mol)
-            if lactone_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "lactone", _ha, lactone_name[:60],
-                    )
-                # Lactone handler already includes stereo with correct ring locants.
-                # Pass None -- regex guard detects existing stereo prefix and returns early.
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(lactone_name, "lactone", features)
-                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
-
-    # ASML-10 complete: Lactam handler calls _integrate_universal_prefixes()
-    # for exocyclic substituent discovery (parallel to lactones).
-    # Lactams are cyclic amides named as heterocyclic ketones.
-    # e.g., azetidin-2-one, pyrrolidin-2-one, piperidin-2-one
-    # Same coverage guard as lactones above.
-    from ..rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
-    lactam_info = is_monocyclic_lactam(features.mol)
-    if lactam_info:
-        total_heavy = features.mol.GetNumHeavyAtoms()
-        ring_size = lactam_info.get('ring_size', 0)
-        # For macrocycles (ring_size > 8), the ring IS the parent — skip guard
-        if ring_size > 8 or total_heavy <= ring_size + 8:
-            lactam_name = name_monocyclic_lactam(features.mol)
-            if lactam_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "lactam", _ha, lactam_name[:60],
-                    )
-                # Lactam handler already includes stereo with correct ring locants.
-                # Pass None -- regex guard detects existing stereo prefix and returns early.
-                # Phase 145.1: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(lactam_name, "lactam", features)
-                return _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
+    # [removed: lactam dispatched via inner_dispatch as of commit 02-14]
 
     # ASML-10 complete: Ring-attached ester handler uses
     # _assemble_ring_with_ester_prefixes() which generates acyloxy prefixes
@@ -1119,36 +959,23 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 return pool.best().name
         # If name_ester returns None (lactone or complex), fall through
 
-    # ASML-10 self-gating: Sulfoxide/sulfone handlers use _count_alkyl_carbons()
-    # which returns None for any non-simple-alkyl R-group. The handler returns
-    # None, and the molecule falls through to polyfunctional or chain/ring parent
-    # path where the universal pipeline operates. No substituents silently dropped.
-    if features.principal_group in ('sulfoxide', 'sulfone'):
-        from ..rules.sulfur import name_sulfoxide, name_sulfone
-        if features.principal_group == 'sulfoxide':
-            matches = features.functional_groups.get('sulfoxide', [])
-            if matches:
-                name = name_sulfoxide(features.mol, matches[0])
-                if name:
-                    name = _enrich_handler_name(features, name, "sulfoxide")
-                    # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                    pool = get_current_pool()
-                    cand = pool.add(name, "sulfoxide", features)
-                    if cand is not None:
-                        return _inject_stereo_if_missing(features, cand.name)
-                    # Low confidence: pool.add returned None, fall through
-        elif features.principal_group == 'sulfone':
-            matches = features.functional_groups.get('sulfone', [])
-            if matches:
-                name = name_sulfone(features.mol, matches[0])
-                if name:
-                    name = _enrich_handler_name(features, name, "sulfone")
-                    # Phase 145.1: route through pool.add() — returns None on gate-fail.
-                    pool = get_current_pool()
-                    cand = pool.add(name, "sulfone", features)
-                    if cand is not None:
-                        return _inject_stereo_if_missing(features, cand.name)
-                    # Low confidence: pool.add returned None, fall through
+    # [removed: sulfoxide dispatched via inner_dispatch as of commit 02-15
+    #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
+    #  to Plan-03 per deferred-items.md)]
+    # ASML-10 self-gating: sulfone handler (still inline; extracted commit 02-16).
+    if features.principal_group == 'sulfone':
+        from ..rules.sulfur import name_sulfone
+        matches = features.functional_groups.get('sulfone', [])
+        if matches:
+            name = name_sulfone(features.mol, matches[0])
+            if name:
+                name = _enrich_handler_name(features, name, "sulfone")
+                # Phase 145.1: route through pool.add() — returns None on gate-fail.
+                pool = get_current_pool()
+                cand = pool.add(name, "sulfone", features)
+                if cand is not None:
+                    return _inject_stereo_if_missing(features, cand.name)
+                # Low confidence: pool.add returned None, fall through
 
     # ASML-10 self-gating: Thioether handler uses name_sulfide() which returns
     # None for complex R-groups. Falls through to universal pipeline. No silent drop.
@@ -1290,18 +1117,7 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 pool.add(name, "phosphinic_acid", features)
                 return _inject_stereo_if_missing(features, pool.best().name)
 
-    # ASML-10 complete: Boronic acid handler calls _name_r_group() (Phase 125
-    # fix) for R-group naming. Substituted aromatic R-groups correctly named.
-    if features.principal_group == 'boronic_acid':
-        boronic_name = _name_boronic_acid(features)
-        if boronic_name:
-            boronic_name = _enrich_handler_name(features, boronic_name, "boronic_acid")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            pool = get_current_pool()
-            cand = pool.add(boronic_name, "boronic_acid", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # [removed: boronic_acid dispatched via inner_dispatch as of commit 02-10]
 
     # ASML-10 verified: Ring assembly has own _get_substituent_info() at
     # ring_assemblies.py which discovers substituents via BFS + _name_substituent().
