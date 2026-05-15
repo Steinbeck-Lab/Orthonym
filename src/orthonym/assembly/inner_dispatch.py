@@ -308,6 +308,30 @@ def reset_inner_dispatch_stats() -> None:
     _INNER_DISPATCH_STATS.clear()
 
 
+# ============================================================================
+# Per-handler _register_inner(...) calls (appended per Plan-02 / Plan-03
+# atomic commit per 160-AUDIT-DECOMP.md § 3 topological ordering).
+#
+# Each call MUST cite the audit row it implements; the audit § 1
+# enumeration is the LOCKED spec per CONTEXT D-07 + AP-160-10.
+# ============================================================================
+
+# --- Plan-02 commit 02-01: oxime (Tier-1 LIFT; composer.py:771-782 inline
+#     branch removed; composer.py:1906-2042 body stays per CONTEXT D-24;
+#     audit § 1 row 'oxime' + § 2.2 predicate purity proof).
+from .handlers.oxime import _is_oxime, name_oxime  # noqa: E402
+
+_register_inner(
+    handler_id="oxime",
+    priority=100,
+    predicate=_is_oxime,
+    handler=name_oxime,
+    iupac_section="P-66.6",
+    description="Oxime functional class naming; e.g. propan-2-one oxime",
+    side_effect_inventory=(),
+)
+
+
 __all__ = [
     "InnerDispatchEntry",
     "InnerDispatchResult",

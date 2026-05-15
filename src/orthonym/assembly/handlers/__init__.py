@@ -51,6 +51,7 @@ from ..name_tree_to_string import name_tree_to_string
 # Per-handler imports appended per atomic commit 02-01..02-29 (Plan-02)
 # + 03-01..03-09 (Plan-03). See 160-AUDIT-DECOMP.md § 3 for topological
 # extraction order. Substrate commit 02-00 ships ZERO handler imports.
+from .oxime import name_oxime  # commit 02-01
 
 __all__ = [
     "NameTreeNode",
@@ -60,7 +61,7 @@ __all__ = [
     "INNER_DISPATCH_TABLE",
     "InnerDispatchEntry",
     # Handler exports appended per atomic commit:
-    # "name_oxime",          # 02-01
+    "name_oxime",  # 02-01
     # "name_hydrazone",      # 02-02
     # "name_n_oxide",        # 02-03
     # ... (29 total at Plan-02 end; 39 at Plan-03 end)

@@ -767,19 +767,41 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # Fallback to existing ion naming if composition fails
         return assemble_ion_name(features, features.mol, style)
 
-    # Handle oximes - functional class naming: "propan-2-one oxime"
-    if features.principal_group == 'oxime':
-        oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
-        if oxime_name:
-            oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
-            # Phase 145.1: route through pool.add() — returns None on gate-fail.
-            # Pool's gate_threshold=0.40 (HANDLER_POLICIES['oxime']) reproduces
-            # the deleted _confidence_gate() check bit-for-bit.
-            pool = get_current_pool()
-            cand = pool.add(oxime_name, "oxime", features)
-            if cand is not None:
-                return _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-            # Low confidence: pool.add returned None, fall through to next handler
+    # =========================================================================
+    # PHASE 160 INNER DISPATCH (DECOMP-01 + CONTEXT D-08 + D-10)
+    # =========================================================================
+    # The inner-dispatch table at orthonym.assembly.inner_dispatch is
+    # populated by per-handler atomic commits 02-01..02-29 (Plan-02) +
+    # 03-01..03-09 (Plan-03). Each registered handler's predicate is
+    # checked in priority order (first-match-wins); on match, the handler
+    # produces a NamingResult routed through _inject_stereo_if_missing for
+    # stereo-injection parity with the previous inline cascade.
+    #
+    # Plan-02 wave: dispatch_inner returns None on no-match because the
+    # catch-all general_acyclic handler is registered in Plan-03 commit
+    # 03-09. When dispatch_inner returns None, control falls through to
+    # the inline mid-tier + root branches still present at composer.py:
+    # 1501-1903 (per CONTEXT D-01 + D-08 Plan-02 boundary).
+    #
+    # Byte-identical lock per CONTEXT D-21 (DECOMP-03): the per-handler
+    # atomic commit canary delta (
+    # --mode delta`) gates every commit at zero diff vs the frozen baseline
+    # `tests/canary/canary_pre_decomp_160.csv`.
+    # =========================================================================
+    from .inner_dispatch import dispatch_inner
+    _inner_result = dispatch_inner(features)
+    if _inner_result is not None:
+        _inner_naming = _inner_result.handler(features, features.mol, style=style)
+        if _inner_naming is not None:
+            return _inject_stereo_if_missing(
+                features, _inner_naming.name,
+                atom_to_locant=_inner_naming.atom_to_locant_hint,
+            )
+        # Handler matched but returned None (gate-fail / not-applicable).
+        # Fall through to the inline cascade below for the residual
+        # cases not yet extracted to handlers/ (Plan-02 boundary).
+
+    # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
 
     # Handle hydrazones - functional class naming: "propan-2-one hydrazone"
     if features.principal_group == 'hydrazone':
