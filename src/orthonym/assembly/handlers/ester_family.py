@@ -119,15 +119,24 @@ def name_ester_family(
     features argument, same return type semantics).
 
     Per Phase 160.1 D-18 / ADR-19-04 handler contract: when pool.add()
-    accepts a candidate but pool.best() returns None (e.g., wildcard-atom
-    SMILES rejected by the pool's quality gate), the handler returns None
-    (gate-fail) so dispatch_inner can retry the next-priority entry.
-    Pre-amendment this case raised AttributeError which the caller's
-    broad `except (TypeError, KeyError, IndexError, AttributeError)` in
-    namer.name_compound caught and fell through to _descriptive_fallback;
-    post-amendment the wrapped RuntimeError from dispatch_inner would
-    bypass that catch — so the handler must explicitly return None on
-    pool.best() is None, preserving the pre-amendment behavior path.
+    accepts a candidate but pool.best() returns None (pool rejected the
+    candidate per quality threshold / wildcard / ratio-floor), the handler
+    raises AttributeError verbatim mirroring the pre-Plan-03-01 inline
+    cascade behavior at composer.py:875 (`return pool.best().name`).
+
+    The AttributeError propagates UN-WRAPPED through dispatch_inner per
+    the Phase 160.1 D-16 exception list in dispatch_inner; namer's broad
+    `except (TypeError, KeyError, IndexError, AttributeError)` at
+    namer.py:1888 catches it and falls through to _descriptive_fallback
+    (wildcard-bearing molecules) OR — when called recursively from the
+    decomposition engine — signals "this fragment is unnameable; try
+    another decomposition strategy."
+
+    This is the SAME exception flow as the pre-amendment inline cascade
+    at composer.py:875 (`return pool.best().name`); it is NOT a new
+    behavior. The cascade-removal sweep (Plan-03-01) keeps the exception
+    propagation path that decomposition engine + namer.name_compound's
+    broad except both depend on.
     """
     from ..candidate_pool import get_current_pool
 
@@ -146,15 +155,21 @@ def name_ester_family(
                 )
             pool = get_current_pool()
             pool.add(poly_name, "polyfunctional", features)
-            best = pool.best()
-            if best is None:
-                # Pool rejected the candidate (e.g., wildcard atoms, quality
-                # threshold). Per ADR-19-04: return None so dispatch_inner
-                # retries next-priority. Preserves pre-amendment fall-through
-                # to _descriptive_fallback for the wildcard-atom canary case.
-                return None
+            # Phase 160.1 Plan-03-01 D-16: pool.best().name raises
+            # AttributeError when pool.best() is None — mirrors the
+            # pre-amendment inline cascade at composer.py:875 verbatim.
+            # The AttributeError is propagated un-wrapped through
+            # dispatch_inner per the D-16 exception list, then caught by
+            # namer.name_compound's broad `except (TypeError, KeyError,
+            # IndexError, AttributeError)` at namer.py:1888, falling
+            # through to _descriptive_fallback (or the decomposition
+            # engine's mixed-decomp fragment rejection per
+            # decomposition/engine.py "Mixed-decomp fragment name X
+            # rejected: poor coverage"). DO NOT defensively return None
+            # — that changes the byte-identical canary baseline and
+            # breaks the decomposition engine's coverage-rejection path.
             return NamingResult(
-                name=best.name, tree=None, atom_to_locant_hint=None,
+                name=pool.best().name, tree=None, atom_to_locant_hint=None,
             )
         logger.debug(
             "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
@@ -177,6 +192,11 @@ def name_ester_family(
                 name_independent_esters,
             )
             ester_type = classify_multi_ester(features.mol, all_esters)
+            # Phase 160.1 Plan-03-01 D-16: all multi_ester sub-paths mirror
+            # the pre-amendment inline cascade verbatim — pool.best().name
+            # raises AttributeError when pool.best() is None, propagated
+            # un-wrapped through dispatch_inner per D-16 to namer's broad
+            # except (TypeError, KeyError, IndexError, AttributeError).
             if ester_type == "dicarboxylic_diester":
                 diester_name = name_dicarboxylic_diester(features.mol, all_esters)
                 if diester_name:
@@ -188,11 +208,8 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(diester_name, "multi_ester", features)
-                    best = pool.best()
-                    if best is None:
-                        return None
                     return NamingResult(
-                        name=best.name, tree=None, atom_to_locant_hint=None,
+                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
                     )
             elif ester_type == "polyol_polyester":
                 polyol_name = name_polyol_polyester(features.mol, all_esters)
@@ -205,11 +222,8 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(polyol_name, "multi_ester", features)
-                    best = pool.best()
-                    if best is None:
-                        return None
                     return NamingResult(
-                        name=best.name, tree=None, atom_to_locant_hint=None,
+                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
                     )
             elif ester_type == "independent":
                 indep_name = name_independent_esters(features.mol, all_esters)
@@ -222,16 +236,16 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(indep_name, "multi_ester", features)
-                    best = pool.best()
-                    if best is None:
-                        return None
                     return NamingResult(
-                        name=best.name, tree=None, atom_to_locant_hint=None,
+                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
                     )
 
     # ============================================================
     # Sub-path 3: ester (composer.py:931-949 verbatim lift)
     # ============================================================
+    # Phase 160.1 Plan-03-01 D-16: mirrors the pre-amendment inline cascade
+    # verbatim — pool.best().name raises AttributeError when pool.best()
+    # is None, propagated un-wrapped through dispatch_inner per D-16.
     if getattr(features, 'principal_group', None) == "ester":
         ester_match = getattr(features, 'ester_match', None)
         if ester_match:
@@ -246,11 +260,8 @@ def name_ester_family(
                     )
                 pool = get_current_pool()
                 pool.add(ester_name, "ester", features)
-                best = pool.best()
-                if best is None:
-                    return None
                 return NamingResult(
-                    name=best.name, tree=None, atom_to_locant_hint=None,
+                    name=pool.best().name, tree=None, atom_to_locant_hint=None,
                 )
 
     # All three sub-paths fell through.

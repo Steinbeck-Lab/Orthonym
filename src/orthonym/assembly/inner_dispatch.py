@@ -332,8 +332,21 @@ def dispatch_inner(
         # gate-fail. Per CONTEXT D-27 + CR-01: handler exceptions are NOT
         # silently swallowed — they surface as RuntimeError chained via
         # __cause__, mirroring the predicate-TypeError pattern above.
+        #
+        # Phase 160.1 D-16 exception: AttributeError / ValueError from a
+        # handler are propagated UN-WRAPPED so namer.name_compound's broad
+        # `except (TypeError, KeyError, IndexError, AttributeError)` at
+        # namer.py:1888 catches them and falls through to
+        # _descriptive_fallback. This preserves the pre-amendment behavior
+        # path for wildcard-bearing molecules whose ester_family handler
+        # raises AttributeError per the Plan-03-01 cascade-removal
+        # preservation logic (handlers/ester_family.py D-16 guard).
         try:
             result = entry.handler(features, _mol, style=style)
+        except (AttributeError, KeyError, IndexError, TypeError):
+            # Re-raise un-wrapped per D-16. namer.name_compound's broad
+            # except clause handles these as descriptive-fallback signals.
+            raise
         except Exception as exc:
             raise RuntimeError(
                 f"dispatch_inner: handler {entry.handler_id!r} "

@@ -856,100 +856,16 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
 
     # [removed: ring_ester dispatched via inner_dispatch as of commit 03-04]
 
-    # ASML-10 complete: Polyfunctional handler (polyfunctional.py) uses
-    # _integrate_universal_prefixes() for substituent discovery on both
-    # chain and ring parents. Stereo: handled by name_polyfunctional() internally.
-    if getattr(features, 'is_polyfunctional', False):
-        from ..rules.polyfunctional import name_polyfunctional
-        poly_name = name_polyfunctional(features)
-        if poly_name:
-            if logger.isEnabledFor(logging.DEBUG):
-                _ha = features.mol.GetNumHeavyAtoms()
-                logger.debug(
-                    "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                    "polyfunctional", _ha, poly_name[:60],
-                )
-            # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
-            pool = get_current_pool()
-            pool.add(poly_name, "polyfunctional", features)
-            return pool.best().name
-        # If name_polyfunctional returns None, fall through to normal handling
-        # (by-design: specialized handlers produce correct names via fallthrough)
-        logger.debug(
-            "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
-        )
-
-    # Handle multi-ester compounds (dicarboxylic acid diesters)
-    # Must come BEFORE single-ester naming so 2-ester diacids are caught
-    if features.principal_group == "ester":
-        all_esters = getattr(features, 'all_ester_matches', None)
-        if all_esters and len(all_esters) >= 2 and not getattr(features, 'is_polyfunctional', False):
-            from ..rules.esters import classify_multi_ester, name_dicarboxylic_diester, name_polyol_polyester, name_independent_esters
-            # Stereo: handled by ester naming functions (acid-fragment stereo internally)
-            ester_type = classify_multi_ester(features.mol, all_esters)
-            if ester_type == "dicarboxylic_diester":
-                diester_name = name_dicarboxylic_diester(features.mol, all_esters)
-                if diester_name:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        _ha = features.mol.GetNumHeavyAtoms()
-                        logger.debug(
-                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                            "multi_ester", _ha, diester_name[:60],
-                        )
-                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
-                    pool = get_current_pool()
-                    pool.add(diester_name, "multi_ester", features)
-                    return pool.best().name
-            elif ester_type == "polyol_polyester":
-                polyol_name = name_polyol_polyester(features.mol, all_esters)
-                if polyol_name:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        _ha = features.mol.GetNumHeavyAtoms()
-                        logger.debug(
-                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                            "multi_ester", _ha, polyol_name[:60],
-                        )
-                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
-                    pool = get_current_pool()
-                    pool.add(polyol_name, "multi_ester", features)
-                    return pool.best().name
-            elif ester_type == "independent":
-                indep_name = name_independent_esters(features.mol, all_esters)
-                if indep_name:
-                    if logger.isEnabledFor(logging.DEBUG):
-                        _ha = features.mol.GetNumHeavyAtoms()
-                        logger.debug(
-                            "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                            "multi_ester", _ha, indep_name[:60],
-                        )
-                    # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
-                    pool = get_current_pool()
-                    pool.add(indep_name, "multi_ester", features)
-                    return pool.best().name
-                # If returns None, fall through to single ester or decomposition
-
-    # ASML-10 complete: Ester handler (esters.py) names acid and alkyl
-    # components independently. Acid-fragment stereo handled internally.
-    # Only reached for acyclic esters (ring-attached esters handled above)
-    if features.principal_group == "ester":
-        ester_match = getattr(features, 'ester_match', None)
-        if ester_match:
-            from ..rules.esters import name_ester
-            # Simple acyclic ester: use "alkyl alkanoate" naming
-            # Stereo: handled by name_ester() (collects acid-fragment stereo internally)
-            ester_name = name_ester(features.mol, ester_match)
-            if ester_name:
-                if logger.isEnabledFor(logging.DEBUG):
-                    _ha = features.mol.GetNumHeavyAtoms()
-                    logger.debug(
-                        "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
-                        "ester", _ha, ester_name[:60],
-                    )
-                # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
-                pool = get_current_pool()
-                pool.add(ester_name, "ester", features)
-                return pool.best().name
-        # If name_ester returns None (lactone or complex), fall through
+    # [removed: polyfunctional / multi_ester / ester inline cascade
+    #  (composer.py:859-952 in pre-Plan-03 line numbers) — Plan-03-01 per
+    #  CONTEXT D-06. Routed via ester_family@1500 inner-dispatch entry
+    #  (handlers/ester_family.py from Phase 160 Plan-07). Per CONTEXT D-18
+    #  + ADR-19-04: dispatch_inner gate-fail-retry semantics (Plan-03-00a)
+    #  ensure that when ester_family gate-fails on a polyfunctional or
+    #  multi-ester case that doesn't apply, the next-priority handler
+    #  (and ultimately the post-cascade tier-A path / catch-all) is
+    #  retried — eliminating the need for the inline fall-through that
+    #  the pre-amendment caller relied on.]
 
     # [removed: sulfoxide dispatched via inner_dispatch as of commit 02-15
     #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
