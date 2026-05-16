@@ -152,6 +152,31 @@ def test_name_with_tree_first_wave_tree_is_none_doc(namer):
         )
 
 
+@pytest.mark.parametrize("smi", ["[He]", "[Ne]", "[Ar]", "[Kr]", "[Xe]", "[Rn]"])
+def test_simple_molecule_emits_tree_round_trip(smi, namer):
+    """Plan-10 DECOMP-02 OBSERVABLE CLOSURE: simple_molecule is the FIRST
+    tree-emitting handler. For each in-scope SMILES, the handler returns
+    a NameTreeNode whose serialization round-trips byte-identically to
+    result.name.
+    """
+    result = namer.name_with_tree(smi)
+    assert isinstance(result, NamingResult)
+    assert result.tree is not None, (
+        f"simple_molecule must emit a non-None tree for {smi!r}; "
+        f"DECOMP-02 closure depends on at least ONE handler proving "
+        f"the IR substrate works end-to-end"
+    )
+    assert result.tree.parent_stem == result.name, (
+        f"NameTreeNode.parent_stem must equal NamingResult.name for "
+        f"simple_molecule; got {result.tree.parent_stem!r} vs {result.name!r}"
+    )
+    assert result.tree.class_id == "simple_molecule"
+    assert result.tree.iupac_section_cite == "P-14"
+    assert name_tree_to_string(result.tree) == result.name, (
+        f"name_tree_to_string round-trip must equal result.name for {smi!r}"
+    )
+
+
 def test_atom_to_locant_hint_preserved_for_n_oxide(namer):
     """CR-04 part B regression: n_oxide handler's atom_to_locant_hint
     threads to name_with_tree caller (no longer silently None).

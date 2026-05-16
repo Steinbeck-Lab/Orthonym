@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_simple_molecule(features: Any) -> bool:
@@ -41,13 +41,25 @@ def _is_simple_molecule(features: Any) -> bool:
 def name_simple_molecule(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Direct-return simple-molecule handler."""
+    """Direct-return simple-molecule handler.
+
+    Plan-10 DECOMP-02 OBSERVABLE CLOSURE: this is the FIRST tree-emitting
+    handler in Orthonym. The NameTreeNode contains only ``parent_stem``
+    (the noble-gas / atom name) because simple molecules have no locants,
+    no prefixes, no suffix, no stereo. ``name_tree_to_string(tree)`` is
+    byte-identical to ``result.name``.
+    """
     from ..composer import _name_simple_molecule
 
     name = _name_simple_molecule(features)
     if not name:
         return None
-    return NamingResult(name=name, tree=None, atom_to_locant_hint=None)
+    tree = NameTreeNode(
+        parent_stem=name,
+        class_id='simple_molecule',
+        iupac_section_cite='P-14',
+    )
+    return NamingResult(name=name, tree=tree, atom_to_locant_hint=None)
 
 
 __all__ = ["name_simple_molecule", "_is_simple_molecule"]
