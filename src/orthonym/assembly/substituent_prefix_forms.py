@@ -41,7 +41,7 @@ from typing import List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-from .naming_utils import ALKYL_NAMES, get_alkyl_name
+from .naming_utils import ALKYL_NAMES, alpha_sort_key, get_alkyl_name
 from ..rules.seniority import PREFIX_FORMS
 
 
@@ -590,6 +590,291 @@ def get_sulfanyl_prefix(
         return None
 
 
+def _alkoxy_name_for_branch(
+    mol,
+    alkyl_atom: int,
+    exclude: Set[int],
+) -> Optional[str]:
+    """Helper: produce the alkoxy-group name (e.g., "methoxy", "ethoxy") for the
+    fragment starting at ``alkyl_atom`` and bounded by ``exclude``.
+
+    Used by ``get_carbamoyloxy_prefix`` Branch A to name the R-O- portion of
+    ``-NHC(=O)OR`` substituents per IUPAC P-65.6.3 / P-66.6.4. Mirrors the
+    ALKOXY_NAMES lookup pattern used by ``get_alkoxycarbonyl_prefix``.
+
+    Returns None if the fragment is heteroatom-bearing, empty, or oversized.
+    """
+    visited: Set[int] = set()
+    queue = deque([alkyl_atom])
+    while queue:
+        atom_idx = queue.popleft()
+        if atom_idx in visited or atom_idx in exclude:
+            continue
+        visited.add(atom_idx)
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() not in ("C", "H"):
+            return None
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in exclude:
+                queue.append(nbr_idx)
+
+    carbon_count = _count_fragment_atoms(
+        mol, alkyl_atom, exclude, carbons_only=True
+    )
+    if carbon_count == 0:
+        return None
+    if carbon_count in ALKOXY_NAMES:
+        return ALKOXY_NAMES[carbon_count]
+    try:
+        alkyl = get_alkyl_name(carbon_count)
+        if alkyl.endswith("yl"):
+            return alkyl[:-2] + "yloxy"
+        return alkyl + "oxy"
+    except (ValueError, KeyError):
+        return None
+
+
+def _name_alkyl_branch_from_atom(
+    mol,
+    alkyl_atom: int,
+    exclude: Set[int],
+) -> Optional[str]:
+    """Helper: produce the alkyl-group name (e.g., "methyl", "ethyl") for the
+    fragment starting at ``alkyl_atom`` and bounded by ``exclude``.
+
+    Used by the 3 NEW Phase 160.1 Plan-02-02 generators to name the alkyl
+    portion attached to the amide-N or carbamate-N/O. The carbon count is
+    derived from a BFS over the fragment (carbons only); ``get_alkyl_name``
+    maps the count to the IUPAC stem ("methyl", "ethyl", "propyl", ...).
+
+    Heteroatom-bearing alkyl fragments return None (the caller falls through
+    to a different prefix form).
+    """
+    # Reject heteroatom-bearing alkyl side per IUPAC P-66.6.1 substituent
+    # naming (analog to get_alkoxycarbonyl_prefix Guard 3).
+    visited: Set[int] = set()
+    queue = deque([alkyl_atom])
+    while queue:
+        atom_idx = queue.popleft()
+        if atom_idx in visited or atom_idx in exclude:
+            continue
+        visited.add(atom_idx)
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if atom.GetSymbol() not in ("C", "H"):
+            return None
+        for neighbor in atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx not in visited and nbr_idx not in exclude:
+                queue.append(nbr_idx)
+
+    carbon_count = _count_fragment_atoms(
+        mol, alkyl_atom, exclude, carbons_only=True
+    )
+    if carbon_count == 0:
+        return None
+    try:
+        return get_alkyl_name(carbon_count)
+    except (ValueError, KeyError):
+        return None
+
+
+def get_n_alkyl_carbamoyl_prefix(
+    mol,
+    amide_atoms: tuple,
+    principal_chain: Optional[List[int]] = None,
+) -> Optional[str]:
+    """Generate N-(alkyl)carbamoyl prefix for secondary-amide-as-substituent.
+
+    Per IUPAC P-66.6.1, when a secondary amide ``-C(=O)NHR`` is not the
+    principal group AND attached to the parent through the carbonyl-C,
+    the prefix form is ``N-(alkyl)carbamoyl``::
+
+        -C(=O)NHCH3   -> N-methylcarbamoyl
+        -C(=O)NHC2H5  -> N-ethylcarbamoyl
+
+    Returns None for:
+
+      * Lactam (cyclic amide; handled by ring handler)
+      * Amide attached through N (acetylamino path; handled by
+        ``_name_amino_branch``)
+      * Backbone amide (both ends on principal chain)
+
+    Args:
+        mol: RDKit Mol (the full molecule, not the substituent fragment).
+        amide_atoms: 4-tuple ``(carbonyl_C, carbonyl_O, amide_N, alkyl_C)``
+            from SMARTS ``[CX3](=O)[NX3H1][#6]`` match.
+        principal_chain: principal-chain atom indices, or None for
+            sub-fragment context (the Tier-0.5 caller; in that case the
+            orientation gate is the caller's responsibility — this function
+            assumes carbonyl-C-attached orientation and returns the
+            carbamoyl form).
+
+    Returns:
+        IUPAC-canonical ``"N-(alkyl)carbamoyl"`` string, or None.
+    """
+    chain_set: Set[int] = set(principal_chain) if principal_chain else set()
+
+    # Guard 1: 4-atom tuple required (FUNCTIONAL_GROUP_SMARTS["secondary_amide"])
+    if len(amide_atoms) < 4:
+        return None
+    carbonyl_c, carbonyl_o, amide_n, alkyl_c = amide_atoms[:4]
+
+    # Guard 2: lactam exclusion — if both amide_N and carbonyl_C are in a ring,
+    # this is a cyclic amide (lactam) handled by the ring handler.
+    if (
+        mol.GetAtomWithIdx(amide_n).IsInRing()
+        and mol.GetAtomWithIdx(carbonyl_c).IsInRing()
+    ):
+        return None
+
+    # Guard 3: orientation — carbamoyl form requires attach through carbonyl_C.
+    # In principal-chain context: reject N-attached and backbone-amide cases.
+    # In sub-fragment context (principal_chain=None): trust the caller — the
+    # Tier-0.5 hook (Plan-02-04) pre-filters by attach_idx.
+    if chain_set:
+        c_on_chain = carbonyl_c in chain_set
+        n_on_chain = amide_n in chain_set
+        if n_on_chain and not c_on_chain:
+            return None  # N-attached → acetylamino path, not carbamoyl
+        if c_on_chain and n_on_chain:
+            return None  # backbone amide → reject
+
+    # Guard 4: name the alkyl group on N (must be pure-C fragment)
+    alkyl_name = _name_alkyl_branch_from_atom(
+        mol, alkyl_c, exclude={carbonyl_c, carbonyl_o, amide_n}
+    )
+    if not alkyl_name:
+        return None
+
+    return f"N-{alkyl_name}carbamoyl"
+
+
+def get_n_n_dialkyl_carbamoyl_prefix(
+    mol,
+    amide_atoms: tuple,
+    principal_chain: Optional[List[int]] = None,
+) -> Optional[str]:
+    """Generate N,N-(dialkyl)carbamoyl prefix for tertiary-amide-as-substituent.
+
+    Per IUPAC P-66.6.1::
+
+        -C(=O)N(CH3)2      -> N,N-dimethylcarbamoyl
+        -C(=O)N(CH3)(C2H5) -> N-ethyl-N-methylcarbamoyl  (alphabetized)
+        -C(=O)N(C2H5)2     -> N,N-diethylcarbamoyl
+
+    Returns None for cyclic tertiary amide, backbone amide, or N-attached
+    orientation (same gates as ``get_n_alkyl_carbamoyl_prefix``).
+    """
+    chain_set: Set[int] = set(principal_chain) if principal_chain else set()
+
+    if len(amide_atoms) < 5:
+        return None
+    carbonyl_c, carbonyl_o, amide_n, alkyl_c1, alkyl_c2 = amide_atoms[:5]
+
+    if (
+        mol.GetAtomWithIdx(amide_n).IsInRing()
+        and mol.GetAtomWithIdx(carbonyl_c).IsInRing()
+    ):
+        return None
+
+    if chain_set:
+        c_on_chain = carbonyl_c in chain_set
+        n_on_chain = amide_n in chain_set
+        if n_on_chain and not c_on_chain:
+            return None
+        if c_on_chain and n_on_chain:
+            return None
+
+    # Name both alkyl groups on N
+    excl_base = {carbonyl_c, carbonyl_o, amide_n}
+    alkyl1 = _name_alkyl_branch_from_atom(
+        mol, alkyl_c1, exclude=excl_base | {alkyl_c2}
+    )
+    alkyl2 = _name_alkyl_branch_from_atom(
+        mol, alkyl_c2, exclude=excl_base | {alkyl_c1}
+    )
+    if not alkyl1 or not alkyl2:
+        return None
+
+    if alkyl1 == alkyl2:
+        return f"N,N-di{alkyl1}carbamoyl"
+
+    # Alphabetize ascending: N-{lower}-N-{higher}carbamoyl
+    if alpha_sort_key(alkyl1) < alpha_sort_key(alkyl2):
+        first, second = alkyl1, alkyl2
+    else:
+        first, second = alkyl2, alkyl1
+    return f"N-{first}-N-{second}carbamoyl"
+
+
+def get_carbamoyloxy_prefix(
+    mol,
+    carbamate_atoms: tuple,
+    principal_chain: Optional[List[int]] = None,
+) -> Optional[str]:
+    """Generate carbamate prefix per IUPAC P-66.6.4.
+
+    The carbamate ``-NHC(=O)O-`` has TWO orientation forms:
+
+      * **Branch A**: connects through N → ``-NHC(=O)OCH3`` → ``"(methoxycarbonyl)amino"``
+      * **Branch B**: connects through O → ``-OC(=O)NH2`` → ``"carbamoyloxy"``
+
+    Returns None for cyclic carbamate (oxazolidinone; handled by ring
+    handler) or backbone carbamate (all atoms on principal chain).
+
+    In sub-fragment context (``principal_chain=None``) defaults to Branch A
+    naming for ``-NHC(=O)OR`` fragments (the more-common substituent shape per
+    CONTEXT D-05 row 11); Branch B is invoked by the Tier-0.5 caller when
+    attach_idx == ester_O.
+
+    Args:
+        mol: RDKit Mol object.
+        carbamate_atoms: 5-tuple ``(amide_N, carbonyl_C, carbonyl_O, ester_O,
+            alkyl_C)`` from SMARTS ``[NX3][CX3](=O)[OX2][#6]`` match.
+        principal_chain: principal-chain atom indices, or None.
+    """
+    chain_set: Set[int] = set(principal_chain) if principal_chain else set()
+
+    if len(carbamate_atoms) < 5:
+        return None
+    amide_n, carbonyl_c, carbonyl_o, ester_o, alkyl_c = carbamate_atoms[:5]
+
+    # Guard: cyclic carbamate (oxazolidinone) — deferred to ring handler
+    if (
+        mol.GetAtomWithIdx(amide_n).IsInRing()
+        and mol.GetAtomWithIdx(carbonyl_c).IsInRing()
+        and mol.GetAtomWithIdx(ester_o).IsInRing()
+    ):
+        return None
+
+    exclude_for_alkyl = {amide_n, carbonyl_c, carbonyl_o, ester_o}
+
+    if chain_set:
+        n_on_chain = amide_n in chain_set
+        o_on_chain = ester_o in chain_set
+        if n_on_chain and o_on_chain:
+            return None  # backbone carbamate
+        if n_on_chain:
+            # Branch A: -NHC(=O)OR → "(R-oxycarbonyl)amino" (IUPAC P-66.6.4)
+            alkoxy_part = _alkoxy_name_for_branch(mol, alkyl_c, exclude_for_alkyl)
+            if not alkoxy_part:
+                return None
+            return f"({alkoxy_part}carbonyl)amino"
+        if o_on_chain:
+            # Branch B: -OC(=O)NH2 → "carbamoyloxy"
+            return "carbamoyloxy"
+        return None
+
+    # Sub-fragment context (principal_chain=None): default to Branch A.
+    # The Tier-0.5 caller selects Branch B explicitly by detecting attach_idx
+    # == ester_O before invoking this generator.
+    alkoxy_part = _alkoxy_name_for_branch(mol, alkyl_c, exclude_for_alkyl)
+    if not alkoxy_part:
+        return None
+    return f"({alkoxy_part}carbonyl)amino"
+
+
 def get_substituent_prefix_form(
     fg_name: str,
     mol,
@@ -631,13 +916,13 @@ def get_substituent_prefix_form(
     if fg_name == "thioether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain)
 
-    # --- Dynamic (NEW in Plan-02-02; placeholder None at Plan-02-01) — rows 4, 5, 11 ---
+    # --- Dynamic (NEW Plan-02-02) — rows 4, 5, 11 ---
     if fg_name == "secondary_amide":
-        return None  # TODO Plan-02-02: get_n_alkyl_carbamoyl_prefix
+        return get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain)
     if fg_name == "tertiary_amide":
-        return None  # TODO Plan-02-02: get_n_n_dialkyl_carbamoyl_prefix
+        return get_n_n_dialkyl_carbamoyl_prefix(mol, atoms, principal_chain)
     if fg_name == "carbamate":
-        return None  # TODO Plan-02-02: get_carbamoyloxy_prefix
+        return get_carbamoyloxy_prefix(mol, atoms, principal_chain)
 
     # --- Static-table lookups — rows 3, 6, 12, 13, 14 ---
     if fg_name == "primary_amide":
