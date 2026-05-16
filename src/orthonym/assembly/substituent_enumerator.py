@@ -30,6 +30,7 @@ from rdkit.Chem import RWMol
 
 from .naming_utils import get_alkyl_name
 from .substituent_naming import name_substituent_fragment
+from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..rules.seniority import get_prefix
 
 logger = logging.getLogger(__name__)
@@ -284,6 +285,23 @@ def name_substituent(mol, frag_atoms, attach_idx):
     # Edge case: empty fragment
     if not frag_atoms_set:
         return "substituent"
+
+    # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
+    # PURE read-only check. Returns the IUPAC-canonical prefix form for any
+    # fragment that ENTIRELY contains one of the 14 non-principal functional
+    # groups (ester, ether, amide, sulfoxide, sulfone, thioether, nitrile,
+    # carbamate, urea, isocyanate, isothiocyanate). Short-circuits Tier-1..5
+    # for FG-bearing fragments, eliminating the 'methyl formatyl' /
+    # 'hydroxymethyl' bug per RESEARCH §3 root-cause fix.
+    try:
+        prefix_form = _check_substituent_prefix_form(
+            mol, frag_atoms_set, attach_idx
+        )
+        if prefix_form is not None:
+            return prefix_form
+    except Exception:
+        # Defensive: any unexpected SMARTS / RDKit error falls through to Tier-1
+        pass
 
     # ---- Tier 1: Retained substituent names ----
     # Checked first per IUPAC: retained names (phenyl, isopropyl, etc.)
@@ -847,6 +865,14 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
       - pure_alkyl: Only carbon atoms (methyl, ethyl, etc.)
       - compound: Carbon + heteroatoms (trifluoromethyl, hydroxymethyl, etc.)
 
+    Phase 160.1 D-04: Tier-0.5 prefix-form check runs FIRST so that any
+    fragment matching the 14-row IUPAC P-65/P-66 prefix-form table is
+    named via the canonical prefix form (e.g., -C(=O)OCH3 -> methoxycarbonyl)
+    before falling through to compound/pure_alkyl/fg_only classification.
+    This eliminates the polyfunctional-path duplicate-name bug
+    (hydroxymethyl + methoxycarbonyl on the same ester atoms) per
+    RESEARCH §3 root-cause fix.
+
     Args:
         mol: RDKit Mol object of the full molecule.
         frag_info: SubstituentInfo namedtuple for this substituent.
@@ -859,6 +885,25 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
     """
     frag_mol = frag_info.frag_mol
     frag_atoms = frag_info.frag_atoms
+
+    # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
+    # Pure read-only check. Applies to fragments that entirely contain one of
+    # the 14 non-principal functional groups. The polyfunctional handler routes
+    # substituent fragments here (via _name_compound_substituent fallback);
+    # without this gate the compound-substituent path generates "hydroxymethyl"
+    # for the methyl-ester fragment per RESEARCH §3 bug trace.
+    try:
+        frag_atom_set = set(frag_atoms) if not isinstance(frag_atoms, set) else frag_atoms
+        attach_idx = getattr(frag_info, "attach_mol_idx", None)
+        if attach_idx is None and frag_atom_set:
+            attach_idx = next(iter(frag_atom_set))
+        prefix_form = _check_substituent_prefix_form(
+            mol, frag_atom_set, attach_idx
+        )
+        if prefix_form is not None:
+            return prefix_form
+    except Exception:
+        pass
 
     # Classify the fragment by composition
     category = _classify_fragment(mol, frag_mol, frag_atoms)

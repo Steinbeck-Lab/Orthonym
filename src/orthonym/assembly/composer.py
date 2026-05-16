@@ -6236,9 +6236,38 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
     alkoxy, acylamino, or acyloxy.
 
     Handles: simple amino alkyl chains, hydroxyalkyl, etc.
+
+    Phase 160.1 D-04: Tier-0.5 IUPAC P-65/P-66 prefix-form check runs FIRST.
+    Fragments matching the 14-row closed set (ester, ether, amide variants,
+    sulfoxide, sulfone, thioether, nitrile, carbamate, urea, isocyanate,
+    isothiocyanate) are named via the canonical prefix form (e.g.,
+    -C(=O)OCH3 -> methoxycarbonyl per P-65.6.3), short-circuiting the
+    misclassification path that previously produced "hydroxymethyl" for
+    4-atom 2C+2O ester fragments per RESEARCH §3 bug trace.
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
+
+    # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
+    try:
+        from .substituent_prefix_forms import _check_substituent_prefix_form
+        # Identify attach atom (matches the logic below; if undetermined,
+        # any atom of the fragment is acceptable for the SMARTS subset check).
+        _attach = None
+        for _idx in sub_atoms:
+            for _nbr in mol.GetAtomWithIdx(_idx).GetNeighbors():
+                if _nbr.GetIdx() in chain_set:
+                    _attach = _idx
+                    break
+            if _attach is not None:
+                break
+        if _attach is None and sub_atoms:
+            _attach = sub_atoms[0]
+        prefix_form = _check_substituent_prefix_form(mol, sub_set, _attach)
+        if prefix_form is not None:
+            return prefix_form
+    except Exception:
+        pass
 
     # Identify the atom bonded to the chain (the attachment point)
     attach_atom = None

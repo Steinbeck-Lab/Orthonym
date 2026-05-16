@@ -945,3 +945,97 @@ def get_substituent_prefix_form(
     # hydroxyl → "hydroxy", amino, etc.). Returning None signals "this row
     # is not in the 14-row Phase 160.1 closed-set".
     return None
+
+
+# ====================================================================
+# Tier-0.5 hook — Phase 160.1 CONTEXT D-04 substituent_enumerator wiring
+# ====================================================================
+
+# The 14-row prefix-form FG names in dispatcher order. Lazy-compiled SMARTS
+# patterns are cached at first call per RESEARCH §11 Risk F (avoid repeated
+# Chem.MolFromSmarts cost per Tier-0.5 invocation; ~ 14 × 1µs cache lookup
+# instead of ~ 14 × 50µs compile + match cost).
+_PREFIX_FORM_FG_NAMES = (
+    "ester",
+    "ether", "vinyl_ether", "aromatic_ether",
+    "primary_amide", "secondary_amide", "tertiary_amide",
+    "nitrile",
+    "sulfoxide", "sulfone", "thioether",
+    "carbamate", "urea",
+    "isocyanate", "isothiocyanate",
+)
+
+_PREFIX_FORM_PATTERNS: dict = {}  # Lazily populated on first call
+
+
+def _ensure_patterns_cached() -> None:
+    """Lazy-compile the 14 SMARTS patterns once per process."""
+    if _PREFIX_FORM_PATTERNS:
+        return
+    from rdkit import Chem
+    from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+
+    for fg_name in _PREFIX_FORM_FG_NAMES:
+        if fg_name in FUNCTIONAL_GROUP_SMARTS:
+            _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
+                FUNCTIONAL_GROUP_SMARTS[fg_name]
+            )
+
+
+def _check_substituent_prefix_form(
+    mol,
+    frag_atoms_set: Set[int],
+    attach_idx: int,
+) -> Optional[str]:
+    """Tier-0.5 prefix-form check for FG-bearing substituent fragments.
+
+    Per Phase 160.1 CONTEXT D-04 + IUPAC P-65 / P-66 prefix-form rules, a
+    substituent fragment that ENTIRELY contains one of the 14 non-principal
+    functional groups is named via the IUPAC-canonical prefix form (e.g.,
+    ``-C(=O)OCH3 → "methoxycarbonyl"`` per P-65.6.3), short-circuiting the
+    Tier-4 recursive ``name_substituent_fragment`` path that produces
+    ``"methyl formatyl"`` / ``"hydroxymethyl"`` incorrectly per RESEARCH §3
+    root-cause bug trace.
+
+    PURE: read-only on (mol, frag_atoms_set, attach_idx); no mutation;
+    no ``pool.add()``; no ``MolecularFeatures`` touch.
+
+    Args:
+        mol: RDKit Mol (the full molecule, not the substituent fragment).
+        frag_atoms_set: atom indices of the substituent fragment.
+        attach_idx: index of the atom in ``frag_atoms_set`` that bonds to
+            the parent. Used only for orientation discrimination on the
+            carbamate row 11 (Branch A vs Branch B); ignored otherwise.
+
+    Returns:
+        IUPAC-canonical prefix form (e.g., ``"methoxycarbonyl"``,
+        ``"carbamoyl"``) if a 14-row match applies entirely within the
+        fragment; None otherwise (caller falls through to Tier-1).
+    """
+    _ensure_patterns_cached()
+    # Tighter than subset: the SMARTS match must be exactly the fragment
+    # (no extra atoms). This prevents large heterosubstituent fragments
+    # containing an embedded FG bond from being mis-named as that FG's
+    # prefix (e.g., a 47-atom branch that contains an ether bond should
+    # NOT be named "heptatetracontyloxy"). Linker-bearing substituents
+    # like -CH2-C(=O)OCH3 fall through to Tier-1+ which correctly names
+    # the methylene linker around the FG.
+    for fg_name in _PREFIX_FORM_FG_NAMES:
+        pattern = _PREFIX_FORM_PATTERNS.get(fg_name)
+        if pattern is None:
+            continue
+        matches = mol.GetSubstructMatches(pattern)
+        for match in matches:
+            match_set = set(match)
+            # FG must EQUAL the fragment (no extra atoms). This is the
+            # IUPAC P-65/P-66 prefix-form precondition: the substituent
+            # fragment must be the FG itself, not a larger group containing
+            # the FG (CONTEXT D-04 strict scope).
+            if match_set != frag_atoms_set:
+                continue
+            prefix = get_substituent_prefix_form(
+                fg_name, mol, tuple(match), principal_chain=None
+            )
+            if prefix is not None:
+                return prefix
+    return None
