@@ -29,6 +29,17 @@ from .seniority import (
     SENIORITY_ORDER,
     PREFIX_FORMS,
 )
+# Phase 160.1 CONTEXT D-03: lift the 5 prefix-form generators + dispatcher to
+# assembly/substituent_prefix_forms.py. The functions below remain as thin
+# re-exports preserving the existing polyfunctional.py public API.
+from ..assembly.substituent_prefix_forms import (
+    get_substituent_prefix_form as _ASSEMBLY_get_substituent_prefix_form,
+    get_alkoxycarbonyl_prefix as _ASSEMBLY_get_alkoxycarbonyl_prefix,
+    get_alkoxy_prefix as _ASSEMBLY_get_alkoxy_prefix,
+    get_sulfinyl_prefix as _ASSEMBLY_get_sulfinyl_prefix,
+    get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
+    get_sulfanyl_prefix as _ASSEMBLY_get_sulfanyl_prefix,
+)
 
 
 # Functional groups that can be detected but have no seniority
@@ -131,6 +142,13 @@ def get_fg_prefix_form(
     For most groups, uses the standard prefix from seniority.py.
     For ethers, determines the alkoxy prefix based on substituent size.
 
+    Phase 160.1 CONTEXT D-03: chemistry rules lifted to
+    assembly/substituent_prefix_forms.py. This shim consults the new
+    dispatcher first; on None (out-of-14-row-set), falls back to the
+    static PREFIX_FORMS lookup via get_prefix() — preserving the original
+    polyfunctional caller's expectation that any FG in PREFIX_FORMS
+    (e.g., hydroxyl, amino, carboxy) gets its static prefix form returned.
+
     Args:
         fg_name: Name of the functional group
         mol: RDKit Mol object
@@ -140,27 +158,14 @@ def get_fg_prefix_form(
     Returns:
         Prefix string (e.g., "hydroxy", "oxo", "methoxy") or None if no prefix
     """
-    # Handle ethers specially - determine alkoxy prefix
-    if fg_name in ("ether", "vinyl_ether", "aromatic_ether"):
-        return _get_alkoxy_prefix(mol, atoms, principal_chain)
+    # Phase 160.1: consult the 14-row dispatcher first (P-65 / P-66 forms).
+    result = _ASSEMBLY_get_substituent_prefix_form(fg_name, mol, atoms, principal_chain)
+    if result is not None:
+        return result
 
-    # Handle esters specially - generate alkoxycarbonyl prefix (IUPAC P-65.6.3)
-    if fg_name == "ester":
-        return _get_alkoxycarbonyl_prefix(mol, atoms, principal_chain)
-
-    # Handle sulfoxide -> (alkyl)sulfinyl compound prefix (IUPAC P-63.6)
-    if fg_name == "sulfoxide":
-        return _get_sulfinyl_prefix(mol, atoms, principal_chain)
-
-    # Handle sulfone -> (alkyl)sulfonyl compound prefix (IUPAC P-63.6)
-    if fg_name == "sulfone":
-        return _get_sulfonyl_prefix(mol, atoms, principal_chain)
-
-    # Handle thioether -> (alkyl)sulfanyl compound prefix (IUPAC P-63.2.5)
-    if fg_name == "thioether":
-        return _get_sulfanyl_prefix(mol, atoms, principal_chain)
-
-    # For other groups, use standard prefix form
+    # Fall through to the static PREFIX_FORMS table for FGs not in the
+    # 14-row Phase 160.1 closed-set (e.g., carboxylic_acid → "carboxy",
+    # primary_alcohol → "hydroxy", primary_amine → "amino").
     return get_prefix(fg_name)
 
 
@@ -169,100 +174,13 @@ def _get_alkoxy_prefix(
     ether_atoms: tuple,
     principal_chain: List[int]
 ) -> Optional[str]:
+    """Thin re-export — see assembly/substituent_prefix_forms.get_alkoxy_prefix.
+
+    Phase 160.1 CONTEXT D-03: chemistry rule lifted to
+    assembly/substituent_prefix_forms.py. This shim preserves the
+    polyfunctional.py public API for existing callers.
     """
-    Determine the alkoxy prefix for an ether.
-
-    The ether SMARTS "[OX2]([CX4])[CX4]" matches both carbons.
-    We need to determine which side is the substituent (smaller/not in chain)
-    and name it as alkoxy.
-
-    Args:
-        mol: RDKit Mol object
-        ether_atoms: Atom indices from ether SMARTS match (O, C, C)
-        principal_chain: Atom indices of the principal chain
-
-    Returns:
-        Alkoxy prefix (e.g., "methoxy", "ethoxy"), or None if naming fails.
-        Never returns the literal string "alkoxy" (not valid IUPAC).
-    """
-    # ether_atoms from SMARTS "[OX2]([CX4])[CX4]" = (O, C1, C2)
-    if len(ether_atoms) < 3:
-        return None  # Defensive guard: let caller skip this ether
-
-    oxygen_idx = ether_atoms[0]
-    carbon1_idx = ether_atoms[1]
-    carbon2_idx = ether_atoms[2]
-
-    chain_set = set(principal_chain)
-
-    # Determine which carbon is the substituent (not in principal chain)
-    # or the smaller fragment if both/neither in chain
-    carbon1_in_chain = carbon1_idx in chain_set
-    carbon2_in_chain = carbon2_idx in chain_set
-
-    if carbon1_in_chain and not carbon2_in_chain:
-        # carbon2 is the substituent
-        sub_carbon = carbon2_idx
-    elif carbon2_in_chain and not carbon1_in_chain:
-        # carbon1 is the substituent
-        sub_carbon = carbon1_idx
-    else:
-        # Neither or both in chain - use smaller fragment
-        # Count atoms on each side via BFS
-        frag1_size = _count_fragment_atoms(mol, carbon1_idx, {oxygen_idx})
-        frag2_size = _count_fragment_atoms(mol, carbon2_idx, {oxygen_idx})
-        sub_carbon = carbon1_idx if frag1_size <= frag2_size else carbon2_idx
-
-    # Check if the substituent is aromatic (phenoxy, benzyloxy)
-    sub_atom = mol.GetAtomWithIdx(sub_carbon)
-
-    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
-    if sub_atom.GetIsAromatic():
-        ring_info = mol.GetRingInfo()
-        for ring in ring_info.AtomRings():
-            if sub_carbon in ring and len(ring) == 6:
-                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
-                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
-                       for r in ring):
-                    return "phenoxy"
-        # Fallback for other aromatic ethers
-        return "phenoxy"
-
-    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
-    if (not sub_atom.GetIsAromatic()
-            and sub_atom.GetSymbol() == 'C'
-            and sub_atom.GetTotalNumHs() >= 1):
-        arom_nbrs = [n for n in sub_atom.GetNeighbors()
-                     if n.GetIdx() != oxygen_idx and n.GetIsAromatic()]
-        non_h_non_arom = [n for n in sub_atom.GetNeighbors()
-                          if n.GetIdx() != oxygen_idx
-                          and not n.GetIsAromatic()
-                          and n.GetSymbol() != 'H']
-        if arom_nbrs and not non_h_non_arom:
-            return "benzyloxy"
-
-    # Count carbons in the substituent fragment
-    carbon_count = _count_fragment_atoms(mol, sub_carbon, {oxygen_idx}, carbons_only=True)
-
-    # Get alkoxy name
-    if carbon_count in ALKOXY_NAMES:
-        return ALKOXY_NAMES[carbon_count]
-    else:
-        # For larger groups, build name from alkyl
-        try:
-            alkyl = get_alkyl_name(carbon_count)
-            # Remove 'yl' and add 'yloxy' for larger alkoxy groups
-            if alkyl.endswith("yl"):
-                return alkyl[:-2] + "yloxy"
-            return alkyl + "oxy"
-        except (ValueError, KeyError):
-            # get_alkyl_name failed; try get_chain_prefix for arbitrary counts
-            try:
-                from ..data.chain_names import get_chain_prefix
-                prefix = get_chain_prefix(carbon_count)
-                return f"{prefix}yloxy"
-            except (ValueError, KeyError):
-                return None  # Not "alkoxy" -- let caller handle absence
+    return _ASSEMBLY_get_alkoxy_prefix(mol, ether_atoms, principal_chain)
 
 
 def _get_alkoxycarbonyl_prefix(
@@ -270,142 +188,13 @@ def _get_alkoxycarbonyl_prefix(
     ester_atoms: tuple,
     principal_chain: List[int],
 ) -> Optional[str]:
-    """Generate alkoxycarbonyl prefix for ester-as-non-principal-group.
+    """Thin re-export — see assembly/substituent_prefix_forms.get_alkoxycarbonyl_prefix.
 
-    Per IUPAC P-65.6.3, when an ester group -C(=O)-O-R is not the principal
-    characteristic group, it is expressed as an alkoxycarbonyl prefix:
-      -COOCH3   -> methoxycarbonyl
-      -COOC2H5  -> ethoxycarbonyl
-      -COOPh    -> phenoxycarbonyl
-
-    Args:
-        mol: RDKit Mol object.
-        ester_atoms: Tuple from ester SMARTS "[CX3](=O)[OX2][#6]":
-                     (carbonyl_C, carbonyl_O, ester_O, alkyl_C).
-        principal_chain: Atom indices of the principal chain.
-
-    Returns:
-        Alkoxycarbonyl prefix string, or None if this ester should not
-        be named as alkoxycarbonyl (e.g., lactones).
+    Phase 160.1 CONTEXT D-03: chemistry rule lifted to
+    assembly/substituent_prefix_forms.py. This shim preserves the
+    polyfunctional.py public API for existing callers.
     """
-    from .esters import parse_ester_fragments, is_lactone
-
-    # Guard 1: lactones are named differently, not as alkoxycarbonyl
-    if is_lactone(mol, ester_atoms):
-        return None
-
-    # Guard 2: orientation check — alkoxycarbonyl only applies when the
-    # carbonyl C is on or bonded to the principal chain, meaning the ester
-    # extends as -C(=O)-O-R away from the chain.  When the ester O is on
-    # the chain instead (chain-O-C(=O)-R), the ester is an acyloxy
-    # substituent, handled by _check_for_acyloxy() in composer.py.
-    carbonyl_c = ester_atoms[0]
-    ester_o = ester_atoms[2] if len(ester_atoms) > 2 else None
-    chain_set = set(principal_chain)
-    if chain_set and ester_o is not None:
-        c_on_chain = carbonyl_c in chain_set
-        o_on_chain = ester_o in chain_set
-        c_adj_chain = c_on_chain or any(
-            nbr.GetIdx() in chain_set
-            for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
-            if nbr.GetIdx() != ester_atoms[1]  # exclude carbonyl O
-            and nbr.GetIdx() != ester_o
-        )
-        if not c_adj_chain and o_on_chain:
-            # O faces the chain, C(=O) faces away -> acyloxy, not alkoxycarbonyl
-            return None
-        if not c_adj_chain and not o_on_chain:
-            # Neither end touches the chain; ester is in an isolated branch
-            return None
-        if c_on_chain and o_on_chain:
-            # Both ends of ester on principal chain -- ester is backbone,
-            # not a substituent. Reject alkoxycarbonyl naming.
-            return None
-
-    # Split ester into acid and alkyl (OR) fragments
-    acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_atoms)
-    if not alkyl_atoms:
-        return None
-
-    if ester_o is None:
-        return None
-
-    # Early return for aromatic alkyl: phenoxycarbonyl, (benzyloxy)carbonyl
-    first_alkyl = alkyl_atoms[0]
-    first_atom = mol.GetAtomWithIdx(first_alkyl)
-
-    if first_atom.GetIsAromatic():
-        ring_info = mol.GetRingInfo()
-        for ring in ring_info.AtomRings():
-            if first_alkyl in ring and len(ring) == 6:
-                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
-                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
-                       for r in ring):
-                    return "phenoxycarbonyl"
-        return "phenoxycarbonyl"
-
-    if (not first_atom.GetIsAromatic()
-            and first_atom.GetSymbol() == 'C'
-            and first_atom.GetTotalNumHs() >= 1):
-        arom_nbrs = [n for n in first_atom.GetNeighbors()
-                     if n.GetIdx() != ester_o and n.GetIsAromatic()]
-        non_h_non_arom = [n for n in first_atom.GetNeighbors()
-                          if n.GetIdx() != ester_o
-                          and not n.GetIsAromatic()
-                          and n.GetSymbol() != 'H']
-        if arom_nbrs and not non_h_non_arom:
-            return "(benzyloxy)carbonyl"
-
-    # Guard 3: the alkyl (OR) fragment must be pure carbon (no heteroatoms)
-    # for simple alkoxycarbonyl naming.  Heteroatom-containing fragments
-    # (e.g., amino acid side chains) need complex naming beyond the scope
-    # of this prefix generator.
-    has_heteroatom = any(
-        mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H')
-        for a in alkyl_atoms
-    )
-    if has_heteroatom:
-        return None
-
-    # Guard 4: size sanity — if the OR fragment is larger than the principal
-    # chain, this ester should be handled by functional-class naming.
-    carbon_count = sum(
-        1 for a in alkyl_atoms if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
-    )
-    chain_len = len(principal_chain) if principal_chain else 0
-    if chain_len > 0 and carbon_count > chain_len:
-        return None
-    # Reject non-aromatic ring-containing alkyl fragments (macrocyclic esters).
-    # Aromatic rings (phenyl) are already handled above.
-    ring_info = mol.GetRingInfo()
-    has_non_aromatic_ring = any(
-        ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
-        for a in alkyl_atoms
-    )
-    if has_non_aromatic_ring:
-        return None
-
-    if carbon_count == 0:
-        return None
-
-    # Build the alkoxycarbonyl name from ALKOXY_NAMES (same table as ethers)
-    if carbon_count in ALKOXY_NAMES:
-        alkoxy = ALKOXY_NAMES[carbon_count]
-        return f"{alkoxy}carbonyl"
-
-    # For larger/unknown sizes, build from alkyl name
-    try:
-        alkyl_name = get_alkyl_name(carbon_count)
-        if alkyl_name.endswith("yl"):
-            return f"{alkyl_name[:-2]}yloxy" + "carbonyl"
-        return f"{alkyl_name}oxy" + "carbonyl"
-    except (ValueError, KeyError):
-        try:
-            from ..data.chain_names import get_chain_prefix
-            prefix = get_chain_prefix(carbon_count)
-            return f"{prefix}yloxycarbonyl"
-        except (ValueError, KeyError):
-            return None
+    return _ASSEMBLY_get_alkoxycarbonyl_prefix(mol, ester_atoms, principal_chain)
 
 
 def _get_sulfinyl_prefix(
@@ -413,62 +202,13 @@ def _get_sulfinyl_prefix(
     sulfoxide_atoms: tuple,
     principal_chain: List[int]
 ) -> Optional[str]:
-    """Generate (alkyl)sulfinyl prefix for sulfoxide as non-principal group.
+    """Thin re-export — see assembly/substituent_prefix_forms.get_sulfinyl_prefix.
 
-    IUPAC P-63.6: R-S(=O)-R' when not the principal group is expressed as
-    an (alkyl)sulfinyl prefix on the parent chain.
-
-    SMARTS "[SX3](=[OX1])([#6])[#6]" matches (S, O, C1, C2).
-
-    Args:
-        mol: RDKit Mol object.
-        sulfoxide_atoms: Atom indices from sulfoxide SMARTS match.
-        principal_chain: Atom indices of the principal chain.
-
-    Returns:
-        Compound prefix string (e.g., "methylsulfinyl"), or None on failure.
+    Phase 160.1 CONTEXT D-03: chemistry rule lifted to
+    assembly/substituent_prefix_forms.py. This shim preserves the
+    polyfunctional.py public API for existing callers.
     """
-    if len(sulfoxide_atoms) < 3:
-        return None
-
-    sulfur_idx = sulfoxide_atoms[0]
-    chain_set = set(principal_chain)
-
-    # Find the two C neighbors of S (skip O neighbors)
-    sulfur = mol.GetAtomWithIdx(sulfur_idx)
-    c_neighbors = [n for n in sulfur.GetNeighbors()
-                   if n.GetSymbol() == 'C']
-    if len(c_neighbors) < 2:
-        return None
-
-    # Determine which C is on the chain vs substituent
-    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
-    c1_on_chain = c1 in chain_set
-    c2_on_chain = c2 in chain_set
-
-    if c1_on_chain and not c2_on_chain:
-        sub_carbon = c2
-    elif c2_on_chain and not c1_on_chain:
-        sub_carbon = c1
-    else:
-        # Neither or both on chain -- use smaller fragment
-        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
-        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
-        sub_carbon = c1 if frag1 <= frag2 else c2
-
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
-
-    # Build compound prefix: methylsulfinyl, ethylsulfinyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfinyl"
-    except (ValueError, KeyError):
-        return None
+    return _ASSEMBLY_get_sulfinyl_prefix(mol, sulfoxide_atoms, principal_chain)
 
 
 def _get_sulfonyl_prefix(
@@ -476,62 +216,13 @@ def _get_sulfonyl_prefix(
     sulfone_atoms: tuple,
     principal_chain: List[int]
 ) -> Optional[str]:
-    """Generate (alkyl)sulfonyl prefix for sulfone as non-principal group.
+    """Thin re-export — see assembly/substituent_prefix_forms.get_sulfonyl_prefix.
 
-    IUPAC P-63.6: R-S(=O)(=O)-R' when not the principal group is expressed
-    as an (alkyl)sulfonyl prefix on the parent chain.
-
-    SMARTS "[SX4](=[OX1])(=[OX1])([#6])[#6]" matches (S, O1, O2, C1, C2).
-
-    Args:
-        mol: RDKit Mol object.
-        sulfone_atoms: Atom indices from sulfone SMARTS match.
-        principal_chain: Atom indices of the principal chain.
-
-    Returns:
-        Compound prefix string (e.g., "methylsulfonyl"), or None on failure.
+    Phase 160.1 CONTEXT D-03: chemistry rule lifted to
+    assembly/substituent_prefix_forms.py. This shim preserves the
+    polyfunctional.py public API for existing callers.
     """
-    if len(sulfone_atoms) < 3:
-        return None
-
-    sulfur_idx = sulfone_atoms[0]
-    chain_set = set(principal_chain)
-
-    # Find the two C neighbors of S (skip O neighbors)
-    sulfur = mol.GetAtomWithIdx(sulfur_idx)
-    c_neighbors = [n for n in sulfur.GetNeighbors()
-                   if n.GetSymbol() == 'C']
-    if len(c_neighbors) < 2:
-        return None
-
-    # Determine which C is on the chain vs substituent
-    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
-    c1_on_chain = c1 in chain_set
-    c2_on_chain = c2 in chain_set
-
-    if c1_on_chain and not c2_on_chain:
-        sub_carbon = c2
-    elif c2_on_chain and not c1_on_chain:
-        sub_carbon = c1
-    else:
-        # Neither or both on chain -- use smaller fragment
-        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
-        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
-        sub_carbon = c1 if frag1 <= frag2 else c2
-
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
-
-    # Build compound prefix: methylsulfonyl, ethylsulfonyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfonyl"
-    except (ValueError, KeyError):
-        return None
+    return _ASSEMBLY_get_sulfonyl_prefix(mol, sulfone_atoms, principal_chain)
 
 
 def _get_sulfanyl_prefix(
@@ -539,62 +230,13 @@ def _get_sulfanyl_prefix(
     thioether_atoms: tuple,
     principal_chain: List[int]
 ) -> Optional[str]:
-    """Generate (alkyl)sulfanyl prefix for thioether as non-principal group.
+    """Thin re-export — see assembly/substituent_prefix_forms.get_sulfanyl_prefix.
 
-    IUPAC P-63.2.5: R-S-R' when not the principal group is expressed as
-    an (alkyl)sulfanyl prefix on the parent chain.
-
-    SMARTS "[SX2]([#6])[#6]" matches (S, C1, C2).
-
-    Args:
-        mol: RDKit Mol object.
-        thioether_atoms: Atom indices from thioether SMARTS match.
-        principal_chain: Atom indices of the principal chain.
-
-    Returns:
-        Compound prefix string (e.g., "methylsulfanyl"), or None on failure.
+    Phase 160.1 CONTEXT D-03: chemistry rule lifted to
+    assembly/substituent_prefix_forms.py. This shim preserves the
+    polyfunctional.py public API for existing callers.
     """
-    if len(thioether_atoms) < 3:
-        return None
-
-    sulfur_idx = thioether_atoms[0]
-    chain_set = set(principal_chain)
-
-    # Find the two C neighbors of S
-    sulfur = mol.GetAtomWithIdx(sulfur_idx)
-    c_neighbors = [n for n in sulfur.GetNeighbors()
-                   if n.GetSymbol() == 'C']
-    if len(c_neighbors) < 2:
-        return None
-
-    # Determine which C is on the chain vs substituent
-    c1, c2 = c_neighbors[0].GetIdx(), c_neighbors[1].GetIdx()
-    c1_on_chain = c1 in chain_set
-    c2_on_chain = c2 in chain_set
-
-    if c1_on_chain and not c2_on_chain:
-        sub_carbon = c2
-    elif c2_on_chain and not c1_on_chain:
-        sub_carbon = c1
-    else:
-        # Neither or both on chain -- use smaller fragment
-        frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
-        frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
-        sub_carbon = c1 if frag1 <= frag2 else c2
-
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
-
-    # Build compound prefix: methylsulfanyl, ethylsulfanyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfanyl"
-    except (ValueError, KeyError):
-        return None
+    return _ASSEMBLY_get_sulfanyl_prefix(mol, thioether_atoms, principal_chain)
 
 
 def _count_fragment_atoms(
