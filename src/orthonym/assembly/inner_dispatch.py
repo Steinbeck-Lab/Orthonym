@@ -97,27 +97,42 @@ class InnerDispatchEntry:
 
 @dataclass(frozen=True)
 class InnerDispatchResult:
-    """Phase 160 D-10: result of a successful ``dispatch_inner(features)`` call.
+    """Phase 160 D-10 + Phase 160.1 D-18 / ADR-19-04: result of a successful
+    ``dispatch_inner(features, mol, style)`` call.
 
-    Returned by ``dispatch_inner`` when a predicate matches. The caller
-    (composer.py:_assemble_name_impl) invokes ``result.handler(features, ...)``
-    to obtain a ``NamingResult`` and then routes through the standard
-    pool.add() / _inject_stereo_if_missing pipeline.
+    Pre-amendment (Phase 160 D-10): returned the matched-entry reference;
+    the caller (composer.py:_assemble_name_impl) invoked ``result.handler(...)``
+    separately and handled gate-fail (handler returning None) via inline
+    fall-through to the legacy cascade.
 
-    Plan-02 wave: ``dispatch_inner`` returns ``None`` on no-match because
-    the Plan-02 INNER_DISPATCH_TABLE has NO catch-all entry — the general_
-    acyclic catch-all ships in Plan-03 commit 03-09. When ``dispatch_inner``
-    returns None, the caller falls through to the inline mid-tier + root
-    branches still present at composer.py:1501-1903.
+    Post-amendment (Phase 160.1 D-18 + ADR-19-04 — first-match-AND-succeeds-wins):
+    ``dispatch_inner`` invokes the handler INTERNALLY and retries the
+    next-priority entry on gate-fail (handler returning ``None``). The new
+    ``result: NamingResult`` field carries the non-None ``NamingResult``
+    that the chosen handler returned. The caller collapses to a single
+    ``return _inner_result.result.name``.
+
+    Handler contract per ADR-19-04:
+      * Return non-None ``NamingResult`` ⇒ "I succeeded; use this result."
+      * Return ``None`` ⇒ "I gate-failed; defer to next-priority handler."
+      * Raise ``Exception`` ⇒ surfaced as ``RuntimeError`` chained via
+        ``__cause__`` (no swallowing per CONTEXT D-27 honest-fail-on-data).
+
+    Predicate purity (Phase 160 D-25) is preserved verbatim: predicates
+    report whether a handler CAN POSSIBLY apply (cheap structural check);
+    the handler's own gate decides whether it SHOULD apply (full IUPAC
+    compliance check on coverage / orientation / locant feasibility / etc.).
 
     The ``audit_record`` field is a dict of audit metadata (handler_id,
     priority, iupac_section) for the Plan-04 ``--dump-tree`` CLI + the
-    inner-dispatch stats counter.
+    inner-dispatch stats counter (stats now count SUCCESSFUL handlers
+    only, not predicate matches per D-18).
     """
     handler_id: str
     handler: Callable[..., NamingResultLike]
     audit_record: Dict[str, str]
     matched_entry: InnerDispatchEntry
+    result: NamingResultLike = None  # Phase 160.1 D-18 / ADR-19-04
 
 
 # Plan-02 substrate ships INNER_DISPATCH_TABLE EMPTY. Per-handler atomic
@@ -237,28 +252,50 @@ def freeze_inner_table() -> None:
     _INNER_REGISTRATION_FROZEN = True
 
 
-def dispatch_inner(features: Any) -> Optional[InnerDispatchResult]:
-    """Phase 160 D-10: first-match-wins inner-cascade dispatch.
+def dispatch_inner(
+    features: Any, mol: Any = None, style: str = "pin",
+) -> Optional[InnerDispatchResult]:
+    """Phase 160 D-10 + Phase 160.1 D-18 / ADR-19-04: first-match-AND-
+    succeeds-wins inner-cascade dispatch.
 
     Iterates ``INNER_DISPATCH_TABLE`` in priority order (lowest first;
     OrderedDict insertion order matches priority-sorted insertion via
-    ``_register_inner``); returns the first match per
-    ``entry.predicate(features)``.
+    ``_register_inner``); for each entry whose predicate matches, INVOKES
+    the handler internally. On non-None return, builds and returns
+    ``InnerDispatchResult`` carrying the result. On None return (gate-fail
+    per ADR-19-04 contract), CONTINUES to the next-priority entry. Final
+    no-match returns ``None``.
+
+    ADR-19-04 amends Phase 160 CONTEXT D-22 from "first-match-wins" to
+    "first-match-AND-succeeds-wins." Handler contract:
+      * Return non-None ``NamingResult`` ⇒ "I succeeded; use this result."
+      * Return ``None`` ⇒ "I gate-failed; defer to next-priority handler."
+      * Raise ``Exception`` ⇒ surfaced as ``RuntimeError`` chained via
+        ``__cause__`` (no silent swallowing).
+
+    Predicate purity (Phase 160 D-25) preserved verbatim: predicates report
+    whether a handler CAN POSSIBLY apply (cheap structural check);
+    handlers may perform internal pool.add() side effects per their
+    individual contracts.
+
+    Args:
+        features: ``MolecularFeatures`` instance (the upstream perception
+            output that handlers consume).
+        mol: RDKit ``Mol`` object. Defaults to ``features.mol`` when None
+            (preserves the pre-amendment call-site signature).
+        style: PIN / IUPAC name-style flag forwarded to handlers; default
+            ``"pin"``.
 
     Returns:
-        InnerDispatchResult with the matched handler + entry, or ``None``
-        on no match.
+        ``InnerDispatchResult`` carrying the SUCCESSFUL handler's
+        ``NamingResult`` in ``.result``, or ``None`` if no handler
+        succeeded. Once ``general_acyclic@99999`` catch-all ships
+        (Plan-03-03 per CONTEXT D-08), the None branch is unreachable
+        in production.
 
-    Plan-02 wave: returns ``None`` on no-match because Plan-02 does NOT
-    register the catch-all. The caller (composer.py:_assemble_name_impl)
-    falls through to the inline mid-tier + root branches still present
-    at composer.py:1501-1903 in Plan-02. Plan-03 commit 03-09 adds the
-    catch-all entry; from that commit on, dispatch_inner ALWAYS returns
-    a non-None InnerDispatchResult.
-
-    Per CONTEXT D-27 honest-fail-on-data: defensive ``try/except TypeError``
-    around the predicate call (PATTERNS § Error Handling) handles the case
-    where a predicate doesn't accept the kwarg-less call shape.
+    Per CONTEXT D-27 honest-fail-on-data: defensive try/except around BOTH
+    predicate AND handler invocations surface bugs (NoneType attribute
+    access, etc.) as ``RuntimeError`` chained via ``__cause__``.
     """
     # WR-01: use cached priority-sorted tuple instead of re-sorting per call.
     # The cache is invalidated by _register_inner; once frozen by
@@ -269,6 +306,9 @@ def dispatch_inner(features: Any) -> Optional[InnerDispatchResult]:
         _SORTED_ENTRIES_CACHE = tuple(
             sorted(INNER_DISPATCH_TABLE.values(), key=lambda e: e.priority)
         )
+
+    _mol = mol if mol is not None else getattr(features, "mol", None)
+
     for entry in _SORTED_ENTRIES_CACHE:
         try:
             matched = entry.predicate(features)
@@ -285,27 +325,55 @@ def dispatch_inner(features: Any) -> Optional[InnerDispatchResult]:
                 f"read-only; AP-160-26)."
             ) from exc
 
-        if matched:
-            # Increment per-instance stats per CONTEXT D-18 + AP-160-13.
-            _INNER_DISPATCH_STATS[entry.handler_id] = (
-                _INNER_DISPATCH_STATS.get(entry.handler_id, 0) + 1
-            )
-            return InnerDispatchResult(
-                handler_id=entry.handler_id,
-                handler=entry.handler,
-                audit_record={
-                    "handler_id": entry.handler_id,
-                    "priority": str(entry.priority),
-                    "iupac_section": entry.iupac_section,
-                    "description": entry.description,
-                },
-                matched_entry=entry,
-            )
+        if not matched:
+            continue
 
-    # No-match per CONTEXT D-08 Plan-02 boundary: return None and let the
-    # caller fall through to inline branches. Plan-03 commit 03-09 adds
-    # the general_acyclic catch-all at priority 99999; from that commit
-    # on, this branch is unreachable in production.
+        # Phase 160.1 D-18 / ADR-19-04: invoke handler internally; retry on
+        # gate-fail. Per CONTEXT D-27 + CR-01: handler exceptions are NOT
+        # silently swallowed — they surface as RuntimeError chained via
+        # __cause__, mirroring the predicate-TypeError pattern above.
+        try:
+            result = entry.handler(features, _mol, style=style)
+        except Exception as exc:
+            raise RuntimeError(
+                f"dispatch_inner: handler {entry.handler_id!r} "
+                f"raised {type(exc).__name__}: {exc}. "
+                f"Fix the handler or its predicate (CONTEXT D-18 + "
+                f"ADR-19-04: handlers return None on gate-fail, never "
+                f"raise)."
+            ) from exc
+
+        if result is None:
+            # Gate-fail per ADR-19-04: this handler matched the predicate
+            # but its internal gate (coverage / orientation / locant
+            # feasibility / etc.) rejected. Continue to the next-priority
+            # entry.
+            continue
+
+        # Handler succeeded. Increment per-handler stats (successful
+        # handler only per D-18, mirroring outcome semantics over
+        # predicate-match semantics).
+        _INNER_DISPATCH_STATS[entry.handler_id] = (
+            _INNER_DISPATCH_STATS.get(entry.handler_id, 0) + 1
+        )
+        return InnerDispatchResult(
+            handler_id=entry.handler_id,
+            handler=entry.handler,
+            audit_record={
+                "handler_id": entry.handler_id,
+                "priority": str(entry.priority),
+                "iupac_section": entry.iupac_section,
+                "description": entry.description,
+            },
+            matched_entry=entry,
+            result=result,
+        )
+
+    # No handler succeeded. Once general_acyclic@99999 catch-all ships
+    # (Plan-03-03 per CONTEXT D-08), this branch is unreachable in
+    # production. Plan-03-00a + 03-00b leave it reachable so the inline
+    # cascade in composer.py:858-948 + 1006-1322 continues to handle the
+    # cases not yet routed via dispatch_inner.
     return None
 
 

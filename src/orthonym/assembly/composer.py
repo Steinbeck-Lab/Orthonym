@@ -800,37 +800,40 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # --mode delta`) gates every commit at zero diff vs the frozen baseline
     # `tests/canary/canary_pre_decomp_160.csv`.
     # =========================================================================
+    # Phase 160.1 D-18 / ADR-19-04: dispatch_inner now invokes handlers
+    # internally and retries the next-priority entry on gate-fail (handler
+    # returning None). The caller collapses to a single return; the
+    # matched-but-None fall-through branch DELETED per D-18. If no
+    # handler succeeds at this commit, dispatch_inner returns None and
+    # control falls through to the inline cascade below — Plan-03-01..03-04
+    # remove those inline cascades, and general_acyclic@99999 (Plan-03-03)
+    # becomes the catch-all that guarantees a non-None result.
     from .inner_dispatch import dispatch_inner
-    _inner_result = dispatch_inner(features)
+    _inner_result = dispatch_inner(features, mol=features.mol, style=style)
     if _inner_result is not None:
-        _inner_naming = _inner_result.handler(features, features.mol, style=style)
-        if _inner_naming is not None:
-            # CR-04 part B + W7: capture the inner-dispatch NamingResult
-            # for name_with_tree() consumers via contextvars.ContextVar
-            # (PEP 567). The slot is installed by Orthonym.name_with_tree()
-            # before invoking self.name(); when absent (default=None), this
-            # is a no-op for the regular Orthonym.name() path. ContextVar
-            # is thread-local AND asyncio-task-local — safe under
-            # concurrent invocation from multiple threads / tasks.
-            from ..namer import _name_with_tree_capture
-            _slot = _name_with_tree_capture.get()
-            if _slot is not None:
-                _slot["naming"] = _inner_naming
-            # Per CONTEXT D-13 + the comment above: the handler's
-            # NamingResult.name is the FINAL byte-identical string. No
-            # post-processing here. Handlers that need _inject_stereo_if_missing
-            # call it themselves (oxime, hydrazone, n_oxide, isocyanate,
-            # isothiocyanate, carbamic_acid, carbamate, urea, guanidine,
-            # boronic_acid, acid_halide, anhydride, lactone, lactam, sulfoxide,
-            # sulfone, thioether, phosphine_oxide, phosphate_ester, phosphine,
-            # phosphinic_acid, ring_assembly, polycyclic, partial_sat);
-            # handlers that do NOT inject stereo are polyfunctional,
-            # multi_ester, ester, simple_molecule (final string is direct
-            # from pool.best().name in their inline branches).
-            return _inner_naming.name
-        # Handler matched but returned None (gate-fail / not-applicable).
-        # Fall through to the inline cascade below for the residual
-        # cases not yet extracted to handlers/ (Plan-02 boundary).
+        # CR-04 part B + W7: capture the inner-dispatch NamingResult
+        # for name_with_tree() consumers via contextvars.ContextVar
+        # (PEP 567). The slot is installed by Orthonym.name_with_tree()
+        # before invoking self.name(); when absent (default=None), this
+        # is a no-op for the regular Orthonym.name() path. ContextVar
+        # is thread-local AND asyncio-task-local — safe under
+        # concurrent invocation from multiple threads / tasks.
+        from ..namer import _name_with_tree_capture
+        _slot = _name_with_tree_capture.get()
+        if _slot is not None:
+            _slot["naming"] = _inner_result.result
+        # Per CONTEXT D-13 + the comment above: the handler's
+        # NamingResult.name is the FINAL byte-identical string. No
+        # post-processing here. Handlers that need _inject_stereo_if_missing
+        # call it themselves (oxime, hydrazone, n_oxide, isocyanate,
+        # isothiocyanate, carbamic_acid, carbamate, urea, guanidine,
+        # boronic_acid, acid_halide, anhydride, lactone, lactam, sulfoxide,
+        # sulfone, thioether, phosphine_oxide, phosphate_ester, phosphine,
+        # phosphinic_acid, ring_assembly, polycyclic, partial_sat);
+        # handlers that do NOT inject stereo are polyfunctional,
+        # multi_ester, ester, simple_molecule (final string is direct
+        # from pool.best().name in their inline branches).
+        return _inner_result.result.name
 
     # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
     # [removed: hydrazone dispatched via inner_dispatch as of commit 02-02]

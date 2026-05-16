@@ -229,46 +229,93 @@ class TestRegistrationLock:
 
 
 class TestDispatchInnerBehavior:
-    """CONTEXT D-10: dispatch_inner first-match-wins iteration."""
+    """CONTEXT D-10 + Phase 160.1 D-18 / ADR-19-04: dispatch_inner first-
+    match-AND-succeeds-wins iteration.
+
+    Per Phase 160.1 D-18, ``dispatch_inner(features, mol, style)`` now
+    invokes the handler internally. Tests that previously relied on the
+    "first-match-wins-no-handler-invoke" semantics are amended to either
+    use mocked entries (via ``_replace_table_with``) or real molecules
+    (via ``orthonym.name_compound``).
+    """
+
+    @staticmethod
+    def _make_fake_entry(handler_id, priority, predicate, handler):
+        """Helper: build an InnerDispatchEntry for table-replace tests."""
+        return InnerDispatchEntry(
+            handler_id=handler_id,
+            priority=priority,
+            predicate=predicate,
+            handler=handler,
+            iupac_section="P-X.Y.Z",
+            description=f"fake {handler_id}",
+            side_effect_inventory=(),
+        )
+
+    @staticmethod
+    def _replace_table_with(entries):
+        """Helper: swap INNER_DISPATCH_TABLE for isolated dispatch tests.
+
+        Returns a context-manager-style restore callable. Mirrors
+        TestInnerDispatchTypeErrorWrapping's per-entry replace pattern
+        scaled to the entire table.
+        """
+        from orthonym.assembly import inner_dispatch as ind
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        for e in entries:
+            ind.INNER_DISPATCH_TABLE[e.handler_id] = e
+        ind._SORTED_ENTRIES_CACHE = None  # invalidate cache
+
+        def restore():
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
+        return restore
 
     def test_dispatch_inner_returns_result_on_match(self):
-        """When a predicate matches, dispatch_inner returns an InnerDispatchResult."""
-        # Build a minimal features object with principal_group='oxime'.
-        class MockFeatures:
-            principal_group = "oxime"
-        result = dispatch_inner(MockFeatures())
-        assert result is not None
-        assert isinstance(result, InnerDispatchResult)
-        assert result.handler_id == "oxime"
+        """Per D-18: dispatch_inner invokes handler internally; returns
+        InnerDispatchResult on handler success."""
+        from orthonym.assembly.name_tree import NamingResult
+        sentinel = NamingResult(name="fake_name", tree=None,
+                                atom_to_locant_hint=None)
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return sentinel
+
+        entry = self._make_fake_entry("fake_a", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            result = dispatch_inner(object())
+            assert result is not None
+            assert isinstance(result, InnerDispatchResult)
+            assert result.handler_id == "fake_a"
+            assert result.result is sentinel
+        finally:
+            restore()
 
     def test_dispatch_inner_returns_none_on_no_match(self):
-        """No matching predicate -> returns None (Plan-02 wave-1 contract).
+        """No matching predicate -> returns None (Plan-03-00a-pre-catch-all
+        contract; once general_acyclic@99999 ships in Plan-03-03 this branch
+        becomes unreachable in production)."""
 
-        Note: even with 30 entries, an object with NO recognizable
-        principal_group / cyclic / ring attributes should fall through
-        because the catch-all general_acyclic is NOT registered (deferred).
-        """
-        class EmptyFeatures:
-            principal_group = None
-            is_cyclic = False
-            is_polyfunctional = False
-            chain_is_parent = False
-            ring_systems = []
-            principal_chain = None
-            ring_assembly_info = None
-            polycyclic_name = None
-            mol = None
-            species_type = "neutral"
-            heterocyclic_match = False
-            exocyclic_esters = []
-            multi_ester_match = False
-            ester_match = False
-            principal_chain_atoms = []
-            pg_count = 0
-        result = dispatch_inner(EmptyFeatures())
-        # Either None (no match) or a valid entry — both are acceptable
-        # depending on which predicates match the mock.
-        assert result is None or isinstance(result, InnerDispatchResult)
+        def predicate(features):
+            return False
+
+        def handler(features, mol, style):
+            raise AssertionError("unreachable — predicate is False")
+
+        entry = self._make_fake_entry("fake_b", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            result = dispatch_inner(object())
+            assert result is None
+        finally:
+            restore()
 
     def test_dispatch_inner_priority_order(self):
         """First-match-wins: lower priority wins over higher priority for same predicate."""
@@ -283,23 +330,47 @@ class TestDispatchInnerBehavior:
 
     def test_dispatch_inner_result_carries_audit_record(self):
         """InnerDispatchResult carries audit_record dict for telemetry."""
-        class MockFeatures:
-            principal_group = "oxime"
-        result = dispatch_inner(MockFeatures())
-        assert result is not None
-        assert isinstance(result.audit_record, dict)
-        assert "handler_id" in result.audit_record
-        assert "priority" in result.audit_record
-        assert "iupac_section" in result.audit_record
+        from orthonym.assembly.name_tree import NamingResult
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return NamingResult(name="fake_name", tree=None,
+                                atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry("fake_c", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            result = dispatch_inner(object())
+            assert result is not None
+            assert isinstance(result.audit_record, dict)
+            assert "handler_id" in result.audit_record
+            assert "priority" in result.audit_record
+            assert "iupac_section" in result.audit_record
+        finally:
+            restore()
 
     def test_dispatch_inner_result_carries_matched_entry(self):
         """InnerDispatchResult.matched_entry references the InnerDispatchEntry."""
-        class MockFeatures:
-            principal_group = "oxime"
-        result = dispatch_inner(MockFeatures())
-        assert result is not None
-        assert isinstance(result.matched_entry, InnerDispatchEntry)
-        assert result.matched_entry.handler_id == "oxime"
+        from orthonym.assembly.name_tree import NamingResult
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return NamingResult(name="fake_name", tree=None,
+                                atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry("fake_d", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            result = dispatch_inner(object())
+            assert result is not None
+            assert isinstance(result.matched_entry, InnerDispatchEntry)
+            assert result.matched_entry.handler_id == "fake_d"
+        finally:
+            restore()
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +379,40 @@ class TestDispatchInnerBehavior:
 
 
 class TestInnerDispatchStats:
-    """CONTEXT D-18 + AP-160-13: per-handler dispatch counters."""
+    """CONTEXT D-18 + AP-160-13: per-handler dispatch counters.
+
+    Per Phase 160.1 D-18: stats now count SUCCESSFUL handlers only (the
+    handler that returned non-None), not every predicate match. Tests
+    use table-replace pattern to isolate from real handler bodies.
+    """
+
+    @staticmethod
+    def _make_fake_entry(handler_id, priority, predicate, handler):
+        return InnerDispatchEntry(
+            handler_id=handler_id,
+            priority=priority,
+            predicate=predicate,
+            handler=handler,
+            iupac_section="P-X.Y.Z",
+            description=f"fake {handler_id}",
+            side_effect_inventory=(),
+        )
+
+    @staticmethod
+    def _replace_table_with(entries):
+        from orthonym.assembly import inner_dispatch as ind
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        for e in entries:
+            ind.INNER_DISPATCH_TABLE[e.handler_id] = e
+        ind._SORTED_ENTRIES_CACHE = None
+
+        def restore():
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
+        return restore
 
     def setup_method(self):
         """Reset counter state before each test for isolation."""
@@ -320,33 +424,66 @@ class TestInnerDispatchStats:
 
     def test_dispatch_increments_counter(self):
         """A successful dispatch_inner match increments the counter."""
-        class MockFeatures:
-            principal_group = "oxime"
-        before = get_inner_dispatch_stats().get("oxime", 0)
-        dispatch_inner(MockFeatures())
-        after = get_inner_dispatch_stats().get("oxime", 0)
-        assert after == before + 1
+        from orthonym.assembly.name_tree import NamingResult
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return NamingResult(name="x", tree=None, atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry("fake_stats", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            before = get_inner_dispatch_stats().get("fake_stats", 0)
+            dispatch_inner(object())
+            after = get_inner_dispatch_stats().get("fake_stats", 0)
+            assert after == before + 1
+        finally:
+            restore()
 
     def test_reset_clears_counter(self):
         """reset_inner_dispatch_stats() clears all counters."""
-        class MockFeatures:
-            principal_group = "oxime"
-        dispatch_inner(MockFeatures())
-        assert get_inner_dispatch_stats().get("oxime", 0) >= 1
-        reset_inner_dispatch_stats()
-        assert get_inner_dispatch_stats() == {}
+        from orthonym.assembly.name_tree import NamingResult
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return NamingResult(name="x", tree=None, atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry("fake_reset", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            dispatch_inner(object())
+            assert get_inner_dispatch_stats().get("fake_reset", 0) >= 1
+            reset_inner_dispatch_stats()
+            assert get_inner_dispatch_stats() == {}
+        finally:
+            restore()
 
     def test_get_returns_copy(self):
         """get_inner_dispatch_stats returns a defensive copy.
 
         Mutating the returned dict should not change the underlying counter.
         """
-        class MockFeatures:
-            principal_group = "oxime"
-        dispatch_inner(MockFeatures())
-        snapshot = get_inner_dispatch_stats()
-        snapshot["oxime"] = 999999
-        assert get_inner_dispatch_stats()["oxime"] != 999999
+        from orthonym.assembly.name_tree import NamingResult
+
+        def predicate(features):
+            return True
+
+        def handler(features, mol, style):
+            return NamingResult(name="x", tree=None, atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry("fake_copy", 100, predicate, handler)
+        restore = self._replace_table_with([entry])
+        try:
+            dispatch_inner(object())
+            snapshot = get_inner_dispatch_stats()
+            snapshot["fake_copy"] = 999999
+            assert get_inner_dispatch_stats()["fake_copy"] != 999999
+        finally:
+            restore()
 
 
 # ---------------------------------------------------------------------------
@@ -432,6 +569,7 @@ class TestInnerDispatchTypeErrorWrapping:
     def test_predicate_typeerror_wraps_with_runtime(self):
         """A predicate raising TypeError surfaces as RuntimeError with handler_id."""
         from dataclasses import replace
+        from orthonym.assembly import inner_dispatch as ind
         first_handler_id = next(iter(INNER_DISPATCH_TABLE))
         first_entry = INNER_DISPATCH_TABLE[first_handler_id]
 
@@ -441,6 +579,7 @@ class TestInnerDispatchTypeErrorWrapping:
         INNER_DISPATCH_TABLE[first_handler_id] = replace(
             first_entry, predicate=bad_predicate,
         )
+        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (D-18 fix)
         try:
             with pytest.raises(RuntimeError) as excinfo:
                 dispatch_inner(object())
@@ -449,10 +588,12 @@ class TestInnerDispatchTypeErrorWrapping:
             assert "synthetic" in str(excinfo.value)
         finally:
             INNER_DISPATCH_TABLE[first_handler_id] = first_entry
+            ind._SORTED_ENTRIES_CACHE = None
 
     def test_predicate_typeerror_chains_original_via_cause(self):
         """The wrapping RuntimeError has __cause__ set to the original TypeError."""
         from dataclasses import replace
+        from orthonym.assembly import inner_dispatch as ind
         first_handler_id = next(iter(INNER_DISPATCH_TABLE))
         first_entry = INNER_DISPATCH_TABLE[first_handler_id]
         original = TypeError("original-cause")
@@ -463,56 +604,105 @@ class TestInnerDispatchTypeErrorWrapping:
         INNER_DISPATCH_TABLE[first_handler_id] = replace(
             first_entry, predicate=bad_predicate,
         )
+        ind._SORTED_ENTRIES_CACHE = None  # invalidate per-call cache (D-18 fix)
         try:
             with pytest.raises(RuntimeError) as excinfo:
                 dispatch_inner(object())
             assert excinfo.value.__cause__ is original
         finally:
             INNER_DISPATCH_TABLE[first_handler_id] = first_entry
+            ind._SORTED_ENTRIES_CACHE = None
 
     def test_predicate_returning_false_works_unchanged(self):
-        """Regression: non-raising predicates returning False continue to work."""
-        class FakeFeatures:
-            species_type = "neutral"
-            principal_chain = None
-            ring_systems = None
-            principal_group = None
-            is_polyfunctional = False
-            is_cyclic = False
-            chain_is_parent = False
-            mol = None
+        """Regression: non-raising predicates returning False continue to work.
 
-        # Should NOT raise; either None (no match) or a real dispatch result.
-        result = dispatch_inner(FakeFeatures())
-        assert result is None or hasattr(result, "handler_id")
+        Per Phase 160.1 D-18: with the amendment, ALL handlers whose predicate
+        matches are invoked. To exercise the false-predicate path in isolation,
+        we use the table-replace pattern.
+        """
+        from orthonym.assembly import inner_dispatch as ind
+        entry = InnerDispatchEntry(
+            handler_id="fake_false_pred",
+            priority=100,
+            predicate=lambda _f: False,
+            handler=lambda _f, _m, style: None,
+            iupac_section="P-X",
+            description="fake",
+            side_effect_inventory=(),
+        )
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        ind.INNER_DISPATCH_TABLE["fake_false_pred"] = entry
+        ind._SORTED_ENTRIES_CACHE = None
+        try:
+            # Should NOT raise; should return None (predicate is False).
+            result = dispatch_inner(object())
+            assert result is None
+        finally:
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
 
 
 class TestInnerDispatchSortCache:
-    """WR-01 regression: dispatch_inner uses cached sorted tuple, not per-call sort."""
+    """WR-01 regression: dispatch_inner uses cached sorted tuple, not per-call sort.
+
+    Per Phase 160.1 D-18: with the gate-fail-retry amendment, the WR-01
+    cache behavior is preserved; tests use the table-replace pattern to
+    isolate from real handlers.
+    """
 
     def test_sort_cache_is_populated_after_first_dispatch(self):
         from orthonym.assembly import inner_dispatch as ind
-
-        class FakeFeatures:
-            species_type = "neutral"
-            principal_chain = None
-            ring_systems = None
-            principal_group = None
-            is_polyfunctional = False
-            is_cyclic = False
-            chain_is_parent = False
-            mol = None
-
-        ind.dispatch_inner(FakeFeatures())
-        assert ind._SORTED_ENTRIES_CACHE is not None
-        priorities = [e.priority for e in ind._SORTED_ENTRIES_CACHE]
-        assert priorities == sorted(priorities)
+        from orthonym.assembly.name_tree import NamingResult
+        entry = InnerDispatchEntry(
+            handler_id="fake_cache_a",
+            priority=100,
+            predicate=lambda _f: True,
+            handler=lambda _f, _m, style: NamingResult(
+                name="x", tree=None, atom_to_locant_hint=None,
+            ),
+            iupac_section="P-X",
+            description="fake",
+            side_effect_inventory=(),
+        )
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        ind.INNER_DISPATCH_TABLE["fake_cache_a"] = entry
+        ind._SORTED_ENTRIES_CACHE = None
+        try:
+            ind.dispatch_inner(object())
+            assert ind._SORTED_ENTRIES_CACHE is not None
+            priorities = [e.priority for e in ind._SORTED_ENTRIES_CACHE]
+            assert priorities == sorted(priorities)
+        finally:
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
 
     def test_dispatch_inner_does_not_call_sorted_per_call(self, monkeypatch):
         """Performance regression guard: sorted() is called at most once
         on cache rebuild, not per dispatch."""
         from orthonym.assembly import inner_dispatch as ind
+        from orthonym.assembly.name_tree import NamingResult
 
+        entry = InnerDispatchEntry(
+            handler_id="fake_cache_b",
+            priority=100,
+            predicate=lambda _f: True,
+            handler=lambda _f, _m, style: NamingResult(
+                name="x", tree=None, atom_to_locant_hint=None,
+            ),
+            iupac_section="P-X",
+            description="fake",
+            side_effect_inventory=(),
+        )
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        ind.INNER_DISPATCH_TABLE["fake_cache_b"] = entry
         ind._SORTED_ENTRIES_CACHE = None
         sort_call_count = [0]
         real_sorted = sorted
@@ -523,16 +713,254 @@ class TestInnerDispatchSortCache:
 
         monkeypatch.setattr("builtins.sorted", counting_sorted)
 
-        class FakeFeatures:
-            species_type = "neutral"
-            principal_chain = None
-            ring_systems = None
-            principal_group = None
-            is_polyfunctional = False
-            is_cyclic = False
-            chain_is_parent = False
-            mol = None
+        try:
+            for _ in range(10):
+                ind.dispatch_inner(object())
+            assert sort_call_count[0] <= 1
+        finally:
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
 
-        for _ in range(10):
-            ind.dispatch_inner(FakeFeatures())
-        assert sort_call_count[0] <= 1
+
+# ---------------------------------------------------------------------------
+# Class 9 — Phase 160.1 D-18 / ADR-19-04 gate-fail-retry semantics (8 tests)
+# ---------------------------------------------------------------------------
+
+
+class TestDispatchInnerGateFailRetry:
+    """Phase 160.1 D-18 + ADR-19-04: first-match-AND-succeeds-wins.
+
+    These tests verify the gate-fail-retry semantics that amend Phase 160
+    CONTEXT D-22 from "first-match-wins" to "first-match-AND-succeeds-wins."
+    Handler contract per ADR-19-04:
+      * Return non-None NamingResult ⇒ "I succeeded; use this result."
+      * Return None ⇒ "I gate-failed; defer to next-priority handler."
+      * Raise Exception ⇒ surfaced as RuntimeError chained via __cause__.
+
+    Per CONTEXT D-25 preserved: predicate purity (predicates report
+    whether handler CAN POSSIBLY apply; handler's gate decides whether
+    it SHOULD apply).
+    """
+
+    @staticmethod
+    def _make_fake_entry(handler_id, priority, predicate, handler):
+        return InnerDispatchEntry(
+            handler_id=handler_id,
+            priority=priority,
+            predicate=predicate,
+            handler=handler,
+            iupac_section="P-X.Y.Z",
+            description=f"fake {handler_id}",
+            side_effect_inventory=(),
+        )
+
+    @staticmethod
+    def _replace_table_with(entries):
+        from orthonym.assembly import inner_dispatch as ind
+        original_table = ind.INNER_DISPATCH_TABLE.copy()
+        original_cache = ind._SORTED_ENTRIES_CACHE
+        ind.INNER_DISPATCH_TABLE.clear()
+        for e in entries:
+            ind.INNER_DISPATCH_TABLE[e.handler_id] = e
+        ind._SORTED_ENTRIES_CACHE = None
+
+        def restore():
+            ind.INNER_DISPATCH_TABLE.clear()
+            ind.INNER_DISPATCH_TABLE.update(original_table)
+            ind._SORTED_ENTRIES_CACHE = original_cache
+        return restore
+
+    def setup_method(self):
+        reset_inner_dispatch_stats()
+
+    def test_predicate_matches_handler_succeeds_returns_result(self):
+        """Sanity: single handler, predicate match, handler returns non-None."""
+        from orthonym.assembly.name_tree import NamingResult
+        sentinel = NamingResult(name="success", tree=None,
+                                atom_to_locant_hint=None)
+        entry = self._make_fake_entry(
+            "h_success", 100, lambda _f: True,
+            lambda _f, _m, style: sentinel,
+        )
+        restore = self._replace_table_with([entry])
+        try:
+            result = dispatch_inner(object())
+            assert result is not None
+            assert result.handler_id == "h_success"
+            assert result.result is sentinel
+        finally:
+            restore()
+
+    def test_predicate_matches_handler_gate_fails_retries_next(self):
+        """The lactone-fixture pattern: handler A matches predicate but
+        gate-fails (returns None); dispatch_inner retries handler B at
+        lower priority. ADR-19-04 the core gate-fail-retry behavior."""
+        from orthonym.assembly.name_tree import NamingResult
+
+        a_called = []
+        b_called = []
+
+        def handler_a(_f, _m, style):
+            a_called.append(True)
+            return None  # gate-fail
+
+        def handler_b(_f, _m, style):
+            b_called.append(True)
+            return NamingResult(name="b_won", tree=None,
+                                atom_to_locant_hint=None)
+
+        entry_a = self._make_fake_entry("h_a", 100, lambda _f: True, handler_a)
+        entry_b = self._make_fake_entry("h_b", 200, lambda _f: True, handler_b)
+        restore = self._replace_table_with([entry_a, entry_b])
+        try:
+            result = dispatch_inner(object())
+            assert result is not None
+            assert result.handler_id == "h_b"
+            assert result.result.name == "b_won"
+            # Both handlers MUST have been invoked (A first, gate-failed; B retry)
+            assert len(a_called) == 1
+            assert len(b_called) == 1
+        finally:
+            restore()
+
+    def test_all_handlers_gate_fail_returns_None(self):
+        """When no handler succeeds, dispatch_inner returns None.
+        Once general_acyclic@99999 ships in Plan-03-03 this branch becomes
+        unreachable in production."""
+        entry_a = self._make_fake_entry(
+            "h_failA", 100, lambda _f: True, lambda _f, _m, style: None,
+        )
+        entry_b = self._make_fake_entry(
+            "h_failB", 200, lambda _f: True, lambda _f, _m, style: None,
+        )
+        restore = self._replace_table_with([entry_a, entry_b])
+        try:
+            result = dispatch_inner(object())
+            assert result is None
+        finally:
+            restore()
+
+    def test_stats_counts_successful_handler_only(self):
+        """_INNER_DISPATCH_STATS increments ONLY on the entry whose
+        handler returned non-None, not on every predicate match."""
+        from orthonym.assembly.name_tree import NamingResult
+
+        entry_a = self._make_fake_entry(
+            "h_gateFail", 100, lambda _f: True,
+            lambda _f, _m, style: None,
+        )
+        entry_b = self._make_fake_entry(
+            "h_succeed", 200, lambda _f: True,
+            lambda _f, _m, style: NamingResult(
+                name="x", tree=None, atom_to_locant_hint=None,
+            ),
+        )
+        restore = self._replace_table_with([entry_a, entry_b])
+        try:
+            dispatch_inner(object())
+            stats = get_inner_dispatch_stats()
+            # Only the SUCCESSFUL handler should have its counter incremented.
+            assert stats.get("h_succeed", 0) == 1
+            assert stats.get("h_gateFail", 0) == 0
+        finally:
+            restore()
+
+    def test_predicate_raises_TypeError_surfaced_as_RuntimeError(self):
+        """Existing behavior preserved: predicate TypeError → RuntimeError."""
+
+        def bad_predicate(_features):
+            raise TypeError("synthetic predicate bug")
+
+        entry = self._make_fake_entry(
+            "h_badpred", 100, bad_predicate,
+            lambda _f, _m, style: None,
+        )
+        restore = self._replace_table_with([entry])
+        try:
+            with pytest.raises(RuntimeError) as excinfo:
+                dispatch_inner(object())
+            assert "h_badpred" in str(excinfo.value)
+            assert "TypeError" in str(excinfo.value)
+        finally:
+            restore()
+
+    def test_handler_raises_Exception_surfaced_as_RuntimeError(self):
+        """New behavior per D-18: handler exception → RuntimeError chained
+        via __cause__ (no silent swallowing per CONTEXT D-27)."""
+        original = ValueError("original handler bug")
+
+        def bad_handler(_f, _m, style):
+            raise original
+
+        entry = self._make_fake_entry(
+            "h_badhandler", 100, lambda _f: True, bad_handler,
+        )
+        restore = self._replace_table_with([entry])
+        try:
+            with pytest.raises(RuntimeError) as excinfo:
+                dispatch_inner(object())
+            assert "h_badhandler" in str(excinfo.value)
+            assert "ValueError" in str(excinfo.value)
+            assert excinfo.value.__cause__ is original
+        finally:
+            restore()
+
+    def test_dispatch_inner_callable_with_mol_kwarg(self):
+        """New API per D-18: dispatch_inner(features, mol=mol, style='pin')
+        works; falls back to features.mol when mol kwarg omitted."""
+        from orthonym.assembly.name_tree import NamingResult
+
+        captured = {}
+
+        def handler(features, mol, style):
+            captured["mol_arg"] = mol
+            captured["style_arg"] = style
+            return NamingResult(name="x", tree=None,
+                                atom_to_locant_hint=None)
+
+        entry = self._make_fake_entry(
+            "h_kwarg", 100, lambda _f: True, handler,
+        )
+        restore = self._replace_table_with([entry])
+        try:
+            sentinel_mol = object()
+            dispatch_inner(object(), mol=sentinel_mol, style="iupac")
+            assert captured["mol_arg"] is sentinel_mol
+            assert captured["style_arg"] == "iupac"
+
+            # Default style="pin"; mol falls back to features.mol when None
+            class FakeFeatures:
+                mol = "FEATURES_MOL_SENTINEL"
+            captured.clear()
+            dispatch_inner(FakeFeatures())
+            assert captured["mol_arg"] == "FEATURES_MOL_SENTINEL"
+            assert captured["style_arg"] == "pin"
+        finally:
+            restore()
+
+    def test_canary_fixture_lactone_gate_fail_routes_via_ester_family(self):
+        """Integration: the Phase 160.1 regression-fixture SMILES from
+        CONTEXT <specifics>. With the amendment, even when the inline
+        ester cascade still exists, the regression fixture must continue
+        to name correctly (the amendment is invariant on byte-identical
+        output until Plan-03-01 removes the inline cascade)."""
+        from orthonym import name_compound
+        smi = (
+            "COC(=O)/C(CC(=O)O)=C("
+            "\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O"
+            ")C(=O)O"
+        )
+        name = name_compound(smi)
+        assert "hydroxymethyl" not in name, (
+            f"D-18 regression-fixture invariance broken: 'hydroxymethyl' "
+            f"appeared in {name!r}"
+        )
+        assert "formatyl" not in name, (
+            f"D-18 regression-fixture invariance broken: 'formatyl' "
+            f"appeared in {name!r}"
+        )
+        assert "methoxycarbonyl" in name, (
+            f"D-18 regression-fixture invariance broken: 'methoxycarbonyl' "
+            f"missing from {name!r}"
+        )

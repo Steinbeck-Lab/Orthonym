@@ -117,6 +117,17 @@ def name_ester_family(
     Byte-identical preservation per DECOMP-03: each sub-path's pool.add call
     is preserved verbatim from composer.py:859-949 (same handler_id, same
     features argument, same return type semantics).
+
+    Per Phase 160.1 D-18 / ADR-19-04 handler contract: when pool.add()
+    accepts a candidate but pool.best() returns None (e.g., wildcard-atom
+    SMILES rejected by the pool's quality gate), the handler returns None
+    (gate-fail) so dispatch_inner can retry the next-priority entry.
+    Pre-amendment this case raised AttributeError which the caller's
+    broad `except (TypeError, KeyError, IndexError, AttributeError)` in
+    namer.name_compound caught and fell through to _descriptive_fallback;
+    post-amendment the wrapped RuntimeError from dispatch_inner would
+    bypass that catch — so the handler must explicitly return None on
+    pool.best() is None, preserving the pre-amendment behavior path.
     """
     from ..candidate_pool import get_current_pool
 
@@ -135,8 +146,15 @@ def name_ester_family(
                 )
             pool = get_current_pool()
             pool.add(poly_name, "polyfunctional", features)
+            best = pool.best()
+            if best is None:
+                # Pool rejected the candidate (e.g., wildcard atoms, quality
+                # threshold). Per ADR-19-04: return None so dispatch_inner
+                # retries next-priority. Preserves pre-amendment fall-through
+                # to _descriptive_fallback for the wildcard-atom canary case.
+                return None
             return NamingResult(
-                name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                name=best.name, tree=None, atom_to_locant_hint=None,
             )
         logger.debug(
             "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
@@ -170,8 +188,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(diester_name, "multi_ester", features)
+                    best = pool.best()
+                    if best is None:
+                        return None
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=best.name, tree=None, atom_to_locant_hint=None,
                     )
             elif ester_type == "polyol_polyester":
                 polyol_name = name_polyol_polyester(features.mol, all_esters)
@@ -184,8 +205,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(polyol_name, "multi_ester", features)
+                    best = pool.best()
+                    if best is None:
+                        return None
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=best.name, tree=None, atom_to_locant_hint=None,
                     )
             elif ester_type == "independent":
                 indep_name = name_independent_esters(features.mol, all_esters)
@@ -198,8 +222,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(indep_name, "multi_ester", features)
+                    best = pool.best()
+                    if best is None:
+                        return None
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=best.name, tree=None, atom_to_locant_hint=None,
                     )
 
     # ============================================================
@@ -219,8 +246,11 @@ def name_ester_family(
                     )
                 pool = get_current_pool()
                 pool.add(ester_name, "ester", features)
+                best = pool.best()
+                if best is None:
+                    return None
                 return NamingResult(
-                    name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                    name=best.name, tree=None, atom_to_locant_hint=None,
                 )
 
     # All three sub-paths fell through.
