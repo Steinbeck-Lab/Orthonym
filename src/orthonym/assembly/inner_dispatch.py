@@ -813,6 +813,28 @@ _register_inner(
 )
 
 
+# --- Plan-07 commit 07-01: ester_family composite (closes 3 of 8 deferred
+#     handlers: polyfunctional, multi_ester, ester). Per CONTEXT D-28 +
+#     ADR-19-02 §3.1 Option A composite-handler resolution path. Priority
+#     1500 fires AFTER ring_ester(1450) per inline cascade order.
+from .handlers.ester_family import _is_ester_family, name_ester_family  # noqa: E402
+
+_register_inner(
+    handler_id="ester_family",
+    priority=1500,
+    predicate=_is_ester_family,
+    handler=name_ester_family,
+    iupac_section="P-65.6.3",
+    description=(
+        "Composite handler for polyfunctional/multi_ester/ester cascade. "
+        "Internal sub-paths: polyfunctional -> multi_ester (dicarboxylic_diester "
+        "/ polyol_polyester / independent) -> ester. LIFT from composer.py:846-938 "
+        "per CONTEXT D-28 + ADR-19-02 §3.1 Option A."
+    ),
+    side_effect_inventory=(),
+)
+
+
 __all__ = [
     "InnerDispatchEntry",
     "InnerDispatchResult",

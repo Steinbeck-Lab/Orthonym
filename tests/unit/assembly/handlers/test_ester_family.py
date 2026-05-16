@@ -146,3 +146,76 @@ def test_byte_identical_simple_ester_via_inline_cascade():
     # wiring time. This test pins the inline-name baseline for that gate.
     assert isinstance(inline_name, str)
     assert inline_name  # non-empty
+
+
+def test_predicate_rejects_ring_assembly_dominant_polyfunctional():
+    """Plan-07 IUPAC P-44.1 root-cause fix: the predicate MUST NOT match
+    ring-assembly-dominant polyfunctional molecules (e.g. terphenyl polyhydroxy).
+    For those, ring_assembly@2500 is the correct dispatch target, not
+    ester_family@1500.
+
+    Verified against canary regression: 'COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)
+    c(O)c1-c1ccc(O)c(O)c1' is is_polyfunctional=True but has principal_chain=
+    None and aromatic rings. name_polyfunctional returns None for it; the
+    predicate must therefore return False so dispatch_inner reaches
+    ring_assembly@2500.
+    """
+    from orthonym.namer import compute_features
+    from rdkit import Chem
+    smi = "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1"
+    mol = Chem.MolFromSmiles(smi)
+    # Use Orthonym pipeline to get fully-populated features (compute_features
+    # alone doesn't set is_polyfunctional).
+    namer = Orthonym()
+    # Reach into the pipeline to extract features.
+    canonical = Chem.MolToSmiles(mol)
+    features = namer._perceive(mol, smi, canonical)  # noqa: SLF001 — test access
+    namer._classify(features)  # noqa: SLF001
+    assert getattr(features, 'is_polyfunctional', False) is True, (
+        "Sanity: this molecule should be polyfunctional"
+    )
+    assert _is_ester_family(features) is False, (
+        "Predicate must reject ring-assembly-dominant polyfunctional molecules "
+        "(IUPAC P-44.1 hierarchical seniority; ring_assembly@2500 owns these)"
+    )
+
+
+def test_predicate_accepts_chain_parent_polyfunctional():
+    """Counter-regression: chain-parent polyfunctional molecules with a
+    principal_chain + atom_to_locant must STILL match the predicate so
+    ester_family handles them (sub-path 1 polyfunctional)."""
+    from unittest.mock import MagicMock
+
+    class FakeFeatures:
+        is_polyfunctional = True
+        principal_chain = [0, 1, 2, 3]  # truthy
+        atom_to_locant = {0: 1, 1: 2}   # truthy
+        principal_group = 'hydroxy'
+        is_cyclic = False
+        chain_is_parent = True
+        principal_group_atoms = [(0,)]
+        ester_match = None
+        all_ester_matches = None
+        mol = MagicMock()
+
+    assert _is_ester_family(FakeFeatures()) is True
+
+
+def test_predicate_accepts_saturated_monocyclic_polyfunctional():
+    """Counter-regression: monocyclic saturated polyfunctional rings
+    (name_polyfunctional ring-as-parent path) must match."""
+    from rdkit import Chem
+    # Cyclohexane-1,2-diol — saturated monocyclic, multiple OH = polyfunctional
+    mol = Chem.MolFromSmiles("OC1CCCCC1O")
+
+    class FakeFeatures:
+        is_polyfunctional = True
+        principal_chain = None
+        atom_to_locant = None
+        principal_group = 'hydroxy'
+        is_cyclic = True
+        chain_is_parent = False
+
+    feats = FakeFeatures()
+    feats.mol = mol
+    assert _is_ester_family(feats) is True

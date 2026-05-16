@@ -32,18 +32,78 @@ logger = logging.getLogger(__name__)
 
 
 def _is_ester_family(features: Any) -> bool:
-    """Predicate: matches if any of the three sub-paths could fire.
+    """Predicate: matches ONLY when one of the three sub-paths can actually
+    produce a name (mirrors the success-condition gates inside
+    rules.polyfunctional.name_polyfunctional and rules.esters.name_ester).
 
-    Per CONTEXT D-25 + AP-160-26 predicate-purity. Pure read-only on features.
+    Per CONTEXT D-25 + AP-160-26 predicate-purity. Pure read-only on
+    features (RingInfo + atom traversal are OK — D-25 bans mutation, not
+    expensive reads).
+
+    Why tight, not broad: dispatch_inner is first-match-wins (D-22). If
+    the predicate matched ``is_polyfunctional`` unconditionally, ring-
+    assembly-dominant molecules would be preempted from ring_assembly
+    @2500 by this handler @1500 and fall back to a wrong name. IUPAC
+    P-44.1 hierarchical seniority requires that ring_assembly handle
+    these. Tight predicate preserves byte-identical canary by mirroring
+    ``name_polyfunctional``'s internal success conditions
+    (rules/polyfunctional.py:1083-1129 ring-as-parent path).
     """
-    if getattr(features, 'is_polyfunctional', False):
-        return True
-    if getattr(features, 'principal_group', None) == 'ester':
+    # Sub-path 2 / 3: ester principal group with concrete match data.
+    pg = getattr(features, 'principal_group', None)
+    if pg == 'ester':
         all_esters = getattr(features, 'all_ester_matches', None)
         if all_esters and len(all_esters) >= 2:
             return True
         if getattr(features, 'ester_match', None):
             return True
+
+    # Sub-path 1: polyfunctional. Only match conditions name_polyfunctional
+    # actually handles successfully.
+    if getattr(features, 'is_polyfunctional', False):
+        # Chain-parent polyfunctional (rules/polyfunctional.py:1077-1082):
+        # name_polyfunctional handles this when principal_chain + atom_to_locant
+        # are populated AND the molecule has a principal characteristic group.
+        if (
+            getattr(features, 'principal_chain', None)
+            and getattr(features, 'atom_to_locant', None)
+            and pg
+        ):
+            return True
+
+        # Ring-as-parent polyfunctional (rules/polyfunctional.py:1083-1129):
+        # name_polyfunctional handles this when cyclic + ring-parent + has
+        # principal_group + single saturated non-aromatic ring + ring is
+        # ≥35% of heavy atoms. Mirror these gates verbatim so the
+        # predicate fires only when the handler will succeed.
+        if (
+            getattr(features, 'is_cyclic', False)
+            and not getattr(features, 'chain_is_parent', False)
+            and pg
+        ):
+            mol = getattr(features, 'mol', None)
+            if mol is None:
+                return False
+            ring_info = mol.GetRingInfo()
+            if ring_info.NumRings() != 1:
+                return False
+            ring_atoms = list(ring_info.AtomRings()[0])
+            total_heavy = mol.GetNumHeavyAtoms()
+            if total_heavy <= 0:
+                return False
+            if len(ring_atoms) / total_heavy < 0.35:
+                return False
+            ring_set = set(ring_atoms)
+            for idx in ring_atoms:
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetIsAromatic():
+                    return False
+                for bond in atom.GetBonds():
+                    other = bond.GetOtherAtomIdx(idx)
+                    if other in ring_set and bond.GetBondTypeAsDouble() == 2.0:
+                        return False
+            return True
+
     return False
 
 
