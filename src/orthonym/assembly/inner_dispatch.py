@@ -916,6 +916,50 @@ _register_inner(
 )
 
 
+# --- Phase 160.1 Plan-03-02: tier_a_ring composite (Phase 160 Plan-06
+#     substrate; UNCHANGED handler body). Per CONTEXT D-06 + ADR-19-02
+#     §3.2 Option A: encodes the Tier-A pool-compete cascade
+#     (composer.py:1006-1322, ~316 LOC) as a SINGLE composite handler
+#     so the dispatch_inner first-match-wins interface (Phase 160
+#     CONTEXT D-22 / Phase 160.1 D-18 amendment) stays untouched.
+#
+# Priority 4500 places tier_a_ring between sulfoxide@1800 / sulfone@1900
+# / thioether@2000 / phosphine_oxide@2100 / phosphate_ester@2200 /
+# phosphine@2300 / phosphinic_acid@2400 / ring_assembly@2500 / polycyclic@2600
+# / partial_sat@2700 / simple_molecule@2800 (which fire BEFORE Tier-A
+# in the legacy inline cascade order) AND before ring_nitrile@5100 /
+# amide@5200 / amine@5300 (which fire AFTER Tier-A as the post-cascade
+# fall-through tier). Priority 4500 is per RESEARCH §11 Risk E priority
+# race analysis.
+#
+# Internal cascade order (see handlers/tier_a_ring.py for full body):
+# 1. complex_ring detection + assembly
+# 2. polycyclic fallback when complex_ring rejected
+# 3. partial_sat fallback when complex_ring rejected
+# 4. heterocycle + lactone safety net
+# 5. benzene
+# 6. Phase 146 chain push-to-pool
+# 7. select_best_candidate selector + handler-level stereo injection
+from .handlers.tier_a_ring import (  # noqa: E402
+    _is_tier_a_ring, name_tier_a_ring,
+)
+_register_inner(
+    handler_id="tier_a_ring",
+    priority=4500,
+    predicate=_is_tier_a_ring,
+    handler=name_tier_a_ring,
+    iupac_section="P-44.1",
+    description=(
+        "Tier-A ring composite (complex_ring + benzene + heterocycle + "
+        "partial_sat + chain-push + select_best_candidate cascade per "
+        "Phase 160 D-28). LIFT from composer.py:1006-1322 per CONTEXT "
+        "D-06 + ADR-19-02 §3.2 Option A. Substrate from Phase 160 "
+        "Plan-06 (handler file UNCHANGED in Phase 160.1)."
+    ),
+    side_effect_inventory=(),
+)
+
+
 __all__ = [
     "InnerDispatchEntry",
     "InnerDispatchResult",
