@@ -35,11 +35,41 @@ logger = logging.getLogger(__name__)
 
 
 def _is_general_acyclic(features: Any) -> bool:
-    """Catch-all predicate per CONTEXT D-08 + AP-160-08. Always True.
+    """Catch-all predicate per CONTEXT D-08 + AP-160-08.
 
-    Pure read-only per CONTEXT D-25 + AP-160-26 (no mutation of features /
-    mol / module-global state).
+    AP-160.2-06 CASE B refinement (Phase 160.2 Plan-02-03 honest-fail-on-data):
+    the catch-all MUST mirror the chain-fallback section's effective domain
+    in composer.py:_assemble_name_impl. The inline cascade still contains
+    amide+amine branches (composer.py:917-931) that the handler-side
+    _is_amide / _is_amine predicates REJECT (polyfunctional + Tier-A
+    mutexes that the inline branches do NOT enforce). A pure
+    True-always catch-all would preempt those inline branches and break
+    byte-identical for polyfunctional amide / amine cases.
+
+    Pure read-only per CONTEXT D-25 + AP-160-26.
+
+    Inline-cascade-order mirror — returns False (defer to inline cascade) when:
+    1. principal_group is amide AND pg_count == 1
+       (inline amide branch at composer.py:917-931 handles this).
+    2. principal_group is amine
+       (inline amine branch at composer.py:919-931 handles this).
+    Otherwise returns True (general acyclic catch-all fires).
+
+    Refinement REVERTS automatically when Plan-02-04 ships in CASE A
+    (predicate parity verified for amide / amine handlers); at that point
+    the inline cascade is deleted and this predicate can collapse back to
+    `return True` per the original CONTEXT D-08 catch-all spec.
     """
+    pg = getattr(features, 'principal_group', None)
+    # Mirror composer.py:917-919 inline amide branch guard.
+    if pg in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
+        pg_atoms = getattr(features, 'principal_group_atoms', None)
+        pg_count = len(pg_atoms) if pg_atoms else 1
+        if pg_count == 1:
+            return False
+    # Mirror composer.py:919 inline amine branch guard.
+    if pg in ('secondary_amine', 'tertiary_amine'):
+        return False
     return True
 
 

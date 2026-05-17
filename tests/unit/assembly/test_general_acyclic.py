@@ -23,18 +23,50 @@ from orthonym.assembly.name_tree import NamingResult
 # =============================================================================
 
 
-def test_is_general_acyclic_always_true():
-    """CONTEXT D-08 catch-all: predicate returns True for any input."""
-    assert _is_general_acyclic(None) is True
-    assert _is_general_acyclic({}) is True
-    assert _is_general_acyclic(object()) is True
+def test_is_general_acyclic_true_for_alkane():
+    """Catch-all predicate fires for typical alkane features."""
+    features = _features_for("CCCC")
+    assert _is_general_acyclic(features) is True
+
+
+def test_is_general_acyclic_false_for_simple_amide():
+    """AP-160.2-06 CASE B refinement: predicate defers to inline amide branch
+    for single-amide cases (composer.py:917-919 inline guard mirror)."""
+
+    class FakeFeatures:
+        principal_group = 'primary_amide'
+        principal_group_atoms = [(0, 1, 2)]  # single amide match
+
+    assert _is_general_acyclic(FakeFeatures()) is False
+
+
+def test_is_general_acyclic_false_for_amine():
+    """AP-160.2-06 CASE B refinement: predicate defers to inline amine branch
+    for secondary/tertiary amine cases (composer.py:919 inline guard mirror)."""
+
+    class FakeFeatures:
+        principal_group = 'secondary_amine'
+        principal_group_atoms = None
+
+    assert _is_general_acyclic(FakeFeatures()) is False
+
+
+def test_is_general_acyclic_true_for_multi_amide():
+    """Multi-amide compounds fall through to general_acyclic (pg_count > 1
+    matches the chain-fallback path, not the inline amide branch)."""
+
+    class FakeFeatures:
+        principal_group = 'primary_amide'
+        principal_group_atoms = [(0, 1, 2), (3, 4, 5)]  # diamide
+
+    assert _is_general_acyclic(FakeFeatures()) is True
 
 
 def test_is_general_acyclic_pure():
     """Predicate is pure read-only: idempotent across calls."""
-    sentinel = object()
-    assert _is_general_acyclic(sentinel) is True
-    assert _is_general_acyclic(sentinel) is True
+    features = _features_for("CCCC")
+    assert _is_general_acyclic(features) is True
+    assert _is_general_acyclic(features) is True
 
 
 # =============================================================================

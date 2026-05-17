@@ -960,6 +960,51 @@ _register_inner(
 )
 
 
+# --- Phase 160.2 Plan-02-03: general_acyclic catch-all (DECOMP-01 closure).
+#     Per CONTEXT D-08 + ADR-19-02 §3.1 + ADR-19-04 first-match-AND-succeeds-wins.
+#     Predicate _is_general_acyclic returns True for the chain-fallback
+#     section's effective domain (per AP-160.2-06 CASE B refinement: defers
+#     to inline amide/amine cascade branches in composer.py:917-931 since
+#     handler-side _is_amide/_is_amine predicates are stricter than the
+#     inline guards). Priority 99999 fires LAST so all specialized handlers
+#     get first chance. Closes the general_acyclic deferral from Phase 160.1
+#     Plan-03 SUMMARY §3 + brings INNER_DISPATCH_TABLE to 33 entries.
+from .handlers.general_acyclic import (  # noqa: E402
+    _is_general_acyclic, name_general_acyclic,
+)
+_register_inner(
+    handler_id="general_acyclic",
+    priority=99999,
+    predicate=_is_general_acyclic,
+    handler=name_general_acyclic,
+    iupac_section="P-14 + P-23 + P-44",
+    description=(
+        "General catch-all chain/ring fallback (DECOMP-01 closure; Phase 160.2). "
+        "Verbatim lift of composer.py:951-1055 chain-fallback section. Catch-all "
+        "predicate per CONTEXT D-08 + AP-160.2-06 CASE B refinement (defers to "
+        "inline amide/amine cascade branches that the handler-side _is_amide / "
+        "_is_amine predicates reject); priority 99999 ensures specialized handlers "
+        "fire first. NamingResult.tree=None per Phase 160 CONTEXT D-05 first-wave "
+        "policy."
+    ),
+    side_effect_inventory=(),
+)
+
+
+# --- Phase 160.2 Plan-02-03: lock the inner dispatch table per Phase 160
+#     CONTEXT D-10 + WR-06 fix (160.1-REVIEW). Eager freeze eliminates the
+#     lazy-init race in _SORTED_ENTRIES_CACHE (lines 304-308). All 33 entries
+#     have now been registered: 32 from Phase 160 + 160.1 + 1 from Phase 160.2
+#     (general_acyclic@99999). Per AP-160.2-04 the freeze MUST land in the
+#     SAME commit as the last _register_inner call.
+freeze_inner_table()
+
+# Eagerly populate the sorted cache to close WR-06 entirely (no lazy-init race):
+_SORTED_ENTRIES_CACHE = tuple(
+    sorted(INNER_DISPATCH_TABLE.values(), key=lambda e: e.priority)
+)
+
+
 __all__ = [
     "InnerDispatchEntry",
     "InnerDispatchResult",

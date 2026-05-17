@@ -169,10 +169,29 @@ class TestInnerDispatchEntryRegistration:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def _unfrozen_table():
+    """Temporarily un-freeze INNER_DISPATCH_TABLE so duplicate-check / side-effect-
+    check tests can reach those code paths.
+
+    Phase 160.2 Plan-02-03: freeze_inner_table() now runs at module-import
+    bottom (WR-06 fix), so _register_inner returns "frozen" before reaching
+    the duplicate / side-effect checks. Tests that target those checks must
+    explicitly unfreeze the sentinel for the duration of the test.
+    """
+    from orthonym.assembly import inner_dispatch as _idmod
+    saved = _idmod._INNER_REGISTRATION_FROZEN
+    _idmod._INNER_REGISTRATION_FROZEN = False
+    try:
+        yield
+    finally:
+        _idmod._INNER_REGISTRATION_FROZEN = saved
+
+
 class TestRegistrationLock:
     """CONTEXT D-10: _register_inner raises on duplicate / frozen state."""
 
-    def test_register_duplicate_handler_id_raises(self):
+    def test_register_duplicate_handler_id_raises(self, _unfrozen_table):
         """Duplicate handler_id is a RuntimeError (CONTEXT D-03 + AP-160-06)."""
         with pytest.raises(RuntimeError, match="Duplicate"):
             _register_inner(
@@ -185,7 +204,7 @@ class TestRegistrationLock:
                 side_effect_inventory=(),
             )
 
-    def test_register_duplicate_priority_raises(self):
+    def test_register_duplicate_priority_raises(self, _unfrozen_table):
         """Duplicate priority is a RuntimeError (CONTEXT D-10)."""
         # Priority 100 = oxime
         with pytest.raises(RuntimeError, match="priority"):
@@ -199,7 +218,7 @@ class TestRegistrationLock:
                 side_effect_inventory=(),
             )
 
-    def test_register_non_empty_side_effect_raises(self):
+    def test_register_non_empty_side_effect_raises(self, _unfrozen_table):
         """side_effect_inventory != () raises ValueError (CONTEXT D-25 hard invariant)."""
         with pytest.raises(ValueError, match="side_effect_inventory"):
             _register_inner(
@@ -215,12 +234,24 @@ class TestRegistrationLock:
     def test_freeze_inner_table_locks_registration(self):
         """After freeze_inner_table(), _register_inner raises RuntimeError.
 
-        We DO NOT freeze the live table here (would break other tests); we
-        just verify the function exists and is callable. The freeze
-        behavior is tested by _register_inner raising the duplicate test above.
+        Phase 160.2 Plan-02-03 update: freeze now runs at module-import bottom
+        (WR-06 fix). This test verifies the LIVE frozen state by attempting
+        registration without the _unfrozen_table fixture — the frozen check
+        fires first.
         """
         from orthonym.assembly.inner_dispatch import freeze_inner_table
         assert callable(freeze_inner_table)
+        # Live frozen-state verification: _register_inner raises 'frozen'.
+        with pytest.raises(RuntimeError, match="frozen"):
+            _register_inner(
+                handler_id="phase_160_2_test_frozen_live",
+                priority=999996,
+                predicate=lambda f: False,
+                handler=lambda f, m=None, s="pin": None,
+                iupac_section="P-TEST",
+                description="live frozen test",
+                side_effect_inventory=(),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -534,27 +565,31 @@ class TestDeferredHandlerGap:
         """Plan-03 honest-fail per Tier-A pool-compete semantic."""
         assert "chain" not in INNER_DISPATCH_TABLE
 
-    def test_general_acyclic_not_yet_extracted(self):
-        """Plan-03 honest-fail per ~2000 LOC catch-all extraction prerequisite chain.
+    def test_general_acyclic_extracted_in_phase_160_2(self):
+        """Phase 160.2 Plan-02-03 closure: general_acyclic@99999 NOW REGISTERED.
 
-        Note: this means dispatch_inner can return None for molecules
-        whose principal_group does not match the 30 extracted handlers'
-        predicates. The caller (composer.py:_assemble_name_impl) handles
-        the None by falling through to the inline cascade. This is the
-        Plan-02 wave-1 contract per CONTEXT D-08; the catch-all closure
-        is a v19.x follow-up.
+        Pre-amendment (Phase 160.1): this test asserted ``not in`` because the
+        ~2000 LOC catch-all extraction was deferred. Phase 160.2 Plan-02-02
+        ships handlers/general_acyclic.py (verbatim lift of composer.py:951-1055
+        chain-fallback section); Phase 160.2 Plan-02-03 wires it via
+        ``_register_inner(handler_id='general_acyclic', priority=99999, ...)``
+        with the AP-160.2-06 CASE B predicate refinement (defers to inline
+        amide / amine cascade branches in composer.py:917-931).
         """
-        assert "general_acyclic" not in INNER_DISPATCH_TABLE
+        assert "general_acyclic" in INNER_DISPATCH_TABLE
 
-    def test_total_deferred_count_is_8(self):
-        """Quantitative gap signal: 8 of 38 target handlers missing."""
+    def test_total_deferred_count_is_7(self):
+        """Quantitative gap signal post-Phase-160.2 Plan-02-03: 7 of 38 target
+        handlers still deferred (general_acyclic closed in Phase 160.2 Plan-02)."""
         deferred = {
             "polyfunctional", "multi_ester", "ester", "benzene",
-            "heterocycle", "complex_ring", "chain", "general_acyclic",
+            "heterocycle", "complex_ring", "chain",
+            # general_acyclic: CLOSED in Phase 160.2 Plan-02-03.
         }
         missing = deferred - set(INNER_DISPATCH_TABLE.keys())
-        assert len(missing) == 8, (
-            f"Expected exactly 8 deferred handlers; got {missing!r}"
+        assert len(missing) == 7, (
+            f"Expected exactly 7 deferred handlers post-160.2 Plan-02; "
+            f"got {missing!r}"
         )
 
 
@@ -964,3 +999,88 @@ class TestDispatchInnerGateFailRetry:
             f"D-18 regression-fixture invariance broken: 'methoxycarbonyl' "
             f"missing from {name!r}"
         )
+
+
+# =============================================================================
+# Phase 160.2 Plan-02-03: general_acyclic@99999 + freeze_inner_table() landed.
+# =============================================================================
+
+
+class TestPhase160_2_Registrations:
+    """Phase 160.2 Plan-02-03 verification: general_acyclic registered +
+    INNER_DISPATCH_TABLE frozen + _SORTED_ENTRIES_CACHE eagerly populated."""
+
+    def test_general_acyclic_registered(self):
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+        assert "general_acyclic" in INNER_DISPATCH_TABLE
+
+    def test_general_acyclic_priority_99999(self):
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+        assert INNER_DISPATCH_TABLE["general_acyclic"].priority == 99999
+
+    def test_general_acyclic_handler_bound(self):
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+        from orthonym.assembly.handlers.general_acyclic import name_general_acyclic
+        assert INNER_DISPATCH_TABLE["general_acyclic"].handler is name_general_acyclic
+
+    def test_inner_dispatch_table_size_33(self):
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+        # 32 from Phase 160 + 160.1 + 1 NEW (general_acyclic) per CONTEXT D-04.
+        # NOTE: amide@5200 + amine@5300 are ALREADY in the 32 (RESEARCH §2
+        # typo correction; CONTEXT D-04 narrative "amide@1700 + amine@1800"
+        # is typo drift verified live by grep against HEAD).
+        assert len(INNER_DISPATCH_TABLE) == 33
+
+    def test_table_frozen_after_import(self):
+        """WR-06: freeze_inner_table() called at module-import bottom;
+        subsequent _register_inner raises RuntimeError per Phase 160 CONTEXT
+        D-10 contract + AP-160.2-04."""
+        import pytest
+        from orthonym.assembly.inner_dispatch import _register_inner
+        from orthonym.assembly.name_tree import NamingResult
+        with pytest.raises(RuntimeError, match="frozen"):
+            _register_inner(
+                handler_id="phase_160_2_test_frozen",
+                priority=99998,
+                predicate=lambda *_: True,
+                handler=lambda *_, **__: NamingResult(
+                    name="test", tree=None, atom_to_locant_hint=None,
+                ),
+                iupac_section="N/A",
+                description="WR-06 frozen-table assertion test",
+                side_effect_inventory=(),
+            )
+
+    def test_sorted_entries_cache_populated_eagerly(self):
+        """WR-06: _SORTED_ENTRIES_CACHE populated at module-import (no lazy-init race)."""
+        from orthonym.assembly.inner_dispatch import _SORTED_ENTRIES_CACHE
+        # Eagerly populated tuple per WR-06 + RESEARCH §5
+        assert _SORTED_ENTRIES_CACHE is not None
+        assert len(_SORTED_ENTRIES_CACHE) == 33
+        # Priorities monotonically non-decreasing per sorted() contract
+        priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
+        assert priorities == sorted(priorities)
+
+    def test_general_acyclic_predicate_defers_to_inline_amide(self):
+        """AP-160.2-06 CASE B: catch-all predicate returns False for single-amide
+        cases that the inline amide branch (composer.py:917-919) handles."""
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+
+        class FakeFeatures:
+            principal_group = 'primary_amide'
+            principal_group_atoms = [(0, 1, 2)]
+
+        predicate = INNER_DISPATCH_TABLE["general_acyclic"].predicate
+        assert predicate(FakeFeatures()) is False
+
+    def test_general_acyclic_predicate_defers_to_inline_amine(self):
+        """AP-160.2-06 CASE B: catch-all predicate returns False for amine cases
+        that the inline amine branch (composer.py:919-931) handles."""
+        from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
+
+        class FakeFeatures:
+            principal_group = 'secondary_amine'
+            principal_group_atoms = None
+
+        predicate = INNER_DISPATCH_TABLE["general_acyclic"].predicate
+        assert predicate(FakeFeatures()) is False
