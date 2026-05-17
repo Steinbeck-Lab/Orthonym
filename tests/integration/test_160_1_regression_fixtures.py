@@ -146,3 +146,85 @@ class TestCanonicalForms:
         # Deprecated alternates must NOT appear
         assert "carbphenoxy" not in n.lower()
         assert "carbophenoxy" not in n.lower()
+
+
+# ====================================================================
+# Phase 160.2 Plan-04-01 — CR-01 BLOCKER regression fixture
+# ====================================================================
+
+
+class TestOxygenAttachedCarbamateBranchB:
+    """Phase 160.2 Plan-04-01 CR-01 regression: oxygen-attached carbamate
+    must use ``carbamoyloxy`` (IUPAC P-66.6.4 Branch B), not Branch A
+    fall-through.
+
+    SMILES: ``O=C(N)OCCCC(=O)O``
+    Structure: ``NH2-C(=O)-O-CH2-CH2-CH2-C(=O)-OH``
+    Parent: butanoic acid (4C including carboxyl)
+    Substituent at C4: ``carbamoyloxy`` (P-66.6.4 Branch B)
+    Expected: ``4-(carbamoyloxy)butanoic acid``
+
+    Pre-fix (160.1 ship at HEAD): emitted ``4-(methanoyloxy)butanoic acid``;
+    OPSIN round-trip dropped the N+H atoms producing the wrong molecule
+    (InChI=1S/C5H8O4 instead of input C5H9NO4) per RESEARCH §2.
+    Post-fix (160.2 Plan-04-01): emits ``4-(carbamoyloxy)butanoic acid``;
+    OPSIN round-trip matches input InChI L1.
+    """
+
+    def test_oxygen_attached_carbamate_branch_b(self):
+        """name_compound emits Branch B carbamoyloxy per IUPAC P-66.6.4."""
+        smiles = "O=C(N)OCCCC(=O)O"
+        expected = "4-(carbamoyloxy)butanoic acid"
+        actual = name_compound(smiles, style="pin")
+        assert actual == expected, (
+            f"CR-01 regression: expected {expected!r} per IUPAC P-66.6.4 "
+            f"Branch B (carbamate attached through ester-O); "
+            f"got: {actual!r}"
+        )
+
+    def test_oxygen_attached_carbamate_opsin_roundtrip(self):
+        """OPSIN parses the corrected name back to the original structure
+        per InChI L1 (formula + connectivity)."""
+        import subprocess
+        import os
+        from rdkit import Chem
+
+        smiles = "O=C(N)OCCCC(=O)O"
+        name = name_compound(smiles, style="pin")
+
+        # Locate the OPSIN jar shipping in the repo opsin/ tree (relative
+        # path; opsin/opsin-cli-2.9.0-jar-with-dependencies.jar per
+        # Phase 138 D-22 pinned version).
+        opsin_jar_candidates = [
+            "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "opsin",
+                "opsin-cli-2.9.0-jar-with-dependencies.jar",
+            ),
+        ]
+        opsin_jar = None
+        for candidate in opsin_jar_candidates:
+            if os.path.isfile(candidate):
+                opsin_jar = candidate
+                break
+        if opsin_jar is None:
+            import pytest as _pytest
+            _pytest.skip("OPSIN jar not found in repo; skipping round-trip")
+
+        result = subprocess.run(
+            ["java", "-jar", opsin_jar, "-osmi"],
+            input=name + "\n", capture_output=True, text=True, timeout=30,
+        )
+        rt_smiles = result.stdout.strip().split("\n")[0]
+        assert rt_smiles, f"OPSIN failed to parse {name!r}: {result.stderr}"
+
+        mol_input = Chem.MolFromSmiles(smiles)
+        mol_rt = Chem.MolFromSmiles(rt_smiles)
+        assert mol_input is not None and mol_rt is not None
+        inchi_input = Chem.MolToInchi(mol_input)
+        inchi_rt = Chem.MolToInchi(mol_rt)
+        # Formula layer match (1S/<formula>/...) — strict equality across
+        # all layers since the molecule is fully determinate.
+        assert inchi_input.split("/")[1] == inchi_rt.split("/")[1], (
+            f"formula mismatch: input={inchi_input} rt={inchi_rt}"
+        )

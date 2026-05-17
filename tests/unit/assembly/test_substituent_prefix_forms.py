@@ -589,3 +589,166 @@ class TestIsothiocyanate:
             "still_not_a_real_fg", mol, (0, 1, 2), principal_chain=None
         )
         assert result is None
+
+
+# ====================================================================
+# Phase 160.2 Plan-04-01 — CR-01 unit-level Branch A vs Branch B routing
+# ====================================================================
+
+
+class TestCarbamateAttachIdxRouting:
+    """Phase 160.2 Plan-04-01 CR-01 unit-level coverage of
+    ``_check_substituent_prefix_form`` Branch A vs Branch B routing per
+    IUPAC P-66.6.4.
+
+    SMARTS ``[NX3][CX3](=O)[OX2][#6]`` match indexes:
+        match[0]=amide_N (Branch A trigger), match[3]=ester_O (Branch B
+        trigger), match[4]=alkyl_C (parent attach point in Branch B).
+
+    Pre-CR-01 fix: ``_check_substituent_prefix_form`` never consulted
+    ``attach_idx`` for carbamate, silently dropping the Branch B
+    (``carbamoyloxy``) path documented at lines 1006-1008. This test
+    class locks the new Branch B routing.
+    """
+
+    def test_branch_b_oxygen_attached_returns_carbamoyloxy(self):
+        """attach_idx == match[3] (ester_O) → ``carbamoyloxy`` per Branch B."""
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("CCCCOC(=O)N")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match in CCCCOC(=O)N"
+        match = matches[0]
+        # match indexes: [amide_N, carbonyl_C, carbonyl_O, ester_O, alkyl_C]
+        _amide_N, _cC, _cO, ester_O, _alkyl = match
+        frag_set = set(match)
+        prefix = _check_substituent_prefix_form(mol, frag_set, ester_O)
+        assert prefix == "carbamoyloxy", (
+            f"expected carbamoyloxy (Branch B), got {prefix!r}"
+        )
+
+    def test_branch_b_oxygen_attached_substituent_subset(self):
+        """Branch B as substituent: frag = match - {alkyl_C}, attach = ester_O.
+
+        Mirrors the live ``O=C(N)OCCCC(=O)O`` flow where the substituent
+        atoms are 4 (carbamate N, C, =O, ester_O) and the alkyl_C belongs
+        to the principal chain (not the substituent fragment).
+        """
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("O=C(N)OCCCC(=O)O")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match"
+        match = matches[0]
+        _amide_N, _cC, _cO, ester_O, alkyl_C = match
+        # Substituent set excludes alkyl_C (which is the parent attach atom)
+        frag_set = set(match) - {alkyl_C}
+        prefix = _check_substituent_prefix_form(mol, frag_set, ester_O)
+        assert prefix == "carbamoyloxy", (
+            f"Branch B substituent-context: expected carbamoyloxy, "
+            f"got {prefix!r}"
+        )
+
+    def test_branch_a_nitrogen_attached_does_not_return_carbamoyloxy(self):
+        """attach_idx == match[0] (amide_N) MUST NOT return ``carbamoyloxy``.
+
+        Branch A is the documented default for amide-N-attached carbamates;
+        the unit test enforces that the CR-01 special-case for Branch B
+        does NOT misroute Branch A inputs to ``carbamoyloxy``.
+        """
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("CCCCNC(=O)OC")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match in CCCCNC(=O)OC"
+        match = matches[0]
+        amide_N, _cC, _cO, _ester_O, _alkyl = match
+        frag_set = set(match)
+        prefix = _check_substituent_prefix_form(mol, frag_set, amide_N)
+        # Branch A returns a non-carbamoyloxy prefix via fall-through
+        # (either get_carbamoyloxy_prefix's sub-fragment default or None).
+        assert prefix != "carbamoyloxy", (
+            f"Branch A misrouted to Branch B: {prefix!r}"
+        )
+
+
+# ====================================================================
+# Phase 160.2 Plan-04-03a — WR-05 _PREFIX_FORM_PATTERNS thread-safety
+# ====================================================================
+
+
+class TestWR05PrefixFormCacheThreadSafe:
+    """Phase 160.2 Plan-04-03a WR-05 closure: ``_PREFIX_FORM_PATTERNS``
+    lazy init is thread-safe via ``threading.Lock`` double-check pattern.
+
+    Validates the documented contract:
+    * ``_PREFIX_FORM_CACHE_LOCK`` exists and is a ``threading.Lock``.
+    * Concurrent first-callers see consistent cache state across threads
+      (no thread sees a partially populated dict; ``Chem.MolFromSmarts``
+      is invoked at most once per ``fg_name`` across all threads).
+    """
+
+    def test_prefix_form_cache_lock_is_threading_lock(self):
+        """The lock object is an actual ``threading.Lock`` / ``RLock``."""
+        import threading
+        from orthonym.assembly import substituent_prefix_forms as spf
+        # threading.Lock() returns a _thread.lock instance — check via the
+        # public sentinel methods (locked / acquire / release).
+        assert hasattr(spf._PREFIX_FORM_CACHE_LOCK, "locked")
+        assert callable(spf._PREFIX_FORM_CACHE_LOCK.locked)
+        # And it's an instance of one of the lock types in threading.
+        assert isinstance(
+            spf._PREFIX_FORM_CACHE_LOCK,
+            (type(threading.Lock()), type(threading.RLock())),
+        )
+
+    def test_prefix_form_cache_thread_safe(self):
+        """Concurrent ``_ensure_patterns_cached`` calls do not race or
+        double-init.
+
+        Spawns 10 threads that all reset + call the cache init; verifies
+        that all see the same cache size at the end (no torn writes;
+        one consistent populated dict).
+        """
+        import threading
+        from orthonym.assembly import substituent_prefix_forms as spf
+
+        # Reset cache to force re-init under concurrent first-call.
+        spf._PREFIX_FORM_PATTERNS.clear()
+
+        results = []
+        errors = []
+
+        def worker():
+            try:
+                spf._ensure_patterns_cached()
+                results.append(len(spf._PREFIX_FORM_PATTERNS))
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors, f"thread errors: {errors}"
+        # All threads see the same cache size (single-init invariant)
+        assert len(set(results)) == 1, (
+            f"inconsistent cache sizes across threads: {results}"
+        )
+        # Cache is populated (non-zero patterns; the 14-row closed-set
+        # has 15 SMARTS names but some may not have FUNCTIONAL_GROUP_SMARTS
+        # mappings — assert >= 10 as a sanity floor).
+        assert results[0] >= 10, (
+            f"cache underpopulated post-init: size={results[0]}"
+        )

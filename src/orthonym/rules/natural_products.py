@@ -831,7 +831,12 @@ def _find_scaffold_unsaturation(
             if mol.GetAtomWithIdx(idx).GetIsAromatic()
         }
         if runtime_aromatic_atoms:
-            for low, high, indicated_h in _NP_AROMATIC_RING_LOCANTS[scaffold_class]:
+            # Phase 160.2 Plan-04-02 WR-03 closure: ``high`` is intentionally
+            # unused in the loop body (the ``_NP_AROMATIC_RING_LOCANTS`` table
+            # schema declares (lower_locant, higher_locant, indicated_h) but
+            # this site only consumes ``lower_locant`` and ``indicated_h``).
+            # Rename to ``_high`` per Python unused-variable convention.
+            for low, _high, indicated_h in _NP_AROMATIC_RING_LOCANTS[scaffold_class]:
                 ene_locants.append(low)
                 if indicated_h is not None:
                     ene_indicated_h[low] = indicated_h

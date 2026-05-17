@@ -35,11 +35,14 @@ context (the substituent has no principal-chain).
 """
 from __future__ import annotations
 
-import logging
+import threading
+
+# Phase 160.2 Plan-04-02 WR-04 closure: removed unused ``import logging``
+# and ``logger = logging.getLogger(__name__)`` — no ``logger.*`` call sites
+# in 1041 LOC (verified via grep). Maintainers who want to add debug
+# instrumentation should re-add the import + module-local logger then.
 from collections import deque
 from typing import List, Optional, Set
-
-logger = logging.getLogger(__name__)
 
 from .naming_utils import ALKYL_NAMES, alpha_sort_key, get_alkyl_name
 from ..rules.seniority import PREFIX_FORMS
@@ -967,19 +970,37 @@ _PREFIX_FORM_FG_NAMES = (
 
 _PREFIX_FORM_PATTERNS: dict = {}  # Lazily populated on first call
 
+# Phase 160.2 Plan-04-03a WR-05 closure: lock guarding the lazy-init of
+# ``_PREFIX_FORM_PATTERNS``. Industry-standard double-check pattern
+# (first check WITHOUT lock for fast-path; re-check INSIDE lock to ensure
+# one-time init under concurrent first-call). Closes the thread-safety
+# gap documented at 160.1-REVIEW.md WR-05 — concurrent first callers no
+# longer race ``Chem.MolFromSmarts`` 28 times.
+_PREFIX_FORM_CACHE_LOCK = threading.Lock()
+
 
 def _ensure_patterns_cached() -> None:
-    """Lazy-compile the 14 SMARTS patterns once per process."""
-    if _PREFIX_FORM_PATTERNS:
-        return
-    from rdkit import Chem
-    from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+    """Lazy-compile the 14 SMARTS patterns once per process.
 
-    for fg_name in _PREFIX_FORM_FG_NAMES:
-        if fg_name in FUNCTIONAL_GROUP_SMARTS:
-            _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
-                FUNCTIONAL_GROUP_SMARTS[fg_name]
-            )
+    Phase 160.2 Plan-04-03a WR-05 closure: thread-safe via
+    ``threading.Lock`` double-check pattern. Concurrent first calls
+    re-acquire-and-recheck under the lock so the population loop runs
+    exactly once across all threads (mirroring the standard
+    double-checked-locking idiom).
+    """
+    if _PREFIX_FORM_PATTERNS:
+        return  # First check (no lock; fast path for the common warm-cache case)
+    with _PREFIX_FORM_CACHE_LOCK:
+        if _PREFIX_FORM_PATTERNS:
+            return  # Second check (inside lock; ensures one-time init)
+        from rdkit import Chem
+        from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+
+        for fg_name in _PREFIX_FORM_FG_NAMES:
+            if fg_name in FUNCTIONAL_GROUP_SMARTS:
+                _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
+                    FUNCTIONAL_GROUP_SMARTS[fg_name]
+                )
 
 
 def _check_substituent_prefix_form(
@@ -1027,6 +1048,34 @@ def _check_substituent_prefix_form(
         matches = mol.GetSubstructMatches(pattern)
         for match in matches:
             match_set = set(match)
+            # --- Phase 160.2 Plan-04-01: CR-01 fix per IUPAC P-66.6.4 ---
+            # Branch B carbamate (-OC(=O)NH2): when attach_idx points at the
+            # ester_O (match[3]) the prefix is ``carbamoyloxy`` (P-66.6.4),
+            # NOT ``(R-oxycarbonyl)amino`` (Branch A) or some unrelated
+            # acyloxy form.
+            #
+            # SMARTS ``[NX3][CX3](=O)[OX2][#6]`` matches 5 atoms; the trailing
+            # ``[#6]`` is the alkyl_C parent attach point (match[4]) which
+            # may live OUTSIDE the substituent fragment (live case
+            # ``O=C(N)OCCCC(=O)O`` where the substituent is the 4-atom
+            # -OC(=O)NH2 group and alkyl_C is on the principal chain), or
+            # INSIDE the substituent fragment (synthetic-direct call where
+            # the fragment IS the full SMARTS match). Accept both shapes so
+            # the documented Tier-0.5 → Branch B routing fires uniformly.
+            # See 160.2-AUDIT-DECOMP-CLOSURE.md §5 + 160.1-REVIEW.md CR-01.
+            if (
+                fg_name == "carbamate"
+                and len(match) >= 5
+                and attach_idx == match[3]
+                and (
+                    # Substituent-context (live): fragment is match - {alkyl_C}
+                    frag_atoms_set == match_set - {match[4]}
+                    # Full-match context (unit / direct call): frag == match
+                    or frag_atoms_set == match_set
+                )
+            ):
+                return "carbamoyloxy"
+            # --- End CR-01 fix ---
             # FG must EQUAL the fragment (no extra atoms). This is the
             # IUPAC P-65/P-66 prefix-form precondition: the substituent
             # fragment must be the FG itself, not a larger group containing
