@@ -5168,6 +5168,28 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
                         break
 
             if has_carbonyl:
+                # Phase 160.2 Plan-04-01 CR-01 guard per IUPAC P-66.6.4:
+                # If the carbonyl C has an N neighbor inside the fragment,
+                # this is a CARBAMATE (-OC(=O)NHR / -OC(=O)NH2), NOT a simple
+                # acyloxy. Per IUPAC P-66.6.4 Branch B the prefix is
+                # ``carbamoyloxy`` (or N-substituted variant), and the naming
+                # belongs to the Tier-0.5 prefix-form hook downstream, not to
+                # the acyloxy generator. Skipping here ensures the next
+                # fallback (_name_heteroatom_substituent → Tier-0.5
+                # _check_substituent_prefix_form) sees the fragment and
+                # routes it to ``carbamoyloxy``. Without this guard, the
+                # acyloxy generator drops the N atom and produces
+                # ``methanoyloxy`` for the canonical CR-01 fixture
+                # (``O=C(N)OCCCC(=O)O``), which OPSIN round-trips to a
+                # different molecule (missing N+H per RESEARCH §2).
+                # See 160.2-AUDIT-DECOMP-CLOSURE.md §5 + 160.1-REVIEW.md CR-01.
+                has_nitrogen_on_carbonyl = any(
+                    nbr2.GetSymbol() == 'N' and nbr2.GetIdx() in sub_set
+                    for nbr2 in nbr.GetNeighbors()
+                )
+                if has_nitrogen_on_carbonyl:
+                    return None
+
                 # Count carbons in acyl chain via C-C bonds only
                 exclude = chain_set | {idx}
                 if carbonyl_o is not None:

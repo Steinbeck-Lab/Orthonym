@@ -589,3 +589,93 @@ class TestIsothiocyanate:
             "still_not_a_real_fg", mol, (0, 1, 2), principal_chain=None
         )
         assert result is None
+
+
+# ====================================================================
+# Phase 160.2 Plan-04-01 — CR-01 unit-level Branch A vs Branch B routing
+# ====================================================================
+
+
+class TestCarbamateAttachIdxRouting:
+    """Phase 160.2 Plan-04-01 CR-01 unit-level coverage of
+    ``_check_substituent_prefix_form`` Branch A vs Branch B routing per
+    IUPAC P-66.6.4.
+
+    SMARTS ``[NX3][CX3](=O)[OX2][#6]`` match indexes:
+        match[0]=amide_N (Branch A trigger), match[3]=ester_O (Branch B
+        trigger), match[4]=alkyl_C (parent attach point in Branch B).
+
+    Pre-CR-01 fix: ``_check_substituent_prefix_form`` never consulted
+    ``attach_idx`` for carbamate, silently dropping the Branch B
+    (``carbamoyloxy``) path documented at lines 1006-1008. This test
+    class locks the new Branch B routing.
+    """
+
+    def test_branch_b_oxygen_attached_returns_carbamoyloxy(self):
+        """attach_idx == match[3] (ester_O) → ``carbamoyloxy`` per Branch B."""
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("CCCCOC(=O)N")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match in CCCCOC(=O)N"
+        match = matches[0]
+        # match indexes: [amide_N, carbonyl_C, carbonyl_O, ester_O, alkyl_C]
+        _amide_N, _cC, _cO, ester_O, _alkyl = match
+        frag_set = set(match)
+        prefix = _check_substituent_prefix_form(mol, frag_set, ester_O)
+        assert prefix == "carbamoyloxy", (
+            f"expected carbamoyloxy (Branch B), got {prefix!r}"
+        )
+
+    def test_branch_b_oxygen_attached_substituent_subset(self):
+        """Branch B as substituent: frag = match - {alkyl_C}, attach = ester_O.
+
+        Mirrors the live ``O=C(N)OCCCC(=O)O`` flow where the substituent
+        atoms are 4 (carbamate N, C, =O, ester_O) and the alkyl_C belongs
+        to the principal chain (not the substituent fragment).
+        """
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("O=C(N)OCCCC(=O)O")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match"
+        match = matches[0]
+        _amide_N, _cC, _cO, ester_O, alkyl_C = match
+        # Substituent set excludes alkyl_C (which is the parent attach atom)
+        frag_set = set(match) - {alkyl_C}
+        prefix = _check_substituent_prefix_form(mol, frag_set, ester_O)
+        assert prefix == "carbamoyloxy", (
+            f"Branch B substituent-context: expected carbamoyloxy, "
+            f"got {prefix!r}"
+        )
+
+    def test_branch_a_nitrogen_attached_does_not_return_carbamoyloxy(self):
+        """attach_idx == match[0] (amide_N) MUST NOT return ``carbamoyloxy``.
+
+        Branch A is the documented default for amide-N-attached carbamates;
+        the unit test enforces that the CR-01 special-case for Branch B
+        does NOT misroute Branch A inputs to ``carbamoyloxy``.
+        """
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+
+        mol = Chem.MolFromSmiles("CCCCNC(=O)OC")
+        pattern = Chem.MolFromSmarts("[NX3][CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pattern)
+        assert matches, "no carbamate match in CCCCNC(=O)OC"
+        match = matches[0]
+        amide_N, _cC, _cO, _ester_O, _alkyl = match
+        frag_set = set(match)
+        prefix = _check_substituent_prefix_form(mol, frag_set, amide_N)
+        # Branch A returns a non-carbamoyloxy prefix via fall-through
+        # (either get_carbamoyloxy_prefix's sub-fragment default or None).
+        assert prefix != "carbamoyloxy", (
+            f"Branch A misrouted to Branch B: {prefix!r}"
+        )

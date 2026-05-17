@@ -1027,6 +1027,34 @@ def _check_substituent_prefix_form(
         matches = mol.GetSubstructMatches(pattern)
         for match in matches:
             match_set = set(match)
+            # --- Phase 160.2 Plan-04-01: CR-01 fix per IUPAC P-66.6.4 ---
+            # Branch B carbamate (-OC(=O)NH2): when attach_idx points at the
+            # ester_O (match[3]) the prefix is ``carbamoyloxy`` (P-66.6.4),
+            # NOT ``(R-oxycarbonyl)amino`` (Branch A) or some unrelated
+            # acyloxy form.
+            #
+            # SMARTS ``[NX3][CX3](=O)[OX2][#6]`` matches 5 atoms; the trailing
+            # ``[#6]`` is the alkyl_C parent attach point (match[4]) which
+            # may live OUTSIDE the substituent fragment (live case
+            # ``O=C(N)OCCCC(=O)O`` where the substituent is the 4-atom
+            # -OC(=O)NH2 group and alkyl_C is on the principal chain), or
+            # INSIDE the substituent fragment (synthetic-direct call where
+            # the fragment IS the full SMARTS match). Accept both shapes so
+            # the documented Tier-0.5 → Branch B routing fires uniformly.
+            # See 160.2-AUDIT-DECOMP-CLOSURE.md §5 + 160.1-REVIEW.md CR-01.
+            if (
+                fg_name == "carbamate"
+                and len(match) >= 5
+                and attach_idx == match[3]
+                and (
+                    # Substituent-context (live): fragment is match - {alkyl_C}
+                    frag_atoms_set == match_set - {match[4]}
+                    # Full-match context (unit / direct call): frag == match
+                    or frag_atoms_set == match_set
+                )
+            ):
+                return "carbamoyloxy"
+            # --- End CR-01 fix ---
             # FG must EQUAL the fragment (no extra atoms). This is the
             # IUPAC P-65/P-66 prefix-form precondition: the substituent
             # fragment must be the FG itself, not a larger group containing
