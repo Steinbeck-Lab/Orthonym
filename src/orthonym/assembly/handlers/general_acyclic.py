@@ -1,0 +1,188 @@
+"""Phase 160.2 general_acyclic catch-all handler (DECOMP-01 closure).
+
+Per CONTEXT D-08 + ADR-19-02 §3.1 + CONTEXT D-12 RESEARCH §10: explicit
+catch-all (priority 99999, predicate=lambda *_: True) closing the
+Plan-02 fallthrough gap so dispatch_inner first-match-AND-succeeds-wins
+(ADR-19-04) ALWAYS returns a non-None InnerDispatchResult.
+
+LIFT SOURCE: composer.py:951-1055 chain-fallback section (verbatim, with
+helper calls re-routed from local composer scope to
+``from ._handler_shared import _generate_chain_parent, _generate_ring_parent,
+_generate_suffix, _generate_prefixes, _generate_stereodescriptors,
+_assemble_fragments``; final ``return candidate_name`` replaced by
+``return NamingResult(name=candidate_name, tree=None,
+atom_to_locant_hint=None)``).
+
+IUPAC cite: P-14 + P-23 + P-44 (catch-all substitutive nomenclature).
+
+Per Phase 160 CONTEXT D-05 first-wave policy: emits NamingResult.tree=None
+(full tree IR population deferred to v19+ phases).
+
+CRITICAL: this handler lifts ONLY the chain-fallback section. The
+cycloalkane stereo backstop at composer.py:1057-1097 STAYS in
+_assemble_name_impl (orchestrator applies it AFTER dispatch_inner returns)
+per CONTEXT D-04.
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Optional
+
+from ..name_tree import NamingResult
+
+
+logger = logging.getLogger(__name__)
+
+
+def _is_general_acyclic(features: Any) -> bool:
+    """Catch-all predicate per CONTEXT D-08 + AP-160-08. Always True.
+
+    Pure read-only per CONTEXT D-25 + AP-160-26 (no mutation of features /
+    mol / module-global state).
+    """
+    return True
+
+
+def name_general_acyclic(
+    features: Any, mol: Any = None, style: str = "pin",
+) -> Optional[NamingResult]:
+    """General catch-all chain/ring fallback (DECOMP-01 closure; Phase 160.2).
+
+    Verbatim lift of composer.py:951-1055 (chain-fallback section). Helper
+    calls re-routed from composer.py local scope to ``_handler_shared``
+    imports. String output MUST be byte-identical per DECOMP-03 contract.
+
+    Returns NamingResult(name=..., tree=None, atom_to_locant_hint=None) per
+    Phase 160 CONTEXT D-05 first-wave policy.
+    """
+    # Lazy imports per PATTERNS § Lazy Import — break the
+    # composer.py <-> general_acyclic.py cycle that the inner_dispatch
+    # registration will create at module load time.
+    from ..candidate_pool import get_current_pool
+    from ..composer import (
+        HandlerResult,
+        NameFragment,
+        _get_parent_atom_count,
+    )
+    from ._handler_shared import (
+        _assemble_fragments,
+        _generate_chain_parent,
+        _generate_prefixes,
+        _generate_ring_parent,
+        _generate_stereodescriptors,
+        _generate_suffix,
+    )
+
+    # === Body: verbatim lift of composer.py:951-1055 (chain-fallback section) ===
+    fragments = []
+
+    # Generate parent name (chain or ring)
+    if features.principal_chain:
+        parent = _generate_chain_parent(features)
+    elif features.ring_systems:
+        parent = _generate_ring_parent(features)
+    else:
+        parent = NameFragment(text="", fragment_type="parent")
+
+    fragments.append(parent)
+
+    # Generate suffix for principal group
+    suffix = None
+    if features.principal_group:
+        suffix = _generate_suffix(features)
+        if suffix:
+            # Validate suffix locants against parent capacity
+            parent_size = _get_parent_atom_count(features)
+            from ...rules.locant_validation import validate_suffix_locants
+            validated_locants, validated_count = validate_suffix_locants(
+                list(suffix.locants), parent_size, suffix.count
+            )
+            if validated_locants != list(suffix.locants) or validated_count != suffix.count:
+                suffix = NameFragment(
+                    text=suffix.text,
+                    locants=tuple(validated_locants),
+                    fragment_type="suffix",
+                    count=validated_count,
+                )
+            fragments.append(suffix)
+
+    # Generate prefixes for substituents and non-principal groups
+    prefixes = _generate_prefixes(features)
+    fragments.extend(prefixes)
+
+    # Generate stereodescriptors (for R/S stereocenters and E/Z double bonds)
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        stereo = _generate_stereodescriptors(features)
+        if stereo:
+            fragments.append(stereo)
+
+    # Assemble in correct order
+    assembled = _assemble_fragments(fragments, style)
+
+    # Observational coverage logging for fallback chain/ring path (ARCH-06)
+    if logger.isEnabledFor(logging.DEBUG):
+        _fb_total_ha = features.mol.GetNumHeavyAtoms()
+        _fb_parent = set(features.principal_chain or []) | set(getattr(features, 'principal_ring', None) or [])
+        _fb_accounted = set(_fb_parent)
+        # Include FG atoms
+        for _fb_fg_matches in getattr(features, 'functional_groups', {}).values():
+            for _fb_m in _fb_fg_matches:
+                _fb_accounted.update(_fb_m)
+        _fb_hr = HandlerResult(
+            name=assembled,
+            handler_id="fallback_chain_ring",
+            parent_atoms=_fb_parent,
+            accounted_atoms=_fb_accounted,
+            total_heavy_atoms=_fb_total_ha,
+        )
+        logger.debug(
+            "HANDLER_COVERAGE: handler=%s coverage=%.2f accounted=%d/%d name=%s",
+            _fb_hr.handler_id, _fb_hr.coverage, len(_fb_hr.accounted_atoms),
+            _fb_hr.total_heavy_atoms, _fb_hr.name[:60],
+        )
+
+    # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
+    # Guarded by logger level check so there is no performance impact in production.
+    if logger.isEnabledFor(logging.DEBUG):
+        from ...rules.seniority import PREFIX_FORMS
+        detected_fgs = set()
+        fg_dict = getattr(features, 'functional_groups', {})
+        pg = getattr(features, 'principal_group', None)
+        for fg_name_audit, fg_matches in fg_dict.items():
+            if fg_name_audit in ('alkene', 'alkyne'):
+                continue
+            if fg_name_audit == pg:
+                continue  # principal group is the suffix, not a prefix
+            if fg_matches:
+                detected_fgs.add(fg_name_audit)
+        missing_fgs = set()
+        for fg_audit in detected_fgs:
+            prefix = PREFIX_FORMS.get(fg_audit)
+            if prefix is None:
+                continue  # functional-class-only, no prefix form expected
+            if prefix and prefix in assembled:
+                continue
+            missing_fgs.add(fg_audit)
+        if missing_fgs:
+            logger.debug(
+                "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
+                missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
+            )
+
+    # Phase 145.1: route chain-naming through pool.
+    # In first_applicable mode, pool.best() returns the FIRST added
+    # candidate. If a higher-priority handler already added one above,
+    # pool.best() is that one (chain naming computed but not returned).
+    # If no other handler fired (this is the only candidate), pool.best()
+    # is the chain candidate. D-02: chain has priority=fallback in 145.1
+    # (preserves byte-identical); Phase 146 raises priority for competition.
+    pool = get_current_pool()
+    pool.add(assembled, "chain", features)
+    candidate_name = pool.best().name
+
+    return NamingResult(
+        name=candidate_name, tree=None, atom_to_locant_hint=None,
+    )
+
+
+__all__ = ["name_general_acyclic", "_is_general_acyclic"]
