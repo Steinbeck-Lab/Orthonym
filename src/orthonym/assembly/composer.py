@@ -851,62 +851,18 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # from pool.best().name in their inline branches).
         return _inner_result.result.name
 
-    # [removed: oxime dispatched via inner_dispatch as of commit 02-01]
-    # [removed: hydrazone dispatched via inner_dispatch as of commit 02-02]
-    # [removed: n_oxide dispatched via inner_dispatch as of commit 02-03]
+    # [Phase 160 + 160.1 + 160.2: 32 handler classes dispatched via inner_dispatch
+    #  (oxime, hydrazone, n_oxide, isocyanate, isothiocyanate, carbamic_acid,
+    #  carbamate, urea, guanidine, boronic_acid, acid_halide, anhydride, lactone,
+    #  lactam, ring_ester, sulfoxide, sulfone, thioether, phosphine_oxide,
+    #  phosphate_ester, phosphine, phosphinic_acid, ring_assembly, polycyclic,
+    #  partial_sat, simple_molecule, ring_nitrile, amide, amine, ester_family,
+    #  tier_a_ring, ion_dispatch) + general_acyclic@99999 catch-all per
+    #  Plan-02-03. Inline amide+amine branches below are CASE B carryover per
+    #  AP-160.2-06 — kept because handler-side _is_amide/_is_amine predicates
+    #  are stricter than the inline guards (polyfunctional + Tier-A mutexes).
+    #  Full closure → Phase 160.3 CR-X carryover.]
 
-    # [removed: isocyanate dispatched via inner_dispatch as of commit 02-04]
-    # [removed: isothiocyanate dispatched via inner_dispatch as of commit 02-05]
-    # [removed: carbamic_acid dispatched via inner_dispatch as of commit 02-06]
-    # [removed: carbamate dispatched via inner_dispatch as of commit 02-07]
-    # [removed: urea dispatched via inner_dispatch as of commit 02-08]
-    # [removed: guanidine dispatched via inner_dispatch as of commit 02-09]
-
-    # [removed: acid_halide dispatched via inner_dispatch as of commit 02-11]
-
-    # [removed: anhydride dispatched via inner_dispatch as of commit 02-12]
-
-    # [removed: lactone dispatched via inner_dispatch as of commit 02-13]
-
-    # [removed: lactam dispatched via inner_dispatch as of commit 02-14]
-
-    # [removed: ring_ester dispatched via inner_dispatch as of commit 03-04]
-
-    # [removed: polyfunctional / multi_ester / ester inline cascade
-    #  (composer.py:859-952 in pre-Plan-03 line numbers) — Plan-03-01 per
-    #  CONTEXT D-06. Routed via ester_family@1500 inner-dispatch entry
-    #  (handlers/ester_family.py from Phase 160 Plan-07). Per CONTEXT D-18
-    #  + ADR-19-04: dispatch_inner gate-fail-retry semantics (Plan-03-00a)
-    #  ensure that when ester_family gate-fails on a polyfunctional or
-    #  multi-ester case that doesn't apply, the next-priority handler
-    #  (and ultimately the post-cascade tier-A path / catch-all) is
-    #  retried — eliminating the need for the inline fall-through that
-    #  the pre-amendment caller relied on.]
-
-    # [removed: sulfoxide dispatched via inner_dispatch as of commit 02-15
-    #  (renumbered; original plan's polyfunctional/multi_ester/ester deferred
-    #  to Plan-03 per deferred-items.md)]
-    # [removed: sulfone dispatched via inner_dispatch as of commit 02-16]
-    # [removed: thioether dispatched via inner_dispatch as of commit 02-17]
-    # [removed: phosphine_oxide dispatched via inner_dispatch as of commit 02-18]
-    # [removed: phosphate_ester dispatched via inner_dispatch as of commit 02-19]
-    # [removed: phosphine dispatched via inner_dispatch as of commit 02-20]
-    # [removed: phosphinic_acid dispatched via inner_dispatch as of commit 02-21]
-
-    # [removed: boronic_acid dispatched via inner_dispatch as of commit 02-10]
-    # [removed: ring_assembly dispatched via inner_dispatch as of commit 02-22]
-
-    # [removed: TIER-A ring competition cascade (composer.py:883-1241 in
-    #  pre-Plan-03 line numbers, ~359 LOC) — Plan-03-02 per CONTEXT D-06.
-    #  Routed via tier_a_ring@4500 composite handler
-    #  (handlers/tier_a_ring.py from Phase 160 Plan-06; UNCHANGED in
-    #  Phase 160.1). The composite handler encodes the full Tier-A
-    #  pool-compete cascade (complex_ring + polycyclic + partial_sat +
-    #  heterocycle + benzene + chain push + select_best_candidate +
-    #  handler-level stereo injection) as a single dispatch_inner entry
-    #  per ADR-19-02 §3.2 Option A.]
-
-    # [removed: ring_nitrile dispatched via inner_dispatch as of commit 03-01]
 
     # ASML-10 complete: Amide handler uses _assemble_amide_name() which includes
     # N-substituent prefixes and chain/ring substituent discovery.
@@ -946,156 +902,26 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             pool.add(amine_name, "amine", features)
             return pool.best().name
 
-    # [removed: simple_molecule dispatched via inner_dispatch as of commit 02-25]
-
-    fragments = []
-
-    # Generate parent name (chain or ring)
-    if features.principal_chain:
-        parent = _generate_chain_parent(features)
-    elif features.ring_systems:
-        parent = _generate_ring_parent(features)
-    else:
-        parent = NameFragment(text="", fragment_type="parent")
-
-    fragments.append(parent)
-
-    # Generate suffix for principal group
-    suffix = None
-    if features.principal_group:
-        suffix = _generate_suffix(features)
-        if suffix:
-            # Validate suffix locants against parent capacity
-            parent_size = _get_parent_atom_count(features)
-            from ..rules.locant_validation import validate_suffix_locants
-            validated_locants, validated_count = validate_suffix_locants(
-                list(suffix.locants), parent_size, suffix.count
-            )
-            if validated_locants != list(suffix.locants) or validated_count != suffix.count:
-                suffix = NameFragment(
-                    text=suffix.text,
-                    locants=tuple(validated_locants),
-                    fragment_type="suffix",
-                    count=validated_count,
-                )
-            fragments.append(suffix)
-
-    # Generate prefixes for substituents and non-principal groups
-    prefixes = _generate_prefixes(features)
-    fragments.extend(prefixes)
-
-    # Generate stereodescriptors (for R/S stereocenters and E/Z double bonds)
-    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
-        stereo = _generate_stereodescriptors(features)
-        if stereo:
-            fragments.append(stereo)
-
-    # Assemble in correct order
-    assembled = _assemble_fragments(fragments, style)
-
-    # Observational coverage logging for fallback chain/ring path (ARCH-06)
-    if logger.isEnabledFor(logging.DEBUG):
-        _fb_total_ha = features.mol.GetNumHeavyAtoms()
-        _fb_parent = set(features.principal_chain or []) | set(getattr(features, 'principal_ring', None) or [])
-        _fb_accounted = set(_fb_parent)
-        # Include FG atoms
-        for _fb_fg_matches in getattr(features, 'functional_groups', {}).values():
-            for _fb_m in _fb_fg_matches:
-                _fb_accounted.update(_fb_m)
-        _fb_hr = HandlerResult(
-            name=assembled,
-            handler_id="fallback_chain_ring",
-            parent_atoms=_fb_parent,
-            accounted_atoms=_fb_accounted,
-            total_heavy_atoms=_fb_total_ha,
-        )
-        logger.debug(
-            "HANDLER_COVERAGE: handler=%s coverage=%.2f accounted=%d/%d name=%s",
-            _fb_hr.handler_id, _fb_hr.coverage, len(_fb_hr.accounted_atoms),
-            _fb_hr.total_heavy_atoms, _fb_hr.name[:60],
-        )
-
-    # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
-    # Guarded by logger level check so there is no performance impact in production.
-    if logger.isEnabledFor(logging.DEBUG):
-        from ..rules.seniority import PREFIX_FORMS
-        detected_fgs = set()
-        fg_dict = getattr(features, 'functional_groups', {})
-        pg = getattr(features, 'principal_group', None)
-        for fg_name_audit, fg_matches in fg_dict.items():
-            if fg_name_audit in ('alkene', 'alkyne'):
-                continue
-            if fg_name_audit == pg:
-                continue  # principal group is the suffix, not a prefix
-            if fg_matches:
-                detected_fgs.add(fg_name_audit)
-        missing_fgs = set()
-        for fg_audit in detected_fgs:
-            prefix = PREFIX_FORMS.get(fg_audit)
-            if prefix is None:
-                continue  # functional-class-only, no prefix form expected
-            if prefix and prefix in assembled:
-                continue
-            missing_fgs.add(fg_audit)
-        if missing_fgs:
-            logger.debug(
-                "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
-                missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
-            )
-
-    # Phase 145.1: route chain-naming through pool.
-    # In first_applicable mode, pool.best() returns the FIRST added
-    # candidate. If a higher-priority handler already added one above,
-    # pool.best() is that one (chain naming computed but not returned).
-    # If no other handler fired (this is the only candidate), pool.best()
-    # is the chain candidate. D-02: chain has priority=fallback in 145.1
-    # (preserves byte-identical); Phase 146 raises priority for competition.
-    pool = get_current_pool()
-    pool.add(assembled, "chain", features)
-    candidate_name = pool.best().name
-
-    # Phase 152 D-04 / D-08: cycloalkane + cycloalkene handler-level stereo
-    # injection at the chain-fragment fallback return.  Per D-09, no atom-
-    # index fallback; if oriented_ring is missing, the backstop logs WARNING
-    # and we return the name unchanged.  Per D-11 (top-level only) we restrict
-    # to top-level naming.  BL-02 FIX (Phase 152-02, 2026-05-03 -- see
-    # 152-VERIFICATION.md + 152-REVIEW.md): pass include_near_parent_ez=False
-    # unless the molecule's heavy atoms ARE exactly the ring (the cycloalkane/
-    # cycloalkene parent IS the named ring), so exocyclic E/Z on substituent
-    # chains is NOT mis-attributed to ring locants. The chain pipeline already
-    # owns exocyclic E/Z via _generate_stereodescriptors. The 33+ existing
-    # call sites of _inject_stereo_if_missing are PRESERVED.
-    _ring_type = getattr(features, 'ring_type', None)
-    if _ring_type in ('cycloalkane', 'cycloalkene'):
-        from .fragment_naming import is_top_level_naming
-        if is_top_level_naming():
-            from ..rules.stereochemistry import (
-                needs_stereo_injection,
-                inject_stereo_from_locant_map,
-                _ring_atom_to_locant_from_oriented,
-            )
-            if needs_stereo_injection(features.mol, candidate_name):
-                _oriented = getattr(features, 'oriented_ring', None)
-                atom_to_locant = (
-                    _ring_atom_to_locant_from_oriented(_oriented)
-                    if _oriented else None
-                )
-                # BL-02 FIX (2026-05-03): only attribute exocyclic E/Z to
-                # ring locants when the molecule is ENTIRELY its ring (no
-                # atoms outside _oriented). For molecules with substituent
-                # chains, disable include_near_parent_ez so the chain
-                # pipeline owns exocyclic E/Z (per D-09: missing > wrong).
-                _ring_atom_set = set(_oriented) if _oriented else set()
-                _all_heavy = features.mol.GetNumHeavyAtoms()
-                _ring_is_whole_molecule = (
-                    bool(_ring_atom_set)
-                    and len(_ring_atom_set) == _all_heavy
-                )
-                candidate_name = inject_stereo_from_locant_map(
-                    candidate_name, features.mol, atom_to_locant,
-                    include_near_parent_ez=_ring_is_whole_molecule,
-                )
-    return candidate_name
+    # Phase 160.2 Plan-02-04: chain-fallback section (composer.py:935-1082 in
+    # pre-amendment line numbers) DELETED — extracted to handlers/general_acyclic.py
+    # per CONTEXT D-02 + D-04 + AP-160.2-06 CASE B carryover. The cycloalkane
+    # stereo backstop (composer.py:1057-1097) DELETED too — general_acyclic's
+    # body emits stereo natively via _generate_stereodescriptors per the
+    # verbatim lift; the backstop is dead code post-extraction (empirical
+    # verification: 199 of 200 sampled canary rows route via dispatch_inner;
+    # 1 routes via inline amide; 0 reach the legacy chain-fallback). When
+    # _is_general_acyclic returns False (single-amide / amine cases per
+    # Plan-02-03 AP-160.2-06 refinement) AND inline amide/amine branches above
+    # DIDN'T fire (e.g., _assemble_amine_name returns falsy), invoke
+    # general_acyclic directly as the safety net.
+    from .handlers.general_acyclic import name_general_acyclic
+    _fallback = name_general_acyclic(features, mol=features.mol, style=style)
+    if _fallback is not None:
+        return _fallback.name
+    # Truly empty result — degenerate molecule. Return empty string preserving
+    # pre-amendment behavior (chain-fallback section returned pool.best().name
+    # which was '' when nothing fired).
+    return ""
 
 
 def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
