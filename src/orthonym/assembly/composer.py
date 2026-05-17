@@ -5192,19 +5192,13 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
 
 
 def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
-    """
-    Fallback naming for heteroatom-containing substituents that aren't
-    alkoxy, acylamino, or acyloxy.
+    """Orchestrator for heteroatom-substituent fallback naming (Phase 160.2 D-05).
 
-    Handles: simple amino alkyl chains, hydroxyalkyl, etc.
-
-    Phase 160.1 D-04: Tier-0.5 IUPAC P-65/P-66 prefix-form check runs FIRST.
-    Fragments matching the 14-row closed set (ester, ether, amide variants,
-    sulfoxide, sulfone, thioether, nitrile, carbamate, urea, isocyanate,
-    isothiocyanate) are named via the canonical prefix form (e.g.,
-    -C(=O)OCH3 -> methoxycarbonyl per P-65.6.3), short-circuiting the
-    misclassification path that previously produced "hydroxymethyl" for
-    4-atom 2C+2O ester fragments per RESEARCH §3 bug trace.
+    Runs Tier-0.5 (P-65/P-66) prefix-form check (Phase 160.1 D-04), identifies the
+    attachment atom, then dispatches by attach-symbol + structural class to one of
+    three in-file helpers (CONTEXT D-13). Verbatim mechanical lift per Phase 145.1
+    D-09; each helper re-derives local scope as the only edit. Returns None if no
+    symbol branch applies (preserves pre-Plan-03 contract).
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
@@ -5247,461 +5241,524 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
     atom = mol.GetAtomWithIdx(attach_atom)
     symbol = atom.GetSymbol()
 
-    # If attachment is through N (amino substituent)
+    # Dispatch by attachment-atom symbol + structural class (Phase 160.2 D-05)
     if symbol == 'N':
-        # Check if any atoms reachable from N (excluding chain) are in a ring
-        ring_info = mol.GetRingInfo()
-        sub_has_ring = any(
-            ring_info.NumAtomRings(idx) > 0
-            for idx in sub_atoms
-            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+        return _name_n_attached_substituent_fallback(
+            mol, sub_atoms, sub_set, chain_set, attach_atom
         )
-        if sub_has_ring:
-            # --- Phase 79-02: Fused heterocycle detection for N-branch ---
-            # Try fused heterocycle identification FIRST (O(1) static lookup,
-            # Phase 78 infrastructure). This must come before the anilino check
-            # because fused hets like quinoline contain a benzene ring that
-            # would falsely match the all-C aromatic 6-membered ring test.
-            from ..data.fused_heterocycles import (
-                match_fused_heterocycle_core as _match_fused_het,
-                get_fused_heterocycle_prefix as _get_fused_het_prefix,
-            )
-            fused_result = _match_fused_het(mol)
-            if fused_result is not None:
-                het_name, atom_mapping, core_smiles = fused_result
-                core_atom_set = set(atom_mapping.keys())
-                # Check that fused het core overlaps with substituent atoms
-                if core_atom_set & sub_set:
-                    # Find the ring atom that attaches to N (or nearest to N)
-                    attach_ring_idx = None
-                    for ra in core_atom_set & sub_set:
-                        atom_ra = mol.GetAtomWithIdx(ra)
-                        for nbr in atom_ra.GetNeighbors():
-                            if nbr.GetIdx() == attach_atom:  # attach_atom is the N
-                                attach_ring_idx = ra
-                                break
-                        if attach_ring_idx is not None:
-                            break
-                    if attach_ring_idx is None:
-                        # Fused het may not be directly bonded to N -- check through intermediate atoms
-                        for ra in core_atom_set & sub_set:
-                            atom_ra = mol.GetAtomWithIdx(ra)
-                            for nbr in atom_ra.GetNeighbors():
-                                if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set:
-                                    attach_ring_idx = ra
-                                    break
-                            if attach_ring_idx is not None:
-                                break
-                    if attach_ring_idx is not None:
-                        prefix = _get_fused_het_prefix(core_smiles, attach_ring_idx, atom_mapping)
-                        if prefix is not None:
-                            # Check if ring accounts for all sub atoms (pure fused het, no linker)
-                            non_core_c = sum(
-                                1 for idx in sub_set
-                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                                and idx not in core_atom_set
-                            )
-                            if non_core_c == 0:
-                                # Pure fused het on N: e.g., (quinolin-8-ylamino)
-                                return f"(({prefix})amino)"
-                            # Fused het with linker carbons: fall through to recursive naming
-            # --- End Phase 79-02 fused het detection for N-branch ---
-
-            # Substituent has a ring - check for phenyl/benzene (anilino)
-            # Only match if the ring is NOT part of a fused system (to avoid
-            # falsely matching benzene ring of quinoline etc.)
-            for ring in ring_info.AtomRings():
-                if all(r in sub_set for r in ring) and len(ring) == 6:
-                    all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
-                    all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
-                    if all_arom and all_c:
-                        # Verify this is an isolated benzene ring (not part of fused system)
-                        ring_set_check = set(ring)
-                        is_fused = False
-                        for other_ring in ring_info.AtomRings():
-                            if set(other_ring) != ring_set_check and set(other_ring) & ring_set_check:
-                                is_fused = True
-                                break
-                        if not is_fused:
-                            return "anilino"
-
-            # --- Phase 79-01: Direct ring identification for N-branch (DROP-18 fix) ---
-            # Try O(1) ring identification before recursive naming fallback.
-            # Only applies when the substituent IS a pure ring (all C atoms are ring atoms).
-            from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name
-            from ..rules.ring_substituents import identify_ring_system as _identify_ring
-            for ring in ring_info.AtomRings():
-                ring_set_inner = set(ring)
-                if ring_set_inner.issubset(sub_set):
-                    # Check if ring accounts for all C atoms in substituent
-                    # (pure ring vs ring+chain like cyclohexylmethyl)
-                    non_ring_c = sum(
-                        1 for idx in sub_atoms
-                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                        and idx not in ring_set_inner
-                    )
-                    if non_ring_c == 0:
-                        ring_prefix = _get_ring_sub_name(mol, tuple(ring))
-                        if ring_prefix:
-                            return f"({ring_prefix}amino)"
-            # --- End Phase 79-01 direct ring identification ---
-
-            # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
-            # Guard: only for moderately-sized substituents (<=25 atoms).
-            if len(sub_atoms) <= 25:
-                from .substituent_naming import name_substituent_fragment
-                from .naming_utils import needs_brackets
-                sub_name = name_substituent_fragment(
-                    mol, list(sub_set), attach_atom, list(chain_set)
-                )
-                # Validate: reject only if fragment has ring atoms but name is acyclic
-                # (Phase 85 structural validation replaces pure string-based check)
-                if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
-                    # Likely linearized a ring -- reject
-                    sub_name = None
-                if sub_name:
-                    if needs_brackets(sub_name):
-                        sub_name = f"({sub_name})"
-                    return sub_name
-            # Fallback: recursive naming via name_fragment_recursively()
-            # for ring-containing N-branch fragments that failed direct naming.
-            if len(sub_atoms) <= 25:
-                try:
-                    frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
-                    if frag_smiles:
-                        from .fragment_naming import name_fragment_recursively
-                        from .substituent_naming import parent_to_prefix
-                        frag_name = name_fragment_recursively(frag_smiles)
-                        if frag_name:
-                            carbon_count = sum(
-                                1 for idx in sub_atoms
-                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                            )
-                            prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
-                            if prefix:
-                                from .naming_utils import needs_brackets
-                                if needs_brackets(prefix):
-                                    prefix = f"({prefix})"
-                                return f"({prefix}amino)"
-                except Exception:
-                    pass
-            logger.debug(
-                "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
-            )
-            return None
-
-        # Count carbons reachable from N via C-C bonds only
-        carbon_count = 0
-        for nbr in atom.GetNeighbors():
-            if nbr.GetIdx() in chain_set:
-                continue
-            if nbr.GetSymbol() == 'C':
-                carbon_count += _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
-
-        if carbon_count == 0:
-            return "amino"
-        try:
-            alkyl = get_alkyl_name(carbon_count)
-            return f"({alkyl}amino)"
-        except (ValueError, KeyError):
-            return "amino"
-
-    # If attachment is through O but not alkoxy or acyloxy
-    # (could be plain hydroxyl on carbon substituent)
     if symbol == 'O':
-        return None  # handled by FG prefixes
-
-    # If attachment is through C with heteroatoms deeper in the chain
+        return None  # handled by FG prefixes (kept inline per CONTEXT D-05)
     if symbol == 'C':
-        # Check if substituent contains a ring - skip complex ring naming
         ring_info = mol.GetRingInfo()
         sub_has_ring = any(
             ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms
         )
         if sub_has_ring:
-            # --- Phase 79-02: Fused heterocycle detection for C-branch ---
-            # Try fused het identification first (O(1) static lookup).
-            from ..data.fused_heterocycles import (
-                match_fused_heterocycle_core as _match_fused_het_c,
-                get_fused_heterocycle_prefix as _get_fused_het_prefix_c,
+            return _name_c_attached_ring_substituent_fallback(
+                mol, sub_atoms, sub_set, chain_set, attach_atom
             )
-            fused_result_c = _match_fused_het_c(mol)
-            if fused_result_c is not None:
-                het_name_c, atom_mapping_c, core_smiles_c = fused_result_c
-                core_atom_set_c = set(atom_mapping_c.keys())
-                if core_atom_set_c & sub_set:
-                    # Find ring atom attached to the C-branch attachment point
-                    attach_ring_idx_c = None
-                    for ra in core_atom_set_c & sub_set:
+        return _name_c_attached_chain_substituent_fallback(
+            mol, sub_atoms, sub_set, chain_set, attach_atom
+        )
+
+    return None
+
+
+def _name_n_attached_substituent_fallback(
+    mol, sub_atoms: List[int], sub_set: set, chain_set: set, attach_atom: int
+) -> Optional[str]:
+    """N-attached heteroatom substituent fallback (DECOMP-05 closure helper #1).
+
+    Per Phase 160.2 CONTEXT D-05 + Phase 145.1 D-09 mechanical-lift: VERBATIM lift
+    of the prior `_name_heteroatom_substituent` N-branch body (composer.py:5253-5407
+    in pre-Plan-03 layout). Covers Phase 79-02 fused het detection, aniline matching,
+    Phase 79-01 direct ring identification, recursive ring sub, alkyl chain count +
+    (alkylamino) prefix routing. IUPAC P-66.6 (amines) + P-29 substituent grammar.
+
+    Per AP-160.2-07: cross-branch shared helpers (`_count_carbon_chain`,
+    `_has_ring_atoms`, `_name_reflects_ring`, `get_alkyl_name`, etc.) STAY in
+    composer.py at their current line ranges; this helper references them via
+    Python module-level scope (no imports needed within composer.py).
+    """
+    # Re-derive locals that lived in orchestrator scope:
+    atom = mol.GetAtomWithIdx(attach_atom)
+    ring_info = mol.GetRingInfo()
+    sub_has_ring = any(
+        ring_info.NumAtomRings(idx) > 0
+        for idx in sub_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    )
+    if sub_has_ring:
+        # --- Phase 79-02: Fused heterocycle detection for N-branch ---
+        # Try fused heterocycle identification FIRST (O(1) static lookup,
+        # Phase 78 infrastructure). This must come before the anilino check
+        # because fused hets like quinoline contain a benzene ring that
+        # would falsely match the all-C aromatic 6-membered ring test.
+        from ..data.fused_heterocycles import (
+            match_fused_heterocycle_core as _match_fused_het,
+            get_fused_heterocycle_prefix as _get_fused_het_prefix,
+        )
+        fused_result = _match_fused_het(mol)
+        if fused_result is not None:
+            het_name, atom_mapping, core_smiles = fused_result
+            core_atom_set = set(atom_mapping.keys())
+            # Check that fused het core overlaps with substituent atoms
+            if core_atom_set & sub_set:
+                # Find the ring atom that attaches to N (or nearest to N)
+                attach_ring_idx = None
+                for ra in core_atom_set & sub_set:
+                    atom_ra = mol.GetAtomWithIdx(ra)
+                    for nbr in atom_ra.GetNeighbors():
+                        if nbr.GetIdx() == attach_atom:  # attach_atom is the N
+                            attach_ring_idx = ra
+                            break
+                    if attach_ring_idx is not None:
+                        break
+                if attach_ring_idx is None:
+                    # Fused het may not be directly bonded to N -- check through intermediate atoms
+                    for ra in core_atom_set & sub_set:
                         atom_ra = mol.GetAtomWithIdx(ra)
                         for nbr in atom_ra.GetNeighbors():
-                            if nbr.GetIdx() == attach_atom:
-                                attach_ring_idx_c = ra
+                            if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set:
+                                attach_ring_idx = ra
                                 break
-                            if nbr.GetIdx() in chain_set:
-                                attach_ring_idx_c = ra
-                                break
-                        if attach_ring_idx_c is not None:
+                        if attach_ring_idx is not None:
                             break
-                    if attach_ring_idx_c is None:
-                        # Check through intermediate atoms
-                        for ra in core_atom_set_c & sub_set:
-                            atom_ra = mol.GetAtomWithIdx(ra)
-                            for nbr in atom_ra.GetNeighbors():
-                                if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set_c:
-                                    attach_ring_idx_c = ra
-                                    break
-                            if attach_ring_idx_c is not None:
-                                break
-                    if attach_ring_idx_c is not None:
-                        prefix_c = _get_fused_het_prefix_c(core_smiles_c, attach_ring_idx_c, atom_mapping_c)
-                        if prefix_c is not None:
-                            non_core_c_count = sum(
-                                1 for idx in sub_set
-                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                                and idx not in core_atom_set_c
-                            )
-                            if non_core_c_count == 0:
-                                # Pure fused het on C-branch
-                                from .naming_utils import needs_brackets
-                                wrapped = f"({prefix_c})"
-                                return wrapped
-                            # Fused het with linker: fall through to recursive naming
-            # --- End Phase 79-02 fused het detection for C-branch ---
+                if attach_ring_idx is not None:
+                    prefix = _get_fused_het_prefix(core_smiles, attach_ring_idx, atom_mapping)
+                    if prefix is not None:
+                        # Check if ring accounts for all sub atoms (pure fused het, no linker)
+                        non_core_c = sum(
+                            1 for idx in sub_set
+                            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                            and idx not in core_atom_set
+                        )
+                        if non_core_c == 0:
+                            # Pure fused het on N: e.g., (quinolin-8-ylamino)
+                            return f"(({prefix})amino)"
+                        # Fused het with linker carbons: fall through to recursive naming
+        # --- End Phase 79-02 fused het detection for N-branch ---
 
-            # --- Phase 79-01: Direct ring identification for C-branch (DROP-19 fix) ---
-            # Try O(1) ring identification before recursive naming fallback.
-            from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name_c
-            for ring in ring_info.AtomRings():
-                ring_set_inner = set(ring)
-                if ring_set_inner.issubset(sub_set):
-                    # Check if ring accounts for all C atoms in substituent
-                    non_ring_c = sum(
+        # Substituent has a ring - check for phenyl/benzene (anilino)
+        # Only match if the ring is NOT part of a fused system (to avoid
+        # falsely matching benzene ring of quinoline etc.)
+        for ring in ring_info.AtomRings():
+            if all(r in sub_set for r in ring) and len(ring) == 6:
+                all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
+                all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
+                if all_arom and all_c:
+                    # Verify this is an isolated benzene ring (not part of fused system)
+                    ring_set_check = set(ring)
+                    is_fused = False
+                    for other_ring in ring_info.AtomRings():
+                        if set(other_ring) != ring_set_check and set(other_ring) & ring_set_check:
+                            is_fused = True
+                            break
+                    if not is_fused:
+                        return "anilino"
+
+        # --- Phase 79-01: Direct ring identification for N-branch (DROP-18 fix) ---
+        # Try O(1) ring identification before recursive naming fallback.
+        # Only applies when the substituent IS a pure ring (all C atoms are ring atoms).
+        from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name
+        from ..rules.ring_substituents import identify_ring_system as _identify_ring
+        for ring in ring_info.AtomRings():
+            ring_set_inner = set(ring)
+            if ring_set_inner.issubset(sub_set):
+                # Check if ring accounts for all C atoms in substituent
+                # (pure ring vs ring+chain like cyclohexylmethyl)
+                non_ring_c = sum(
+                    1 for idx in sub_atoms
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                    and idx not in ring_set_inner
+                )
+                if non_ring_c == 0:
+                    ring_prefix = _get_ring_sub_name(mol, tuple(ring))
+                    if ring_prefix:
+                        return f"({ring_prefix}amino)"
+        # --- End Phase 79-01 direct ring identification ---
+
+        # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
+        # Guard: only for moderately-sized substituents (<=25 atoms).
+        if len(sub_atoms) <= 25:
+            from .substituent_naming import name_substituent_fragment
+            from .naming_utils import needs_brackets
+            sub_name = name_substituent_fragment(
+                mol, list(sub_set), attach_atom, list(chain_set)
+            )
+            # Validate: reject only if fragment has ring atoms but name is acyclic
+            # (Phase 85 structural validation replaces pure string-based check)
+            if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
+                # Likely linearized a ring -- reject
+                sub_name = None
+            if sub_name:
+                if needs_brackets(sub_name):
+                    sub_name = f"({sub_name})"
+                return sub_name
+        # Fallback: recursive naming via name_fragment_recursively()
+        # for ring-containing N-branch fragments that failed direct naming.
+        if len(sub_atoms) <= 25:
+            try:
+                frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
+                if frag_smiles:
+                    from .fragment_naming import name_fragment_recursively
+                    from .substituent_naming import parent_to_prefix
+                    frag_name = name_fragment_recursively(frag_smiles)
+                    if frag_name:
+                        carbon_count = sum(
+                            1 for idx in sub_atoms
+                            if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                        )
+                        prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                        if prefix:
+                            from .naming_utils import needs_brackets
+                            if needs_brackets(prefix):
+                                prefix = f"({prefix})"
+                            return f"({prefix}amino)"
+            except Exception:
+                pass
+        logger.debug(
+            "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
+        )
+        return None
+
+    # Count carbons reachable from N via C-C bonds only
+    carbon_count = 0
+    for nbr in atom.GetNeighbors():
+        if nbr.GetIdx() in chain_set:
+            continue
+        if nbr.GetSymbol() == 'C':
+            carbon_count += _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
+
+    if carbon_count == 0:
+        return "amino"
+    try:
+        alkyl = get_alkyl_name(carbon_count)
+        return f"({alkyl}amino)"
+    except (ValueError, KeyError):
+        return "amino"
+
+
+def _name_c_attached_ring_substituent_fallback(
+    mol, sub_atoms: List[int], sub_set: set, chain_set: set, attach_atom: int
+) -> Optional[str]:
+    """C-attached ring-containing substituent fallback (DECOMP-05 closure helper #2).
+
+    Per Phase 160.2 CONTEXT D-05 + Phase 145.1 D-09 mechanical-lift: VERBATIM lift
+    of the prior `_name_heteroatom_substituent` C-branch ring sub-body
+    (composer.py:5424-5534 in pre-Plan-03 layout). Covers Phase 79-02 fused het
+    detection (C-branch), Phase 79-01 direct-ring identification, recursive ring
+    sub, fragment-recursive fallback. IUPAC P-23 + P-29 substituent grammar.
+
+    Per AP-160.2-07: cross-branch shared helpers (`_has_ring_atoms`,
+    `_name_reflects_ring`, `name_substituent_fragment`, `name_fragment_recursively`,
+    `parent_to_prefix`, etc.) STAY in composer.py at their current line ranges;
+    this helper references them via Python module-level scope.
+    """
+    # Re-derive ring_info that lived in orchestrator scope:
+    ring_info = mol.GetRingInfo()
+
+    # --- Phase 79-02: Fused heterocycle detection for C-branch ---
+    # Try fused het identification first (O(1) static lookup).
+    from ..data.fused_heterocycles import (
+        match_fused_heterocycle_core as _match_fused_het_c,
+        get_fused_heterocycle_prefix as _get_fused_het_prefix_c,
+    )
+    fused_result_c = _match_fused_het_c(mol)
+    if fused_result_c is not None:
+        het_name_c, atom_mapping_c, core_smiles_c = fused_result_c
+        core_atom_set_c = set(atom_mapping_c.keys())
+        if core_atom_set_c & sub_set:
+            # Find ring atom attached to the C-branch attachment point
+            attach_ring_idx_c = None
+            for ra in core_atom_set_c & sub_set:
+                atom_ra = mol.GetAtomWithIdx(ra)
+                for nbr in atom_ra.GetNeighbors():
+                    if nbr.GetIdx() == attach_atom:
+                        attach_ring_idx_c = ra
+                        break
+                    if nbr.GetIdx() in chain_set:
+                        attach_ring_idx_c = ra
+                        break
+                if attach_ring_idx_c is not None:
+                    break
+            if attach_ring_idx_c is None:
+                # Check through intermediate atoms
+                for ra in core_atom_set_c & sub_set:
+                    atom_ra = mol.GetAtomWithIdx(ra)
+                    for nbr in atom_ra.GetNeighbors():
+                        if nbr.GetIdx() in sub_set and nbr.GetIdx() not in core_atom_set_c:
+                            attach_ring_idx_c = ra
+                            break
+                    if attach_ring_idx_c is not None:
+                        break
+            if attach_ring_idx_c is not None:
+                prefix_c = _get_fused_het_prefix_c(core_smiles_c, attach_ring_idx_c, atom_mapping_c)
+                if prefix_c is not None:
+                    non_core_c_count = sum(
+                        1 for idx in sub_set
+                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                        and idx not in core_atom_set_c
+                    )
+                    if non_core_c_count == 0:
+                        # Pure fused het on C-branch
+                        from .naming_utils import needs_brackets
+                        wrapped = f"({prefix_c})"
+                        return wrapped
+                    # Fused het with linker: fall through to recursive naming
+    # --- End Phase 79-02 fused het detection for C-branch ---
+
+    # --- Phase 79-01: Direct ring identification for C-branch (DROP-19 fix) ---
+    # Try O(1) ring identification before recursive naming fallback.
+    from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name_c
+    for ring in ring_info.AtomRings():
+        ring_set_inner = set(ring)
+        if ring_set_inner.issubset(sub_set):
+            # Check if ring accounts for all C atoms in substituent
+            non_ring_c = sum(
+                1 for idx in sub_atoms
+                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                and idx not in ring_set_inner
+            )
+            if non_ring_c == 0:
+                ring_prefix = _get_ring_sub_name_c(mol, tuple(ring))
+                if ring_prefix:
+                    from .naming_utils import needs_brackets
+                    if needs_brackets(ring_prefix):
+                        ring_prefix = f"({ring_prefix})"
+                    return ring_prefix
+    # --- End Phase 79-01 direct ring identification ---
+
+    # Ring-containing C-branch: try recursive naming
+    # Guard: only for moderately-sized substituents (<=25 atoms).
+    if len(sub_atoms) <= 25:
+        from .substituent_naming import name_substituent_fragment
+        from .naming_utils import needs_brackets
+        sub_name = name_substituent_fragment(
+            mol, list(sub_set), attach_atom, list(chain_set)
+        )
+        # Validate: reject only if fragment has ring atoms but name is acyclic
+        # (Phase 85 structural validation replaces pure string-based check)
+        if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
+            sub_name = None
+        if sub_name:
+            if needs_brackets(sub_name):
+                sub_name = f"({sub_name})"
+            return sub_name
+    # Fallback: recursive naming via name_fragment_recursively()
+    # for ring-containing C-branch fragments that failed direct naming.
+    if len(sub_atoms) <= 25:
+        try:
+            frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
+            if frag_smiles:
+                from .fragment_naming import name_fragment_recursively
+                from .substituent_naming import parent_to_prefix
+                frag_name = name_fragment_recursively(frag_smiles)
+                if frag_name:
+                    carbon_count = sum(
                         1 for idx in sub_atoms
                         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                        and idx not in ring_set_inner
                     )
-                    if non_ring_c == 0:
-                        ring_prefix = _get_ring_sub_name_c(mol, tuple(ring))
-                        if ring_prefix:
-                            from .naming_utils import needs_brackets
-                            if needs_brackets(ring_prefix):
-                                ring_prefix = f"({ring_prefix})"
-                            return ring_prefix
-            # --- End Phase 79-01 direct ring identification ---
+                    prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    if prefix:
+                        from .naming_utils import needs_brackets
+                        if needs_brackets(prefix):
+                            prefix = f"({prefix})"
+                        return prefix
+        except Exception:
+            pass
+    logger.debug(
+        "DROP-19 substituent_skip: reason=c_branch_ring_sub_still_unnameable",
+    )
+    return None
 
-            # Ring-containing C-branch: try recursive naming
-            # Guard: only for moderately-sized substituents (<=25 atoms).
-            if len(sub_atoms) <= 25:
-                from .substituent_naming import name_substituent_fragment
-                from .naming_utils import needs_brackets
-                sub_name = name_substituent_fragment(
-                    mol, list(sub_set), attach_atom, list(chain_set)
-                )
-                # Validate: reject only if fragment has ring atoms but name is acyclic
-                # (Phase 85 structural validation replaces pure string-based check)
-                if sub_name and _has_ring_atoms(mol, sub_atoms) and not _name_reflects_ring(sub_name):
-                    sub_name = None
-                if sub_name:
-                    if needs_brackets(sub_name):
-                        sub_name = f"({sub_name})"
-                    return sub_name
-            # Fallback: recursive naming via name_fragment_recursively()
-            # for ring-containing C-branch fragments that failed direct naming.
-            if len(sub_atoms) <= 25:
+
+def _name_c_attached_chain_substituent_fallback(
+    mol, sub_atoms: List[int], sub_set: set, chain_set: set, attach_atom: int
+) -> Optional[str]:
+    """C-attached chain-only substituent fallback (DECOMP-05 closure helper #3).
+
+    Per Phase 160.2 CONTEXT D-05 + Phase 145.1 D-09 mechanical-lift: VERBATIM lift
+    of the prior `_name_heteroatom_substituent` C-branch chain sub-body
+    (composer.py:5540-5704 in pre-Plan-03 layout). Covers BUG-A haloalkyl
+    (fluoroalkyl / chloroalkyl / bromoalkyl / iodoalkyl rendering with BFS-locant
+    positioning), BUG-D hydroxyalkyl, BUG-C aminoalkyl, plain alkyl fallback.
+    IUPAC P-29 + P-65 + P-66 substituent grammar.
+
+    Per AP-160.2-07: cross-branch shared helpers (`_count_carbon_chain`,
+    `get_alkyl_name`, `get_multiplier_prefix`, etc.) STAY in composer.py at
+    their current line ranges; this helper references them via Python
+    module-level scope.
+    """
+    # Count carbons via C-C bonds only (don't traverse through heteroatoms)
+    total_carbons = _count_carbon_chain(mol, attach_atom, chain_set)
+    if total_carbons > 0:
+        # Check what heteroatoms are present
+        heteroatoms = set()
+        halogen_counts = {'F': 0, 'Cl': 0, 'Br': 0, 'I': 0}
+        other_hetero = 0
+        for i in sub_atoms:
+            sym = mol.GetAtomWithIdx(i).GetSymbol()
+            if sym not in ('C', 'H'):
+                heteroatoms.add(sym)
+                if sym in halogen_counts:
+                    halogen_counts[sym] += 1
+                else:
+                    other_hetero += 1
+
+        # BUG-A: Haloalkyl naming (check FIRST, before hydroxy/amino)
+        # Pure haloalkyl: only C and halogens, no other heteroatoms
+        if other_hetero == 0 and any(halogen_counts.values()):
+            halogen_prefix_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+            if total_carbons == 1:
+                # Single-carbon haloalkyl: trifluoromethyl, dichloromethyl, etc.
+                halogen_parts = []
+                for hal in ['Br', 'Cl', 'F', 'I']:  # alphabetical by prefix
+                    cnt = halogen_counts[hal]
+                    if cnt > 0:
+                        mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
+                        halogen_parts.append(f'{mp}{halogen_prefix_map[hal]}')
+                return '(' + ''.join(halogen_parts) + 'methyl)'
+            elif total_carbons <= 3:
+                # Multi-carbon haloalkyl (2-3 carbons): (2-fluoroethyl), etc.
+                # Find halogen positions via BFS distance from attachment point
+                from collections import deque
+                distances = {}
+                bfs_queue = deque([(attach_atom, 0)])
+                bfs_visited = set()
+                while bfs_queue:
+                    curr, dist = bfs_queue.popleft()
+                    if curr in bfs_visited or curr in chain_set:
+                        continue
+                    bfs_visited.add(curr)
+                    curr_atom = mol.GetAtomWithIdx(curr)
+                    curr_sym = curr_atom.GetSymbol()
+                    if curr_sym in halogen_counts and halogen_counts[curr_sym] > 0:
+                        distances[curr] = dist
+                    for nbr in curr_atom.GetNeighbors():
+                        if nbr.GetIdx() not in bfs_visited and nbr.GetIdx() not in chain_set:
+                            bfs_queue.append((nbr.GetIdx(), dist + 1))
+
                 try:
-                    frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
-                    if frag_smiles:
-                        from .fragment_naming import name_fragment_recursively
-                        from .substituent_naming import parent_to_prefix
-                        frag_name = name_fragment_recursively(frag_smiles)
-                        if frag_name:
-                            carbon_count = sum(
-                                1 for idx in sub_atoms
-                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-                            )
-                            prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
-                            if prefix:
-                                from .naming_utils import needs_brackets
-                                if needs_brackets(prefix):
-                                    prefix = f"({prefix})"
-                                return prefix
-                except Exception:
-                    pass
-            logger.debug(
-                "DROP-19 substituent_skip: reason=c_branch_ring_sub_still_unnameable",
-            )
-            return None
+                    alkyl = get_alkyl_name(total_carbons)
+                except (ValueError, KeyError):
+                    alkyl = None
 
-        # Count carbons via C-C bonds only (don't traverse through heteroatoms)
-        total_carbons = _count_carbon_chain(mol, attach_atom, chain_set)
-        if total_carbons > 0:
-            # Check what heteroatoms are present
-            heteroatoms = set()
-            halogen_counts = {'F': 0, 'Cl': 0, 'Br': 0, 'I': 0}
-            other_hetero = 0
-            for i in sub_atoms:
-                sym = mol.GetAtomWithIdx(i).GetSymbol()
-                if sym not in ('C', 'H'):
-                    heteroatoms.add(sym)
-                    if sym in halogen_counts:
-                        halogen_counts[sym] += 1
-                    else:
-                        other_hetero += 1
+                if alkyl:
+                    # Group halogens by position on the sub-chain
+                    # For single halogen type at single position: (2-fluoroethyl)
+                    # For halogens all on terminal C: (2,2,2-trifluoroethyl)
+                    hal_positions = {}  # {halogen_symbol: [sub_locants]}
+                    for h_idx, dist in distances.items():
+                        h_sym = mol.GetAtomWithIdx(h_idx).GetSymbol()
+                        sub_locant = dist  # distance from attachment = sub-chain locant
+                        if h_sym not in hal_positions:
+                            hal_positions[h_sym] = []
+                        hal_positions[h_sym].append(sub_locant)
 
-            # BUG-A: Haloalkyl naming (check FIRST, before hydroxy/amino)
-            # Pure haloalkyl: only C and halogens, no other heteroatoms
-            if other_hetero == 0 and any(halogen_counts.values()):
-                halogen_prefix_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
-                if total_carbons == 1:
-                    # Single-carbon haloalkyl: trifluoromethyl, dichloromethyl, etc.
                     halogen_parts = []
-                    for hal in ['Br', 'Cl', 'F', 'I']:  # alphabetical by prefix
-                        cnt = halogen_counts[hal]
-                        if cnt > 0:
-                            mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
-                            halogen_parts.append(f'{mp}{halogen_prefix_map[hal]}')
-                    return '(' + ''.join(halogen_parts) + 'methyl)'
-                elif total_carbons <= 3:
-                    # Multi-carbon haloalkyl (2-3 carbons): (2-fluoroethyl), etc.
-                    # Find halogen positions via BFS distance from attachment point
-                    from collections import deque
-                    distances = {}
-                    bfs_queue = deque([(attach_atom, 0)])
-                    bfs_visited = set()
-                    while bfs_queue:
-                        curr, dist = bfs_queue.popleft()
-                        if curr in bfs_visited or curr in chain_set:
+                    for hal in ['Br', 'Cl', 'F', 'I']:
+                        if hal not in hal_positions:
                             continue
-                        bfs_visited.add(curr)
-                        curr_atom = mol.GetAtomWithIdx(curr)
-                        curr_sym = curr_atom.GetSymbol()
-                        if curr_sym in halogen_counts and halogen_counts[curr_sym] > 0:
-                            distances[curr] = dist
-                        for nbr in curr_atom.GetNeighbors():
-                            if nbr.GetIdx() not in bfs_visited and nbr.GetIdx() not in chain_set:
-                                bfs_queue.append((nbr.GetIdx(), dist + 1))
+                        locs = sorted(hal_positions[hal])
+                        cnt = len(locs)
+                        mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
+                        loc_str = ','.join(str(l) for l in locs)
+                        halogen_parts.append(f'{loc_str}-{mp}{halogen_prefix_map[hal]}')
 
+                    return '(' + ''.join(halogen_parts) + alkyl + ')'
+
+        # BUG-D: For C-chain with OH: name as hydroxyalkyl
+        # Locant computed via BFS distance from attachment point
+        if heteroatoms == {'O'}:
+            # Check if the O is -OH (not C=O or ether)
+            for i in sub_atoms:
+                a = mol.GetAtomWithIdx(i)
+                if a.GetSymbol() == 'O' and a.GetDegree() == 1:
                     try:
                         alkyl = get_alkyl_name(total_carbons)
+                        if total_carbons == 1:
+                            return f"(hydroxy{alkyl})"
+                        else:
+                            # Find the carbon bearing OH via BFS
+                            oh_carbon = None
+                            for nb in a.GetNeighbors():
+                                if nb.GetSymbol() == 'C':
+                                    oh_carbon = nb.GetIdx()
+                                    break
+                            # Compute BFS distance from attachment to OH carbon
+                            oh_locant = total_carbons  # default: terminal
+                            if oh_carbon is not None:
+                                from collections import deque as _deque
+                                _bfs_q = _deque([(attach_atom, 1)])
+                                _bfs_v = set()
+                                while _bfs_q:
+                                    _ci, _d = _bfs_q.popleft()
+                                    if _ci in _bfs_v or _ci in chain_set:
+                                        continue
+                                    _bfs_v.add(_ci)
+                                    if _ci == oh_carbon:
+                                        oh_locant = _d
+                                        break
+                                    _ca = mol.GetAtomWithIdx(_ci)
+                                    if _ca.GetSymbol() == 'C':
+                                        for _nb in _ca.GetNeighbors():
+                                            _ni = _nb.GetIdx()
+                                            if _ni not in _bfs_v and _ni not in chain_set:
+                                                _bfs_q.append((_ni, _d + 1))
+                            return f"({oh_locant}-hydroxy{alkyl})"
                     except (ValueError, KeyError):
-                        alkyl = None
+                        pass
 
-                    if alkyl:
-                        # Group halogens by position on the sub-chain
-                        # For single halogen type at single position: (2-fluoroethyl)
-                        # For halogens all on terminal C: (2,2,2-trifluoroethyl)
-                        hal_positions = {}  # {halogen_symbol: [sub_locants]}
-                        for h_idx, dist in distances.items():
-                            h_sym = mol.GetAtomWithIdx(h_idx).GetSymbol()
-                            sub_locant = dist  # distance from attachment = sub-chain locant
-                            if h_sym not in hal_positions:
-                                hal_positions[h_sym] = []
-                            hal_positions[h_sym].append(sub_locant)
-
-                        halogen_parts = []
-                        for hal in ['Br', 'Cl', 'F', 'I']:
-                            if hal not in hal_positions:
-                                continue
-                            locs = sorted(hal_positions[hal])
-                            cnt = len(locs)
-                            mp = get_multiplier_prefix(cnt, halogen_prefix_map[hal]) if cnt > 1 else ''
-                            loc_str = ','.join(str(l) for l in locs)
-                            halogen_parts.append(f'{loc_str}-{mp}{halogen_prefix_map[hal]}')
-
-                        return '(' + ''.join(halogen_parts) + alkyl + ')'
-
-            # BUG-D: For C-chain with OH: name as hydroxyalkyl
-            # Locant computed via BFS distance from attachment point
-            if heteroatoms == {'O'}:
-                # Check if the O is -OH (not C=O or ether)
-                for i in sub_atoms:
-                    a = mol.GetAtomWithIdx(i)
-                    if a.GetSymbol() == 'O' and a.GetDegree() == 1:
-                        try:
-                            alkyl = get_alkyl_name(total_carbons)
-                            if total_carbons == 1:
-                                return f"(hydroxy{alkyl})"
-                            else:
-                                # Find the carbon bearing OH via BFS
-                                oh_carbon = None
-                                for nb in a.GetNeighbors():
-                                    if nb.GetSymbol() == 'C':
-                                        oh_carbon = nb.GetIdx()
+        # BUG-C: For C-chain with NH2: name as (aminoalkyl)
+        # e.g., -CH2NH2 -> (aminomethyl), -CH2CH2NH2 -> (2-aminoethyl)
+        # Locant computed via BFS distance from attachment point
+        if 'N' in heteroatoms:
+            # Check for terminal primary amine (-NH2) on the chain
+            for i in sub_atoms:
+                a = mol.GetAtomWithIdx(i)
+                if (a.GetSymbol() == 'N' and a.GetDegree() == 1
+                        and a.GetTotalNumHs() == 2):
+                    try:
+                        alkyl = get_alkyl_name(total_carbons)
+                        if total_carbons == 1:
+                            return f"(amino{alkyl})"
+                        else:
+                            # Find the carbon bearing NH2 via BFS
+                            nh2_carbon = None
+                            for nb in a.GetNeighbors():
+                                if nb.GetSymbol() == 'C':
+                                    nh2_carbon = nb.GetIdx()
+                                    break
+                            nh2_locant = total_carbons  # default: terminal
+                            if nh2_carbon is not None:
+                                from collections import deque as _deque
+                                _bfs_q = _deque([(attach_atom, 1)])
+                                _bfs_v = set()
+                                while _bfs_q:
+                                    _ci, _d = _bfs_q.popleft()
+                                    if _ci in _bfs_v or _ci in chain_set:
+                                        continue
+                                    _bfs_v.add(_ci)
+                                    if _ci == nh2_carbon:
+                                        nh2_locant = _d
                                         break
-                                # Compute BFS distance from attachment to OH carbon
-                                oh_locant = total_carbons  # default: terminal
-                                if oh_carbon is not None:
-                                    from collections import deque as _deque
-                                    _bfs_q = _deque([(attach_atom, 1)])
-                                    _bfs_v = set()
-                                    while _bfs_q:
-                                        _ci, _d = _bfs_q.popleft()
-                                        if _ci in _bfs_v or _ci in chain_set:
-                                            continue
-                                        _bfs_v.add(_ci)
-                                        if _ci == oh_carbon:
-                                            oh_locant = _d
-                                            break
-                                        _ca = mol.GetAtomWithIdx(_ci)
-                                        if _ca.GetSymbol() == 'C':
-                                            for _nb in _ca.GetNeighbors():
-                                                _ni = _nb.GetIdx()
-                                                if _ni not in _bfs_v and _ni not in chain_set:
-                                                    _bfs_q.append((_ni, _d + 1))
-                                return f"({oh_locant}-hydroxy{alkyl})"
-                        except (ValueError, KeyError):
-                            pass
+                                    _ca = mol.GetAtomWithIdx(_ci)
+                                    if _ca.GetSymbol() == 'C':
+                                        for _nb in _ca.GetNeighbors():
+                                            _ni = _nb.GetIdx()
+                                            if _ni not in _bfs_v and _ni not in chain_set:
+                                                _bfs_q.append((_ni, _d + 1))
+                            return f"({nh2_locant}-amino{alkyl})"
+                    except (ValueError, KeyError):
+                        pass
 
-            # BUG-C: For C-chain with NH2: name as (aminoalkyl)
-            # e.g., -CH2NH2 -> (aminomethyl), -CH2CH2NH2 -> (2-aminoethyl)
-            # Locant computed via BFS distance from attachment point
-            if 'N' in heteroatoms:
-                # Check for terminal primary amine (-NH2) on the chain
-                for i in sub_atoms:
-                    a = mol.GetAtomWithIdx(i)
-                    if (a.GetSymbol() == 'N' and a.GetDegree() == 1
-                            and a.GetTotalNumHs() == 2):
-                        try:
-                            alkyl = get_alkyl_name(total_carbons)
-                            if total_carbons == 1:
-                                return f"(amino{alkyl})"
-                            else:
-                                # Find the carbon bearing NH2 via BFS
-                                nh2_carbon = None
-                                for nb in a.GetNeighbors():
-                                    if nb.GetSymbol() == 'C':
-                                        nh2_carbon = nb.GetIdx()
-                                        break
-                                nh2_locant = total_carbons  # default: terminal
-                                if nh2_carbon is not None:
-                                    from collections import deque as _deque
-                                    _bfs_q = _deque([(attach_atom, 1)])
-                                    _bfs_v = set()
-                                    while _bfs_q:
-                                        _ci, _d = _bfs_q.popleft()
-                                        if _ci in _bfs_v or _ci in chain_set:
-                                            continue
-                                        _bfs_v.add(_ci)
-                                        if _ci == nh2_carbon:
-                                            nh2_locant = _d
-                                            break
-                                        _ca = mol.GetAtomWithIdx(_ci)
-                                        if _ca.GetSymbol() == 'C':
-                                            for _nb in _ca.GetNeighbors():
-                                                _ni = _nb.GetIdx()
-                                                if _ni not in _bfs_v and _ni not in chain_set:
-                                                    _bfs_q.append((_ni, _d + 1))
-                                return f"({nh2_locant}-amino{alkyl})"
-                        except (ValueError, KeyError):
-                            pass
-
-            # For simple case: just name as alkyl (ignoring heteroatoms)
-            # This is imperfect but better than dropping entirely
-            try:
-                return get_alkyl_name(total_carbons)
-            except (ValueError, KeyError):
-                pass
+        # For simple case: just name as alkyl (ignoring heteroatoms)
+        # This is imperfect but better than dropping entirely
+        try:
+            return get_alkyl_name(total_carbons)
+        except (ValueError, KeyError):
+            pass
 
     return None
 
