@@ -35,11 +35,12 @@ context (the substituent has no principal-chain).
 """
 from __future__ import annotations
 
-import logging
+# Phase 160.2 Plan-04-02 WR-04 closure: removed unused ``import logging``
+# and ``logger = logging.getLogger(__name__)`` — no ``logger.*`` call sites
+# in 1041 LOC (verified via grep). Maintainers who want to add debug
+# instrumentation should re-add the import + module-local logger then.
 from collections import deque
 from typing import List, Optional, Set
-
-logger = logging.getLogger(__name__)
 
 from .naming_utils import ALKYL_NAMES, alpha_sort_key, get_alkyl_name
 from ..rules.seniority import PREFIX_FORMS

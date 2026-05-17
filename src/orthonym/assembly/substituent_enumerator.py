@@ -23,7 +23,12 @@ References:
 
 import logging
 from collections import deque, namedtuple
-from typing import List, Optional, Set, Dict
+
+# Phase 160.2 Plan-04-02 WR-04 closure: removed unused
+# ``from typing import List, Optional, Set, Dict`` — none of the four
+# names are referenced anywhere in 1608 LOC (verified via AST scan;
+# they appeared only in docstrings, not annotations). Re-add narrowly
+# scoped imports here when real annotations are added.
 
 from rdkit import Chem
 from rdkit.Chem import RWMol

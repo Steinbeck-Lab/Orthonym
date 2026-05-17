@@ -46,6 +46,7 @@ References:
 """
 from __future__ import annotations
 
+import contextvars
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -158,7 +159,31 @@ _INNER_REGISTRATION_FROZEN: bool = False
 # Per-instance counter for the inner-dispatch stats helper (mirror of
 # Phase 158 routing/dispatcher.py:_dispatch_counter pattern, per CONTEXT
 # D-18 + AP-160-13).
-_INNER_DISPATCH_STATS: Dict[str, int] = {}
+#
+# Phase 160.2 Plan-04-02 WR-01 closure: wrapped in ``contextvars.ContextVar``
+# so concurrent Orthonym instances + ``ContextVar``-isolated test contexts
+# see their own counter dict (per-instance isolation per AP-160-13's
+# documented contract). Mirrors the ``namer.py:30`` ``_name_with_tree_capture``
+# precedent. The lazy-init ``_get_stats_dict()`` helper materialises the dict
+# on first touch; ``get_inner_dispatch_stats()`` / ``reset_inner_dispatch_stats()``
+# / the dispatch-success increment all route through it.
+_INNER_DISPATCH_STATS: contextvars.ContextVar = contextvars.ContextVar(
+    "inner_dispatch_stats", default=None
+)
+
+
+def _get_stats_dict() -> Dict[str, int]:
+    """Lazy init of per-ContextVar-context stats dict. WR-01 closure.
+
+    Returns the dict stored in the current ``ContextVar`` context, creating
+    + binding it on first call. Each call site that previously read or
+    mutated the module-global dict now goes through this helper.
+    """
+    stats = _INNER_DISPATCH_STATS.get()
+    if stats is None:
+        stats = {}
+        _INNER_DISPATCH_STATS.set(stats)
+    return stats
 
 
 def _register_inner(
@@ -365,10 +390,11 @@ def dispatch_inner(
 
         # Handler succeeded. Increment per-handler stats (successful
         # handler only per D-18, mirroring outcome semantics over
-        # predicate-match semantics).
-        _INNER_DISPATCH_STATS[entry.handler_id] = (
-            _INNER_DISPATCH_STATS.get(entry.handler_id, 0) + 1
-        )
+        # predicate-match semantics). Phase 160.2 Plan-04-02 WR-01:
+        # route through _get_stats_dict() so each ContextVar context
+        # mutates its own dict.
+        _stats = _get_stats_dict()
+        _stats[entry.handler_id] = _stats.get(entry.handler_id, 0) + 1
         return InnerDispatchResult(
             handler_id=entry.handler_id,
             handler=entry.handler,
@@ -396,8 +422,11 @@ def get_inner_dispatch_stats() -> Dict[str, int]:
     Returns a COPY of the in-memory counter dict so callers cannot mutate
     the underlying state. Plan-04 wires this into the CLI (--audit-trace
     flag) to surface per-handler hit rates during benchmarking.
+
+    Phase 160.2 Plan-04-02 WR-01: reads the per-``ContextVar`` context dict
+    so concurrent Orthonym instances each see their own counter snapshot.
     """
-    return dict(_INNER_DISPATCH_STATS)
+    return dict(_get_stats_dict())
 
 
 def reset_inner_dispatch_stats() -> None:
@@ -405,8 +434,11 @@ def reset_inner_dispatch_stats() -> None:
 
     Called by tests + Plan-04 benchmarks to isolate counter state across
     runs. Mirrors Phase 158 ``reset_dispatch_counter()`` per AP-160-13.
+
+    Phase 160.2 Plan-04-02 WR-01: clears the current ``ContextVar``
+    context's dict only; other concurrent contexts keep their counters.
     """
-    _INNER_DISPATCH_STATS.clear()
+    _get_stats_dict().clear()
 
 
 # ============================================================================

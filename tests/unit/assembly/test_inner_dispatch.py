@@ -1084,3 +1084,96 @@ class TestPhase160_2_Registrations:
 
         predicate = INNER_DISPATCH_TABLE["general_acyclic"].predicate
         assert predicate(FakeFeatures()) is False
+
+
+# =============================================================================
+# Phase 160.2 Plan-04-02 WR-01: _INNER_DISPATCH_STATS ContextVar isolation.
+# =============================================================================
+
+
+class TestWR01InnerDispatchStatsContextVarIsolation:
+    """Phase 160.2 Plan-04-02 WR-01 closure: ``_INNER_DISPATCH_STATS`` is
+    wrapped in ``contextvars.ContextVar`` so per-Orthonym-instance
+    counters are isolated (matches the AP-160-13 documented contract +
+    the ``namer.py:30`` ``_name_with_tree_capture`` precedent).
+    """
+
+    def test_dispatch_stats_is_contextvar(self):
+        import contextvars
+        from orthonym.assembly import inner_dispatch
+        assert isinstance(
+            inner_dispatch._INNER_DISPATCH_STATS, contextvars.ContextVar
+        ), (
+            "WR-01: _INNER_DISPATCH_STATS must be a contextvars.ContextVar"
+        )
+
+    def test_get_stats_dict_lazy_init_returns_dict(self):
+        import contextvars
+        from orthonym.assembly.inner_dispatch import _get_stats_dict
+
+        def _isolated():
+            d = _get_stats_dict()
+            assert isinstance(d, dict)
+            # First call lazily binds an empty dict
+            assert d == {} or all(isinstance(v, int) for v in d.values())
+
+        ctx = contextvars.copy_context()
+        ctx.run(_isolated)
+
+    def test_dispatch_stats_isolated_between_contexts(self):
+        """Two parallel ContextVar contexts each see only their own
+        handler-id keys (per-instance isolation per AP-160-13)."""
+        import contextvars
+        from orthonym.assembly.inner_dispatch import (
+            reset_inner_dispatch_stats,
+            get_inner_dispatch_stats,
+            _get_stats_dict,
+        )
+
+        def context_a():
+            reset_inner_dispatch_stats()
+            _get_stats_dict()["handler_a"] = 1
+            return dict(get_inner_dispatch_stats())
+
+        def context_b():
+            reset_inner_dispatch_stats()
+            _get_stats_dict()["handler_b"] = 2
+            return dict(get_inner_dispatch_stats())
+
+        ctx_a = contextvars.copy_context()
+        ctx_b = contextvars.copy_context()
+        a_stats = ctx_a.run(context_a)
+        b_stats = ctx_b.run(context_b)
+
+        # Per-instance isolation: each context sees only its own handler
+        assert "handler_a" in a_stats and "handler_b" not in a_stats, (
+            f"context A leaked context B's key: {a_stats}"
+        )
+        assert "handler_b" in b_stats and "handler_a" not in b_stats, (
+            f"context B leaked context A's key: {b_stats}"
+        )
+
+    def test_get_inner_dispatch_stats_returns_copy(self):
+        """``get_inner_dispatch_stats`` returns a COPY, not the underlying
+        dict (callers cannot mutate the ContextVar state through the
+        returned dict)."""
+        import contextvars
+        from orthonym.assembly.inner_dispatch import (
+            reset_inner_dispatch_stats,
+            get_inner_dispatch_stats,
+            _get_stats_dict,
+        )
+
+        def _isolated():
+            reset_inner_dispatch_stats()
+            _get_stats_dict()["handler_x"] = 7
+            snapshot = get_inner_dispatch_stats()
+            snapshot["handler_x"] = 999  # mutate the returned dict
+            return dict(get_inner_dispatch_stats())  # re-read
+
+        ctx = contextvars.copy_context()
+        live = ctx.run(_isolated)
+        # The snapshot mutation must NOT leak back into the live state
+        assert live.get("handler_x") == 7, (
+            f"mutation leaked: live state shows {live!r}"
+        )
