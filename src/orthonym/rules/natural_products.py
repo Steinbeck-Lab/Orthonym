@@ -232,6 +232,40 @@ def format_np_modification_prefix(modifications: List[Dict]) -> str:
     return "-".join(parts)
 
 
+# ----------------------------------------------------------------------------
+# Phase 160.1 D-19 + D-20 + ADR-19-05: IUPAC-canonical aromatic-ring ene
+# locants for retained-NP scaffolds.
+#
+# Replaces Chem.Kekulize-based aromatic-ring ene detection (which is
+# PYTHONHASHSEED-sensitive per Phase 145.2 D-09 — RDKit's Kekulize algorithm
+# is deterministic within a process but sensitive to upstream atom-iteration
+# order, producing different equally-valid Kekulé forms across processes).
+#
+# Each entry: list of (lower_locant, higher_locant, indicated_h_locant_or_None)
+# tuples — one per canonical aromatic-ring double bond per IUPAC P-31.1.3.4.
+# The (indicated_h_locant) is the parenthetical marker rendered per
+# IUPAC P-31.1.4.3.4 when a double bond spans a ring-junction atom.
+#
+# For estrane, the canonical IUPAC PIN form is `1,3,5(10)-trien` — three
+# aromatic-ring double bonds at C1=C2, C3=C4, C5=C10 (the (10) marker
+# disambiguates between C5-C6 and C5-C10).
+#
+# Source: IUPAC Blue Book §P-31.1.3.4 + §P-31.1.4.3.4
+# Cross-reference: opsin/opsin-core/.../steroidGroupNames.xml
+# ----------------------------------------------------------------------------
+_NP_AROMATIC_RING_LOCANTS: Dict[str, List[Tuple[int, int, Optional[int]]]] = {
+    # estra-1,3,5(10)-triene: aromatic ring A of estrane (estradiol class).
+    # Three canonical aromatic double bonds: 1=2, 3=4, 5=10 (the (10) marks
+    # the ring-junction double bond per P-31.1.4.3.4; without it, the 5-en
+    # is ambiguous between C5-C6 and C5-C10).
+    "estrane": [(1, 2, None), (3, 4, None), (5, 10, 10)],
+    # Future aromatic-NP scaffolds attach by adding rows here as Phase 161+
+    # ships them; e.g.:
+    #   "morphinan": [(1, 2, None), (3, 4, None), ...],
+    #   "ergoline": [...],
+}
+
+
 def name_natural_product(mol) -> Optional[str]:
     """Name a molecule using natural product recognition.
 
@@ -283,6 +317,7 @@ def name_natural_product(mol) -> Optional[str]:
             unsaturation = _find_scaffold_unsaturation(
                 mol, set(scaffold_info["matched_atoms"]), numbering,
                 scaffold_aromatic_atoms=scaffold_arom,
+                scaffold_class=scaffold_info.get("scaffold_name"),
             )
             if unsaturation["ene"] or unsaturation["yne"]:
                 stereo_prefix = _collect_np_stereo(mol, numbering)
@@ -422,6 +457,7 @@ def name_natural_product_with_substituents(
     unsaturation = _find_scaffold_unsaturation(
         mol, matched_set, numbering,
         scaffold_aromatic_atoms=scaffold_arom,
+        scaffold_class=scaffold_info.get("scaffold_name"),
     )
 
     # 3b. Find methyl substituents on scaffold (extra CH3 not part of scaffold)
@@ -716,7 +752,8 @@ def _build_scaffold_aromatic_atoms(
 def _find_scaffold_unsaturation(
     mol, matched_set: set, numbering: Dict[int, int],
     scaffold_aromatic_atoms: Optional[set] = None,
-) -> Dict[str, List[int]]:
+    scaffold_class: Optional[str] = None,
+) -> Dict[str, object]:
     """Find double and triple bonds within the scaffold.
 
     Detects explicit DOUBLE and TRIPLE bonds directly.  For aromatic rings
@@ -729,6 +766,16 @@ def _find_scaffold_unsaturation(
     morphinan Ring A, whose SMARTS already contains ``c`` atoms) are excluded
     because the base scaffold name already encodes that aromaticity.
 
+    Phase 160.1 D-19 + D-20 + ADR-19-05: for retained-NP scaffolds with
+    fully-aromatic rings (``scaffold_class in _NP_AROMATIC_RING_LOCANTS``),
+    the canonical aromatic-ring ene locants come from the per-scaffold
+    canonical-locant table BEFORE Kekulize. This produces IUPAC-canonical
+    locants deterministically across all PYTHONHASHSEED values (replacing
+    the previous Chem.Kekulize-based detection which was PYTHONHASHSEED-
+    sensitive per Phase 145.2 D-09). The Kekulize path is preserved for
+    novel aromatic substituents OUTSIDE the scaffold and for non-cataloged
+    scaffold classes.
+
     Args:
         mol: RDKit Mol object.
         matched_set: Atom indices belonging to the scaffold.
@@ -736,15 +783,61 @@ def _find_scaffold_unsaturation(
         scaffold_aromatic_atoms: Atom indices that are aromatic in the
             scaffold SMARTS pattern (from ``_build_scaffold_aromatic_atoms``).
             When ``None`` or empty, all aromatic C-C ene positions are counted.
+        scaffold_class: Scaffold class label (e.g., 'estrane'). When present
+            in ``_NP_AROMATIC_RING_LOCANTS``, the aromatic-ring ene locants
+            come from the table; Kekulize is bypassed for atoms in
+            ``scaffold_aromatic_atoms``.
 
-    Returns a dict with 'ene' and 'yne' keys, each a sorted list of
-    IUPAC locants (lower locant of each unsaturated bond).
+    Returns a dict with:
+      * 'ene' - sorted list of int IUPAC locants (lower locant of each
+        unsaturated bond). PRESERVED for backwards compatibility.
+      * 'yne' - sorted list of int IUPAC locants (lower locant of each
+        triple bond).
+      * 'ene_indicated_h' - Dict[int, int] mapping lower-locant to
+        indicated-H locant per IUPAC P-31.1.4.3.4 (e.g., {5: 10} for the
+        canonical estrane 5(10)-en); only populated for table-sourced
+        aromatic-ring ene entries. Used by the locant-string renderer to
+        emit the parenthetical marker.
     """
     if scaffold_aromatic_atoms is None:
         scaffold_aromatic_atoms = set()
 
-    ene_locants = []
-    yne_locants = []
+    ene_locants: List[int] = []
+    yne_locants: List[int] = []
+    ene_indicated_h: Dict[int, int] = {}
+
+    # Phase 160.1 D-19 + D-20 + ADR-19-05: deterministic aromatic-ring
+    # canonical locants from the per-scaffold-class table when the scaffold
+    # is cataloged AND the molecule has aromatic atoms inside the scaffold.
+    # This bypasses the PYTHONHASHSEED-sensitive Chem.Kekulize call for
+    # those atoms; the existing Kekulize path remains for atoms OUTSIDE
+    # the scaffold's aromatic region.
+    #
+    # The trigger condition uses the molecule's RUNTIME aromaticity (any
+    # scaffold-matched atom with GetIsAromatic() == True), NOT the SMARTS-
+    # inherent aromaticity passed via scaffold_aromatic_atoms. This is
+    # because steroid scaffolds (e.g., estrane) use C atoms in their SMARTS
+    # (not aromatic c) but the actual molecule can have an aromatic Ring A
+    # (estradiol). Runtime aromaticity detection is what determines whether
+    # the canonical table should override Kekulize.
+    table_handled_atoms: set = set()
+    if (
+        scaffold_class is not None
+        and scaffold_class in _NP_AROMATIC_RING_LOCANTS
+    ):
+        # Identify scaffold atoms that are aromatic in the actual molecule.
+        runtime_aromatic_atoms = {
+            idx for idx in matched_set
+            if mol.GetAtomWithIdx(idx).GetIsAromatic()
+        }
+        if runtime_aromatic_atoms:
+            for low, high, indicated_h in _NP_AROMATIC_RING_LOCANTS[scaffold_class]:
+                ene_locants.append(low)
+                if indicated_h is not None:
+                    ene_indicated_h[low] = indicated_h
+            # Mark all runtime-aromatic scaffold atoms as handled so the
+            # Kekulize loop below does not also count them.
+            table_handled_atoms = runtime_aromatic_atoms
 
     # Determine if we need Kekulized bond orders for aromatic detection.
     # Check whether the molecule has any aromatic scaffold C-C bonds that
@@ -804,6 +897,14 @@ def _find_scaffold_unsaturation(
         lower_loc = min(b_loc, e_loc)
 
         if bond.GetBondType() == Chem.BondType.DOUBLE:
+            # Phase 160.1 D-20: skip aromatic bonds already accounted for
+            # by the canonical-locant table (atoms in table_handled_atoms).
+            if (
+                b_atom.GetIsAromatic() and e_atom.GetIsAromatic()
+                and b_idx in table_handled_atoms
+                and e_idx in table_handled_atoms
+            ):
+                continue  # Handled via _NP_AROMATIC_RING_LOCANTS above
             # For Kekulized aromatic bonds, check the scaffold-inherent filter
             if b_atom.GetIsAromatic() and e_atom.GetIsAromatic():
                 if b_idx in scaffold_aromatic_atoms and e_idx in scaffold_aromatic_atoms:
@@ -812,7 +913,11 @@ def _find_scaffold_unsaturation(
         elif bond.GetBondType() == Chem.BondType.TRIPLE:
             yne_locants.append(lower_loc)
 
-    return {"ene": sorted(ene_locants), "yne": sorted(yne_locants)}
+    return {
+        "ene": sorted(ene_locants),
+        "yne": sorted(yne_locants),
+        "ene_indicated_h": ene_indicated_h,
+    }
 
 
 def _find_epoxy_bridges(
@@ -1117,6 +1222,9 @@ def _assemble_np_name(
     # not cholest-5,7-dien). For a single locant, no 'a' (cholest-5-en).
     ene_locs = unsaturation.get("ene", [])
     yne_locs = unsaturation.get("yne", [])
+    # Phase 160.1 D-20 + ADR-19-05: indicated-H locant map for ring-junction
+    # double bonds per IUPAC P-31.1.4.3.4 (e.g., {5: 10} renders as "5(10)").
+    ene_indicated_h = unsaturation.get("ene_indicated_h", {})
     total_unsat_locants = len(ene_locs) + len(yne_locs)
 
     # Add terminal 'a' to stem when multiple unsaturation locants (IUPAC P-31.1.3.4)
@@ -1124,11 +1232,23 @@ def _assemble_np_name(
     if total_unsat_locants >= 2:
         effective_stem = stem + "a"
 
+    def _fmt_ene_locant(loc: int) -> str:
+        """Render an ene locant with optional indicated-H marker.
+
+        Per IUPAC P-31.1.4.3.4: ring-junction double bonds emit the
+        parenthetical indicated-H locant (e.g., '5(10)'). Plain integer
+        for non-junction locants.
+        """
+        h = ene_indicated_h.get(loc)
+        if h is None:
+            return str(loc)
+        return f"{loc}({h})"
+
     unsat_suffix = ""
     if ene_locs or yne_locs:
         parts = []
         if ene_locs:
-            ene_locant_str = ",".join(str(loc) for loc in ene_locs)
+            ene_locant_str = ",".join(_fmt_ene_locant(loc) for loc in ene_locs)
             ene_count = len(ene_locs)
             if ene_count == 1:
                 parts.append(f"-{ene_locant_str}-en")
@@ -1444,12 +1564,24 @@ def _assemble_np_ester_name(
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
     yne_locs = unsaturation.get("yne", [])
+    # Phase 160.1 D-20 + ADR-19-05: indicated-H locant map for ring-junction
+    # double bonds per IUPAC P-31.1.4.3.4 (e.g., {5: 10} renders as "5(10)").
+    ene_indicated_h = unsaturation.get("ene_indicated_h", {})
+
+    def _fmt_ene_locant_ester(loc: int) -> str:
+        """Render an ene locant with optional indicated-H marker (ester path)."""
+        h = ene_indicated_h.get(loc)
+        if h is None:
+            return str(loc)
+        return f"{loc}({h})"
 
     unsat_suffix = ""
     if ene_locs or yne_locs:
         parts = []
         if ene_locs:
-            ene_locant_str = ",".join(str(loc) for loc in ene_locs)
+            ene_locant_str = ",".join(
+                _fmt_ene_locant_ester(loc) for loc in ene_locs
+            )
             ene_count = len(ene_locs)
             if ene_count == 1:
                 parts.append(f"-{ene_locant_str}-en")
