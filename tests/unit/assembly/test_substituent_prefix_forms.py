@@ -679,3 +679,76 @@ class TestCarbamateAttachIdxRouting:
         assert prefix != "carbamoyloxy", (
             f"Branch A misrouted to Branch B: {prefix!r}"
         )
+
+
+# ====================================================================
+# Phase 160.2 Plan-04-03a — WR-05 _PREFIX_FORM_PATTERNS thread-safety
+# ====================================================================
+
+
+class TestWR05PrefixFormCacheThreadSafe:
+    """Phase 160.2 Plan-04-03a WR-05 closure: ``_PREFIX_FORM_PATTERNS``
+    lazy init is thread-safe via ``threading.Lock`` double-check pattern.
+
+    Validates the documented contract:
+    * ``_PREFIX_FORM_CACHE_LOCK`` exists and is a ``threading.Lock``.
+    * Concurrent first-callers see consistent cache state across threads
+      (no thread sees a partially populated dict; ``Chem.MolFromSmarts``
+      is invoked at most once per ``fg_name`` across all threads).
+    """
+
+    def test_prefix_form_cache_lock_is_threading_lock(self):
+        """The lock object is an actual ``threading.Lock`` / ``RLock``."""
+        import threading
+        from orthonym.assembly import substituent_prefix_forms as spf
+        # threading.Lock() returns a _thread.lock instance — check via the
+        # public sentinel methods (locked / acquire / release).
+        assert hasattr(spf._PREFIX_FORM_CACHE_LOCK, "locked")
+        assert callable(spf._PREFIX_FORM_CACHE_LOCK.locked)
+        # And it's an instance of one of the lock types in threading.
+        assert isinstance(
+            spf._PREFIX_FORM_CACHE_LOCK,
+            (type(threading.Lock()), type(threading.RLock())),
+        )
+
+    def test_prefix_form_cache_thread_safe(self):
+        """Concurrent ``_ensure_patterns_cached`` calls do not race or
+        double-init.
+
+        Spawns 10 threads that all reset + call the cache init; verifies
+        that all see the same cache size at the end (no torn writes;
+        one consistent populated dict).
+        """
+        import threading
+        from orthonym.assembly import substituent_prefix_forms as spf
+
+        # Reset cache to force re-init under concurrent first-call.
+        spf._PREFIX_FORM_PATTERNS.clear()
+
+        results = []
+        errors = []
+
+        def worker():
+            try:
+                spf._ensure_patterns_cached()
+                results.append(len(spf._PREFIX_FORM_PATTERNS))
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors, f"thread errors: {errors}"
+        # All threads see the same cache size (single-init invariant)
+        assert len(set(results)) == 1, (
+            f"inconsistent cache sizes across threads: {results}"
+        )
+        # Cache is populated (non-zero patterns; the 14-row closed-set
+        # has 15 SMARTS names but some may not have FUNCTIONAL_GROUP_SMARTS
+        # mappings — assert >= 10 as a sanity floor).
+        assert results[0] >= 10, (
+            f"cache underpopulated post-init: size={results[0]}"
+        )

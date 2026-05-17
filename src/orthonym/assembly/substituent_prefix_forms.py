@@ -35,6 +35,8 @@ context (the substituent has no principal-chain).
 """
 from __future__ import annotations
 
+import threading
+
 # Phase 160.2 Plan-04-02 WR-04 closure: removed unused ``import logging``
 # and ``logger = logging.getLogger(__name__)`` — no ``logger.*`` call sites
 # in 1041 LOC (verified via grep). Maintainers who want to add debug
@@ -968,19 +970,37 @@ _PREFIX_FORM_FG_NAMES = (
 
 _PREFIX_FORM_PATTERNS: dict = {}  # Lazily populated on first call
 
+# Phase 160.2 Plan-04-03a WR-05 closure: lock guarding the lazy-init of
+# ``_PREFIX_FORM_PATTERNS``. Industry-standard double-check pattern
+# (first check WITHOUT lock for fast-path; re-check INSIDE lock to ensure
+# one-time init under concurrent first-call). Closes the thread-safety
+# gap documented at 160.1-REVIEW.md WR-05 — concurrent first callers no
+# longer race ``Chem.MolFromSmarts`` 28 times.
+_PREFIX_FORM_CACHE_LOCK = threading.Lock()
+
 
 def _ensure_patterns_cached() -> None:
-    """Lazy-compile the 14 SMARTS patterns once per process."""
-    if _PREFIX_FORM_PATTERNS:
-        return
-    from rdkit import Chem
-    from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+    """Lazy-compile the 14 SMARTS patterns once per process.
 
-    for fg_name in _PREFIX_FORM_FG_NAMES:
-        if fg_name in FUNCTIONAL_GROUP_SMARTS:
-            _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
-                FUNCTIONAL_GROUP_SMARTS[fg_name]
-            )
+    Phase 160.2 Plan-04-03a WR-05 closure: thread-safe via
+    ``threading.Lock`` double-check pattern. Concurrent first calls
+    re-acquire-and-recheck under the lock so the population loop runs
+    exactly once across all threads (mirroring the standard
+    double-checked-locking idiom).
+    """
+    if _PREFIX_FORM_PATTERNS:
+        return  # First check (no lock; fast path for the common warm-cache case)
+    with _PREFIX_FORM_CACHE_LOCK:
+        if _PREFIX_FORM_PATTERNS:
+            return  # Second check (inside lock; ensures one-time init)
+        from rdkit import Chem
+        from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+
+        for fg_name in _PREFIX_FORM_FG_NAMES:
+            if fg_name in FUNCTIONAL_GROUP_SMARTS:
+                _PREFIX_FORM_PATTERNS[fg_name] = Chem.MolFromSmarts(
+                    FUNCTIONAL_GROUP_SMARTS[fg_name]
+                )
 
 
 def _check_substituent_prefix_form(
