@@ -1,0 +1,101 @@
+smiles,expected_rule_based_name,stout_class,tier,source_canary_file,source_fixture_id
+CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](COS(=O)(=O)[O-])[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@@H](CO[C@@H]2O[C@H](CO)[C@H](O)[C@H](O[C@@H]3O[C@H](COS(=O)(=O)[O-])[C@@H](O)[C@H](O)[C@H]3O)[C@H]2NC(C)=O)O[C@H]1O.[Na+].[Na+],"disodium (2R,3R,4R,5R,6R)-5-ethyl-3,6-dihydroxy-2,4-dioxanyloxane",SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0036
+CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])NC1=O.[NH4+],ammonium quinoline-3-carboxylate,SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0407
+NC(N)=[NH2+].O=C([O-])C(=O)O,guanidinium hydrogen ethanedioate,SALT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0149
+O=C([O-])/C=C/C(=O)O.[Na+],sodium hydrogen (2E)-but-2-enedioate,SALT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0144
+O=P([O-])([O-])[O-].[Mg+2].[NH4+],ammonium magnesium phosphate,SALT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0031
+CCOC(=O)Nc1ccc2c(c1)N(C(=O)CC[NH+]1CCOCC1)c1ccccc1S2.[Cl-],ethyl carbamatylbenzeneium chloride,SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0439
+[NH3+]C(CCC(=O)[O-])C(=O)[O-].[Na+],sodium glutamate,SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0354
+O.O.O.O.O.O.O.O=S(=O)([O-])[O-].[Ni+2],nickel(II) unknown organic compound,SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0054
+CCC[NH+]1CCCC[C@H]1C(=O)Nc1c(C)cccc1C.[Cl-],(2S)-2-phenyl-N-propylpiperidineium chloride,SALT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0561
+O=P([O-])([O-])[O-].[Na+].[Na+].[Na+],trisodium phosphate,SALT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0645
+CCC(O)CC(=O)O[C@H](CC(=O)[O-])C[N+](C)(C)C,ammonium dodecanoate,ZWITTERION,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0378
+C[N+](C)(C)CC(=O)[O-],betaine,ZWITTERION,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0145
+C[C@H](O)[C@H]([NH3+])C(=O)[O-],"(2S,3S)-2-amino-3-hydroxybutanoic acid",ZWITTERION,Tier 1,canary_post_160.2.csv,test_canary_rt75_0581
+O=S([O-])[O-],sulfite,ANION_RETAINED,Tier 1,canary_post_160.2.csv,test_canary_rt75_0204
+CCCCC/C=C\CC(O)/C=C/C=C\C/C=C\CCCC(=O)[O-],"(5Z,8Z,10E,14Z)-12-hydroxyicosa-5,8,10,14-tetraenoate",ANION_SMALL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0659
+CCc1cc(S(=O)(=O)[O-])c2cc(C(C)C)cccc1-2,pentadecanolate,ANION_SMALL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0441
+O=C([O-])C(=O)C[C@@H](O)C(=O)[O-],(2R)-2-hydroxy-4-oxopentanedioate,POLY_ANION,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0550
+C=C[C@H]1C[N@]2CC[C@H]1C[C@@H]2[C@@H](O)c1ccnc2ccc(OC)cc12.O=C(O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO,"cinchonane (2R,3S,4R,5R)-2,3,4,5,6-pentahydroxyhexanoic acid",MULTI_COMPONENT_NEUTRAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0238
+COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.COc1ccc(C[C@H](C)NC[C@@H](O)c2ccc(O)c(NC=O)c2)cc1.O=C(O)/C=C/C(=O)O,N-formyl(2S)-2-(3-amino-4-hydroxyphenyl)-1-amino-1-anilinoethan-2-ol N-formyl(2S)-2-(3-amino-4-hydroxyphenyl)-1-amino-1-anilinoethan-2-ol (2E)-but-2-enedioic acid,MULTI_COMPONENT_NEUTRAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0262
+CN[C@@H]1[C@@H](O)C(O)OC[C@]1(C)O,garosamine,CARBOHYDRATE_LOOKUP,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0549
+CC1OC(O)C(O)C(O)C1O,rhamnopyranose,CARBOHYDRATE_LOOKUP,Tier 1,canary_post_160.2.csv,test_canary_rt75_0112
+C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO,"(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-dien-3,20-dione",NATURAL_PRODUCT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0420
+CC(=O)OC[C@]12CC[C@H](O)C(C)(C)[C@@H]1CCC1=C2CC[C@]2(C)[C@@H]([C@H](C)[C@H](C/C=C(/C)C(=O)O)OC(C)=O)CC[C@@]12C,"(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-3,27-dihydroxy-4,4,14-trimethyl-27-oxocholest-8,24-dien-19,22-diyl diacetate",NATURAL_PRODUCT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0509
+COC1=CC=C2[C@H]3Cc4ccc(OC)c5c4[C@@]2(C[C@@H](C2=C[C@@]4(O)[C@H]6Cc7ccc(O)c8c7[C@@]4(CCN6C)[C@@H](O8)C2=O)N3C)[C@H]1O5,"(5R,9R,13S,16S)-4,5-epoxy-3,6-dimethoxy-17-methylmorphina-6,8-diene",NATURAL_PRODUCT,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0062
+C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O,"N-[(2S,3R)-3-hydroxy-2-(pentanoylamino)butanoyl](2S)-2-amino-3-phenylpropanoic acid",PEPTIDE,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0006
+CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O,L-valyl-L-isoleucyl-L-threonine,PEPTIDE,Tier 1,canary_post_160.2.csv,test_canary_rt75_0061
+CC(C)C[C@H](NC(=O)[C@H](C)N)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)O)[C@@H](C)O,L-alanyl-L-leucyl-L-threonyl-L-glutamine,PEPTIDE,Tier 1,canary_post_160.2.csv,test_canary_rt75_0663
+CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O,L-leucyl-L-serylglycine,PEPTIDE,Tier 1,canary_post_160.2.csv,test_canary_rt75_0009
+CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O,L-isoleucyl-L-tyrosyl-L-serine,PEPTIDE,Tier 1,canary_post_160.2.csv,test_canary_rt75_0498
+CCOC(C)=O,ethyl acetate,RETAINED_NAME,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0133
+C1COCCO1,"1,4-dioxane",RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0376
+C1OCCO1,"1,3-dioxolane",RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0075
+c1ccc2[nH]ccc2c1,1H-indole,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0196
+N#Cc1ccccc1,benzonitrile,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0205
+O=CO,formic acid,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0088
+c1ccc2c(c1)Cc1ccccc1-2,fluorene,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0359
+c1ccc2ncccc2c1,quinoline,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0198
+O=C1CCC(=O)N1,succinimide,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0079
+OCCCO,trimethylene glycol,RETAINED_NAME,Tier 1,canary_post_160.2.csv,test_canary_rt75_0214
+N=C(N)NCCS(=O)O,hypotaurocyamine,AMINO_ACID,Tier 1,canary_post_160.2.csv,test_canary_rt75_0492
+CCOCCCO,4-oxahexan-1-ol,SKELETAL_REPLACEMENT,Tier 1,canary_post_160.2.csv,test_canary_rt75_0585
+CCCCCCC/C=C\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCCCC/C=C\CCCCCCCC,(2R)-1-((9Z)-heptadec-9-enoyloxy)-2-(oleoyloxy)propanamine,DECOMPOSITION_PRE_GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0316
+CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)[O-],hexacosanoate,DECOMPOSITION_PRE_GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0627
+CC1=CC(=O)CC2C1(C)CCC(C)C2(C)CC/C(C)=C/C(=O)O,(2E)-5-cyclodecanyl-3-methylpent-2-enoic acid,DECOMPOSITION_PRE_GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0337
+COc1cc(O)c2c(=O)c(OC)c(-c3ccc(OC)c(O)c3)oc2c1,3-methoxyphenol,DECOMPOSITION_PRE_GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0530
+CCCCCCCCCCCCCCCC(=O)OC[C@H](CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)OC(=O)CCCCCCCCCCCCCCC,"(beta-D-galactopyranosyloxy)(2S)-1,2-bis(palmitoyloxy)propan-3-ol",DECOMPOSITION_PRE_GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0248
+[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,decamethylferrocene,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-10
+CC[Li],ethyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-20
+[Li]C=C,ethyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-12
+[Ni].C=CC.C=CC,bis(η³-prop-2-en-1-yl)nickel,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-06
+[Li][CH3],methyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T3-01
+CCC(=O)c1ccc(OC)cc1OC,"1-(2,4-dimethoxyphenyl)propan-1-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0673
+CCCCCCCCCCCCCCCCCC(=O)[C@@H](N)CO,(2S)-2-amino-1-hydroxyicosan-3-one,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0620
+Cc1cc(C)c2ccccc2c1,"1,3-dimethylnaphthalene",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0362
+C/C=C\CCCCC(=O)O,(6Z)-oct-6-enoic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0311
+C=C1CCCCC1,methylidenecyclohexane,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0287
+CC(=O)OC[C@]1(C)[C@@H](OC(C)=O)CC[C@]2(C)C3=Cc4c(cc(-c5ccccc5)oc4=O)O[C@]3(C)[C@@H](OC(C)=O)C[C@@H]12,bis(acetyloxy)ethyl acetate,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0307
+N#CC(SC[C@H](NC(=O)CC[C@H]([NH3+])C(=O)[O-])C(=O)NCC(=O)[O-])c1c[nH]c2ccccc12,N-L-glutamyl-2-(propanoylamino)ethanoate,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0033
+C/C=C/C(=O)O[C@@H]1CC2O[C@@H]3C=C(C)[C@@H](O)[C@@H]4OCC2(O)[C@@]1(C)[C@@]34C,(2E)-((2E)-but-2-enoyloxy)but-2-enol,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0336
+NC(C(=O)O)c1ccccc1F,2-(2-fluorophenyl)-2-aminoethanoic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0559
+CCCC(=O)CCCCCO,9-hydroxynonan-4-one,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0438
+Oc1ccc(CCC(O)CC/C=C/c2ccccc2)cc1,(6E)-1-(4-hydroxyphenyl)-7-phenylhept-6-en-3-ol,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0434
+C=CC(=O)Nc1ccc2ncnc(Nc3ccc(-c4ccccc4)cc3)c2c1,1-anilinoprop-2-enamide,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0039
+Oc1ccc2ncccc2c1,6-hydroxyquinoline,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0186
+CC[C@@H](O)C[C@@H](O)c1cc(OC)cc(=O)o1,"(1R,3R)-1-cyclohexylpentane-1,3-diol",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0292
+NC(C(=O)O)C(CC[C@H](N)C(=O)O)C(=O)O,"(6S)-2,6-diamino-3-(hydroxymethyl)heptanetrioic acid",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0004
+CCC(C)(NC(=O)C(CCC(N)=O)NC(=O)C1CC(O)CN1C(=O)C(C)(C)NC(=O)C(C)(C)NC(=O)C(CC(C)C)NC(=O)CNC(=O)C(NC(=O)C(C)(C)NC(=O)C(C)(C)NC(=O)C(NC(C)=O)C(C)C)C(C)C)C(=O)N1CC(O)CC1C(=O)NC(C)(C)C(=O)NC(CO)Cc1ccccc1,N-[2-(butanoylamino)-2-methylpropanoyl]-5-anilino-4-(pentanoylamino)pentanamide,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0397
+O=C(/C=C/c1ccc(O)cc1)c1ccc(O)c(O)c1O,"(2E)-1-(2,3,4-trihydroxyphenyl)-3-(4-hydroxyphenyl)prop-2-en-1-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0393
+CCCCC[C@H](O)/C=C/C=C\C/C=C\CCCCCCC(=O)O,"(8Z,11Z,13E,15S)-15-hydroxyicosa-8,11,13-trienoic acid",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0494
+CC(C)(C)OC(=O)c1cccc(N)c1,2-methylpropan-2-yl 3-aminobenzoate,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0676
+CC(C)(C)/C=C/C(=O)O,"(2E)-4,4-dimethylpent-2-enoic acid",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0255
+NC(=O)O,carbamic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0083
+CCC(C)c1nc(OC)c(C(O)c2ccc(O)cc2)n(OC)c1=O,5-(sec-butyl)-N-methyl-3-methyl-6-oxo-2-phenylpyrazine,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0546
+O=C1CCC(O)C(O)CO1,"5,6-dihydroxyoxepan-2-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0594
+O=C(O)CCCC/C=C\CCCCCCCCCC,(6Z)-heptadec-6-enoic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0101
+C=C1/C=C/C(C)(C)CCC/C(C)=C\CC1,"(1Z,6E)-1,8,8-trimethyl-5-methylidenecycloundeca-1,6-diene",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0616
+CC1CCCN1,2-methylpyrrolidine,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0429
+COc1cc2c(cc1OC)C1C(CO2)Oc2c(ccc3occc23)C1O,"18,19-dimethoxy-7,12,15-trioxa-pentacyclo[11.8.0.0(3,11).0(6,10).0(16,21)]henicosan-2-ol",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0275
+COC1C(C(OC2OC(C(=O)O)=CC(O)C2O)C(N)=O)OC(n2ccc(=O)[nH]c2=O)C1OC(N)=O,"3,4-dimethyl-5-oxanyl-2-pyrimidinyloxolane",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0322
+C[C@H]1C/C=C\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\[C@@](C)(O)C1=O,"(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-aza-tetracyclo[10.8.0.0(12,16).0(18,20)]icosa-2,8-dien-6,10,13-trione",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0317
+CCCCC[C@H](O)/C=C/CCCCCCCCCC(=O)O,"(11E,13S)-13-hydroxyoctadec-11-enoic acid",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0479
+CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1,cyclohexyl arachidate,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0103
+CC(CO)C(=O)O,3-hydroxy-2-methylpropanoic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0248
+CCCCCCCCCCCCCCCC(=O)OCC(=O)COP(=O)(O)O,3-hydroxy-2-oxo-1-phosphonooxypropanephosphonic acid palmitate,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0504
+O=C1C[C@](O)(CO)CC(O)=C1O,"(5S)-2,3,5-trihydroxy-5-hydroxymethylcyclohex-2-en-1-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0372
+COc1cc(O)cc2cc(CO)c(=O)oc12,6-hydroxy-3-hydroxymethyl-8-methoxycoumarin,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0544
+O=CC(=O)C[C@H](O)CO,"(4S)-4,5-dihydroxy-2-oxopentanal",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0569
+C[C@@H]1O[C@@H](OCCCCCCCCCCCCCCCCCCCC[C@@H](O)CC(=O)O)[C@H](O)C[C@H]1O,(3R)-23-hexyloxy-3-hydroxytricosanoic acid,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0344
+CC/C=C\CC,(3Z)-hex-3-ene,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0661
+CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1,"(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0409
+O=C(O)CCC/C=C\CCCC(=O)O,(5Z)-dec-5-enedioic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0224
+C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O,3-hexyl-4-hydroxy-5-isopropyl-2-oxoazole,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0415
+COc1cccc(C(=O)O)c1O,2-hydroxy-3-methoxybenzoic acid,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0062
+C/N=C(\N)NCCCCN,4-guanidino-4-(methylamino)butan-1-amine,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0241
+CCC(=C)CC,3-methylidenepentane,GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0141
+C/C=C/C(=O)c1c(OC)cc(O)c(CC)c1O,"(2E)-1-(3-ethyl-2,4-dihydroxy-6-methoxyphenyl)but-2-en-1-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0657
+C[C@H](N[C@@H](CCc1ccccc1)C(=O)O)C(=O)N1CCC[C@H]1C(=O)O,"(3S,5S)-5-amino-3-(hydroxymethyl)-5-methyl-1-phenyl-6-pyrrolidinylheptanedioic acid",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0545
+CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1,"(1S,2R,5R,7S,10R,11R,15S,20S)-7-hydroxy-1,2,6,6,10,17,17-heptamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0352
+CSc1ccc(N)cc1,1-amino-4-(methylsulfanyl)benzene,GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0541
+CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C,"(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol",GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0246
