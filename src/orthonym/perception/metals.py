@@ -121,9 +121,9 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # Phase 161.3 deferred: multinuclear bridged complexes
     is_multimetal = len(metal_atom_indices) > 1
 
-    # === Tier-1 topology: dot-separated metallocene ===
-    # Frags structure: 1 metal frag (single atom) + N Cp-anion frags (5-atom
-    # aromatic rings each carrying formal_charge sum = -1).
+    # === Tier-1 / Tier-2 topology: dot-separated multi-component ===
+    # Frags structure: 1 metal frag (single atom) + N ligand frags
+    # (Cp anions for Tier-1, CO ligands for Tier-2).
     frags = Chem.GetMolFrags(mol, asMols=False)
     if len(frags) >= 2 and not is_multimetal:
         metal_idx = metal_atom_indices[0]
@@ -156,6 +156,27 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
                     formal_charges=tuple(formal_charges),
                     is_multimetal=False,
                 )
+
+        # Tier-2 metal carbonyl: metal frag is single atom + N CO ligand frags
+        if (metal_frag is not None and len(metal_frag) == 1
+                and len(ligand_frags) >= 2
+                and all(_is_co_ligand(mol, lf) for lf in ligand_frags)):
+            co_groups = [
+                LigandGroup(
+                    metal_atom_idx=metal_idx,
+                    ligand_atom_indices=tuple(sorted(lf)),
+                    hapticity_n=1,
+                    ligand_smarts_key='[C-]#[O+]',
+                    ligand_canonical_smiles='[C-]#[O+]',
+                )
+                for lf in ligand_frags
+            ]
+            return MetalComplex(
+                metal_atom_indices=tuple(metal_atom_indices),
+                ligand_groups=tuple(co_groups),
+                formal_charges=tuple(formal_charges),
+                is_multimetal=False,
+            )
 
     # === Tier-3 topology: single-component σ-bonded main-group ===
     # 1 metal atom + N alkyl/aryl ligand atoms directly bonded (single bonds);
@@ -287,6 +308,31 @@ def _is_cp_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:
             return False
         charge_sum += atom.GetFormalCharge()
     return charge_sum == -1
+
+
+def _is_co_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:
+    """Check if a frag's atom indices form a carbonyl (CO) ligand.
+
+    CO ligand canonical SMILES: ``[C-]#[O+]`` — 1 C atom (charge -1) +
+    1 O atom (charge +1) joined by a triple bond. Pure read-only on mol.
+    """
+    if len(atom_indices) != 2:
+        return False
+    atoms = [mol.GetAtomWithIdx(i) for i in atom_indices]
+    symbols = sorted(a.GetSymbol() for a in atoms)
+    if symbols != ['C', 'O']:
+        return False
+    c_atom = next(a for a in atoms if a.GetSymbol() == 'C')
+    o_atom = next(a for a in atoms if a.GetSymbol() == 'O')
+    if c_atom.GetFormalCharge() != -1:
+        return False
+    if o_atom.GetFormalCharge() != 1:
+        return False
+    # Verify the bond is triple (CO ligand has C≡O)
+    bond = mol.GetBondBetweenAtoms(atom_indices[0], atom_indices[1])
+    if bond is None:
+        return False
+    return bond.GetBondType() == Chem.BondType.TRIPLE
 
 
 def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,

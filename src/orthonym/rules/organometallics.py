@@ -306,6 +306,57 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
     metal_charge = metal_complex.formal_charges[0]
     ligand_groups = metal_complex.ligand_groups
 
+    # === TIER-2 dispatch: mononuclear metal carbonyls ===
+    if (ligand_groups
+            and all(lg.ligand_smarts_key == '[C-]#[O+]' for lg in ligand_groups)):
+        n_co = len(ligand_groups)
+        co_prefix = _multiplicative_prefix(n_co)
+
+        # Determine ligand_class for Stock lookup (neutral vs anionic)
+        if metal_charge == 0:
+            ligand_class = f'CO{n_co}'
+        else:
+            ligand_class = f'CO{n_co}_anion'
+
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, ligand_class))
+        if hints is None:
+            return None
+
+        metal_name_info = METAL_NAMES.get(metal_symbol)
+        if metal_name_info is None:
+            return None
+        metal_name = metal_name_info['direct']
+
+        include_stock = (
+            hints['stock_required_systematic'] if style == 'systematic'
+            else hints['stock_required_pin']
+        )
+
+        # Stock notation per CONTEXT D-07:
+        # - Systematic: always Roman (e.g., (0), (-I))
+        # - PIN with anionic metals: Ewens-Bassett charge form (e.g., (1-))
+        # - PIN with neutral metals: omit
+        if include_stock:
+            oxidation = metal_charge if metal_charge != 0 else hints['default_state']
+            if metal_charge < 0 and style == 'pin':
+                stock_str = f"({abs(metal_charge)}-)"
+            elif metal_charge > 0 and style == 'pin':
+                stock_str = f"({metal_charge}+)"
+            else:
+                stock_str = f"({_to_roman(oxidation)})"
+        else:
+            stock_str = ""
+
+        # Salzer §5: ligand-first composition order — carbonyl prefix before metal
+        full_name = f"{co_prefix}carbonyl{metal_name}{stock_str}"
+        metal_name_part = f"{metal_name}{stock_str}"
+        co_node = NameTreeNode(
+            parent_stem='carbonyl',
+            multiplicative_prefix=co_prefix or None,
+            class_id='organometallic_ligand',
+        )
+        return (full_name, metal_name_part, [co_node])
+
     # === TIER-1 dispatch: bis(η5-cyclopentadienyl)M sandwich complexes ===
     if (len(ligand_groups) == 2
             and all(lg.ligand_smarts_key == 'c1cc[cH-]c1' for lg in ligand_groups)):
