@@ -115,7 +115,7 @@ class StoutClass(_StrEnumBase):
 
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
-    # ML_FALLBACK = "ml_fallback"                   # Phase 162 (priority 99998)
+    ML_FALLBACK = "ml_fallback"                   # Phase 162 telemetry tag (CONTEXT D-03; NOT a CFR dispatch entry — increment via _cfr_router._increment_stat at namer.py:1248 wrapper, no _register_dispatch call)
     # THIO_FUNCTIONAL_REPLACEMENT = "thio_fr"       # Phase 163 (P-25.3; priority 30000-40000)
     # SELENO_FUNCTIONAL_REPLACEMENT = "seleno_fr"   # Phase 163
     # TELLURO_FUNCTIONAL_REPLACEMENT = "telluro_fr" # Phase 163

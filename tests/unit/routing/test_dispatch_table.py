@@ -97,9 +97,16 @@ class TestDispatchTableIntegrity:
         """CFR-02 enumeration completeness: every StoutClass has a dispatch row.
 
         No orphan enum members; no orphan registrations.
+
+        Phase 162 D-03 exemption: StoutClass.ML_FALLBACK is a telemetry tag
+        (no CFR dispatch entry; see 162-AUDIT-MLF.md § 8.14). Exclude it
+        from the count comparison.
         """
-        assert len(list(StoutClass)) == len(DISPATCH_TABLE), (
-            f"len(StoutClass)={len(list(StoutClass))} but "
+        # Telemetry-only enum members exempt from DISPATCH_TABLE (Phase 162 D-03).
+        EXEMPT = frozenset({"ML_FALLBACK"})
+        active_classes = [c for c in StoutClass if c.name not in EXEMPT]
+        assert len(active_classes) == len(DISPATCH_TABLE), (
+            f"len(active StoutClass)={len(active_classes)} but "
             f"len(DISPATCH_TABLE)={len(DISPATCH_TABLE)}; CFR-02 violation."
         )
 
@@ -170,12 +177,36 @@ class TestDispatchTableIntegrity:
 class TestStoutClassRegistration:
     """158-AUDIT-CFR.md § 1: every StoutClass row registered with valid contents."""
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    # Phase 162 D-03 + 162-AUDIT-MLF.md § 8.14: StoutClass.ML_FALLBACK is a
+    # TELEMETRY tag, NOT a CFR dispatch entry. The post-pipeline wrapper at
+    # namer.py:1248 (Plan-03 T01) increments the counter via
+    # `_cfr_router._increment_stat(StoutClass.ML_FALLBACK)` directly; no
+    # `_register_dispatch(...)` call exists for it. Exempt the integrity
+    # tests so they remain green.
+    _STOUT_CLASS_EXEMPT_FROM_DISPATCH_TABLE = frozenset({"ML_FALLBACK"})
+
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_every_stoutclass_has_dispatch_entry(self, class_id):
-        """158-AUDIT-CFR.md § 1: every StoutClass member is in DISPATCH_TABLE (CFR-02)."""
+        """158-AUDIT-CFR.md § 1: every StoutClass member is in DISPATCH_TABLE (CFR-02).
+
+        Phase 162 D-03 exemption: ML_FALLBACK is telemetry-only (no CFR entry).
+        """
+        if class_id.name in self._STOUT_CLASS_EXEMPT_FROM_DISPATCH_TABLE:
+            pytest.skip(
+                f"{class_id.name} is exempt per Phase 162 D-03 "
+                f"(telemetry tag; see 162-AUDIT-MLF.md § 8.14)"
+            )
         assert class_id in DISPATCH_TABLE
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_predicates_are_callable(self, class_id):
         """158-AUDIT-CFR.md § 1 column 'predicate_helpers': predicate is a callable."""
         entry = DISPATCH_TABLE[class_id]
@@ -183,7 +214,11 @@ class TestStoutClassRegistration:
             f"{class_id.name}: predicate {entry.predicate!r} is not callable"
         )
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_handlers_are_callable(self, class_id):
         """158-AUDIT-CFR.md § 1 column 'handler_function': handler is a callable."""
         entry = DISPATCH_TABLE[class_id]
@@ -191,7 +226,11 @@ class TestStoutClassRegistration:
             f"{class_id.name}: handler {entry.handler!r} is not callable"
         )
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_iupac_section_is_non_empty(self, class_id):
         """158-AUDIT-CFR.md § 1 column 'iupac_section': non-empty traceability cite."""
         entry = DISPATCH_TABLE[class_id]
@@ -200,7 +239,11 @@ class TestStoutClassRegistration:
             f"{class_id.name}: iupac_section is empty"
         )
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_tier_values_are_1_or_2(self, class_id):
         """CONTEXT D-07: tier ∈ {1, 2}; Tier-1 is mol-only, Tier-2 is features-required."""
         entry = DISPATCH_TABLE[class_id]
@@ -208,7 +251,11 @@ class TestStoutClassRegistration:
             f"{class_id.name}: tier={entry.tier!r}; CONTEXT D-07 requires tier ∈ {{1, 2}}."
         )
 
-    @pytest.mark.parametrize("class_id", list(StoutClass), ids=lambda c: c.name)
+    @pytest.mark.parametrize(
+        "class_id",
+        [c for c in StoutClass if c.name not in {"ML_FALLBACK"}],
+        ids=lambda c: c.name,
+    )
     def test_side_effect_inventory_is_empty(self, class_id):
         """CONTEXT D-26 HARD INVARIANT: every entry's side_effect_inventory MUST be ().
 
