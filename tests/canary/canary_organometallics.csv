@@ -1,0 +1,54 @@
+id,smiles,canonical_smiles,expected_name_pin,expected_name_systematic,tier_tag,ligand_class,hapticity_n,opsin_parse_pin_status,opsin_parse_systematic_status,inchi_rt_status,iupac_section_cite
+ORG-T1-01,[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1,[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1,ferrocene,bis(η⁵-cyclopentadienyl)iron(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,P-69 + Salzer §5.4
+ORG-T1-02,[Ru+2].c1cc[cH-]c1.c1cc[cH-]c1,[Ru+2].c1cc[cH-]c1.c1cc[cH-]c1,ruthenocene,bis(η⁵-cyclopentadienyl)ruthenium(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-03,[Os+2].c1cc[cH-]c1.c1cc[cH-]c1,[Os+2].c1cc[cH-]c1.c1cc[cH-]c1,osmocene,bis(η⁵-cyclopentadienyl)osmium(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-04,[Co+2].c1cc[cH-]c1.c1cc[cH-]c1,[Co+2].c1cc[cH-]c1.c1cc[cH-]c1,cobaltocene,bis(η⁵-cyclopentadienyl)cobalt(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-05,[Ni+2].c1cc[cH-]c1.c1cc[cH-]c1,[Ni+2].c1cc[cH-]c1.c1cc[cH-]c1,nickelocene,bis(η⁵-cyclopentadienyl)nickel(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-06,[Cr+2].c1cc[cH-]c1.c1cc[cH-]c1,[Cr+2].c1cc[cH-]c1.c1cc[cH-]c1,chromocene,bis(η⁵-cyclopentadienyl)chromium(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-07,[V+2].c1cc[cH-]c1.c1cc[cH-]c1,[V+2].c1cc[cH-]c1.c1cc[cH-]c1,vanadocene,bis(η⁵-cyclopentadienyl)vanadium(II),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T1-08,[Mn+2].c1cc[cH-]c1.c1cc[cH-]c1,[Mn+2].c1cc[cH-]c1.c1cc[cH-]c1,manganocene,bis(η⁵-cyclopentadienyl)manganese(II),tier1,metallocene,5,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
+ORG-T1-09,[Fe+3].c1cc[cH-]c1.c1cc[cH-]c1,[Fe+3].c1cc[cH-]c1.c1cc[cH-]c1,ferrocenium,bis(η⁵-cyclopentadienyl)iron(III),tier1,metallocene,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T2-01,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe],pentacarbonyliron,pentacarbonyliron(0),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-02,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Ni],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Ni],tetracarbonylnickel,tetracarbonylnickel(0),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-03,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr],hexacarbonylchromium,hexacarbonylchromium(0),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-04,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mo],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mo],hexacarbonylmolybdenum,hexacarbonylmolybdenum(0),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-05,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[W],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[W],hexacarbonyltungsten,hexacarbonyltungsten(0),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-06,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[V-],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[V-],hexacarbonylvanadium(1-),hexacarbonylvanadium(-I),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-07,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Co-],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Co-],tetracarbonylcobalt(1-),tetracarbonylcobalt(-I),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T2-08,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn-],[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn-],pentacarbonylmanganese(1-),pentacarbonylmanganese(-I),tier2,carbonyl,1,parse_ok,parse_ok,element_count_match,Salzer §6
+ORG-T3-01,[Li][CH3],[Li][CH3],methyllithium,methyllithium,tier3,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-02,[Li][CH2]CCC,[Li][CH2]CCC,butyllithium,butyllithium,tier3,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-03,C[CH2][Mg][Br],C[CH2][Mg][Br],ethylmagnesium bromide,ethylmagnesium bromide,tier3,sigma_grignard,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-04,[CH3][Zn][CH3],[CH3][Zn][CH3],dimethylzinc,dimethylzinc,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-05,[CH3][Sn]([CH3])([CH3])[CH3],C[Sn](C)(C)C,tetramethylstannane,tetramethylstannane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T3-06,[CH3][Pb]([CH3])([CH3])[CH3],C[Pb](C)(C)C,tetramethylplumbane,tetramethylplumbane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T3-07,C[Si](C)(C)C,C[Si](C)(C)C,tetramethylsilane,tetramethylsilane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T3-08,[CH3][Ge]([CH3])([CH3])[CH3],C[Ge](C)(C)C,tetramethylgermane,tetramethylgermane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T3-09,c1cc[c]([Hg][c]2ccccc2)cc1,c1ccc([Hg]c2ccccc2)cc1,diphenylmercury,diphenylmercury,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-10,[CH3][Al]([CH3])[CH3],C[Al](C)C,trimethylaluminum,trimethylaluminum,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-11,[CH3][Cd][CH3],C[Cd]C,dimethylcadmium,dimethylcadmium,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-01,[Cr].c1ccccc1.c1ccccc1,[Cr].c1ccccc1.c1ccccc1,bis(η⁶-benzene)chromium,bis(η⁶-benzene)chromium(0),tier4,bis_arene,6,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
+ORG-T4-02,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr].c1ccccc1,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr].c1ccccc1,tricarbonyl(η⁶-benzene)chromium,tricarbonyl(η⁶-benzene)chromium(0),tier4,half_sandwich,6,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5+§6
+ORG-T4-03,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn].c1cc[cH-]c1,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn].c1cc[cH-]c1,tricarbonyl(η⁵-cyclopentadienyl)manganese,tricarbonyl(η⁵-cyclopentadienyl)manganese(I),tier4,half_sandwich,5,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5+§6 (cymantrene)
+ORG-T4-04,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe].C=CC=C,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe].C=CC=C,"tricarbonyl(η⁴-1,3-butadiene)iron","tricarbonyl(η⁴-1,3-butadiene)iron(0)",tier4,half_sandwich,4,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5+§6
+ORG-T4-05,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe].C=C,[C-]#[O+].[C-]#[O+].[C-]#[O+].[C-]#[O+].[Fe].C=C,tetracarbonyl(η²-ethene)iron,tetracarbonyl(η²-ethene)iron(0),tier4,half_sandwich,2,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5+§6
+ORG-T4-06,[Ni].C=CC.C=CC,[Ni].C=CC.C=CC,bis(η³-prop-2-en-1-yl)nickel,bis(η³-allyl)nickel(0),tier4,bis_allyl,3,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.3
+ORG-T4-07,Cl[Pd]CC=C,Cl[Pd]CC=C,chloro(η³-prop-2-en-1-yl)palladium,chloro(η³-allyl)palladium(II),tier4,half_sandwich_eta3,3,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.3
+ORG-T4-08,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn].C1=CC=CC=CC=1,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn].C1=CC=CC=CC=1,tricarbonyl(η⁷-cycloheptatrienyl)manganese,tricarbonyl(η⁷-cycloheptatrienyl)manganese(I),tier4,half_sandwich,7,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.3
+ORG-T4-09,[Fe].C1=CC=CC=CC=C1,[Fe].C1=CC=CC=CC=C1,(η⁸-cyclooctatetraene)iron,(η⁸-cyclooctatetraene)iron(0),tier4,bis_cot,8,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
+ORG-T4-10,[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,decamethylferrocene,bis(η⁵-pentamethylcyclopentadienyl)iron(II),tier4,metallocene_substituted,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
+ORG-T4-11,C[SiH3],C[SiH3],methylsilane,methylsilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-12,[Li]C=C,[Li]C=C,vinyllithium,ethenyllithium,tier4,sigma_alkali_unsat,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-13,C[Si](C)(C)c1ccccc1,C[Si](C)(C)c1ccccc1,phenyltrimethylsilane,trimethylphenylsilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-14,CCCC[Li],CCCC[Li],sec-butyllithium,sec-butyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-15,CC(C)(C)[Li],CC(C)(C)[Li],tert-butyllithium,tert-butyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-16,C[Mg]Cl,C[Mg]Cl,methylmagnesium chloride,methylmagnesium chloride,tier4,sigma_grignard,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-17,c1ccc(cc1)[Li],c1ccc([Li])cc1,phenyllithium,phenyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-18,c1ccc(cc1)[Na],c1ccc([Na])cc1,phenylsodium,phenylsodium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-19,C[K],C[K],methylpotassium,methylpotassium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-20,CC[Li],CC[Li],ethyllithium,ethyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-21,CCCC[Pb](CCCC)(CCCC)CCCC,CCCC[Pb](CCCC)(CCCC)CCCC,tetrabutylplumbane,tetrabutylplumbane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-22,C[Si]([Si](C)(C)C)(C)C,C[Si]([Si](C)(C)C)(C)C,hexamethyldisilane,hexamethyldisilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-23,CC[Si](CC)(CC)CC,CC[Si](CC)(CC)CC,tetraethylsilane,tetraethylsilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-24,CC[Pb](CC)(CC)CC,CC[Pb](CC)(CC)CC,tetraethylplumbane,tetraethylplumbane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
+ORG-T4-25,[Mn+2].c1cc[c-](C)c1.c1cc[c-](C)c1,[Mn+2].c1cc[c-](C)c1.c1cc[c-](C)c1,bis(η⁵-methylcyclopentadienyl)manganese,bis(η⁵-methylcyclopentadienyl)manganese(II),tier4,metallocene_substituted,5,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
