@@ -114,7 +114,7 @@ class StoutClass(_StrEnumBase):
     GENERAL = "general"                       # row 18; namer.py:1124-1131; CFR-02 D-08
 
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
-    # ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50000-60000)
+    ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     # ML_FALLBACK = "ml_fallback"                   # Phase 162 (priority 99998)
     # THIO_FUNCTIONAL_REPLACEMENT = "thio_fr"       # Phase 163 (P-25.3; priority 30000-40000)
     # SELENO_FUNCTIONAL_REPLACEMENT = "seleno_fr"   # Phase 163
@@ -412,6 +412,22 @@ def _is_general(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     return True
 
 
+def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Tier-1; CFR priority 50; ORGM-03 + D-12 purity (audit § 2.20).
+
+    PURE per CONTEXT D-12 + Phase 158 D-26 hard invariant:
+    - mol is None guard early-exit.
+    - Lazy-import detect_metal_complex from perception.metals.
+    - Returns True iff detect_metal_complex(mol) is not None.
+    - NO mol mutation; NO features mutation; NO module-global state R/W;
+      NO exception swallowing (RDKit exceptions propagate).
+    """
+    if mol is None:
+        return False
+    from orthonym.perception.metals import detect_metal_complex
+    return detect_metal_complex(mol) is not None
+
+
 # ---------------------------------------------------------------------------
 # Section 6: Per-class handler shims (audit § 1; AP-5 1-line-wrapper discipline)
 #
@@ -685,6 +701,19 @@ def _handle_general(mol, smiles, canonical_smiles, features=None, *,
     return None
 
 
+def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
+                           style: str = "pin", **kwargs) -> Optional[str]:
+    """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
+
+    Cascade-continuation on None per CONTEXT D-02: if name_organometallic
+    returns None (compound not actually ORGM or cannot be named), the CFR
+    cascade falls through to SALT@100 → ... → GENERAL@99999.
+    """
+    from orthonym.assembly.handlers.organometallic import name_organometallic
+    result = name_organometallic(features, mol, style=style)
+    return result.name if result is not None else None
+
+
 # ---------------------------------------------------------------------------
 # Section 7: _register_dispatch(...) calls — audit § 1 1:1 translation
 #
@@ -692,6 +721,23 @@ def _handle_general(mol, smiles, canonical_smiles, features=None, *,
 # sibling-phase insertions. The cascade order mirrors namer.py:852-1131
 # byte-identical.
 # ---------------------------------------------------------------------------
+
+# --- Phase 161: ORGANOMETALLIC at priority 50 (intercepts BEFORE SALT@100) ---
+# Per CONTEXT D-02: ferrocene/ruthenocene/all sandwich complexes are
+# dot-separated [M+n].[ligand-]...[ligand-] SMILES that would otherwise
+# route to SALT@100 and produce nonsense (verified empirically:
+# Orthonym().name('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1') returns
+# 'iron(II) dipentanide' today; Orthonym().name('C[Li]') returns
+# 'methane'; etc. per RESEARCH executive summary line 89).
+# Priority 50 sits BELOW the prior CFR minimum (SALT@100); free per Phase 158
+# audit log. Cascade-continuation on None preserved per D-02.
+_register_dispatch(
+    class_id=StoutClass.ORGANOMETALLIC, priority=50, tier=1,
+    predicate=_is_organometallic, handler=_handle_organometallic,
+    iupac_section="Blue Book P-69 + IR-10 + Salzer 1999",
+    description="Organometallic complex (metal-carbon direct bond or sandwich/half-sandwich); routes to handlers.organometallic.name_organometallic",
+    side_effect_inventory=(),
+)
 
 # --- Tier-1 charged-species + dot-disconnected (audit § 1 rows 1-8) ---
 _register_dispatch(

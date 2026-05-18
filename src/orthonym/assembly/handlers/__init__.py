@@ -81,6 +81,7 @@ from .ring_nitrile import name_ring_nitrile  # commit 03-01
 from .amide import name_amide  # commit 03-02
 from .amine import name_amine  # commit 03-03
 from .ring_ester import name_ring_ester  # commit 03-04
+from .organometallic import name_organometallic  # commit 02-04 (Phase 161)
 
 __all__ = [
     "NameTreeNode",
@@ -120,5 +121,6 @@ __all__ = [
     "name_amide",  # 03-02
     "name_amine",  # 03-03
     "name_ring_ester",  # 03-04
+    "name_organometallic",  # 02-04 (Phase 161)
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)
 ]
