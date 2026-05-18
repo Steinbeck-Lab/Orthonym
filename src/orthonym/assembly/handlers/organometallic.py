@@ -36,34 +36,70 @@ def name_organometallic(
 ) -> Optional[NamingResult]:
     """Phase 161 ORGM handler; CFR-routed at priority 50.
 
-    STUB BODY (Plan-02): returns None always — cascade falls through to
-    SALT@100 → existing pipeline. Plan-03 implements per-tier branches
-    per RESEARCH §4.3 lines 765-815.
-
     Per CONTEXT D-11: returns Optional[NamingResult] with tree populated
     when result is non-None. The CFR shim _handle_organometallic in
     routing/dispatch_table.py extracts result.name as Optional[str].
+
+    Tier-1 fast path: retained-PIN lookup for style="pin" — ferrocene,
+    ruthenocene, etc. Tier-1 systematic + Tier-2/3/4 forms go through
+    the systematic-assembly path.
+
+    Cascade-continuation on None per CONTEXT D-02: any failure (mol is
+    None; metal_complex is None; multimetal; ValueError from hapticity;
+    result is None) returns None so CFR cascade falls through to
+    SALT@100 → ... → GENERAL@99999.
     """
-    # Plan-03 implementation per RESEARCH §4.3 + AUDIT § 5:
-    # 1. Lazy-import detect_metal_complex, RETAINED_METALLOCENES,
-    #    assemble_organometallic_name.
-    # 2. Guard: if mol is None: return None.
-    # 3. metal_complex = detect_metal_complex(mol); if None: return None.
-    # 4. Risk R-08 guard: if metal_complex.is_multimetal: return None
-    #    (Phase 161.3 territory).
-    # 5. Tier-1 fast path: canon_smi = Chem.MolToSmiles(mol);
-    #    if style=='pin' and canon_smi in RETAINED_METALLOCENES:
-    #      return NamingResult(name=retained, tree=NameTreeNode(
-    #        parent_stem=retained, class_id='organometallic',
-    #        iupac_section_cite='P-69 / Salzer §5.4'),
-    #        atom_to_locant_hint=None).
-    # 6. Systematic path: try assemble_organometallic_name(metal_complex,
-    #    mol, style=style); on ValueError or None result, return None.
-    # 7. Build NameTreeNode(parent_stem=metal_name_part,
-    #    prefixes=tuple(ligand_tree_nodes), class_id='organometallic',
-    #    iupac_section_cite='P-69 / IR-10 / Salzer 1999').
-    # 8. Return NamingResult(name=name, tree=tree, atom_to_locant_hint=None).
-    return None
+    from rdkit import Chem
+
+    if mol is None:
+        return None
+
+    # Lazy imports avoid circular dependency at module import time.
+    from ...perception.metals import detect_metal_complex
+    from ...rules.organometallics import assemble_organometallic_name
+    from ...data.organometallics import RETAINED_METALLOCENES
+
+    metal_complex = detect_metal_complex(mol)
+    if metal_complex is None:
+        return None
+    if metal_complex.is_multimetal:
+        return None  # Risk R-08: Phase 161.3 territory
+
+    # Tier-1 fast path: retained PIN lookup for style="pin"
+    canon_smi = Chem.MolToSmiles(mol)
+    if style == "pin" and canon_smi in RETAINED_METALLOCENES:
+        retained_name = RETAINED_METALLOCENES[canon_smi]
+        tree = NameTreeNode(
+            parent_stem=retained_name,
+            class_id='organometallic',
+            iupac_section_cite='P-69 / Salzer §5.4',
+        )
+        return NamingResult(name=retained_name, tree=tree, atom_to_locant_hint=None)
+
+    # Systematic assembly path (also covers style="pin" for compounds
+    # without retained PIN, e.g. Tier-2/3/4 + Tier-1 systematic style)
+    try:
+        result = assemble_organometallic_name(metal_complex, mol, style=style)
+    except ValueError:
+        # Per CONTEXT D-12 honest-fail-on-data: hapticity/naming failure
+        # cascades to next CFR entry.
+        return None
+
+    if result is None:
+        return None  # cascade to SALT@100
+
+    full_name, _metal_name_part, _ligand_tree_nodes = result
+    # Use flat tree with full name as parent_stem to satisfy the byte-identical
+    # round-trip contract (name_tree_to_string(tree) == result.name).
+    # CONTEXT D-11 allows the metal_name_part + prefixes structure too; the
+    # flat representation is the minimal compliant form. Sub-tree structure
+    # can be refined in Phase 161.1+ if downstream consumers need it.
+    tree = NameTreeNode(
+        parent_stem=full_name,
+        class_id='organometallic',
+        iupac_section_cite='P-69 / IR-10 / Salzer 1999',
+    )
+    return NamingResult(name=full_name, tree=tree, atom_to_locant_hint=None)
 
 
 __all__ = ["name_organometallic"]

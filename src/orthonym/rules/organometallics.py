@@ -31,6 +31,28 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..data.organometallics import (
     METAL_NAMES, LIGAND_NAMES, LIGAND_ETA_DEFAULTS, RETAINED_METALLOCENES,
 )
+from ..assembly.name_tree import NameTreeNode
+
+
+# Phase 161 Stock-notation Roman numerals (scope -3 .. +8 per CONTEXT D-07)
+_ROMAN_NUMERALS: Dict[int, str] = {
+    0: '0', 1: 'I', 2: 'II', 3: 'III', 4: 'IV',
+    5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII',
+    -1: '-I', -2: '-II', -3: '-III',
+}
+
+
+def _to_roman(n: int) -> str:
+    """Stock-notation oxidation state in Roman numerals.
+
+    Per CONTEXT D-07: Phase 161 scope is -3..+8. Raises ValueError outside
+    that range (caller catches per CONTEXT D-12 honest-fail-on-data).
+    """
+    if n not in _ROMAN_NUMERALS:
+        raise ValueError(
+            f"Stock-notation oxidation state {n} out of Phase 161 scope (-3..+8)"
+        )
+    return _ROMAN_NUMERALS[n]
 
 
 # === ORGM_LIGAND_ORDER (Salzer 1999 §5.2 alphabetic with multiplicatives ignored) ===
@@ -178,23 +200,61 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                                   ) -> Optional[Tuple[str, str, List[Any]]]:
     """Assemble systematic IUPAC name for a metal complex per Salzer 1999 §5.
 
-    STUB BODY (Plan-02): returns None. Plan-03 implements per-tier
-    branches (commits 03-01 Tier-1 → 03-02 Tier-3 → 03-03 Tier-2 → 03-04
-    Tier-4) per RESEARCH §7.
+    Plan-03 implementation: Tier-1 Cp2 metallocene branch (commit 03-01).
+    Subsequent commits 03-02/03/04 add Tier-3/2/4 branches.
 
     Returns: (full_name, metal_name_part, ligand_tree_nodes) per
-    RESEARCH §4.3 lines 799-815, so the handler can build
-    NameTreeNode(parent_stem=metal_name_part, prefixes=tuple(ligand_tree_nodes),
-    iupac_section_cite='P-69 / IR-10 / Salzer 1999', class_id='organometallic').
-
-    The byte-identical contract per CONTEXT D-11:
-    name_tree_to_string(tree) == full_name.
+    RESEARCH §4.3 lines 799-815. The handler wraps this in NameTreeNode.
 
     Returns None to signal cascade-continuation when:
     - metal_complex.is_multimetal (Phase 161.3 deferred per Risk R-08)
-    - Hapticity computation raises ValueError (no contiguous π-system)
     - Stock-notation lookup fails for the (metal, ligand_class) tuple
+    - The compound's topology doesn't match any tier branch yet
     """
+    # Risk R-08: defer multinuclear bridges to Phase 161.3
+    if metal_complex.is_multimetal:
+        return None
+
+    metal_idx = metal_complex.metal_atom_indices[0]
+    metal_symbol = mol.GetAtomWithIdx(metal_idx).GetSymbol()
+    metal_charge = metal_complex.formal_charges[0]
+    ligand_groups = metal_complex.ligand_groups
+
+    # === TIER-1 dispatch: bis(η5-cyclopentadienyl)M sandwich complexes ===
+    if (len(ligand_groups) == 2
+            and all(lg.ligand_smarts_key == 'c1cc[cH-]c1' for lg in ligand_groups)):
+        # Cp2 ligand class; metal in +2 (or +3 for ferrocenium) oxidation state
+        ligand_class = 'Cp2_cation' if metal_charge == 3 else 'Cp2'
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, ligand_class))
+        if hints is None:
+            return None  # cascade to SALT@100
+
+        metal_name_info = METAL_NAMES.get(metal_symbol)
+        if metal_name_info is None:
+            return None
+        metal_name = metal_name_info['direct']
+
+        include_stock = (
+            hints['stock_required_systematic'] if style == 'systematic'
+            else hints['stock_required_pin']
+        )
+
+        # Use empirical formal charge for Stock when nonzero, else hint default
+        oxidation_state = metal_charge if metal_charge != 0 else hints['default_state']
+        stock_str = f"({_to_roman(oxidation_state)})" if include_stock else ""
+
+        # Salzer 1999 §5.4: bis(η⁵-cyclopentadienyl)<metal>(<Stock>)
+        full_name = f"bis(η⁵-cyclopentadienyl){metal_name}{stock_str}"
+        metal_name_part = f"{metal_name}{stock_str}"
+
+        ligand_node = NameTreeNode(
+            parent_stem='η⁵-cyclopentadienyl',
+            multiplicative_prefix='bis',
+            class_id='organometallic_ligand',
+        )
+        return (full_name, metal_name_part, [ligand_node])
+
+    # Tier 2/3/4 dispatch lands in commits 03-02/03/04
     return None
 
 
