@@ -119,12 +119,20 @@ class TestDispatchTableIntegrity:
     def test_priorities_are_spaced_in_hundreds(self):
         """CONTEXT D-06: non-GENERAL priorities are spaced in 100s for v19 insertability.
 
-        Exception: GENERAL @ 99999 + DECOMPOSITION_PRE_GENERAL @ 99000 sit far
-        beyond the dense outer-cascade region (100-1600); spacing rule applies
-        within the dense region only.
+        Exceptions to the spacing rule (per docstring intent + Phase 161 D-02):
+        - GENERAL @ 99999 + DECOMPOSITION_PRE_GENERAL @ 99000 sit far beyond
+          the dense outer-cascade region (100-1600); spacing rule applies
+          within the dense region only.
+        - Phase 161 D-02 sub-100 insertions (ORGANOMETALLIC @ 50): sit BELOW
+          the dense floor (100); these are pre-cascade interceptors picked to
+          fire BEFORE the dense outer cascade. Spacing rule does not apply
+          across the sub-100 -> 100 boundary because the architectural intent
+          is "intercept before dense cascade", not "insert within it".
         """
         outer = sorted(
-            e.priority for e in DISPATCH_TABLE.values() if e.priority < 10000
+            e.priority
+            for e in DISPATCH_TABLE.values()
+            if 100 <= e.priority < 10000  # dense region per docstring
         )
         for prev, curr in zip(outer, outer[1:]):
             assert curr - prev >= 100, (
