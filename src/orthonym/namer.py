@@ -1287,8 +1287,72 @@ class Orthonym:
                             )
                             return decomp_name
 
+        # Phase 162 ML Fallback Gate wrapper per CONTEXT D-03 +
+        # 162-AUDIT-MLF.md § 2 (predicate spec) + § 5 (logging contract).
+        # Post-pipeline wrapper at _name_impl's final return statement —
+        # activates only when ALL rule-based paths are exhausted AND
+        # self._allow_ml_fallback is True AND is_name_quality_inadequate
+        # flags the output as degraded (per MLF-06).
+        if self._allow_ml_fallback:
+            # Lazy imports (CONTEXT D-09): ml_fallback only loaded when needed.
+            # StoutClass is imported at module-level (line 53) so we don't
+            # rebind it locally here; doing so would shadow the closure-scoped
+            # name used elsewhere in this function.
+            from .ml_fallback import (
+                is_name_quality_inadequate,
+                MLFallbackInvoker,
+            )
+            from .ml_fallback.invoker import MLFallbackResult
+            from .data.ml_model_pin import MLModelPinViolation
+
+            if is_name_quality_inadequate(
+                name, mol, canonical_smiles,
+                opsin_parse_required=self._opsin_parse_required,
+            ):
+                # Telemetry counter per RESEARCH § 9.4 — counts ATTEMPTS
+                # (not successes). Increment BEFORE the try/except so a
+                # SHA-pin or import error still registers as an attempt.
+                # ClassFirstRouter exposes the Counter directly (see
+                # dispatcher.py:92) — no public _increment_stat helper.
+                self._cfr_router._dispatch_stats[StoutClass.ML_FALLBACK] += 1
+                try:
+                    invoker = MLFallbackInvoker.get_instance()
+                    context_class = (
+                        result.class_id.value
+                        if result is not None and hasattr(result, "class_id")
+                        else None
+                    )
+                    ml_result = invoker.invoke(
+                        smiles, context_class=context_class,
+                    )
+                except MLModelPinViolation:
+                    # HARD-FAIL per CONTEXT D-10 tier 3 — reproducibility
+                    # non-negotiable; sentinel SHA or model drift both
+                    # surface here.
+                    raise
+                except RuntimeError:
+                    # D-10 tier 1: STOUT not installed (helpful pip hint
+                    # already in the RuntimeError). Soft-fail: emit a
+                    # placeholder MLFallbackResult so the wrapper records
+                    # the attempt + name_with_confidence sees a result.
+                    ml_result = MLFallbackResult(
+                        name=None,
+                        model_version="not_installed",
+                        opsin_parse_status="ml_inference_failed",
+                    )
+                self._last_ml_result = ml_result
+                if ml_result.name:
+                    return ml_result.name
+                # ML inference failed: fall through to the rule-based
+                # degraded name per D-10 tier 2 (preserves existing output
+                # rather than introducing a new None failure mode).
+                return name
+
+        # ML branch not taken — reset the per-call slot so
+        # name_with_confidence emits ml_fallback_used=False.
+        self._last_ml_result = None
         return name
-    
+
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
         """
         Extract molecular features using RDKit.
