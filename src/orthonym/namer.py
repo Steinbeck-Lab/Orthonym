@@ -954,12 +954,22 @@ class Orthonym:
                   {'ratio': float, 'atom_coverage': float,
                    'fg_recognition': float, 'substituent_completeness': float}
               - 'handler' (str): Which handler produced the name
+              - 'ml_fallback_used' (bool): Phase 162 MLF-02 — True iff the
+                STOUT ML model was invoked for this call (False at Plan-02
+                ship since the wrapper at _name_impl():1248 has not landed)
+              - 'ml_model_version' (Optional[str]): Phase 162 MLF-05 —
+                64-char SHA-256 manifest hash of the STOUT artifact when
+                ML fired; None otherwise
 
         Raises:
             ValueError: If SMILES is invalid
         """
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
+        # Phase 162 MLF-02 + CONTEXT D-13 no-caching: reset per-call ML
+        # result slot so stale state cannot leak across name_with_confidence
+        # calls. Matches the clear_confidence() pattern.
+        self._last_ml_result = None
         start_naming_session()
         clear_confidence()
         try:
@@ -990,6 +1000,17 @@ class Orthonym:
                 # Ensure name matches (the stored candidate should match
                 # what was returned)
                 metadata['name'] = name
+
+            # Phase 162 ML annotations per CONTEXT line 53 + MLF-02.
+            # Default: False / None when ML not invoked.
+            # Populated by _name_impl wrapper at Plan-03 T01 when
+            # MLFallbackInvoker fires (sets self._last_ml_result to an
+            # MLFallbackResult instance).
+            ml_used = self._last_ml_result is not None
+            metadata['ml_fallback_used'] = ml_used
+            metadata['ml_model_version'] = (
+                self._last_ml_result.model_version if ml_used else None
+            )
             return metadata
         finally:
             end_naming_session()
