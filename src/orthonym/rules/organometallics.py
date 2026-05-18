@@ -246,6 +246,9 @@ METAL_OXIDATION_STATE_HINTS: Dict[Tuple[str, str], Dict[str, Any]] = {
                        'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
     ('Mn', 'Cp_CO3'): {'default_state': 1, 'stock_required_systematic': True,
                        'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
+    # Cycloheptatrienyl-Mn(CO)3 — Mn in +1 oxidation state per Salzer §5+§6
+    ('Mn', 'CHT_CO3'): {'default_state': 1, 'stock_required_systematic': True,
+                        'stock_required_pin': False, 'iupac_cite': 'Salzer §5+§6'},
 }
 
 
@@ -357,9 +360,17 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         )
         return (full_name, metal_name_part, [co_node])
 
-    # === TIER-1 dispatch: bis(η5-cyclopentadienyl)M sandwich complexes ===
+    # === TIER-1 dispatch: bis(η⁵-Cp-class)M sandwich complexes ===
+    # Match 2 identical Cp-class ligand groups (hapticity 5, both same key).
     if (len(ligand_groups) == 2
-            and all(lg.ligand_smarts_key == 'c1cc[cH-]c1' for lg in ligand_groups)):
+            and all(lg.hapticity_n == 5 for lg in ligand_groups)
+            and ligand_groups[0].ligand_smarts_key == ligand_groups[1].ligand_smarts_key
+            and ligand_groups[0].ligand_smarts_key is not None
+            and ligand_groups[0].ligand_smarts_key in LIGAND_ETA_DEFAULTS):
+        # Lookup the Cp variant name (cyclopentadienyl / methylcyclopentadienyl /
+        # pentamethylcyclopentadienyl)
+        _hap, cp_name = LIGAND_ETA_DEFAULTS[ligand_groups[0].ligand_smarts_key]
+
         # Cp2 ligand class; metal in +2 (or +3 for ferrocenium) oxidation state
         ligand_class = 'Cp2_cation' if metal_charge == 3 else 'Cp2'
         hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, ligand_class))
@@ -376,16 +387,15 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             else hints['stock_required_pin']
         )
 
-        # Use empirical formal charge for Stock when nonzero, else hint default
         oxidation_state = metal_charge if metal_charge != 0 else hints['default_state']
         stock_str = f"({_to_roman(oxidation_state)})" if include_stock else ""
 
-        # Salzer 1999 §5.4: bis(η⁵-cyclopentadienyl)<metal>(<Stock>)
-        full_name = f"bis(η⁵-cyclopentadienyl){metal_name}{stock_str}"
+        # Salzer 1999 §5.4: bis(η⁵-<cp_name>)<metal>(<Stock>)
+        full_name = f"bis(η⁵-{cp_name}){metal_name}{stock_str}"
         metal_name_part = f"{metal_name}{stock_str}"
 
         ligand_node = NameTreeNode(
-            parent_stem='η⁵-cyclopentadienyl',
+            parent_stem=f"η⁵-{cp_name}",
             multiplicative_prefix='bis',
             class_id='organometallic_ligand',
         )
@@ -509,8 +519,165 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             ]
             return (full_name, metal_name_part, ligand_tree_nodes)
 
-    # Tier-2 / Tier-4 dispatch lands in commits 03-03/04
+    # === TIER-4 dispatch: mixed π-ligand sandwich / half-sandwich ===
+    # Fires AFTER Tier-1/2/3 (which handle specific topologies). Detected
+    # when any ligand has hapticity > 1 (η-bonded).
+    if any(lg.hapticity_n > 1 for lg in ligand_groups):
+        return _assemble_tier4(metal_complex, mol, style)
+
+    # No tier matched — cascade to SALT@100
     return None
+
+
+def _assemble_tier4(metal_complex: Any, mol: Any,
+                     style: str = "pin") -> Optional[Tuple[str, str, List[Any]]]:
+    """Tier-4 assembly for mixed η-bonded / half-sandwich complexes.
+
+    Per Salzer 1999 §5 + audit § 1 lock: CO (carbonyl) ligands are emitted
+    BEFORE η-bonded ligands in the prefix sequence, even though strict
+    Salzer alphabetic order would place benzene (b) before carbonyl (c).
+    The audit-locked output convention reflects established IUPAC practice
+    for organometallic carbonyl complexes (cf. Wikipedia "Tricarbonyl
+    (η⁶-benzene)chromium").
+    """
+    metal_idx = metal_complex.metal_atom_indices[0]
+    metal_symbol = mol.GetAtomWithIdx(metal_idx).GetSymbol()
+    metal_charge = metal_complex.formal_charges[0]
+    ligand_groups = metal_complex.ligand_groups
+
+    metal_name_info = METAL_NAMES.get(metal_symbol)
+    if metal_name_info is None:
+        return None
+    metal_name = metal_name_info['direct']
+
+    # Partition ligands: CO + η-bonded
+    co_ligands = [lg for lg in ligand_groups if lg.ligand_smarts_key == '[C-]#[O+]']
+    pi_ligands = [lg for lg in ligand_groups if lg.ligand_smarts_key != '[C-]#[O+]']
+
+    # Resolve each π-ligand to (hapticity, ligand_iupac_name)
+    pi_names: List[Tuple[int, str]] = []
+    for lg in pi_ligands:
+        if lg.ligand_smarts_key is None or lg.ligand_smarts_key not in LIGAND_ETA_DEFAULTS:
+            return None
+        hap, name = LIGAND_ETA_DEFAULTS[lg.ligand_smarts_key]
+        pi_names.append((lg.hapticity_n, name))
+
+    # Style-aware ligand name overrides (PIN uses different names than systematic
+    # for some ligands; per IUPAC P-69 + Salzer §5).
+    if style == 'systematic':
+        pi_names = [(hap, _SYSTEMATIC_LIGAND_NAME_OVERRIDES.get(name, name))
+                    for hap, name in pi_names]
+
+    # Group identical π-ligands (count by (hapticity, name) tuple)
+    from collections import Counter
+    pi_counter = Counter(pi_names)
+    # Sort π-ligands alphabetically by name (ignoring multiplicative prefix)
+    pi_sorted = sorted(pi_counter.items(), key=lambda x: x[0][1])
+
+    # Determine if CO uses 'bis/tris/tetrakis'-style or simple multiplicative
+    # Per Salzer: simple ligands use di/tri/tetra; complex ligands (with
+    # parens/locants/η-prefix) use bis/tris/tetrakis.
+    pi_prefix_parts: List[str] = []
+    pi_tree_nodes: List[Any] = []
+    for (hap, name), count in pi_sorted:
+        eta = f"η{_superscript_int(hap)}-"
+        ligand_str = f"({eta}{name})"
+        if count == 1:
+            pi_prefix_parts.append(ligand_str)
+        else:
+            mult = _COMPLEX_MULTIPLICATIVE_PREFIXES.get(count)
+            if mult is None:
+                return None
+            pi_prefix_parts.append(f"{mult}{ligand_str}")
+        pi_tree_nodes.append(NameTreeNode(
+            parent_stem=f"{eta}{name}",
+            multiplicative_prefix=_COMPLEX_MULTIPLICATIVE_PREFIXES.get(count) if count > 1 else None,
+            class_id='organometallic_ligand',
+            parenthesization_hint=True,
+        ))
+
+    # Carbonyl prefix
+    co_prefix_str = ""
+    co_tree_nodes: List[Any] = []
+    if co_ligands:
+        n_co = len(co_ligands)
+        co_mult = _multiplicative_prefix(n_co)
+        co_prefix_str = f"{co_mult}carbonyl"
+        co_tree_nodes.append(NameTreeNode(
+            parent_stem='carbonyl',
+            multiplicative_prefix=co_mult or None,
+            class_id='organometallic_ligand',
+        ))
+
+    # Stock notation: use metal's empirical formal charge as oxidation state.
+    # For neutral metals (charge 0) bound to neutral π-ligands (benzene,
+    # butadiene, ethene, COT), the metal is in 0 oxidation state.
+    # For neutral metals bound to anionic ligands (Cp anion), the metal's
+    # SMILES form would carry the corresponding positive charge already.
+    # For cymantrene CpMn(CO)3 specifically: Mn is neutral in SMILES but the
+    # complex has Mn(I); audit § 6 lock applies via METAL_OXIDATION_STATE_HINTS.
+    # We use the empirical charge if non-zero; otherwise look up hints.
+    hints = None
+    # Pick a ligand_class hint key based on the ligand mix
+    if len(pi_ligands) == 1 and pi_ligands[0].ligand_smarts_key == 'c1ccccc1' and len(co_ligands) == 3:
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, 'bz_CO3'))
+    elif (len(pi_ligands) == 1 and pi_ligands[0].ligand_smarts_key == 'c1cc[cH-]c1'
+          and len(co_ligands) == 3):
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, 'Cp_CO3'))
+    elif (len(pi_ligands) == 2 and len(co_ligands) == 0
+          and all(lg.ligand_smarts_key == 'c1ccccc1' for lg in pi_ligands)):
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, 'bz2'))
+    elif (len(pi_ligands) == 1 and pi_ligands[0].ligand_smarts_key == 'C1=CC=CC=CC=1'
+          and len(co_ligands) == 3):
+        hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, 'CHT_CO3'))
+
+    if metal_charge != 0:
+        effective_oxidation = metal_charge
+    elif hints is not None:
+        effective_oxidation = hints['default_state']
+    else:
+        effective_oxidation = 0  # neutral metal default
+
+    # PIN: no Stock for these by default; systematic: include Stock
+    include_stock = (style == 'systematic')
+    if include_stock:
+        try:
+            stock_str = f"({_to_roman(effective_oxidation)})"
+        except ValueError:
+            stock_str = ""
+    else:
+        stock_str = ""
+
+    # Compose full name: CO-prefix + π-ligands + metal + Stock
+    full_name = f"{co_prefix_str}{''.join(pi_prefix_parts)}{metal_name}{stock_str}"
+    metal_name_part = f"{metal_name}{stock_str}"
+    return (full_name, metal_name_part, co_tree_nodes + pi_tree_nodes)
+
+
+def _superscript_int(n: int) -> str:
+    """Convert an integer to Unicode superscript digits."""
+    digits = {
+        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+        '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+        '-': '⁻',
+    }
+    return ''.join(digits[c] for c in str(n))
+
+
+# Complex-ligand multiplicative prefixes per Salzer §5.2 (used when ligand
+# contains parens / locants / η-prefix).
+_COMPLEX_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
+    2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
+    6: 'hexakis', 7: 'heptakis', 8: 'octakis',
+}
+
+
+# Style-aware ligand name overrides for systematic forms.
+# PIN uses the strict IUPAC-2013 substitutive name; systematic uses the
+# traditional Salzer 1999 / Red Book IR-10 organometallic-specific name.
+_SYSTEMATIC_LIGAND_NAME_OVERRIDES: Dict[str, str] = {
+    'prop-2-en-1-yl': 'allyl',  # T4-06 systematic: bis(η³-allyl)nickel(0)
+}
 
 
 def _group_ligand_counts(ligand_names: List[Optional[str]]) -> List[Tuple[int, str]]:

@@ -34,9 +34,10 @@ RETAINED_METALLOCENES: Dict[str, str] = {
     '[V+2].c1cc[cH-]c1.c1cc[cH-]c1':  'vanadocene',         # ORG-T1-07
     '[Mn+2].c1cc[cH-]c1.c1cc[cH-]c1': 'manganocene',        # ORG-T1-08
     '[Fe+3].c1cc[cH-]c1.c1cc[cH-]c1': 'ferrocenium',        # ORG-T1-09
-    # Tier 4 stretch — decamethylferrocene
-    # canonical form per RESEARCH §1.7 ORG-T4-10
-    '[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C': 'decamethylferrocene',
+    # Tier 4 stretch — decamethylferrocene; key is the RDKit canonical
+    # SMILES (Chem.MolToSmiles output of the AUDIT § 1 input SMILES),
+    # which is what the lookup site (Chem.MolToSmiles(mol)) produces.
+    'Cc1c(C)c(C)[c-](C)c1C.Cc1c(C)c(C)[c-](C)c1C.[Fe+2]': 'decamethylferrocene',
 }
 
 
@@ -116,7 +117,11 @@ LIGAND_NAMES: Dict[str, str] = {
     '[CH2]=CC':          'allyl',
     'C=C':               'ethene',
     'C#C':               'ethyne',
-    'C1=CC=CC=CC=C1':    'cycloheptatrienyl',
+    # 7-atom ring cycloheptatrienyl + 8-atom ring cyclooctatetraene
+    # — Plan-02 substrate previously mislabeled the 8-atom ring as
+    # cycloheptatrienyl. Amendment per AUDIT § 1 ORG-T4-08/09.
+    'C1=CC=CC=CC=1':     'cycloheptatrienyl',
+    'C1=CC=CC=CC=C1':    'cyclooctatetraene',
     '[H-]':              'hydrido',
     '[Cl-]':             'chlorido',
     '[Br-]':             'bromido',
@@ -134,14 +139,22 @@ LIGAND_NAMES: Dict[str, str] = {
 LIGAND_ETA_DEFAULTS: Dict[str, Tuple[int, str]] = {
     'c1cc[cH-]c1':       (5, 'cyclopentadienyl'),
     '[c-]1cccc1':        (5, 'cyclopentadienyl'),
-    'CC1=C(C)C(C)=C(C)[C-]1C': (5, 'pentamethylcyclopentadienyl'),
+    # pentamethyl-Cp: key is RDKit canonical SMILES per Plan-03-04 amendment.
+    'Cc1c(C)c(C)[c-](C)c1C': (5, 'pentamethylcyclopentadienyl'),
+    # mono-methyl-Cp: per AUDIT § 1 ORG-T4-25 amendment.
+    'C[c-]1cccc1':       (5, 'methylcyclopentadienyl'),
     'c1ccccc1':          (6, 'benzene'),
     'C=CC=C':            (4, '1,3-butadiene'),
     'C=CC':              (3, 'prop-2-en-1-yl'),
     '[CH2]=CC':          (3, 'allyl'),
     'C=C':               (2, 'ethene'),
     'C#C':               (2, 'ethyne'),
-    'C1=CC=CC=CC=C1':    (7, 'cycloheptatrienyl'),
+    # 7-atom ring cycloheptatrienyl (C1=CC=CC=CC=1; 7 atoms total)
+    'C1=CC=CC=CC=1':     (7, 'cycloheptatrienyl'),
+    # 8-atom ring cyclooctatetraene (COT; C1=CC=CC=CC=C1; 8 atoms total)
+    # — Plan-02 substrate previously mislabeled this as 'cycloheptatrienyl'.
+    # Amendment per AUDIT § 1 ORG-T4-08/09.
+    'C1=CC=CC=CC=C1':    (8, 'cyclooctatetraene'),
     '[c+]1cccccc1':      (7, 'tropylium'),
     '[C-]#[O+]':         (1, 'carbonyl'),
     'C#O':               (1, 'carbonyl'),

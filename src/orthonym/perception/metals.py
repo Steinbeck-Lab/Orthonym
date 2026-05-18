@@ -136,19 +136,15 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
             else:
                 ligand_frags.append(frag)
 
-        # Tier-1 metallocene: metal frag is single atom + exactly 2 Cp ligand frags
+        # Tier-1 metallocene: metal frag is single atom + exactly 2 Cp ligand
+        # frags (un-substituted or substituted via SMARTS-template match).
         if (metal_frag is not None and len(metal_frag) == 1
                 and len(ligand_frags) == 2):
-            cp_groups = []
+            cp_groups: List[LigandGroup] = []
             for lig_frag in ligand_frags:
-                if _is_cp_ligand(mol, lig_frag):
-                    cp_groups.append(LigandGroup(
-                        metal_atom_idx=metal_idx,
-                        ligand_atom_indices=tuple(sorted(lig_frag)),
-                        hapticity_n=5,
-                        ligand_smarts_key='c1cc[cH-]c1',
-                        ligand_canonical_smiles='c1cc[cH-]c1',
-                    ))
+                cp_group = _try_make_cp_group(mol, metal_idx, lig_frag)
+                if cp_group is not None:
+                    cp_groups.append(cp_group)
             if len(cp_groups) == 2:
                 return MetalComplex(
                     metal_atom_indices=tuple(metal_atom_indices),
@@ -177,6 +173,19 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
                 formal_charges=tuple(formal_charges),
                 is_multimetal=False,
             )
+
+        # Tier-4 dot-separated mixed π-ligand topology (benzene / butadiene /
+        # COT / allyl / cycloheptatrienyl + optional CO ligands).
+        if (metal_frag is not None and len(metal_frag) == 1
+                and len(ligand_frags) >= 1):
+            tier4_groups = _build_pi_ligand_groups(mol, metal_idx, ligand_frags)
+            if tier4_groups is not None:
+                return MetalComplex(
+                    metal_atom_indices=tuple(metal_atom_indices),
+                    ligand_groups=tuple(tier4_groups),
+                    formal_charges=tuple(formal_charges),
+                    is_multimetal=False,
+                )
 
     # === Tier-3 topology: single-component σ-bonded main-group ===
     # 1 metal atom + N alkyl/aryl ligand atoms directly bonded (single bonds);
@@ -291,6 +300,59 @@ def _collect_organic_component(mol: "Chem.Mol", start_idx: int,
     return sorted(visited)
 
 
+def _try_make_cp_group(mol: "Chem.Mol", metal_idx: int,
+                       atom_indices: Tuple[int, ...]
+                       ) -> Optional[LigandGroup]:
+    """Try to recognise an atom-frag as a Cp ligand (with optional substituents).
+
+    Recognises:
+    - Bare Cp anion ``c1cc[cH-]c1`` (5 atoms)
+    - Substituted Cp anion via SMARTS-template lookup in LIGAND_ETA_DEFAULTS
+      (e.g. pentamethyl-Cp ``Cc1c(C)c(C)[c-](C)c1C``)
+
+    Returns None if the frag doesn't match any known Cp variant.
+    """
+    from ..data.organometallics import LIGAND_ETA_DEFAULTS
+
+    if _is_cp_ligand(mol, atom_indices):
+        return LigandGroup(
+            metal_atom_idx=metal_idx,
+            ligand_atom_indices=tuple(sorted(atom_indices)),
+            hapticity_n=5,
+            ligand_smarts_key='c1cc[cH-]c1',
+            ligand_canonical_smiles='c1cc[cH-]c1',
+        )
+
+    # Substituted Cp: compute frag canonical SMILES and look up
+    submol = Chem.RWMol()
+    atom_map: dict = {}
+    for idx in atom_indices:
+        new_idx = submol.AddAtom(mol.GetAtomWithIdx(idx))
+        atom_map[idx] = new_idx
+    for idx in atom_indices:
+        for bond in mol.GetAtomWithIdx(idx).GetBonds():
+            other = bond.GetOtherAtomIdx(idx)
+            if other in atom_indices and other > idx:
+                submol.AddBond(atom_map[idx], atom_map[other], bond.GetBondType())
+    try:
+        ligand_smi = Chem.MolToSmiles(submol)
+    except Exception:
+        return None
+
+    if ligand_smi in LIGAND_ETA_DEFAULTS:
+        hapticity, name = LIGAND_ETA_DEFAULTS[ligand_smi]
+        # Accept only Cp-class ligands (hapticity 5; named with 'cyclopentadienyl' suffix)
+        if hapticity == 5 and 'cyclopentadienyl' in name:
+            return LigandGroup(
+                metal_atom_idx=metal_idx,
+                ligand_atom_indices=tuple(sorted(atom_indices)),
+                hapticity_n=5,
+                ligand_smarts_key=ligand_smi,
+                ligand_canonical_smiles=ligand_smi,
+            )
+    return None
+
+
 def _is_cp_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:
     """Check if a frag's atom indices form a Cp anion ring.
 
@@ -308,6 +370,79 @@ def _is_cp_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:
             return False
         charge_sum += atom.GetFormalCharge()
     return charge_sum == -1
+
+
+def _build_pi_ligand_groups(mol: "Chem.Mol", metal_idx: int,
+                             ligand_frags: List[Tuple[int, ...]]
+                             ) -> Optional[List[LigandGroup]]:
+    """Build LigandGroups for Tier-4 mixed π-ligand topology.
+
+    Each ligand frag is a contiguous π-system bound to the metal. Use
+    LIGAND_ETA_DEFAULTS for SMARTS-template lookup; on miss return None
+    (handler cascades to SALT@100). Also accept CO frags (will already
+    have been caught by Tier-2 if all-CO; this branch handles mixed
+    CO + π topology).
+    """
+    from ..data.organometallics import LIGAND_ETA_DEFAULTS
+
+    groups: List[LigandGroup] = []
+    for frag in ligand_frags:
+        # CO ligand sub-case
+        if _is_co_ligand(mol, frag):
+            groups.append(LigandGroup(
+                metal_atom_idx=metal_idx,
+                ligand_atom_indices=tuple(sorted(frag)),
+                hapticity_n=1,
+                ligand_smarts_key='[C-]#[O+]',
+                ligand_canonical_smiles='[C-]#[O+]',
+            ))
+            continue
+
+        # Cp anion (5 aromatic C, charge sum -1)
+        if _is_cp_ligand(mol, frag):
+            groups.append(LigandGroup(
+                metal_atom_idx=metal_idx,
+                ligand_atom_indices=tuple(sorted(frag)),
+                hapticity_n=5,
+                ligand_smarts_key='c1cc[cH-]c1',
+                ligand_canonical_smiles='c1cc[cH-]c1',
+            ))
+            continue
+
+        # General π-ligand: compute canonical SMILES of the sub-frag and
+        # look up in LIGAND_ETA_DEFAULTS
+        submol = Chem.RWMol()
+        atom_map: dict = {}
+        for idx in frag:
+            new_idx = submol.AddAtom(mol.GetAtomWithIdx(idx))
+            atom_map[idx] = new_idx
+        for idx in frag:
+            for bond in mol.GetAtomWithIdx(idx).GetBonds():
+                other = bond.GetOtherAtomIdx(idx)
+                if other in frag and other > idx:
+                    submol.AddBond(atom_map[idx], atom_map[other], bond.GetBondType())
+        try:
+            ligand_smi = Chem.MolToSmiles(submol)
+        except Exception:
+            return None
+
+        if ligand_smi in LIGAND_ETA_DEFAULTS:
+            hapticity, _name = LIGAND_ETA_DEFAULTS[ligand_smi]
+            groups.append(LigandGroup(
+                metal_atom_idx=metal_idx,
+                ligand_atom_indices=tuple(sorted(frag)),
+                hapticity_n=hapticity,
+                ligand_smarts_key=ligand_smi,
+                ligand_canonical_smiles=ligand_smi,
+            ))
+            continue
+
+        # No match — cascade to SALT@100
+        return None
+
+    if not groups:
+        return None
+    return groups
 
 
 def _is_co_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:
