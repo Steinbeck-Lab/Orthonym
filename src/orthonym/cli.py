@@ -108,6 +108,44 @@ def main(args: List[str] = None) -> int:
         help="Output format for --dump-tree (default: text)"
     )
 
+    # Phase 162 ML Fallback Gate (MLF-01 + CONTEXT D-08).
+    # --allow-ml-fallback: opt-in only; default OFF (MLF-01 non-negotiable).
+    #   Requires the [ml] optional extra (pip install orthonym[ml]).
+    # --ml-opsin-parse-required: gates the expensive P5 OPSIN-subprocess
+    #   pattern in the quality-gate predicate. Default ON for production
+    #   correctness; --no-ml-opsin-parse-required disables for the
+    #   MLF-04 dual-config raw-attach-rate measurement mode.
+    ml_group = parser.add_argument_group("ML Fallback (Phase 162)")
+    ml_group.add_argument(
+        "--allow-ml-fallback",
+        dest="allow_ml_fallback",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable opt-in ML fallback (STOUT-pypi). Default OFF; "
+            "rule-based pipeline is the only path under default settings "
+            "(MLF-01). Requires the [ml] optional extra: "
+            "pip install orthonym[ml]. See 162-AUDIT-MLF.md § 1.2."
+        ),
+    )
+    ml_group.add_argument(
+        "--ml-opsin-parse-required",
+        action="store_true",
+        default=True,
+        help=(
+            "Quality-gate OPSIN-parse criterion (Phase 162 D-08). "
+            "Default True. Use --no-ml-opsin-parse-required to disable "
+            "(raw-attach-rate measurement mode; useful for MLF-04 "
+            "dual-config benchmark)."
+        ),
+    )
+    ml_group.add_argument(
+        "--no-ml-opsin-parse-required",
+        dest="ml_opsin_parse_required",
+        action="store_false",
+        help=argparse.SUPPRESS,
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
