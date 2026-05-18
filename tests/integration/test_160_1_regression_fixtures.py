@@ -228,3 +228,81 @@ class TestOxygenAttachedCarbamateBranchB:
         assert inchi_input.split("/")[1] == inchi_rt.split("/")[1], (
             f"formula mismatch: input={inchi_input} rt={inchi_rt}"
         )
+
+
+class TestNSubstitutedCarbamateBranchB:
+    """Phase 160.2 post-merge: N-substituted Branch B carbamate per IUPAC
+    P-66.6.4. The original Plan-04-01 guard hard-coded ``carbamoyloxy`` and
+    silently dropped N-substituents; the follow-up fix routes through
+    ``_compute_branch_b_carbamoyloxy_name`` which produces explicit-N-locant
+    PIN forms via the existing ``get_n_alkyl_carbamoyl_prefix`` /
+    ``get_n_n_dialkyl_carbamoyl_prefix`` conventions then appends ``oxy``.
+
+      * ``O=C(NC)OCCCC(=O)O``        → ``4-(N-methylcarbamoyl)oxybutanoic acid``
+      * ``O=C(NCC)OCCCC(=O)O``       → ``4-(N-ethylcarbamoyl)oxybutanoic acid``
+      * ``O=C(N(C)C)OCCCC(=O)O``     → ``4-(N,N-dimethylcarbamoyl)oxybutanoic acid``
+      * ``O=C(N(C)CC)OCCCC(=O)O``    → ``4-(N-ethyl-N-methylcarbamoyl)oxybutanoic acid``
+
+    Each name OPSIN-round-trips to the input InChI L1 (formula + connectivity).
+    """
+
+    _CASES = [
+        ("O=C(NC)OCCCC(=O)O", "4-(N-methylcarbamoyl)oxybutanoic acid"),
+        ("O=C(NCC)OCCCC(=O)O", "4-(N-ethylcarbamoyl)oxybutanoic acid"),
+        ("O=C(N(C)C)OCCCC(=O)O", "4-(N,N-dimethylcarbamoyl)oxybutanoic acid"),
+        (
+            "O=C(N(C)CC)OCCCC(=O)O",
+            "4-(N-ethyl-N-methylcarbamoyl)oxybutanoic acid",
+        ),
+    ]
+
+    def test_n_substituted_carbamate_branch_b_names(self):
+        """name_compound emits N-substituted Branch B carbamoyloxy forms."""
+        for smiles, expected in self._CASES:
+            actual = name_compound(smiles, style="pin")
+            assert actual == expected, (
+                f"Branch B regression: smiles={smiles!r}, "
+                f"expected={expected!r}, got={actual!r}"
+            )
+
+    def test_n_substituted_carbamate_opsin_roundtrip(self):
+        """Generated names OPSIN-round-trip to input InChI L1."""
+        import subprocess
+        import os
+        from rdkit import Chem
+
+        opsin_jar_candidates = [
+            "opsin/opsin-cli-2.9.0-jar-with-dependencies.jar",
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "opsin",
+                "opsin-cli-2.9.0-jar-with-dependencies.jar",
+            ),
+        ]
+        opsin_jar = None
+        for candidate in opsin_jar_candidates:
+            if os.path.isfile(candidate):
+                opsin_jar = candidate
+                break
+        if opsin_jar is None:
+            import pytest as _pytest
+            _pytest.skip("OPSIN jar not found in repo; skipping round-trip")
+
+        for smiles, _expected in self._CASES:
+            name = name_compound(smiles, style="pin")
+            result = subprocess.run(
+                ["java", "-jar", opsin_jar, "-osmi"],
+                input=name + "\n", capture_output=True, text=True, timeout=30,
+            )
+            rt_smiles = result.stdout.strip().split("\n")[0]
+            assert rt_smiles, (
+                f"OPSIN failed to parse {name!r}: {result.stderr}"
+            )
+            mol_input = Chem.MolFromSmiles(smiles)
+            mol_rt = Chem.MolFromSmiles(rt_smiles)
+            assert mol_input is not None and mol_rt is not None
+            inchi_input = Chem.MolToInchi(mol_input)
+            inchi_rt = Chem.MolToInchi(mol_rt)
+            assert inchi_input.split("/")[1] == inchi_rt.split("/")[1], (
+                f"formula mismatch for {smiles!r}: "
+                f"input={inchi_input} rt={inchi_rt}"
+            )

@@ -811,6 +811,72 @@ def get_n_n_dialkyl_carbamoyl_prefix(
     return f"N-{first}-N-{second}carbamoyl"
 
 
+def _compute_branch_b_carbamoyloxy_name(
+    mol,
+    carbamate_atoms: tuple,
+) -> Optional[str]:
+    """Compute Branch B carbamoyloxy name with N-substitution per IUPAC P-66.6.4.
+
+    For ``-OC(=O)NR1R2`` substituents (attached through the ester-O):
+
+      * ``-OC(=O)NH2``           → ``"carbamoyloxy"``
+      * ``-OC(=O)NHCH3``         → ``"(N-methylcarbamoyl)oxy"``
+      * ``-OC(=O)NHC2H5``        → ``"(N-ethylcarbamoyl)oxy"``
+      * ``-OC(=O)N(CH3)2``       → ``"(N,N-dimethylcarbamoyl)oxy"``
+      * ``-OC(=O)N(CH3)(C2H5)``  → ``"(N-ethyl-N-methylcarbamoyl)oxy"``  (alphabetized)
+
+    Mirrors ``get_n_alkyl_carbamoyl_prefix`` + ``get_n_n_dialkyl_carbamoyl_prefix``
+    conventions (uses explicit ``N-`` locants) then appends ``oxy``.
+
+    Returns None for heteroatom-bearing N-substituents (caller falls through).
+    """
+    if len(carbamate_atoms) < 5:
+        return None
+    amide_n, carbonyl_c, carbonyl_o, _ester_o, _alkyl_c = carbamate_atoms[:5]
+
+    # Find N's non-H, non-carbonyl-C neighbours (the N-substituents).
+    n_atom = mol.GetAtomWithIdx(amide_n)
+    n_alkyl_neighbors: List[int] = []
+    for nbr in n_atom.GetNeighbors():
+        if nbr.GetIdx() == carbonyl_c:
+            continue
+        if nbr.GetAtomicNum() == 1:
+            continue
+        n_alkyl_neighbors.append(nbr.GetIdx())
+
+    # Unsubstituted: -OC(=O)NH2 → carbamoyloxy
+    if not n_alkyl_neighbors:
+        return "carbamoyloxy"
+
+    excl_base = {carbonyl_c, carbonyl_o, amide_n}
+
+    # Mono-N-substituted: -OC(=O)NHR → (N-Rcarbamoyl)oxy
+    if len(n_alkyl_neighbors) == 1:
+        alkyl_name = _name_alkyl_branch_from_atom(
+            mol, n_alkyl_neighbors[0], exclude=excl_base
+        )
+        if not alkyl_name:
+            return None
+        return f"(N-{alkyl_name}carbamoyl)oxy"
+
+    # Di-N-substituted: -OC(=O)NR1R2 → (N,N-(R1)(R2)carbamoyl)oxy
+    if len(n_alkyl_neighbors) == 2:
+        a1, a2 = n_alkyl_neighbors
+        alkyl1 = _name_alkyl_branch_from_atom(mol, a1, exclude=excl_base | {a2})
+        alkyl2 = _name_alkyl_branch_from_atom(mol, a2, exclude=excl_base | {a1})
+        if not alkyl1 or not alkyl2:
+            return None
+        if alkyl1 == alkyl2:
+            return f"(N,N-di{alkyl1}carbamoyl)oxy"
+        if alpha_sort_key(alkyl1) < alpha_sort_key(alkyl2):
+            first, second = alkyl1, alkyl2
+        else:
+            first, second = alkyl2, alkyl1
+        return f"(N-{first}-N-{second}carbamoyl)oxy"
+
+    return None
+
+
 def get_carbamoyloxy_prefix(
     mol,
     carbamate_atoms: tuple,
@@ -821,7 +887,8 @@ def get_carbamoyloxy_prefix(
     The carbamate ``-NHC(=O)O-`` has TWO orientation forms:
 
       * **Branch A**: connects through N → ``-NHC(=O)OCH3`` → ``"(methoxycarbonyl)amino"``
-      * **Branch B**: connects through O → ``-OC(=O)NH2`` → ``"carbamoyloxy"``
+      * **Branch B**: connects through O → ``-OC(=O)NH2`` → ``"carbamoyloxy"`` (N-substituted
+        variants per ``_compute_branch_b_carbamoyloxy_name``: ``(N-methylcarbamoyl)oxy`` etc.)
 
     Returns None for cyclic carbamate (oxazolidinone; handled by ring
     handler) or backbone carbamate (all atoms on principal chain).
@@ -865,8 +932,8 @@ def get_carbamoyloxy_prefix(
                 return None
             return f"({alkoxy_part}carbonyl)amino"
         if o_on_chain:
-            # Branch B: -OC(=O)NH2 → "carbamoyloxy"
-            return "carbamoyloxy"
+            # Branch B: -OC(=O)NR1R2 → carbamoyloxy / (N-Rcarbamoyl)oxy
+            return _compute_branch_b_carbamoyloxy_name(mol, carbamate_atoms)
         return None
 
     # Sub-fragment context (principal_chain=None): default to Branch A.
@@ -1067,14 +1134,23 @@ def _check_substituent_prefix_form(
                 fg_name == "carbamate"
                 and len(match) >= 5
                 and attach_idx == match[3]
-                and (
-                    # Substituent-context (live): fragment is match - {alkyl_C}
-                    frag_atoms_set == match_set - {match[4]}
-                    # Full-match context (unit / direct call): frag == match
-                    or frag_atoms_set == match_set
-                )
             ):
-                return "carbamoyloxy"
+                # The carbamate 4-atom core (amide_N, carbonyl_C, carbonyl_O,
+                # ester_O) must live inside the substituent fragment. The
+                # trailing SMARTS atom (alkyl_C = match[4]) is the parent
+                # attachment point, which may be EITHER inside or outside the
+                # fragment. Any extra atoms in the fragment beyond the core
+                # are valid N-substituents (NHR / NR1R2 cases handled by
+                # ``_compute_branch_b_carbamoyloxy_name``).
+                core_set = match_set - {match[4]}
+                if core_set.issubset(frag_atoms_set):
+                    # Phase 160.2 follow-up: N-substituted Branch B per
+                    # IUPAC P-66.6.4. NH2 → "carbamoyloxy"; NHR →
+                    # "(N-Rcarbamoyl)oxy"; NR1R2 →
+                    # "(N,N-(R1)(R2)carbamoyl)oxy" (alphabetized).
+                    branch_b = _compute_branch_b_carbamoyloxy_name(mol, match)
+                    if branch_b is not None:
+                        return branch_b
             # --- End CR-01 fix ---
             # FG must EQUAL the fragment (no extra atoms). This is the
             # IUPAC P-65/P-66 prefix-form precondition: the substituent
