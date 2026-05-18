@@ -725,7 +725,9 @@ class Orthonym:
     """
     
     def __init__(self, style: str = "pin", *,
-                 _disable_grammar_validation: bool = False):
+                 _disable_grammar_validation: bool = False,
+                 allow_ml_fallback: bool = False,
+                 opsin_parse_required: bool = True):
         """
         Initialize namer.
 
@@ -739,8 +741,27 @@ class Orthonym:
                 disabled (`self._grammar` is None). ON by default in
                 production; OFF only for unit tests inspecting raw
                 handler output.
+            allow_ml_fallback: Phase 162 MLF-01 opt-in flag. Default
+                False (rule-based pipeline only). When True, the
+                _name_impl wrapper (Plan-03 T01) consults
+                is_name_quality_inadequate() and may attach the STOUT
+                ML model when the rule-based pipeline emits a degraded
+                name. Requires the [ml] optional extra.
+            opsin_parse_required: Phase 162 D-08 quality-gate flag.
+                Default True (OPSIN-parse criterion ON for production
+                correctness). When False, the expensive P5 OPSIN
+                subprocess is bypassed (raw-attach-rate measurement
+                mode for the MLF-04 dual-config benchmark).
         """
         self.style = style
+        # Phase 162 ML Fallback Gate per MLF-01 + D-08 (kwargs stored;
+        # the wrapper at _name_impl():1248 lands in Plan-03 T01).
+        self._allow_ml_fallback: bool = allow_ml_fallback
+        self._opsin_parse_required: bool = opsin_parse_required
+        # Per-instance state: populated by Plan-03 T01 wrapper when
+        # MLFallbackInvoker fires. None at construction; reset to None
+        # at the start of every name_with_confidence call.
+        self._last_ml_result: Optional[Any] = None
         # Phase 156 D-17 + AP-19: per-instance counter dict, NEVER
         # module-global. Pre-seed all seven buckets so callers see a
         # complete histogram even before any name() invocation.
@@ -1825,7 +1846,10 @@ def name_with_tree(smiles: str, style: str = "pin"):
 
 
 def name_compound(smiles: str, style: str = "pin",
-                   include_confidence: bool = False):
+                   include_confidence: bool = False,
+                   *,
+                   allow_ml_fallback: bool = False,
+                   opsin_parse_required: bool = True):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -1838,6 +1862,10 @@ def name_compound(smiles: str, style: str = "pin",
             - "cas": CAS-style naming
         include_confidence: If True, return dict with confidence metadata
             instead of plain str
+        allow_ml_fallback: Phase 162 MLF-01 opt-in flag (default False).
+            See Orthonym.__init__ docstring.
+        opsin_parse_required: Phase 162 D-08 quality-gate flag (default True).
+            See Orthonym.__init__ docstring.
 
     Returns:
         str: IUPAC systematic name (default)
@@ -1858,7 +1886,11 @@ def name_compound(smiles: str, style: str = "pin",
         >>> name_compound("CCO", include_confidence=True)
         {'name': 'ethanol', 'confidence': 1.0, ...}
     """
-    namer = Orthonym(style=style)
+    namer = Orthonym(
+        style=style,
+        allow_ml_fallback=allow_ml_fallback,
+        opsin_parse_required=opsin_parse_required,
+    )
 
     if include_confidence:
         try:

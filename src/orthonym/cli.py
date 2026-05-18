@@ -236,9 +236,17 @@ def main(args: List[str] = None) -> int:
                 _print_tree_text(result)
             return 0
 
+        # Phase 162: thread parsed CLI flags to the Orthonym() constructor
+        # via name_compound's new kwargs. getattr defensive pattern preserves
+        # backwards compat for any direct callers that pre-date Phase 162.
+        ml_kwargs = {
+            "allow_ml_fallback": getattr(parsed, "allow_ml_fallback", False),
+            "opsin_parse_required": getattr(parsed, "ml_opsin_parse_required", True),
+        }
+
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
-                                   include_confidence=True)
+                                   include_confidence=True, **ml_kwargs)
             print(f"Name:       {result['name']}")
             print(f"Confidence: {result['confidence']:.4f}")
             print(f"Handler:    {result['handler']}")
@@ -246,13 +254,16 @@ def main(args: List[str] = None) -> int:
                 print("Factors:")
                 for k, v in result['factors'].items():
                     print(f"  {k}: {v:.4f}")
+            if result.get('ml_fallback_used'):
+                print(f"ML fallback used: True")
+                print(f"ML model version: {result.get('ml_model_version', 'unknown')}")
         elif parsed.verbose:
-            name = name_compound(parsed.smiles, style=parsed.style)
+            name = name_compound(parsed.smiles, style=parsed.style, **ml_kwargs)
             print(f"SMILES: {parsed.smiles}")
             print(f"Style:  {parsed.style}")
             print(f"Name:   {name}")
         else:
-            name = name_compound(parsed.smiles, style=parsed.style)
+            name = name_compound(parsed.smiles, style=parsed.style, **ml_kwargs)
             print(name)
 
         return 0
