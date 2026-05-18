@@ -23,7 +23,7 @@ Phase 161 (v19 first scope-expansion phase per ADR-19-07).
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import FrozenSet, Optional, Tuple
+from typing import FrozenSet, List, Optional, Tuple
 from rdkit import Chem
 
 
@@ -157,8 +157,117 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
                     is_multimetal=False,
                 )
 
-    # Other topologies (Tier-2/3/4) land in subsequent Plan-03 commits.
+    # === Tier-3 topology: single-component σ-bonded main-group ===
+    # 1 metal atom + N alkyl/aryl ligand atoms directly bonded (single bonds);
+    # Grignard topology: 1 organic ligand + 1 halide ligand.
+    if len(frags) == 1 and not is_multimetal:
+        metal_idx = metal_atom_indices[0]
+        sigma_groups = _build_sigma_ligand_groups(mol, metal_idx)
+        if sigma_groups is not None:
+            return MetalComplex(
+                metal_atom_indices=tuple(metal_atom_indices),
+                ligand_groups=tuple(sigma_groups),
+                formal_charges=tuple(formal_charges),
+                is_multimetal=False,
+            )
+
+    # Tier-2 (dot-separated metal carbonyls) and Tier-4 (mixed η-bonded /
+    # half-sandwich) topologies land in subsequent Plan-03 commits.
     return None
+
+
+_HALIDE_SMARTS_KEYS: FrozenSet[str] = frozenset({
+    '[Cl-]', '[Br-]', '[F-]', '[I-]',
+})
+
+
+def _build_sigma_ligand_groups(mol: "Chem.Mol",
+                               metal_idx: int) -> Optional[Tuple[LigandGroup, ...]]:
+    """Build LigandGroups for a σ-bonded single-component organometallic.
+
+    For each direct neighbor of the metal atom, walk the connected non-metal
+    subgraph (BFS over single/aromatic bonds, not crossing the metal again).
+    Each component becomes a LigandGroup with hapticity_n=1.
+
+    For halide leaf-atoms (Cl/Br/F/I directly bonded to metal), produce a
+    single-atom LigandGroup with ligand_smarts_key set per
+    _HALIDE_SMARTS_KEYS so the rules layer can dispatch Grignard vs alkyl.
+
+    Returns None if the topology doesn't match σ-bonded (e.g., aromatic
+    π-bonded ligand attached to metal). Pure per CONTEXT D-12.
+    """
+    metal_atom = mol.GetAtomWithIdx(metal_idx)
+    sigma_groups: List[LigandGroup] = []
+    seen_atoms: set = {metal_idx}
+
+    for neighbor_bond in metal_atom.GetBonds():
+        neighbor_idx = neighbor_bond.GetOtherAtomIdx(metal_idx)
+        if neighbor_idx in seen_atoms:
+            continue
+        neighbor_atom = mol.GetAtomWithIdx(neighbor_idx)
+
+        # Halide leaf-atom: single-atom ligand
+        if (neighbor_atom.GetDegree() == 1
+                and neighbor_atom.GetSymbol() in ('Cl', 'Br', 'F', 'I')):
+            halide_key = f"[{neighbor_atom.GetSymbol()}-]"
+            sigma_groups.append(LigandGroup(
+                metal_atom_idx=metal_idx,
+                ligand_atom_indices=(neighbor_idx,),
+                hapticity_n=1,
+                ligand_smarts_key=halide_key,
+                ligand_canonical_smiles=halide_key,
+            ))
+            seen_atoms.add(neighbor_idx)
+            continue
+
+        # Skip if connecting via a non-single bond (aromatic / double / triple)
+        # — those are π-bonded, Tier-4 territory. Aryl σ-bonds to metal are
+        # single bonds; aromatic-ring atoms inside the ring are aromatic but
+        # the M-C bond itself is single.
+        if neighbor_bond.GetBondTypeAsDouble() > 1.5:
+            return None
+
+        # Walk the organic ligand subgraph via BFS, not crossing the metal
+        ligand_atoms = _collect_organic_component(mol, neighbor_idx, metal_idx)
+        # Refuse to collect atoms already in another ligand (e.g., a bridging
+        # carbon would belong to two metals — Phase 161.3 territory)
+        if any(a in seen_atoms for a in ligand_atoms):
+            return None
+        seen_atoms.update(ligand_atoms)
+
+        sigma_groups.append(LigandGroup(
+            metal_atom_idx=metal_idx,
+            ligand_atom_indices=tuple(sorted(ligand_atoms)),
+            hapticity_n=1,
+            ligand_smarts_key=None,  # σ-bonded; no SMARTS catalog hit
+            ligand_canonical_smiles=None,
+        ))
+
+    if not sigma_groups:
+        return None
+    return tuple(sigma_groups)
+
+
+def _collect_organic_component(mol: "Chem.Mol", start_idx: int,
+                                metal_idx: int) -> List[int]:
+    """BFS over non-metal atoms reachable from start_idx, not crossing metal."""
+    visited = {start_idx}
+    queue = [start_idx]
+    while queue:
+        current = queue.pop()
+        atom = mol.GetAtomWithIdx(current)
+        for bond in atom.GetBonds():
+            other_idx = bond.GetOtherAtomIdx(current)
+            if other_idx == metal_idx:
+                continue
+            if other_idx in visited:
+                continue
+            other_atom = mol.GetAtomWithIdx(other_idx)
+            if is_metal_element(other_atom.GetSymbol()):
+                continue
+            visited.add(other_idx)
+            queue.append(other_idx)
+    return sorted(visited)
 
 
 def _is_cp_ligand(mol: "Chem.Mol", atom_indices: Tuple[int, ...]) -> bool:

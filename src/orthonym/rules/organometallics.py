@@ -55,6 +55,92 @@ def _to_roman(n: int) -> str:
     return _ROMAN_NUMERALS[n]
 
 
+# Multiplicative prefixes for simple ligand counts per Salzer §5.2.
+_SIMPLE_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
+    1: '',
+    2: 'di',
+    3: 'tri',
+    4: 'tetra',
+    5: 'penta',
+    6: 'hexa',
+    7: 'hepta',
+    8: 'octa',
+}
+
+
+def _multiplicative_prefix(count: int) -> str:
+    """Return the multiplicative prefix for a simple ligand count."""
+    if count not in _SIMPLE_MULTIPLICATIVE_PREFIXES:
+        raise ValueError(f"ligand count {count} outside simple-prefix range (1..8)")
+    return _SIMPLE_MULTIPLICATIVE_PREFIXES[count]
+
+
+# Halide ligand name swaps for Grignard form (chlorido → chloride, etc.)
+_HALIDE_LIGAND_TO_HALIDE_WORD: Dict[str, str] = {
+    '[F-]':  'fluoride',
+    '[Cl-]': 'chloride',
+    '[Br-]': 'bromide',
+    '[I-]':  'iodide',
+}
+
+
+def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional[str]:
+    """Identify the IUPAC name of an alkyl/aryl ligand from its atom indices.
+
+    Recognised ligands (Phase 161 scope; per LIGAND_NAMES + AUDIT § 2):
+    - methyl (1 C, all sp³)
+    - ethyl (2 C, all sp³)
+    - propyl / n-propyl (3 C, all sp³, linear)
+    - butyl / n-butyl (4 C, all sp³, linear)
+    - phenyl (6 aromatic C in a ring)
+    - vinyl / ethenyl (2 C with C=C double bond)
+
+    Returns None if the ligand doesn't match any known pattern.
+    """
+    n_atoms = len(atom_indices)
+    if n_atoms == 0:
+        return None
+
+    atoms = [mol.GetAtomWithIdx(i) for i in atom_indices]
+    symbols = [a.GetSymbol() for a in atoms]
+
+    # All carbons?
+    if not all(s == 'C' for s in symbols):
+        return None
+
+    aromatic_count = sum(1 for a in atoms if a.GetIsAromatic())
+
+    # Phenyl: 6 aromatic carbons in a ring
+    if n_atoms == 6 and aromatic_count == 6:
+        return 'phenyl'
+
+    # Alkyl groups: all sp³ carbons in a linear chain
+    if aromatic_count == 0:
+        # Check linearity: degree 1 carbons at the ends, degree 2 in middle
+        # (the metal-attached carbon will have degree 1 since metal isn't in
+        # atom_indices). For n_atoms == 1, it's methyl.
+        if n_atoms == 1:
+            return 'methyl'
+
+        # Build internal degree map (degree within the ligand subgraph)
+        idx_set = set(atom_indices)
+        internal_degrees = {}
+        for idx in atom_indices:
+            atom = mol.GetAtomWithIdx(idx)
+            internal_degrees[idx] = sum(
+                1 for b in atom.GetBonds()
+                if b.GetOtherAtomIdx(idx) in idx_set
+            )
+        # Linear chain: exactly 2 atoms with degree 1; rest with degree 2
+        deg_counts = list(internal_degrees.values())
+        if deg_counts.count(1) == 2 and deg_counts.count(2) == n_atoms - 2:
+            return {2: 'ethyl', 3: 'propyl', 4: 'butyl',
+                    5: 'pentyl', 6: 'hexyl', 7: 'heptyl',
+                    8: 'octyl'}.get(n_atoms)
+
+    return None
+
+
 # === ORGM_LIGAND_ORDER (Salzer 1999 §5.2 alphabetic with multiplicatives ignored) ===
 # This is NOT the carbon-organic seniority of P-43 — that stays UNTOUCHED
 # in src/orthonym/rules/seniority.py per CONTEXT D-06.
@@ -254,8 +340,147 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         )
         return (full_name, metal_name_part, [ligand_node])
 
-    # Tier 2/3/4 dispatch lands in commits 03-02/03/04
+    # === TIER-3 dispatch: σ-bonded main-group organometallics ===
+    if all(lg.hapticity_n == 1 for lg in ligand_groups):
+        metal_name_info = METAL_NAMES.get(metal_symbol)
+        if metal_name_info is None:
+            return None
+        naming_system = metal_name_info['naming_system']
+
+        # Partition into organic ligands and halide ligands
+        halide_ligs = [
+            lg for lg in ligand_groups
+            if lg.ligand_smarts_key in _HALIDE_LIGAND_TO_HALIDE_WORD
+        ]
+        organic_ligs = [
+            lg for lg in ligand_groups
+            if lg.ligand_smarts_key not in _HALIDE_LIGAND_TO_HALIDE_WORD
+        ]
+
+        # Identify organic ligand names from atom indices
+        organic_names: List[Optional[str]] = [
+            _ligand_name_from_atoms(mol, lg.ligand_atom_indices)
+            for lg in organic_ligs
+        ]
+        if any(n is None for n in organic_names):
+            return None  # cascade to SALT@100
+
+        # === Branch A: hydride-parent system (Group 14: Si/Ge/Sn/Pb) ===
+        if naming_system == 'hydride_parent':
+            parent_name = metal_name_info['hydride_parent']
+            if parent_name is None:
+                return None
+            if halide_ligs:
+                # Halide on Si/Ge/Sn/Pb: out of Phase 161 scope (defer)
+                return None
+            # Group identical ligands
+            grouped = _group_ligand_counts(organic_names)
+            sorted_groups = _alphabetize_simple_ligands(grouped)
+            ligand_prefix = ''.join(
+                _multiplicative_prefix(count) + name
+                for count, name in sorted_groups
+            )
+            full_name = f"{ligand_prefix}{parent_name}"
+            ligand_tree_nodes = [
+                NameTreeNode(
+                    parent_stem=name,
+                    multiplicative_prefix=_multiplicative_prefix(count) or None,
+                    class_id='organometallic_ligand',
+                )
+                for count, name in sorted_groups
+            ]
+            # No Stock notation (hydride-parent system implicit +4)
+            return (full_name, parent_name, ligand_tree_nodes)
+
+        # === Branch B: metal-direct system (Groups 1/2/12/13) ===
+        if naming_system == 'metal_direct':
+            metal_name = metal_name_info['direct']
+
+            # Determine ligand_class for Stock lookup
+            if halide_ligs and metal_symbol == 'Mg':
+                ligand_class = 'alkyl_halide'
+            elif metal_symbol in ('Zn', 'Cd', 'Hg') and len(organic_ligs) == 2:
+                ligand_class = 'alkyl2'
+            elif metal_symbol == 'Al' and len(organic_ligs) == 3:
+                ligand_class = 'alkyl3'
+            elif metal_symbol in ('Li', 'Na', 'K') and len(organic_ligs) == 1:
+                ligand_class = 'alkyl'
+            else:
+                # Unknown combination — cascade to SALT@100
+                return None
+
+            hints = METAL_OXIDATION_STATE_HINTS.get((metal_symbol, ligand_class))
+            if hints is None:
+                return None
+
+            include_stock = (
+                hints['stock_required_systematic'] if style == 'systematic'
+                else hints['stock_required_pin']
+            )
+
+            # Grignard: space-separated "ethylmagnesium bromide" form
+            if ligand_class == 'alkyl_halide':
+                organic_name = organic_names[0]  # exactly one organic ligand
+                halide_word = _HALIDE_LIGAND_TO_HALIDE_WORD[halide_ligs[0].ligand_smarts_key]
+                full_name = f"{organic_name}{metal_name} {halide_word}"
+                metal_name_part = metal_name
+                ligand_tree_nodes = [
+                    NameTreeNode(parent_stem=organic_name,
+                                 class_id='organometallic_ligand'),
+                    NameTreeNode(parent_stem=halide_word,
+                                 class_id='organometallic_ligand'),
+                ]
+                return (full_name, metal_name_part, ligand_tree_nodes)
+
+            # Single-component multi-alkyl (dimethylzinc, trimethylaluminum, etc.)
+            grouped = _group_ligand_counts(organic_names)
+            sorted_groups = _alphabetize_simple_ligands(grouped)
+            ligand_prefix = ''.join(
+                _multiplicative_prefix(count) + name
+                for count, name in sorted_groups
+            )
+
+            if include_stock:
+                oxidation = metal_charge if metal_charge != 0 else hints['default_state']
+                stock_str = f"({_to_roman(oxidation)})"
+            else:
+                stock_str = ""
+
+            full_name = f"{ligand_prefix}{metal_name}{stock_str}"
+            metal_name_part = f"{metal_name}{stock_str}"
+            ligand_tree_nodes = [
+                NameTreeNode(
+                    parent_stem=name,
+                    multiplicative_prefix=_multiplicative_prefix(count) or None,
+                    class_id='organometallic_ligand',
+                )
+                for count, name in sorted_groups
+            ]
+            return (full_name, metal_name_part, ligand_tree_nodes)
+
+    # Tier-2 / Tier-4 dispatch lands in commits 03-03/04
     return None
+
+
+def _group_ligand_counts(ligand_names: List[Optional[str]]) -> List[Tuple[int, str]]:
+    """Group identical ligand names with their occurrence counts.
+
+    Returns [(count, name), ...]. Names are not yet sorted.
+    """
+    from collections import Counter
+    counter = Counter(n for n in ligand_names if n is not None)
+    return [(count, name) for name, count in counter.items()]
+
+
+def _alphabetize_simple_ligands(
+    grouped: List[Tuple[int, str]],
+) -> List[Tuple[int, str]]:
+    """Sort ligand entries alphabetically per Salzer §5.2.
+
+    Multiplicative prefixes (di-, tri-, tetra-) are IGNORED — alphabetize
+    by the ligand name itself (the input here is already stripped).
+    """
+    return sorted(grouped, key=lambda entry: entry[1])
 
 
 __all__ = [
