@@ -120,6 +120,17 @@ TERMINAL_FG_TYPES = frozenset({
     "thioic_O_acid",    # Always at chain end (locant 1)
     "dithioic_acid",    # Always at chain end (locant 1)
     "carbamic_acid",    # Retained name, terminal (locant 1)
+    # Phase 163 Tier FRN-A chalcogen acids (P-66.6.3 functional replacement; IUPAC PIN
+    # 'propaneselenoic Se-acid' / 'propanetelluroic Te-acid' — never carries locant-1)
+    "selenoic_Se_acid", "selenoic_O_acid", "diselenoic_acid",
+    "telluroic_Te_acid", "telluroic_O_acid", "ditelluroic_acid",
+    # Phase 163 Tier FRN-B chalcogen amides (P-66.1.4.1.1 functional replacement; IUPAC PIN
+    # 'propanethioamide' / 'propaneselenoamide' — never carries locant-1)
+    "thioamide", "selenoamide", "telluroamide",
+    # Phase 163 Tier FRN-C chalcogen aldehydes (P-66.6.3 — "propanethial" / "propaneselenal" /
+    # "propanetellural"; suffix is "-thial"/"-selenal"/"-tellural" per seniority.py SUFFIX_FORMS,
+    # but FG identifier is the long form. Always terminal — never carries locant-1.)
+    "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
 })
 
 
@@ -982,11 +993,20 @@ def format_suffix_with_locants(
             return f"{base}e-{locant_str}-{full_suffix}"
         else:
             # Without multiplier: base + '-locants-' + suffix
-            # e.g., 'propan-1-ol'
-            # Apply elision to base before the hyphen-locant construct
-            # In PIN style, the base does NOT get 'e' appended when
-            # locants follow directly
-            return f"{base}-{locant_str}-{suffix}"
+            # IUPAC P-16.3.3 vowel elision: drop terminal 'e' of the parent stem
+            # only when the suffix begins with a, i, o, u, or y. Before consonant-
+            # leading suffixes (-thione, -selone, -tellone, etc.) preserve the 'e'.
+            #
+            # Examples:
+            #   propan + 1 + ol     -> 'propan-1-ol'     (elide e — 'o' is vowel)
+            #   butan  + 2 + one    -> 'butan-2-one'     (elide e — 'o' is vowel)
+            #   propan + 2 + thione -> 'propane-2-thione' (keep e — 't' is consonant)
+            #   propan + 2 + selone -> 'propane-2-selone' (keep e — 's' is consonant)
+            #   ethan  + 1 + thione -> 'ethane-1-thione' (P-66.1.4.3 example PIN)
+            if suffix and suffix[0] in _ELISION_VOWELS:
+                return f"{base}-{locant_str}-{suffix}"
+            else:
+                return f"{base}e-{locant_str}-{suffix}"
     else:
         # No locants: combine base and suffix with elision
         # e.g., 'pentanoic acid', 'propanal'

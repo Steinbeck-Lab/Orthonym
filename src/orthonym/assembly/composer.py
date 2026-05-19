@@ -517,6 +517,10 @@ TERMINAL_GROUPS = {
     "thioamide",           # Always at chain end (locant 1)
     "selenoamide",         # Always at chain end (locant 1)
     "telluroamide",        # Always at chain end (locant 1)
+    # Phase 163 Tier FRN-C: chalcogen aldehydes (parallel to aldehyde; "-thial"/"-selenal"/"-tellural")
+    "thioaldehyde",        # Always at chain end (locant 1)
+    "selenoaldehyde",      # Always at chain end (locant 1)
+    "telluroaldehyde",     # Always at chain end (locant 1)
     "carbamic_acid",    # Retained name, terminal (locant 1)
 }
 
@@ -881,7 +885,14 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # so that the multiplier prefix (di-, tri-) is correctly applied.
     # Stereo: handled within _assemble_amide_name() -- unsaturated path calls
     # _generate_stereodescriptors(); ring/saturated paths inject stereo at return.
-    if features.principal_group in ('primary_amide', 'secondary_amide', 'tertiary_amide'):
+    if features.principal_group in (
+        'primary_amide', 'secondary_amide', 'tertiary_amide',
+        # Phase 163 chalcogen amides — single-permissive thio/seleno/telluro PG
+        # per AUDIT § 2.2 (no 3-way primary/secondary/tertiary split). The same
+        # _assemble_amide_name pipeline handles N-substitution rendering; the
+        # suffix_form lookup happens inside via _CHALCOGEN_AMIDE_SUFFIX_FORMS.
+        'thioamide', 'selenoamide', 'telluroamide',
+    ):
         pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
         if pg_count == 1:
             _amide_name = _assemble_amide_name(features, style)
@@ -3218,6 +3229,18 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         get_n_substituents, format_n_substitution,
     )
 
+    # Phase 163 chalcogen amides funnel into this pipeline; map the
+    # principal_group to its IUPAC PIN suffix form. Regular amides use the
+    # default "amide" suffix.
+    _CHALCOGEN_AMIDE_SUFFIX_FORMS = {
+        'thioamide': 'thioamide',
+        'selenoamide': 'selenoamide',
+        'telluroamide': 'telluroamide',
+    }
+    amide_suffix_form = _CHALCOGEN_AMIDE_SUFFIX_FORMS.get(
+        features.principal_group, 'amide',
+    )
+
     mol = features.mol
     amide_atoms = None
     if features.principal_group_atoms:
@@ -3229,7 +3252,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     # Ring-attached amides use -carboxamide suffix via name_amide()
     # (ring systems rarely have E/Z issues; existing path is correct)
     if is_ring_attached_amide(mol, amide_atoms):
-        base_name = name_amide(mol, amide_atoms)
+        base_name = name_amide(mol, amide_atoms, suffix_form=amide_suffix_form)
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: NameFragment.text already includes locants -- use directly.
@@ -3256,7 +3279,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         getattr(features, 'triple_bonds', None)
     )
     if not has_chain_unsaturation:
-        base_name = name_amide(mol, amide_atoms)
+        base_name = name_amide(mol, amide_atoms, suffix_form=amide_suffix_form)
         if base_name:
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: _generate_prefixes returns NameFragments whose .text
@@ -3283,7 +3306,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         parent = _generate_chain_parent(features)
     else:
         # Unexpected for chain amide, but fallback gracefully
-        base_name = name_amide(mol, amide_atoms)
+        base_name = name_amide(mol, amide_atoms, suffix_form=amide_suffix_form)
         return base_name if base_name else "amide"
 
     fragments.append(parent)
@@ -4684,12 +4707,47 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 continue
 
         # Guard 2: Skip substituents overlapping with the principal group
-        # (amide/amine N-substituents handled by specialized assemblers)
+        # (amide/amine N-substituents handled by specialized assemblers).
+        # Phase 163: chalcogen amides use single-permissive [NX3] SMARTS so the
+        # N-substituent atoms are NOT in pg_atom_set directly. _assemble_amide_name
+        # renders the N-substitution via name_amide()'s get_n_substituents() path;
+        # this guard skips them here to prevent double-counting as chain prefixes.
         if features.principal_group in (
             'primary_amide', 'secondary_amide', 'tertiary_amide',
             'secondary_amine', 'tertiary_amine',
+            'thioamide', 'selenoamide', 'telluroamide',
         ):
-            if sub_info.frag_atoms & pg_atom_set:
+            # For chalcogen amides extend pg_atom_set with all atoms reachable from
+            # the principal-group N (excluding the carbonyl C) so the N-bonded
+            # carbons (methyl / ethyl / etc.) overlap correctly.
+            effective_pg = pg_atom_set
+            if features.principal_group in (
+                'thioamide', 'selenoamide', 'telluroamide',
+            ):
+                effective_pg = set(pg_atom_set)
+                for match in features.principal_group_atoms or ():
+                    # Match layout: (C_carbonyl, =chalcogen, N) per Phase 163 SMARTS
+                    if len(match) >= 3:
+                        n_idx = match[2]
+                        carbonyl_c_idx = match[0]
+                        n_atom = mol.GetAtomWithIdx(n_idx)
+                        for nbr in n_atom.GetNeighbors():
+                            if nbr.GetIdx() == carbonyl_c_idx:
+                                continue
+                            # BFS the N-substituent fragment so multi-atom
+                            # N-substituents (e.g., N-ethyl, N-benzyl) are all covered.
+                            stack = [nbr.GetIdx()]
+                            seen = {n_idx, carbonyl_c_idx}
+                            while stack:
+                                cur = stack.pop()
+                                if cur in seen:
+                                    continue
+                                seen.add(cur)
+                                effective_pg.add(cur)
+                                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                                    if nn.GetIdx() not in seen:
+                                        stack.append(nn.GetIdx())
+            if sub_info.frag_atoms & effective_pg:
                 logger.debug(
                     "DROP-03 substituent_skip: reason=pg_branch_overlap locant=%d pg=%s",
                     sub_info.locant, features.principal_group,

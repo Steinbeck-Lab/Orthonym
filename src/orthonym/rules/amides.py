@@ -108,9 +108,10 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
         if atom.GetSymbol() == 'N':
             nitrogen_idx = idx
         elif atom.GetSymbol() == 'C':
-            # Check if this carbon has a double bond to oxygen
+            # Find the chalcogen-double-bonded carbon (=O for regular amides,
+            # =S/=Se/=Te for Phase 163 chalcogen amides).
             for neighbor in atom.GetNeighbors():
-                if neighbor.GetSymbol() == 'O':
+                if neighbor.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
                     bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
                     if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
                         carbonyl_carbon_idx = idx
@@ -443,14 +444,14 @@ def is_ring_attached_amide(mol, amide_atoms: tuple) -> bool:
     Returns:
         True if the amide is ring-attached
     """
-    # Find the carbonyl carbon
+    # Find the carbonyl-like carbon (=O regular amide, or =S/=Se/=Te
+    # for Phase 163 chalcogen amides)
     carbonyl_carbon_idx = None
     for idx in amide_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() == 'C':
-            # Check if this carbon has a double bond to oxygen
             for neighbor in atom.GetNeighbors():
-                if neighbor.GetSymbol() == 'O':
+                if neighbor.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
                     bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
                     if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
                         carbonyl_carbon_idx = idx
@@ -463,26 +464,34 @@ def is_ring_attached_amide(mol, amide_atoms: tuple) -> bool:
 
     carbonyl = mol.GetAtomWithIdx(carbonyl_carbon_idx)
 
-    # Check if carbonyl carbon has a neighbor in a ring
+    # Check if carbonyl carbon has a neighbor in a ring (excluding the
+    # principal-group leaf N and the double-bonded chalcogen).
     for neighbor in carbonyl.GetNeighbors():
         if neighbor.GetSymbol() == 'N':
             continue  # Skip the nitrogen
-        if neighbor.GetSymbol() == 'O':
-            continue  # Skip the oxygen
+        if neighbor.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
+            continue  # Skip the carbonyl chalcogen (=O / =S / =Se / =Te)
         if neighbor.IsInRing():
             return True
 
     return False
 
 
+_AMIDE_CHALCOGEN_ELEMENTS = ('O', 'S', 'Se', 'Te')
+
+
 def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
     """
     Get the chain length for an amide (including carbonyl carbon).
 
+    Works for regular amides (=O) and Phase 163 chalcogen amides
+    (=S thioamide / =Se selenoamide / =Te telluroamide) per P-66.1.4.1.1
+    + P-66.6.3.
+
     The chain length determines the parent name:
-    - 1: formamide
-    - 2: acetamide
-    - 3: propanamide
+    - 1: formamide / methanethioamide / methaneselenoamide
+    - 2: acetamide / ethanethioamide / ethaneselenoamide
+    - 3: propanamide / propanethioamide / propaneselenoamide
     etc.
 
     Args:
@@ -492,7 +501,8 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
     Returns:
         Chain length (number of carbons in parent chain)
     """
-    # Find the carbonyl carbon and nitrogen
+    # Find the carbonyl carbon (the C with a double bond to any chalcogen
+    # O / S / Se / Te) and the nitrogen.
     carbonyl_carbon_idx = None
     nitrogen_idx = None
 
@@ -502,7 +512,7 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
             nitrogen_idx = idx
         elif atom.GetSymbol() == 'C':
             for neighbor in atom.GetNeighbors():
-                if neighbor.GetSymbol() == 'O':
+                if neighbor.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
                     bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
                     if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
                         carbonyl_carbon_idx = idx
@@ -511,11 +521,12 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
     if carbonyl_carbon_idx is None:
         return 1
 
-    # BFS to find longest chain from carbonyl carbon (excluding nitrogen direction)
+    # BFS to find longest chain from carbonyl carbon (excluding nitrogen direction
+    # and the double-bonded chalcogen, since that's the principal-group leaf).
     exclude = {nitrogen_idx} if nitrogen_idx else set()
     for idx in amide_atoms:
         atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == 'O':
+        if atom.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
             exclude.add(idx)
 
     chain = _find_longest_carbon_chain(mol, carbonyl_carbon_idx, exclude)
@@ -554,33 +565,56 @@ def _find_longest_carbon_chain(mol, start_idx: int, exclude: set) -> List[int]:
     return best_chain
 
 
-def get_amide_parent_name(chain_length: int, is_ring: bool = False) -> str:
+def get_amide_parent_name(
+    chain_length: int,
+    is_ring: bool = False,
+    suffix_form: str = "amide",
+) -> str:
     """
-    Get the parent amide name based on chain length.
+    Get the parent amide name based on chain length and suffix form.
 
     Args:
         chain_length: Number of carbons in parent chain
         is_ring: If True, use -carboxamide form
+        suffix_form: One of "amide", "thioamide", "selenoamide", "telluroamide"
+            (P-66.1.4.1.1 + P-66.6.3 functional replacement). For chalcogen forms
+            the IUPAC PIN preserves the parent-stem terminal 'e' (e.g.,
+            'propanethioamide') because the suffix starts with a consonant.
 
     Returns:
-        Parent amide name (e.g., "formamide", "acetamide", "propanamide")
+        Parent amide name (e.g., "formamide", "acetamide", "propanamide",
+        "ethanethioamide", "propaneselenoamide").
     """
     if is_ring:
-        # Ring-attached amides: parent + carboxamide
+        # Ring-attached amides: parent + carboxamide / carbothioamide / etc.
         stem = _get_chain_prefix(chain_length)
-        return f"cyclo{stem}anecarboxamide"
+        if suffix_form == "amide":
+            return f"cyclo{stem}anecarboxamide"
+        # P-66.1.4.1.1 chalcogen analogs: "-carbothioamide", "-carboselenoamide",
+        # "-carbotelluroamide". OPSIN-confirmed PINs.
+        return f"cyclo{stem}anecarbo{suffix_form}"
 
     # Chain amides
-    if chain_length == 1:
-        return "formamide"
-    elif chain_length == 2:
-        return "acetamide"
-    else:
-        stem = _get_chain_prefix(chain_length)
-        return f"{stem}anamide"
+    if suffix_form == "amide":
+        # Retained PIN names for regular amides (P-66.1.1.1.1)
+        if chain_length == 1:
+            return "formamide"
+        elif chain_length == 2:
+            return "acetamide"
+        else:
+            stem = _get_chain_prefix(chain_length)
+            return f"{stem}anamide"
+
+    # Phase 163 chalcogen amides (-thioamide / -selenoamide / -telluroamide):
+    # NO retained "thioformamide" / "thioacetamide" forms — systematic only per
+    # OPSIN-confirmed PINs methanethioamide / ethanethioamide / propanethioamide.
+    # Suffix starts with consonant, so terminal 'e' of '{stem}ane' is preserved
+    # per IUPAC P-16.3.3 vowel-elision rule.
+    stem = _get_chain_prefix(chain_length)
+    return f"{stem}ane{suffix_form}"
 
 
-def name_amide(mol, amide_atoms: tuple) -> str:
+def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
     """
     Generate IUPAC name for an amide compound.
 
@@ -589,10 +623,14 @@ def name_amide(mol, amide_atoms: tuple) -> str:
     - Secondary amides: N-methylacetamide
     - Tertiary amides: N,N-dimethylformamide
     - Ring-attached amides: cyclohexanecarboxamide
+    - Phase 163 chalcogen amides (suffix_form="thioamide"/"selenoamide"/"telluroamide"):
+      ethanethioamide, N-methylpropaneselenoamide, etc.
 
     Args:
         mol: RDKit Mol object
         amide_atoms: Atom indices from amide SMARTS match
+        suffix_form: PIN suffix variant — "amide" (default) or chalcogen analog
+            ("thioamide" / "selenoamide" / "telluroamide", per P-66.1.4.1.1).
 
     Returns:
         IUPAC name for the amide
@@ -625,9 +663,9 @@ def name_amide(mol, amide_atoms: tuple) -> str:
                             break
                     break
 
-        stem = _get_chain_prefix(ring_size)
-
-        parent_name = f"cyclo{stem}anecarboxamide"
+        parent_name = get_amide_parent_name(
+            ring_size, is_ring=True, suffix_form=suffix_form,
+        )
 
         # Check for N-substitution
         amide_type = get_amide_type(mol, amide_atoms)
@@ -641,7 +679,7 @@ def name_amide(mol, amide_atoms: tuple) -> str:
 
     # Chain amide
     chain_length = get_amide_chain_length(mol, amide_atoms)
-    parent_name = get_amide_parent_name(chain_length)
+    parent_name = get_amide_parent_name(chain_length, suffix_form=suffix_form)
 
     # Check for N-substitution
     amide_type = get_amide_type(mol, amide_atoms)

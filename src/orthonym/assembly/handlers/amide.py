@@ -41,7 +41,13 @@ from ..name_tree import NamingResult
 
 logger = logging.getLogger(__name__)
 
-_AMIDE_PRINCIPAL_GROUPS = ('primary_amide', 'secondary_amide', 'tertiary_amide')
+_AMIDE_PRINCIPAL_GROUPS = (
+    'primary_amide', 'secondary_amide', 'tertiary_amide',
+    # Phase 163 chalcogen amides (single-permissive [NX3] per AUDIT § 2.2;
+    # no 3-way primary/secondary/tertiary split). Same _assemble_amide_name
+    # pipeline; per-PG suffix lookup happens inside via _CHALCOGEN_AMIDE_SUFFIX_FORMS.
+    'thioamide', 'selenoamide', 'telluroamide',
+)
 
 
 def _is_amide(features: Any) -> bool:

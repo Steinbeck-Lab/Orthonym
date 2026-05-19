@@ -199,14 +199,30 @@ class TestEdgeCases:
 class TestTerminalFGTypes:
     """Tests for the TERMINAL_FG_TYPES frozenset."""
 
-    def test_contains_all_13_terminal_groups(self):
-        """TERMINAL_FG_TYPES must contain all 13 terminal group types."""
+    def test_contains_all_terminal_groups(self):
+        """TERMINAL_FG_TYPES must contain all terminal group types.
+
+        Pre-Phase-163: 13 entries. Phase 163 + 163.1 added 9 chalcogen-replacement
+        terminal groups per IUPAC P-66.6.3 + P-66.1.4.1.1:
+          - chalcogen acids (6): selenoic_Se_acid, selenoic_O_acid, diselenoic_acid,
+            telluroic_Te_acid, telluroic_O_acid, ditelluroic_acid
+          - chalcogen amides (3): thioamide, selenoamide, telluroamide
+          - chalcogen aldehydes (3): thioaldehyde, selenoaldehyde, telluroaldehyde
+        Total: 13 + 12 = 25 entries.
+        """
         expected = {
             "carboxylic_acid", "aldehyde", "nitrile",
             "primary_amide", "secondary_amide", "tertiary_amide",
             "acid_chloride", "acid_bromide", "acid_fluoride",
             "thioic_S_acid", "thioic_O_acid", "dithioic_acid",
             "carbamic_acid",
+            # Phase 163 FRN-A chalcogen acids
+            "selenoic_Se_acid", "selenoic_O_acid", "diselenoic_acid",
+            "telluroic_Te_acid", "telluroic_O_acid", "ditelluroic_acid",
+            # Phase 163 FRN-B chalcogen amides
+            "thioamide", "selenoamide", "telluroamide",
+            # Phase 163 FRN-C chalcogen aldehydes
+            "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -214,6 +230,6 @@ class TestTerminalFGTypes:
         """TERMINAL_FG_TYPES must be a frozenset (immutable)."""
         assert isinstance(TERMINAL_FG_TYPES, frozenset)
 
-    def test_length_is_13(self):
-        """TERMINAL_FG_TYPES must contain exactly 13 entries."""
-        assert len(TERMINAL_FG_TYPES) == 13
+    def test_terminal_count_after_phase_163(self):
+        """TERMINAL_FG_TYPES must contain exactly 25 entries post-Phase 163 (13 baseline + 12 chalcogen)."""
+        assert len(TERMINAL_FG_TYPES) == 25

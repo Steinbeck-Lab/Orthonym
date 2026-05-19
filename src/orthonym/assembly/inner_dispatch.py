@@ -845,6 +845,27 @@ _register_inner(
     side_effect_inventory=(),  # D-07 predicate purity invariant
 )
 
+# --- Phase 163.1 closure: chalcogen_ester (Tier-E FRN handler;
+#     selenoester + telluroester functional-class). Priority 2950 sits in the
+#     specialty-intercept tier alongside imidate@2900 — fires BEFORE Tier-A
+#     ring/chain composite so the {X-alkyl} {chain}X-suffix form is emitted
+#     correctly for R-C(=O)-Se-R' and R-C(=O)-Te-R'. The audit originally
+#     backlogged this to Phase 163.1; closed inline as part of the FRN canary
+#     Tier-A push.
+from .handlers.chalcogen_ester import (  # noqa: E402
+    _is_chalcogen_ester, name_chalcogen_ester,
+)
+
+_register_inner(
+    handler_id="chalcogen_ester",
+    priority=2950,
+    predicate=_is_chalcogen_ester,
+    handler=name_chalcogen_ester,
+    iupac_section="P-65.6",
+    description="Chalcogen ester (Se-/Te-alkyl alkane{seleno,telluro}ate) functional-class handler (Phase 163 FRN-E)",
+    side_effect_inventory=(),  # D-07 predicate purity invariant
+)
+
 # --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
 #     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 #     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS

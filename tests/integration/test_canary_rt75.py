@@ -2822,7 +2822,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCOc1ccc(CC(=O)NO)cc1",  # aromatic,medium
-        "2-(4-(butyloxy)phenyl)ethan-1-hydroxamic acid",
+        # Phase 163.1 closure: e-preservation corrected per IUPAC P-16.3.3
+        # (suffix "-hydroxamic acid" starts with consonant 'h' -> keep terminal e).
+        "2-(4-(butyloxy)phenyl)ethane-1-hydroxamic acid",
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
