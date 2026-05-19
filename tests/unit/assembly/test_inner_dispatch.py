@@ -1023,13 +1023,11 @@ class TestPhase160_2_Registrations:
         from orthonym.assembly.handlers.general_acyclic import name_general_acyclic
         assert INNER_DISPATCH_TABLE["general_acyclic"].handler is name_general_acyclic
 
-    def test_inner_dispatch_table_size_33(self):
+    def test_inner_dispatch_table_size_34(self):
         from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
-        # 32 from Phase 160 + 160.1 + 1 NEW (general_acyclic) per CONTEXT D-04.
-        # NOTE: amide@5200 + amine@5300 are ALREADY in the 32 (RESEARCH §2
-        # typo correction; CONTEXT D-04 narrative "amide@1700 + amine@1800"
-        # is typo drift verified live by grep against HEAD).
-        assert len(INNER_DISPATCH_TABLE) == 33
+        # 33 through Phase 160.2 (general_acyclic@99999) + 1 NEW (imidate@2900,
+        # Phase 163 AUDIT-FRN § 7). Bump per ADR-19-09 additive seniority-extension.
+        assert len(INNER_DISPATCH_TABLE) == 34
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1054,9 +1052,10 @@ class TestPhase160_2_Registrations:
     def test_sorted_entries_cache_populated_eagerly(self):
         """WR-06: _SORTED_ENTRIES_CACHE populated at module-import (no lazy-init race)."""
         from orthonym.assembly.inner_dispatch import _SORTED_ENTRIES_CACHE
-        # Eagerly populated tuple per WR-06 + RESEARCH §5
+        # Eagerly populated tuple per WR-06 + RESEARCH §5; size matches INNER_DISPATCH_TABLE
+        # which Phase 163 grew from 33 → 34 via imidate@2900 (AUDIT-FRN § 7).
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 33
+        assert len(_SORTED_ENTRIES_CACHE) == 34
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)

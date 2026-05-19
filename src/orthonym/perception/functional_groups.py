@@ -62,9 +62,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT D-08
     # AUDIT DECISION (AUDIT-FRN § 2.2): single-permissive [NX3] (NOT 3-way primary/secondary/tertiary
     # split) captures all 3 N-substitution levels per Open Question 2 + RESEARCH §3.2 line 265.
-    "thioamide": "[CX3](=S)[NX3]",                # R-C(=S)-N(H,R) (P-66.1.4.1.1)
-    "selenoamide": "[CX3](=[SeX1])[NX3]",         # R-C(=Se)-N(H,R) (P-66.6.3)
-    "telluroamide": "[CX3](=[TeX1])[NX3]",        # R-C(=Te)-N(H,R) (P-66.6.3 parallel)
+    # CR-fix (post-merge regression closure): require explicit C neighbor on the chalcogen-carbonyl
+    # carbon so thiocarbamates (R-O-C(=S)-N-, R-S-C(=S)-N-) and chalcogen-ureas (N-C(=S)-N) route
+    # through their own pathways rather than over-matching as thio-/seleno-/telluro-amides.
+    "thioamide": "[CX3;$([CX3]([#6])(=S)[NX3])](=S)[NX3]",     # R-C(=S)-N(H,R), R=C only (P-66.1.4.1.1)
+    "selenoamide": "[CX3;$([CX3]([#6])(=[SeX1])[NX3])](=[SeX1])[NX3]",  # R-C(=Se)-N, R=C only (P-66.6.3)
+    "telluroamide": "[CX3;$([CX3]([#6])(=[TeX1])[NX3])](=[TeX1])[NX3]", # R-C(=Te)-N, R=C only (P-66.6.3 parallel)
 
     # === SULFONAMIDES ===
     "primary_sulfonamide": "[SX4](=O)(=O)[NX3H2]",

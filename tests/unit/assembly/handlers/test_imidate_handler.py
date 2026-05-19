@@ -214,3 +214,121 @@ class TestImidateEdgeCases:
         # naming pipeline still gates on the acyclic-only audit baseline.
         # This test simply documents the empirical behavior.
         assert isinstance(matches, tuple)  # passes regardless of match
+
+
+# =============================================================================
+# CR-fix coverage (Phase 163 post-merge): branched/substituted iminoesters.
+# These tests would have caught CR-01..CR-04 in code review:
+#   CR-01: _is_imidate failing to consult principal_group on mixed-PG inputs
+#   CR-02: _name_alkyl_fragment dropping branching/substitution on R' (R'-O-)
+#   CR-03: _name_chain_with_imidate_suffix dropping branching/substitution on R
+# Aligned with ./skills/fix-methodology.md "root cause, not band-aid".
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestImidateBranchedAndSubstituted:
+    """CR-02/03 fixes: branched + substituted iminoesters render correctly."""
+
+    def _run(self, smiles, expected_pin):
+        from orthonym import name_compound
+        actual = name_compound(smiles, style="pin")
+        assert actual == expected_pin, (
+            f"SMILES {smiles!r}: got {actual!r}, expected {expected_pin!r}"
+        )
+
+    def test_isopropyl_acetimidate(self):
+        """CR-02: branched alkyl side (isopropyl, not propyl)."""
+        self._run("CC(=N)OC(C)C", "isopropyl acetimidate")
+
+    def test_alpha_methyl_propanimidate(self):
+        """CR-03: α-methyl-branched stem (propanimidate with 2-methyl)."""
+        self._run("CC(C)C(=N)OC", "methyl 2-methylpropanimidate")
+
+    def test_pivalimidate_stem(self):
+        """CR-03: tert-butyl-branched stem -> 2,2-dimethylpropanimidate.
+        Reviewer's specific case: previously rendered as 'methyl pentanimidate'.
+        """
+        self._run("CC(C)(C)C(=N)OC", "methyl 2,2-dimethylpropanimidate")
+
+    def test_alpha_chloro_propanimidate(self):
+        """CR-03: α-substituted stem (chloro at position 2)."""
+        self._run("CC(Cl)C(=N)OC", "methyl 2-chloropropanimidate")
+
+    def test_benzyl_acetimidate(self):
+        """CR-02: benzyl alkyl side (retained substituent)."""
+        self._run("CC(=N)OCc1ccccc1", "benzyl acetimidate")
+
+
+@pytest.mark.unit
+class TestImidatePredicateDefersToHigherPG:
+    """CR-01 fix: _is_imidate consults principal_group and defers when a
+    higher-seniority group (acid/ester/amide/...) wins the seniority cascade.
+
+    Without the fix the handler claimed dispatch slot 2900 whenever any
+    iminoester SMARTS matched, silently dropping the acid carbon and
+    inflating the chain (reviewer's case OC(=O)c1ccc(C(=N)OC)cc1 ->
+    'methyl octanimidate').
+    """
+
+    def test_predicate_defers_when_principal_group_is_carboxylic_acid(self):
+        """If acid is principal, imidate handler must NOT fire."""
+        features = _make_mock_features(
+            functional_groups={'iminoester': [(0, 1, 2, 3)],
+                               'carboxylic_acid': [(4, 5, 6)]},
+        )
+        features.principal_group = 'carboxylic_acid'
+        assert _is_imidate(features) is False
+
+    def test_predicate_defers_when_principal_group_is_ester(self):
+        """If ester is principal, imidate handler must NOT fire."""
+        features = _make_mock_features(
+            functional_groups={'iminoester': [(0, 1, 2, 3)]},
+        )
+        features.principal_group = 'ester'
+        assert _is_imidate(features) is False
+
+    def test_predicate_defers_when_principal_group_is_amide(self):
+        """If amide is principal, imidate handler must NOT fire."""
+        features = _make_mock_features(
+            functional_groups={'iminoester': [(0, 1, 2, 3)]},
+        )
+        features.principal_group = 'primary_amide'
+        assert _is_imidate(features) is False
+
+    def test_predicate_fires_when_principal_group_is_iminoester(self):
+        """If iminoester IS principal, handler must fire."""
+        features = _make_mock_features(
+            functional_groups={'iminoester': [(0, 1, 2, 3)]},
+        )
+        features.principal_group = 'iminoester'
+        assert _is_imidate(features) is True
+
+    def test_predicate_fires_when_principal_group_is_none(self):
+        """Pure-imidate compound (no other PG) -> handler fires."""
+        features = _make_mock_features(
+            functional_groups={'iminoester': [(0, 1, 2, 3)]},
+        )
+        features.principal_group = None
+        assert _is_imidate(features) is True
+
+    def test_acid_with_imidate_substituent_drops_to_acid_naming(self):
+        """End-to-end CR-01 case from reviewer: acid wins, no silent acid drop.
+
+        Pre-fix: OC(=O)c1ccc(C(=N)OC)cc1 -> 'methyl octanimidate' (acid lost,
+        chain inflated to 8 aromatic carbons). Post-fix: handler defers to
+        acid pipeline.
+        """
+        from orthonym import name_compound
+        actual = name_compound("OC(=O)c1ccc(C(=N)OC)cc1", style="pin")
+        # The exact name depends on the acid pipeline; the regression-defining
+        # assertion is that the acid is NOT silently dropped (i.e. the name
+        # is NOT the bogus 'methyl octanimidate' from CR-01).
+        assert actual is not None
+        assert "octanimidate" not in actual.lower(), (
+            f"CR-01 regression: acid silently dropped; got {actual!r}"
+        )
+        # Acid carbon must appear in the name (as 'benzoic acid' or similar).
+        assert "acid" in actual.lower(), (
+            f"CR-01 regression: acid-PG name expected; got {actual!r}"
+        )
