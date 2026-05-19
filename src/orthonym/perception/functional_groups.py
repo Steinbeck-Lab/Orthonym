@@ -20,6 +20,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
     "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
     "dithioic_acid": "[CX3](=S)[SX2H1]",    # R-C(=S)-SH -> dithioic acid
+    # Phase 163 Tier FRN-A: chalcogen-on-acid (P-65.3) -- additive per CONTEXT D-08
+    "selenoic_Se_acid": "[CX3](=O)[SeX2H1]",     # R-C(=O)-SeH (P-65.3; AUDIT-FRN § 2)
+    "selenoic_O_acid": "[CX3](=[SeX1])[OX2H1]",  # R-C(=Se)-OH (P-65.3; AUDIT-FRN § 2)
+    "diselenoic_acid": "[CX3](=[SeX1])[SeX2H1]", # R-C(=Se)-SeH (P-65.3; AUDIT-FRN § 2)
+    "telluroic_Te_acid": "[CX3](=O)[TeX2H1]",    # R-C(=O)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
+    "telluroic_O_acid": "[CX3](=[TeX1])[OX2H1]", # R-C(=Te)-OH (P-65.3 parallel; AUDIT-FRN § 2)
+    "ditelluroic_acid": "[CX3](=[TeX1])[TeX2H1]",# R-C(=Te)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
     # Carbamic acid (IUPAC P-65.2.3): N-C(=O)-OH (free acid, not ester)
     "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
@@ -230,6 +237,17 @@ def _resolve_fg_collisions(results):
         # C(=S)OH should not collide with carboxylic_acid (different SMARTS: =S vs =O)
         # but suppress thioketone matches on the C=S carbon
         ('thioic_O_acid', ['thioketone']),
+        # Phase 163 Tier FRN-A: chalcogen-acid suppressions
+        # (mirror thioic_S_acid -> thiol+thioester at line 228 above; AUDIT-FRN § 2.1)
+        # Forward-reference note: selenoester/telluroester/tellurol added in
+        # commits 163-02-03 (chalcogen-ketones) + 163-02-05 (chalcogen-esters);
+        # unknown FG names are harmlessly no-op'd by the resolver loop below.
+        ('selenoic_Se_acid', ['selenol', 'selenoester', 'thioester']),
+        ('diselenoic_acid', ['selenol', 'selenoketone']),
+        ('selenoic_O_acid', ['selenoketone', 'carboxylic_acid']),
+        ('telluroic_Te_acid', ['tellurol', 'telluroester', 'thioester']),
+        ('ditelluroic_acid', ['tellurol', 'telluroketone']),
+        ('telluroic_O_acid', ['telluroketone', 'carboxylic_acid']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
