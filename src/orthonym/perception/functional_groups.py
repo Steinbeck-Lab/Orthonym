@@ -51,6 +51,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     "tertiary_amide": "[CX3](=O)[NX3]([#6])[#6]",
     "hydrazide": "[CX3](=O)[NX3][NX3]",
     "imide": "[CX3](=O)[NX3][CX3](=O)",
+    # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT D-08
+    # AUDIT DECISION (AUDIT-FRN § 2.2): single-permissive [NX3] (NOT 3-way primary/secondary/tertiary
+    # split) captures all 3 N-substitution levels per Open Question 2 + RESEARCH §3.2 line 265.
+    "thioamide": "[CX3](=S)[NX3]",                # R-C(=S)-N(H,R) (P-66.1.4.1.1)
+    "selenoamide": "[CX3](=[SeX1])[NX3]",         # R-C(=Se)-N(H,R) (P-66.6.3)
+    "telluroamide": "[CX3](=[TeX1])[NX3]",        # R-C(=Te)-N(H,R) (P-66.6.3 parallel)
 
     # === SULFONAMIDES ===
     "primary_sulfonamide": "[SX4](=O)(=O)[NX3H2]",
@@ -248,6 +254,12 @@ def _resolve_fg_collisions(results):
         ('telluroic_Te_acid', ['tellurol', 'telluroester', 'thioester']),
         ('ditelluroic_acid', ['tellurol', 'telluroketone']),
         ('telluroic_O_acid', ['telluroketone', 'carboxylic_acid']),
+        # Phase 163 Tier FRN-B: chalcogen-amide suppressions (AUDIT-FRN § 2.2 + RESEARCH §3.2).
+        # Single-permissive [NX3] match captures =[S,Se,Te]-N(H,R) at all 3 N-degrees;
+        # downstream N-degree inspection happens at assembly time.
+        ('thioamide', ['thioketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        ('selenoamide', ['selenoketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        ('telluroamide', ['telluroketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
