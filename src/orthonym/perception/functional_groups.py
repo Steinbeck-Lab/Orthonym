@@ -45,6 +45,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
     "iminoester": "[CX3](=[NX2H1])[OX2][#6]",     # R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")
     "thioester": "[CX3](=O)[SX2][#6]",
+    # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
+    "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
+    "telluroester": "[CX3](=O)[TeX2][#6]",        # R-C(=O)-Te-R' (P-65.6; Te-alkyl alkanetelluroate)
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
@@ -282,6 +285,14 @@ def _resolve_fg_collisions(results):
         # cascade discipline; imine/primary_amine suppress the =NH from being double-claimed;
         # ether suppresses the -O-C portion from being double-claimed.
         ('iminoester', ['ester', 'imine', 'primary_amine', 'ether']),
+        # Phase 163 Tier FRN-E: chalcogen-ester suppressions (AUDIT-FRN § 2.5 + RESEARCH §3.5).
+        # Note: Tier FRN-A suppressions at lines above already declared
+        # ('selenoic_Se_acid', ['selenol', 'selenoester', 'thioester']) and
+        # ('telluroic_Te_acid', ['tellurol', 'telluroester', 'thioester']) anticipating
+        # the existence of selenoester/telluroester per RESEARCH §3.5 line 306. Now that
+        # those SMARTS exist, the suppression cascade works as designed.
+        ('selenoester', ['selenol']),
+        ('telluroester', ['tellurol']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
