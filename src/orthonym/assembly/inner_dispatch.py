@@ -820,6 +820,31 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Phase 163 Plan-03 commit 03-04: imidate (Tier-D FRN handler;
+#     163-AUDIT-FRN.md § 7 LOCK at priority 2900).
+#     Rationale per AUDIT § 7 + RESEARCH §5.3:
+#     - Sits in "specialty intercept" tier alongside simple_molecule@2800
+#       (structurally parallel: SMARTS-match intercept BEFORE Tier-A ring/
+#       chain composite fires).
+#     - Fires AFTER partial_sat@2700 (partial_sat doesn't match acyclic
+#       iminoesters).
+#     - Fires BEFORE tier_a_ring@4500 (prevents Tier-A from omitting =NH
+#       in ring/chain assembly for compounds where iminoester is the
+#       defining feature).
+#     - Handler internal gate (returns None on no-match) preserves
+#       cascade-continuation per ADR-19-04 first-match-AND-succeeds-wins.
+from .handlers.imidate import _is_imidate, name_imidate  # noqa: E402
+
+_register_inner(
+    handler_id="imidate",
+    priority=2900,
+    predicate=_is_imidate,
+    handler=name_imidate,
+    iupac_section="P-65.1.7",
+    description="Iminoester (alkyl alkanimidate) functional-class handler (Phase 163 FRN-D)",
+    side_effect_inventory=(),  # D-07 predicate purity invariant
+)
+
 # --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
 #     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 #     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS
