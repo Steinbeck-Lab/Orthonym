@@ -97,7 +97,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     "ketone": "[#6][CX3](=O)[#6]",
     "thioaldehyde": "[CX3H1](=S)",
     "thioketone": "[#6][CX3](=S)[#6]",
-    
+    # Phase 163 Tier FRN-C: chalcogen-on-aldehyde/ketone (P-66.6.3) -- additive per CONTEXT D-08
+    "selenoaldehyde": "[CX3H1](=[SeX1])",         # R-C(=Se)H (P-66.6.3)
+    "telluroaldehyde": "[CX3H1](=[TeX1])",        # R-C(=Te)H (P-66.6.3 parallel)
+    "selenoketone": "[#6][CX3](=[SeX1])[#6]",     # R-C(=Se)-R' (P-66.6.3); selone PIN suffix form
+    "telluroketone": "[#6][CX3](=[TeX1])[#6]",    # R-C(=Te)-R' (P-66.6.3 parallel); tellone PIN suffix form
+
     # === ALCOHOLS AND ANALOGS ===
     # Generic catch-all: any OH on sp3 carbon (IUPAC P-63.1)
     # Complements specific sub-type patterns below; ensures detection of
@@ -260,6 +265,13 @@ def _resolve_fg_collisions(results):
         ('thioamide', ['thioketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('selenoamide', ['selenoketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('telluroamide', ['telluroketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        # Phase 163 Tier FRN-C: chalcogen-aldehyde/ketone suppressions (AUDIT-FRN § 2.3 + RESEARCH §3.3).
+        # Defensive suppression mirrors existing thioaldehyde discipline; =O vs =Se/=Te should not
+        # overlap structurally but the cascade preserves parallelism for downstream safety.
+        ('selenoaldehyde', ['aldehyde', 'ketone']),
+        ('telluroaldehyde', ['aldehyde', 'ketone']),
+        ('selenoketone', ['selenoether', 'selenoester']),
+        ('telluroketone', ['telluroether', 'telluroester']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
