@@ -1,0 +1,37 @@
+id,smiles,canonical_smiles,expected_name_pin,tier_tag,frn_class,opsin_parse_status,inchi_rt_status,iupac_section_cite
+FRN-A-01,CCC(=O)[SeH],CCC(=O)[SeH],propaneselenoic Se-acid,FRN-A,selenoic_Se_acid,parse_ok,rt_ok,P-65.3
+FRN-A-02,CCC(=[Se])O,CCC(O)=[Se],propaneselenoic O-acid,FRN-A,selenoic_O_acid,parse_ok,rt_ok,P-65.3
+FRN-A-03,CCC(=[Se])[SeH],CCC(=[Se])[SeH],propanediselenoic acid,FRN-A,diselenoic_acid,parse_ok,rt_ok,P-65.3
+FRN-A-04,CCC(=O)[TeH],CCC(=O)[TeH],propanetelluroic Te-acid,FRN-A,telluroic_Te_acid,parse_ok,rt_ok,P-65.3
+FRN-A-05,CCC(=[Te])O,CCC(O)=[Te],propanetelluroic O-acid,FRN-A,telluroic_O_acid,parse_ok,rt_ok,P-65.3
+FRN-A-06,CCC(=[Te])[TeH],CCC(=[Te])[TeH],propaneditelluroic acid,FRN-A,ditelluroic_acid,parse_ok,rt_ok,P-65.3
+FRN-A-07,CC(=O)[SeH],CC(=O)[SeH],ethaneselenoic Se-acid,FRN-A,selenoic_Se_acid,parse_ok,rt_ok,P-65.3
+FRN-A-08,CC(=O)[TeH],CC(=O)[TeH],ethanetelluroic Te-acid,FRN-A,telluroic_Te_acid,parse_ok,rt_ok,P-65.3
+FRN-B-01,CCC(N)=S,CCC(N)=S,propanethioamide,FRN-B,thioamide,parse_ok,rt_ok,P-66.1.4.1.1
+FRN-B-02,CCC(=S)NC,CCC(=S)NC,N-methylpropanethioamide,FRN-B,thioamide,parse_ok,rt_ok,P-66.1.4.1.1
+FRN-B-03,CCC(=S)N(C)C,CCC(=S)N(C)C,"N,N-dimethylpropanethioamide",FRN-B,thioamide,parse_ok,rt_ok,P-66.1.4.1.1
+FRN-B-04,CCC(N)=[Se],CCC(N)=[Se],propaneselenoamide,FRN-B,selenoamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-05,CCC(=[Se])NC,CCC(=[Se])NC,N-methylpropaneselenoamide,FRN-B,selenoamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-06,CCC(=[Se])N(C)C,CCC(=[Se])N(C)C,"N,N-dimethylpropaneselenoamide",FRN-B,selenoamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-07,CCC(N)=[Te],CCC(N)=[Te],propanetelluroamide,FRN-B,telluroamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-08,CCC(=[Te])NC,CCC(=[Te])NC,N-methylpropanetelluroamide,FRN-B,telluroamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-09,CCC(=[Te])N(C)C,CCC(=[Te])N(C)C,"N,N-dimethylpropanetelluroamide",FRN-B,telluroamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-10,CC(N)=S,CC(N)=S,ethanethioamide,FRN-B,thioamide,parse_ok,rt_ok,P-66.1.4.1.1
+FRN-B-11,CC(N)=[Se],CC(N)=[Se],ethaneselenoamide,FRN-B,selenoamide,parse_ok,rt_ok,P-66.6.3
+FRN-B-12,CC(N)=[Te],CC(N)=[Te],ethanetelluroamide,FRN-B,telluroamide,parse_ok,rt_ok,P-66.6.3
+FRN-C-01,CCC=[Se],CCC=[Se],propaneselenal,FRN-C,selenoaldehyde,parse_ok,rt_ok,P-66.6.3
+FRN-C-02,CCC=[Te],CCC=[Te],propanetellural,FRN-C,telluroaldehyde,parse_ok,rt_ok,P-66.6.3
+FRN-C-03,CC(=[Se])C,CC(C)=[Se],propane-2-selone,FRN-C,selenoketone,parse_ok,rt_ok,P-66.6.3
+FRN-C-04,CCC(=[Se])CC,CCC(=[Se])CC,pentan-3-selone,FRN-C,selenoketone,parse_ok,rt_ok,P-66.6.3
+FRN-C-05,CC(=[Te])C,CC(C)=[Te],propane-2-tellone,FRN-C,telluroketone,parse_ok,rt_ok,P-66.6.3
+FRN-C-06,CCC(=[Te])CC,CCC(=[Te])CC,pentan-3-tellone,FRN-C,telluroketone,parse_ok,rt_ok,P-66.6.3
+FRN-D-01,CCC(=N)OC,CCC(=N)OC,methyl propanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-02,CC(=N)OC,COC(C)=N,methyl acetimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-03,CCC(=N)OCC,CCOC(=N)CC,ethyl propanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-04,C(=N)(c1ccccc1)OC,COC(=N)c1ccccc1,methyl benzimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-05,CCCCC(=N)OC,CCCCC(=N)OC,methyl pentanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-06,CC(=N)OCC,CCOC(C)=N,ethyl acetimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-E-01,CCC(=O)[Se]C,CCC(=O)[Se]C,Se-methyl propaneselenoate,FRN-E,selenoester,parse_ok,rt_ok,P-65.6
+FRN-E-02,CCC(=O)[Te]C,CCC(=O)[Te]C,Te-methyl propanetelluroate,FRN-E,telluroester,parse_ok,rt_ok,P-65.6
+FRN-E-03,CC(=O)[Se]C,C[Se]C(C)=O,Se-methyl ethaneselenoate,FRN-E,selenoester,parse_ok,rt_ok,P-65.6
+FRN-E-04,CC(=O)[Se]CC,CC[Se]C(C)=O,Se-ethyl ethaneselenoate,FRN-E,selenoester,parse_ok,rt_ok,P-65.6
