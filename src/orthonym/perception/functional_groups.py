@@ -39,6 +39,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === ACID DERIVATIVES ===
     "anhydride": "[CX3](=O)[OX2][CX3](=O)",
     "ester": "[CX3](=O)[OX2][#6]",
+    # Phase 163 Tier FRN-D: iminoester / imidate (P-65.1.7) -- additive per CONTEXT D-08
+    # AUDIT DECISION (AUDIT-FRN § 2.4): [NX2H1] only (=NH form); N-substituted iminoesters
+    # (R-C(=NR')-O-R'') deferred to Phase 163.1 per Open Question 4. Free imidic acid form
+    # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
+    "iminoester": "[CX3](=[NX2H1])[OX2][#6]",     # R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")
     "thioester": "[CX3](=O)[SX2][#6]",
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
@@ -272,6 +277,11 @@ def _resolve_fg_collisions(results):
         ('telluroaldehyde', ['aldehyde', 'ketone']),
         ('selenoketone', ['selenoether', 'selenoester']),
         ('telluroketone', ['telluroether', 'telluroester']),
+        # Phase 163 Tier FRN-D: iminoester suppressions (AUDIT-FRN § 2.4 + RESEARCH §3.4 + §9 Risk B).
+        # Risk B mitigation: iminoester -> ester defensive suppression mirrors the existing thio*
+        # cascade discipline; imine/primary_amine suppress the =NH from being double-claimed;
+        # ether suppresses the -O-C portion from being double-claimed.
+        ('iminoester', ['ester', 'imine', 'primary_amine', 'ether']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
