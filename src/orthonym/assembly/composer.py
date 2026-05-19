@@ -506,6 +506,17 @@ TERMINAL_GROUPS = {
     "thioic_S_acid",    # Always at chain end (locant 1)
     "thioic_O_acid",    # Always at chain end (locant 1)
     "dithioic_acid",    # Always at chain end (locant 1)
+    # Phase 163 Tier FRN-A: chalcogen acids (parallel to thioic_*_acid) — additive per CONTEXT D-08
+    "selenoic_Se_acid",    # Always at chain end (locant 1)
+    "selenoic_O_acid",     # Always at chain end (locant 1)
+    "diselenoic_acid",     # Always at chain end (locant 1)
+    "telluroic_Te_acid",   # Always at chain end (locant 1)
+    "telluroic_O_acid",    # Always at chain end (locant 1)
+    "ditelluroic_acid",    # Always at chain end (locant 1)
+    # Phase 163 Tier FRN-B: chalcogen amides (parallel to primary/secondary/tertiary_amide)
+    "thioamide",           # Always at chain end (locant 1)
+    "selenoamide",         # Always at chain end (locant 1)
+    "telluroamide",        # Always at chain end (locant 1)
     "carbamic_acid",    # Retained name, terminal (locant 1)
 }
 
@@ -1408,19 +1419,25 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     # BEFORE simple alkyl path.  Oxygen and sulfur on chains indicate
     # functional groups (=O -> "oxo", -OH -> "hydroxy", =S -> "thioxo")
     # that get_alkyl_name() would silently ignore.
-    # Scope limited to O/S only:
+    # Phase 163 (FRN) extension: also recognize selenium (34) and tellurium (52)
+    # parallel to S — =Se -> "selenoxo", =Te -> "telluroxo" per AUDIT-FRN § 5.4
+    # (PREFIX_FORMS entries for selenoaldehyde / telluroaldehyde / selenoketone /
+    # telluroketone shipped in commit 163-03-01).
+    # Scope limited to O/S/Se/Te:
     #   - Nitrogen is excluded because N atoms in fragments are typically
     #     part of functional class patterns (urea, guanidine, amide) that
     #     are handled by dedicated naming paths, not chain FG prefixes.
+    #     (=NH iminoester naming is delegated to handlers/imidate.py per
+    #     CONTEXT D-03.)
     #   - Ring heteroatoms are excluded (structural ring members).
     #   - Exocyclic heteroatoms bonded ONLY to ring atoms (C=O on a ring
     #     carbon in fused ureas/lactams) are excluded (ring decorations).
-    # A non-ring O/S qualifies as a chain FG indicator only when at least
-    # one of its fragment-neighbors is also NOT in a ring (chain context).
+    # A non-ring O/S/Se/Te qualifies as a chain FG indicator only when at
+    # least one of its fragment-neighbors is also NOT in a ring (chain context).
     def _is_chain_fg_heteroatom(idx):
         atom = mol.GetAtomWithIdx(idx)
-        # Only oxygen (8) and sulfur (16) -- not nitrogen or others
-        if atom.GetAtomicNum() not in (8, 16):
+        # Oxygen (8), sulfur (16), selenium (34, Phase 163), tellurium (52, Phase 163)
+        if atom.GetAtomicNum() not in (8, 16, 34, 52):
             return False
         if atom.IsInRing():
             return False

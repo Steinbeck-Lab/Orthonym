@@ -42,6 +42,14 @@ SENIORITY_ORDER = [
     "thioic_S_acid",
     "thioic_O_acid",
     "dithioic_acid",
+    # Phase 163 Tier FRN-A: chalcogen acids (P-65.3) — additive per CONTEXT D-08;
+    # position locked by AUDIT-FRN § 5; parallel to thioic_S_acid/O_acid/dithioic
+    "selenoic_Se_acid",
+    "selenoic_O_acid",
+    "diselenoic_acid",
+    "telluroic_Te_acid",
+    "telluroic_O_acid",
+    "ditelluroic_acid",
     # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
@@ -54,7 +62,13 @@ SENIORITY_ORDER = [
     # Acid derivatives
     "anhydride",
     "ester",
+    # Phase 163 Tier FRN-D: iminoester at ester-tier per AUDIT-FRN § 5 LOCK
+    # ("alkyl alkanimidate" functional-class parallel to "alkyl alkanoate" per P-65.1.7)
+    "iminoester",
     "thioester",
+    # Phase 163 Tier FRN-E: chalcogen-esters (P-65.6 extension) — additive per CONTEXT D-08
+    "selenoester",
+    "telluroester",
     "acid_chloride",
     "acid_bromide",
     "acid_fluoride",
@@ -64,6 +78,11 @@ SENIORITY_ORDER = [
     "primary_amide",
     "secondary_amide",
     "tertiary_amide",
+    # Phase 163 Tier FRN-B: chalcogen amides (P-66.1.4.1.1 + P-66.6.3) — additive per CONTEXT D-08
+    # thioamide ranks below amide and above sulfonamide; selenoamide/telluroamide parallel
+    "thioamide",
+    "selenoamide",
+    "telluroamide",
     "primary_sulfonamide",
     "secondary_sulfonamide",
     "tertiary_sulfonamide",
@@ -80,7 +99,13 @@ SENIORITY_ORDER = [
     "aldehyde",
     "ketone",
     "thioaldehyde",
+    # Phase 163 Tier FRN-C aldehydes (P-66.6.3) — additive per CONTEXT D-08
+    "selenoaldehyde",
+    "telluroaldehyde",
     "thioketone",
+    # Phase 163 Tier FRN-C ketones (P-66.6.3) — additive per CONTEXT D-08
+    "selenoketone",
+    "telluroketone",
 
     # Alcohols and analogs
     "primary_alcohol",
@@ -151,6 +176,13 @@ SUFFIX_FORMS = {
     "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
     "thioic_O_acid": ("thioic O-acid", "carbothioic O-acid"),
     "dithioic_acid": ("dithioic acid", "carbodithioic acid"),
+    # Phase 163 Tier FRN-A: chalcogen-acid SUFFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
+    "selenoic_Se_acid": ("selenoic Se-acid", "carboselenoic Se-acid"),
+    "selenoic_O_acid": ("selenoic O-acid", "carboselenoic O-acid"),
+    "diselenoic_acid": ("diselenoic acid", "carbodiselenoic acid"),
+    "telluroic_Te_acid": ("telluroic Te-acid", "carbotelluroic Te-acid"),
+    "telluroic_O_acid": ("telluroic O-acid", "carbotelluroic O-acid"),
+    "ditelluroic_acid": ("ditelluroic acid", "carboditelluroic acid"),
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
@@ -164,6 +196,10 @@ SUFFIX_FORMS = {
     "primary_amide": ("amide", "carboxamide"),
     "secondary_amide": ("amide", "carboxamide"),
     "tertiary_amide": ("amide", "carboxamide"),
+    # Phase 163 Tier FRN-B: chalcogen-amide SUFFIX_FORMS (P-66.1.4.1.1 + P-66.6.3 PIN)
+    "thioamide": ("thioamide", "carbothioamide"),
+    "selenoamide": ("selenoamide", "carboselenoamide"),
+    "telluroamide": ("telluroamide", "carbotelluroamide"),
     "primary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "secondary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "tertiary_sulfonamide": ("sulfonamide", "sulfonamide"),
@@ -172,6 +208,13 @@ SUFFIX_FORMS = {
     "ketone": ("one", "one"),
     "thioaldehyde": ("thial", "carbothialdehyde"),
     "thioketone": ("thione", "thione"),
+    # Phase 163 Tier FRN-C: chalcogen-aldehyde/ketone SUFFIX_FORMS per AUDIT-FRN § 5 LOCK
+    # PIN short form -selenal / -tellural (parallel to -thial per P-66.6.3)
+    "selenoaldehyde": ("selenal", "carboselenoaldehyde"),
+    "telluroaldehyde": ("tellural", "carbotelluroaldehyde"),
+    # PIN suffix form -selone / -tellone (dialkyl-word form fails OPSIN per AUDIT § 5 LOCK + RESEARCH §7.2)
+    "selenoketone": ("selone", "selone"),
+    "telluroketone": ("tellone", "tellone"),
     "primary_alcohol": ("ol", "ol"),
     "secondary_alcohol": ("ol", "ol"),
     "tertiary_alcohol": ("ol", "ol"),
@@ -196,6 +239,10 @@ SUFFIX_FORMS = {
     "imide": ("imide", "dicarboximide"),  # IUPAC P-66.2
     # FGs with functional class naming only (no substitutive suffix)
     "thioester": None,           # IUPAC P-65.3.1: functional class naming (S-alkyl alkanethioate)
+    # Phase 163 Tier FRN-D + FRN-E: functional-class (handler-emitted) — SUFFIX_FORMS = None
+    "iminoester": None,          # P-65.1.7: emitted via handlers/imidate.py per CONTEXT D-03
+    "selenoester": None,         # P-65.6: functional-class "Se-alkyl alkaneselenoate"
+    "telluroester": None,        # P-65.6: functional-class "Te-alkyl alkanetelluroate"
     "isocyanide": None,          # IUPAC 2013 P-66.5.3: prefix-only (isocyano)
     "sulfoxide": None,           # IUPAC P-63.6: functional class naming (dialkyl sulfoxide)
     "sulfone": None,             # IUPAC P-63.6: functional class naming (dialkyl sulfone)
@@ -229,12 +276,22 @@ PREFIX_FORMS = {
     "thioic_S_acid": "sulfanylcarbonyl",  # IUPAC P-65.1.1.4: S-acid prefix (-C(=O)SH)
     "thioic_O_acid": "carbothioyl",      # IUPAC P-65.1.1.4: O-acid prefix (-C(=S)OH)
     "dithioic_acid": "dithiocarboxy",     # IUPAC P-65.1.1.4: dithioic acid prefix (-C(=S)SH)
+    # Phase 163 Tier FRN-A: chalcogen-acid PREFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
+    "selenoic_Se_acid": "selanylcarbonyl",
+    "selenoic_O_acid": "carboselenoyl",
+    "diselenoic_acid": "diselenocarboxy",
+    "telluroic_Te_acid": "tellanylcarbonyl",
+    "telluroic_O_acid": "carbotelluroyl",
+    "ditelluroic_acid": "ditellurocarboxy",
     "carbamic_acid": "carbamoyloxy",  # When not principal group
     "sulfonic_acid": "sulfo",
     "sulfinic_acid": "sulfino",
     "aldehyde": "oxo",  # or "formyl" for terminal
     "ketone": "oxo",
     "thioketone": "sulfanylidene",  # P-63.1.5: =S as non-principal prefix
+    # Phase 163 Tier FRN-C: =Se / =Te ketone non-principal prefix (parallel to sulfanylidene) per AUDIT-FRN § 5
+    "selenoketone": "selanylidene",
+    "telluroketone": "tellanylidene",
     "primary_alcohol": "hydroxy",
     "secondary_alcohol": "hydroxy",
     "tertiary_alcohol": "hydroxy",
@@ -269,6 +326,10 @@ PREFIX_FORMS = {
     # are already handled via the acylamino naming pathway in the pipeline.
     # Adding carbamoyl for sec/tert causes double-naming (e.g., "ethanoylamino" + "carbamoyl").
     "primary_amide": "carbamoyl",
+    # Phase 163 Tier FRN-B: chalcogen-amide PREFIX_FORMS (parallel to primary_amide carbamoyl) per AUDIT-FRN § 5
+    "thioamide": "carbamothioyl",
+    "selenoamide": "carbamoselenoyl",
+    "telluroamide": "carbamotelluroyl",
     # Halogens (always prefixes)
     "fluoro": "fluoro",
     "chloro": "chloro",
@@ -314,7 +375,14 @@ PREFIX_FORMS = {
     "hydrazide": "hydrazinecarbonyl",  # IUPAC P-66.3.5
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
+    # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5
+    "selenoaldehyde": "selenoxo",
+    "telluroaldehyde": "telluroxo",
     "thioester": None,            # Named via decomposition pathway
+    # Phase 163 Tier FRN-D + FRN-E: functional-class — no prefix form
+    "iminoester": None,
+    "selenoester": None,
+    "telluroester": None,
     # Phase 109: 6 new FG classes
     "acid_iodide": "iodocarbonyl",     # IUPAC P-65.5.1.4
     "amidine": "amidino",              # IUPAC P-66.4.1
