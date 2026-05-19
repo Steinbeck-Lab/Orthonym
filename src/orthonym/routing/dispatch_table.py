@@ -116,10 +116,12 @@ class StoutClass(_StrEnumBase):
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     ML_FALLBACK = "ml_fallback"                   # Phase 162 telemetry tag (CONTEXT D-03; NOT a CFR dispatch entry — increment via _cfr_router._increment_stat at namer.py:1248 wrapper, no _register_dispatch call)
-    # THIO_FUNCTIONAL_REPLACEMENT = "thio_fr"       # Phase 163 (P-25.3; priority 30000-40000)
-    # SELENO_FUNCTIONAL_REPLACEMENT = "seleno_fr"   # Phase 163
-    # TELLURO_FUNCTIONAL_REPLACEMENT = "telluro_fr" # Phase 163
-    # IMINO_FUNCTIONAL_REPLACEMENT = "imino_fr"     # Phase 163
+    # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
+    # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
+    # INNER_DISPATCH entry for imidate (functional-class naming for
+    # iminoesters). NO new OUTER CFR rows. See */
+    # 163-AUDIT-FRN.md` § 8 for the full intercept analysis. Phase 161 D-02
+    # priority-placeholder-correction precedent.
 
 
 # ---------------------------------------------------------------------------
