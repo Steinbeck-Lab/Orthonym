@@ -20,6 +20,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
     "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
     "dithioic_acid": "[CX3](=S)[SX2H1]",    # R-C(=S)-SH -> dithioic acid
+    # Phase 163 Tier FRN-A: chalcogen-on-acid (P-65.3) -- additive per CONTEXT D-08
+    "selenoic_Se_acid": "[CX3](=O)[SeX2H1]",     # R-C(=O)-SeH (P-65.3; AUDIT-FRN § 2)
+    "selenoic_O_acid": "[CX3](=[SeX1])[OX2H1]",  # R-C(=Se)-OH (P-65.3; AUDIT-FRN § 2)
+    "diselenoic_acid": "[CX3](=[SeX1])[SeX2H1]", # R-C(=Se)-SeH (P-65.3; AUDIT-FRN § 2)
+    "telluroic_Te_acid": "[CX3](=O)[TeX2H1]",    # R-C(=O)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
+    "telluroic_O_acid": "[CX3](=[TeX1])[OX2H1]", # R-C(=Te)-OH (P-65.3 parallel; AUDIT-FRN § 2)
+    "ditelluroic_acid": "[CX3](=[TeX1])[TeX2H1]",# R-C(=Te)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
     # Carbamic acid (IUPAC P-65.2.3): N-C(=O)-OH (free acid, not ester)
     "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
@@ -32,7 +39,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === ACID DERIVATIVES ===
     "anhydride": "[CX3](=O)[OX2][CX3](=O)",
     "ester": "[CX3](=O)[OX2][#6]",
+    # Phase 163 Tier FRN-D: iminoester / imidate (P-65.1.7) -- additive per CONTEXT D-08
+    # AUDIT DECISION (AUDIT-FRN § 2.4): [NX2H1] only (=NH form); N-substituted iminoesters
+    # (R-C(=NR')-O-R'') deferred to Phase 163.1 per Open Question 4. Free imidic acid form
+    # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
+    "iminoester": "[CX3](=[NX2H1])[OX2][#6]",     # R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")
     "thioester": "[CX3](=O)[SX2][#6]",
+    # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
+    "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
+    "telluroester": "[CX3](=O)[TeX2][#6]",        # R-C(=O)-Te-R' (P-65.6; Te-alkyl alkanetelluroate)
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
@@ -44,6 +59,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     "tertiary_amide": "[CX3](=O)[NX3]([#6])[#6]",
     "hydrazide": "[CX3](=O)[NX3][NX3]",
     "imide": "[CX3](=O)[NX3][CX3](=O)",
+    # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT D-08
+    # AUDIT DECISION (AUDIT-FRN § 2.2): single-permissive [NX3] (NOT 3-way primary/secondary/tertiary
+    # split) captures all 3 N-substitution levels per Open Question 2 + RESEARCH §3.2 line 265.
+    "thioamide": "[CX3](=S)[NX3]",                # R-C(=S)-N(H,R) (P-66.1.4.1.1)
+    "selenoamide": "[CX3](=[SeX1])[NX3]",         # R-C(=Se)-N(H,R) (P-66.6.3)
+    "telluroamide": "[CX3](=[TeX1])[NX3]",        # R-C(=Te)-N(H,R) (P-66.6.3 parallel)
 
     # === SULFONAMIDES ===
     "primary_sulfonamide": "[SX4](=O)(=O)[NX3H2]",
@@ -84,7 +105,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     "ketone": "[#6][CX3](=O)[#6]",
     "thioaldehyde": "[CX3H1](=S)",
     "thioketone": "[#6][CX3](=S)[#6]",
-    
+    # Phase 163 Tier FRN-C: chalcogen-on-aldehyde/ketone (P-66.6.3) -- additive per CONTEXT D-08
+    "selenoaldehyde": "[CX3H1](=[SeX1])",         # R-C(=Se)H (P-66.6.3)
+    "telluroaldehyde": "[CX3H1](=[TeX1])",        # R-C(=Te)H (P-66.6.3 parallel)
+    "selenoketone": "[#6][CX3](=[SeX1])[#6]",     # R-C(=Se)-R' (P-66.6.3); selone PIN suffix form
+    "telluroketone": "[#6][CX3](=[TeX1])[#6]",    # R-C(=Te)-R' (P-66.6.3 parallel); tellone PIN suffix form
+
     # === ALCOHOLS AND ANALOGS ===
     # Generic catch-all: any OH on sp3 carbon (IUPAC P-63.1)
     # Complements specific sub-type patterns below; ensures detection of
@@ -230,6 +256,43 @@ def _resolve_fg_collisions(results):
         # C(=S)OH should not collide with carboxylic_acid (different SMARTS: =S vs =O)
         # but suppress thioketone matches on the C=S carbon
         ('thioic_O_acid', ['thioketone']),
+        # Phase 163 Tier FRN-A: chalcogen-acid suppressions
+        # (mirror thioic_S_acid -> thiol+thioester at line 228 above; AUDIT-FRN § 2.1)
+        # Forward-reference note: selenoester/telluroester/tellurol added in
+        # commits 163-02-03 (chalcogen-ketones) + 163-02-05 (chalcogen-esters);
+        # unknown FG names are harmlessly no-op'd by the resolver loop below.
+        ('selenoic_Se_acid', ['selenol', 'selenoester', 'thioester']),
+        ('diselenoic_acid', ['selenol', 'selenoketone']),
+        ('selenoic_O_acid', ['selenoketone', 'carboxylic_acid']),
+        ('telluroic_Te_acid', ['tellurol', 'telluroester', 'thioester']),
+        ('ditelluroic_acid', ['tellurol', 'telluroketone']),
+        ('telluroic_O_acid', ['telluroketone', 'carboxylic_acid']),
+        # Phase 163 Tier FRN-B: chalcogen-amide suppressions (AUDIT-FRN § 2.2 + RESEARCH §3.2).
+        # Single-permissive [NX3] match captures =[S,Se,Te]-N(H,R) at all 3 N-degrees;
+        # downstream N-degree inspection happens at assembly time.
+        ('thioamide', ['thioketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        ('selenoamide', ['selenoketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        ('telluroamide', ['telluroketone', 'primary_amine', 'secondary_amine', 'tertiary_amine']),
+        # Phase 163 Tier FRN-C: chalcogen-aldehyde/ketone suppressions (AUDIT-FRN § 2.3 + RESEARCH §3.3).
+        # Defensive suppression mirrors existing thioaldehyde discipline; =O vs =Se/=Te should not
+        # overlap structurally but the cascade preserves parallelism for downstream safety.
+        ('selenoaldehyde', ['aldehyde', 'ketone']),
+        ('telluroaldehyde', ['aldehyde', 'ketone']),
+        ('selenoketone', ['selenoether', 'selenoester']),
+        ('telluroketone', ['telluroether', 'telluroester']),
+        # Phase 163 Tier FRN-D: iminoester suppressions (AUDIT-FRN § 2.4 + RESEARCH §3.4 + §9 Risk B).
+        # Risk B mitigation: iminoester -> ester defensive suppression mirrors the existing thio*
+        # cascade discipline; imine/primary_amine suppress the =NH from being double-claimed;
+        # ether suppresses the -O-C portion from being double-claimed.
+        ('iminoester', ['ester', 'imine', 'primary_amine', 'ether']),
+        # Phase 163 Tier FRN-E: chalcogen-ester suppressions (AUDIT-FRN § 2.5 + RESEARCH §3.5).
+        # Note: Tier FRN-A suppressions at lines above already declared
+        # ('selenoic_Se_acid', ['selenol', 'selenoester', 'thioester']) and
+        # ('telluroic_Te_acid', ['tellurol', 'telluroester', 'thioester']) anticipating
+        # the existence of selenoester/telluroester per RESEARCH §3.5 line 306. Now that
+        # those SMARTS exist, the suppression cascade works as designed.
+        ('selenoester', ['selenol']),
+        ('telluroester', ['tellurol']),
         # Ester O-Ar bond should NOT also match aromatic_ether.
         # The ester oxygen in -C(=O)-O-Ar is part of the ester, not a separate
         # aromatic ether; without this, phenyl esters double-name as both
