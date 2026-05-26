@@ -61,7 +61,13 @@ def name_thioether(
 
     # composer.py:991 inline: _inject_stereo_if_missing(features, cand.name)
     final_name = _inject_stereo_if_missing(features, cand.name)
-    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
+    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+    _nm = final_name
+    return NamingResult(
+        name=_nm,
+        tree=NameTreeNode(parent_stem=_nm, class_id="thioether", iupac_section_cite="P-63.2", fragment_legacy=_nm),
+        atom_to_locant_hint=None,
+    )
 
 
 __all__ = ["name_thioether", "_is_thioether"]

@@ -52,7 +52,13 @@ def name_phosphine_oxide(
     pool.add(name, "phosphine_oxide", features)
     # composer.py:989 inline: _inject_stereo_if_missing(features, pool.best().name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
-    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
+    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+    _nm = final_name
+    return NamingResult(
+        name=_nm,
+        tree=NameTreeNode(parent_stem=_nm, class_id="phosphine_oxide", iupac_section_cite="P-68.3", fragment_legacy=_nm),
+        atom_to_locant_hint=None,
+    )
 
 
 __all__ = ["name_phosphine_oxide", "_is_phosphine_oxide"]

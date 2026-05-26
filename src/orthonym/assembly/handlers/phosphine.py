@@ -86,8 +86,12 @@ def name_phosphine(
                 pool = get_current_pool()
                 pool.add(name, "phosphine", features)
                 final_name = _inject_stereo_if_missing(features, pool.best().name)
+                from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+                _nm = final_name
                 return NamingResult(
-                    name=final_name, tree=None, atom_to_locant_hint=None,
+                    name=_nm,
+                    tree=NameTreeNode(parent_stem=_nm, class_id="phosphine", iupac_section_cite="P-68.3", fragment_legacy=_nm),
+                    atom_to_locant_hint=None,
                 )
             break
 
