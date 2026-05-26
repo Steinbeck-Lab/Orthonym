@@ -57,12 +57,13 @@ def test_dump_tree_text_format_simple():
     assert "ethanol" in stdout
 
 
-def test_dump_tree_text_first_wave_note_present():
-    """First-wave tree=None handler emits an explicit note in the text dump."""
+def test_dump_tree_text_renders_populated_tree():
+    """Phase 165: CCO routes to general_acyclic which now emits a populated tree;
+    the text dump renders parent_stem with NO first-wave tree=None placeholder."""
     stdout, stderr, rc = _run_cli(["--dump-tree", "CCO"])
     assert rc == 0
-    # The text-format renderer prints a note about first-wave / tree=None.
-    assert "tree=None" in stdout or "first-wave" in stdout.lower()
+    assert "parent_stem" in stdout
+    assert "first-wave" not in stdout.lower()
 
 
 def test_dump_tree_json_format_parseable():
@@ -87,15 +88,16 @@ def test_dump_tree_json_name_field():
     assert data["name"] == expected
 
 
-def test_dump_tree_json_tree_is_null_for_first_wave():
-    """First-wave handlers emit tree=None; JSON dump preserves that as null."""
+def test_dump_tree_json_tree_populated():
+    """Phase 165: CCO emits a populated tree; JSON dump renders it as a dict
+    with the structured fields."""
     stdout, _stderr, rc = _run_cli(
         ["--dump-tree", "--format", "json", "CCO"],
     )
     assert rc == 0
     data = json.loads(stdout)
-    # tree should be null for first-wave; future v19+1 may flip.
-    assert data["tree"] is None or isinstance(data["tree"], dict)
+    assert isinstance(data["tree"], dict)
+    assert "parent_stem" in data["tree"]
 
 
 def test_dump_tree_text_format_default():
@@ -136,3 +138,37 @@ def test_dump_tree_format_help():
     stdout, _stderr, rc = _run_cli(["--help"])
     assert rc == 0
     assert "--format" in stdout
+
+
+def test_dump_tree_recursive_multiprefix_text():
+    """Phase 165 D-04: a multi-prefix molecule renders nested prefixes[] subtrees
+    (the recursive renderer emits a parent_stem line per node)."""
+    stdout, stderr, rc = _run_cli(["--dump-tree", "CC(C)CC(C)CO"])
+    assert rc == 0, f"stderr={stderr!r}"
+    # Root + >=1 prefix subtree -> at least 2 parent_stem lines.
+    assert stdout.count("parent_stem") >= 2, stdout
+
+
+def test_dump_tree_json_multiprefix_no_typeerror():
+    """Pitfall 6: JSON recursion over a multi-prefix tree survives — str
+    fragment_legacy is serializable, no NameFragment TypeError."""
+    stdout, stderr, rc = _run_cli(
+        ["--dump-tree", "--format", "json", "CC(C)CC(C)CO"],
+    )
+    assert rc == 0, f"stderr={stderr!r}"
+    data = json.loads(stdout)
+    assert isinstance(data["tree"], dict)
+
+
+def test_dump_tree_any_smiles_ion():
+    """SC-3: --dump-tree works for ANY SMILES including ions (boundary coarse
+    fallback) — text + JSON, no crash."""
+    stdout, stderr, rc = _run_cli(["--dump-tree", "CC(=O)[O-]"])
+    assert rc == 0, f"stderr={stderr!r}"
+    assert "NameTree" in stdout
+    stdout_j, _stderr_j, rc_j = _run_cli(
+        ["--dump-tree", "--format", "json", "CC(=O)[O-]"],
+    )
+    assert rc_j == 0
+    data = json.loads(stdout_j)
+    assert isinstance(data["tree"], dict)

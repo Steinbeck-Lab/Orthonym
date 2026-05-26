@@ -87,14 +87,13 @@ def main(args: List[str] = None) -> int:
         help="Print CFR dispatch counters (Phase 158 D-16 telemetry) to stderr"
     )
 
-    # Phase 160 Plan-04 (CONTEXT D-19): --dump-tree emits the NameTreeNode
-    # IR for the given SMILES. Default format is "text" (chemist-readable
-    # indented tree); --format json emits dataclasses.asdict() JSON for
-    # machine consumption. The CLI invokes Orthonym.name_with_tree(smi)
-    # which returns NamingResult(name, tree, atom_to_locant_hint). For
-    # first-wave handlers (Plans 02-03 ship) tree is None — the dump shows
-    # the legacy ``fragment_legacy`` field; for tree-emitting handlers
-    # (v19+1) tree is a NameTreeNode and the dump shows the full IR.
+    # Phase 160 Plan-04 (CONTEXT D-19) + Phase 165: --dump-tree emits the
+    # NameTreeNode IR for the given SMILES. Default format is "text"
+    # (chemist-readable indented tree); --format json emits dataclasses.asdict()
+    # JSON for machine consumption. The CLI invokes Orthonym.name_with_tree(smi)
+    # which returns NamingResult(name, tree, atom_to_locant_hint). Phase 165:
+    # every reachable handler plus the ion/retained boundary fallback populates
+    # a tree, so the dump always shows a structured-or-coarse IR (recursive).
     parser.add_argument(
         "--dump-tree",
         action="store_true",
@@ -330,61 +329,47 @@ def _process_batch(input_file: str, output_file: str, style: str,
     return 0 if errors == 0 else 1
 
 
+def _render_node(node, indent: str = "", is_last: bool = True) -> None:
+    """Phase 165 D-04: recursively render a NameTreeNode with indented
+    box-drawing connectors. Nested ``prefixes[]`` subtrees render recursively
+    so a multi-prefix molecule shows its full structure (not a flat list)."""
+    connector = "+-" if is_last else "|-"
+    print(f"{indent}{connector} parent_stem: {node.parent_stem!r}")
+    child = indent + ("   " if is_last else "|  ")
+    if node.locants:
+        print(f"{child}|- locants: {node.locants}")
+    if node.suffix:
+        print(f"{child}|- suffix: {node.suffix!r}")
+    if node.stereo:
+        print(f"{child}|- stereo: {node.stereo!r}")
+    if node.unsaturation_locants and any(node.unsaturation_locants):
+        print(f"{child}|- unsaturation_locants: {node.unsaturation_locants}")
+    if node.multiplicative_prefix:
+        print(f"{child}|- multiplicative_prefix: {node.multiplicative_prefix!r}")
+    for i, sub in enumerate(node.prefixes):
+        _render_node(sub, child, is_last=(i == len(node.prefixes) - 1))
+
+
 def _print_tree_text(result) -> None:
-    """Phase 160 D-19 text-format renderer for ``--dump-tree``.
+    """Phase 160 D-19 / Phase 165 D-04 text renderer for ``--dump-tree``.
 
-    Renders a ``NamingResult`` as an indented, chemist-readable tree using
-    box-drawing-style ASCII connectors. Mirrors the CONTEXT D-19 reference
-    example::
-
-        NameTree: ethanol  (class_id=general_acyclic)
-        |- parent_stem: "ethan"
-        |- locants: (1,)
-        |- suffix: "-ol"
-        ...
-        +- prefixes: []
-
-    Per CONTEXT D-05 incremental migration: for the 30 currently-extracted
-    handlers (Plans 02-03 ship) the tree is None and we print the
-    flat ``NameTree: <name>  (tree=None)`` line plus a note that the
-    legacy ``fragment_legacy`` field carried the rendering. For
-    tree-emitting handlers (v19+1) the full IR is rendered.
+    Renders a ``NamingResult`` as an indented, chemist-readable tree with
+    recursive ``prefixes[]`` subtrees. Phase 165: every reachable handler plus
+    the ion/retained boundary fallback (namer.name_with_tree) populates a tree,
+    so the Phase-160 ``tree=None`` placeholder is retired.
     """
-    # Header line: name + class_id (or tree-None indicator).
-    if result.tree is None:
-        print(f"NameTree: {result.name}  (tree=None; first-wave handler per CONTEXT D-05)")
-        print("|- name: {!r}".format(result.name))
-        if result.atom_to_locant_hint is not None:
-            print(f"|- atom_to_locant_hint: {result.atom_to_locant_hint!r}")
-        print("+- note: tree=None is EXPECTED for first-wave handlers")
-        print("        (30 of 38 handlers extracted at Phase 160 ship per Plans 02-03);")
-        print("        the legacy fragment-list rendering produced this name byte-for-byte")
-        print("        via composer.py:_assemble_fragments. Tree population is iterative")
-        print("        across v19+ phases per CONTEXT D-05.")
-        return
-
-    # Tree-populated branch (v19+1 path; not exercised by first-wave handlers).
     tree = result.tree
-    print(f"NameTree: {result.name}  (class_id={tree.class_id or 'unspecified'})")
-    print(f"|- parent_stem: {tree.parent_stem!r}")
-    print(f"|- locants: {tree.locants}")
-    print(f"|- suffix: {tree.suffix!r}")
-    print(f"|- stereo: {tree.stereo!r}")
-    print(f"|- indicated_h: {tree.indicated_h}")
-    print(f"|- unsaturation_locants: {tree.unsaturation_locants}")
-    print(f"|- multiplicative_prefix: {tree.multiplicative_prefix!r}")
-    print(f"|- parenthesization_hint: {tree.parenthesization_hint}")
-    print(f"|- iupac_section_cite: {tree.iupac_section_cite!r}")
-    if tree.fragment_legacy is not None:
-        print(f"|- fragment_legacy: <NameFragment object id={id(tree.fragment_legacy):#x}>")
-    else:
-        print("|- fragment_legacy: None")
-    if tree.prefixes:
-        print(f"+- prefixes: ({len(tree.prefixes)} subtree(s))")
-        for i, sub in enumerate(tree.prefixes):
-            print(f"   [{i}] parent_stem={sub.parent_stem!r}, locants={sub.locants}")
-    else:
-        print("+- prefixes: []")
+    if tree is None:
+        # Defensive only: name_with_tree's SC-3 fallback guarantees a non-null
+        # tree for any non-empty name; this branch is reachable only for an
+        # empty name (degenerate input).
+        print(f"NameTree: {result.name!r}  (tree=None)")
+        return
+    cite = f", cite={tree.iupac_section_cite}" if tree.iupac_section_cite else ""
+    print(f"NameTree: {result.name}  (class_id={tree.class_id or 'unspecified'}{cite})")
+    _render_node(tree, indent="", is_last=True)
+    if result.atom_to_locant_hint is not None:
+        print(f"   (atom_to_locant_hint: {result.atom_to_locant_hint!r})")
 
 
 if __name__ == "__main__":
