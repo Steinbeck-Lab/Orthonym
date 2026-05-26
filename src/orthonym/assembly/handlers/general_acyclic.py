@@ -9,14 +9,16 @@ LIFT SOURCE: composer.py:951-1055 chain-fallback section (verbatim, with
 helper calls re-routed from local composer scope to
 ``from ._handler_shared import _generate_chain_parent, _generate_ring_parent,
 _generate_suffix, _generate_prefixes, _generate_stereodescriptors,
-_assemble_fragments``; final ``return candidate_name`` replaced by
-``return NamingResult(name=candidate_name, tree=None,
-atom_to_locant_hint=None)``).
+_assemble_fragments``; final ``return candidate_name`` replaced by a
+pool-carried ``NamingResult(name=best.name, tree=best.tree, ...)``).
 
 IUPAC cite: P-14 + P-23 + P-44 (catch-all substitutive nomenclature).
 
-Per Phase 160 CONTEXT D-05 first-wave policy: emits NamingResult.tree=None
-(full tree IR population deferred to v19+ phases).
+Phase 165 SCORE-01: emits a STRUCTURED NameTreeNode derived from its own
+fragment list via ``fragments_to_tree`` (Path A), attached through the
+CandidatePool ``tree=`` carry. The returned tree is read off the winning
+candidate (``best().tree``) so a higher-priority handler's win is never
+mislabelled with a general_acyclic tree.
 
 CRITICAL: this handler lifts ONLY the chain-fallback section. The
 cycloalkane stereo backstop at composer.py:1057-1097 STAYS in
@@ -82,8 +84,9 @@ def name_general_acyclic(
     calls re-routed from composer.py local scope to ``_handler_shared``
     imports. String output MUST be byte-identical per DECOMP-03 contract.
 
-    Returns NamingResult(name=..., tree=None, atom_to_locant_hint=None) per
-    Phase 160 CONTEXT D-05 first-wave policy.
+    Returns NamingResult(name=..., tree=<structured NameTreeNode>,
+    atom_to_locant_hint=None); the tree is read off the winning pool candidate
+    (Phase 165 SCORE-01).
     """
     # Lazy imports per PATTERNS § Lazy Import — break the
     # composer.py <-> general_acyclic.py cycle that the inner_dispatch
@@ -207,11 +210,21 @@ def name_general_acyclic(
     # is the chain candidate. D-02: chain has priority=fallback in 145.1
     # (preserves byte-identical); Phase 146 raises priority for competition.
     pool = get_current_pool()
-    pool.add(assembled, "chain", features)
-    candidate_name = pool.best().name
+    # Phase 165 SCORE-01: derive a structured tree from the SAME fragment list
+    # built above and attach it to the chain candidate. Reading best().tree
+    # (NOT the local `tree`) guarantees the returned tree corresponds to the
+    # RETURNED name: if a higher-priority handler's candidate wins, best.tree is
+    # that handler's tree (or None -> coarse-bucket counted in Plan 04), never a
+    # mismatched general_acyclic tree.
+    from ..name_tree_builder import fragments_to_tree
+    tree = fragments_to_tree(
+        fragments, class_id="general_acyclic", section_cite="P-14+P-23+P-44"
+    )
+    pool.add(assembled, "chain", features, tree=tree)
+    best = pool.best()
 
     return NamingResult(
-        name=candidate_name, tree=None, atom_to_locant_hint=None,
+        name=best.name, tree=best.tree, atom_to_locant_hint=None,
     )
 
 
