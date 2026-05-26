@@ -26,6 +26,8 @@ from orthonym.rules.parent_correctness import (
     _opsin_to_smi,
     _pc_context,
     clear_reference_name,
+    match_token_atoms_in_mol,
+    opsin_reference_mol,
     set_reference_name,
     OPSIN_JAR,
     OPSIN_TIMEOUT,
@@ -220,3 +222,53 @@ class TestThreadLocalContext:
 
         assert results['a'] == "ethanol", "Thread A should see its own reference name"
         assert results['b'] is None, "Thread B should not see thread A's reference name"
+
+
+# ---------------------------------------------------------------------------
+# Phase 166 SCORE-03: reusable per-node alignment helpers
+# ---------------------------------------------------------------------------
+
+class TestPerNodeAlignmentHelpers:
+    """opsin_reference_mol + match_token_atoms_in_mol (the per-node generalization
+    of the OPSIN-reference alignment). _extract_reference_parent_atoms now
+    delegates to match_token_atoms_in_mol with UNCHANGED behavior."""
+
+    def test_match_token_empty_returns_none(self):
+        """Empty/None token -> None with zero OPSIN cost (unguarded)."""
+        mol = Chem.MolFromSmiles("CCCC")
+        assert match_token_atoms_in_mol("", mol) is None
+        assert match_token_atoms_in_mol(None, mol) is None
+
+    @opsin_required
+    def test_match_token_unparseable_returns_none(self):
+        """A token OPSIN cannot parse -> None (no-decision)."""
+        mol = Chem.MolFromSmiles("CCCC")
+        assert match_token_atoms_in_mol("zzznotarealname", mol) is None
+
+    @opsin_required
+    def test_match_token_matches_butane(self):
+        """'butane' submol matches all 4 carbons of CCCC (deterministic)."""
+        mol = Chem.MolFromSmiles("CCCC")
+        atoms = match_token_atoms_in_mol("butane", mol)
+        assert atoms == {0, 1, 2, 3}
+
+    @opsin_required
+    def test_opsin_reference_mol_parses(self):
+        """opsin_reference_mol('ethanol') -> a 3-atom RDKit mol (CCO)."""
+        ref = opsin_reference_mol("ethanol")
+        assert ref is not None
+        assert ref.GetNumAtoms() == 3  # C, C, O
+
+    @opsin_required
+    def test_opsin_reference_mol_unparseable_returns_none(self):
+        """An unparseable name -> None (caught-failure contract)."""
+        assert opsin_reference_mol("zzznotarealname") is None
+
+    @opsin_required
+    def test_extract_reference_parent_atoms_behavior_unchanged(self):
+        """The refactored _extract_reference_parent_atoms still returns the
+        parent atom set for a known case (delegates to match_token_atoms_in_mol;
+        byte-identical behavior preserved)."""
+        mol = Chem.MolFromSmiles("CCO")
+        atoms = _extract_reference_parent_atoms("ethanol", mol)
+        assert atoms == {0, 1, 2}

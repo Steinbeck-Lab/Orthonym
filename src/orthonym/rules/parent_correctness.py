@@ -184,32 +184,44 @@ def _extract_parent_token(name: Optional[str]) -> Optional[str]:
     return parent if parent else None
 
 
-def _extract_reference_parent_atoms(
-    ref_name: str, input_mol: Any
-) -> Optional[Set[int]]:
-    """Extract reference parent atom indices via OPSIN round-trip.
+def opsin_reference_mol(ref_name: str) -> Optional[Any]:
+    """OPSIN-parse the FULL reference name once -> reference RDKit mol.
 
-    Pipeline:
-      1. Extract parent-hydride token from ref_name (heuristic)
-      2. OPSIN-parse parent token alone -> parent SMILES
-      3. RDKit-parse parent SMILES -> parent_mol
-      4. Substructure-match parent_mol in input_mol -> atom indices
-      5. Tiebreak ambiguous matches via canonical atom rank
-
-    Returns set of atom indices in input_mol comprising the reference
-    parent. Returns None on any pipeline failure.
+    Phase 166 SCORE-03 (A1 strategy, 166-AUDIT §A1 OPSIN-Cost Prototype):
+    the per-node scorer parses the reference name ONCE per compound, then
+    does RDKit fragment-submol matching per node (NOT one OPSIN call per
+    node). Returns None on any OPSIN/parse failure (mirrors _opsin_to_smi's
+    caught-exception contract at :135-137). Reference names come from
+    trusted corpora; OPSIN runs on STDIN (no shell), OPSIN_TIMEOUT=10.0.
     """
-    parent_token = _extract_parent_token(ref_name)
-    if not parent_token:
+    smi = _opsin_to_smi(ref_name)
+    if not smi:
         return None
-    parent_smi = _opsin_to_smi(parent_token)
-    if not parent_smi:
+    return Chem.MolFromSmiles(smi)
+
+
+def match_token_atoms_in_mol(token: str, input_mol: Any) -> Optional[Set[int]]:
+    """OPSIN-parse a parent-stem/fragment token and substructure-match it
+    into input_mol, returning the matched atom-index set (or None).
+
+    Phase 166 SCORE-03: the reusable per-node generalization of the
+    atom-alignment step (extracted verbatim from the old inline body of
+    _extract_reference_parent_atoms). 0 hits -> None; >1 hits ->
+    CanonicalRankAtoms(breakTies=True) deterministic tiebreak (load-bearing
+    per RESEARCH Pitfall 4 — set-order non-determinism caused a real Phase
+    145.1 byte-diff); any failure -> None. OPSIN runs on STDIN via
+    _opsin_to_smi (no shell, OPSIN_TIMEOUT=10.0).
+    """
+    if not token:
         return None
-    parent_mol = Chem.MolFromSmiles(parent_smi)
-    if parent_mol is None:
+    token_smi = _opsin_to_smi(token)
+    if not token_smi:
+        return None
+    token_mol = Chem.MolFromSmiles(token_smi)
+    if token_mol is None:
         return None
     try:
-        matches = input_mol.GetSubstructMatches(parent_mol)
+        matches = input_mol.GetSubstructMatches(token_mol)
     except Exception as e:
         logger.debug("Substructure match failed: %s", e)
         return None
@@ -226,6 +238,28 @@ def _extract_reference_parent_atoms(
         logger.debug("Canonical rank tiebreak failed: %s", e)
         # Deterministic fallback: first match
         return set(matches[0])
+
+
+def _extract_reference_parent_atoms(
+    ref_name: str, input_mol: Any
+) -> Optional[Set[int]]:
+    """Extract reference parent atom indices via OPSIN round-trip.
+
+    Pipeline:
+      1. Extract parent-hydride token from ref_name (heuristic)
+      2. match_token_atoms_in_mol: OPSIN-parse the token, RDKit-substructure
+         match into input_mol, canonical-rank tiebreak on ambiguity.
+
+    Returns set of atom indices in input_mol comprising the reference
+    parent. Returns None on any pipeline failure. Behavior is UNCHANGED from
+    the pre-Phase-166 inline implementation (now delegated to the reusable
+    match_token_atoms_in_mol helper so the per-node scorer shares one code
+    path).
+    """
+    parent_token = _extract_parent_token(ref_name)
+    if not parent_token:
+        return None
+    return match_token_atoms_in_mol(parent_token, input_mol)
 
 
 # ---------------------------------------------------------------------------
