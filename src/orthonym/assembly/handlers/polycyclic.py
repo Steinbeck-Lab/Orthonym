@@ -85,8 +85,12 @@ def name_polycyclic(
     pool = get_current_pool()
     pool.add(poly_assembled, "polycyclic", features)
     # composer.py:1114 inline: return pool.best().name (NO _inject_stereo wrap)
+    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+    _nm = pool.best().name
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=_nm,
+        tree=NameTreeNode(parent_stem=_nm, class_id="polycyclic", iupac_section_cite="P-25", fragment_legacy=_nm),
+        atom_to_locant_hint=None,
     )
 
 

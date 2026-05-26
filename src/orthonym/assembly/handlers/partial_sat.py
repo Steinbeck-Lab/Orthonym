@@ -75,8 +75,12 @@ def name_partial_sat(
         return None
 
     # composer.py:1130 inline: return cand.name (NO _inject_stereo wrap)
+    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+    _nm = cand.name
     return NamingResult(
-        name=cand.name, tree=None, atom_to_locant_hint=None,
+        name=_nm,
+        tree=NameTreeNode(parent_stem=_nm, class_id="partial_sat", iupac_section_cite="P-25.3", fragment_legacy=_nm),
+        atom_to_locant_hint=None,
     )
 
 
