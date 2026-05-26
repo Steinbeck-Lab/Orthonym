@@ -154,11 +154,23 @@ def test_capture_slot_written_for_all_reachable(namer):
         assert result.name, f"{probe['handler_id']}: empty name for {probe['smiles']!r}"
         fired = [k for k, v in get_inner_dispatch_stats().items() if v]
         if probe["handler_id"] == "ion_path":
-            # Pitfall 4 Path D: ion pre-pool bypass; tree population is Plan-04 scope.
-            assert result.tree is None or result.tree is not None  # slot returned
+            # IN-6: Plan-04 now populates the ion pre-pool-bypass path (Pitfall 4
+            # Path D, composer.py:782-799). The probe ``CC(=O)[O-]`` -> ``acetate``
+            # must surface a populated ``coarse_fallback`` node (was tree=None
+            # pre-Plan-04). Replaces the prior tautological ``tree is None or tree
+            # is not None`` placeholder with a real, falsifiable check.
+            assert result.tree is not None, "ion_path: tree no longer populated (RED)"
+            assert result.tree.class_id == "coarse_fallback", (
+                f"ion_path: expected coarse_fallback node, got "
+                f"{result.tree.class_id!r}"
+            )
         else:
-            # Slot is written regardless of tree population; tree may be None now.
-            assert result is not None
+            # Capture slot is written for every reachable handler. The tree itself
+            # may be coarse or structured, but it must round-trip byte-identically
+            # to the returned name (SC-1). (``isinstance``/``result.name`` above
+            # already cover slot presence; the prior ``result is not None`` line
+            # was vacuous filler and is removed per IN-6.)
+            assert result.tree is None or name_tree_to_string(result.tree, "pin") == result.name
         _ = fired  # routing recorded for the diagnostic below
 
 
