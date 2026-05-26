@@ -9,9 +9,13 @@ selection_mode='first_applicable' which reproduces the current sequential
 'if applies: return' flow bit-for-bit. SHIP GATE: byte-identical generated
 name strings on baseline_v17_all_corpora.csv (7,500 rows).
 
-Phase 146 (downstream consumer): flips selection_mode to 'score_based',
-raises chain priority, sets the three gate thresholds to None to delete
-the IUPAC-non-conformant ratio gates, and recalibrates FACTOR_WEIGHTS.
+Phase 146 (downstream consumer) was DESIGNED to flip selection_mode to
+'score_based', raise chain priority, set the three gate thresholds to None
+to delete the IUPAC-non-conformant ratio gates, and recalibrate
+FACTOR_WEIGHTS. NOTE (Phase 166 SCORE-04, audit §Stale-Comment Inventory):
+that production flip never landed — production stays 'first_applicable'.
+The RT-moving cutover is now the default-OFF 'score_based_per_substring'
+mode, deferred to a downstream documented-delta phase (D-01).
 All four 146 changes are 1-line edits to HANDLER_POLICIES + FACTOR_WEIGHTS.
 
 DESIGN CONTRACT (D-08, D-09 from 145.1-CONTEXT.md):
@@ -130,9 +134,11 @@ RATIO_REJECT_FLOOR: float = 0.10
 _DEFAULT_SELECTION_MODE: str = os.getenv(
     'ORTHONYM_SELECTION_MODE', 'first_applicable'
 ).strip().lower()
-assert _DEFAULT_SELECTION_MODE in ('first_applicable', 'score_based'), (
-    f"Invalid ORTHONYM_SELECTION_MODE={_DEFAULT_SELECTION_MODE!r}; "
-    f"must be 'first_applicable' or 'score_based'"
+assert _DEFAULT_SELECTION_MODE in (
+    'first_applicable', 'score_based', 'score_based_per_substring'
+), (
+    f"Invalid ORTHONYM_SELECTION_MODE={_DEFAULT_SELECTION_MODE!r}; must be "
+    f"'first_applicable', 'score_based', or 'score_based_per_substring'"
 )
 
 
@@ -713,7 +719,8 @@ class CandidatePool:
     """
 
     def __init__(self, selection_mode: str = 'first_applicable') -> None:
-        assert selection_mode in ('first_applicable', 'score_based'), \
+        assert selection_mode in (
+            'first_applicable', 'score_based', 'score_based_per_substring'), \
             f"unknown selection_mode: {selection_mode!r}"
         self.selection_mode = selection_mode
         self._candidates: List[CandidateName] = []
@@ -887,9 +894,12 @@ class CandidatePool:
         Otherwise, return the first added candidate (Tier A subset
         compete-by-position for first_applicable).
 
-        Phase 146 will flip selection_mode to 'score_based' and the
-        _direct_return_winner short-circuit no longer applies — full
-        candidate set competes via select_best_candidate() per D-08.
+        Phase 146's planned flip to 'score_based' as the production default
+        never landed (Phase 166 SCORE-04, audit §Stale-Comment Inventory):
+        production stays 'first_applicable'. The default-OFF
+        'score_based_per_substring' mode (the D-01 deferred cutover) competes
+        the full candidate set via _best_two_tier(per_substring=True) ->
+        select_best_candidate().
         """
         if not self._candidates:
             return None
@@ -905,13 +915,19 @@ class CandidatePool:
         #         + step 6 gated on iupac_locants per D-02).
         # Tier 2: weighted-sum tiebreak via select_best_candidate.
         # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
-        return self._best_two_tier()
+        # Phase 166 SCORE-04: the default-OFF 'score_based_per_substring' mode
+        # adds a lexicographic per-substring refinement (parent->locant->
+        # substituent, D-05) BEFORE the Tier-2 aggregate fallback. The existing
+        # 'score_based' path is byte-identical (per_substring=False).
+        return self._best_two_tier(
+            per_substring=(self.selection_mode == 'score_based_per_substring')
+        )
 
     def all_candidates(self) -> List[CandidateName]:
         """Return all collected candidates (for logging/diagnostics)."""
         return list(self._candidates)
 
-    def _best_two_tier(self) -> Optional[CandidateName]:
+    def _best_two_tier(self, *, per_substring: bool = False) -> Optional[CandidateName]:
         """Phase 146 Tier-1 lexicographic cascade + Tier-2 weighted-sum tiebreak.
 
         Implements Blue Book P-44.1 per CONTEXT.md <domain>:
@@ -951,6 +967,25 @@ class CandidatePool:
 
         if len(candidates) == 1:
             return candidates[0]
+
+        # Phase 166 SCORE-04: per-substring lexicographic refinement (D-05),
+        # default-OFF — only 'score_based_per_substring' passes per_substring=True.
+        # Reduce to the candidate(s) no other beats by parent->locant->
+        # substituent first-point-of-difference; a remaining full tie (all
+        # compare_by_node_scores == 0) falls through to the Tier-2 aggregate
+        # (STRICT refinement). per_substring=False => byte-identical to today.
+        if per_substring and len(candidates) > 1:
+            from .per_substring_scoring import compare_by_node_scores
+            best = candidates[0]
+            for cand in candidates[1:]:
+                if compare_by_node_scores(cand, best) < 0:
+                    best = cand
+            candidates = [
+                c for c in candidates
+                if compare_by_node_scores(c, best) == 0
+            ]
+            if len(candidates) == 1:
+                return candidates[0]
 
         # Tier 2 — weighted-sum tiebreak (existing infrastructure).
         # Import locally to avoid any circular-import surprises at module load.
