@@ -186,15 +186,32 @@ class PerNodeScorer:
 _NO_DECISION = NodeScores(0.5, 0.5, 0.5)
 
 
-def _root_scores(cand: Any) -> NodeScores:
-    """Return the ROOT node's NodeScores for a candidate, or the all-0.5
-    no-decision sentinel when the candidate has no scored tree (node_scores
-    None/empty, or the root key is absent)."""
+def _candidate_scores(cand: Any) -> NodeScores:
+    """Aggregate a candidate's tree into comparison-level NodeScores (D-05).
+
+    ``parent_score`` and ``substituent_score`` are read from the ROOT node (the
+    main parent + whether its immediate substituents match). ``locant_score``
+    is the WORST real (non-0.5) locant decision ANYWHERE in the tree, so a wrong
+    locant on a child substituent node still surfaces at comparison level — e.g.
+    ``2-methylbutane`` vs ``3-methylbutane``, where the distinguishing locant
+    lives on the ``methyl`` prefix node, not the root. (A root-only read would
+    tie these, since the root chain carries no locant.) Returns the all-0.5
+    no-decision sentinel when the candidate has no scored tree.
+    """
     node_scores = getattr(cand, "node_scores", None)
     tree = getattr(cand, "tree", None)
     if not node_scores or tree is None:
         return _NO_DECISION
-    return node_scores.get(id(tree), _NO_DECISION)
+    root = node_scores.get(id(tree))
+    if root is None:
+        return _NO_DECISION
+    # locant: the worst real locant decision anywhere in the tree (the first
+    # wrong locant drags the whole candidate down); 0.5 if every node abstained.
+    real_locants = [
+        ns.locant_score for ns in node_scores.values() if ns.locant_score != 0.5
+    ]
+    locant = min(real_locants) if real_locants else 0.5
+    return NodeScores(root.parent_score, locant, root.substituent_score)
 
 
 def compare_by_node_scores(a: Any, b: Any) -> int:
@@ -215,7 +232,7 @@ def compare_by_node_scores(a: Any, b: Any) -> int:
     first-point-of-difference, Blue Book P-31.1.4). Pure function: no OPSIN, no
     mutation, deterministic.
     """
-    sa, sb = _root_scores(a), _root_scores(b)
+    sa, sb = _candidate_scores(a), _candidate_scores(b)
     for key in ("parent_score", "locant_score", "substituent_score"):
         va, vb = getattr(sa, key), getattr(sb, key)
         if va != vb:

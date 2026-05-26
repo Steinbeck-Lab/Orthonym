@@ -1,33 +1,27 @@
-"""Phase 166 Plan 01 Wave 0 RED scaffold — SCORE-04 curated near-tie selection.
+"""Phase 166 SCORE-04: curated near-tie selection proof set.
 
-Imports ``compare_by_node_scores`` from
-``orthonym.assembly.per_substring_scoring`` (the comparator lands in Plan 03)
-and ``PerNodeScorer`` (Plan 02). Collection ERRORS until those land — the
-intended Wave 0 RED state. Plan 03 turns these GREEN after the default-OFF
-``score_based_per_substring`` selection mode is wired.
-
-Selector discipline (CONTEXT D-01/D-05): these fixtures run the pool in the new
-``score_based_per_substring`` mode (or call ``compare_by_node_scores`` directly).
-PRODUCTION stays ``first_applicable`` — this is a demonstrated, non-production
-path. Each fixture's expected winner is OPSIN-RT-verified at authoring
-(Assumption A5); the verification is recorded inline so a reviewer can re-check.
+Each fixture is a structurally-equal candidate PAIR differing in exactly one
+substring; the selector (the default-OFF ``score_based_per_substring`` mode, or
+the comparator directly) must pick the OPSIN-RT-correct member. PRODUCTION stays
+``first_applicable`` — this is a demonstrated, non-production path.
 
 Comparator order (D-05, lexicographic first-point-of-difference):
     parent_score -> locant_score -> substituent_score -> aggregate fallback.
+A full per-substring tie defers to ``select_best_candidate`` (the aggregate) —
+a STRICT refinement: no behaviour change on a tie.
 """
 import pytest
 from rdkit import Chem
 
 from orthonym.assembly.candidate_pool import CandidatePool
+from orthonym.assembly.coverage_scoring import CandidateName, select_best_candidate
 from orthonym.assembly.name_tree import NameTreeNode
-from orthonym.namer import Orthonym
+from orthonym.namer import Orthonym, name_with_tree
 from orthonym.rules.parent_correctness import (
     OPSIN_JAR,
     clear_reference_name,
     set_reference_name,
 )
-
-# RED dependency: PerNodeScorer (Plan 02) + compare_by_node_scores (Plan 03).
 from orthonym.assembly.per_substring_scoring import (
     NodeScores,
     PerNodeScorer,
@@ -49,42 +43,90 @@ class TestNearTieSelection:
 
     @opsin_required
     def test_locant_near_tie(self):
-        """Locant near-tie: the selector must prefer the correct-locant name
-        ``2-methylbutane`` over the wrong-locant ``3-methylbutane`` — same
-        parent (butane) and same substituent (methyl), differing ONLY in the
-        locant, so ``locant_score`` breaks the tie (parent_score ties at 1.0).
+        """Locant near-tie: the selector prefers correct-locant ``2-methylbutane``
+        over wrong-locant ``3-methylbutane`` — same parent (butane), same methyl
+        substituent, differing ONLY in the substituent locant. ``locant_score``
+        breaks it (parent ties). The distinguishing locant lives on the methyl
+        PREFIX node, so the comparator's tree-aggregated locant_score surfaces it.
 
-        OPSIN-RT verify (A5, 2026-05-26): both names parse under OPSIN to the
-        same structure CC(C)CC (3-methylbutane is a non-preferred locant for the
-        identical graph); the correct IUPAC locant is 2, so the locant_score
-        against the OPSIN-reference numbering must favour ``2-methylbutane``.
+        Exercises the REAL pipeline end-to-end: ``CandidatePool`` in the new mode,
+        ``pool.add`` (which attaches node_scores via the real OPSIN-driven
+        ``PerNodeScorer``), and ``best()`` -> ``_best_two_tier(per_substring=True)``.
 
-        GREEN in Plan 03 (needs score_based_per_substring + the curated pair).
+        OPSIN-RT verify (A5, 2026-05-26): name_compound('CC(C)CC') == '2-methylbutane';
+        both '2-methylbutane' and '3-methylbutane' OPSIN-round-trip to the CC(C)CC
+        graph (3-methyl is a non-preferred locant for the identical constitution),
+        so the correct IUPAC locant is 2.
         """
-        pytest.skip("Plan 03 fleshes out the curated pair once the mode lands")
+        smi = "CC(C)CC"
+        mol = Chem.MolFromSmiles(smi)
+        feats = Orthonym()._perceive(mol, smi, Chem.MolToSmiles(mol))
+        correct_tree = name_with_tree(smi).tree            # real 2-methylbutane tree
+        assert correct_tree is not None
+        wrong_tree = NameTreeNode(
+            parent_stem="but",
+            fragment_legacy="3-methylbutane",
+            prefixes=(NameTreeNode(parent_stem="3-methyl", locants=(3,)),),
+        )
+        set_reference_name("2-methylbutane")
+        try:
+            pool = CandidatePool("score_based_per_substring")
+            pool.add("2-methylbutane", "chain", feats, tree=correct_tree)
+            pool.add("3-methylbutane", "chain", feats, tree=wrong_tree)
+            winner = pool.best()
+        finally:
+            clear_reference_name()
+        assert winner.name == "2-methylbutane"
 
-    @opsin_required
     def test_parent_near_tie(self):
-        """Parent near-tie: the selector must prefer the correct-parent chain
-        over a parent-shifted sibling. ``parent_score`` is checked FIRST (D-05),
-        so a wrong parent can never win on a lucky substituent/locant match —
-        this directly attacks the 97.5%-parent_score=0 aggregate-blindness.
+        """Parent near-tie (the aggregate-blindness kill): a parent-CORRECT /
+        substituent-WRONG candidate must beat a parent-WRONG / substituent-RIGHT
+        candidate — EVEN when the parent-wrong candidate is added first AND has
+        the higher aggregate confidence. ``parent_score`` breaks FIRST (D-05), so
+        a wrong parent can never win on a lucky substituent match: the exact
+        failure this phase exists to kill.
 
-        OPSIN-RT verify (A5, 2026-05-26): expected-winner name OPSIN-round-trips
-        to the input SMILES; the parent-shifted decoy round-trips to a different
-        (or no) structure. Recorded fully in Plan 03 with the concrete pair.
-
-        GREEN in Plan 03.
+        Synthetic node_scores (no OPSIN) make the parent/substituent contrast
+        crisp and deterministic; the candidates go through ``pool.add`` (real
+        features) so the full selection wiring is exercised, then node_scores +
+        confidence are set to the controlled scenario.
         """
-        pytest.skip("Plan 03 fleshes out the curated pair once the mode lands")
+        smi = "CCCC"
+        mol = Chem.MolFromSmiles(smi)
+        feats = Orthonym()._perceive(mol, smi, Chem.MolToSmiles(mol))
+        pool = CandidatePool("score_based_per_substring")
+        # Parent-wrong added FIRST and with the HIGHER aggregate confidence.
+        wrong = pool.add(
+            "parent-wrong", "chain", feats,
+            tree=NameTreeNode(parent_stem="w", suffix="x"))
+        right = pool.add(
+            "parent-correct", "chain", feats,
+            tree=NameTreeNode(parent_stem="y", suffix="z"))
+        wrong.node_scores = {id(wrong.tree): NodeScores(0.0, 0.5, 1.0)}
+        wrong.confidence = 0.9
+        right.node_scores = {id(right.tree): NodeScores(1.0, 0.5, 0.0)}
+        right.confidence = 0.3
+        # Comparator: parent breaks first -> parent-correct wins despite lower aggregate.
+        assert compare_by_node_scores(right, wrong) == -1
+        # End-to-end through the pool selection wiring.
+        assert pool.best().name == "parent-correct"
 
     def test_full_tie_aggregate_fallback(self):
-        """Full per-substring tie -> fall back to aggregate confidence (strict
-        refinement: identical parent/locant/substituent scores must NOT change
-        behaviour vs the current aggregate selection). Exercises the comparator
-        tie path via ``compare_by_node_scores`` directly (no OPSIN needed).
-
-        GREEN in Plan 03 (asserts compare_by_node_scores(a, b) == 0 -> the
-        downstream selection defers to the aggregate, byte-identical to today).
-        """
-        pytest.skip("Plan 03 fleshes out the tie path once the comparator lands")
+        """Full per-substring tie -> defers to the aggregate (STRICT refinement,
+        NO behaviour change). Two candidates with IDENTICAL per-substring scores:
+        ``compare_by_node_scores`` == 0, and the pool's winner equals EXACTLY what
+        ``select_best_candidate`` (the aggregate) alone would pick. No OPSIN."""
+        smi = "CCCC"
+        mol = Chem.MolFromSmiles(smi)
+        feats = Orthonym()._perceive(mol, smi, Chem.MolToSmiles(mol))
+        pool = CandidatePool("score_based_per_substring")
+        a = pool.add("cand-a", "chain", feats,
+                     tree=NameTreeNode(parent_stem="a", suffix="x"))
+        b = pool.add("cand-b", "chain", feats,
+                     tree=NameTreeNode(parent_stem="b", suffix="x"))
+        a.node_scores = {id(a.tree): NodeScores(1.0, 0.5, 0.5)}
+        b.node_scores = {id(b.tree): NodeScores(1.0, 0.5, 0.5)}
+        assert compare_by_node_scores(a, b) == 0           # identical per-substring
+        # What the aggregate alone would pick from the same (post-tie) candidate set.
+        expected = select_best_candidate(list(pool.all_candidates()))
+        assert pool.best().name == expected.name           # tie -> aggregate decides
