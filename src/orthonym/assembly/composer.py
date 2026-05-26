@@ -3249,6 +3249,15 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     Returns:
         Complete IUPAC name for the amide
     """
+    # WR-2: reset the transient side-channel BEFORE any early return. Only the
+    # unsaturated-chain branch (below) sets ``features._amide_tree``; the
+    # saturated and ring-attached branches return without setting it. name_amide
+    # (handlers/amide.py) reads ``getattr(features, "_amide_tree", None)`` and
+    # falls back to a coarse node only when None. Resetting at function entry
+    # guarantees the read can never observe a STALE structured tree from a prior
+    # molecule if a MolecularFeatures instance is ever reused. This touches only
+    # the post-hoc tree path, never the returned name string (byte-identical).
+    features._amide_tree = None
     from ..rules.amides import (
         name_amide, is_ring_attached_amide, get_amide_type,
         get_n_substituents, format_n_substitution,
