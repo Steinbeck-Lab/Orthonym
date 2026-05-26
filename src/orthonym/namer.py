@@ -922,8 +922,27 @@ class Orthonym:
             # round-trips verbatim. class_id="coarse_fallback" distinguishes this
             # boundary node from real handler trees in the coarse-bucket report.
             from .assembly.name_tree import NameTreeNode
-            from .assembly.name_tree_to_string import name_tree_to_string
-            if tree is None or name_tree_to_string(tree) != name:
+            from .assembly.name_tree_to_string import (
+                NameTreeSerializerError,
+                name_tree_to_string,
+            )
+            # WR-3: this staleness check is the defence point against bad trees,
+            # so it must not itself crash on one. name_tree_to_string raises
+            # NameTreeSerializerError (a ValueError subclass) on a malformed node
+            # (empty parent_stem + non-str fragment_legacy). An uncaught raise
+            # here would escape as ValueError, which this method's docstring maps
+            # to "invalid SMILES" — mis-surfacing a malformed captured tree on a
+            # perfectly valid input. Treat a malformed/unserializable captured
+            # tree exactly like a stale one: synthesize the sanctioned coarse
+            # fallback. This keeps name output byte-identical (only the tree path
+            # is affected).
+            needs_fallback = tree is None
+            if not needs_fallback:
+                try:
+                    needs_fallback = name_tree_to_string(tree) != name
+                except NameTreeSerializerError:
+                    needs_fallback = True
+            if needs_fallback:
                 tree = NameTreeNode(
                     parent_stem=name, class_id="coarse_fallback",
                     iupac_section_cite="P-73", fragment_legacy=name,
