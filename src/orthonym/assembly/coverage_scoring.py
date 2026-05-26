@@ -21,7 +21,10 @@ import os
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only import (avoids runtime cycle)
+    from .name_tree import NameTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +75,12 @@ class CandidateName:
     # via _has_iupac_locants probe at candidate_pool.py:501-514.
     # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
     ring_info: Optional[Dict[str, Any]] = None
+    # Phase 165 SCORE-01: structured Name-Tree IR for this candidate. Populated
+    # POST-HOC by CandidatePool.add(tree=...) — same Risk 1 mitigation as
+    # parent_atom_indices / ring_info: NEVER passed into compute_confidence()
+    # (would break the byte-identical guarantee). None means "no tree yet"
+    # (coarse-bucket counted in Plan 04). pool.best().tree surfaces the winner's.
+    tree: Optional["NameTreeNode"] = None
 
 
 # ---------------------------------------------------------------------------

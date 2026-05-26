@@ -54,7 +54,10 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only import (avoids runtime cycle)
+    from .name_tree import NameTreeNode
 
 from .coverage_scoring import (
     CandidateName,
@@ -708,6 +711,7 @@ class CandidatePool:
         features: Any,
         parent_atom_indices: Optional[Set[int]] = None,
         ring_info: Optional[Dict[str, Any]] = None,
+        tree: Optional["NameTreeNode"] = None,
     ) -> Optional[CandidateName]:
         """Score and add a candidate. Returns the candidate, or None if
         gate-rejected (Tier B handlers only).
@@ -761,6 +765,10 @@ class CandidatePool:
         # NEVER passed into compute_confidence() — that would break the
         # byte-identical guarantee per Phase 146 D-19.
         cand.ring_info = ring_info
+        # Phase 165 SCORE-01: attach the structured Name-Tree POST-HOC (Risk 1
+        # pattern). NEVER passed into compute_confidence() — byte-identical
+        # preserved (Phase 146 D-19). best() surfaces the winner's tree.
+        cand.tree = tree
         # Phase 147 fallback: if ring_info wasn't passed explicitly, read
         # the transient attribute set by namer.py:_classify (allows existing
         # composer.py call sites to flow ring_info through without a
