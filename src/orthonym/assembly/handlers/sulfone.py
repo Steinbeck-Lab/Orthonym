@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_sulfone(features: Any) -> bool:
@@ -48,7 +48,6 @@ def name_sulfone(
 
     # composer.py:977 inline: _inject_stereo_if_missing(features, cand.name)
     final_name = _inject_stereo_if_missing(features, cand.name)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = final_name
     return NamingResult(
         name=_nm,

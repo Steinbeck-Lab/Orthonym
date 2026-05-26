@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,6 @@ def name_polycyclic(
     pool = get_current_pool()
     pool.add(poly_assembled, "polycyclic", features)
     # composer.py:1114 inline: return pool.best().name (NO _inject_stereo wrap)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = pool.best().name
     return NamingResult(
         name=_nm,

@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,6 @@ def name_phosphine_oxide(
     pool.add(name, "phosphine_oxide", features)
     # composer.py:989 inline: _inject_stereo_if_missing(features, pool.best().name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = final_name
     return NamingResult(
         name=_nm,

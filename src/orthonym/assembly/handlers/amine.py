@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,6 @@ def name_amine(
     # string concatenation (no fragment list) -> counted coarse node (D-03),
     # parity-safe via fragment_legacy. A structured upgrade requires a
     # fragments-based refactor of _assemble_amine_name (deferred; documented A1).
-    from ..name_tree import NameTreeNode
     tree = NameTreeNode(
         parent_stem=amine_name, fragment_legacy=amine_name,
         class_id="amine", iupac_section_cite="P-62",

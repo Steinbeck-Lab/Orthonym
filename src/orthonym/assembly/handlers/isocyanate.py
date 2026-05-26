@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_isocyanate(features: Any) -> bool:
@@ -56,7 +56,6 @@ def name_isocyanate(
 
     # composer.py:836 inline branch wraps in _inject_stereo_if_missing (atom_to_locant=None).
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = final_name
     return NamingResult(
         name=_nm,

@@ -37,7 +37,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,6 @@ def name_amide(
     # amides) that build no fragment list. fragment_legacy=name guarantees a
     # byte-identical round-trip. Read best().tree so the tree matches the
     # RETURNED candidate (winner-guard).
-    from ..name_tree import NameTreeNode
     tree = getattr(features, "_amide_tree", None)
     if tree is None:
         tree = NameTreeNode(

@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_partial_sat(features: Any) -> bool:
@@ -75,7 +75,6 @@ def name_partial_sat(
         return None
 
     # composer.py:1130 inline: return cand.name (NO _inject_stereo wrap)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = cand.name
     return NamingResult(
         name=_nm,

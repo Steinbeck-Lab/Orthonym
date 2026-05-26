@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,6 @@ def name_ring_ester(
     pool = get_current_pool()
     pool.add(ring_ester_name, "ring_ester", features)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
-    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
     _nm = final_name
     return NamingResult(
         name=_nm,
