@@ -3345,13 +3345,26 @@ def _assemble_amide_name(features: Any, style: str) -> str:
 
     # Handle N-substitution for secondary/tertiary amides
     amide_type = get_amide_type(mol, amide_atoms)
+    final_name = base_name
     if amide_type in ("secondary", "tertiary"):
         n_subs = get_n_substituents(mol, amide_atoms)
         n_prefix = format_n_substitution(n_subs)
         if n_prefix:
-            return f"{n_prefix}{base_name}"
+            final_name = f"{n_prefix}{base_name}"
 
-    return base_name
+    # Phase 165 SCORE-01 (Pitfall 2): stash a STRUCTURED tree from the chain
+    # fragment list, with fragment_legacy overridden to the FINAL (post-N-prefix)
+    # string so name_tree_to_string round-trips byte-identically for BOTH
+    # unsubstituted and N-substituted unsaturated-chain amides (the N-prefix is
+    # carried in fragment_legacy, not dropped). The amide handler reads
+    # features._amide_tree and attaches it via the pool tree= carry.
+    import dataclasses as _dc
+    from .name_tree_builder import fragments_to_tree
+    features._amide_tree = _dc.replace(
+        fragments_to_tree(fragments, class_id="amide", section_cite="P-66.1"),
+        fragment_legacy=final_name,
+    )
+    return final_name
 
 
 def _assemble_amine_name(features: Any, style: str) -> Optional[str]:

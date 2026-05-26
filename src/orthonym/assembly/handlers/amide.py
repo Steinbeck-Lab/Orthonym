@@ -105,11 +105,25 @@ def name_amide(
             "amide", _ha, (_amide_name or "")[:60],
         )
 
+    # Phase 165 SCORE-01: prefer the structured tree stashed by
+    # _assemble_amide_name (unsaturated chain-fragment path); else a counted
+    # coarse node (D-03) for the name_amide() string paths (saturated/ring
+    # amides) that build no fragment list. fragment_legacy=name guarantees a
+    # byte-identical round-trip. Read best().tree so the tree matches the
+    # RETURNED candidate (winner-guard).
+    from ..name_tree import NameTreeNode
+    tree = getattr(features, "_amide_tree", None)
+    if tree is None:
+        tree = NameTreeNode(
+            parent_stem=_amide_name, fragment_legacy=_amide_name,
+            class_id="amide", iupac_section_cite="P-66.1",
+        )
     # Phase 145.1: route through pool.add() — direct_return handler.
     pool = get_current_pool()
-    pool.add(_amide_name, "amide", features)
+    pool.add(_amide_name, "amide", features, tree=tree)
+    best = pool.best()
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=best.name, tree=best.tree, atom_to_locant_hint=None,
     )
 
 

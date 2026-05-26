@@ -85,11 +85,21 @@ def name_amine(
             "amine", _ha, amine_name[:60],
         )
 
+    # Phase 165 SCORE-01: _assemble_amine_name builds the name via N-prefix
+    # string concatenation (no fragment list) -> counted coarse node (D-03),
+    # parity-safe via fragment_legacy. A structured upgrade requires a
+    # fragments-based refactor of _assemble_amine_name (deferred; documented A1).
+    from ..name_tree import NameTreeNode
+    tree = NameTreeNode(
+        parent_stem=amine_name, fragment_legacy=amine_name,
+        class_id="amine", iupac_section_cite="P-62",
+    )
     # Phase 145.1: route through pool.add() — direct_return handler.
     pool = get_current_pool()
-    pool.add(amine_name, "amine", features)
+    pool.add(amine_name, "amine", features, tree=tree)
+    best = pool.best()
     return NamingResult(
-        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+        name=best.name, tree=best.tree, atom_to_locant_hint=None,
     )
 
 
