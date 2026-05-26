@@ -130,26 +130,30 @@ def test_name_with_tree_invalid_smiles_raises(namer):
         namer.name_with_tree("not-a-valid-smiles-string-XYZ!!")
 
 
-def test_name_with_tree_first_wave_tree_is_none_doc(namer):
-    """Per CONTEXT D-05 first-wave handlers emit tree=None — this is EXPECTED.
+def test_name_with_tree_tree_population_status(namer):
+    """Phase 165 SCORE-01 supersedes the Phase-160 first-wave tree=None policy.
 
-    This test documents the contract: at Phase 160 ship, the 30
-    extracted handlers all return tree=None. Tree population is
-    iterative across v19+ phases. ADR-19-02 documents the migration plan.
+    Handlers that route via dispatch_inner now emit a NameTreeNode whose
+    serialization round-trips byte-identically to the name. Functional-class /
+    retained-name paths that are named BEFORE dispatch_inner (e.g. dimethyl
+    sulfoxide) still surface tree=None — documented in 165-01-SUMMARY.md
+    (Open Question 3) + CANARY-BASELINE.md.
     """
-    smiles_per_extracted_handler = [
-        "CCO",  # general acyclic — actually routes to retained-name
-        "CS(=O)C",  # sulfoxide
-        "CN=C=O",  # isocyanate
-    ]
-    for smi in smiles_per_extracted_handler:
+    from orthonym.assembly.name_tree import NameTreeNode
+    from orthonym.assembly.name_tree_to_string import name_tree_to_string
+
+    # Routes via dispatch_inner -> tree populated (Phase 165).
+    for smi in ["CCCCO", "CN=C=O"]:  # general_acyclic (structured), isocyanate (coarse)
         result = namer.name_with_tree(smi)
-        # For first-wave: tree is None.
-        assert result.tree is None, (
-            f"Expected tree=None for first-wave handler on {smi!r}; "
-            f"got {result.tree!r}. If a handler now emits a tree, "
-            f"update this test + the ADR-19-02 tree-emission status table."
+        assert isinstance(result.tree, NameTreeNode), (
+            f"Expected a populated tree for {smi!r} (Phase 165 SCORE-01); "
+            f"got {result.tree!r}."
         )
+        assert name_tree_to_string(result.tree, "pin") == result.name
+
+    # Functional-class name produced before dispatch_inner -> still tree=None.
+    result = namer.name_with_tree("CS(=O)C")  # dimethyl sulfoxide (bypasses dispatch_inner)
+    assert result.tree is None
 
 
 @pytest.mark.parametrize("smi", ["[He]", "[Ne]", "[Ar]", "[Kr]", "[Xe]", "[Rn]"])
