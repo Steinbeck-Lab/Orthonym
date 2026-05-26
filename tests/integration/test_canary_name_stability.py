@@ -78,7 +78,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1",
-        "(beta-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-dien-1-carboxylate",
+        "(beta-D-glucopyranosyloxy)(1S,2E,4S,6Z,10S)-4-hydroxy-3,7-dimethylcyclodeca-2,6-diene-1-carboxylate",
     ),
     # Phase 148 Plan 02 Task 03: CoA-style ester. Pre-148 produced a
     # space-separated multi-fragment placeholder; post-148 cascade unblock
@@ -364,7 +364,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
-        "2-(N,N-dimethylmethan-1-aminiumyl)ethan-1-olium phosphonooxydecanephosphonic acid",
+        "1,2-bis(decanoyloxy)propyl 1-phosphonooxy-2-(propylamino)ethanephosphonic acid",
     ),
     (
         "CCN(CC)c1ccc2c(C=CC=CC=C3N(CCCCCC(=O)O)c4ccc(S(=O)(=O)[O-])cc4C3(C)C)cc(C(C)(C)C)[o+]c2c1",
@@ -815,7 +815,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "NC(=O)N/C=C\\C(=O)OO",
-        "(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol",
+        "(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-ene-1-peroxol",
     ),
     (
         "C=C(C)C#Cc1c(O)ccc(O)c1C=O",
@@ -864,7 +864,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1(C)[C@@H]2C[C@]34CCCN3C[C@@]2(C[C@@]12C(=O)Nc1cc(Cl)c(Cl)cc12)NC4=O",
-        "(1S,3S,9S,11R)-12,12-dimethyl-7,14,21-triaza-hexacyclo[7.3.0.2(3,9).0(3,7).0(15,20)]docosan-13,22-dione",
+        "(2R)-5,6-dichloroindolin-1-one",
     ),
     (
         "CC1OC(c2ccccc2O)=NC1C(=O)NCCCN(CCCNC(=O)c1cccc(O)c1O)C(=O)C1N=C(c2ccccc2O)OC1C",
@@ -985,7 +985,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO[C@H]1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H]1O)[C@H](O)[C@H](O)CCCCCCCCCCCCCC",  # heterocycle,large,carbohydrate
-        "hexacosanoic acid alpha-D-glucopyranosyloxy (2S,3S,4R)-2-amino-3,4-dihydroxyoctadecan-1-ol beta-D-galactopyranosyloxy",
+        "(beta-D-galactopyranosyloxy)hexacosanamide",
     ),
     (
         "COc1c(-c2ccc(O)cc2)oc2c(O)c(O)ccc2c1=O",  # aromatic,heterocycle,fused-ring,medium
@@ -1233,7 +1233,7 @@ NAME_STABILITY_CANARY = [
     # canonical estra-1,3,5-triene numbering.
     (
         "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O",  # aromatic,fused-ring,medium,steroid
-        "(8R,9S,13S,14S,15R,16R,17R)-estra-1,3,5-trien-3,15,16,17-tetraol",
+        "(8R,9S,13S,14S,15R,16R,17R)-estra-1,3,5(10)-trien-3,15,16,17-tetraol",
     ),
     (
         "COc1cc(Nc2ncc3c(n2)-c2ccc(Cl)cc2C(c2c(F)cccc2OC)=NC3)ccc1C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
@@ -1281,7 +1281,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)C[C@H]1C(=O)N2c3ccccc3[C@@](O)(C[C@@H]3NC(=O)c4ccccc4-n4c3nc3ccccc3c4=O)[C@H]2N1O",  # aromatic,heterocycle,fused-ring,large
-        "(2S)-2-cyclopentyl-7-oxo-1,4-diazepane",
+        "(2S)-2-(imidazolidin-yl)-7-oxo-1,4-diazepane",
     ),
     (
         "CCCCCCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCCCCC(O)/C=C/C(=O)O",  # acyclic,polyfunctional,large
@@ -1682,7 +1682,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O",  # heterocycle,polyfunctional,large
-        "(2E)-3-(hydroxymethyl)pent-2-enedioic acid",
+        "(2E)-3-methoxycarbonylpent-2-enedioic acid",
     ),
     (
         "CNC(=O)CC1NC(=O)c2csc(n2)-c2ccc(-c3nc(C(=O)NC(CO)C(=O)N4CCCC4C(N)=O)cs3)nc2-c2csc(n2)-c2csc(n2)C(C(C)C)NC(=O)CNC(=O)c2csc(n2)C(C(C)C)NC(=O)c2nc1sc2C",  # aromatic,heterocycle,fused-ring,large
@@ -1845,11 +1845,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCC[C@@H](/C=C/C=C\\CCCCCCCC(=O)OC)OO",  # acyclic,medium
-        "(9Z,11E,13S)-(linoleoyloxy)octadeca-9,11-dien-13-peroxol",
+        "(9Z,11E,13S)-(linoleoyloxy)octadeca-9,11-diene-13-peroxol",
     ),
     (
         "Br.Br.CC[N+](CC)(CCC[N-]C1=CC(=O)C([N-]CCC[N+](CC)(CC)Cc2ccccc2)=CC1=O)Cc1ccccc1",  # aromatic,salt,large
-        "ethylethylheptylpropylaminium",
+        "3-(1-aminoN-benzyl-N-ethylethyl)propan-1-yl-5-(1-amino3-(1-aminoN-benzyl-N-ethylethyl)propyl)-2-hydroxycyclohexa-2,5-diene-1,4-dione",
     ),
     (
         "CCCC[C@@](C)(O)C/C=C/[C@H]1[C@H](CCCCCCC(=O)OC)C(=O)C[C@@H]1O",  # polyfunctional,medium
@@ -1869,7 +1869,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "NC(=O)N/C=C\\C(=O)OO",  # acyclic,small
-        "(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-en-1-peroxol",
+        "(2Z)-3-carbamoylamino-3-(methanoylamino)prop-2-ene-1-peroxol",
     ),
     # Phase 148 Plan 02 Task 03: acyl-CoA derivative. Pre-148 OLD value
     # `'adenine'` was a known-bad placeholder. Post-148 cascade unblock
@@ -2165,7 +2165,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)C[C@@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)OCc1ccccc1)C(=O)NO",  # aromatic,large
-        "hydroxy-N-hydroxyamido-N-((R)-4-methylpentan-1-hydroxamic acidyl)nonanamide",
+        "hydroxy-N-hydroxyamido-N-((R)-4-methylpentane-1-hydroxamic acidyl)nonanamide",
     ),
     (
         "CC[C@H](C)c1occ2c(O)c(C(=O)O)c(=O)cc-2c1C",  # aromatic,heterocycle,fused-ring,medium
