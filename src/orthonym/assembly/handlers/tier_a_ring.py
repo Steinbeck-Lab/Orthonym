@@ -174,10 +174,9 @@ def name_tier_a_ring(
                 pool = get_current_pool()
                 cand = pool.add(partial_sat_name, "partial_sat", features)
                 if cand is not None:
-                    _nm = cand.name
                     return NamingResult(
-                        name=_nm,
-                        tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                        name=cand.name,
+                        tree=NameTreeNode(parent_stem=cand.name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=cand.name),
                         atom_to_locant_hint=None,
                     )
 
@@ -288,10 +287,9 @@ def name_tier_a_ring(
                             candidate_name, features.mol, atom_to_locant,
                             include_near_parent_ez=_inpe,
                         )
-            _nm = candidate_name
             return NamingResult(
-                name=_nm,
-                tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                name=candidate_name,
+                tree=NameTreeNode(parent_stem=candidate_name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=candidate_name),
                 atom_to_locant_hint=None,
             )
         # Low ratio: fall through but store metadata for debugging.

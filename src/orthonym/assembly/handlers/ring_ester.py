@@ -97,10 +97,9 @@ def name_ring_ester(
     pool = get_current_pool()
     pool.add(ring_ester_name, "ring_ester", features)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
-    _nm = final_name
     return NamingResult(
-        name=_nm,
-        tree=NameTreeNode(parent_stem=_nm, class_id="ring_ester", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+        name=final_name,
+        tree=NameTreeNode(parent_stem=final_name, class_id="ring_ester", iupac_section_cite="P-65.6", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
 

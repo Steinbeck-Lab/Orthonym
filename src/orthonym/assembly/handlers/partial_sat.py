@@ -75,10 +75,9 @@ def name_partial_sat(
         return None
 
     # composer.py:1130 inline: return cand.name (NO _inject_stereo wrap)
-    _nm = cand.name
     return NamingResult(
-        name=_nm,
-        tree=NameTreeNode(parent_stem=_nm, class_id="partial_sat", iupac_section_cite="P-25.3", fragment_legacy=_nm),
+        name=cand.name,
+        tree=NameTreeNode(parent_stem=cand.name, class_id="partial_sat", iupac_section_cite="P-25.3", fragment_legacy=cand.name),
         atom_to_locant_hint=None,
     )
 

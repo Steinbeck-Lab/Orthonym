@@ -52,10 +52,9 @@ def name_phosphinic_acid(
     pool.add(name, "phosphinic_acid", features)
     # composer.py:1079 inline: _inject_stereo_if_missing(features, pool.best().name)
     final_name = _inject_stereo_if_missing(features, pool.best().name)
-    _nm = final_name
     return NamingResult(
-        name=_nm,
-        tree=NameTreeNode(parent_stem=_nm, class_id="phosphinic_acid", iupac_section_cite="P-67.1", fragment_legacy=_nm),
+        name=final_name,
+        tree=NameTreeNode(parent_stem=final_name, class_id="phosphinic_acid", iupac_section_cite="P-67.1", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
 

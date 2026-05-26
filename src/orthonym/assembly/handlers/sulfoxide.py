@@ -49,10 +49,9 @@ def name_sulfoxide(
     # composer.py:978 inline: _inject_stereo_if_missing(features, cand.name)
     # — no explicit atom_to_locant kwarg (defaults to None).
     final_name = _inject_stereo_if_missing(features, cand.name)
-    _nm = final_name
     return NamingResult(
-        name=_nm,
-        tree=NameTreeNode(parent_stem=_nm, class_id="sulfoxide", iupac_section_cite="P-63.6", fragment_legacy=_nm),
+        name=final_name,
+        tree=NameTreeNode(parent_stem=final_name, class_id="sulfoxide", iupac_section_cite="P-63.6", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
 

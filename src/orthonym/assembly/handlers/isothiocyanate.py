@@ -50,10 +50,9 @@ def name_isothiocyanate(
         return None
 
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
-    _nm = final_name
     return NamingResult(
-        name=_nm,
-        tree=NameTreeNode(parent_stem=_nm, class_id="isothiocyanate", iupac_section_cite="P-66.5", fragment_legacy=_nm),
+        name=final_name,
+        tree=NameTreeNode(parent_stem=final_name, class_id="isothiocyanate", iupac_section_cite="P-66.5", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
 
