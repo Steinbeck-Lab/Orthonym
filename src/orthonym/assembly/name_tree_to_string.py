@@ -102,6 +102,15 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
         # fragments_to_tree deriver + caller-side concatenations (e.g. amide
         # N-prefix). RESEARCH 165 lines 459-462.
         if isinstance(node.fragment_legacy, str):
+            # IN-4 note: an empty-string ``fragment_legacy=""`` is a VALID
+            # (empty) carrier and returns ``""`` verbatim here — deliberately
+            # distinct from ``fragment_legacy is None`` (the latter falls through
+            # to the explicit-field / honest-fail path below). This str branch is
+            # reached only when ``fragment_legacy is not None`` (outer guard), so
+            # ``""`` short-circuits BEFORE the ``parent_stem`` honest-fail at the
+            # bottom. The SC-3 boundary only synthesizes a node when ``name`` is
+            # truthy (namer.py ``if name:``), so an empty name never reaches here
+            # in production; this is documented, not a behavioral guard.
             return node.fragment_legacy
         # Lazy import to avoid composer.py -> name_tree_to_string -> composer.py
         # cycle at module-import time (PATTERNS § Lazy Import).
