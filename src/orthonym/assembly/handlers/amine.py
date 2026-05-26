@@ -65,8 +65,9 @@ def name_amine(
     """Direct-return amine handler (fast-path).
 
     Verbatim semantics of composer.py:1374-1386. Returns
-    ``NamingResult(name=pool.best().name, tree=None, atom_to_locant_hint=None)``
-    after ``pool.add(name, 'amine', features)``. Returns None if
+    ``NamingResult(name=best.name, tree=best.tree, atom_to_locant_hint=None)``
+    after ``pool.add(name, 'amine', features, tree=...)`` (Phase 165 SCORE-01:
+    counted coarse node, parity-safe via fragment_legacy). Returns None if
     ``_assemble_amine_name`` returns falsy (per inline guard at composer.py:1375).
     """
     from ..candidate_pool import get_current_pool

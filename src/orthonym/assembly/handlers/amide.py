@@ -84,8 +84,10 @@ def name_amide(
     """Direct-return amide handler (fast-path).
 
     Verbatim semantics of composer.py:1343-1356. Returns
-    ``NamingResult(name=pool.best().name, tree=None, atom_to_locant_hint=None)``
-    after ``pool.add(name, 'amide', features)``. No ``_inject_stereo_if_missing``
+    ``NamingResult(name=best.name, tree=best.tree, atom_to_locant_hint=None)``
+    after ``pool.add(name, 'amide', features, tree=...)`` (Phase 165 SCORE-01:
+    structured tree from the chain-fragment path, else a coarse node).
+    No ``_inject_stereo_if_missing``
     wrap per the inline branch behavior at composer.py:1356.
     """
     from ..candidate_pool import get_current_pool
