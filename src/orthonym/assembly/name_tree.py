@@ -169,9 +169,41 @@ def _alphabetize_prefixes(
     return tuple(sorted(prefixes, key=lambda p: alpha_sort_key(p.parent_stem)))
 
 
+def is_coarse_node(node: NameTreeNode) -> bool:
+    """Phase 165 SCORE-02 (WR-1): single source of truth for the coarse/structured
+    classification used by BOTH the coarse-bucket metric script and the handler
+    contract test.
+
+    Provenance-based: a node is "coarse" when it is a flat single-node tree that
+    carries ONLY the final string in ``fragment_legacy`` with no recoverable
+    structural decomposition — i.e. empty ``prefixes``, no ``suffix``,
+    ``fragment_legacy`` set, AND ``parent_stem == fragment_legacy`` (both written
+    to the same final string by a coarse construction). A "structured" node has a
+    bare stem in ``parent_stem`` (e.g. "but") distinct from the full assembled
+    name in ``fragment_legacy`` ("butane"), or carries real prefix/suffix parts,
+    or has ``fragment_legacy is None`` (the explicit-field reference handler).
+
+    WR-4 rationale: the metric script and the contract test previously defined
+    this twice with a DIFFERENT last clause (``parent_stem == fragment_legacy``
+    in the script vs ``parent_stem == name`` in the test). Those are not
+    equivalent in general, so the public-facing "structured %" headline could
+    drift from what the test counts. The provenance form below is the robust one
+    (per the script's own docstring): it compares against the node's own
+    ``fragment_legacy`` rather than the post-processed final ``name``, so it is
+    invariant under downstream name rewriting.
+    """
+    return (
+        node.fragment_legacy is not None
+        and not node.prefixes
+        and node.suffix is None
+        and node.parent_stem == node.fragment_legacy
+    )
+
+
 __all__ = [
     "NameTreeNode",
     "NamingResult",
     "_normalize_locants",
     "_alphabetize_prefixes",
+    "is_coarse_node",
 ]

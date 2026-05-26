@@ -31,7 +31,7 @@ from orthonym.assembly.inner_dispatch import (
     get_inner_dispatch_stats,
     reset_inner_dispatch_stats,
 )
-from orthonym.assembly.name_tree import NamingResult
+from orthonym.assembly.name_tree import NamingResult, is_coarse_node
 from orthonym.assembly.name_tree_to_string import name_tree_to_string
 
 _FIXTURE = json.loads(
@@ -63,15 +63,13 @@ def namer():
     return Orthonym()
 
 
-def _is_coarse(node, name: str) -> bool:
-    """Open Question 2 resolution: a coarse node is a flat fragment_legacy
-    single-node (no structured decomposition)."""
-    return (
-        not node.prefixes
-        and node.suffix is None
-        and node.fragment_legacy is not None
-        and node.parent_stem == name
-    )
+# WR-4: the coarse/structured classifier now lives once in
+# orthonym.assembly.name_tree.is_coarse_node (the provenance-based
+# parent_stem == fragment_legacy form), shared with
+#  so the contract test and the public
+# headline metric count "coarse" identically. The previous local _is_coarse used
+# parent_stem == name, which is NOT equivalent in general and could drift from
+# the script's number.
 
 
 @pytest.mark.parametrize("probe", CONTRACT_PROBES, ids=CONTRACT_IDS)
@@ -100,7 +98,7 @@ def test_tree_well_formed(probe, namer):
     """SCORE-02: structured trees carry their own fields; coarse nodes recorded."""
     result = namer.name_with_tree(probe["smiles"])
     assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
-    if _is_coarse(result.tree, result.name):
+    if is_coarse_node(result.tree):
         COARSE_HANDLERS.add(probe["handler_id"])
         return
     # Structured node: parent stem present and serialization round-trips.
