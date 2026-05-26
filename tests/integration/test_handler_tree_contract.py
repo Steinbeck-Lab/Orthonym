@@ -43,6 +43,16 @@ PROBES = _FIXTURE["probes"]
 CONTRACT_PROBES = [p for p in PROBES if p.get("role") == "contract"]
 CONTRACT_IDS = [p["handler_id"] for p in CONTRACT_PROBES]
 
+# WR-1: probes whose handler emits a genuine STRUCTURED tree (recoverable
+# parent/suffix/prefix parts, not a flat fragment_legacy carrier). These get an
+# additional non-vacuous assertion: the public name_with_tree result must NOT be
+# the coarse_fallback node, i.e. the SC-1 boundary in namer.py must NOT have
+# silently swapped a broken structured tree for a verbatim-round-tripping coarse
+# node. Without this guard the parity assertions below are vacuous for structured
+# handlers (the boundary guarantees parity by construction; see WR-1).
+STRUCTURED_PROBES = [p for p in CONTRACT_PROBES if p.get("structured")]
+STRUCTURED_IDS = [p["handler_id"] for p in STRUCTURED_PROBES]
+
 # Handlers whose tree is a counted coarse fragment_legacy node (D-03). Populated
 # by test_tree_well_formed as handlers ship; read by the Plan-04 bucket report.
 COARSE_HANDLERS: set = set()
@@ -98,6 +108,40 @@ def test_tree_well_formed(probe, namer):
         f"{probe['handler_id']}: structured tree has empty parent_stem"
     )
     assert name_tree_to_string(result.tree, "pin") == result.name
+
+
+@pytest.mark.parametrize("probe", STRUCTURED_PROBES, ids=STRUCTURED_IDS)
+def test_structured_tree_not_silently_downgraded(probe, namer):
+    """WR-1: a handler declared ``structured`` must surface a genuinely
+    structured tree from ``name_with_tree`` — NOT the SC-1 boundary's
+    ``coarse_fallback`` node.
+
+    Why this is the non-vacuous parity check the suite was missing: the SC-1
+    boundary in ``namer.py`` swaps ANY tree for which
+    ``name_tree_to_string(tree) != name`` with a ``class_id="coarse_fallback"``
+    node whose ``fragment_legacy == name`` round-trips verbatim. That makes
+    ``test_tree_parity`` pass *by construction* even when a structured handler
+    emits a broken tree (the broken tree is silently coarse-replaced). This test
+    detects that silent downgrade: a broken structured tree -> coarse-replaced ->
+    ``class_id == "coarse_fallback"`` -> this assertion FAILS, exactly as a parity
+    contract test must be able to. The coarse-handler probes are intentionally NOT
+    in ``STRUCTURED_PROBES`` (they legitimately carry ``fragment_legacy`` and would
+    falsely fail this guard).
+    """
+    result = namer.name_with_tree(probe["smiles"])
+    assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
+    assert result.tree.class_id != "coarse_fallback", (
+        f"{probe['handler_id']}: structured handler tree was silently swapped for "
+        f"the SC-1 coarse_fallback node (name={result.name!r}). The handler emitted "
+        f"a tree that fails byte-identical round-trip, so name_with_tree's boundary "
+        f"masked it. Fix the handler's tree, not this assertion."
+    )
+    # And the structured tree still round-trips (defence in depth — this part the
+    # boundary could mask, but combined with the class_id guard it cannot).
+    assert name_tree_to_string(result.tree, "pin") == result.name, (
+        f"{probe['handler_id']}: structured tree serialization "
+        f"{name_tree_to_string(result.tree, 'pin')!r} != name {result.name!r}"
+    )
 
 
 def test_capture_slot_written_for_all_reachable(namer):
