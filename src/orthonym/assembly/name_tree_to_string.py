@@ -94,6 +94,15 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
     # --dump-tree integration tests + by v19+ handlers that populate
     # trees.
     if node.fragment_legacy is not None:
+        # Phase 165 (SCORE-01) final-string carrier: a ``str`` fragment_legacy
+        # holds the pre-assembled final name and is returned verbatim. A single
+        # synthetic NameFragment cannot reproduce a multi-fragment concatenation
+        # (the parent path appends 'ane' via _build_hydrocarbon_name), so the
+        # dedicated string short-circuit is the byte-identical carrier for the
+        # fragments_to_tree deriver + caller-side concatenations (e.g. amide
+        # N-prefix). RESEARCH 165 lines 459-462.
+        if isinstance(node.fragment_legacy, str):
+            return node.fragment_legacy
         # Lazy import to avoid composer.py -> name_tree_to_string -> composer.py
         # cycle at module-import time (PATTERNS § Lazy Import).
         from .composer import _assemble_fragments
