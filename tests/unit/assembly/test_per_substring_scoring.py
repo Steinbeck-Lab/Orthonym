@@ -20,6 +20,7 @@ from rdkit import Chem
 
 from orthonym.assembly.name_tree import NameTreeNode, is_coarse_node
 from orthonym.assembly.candidate_pool import CandidatePool
+from orthonym.assembly.coverage_scoring import CandidateName
 from orthonym.namer import Orthonym, name_with_tree
 from orthonym.rules.parent_correctness import (
     OPSIN_JAR,
@@ -27,10 +28,14 @@ from orthonym.rules.parent_correctness import (
     set_reference_name,
 )
 
-# RED dependency: this module is the Plan 02 deliverable. Importing it at module
-# top makes collection fail (ModuleNotFoundError) until Plan 02 lands — the
+# RED dependency: this module is the Plan 02/03 deliverable. Importing it at
+# module top makes collection fail (ModuleNotFoundError) until it lands — the
 # intended Wave 0 RED state.
-from orthonym.assembly.per_substring_scoring import NodeScores, PerNodeScorer
+from orthonym.assembly.per_substring_scoring import (
+    NodeScores,
+    PerNodeScorer,
+    compare_by_node_scores,
+)
 
 # OPSIN-required guard (mirrors test_parent_correctness.py:36-38).
 opsin_required = pytest.mark.skipif(
@@ -118,3 +123,55 @@ class TestPerNodeScorer:
             assert isinstance(ns, NodeScores)
             for v in (ns.parent_score, ns.locant_score, ns.substituent_score):
                 assert v in (0.0, 0.5, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Phase 166 SCORE-04: lexicographic near-tie comparator (no OPSIN needed)
+# ---------------------------------------------------------------------------
+
+def _cand(parent, locant, subst, name="x"):
+    """A synthetic CandidateName whose ROOT node carries the given scores."""
+    cand = CandidateName(name=name, handler="chain", confidence=0.5)
+    root = NameTreeNode(parent_stem="x")
+    cand.tree = root
+    cand.node_scores = {id(root): NodeScores(parent, locant, subst)}
+    return cand
+
+
+@pytest.mark.unit
+class TestCompareByNodeScores:
+    def test_higher_parent_wins(self):
+        a = _cand(1.0, 0.0, 0.0)
+        b = _cand(0.0, 1.0, 1.0)
+        assert compare_by_node_scores(a, b) == -1
+        assert compare_by_node_scores(b, a) == 1
+
+    def test_parent_breaks_first_aggregate_blindness_kill(self):
+        """A parent-correct / substituent-WRONG candidate MUST beat a
+        parent-wrong / substituent-RIGHT candidate (parent breaks first; NOT a
+        weighted sum). This is the exact aggregate-blindness this phase kills."""
+        parent_right = _cand(1.0, 0.5, 0.0)   # right parent, wrong substituents
+        parent_wrong = _cand(0.0, 0.5, 1.0)   # wrong parent, lucky substituents
+        assert compare_by_node_scores(parent_right, parent_wrong) == -1
+
+    def test_locant_breaks_when_parent_ties(self):
+        a = _cand(1.0, 1.0, 0.0)
+        b = _cand(1.0, 0.0, 1.0)
+        assert compare_by_node_scores(a, b) == -1
+
+    def test_substituent_breaks_when_parent_and_locant_tie(self):
+        a = _cand(1.0, 1.0, 1.0)
+        b = _cand(1.0, 1.0, 0.0)
+        assert compare_by_node_scores(a, b) == -1
+
+    def test_full_tie_returns_zero(self):
+        a = _cand(1.0, 0.5, 0.0)
+        b = _cand(1.0, 0.5, 0.0)
+        assert compare_by_node_scores(a, b) == 0
+
+    def test_unscored_candidates_tie(self):
+        """No node_scores -> all-0.5 sentinel -> tie -> aggregate fallback
+        (an unscored candidate never wins/loses on per-substring; D-05)."""
+        a = CandidateName(name="a", handler="chain", confidence=0.7)
+        b = CandidateName(name="b", handler="chain", confidence=0.3)
+        assert compare_by_node_scores(a, b) == 0

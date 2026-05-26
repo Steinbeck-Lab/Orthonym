@@ -174,3 +174,50 @@ class PerNodeScorer:
         if any(s == 0.0 for s in prefix_scores):
             return 0.0
         return 0.5                       # mixed no-decision (binary, per audit)
+
+
+# ---------------------------------------------------------------------------
+# D-05 lexicographic near-tie comparator (SCORE-04)
+# ---------------------------------------------------------------------------
+
+# Sentinel for an unscored candidate: all-no-decision -> ties everything ->
+# the comparator returns 0 and the caller defers to the aggregate (D-05 strict
+# refinement). An unscored candidate never wins or loses on per-substring.
+_NO_DECISION = NodeScores(0.5, 0.5, 0.5)
+
+
+def _root_scores(cand: Any) -> NodeScores:
+    """Return the ROOT node's NodeScores for a candidate, or the all-0.5
+    no-decision sentinel when the candidate has no scored tree (node_scores
+    None/empty, or the root key is absent)."""
+    node_scores = getattr(cand, "node_scores", None)
+    tree = getattr(cand, "tree", None)
+    if not node_scores or tree is None:
+        return _NO_DECISION
+    return node_scores.get(id(tree), _NO_DECISION)
+
+
+def compare_by_node_scores(a: Any, b: Any) -> int:
+    """Lexicographic first-point-of-difference comparator (CONTEXT D-05).
+
+    Compares two near-tie candidates by their ROOT NodeScores in the FIXED
+    priority order ``parent_score -> locant_score -> substituent_score``. At
+    the first key where they differ, the HIGHER score wins. Returns:
+
+        -1  a is better
+        +1  b is better
+         0  full per-substring tie -> caller defers to the aggregate
+            (``select_best_candidate``), a STRICT refinement.
+
+    This is NOT a weighted sum (the anti-pattern this phase exists to kill — a
+    high ``substituent_score`` must never mask a zero ``parent_score``; the
+    parent must be right before locants matter, mirroring IUPAC
+    first-point-of-difference, Blue Book P-31.1.4). Pure function: no OPSIN, no
+    mutation, deterministic.
+    """
+    sa, sb = _root_scores(a), _root_scores(b)
+    for key in ("parent_score", "locant_score", "substituent_score"):
+        va, vb = getattr(sa, key), getattr(sb, key)
+        if va != vb:
+            return -1 if va > vb else 1
+    return 0
