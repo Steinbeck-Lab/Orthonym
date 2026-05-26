@@ -893,6 +893,21 @@ class Orthonym:
             hint = captured.atom_to_locant_hint if captured is not None else None
         finally:
             _name_with_tree_capture.reset(token)
+        if tree is None and name:
+            # Phase 165 SC-3 / Pitfall 4: guarantee a non-null IR for ANY SMILES.
+            # Salts, ions, radicals, and retained names are produced by paths
+            # BELOW dispatch_inner that never write the capture slot; synthesize
+            # the sanctioned coarse node (D-03, counted) so --dump-tree works
+            # universally. str fragment_legacy -> verbatim byte-identical
+            # round-trip. class_id="coarse_fallback" distinguishes this boundary
+            # node from real handler trees in the coarse-bucket report (so it does
+            # NOT mask a handler regressing to tree=None — that would surface as a
+            # fallback node, not a structured one).
+            from .assembly.name_tree import NameTreeNode
+            tree = NameTreeNode(
+                parent_stem=name, class_id="coarse_fallback",
+                iupac_section_cite="P-73", fragment_legacy=name,
+            )
         return NamingResult(name=name, tree=tree, atom_to_locant_hint=hint)
 
     def get_validation_stats(self) -> Dict[str, int]:

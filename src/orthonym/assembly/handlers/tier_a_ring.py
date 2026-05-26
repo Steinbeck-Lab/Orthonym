@@ -6,7 +6,8 @@ dispatch_inner first-match-wins interface (CONTEXT D-22) stays untouched.
 
 LIFT SOURCE: composer.py:996-1322 (verbatim, with ``return pool.best().name``
 or ``return candidate_name`` replaced by ``return NamingResult(name=...,
-tree=None, atom_to_locant_hint=None)``).
+tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` — Phase 165 SCORE-01
+attaches a coarse tree at EVERY return site, including the early returns).
 
 Internal cascade order (preserved verbatim from composer.py inline body):
 1. complex_ring detection + assembly (composer.py:1014-1066) — pushed to pool
@@ -38,7 +39,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NamingResult, NameTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +158,11 @@ def name_tier_a_ring(
             poly_assembled = _assemble_polycyclic_name(features, style)
             pool = get_current_pool()
             pool.add(poly_assembled, "polycyclic", features)
+            _nm = pool.best().name
             return NamingResult(
-                name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                name=_nm,
+                tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                atom_to_locant_hint=None,
             )
 
         if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
@@ -170,8 +174,11 @@ def name_tier_a_ring(
                 pool = get_current_pool()
                 cand = pool.add(partial_sat_name, "partial_sat", features)
                 if cand is not None:
+                    _nm = cand.name
                     return NamingResult(
-                        name=cand.name, tree=None, atom_to_locant_hint=None,
+                        name=_nm,
+                        tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                        atom_to_locant_hint=None,
                     )
 
     # === Sub-paths 3 & 4: heterocycle + benzene (composer.py:1116-1173) ===
@@ -188,8 +195,11 @@ def name_tier_a_ring(
                 if lactone_name:
                     pool = get_current_pool()
                     pool.add(lactone_name, "lactone", features)
+                    _nm = pool.best().name
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=_nm,
+                        tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                        atom_to_locant_hint=None,
                     )
             # Heterocycle candidate push.
             hetero_name = _assemble_heterocycle_name(features, style)
@@ -278,8 +288,11 @@ def name_tier_a_ring(
                             candidate_name, features.mol, atom_to_locant,
                             include_near_parent_ez=_inpe,
                         )
+            _nm = candidate_name
             return NamingResult(
-                name=candidate_name, tree=None, atom_to_locant_hint=None,
+                name=_nm,
+                tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),
+                atom_to_locant_hint=None,
             )
         # Low ratio: fall through but store metadata for debugging.
         logger.debug(

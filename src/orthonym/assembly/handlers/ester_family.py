@@ -6,8 +6,9 @@ composite handler so the dispatch_inner first-match-wins interface
 (CONTEXT D-22) stays untouched.
 
 LIFT SOURCE: composer.py:859-949 (verbatim, with ``return pool.best().name``
-replaced by ``return NamingResult(name=pool.best().name, tree=None,
-atom_to_locant_hint=None)``).
+replaced by ``return NamingResult(name=pool.best().name,
+tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` — Phase 165 SCORE-01
+attaches a coarse tree at every return site).
 
 Internal cascade order (preserved from composer.py inline body):
 1. polyfunctional (if features.is_polyfunctional)
@@ -26,7 +27,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from ..name_tree import NamingResult
+from ..name_tree import NamingResult, NameTreeNode
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +169,11 @@ def name_ester_family(
             # rejected: poor coverage"). DO NOT defensively return None
             # — that changes the byte-identical canary baseline and
             # breaks the decomposition engine's coverage-rejection path.
+            _nm = pool.best().name
             return NamingResult(
-                name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                name=_nm,
+                tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+                atom_to_locant_hint=None,
             )
         logger.debug(
             "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
@@ -208,8 +212,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(diester_name, "multi_ester", features)
+                    _nm = pool.best().name
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=_nm,
+                        tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+                        atom_to_locant_hint=None,
                     )
             elif ester_type == "polyol_polyester":
                 polyol_name = name_polyol_polyester(features.mol, all_esters)
@@ -222,8 +229,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(polyol_name, "multi_ester", features)
+                    _nm = pool.best().name
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=_nm,
+                        tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+                        atom_to_locant_hint=None,
                     )
             elif ester_type == "independent":
                 indep_name = name_independent_esters(features.mol, all_esters)
@@ -236,8 +246,11 @@ def name_ester_family(
                         )
                     pool = get_current_pool()
                     pool.add(indep_name, "multi_ester", features)
+                    _nm = pool.best().name
                     return NamingResult(
-                        name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                        name=_nm,
+                        tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+                        atom_to_locant_hint=None,
                     )
 
     # ============================================================
@@ -260,8 +273,11 @@ def name_ester_family(
                     )
                 pool = get_current_pool()
                 pool.add(ester_name, "ester", features)
+                _nm = pool.best().name
                 return NamingResult(
-                    name=pool.best().name, tree=None, atom_to_locant_hint=None,
+                    name=_nm,
+                    tree=NameTreeNode(parent_stem=_nm, class_id="ester_family", iupac_section_cite="P-65.6", fragment_legacy=_nm),
+                    atom_to_locant_hint=None,
                 )
 
     # All three sub-paths fell through.

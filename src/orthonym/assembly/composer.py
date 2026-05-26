@@ -725,6 +725,31 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         pop_pool()
 
 
+def _emit_ion_with_tree(ion_name: str) -> str:
+    """Phase 165 SC-3 / Pitfall 4: the ion/salt/radical pre-pool bypass returns
+    before dispatch_inner and never writes the name_with_tree capture slot. Write
+    a coarse NameTreeNode (str fragment_legacy -> verbatim round-trip) so
+    ``name_with_tree`` / ``--dump-tree`` work for ANY SMILES including ions. The
+    production string path is unchanged (returns ion_name as before). ion_dispatch
+    stays EXCLUDED from the per-handler contract suite (it never runs via
+    dispatch_inner). Returns ion_name unchanged.
+    """
+    if ion_name:
+        from ..namer import _name_with_tree_capture
+        from .name_tree import NameTreeNode, NamingResult
+        _slot = _name_with_tree_capture.get()
+        if _slot is not None:
+            _slot["naming"] = NamingResult(
+                name=ion_name,
+                tree=NameTreeNode(
+                    parent_stem=ion_name, class_id="ion_path",
+                    iupac_section_cite="P-73", fragment_legacy=ion_name,
+                ),
+                atom_to_locant_hint=None,
+            )
+    return ion_name
+
+
 def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool = False) -> str:
     """Implementation body of assemble_name(). Do NOT call directly — call
     assemble_name() instead so the per-call pool scope is set up correctly.
@@ -780,12 +805,12 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # IS the name. No substituent discovery needed.
     # Stereo: handled by assemble_ion_name() (ions/salts rarely have stereo in benchmark)
     if species_type in ('salt', 'zwitterion'):
-        return assemble_ion_name(features, features.mol, style)
+        return _emit_ion_with_tree(assemble_ion_name(features, features.mol, style))
 
     # ASML-10 by-design: Radical handler uses specialized naming (IUPAC P-68).
     # Stereo: handled by assemble_ion_name()
     if species_type == 'radical':
-        return assemble_ion_name(features, features.mol, style)
+        return _emit_ion_with_tree(assemble_ion_name(features, features.mol, style))
 
     # ASML-10 by-design: Single-component ion uses aspect composition or
     # assemble_ion_name(). Ion naming follows IUPAC P-73 functional class
@@ -794,9 +819,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     if species_type == 'ion' and not _composing_ion:
         composed_name = _try_ion_aspect_composition(features, style)
         if composed_name:
-            return composed_name
+            return _emit_ion_with_tree(composed_name)
         # Fallback to existing ion naming if composition fails
-        return assemble_ion_name(features, features.mol, style)
+        return _emit_ion_with_tree(assemble_ion_name(features, features.mol, style))
 
     # =========================================================================
     # PHASE 160 INNER DISPATCH (DECOMP-01 + CONTEXT D-08 + D-10)
