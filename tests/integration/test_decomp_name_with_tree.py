@@ -131,18 +131,15 @@ def test_name_with_tree_invalid_smiles_raises(namer):
 
 
 def test_name_with_tree_tree_population_status(namer):
-    """Phase 165 SCORE-01 supersedes the Phase-160 first-wave tree=None policy.
-
-    Handlers that route via dispatch_inner now emit a NameTreeNode whose
-    serialization round-trips byte-identically to the name. Functional-class /
-    retained-name paths that are named BEFORE dispatch_inner (e.g. dimethyl
-    sulfoxide) still surface tree=None — documented in 165-01-SUMMARY.md
-    (Open Question 3) + CANARY-BASELINE.md.
+    """Phase 165: every reachable handler populates a NameTreeNode (SCORE-01) and
+    the Plan-04 SC-3 boundary fallback guarantees a non-null, parity-passing tree
+    for ANY SMILES — including functional-class / retained / ion names produced
+    BELOW dispatch_inner (which get a coarse_fallback node).
     """
     from orthonym.assembly.name_tree import NameTreeNode
     from orthonym.assembly.name_tree_to_string import name_tree_to_string
 
-    # Routes via dispatch_inner -> tree populated (Phase 165).
+    # Routes via dispatch_inner -> handler-populated tree.
     for smi in ["CCCCO", "CN=C=O"]:  # general_acyclic (structured), isocyanate (coarse)
         result = namer.name_with_tree(smi)
         assert isinstance(result.tree, NameTreeNode), (
@@ -151,9 +148,12 @@ def test_name_with_tree_tree_population_status(namer):
         )
         assert name_tree_to_string(result.tree, "pin") == result.name
 
-    # Functional-class name produced before dispatch_inner -> still tree=None.
+    # Functional-class name produced BELOW dispatch_inner -> SC-3 boundary
+    # coarse fallback (Phase 165 Plan 04): non-null + parity, class_id marks it.
     result = namer.name_with_tree("CS(=O)C")  # dimethyl sulfoxide (bypasses dispatch_inner)
-    assert result.tree is None
+    assert isinstance(result.tree, NameTreeNode)
+    assert name_tree_to_string(result.tree, "pin") == result.name
+    assert result.tree.class_id == "coarse_fallback"
 
 
 @pytest.mark.parametrize("smi", ["[He]", "[Ne]", "[Ar]", "[Kr]", "[Xe]", "[Rn]"])

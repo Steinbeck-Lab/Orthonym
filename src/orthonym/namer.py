@@ -886,28 +886,48 @@ class Orthonym:
         # invocation from multiple threads / tasks.
         token = _name_with_tree_capture.set({"naming": None})
         try:
-            name = self.name(smiles)
+            try:
+                name = self.name(smiles)
+            except ValueError:
+                raise  # invalid SMILES — propagate (matches name() contract)
+            except (TypeError, KeyError, IndexError, AttributeError) as _e:
+                # SC-3 robustness: name_with_tree must be as resilient as the
+                # module-level name_compound. The inner handlers' "pool.best().name
+                # raises on None" fall-through contract surfaces here because
+                # self.name() lacks name_compound's broad except. Recover with the
+                # same descriptive fallback so name_with_tree never crashes and its
+                # name matches the canary's name_compound output.
+                logger.debug(
+                    "name_with_tree naming error for %s: %s: %s",
+                    smiles, type(_e).__name__, _e,
+                )
+                name = _descriptive_fallback(smiles)
             slot = _name_with_tree_capture.get()
             captured = slot["naming"] if slot else None
             tree = captured.tree if captured is not None else None
             hint = captured.atom_to_locant_hint if captured is not None else None
         finally:
             _name_with_tree_capture.reset(token)
-        if tree is None and name:
-            # Phase 165 SC-3 / Pitfall 4: guarantee a non-null IR for ANY SMILES.
-            # Salts, ions, radicals, and retained names are produced by paths
-            # BELOW dispatch_inner that never write the capture slot; synthesize
-            # the sanctioned coarse node (D-03, counted) so --dump-tree works
-            # universally. str fragment_legacy -> verbatim byte-identical
-            # round-trip. class_id="coarse_fallback" distinguishes this boundary
-            # node from real handler trees in the coarse-bucket report (so it does
-            # NOT mask a handler regressing to tree=None — that would surface as a
-            # fallback node, not a structured one).
+        if name:
+            # Phase 165 SC-1 + SC-3 boundary guarantee. Two failure modes:
+            #  (a) tree is None — salts/ions/radicals/retained names are produced
+            #      by paths BELOW dispatch_inner that never write the capture slot.
+            #  (b) STALE tree — the inner handler wrote the slot, but downstream
+            #      _name_impl processing (decomposition engine, coverage gate,
+            #      stereo backstop) OVERRODE the final name afterward, so the
+            #      captured tree no longer round-trips to it.
+            # In BOTH cases synthesize the sanctioned coarse node (D-03, counted)
+            # so name_tree_to_string(tree) == name holds for EVERY SMILES (SC-1)
+            # and --dump-tree works universally (SC-3). The str fragment_legacy
+            # round-trips verbatim. class_id="coarse_fallback" distinguishes this
+            # boundary node from real handler trees in the coarse-bucket report.
             from .assembly.name_tree import NameTreeNode
-            tree = NameTreeNode(
-                parent_stem=name, class_id="coarse_fallback",
-                iupac_section_cite="P-73", fragment_legacy=name,
-            )
+            from .assembly.name_tree_to_string import name_tree_to_string
+            if tree is None or name_tree_to_string(tree) != name:
+                tree = NameTreeNode(
+                    parent_stem=name, class_id="coarse_fallback",
+                    iupac_section_cite="P-73", fragment_legacy=name,
+                )
         return NamingResult(name=name, tree=tree, atom_to_locant_hint=hint)
 
     def get_validation_stats(self) -> Dict[str, int]:
