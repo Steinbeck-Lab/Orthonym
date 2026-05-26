@@ -58,7 +58,13 @@ def name_boronic_acid(
     # composer.py:1213 inline branch: _inject_stereo_if_missing(features, cand.name)
     # — no explicit atom_to_locant kwarg (defaults to None).
     final_name = _inject_stereo_if_missing(features, cand.name)
-    return NamingResult(name=final_name, tree=None, atom_to_locant_hint=None)
+    from ..name_tree import NameTreeNode  # Phase 165 SCORE-01 Path-B coarse node
+    _nm = final_name
+    return NamingResult(
+        name=_nm,
+        tree=NameTreeNode(parent_stem=_nm, class_id="boronic_acid", iupac_section_cite="P-68.1", fragment_legacy=_nm),
+        atom_to_locant_hint=None,
+    )
 
 
 __all__ = ["name_boronic_acid", "_is_boronic_acid"]
