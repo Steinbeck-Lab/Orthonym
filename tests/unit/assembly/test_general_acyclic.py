@@ -99,11 +99,18 @@ def test_name_general_acyclic_returns_naming_result():
     assert isinstance(result, NamingResult)
 
 
-def test_name_general_acyclic_tree_is_none():
-    """First-wave policy per CONTEXT D-05 + D-10: tree=None for general_acyclic."""
+def test_name_general_acyclic_emits_structured_tree():
+    """Phase 165 SCORE-01: general_acyclic now emits a STRUCTURED NameTreeNode
+    (superseding the Phase-160 first-wave tree=None). The tree round-trips
+    byte-identically to the returned name."""
+    from orthonym.assembly.name_tree import NameTreeNode
+    from orthonym.assembly.name_tree_to_string import name_tree_to_string
     features = _features_for("CCCC")
     result = name_general_acyclic(features, mol=features.mol, style="pin")
-    assert result.tree is None
+    assert isinstance(result.tree, NameTreeNode)
+    assert result.tree.parent_stem != ""
+    assert result.tree.class_id == "general_acyclic"
+    assert name_tree_to_string(result.tree, "pin") == result.name
     assert result.atom_to_locant_hint is None
 
 

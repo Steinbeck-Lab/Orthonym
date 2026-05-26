@@ -158,12 +158,13 @@ def test_amide_routes_through_pool_on_success():
     FakeFeatures.mol.GetNumHeavyAtoms = MagicMock(return_value=5)
 
     class FakePool:
-        def add(self, name, hid, feats):
+        def add(self, name, hid, feats, tree=None, **kwargs):
             return None
 
         def best(self):
             class B:
                 name = "acetamide"
+                tree = None  # Phase 165: handler reads best().tree
             return B()
 
     with patch("orthonym.assembly.composer._assemble_amide_name", return_value="acetamide"), \
