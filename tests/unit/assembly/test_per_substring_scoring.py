@@ -99,11 +99,16 @@ class TestPerNodeScorer:
     def test_structured_node_scored_with_reference(self):
         """A structured chain tree scored with a reference yields a non-empty
         dict whose values are NodeScores with parent/locant/substituent in
-        {0.0, 0.5, 1.0} (binary scorer per the audit doc)."""
-        res = name_with_tree("CCCC")  # butane: structured general_acyclic tree
+        {0.0, 0.5, 1.0} (binary scorer per the audit doc).
+
+        Uses 2-methylbutane: a bare unbranched alkane like butane is COARSE
+        (parent_stem == fragment_legacy), but a substituted chain is structured
+        (root 'but' + a '2-methyl' prefix node carrying locants).
+        """
+        res = name_with_tree("CC(C)CC")  # 2-methylbutane: STRUCTURED chain
         assert res.tree is not None and not is_coarse_node(res.tree)
-        mol = Chem.MolFromSmiles("CCCC")
-        set_reference_name("butane")
+        mol = Chem.MolFromSmiles("CC(C)CC")
+        set_reference_name("2-methylbutane")
         try:
             scores = PerNodeScorer.score_tree(res.tree, mol)
         finally:

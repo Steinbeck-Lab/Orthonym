@@ -1,0 +1,176 @@
+"""Phase 166 SCORE-03: per-substring (per-node) scoring on the Name-Tree IR.
+
+Generalizes the scalar ``ParentCorrectnessScorer`` (rules/parent_correctness.py)
+to NODE granularity (CONTEXT D-04): for each STRUCTURED ``NameTreeNode``,
+attribute a binary ``parent_score`` / ``locant_score`` / ``substituent_score``
+(1.0 match / 0.0 mismatch / 0.5 no-decision) by aligning the node against the
+OPSIN-parsed reference name.
+
+Mechanism (REUSED, not re-invented — RESEARCH §Don't-Hand-Roll):
+  - The reference name is OPSIN-parsed ONCE per compound (A1 strategy, audit
+    §A1 OPSIN-Cost Prototype) via ``opsin_reference_mol``; per-node atom
+    alignment is RDKit substructure matching via ``match_token_atoms_in_mol``
+    (``CanonicalRankAtoms(breakTies=True)`` deterministic tiebreak — RESEARCH
+    Pitfall 4).
+  - Reads the reference name from the SAME thread-local as the parent oracle
+    (``parent_correctness._pc_context``). Production (no reference set) -> ``{}``
+    with ZERO OPSIN cost -> byte-identical (SCORE-05).
+  - Coarse nodes (``is_coarse_node``, WR-4 single source of truth) are OMITTED
+    from the score dict (D-02): they carry no scoreable substrings; the
+    aggregate confidence is retained for them.
+
+POST-HOC contract (D-04, audit §POST-HOC Byte-Identical Contract): the
+``node_scores`` dict is attached on ``CandidateName`` AFTER ``compute_confidence``
+returns; it NEVER feeds back into ``confidence`` (contrast the V18
+``multiple_bond_count`` recompute at ``candidate_pool.py:810-823`` — the
+explicit anti-model).
+
+Binary ``substituent_score`` is locked (audit §Binary-vs-Graded); a graded
+variant is a documented escape hatch only if the SCORE-04 curated near-tie set
+proves binary insufficient (Plan 03 owns that validation).
+"""
+import logging
+import re
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from .name_tree import NameTreeNode, is_coarse_node
+
+logger = logging.getLogger(__name__)
+
+# Integer locants appearing in an IUPAC name (e.g. 2 and 3 in "2,3-dimethyl...").
+_LOCANT_INT_RE = re.compile(r"\d+")
+
+# Leading locant cluster on a substituent stem ("2-methyl" -> "methyl").
+_LOCANT_PREFIX_RE = re.compile(r"^\d+[a-z]?,?(\d+[a-z]?,?)*-?")
+
+
+@dataclass(frozen=True)
+class NodeScores:
+    """Per-node parent/locant/substituent scores (binary: 1.0 / 0.0 / 0.5)."""
+
+    parent_score: float       # node's parent atom set vs reference parent
+    locant_score: float       # node's locants vs reference numbering
+    substituent_score: float  # do node.prefixes[] subtrees match (binary)
+
+
+def _ref_locant_set(ref_name: str) -> set:
+    """All integer locants appearing in the reference name."""
+    return {int(m) for m in _LOCANT_INT_RE.findall(ref_name or "")}
+
+
+def _node_parent_token(node: "NameTreeNode") -> Optional[str]:
+    """Best-effort OPSIN-parseable parent-hydride stem for a node.
+
+    A structured root carries a bare stem ('but') with the saturated suffix
+    implicit; substituent prefix nodes carry e.g. '2-methyl'. Strip any leading
+    locant cluster so a prefix resolves to its hydride stem ('methyl'). The
+    matcher (``_candidate_parent_atoms``) then also tries the stem+'ane' alkane
+    form; if neither parses, the scorer treats it as no-decision (0.5).
+    """
+    stem = (node.parent_stem or "").strip()
+    if not stem:
+        return None
+    stem_core = _LOCANT_PREFIX_RE.sub("", stem).strip()
+    return stem_core or stem
+
+
+def _candidate_parent_atoms(node: "NameTreeNode", mol: Any) -> Optional[set]:
+    """Match the node's parent-hydride atoms in ``mol`` (None on any failure)."""
+    # Lazy import to avoid any assembly<->rules import cycle at module load
+    # (mirrors name_tree._alphabetize_prefixes:168).
+    from ..rules.parent_correctness import match_token_atoms_in_mol
+
+    token = _node_parent_token(node)
+    if not token:
+        return None
+    # Try the token as-is, then the saturated alkane form (bare stem -> +'ane').
+    for candidate_token in (token, token + "ane"):
+        atoms = match_token_atoms_in_mol(candidate_token, mol)
+        if atoms:
+            return atoms
+    return None
+
+
+class PerNodeScorer:
+    """Attributes per-node parent/locant/substituent scores off the IR (D-04)."""
+
+    @staticmethod
+    def score_tree(tree: "NameTreeNode", mol: Any) -> Dict[int, NodeScores]:
+        """Return ``{id(node): NodeScores}`` for each STRUCTURED node, or ``{}``.
+
+        ``{}`` is returned when: no reference name is set (production
+        byte-identical guard, zero OPSIN cost), the root is coarse (D-02), or
+        the reference name does not OPSIN-parse (no-decision).
+        """
+        # Lazy import to avoid any assembly<->rules import-cycle at module load.
+        from ..rules.parent_correctness import (
+            _extract_reference_parent_atoms,
+            _pc_context,
+            opsin_reference_mol,
+        )
+
+        ref_name = getattr(_pc_context, "reference_name", None)
+        if ref_name is None:
+            return {}                    # production: no signal, zero OPSIN cost
+        if tree is None or is_coarse_node(tree):
+            return {}                    # coarse -> aggregate retained (D-02)
+        if opsin_reference_mol(ref_name) is None:
+            return {}                    # reference unparseable -> no-decision
+        ref_parent_atoms = _extract_reference_parent_atoms(ref_name, mol)
+        ref_locants = _ref_locant_set(ref_name)
+        scores: Dict[int, NodeScores] = {}
+        PerNodeScorer._walk(tree, mol, ref_parent_atoms, ref_locants, scores)
+        return scores
+
+    @staticmethod
+    def _walk(node, mol, ref_parent_atoms, ref_locants, scores) -> None:
+        if is_coarse_node(node):
+            return                       # skip coarse sub-nodes (D-02)
+        scores[id(node)] = PerNodeScorer._score_node(
+            node, mol, ref_parent_atoms, ref_locants
+        )
+        for prefix in node.prefixes:
+            PerNodeScorer._walk(prefix, mol, ref_parent_atoms, ref_locants, scores)
+
+    @staticmethod
+    def _score_node(node, mol, ref_parent_atoms, ref_locants) -> NodeScores:
+        return NodeScores(
+            parent_score=PerNodeScorer._parent_score(node, mol, ref_parent_atoms),
+            locant_score=PerNodeScorer._locant_score(node, ref_locants),
+            substituent_score=PerNodeScorer._substituent_score(
+                node, mol, ref_parent_atoms
+            ),
+        )
+
+    @staticmethod
+    def _parent_score(node, mol, ref_parent_atoms) -> float:
+        if ref_parent_atoms is None:
+            return 0.5                   # reference alignment unavailable
+        node_atoms = _candidate_parent_atoms(node, mol)
+        if node_atoms is None:
+            return 0.5                   # node token unmatched -> no-decision
+        return 1.0 if node_atoms == ref_parent_atoms else 0.0
+
+    @staticmethod
+    def _locant_score(node, ref_locants) -> float:
+        if not node.locants:
+            return 0.5                   # no locants on this node -> no-decision
+        if not ref_locants:
+            return 0.5
+        return 1.0 if set(node.locants) <= ref_locants else 0.0
+
+    @staticmethod
+    def _substituent_score(node, mol, ref_parent_atoms) -> float:
+        structured = [p for p in node.prefixes if not is_coarse_node(p)]
+        if not structured:
+            return 0.5                   # no substituents -> no-decision
+        prefix_scores = [
+            PerNodeScorer._parent_score(p, mol, ref_parent_atoms)
+            for p in structured
+        ]
+        if all(s == 1.0 for s in prefix_scores):
+            return 1.0
+        if any(s == 0.0 for s in prefix_scores):
+            return 0.0
+        return 0.5                       # mixed no-decision (binary, per audit)
