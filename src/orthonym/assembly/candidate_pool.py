@@ -83,6 +83,21 @@ except ImportError:
     # factor to 0.5 (no-decision; safe because FACTOR_WEIGHTS weight=0.0).
     ParentCorrectnessScorer = None  # type: ignore[assignment, misc]
 
+# Phase 166 SCORE-03: module-level PerNodeScorer binding (mirrors the
+# ParentCorrectnessScorer guard above — pay the import once at load, tolerate
+# the scorer module being absent in pre-Plan-02 isolated tests). The add()
+# attach below no-ops when this is None.
+try:
+    from .per_substring_scoring import PerNodeScorer
+except ImportError:
+    PerNodeScorer = None  # type: ignore[assignment, misc]
+
+# WR-4 single source of truth for the coarse/structured discriminator. name_tree
+# is a leaf module (stdlib-only top-level imports), so this direct runtime import
+# introduces no cycle — never re-derive the predicate (it would drift from the
+# contract test).
+from .name_tree import is_coarse_node
+
 logger = logging.getLogger(__name__)
 
 
@@ -769,6 +784,14 @@ class CandidatePool:
         # pattern). NEVER passed into compute_confidence() — byte-identical
         # preserved (Phase 146 D-19). best() surfaces the winner's tree.
         cand.tree = tree
+        # Phase 166 SCORE-03: attach per-node scores POST-HOC (Risk 1 pattern).
+        # NEVER into compute_confidence(); score_tree returns {} in production
+        # (no reference name set) and on coarse trees, so cand.confidence stays
+        # byte-identical (SCORE-05). Contrast the :810-823 multiple_bond_count
+        # recompute — that is the ANTI-model; node_scores never touches confidence.
+        if (PerNodeScorer is not None and tree is not None
+                and not is_coarse_node(tree)):
+            cand.node_scores = PerNodeScorer.score_tree(tree, features.mol)
         # Phase 147 fallback: if ring_info wasn't passed explicitly, read
         # the transient attribute set by namer.py:_classify (allows existing
         # composer.py call sites to flow ring_info through without a

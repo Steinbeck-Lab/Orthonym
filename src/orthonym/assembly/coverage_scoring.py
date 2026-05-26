@@ -81,6 +81,13 @@ class CandidateName:
     # (would break the byte-identical guarantee). None means "no tree yet"
     # (coarse-bucket counted in Plan 04). pool.best().tree surfaces the winner's.
     tree: Optional["NameTreeNode"] = None
+    # Phase 166 SCORE-03: POST-HOC per-node {id(node): NodeScores}, same Risk 1
+    # mitigation as tree / parent_atom_indices / ring_info: NEVER passed into
+    # compute_confidence() (would break the byte-identical guarantee). None / {}
+    # means "no per-substring signal" — the production no-reference path, or a
+    # coarse tree. pool.best().node_scores surfaces the winner's map for the
+    # Plan 04 SCORE-06 measurement.
+    node_scores: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
