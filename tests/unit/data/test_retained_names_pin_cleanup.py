@@ -9,11 +9,55 @@ Verifies:
 - Cubane added to BICYCLO_RETAINED_NAMES
 """
 
+import glob
+import shutil
+import subprocess
+
 import pytest
 from orthonym.data.retained_names import RETAINED_NAMES
 from orthonym.data import ALL_RETAINED_NAMES
 from orthonym.data.bicyclo_systems import BICYCLO_RETAINED_NAMES
 from orthonym import name_compound
+
+
+def _find_opsin_jar():
+    for pat in (
+        "opsin-cli-*-jar-with-dependencies.jar",
+        "opsin.jar",
+        "opsin/opsin-cli-*-jar-with-dependencies.jar",
+        "opsin/opsin-cli/target/opsin-cli-*-jar-with-dependencies.jar",
+    ):
+        matches = glob.glob(pat)
+        if matches:
+            return matches[0]
+    return None
+
+
+_OPSIN_JAR = _find_opsin_jar()
+_OPSIN_AVAILABLE = bool(_OPSIN_JAR) and shutil.which("java") is not None
+
+
+def _opsin_smiles(name):
+    """Name -> SMILES via OPSIN over STDIN.
+
+    OPSIN 2.9.0 reads the name on stdin (post-`-osmi` argv is treated as a
+    file; the conftest `opsin_to_smiles` fixture's argv form returns None on
+    this version). stdout carries only the SMILES; the banner goes to stderr.
+    """
+    if not _OPSIN_AVAILABLE:
+        return None
+    try:
+        result = subprocess.run(
+            ["java", "-jar", _OPSIN_JAR, "-osmi"],
+            input=name + "\n",
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except Exception:
+        return None
+    out = result.stdout.strip()
+    return out or None
 
 
 def _inchi(smiles):
@@ -184,10 +228,12 @@ class TestErythreneRemoved:
 
     @pytest.mark.unit
     @pytest.mark.roundtrip
-    def test_emitted_name_roundtrips(self, opsin_to_smiles):
+    def test_emitted_name_roundtrips(self):
         """Whatever is emitted (target: buta-1,3-diene) must round-trip (D-03)."""
+        if not _OPSIN_AVAILABLE:
+            pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)
-        rt = opsin_to_smiles(emitted)
+        rt = _opsin_smiles(emitted)
         assert rt is not None, f"OPSIN could not parse emitted name {emitted!r}"
         assert _inchi(rt) == _inchi(self.SMILES)
 
@@ -213,10 +259,12 @@ class TestTrimethyleneGlycolRemoved:
 
     @pytest.mark.unit
     @pytest.mark.roundtrip
-    def test_emitted_name_roundtrips(self, opsin_to_smiles):
+    def test_emitted_name_roundtrips(self):
         """Target: propane-1,3-diol (D-03 structural round-trip)."""
+        if not _OPSIN_AVAILABLE:
+            pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)
-        rt = opsin_to_smiles(emitted)
+        rt = _opsin_smiles(emitted)
         assert rt is not None, f"OPSIN could not parse emitted name {emitted!r}"
         assert _inchi(rt) == _inchi(self.SMILES)
 
@@ -242,9 +290,11 @@ class TestAspirinRemoved:
 
     @pytest.mark.unit
     @pytest.mark.roundtrip
-    def test_emitted_name_roundtrips(self, opsin_to_smiles):
+    def test_emitted_name_roundtrips(self):
         """Target: 2-acetyloxybenzoic acid (D-03 structural round-trip)."""
+        if not _OPSIN_AVAILABLE:
+            pytest.skip("OPSIN/Java not available")
         emitted = name_compound(self.SMILES)
-        rt = opsin_to_smiles(emitted)
+        rt = _opsin_smiles(emitted)
         assert rt is not None, f"OPSIN could not parse emitted name {emitted!r}"
         assert _inchi(rt) == _inchi(self.SMILES)
