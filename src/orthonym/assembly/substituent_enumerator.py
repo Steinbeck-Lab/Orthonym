@@ -33,7 +33,7 @@ from collections import deque, namedtuple
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
-from .naming_utils import get_alkyl_name
+from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS
 from .substituent_naming import name_substituent_fragment, _name_aryl_methyl_ether
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..rules.seniority import get_prefix
@@ -1472,6 +1472,63 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                 return f"{alkyl_name}amino"
             except (ValueError, KeyError):
                 pass
+
+    # -N(alkyl)2+ -> dialkylamino (e.g. dimethylamino). HYG-04 site#2 (Phase 167):
+    # the disubstituted case the docstring promised but was never implemented, so
+    # N,N-dialkylamino substituents on a chain parent fell to `return None` and were
+    # mis-walked into a spurious amino+alkylamino split. Mirror the WORKING
+    # principal-amine multiplicity (composer._assemble_amine_name: Counter +
+    # SIMPLE_MULTIPLIERS) as a PREFIX form (no N- locants). Principal-amine path
+    # (_assemble_amine_name) is untouched (Pitfall 3).
+    if len(branches) >= 2:
+        from collections import Counter
+
+        branch_names = []
+        all_pure = True
+        for branch_start in branches:
+            visited = set()
+            stack_c = [branch_start]
+            carbon_count = 0
+            has_hetero = False
+            has_ring = False
+            while stack_c:
+                idx = stack_c.pop()
+                if idx in visited or idx == attach_idx:
+                    continue
+                if idx not in frag_set:
+                    continue
+                visited.add(idx)
+                atom = mol.GetAtomWithIdx(idx)
+                if atom.GetSymbol() == 'C':
+                    carbon_count += 1
+                elif atom.GetAtomicNum() != 1:
+                    has_hetero = True
+                if ring_info.NumAtomRings(idx) > 0:
+                    has_ring = True
+                for n in atom.GetNeighbors():
+                    if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
+                        stack_c.append(n.GetIdx())
+            if carbon_count <= 0 or has_hetero or has_ring:
+                all_pure = False
+                break
+            try:
+                branch_names.append(get_alkyl_name(carbon_count))
+            except (ValueError, KeyError):
+                all_pure = False
+                break
+        if all_pure and branch_names:
+            counts = Counter(branch_names)
+            parts = []
+            # Alphabetical by alkyl stem (di-/tri- are ignored for ordering,
+            # matching the principal-amine analog's sorted assembly).
+            for nm in sorted(counts.keys()):
+                count = counts[nm]
+                if count == 1:
+                    parts.append(nm)
+                else:
+                    mult = SIMPLE_MULTIPLIERS.get(count, str(count))
+                    parts.append(f"{mult}{nm}")
+            return f"{''.join(parts)}amino"
 
     return None
 

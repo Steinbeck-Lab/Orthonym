@@ -5126,21 +5126,39 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                 return "anilino"
                 continue  # Skip non-phenyl ring substituents
 
-            # Count carbons attached to N via C-C bonds only
-            n_alkyl_carbons = 0
+            # Count carbons PER N-branch via C-C bonds only.
+            # Phase 167 HYG-04 site#2: previously SUMMED carbons across all
+            # N-branches as one chain, so -N(CH3)2 (two 1-carbon methyls) named
+            # "(ethylamino)" instead of "(dimethylamino)". Name each branch and
+            # apply the principal-amine multiplicity. Single-branch form preserved
+            # byte-identical; only the N,N-dialkyl(+) case changes.
+            _branch_alkyls = []
+            _branch_impure = False
             for nbr in atom.GetNeighbors():
                 if nbr.GetIdx() in chain_set:
                     continue
                 if nbr.GetSymbol() == 'C':
-                    n_alkyl_carbons += _count_carbon_chain(
-                        mol, nbr.GetIdx(), chain_set | {idx}
+                    _bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {idx})
+                    if _bc <= 0:
+                        continue
+                    try:
+                        _branch_alkyls.append(get_alkyl_name(_bc))
+                    except (ValueError, KeyError):
+                        _branch_impure = True
+            if _branch_alkyls and not _branch_impure:
+                if len(_branch_alkyls) == 1:
+                    return f"({_branch_alkyls[0]}amino)"
+                from collections import Counter as _Counter
+
+                _counts = _Counter(_branch_alkyls)
+                _parts = []
+                for _nm in sorted(_counts.keys()):
+                    _c = _counts[_nm]
+                    _parts.append(
+                        _nm if _c == 1
+                        else f"{SIMPLE_MULTIPLIERS.get(_c, str(_c))}{_nm}"
                     )
-            if n_alkyl_carbons > 0:
-                try:
-                    alkyl = get_alkyl_name(n_alkyl_carbons)
-                    return f"({alkyl}amino)"
-                except (ValueError, KeyError):
-                    pass
+                return f"({''.join(_parts)}amino)"
             continue
 
         # Found carbonyl: identify the C=O oxygen
@@ -5554,21 +5572,40 @@ def _name_n_attached_substituent_fallback(
         )
         return None
 
-    # Count carbons reachable from N via C-C bonds only
-    carbon_count = 0
+    # Count carbons PER N-branch via C-C bonds only.
+    # Phase 167 HYG-04 site#2: previously this SUMMED carbons across all N-branches
+    # as one chain, so -N(CH3)2 (two 1-carbon methyls) named "(ethylamino)" instead
+    # of "(dimethylamino)". Name each branch separately and apply the principal-amine
+    # multiplicity (Counter + SIMPLE_MULTIPLIERS). Single-branch form preserved
+    # byte-identical; only the N,N-dialkyl(+) case changes.
+    branch_alkyls = []
+    branch_impure = False
     for nbr in atom.GetNeighbors():
         if nbr.GetIdx() in chain_set:
             continue
         if nbr.GetSymbol() == 'C':
-            carbon_count += _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
+            bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
+            if bc <= 0:
+                continue
+            try:
+                branch_alkyls.append(get_alkyl_name(bc))
+            except (ValueError, KeyError):
+                branch_impure = True
 
-    if carbon_count == 0:
+    if not branch_alkyls or branch_impure:
         return "amino"
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"({alkyl}amino)"
-    except (ValueError, KeyError):
-        return "amino"
+    if len(branch_alkyls) == 1:
+        # Single N-alkyl: exact legacy form (byte-identical).
+        return f"({branch_alkyls[0]}amino)"
+    # N,N-dialkyl(+): multiplicity prefix, e.g. -N(CH3)2 -> (dimethylamino).
+    from collections import Counter as _Counter
+
+    _counts = _Counter(branch_alkyls)
+    _parts = []
+    for _nm in sorted(_counts.keys()):
+        _c = _counts[_nm]
+        _parts.append(_nm if _c == 1 else f"{SIMPLE_MULTIPLIERS.get(_c, str(_c))}{_nm}")
+    return f"({''.join(_parts)}amino)"
 
 
 def _name_c_attached_ring_substituent_fallback(
