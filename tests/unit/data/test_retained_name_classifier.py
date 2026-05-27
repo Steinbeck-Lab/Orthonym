@@ -322,3 +322,55 @@ class TestJSONAllowListSchema:
             f"duplicate names in PIN list: {dups}; classifier is "
             f"name-keyed so duplicates collapse silently."
         )
+
+
+# ============================================================================
+# Phase 167 (HYG-03) — deny / gate-safety tests.
+# Audit:  § "Phase 167".
+# ============================================================================
+
+
+class TestErythreneDenied:
+    """RED until Plan 167-02 adds 'erythrene' to _PIN_DENY.
+
+    'erythrene' currently slips the gate because (S1 OR S2) AND S3 admits any
+    OPSIN-recognised synonym that round-trips — round-trip != PIN. Explicit DENY
+    wins (data/__init__.py:_is_promotable). See 167-RESEARCH.md HYG-03 root cause.
+    """
+
+    @pytest.mark.unit
+    def test_erythrene_in_pin_deny(self):
+        assert "erythrene" in _PIN_DENY
+
+    @pytest.mark.unit
+    def test_is_promotable_rejects_erythrene(self):
+        # Explicit DENY must override S1 ("hrene" ending) + S3 (OPSIN-input RT).
+        assert _is_promotable("C=CC=C", "erythrene") is False
+
+
+class TestHCGateSafetyA1:
+    """A1 guard (regression): the deny-based fix must NOT drop genuine names.
+
+    The A1 dropped-set audit ( § Phase 167 STEP B)
+    found 217/296 hand-curated entries fail the FULL _is_promotable gate — which
+    is exactly why Plan 02 uses DENY-based exclusion, not full-gate promotion.
+    These genuine PIN/retained names must (a) never be in _PIN_DENY and (b) stay
+    emittable in ALL_RETAINED_NAMES. Green now and after Plan 02 (regression guard).
+    """
+
+    GENUINE = ["benzaldehyde", "butanoic acid", "camphor", "biphenyl", "acetamide"]
+
+    @pytest.mark.unit
+    def test_genuine_names_not_denied(self):
+        for name in self.GENUINE:
+            assert name.lower() not in _PIN_DENY, (
+                f"genuine retained/PIN name {name!r} must not be denied"
+            )
+
+    @pytest.mark.unit
+    def test_genuine_names_still_emittable(self):
+        values = set(ALL_RETAINED_NAMES.values())
+        for name in self.GENUINE:
+            assert name in values, (
+                f"genuine retained/PIN name {name!r} dropped from ALL_RETAINED_NAMES"
+            )
