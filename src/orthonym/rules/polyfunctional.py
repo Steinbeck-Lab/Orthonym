@@ -903,6 +903,41 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     )
                 continue
 
+        # HYG-04 site#2 double-count guard: a secondary/tertiary amine whose
+        # nitrogen sits in a substituent branch is named IN FULL by the
+        # substituent-naming path as a single "(...amino)" prefix
+        # (methylamino / dimethylamino / ...). Emitting a bare "amino" FG-prefix
+        # for the same nitrogen here double-counts it, producing geminal-diamine
+        # artifacts like "2-amino-2-(dimethylamino)ethan-1-ol". Drop such matches
+        # so the substituent walk owns the naming. Primary -NH2 is unaffected:
+        # its branch is carbon-free, the substituent walk skips it, and this
+        # FG-prefix remains its sole, correct name. Mirrors the BUG-B guard above
+        # but keyed on the nitrogen (the amine match also spans the chain carbon,
+        # so an "entirely on branch" test would miss it).
+        _N_SUBSTITUTED_AMINE_FGS = {'secondary_amine', 'tertiary_amine'}
+        if fg_name in _N_SUBSTITUTED_AMINE_FGS and features.substituents:
+            _amine_kept = []
+            for _match in matches:
+                _n_owned_by_branch = False
+                for _n in (a for a in _match
+                           if mol.GetAtomWithIdx(a).GetSymbol() == 'N'):
+                    for _sub_list in features.substituents.values():
+                        if any(_n in _sub_atoms for _sub_atoms in _sub_list):
+                            _n_owned_by_branch = True
+                            break
+                    if _n_owned_by_branch:
+                        break
+                if not _n_owned_by_branch:
+                    _amine_kept.append(_match)
+            if not _amine_kept:
+                logger.debug(
+                    "DROP-HYG04 polyfunc: skip bare 'amino' FG-prefix for %s — "
+                    "N-substituted amine named in full by the substituent walk",
+                    fg_name,
+                )
+                continue
+            matches = _amine_kept
+
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(
             fg_name, mol, matches[0], principal_chain
@@ -946,6 +981,57 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             features, skip_acyloxy=_esters_demoted
         )
         all_prefixes.extend(alkyl_prefixes)
+
+    # --- HYG-04 site#2: N-substituent prefixes for a PRINCIPAL amine ---
+    # When the amine is the principal characteristic group (suffix -amine), its
+    # N-substituents are cited as N-/N,N- prefixes (e.g. N,N-dimethylethan-1-amine),
+    # mirroring composer._assemble_amine_name. Without this, a tertiary amine
+    # (e.g. diphenhydramine core) leaks its N-alkyls into a "(dimethylamino)"
+    # substituent that double-counts the principal nitrogen. The principal-amine
+    # branch itself is excluded from the substituent walk (see
+    # _generate_alkyl_prefixes_for_polyfunctional). These prefixes join the same
+    # alphanumerical sort below, so they interleave correctly with C-substituents.
+    _AMINE_PRINCIPAL_FGS = {
+        'primary_amine', 'secondary_amine', 'tertiary_amine', 'aromatic_amine',
+    }
+    _principal_amine_n_atoms = set()
+    if principal_group in _AMINE_PRINCIPAL_FGS:
+        for _pmatch in getattr(features, 'principal_group_atoms', None) or []:
+            for _pa in _pmatch:
+                if mol.GetAtomWithIdx(_pa).GetSymbol() == 'N':
+                    _principal_amine_n_atoms.add(_pa)
+    # Scope: exactly ONE principal amine nitrogen. Di-/polyamines need primed
+    # N-locants (N,N,N',N'-tetramethyl...) keyed to each amine position — a
+    # distinct feature; applying single-N logic there would mis-assign locants
+    # (e.g. "N,N-tetramethyl"). Multi-N principal amines fall back to the prior
+    # path (the substituent walk names each "(dimethylamino)"), avoiding a drop.
+    if len(_principal_amine_n_atoms) == 1:
+        from ..assembly.composer import _name_r_group, _wrap_n_substituent
+        from collections import Counter as _NCounter
+
+        _amine_n_atom = next(iter(_principal_amine_n_atoms))
+        _chain_set_amine = set(principal_chain)
+        _n_sub_names: List[str] = []
+        for _pnb in mol.GetAtomWithIdx(_amine_n_atom).GetNeighbors():
+            _pni = _pnb.GetIdx()
+            # Skip the parent-chain attachment carbon and hydrogens;
+            # the remaining heavy neighbours are the N-substituents.
+            if _pni in _chain_set_amine or _pnb.GetAtomicNum() <= 1:
+                continue
+            _rn = _name_r_group(mol, _pni, exclude_atoms={_amine_n_atom})
+            if _rn:
+                _n_sub_names.append(_rn)
+        if _n_sub_names:
+            _n_counts = _NCounter(_n_sub_names)
+            for _rn in sorted(_n_counts.keys()):
+                _rc = _n_counts[_rn]
+                if _rc == 1:
+                    all_prefixes.append(f"N-{_wrap_n_substituent(_rn)}")
+                else:
+                    _rmult = get_multiplier_prefix(_rc, _rn)
+                    all_prefixes.append(
+                        f"N,N-{_rmult}{_wrap_n_substituent(_rn)}"
+                    )
 
     # --- Merge duplicate bare prefix names ---
     # When two FG detection paths (e.g., primary_alcohol and secondary_alcohol)
@@ -1125,8 +1211,33 @@ def _generate_alkyl_prefixes_for_polyfunctional(
         for ring_atoms in ring_groups:
             ring_atoms_to_skip.update(ring_atoms)
 
+    # HYG-04 site#2: when a PRINCIPAL amine carries N-substituents (e.g. -N(CH3)2),
+    # those atoms ARE the principal group; they are expressed as N,N- prefixes on
+    # the amine suffix (in name_polyfunctional), NOT walked as a "(dimethylamino)"
+    # substituent. Skipping the principal-amine's own branch here prevents naming
+    # the same nitrogen twice (the "1-(dimethylamino)...-1-amine" double-count).
+    _AMINE_PRINCIPALS = {
+        'primary_amine', 'secondary_amine', 'tertiary_amine', 'aromatic_amine',
+    }
+    # The principal amine's NITROGEN atom(s). A substituent branch that contains
+    # the principal nitrogen IS the principal group (its alkyls extend past the
+    # FG-match atoms, so an "issubset" test misses multi-carbon N-substituents).
+    _principal_amine_n: set = set()
+    if getattr(features, 'principal_group', None) in _AMINE_PRINCIPALS:
+        for _pm in getattr(features, 'principal_group_atoms', []) or []:
+            for _pa in _pm:
+                if mol.GetAtomWithIdx(_pa).GetSymbol() == 'N':
+                    _principal_amine_n.add(_pa)
+    # Scope to a single principal amine nitrogen (matches the N,N-prefix emission
+    # in name_polyfunctional). Di-/polyamines fall back to the prior path.
+    _exclude_principal_amine = len(_principal_amine_n) == 1
+
     for position, sub_list in features.substituents.items():
         for sub_atoms in sub_list:
+            # HYG-04 site#2: don't name the principal amine's own branch as a
+            # substituent — its N-substituents are emitted as N,N- prefixes.
+            if _exclude_principal_amine and (_principal_amine_n & set(sub_atoms)):
+                continue
             # Skip substituents whose ring atoms are handled by
             # _generate_ring_substituent_prefixes (ring + its own substituents).
             # A substituent is a "ring substituent" if its attachment atom
@@ -1405,6 +1516,13 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
+            # An italic-N locant prefix ("N-..." / "N,N-...") is a locant-bearing
+            # term like a numeric locant — it must be hyphen-separated from a
+            # preceding substituent (e.g. "2-methoxy" + "N,N-dimethyl" ->
+            # "2-methoxy-N,N-dimethyl"). HYG-04 site#2.
+            next_is_n_locant = (
+                first_char == 'N' and len(current) > 1 and current[1] in (',', '-')
+            )
             # Insert hyphen between letter/paren and digit
             # e.g., "amino" + "4-methyl" → "amino-4-methyl"
             # e.g., "(ethanoyl)amino" + "4-methyl" → "(ethanoyl)amino-4-methyl"
@@ -1412,6 +1530,9 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
                 result += "-"
             # Also between ')' and letter for clarity
             elif last_char == ')' and first_char.isalpha():
+                result += "-"
+            # Letter/paren followed by an italic-N locant prefix
+            elif next_is_n_locant and (last_char.isalpha() or last_char == ')'):
                 result += "-"
         result += current
 

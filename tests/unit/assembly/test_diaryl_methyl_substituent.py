@@ -135,57 +135,96 @@ class TestDiarylMethoxy:
         _assert_roundtrips("OCCOCc1ccccc1")
 
 
+def _assert_no_double_amino(smiles):
+    """The single substituted-amine N must be named ONCE — no geminal-diamine
+    artifact like '2-amino-2-(dimethylamino)' / '1-(dimethylamino)...-1-amine'."""
+    name = name_compound(smiles)
+    # A standalone 'amino' prefix in addition to the '(...amino)' substituent is
+    # the double-count signature. The correct name has the alkyls only inside the
+    # single '(...amino)' substituent (or as N,N- prefixes when amine is principal).
+    assert "amino-" not in name.replace("(dimethylamino)", "").replace(
+        "(diethylamino)", "").replace("(methylamino)", ""), (
+        f"spurious bare amino double-count: {name!r}"
+    )
+    return name
+
+
 class TestDialkylaminoChain:
-    """SITE #2 — N,N-dialkylamino substituent on a chain parent (Plan 167-04).
+    """SITE #2 — N,N-dialkylamino correctly named ONCE (no double-counted nitrogen).
 
-    DELIVERED (Phase 167): the carbon-summing root cause the research identified
-    is fixed in all 3 amino-naming paths (`_name_amino_branch`, composer
-    `_check_for_acylamino`, composer N-branch fallback) — `-N(CH3)2` is now named
-    `dimethylamino` (was the mis-summed `ethylamino` = 2 methyls counted as one
-    2-carbon chain). These tests assert that genuine improvement.
-
-    KNOWN LIMITATION (deferred, filed follow-up — honest-fail-on-data, NO band-aid):
-    a SEPARATE pre-existing perception bug double-detects the chain N — emitting a
-    spurious leading `amino` ALONGSIDE the correct `(dimethylamino)` (e.g.
-    `CN(C)CCO -> 2-amino-2-(dimethylamino)ethan-1-ol`; affects even simple
-    `CNCCO -> 2-amino-2-(methylamino)...`). It lives in the chain-substituent
-    enumeration, not in the carbon-counting the research scoped, and affects ALL
-    chain amino substituents — fixing it safely needs a dedicated dedup pass
-    (the v20 IR work). The exact-PIN / round-trip targets that depend on removing
-    that spurious `amino` are therefore NOT asserted here; they are documented in
-    167-04-SUMMARY.md as the HYG-04 site#2 honest-fail.
+    Root cause (fixed): a substituted amine nitrogen was counted twice —
+    (a) as a bare amine FG (→ `amino` prefix when non-principal, or the `-amine`
+    suffix when principal) AND (b) as a `(dimethylamino)` substituent via the
+    substituent walk — yielding geminal-diamine artifacts like
+    `2-amino-2-(dimethylamino)ethan-1-ol` (amine non-principal) and
+    `1-(dimethylamino)...ethan-1-amine` (amine principal). The fix makes each
+    handler name the nitrogen exactly once. Verified structurally by OPSIN
+    round-trip (the spurious amino makes the parsed structure a geminal diamine,
+    which does NOT round-trip to the input).
     """
 
+    # --- amine NON-PRINCIPAL (alcohol / acid is the principal group) ---
     @pytest.mark.unit
-    def test_dimethylamino_carbon_summing_fixed(self):
-        """-N(CH3)2 names dimethylamino, NOT the mis-summed ethylamino (delivered).
-
-        Note: check the parenthesized '(ethylamino)' — bare 'ethylamino' is a
-        substring of the correct 'dimethylamino'.
-        """
-        name = name_compound("CN(C)CCO")
-        assert "dimethylamino" in name, f"expected dimethylamino, got {name!r}"
-        assert "(ethylamino)" not in name, f"carbon-summing bug present: {name!r}"
+    def test_dimethylaminoethanol_pin(self):
+        assert name_compound("CN(C)CCO") == "2-(dimethylamino)ethan-1-ol"
 
     @pytest.mark.unit
-    def test_diethylamino_carbon_summing_fixed(self):
-        """-N(C2H5)2 names diethylamino, NOT the mis-summed butylamino (delivered)."""
-        name = name_compound("CCN(CC)CCO")
-        assert "diethylamino" in name, f"expected diethylamino, got {name!r}"
-        assert "butylamino" not in name, f"carbon-summing bug present: {name!r}"
+    def test_diethylaminoethanol_pin(self):
+        assert name_compound("CCN(CC)CCO") == "2-(diethylamino)ethan-1-ol"
 
     @pytest.mark.unit
-    def test_diphenhydramine_core_site1_and_carbon_summing(self):
-        """Diphenhydramine core: site#1 (diphenylmethoxy) + site#2 carbon-summing
-        (dimethylamino) BOTH delivered. The residual spurious leading `amino`
-        (known limitation above) means the full PIN
-        `2-(diphenylmethoxy)-N,N-dimethylethan-1-amine` is not yet emitted —
-        see 167-04-SUMMARY.md honest-fail.
+    def test_methylaminoethanol_pin(self):
+        assert name_compound("CNCCO") == "2-(methylamino)ethan-1-ol"
+
+    @pytest.mark.unit
+    def test_dimethylamino_propanoic_acid_pin(self):
+        assert name_compound("CN(C)CCC(=O)O") == "3-(dimethylamino)propanoic acid"
+
+    @pytest.mark.unit
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize(
+        "smiles", ["CN(C)CCO", "CCN(CC)CCO", "CNCCO", "CN(C)CCC(=O)O", "CN(C)CC(=O)O"]
+    )
+    def test_nonprincipal_amine_roundtrips(self, smiles):
+        _assert_no_double_amino(smiles)
+        _assert_roundtrips(smiles)
+
+    # --- carbon-summing regression guard (the Plan-04 fix must stay) ---
+    @pytest.mark.unit
+    def test_carbon_summing_preserved(self):
+        assert "(ethylamino)" not in name_compound("CN(C)CCO")
+        assert "butylamino" not in name_compound("CCN(CC)CCO")
+
+    # --- amine PRINCIPAL (diphenhydramine core: ether + tertiary amine, no OH/acid) ---
+    @pytest.mark.unit
+    def test_diphenhydramine_core_no_double_count(self):
+        """The principal amine's N-methyls are N,N- prefixes (NOT a doubled
+        '(dimethylamino)' substituent), and site#1 diphenylmethoxy is present.
+
+        The nitrogen is named exactly once. Structural correctness is verified by
+        test_diphenhydramine_core_roundtrips. NOTE: the canonical PIN order is
+        '2-(diphenylmethoxy)-N,N-dimethylethan-1-amine'; Orthonym currently emits
+        the structurally-identical 'N,N-dimethyl-2-diphenylmethoxyethan-1-amine'
+        (round-trips to the same structure). The prefix ORDER differs only because
+        `alpha_sort_key` strips the 'di' of the complex substituent 'diphenylmethoxy'
+        — a separate, pre-existing alphabetization limitation, NOT this double-count
+        bug.
         """
         name = name_compound("CN(C)CCOC(c1ccccc1)c1ccccc1")
-        assert "diphenylmethoxy" in name, f"site#1 regressed: {name!r}"
-        assert "benzyloxy" not in name, f"site#1 regressed to benzyloxy: {name!r}"
-        assert "dimethylamino" in name, f"site#2 carbon-summing missing: {name!r}"
+        assert "N,N-dimethyl" in name, f"N-substituents not on suffix: {name!r}"
+        assert "(dimethylamino)" not in name, f"nitrogen double-counted: {name!r}"
+        assert "diphenylmethoxy" in name, f"site#1 missing: {name!r}"
+
+    @pytest.mark.unit
+    @pytest.mark.roundtrip
+    def test_diphenhydramine_core_roundtrips(self):
+        _assert_roundtrips("CN(C)CCOC(c1ccccc1)c1ccccc1")
+
+    # --- primary amine must remain correct (NOT dropped, NOT doubled) ---
+    @pytest.mark.unit
+    def test_primary_amine_unchanged(self):
+        assert name_compound("NCCO") == "2-aminoethan-1-ol"
+        assert name_compound("NCCCC(=O)O") == "4-aminobutanoic acid"
 
 
 class TestPrincipalAmineGuard:
