@@ -792,7 +792,7 @@ rt75,test_canary_rt75_0210,CSCCSC,"2,5-dithiahexane",CSCCSC,True
 rt75,test_canary_rt75_0211,CCCCCCCCCCCCCCCCCCCCCCC(=O)O,tricosanoic acid,C(CCCCCCCCCCCCCCCCCCCCCC)(=O)O,True
 rt75,test_canary_rt75_0212,NCCO,2-aminoethan-1-ol,NCCO,True
 rt75,test_canary_rt75_0213,CCCCCCCCCCCCCCCCOC(C)=O,hexadecyl acetate,C(C)(=O)OCCCCCCCCCCCCCCCC,True
-rt75,test_canary_rt75_0214,OCCCO,trimethylene glycol,C(CCO)O,True
+rt75,test_canary_rt75_0214,OCCCO,propane-1,3-diol,C(CCO)O,True
 rt75,test_canary_rt75_0215,CC(C)C[C@H](N)C(=O)N[C@@H](CS)C(=O)O,L-leucyl-L-cysteine,N[C@@H](CC(C)C)C(=O)N[C@@H](CS)C(=O)O,True
 rt75,test_canary_rt75_0216,CCCCC=CC(=O)OCC,ethyl hept-2-enoate,C(C=CCCCC)(=O)OCC,True
 rt75,test_canary_rt75_0217,NCCCCCCCCC(=O)O,9-aminononanoic acid,NCCCCCCCCC(=O)O,True

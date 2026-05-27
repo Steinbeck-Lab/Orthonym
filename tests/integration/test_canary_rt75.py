@@ -959,7 +959,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OCCCO",
-        "trimethylene glycol",
+        # Phase 167 HYG-03: was "trimethylene glycol" (deprecated glycol name);
+        # PIN is propane-1,3-diol. Intentional, OPSIN-RT-verified correction.
+        "propane-1,3-diol",
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CS)C(=O)O",
