@@ -295,9 +295,10 @@ RETAINED_NAMES = {
     "CC(=O)C=C(C)C": "mesityl oxide",
 
     # === DIOLS AND POLYOLS (Phase 8 expansion) ===
-    "OCCO": "ethylene glycol",
-    "CC(O)CO": "propylene glycol",
-    "OCCCO": "trimethylene glycol",
+    # Phase 167 HYG-03: ethylene/propylene/trimethylene glycol removed (deprecated
+    # "glycol" names, not PINs). Systematic ethane-1,2-diol / propane-1,2-diol /
+    # propane-1,3-diol now emitted; also enforced by _PIN_DENY (recurrence guard).
+    # See  § "Phase 167".
     "OCCCCO": "butane-1,4-diol",
 
     # === UNSATURATED ALCOHOLS (Phase 8 expansion) ===
@@ -313,7 +314,8 @@ RETAINED_NAMES = {
     "Oc1ccc(-c2ccccc2)cc1": "4-phenylphenol",
 
     # === COMMON PHARMACEUTICALS (Phase 8 expansion) ===
-    "CC(=O)Oc1ccccc1C(=O)O": "aspirin",
+    # Phase 167 HYG-03: "aspirin" (brand name) removed; PIN 2-acetyloxybenzoic
+    # acid now emitted; also enforced by _PIN_DENY. See retained_name_conflicts.md.
 
     # === CYCLIC IMIDES (Phase 49, expanded Phase 91.1) ===
     "O=C1CCC(=O)N1": "succinimide",

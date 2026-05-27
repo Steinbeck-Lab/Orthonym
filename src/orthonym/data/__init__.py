@@ -152,9 +152,19 @@ try:
     _PIN_DENY = frozenset(
         e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is False
     )
+    # Phase 167 HYG-03: deny subset that ALSO filters the hand-curated dict.
+    # Excludes ``hc_override`` entries (cumene/quinuclidine/acetylene) which
+    # Phase 150 D-11 intentionally retains on the HC side (their deny applies
+    # only to OPSIN-side promotion). New HYG-03 corrections carry no
+    # hc_override, so they filter BOTH emission sources.
+    _PIN_DENY_HC = frozenset(
+        e["name"].lower() for e in _PIN_LIST["entries"]
+        if e.get("pin") is False and not e.get("hc_override")
+    )
 except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as e:
     _PIN_ALLOW = frozenset()
     _PIN_DENY = frozenset()
+    _PIN_DENY_HC = frozenset()
     logger.warning(
         "PIN list load failed at %s: %s; classifier degrades to "
         "Signal 1 only", _PIN_LIST_PATH, e
@@ -228,7 +238,19 @@ if _stem_count > 0:
     )
 
 # Merge: OPSIN first, then hand-curated overwrites (D-11: hand-curated wins)
-ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_NAMES}
+# Phase 167 HYG-03: gate the hand-curated dict against _PIN_DENY_HC (the unified
+# deny set, hc_override-exempt) BEFORE the merge — eliminating the two-path
+# asymmetry where HC was merged RAW while OPSIN imports passed _is_promotable.
+# This is DENY-based exclusion, NOT the full (S1 OR S2) AND S3 promotion gate:
+# the Phase 167 A1 audit proved full-gate routing of the curated dict drops 217
+# genuine names whose canonical SMILES are absent from the OPSIN round-trip cache
+# (Signal 3). _OPSIN_NAMES already applied _is_promotable (deny included); this
+# extends the same explicit-DENY enforcement to the hand-curated side.
+_HAND_CURATED_GATED: Dict[str, str] = {
+    smi: name for smi, name in _HAND_CURATED_NAMES.items()
+    if name.lower().strip() not in _PIN_DENY_HC
+}
+ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}
 
 # Backward-compatible alias (D-12)
 RETAINED_NAMES = ALL_RETAINED_NAMES

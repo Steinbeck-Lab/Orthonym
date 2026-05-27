@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 99,
+  "total_entries": 105,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},
@@ -102,6 +102,12 @@
     {"name": "skatol", "smiles": "Cc1c[nH]c2ccccc12", "pin": false, "citation": "P-22.2.1", "note": "OPSIN stem; PIN is 3-methyl-1H-indole per substitutive nomenclature. Promoted to deny per CONTEXT D-05 RT regression triage."},
     {"name": "skatole", "smiles": "Cc1c[nH]c2ccccc12", "pin": false, "citation": "P-22.2.1", "note": "Trivial name; PIN is 3-methyl-1H-indole. Promoted to deny per CONTEXT D-05 RT regression triage."},
     {"name": "isobenzothiofuran", "smiles": "c1ccc2cscc2c1", "pin": false, "citation": "P-25.3.1.3", "note": "OPSIN trivial; PIN is benzo[c]thiophene per fusion nomenclature. Promoted to deny per CONTEXT D-05 RT regression triage."},
-    {"name": "trihydrocitrate", "smiles": "OC(=O)CC(O)(CC(=O)O)C(=O)O", "pin": false, "citation": "P-65.1.1", "note": "Non-PIN trivial; PIN is 2-hydroxypropane-1,2,3-tricarboxylic acid (citric acid is HC retained). Promoted to deny per CONTEXT D-05 RT regression triage."}
+    {"name": "trihydrocitrate", "smiles": "OC(=O)CC(O)(CC(=O)O)C(=O)O", "pin": false, "citation": "P-65.1.1", "note": "Non-PIN trivial; PIN is 2-hydroxypropane-1,2,3-tricarboxylic acid (citric acid is HC retained). Promoted to deny per CONTEXT D-05 RT regression triage."},
+    {"name": "erythrene", "smiles": "C=CC=C", "pin": false, "citation": "P-31.1.4", "note": "Phase 167 HYG-03: archaic/incorrect name for buta-1,3-diene (OPSIN-imported synonym leaking into emission). Deny so the systematic PIN buta-1,3-diene is emitted. OPSIN-RT-verified."},
+    {"name": "trimethylene glycol", "smiles": "OCCCO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: deprecated 'glycol' name; PIN is propane-1,3-diol. OPSIN-RT-verified."},
+    {"name": "aspirin", "smiles": "CC(=O)Oc1ccccc1C(=O)O", "pin": false, "citation": "P-65.6.3.2", "note": "Phase 167 HYG-03: brand name, not IUPAC; PIN is 2-acetyloxybenzoic acid (acetyloxy is the PIN acyloxy form per P-65.6.3.2). OPSIN-RT-verified."},
+    {"name": "ethylene glycol", "smiles": "OCCO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: acceptable in general nomenclature but not the PIN; PIN is ethane-1,2-diol. OPSIN-RT-verified."},
+    {"name": "propylene glycol", "smiles": "CC(O)CO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: not the PIN; PIN is propane-1,2-diol. OPSIN-RT-verified."},
+    {"name": "neopentyl glycol", "smiles": "CC(C)(CO)CO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: deprecated glycol name; PIN is 2,2-dimethylpropane-1,3-diol. OPSIN-RT-verified."}
   ]
 }
