@@ -2,7 +2,7 @@ canary_tier,fixture_id,smiles_input,name_output,opsin_parse_smiles,inchi_l1_matc
 hyg04,hyg04_diphenylmethoxy_ethanol,OCCOC(c1ccccc1)c1ccccc1,2-(diphenylmethoxy)ethan-1-ol,C1(=CC=CC=C1)C(OCCO)C1=CC=CC=C1,True
 hyg04,hyg04_diphenylmethoxy_propanol,OCCCOC(c1ccccc1)c1ccccc1,3-(diphenylmethoxy)propan-1-ol,C1(=CC=CC=C1)C(OCCCO)C1=CC=CC=C1,True
 hyg04,hyg04_diphenylmethoxy_butanol,OCCCCOC(c1ccccc1)c1ccccc1,4-(diphenylmethoxy)butan-1-ol,C1(=CC=CC=C1)C(OCCCCO)C1=CC=CC=C1,True
-hyg04_known_limitation,hyg04_dimethylaminoethanol,CN(C)CCO,2-amino-2-(dimethylamino)ethan-1-ol,NC(CO)N(C)C,False
-hyg04_known_limitation,hyg04_diethylaminoethanol,CCN(CC)CCO,2-amino-2-(diethylamino)ethan-1-ol,NC(CO)N(CC)CC,False
-hyg04_known_limitation,hyg04_diphenhydramine_core,CN(C)CCOC(c1ccccc1)c1ccccc1,1-(dimethylamino)-2-diphenylmethoxyethan-1-amine,CN(C(COC(C1=CC=CC=C1)C1=CC=CC=C1)N)C,False
+hyg04,hyg04_dimethylaminoethanol,CN(C)CCO,2-(dimethylamino)ethan-1-ol,CN(CCO)C,True
+hyg04,hyg04_diethylaminoethanol,CCN(CC)CCO,2-(diethylamino)ethan-1-ol,C(C)N(CCO)CC,True
+hyg04,hyg04_diphenhydramine_core,CN(C)CCOC(c1ccccc1)c1ccccc1,"N,N-dimethyl-2-diphenylmethoxyethan-1-amine",CN(CCOC(C1=CC=CC=C1)C1=CC=CC=C1)C,True
 hyg04,hyg04_benzyloxy_negctl,OCCOCc1ccccc1,2-benzyloxyethan-1-ol,C(C1=CC=CC=C1)OCCO,True
