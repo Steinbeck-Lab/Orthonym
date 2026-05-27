@@ -34,7 +34,7 @@ from rdkit import Chem
 from rdkit.Chem import RWMol
 
 from .naming_utils import get_alkyl_name
-from .substituent_naming import name_substituent_fragment
+from .substituent_naming import name_substituent_fragment, _name_aryl_methyl_ether
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..rules.seniority import get_prefix
 
@@ -1291,18 +1291,11 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
                     return "phenoxy"
         return "phenoxy"
 
-    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
-    if (not alkyl_atom.GetIsAromatic()
-            and alkyl_atom.GetSymbol() == 'C'
-            and alkyl_atom.GetTotalNumHs() >= 1):
-        arom_nbrs = [n for n in alkyl_atom.GetNeighbors()
-                     if n.GetIdx() != attach_idx and n.GetIsAromatic()]
-        non_h_non_arom = [n for n in alkyl_atom.GetNeighbors()
-                          if n.GetIdx() != attach_idx
-                          and not n.GetIsAromatic()
-                          and n.GetSymbol() != 'H']
-        if arom_nbrs and not non_h_non_arom:
-            return "benzyloxy"
+    # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
+    # HYG-04 (Phase 167): single shared aryl-count helper (was inline benzyloxy here).
+    _aryl_ether = _name_aryl_methyl_ether(mol, alkyl_start, attach_idx)
+    if _aryl_ether is not None:
+        return _aryl_ether
 
     # Case C: O -> simple alkyl chain -> "methoxy", "ethoxy", etc.
     # Count carbons in the alkyl part (BFS from alkyl_start excluding O)

@@ -61,7 +61,7 @@ from .naming_utils import (
     BRANCH_HANDLED_FGS,
 )
 from ..data.chain_names import get_chain_prefix
-from .substituent_naming import name_substituent_fragment, _is_linear_alkyl
+from .substituent_naming import name_substituent_fragment, _is_linear_alkyl, _name_aryl_methyl_ether
 from .substituent_enumerator import (
     extract_ring_substituents,
     classify_and_name_fragment,
@@ -4587,15 +4587,10 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
                     if c_start_atom.GetIsAromatic():
                         sub_groups['phenoxy'].append(ring_pos)
                     else:
-                        # Check for benzyloxy: O -> CH2 -> aromatic
-                        benz_nbrs = [n for n in c_start_atom.GetNeighbors()
-                                     if n.GetIdx() != ni and n.GetIsAromatic()]
-                        non_h_non_arom = [n for n in c_start_atom.GetNeighbors()
-                                          if n.GetIdx() != ni
-                                          and not n.GetIsAromatic()
-                                          and n.GetSymbol() != 'H']
-                        if benz_nbrs and not non_h_non_arom and c_start_atom.GetTotalNumHs() >= 1:
-                            sub_groups['benzyloxy'].append(ring_pos)
+                        # HYG-04 (Phase 167): shared aryl-count helper (benzyloxy / diphenylmethoxy).
+                        _aryl_ether = _name_aryl_methyl_ether(mol, c_start, ni)
+                        if _aryl_ether is not None:
+                            sub_groups[_aryl_ether].append(ring_pos)
                         else:
                             # Original pure alkyl path
                             c_count = _count_pure_alkyl(mol, c_start, ring_atom_set | {ni})
@@ -4999,18 +4994,11 @@ def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> 
         # Fallback for other aromatic ethers (e.g., naphthyloxy)
         return "phenoxy"
 
-    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
-    if (not alkyl_atom.GetIsAromatic()
-            and alkyl_atom.GetSymbol() == 'C'
-            and alkyl_atom.GetTotalNumHs() >= 1):
-        arom_nbrs = [n for n in alkyl_atom.GetNeighbors()
-                     if n.GetIdx() != oxygen_idx and n.GetIsAromatic()]
-        non_h_non_arom = [n for n in alkyl_atom.GetNeighbors()
-                          if n.GetIdx() != oxygen_idx
-                          and not n.GetIsAromatic()
-                          and n.GetSymbol() != 'H']
-        if arom_nbrs and not non_h_non_arom:
-            return "benzyloxy"
+    # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
+    # HYG-04 (Phase 167): single shared aryl-count helper (was inline benzyloxy here).
+    _aryl_ether = _name_aryl_methyl_ether(mol, alkyl_start, oxygen_idx)
+    if _aryl_ether is not None:
+        return _aryl_ether
 
     # Count carbons in the alkyl part (excluding the oxygen)
     carbon_count = _count_alkyl_carbons(mol, alkyl_start, {oxygen_idx})

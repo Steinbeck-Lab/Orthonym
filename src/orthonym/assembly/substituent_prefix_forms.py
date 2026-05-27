@@ -184,26 +184,13 @@ def get_alkoxy_prefix(
         # Fallback for other aromatic ethers
         return "phenoxy"
 
-    # Case B: O -> CH2 -> aromatic ring -> "benzyloxy"
-    if (
-        not sub_atom.GetIsAromatic()
-        and sub_atom.GetSymbol() == "C"
-        and sub_atom.GetTotalNumHs() >= 1
-    ):
-        arom_nbrs = [
-            n
-            for n in sub_atom.GetNeighbors()
-            if n.GetIdx() != oxygen_idx and n.GetIsAromatic()
-        ]
-        non_h_non_arom = [
-            n
-            for n in sub_atom.GetNeighbors()
-            if n.GetIdx() != oxygen_idx
-            and not n.GetIsAromatic()
-            and n.GetSymbol() != "H"
-        ]
-        if arom_nbrs and not non_h_non_arom:
-            return "benzyloxy"
+    # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
+    # HYG-04 (Phase 167): single shared aryl-count helper (was inline benzyloxy here).
+    # Local import: file documents circular-import sensitivity (see header).
+    from .substituent_naming import _name_aryl_methyl_ether
+    _aryl_ether = _name_aryl_methyl_ether(mol, sub_carbon, oxygen_idx)
+    if _aryl_ether is not None:
+        return _aryl_ether
 
     # Count carbons in the substituent fragment
     carbon_count = _count_fragment_atoms(

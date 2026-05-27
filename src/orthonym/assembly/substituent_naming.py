@@ -695,6 +695,80 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
 # ============================================================================
 
 
+def _is_plain_phenyl(mol, aromatic_idx: int, central_c_idx: int) -> bool:
+    """True if ``aromatic_idx`` is in an unsubstituted benzene ring (C6H5-).
+
+    "Unsubstituted" = a 6-membered all-aromatic-carbon ring whose only exocyclic
+    heavy attachment is ``central_c_idx``. Used by ``_name_aryl_methyl_ether`` to
+    confirm a genuine *di-phenyl* methyl before emitting ``diphenylmethoxy`` (a
+    tolyl/halophenyl neighbour must NOT be called diphenylmethoxy).
+    """
+    ring_info = mol.GetRingInfo()
+    for ring in ring_info.AtomRings():
+        if aromatic_idx not in ring or len(ring) != 6:
+            continue
+        if not all(
+            mol.GetAtomWithIdx(r).GetIsAromatic()
+            and mol.GetAtomWithIdx(r).GetSymbol() == "C"
+            for r in ring
+        ):
+            continue
+        ring_set = set(ring)
+        for r in ring:
+            for nb in mol.GetAtomWithIdx(r).GetNeighbors():
+                if nb.GetIdx() in ring_set or nb.GetAtomicNum() <= 1:
+                    continue
+                if nb.GetIdx() != central_c_idx:
+                    return False  # ring carries a substituent -> not plain phenyl
+        return True
+    return False
+
+
+def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optional[str]:
+    """Name an ``-O-CH(aryl)ₙ`` ether substituent by counting the central
+    carbon's aromatic neighbours (HYG-04, Phase 167).
+
+    Single source of truth for the benzyloxy/diphenylmethoxy decision, replacing
+    three byte-duplicated sites (``substituent_enumerator._name_alkoxy_branch``
+    Case B and two ``composer`` sites) that returned ``benzyloxy`` for *any* aryl
+    neighbour and so mis-named ``Ph₂CH-O-`` (diphenylmethyl ether) as benzyloxy.
+
+    Returns:
+      - ``"benzyloxy"``      — 1 aromatic neighbour (legacy behaviour, preserved),
+      - ``"diphenylmethoxy"``— exactly 2 *unsubstituted phenyl* neighbours (IUPAC
+        2013 PIN; D-07 — NOT the Beilstein ``benzhydryloxy``),
+      - ``None``             — not a clean aryl-methyl ether (defer to existing logic).
+
+    Byte-identical to the legacy guard (``central is non-aromatic C with ≥1 H and
+    no non-H/non-aromatic heavy neighbour besides O``) except that the genuine
+    diphenylmethyl case is upgraded from benzyloxy to diphenylmethoxy.
+    """
+    central = mol.GetAtomWithIdx(central_c_idx)
+    if (
+        central.GetIsAromatic()
+        or central.GetSymbol() != "C"
+        or central.GetTotalNumHs() < 1
+    ):
+        return None
+    arom_nbrs = [
+        n for n in central.GetNeighbors()
+        if n.GetIdx() != oxygen_idx and n.GetIsAromatic()
+    ]
+    non_h_non_arom = [
+        n for n in central.GetNeighbors()
+        if n.GetIdx() != oxygen_idx
+        and not n.GetIsAromatic()
+        and n.GetSymbol() != "H"
+    ]
+    if not arom_nbrs or non_h_non_arom:
+        return None
+    if len(arom_nbrs) == 2 and all(
+        _is_plain_phenyl(mol, n.GetIdx(), central_c_idx) for n in arom_nbrs
+    ):
+        return "diphenylmethoxy"
+    return "benzyloxy"
+
+
 def _check_retained_substituent(
     mol,
     sub_atoms: List[int],
