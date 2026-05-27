@@ -19,7 +19,9 @@ class TestStyleParameter:
         assert name_compound("c1ccccc1") == "benzene"
         assert name_compound("CCO") == "ethanol"
         assert name_compound("C=CCO") == "allyl alcohol"
-        assert name_compound("OCCO") == "ethylene glycol"
+        # Phase 167 HYG-03: "ethylene glycol" was a deprecated (non-PIN) name and
+        # is now corrected to ethane-1,2-diol; use a genuine retained PIN instead.
+        assert name_compound("Cc1ccccc1") == "toluene"
 
     @pytest.mark.unit
     def test_systematic_style_bypasses_retained_names(self):
