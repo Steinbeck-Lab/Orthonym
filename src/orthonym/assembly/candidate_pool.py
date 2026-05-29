@@ -725,6 +725,13 @@ class CandidatePool:
         self.selection_mode = selection_mode
         self._candidates: List[CandidateName] = []
         self._direct_return_winner: Optional[CandidateName] = None
+        # Phase 168 BLOCKER #9 fix (reviews iter 1): __init__ takes NO features (push_pool builds the
+        # pool with selection_mode only). Initialize the flag+oracle to safe defaults; the REAL
+        # set-site is add() below, which lifts them off the per-call `features` argument (idempotent
+        # on first call). _best_two_tier (Plan-04 Stage B) reads self._enable_triviality_controller.
+        self._enable_triviality_controller: bool = False
+        self._triv_oracle = None
+        self._triv_flag_initialized: bool = False
 
     def add(
         self,
@@ -758,6 +765,15 @@ class CandidatePool:
             None if Tier B gate rejected (cand.confidence <
             CONFIDENCE_GATE_THRESHOLD).
         """
+        # Phase 168 BLOCKER #9 fix (reviews iter 1): lift the controller flag+oracle off the
+        # per-call `features` onto the pool instance ONCE (idempotent). This is the REAL set-site —
+        # __init__ has no features arg (candidate_pool.py:721), so it cannot set these. namer.py
+        # stashes them onto features in _classify (the features._ring_info transient pattern).
+        if not self._triv_flag_initialized:
+            self._enable_triviality_controller = getattr(
+                features, '_enable_triviality_controller', False)
+            self._triv_oracle = getattr(features, '_triv_oracle', None)
+            self._triv_flag_initialized = True
         policy = HANDLER_POLICIES.get(handler_id)
         # Compute confidence WITHOUT parent_atom_indices (Risk 1 mitigation)
         cand = compute_confidence(name, handler_id, features)
@@ -799,6 +815,32 @@ class CandidatePool:
         if (PerNodeScorer is not None and tree is not None
                 and not is_coarse_node(tree)):
             cand.node_scores = PerNodeScorer.score_tree(tree, features.mol)
+        # Phase 168 TRIV-01/02/03: attach the rewritten tree POST-HOC (Risk-1 pattern; SACRED per
+        # Phase 165 D-04 + 166 D-04). NEVER passed into compute_confidence(); byte-identical preserved
+        # at Stage A per CONTEXT D-09. Default (flag OFF): tree_rewritten == tree (no-op), the
+        # controller block is skipped, production reads cand.tree unchanged. Stage B (Plan-04) flips
+        # the comparator/serializer to read tree_rewritten via self._enable_triviality_controller.
+        cand.tree_rewritten = tree
+        cand.node_scores_rewritten = getattr(cand, 'node_scores', None)
+        if (self._enable_triviality_controller and tree is not None
+                and not is_coarse_node(tree)):
+            try:
+                from .retained_substitution import apply_triviality_controller  # Pattern S3 lazy
+                principal_group = getattr(features, 'principal_group', None)
+                cand.tree_rewritten = apply_triviality_controller(
+                    tree, features.mol, principal_group,
+                    opsin_oracle=self._triv_oracle, enabled=True,  # WARNING #9 oracle propagated
+                )
+                if (PerNodeScorer is not None
+                        and not is_coarse_node(cand.tree_rewritten)):
+                    cand.node_scores_rewritten = PerNodeScorer.score_tree(
+                        cand.tree_rewritten, features.mol)
+            except Exception as exc:
+                logger.warning(
+                    "Phase 168 controller error on cand %r: %s; falling back to original tree",
+                    getattr(cand, 'name', '?'), exc,
+                )
+                cand.tree_rewritten = tree
         # Phase 147 fallback: if ring_info wasn't passed explicitly, read
         # the transient attribute set by namer.py:_classify (allows existing
         # composer.py call sites to flow ring_info through without a
