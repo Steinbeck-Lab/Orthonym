@@ -145,6 +145,23 @@ def main(args: List[str] = None) -> int:
         help=argparse.SUPPRESS,
     )
 
+    # Phase 168 Triviality Controller (TRIV-01/02/03 + CONTEXT D-08).
+    triv_group = parser.add_argument_group("Triviality Controller (Phase 168)")
+    triv_group.add_argument(
+        "--enable-triviality-controller",
+        dest="enable_triviality_controller",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable the triviality controller (Phase 168). Default OFF "
+            "(Stage A SACRED canary invariant). When True, the controller "
+            "swaps systematic PIN-eligible parents (benzene/phenol/aniline/"
+            "benzoic acid/etc.) to retained PIN forms at the name-tree IR "
+            "layer per IUPAC P-15.1.8.1..3. See 168-CONTEXT.md D-08. Env "
+            "override: ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1."
+        ),
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
@@ -241,6 +258,9 @@ def main(args: List[str] = None) -> int:
         ml_kwargs = {
             "allow_ml_fallback": getattr(parsed, "allow_ml_fallback", False),
             "opsin_parse_required": getattr(parsed, "ml_opsin_parse_required", True),
+            # Phase 168 D-08: thread the controller flag through name_compound.
+            "enable_triviality_controller": getattr(
+                parsed, "enable_triviality_controller", False),
         }
 
         if parsed.confidence:
