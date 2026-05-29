@@ -11,6 +11,7 @@ This is the inverse of OPSIN's pipeline:
 
 import contextvars
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
@@ -19,6 +20,12 @@ from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
 logger = logging.getLogger(__name__)
+
+# Phase 168 D-08: env-var override for the triviality controller. Read at import
+# time so ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on flips the default for
+# all Orthonym instances (mirrors the Phase 162 env-gate pattern).
+_TRIV_ENV = os.environ.get("ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER", "").strip().lower()
+_DEFAULT_TRIV = _TRIV_ENV in ("1", "true", "yes", "on")
 
 # CR-04 part B + W7: per-call NamingResult capture slot for name_with_tree.
 # ContextVar provides thread-local AND asyncio-task-local isolation per PEP 567;
@@ -727,7 +734,8 @@ class Orthonym:
     def __init__(self, style: str = "pin", *,
                  _disable_grammar_validation: bool = False,
                  allow_ml_fallback: bool = False,
-                 opsin_parse_required: bool = True):
+                 opsin_parse_required: bool = True,
+                 enable_triviality_controller: bool = False):
         """
         Initialize namer.
 
@@ -752,6 +760,15 @@ class Orthonym:
                 correctness). When False, the expensive P5 OPSIN
                 subprocess is bypassed (raw-attach-rate measurement
                 mode for the MLF-04 dual-config benchmark).
+            enable_triviality_controller: Phase 168 D-08 opt-in flag.
+                Default False (Stage A SACRED byte-identical canary
+                invariant). When True, the triviality controller
+                (assembly/retained_substitution.py) swaps systematic
+                PIN-eligible parents to retained PIN forms at the
+                name-tree IR layer per IUPAC P-15.1.8.1..3, and an
+                OpsinOracle is instantiated for the TRIV-03 T2 RT-safety
+                gate. Env override:
+                ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on.
         """
         self.style = style
         # Phase 162 ML Fallback Gate per MLF-01 + D-08 (kwargs stored;
@@ -792,6 +809,35 @@ class Orthonym:
         # DECOMPOSITION_PRE_GENERAL predicate factory reads from kwargs
         # passed by `dispatch()`.
         self._skip_decomposition: bool = False
+
+        # Phase 168 D-08: triviality-controller opt-in (default OFF = Stage A SACRED
+        # byte-identical canary invariant). Env override via ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER.
+        self._enable_triviality_controller: bool = enable_triviality_controller or _DEFAULT_TRIV
+        # WARNING #9 fix (CRITICAL for TRIV-03 runtime per CONTEXT D-07): instantiate the OpsinOracle
+        # when the flag is ON so the T2 RT-safety gate can run. Without it, OpsinOracle.rt_safe
+        # degrades to the permissive always-True fallback and TRIV-03 runtime enforcement is silently
+        # disabled. Default OFF keeps the oracle None (zero cost, byte-identical Stage A).
+        self._triv_oracle = None
+        if self._enable_triviality_controller:
+            try:
+                from .assembly.retained_substitution import OpsinOracle
+                import sys
+                from pathlib import Path
+                _scripts = str(Path(__file__).resolve().parent.parent.parent / "scripts")
+                if _scripts not in sys.path:
+                    sys.path.insert(0, _scripts)
+                try:
+                    from validate_retained_names import find_opsin_jar
+                    _jar = find_opsin_jar() or None
+                except ImportError:
+                    _jar = None
+                self._triv_oracle = OpsinOracle(opsin_jar=_jar)
+            except Exception as exc:
+                logger.warning(
+                    "Phase 168 OpsinOracle instantiation failed: %s; "
+                    "T2 RT-safety degrades to permissive fallback", exc,
+                )
+                self._triv_oracle = None
 
     def get_dispatch_stats(self) -> Dict[Any, int]:
         """Phase 158 D-16: per-instance CFR dispatch histogram.
@@ -1478,6 +1524,13 @@ class Orthonym:
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
 
+        # Phase 168 D-08: stash the controller flag + oracle onto features (the
+        # features._ring_info transient-attribute pattern at :1532) so CandidatePool.add()
+        # can lift them onto the pool (BLOCKER #9 fix). WARNING #9: the oracle is required
+        # for the TRIV-03 T2 runtime RT-safety gate. Both default to OFF/None (Stage A).
+        features._enable_triviality_controller = self._enable_triviality_controller
+        features._triv_oracle = self._triv_oracle
+
         # Store ester match(es) if principal group is ester
         if pg_name == "ester" and pg_atoms:
             features.ester_match = pg_atoms[0]  # First ester match (backward compat)
@@ -1988,7 +2041,8 @@ def name_compound(smiles: str, style: str = "pin",
                    include_confidence: bool = False,
                    *,
                    allow_ml_fallback: bool = False,
-                   opsin_parse_required: bool = True):
+                   opsin_parse_required: bool = True,
+                   enable_triviality_controller: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -2029,6 +2083,7 @@ def name_compound(smiles: str, style: str = "pin",
         style=style,
         allow_ml_fallback=allow_ml_fallback,
         opsin_parse_required=opsin_parse_required,
+        enable_triviality_controller=enable_triviality_controller,
     )
 
     if include_confidence:
