@@ -930,6 +930,18 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
             pool = get_current_pool()
             pool.add(_amide_name, "amide", features)
+            _best = pool.best()
+            # PHASE 168 STAGE B CUTOVER (CONTEXT D-08): flag ON -> render from the rewritten tree;
+            # flag OFF -> fall through to pool.best().name (byte-identical Stage A).
+            if (getattr(pool, '_enable_triviality_controller', False) and _best is not None
+                    and getattr(_best, 'tree_rewritten', None) is not None):
+                try:
+                    from .name_tree_to_string import name_tree_to_string
+                    _rw = name_tree_to_string(_best.tree_rewritten, style=style)
+                    if _rw:
+                        return _rw
+                except Exception:
+                    pass
             return pool.best().name
 
     # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
@@ -947,6 +959,18 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             # Phase 145.1 ISS-001: route through pool.add() — direct_return handler.
             pool = get_current_pool()
             pool.add(amine_name, "amine", features)
+            _best = pool.best()
+            # PHASE 168 STAGE B CUTOVER (CONTEXT D-08): flag ON -> render from the rewritten tree;
+            # flag OFF -> fall through to pool.best().name (byte-identical Stage A).
+            if (getattr(pool, '_enable_triviality_controller', False) and _best is not None
+                    and getattr(_best, 'tree_rewritten', None) is not None):
+                try:
+                    from .name_tree_to_string import name_tree_to_string
+                    _rw = name_tree_to_string(_best.tree_rewritten, style=style)
+                    if _rw:
+                        return _rw
+                except Exception:
+                    pass
             return pool.best().name
 
     # Phase 160.2 Plan-02-04: chain-fallback section (composer.py:935-1082 in
@@ -964,6 +988,24 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     from .handlers.general_acyclic import name_general_acyclic
     _fallback = name_general_acyclic(features, mol=features.mol, style=style)
     if _fallback is not None:
+        # PHASE 168 STAGE B CUTOVER (CONTEXT D-08): _fallback bypasses pool.add (no POST-HOC attach),
+        # so apply the controller directly to _fallback.tree when the flag is ON; flag-OFF falls
+        # through to _fallback.name (byte-identical Stage A).
+        if (getattr(features, '_enable_triviality_controller', False)
+                and getattr(_fallback, 'tree', None) is not None):
+            try:
+                from .retained_substitution import apply_triviality_controller
+                from .name_tree_to_string import name_tree_to_string
+                _rw_tree = apply_triviality_controller(
+                    _fallback.tree, features.mol,
+                    getattr(features, 'principal_group', None),
+                    opsin_oracle=getattr(features, '_triv_oracle', None), enabled=True,
+                )
+                _rw = name_tree_to_string(_rw_tree, style=style)
+                if _rw:
+                    return _rw
+            except Exception:
+                pass
         return _fallback.name
     # Truly empty result — degenerate molecule. Return empty string preserving
     # pre-amendment behavior (chain-fallback section returned pool.best().name
