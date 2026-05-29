@@ -186,6 +186,26 @@ class PerNodeScorer:
 _NO_DECISION = NodeScores(0.5, 0.5, 0.5)
 
 
+def _scores_from(node_scores, tree) -> NodeScores:
+    """Aggregate an explicit ``(node_scores, tree)`` pair into comparison-level NodeScores (D-05).
+
+    Phase 168 STAGE B: extracted from ``_candidate_scores`` so the Stage-B selector can build a
+    comparison key from ``(node_scores_rewritten, tree_rewritten)`` WITHOUT mutating
+    ``cand.node_scores`` (no aliasing, no restore). On ``(cand.node_scores, cand.tree)`` this is
+    byte-identical to the prior inline body — the refactor is behavior-preserving.
+    """
+    if not node_scores or tree is None:
+        return _NO_DECISION
+    root = node_scores.get(id(tree))
+    if root is None:
+        return _NO_DECISION
+    real_locants = [
+        ns.locant_score for ns in node_scores.values() if ns.locant_score != 0.5
+    ]
+    locant = min(real_locants) if real_locants else 0.5
+    return NodeScores(root.parent_score, locant, root.substituent_score)
+
+
 def _candidate_scores(cand: Any) -> NodeScores:
     """Aggregate a candidate's tree into comparison-level NodeScores (D-05).
 
@@ -198,20 +218,23 @@ def _candidate_scores(cand: Any) -> NodeScores:
     tie these, since the root chain carries no locant.) Returns the all-0.5
     no-decision sentinel when the candidate has no scored tree.
     """
-    node_scores = getattr(cand, "node_scores", None)
-    tree = getattr(cand, "tree", None)
-    if not node_scores or tree is None:
-        return _NO_DECISION
-    root = node_scores.get(id(tree))
-    if root is None:
-        return _NO_DECISION
-    # locant: the worst real locant decision anywhere in the tree (the first
-    # wrong locant drags the whole candidate down); 0.5 if every node abstained.
-    real_locants = [
-        ns.locant_score for ns in node_scores.values() if ns.locant_score != 0.5
-    ]
-    locant = min(real_locants) if real_locants else 0.5
-    return NodeScores(root.parent_score, locant, root.substituent_score)
+    # Phase 168 STAGE B: delegate to _scores_from (behavior-preserving; the explicit-pair form lets
+    # the Stage-B selector key on the rewritten tree without mutating cand.node_scores).
+    return _scores_from(getattr(cand, "node_scores", None), getattr(cand, "tree", None))
+
+
+def compare_scores(sa: NodeScores, sb: NodeScores) -> int:
+    """Pure lexicographic first-point-of-difference on two NodeScores (CONTEXT D-05).
+
+    Phase 168 STAGE B: extracted from ``compare_by_node_scores`` so the Stage-B selector can compare
+    explicit keys (e.g. rewritten-tree scores from ``_scores_from``) without re-reading candidate
+    attributes. Behavior on ``_candidate_scores(a/b)`` is byte-identical.
+    """
+    for key in ("parent_score", "locant_score", "substituent_score"):
+        va, vb = getattr(sa, key), getattr(sb, key)
+        if va != vb:
+            return -1 if va > vb else 1
+    return 0
 
 
 def compare_by_node_scores(a: Any, b: Any) -> int:
@@ -232,9 +255,4 @@ def compare_by_node_scores(a: Any, b: Any) -> int:
     first-point-of-difference, Blue Book P-31.1.4). Pure function: no OPSIN, no
     mutation, deterministic.
     """
-    sa, sb = _candidate_scores(a), _candidate_scores(b)
-    for key in ("parent_score", "locant_score", "substituent_score"):
-        va, vb = getattr(sa, key), getattr(sb, key)
-        if va != vb:
-            return -1 if va > vb else 1
-    return 0
+    return compare_scores(_candidate_scores(a), _candidate_scores(b))
