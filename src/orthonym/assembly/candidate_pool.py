@@ -1017,15 +1017,27 @@ class CandidatePool:
         # compare_by_node_scores == 0) falls through to the Tier-2 aggregate
         # (STRICT refinement). per_substring=False => byte-identical to today.
         if per_substring and len(candidates) > 1:
-            from .per_substring_scoring import compare_by_node_scores
+            from .per_substring_scoring import _candidate_scores, _scores_from, compare_scores
+            # PHASE 168 STAGE B CUTOVER (CONTEXT D-08; #1 + BLOCKER #4 fix, reviews iter 1):
+            # read self._enable_triviality_controller from the pool's OWN state (set by add() per
+            # Plan-02 2c-2; NOT a non-existent features_or_pool param). When ON, key each candidate
+            # on (node_scores_rewritten, tree_rewritten) via the pure _scores_from helper — NEVER
+            # mutate cand.node_scores (no aliasing, no restore). Flag-OFF: _key == _candidate_scores
+            # and compare_scores == the prior compare_by_node_scores body -> byte-identical.
+            def _key(cand):
+                if self._enable_triviality_controller:
+                    return _scores_from(
+                        getattr(cand, 'node_scores_rewritten', None),
+                        getattr(cand, 'tree_rewritten', None),
+                    )
+                return _candidate_scores(cand)
             best = candidates[0]
+            best_key = _key(best)
             for cand in candidates[1:]:
-                if compare_by_node_scores(cand, best) < 0:
-                    best = cand
-            candidates = [
-                c for c in candidates
-                if compare_by_node_scores(c, best) == 0
-            ]
+                ck = _key(cand)
+                if compare_scores(ck, best_key) < 0:
+                    best, best_key = cand, ck
+            candidates = [c for c in candidates if compare_scores(_key(c), best_key) == 0]
             if len(candidates) == 1:
                 return candidates[0]
 
