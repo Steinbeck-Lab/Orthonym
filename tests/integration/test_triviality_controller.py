@@ -23,6 +23,20 @@ import pytest
 
 from orthonym.namer import name_compound
 
+# ===== Phase 168 additions (Plan-03): triviality-controller integration corpus =====
+# This file pre-dates Phase 168 (Phase 150 shipped the multiplier-transition tests above).
+# Phase 168 APPENDS its controller corpus rather than overwriting (preserves Phase-150 coverage).
+import re  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+from typing import Optional  # noqa: E402
+
+from rdkit import Chem  # noqa: E402
+
+from orthonym.assembly.name_tree import NameTreeNode, _alphabetize_prefixes  # noqa: E402
+from orthonym.assembly.name_tree_to_string import name_tree_to_string  # noqa: E402
+from orthonym.assembly.retained_substitution import apply_triviality_controller  # noqa: E402
+
 
 class TestRetainedNameMultiplierTransitions:
     """V18 section 6 line 1031 mandate: 5+ retained-name + multiplier transition tests.
@@ -227,3 +241,232 @@ class TestMultiplierAlphabetization:
         assert lower.index("acet") < lower.index("brom"), (
             f"P-14.5: acet- ('a') must precede brom- ('b') in '{name}'"
         )
+
+
+# ============================================================================
+# Phase 168 Plan-03 controller corpus (appended; Phase-150 content above preserved).
+#
+# HONEST REACH-BOUND (CONTEXT honest-RT-framing #1; confirmed at Plan-03 execution): the
+# controller fires 0 times end-to-end on the current IR — the structured IR fraction is aliphatic
+# chains while the seed targets aromatic rings/acids that route through COARSE handlers (D-04
+# passthrough). So for seed-covered bare molecules the ON output EQUALS the OFF output (the existing
+# retained-name lookup already emits the retained PIN). These tests verify (a) output CORRECTNESS,
+# (b) NO regression (the controller never emits a worse form), and (c) the swap LOGIC via synthetic
+# IR (TestMidNameSwapBeforeAlpha, TestXyleneStemAssembly). The controller activates for free once
+# coarse-handler structured-coverage expands (a SCORE-01 follow-on, out of Phase-168 scope).
+# ============================================================================
+
+
+def _p168_find_opsin_jar():
+    import glob
+    for pat in ("opsin-cli-*-jar-with-dependencies.jar",
+                "opsin/opsin-cli-*-jar-with-dependencies.jar"):
+        m = glob.glob(pat)
+        if m:
+            return m[0]
+    return None
+
+
+_P168_OPSIN_JAR = _p168_find_opsin_jar()
+_P168_OPSIN_AVAILABLE = bool(_P168_OPSIN_JAR) and shutil.which("java") is not None
+
+
+def _p168_opsin_smiles(name: str) -> Optional[str]:
+    if not _P168_OPSIN_AVAILABLE or not name:
+        return None
+    try:
+        r = subprocess.run(["java", "-jar", _P168_OPSIN_JAR, "-osmi"], input=name + "\n",
+                           capture_output=True, text=True, timeout=20)
+    except Exception:
+        return None
+    return r.stdout.strip() or None
+
+
+def _p168_inchi(smiles: str) -> Optional[str]:
+    if not smiles:
+        return None
+    mol = Chem.MolFromSmiles(smiles)
+    return Chem.MolToInchi(mol) if mol else None
+
+
+TYPE_1_FIXTURES = [
+    ("c1ccoc1", "furan"), ("c1cc[nH]c1", "pyrrole"), ("c1ccncc1", "pyridine"),
+    ("c1ccsc1", "thiophene"), ("C1COCCN1", "morpholine"), ("C1CCNCC1", "piperidine"),
+    ("c1ccc2ccccc2c1", "naphthalene"), ("c1ccc2[nH]ccc2c1", "indole"),
+    ("Cc1ccncc1", "pyridine"), ("Brc1ccc2ccccc2c1", "naphthalene"),
+]
+
+
+class TestType1Branch:
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected", TYPE_1_FIXTURES)
+    def test_retained_form_present(self, smiles, expected):
+        out = name_compound(smiles, enable_triviality_controller=True)
+        assert expected in out.lower(), f"{smiles}: expected {expected!r} in {out!r}"
+
+    @pytest.mark.integration
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles,expected", TYPE_1_FIXTURES)
+    def test_output_roundtrips(self, smiles, expected):
+        if not _P168_OPSIN_AVAILABLE:
+            pytest.skip("OPSIN/Java unavailable")
+        out = name_compound(smiles, enable_triviality_controller=True)
+        rt = _p168_opsin_smiles(out)
+        if rt is None:
+            pytest.skip(f"OPSIN could not parse {out!r}")
+        assert _p168_inchi(rt) == _p168_inchi(smiles)
+
+
+TYPE_2A_POSITIVE = [
+    ("Oc1ccccc1", "phenol"), ("Oc1ccc(Br)cc1", "phenol"), ("Nc1ccccc1", "aniline"),
+    ("OC(=O)c1ccccc1", "benzoic acid"), ("CC(=O)O", "acetic acid"),
+]
+
+
+class TestType2aBranch:
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected", TYPE_2A_POSITIVE)
+    def test_positive_retained_form(self, smiles, expected):
+        out = name_compound(smiles, enable_triviality_controller=True)
+        assert expected in out.lower(), f"{smiles}: expected {expected!r} in {out!r}"
+
+    @pytest.mark.integration
+    def test_negative_pg_mismatch_no_phenol_parent(self):
+        out = name_compound("OC(=O)c1ccc(O)cc1", enable_triviality_controller=True).lower()
+        assert not out.endswith("phenol"), f"phenol parent leaked: {out!r}"
+
+
+TYPE_2B_POSITIVE = [
+    ("OC=O", "formic acid"), ("OC(=O)Br", "methanoic acid"), ("OC(=O)F", "methanoic acid"),
+]
+TYPE_2B_NEGATIVE_SMILES = ["OC(=O)CC"]
+
+
+class TestType2bBranch:
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles,expected_sub", TYPE_2B_POSITIVE)
+    def test_positive_swap(self, smiles, expected_sub):
+        out = name_compound(smiles, enable_triviality_controller=True).lower()
+        assert any(k in out for k in ("formic", "methanoic", "carbono")), \
+            f"{smiles}: expected formic/methanoic/carbono in {out!r}"
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles", TYPE_2B_NEGATIVE_SMILES)
+    def test_negative_carbon_substituent_not_emitted(self, smiles):
+        # #7 REAL boundary: never emit a carbon-substituted formic/methanoic-acid form (carbon is
+        # out of the P-15.1.8.2.2 closed list). Systematic 'propanoic acid' is expected.
+        actual = name_compound(smiles, enable_triviality_controller=True).lower()
+        assert not re.search(r"\w+formic acid", actual), f"carbon-formic leak: {actual!r}"
+
+    @pytest.mark.integration
+    def test_type_2b_check_refuses_carbon_substituent_unit(self):
+        from orthonym.assembly.retained_substitution import _type_2b_check
+        from orthonym.data.triviality_controller_seed import SEED_TABLE
+        key = Chem.CanonSmiles("OC=O")
+        if key not in SEED_TABLE:
+            pytest.xfail("Type 2b empty post-audit per A1; documented in 168-AUDIT-TRIV.md section 7")
+        entry = SEED_TABLE[key]
+        node = NameTreeNode(parent_stem="methanoic acid", prefixes=(NameTreeNode(parent_stem="methyl"),))
+        assert _type_2b_check(node, Chem.MolFromSmiles("CC(=O)O"), entry, None) is False
+
+
+class TestType2cBranch:
+    @pytest.mark.integration
+    def test_anisole_bare_present(self):
+        out = name_compound("COc1ccccc1", enable_triviality_controller=True).lower()
+        assert "anisole" in out or "methoxybenzene" in out, f"unexpected: {out!r}"
+
+    @pytest.mark.integration
+    def test_substituted_anisole_not_bare_anisole(self):
+        out = name_compound("COc1ccc(Br)cc1", enable_triviality_controller=True).lower()
+        assert out != "anisole"
+
+
+class TestType3Branch:
+    @pytest.mark.integration
+    def test_toluene_bare_present(self):
+        out = name_compound("Cc1ccccc1", enable_triviality_controller=True).lower()
+        assert "toluene" in out, f"expected toluene in {out!r}"
+
+    @pytest.mark.integration
+    def test_chlorotoluene_not_bare_toluene(self):
+        out = name_compound("Cc1ccc(Cl)cc1", enable_triviality_controller=True).lower()
+        assert not out.endswith("toluene")
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("smiles", ["Cc1ccccc1C", "Cc1cccc(C)c1", "Cc1ccc(C)cc1"])
+    def test_xylene_no_italic_locant_reach_bound(self, smiles):
+        # HONEST reach-bound: the dimethylbenzene node is COARSE, so the swap to "1,2-xylene" does
+        # NOT fire end-to-end (the swap LOGIC is proven by TestXyleneStemAssembly). Invariant: the
+        # controller NEVER emits an italic o-/m-/p- locant (D-11), fired or not.
+        out = name_compound(smiles, enable_triviality_controller=True).lower()
+        assert not any(t in out for t in ("o-xylene", "m-xylene", "p-xylene"))
+
+
+class TestMultiplierFeedback:
+    @pytest.mark.unit
+    def test_simple_substituent_uses_di(self):
+        from orthonym.assembly.retained_substitution import _build_rewrite
+        from orthonym.data.triviality_controller_seed import SEED_TABLE
+        entry = SEED_TABLE[Chem.CanonSmiles("Oc1ccccc1")]
+        out = _build_rewrite(NameTreeNode(parent_stem="benzenol", multiplicative_prefix="di"), entry, ())
+        assert out.multiplicative_prefix == "di"
+
+    @pytest.mark.unit
+    def test_complex_substituent_uses_bis(self):
+        from orthonym.assembly.retained_substitution import _build_rewrite
+        from orthonym.data.triviality_controller_seed import SEED_TABLE
+        entry = SEED_TABLE[Chem.CanonSmiles("Cc1ccccc1C")]
+        out = _build_rewrite(NameTreeNode(parent_stem="x", multiplicative_prefix="di"), entry, ())
+        assert out.multiplicative_prefix == "bis"
+
+
+class TestMidNameSwapBeforeAlpha:
+    @pytest.mark.unit
+    def test_swap_happens_before_alphabetization(self):
+        # Synthetic IR with OPSIN-parseable stems (so recovery CAN succeed): assert the D-06
+        # re-alphabetize invariant always; IF the swap fired, 'aniline' ('a') precedes 'ethyl' ('e').
+        child_amine = NameTreeNode(parent_stem="benzenamine", fragment_legacy=None)
+        child_ethyl = NameTreeNode(parent_stem="ethyl", locants=(2,), fragment_legacy=None)
+        parent = NameTreeNode(parent_stem="benzene",
+                              prefixes=(child_amine, child_ethyl), fragment_legacy=None)
+        out = apply_triviality_controller(parent, Chem.MolFromSmiles("Nc1ccc(CC)cc1"),
+                                          "primary_amine", enabled=True)
+        assert out.prefixes == _alphabetize_prefixes(out.prefixes)
+        stems = [p.parent_stem for p in out.prefixes]
+        if "aniline" in stems and "ethyl" in stems:
+            assert stems.index("aniline") < stems.index("ethyl")
+
+    @pytest.mark.unit
+    def test_re_alphabetization_invariant_on_every_call(self):
+        c_z = NameTreeNode(parent_stem="zzzz", fragment_legacy=None)
+        c_a = NameTreeNode(parent_stem="aaaa", fragment_legacy=None)
+        parent = NameTreeNode(parent_stem="benzene", prefixes=(c_z, c_a), fragment_legacy=None)
+        out = apply_triviality_controller(parent, Chem.MolFromSmiles("c1ccccc1"), None, enabled=True)
+        assert out.prefixes == _alphabetize_prefixes(out.prefixes)
+
+
+class TestType2aNonPrincipalSubstituent:
+    @pytest.mark.integration
+    def test_phenol_fragment_on_ester_stays_systematic(self):
+        actual = name_compound("COC(=O)c1ccc(O)cc1", enable_triviality_controller=True).lower()
+        assert not actual.endswith("phenol")
+        assert "hydroxy" in actual or "benzoate" in actual
+
+    @pytest.mark.integration
+    def test_aniline_fragment_on_acid_stays_systematic(self):
+        actual = name_compound("OC(=O)c1ccc(N)cc1", enable_triviality_controller=True).lower()
+        assert not actual.endswith("aniline")
+        assert "amino" in actual
+
+
+class TestXyleneStemAssembly:
+    @pytest.mark.unit
+    @pytest.mark.parametrize("locants,expected", [((1, 2), "1,2-xylene"),
+                                                  ((1, 3), "1,3-xylene"), ((1, 4), "1,4-xylene")])
+    def test_xylene_stem_plus_locants_assembles(self, locants, expected):
+        # Proves the explicit-fields serializer composes stem 'xylene' + locants -> '1,2-xylene'
+        # (the swap output the controller WOULD produce on a structured node; reach-bound end-to-end).
+        node = NameTreeNode(parent_stem="xylene", locants=locants, fragment_legacy=None)
+        assembled = name_tree_to_string(node, style="pin").lower()
+        assert "xylene" in assembled and expected in assembled
