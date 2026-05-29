@@ -1,0 +1,88 @@
+canary_tier,fixture_id,smiles_input,name_output,opsin_parse_smiles,inchi_l1_match
+triv168,triv168_type1_01,c1ccoc1,furan,O1C=CC=C1,True
+triv168,triv168_type1_02,c1ccsc1,thiophene,S1C=CC=C1,True
+triv168,triv168_type1_03,c1cc[nH]c1,pyrrole,N1C=CC=C1,True
+triv168,triv168_type1_04,c1ccncc1,pyridine,N1=CC=CC=C1,True
+triv168,triv168_type1_05,c1ccnnc1,pyridazine,N1=NC=CC=C1,True
+triv168,triv168_type1_06,c1cncnc1,pyrimidine,N1=CN=CC=C1,True
+triv168,triv168_type1_07,c1cnccn1,pyrazine,N1=CC=NC=C1,True
+triv168,triv168_type1_08,C1COCCN1,morpholine,N1CCOCC1,True
+triv168,triv168_type1_09,C1CCNCC1,piperidine,N1CCCCC1,True
+triv168,triv168_type1_10,C1CCNC1,pyrrolidine,N1CCCC1,True
+triv168,triv168_type1_11,c1ccc2ccccc2c1,naphthalene,C1=CC=CC2=CC=CC=C12,True
+triv168,triv168_type1_12,c1ccc2[nH]ccc2c1,1H-indole,N1C=CC2=CC=CC=C12,True
+triv168,triv168_type1_13,c1ccc2cc3ccccc3cc2c1,anthracene,C1=CC=CC2=CC3=CC=CC=C3C=C12,True
+triv168,triv168_type1_14,c1ccc2c(c1)ccc1ccccc12,phenanthrene,C1=CC=CC=2C3=CC=CC=C3C=CC12,True
+triv168,triv168_type1_15,c1cc2ccc3cccc4ccc(c1)c2c34,pyrene,C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34,True
+triv168,triv168_type1_16,c1ccc2c(c1)Cc1ccccc1-2,fluorene,C1=CC=CC=2C3=CC=CC=C3CC12,True
+triv168,triv168_type1_17,C1C2CC3CC1CC(C2)C3,adamantane,C12CC3CC(CC(C1)C3)C2,True
+triv168,triv168_type1_18,c1cocn1,oxazole,O1C=NC=C1,True
+triv168,triv168_type1_19,Cc1ccncc1,4-methylpyridine,CC1=CC=NC=C1,True
+triv168,triv168_type1_20,Brc1ccc2ccccc2c1,2-bromonaphthalene,BrC1=CC2=CC=CC=C2C=C1,True
+triv168,triv168_type1_21,Cc1ccoc1,3-methylfuran,CC1=COC=C1,True
+triv168,triv168_type1_22,Clc1ccncc1,4-chloropyridine,ClC1=CC=NC=C1,True
+triv168,triv168_type1_23,Cc1cc[nH]c1,3-methylpyrrole,CC1=CNC=C1,True
+triv168,triv168_type1_24,Cc1ccsc1,3-methylthiophene,CC1=CSC=C1,True
+triv168,triv168_type1_25,Cc1ccc2ccccc2c1,2-methylnaphthalene,CC1=CC2=CC=CC=C2C=C1,True
+triv168,triv168_type1_26,Brc1ccncc1,4-bromopyridine,BrC1=CC=NC=C1,True
+triv168,triv168_type1_27,c1cnoc1,isoxazole,O1N=CC=C1,True
+triv168,triv168_type1_28,c1cscn1,thiazole,S1C=NC=C1,True
+triv168,triv168_type1_29,c1cnsc1,isothiazole,S1N=CC=C1,True
+triv168,triv168_type1_30,c1cn[nH]c1,pyrazole,N1N=CC=C1,True
+triv168,triv168_type1_31,c1c[nH]cn1,imidazole,N1C=NC=C1,True
+triv168,triv168_type1_32,c1ccc2ncccc2c1,quinoline,N1=CC=CC2=CC=CC=C12,True
+triv168,triv168_type1_33,c1ccc2cnccc2c1,isoquinoline,C1=NC=CC2=CC=CC=C12,True
+triv168,triv168_type1_34,c1ccc2nc3ccccc3cc2c1,acridine,C1=CC=CC2=NC3=CC=CC=C3C=C12,True
+triv168,triv168_type1_35,C1CNCCN1,piperazine,N1CCNCC1,True
+triv168,triv168_type1_36,C1CNNC1,pyrazolidine,N1NCCC1,True
+triv168,triv168_type1_37,C1CNCN1,imidazolidine,N1CNCC1,True
+triv168,triv168_type1_38,C1=CCOC=C1,2H-pyran,O1CC=CC=C1,True
+triv168,triv168_type1_39,c1cocn1,oxazole,O1C=NC=C1,True
+triv168,triv168_type1_40,Cc1cnccn1,2-methylpyrazine,CC1=NC=CN=C1,True
+triv168,triv168_type2a_01,Oc1ccccc1,phenol,C1(=CC=CC=C1)O,True
+triv168,triv168_type2a_02,Oc1ccc(Br)cc1,4-bromophenol,BrC1=CC=C(C=C1)O,True
+triv168,triv168_type2a_03,Oc1ccc(Cl)cc1,4-chlorophenol,ClC1=CC=C(C=C1)O,True
+triv168,triv168_type2a_04,Nc1ccccc1,aniline,NC1=CC=CC=C1,True
+triv168,triv168_type2a_05,OC(=O)c1ccccc1,benzoic acid,C(C1=CC=CC=C1)(=O)O,True
+triv168,triv168_type2a_06,CC(=O)O,acetic acid,C(C)(=O)O,True
+triv168,triv168_type2a_07,OC(=O)C(=O)O,dihydroxalate,C(=O)(O)C(=O)O,True
+triv168,triv168_type2a_08,Oc1cccc(Br)c1,3-bromophenol,BrC=1C=C(C=CC1)O,True
+triv168,triv168_type2a_09,OC(=O)c1ccc(Br)cc1,4-bromobenzoic acid,BrC1=CC=C(C(=O)O)C=C1,True
+triv168,triv168_type2a_10,Oc1ccc(I)cc1,4-iodophenol,IC1=CC=C(C=C1)O,True
+triv168,triv168_type2b_01,OC=O,formic acid,C(=O)O,True
+triv168,triv168_type2b_02,OC(=O)Br,1-bromocarbonylmethanoic acid,BrC(=O)C(=O)O,False
+triv168,triv168_type2b_03,OC(=O)F,1-fluorocarbonylmethanoic acid,FC(=O)C(=O)O,False
+triv168,triv168_type2b_04,OC(=O)Cl,1-carbonochloridoylmethanoic acid,C(=O)(Cl)C(=O)O,False
+triv168,triv168_type2c_01,COc1ccccc1,anisole,C1(=CC=CC=C1)OC,True
+triv168,triv168_type2c_02,COc1ccc(Br)cc1,1-bromo-4-methoxybenzene,BrC1=CC=C(C=C1)OC,True
+triv168,triv168_type2c_03,COc1ccccc1C,1-methoxy-2-methylbenzene,COC1=C(C=CC=C1)C,True
+triv168,triv168_type3_01,Cc1ccccc1,toluene,CC1=CC=CC=C1,True
+triv168,triv168_type3_02,Cc1ccccc1C,"1,2-dimethylbenzene",CC1=C(C=CC=C1)C,True
+triv168,triv168_type3_03,Cc1cccc(C)c1,"1,3-dimethylbenzene",CC1=CC(=CC=C1)C,True
+triv168,triv168_type3_04,Cc1ccc(C)cc1,"1,4-dimethylbenzene",CC1=CC=C(C=C1)C,True
+triv168,triv168_type3_05,Cc1ccc(Cl)cc1,1-chloro-4-methylbenzene,ClC1=CC=C(C=C1)C,True
+triv168,triv168_type3_06,Cc1ccc(Br)cc1,1-bromo-4-methylbenzene,BrC1=CC=C(C=C1)C,True
+triv168,triv168_type3_07,Cc1cccc(Cl)c1,1-chloro-3-methylbenzene,ClC1=CC(=CC=C1)C,True
+triv168,triv168_type3_08,Clc1ccccc1C,1-chloro-2-methylbenzene,ClC1=C(C=CC=C1)C,True
+triv168,triv168_prefix_01,c1ccccc1-c1ccccc1,biphenyl,C1(=CC=CC=C1)C1=CC=CC=C1,True
+triv168,triv168_prefix_02,OCc1ccccc1,(hydroxymethyl)benzene,OCC1=CC=CC=C1,True
+triv168,triv168_prefix_03,Clc1ccccc1,chlorobenzene,ClC1=CC=CC=C1,True
+triv168,triv168_prefix_04,Brc1ccccc1,bromobenzene,BrC1=CC=CC=C1,True
+triv168,triv168_prefix_05,Ic1ccccc1,iodobenzene,IC1=CC=CC=C1,True
+triv168,triv168_prefix_06,Fc1ccccc1,fluorobenzene,FC1=CC=CC=C1,True
+triv168,triv168_prefix_07,[O-][N+](=O)c1ccccc1,nitrobenzene,[N+](=O)([O-])C1=CC=CC=C1,True
+triv168,triv168_prefix_08,N#Cc1ccccc1,benzonitrile,C(C1=CC=CC=C1)#N,True
+triv168,triv168_deny_01,C=CC=C,"buta-1,3-diene",C=CC=C,True
+triv168,triv168_deny_02,OCCCO,"propane-1,3-diol",C(CCO)O,True
+triv168,triv168_deny_03,Oc1cccc(O)c1,resorcinol,C1(O)=CC(O)=CC=C1,True
+triv168,triv168_deny_04,Oc1ccc(O)cc1,hydroquinone,C1(O)=CC=C(O)C=C1,True
+triv168,triv168_deny_05,Oc1ccccc1O,catechol,C=1(O)C(O)=CC=CC1,True
+triv168,triv168_deny_06,OCCO,"ethane-1,2-diol",C(CO)O,True
+triv168,triv168_deny_07,CCC(=O)O,propanoic acid,C(CC)(=O)O,True
+triv168,triv168_deny_08,CCCC(=O)O,butanoic acid,C(CCC)(=O)O,True
+triv168,triv168_deny_09,OC(=O)CC(=O)O,propanedioic acid,C(CC(=O)O)(=O)O,True
+triv168,triv168_deny_10,CC(C)C,2-methylpropane,CC(C)C,True
+triv168,triv168_hyg04_01,CN(C)CCOC(c1ccccc1)c1ccccc1,"N,N-dimethyl-2-diphenylmethoxyethan-1-amine",CN(CCOC(C1=CC=CC=C1)C1=CC=CC=C1)C,True
+triv168,triv168_hyg04_02,OCCOC(c1ccccc1)c1ccccc1,2-diphenylmethoxyethan-1-ol,C1(=CC=CC=C1)C(OCCO)C1=CC=CC=C1,True
+triv168,triv168_hyg04_03,OCCCOC(c1ccccc1)c1ccccc1,3-diphenylmethoxypropan-1-ol,C1(=CC=CC=C1)C(OCCCO)C1=CC=CC=C1,True
+triv168,triv168_hyg04_04,OCCCCOC(c1ccccc1)c1ccccc1,4-diphenylmethoxybutan-1-ol,C1(=CC=CC=C1)C(OCCCCO)C1=CC=CC=C1,True
