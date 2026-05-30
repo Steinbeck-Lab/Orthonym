@@ -105,11 +105,16 @@ class OpsinOracle:
         if key in self._cache:
             return self._cache[key]
         if self._jar is None:
-            # Graceful fallback (RESEARCH section 3.8): T2 cannot run; permit the swap (T1 already
-            # verified RT safety at seed load). Stage A canary stays byte-identical anyway because
-            # Stage A does not surface the rewrite.
-            self._cache[key] = True
-            return True
+            # CR-03 (code review 2026-05-30): FAIL CLOSED. With no OPSIN jar the T2 round-trip
+            # CANNOT be verified, so the swap must be REJECTED (keep the systematic form) — a
+            # safety gate that fails open is worse than no gate. The earlier "T1 already verified
+            # RT safety at seed load" justification does NOT hold: T1 validates the BARE
+            # ``retained_pin_name``, whereas ``post_swap_subtree_str`` is the FULL post-swap
+            # subtree (parent + substituents/locants), a different string. TRIV-03 is "RT-safety
+            # by construction": never emit a retained name we could not round-trip. Stage A stays
+            # byte-identical regardless (the flag is OFF, so the controller is never invoked).
+            self._cache[key] = False
+            return False
         try:
             result = subprocess.run(
                 ["java", "-jar", self._jar, "-osmi"],
@@ -247,15 +252,23 @@ def _walk(
     # Build the candidate rewrite (this DOES change parent_stem => fragment_legacy=None per #2/Pitfall 1).
     rewritten = _build_rewrite(node, seed_entry, new_prefixes)
 
-    # T2 runtime RT-safety check (CONTEXT D-07 + TRIV-03).
-    if opsin_oracle is not None:
-        from .name_tree_to_string import name_tree_to_string
-        post_swap_str = name_tree_to_string(rewritten, style="pin")
-        if not opsin_oracle.rt_safe(canonical, post_swap_str):
-            # RT-unsafe => silently reject swap (the systematic form is kept). CONTEXT D-07 + Pitfall 6.
-            # #2 fix: reset fragment_legacy IFF a child changed (the swap of THIS node is rejected,
-            # but a child below may have changed).
-            return _replace_preserving_or_resetting_legacy(node, new_prefixes)
+    # T2 runtime RT-safety check (CONTEXT D-07 + TRIV-03 "RT-safety by construction").
+    # CR-03 (code review 2026-05-30): a swap is emitted ONLY when the oracle verifies that the
+    # post-swap subtree round-trips. No oracle => the round-trip CANNOT be verified => FAIL CLOSED
+    # (keep the systematic form). Previously a None oracle fell straight through to
+    # ``return rewritten``, emitting the swap UNVERIFIED — the same fail-open class as the
+    # jar-None path in ``OpsinOracle.rt_safe``. In production the candidate_pool / _fallback
+    # wiring always passes a non-None OpsinOracle when the flag is ON; the unit tests that
+    # exercise swap LOGIC do so via ``_build_rewrite`` / ``_type_*_check`` directly (no oracle).
+    if opsin_oracle is None:
+        return _replace_preserving_or_resetting_legacy(node, new_prefixes)
+    from .name_tree_to_string import name_tree_to_string
+    post_swap_str = name_tree_to_string(rewritten, style="pin")
+    if not opsin_oracle.rt_safe(canonical, post_swap_str):
+        # RT-unsafe => silently reject swap (the systematic form is kept). CONTEXT D-07 + Pitfall 6.
+        # #2 fix: reset fragment_legacy IFF a child changed (the swap of THIS node is rejected,
+        # but a child below may have changed).
+        return _replace_preserving_or_resetting_legacy(node, new_prefixes)
 
     return rewritten
 
