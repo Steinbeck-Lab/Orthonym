@@ -733,6 +733,20 @@ class CandidatePool:
         self._triv_oracle = None
         self._triv_flag_initialized: bool = False
 
+    def _bind_triviality_features(self, features: Any) -> None:
+        """Bind the Phase 168 controller flag/oracle off the authoritative per-call ``features``.
+
+        WR-06 (code review 2026-05-30): the flag is a per-``Orthonym()``-call constant (namer
+        stashes it on ``features`` in ``_classify`` before ``assemble_name``), so it is bound at
+        pool CONSTRUCTION via ``push_pool(features)`` / ``clear_pool(features)`` rather than
+        lifted off whichever candidate happens to call ``add()`` first. Idempotent: marks the
+        pool initialized so the ``add()`` fallback below does not re-lift.
+        """
+        self._enable_triviality_controller = getattr(
+            features, '_enable_triviality_controller', False)
+        self._triv_oracle = getattr(features, '_triv_oracle', None)
+        self._triv_flag_initialized = True
+
     def add(
         self,
         name: str,
@@ -765,15 +779,14 @@ class CandidatePool:
             None if Tier B gate rejected (cand.confidence <
             CONFIDENCE_GATE_THRESHOLD).
         """
-        # Phase 168 BLOCKER #9 fix (reviews iter 1): lift the controller flag+oracle off the
-        # per-call `features` onto the pool instance ONCE (idempotent). This is the REAL set-site —
-        # __init__ has no features arg (candidate_pool.py:721), so it cannot set these. namer.py
-        # stashes them onto features in _classify (the features._ring_info transient pattern).
+        # WR-06 (code review 2026-05-30): the controller flag/oracle are bound at pool
+        # CONSTRUCTION from the authoritative per-call `features` (push_pool/clear_pool ->
+        # _bind_triviality_features). This lazy lift is now only the FALLBACK for pools created
+        # WITHOUT features — get_current_pool()'s auto-push and isolated unit tests — binding off
+        # the first add()'s features idempotently. In production the pool is already initialized
+        # at construction, so this no-ops (it never depends on add() ordering).
         if not self._triv_flag_initialized:
-            self._enable_triviality_controller = getattr(
-                features, '_enable_triviality_controller', False)
-            self._triv_oracle = getattr(features, '_triv_oracle', None)
-            self._triv_flag_initialized = True
+            self._bind_triviality_features(features)
         policy = HANDLER_POLICIES.get(handler_id)
         # Compute confidence WITHOUT parent_atom_indices (Risk 1 mitigation)
         cand = compute_confidence(name, handler_id, features)
@@ -1088,7 +1101,7 @@ def _ensure_stack() -> List[CandidatePool]:
     return _pool_store.stack
 
 
-def push_pool() -> CandidatePool:
+def push_pool(features: Any = None) -> CandidatePool:
     """Push a fresh pool onto the per-thread stack and return it.
 
     Called by assemble_name() prologue (composer.py). MUST be paired with
@@ -1100,11 +1113,19 @@ def push_pool() -> CandidatePool:
     ORTHONYM_SELECTION_MODE=score_based to activate the two-tier selector
     end-to-end without a code revert.
 
+    WR-06 (code review 2026-05-30): when ``features`` is provided, the Phase 168
+    controller flag/oracle are bound NOW (construction) off that authoritative
+    per-call features object, instead of being lifted lazily off the first
+    add() call. ``features=None`` (get_current_pool auto-push, tests) leaves the
+    pool's flag at its safe default and the add() fallback binds it later.
+
     Returns the new pool that is now the active cascade scope for the
     currently-executing assemble_name() call.
     """
     stack = _ensure_stack()
     new_pool = CandidatePool(selection_mode=_DEFAULT_SELECTION_MODE)
+    if features is not None:
+        new_pool._bind_triviality_features(features)
     stack.append(new_pool)
     return new_pool
 
@@ -1137,7 +1158,7 @@ def get_current_pool() -> CandidatePool:
     return stack[-1]
 
 
-def clear_pool() -> None:
+def clear_pool(features: Any = None) -> None:
     """BACKWARD-COMPAT: replace the top of the stack with a fresh pool.
 
     Pre-fix code (Plan 03) called clear_pool() in assemble_name()'s prologue
@@ -1148,12 +1169,18 @@ def clear_pool() -> None:
     Behavior: if the stack is empty, push a fresh pool (same as pre-fix
     lazy init); if non-empty, replace the top so the current cascade restarts
     cleanly without affecting outer cascades on the stack.
+
+    WR-06 (code review 2026-05-30): binds the Phase 168 controller flag/oracle
+    off ``features`` at construction (see push_pool) when provided.
     """
     stack = _ensure_stack()
     if stack:
-        stack[-1] = CandidatePool(selection_mode=_DEFAULT_SELECTION_MODE)
+        new_pool = CandidatePool(selection_mode=_DEFAULT_SELECTION_MODE)
+        if features is not None:
+            new_pool._bind_triviality_features(features)
+        stack[-1] = new_pool
     else:
-        push_pool()
+        push_pool(features)
 
 
 # ---------------------------------------------------------------------------

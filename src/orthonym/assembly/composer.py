@@ -718,7 +718,7 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
     Returns:
         Complete IUPAC name string
     """
-    push_pool()
+    push_pool(features)  # WR-06: bind Phase 168 controller flag/oracle at pool construction
     try:
         return _assemble_name_impl(features, style, _composing_ion)
     finally:
@@ -765,7 +765,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # MUST appear next to clear_confidence() to guarantee per-call state
     # isolation between consecutive orthonym.name() calls (T-145.1-02
     # mitigation, verified by tests/integration/test_pool_state_isolation.py).
-    clear_pool()
+    # WR-06: bind the Phase 168 controller flag/oracle off `features` at construction (this
+    # clear_pool replaces the push_pool() pool from the wrapper, so it owns the active pool).
+    clear_pool(features)
 
     # INST: Assembly dispatch trace
     if logger.isEnabledFor(logging.DEBUG):
@@ -940,8 +942,16 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _rw = name_tree_to_string(_best.tree_rewritten, style=style)
                     if _rw:
                         return _rw
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # WR-05 (code review 2026-05-30): fail SAFE (fall back to the systematic
+                    # name) but never SILENT — a bare except-pass hid genuine controller/
+                    # serializer logic errors and made a broken controller look like a clean
+                    # no-op. Correctness against malformed-but-valid strings comes from the
+                    # RT-gate (CR-03) + _build_rewrite (CR-01/CR-02), not from swallowing here.
+                    logger.warning(
+                        "Phase 168 Stage-B re-render failed on amide surface: %s; "
+                        "falling back to systematic name", exc,
+                    )
             return pool.best().name
 
     # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
@@ -969,8 +979,12 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     _rw = name_tree_to_string(_best.tree_rewritten, style=style)
                     if _rw:
                         return _rw
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # WR-05 (code review 2026-05-30): fail SAFE but never SILENT (see amide).
+                    logger.warning(
+                        "Phase 168 Stage-B re-render failed on amine surface: %s; "
+                        "falling back to systematic name", exc,
+                    )
             return pool.best().name
 
     # Phase 160.2 Plan-02-04: chain-fallback section (composer.py:935-1082 in
@@ -1004,8 +1018,12 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 _rw = name_tree_to_string(_rw_tree, style=style)
                 if _rw:
                     return _rw
-            except Exception:
-                pass
+            except Exception as exc:
+                # WR-05 (code review 2026-05-30): fail SAFE but never SILENT (see amide).
+                logger.warning(
+                    "Phase 168 Stage-B re-render failed on _fallback surface: %s; "
+                    "falling back to systematic name", exc,
+                )
         return _fallback.name
     # Truly empty result — degenerate molecule. Return empty string preserving
     # pre-amendment behavior (chain-fallback section returned pool.best().name
