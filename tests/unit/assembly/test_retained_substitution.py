@@ -72,13 +72,39 @@ class TestType1Branch:
         assert out.iupac_section_cite == entry.iupac_p_section
 
 
+def _real_principal_group(smiles):
+    """The actual ``features.principal_group`` value the controller compares against — driven
+    through the perception layer so a test cannot encode a stale literal (WR-02)."""
+    from orthonym.perception.functional_groups import detect_functional_groups
+    from orthonym.rules.seniority import get_principal_group
+    mol = Chem.MolFromSmiles(smiles)
+    pg_name, _ = get_principal_group(mol, detect_functional_groups(mol))
+    return pg_name
+
+
 class TestType2aBranch:
-    """Type 2a (P-15.1.8.2.1): principal-group-bound swap; refuses on PG mismatch (Pitfall 2)."""
+    """Type 2a (P-15.1.8.2.1): principal-group-bound swap; refuses on PG mismatch (Pitfall 2).
+
+    CR-04 + WR-02 (code review 2026-05-30): these drive ``_type_2a_check`` with the REAL
+    ``get_principal_group`` output (NOT a hand-written literal). The pre-fix seed required
+    "primary_alcohol"/"primary_amine", but perception returns "phenol"/"aromatic_amine", so the
+    phenol/aniline swaps could NEVER fire — and the old ``test_phenol_swap_with_matching_pg``
+    passed only because it fed the same wrong literal the seed held. Asserting the perceived PG
+    value here fails the suite if the seed vocabulary and perception ever drift apart again."""
 
     @pytest.mark.unit
-    def test_phenol_swap_with_matching_pg(self):
+    def test_phenol_swap_with_real_pg(self):
         entry = _entry("Oc1ccccc1")
-        assert _type_2a_check(NameTreeNode(parent_stem="benzenol"), "primary_alcohol", entry) is True
+        real_pg = _real_principal_group("Oc1ccccc1")
+        assert real_pg == "phenol", f"perception drift: get_principal_group(phenol)={real_pg!r}"
+        assert _type_2a_check(NameTreeNode(parent_stem="benzenol"), real_pg, entry) is True
+
+    @pytest.mark.unit
+    def test_aniline_swap_with_real_pg(self):
+        entry = _entry("Nc1ccccc1")
+        real_pg = _real_principal_group("Nc1ccccc1")
+        assert real_pg == "aromatic_amine", f"perception drift: get_principal_group(aniline)={real_pg!r}"
+        assert _type_2a_check(NameTreeNode(parent_stem="benzenamine"), real_pg, entry) is True
 
     @pytest.mark.unit
     def test_phenol_refuses_swap_when_pg_mismatch(self):

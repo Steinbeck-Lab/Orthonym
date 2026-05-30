@@ -430,8 +430,9 @@ class TestMidNameSwapBeforeAlpha:
         child_ethyl = NameTreeNode(parent_stem="ethyl", locants=(2,), fragment_legacy=None)
         parent = NameTreeNode(parent_stem="benzene",
                               prefixes=(child_amine, child_ethyl), fragment_legacy=None)
+        # CR-04: aniline's real principal_group is "aromatic_amine" (NOT "primary_amine").
         out = apply_triviality_controller(parent, Chem.MolFromSmiles("Nc1ccc(CC)cc1"),
-                                          "primary_amine", enabled=True)
+                                          "aromatic_amine", enabled=True)
         assert out.prefixes == _alphabetize_prefixes(out.prefixes)
         stems = [p.parent_stem for p in out.prefixes]
         if "aniline" in stems and "ethyl" in stems:
