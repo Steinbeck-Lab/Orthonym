@@ -488,3 +488,53 @@ class TestXyleneStemAssembly:
         assert assembled == expected, f"{smiles}: expected {expected!r} got {assembled!r}"
         loc_cluster = expected.split("-")[0]  # "1,2"
         assert assembled.count(loc_cluster) == 1, f"CR-01 doubled-locant regression: {assembled!r}"
+
+
+class TestControllerPositiveSwapFires:
+    """WR-03 (code review 2026-05-30): the end-to-end TestType1Branch / TestType2aBranch tests
+    above pass via the PRE-EXISTING retained-name machinery (OFF == ON, the controller is the
+    0-fire reach-bound) — they would stay green even if ``apply_triviality_controller`` were a
+    ``return tree`` stub. These drive the controller's FULL positive path (recovery -> seed match
+    -> type dispatch -> ``_build_rewrite`` -> RT-gate) on a synthetic STRUCTURED node and assert
+    the swap actually FIRED via fingerprints a stub/no-fire cannot leave: ``iupac_section_cite``
+    stamped from the seed and ``fragment_legacy`` reset to None. Jar-gated because CR-03 makes the
+    RT-gate fail closed without OPSIN."""
+
+    @pytest.mark.integration
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles,p_section", [
+        ("c1ccoc1", "P-22.2.1"),    # furan (Type 1)
+        ("c1ccncc1", "P-22.2.1"),   # pyridine (Type 1)
+        ("c1ccccc1", "P-22.1.2"),   # benzene (Type 1)
+    ])
+    def test_full_path_swap_fires(self, smiles, p_section):
+        if not _P168_OPSIN_AVAILABLE:
+            pytest.skip("OPSIN/Java unavailable — RT-gate fails closed without a jar (CR-03)")
+        from orthonym.assembly.retained_substitution import (
+            apply_triviality_controller, OpsinOracle,
+        )
+        from orthonym.data.triviality_controller_seed import SEED_TABLE
+        entry = SEED_TABLE[Chem.CanonSmiles(smiles)]
+        # Structured node (parent_stem != fragment_legacy => not coarse) whose parent_stem
+        # recovers (Path B token-match) to the seed SMILES. The sentinel cite/fragment_legacy are
+        # cleared ONLY by a real _build_rewrite swap.
+        node = NameTreeNode(parent_stem=entry.retained_pin_name,
+                            iupac_section_cite=None, fragment_legacy="SENTINEL")
+        oracle = OpsinOracle(opsin_jar=_P168_OPSIN_JAR)
+        out = apply_triviality_controller(node, Chem.MolFromSmiles(smiles), None,
+                                          opsin_oracle=oracle, enabled=True)
+        assert out.iupac_section_cite == p_section, \
+            f"{smiles}: swap did not fire (controller behaving as a no-op?)"
+        assert out.fragment_legacy is None, f"{smiles}: swap did not reset fragment_legacy"
+
+    @pytest.mark.integration
+    def test_swap_rejected_when_rt_unverifiable(self):
+        # CR-03 differential: with NO oracle the post-swap round-trip cannot be verified, so the
+        # controller MUST keep the systematic form (fail closed) — the swap fingerprints are NOT
+        # stamped even though recovery (Path B) + seed match + Type-1 check all succeed.
+        from orthonym.assembly.retained_substitution import apply_triviality_controller
+        node = NameTreeNode(parent_stem="furan", iupac_section_cite=None, fragment_legacy="SENTINEL")
+        out = apply_triviality_controller(node, Chem.MolFromSmiles("c1ccoc1"), None,
+                                          opsin_oracle=None, enabled=True)
+        assert out.iupac_section_cite is None and out.fragment_legacy == "SENTINEL", \
+            "swap fired without RT verification (CR-03 fail-open regression)"
