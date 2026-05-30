@@ -461,12 +461,29 @@ class TestType2aNonPrincipalSubstituent:
 
 
 class TestXyleneStemAssembly:
+    """CR-01 regression (code review 2026-05-30). The swap output for a xylene is built by
+    ``_build_rewrite``, NOT a hand-assembled ``NameTreeNode(parent_stem="xylene", ...)`` the
+    controller never produces. ``_build_rewrite`` sets ``parent_stem`` to the FULL seed name
+    ("1,2-xylene") and — because the retained name already embeds the locant cluster — RESETS
+    ``node.locants`` to () so the serializer does NOT prepend a second cluster. The pre-fix code
+    kept ``locants=(1,2)`` AND ``parent_stem="1,2-xylene"`` and emitted the malformed
+    "1,2-1,2-xylene". This test exercises the REAL swap path so the bug cannot hide again."""
+
     @pytest.mark.unit
-    @pytest.mark.parametrize("locants,expected", [((1, 2), "1,2-xylene"),
-                                                  ((1, 3), "1,3-xylene"), ((1, 4), "1,4-xylene")])
-    def test_xylene_stem_plus_locants_assembles(self, locants, expected):
-        # Proves the explicit-fields serializer composes stem 'xylene' + locants -> '1,2-xylene'
-        # (the swap output the controller WOULD produce on a structured node; reach-bound end-to-end).
-        node = NameTreeNode(parent_stem="xylene", locants=locants, fragment_legacy=None)
-        assembled = name_tree_to_string(node, style="pin").lower()
-        assert "xylene" in assembled and expected in assembled
+    @pytest.mark.parametrize("smiles,locants,expected", [
+        ("Cc1ccccc1C", (1, 2), "1,2-xylene"),
+        ("Cc1cccc(C)c1", (1, 3), "1,3-xylene"),
+        ("Cc1ccc(C)cc1", (1, 4), "1,4-xylene"),
+    ])
+    def test_build_rewrite_emits_single_locant_xylene(self, smiles, locants, expected):
+        from orthonym.assembly.retained_substitution import _build_rewrite
+        from orthonym.data.triviality_controller_seed import SEED_TABLE
+        entry = SEED_TABLE[Chem.CanonSmiles(smiles)]
+        # A bare dimethylbenzene structured node carrying the locants _type_3_check gates on.
+        node = NameTreeNode(parent_stem="dimethylbenzene-stem", locants=locants, fragment_legacy=None)
+        out = _build_rewrite(node, entry, ())
+        assembled = name_tree_to_string(out, style="pin").lower()
+        # Exact match: the retained PIN, with the locant cluster appearing EXACTLY ONCE.
+        assert assembled == expected, f"{smiles}: expected {expected!r} got {assembled!r}"
+        loc_cluster = expected.split("-")[0]  # "1,2"
+        assert assembled.count(loc_cluster) == 1, f"CR-01 doubled-locant regression: {assembled!r}"

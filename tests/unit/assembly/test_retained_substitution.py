@@ -187,6 +187,53 @@ class TestFrozenDataclassInvariants:
         assert out.multiplicative_prefix == "bis"
 
 
+class TestCompleteNameFieldReset:
+    """CR-01 + CR-02 regression (code review 2026-05-30): ``_build_rewrite`` resets the fields a
+    COMPLETE retained name already subsumes (Type 2a/2b/2c/3: locants, suffix, indicated_h,
+    unsaturation) and PRESERVES the principal-group suffix for a BARE Type-1 parent hydride.
+    Each case serializes the rewritten node to prove the absence of the double-render bug
+    (pre-fix: "acetic acidoic acid", "1,2-1,2-xylene")."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,suffix,expected", [
+        ("CC(=O)O", "oic acid", "acetic acid"),        # CR-02
+        ("O=C(O)c1ccccc1", "ic acid", "benzoic acid"),
+        ("O=C(O)C(=O)O", "dioic acid", "oxalic acid"),
+    ])
+    def test_acid_swap_clears_redundant_suffix(self, smiles, suffix, expected):
+        from orthonym.assembly.name_tree_to_string import name_tree_to_string
+        entry = _entry(smiles)
+        out = _build_rewrite(NameTreeNode(parent_stem="systematic-stem", suffix=suffix), entry, ())
+        assert out.suffix is None, "a complete acid name must clear the redundant node.suffix"
+        assert name_tree_to_string(out, style="pin") == expected
+
+    @pytest.mark.unit
+    def test_phenol_swap_clears_suffix_and_locants(self):
+        from orthonym.assembly.name_tree_to_string import name_tree_to_string
+        entry = _entry("Oc1ccccc1")
+        out = _build_rewrite(NameTreeNode(parent_stem="benzen", suffix="ol", locants=(1,)), entry, ())
+        assert out.suffix is None and out.locants == ()
+        assert name_tree_to_string(out, style="pin") == "phenol"
+
+    @pytest.mark.unit
+    def test_type1_preserves_principal_group_suffix(self):
+        # Type 1 retained name is a BARE parent hydride; the -ol suffix is NOT embedded in
+        # "naphthalene", so it MUST survive (dropping it would lose the principal group).
+        entry = _entry("c1ccc2ccccc2c1")  # naphthalene (Type 1)
+        out = _build_rewrite(NameTreeNode(parent_stem="naphthalen", suffix="ol", locants=(2,)), entry, ())
+        assert out.parent_stem == "naphthalene"
+        assert out.suffix == "ol" and out.locants == (2,)
+
+    @pytest.mark.unit
+    def test_type1_resets_indicated_h_no_double(self):
+        # "1H-pyrrole" embeds its own indicated H; a node carrying indicated_h must not double it.
+        from orthonym.assembly.name_tree_to_string import name_tree_to_string
+        entry = _entry("c1cc[nH]c1")
+        out = _build_rewrite(NameTreeNode(parent_stem="azole-stem", indicated_h=(1,)), entry, ())
+        assert out.indicated_h == ()
+        assert name_tree_to_string(out, style="pin") == "1H-pyrrole"
+
+
 class TestFragmentLegacyConditionalReset:
     """#2 FIX (reviews iter 1): _replace_preserving_or_resetting_legacy resets fragment_legacy
     when a child changed (the serializer short-circuit would otherwise discard the rewrite) and

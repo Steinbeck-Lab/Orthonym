@@ -9,7 +9,9 @@ Implements TRIV-01/02/03 via a pure functional transform ``NameTreeNode -> NameT
   - Multiplier-feedback after every swap (D-05; TRIV-02): re-derive the di<->bis multiplier
     on the swapped node via ``get_multiplier_prefix`` (which consults ``is_complex_substituent``)
     — never a static per-entry flag.
-  - Re-alphabetization after every swap (D-06): ``_alphabetize_prefixes``.
+  - Re-alphabetization of the node whose prefixes changed, applied when that node is
+    re-emitted (D-06): ``_alphabetize_prefixes`` (NOT a sibling-reorder at the swapped node's
+    own level — the leaves-first walk re-alphabetizes a parent when the parent is visited).
   - T2 runtime OPSIN-RT cache (D-07; TRIV-03; memoized per ``(post_swap_subtree_str,
     pre_swap_canon)`` in a plain dict). On RT mismatch: silently keep systematic form +
     emit ``ControllerEvent(kind='swap_reject_rt_unsafe')``.
@@ -56,7 +58,12 @@ from typing import Dict, Optional, Tuple
 from rdkit import Chem
 
 from .name_tree import NameTreeNode, _alphabetize_prefixes, is_coarse_node
-from .naming_utils import get_multiplier_prefix, is_complex_substituent
+from .naming_utils import (
+    COMPLEX_MULTIPLIERS,
+    SIMPLE_MULTIPLIERS,
+    get_multiplier_prefix,
+    is_complex_substituent,
+)
 
 # Lazy import of SEED_TABLE / SubstitutionType inside function bodies (Pattern S3)
 # to avoid circular-import risk if data/ initialization is not finished.
@@ -64,11 +71,14 @@ from .naming_utils import get_multiplier_prefix, is_complex_substituent
 logger = logging.getLogger(__name__)
 
 # Multiplier -> occurrence count, for TRIV-02 di<->bis re-derivation after a swap.
-_MULT_COUNT = {
-    "di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6, "hepta": 7,
-    "octa": 8, "nona": 9, "deca": 10,
-    "bis": 2, "tris": 3, "tetrakis": 4, "pentakis": 5, "hexakis": 6,
-    "heptakis": 7, "octakis": 8, "nonakis": 9, "decakis": 10,
+# IN-04 (code review 2026-05-30): derived by INVERTING the canonical naming_utils maps
+# (single source of truth) instead of a hand-maintained local copy. The previous literal
+# table stopped at deca/decakis (10) and would silently diverge if naming_utils gained
+# undeca-/dodeca-/... — the inversion tracks SIMPLE_MULTIPLIERS / COMPLEX_MULTIPLIERS exactly
+# (both currently extend to icosa/icosakis = 20).
+_MULT_COUNT: Dict[str, int] = {
+    **{prefix: count for count, prefix in SIMPLE_MULTIPLIERS.items()},
+    **{prefix: count for count, prefix in COMPLEX_MULTIPLIERS.items()},
 }
 
 
@@ -288,13 +298,47 @@ def _build_rewrite(
     (which calls ``get_multiplier_prefix``), and the parenthesization hint is re-derived via
     ``is_complex_substituent`` (P-16.3.4) — both single-source-of-truth predicates, never a static
     flag.
+
+    CR-01 + CR-02 (code review 2026-05-30): the seed ``retained_pin_name`` comes in two shapes,
+    and the rewrite MUST reset the fields the retained string already subsumes or the serializer
+    DOUBLE-renders them (name_tree_to_string.py:185-187 re-prepends locants; :192 re-appends
+    suffix):
+
+      * Type 1 (P-15.1.8.1) — a BARE parent hydride ("benzene", "furan", "1H-pyrrole"). The
+        principal-characteristic-group suffix is NOT part of the retained name, so ``suffix`` and
+        its ``locants`` are PRESERVED (e.g. a 2-ol on naphthalene survives the swap). Only
+        ``indicated_h`` and ring ``unsaturation_locants`` are subsumed by the parent-hydride name
+        ("1H-pyrrole" already carries its own 1H; "furan" its own aromaticity) — reset them so we
+        never emit "1H-1H-pyrrole".
+      * Type 2a / 2b / 2c / 3 — a COMPLETE name that already embeds the principal group and/or
+        the intrinsic locants: "phenol"/"aniline" (the -ol/-amine), "acetic acid"/"benzoic acid"
+        (the acid word), "1,2-xylene" (the locant cluster), "anisole"/"toluene". Keeping
+        ``node.suffix`` here produced "acetic acidoic acid" (CR-02); keeping ``node.locants``
+        produced "1,2-1,2-xylene" (CR-01). Both are reset; only the substituent ``prefixes``
+        survive (Type 2a/2b permit senior-group-bound / compulsory-prefix substitution; Type 2c
+        and Type 3 require ``node.prefixes`` empty via their type checks, so nothing is carried).
+
+    ``substitution_type`` is the single source of truth for the complete-vs-bare split — there is
+    no hand-maintained per-entry flag to drift. ``seed_entry.locant_context`` is consumed ONLY by
+    ``_type_3_check`` as a MATCH criterion now, never re-emitted as output locants.
     """
+    from ..data.triviality_controller_seed import SubstitutionType
+
     new_name = seed_entry.retained_pin_name
+    is_complete = seed_entry.substitution_type != SubstitutionType.TYPE_1
+    if is_complete:
+        new_suffix = None
+        new_locants: Tuple[int, ...] = ()
+    else:
+        new_suffix = node.suffix
+        new_locants = node.locants if node.suffix else ()
     return dataclasses.replace(
         node,
         parent_stem=new_name,
-        locants=(tuple(seed_entry.locant_context)
-                 if seed_entry.locant_context else node.locants),
+        suffix=new_suffix,
+        locants=new_locants,
+        indicated_h=(),                 # subsumed by the retained parent name (e.g. "1H-pyrrole")
+        unsaturation_locants=((), ()),  # subsumed by the retained stem (e.g. "furan", "indene")
         prefixes=_alphabetize_prefixes(new_prefixes),  # D-06 always-re-run
         multiplicative_prefix=_recompute_multiplicative_prefix(
             node.multiplicative_prefix, new_name),  # TRIV-02 (D-05)
