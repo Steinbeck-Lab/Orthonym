@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-31T07:28:27Z",
+  "source": "Phase 169 Plan-01 audit per CONTEXT D-02/D-03; TOPOLOGY ONLY; prefix output strings resolve through seniority.PREFIX_FORMS / assembly.substituent_prefix_forms at runtime and are NEVER duplicated here. Scope bounded to the empirically-firing splittable composites measured by  (ester 482 + thioester 24 events). Citations: QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook) + offline IUPAC_BlueBook_Organic_Naming_Guide.docx.",
+  "rdkit_version_pin": "2026.03.1",
+  "opsin_jar_sha256": "c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f",
+  "total_entries": 2,
+  "entries": [
+    {
+      "fg_name": "ester",
+      "composite_smarts": "[CX3](=O)[OX2][#6]",
+      "components": [
+        {"role": "chalcogen", "bond": "=O", "resolves_via": "ketone"},
+        {"role": "linker", "atom": "O", "resolves_via": "ether"}
+      ],
+      "encoding": "ester_split_oxo_alkoxy",
+      "iupac_p_section": "P-66.6.1, P-68.3.1.2.1",
+      "opsin_rt_verified_at": "2026-05-31T07:28:27Z",
+      "notes": "Losing ester -C(=O)-O-R: the carbonyl carbon stays in the substituent chain bearing the chalcogen (=O -> resolves to the oxo prefix via the ketone PREFIX_FORMS entry) and the -O-R linker (-> resolves to the alkoxy/ether prefix via the ether dispatcher). Verified example: monoethyl succinate -> 4-ethoxy-4-oxobutanoic acid (OPSIN-RT connectivity-InChI match)."
+    },
+    {
+      "fg_name": "thioester",
+      "composite_smarts": "[CX3](=O)[SX2][#6]",
+      "components": [
+        {"role": "chalcogen", "bond": "=O", "resolves_via": "ketone"},
+        {"role": "linker", "atom": "S", "resolves_via": "thioether"}
+      ],
+      "encoding": "thioester_split_oxo_alkylthio",
+      "iupac_p_section": "P-66.6.1, P-63.1.5",
+      "opsin_rt_verified_at": "2026-05-31T07:28:27Z",
+      "notes": "Losing thioester -C(=O)-S-R: the carbonyl carbon stays in the substituent chain bearing the chalcogen (=O -> resolves to the oxo prefix via the ketone PREFIX_FORMS entry) and the -S-R linker (-> resolves to the alkylsulfanyl prefix via the thioether dispatcher). Verified example: S-ethyl monothiosuccinate -> 4-(ethylsulfanyl)-4-oxobutanoic acid (OPSIN-RT connectivity-InChI match)."
+    }
+  ]
+}
