@@ -191,3 +191,34 @@ class TestSulfoNotDropped:
         assert name is not None
         assert "sulfo" in name.lower(), f"Sulfo dropped with acid: {name}"
         assert "acid" in name.lower() or "carboxyl" in name.lower()
+
+
+@pytest.mark.integration
+class TestSplitNotDropped:
+    """Phase 169 POLY-01: a previously-DROP-23-dropped composite loser FG now
+    APPEARS in the name (flag-ON group-splitting). The thioester is the hard
+    whole-molecule anchor; the ester is asserted at the decomposition level
+    (RESEARCH Pitfall 4 — monoethyl succinate is named via ``ethoxycarbonyl``,
+    a moving-base-atom / Phase-172 path, not DROP-23)."""
+
+    def test_thioester_loser_not_dropped(self):
+        """S-ethyl monothiosuccinate: the previously-dropped =O is recovered as oxo
+        and the -S-Et linker as ethylsulfanyl (flag ON)."""
+        name = name_compound("OC(=O)CCC(=O)SCC", enable_group_splitting=True)
+        assert name is not None
+        low = name.lower()
+        assert "oxo" in low, f"thioester chalcogen dropped: {name}"
+        assert "sulfanyl" in low, f"thioester linker dropped: {name}"
+
+    def test_ester_loser_not_dropped(self):
+        """Ester loser decomposes to oxo + R-oxy (the dropped group's sub-prefixes
+        are recovered by split_composite_fg — the no-drop guarantee at the
+        mechanism level)."""
+        from rdkit import Chem
+        from orthonym.assembly.group_splitting import split_composite_fg
+        mol = Chem.MolFromSmiles("OC(=O)CCC(=O)OCC")
+        match = mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3](=O)[OX2][#6]"))[0]
+        comps = split_composite_fg("ester", mol, match, None)
+        assert comps is not None, "ester loser dropped (no split components)"
+        forms = {c.prefix_form for c in comps}
+        assert "oxo" in forms and any(f.endswith("oxy") and f != "oxo" for f in forms), forms
