@@ -943,13 +943,39 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             fg_name, mol, matches[0], principal_chain
         )
         if not prefix_form:
-            # By-design: FGs using functional class naming (ester→alkoxycarbonyl,
-            # secondary_amide→acylamino, thioether, etc.) are handled by
-            # specialized naming paths, not as simple prefixes
-            logger.debug(
-                "DROP-23 substituent_skip: reason=no_fg_prefix_form fg_name=%s",
-                fg_name,
+            # Phase 169 D-01 tier-3 fallback (POLY-01): when a composite loser FG
+            # has no clean strict-IUPAC prefix (the DROP-23 case), decompose it into
+            # its ordered sub-group prefix components instead of dropping it. Gated
+            # behind the default-OFF flag (Stage A byte-identical); the split only
+            # fires for table-listed composites (ester/thioester) and is OPSIN-RT
+            # gated (FAIL-CLOSED, D-05). Lazy import (Pattern-S3) avoids a cycle.
+            components = None
+            if getattr(features, "_enable_group_splitting", False):
+                from ..assembly.group_splitting import split_composite_fg
+                components = split_composite_fg(
+                    fg_name, mol, matches[0], principal_chain,
+                    oracle=getattr(features, "_split_oracle", None),
+                )
+            if not components:
+                # By-design: FGs using functional class naming (ester→alkoxycarbonyl,
+                # secondary_amide→acylamino, thioether, etc.) are handled by
+                # specialized naming paths, not as simple prefixes. Unchanged drop
+                # path for the OFF / non-splittable / RT-rejected cases.
+                logger.debug(
+                    "DROP-23 substituent_skip: reason=no_fg_prefix_form fg_name=%s",
+                    fg_name,
+                )
+                continue
+            # POLY-02 native: each split component re-enters the existing prefix
+            # pipeline (format_fg_prefix + alpha_sort_key) sharing the central-carbon
+            # locant (comp.locants is None -> the caller's locants apply to both).
+            split_locants = get_non_principal_fg_locants(
+                mol, matches, principal_chain, atom_to_locant, fg_name
             )
+            for comp in components:
+                all_prefixes.append(
+                    format_fg_prefix(comp.prefix_form, comp.locants or split_locants, comp.count)
+                )
             continue
 
         # Get locants for this FG

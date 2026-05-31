@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 _TRIV_ENV = os.environ.get("ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER", "").strip().lower()
 _DEFAULT_TRIV = _TRIV_ENV in ("1", "true", "yes", "on")
 
+# Phase 169 D-05: env-var override for group-splitting. Read at import time so
+# ORTHONYM_ENABLE_GROUP_SPLITTING=1/true/yes/on flips the default for all instances.
+_GS_ENV = os.environ.get("ORTHONYM_ENABLE_GROUP_SPLITTING", "").strip().lower()
+_DEFAULT_GS = _GS_ENV in ("1", "true", "yes", "on")
+
 # CR-04 part B + W7: per-call NamingResult capture slot for name_with_tree.
 # ContextVar provides thread-local AND asyncio-task-local isolation per PEP 567;
 # safer than a module-global dict against concurrent Orthonym().name_with_tree()
@@ -735,7 +740,8 @@ class Orthonym:
                  _disable_grammar_validation: bool = False,
                  allow_ml_fallback: bool = False,
                  opsin_parse_required: bool = True,
-                 enable_triviality_controller: bool = False):
+                 enable_triviality_controller: bool = False,
+                 enable_group_splitting: bool = False):
         """
         Initialize namer.
 
@@ -838,6 +844,33 @@ class Orthonym:
                     "T2 RT-safety degrades to permissive fallback", exc,
                 )
                 self._triv_oracle = None
+
+        # Phase 169 D-05: group-splitting flag (default OFF -> byte-identical Stage A).
+        # Env override ORTHONYM_ENABLE_GROUP_SPLITTING. The OpsinOracle is instantiated
+        # only when the flag is ON so the FAIL-CLOSED per-split RT gate (D-05) can run;
+        # default OFF keeps it None (zero cost, byte-identical Stage A).
+        self._enable_group_splitting: bool = enable_group_splitting or _DEFAULT_GS
+        self._split_oracle = None
+        if self._enable_group_splitting:
+            try:
+                from .assembly.retained_substitution import OpsinOracle
+                import sys
+                from pathlib import Path
+                _gs_scripts = str(Path(__file__).resolve().parent.parent.parent / "scripts")
+                if _gs_scripts not in sys.path:
+                    sys.path.insert(0, _gs_scripts)
+                try:
+                    from validate_retained_names import find_opsin_jar
+                    _gs_jar = find_opsin_jar() or None
+                except ImportError:
+                    _gs_jar = None
+                self._split_oracle = OpsinOracle(opsin_jar=_gs_jar)
+            except Exception as exc:
+                logger.warning(
+                    "Phase 169 group-split OpsinOracle instantiation failed: %s; "
+                    "per-split RT gate FAIL-CLOSED (splits rejected)", exc,
+                )
+                self._split_oracle = None
 
     def get_dispatch_stats(self) -> Dict[Any, int]:
         """Phase 158 D-16: per-instance CFR dispatch histogram.
@@ -1530,6 +1563,10 @@ class Orthonym:
         # for the TRIV-03 T2 runtime RT-safety gate. Both default to OFF/None (Stage A).
         features._enable_triviality_controller = self._enable_triviality_controller
         features._triv_oracle = self._triv_oracle
+        # Phase 169 D-05: plumb the group-splitting flag + flag-ON-only oracle onto
+        # features so the DROP-23 tier-3 fallback in polyfunctional.py can read them.
+        features._enable_group_splitting = self._enable_group_splitting
+        features._split_oracle = self._split_oracle
 
         # Store ester match(es) if principal group is ester
         if pg_name == "ester" and pg_atoms:
@@ -2042,7 +2079,8 @@ def name_compound(smiles: str, style: str = "pin",
                    *,
                    allow_ml_fallback: bool = False,
                    opsin_parse_required: bool = True,
-                   enable_triviality_controller: bool = False):
+                   enable_triviality_controller: bool = False,
+                   enable_group_splitting: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -2084,6 +2122,7 @@ def name_compound(smiles: str, style: str = "pin",
         allow_ml_fallback=allow_ml_fallback,
         opsin_parse_required=opsin_parse_required,
         enable_triviality_controller=enable_triviality_controller,
+        enable_group_splitting=enable_group_splitting,
     )
 
     if include_confidence:
