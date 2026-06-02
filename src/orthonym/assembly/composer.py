@@ -6337,11 +6337,17 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
         )
 
         if _omit_locant:
-            # Monosubstituted carbocyclic ring: omit locant (it's always 1)
-            # But complex substituents still need enclosing marks per
-            # IUPAC P-14.5.2 (e.g., "(2-methylbut-2-en-1-yl)benzene")
-            if is_complex_substituent(name) and not name.startswith('('):
-                formatted = f"({name})"
+            # Monosubstituted carbocyclic ring: omit locant (it's always 1).
+            # SUB-05/D-17: complex OR stereo-prefixed substituents need
+            # enclosing marks (P-16.3.3). The old guard skipped enclosing for a
+            # leading-stereo name ((R)-3-methylpentyl starts with '(') -> the
+            # broken (R)-3-methylpentylbenzene. Route through apply_enclosing_marks
+            # passing the BARE name (it does correct ()->[]->{} nesting +
+            # leading-stereo escalation; passing the bare name avoids the
+            # double-enclose hazard).
+            from ..assembly.naming_utils import apply_enclosing_marks, _has_stereo_prefix
+            if is_complex_substituent(name) or _has_stereo_prefix(name):
+                formatted = apply_enclosing_marks(name, depth=-1)
             else:
                 formatted = name
             # Use empty locants so _assemble_fragments won't re-add "1-"

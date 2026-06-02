@@ -1523,6 +1523,16 @@ def _merge_bare_duplicate_prefixes(prefixes: List[str]) -> List[str]:
     return result
 
 
+# SUB-05/D-16 (4b): bare detachable oxo-acid prefixes that, when glued
+# letter->letter to a preceding substituent, must be hyphen-separated. EXACT
+# membership only (so 'phosphonooxy'/'phenylsulfanyl' fused tokens are never
+# split). Conservative oxo-acid set; deliberately excludes the common
+# nitro/nitroso to avoid false splits.
+_DETACHABLE_LETTER_PREFIXES = frozenset({
+    "phosphono", "sulfo", "sulfino", "arsono", "borono",
+})
+
+
 def _join_prefixes(prefix_texts: List[str]) -> str:
     """
     Join multiple prefix strings with proper IUPAC hyphenation.
@@ -1549,6 +1559,16 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
             next_is_n_locant = (
                 first_char == 'N' and len(current) > 1 and current[1] in (',', '-')
             )
+            # SUB-05/D-16 (4b): a bare detachable oxo-acid prefix (phosphono,
+            # sulfo, ...) glued letter->letter to a preceding substituent must
+            # be separated ("3-oxo"+"phosphono" -> "3-oxo-phosphono", NOT
+            # "3-oxophosphono"). GATED to an exact detachable-prefix token set
+            # so legitimately-fused single tokens are NEVER split:
+            # 'phosphonooxy'/'phenylsulfanyl' (.split('-')[-1] != a gate member)
+            # and '2,3-dimethyl' (digit-initial) stay intact.
+            current_tail = current.split('-')[-1]
+            is_detachable = (current in _DETACHABLE_LETTER_PREFIXES
+                             or current_tail in _DETACHABLE_LETTER_PREFIXES)
             # Insert hyphen between letter/paren and digit
             # e.g., "amino" + "4-methyl" → "amino-4-methyl"
             # e.g., "(ethanoyl)amino" + "4-methyl" → "(ethanoyl)amino-4-methyl"
@@ -1559,6 +1579,9 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
                 result += "-"
             # Letter/paren followed by an italic-N locant prefix
             elif next_is_n_locant and (last_char.isalpha() or last_char == ')'):
+                result += "-"
+            # Letter followed by a bare detachable oxo-acid prefix (4b)
+            elif is_detachable and last_char.isalpha() and first_char.isalpha():
                 result += "-"
         result += current
 

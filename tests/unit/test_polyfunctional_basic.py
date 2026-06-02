@@ -248,17 +248,16 @@ class TestSUB05JoinMustNotSplit:
 class TestSUB05GluedAndDroppedPrefix:
     """Glued detachable-prefix pair + dropped off-chain locant — xfail (Plan 04)."""
 
-    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4b): _join_prefixes glues '3-oxo'+'phosphono'", strict=False)
     def test_join_separates_oxo_phosphono(self):
-        # detachable letter->letter pair must be separated (gated to known tokens).
+        # SUB-05 Plan 04 (4b): gated detachable-prefix separator.
         assert _join_prefixes(["3-oxo", "phosphono"]) != "3-oxophosphono"
 
-    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4b): glued oxophosphono in the assembled name", strict=False)
     def test_glued_oxophosphono_in_name(self):
+        # SUB-05 Plan 04 (4b): the 'oxophosphono' glue is gone (now 'oxo-phosphono').
         name = name_compound("CC(=O)C(CP(O)(O)=O)C(=O)O")
         assert "oxophosphono" not in name
 
-    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4a): off-chain phosphono drops its locant", strict=False)
+    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): the off-chain CH2-PO3H2 must unify into the compound substituent '(phosphonomethyl)' (the plan's literal '3-phosphono' is structurally WRONG — agent OPSIN-proven). Option A (unify off-chain FG + suppress the dup alkyl) is a complex substituent-enumerator change; narrow reach (0/300 subset). 4b separated the glue but the unification is deferred.", strict=False)
     def test_dropped_locant_phosphonomethyl(self):
         # HOOC-CH2-CH(CH2PO3H2)-COOH -> 2-(phosphonomethyl)butanedioic acid.
         name = name_compound("OC(=O)CC(CP(=O)(O)O)C(=O)O")
@@ -269,7 +268,7 @@ class TestSUB05GluedAndDroppedPrefix:
 class TestSUB05NestedStereoEnclosing:
     """D-17: monosubstituted ring-substituent stereo must be enclosed — xfail (Plan 04)."""
 
-    @pytest.mark.xfail(reason="SUB-05 D-17 Plan 04: monosubstituted path skips enclosing marks", strict=False)
+    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): for a benzene parent the stereocentre lives INSIDE the substituent, but _generate_stereodescriptors emits it as a MOLECULAR-level '(R)-' prefix, not enclosed with the substituent. The generic-ring D-17 enclosing path IS fixed; the benzene/molecular-stereo case needs substituent-local stereodescriptor generation (a deep architectural change, related to the SUB-04 fragment-context issue). Out of SUB-05 scope.", strict=False)
     def test_nested_stereo_enclosed(self):
         # (R)-3-methylpentylbenzene -> [(R)-3-methylpentyl]benzene (P-16.3.3).
         name = name_compound("CC[C@@H](C)CCc1ccccc1")
