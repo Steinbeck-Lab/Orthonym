@@ -9,7 +9,7 @@ Assembly order:
 """
 
 import logging
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any, Set, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict, deque, namedtuple
 
@@ -3065,12 +3065,17 @@ def _assemble_complete_bicyclo_name(mol, features):
 
     # Build the main name: bicyclo[x.y.z]parent-unsat(-L-suffix)
     main_name = f"{descriptor}{unsat_suffix}"
-    if principal_suffix:
-        # Drop the parent's trailing 'e' (heptane -> heptan) and append the
-        # principal-group suffix (-> heptan-6-one). IUPAC P-31.1.4.3.4.
-        if main_name.endswith('e'):
+    suffix_str, elide_terminal_e = principal_suffix
+    if suffix_str:
+        # IUPAC P-16.3.3 / P-31.1.4.3.4 vowel elision: drop the parent's trailing
+        # 'e' ONLY before a vowel-initial suffix. '-one' elides
+        # ('...heptan-6-one', and '...hept-5-en-6-one' for an unsaturated parent);
+        # the consonant-initial multiplied '-dione'/'-trione' keeps the 'e'
+        # ('...heptane-2,6-dione'). IN-06: the old unconditional endswith('e')
+        # strip mis-elided the multiplied form and any '-diene'/'-triene' parent.
+        if elide_terminal_e and main_name.endswith('e'):
             main_name = main_name[:-1]
-        main_name = f"{main_name}{principal_suffix}"
+        main_name = f"{main_name}{suffix_str}"
     parts.append(main_name)
 
     # Join parts
@@ -3241,11 +3246,25 @@ def _build_bicyclo_substituent_prefix(
     return result
 
 
-def _build_bicyclo_principal_suffix(mol, features, atom_to_locant: Dict[int, int]) -> str:
+def _build_bicyclo_principal_suffix(
+    mol, features, atom_to_locant: Dict[int, int]
+) -> Tuple[str, bool]:
     """SUB-02 (A-fix): principal-characteristic-group suffix for a bicyclo parent.
 
-    Returns e.g. '-6-one' for camphor, or '' if there is no principal group or
-    it is not a ring-carbon-bearing group expressible as '-L-suffix'.
+    Returns ``(suffix, elide_terminal_e)``:
+      * ``suffix`` — ``''`` (no expressible principal group), ``'-6-one'`` (one
+        ring ketone), or ``'-2,6-dione'`` (a bicyclic DI/poly-ketone with the
+        correct multiplier);
+      * ``elide_terminal_e`` — whether the parent's trailing ``e`` must be
+        dropped before this suffix. Per IUPAC P-16.3.3 the vowel-initial
+        ``-one`` elides (``heptan-6-one``) but the consonant-initial multiplied
+        ``-dione``/``-trione`` does NOT (``heptane-2,6-dione``).
+
+    WR-03 + IN-06 (code review 2026-06-02): the old version returned the FIRST
+    carbonyl ring-carbon only (dropping the second ketone of a diketone, with no
+    multiplier) and the caller unconditionally stripped a trailing ``e``
+    (mis-eliding the consonant-initial multiplied suffix). Both are fixed by
+    collecting ALL ring carbonyl locants here and surfacing the elision rule.
 
     SCOPE: ketone only. The carbonyl carbon IS a ring (von Baeyer skeleton)
     atom, so the suffix attaches to its locant and the group is never
@@ -3257,7 +3276,9 @@ def _build_bicyclo_principal_suffix(mol, features, atom_to_locant: Dict[int, int
     pg = getattr(features, 'principal_group', None)
     pg_atoms = getattr(features, 'principal_group_atoms', None)
     if pg != 'ketone' or not pg_atoms:
-        return ""
+        return "", False
+    # Collect EVERY ring carbonyl-carbon locant (a bicyclic diketone has >1).
+    locants = set()
     for match in pg_atoms:
         for idx in match:
             if idx not in atom_to_locant:
@@ -3272,8 +3293,19 @@ def _build_bicyclo_principal_suffix(mol, features, atom_to_locant: Dict[int, int
                 for b in atom.GetBonds()
             )
             if has_carbonyl:
-                return f"-{atom_to_locant[idx]}-one"
-    return ""
+                locants.add(atom_to_locant[idx])
+    if not locants:
+        return "", False
+    sorted_locants = sorted(locants)
+    locant_str = ",".join(str(loc) for loc in sorted_locants)
+    # Principal-group suffixes always take the SIMPLE multiplier (di/tri), never
+    # bis/tris (those are for complex substituents).
+    multiplier = SIMPLE_MULTIPLIERS.get(len(sorted_locants), "") if len(sorted_locants) > 1 else ""
+    suffix_word = f"{multiplier}one"
+    # Elide the parent 'e' only before the vowel-initial bare '-one'; the
+    # multiplied 'dione'/'trione' begins with a consonant, so keep the 'e'.
+    elide_terminal_e = not multiplier
+    return f"-{locant_str}-{suffix_word}", elide_terminal_e
 
 
 def _assemble_heterocycle_name(features: Any, style: str) -> str:

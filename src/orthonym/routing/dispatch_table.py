@@ -46,10 +46,13 @@ IUPAC P-section cites for each StoutClass live in the per-row docstring
 
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 # NOTE: NO eager import of ``orthonym.rules.*`` or ``orthonym.namer``;
 # predicate factories + handler shims use lazy imports inside their bodies
@@ -517,8 +520,20 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
                 anion_name = _acid_name_to_carboxylate(neutral_name, 1)
                 if anion_name:
                     return anion_name
-    except Exception:
-        pass  # Per v18 byte-identical: silent fall-through (namer.py:913-914)
+    except (ValueError, RuntimeError, KeyError, IndexError, RecursionError) as exc:
+        # Expected operational fall-through (edge molecule / recursion limit),
+        # matching ions.py's explicit lists. Logged, not silent.
+        logger.debug("anion_small handler fell through: %s: %s",
+                     type(exc).__name__, exc)
+    except Exception as exc:
+        # WR-07 (code review 2026-06-02): an UNEXPECTED exception here used to be
+        # silently swallowed (bare ``except Exception: pass``), masking real logic
+        # bugs (e.g. an AttributeError or a malformed SuffixInfo from the SUB-01
+        # routing change) as a quiet cascade-to-GENERAL with zero telemetry.
+        # Surface it LOUDLY (WARNING + stack) but still fall through, because
+        # name() has no top-level safety net and the v18 contract is no-crash.
+        logger.warning("anion_small handler UNEXPECTED error (possible bug): %s: %s",
+                       type(exc).__name__, exc, exc_info=True)
     return None  # signal dispatcher to continue cascade
 
 
@@ -535,6 +550,24 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
         from orthonym.rules.ions import classify_anion, _acid_name_to_carboxylate
         from orthonym.perception.ions import _get_internal_charge_atoms, get_ion_sites
         sites = get_ion_sites(mol)
+        # CR-02 (code review 2026-06-02): a fully-deprotonated S/P-oxoacid dianion
+        # (e.g. CP(=O)([O-])[O-], -2) reaches this poly-anion handler and MUST NOT
+        # ship the neutral acid name (the carboxylate_count check below is 0 for a
+        # phosphonate, so it would `return neutral_name` uncharged). Mirror
+        # name_anion's multi-anion oxoacid routing: _name_oxoacid_anion neutralizes
+        # ALL non-internal [O-] and applies the canonical ionic suffix
+        # ("methanephosphonic acid" -> "methanephosphonate", which OPSIN
+        # round-trips to the -2 dianion). Routed only when EVERY anion is an
+        # S/P-oxoacid site; carboxylate / mixed cases fall through unchanged.
+        anion_sites = sites.get('anions', [])
+        if anion_sites and all(
+            classify_anion(mol, a) in ('sulfonate', 'sulfinate', 'phosphonate')
+            for a in anion_sites
+        ):
+            from orthonym.rules.ions import _name_oxoacid_anion, _validate_anion_name
+            oxo_name = _name_oxoacid_anion(mol, style)
+            if oxo_name:
+                return _validate_anion_name(mol, oxo_name)
         internal_charge_atoms = _get_internal_charge_atoms(mol)
         rwmol = RWMol(mol)
         neutralized = False
@@ -567,8 +600,17 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                     if anion_name:
                         return anion_name
                 return neutral_name
-    except Exception:
-        pass  # Per v18 byte-identical: silent fall-through (namer.py:955-956)
+    except (ValueError, RuntimeError, KeyError, IndexError, RecursionError) as exc:
+        # Expected operational fall-through, matching ions.py's explicit lists.
+        logger.debug("poly_anion handler fell through: %s: %s",
+                     type(exc).__name__, exc)
+    except Exception as exc:
+        # WR-07 (code review 2026-06-02): surface a genuinely-unexpected exception
+        # loudly instead of the old silent ``except Exception: pass`` that masked
+        # SUB-01-routing logic bugs as a quiet cascade-to-GENERAL. Still falls
+        # through (no top-level safety net in name(); v18 contract is no-crash).
+        logger.warning("poly_anion handler UNEXPECTED error (possible bug): %s: %s",
+                       type(exc).__name__, exc, exc_info=True)
     return None
 
 

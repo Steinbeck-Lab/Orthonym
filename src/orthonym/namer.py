@@ -212,18 +212,21 @@ def _validity_gate_jar_present() -> bool:
     return _find_opsin_jar() is not None
 
 
-def _validity_gate_parse(name: str) -> Optional[str]:
-    """Cached OPSIN parse-or-None for the SUB-03 gate.
+def _validity_gate_status(name: str) -> str:
+    """Cached 3-valued OPSIN parse outcome for the SUB-03 gate (CR-01).
 
-    Reuses OpsinOracle.name_to_smiles (instance dict cache) via a module-level
-    singleton so the cache is shared process-wide. Monkeypatched in tests.
+    Returns ``"parsed"`` | ``"rejected"`` | ``"unavailable"``. Delegates to
+    ``OpsinOracle.parse_status`` via a module-level singleton so the parse cache
+    is shared process-wide. ``"unavailable"`` (subprocess timeout / OSError /
+    no-JAR) MUST be treated as fail-OPEN by the caller — a transient OPSIN
+    failure must never suppress a valid name. Monkeypatched in tests.
     """
     global _VALIDITY_ORACLE
     if _VALIDITY_ORACLE is None:
         from .assembly.retained_substitution import OpsinOracle
         from .validation.opsin_roundtrip import _find_opsin_jar
         _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
-    return _VALIDITY_ORACLE.name_to_smiles(name)
+    return _VALIDITY_ORACLE.parse_status(name)
 
 
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
@@ -249,9 +252,15 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # D-13 fail-OPEN: probe the JAR FIRST.
     if not _validity_gate_jar_present():
         return name
-    if _validity_gate_parse(name) is not None:
-        return name  # OPSIN parses it -> ship as-is
-    # Unparseable -> suppress to the honest descriptive fallback string.
+    # CR-01 (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
+    # rejection. 'parsed' ships as-is; 'unavailable' (subprocess timeout / OSError
+    # mid-run on a loaded host) fails OPEN — a transient OPSIN failure must never
+    # turn a valid, round-trip-passing name into a descriptive fallback. The old
+    # `parse-or-None` check conflated 'rejected' with 'unavailable', breaking the
+    # phase's "0-regression by construction" guarantee.
+    if _validity_gate_status(name) != "rejected":
+        return name  # OPSIN parses it (or could not be consulted) -> ship as-is
+    # Definitively unparseable -> suppress to the honest descriptive fallback.
     if stats is not None:
         stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1
     logger.warning("OPSIN validity gate suppressed unparseable name: %r", name[:60])

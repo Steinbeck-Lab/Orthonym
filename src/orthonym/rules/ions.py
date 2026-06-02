@@ -16,6 +16,7 @@ Key naming patterns:
 - Carbenium cations: alkane -> ylium (loss of H-)
 """
 
+import re
 from typing import Dict, List, Optional, Any
 from rdkit import Chem
 
@@ -467,10 +468,15 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             result = _name_carbanion_systematic(mol, anion_site)
         elif anion_type == 'thiolate':
             result = _name_thiolate_systematic(mol, anion_site)
-        elif anion_type in ('sulfonate', 'sulfinate', 'phosphonate', 'phosphate'):
+        elif anion_type in ('sulfonate', 'sulfinate', 'phosphonate'):
             # SUB-01/D-01: route S/P oxoacid anions through the general
             # parent-selection pipeline + the structured ionic suffix instead
             # of the carbon-counting alkoxide stub (the heptanolate bug).
+            # IN-01 (code review 2026-06-02): 'phosphate' removed — classify_anion
+            # only returns it for a C-bonded P ('phosphonate'); an O-P phosphate
+            # ESTER has no carbon on P, so it classifies as 'alkoxide' and stays
+            # on the existing path by design. 'phosphate' was therefore an
+            # unreachable arm here.
             result = _name_oxoacid_anion(mol, style)
         else:
             # Generic anion - try to name the neutral skeleton
@@ -478,7 +484,21 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
 
         return _validate_anion_name(mol, result)
 
-    # Multiple anions - try neutralize-then-name approach
+    # Multiple anions - try neutralize-then-name approach.
+    # CR-02 (code review 2026-06-02): a fully-deprotonated S/P-oxoacid (e.g. the
+    # methylphosphonate DIANION, CP(=O)([O-])[O-]) reaches this branch with
+    # len(anions) >= 2 and MUST NOT ship the neutral acid name. _name_oxoacid_anion
+    # already neutralizes ALL non-internal [O-] and applies the canonical ionic
+    # suffix, so it handles the multi-charge oxoacid exactly as the single-anion
+    # path does ("methanephosphonic acid" -> "methanephosphonate", which OPSIN
+    # round-trips to the -2 dianion). Routed only when EVERY anion is an S/P-oxoacid
+    # site; a carboxylate or mixed case falls through to the handling below.
+    oxo_anion_types = ('sulfonate', 'sulfinate', 'phosphonate')
+    if all(classify_anion(mol, a) in oxo_anion_types for a in anions):
+        oxo_name = _name_oxoacid_anion(mol, style)
+        if oxo_name:
+            return _validate_anion_name(mol, oxo_name)
+
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
         # Convert acid suffixes to carboxylate suffixes for deprotonated
@@ -732,7 +752,19 @@ def _try_neutralize_and_name(mol) -> str:
     return ''
 
 
-def _ionize_acid_name(neutral_name: str, total_charge: int) -> str:
+# WR-05 (code review 2026-06-02): the exact set of neutral-acid suffixes a
+# routed S/P-oxoacid anion can carry. Passed by _name_oxoacid_anion to restrict
+# _ionize_acid_name's trailing-suffix match to GENUINE oxoacid suffixes, so the
+# short bare entries of _ANION_SUFFIX_MAP ("ol", "amine", "thiol", "amide") can
+# never mis-fire on a parent stem that merely happens to end in those letters.
+_OXOACID_NEUTRAL_SUFFIXES = frozenset({
+    'sulfonic acid', 'sulfinic acid',
+    'phosphonic acid', 'phosphinic acid', 'phosphoric acid',
+})
+
+
+def _ionize_acid_name(neutral_name: str, total_charge: int,
+                      allowed_suffixes: Optional[frozenset] = None) -> str:
     """Apply the structured ionic-suffix transform to a re-entered neutral name.
 
     SUB-01/D-01 (A3 option-2): the general re-entry (Orthonym().name) rebuilds
@@ -741,6 +773,12 @@ def _ionize_acid_name(neutral_name: str, total_charge: int) -> str:
     canonical ``_ANION_SUFFIX_MAP``/``_CATION_SUFFIX_MAP`` driven through the
     actual ``_apply_anion_modification``/``_apply_cation_modification`` seam
     functions — NOT a per-molecule ``.replace`` band-aid.
+
+    ``allowed_suffixes`` (WR-05): when given, only those neutral suffixes are
+    considered for the trailing match. A caller that knows the chemical class
+    (e.g. _name_oxoacid_anion -> oxoacids only) passes the genuine subset so a
+    short bare key ("ol"/"amine") cannot mis-fire on a coincidental stem ending.
+    When None (the general case) the full map is used as before.
 
     Returns the ionized name, or '' if no canonical suffix transform applies.
     """
@@ -752,13 +790,25 @@ def _ionize_acid_name(neutral_name: str, total_charge: int) -> str:
     )
     smap = _ANION_SUFFIX_MAP if total_charge < 0 else _CATION_SUFFIX_MAP
     apply = _apply_anion_modification if total_charge < 0 else _apply_cation_modification
+    candidates = (
+        smap if allowed_suffixes is None
+        else {k: v for k, v in smap.items() if k in allowed_suffixes}
+    )
     # Longest trailing suffix wins ("sulfonic acid" before "ol").
-    for neutral_suffix in sorted(smap, key=len, reverse=True):
+    for neutral_suffix in sorted(candidates, key=len, reverse=True):
         if neutral_name.endswith(neutral_suffix):
             modified = apply(SuffixInfo(text=neutral_suffix, is_terminal=True))
             if modified.text and modified.text != neutral_suffix:
                 return neutral_name[:-len(neutral_suffix)] + modified.text
     return ''
+
+
+# WR-01 (code review 2026-06-02): a leading unsaturation marker (ane/ene/yne)
+# with NO chain/ring stem in front, glued directly to an oxoacid suffix stem
+# (sulf/phosph/arso/boro) or a locant ('-'/digit/'('). This is the degenerate
+# fused-ring-parent failure shape (D-10), NOT a legitimate parent — a real
+# parent always carries a stem (meth/eth/.../benzene/cyclo...) before ane/ene/yne.
+_DEGENERATE_OXOACID_PARENT_RE = re.compile(r'^(?:ane|ene|yne)(?:sulf|phosph|arso|boro|[0-9(-])')
 
 
 def _name_oxoacid_anion(mol, style: str) -> str:
@@ -802,16 +852,25 @@ def _name_oxoacid_anion(mol, style: str) -> str:
         if not neutral_name:
             return ''
         # Robustness: refuse to propagate a MALFORMED upstream parent name.
-        # A failed fused-ring parent yields a bare-stem "anesulfonic acid"
-        # (the deferred P-25 limitation, D-10); a bare suffix stem ('ane'/
-        # 'ene'/'yne' at the start) or a descriptive fallback is not a valid
-        # parent. Fall through to the existing path rather than emit garbage;
-        # SUB-03 (Plan 06) gates residual malformed outputs globally.
+        # A failed fused-ring parent (the deferred P-25 limitation, D-10) drops
+        # the chain/ring stem, leaving the bare unsaturation marker glued onto
+        # the oxoacid suffix or a locant — "anesulfonic acid", "ene-1-phosphonic
+        # acid". WR-01 (code review 2026-06-02): anchor on EXACTLY that shape (a
+        # leading ane/ene/yne immediately followed by an oxoacid-suffix stem or a
+        # locant) instead of a bare startswith(("ane","ene","yne")), which would
+        # also discard any legitimate parent merely beginning with those three
+        # letters. A descriptive fallback is likewise not a valid parent. Fall
+        # through to the existing path rather than emit garbage; SUB-03 gates
+        # residual malformed outputs globally.
         low = neutral_name.lstrip().lower()
-        if (low.startswith(('ane', 'ene', 'yne'))
+        if (_DEGENERATE_OXOACID_PARENT_RE.match(low)
                 or 'unknown' in low or 'not supported' in low):
             return ''
-        return _ionize_acid_name(neutral_name, total_charge=-1)
+        # WR-05: restrict the suffix match to genuine oxoacid suffixes — this
+        # path only ever sees a re-entered S/P oxoacid parent, so the bare
+        # "ol"/"amine"/"thiol" entries must not be eligible to mis-fire.
+        return _ionize_acid_name(neutral_name, total_charge=-1,
+                                 allowed_suffixes=_OXOACID_NEUTRAL_SUFFIXES)
     except (RecursionError, ValueError, RuntimeError):
         return ''
 
@@ -1080,15 +1139,17 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
 
 
 def _compare_locant_lists(a: list, b: list) -> int:
-    """Compare two locant lists by first-point-of-difference."""
-    for i in range(max(len(a), len(b))):
-        val_a = a[i] if i < len(a) else float('inf')
-        val_b = b[i] if i < len(b) else float('inf')
-        if val_a < val_b:
-            return -1
-        if val_a > val_b:
-            return 1
-    return 0
+    """Compare two locant lists by first-point-of-difference (-1/0/1).
+
+    IN-04 (code review 2026-06-02): delegates to the canonical
+    ``rules.locants.compare_locant_sets`` so the first-point-of-difference
+    semantics have ONE source and cannot desync. The sole caller passes
+    ``sorted(subs.keys())`` for both lists (always sorted, and same length
+    across ring orientations), for which the two are provably equivalent
+    (verified exhaustively over small sorted equal-length int lists).
+    """
+    from .locants import compare_locant_sets
+    return compare_locant_sets(a, b)
 
 
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:

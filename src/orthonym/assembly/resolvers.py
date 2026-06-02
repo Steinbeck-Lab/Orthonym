@@ -101,7 +101,7 @@ def resolve_parent(features: Any, mol: Any) -> ParentInfo:
     # --- 1. Polycyclic aromatic (naphthalene, anthracene, etc.) ---
     polycyclic_name = getattr(features, 'polycyclic_name', None)
     if polycyclic_name:
-        atom_count = _get_polycyclic_atom_count(mol, polycyclic_name)
+        atom_count = _get_polycyclic_atom_count(mol)
         atom_to_locant = _extract_atom_to_locant(features)
         return ParentInfo(
             parent_label=polycyclic_name,
@@ -286,6 +286,11 @@ _ANION_SUFFIX_MAP = {
     "sulfinic acid": "sulfinate",
     "phosphonic acid": "phosphonate",
     "phosphinic acid": "phosphinate",
+    # IN-01 (code review 2026-06-02): RESERVED / unreachable-by-design. A correct
+    # chemical mapping, but O-P phosphate ESTERS are deliberately excluded from
+    # the oxoacid-anion routing upstream (classify_anion sends them to 'alkoxide',
+    # not 'phosphonate'/'phosphate'), so no neutral name ending in "phosphoric
+    # acid" currently reaches _ionize_acid_name. Kept for completeness/future use.
     "phosphoric acid": "phosphate",  # SUB-01/D-02
     # D-06: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
     # internal-charge-filter precision change (protecting every nitro) is not
@@ -387,8 +392,10 @@ def _apply_cation_modification(suffix_info: SuffixInfo) -> SuffixInfo:
                 is_terminal=suffix_info.is_terminal,
             )
 
-    # Fallback: append "-ium" to existing suffix
-    # e.g., "one" -> "onium" (not standard but safe fallback)
+    # IN-02 (code review 2026-06-02): no canonical cation transform for this
+    # suffix -> return it UNCHANGED (the safe default). The previous comment
+    # claimed an "-ium" was appended ("one" -> "onium"), which the code never
+    # did; corrected to describe the actual behavior.
     return suffix_info
 
 
@@ -466,10 +473,17 @@ def _get_ring_atom_count(features: Any, mol: Any) -> int:
     return 0
 
 
-def _get_polycyclic_atom_count(mol: Any, polycyclic_name: str) -> int:
-    """Get atom count for a polycyclic aromatic system."""
-    # Count non-hydrogen atoms in molecule as approximation
-    # (PAH is typically the entire molecule)
+def _get_polycyclic_atom_count(mol: Any) -> int:
+    """Heavy-atom count for a polycyclic aromatic parent (capacity check input).
+
+    IN-03 (code review 2026-06-02): returns the molecule's heavy-atom count. This
+    is exact for an unsubstituted PAH (the parent IS the whole molecule) but
+    OVER-counts when the PAH carries substituents/side-chains (it counts those
+    too). The previously-declared ``polycyclic_name`` parameter was never used and
+    has been dropped. Computing the true named-ring-system atom count is a
+    follow-on; the over-count only widens the downstream ``max_capacity`` check,
+    so it cannot reject a valid suffix.
+    """
     if mol is not None:
         return mol.GetNumHeavyAtoms()
     return 0

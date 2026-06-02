@@ -480,6 +480,26 @@ class TestFindLongestPath:
         assert path[0] == bh1
         assert path[-1] == bh2
 
+    @pytest.mark.unit
+    def test_wr02_dfs_expansion_cap_bounds_search(self, norbornane, monkeypatch):
+        """WR-02 (code review 2026-06-02): the DFS is bounded by
+        ``_MAX_DFS_EXPANSIONS`` so a pathological dense cage cannot hang. With the
+        cap forced to 1 the search aborts immediately (best-so-far is shorter than
+        the full path); with the real cap (>> expansions a real polycyclic needs)
+        the full 4-atom norbornane path is found, proving legitimate input is
+        unaffected."""
+        import orthonym.rules.polycyclic as pc
+        ring_atoms = _get_ring_atoms(norbornane)
+        bh_list = sorted(_get_bridgeheads(norbornane))
+        bh1, bh2 = bh_list[0], bh_list[1]
+        # Real cap: normal, complete result.
+        assert len(find_longest_path(norbornane, bh1, bh2, ring_atoms)) == 4
+        # Forced tiny cap: the search is cut short and returns the best-so-far
+        # rather than exploring further (the anti-hang guard fired).
+        monkeypatch.setattr(pc, "_MAX_DFS_EXPANSIONS", 1)
+        bounded = find_longest_path(norbornane, bh1, bh2, ring_atoms)
+        assert len(bounded) < 4
+
 
 # ============================================================================
 # Edge Case Tests

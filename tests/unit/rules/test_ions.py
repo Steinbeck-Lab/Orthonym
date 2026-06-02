@@ -689,6 +689,56 @@ class TestSUB01ChargeAwareNaming:
         name = name_compound("CP(=O)(O)[O-]")
         assert "phosphonate" in name
 
+    def test_methylphosphonate_dianion_keeps_charge(self):
+        # CR-02 (code review 2026-06-02): the FULLY-deprotonated S/P-oxoacid
+        # DIANION must ship the anion name ("methanephosphonate", which OPSIN
+        # round-trips to the -2 dianion), NOT the neutral acid. Before the fix
+        # the poly-anion path neutralized both [O-] and returned
+        # "methanephosphonic acid" (charge silently dropped).
+        name = name_compound("CP(=O)([O-])[O-]")
+        assert "phosphonate" in name
+        assert "acid" not in name
+
+    def test_phosphonate_dianion_via_name_anion(self):
+        # The library entry point (name_anion) routes the dianion through its
+        # multi-anion oxoacid branch (mirror of the dispatch-table fix).
+        mol = Chem.MolFromSmiles("CCP(=O)([O-])[O-]")
+        out = name_anion(mol, style="pin")
+        assert "phosphonate" in out and "acid" not in out
+
+    def test_carboxylate_dianion_not_misrouted(self):
+        # Regression guard for the CR-02 fix: a pure CARBOXYLATE dianion must
+        # NOT enter the oxoacid branch — succinate stays succinate.
+        assert name_compound("[O-]C(=O)CCC(=O)[O-]") == "succinate"
+
+    def test_wr05_oxoacid_ionize_ignores_bare_ol_amine(self):
+        # WR-05 (code review 2026-06-02): when _ionize_acid_name is restricted to
+        # the oxoacid suffix set, a parent that merely ENDS in "ol"/"amine" must
+        # NOT be transformed (no spurious "...olate"); only genuine oxoacid
+        # suffixes ionize.
+        from orthonym.rules.ions import _ionize_acid_name, _OXOACID_NEUTRAL_SUFFIXES
+        assert _ionize_acid_name("methanephosphonic acid", -1,
+                                 _OXOACID_NEUTRAL_SUFFIXES) == "methanephosphonate"
+        assert _ionize_acid_name("2-methylphenol", -1,
+                                 _OXOACID_NEUTRAL_SUFFIXES) == ""
+        assert _ionize_acid_name("some-parentol", -1,
+                                 _OXOACID_NEUTRAL_SUFFIXES) == ""
+        # The general (unrestricted) helper still ionizes an alcohol, unchanged.
+        assert _ionize_acid_name("ethanol", -1) == "ethanolate"
+
+    def test_wr01_degenerate_parent_guard_is_precise(self):
+        # WR-01 (code review 2026-06-02): the malformed-parent guard must reject
+        # ONLY the degenerate stem-less form (ane/ene/yne glued to an oxoacid
+        # suffix or locant), never a legitimate parent that merely begins with
+        # those three letters.
+        from orthonym.rules.ions import _DEGENERATE_OXOACID_PARENT_RE as rgx
+        for degenerate in ("anesulfonic acid", "enephosphonic acid",
+                           "yne-1-sulfonic acid", "ane-1-phosphonic acid"):
+            assert rgx.match(degenerate), degenerate
+        for legit in ("methanesulfonic acid", "benzenesulfonic acid",
+                     "cyclohexanesulfonic acid", "anethole-ish-sulfonic acid"):
+            assert not rgx.match(legit), legit
+
     @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): carbenium 'phenylmethylium' needs cation-aware parent selection (the C+ as the methylium parent) — neutralize-recurse loses the cation position; a substantial select_parent change, small reach. Currently 'heptylium'.", strict=False)
     def test_phenylmethylium_not_benzylium(self):
         name = name_compound("[CH2+]c1ccccc1")

@@ -106,6 +106,11 @@ class OpsinOracle:
         self._jar = opsin_jar
         self._cache: Dict[Tuple[str, str], bool] = {}
         self._name_cache: Dict[str, Optional[str]] = {}
+        # SUB-03 validity-gate parse-outcome cache (CR-01/WR-04, code review
+        # 2026-06-02). Only DEFINITIVE outcomes ('parsed'/'rejected') are stored
+        # here — a transient 'unavailable' is never cached, so a one-off timeout
+        # cannot poison later lookups of the same name.
+        self._parse_status_cache: Dict[str, str] = {}
         self._events: list = []  # ControllerEvent diagnostic log
 
     def rt_safe(self, pre_swap_canon: str, post_swap_subtree_str: str) -> bool:
@@ -143,25 +148,85 @@ class OpsinOracle:
         self._cache[key] = ok
         return ok
 
-    def name_to_smiles(self, name: str) -> Optional[str]:
-        """Path C reverse-OPSIN helper. Returns canonical SMILES or None on failure. Cached."""
-        if self._jar is None or not name:
-            return None
-        if name in self._name_cache:
-            return self._name_cache[name]
+    def _invoke_opsin(self, name: str) -> Tuple[Optional[str], bool]:
+        """Run OPSIN ``-osmi`` on a single name. Single source of truth for the
+        subprocess call shared by ``name_to_smiles`` and ``parse_status``.
+
+        Returns ``(raw_smiles_or_None, ran)``:
+          * ``ran=True,  raw=<smiles>`` — OPSIN parsed the name, emitted SMILES;
+          * ``ran=True,  raw=None``     — OPSIN ran but emitted nothing (it
+            DEFINITIVELY rejected the name as unparseable);
+          * ``ran=False, raw=None``     — the parse could NOT be performed
+            (subprocess timeout / ``OSError`` such as a fork failure under memory
+            pressure). This is a transient/environmental failure that callers
+            MUST NOT treat as a rejection (CR-01).
+        """
         try:
             result = subprocess.run(
                 ["java", "-jar", self._jar, "-osmi"],
                 input=name + "\n",
                 capture_output=True, text=True, timeout=10,
             )
-            smi = result.stdout.strip()
-            canon = Chem.CanonSmiles(smi) if smi else None
-        except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
-            logger.debug("OpsinOracle.name_to_smiles failed for %r: %s", name, exc)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            logger.debug("OpsinOracle OPSIN invocation unavailable for %r: %s", name, exc)
+            return None, False
+        smi = result.stdout.strip()
+        return (smi or None), True
+
+    def name_to_smiles(self, name: str) -> Optional[str]:
+        """Path C reverse-OPSIN helper. Returns canonical SMILES or None on failure.
+
+        A DEFINITIVE result (a real SMILES, OPSIN's rejection, or a
+        canonicalisation failure on OPSIN's output) is cached; a transient
+        invocation failure (timeout / ``OSError``) is NOT cached (WR-04, code
+        review 2026-06-02), so a one-off failure never poisons later lookups of
+        the same name.
+        """
+        if self._jar is None or not name:
+            return None
+        if name in self._name_cache:
+            return self._name_cache[name]
+        raw, ran = self._invoke_opsin(name)
+        if not ran:
+            return None  # transient — do NOT cache (WR-04)
+        try:
+            canon = Chem.CanonSmiles(raw) if raw else None
+        except ValueError as exc:
+            logger.debug("OpsinOracle.name_to_smiles canonicalisation failed for %r: %s", name, exc)
             canon = None
         self._name_cache[name] = canon
         return canon
+
+    def parse_status(self, name: str) -> str:
+        """Three-valued OPSIN parse outcome for the SUB-03 validity gate (CR-01).
+
+        Returns one of:
+          * ``"parsed"``      — OPSIN accepted the name (emitted SMILES);
+          * ``"rejected"``    — OPSIN ran and definitively rejected it (no SMILES);
+          * ``"unavailable"`` — the parse could not be performed (no JAR / timeout
+            / ``OSError``).
+
+        Callers MUST fail-OPEN on ``"unavailable"`` — a missing JAR or a transient
+        subprocess failure must NEVER suppress a name. This is the distinction the
+        old ``name_to_smiles is not None`` check collapsed, which let a timeout
+        turn a valid, round-trip-passing name into a descriptive fallback.
+
+        Only definitive outcomes are cached, so a transient failure never poisons
+        a later lookup of the same name (WR-04).
+        """
+        if not name:
+            return "rejected"
+        if self._jar is None:
+            return "unavailable"
+        cached = self._parse_status_cache.get(name)
+        if cached is not None:
+            return cached
+        raw, ran = self._invoke_opsin(name)
+        if not ran:
+            return "unavailable"  # transient — NOT cached (WR-04)
+        status = "parsed" if raw else "rejected"
+        self._parse_status_cache[name] = status
+        return status
 
 
 def _recompute_multiplicative_prefix(old_mult: Optional[str], new_name: str) -> Optional[str]:

@@ -585,3 +585,25 @@ class TestSUB02Camphor:
         ref = Chem.MolToInchi(Chem.MolFromSmiles(smi), options="-SNon")
         got = Chem.MolToInchi(Chem.MolFromSmiles(out), options="-SNon")
         assert ref == got
+
+
+@pytest.mark.unit
+class TestBicycloDiketoneSuffix:
+    """WR-03 + IN-06 (code review 2026-06-02): a bicyclic DIKETONE must emit BOTH
+    carbonyl locants with the 'di' multiplier, and keep the parent's terminal 'e'
+    before the consonant-initial '-dione' (IUPAC P-16.3.3)."""
+
+    def test_bicyclo_diketone_names_both_carbonyls(self):
+        # Before the fix only the FIRST ketone was emitted ('...octan-3-one');
+        # now both are, with the 'di' multiplier and the terminal 'e' RETAINED
+        # before the consonant-initial '-dione' (IN-06 elision rule).
+        name = name_compound("O=C1CC2CCC1C(=O)C2")
+        assert name == "bicyclo[2.2.2]octane-3,8-dione"
+        assert "dione" in name           # WR-03: both carbonyls multiplied
+        assert "octane-" in name         # IN-06: parent 'e' kept before 'dione'
+
+    def test_bicyclo_monoketone_elides_e(self):
+        # A single ring ketone keeps eliding the 'e' before the vowel-initial
+        # '-one' ('...heptan-3-one'), unchanged by the WR-03/IN-06 fix.
+        name = name_compound("O=C1CC2CCC1C2")
+        assert name == "bicyclo[2.2.1]heptan-3-one"

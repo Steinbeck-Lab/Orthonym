@@ -112,12 +112,29 @@ class PolycyclicDescriptor:
 # Core Algorithm: find_longest_path
 # ============================================================================
 
+# WR-02 (code review 2026-06-02): hard cap on DFS node-expansions. Simple-path
+# enumeration over a dense ring graph is combinatorial in the cycle count, NOT
+# linear in atom count, so the "<50 atoms => fast" assumption fails on a
+# highly-bridged cage (fullerene fragment, dense cage input) — exactly the kind
+# of system the relaxed SUB-02 bridgehead predicate now admits into the von
+# Baeyer analyzer. Without a bound an adversarial single SMILES could hang the
+# namer (a denial of service, not merely "slow"). A legitimate polycyclic
+# finishes in orders of magnitude fewer expansions than this cap, so real inputs
+# are byte-identical; on a pathological input the search aborts and returns the
+# best/partial result found so far (a valid, if not provably optimal, path —
+# the caller's _find_main_ring_fallback / shortest-path handling degrades
+# gracefully from there).
+_MAX_DFS_EXPANSIONS = 200_000
+
+
 def find_longest_path(mol, start: int, end: int, allowed_atoms: Set[int]) -> List[int]:
     """
     Find the longest simple path from start to end through allowed atoms.
 
     Uses DFS with backtracking. For polycyclic ring systems (<50 atoms),
-    exhaustive search is feasible and fast.
+    exhaustive search is feasible and fast. The search is bounded by
+    ``_MAX_DFS_EXPANSIONS`` (WR-02) so a pathological dense cage cannot hang;
+    on abort the best path found so far is returned.
 
     Args:
         mol: RDKit Mol object
@@ -133,9 +150,13 @@ def find_longest_path(mol, start: int, end: int, allowed_atoms: Set[int]) -> Lis
         return [start]
 
     best_path = []
+    expansions = 0
 
     def dfs(current, visited, path):
-        nonlocal best_path
+        nonlocal best_path, expansions
+        expansions += 1
+        if expansions > _MAX_DFS_EXPANSIONS:
+            return  # WR-02 cap: abort exploration, keep best-so-far
         if current == end:
             if len(path) > len(best_path):
                 best_path = path[:]
@@ -160,14 +181,21 @@ def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int]) -
     """
     Find all simple paths from start to end through allowed atoms.
 
-    Returns list of paths, each a list of atom indices.
+    Returns list of paths, each a list of atom indices. The enumeration is
+    bounded by ``_MAX_DFS_EXPANSIONS`` (WR-02) — on a pathological dense graph
+    it returns the paths found before the cap rather than hanging.
     """
     if start == end:
         return [[start]]
 
     all_paths = []
+    expansions = 0
 
     def dfs(current, visited, path):
+        nonlocal expansions
+        expansions += 1
+        if expansions > _MAX_DFS_EXPANSIONS:
+            return  # WR-02 cap: abort enumeration, keep paths-so-far
         if current == end:
             all_paths.append(path[:])
             return
@@ -552,12 +580,20 @@ class VonBaeyerAnalyzer:
     def _find_path_avoiding_direct(
         self, mol, start: int, end: int, allowed: Set[int]
     ) -> List[int]:
-        """Find a path from start to end that doesn't use the direct bond."""
+        """Find a path from start to end that doesn't use the direct bond.
+
+        Bounded by ``_MAX_DFS_EXPANSIONS`` (WR-02) so a dense cage cannot hang;
+        on abort the best path found so far is returned.
+        """
         # Use BFS to find shortest path first, then try longer paths
         best_path = []
+        expansions = 0
 
         def dfs(current, visited, path):
-            nonlocal best_path
+            nonlocal best_path, expansions
+            expansions += 1
+            if expansions > _MAX_DFS_EXPANSIONS:
+                return  # WR-02 cap: abort exploration, keep best-so-far
             if current == end:
                 if len(path) > len(best_path):
                     best_path = path[:]

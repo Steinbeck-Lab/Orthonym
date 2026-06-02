@@ -448,3 +448,45 @@ class TestRingNameTokensReplacement:
         assert _name_reflects_ring("propyl") is False
         assert _name_reflects_ring("butyl") is False
         assert _name_reflects_ring("hydroxy") is False
+
+
+class TestWR06MultiStereocenterSubstituentLocants:
+    """WR-06 (code review 2026-06-02) — TRACKING xfail for the known
+    multi-stereocenter substituent locant defect.
+
+    A substituent that itself carries >=2 stereocenters currently gets a
+    double-applied, atom-index-numbered (heteroatom-counting) descriptor, e.g.
+    '(2R,3R)-(2R)-2-bromochloropropyl'. The proper fix threads the substituent's
+    OWN IUPAC numbering out of name_fragment_recursively and de-duplicates the
+    recursive stereo descriptor — high blast radius, ~0 corpus reach, and the
+    malformed output is already OPSIN-gated by SUB-03 in production. This xfail
+    pins the defect; it flips green when the root-cause fix lands.
+    """
+
+    @pytest.mark.xfail(
+        reason="WR-06 DEFERRED (169.5 code review): multi-stereocenter substituent "
+               "uses raw atom-index locants AND double-applies the recursive stereo "
+               "descriptor. Correct fix needs the substituent's own numbering threaded "
+               "out of name_fragment_recursively (recursion-contract change, high blast "
+               "radius; branch fires ~25/1282 canary rows that currently pass, so a "
+               "behavior change risks regression; malformed cases SUB-03-gated). "
+               "Tracked here + in the V20 audit.",
+        strict=False,
+    )
+    def test_multi_stereocenter_substituent_single_attachment_rooted_descriptor(self):
+        from rdkit.Chem import rdCIPLabeler
+        from orthonym.assembly.substituent_naming import name_substituent_fragment
+        # benzene bearing -CH(Cl)CH(Br)CH3 (two stereocenters in the substituent)
+        mol = Chem.MolFromSmiles("Cl[C@@H]([C@H](Br)C)c1ccccc1")
+        rdCIPLabeler.AssignCIPLabels(mol)
+        sub_atoms = [a.GetIdx() for a in mol.GetAtoms()
+                     if not a.GetIsAromatic() and a.GetSymbol() != 'H']
+        attach = next(a.GetIdx() for a in mol.GetAtoms()
+                      if a.GetSymbol() == 'C' and not a.GetIsAromatic()
+                      and any(nb.GetIsAromatic() for nb in a.GetNeighbors()))
+        ring = [a.GetIdx() for a in mol.GetAtoms() if a.GetIsAromatic()]
+        name = name_substituent_fragment(mol, sub_atoms, attach, ring)
+        # Correctness property: exactly ONE leading stereo descriptor (no double
+        # application), and attachment-rooted numbering starts at locant 1.
+        assert name.count(")-") == 1, f"double/garbled descriptor: {name!r}"
+        assert "(1" in name, f"numbering not attachment-rooted: {name!r}"

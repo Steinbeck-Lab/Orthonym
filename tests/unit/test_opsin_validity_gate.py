@@ -15,10 +15,13 @@ The gate contract (CONTEXT D-11/D-12/D-13):
     deliberate fail-CLOSED — else a missing-Java env would suppress EVERY name.
 
 Plan 06 will provide these seams on ``orthonym.namer`` (monkeypatched here):
-  - ``_validity_gate_parse(name) -> Optional[str]``   (cached parse-or-None)
+  - ``_validity_gate_status(name) -> str``            (cached 3-valued parse
+    outcome: 'parsed' | 'rejected' | 'unavailable'; CR-01)
   - ``_validity_gate_jar_present() -> bool``          (JAR presence probe)
   - ``_final_opsin_validity_gate(name, smiles) -> str``
 """
+import subprocess
+
 import pytest
 
 # Import guard: skip the whole module until SUB-03 (Plan 06) lands the gate.
@@ -43,15 +46,15 @@ class TestOpsinValidityGate:
         monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False)
 
     def test_parseable_name_passes_through_unchanged(self, monkeypatch):
-        """A name OPSIN can parse is returned verbatim."""
+        """A name OPSIN can parse ('parsed') is returned verbatim."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
-        monkeypatch.setattr(namer, "_validity_gate_parse", lambda n: "CCO")
+        monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "parsed")
         assert _final_opsin_validity_gate("ethanol", "CCO") == "ethanol"
 
     def test_malformed_name_falls_back_to_descriptive_string(self, monkeypatch):
-        """An unparseable name -> the _descriptive_fallback STRING (not None)."""
+        """A DEFINITIVELY rejected name -> the _descriptive_fallback STRING (not None)."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
-        monkeypatch.setattr(namer, "_validity_gate_parse", lambda n: None)
+        monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected")
         smiles = "CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2"  # camphor
         out = _final_opsin_validity_gate("4,7,7-trimethylanediol", smiles)
         assert out == _descriptive_fallback(smiles)
@@ -60,12 +63,91 @@ class TestOpsinValidityGate:
     def test_no_jar_is_fail_open_noop(self, monkeypatch):
         """CRITICAL (D-13): JAR absent -> gate is a no-op, name unchanged."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: False)
-        # parse would return None, but the JAR guard must short-circuit FIRST.
-        monkeypatch.setattr(namer, "_validity_gate_parse", lambda n: None)
+        # status would say 'rejected', but the JAR guard must short-circuit FIRST.
+        monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected")
         assert _final_opsin_validity_gate("anything-at-all", "CCO") == "anything-at-all"
+
+    def test_unavailable_status_is_fail_open(self, monkeypatch):
+        """CR-01: a transient OPSIN failure ('unavailable' — timeout / OSError mid-run,
+        JAR present) must FAIL OPEN and ship the name, NEVER suppress it. The old
+        parse-or-None check suppressed here, turning an RT=1 name into RT=0."""
+        monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
+        monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "unavailable")
+        # A perfectly valid name that simply timed out must survive unchanged.
+        assert _final_opsin_validity_gate("ethanol", "CCO") == "ethanol"
 
     def test_empty_name_is_untouched(self, monkeypatch):
         """A falsy name is returned unchanged (nothing to gate)."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
-        monkeypatch.setattr(namer, "_validity_gate_parse", lambda n: None)
+        monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected")
         assert _final_opsin_validity_gate("", "CCO") == ""
+
+
+@pytest.mark.unit
+class TestOpsinOracleParseStatus:
+    """SUB-03 gate oracle: the 3-valued parse outcome + WR-04 no-poison caching.
+
+    These exercise OpsinOracle directly (no Java needed — the subprocess call is
+    stubbed), pinning the CR-01/WR-04 contract at its source.
+    """
+
+    def _oracle(self):
+        from orthonym.assembly.retained_substitution import OpsinOracle
+        return OpsinOracle(opsin_jar="/fake/opsin.jar")  # non-None jar so we reach the call
+
+    def test_parsed_when_opsin_emits_smiles(self):
+        oracle = self._oracle()
+        oracle._invoke_opsin = lambda name: ("CCO", True)
+        assert oracle.parse_status("ethanol") == "parsed"
+
+    def test_rejected_when_opsin_emits_nothing(self):
+        oracle = self._oracle()
+        oracle._invoke_opsin = lambda name: (None, True)
+        assert oracle.parse_status("4,7,7-trimethylanediol") == "rejected"
+
+    def test_no_jar_is_unavailable(self):
+        from orthonym.assembly.retained_substitution import OpsinOracle
+        assert OpsinOracle(opsin_jar=None).parse_status("ethanol") == "unavailable"
+
+    def test_transient_failure_is_unavailable_and_not_cached(self, monkeypatch):
+        """WR-04: a timeout returns 'unavailable' and is NOT cached, so a later
+        call (after the transient condition clears) re-invokes and can succeed —
+        a single timeout must not permanently suppress a name process-wide."""
+        from orthonym.assembly import retained_substitution as rs
+        oracle = self._oracle()
+        calls = {"n": 0}
+
+        class _Res:
+            def __init__(self, out):
+                self.stdout = out
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise subprocess.TimeoutExpired(cmd="java", timeout=10)
+            return _Res("CCO\n")
+
+        monkeypatch.setattr(rs.subprocess, "run", fake_run)
+        assert oracle.parse_status("ethanol") == "unavailable"  # transient
+        # NOT cached -> the second call re-invokes OPSIN and now succeeds.
+        assert oracle.parse_status("ethanol") == "parsed"
+        assert calls["n"] == 2
+
+    def test_definitive_outcome_is_cached(self, monkeypatch):
+        """A definitive 'parsed'/'rejected' IS cached (one subprocess per name)."""
+        from orthonym.assembly import retained_substitution as rs
+        oracle = self._oracle()
+        calls = {"n": 0}
+
+        class _Res:
+            def __init__(self, out):
+                self.stdout = out
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return _Res("CCO\n")
+
+        monkeypatch.setattr(rs.subprocess, "run", fake_run)
+        assert oracle.parse_status("ethanol") == "parsed"
+        assert oracle.parse_status("ethanol") == "parsed"
+        assert calls["n"] == 1  # cached -> only ONE subprocess call
