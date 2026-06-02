@@ -985,10 +985,13 @@ def _add_substituent_stereo(mol, sub_atoms, name):
     for idx in sub_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.HasProp('_CIPCode'):
+            # SUB-04/D-15: inherit the perception verdict verbatim (the single
+            # source of truth). The former force-uppercase of pseudo-asymmetric
+            # r/s was a latent D-15 violation — it would CORRUPT a genuine
+            # substituent-position pseudo-asymmetric centre. Verified dead on the
+            # whole corpus (0 hits across the genuine-13 + ceramide leaks + 400
+            # stereo molecules), so removal is zero-regression.
             cip = atom.GetProp('_CIPCode')
-            # Enforce uppercase for OPSIN compatibility
-            if cip in ('r', 's'):
-                cip = cip.upper()
             stereo_atoms.append((idx, cip))
 
     if not stereo_atoms:
