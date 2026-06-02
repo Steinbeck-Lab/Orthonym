@@ -220,7 +220,7 @@ class TestSUB01ZwitterionNegativeCanary:
 class TestSUB01Zwitterion:
     """Non-retained zwitterion -> whole-skeleton azaniumyl...oate (D-03)."""
 
-    @pytest.mark.xfail(reason="SUB-01/D-03 Plan 02: charge stripped -> '4-aminobutanoic acid'", strict=False)
+    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): charge-stripped '4-aminobutanoic acid' already RT-correct at connectivity (InChI-L1 ignores charge), so the D-03 azaniumyl...oate compositional path is precision-only / zero-RT / high-risk new-logic. Deferred over the higher-value anion fix.", strict=False)
     def test_gaba_zwitterion_whole_skeleton(self):
         # 4-aminobutanoate zwitterion -> 4-azaniumylbutanoate (both centres).
         name = name_compound("[NH3+]CCCC(=O)[O-]")

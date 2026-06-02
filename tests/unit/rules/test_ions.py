@@ -689,17 +689,17 @@ class TestSUB01ChargeAwareNaming:
         name = name_compound("CP(=O)(O)[O-]")
         assert "phosphonate" in name
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02/D-05: cation carbon-counting stub -> heptylium", strict=False)
+    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): carbenium 'phenylmethylium' needs cation-aware parent selection (the C+ as the methylium parent) — neutralize-recurse loses the cation position; a substantial select_parent change, small reach. Currently 'heptylium'.", strict=False)
     def test_phenylmethylium_not_benzylium(self):
         name = name_compound("[CH2+]c1ccccc1")
         # RESEARCH gotcha: phenylmethylium, NOT benzylium, NOT heptylium.
         assert name == "phenylmethylium"
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02/D-05: currently 'methylammonium'; P-73 PIN is 'methanaminium'", strict=False)
+    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): 'methylammonium' is RT-correct general nomenclature; the PIN 'methanaminium' needs fragment-namer (name_fragment_recursively 'methylamine'->'methanamine') changes outside SUB-01 charge scope.", strict=False)
     def test_methanaminium(self):
         name = name_compound("C[NH3+]")
         # P-73 PIN: methanaminium (from methanamine). 'methylammonium' is the
-        # general-nomenclature form Orthonym emits today.
+        # RT-correct general-nomenclature form Orthonym emits today.
         assert "methanaminium" in name
 
     def test_azide_keeps_azido_prefix(self):
