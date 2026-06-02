@@ -637,3 +637,74 @@ class TestAromaticCarboxylateHelpers:
         carboxyl_c = _find_carboxyl_carbon(mol, sites['anions'][0])
         aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_c)
         assert aromatic_name is None
+
+
+# ============================================================================
+# Phase 169.5 SUB-01 — charge-aware naming (Wave 0 fixtures)
+#
+# Negative canaries assert NOW (the currently-correct charged paths that the
+# SUB-01 routing change MUST NOT regress). The charge-aware targets are
+# xfail until Plan 02 lands (they currently hit the carbon-counting
+# _name_alkoxide_systematic stub: heptanolate/propanolate/methanolate/heptylium).
+# ============================================================================
+
+from orthonym import name_compound  # noqa: E402
+
+
+@pytest.mark.unit
+class TestSUB01NegativeCanary:
+    """Currently-correct charged names that SUB-01 routing MUST preserve."""
+
+    def test_acetate_unchanged(self):
+        assert name_compound("CC(=O)[O-]") == "acetate"
+
+    def test_benzoate_unchanged(self):
+        assert name_compound("[O-]C(=O)c1ccccc1") == "benzoate"
+
+    def test_propanolate_unchanged(self):
+        # propan-1-olate / propanolate — the small-alkoxide retained path.
+        assert name_compound("CCC[O-]") == "propanolate"
+
+    def test_propanethiolate_unchanged(self):
+        assert name_compound("CCC[S-]") == "propanethiolate"
+
+
+@pytest.mark.unit
+class TestSUB01ChargeAwareNaming:
+    """SUB-01 charge-aware targets — xfail until Plan 02 routes charged
+    species through the general pipeline + the ionic-suffix seam."""
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02: S-[O-] hits carbon-counting stub -> propanolate", strict=False)
+    def test_propanesulfonate(self):
+        name = name_compound("CCCS(=O)(=O)[O-]")
+        assert "sulfonate" in name and "olate" not in name
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02: the heptanolate bug (D-06: parent+sulfonate, NOT the 4- locant)", strict=False)
+    def test_formylbenzenesulfonate_parent_and_suffix(self):
+        name = name_compound("O=Cc1ccc(S(=O)(=O)[O-])cc1")
+        # D-06: assert correct parent + -sulfonate; the missing 4- locant is a
+        # SEPARATE pre-existing ring-substituent-locant defect, out of SUB-01 scope.
+        assert "sulfonate" in name and "heptanolate" not in name
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02: P-[O-] hits carbon-counting stub -> methanolate", strict=False)
+    def test_methylphosphonate(self):
+        name = name_compound("CP(=O)(O)[O-]")
+        assert "phosphonate" in name
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02/D-05: cation carbon-counting stub -> heptylium", strict=False)
+    def test_phenylmethylium_not_benzylium(self):
+        name = name_compound("[CH2+]c1ccccc1")
+        # RESEARCH gotcha: phenylmethylium, NOT benzylium, NOT heptylium.
+        assert name == "phenylmethylium"
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02/D-05: currently 'methylammonium'; P-73 PIN is 'methanaminium'", strict=False)
+    def test_methanaminium(self):
+        name = name_compound("C[NH3+]")
+        # P-73 PIN: methanaminium (from methanamine). 'methylammonium' is the
+        # general-nomenclature form Orthonym emits today.
+        assert "methanaminium" in name
+
+    @pytest.mark.xfail(reason="SUB-01 Plan 02/C2: broken azido SMARTS silently drops the azide", strict=False)
+    def test_azide_keeps_azido_prefix(self):
+        name = name_compound("[N-]=[N+]=NCCCNC(=O)CCCC(=O)O")
+        assert "azido" in name

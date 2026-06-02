@@ -214,3 +214,63 @@ class TestLocantDetermination:
 
         locants = get_non_principal_fg_locants(mol, fg_atoms, principal_chain, atom_to_locant)
         assert locants == [2]  # Ketone at position 2
+
+
+# ============================================================================
+# Phase 169.5 SUB-05 — detachable-prefix separators + enclosing marks (Wave 0)
+#
+# Must-not-split negatives assert NOW (D-16: legitimately-fused tokens +
+# single-formatter 2,3-dimethyl stay intact). Glued/dropped-locant/nested-stereo
+# targets xfail until Plan 04 (4a off-chain locant recovery, 4b _join_prefixes
+# separator, D-17 enclosing-mark unify).
+# ============================================================================
+
+import pytest  # noqa: E402
+from orthonym.rules.polyfunctional import _join_prefixes  # noqa: E402
+
+
+@pytest.mark.unit
+class TestSUB05JoinMustNotSplit:
+    """_join_prefixes MUST keep legitimately-fused / single-token prefixes intact."""
+
+    def test_join_keeps_phosphonooxy(self):
+        assert _join_prefixes(["phosphonooxy"]) == "phosphonooxy"
+
+    def test_join_keeps_phenylsulfanyl(self):
+        assert _join_prefixes(["phenylsulfanyl"]) == "phenylsulfanyl"
+
+    def test_join_keeps_dimethyl_locant_token(self):
+        # '2,3-dimethyl' is a SINGLE formatter token — structurally immune.
+        assert _join_prefixes(["2,3-dimethyl"]) == "2,3-dimethyl"
+
+
+@pytest.mark.unit
+class TestSUB05GluedAndDroppedPrefix:
+    """Glued detachable-prefix pair + dropped off-chain locant — xfail (Plan 04)."""
+
+    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4b): _join_prefixes glues '3-oxo'+'phosphono'", strict=False)
+    def test_join_separates_oxo_phosphono(self):
+        # detachable letter->letter pair must be separated (gated to known tokens).
+        assert _join_prefixes(["3-oxo", "phosphono"]) != "3-oxophosphono"
+
+    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4b): glued oxophosphono in the assembled name", strict=False)
+    def test_glued_oxophosphono_in_name(self):
+        name = name_compound("CC(=O)C(CP(O)(O)=O)C(=O)O")
+        assert "oxophosphono" not in name
+
+    @pytest.mark.xfail(reason="SUB-05 Plan 04 (4a): off-chain phosphono drops its locant", strict=False)
+    def test_dropped_locant_phosphonomethyl(self):
+        # HOOC-CH2-CH(CH2PO3H2)-COOH -> 2-(phosphonomethyl)butanedioic acid.
+        name = name_compound("OC(=O)CC(CP(=O)(O)O)C(=O)O")
+        assert "(phosphonomethyl)" in name
+
+
+@pytest.mark.unit
+class TestSUB05NestedStereoEnclosing:
+    """D-17: monosubstituted ring-substituent stereo must be enclosed — xfail (Plan 04)."""
+
+    @pytest.mark.xfail(reason="SUB-05 D-17 Plan 04: monosubstituted path skips enclosing marks", strict=False)
+    def test_nested_stereo_enclosed(self):
+        # (R)-3-methylpentylbenzene -> [(R)-3-methylpentyl]benzene (P-16.3.3).
+        name = name_compound("CC[C@@H](C)CCc1ccccc1")
+        assert name == "[(R)-3-methylpentyl]benzene"

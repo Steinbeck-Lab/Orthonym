@@ -160,3 +160,69 @@ class TestCIPDocumentationExists:
         with open(doc_path) as f:
             content = f.read()
         assert 'rdCIPLabeler' in content, "Missing rdCIPLabeler reference"
+
+
+# ============================================================================
+# Phase 169.5 SUB-04 — stereo r/s casing (Wave 0), RE-SCOPED per C5 + VERIFIED.
+#
+# VERIFIED (rdCIPLabeler probe, 2026-06-02, per the "verify don't trust numbers"
+# directive / A1): the genuine pseudo-asymmetric set = the molecules where
+# rdCIPLabeler ITSELF assigns lowercase r/s on the WHOLE molecule. The fix
+# (D-15) defaults to that verdict, so these MUST keep lowercase (regression
+# gate, assert NOW). NOTE: the (1r,3r)-1-amino-3-fluorocyclobutane the SPEC
+# called a "false leak" is in fact GENUINE (rdCIPLabeler -> r,r; a 1,3-
+# disubstituted cyclobutane is pseudo-asymmetric per P-92.1.4.2) — OPSIN
+# rejecting it in BOTH casings is OPSIN's documented CIP-sequence-rule
+# limitation, not ours. The ACTUAL false leak is the ceramide
+# cyclohexane-1,2,3,4,5,6-hexayl substituent series (name shows 2s/5r but
+# whole-molecule rdCIPLabeler says all-uppercase) — a fragment-vs-whole-molecule
+# CIP-context leak (xfail until Plan 05 reconciles substituent_naming.py:990).
+# ============================================================================
+
+from orthonym.perception.stereo import get_stereocenters  # noqa: E402
+from orthonym import name_compound  # noqa: E402
+
+# Verified genuine set (rdCIPLabeler assigns >=1 lowercase r/s on the whole mol).
+_GENUINE_PSEUDO_ASYM = [
+    ("1-amino-3-fluorocyclobutane-1-carboxylic acid", "N[C@]1(C(=O)O)C[C@@H]([18F])C1"),
+    ("tropan-3-ol",                                    "CN1[C@@H]2CC[C@H]1C[C@H](O)C2"),
+    ("tropan-3-yl nonanoate (mesitylene ester)",       "Cc1cc(C)cc(C(=O)O[C@H]2C[C@H]3CC[C@@H](C2)N3C)c1"),
+    ("norbornane (1s,4s)",                             "C1C[C@H]2CC[C@@H]1C2"),
+]
+
+
+@pytest.mark.unit
+class TestSUB04GenuinePseudoAsymmetricCasing:
+    """The genuine lowercase set — the SUB-04 ZERO-regression gate (assert NOW)."""
+
+    @pytest.mark.parametrize("label,smiles", _GENUINE_PSEUDO_ASYM)
+    def test_genuine_pseudo_keeps_lowercase_at_perception(self, label, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        centers = get_stereocenters(mol)
+        lowercase = [c for c in centers if c.get("cip") in ("r", "s")]
+        assert lowercase, f"{label}: expected >=1 lowercase r/s (genuine pseudo-asym)"
+
+    def test_tropanol_name_keeps_lowercase_descriptor(self):
+        # (1R,3s,5S)-tropan-3-ol — the 3s lowercase must survive into the name.
+        name = name_compound("CN1[C@@H]2CC[C@H]1C[C@H](O)C2")
+        assert "3s" in name
+
+
+@pytest.mark.unit
+class TestSUB04CasingLeak:
+    """The genuine false leak (fragment-vs-whole-molecule CIP context):
+    rdCIPLabeler on the whole molecule says all-uppercase, but the generated
+    name leaks lowercase on the cyclohexane-hexayl substituent. The fix should
+    emit the whole-molecule verdict (uppercase) — xfail until Plan 05."""
+
+    @pytest.mark.xfail(reason="SUB-04 Plan 05: substituent fragment-CIP-context lowercase leak", strict=False)
+    def test_ceramide_inositol_substituent_uppercased(self):
+        # Whole-molecule rdCIPLabeler -> all uppercase; current name leaks 2s/5r.
+        smi = "CCCCCCCCCCCCCCCCCCCCCCCC(=O)N[C@@H](COP(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O)[C@H](O)/C=C/CCCCCCCCCCCCC"
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            pytest.skip("ceramide SMILES did not parse in this RDKit build")
+        # No lowercase r/s anywhere on the whole molecule per rdCIPLabeler.
+        assert not any(c.get("cip") in ("r", "s") for c in get_stereocenters(mol))
+        name = name_compound(smi)
+        assert "2s" not in name and "5r" not in name

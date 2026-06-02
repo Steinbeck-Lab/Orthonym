@@ -192,3 +192,36 @@ class TestStoichiometricPrefix:
     def test_tetra_prefix(self):
         """Test tetra- prefix for count=4."""
         assert _apply_stoichiometric_prefix('oxide', 4) == 'tetraoxide'
+
+
+# ============================================================================
+# Phase 169.5 SUB-01/D-03 — zwitterion (P-74 inner salt) naming (Wave 0)
+#
+# Retained amino-acid zwitterions (glycine/betaine) MUST stay (assert NOW).
+# Non-retained zwitterions currently strip the charge and name the neutral
+# form (GABA -> '4-aminobutanoic acid'), losing the P-74 ionic character.
+# The SUB-01 target names the whole skeleton carrying BOTH centres
+# (azaniumyl... substituent + -oate suffix) — xfail until Plan 02.
+# ============================================================================
+
+from orthonym import name_compound  # noqa: E402
+
+
+class TestSUB01ZwitterionNegativeCanary:
+    """Retained zwitterion names SUB-01 MUST preserve."""
+
+    def test_glycine_retained(self):
+        assert name_compound("[NH3+]CC(=O)[O-]") == "glycine"
+
+    def test_betaine_retained(self):
+        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "betaine"
+
+
+class TestSUB01Zwitterion:
+    """Non-retained zwitterion -> whole-skeleton azaniumyl...oate (D-03)."""
+
+    @pytest.mark.xfail(reason="SUB-01/D-03 Plan 02: charge stripped -> '4-aminobutanoic acid'", strict=False)
+    def test_gaba_zwitterion_whole_skeleton(self):
+        # 4-aminobutanoate zwitterion -> 4-azaniumylbutanoate (both centres).
+        name = name_compound("[NH3+]CCCC(=O)[O-]")
+        assert "azaniumyl" in name and name.endswith("oate")

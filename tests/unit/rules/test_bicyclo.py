@@ -518,3 +518,68 @@ class TestBicycloNamingIntegration:
         # Carbon count verification: 2+2+2+2 = 8
         ring_atoms = get_bicyclo_ring_atoms(bicyclo_222_octane)
         assert len(ring_atoms) == 8
+
+
+# ============================================================================
+# Phase 169.5 SUB-02 — bridged-bicyclic bridgehead perception (Wave 0)
+#
+# The NEGATIVE canaries are the #1 regression gate (C3/D-07): relaxing the
+# bridgehead predicate makes naphthalene/decalin yield 2 bridgeheads identical
+# to camphor's, so they MUST stay correct — kept out of von Baeyer by the
+# is_bicyclo_system applicability guards, NOT the bridgehead count. adamantane/
+# cubane/bridged-tricyclic are the D-08 no-op proof (the already-correct
+# VonBaeyerAnalyzer path must be byte-identical after consolidation).
+# Camphor is the xfail target (mis-named as a cyclopentanone until Plan 03).
+# ============================================================================
+
+from orthonym import name_compound  # noqa: E402
+
+
+@pytest.mark.unit
+class TestSUB02NegativeCanary:
+    """Systems that MUST stay correct after the bridgehead predicate relaxes."""
+
+    def test_negative_naphthalene_unchanged(self):
+        assert name_compound("c1ccc2ccccc2c1") == "naphthalene"
+
+    def test_negative_decalin_unchanged(self):
+        assert name_compound("C1CCC2CCCCC2C1") == "decahydronaphthalene"
+
+    def test_negative_spiro45decane_unchanged(self):
+        assert name_compound("C1CCC2(CC1)CCCC2") == "spiro[4.5]decane"
+
+    def test_negative_adamantane_unchanged(self):
+        assert name_compound("C1C2CC3CC1CC(C2)C3") == "adamantane"
+
+    def test_negative_cubane_unchanged(self):
+        # D-08 no-op proof: the VonBaeyerAnalyzer path is already correct.
+        assert name_compound("C12C3C4C1C5C2C3C45") == \
+            "pentacyclo[3.1.1.1(2,6).0(3,7).0(4,8)]octane"
+
+    def test_negative_bridged_tricyclic_unchanged(self):
+        # D-08 no-op proof: a bridged tricyclic already named via the correct
+        # predicate must be byte-identical after consolidation (twistane-class).
+        assert name_compound("C1CC2CCC3CCC1C2C3") == \
+            "tricyclo[3.3.1.2(4,6)]undecane"
+
+
+@pytest.mark.unit
+class TestSUB02Camphor:
+    """SUB-02 target — camphor names algorithmically as a bicyclo[2.2.1]
+    heptan-2-one (xfail until Plan 03 relaxes the bridgehead predicate)."""
+
+    @pytest.mark.xfail(reason="SUB-02 Plan 03: bridgehead miss -> mis-named (2R,5R)-1,1,2-trimethylcyclopentan-2-one", strict=False)
+    def test_camphor_is_bicycloheptanone(self):
+        name = name_compound("CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2")
+        assert "bicyclo[2.2.1]" in name and "heptan" in name and "one" in name
+
+    @pytest.mark.xfail(reason="SUB-02 Plan 03: camphor bicyclo name must OPSIN-RT", strict=False)
+    def test_camphor_opsin_roundtrips(self, opsin_to_smiles):
+        from rdkit import Chem
+        smi = "CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2"
+        name = name_compound(smi)
+        out = opsin_to_smiles(name)
+        assert out is not None
+        ref = Chem.MolToInchi(Chem.MolFromSmiles(smi), options="-SNon")
+        got = Chem.MolToInchi(Chem.MolFromSmiles(out), options="-SNon")
+        assert ref == got
