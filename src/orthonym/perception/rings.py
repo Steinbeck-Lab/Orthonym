@@ -356,6 +356,44 @@ def get_bridgehead_atoms(mol) -> Set[int]:
     return bridgeheads
 
 
+def find_ring_bridgeheads(mol, ring_atoms: Set[int] = None) -> Set[int]:
+    """Find von-Baeyer bridgehead atoms: ring-skeletal atoms bonded to >=3
+    other ring-skeletal atoms.
+
+    SUB-02/D-08: the SINGLE consolidated bridgehead predicate (seeded from
+    VonBaeyerAnalyzer._find_all_bridgeheads, polycyclic.py:425-433). Counts
+    only ring-member neighbours, so an exocyclic substituent (camphor's
+    gem-dimethyl bridgehead) does NOT disqualify a bridgehead — exactly the
+    SUB-02 fix. This is distinct from get_bridgehead_atoms() (count>=2 ring
+    membership, too loose) which is left unchanged because it is widely
+    imported.
+
+    IUPAC P-23.2.1: a bridgehead is a skeletal atom bonded to three or more
+    other skeletal atoms (excluding H); bridgeheads MAY be quaternary/
+    substituted.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        Set of atom indices that are bridgeheads (>=3 ring-member neighbours).
+    """
+    if ring_atoms is None:
+        ring_atoms = set()
+        for ring in mol.GetRingInfo().AtomRings():
+            ring_atoms.update(ring)
+
+    bridgeheads = set()
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        ring_neighbors = sum(
+            1 for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms
+        )
+        if ring_neighbors >= 3:
+            bridgeheads.add(idx)
+    return bridgeheads
+
+
 def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
     """
     Classify a ring by its chemical type.

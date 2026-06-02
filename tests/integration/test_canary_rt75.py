@@ -1592,7 +1592,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1=CC[C@@H]2C[C@H]1C2(C)C",  # fused-ring,small
-        "(1R,5R)-4,7,7-trimethyl-bicyclo[3.1.1]hept-3-ene",
+        # SUB-02 (169.5): substituent prefix glues to the descriptor
+        # (IUPAC-standard 'trimethylbicyclo', was the non-standard
+        # 'trimethyl-bicyclo'); both OPSIN-RT, the no-hyphen form is correct.
+        "(1R,5R)-4,7,7-trimethylbicyclo[3.1.1]hept-3-ene",
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](C)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium

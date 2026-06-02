@@ -422,15 +422,10 @@ class VonBaeyerAnalyzer:
         Returns:
             Set of bridgehead atom indices
         """
-        bridgeheads = set()
-        for idx in ring_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            ring_neighbors = sum(
-                1 for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms
-            )
-            if ring_neighbors >= 3:
-                bridgeheads.add(idx)
-        return bridgeheads
+        # SUB-02/D-08: delegate to the SINGLE consolidated predicate (identical
+        # ring_neighbours>=3 rule, operating on the passed ring component).
+        from ..perception.rings import find_ring_bridgeheads
+        return find_ring_bridgeheads(mol, ring_atoms)
 
     # ========================================================================
     # VB-2: Main Ring Finding

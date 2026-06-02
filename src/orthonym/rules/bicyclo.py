@@ -21,7 +21,7 @@ from collections import deque
 from rdkit import Chem
 from rdkit.Chem import BondType
 
-from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms
+from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms, find_ring_bridgeheads
 
 
 # ============================================================================
@@ -78,37 +78,14 @@ def find_true_bridgeheads(mol) -> Set[int]:
         >>> find_true_bridgeheads(mol)
         {2, 5}  # or similar indices for the bridgehead carbons
     """
-    ri = mol.GetRingInfo()
-
-    # Count ring membership for each atom
-    atom_ring_count = {}
-    for ring in ri.AtomRings():
-        for idx in ring:
-            atom_ring_count[idx] = atom_ring_count.get(idx, 0) + 1
-
-    # Get all ring atoms
-    ring_atoms = set()
-    for ring in ri.AtomRings():
-        ring_atoms.update(ring)
-
-    bridgeheads = set()
-
-    for idx in range(mol.GetNumAtoms()):
-        # Must be in multiple rings
-        if atom_ring_count.get(idx, 0) < 2:
-            continue
-
-        # Must have 3 neighbors
-        atom = mol.GetAtomWithIdx(idx)
-        neighbors = [n.GetIdx() for n in atom.GetNeighbors()]
-        if len(neighbors) != 3:
-            continue
-
-        # All neighbors must be in the ring system
-        if all(n in ring_atoms for n in neighbors):
-            bridgeheads.add(idx)
-
-    return bridgeheads
+    # SUB-02/D-07+D-08: delegate to the SINGLE consolidated predicate
+    # (perception.rings.find_ring_bridgeheads, ring_neighbours >= 3). The old
+    # body required exactly 3 TOTAL neighbours all-in-ring, which wrongly
+    # excluded substituted/quaternary bridgeheads (camphor's gem-dimethyl) —
+    # the SUB-02 bug. The von-Baeyer-applicability guards in is_bicyclo_system
+    # (cycle_rank / spiro / aromatic-fused / zero-bridge) keep fused/spiro
+    # systems (naphthalene, decalin, spiro) out of von Baeyer naming.
+    return find_ring_bridgeheads(mol)
 
 
 # ============================================================================

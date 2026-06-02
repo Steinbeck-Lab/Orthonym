@@ -237,40 +237,13 @@ def find_all_bridgeheads(mol) -> Set[int]:
         >>> len(find_all_bridgeheads(mol))  
         4
     """
-    ri = mol.GetRingInfo()
-    
-    # Count ring membership for each atom
-    atom_ring_count: Dict[int, int] = {}
-    for ring in ri.AtomRings():
-        for idx in ring:
-            atom_ring_count[idx] = atom_ring_count.get(idx, 0) + 1
-    
-    # Get all ring atoms
-    ring_atoms = set()
-    for ring in ri.AtomRings():
-        ring_atoms.update(ring)
-    
-    bridgeheads = set()
-    
-    for idx in range(mol.GetNumAtoms()):
-        # Must be in multiple rings
-        if atom_ring_count.get(idx, 0) < 2:
-            continue
-        
-        # Must have 3+ neighbors
-        atom = mol.GetAtomWithIdx(idx)
-        neighbors = [n.GetIdx() for n in atom.GetNeighbors()]
-        if len(neighbors) < 3:
-            continue
-        
-        # Count how many neighbors are in the ring system
-        ring_neighbors = sum(1 for n in neighbors if n in ring_atoms)
-        
-        # Bridgeheads have 3+ ring neighbors
-        if ring_neighbors >= 3:
-            bridgeheads.add(idx)
-    
-    return bridgeheads
+    # SUB-02/D-08: delegate to the SINGLE consolidated predicate. The former
+    # body's extra filters (atom_ring_count>=2, total-neighbours>=3) are
+    # redundant given ring_neighbours>=3 (an atom with >=3 ring neighbours is
+    # necessarily in >=2 rings and has >=3 total neighbours), so this is a
+    # provable no-op verified byte-identically against the canary.
+    from ..perception.rings import find_ring_bridgeheads
+    return find_ring_bridgeheads(mol)
 
 
 def get_ring_atoms(mol) -> Set[int]:

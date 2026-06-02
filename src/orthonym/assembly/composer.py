@@ -3024,6 +3024,12 @@ def _assemble_complete_bicyclo_name(mol, features):
     # Build substituent prefix
     sub_prefix = _build_bicyclo_substituent_prefix(mol, substituents, atom_to_locant)
 
+    # SUB-02 (A-fix): principal characteristic group suffix (e.g. '-6-one' for
+    # camphor). The bicyclo assembler historically had NO suffix machinery and
+    # silently dropped a ring ketone. Scoped to ketone (the functional atom is
+    # the ring carbon itself, never double-counted in substituents).
+    principal_suffix = _build_bicyclo_principal_suffix(mol, features, atom_to_locant)
+
     # Collect stereodescriptors
     stereo_prefix = ""
     rdCIPLabeler.AssignCIPLabels(mol)
@@ -3042,16 +3048,29 @@ def _assemble_complete_bicyclo_name(mol, features):
         parts.append(stereo_prefix)
 
     if sub_prefix:
-        # Ensure substituent prefix ends with hyphen before heteroatom or descriptor
-        if not sub_prefix.endswith('-'):
+        # SUB-02 (B-fix): a hyphen separates the substituent prefix from the
+        # NEXT part ONLY when that part starts with a locant digit (e.g.
+        # 'octyl-9-oxa'); a letter-initial next part glues directly
+        # ('trimethyl' + 'bicyclo[...]' -> 'trimethylbicyclo[...]', which OPSIN
+        # requires). The previously-forced unconditional hyphen produced the
+        # OPSIN-rejected 'trimethyl-bicyclo[...]'.
+        sub_prefix = sub_prefix.rstrip('-')
+        next_part = heteroatom_prefix if heteroatom_prefix else descriptor
+        if next_part and next_part[0].isdigit():
             sub_prefix += '-'
         parts.append(sub_prefix)
 
     if heteroatom_prefix:
         parts.append(heteroatom_prefix)
 
-    # Build the main name: bicyclo[x.y.z]parent-unsat
+    # Build the main name: bicyclo[x.y.z]parent-unsat(-L-suffix)
     main_name = f"{descriptor}{unsat_suffix}"
+    if principal_suffix:
+        # Drop the parent's trailing 'e' (heptane -> heptan) and append the
+        # principal-group suffix (-> heptan-6-one). IUPAC P-31.1.4.3.4.
+        if main_name.endswith('e'):
+            main_name = main_name[:-1]
+        main_name = f"{main_name}{principal_suffix}"
     parts.append(main_name)
 
     # Join parts
@@ -3220,6 +3239,41 @@ def _build_bicyclo_substituent_prefix(
     result = _join_prefixes(prefix_texts)
 
     return result
+
+
+def _build_bicyclo_principal_suffix(mol, features, atom_to_locant: Dict[int, int]) -> str:
+    """SUB-02 (A-fix): principal-characteristic-group suffix for a bicyclo parent.
+
+    Returns e.g. '-6-one' for camphor, or '' if there is no principal group or
+    it is not a ring-carbon-bearing group expressible as '-L-suffix'.
+
+    SCOPE: ketone only. The carbonyl carbon IS a ring (von Baeyer skeleton)
+    atom, so the suffix attaches to its locant and the group is never
+    double-counted in the substituent prefix (a 0-H carbonyl O is skipped by
+    _build_bicyclo_substituent_prefix). Other ring-suffix groups (ol/al/acid/
+    nitrile) need substituent de-duplication or have an exocyclic functional
+    carbon and remain out of this minimal scope (a documented follow-on).
+    """
+    pg = getattr(features, 'principal_group', None)
+    pg_atoms = getattr(features, 'principal_group_atoms', None)
+    if pg != 'ketone' or not pg_atoms:
+        return ""
+    for match in pg_atoms:
+        for idx in match:
+            if idx not in atom_to_locant:
+                continue
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            # the carbonyl carbon = the matched ring C double-bonded to an O
+            has_carbonyl = any(
+                b.GetBondTypeAsDouble() == 2.0
+                and b.GetOtherAtom(atom).GetSymbol() == 'O'
+                for b in atom.GetBonds()
+            )
+            if has_carbonyl:
+                return f"-{atom_to_locant[idx]}-one"
+    return ""
 
 
 def _assemble_heterocycle_name(features: Any, style: str) -> str:
