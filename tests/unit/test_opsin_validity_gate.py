@@ -36,6 +36,12 @@ from orthonym.namer import _final_opsin_validity_gate, _descriptive_fallback  # 
 class TestOpsinValidityGate:
     """SUB-03 gate: suppress-malformed / fail-OPEN / parseable-untouched."""
 
+    @pytest.fixture(autouse=True)
+    def _force_enable_gate(self, monkeypatch):
+        """Re-enable the gate for these tests (the conftest autouse fixture
+        disables it for the rest of the suite per D-13)."""
+        monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False)
+
     def test_parseable_name_passes_through_unchanged(self, monkeypatch):
         """A name OPSIN can parse is returned verbatim."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)

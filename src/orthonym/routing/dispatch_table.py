@@ -508,7 +508,10 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
             neutral_mol = rwmol.GetMol()
             neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
             from orthonym.namer import Orthonym
-            neutral_namer = Orthonym(style=style)
+            # SUB-03 (169.5): neutral name is an INTERMEDIATE (ionized below) —
+            # bypass the validity gate so a malformed intermediate isn't
+            # suppressed to a descriptive string before the ionize step.
+            neutral_namer = Orthonym(style=style, _disable_opsin_validity_gate=True)
             neutral_name = neutral_namer.name(neutral_smi)
             if neutral_name:
                 anion_name = _acid_name_to_carboxylate(neutral_name, 1)
@@ -546,7 +549,10 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
             neutral_mol = rwmol.GetMol()
             neutral_smi = Chem.MolToSmiles(neutral_mol, canonical=True)
             from orthonym.namer import Orthonym
-            neutral_namer = Orthonym(style=style)
+            # SUB-03 (169.5): neutral name is an INTERMEDIATE (ionized below) —
+            # bypass the validity gate so a malformed intermediate isn't
+            # suppressed to a descriptive string before the ionize step.
+            neutral_namer = Orthonym(style=style, _disable_opsin_validity_gate=True)
             neutral_name = neutral_namer.name(neutral_smi)
             if neutral_name:
                 # IUPAC P-72.2.1: acid suffix -> carboxylate for deprotonated sites

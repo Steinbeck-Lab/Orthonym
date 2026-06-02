@@ -178,6 +178,86 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
     return name
 
 
+# ============================================================================
+# Phase 169.5 SUB-03: pre-emission OPSIN-parse validity gate (D-11..D-14)
+# ============================================================================
+# A real-OPSIN sibling to the always-on _final_grammar_check: a generated
+# production name that OPSIN CANNOT PARSE is suppressed -> the EXISTING
+# _descriptive_fallback STRING (never a shipped invalid IUPAC string). Catches
+# ONLY opsin_cant_parse (~818) malformed strings, NOT semantically-wrong-but-
+# parseable names (heptanolate/camphor's cyclopentanone both PARSE; C4).
+#
+# Default-ON in production (the OPPOSITE of the 168/169 default-OFF RT-mover
+# flags) — shipping an invalid string IS the bug. Env escape hatch for
+# raw-output tests (the test suite disables it via a conftest autouse fixture;
+# the gate's own tests re-enable it). FAIL-OPEN on no-JAR (D-13).
+_VG_ENV = os.environ.get("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "").strip().lower()
+_DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
+
+# Module-level singleton so the OPSIN parse cache is shared across all name()
+# calls in a process (lazy-init on first use).
+_VALIDITY_ORACLE = None
+
+
+def _validity_gate_jar_present() -> bool:
+    """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
+
+    Independent of parse: OpsinOracle.name_to_smiles returns None for BOTH
+    "JAR absent" and "parse failed", so the gate cannot infer JAR-absence from
+    a parse result. This probe MUST be checked FIRST — else a no-Java env would
+    suppress EVERY name (the OPPOSITE of OpsinOracle.rt_safe's fail-CLOSED).
+    Monkeypatched in the gate's unit tests.
+    """
+    from .validation.opsin_roundtrip import _find_opsin_jar
+    return _find_opsin_jar() is not None
+
+
+def _validity_gate_parse(name: str) -> Optional[str]:
+    """Cached OPSIN parse-or-None for the SUB-03 gate.
+
+    Reuses OpsinOracle.name_to_smiles (instance dict cache) via a module-level
+    singleton so the cache is shared process-wide. Monkeypatched in tests.
+    """
+    global _VALIDITY_ORACLE
+    if _VALIDITY_ORACLE is None:
+        from .assembly.retained_substitution import OpsinOracle
+        from .validation.opsin_roundtrip import _find_opsin_jar
+        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
+    return _VALIDITY_ORACLE.name_to_smiles(name)
+
+
+def _final_opsin_validity_gate(name: str, smiles: Optional[str],
+                               stats: Optional[Dict[str, int]] = None) -> str:
+    """SUB-03 real-OPSIN validity gate (D-11/D-12/D-13).
+
+    Suppress an OPSIN-unparseable production name to the EXISTING
+    _descriptive_fallback STRING (never None / never a shipped invalid string).
+    Runs AFTER stereo + grammar repair, as the last transform before the value
+    leaves name()/name_with_confidence(); inside the is_top_level_naming guard
+    so it never fires on decomposition fragments.
+    """
+    if not name or _DISABLE_VALIDITY_GATE:
+        return name
+    # Don't re-gate an already-descriptive fallback (it won't OPSIN-parse, and
+    # re-suppressing is idempotent anyway) — skip the wasted OPSIN subprocess.
+    try:
+        from .ml_fallback.quality_gate import _DESCRIPTIVE_FALLBACK_NAMES
+        if name in _DESCRIPTIVE_FALLBACK_NAMES:
+            return name
+    except Exception:
+        pass
+    # D-13 fail-OPEN: probe the JAR FIRST.
+    if not _validity_gate_jar_present():
+        return name
+    if _validity_gate_parse(name) is not None:
+        return name  # OPSIN parses it -> ship as-is
+    # Unparseable -> suppress to the honest descriptive fallback string.
+    if stats is not None:
+        stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1
+    logger.warning("OPSIN validity gate suppressed unparseable name: %r", name[:60])
+    return _descriptive_fallback(smiles)
+
+
 # ---------------------------------------------------------------------------
 # Compound class pre-routing (Phase 141, CLASS-06)
 # ---------------------------------------------------------------------------
@@ -738,6 +818,7 @@ class Orthonym:
     
     def __init__(self, style: str = "pin", *,
                  _disable_grammar_validation: bool = False,
+                 _disable_opsin_validity_gate: bool = False,
                  allow_ml_fallback: bool = False,
                  opsin_parse_required: bool = True,
                  enable_triviality_controller: bool = False,
@@ -777,6 +858,12 @@ class Orthonym:
                 ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on.
         """
         self.style = style
+        # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
+        # by neutralize-recurse / fragment intermediate naming (those produce an
+        # INTERMEDIATE name that is transformed downstream, not a final output,
+        # so they must not be gated). Final top-level name() calls leave this
+        # False -> the gate applies.
+        self._disable_opsin_validity_gate: bool = _disable_opsin_validity_gate
         # Phase 162 ML Fallback Gate per MLF-01 + D-08 (kwargs stored;
         # the wrapper at _name_impl():1248 lands in Plan-03 T01).
         self._allow_ml_fallback: bool = allow_ml_fallback
@@ -1072,6 +1159,14 @@ class Orthonym:
                         result, smiles, handler,
                         self._grammar, self._grammar_stats,
                     )
+                    # SUB-03 (169.5): real-OPSIN validity gate, the last
+                    # transform before the name leaves name(). Default-ON,
+                    # fail-OPEN on no-JAR. Skipped for neutralize-recurse /
+                    # fragment intermediates (self._disable_opsin_validity_gate).
+                    if not self._disable_opsin_validity_gate:
+                        result = _final_opsin_validity_gate(
+                            result, smiles, self._grammar_stats,
+                        )
             return result
         finally:
             end_naming_session()
@@ -1118,6 +1213,11 @@ class Orthonym:
                         name, smiles, handler,
                         self._grammar, self._grammar_stats,
                     )
+                    # SUB-03 (169.5): real-OPSIN validity gate (twin of name()).
+                    if not self._disable_opsin_validity_gate:
+                        name = _final_opsin_validity_gate(
+                            name, smiles, self._grammar_stats,
+                        )
             metadata = retrieve_confidence()
             # If no candidate was scored (early return path), build minimal metadata
             if not metadata['name']:

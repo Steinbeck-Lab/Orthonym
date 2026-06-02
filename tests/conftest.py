@@ -264,6 +264,22 @@ def pytest_configure(config):
 # (test_feature_flag.py, test_score_based_mode.py).
 # ============================================================================
 @pytest.fixture(autouse=True)
+def _disable_opsin_validity_gate_for_tests(monkeypatch):
+    """SUB-03/D-13: the OPSIN-parse validity gate is default-ON in production,
+    but the test suite asserts RAW output (incl. some deliberately-malformed
+    names) and must not pay a per-name OPSIN subprocess. Disable the gate by
+    default for every test; the gate's own tests (test_opsin_validity_gate.py)
+    re-enable it via monkeypatch. Best-effort — a missing attr never breaks a
+    test (raising=False)."""
+    try:
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _phase146_clear_thread_locals():
     """Auto-clear the three thread-local stores after each test.
 

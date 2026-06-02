@@ -793,7 +793,12 @@ def _name_oxoacid_anion(mol, style: str) -> str:
         if not neutral_smi:
             return ''
         from ..namer import Orthonym
-        neutral_name = Orthonym(style=style).name(neutral_smi)
+        # _disable_opsin_validity_gate: the neutral acid name is an INTERMEDIATE
+        # (ionized below), not a final output — it must NOT be SUB-03-gated, else
+        # a malformed fused-ring parent ('anesulfonic acid') would be suppressed
+        # to a descriptive string and break the ionize step (169.5 SUB-01/SUB-03
+        # interaction).
+        neutral_name = Orthonym(style=style, _disable_opsin_validity_gate=True).name(neutral_smi)
         if not neutral_name:
             return ''
         # Robustness: refuse to propagate a MALFORMED upstream parent name.
