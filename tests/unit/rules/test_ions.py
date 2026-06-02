@@ -674,19 +674,17 @@ class TestSUB01ChargeAwareNaming:
     """SUB-01 charge-aware targets — xfail until Plan 02 routes charged
     species through the general pipeline + the ionic-suffix seam."""
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02: S-[O-] hits carbon-counting stub -> propanolate", strict=False)
     def test_propanesulfonate(self):
+        # SUB-01 Plan 02: routed through general pipeline + structured suffix.
         name = name_compound("CCCS(=O)(=O)[O-]")
         assert "sulfonate" in name and "olate" not in name
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02: the heptanolate bug (D-06: parent+sulfonate, NOT the 4- locant)", strict=False)
     def test_formylbenzenesulfonate_parent_and_suffix(self):
         name = name_compound("O=Cc1ccc(S(=O)(=O)[O-])cc1")
         # D-06: assert correct parent + -sulfonate; the missing 4- locant is a
         # SEPARATE pre-existing ring-substituent-locant defect, out of SUB-01 scope.
         assert "sulfonate" in name and "heptanolate" not in name
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02: P-[O-] hits carbon-counting stub -> methanolate", strict=False)
     def test_methylphosphonate(self):
         name = name_compound("CP(=O)(O)[O-]")
         assert "phosphonate" in name
@@ -704,7 +702,7 @@ class TestSUB01ChargeAwareNaming:
         # general-nomenclature form Orthonym emits today.
         assert "methanaminium" in name
 
-    @pytest.mark.xfail(reason="SUB-01 Plan 02/C2: broken azido SMARTS silently drops the azide", strict=False)
     def test_azide_keeps_azido_prefix(self):
+        # SUB-01/C2 Plan 02: azido SMARTS fixed -> the azide is no longer dropped.
         name = name_compound("[N-]=[N+]=NCCCNC(=O)CCCC(=O)O")
         assert "azido" in name

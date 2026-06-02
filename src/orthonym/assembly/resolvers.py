@@ -286,6 +286,10 @@ _ANION_SUFFIX_MAP = {
     "sulfinic acid": "sulfinate",
     "phosphonic acid": "phosphonate",
     "phosphinic acid": "phosphinate",
+    "phosphoric acid": "phosphate",  # SUB-01/D-02
+    # D-06: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
+    # internal-charge-filter precision change (protecting every nitro) is not
+    # justified at that frequency.
     "amide": "amidate",
     "carboxylic acid": "carboxylate",
     "carboxamide": "carboxamidate",

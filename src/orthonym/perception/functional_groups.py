@@ -191,7 +191,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === OTHER ===
     "nitro": "[NX3+](=O)[O-]",
     "nitroso": "[NX2]=[OX1]",
-    "azido": "[NX1]=[NX2+]=[NX1-]",
+    "azido": "[N;+0]=[N+]=[N-]",  # SUB-01/C2: organic azide R-N=[N+]=[N-] (attach N is NX2 neutral; the old [NX1]=... never matched RDKit canonical azides)
     "diazo": "[#6]=[NX2+]=[NX1-]",  # DATA-05a: P-61.5 diazo group
 }
 

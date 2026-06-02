@@ -96,6 +96,35 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
                 if neighbor.GetIsAromatic():
                     return 'phenolate'
 
+        # SUB-01/D-02: heteroatom-oxoacid anion (S/P-bound [O-]) recognition,
+        # BEFORE the alkoxide fallthrough. Previously these fell to 'alkoxide'
+        # -> the heptanolate carbon-counting stub. Recognized here ONLY for
+        # routing (name_anion sends them to the general parent-selection
+        # pipeline + the structured ionic suffix); replicates the carboxylate
+        # bond-walk shape (count Chem.BondType.DOUBLE bonds to O).
+        heavy = [n for n in atom.GetNeighbors() if n.GetSymbol() != 'H']
+        if len(heavy) == 1:
+            nb = heavy[0]
+            # TRUE C-bonded sulfonate/sulfinate/phosphonate ONLY (a C-S / C-P
+            # bond on the heteroatom). Sulfate / phosphate ESTERS (R-O-S /
+            # R-O-P, no carbon on the heteroatom) are a SEPARATE class — leave
+            # them on the existing path so the sulfated-glycolipid / phospho-
+            # lipid canaries do not regress. SUB-01/D-02.
+            nb_has_carbon = any(nn.GetSymbol() == 'C' for nn in nb.GetNeighbors())
+            if nb.GetSymbol() == 'S' and nb_has_carbon:
+                double_o = sum(
+                    1 for nn in nb.GetNeighbors()
+                    if nn.GetSymbol() == 'O' and nn.GetIdx() != atom_idx
+                    and mol.GetBondBetweenAtoms(nb.GetIdx(), nn.GetIdx())
+                        .GetBondType() == Chem.BondType.DOUBLE
+                )
+                if double_o >= 2:
+                    return 'sulfonate'
+                if double_o == 1:
+                    return 'sulfinate'
+            elif nb.GetSymbol() == 'P' and nb_has_carbon:
+                return 'phosphonate'
+
         # Default to alkoxide (O- attached to alkyl)
         return 'alkoxide'
 
@@ -438,6 +467,11 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             result = _name_carbanion_systematic(mol, anion_site)
         elif anion_type == 'thiolate':
             result = _name_thiolate_systematic(mol, anion_site)
+        elif anion_type in ('sulfonate', 'sulfinate', 'phosphonate', 'phosphate'):
+            # SUB-01/D-01: route S/P oxoacid anions through the general
+            # parent-selection pipeline + the structured ionic suffix instead
+            # of the carbon-counting alkoxide stub (the heptanolate bug).
+            result = _name_oxoacid_anion(mol, style)
         else:
             # Generic anion - try to name the neutral skeleton
             result = _try_neutralize_and_name(mol)
@@ -696,6 +730,85 @@ def _try_neutralize_and_name(mol) -> str:
         pass
 
     return ''
+
+
+def _ionize_acid_name(neutral_name: str, total_charge: int) -> str:
+    """Apply the structured ionic-suffix transform to a re-entered neutral name.
+
+    SUB-01/D-01 (A3 option-2): the general re-entry (Orthonym().name) rebuilds
+    features, so the structured ``apply_ion_suffix_modification`` seam is applied
+    to the neutral name's trailing acid suffix here. Single source of truth = the
+    canonical ``_ANION_SUFFIX_MAP``/``_CATION_SUFFIX_MAP`` driven through the
+    actual ``_apply_anion_modification``/``_apply_cation_modification`` seam
+    functions — NOT a per-molecule ``.replace`` band-aid.
+
+    Returns the ionized name, or '' if no canonical suffix transform applies.
+    """
+    if not neutral_name:
+        return ''
+    from ..assembly.resolvers import (
+        _ANION_SUFFIX_MAP, _CATION_SUFFIX_MAP, SuffixInfo,
+        _apply_anion_modification, _apply_cation_modification,
+    )
+    smap = _ANION_SUFFIX_MAP if total_charge < 0 else _CATION_SUFFIX_MAP
+    apply = _apply_anion_modification if total_charge < 0 else _apply_cation_modification
+    # Longest trailing suffix wins ("sulfonic acid" before "ol").
+    for neutral_suffix in sorted(smap, key=len, reverse=True):
+        if neutral_name.endswith(neutral_suffix):
+            modified = apply(SuffixInfo(text=neutral_suffix, is_terminal=True))
+            if modified.text and modified.text != neutral_suffix:
+                return neutral_name[:-len(neutral_suffix)] + modified.text
+    return ''
+
+
+def _name_oxoacid_anion(mol, style: str) -> str:
+    """SUB-01/D-01: name an S/P-oxoacid anion (sulfonate/sulfinate/phosphonate/
+    phosphate) via the GENERAL parent-selection pipeline (the chokepoint) plus
+    the structured ionic suffix.
+
+    Mechanism (the C1 anchor — ROUTING, not string surgery): neutralize the
+    [O-] site(s), re-enter ``Orthonym(style).name(neutral_smi)`` (which runs
+    ``_classify`` -> ``select_parent``, naming e.g. ``propane-1-sulfonic acid``),
+    then apply the canonical ionic suffix via ``_ionize_acid_name``
+    (``sulfonic acid`` -> ``sulfonate``). Returns '' on any failure (caller
+    falls through to the existing cascade — v18 byte-identical contract).
+    """
+    if mol is None or _has_metal(mol):
+        return ''
+    try:
+        from ..perception.ions import _get_internal_charge_atoms
+        internal = _get_internal_charge_atoms(mol)
+        rw = Chem.RWMol(mol)
+        neutralized = False
+        for atom in rw.GetAtoms():
+            if (atom.GetSymbol() == 'O' and atom.GetFormalCharge() == -1
+                    and atom.GetIdx() not in internal):
+                atom.SetFormalCharge(0)
+                atom.SetNumExplicitHs(atom.GetTotalNumHs() + 1)
+                neutralized = True
+        if not neutralized:
+            return ''
+        Chem.SanitizeMol(rw)
+        neutral_smi = Chem.MolToSmiles(rw.GetMol(), canonical=True)
+        if not neutral_smi:
+            return ''
+        from ..namer import Orthonym
+        neutral_name = Orthonym(style=style).name(neutral_smi)
+        if not neutral_name:
+            return ''
+        # Robustness: refuse to propagate a MALFORMED upstream parent name.
+        # A failed fused-ring parent yields a bare-stem "anesulfonic acid"
+        # (the deferred P-25 limitation, D-10); a bare suffix stem ('ane'/
+        # 'ene'/'yne' at the start) or a descriptive fallback is not a valid
+        # parent. Fall through to the existing path rather than emit garbage;
+        # SUB-03 (Plan 06) gates residual malformed outputs globally.
+        low = neutral_name.lstrip().lower()
+        if (low.startswith(('ane', 'ene', 'yne'))
+                or 'unknown' in low or 'not supported' in low):
+            return ''
+        return _ionize_acid_name(neutral_name, total_charge=-1)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
 
 
 # === SYSTEMATIC NAMING HELPERS ===
