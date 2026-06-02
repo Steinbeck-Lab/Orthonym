@@ -292,18 +292,41 @@ _ANION_SUFFIX_MAP = {
     # not 'phosphonate'/'phosphate'), so no neutral name ending in "phosphoric
     # acid" currently reaches _ionize_acid_name. Kept for completeness/future use.
     "phosphoric acid": "phosphate",  # SUB-01/D-02
+    # P-72.2.2.2.1.1 (169.6-02): "the 'ic acid' or 'ous acid' ending ... by
+    # 'ate' or 'ite', respectively" — the -ous-acid anion takes -ite, parallel
+    # to the -ic-acid -> -ate transforms above.
+    "ous acid": "ite",
     # D-06: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
     # internal-charge-filter precision change (protecting every nitro) is not
     # justified at that frequency.
-    "amide": "amidate",
-    "carboxylic acid": "carboxylate",
-    "carboxamide": "carboxamidate",
-    "carbonitrile": "carbonitrilate",
+    "carboxylic acid": "carboxylate",  # P-72.2.2.2.1.1 (CORRECT — stays)
+    # P-72.2.2.2.4 (169.6-02 FIX): amide/carboxamide/carbonitrile anionic
+    # centers are named on the corresponding ANIONIC PARENT HYDRIDE form
+    # (e.g. CH3-CO-NH(-) -> acetylazanide), NOT a suffix -ate/-ate/-ate.
+    # "Suffixes such as 'amidide' and 'carboxamidide' are not recommended."
+    # The four non-IUPAC entries amide->amidate, carboxamide->carboxamidate,
+    # carbonitrile->carbonitrilate were REMOVED here (audit §4.1); the seam now
+    # returns '' for them so route_charged falls through to the parent-hydride
+    # path (Plan 03) instead of emitting a wrong -ate name.
 }
 
 _CATION_SUFFIX_MAP = {
-    "amine": "aminium",
-    "ol": "olium",
+    "amine": "aminium",  # P-73.1.2.1 WAY1 / Table 7.4 (protonated amine, the PIN)
+    # Table 7.4 (P-73.1.2.1 / 169.6-02 ADD): cationic characteristic-group
+    # suffixes formed by adding 'ium' to the neutral nitrogen-bearing suffix
+    # ("the largest neutral parent possible is used", P-73.1.2).
+    "amide": "amidium",
+    "carboxamide": "carboxamidium",
+    "imide": "imidium",
+    "carboximide": "carboximidium",
+    "nitrile": "nitrilium",
+    "carbonitrile": "carbonitrilium",
+    "imine": "iminium",
+    # P-73.1.2.1 (169.6-02 FIX): "ol" -> "olium" REMOVED. A protonated alcohol
+    # is named on the oxidanium parent cation (e.g. ethylideneoxidanium), NOT a
+    # bogus -olium suffix; -ol carries no nitrogen so WAY-2 (substitute a
+    # cationic parent hydride) governs, not a suffix swap. Removing it makes the
+    # seam return '' for an -ol stem so the cation path does not mis-fire.
 }
 
 
