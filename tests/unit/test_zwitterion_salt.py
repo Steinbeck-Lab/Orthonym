@@ -96,3 +96,39 @@ class TestZwitterionGuard4:
         # Trimethylamine N-oxide: the N+-O- is an internal (P-59) charge, not a
         # zwitterion -> route_charged sees no ionic site -> ''.
         assert _rc("C[N+](C)(C)[O-]") == ""
+
+
+@pytest.mark.unit
+class TestSaltComposition:
+    """Salt = cation word(s) (alphabetical) + anion as separate words
+    (P-65.6.2.1). The anion is named via route_charged; the cation word comes
+    from data/cation_words.py (reusing namer._METAL_NAMES + NH4->ammonium)."""
+
+    def _salt(self, smiles, style="pin"):
+        from orthonym.rules.salts import name_salt
+        return name_salt(Chem.MolFromSmiles(smiles), style)
+
+    def test_potassium_propanoate(self):
+        """THE worked target. CH3CH2COO- K+ -> potassium propanoate (P-65.6.2.1:
+        cation word + anion, separate words). RT-verified."""
+        assert self._salt("CCC(=O)[O-].[K+]") == "potassium propanoate"
+
+    def test_two_cations_alphabetical(self):
+        """K+ -OOC-CH2CH2-COO- Na+ -> potassium sodium ... (cations ALPHABETICAL:
+        potassium < sodium; P-65.6.2.1)."""
+        name = self._salt("[K+].[O-]C(=O)CCC(=O)[O-].[Na+]")
+        assert name.startswith("potassium sodium ")
+
+    def test_calcium_diacetate_stoichiometry(self):
+        """(CH3COO-)2 Ca2+ -> calcium diacetate (stoichiometric di- prefix)."""
+        assert self._salt("[Ca+2].[O-]C(C)=O.[O-]C(C)=O") == "calcium diacetate"
+
+    def test_ammonium_cation_word(self):
+        """NH4+ -> 'ammonium' (P-73.1.1) from the CATION_WORDS table."""
+        name = self._salt("[NH4+].CC(=O)[O-]")
+        assert name == "ammonium acetate"
+
+    def test_inorganic_salt_retained(self):
+        """A purely inorganic salt ([Na+][Cl-]) keeps the retained-table anion
+        word (chloride) — route_charged does not name a bare halide."""
+        assert self._salt("[Na+].[Cl-]") == "sodium chloride"

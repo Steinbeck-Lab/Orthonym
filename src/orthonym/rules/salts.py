@@ -100,8 +100,10 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     '[NH3+]CCC(=O)[O-]': 'beta-alanine',
     # GABA zwitterion (gamma-aminobutyric acid)
     '[NH3+]CCCC(=O)[O-]': '4-aminobutanoic acid',
-    # Betaine (trimethylammonioacetate) -- IUPAC P-74.1.1
-    'C[N+](C)(C)CC(=O)[O-]': 'betaine',
+    # NOTE (169.6-04): the hardcoded betaine literal entry was DELETED. 'betaine'
+    # is NOT OPSIN-parseable (the validity gate suppressed it to 'unknown organic
+    # compound'); the route_charged GUARD-4 structured producer now emits the
+    # RT-correct (trimethylazaniumyl)acetate (P-74.1.3). No per-molecule literal.
     # L-Carnitine zwitterion
     'C[N+](C)(C)C[C@H](O)CC(=O)[O-]': 'L-carnitine',
     # DL-Carnitine (racemic)
@@ -211,36 +213,49 @@ def name_salt(mol, style: str = 'pin') -> str:
     cation_names = []
     anion_names = []
 
-    # Process cations (excluding H+ fragments already handled above)
+    # Process cations (excluding H+ fragments already handled above).
+    # P-65.6.2.1: the cation word is the element name (metal) or 'ammonium'
+    # (NH4+). The CATION_WORDS table (data/cation_words.py) is the single source
+    # of truth, reusing namer._METAL_NAMES; fall back to the INORGANIC_CATIONS
+    # retained-name table and then to organic cation naming for substituted
+    # ammoniums / carbenium counter-cations.
+    from ..data.cation_words import get_cation_word
     cation_list = other_cation_frags if h_plus_frags else frags['cations']
     for cation_frag in cation_list:
         frag_mol = cation_frag['mol']
         smiles = cation_frag['smiles']
 
-        # Check inorganic cations first
-        if smiles in INORGANIC_CATIONS:
+        word = get_cation_word(frag_mol)
+        if word:
+            cation_names.append(word)
+        elif smiles in INORGANIC_CATIONS:
             cation_names.append(INORGANIC_CATIONS[smiles])
         else:
-            # Try organic cation naming
+            # Substituted organic cation (e.g. tetramethylammonium) -> name_cation.
             name = name_cation(frag_mol, style)
             if name:
                 cation_names.append(name)
             # Skip unnamed cations rather than using generic 'cation'
 
-    # Process anions
+    # Process anions. P-65.6.2.1 / P-63.8.1: name the ORGANIC anion via the
+    # route_charged chokepoint (it owns the parent decision: -oate / -olate /
+    # -sulfonate / -ide), falling back to name_anion and the INORGANIC_ANIONS
+    # retained table (chloride / sulfate / phosphate — which route_charged does
+    # not name). The cation is NOT substituted in (salt = functionalization).
+    from .charged_router import route_charged
     for anion_frag in frags['anions']:
         frag_mol = anion_frag['mol']
         smiles = anion_frag['smiles']
 
-        # Check inorganic anions first
         if smiles in INORGANIC_ANIONS:
             anion_names.append(INORGANIC_ANIONS[smiles])
-        else:
-            # Try organic anion naming
-            name = name_anion(frag_mol, style)
-            if name:
-                anion_names.append(name)
-            # Skip unnamed anions rather than using generic 'anion'
+            continue
+        # Organic anion: chokepoint first (the sound parent decision), then the
+        # legacy name_anion path on '' (retained carboxylate names etc.).
+        name = route_charged(frag_mol, style) or name_anion(frag_mol, style)
+        if name:
+            anion_names.append(name)
+        # Skip unnamed anions rather than using generic 'anion'
 
     # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
     # When an anion fragment still has protonated carboxylic acid groups
@@ -327,20 +342,33 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
         Zwitterion IUPAC name
 
     Example:
-        >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
+        >>> mol = Chem.MolFromSmiles('C[N+](C)(C)CC(=O)[O-]')
         >>> name_zwitterion(mol)
-        '2-azaniumylacetate'
+        '(trimethylazaniumyl)acetate'
     """
     if mol is None:
         return ''
 
-    # Check for retained amino acid names first (unless systematic requested)
+    # Check for retained amino acid names first (D-06: amino-acid zwitterions +
+    # betaines sequenced first). These (glycine / L-alanine / ...) are valid
+    # OPSIN-parseable retained names per P-74 (which allows retained names).
     if style != 'systematic':
         canonical = Chem.MolToSmiles(mol, canonical=True)
         if canonical in RETAINED_AMINO_ACID_ZWITTERIONS:
             return RETAINED_AMINO_ACID_ZWITTERIONS[canonical]
 
-    # Check for amino acid zwitterion pattern
+    # GUARD 4 (P-74.0): the route_charged chokepoint owns the anion-is-parent
+    # override + the structured (…azaniumyl) cation prefix (P-74.1.3). This
+    # REPLACES the deleted hardcoded "2-azaniumyl{base}" / "betaine" / "ammonium
+    # {base}" f-string band-aids (fix-methodology.md: structured, not literal).
+    from .charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed:
+        return routed
+
+    # Check for amino acid zwitterion pattern (the neutral-form path: GABA ->
+    # 4-aminobutanoic acid, which is RT-correct at connectivity since InChI-L1
+    # ignores charge — the deferred D-03 precision path).
     if _is_amino_acid_zwitterion(mol):
         return _name_amino_acid_zwitterion(mol, style)
 
@@ -382,22 +410,25 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
     """
     Name amino acid zwitterion (e.g., glycine zwitterion).
 
-    Per IUPAC P-74 recommendation, amino acid zwitterions are preferably
-    named as their neutral form (e.g., "2-aminoacetic acid" for glycine
-    zwitterion, "2-aminopropanoic acid" for alanine zwitterion).
-    OPSIN parses these neutral-form names correctly.
+    Per IUPAC P-74 recommendation, amino acid zwitterions may be named as their
+    neutral form (e.g., "2-aminoacetic acid" for glycine zwitterion). OPSIN
+    parses these neutral-form names correctly, and they are RT-correct at
+    connectivity (InChI-L1 ignores charge).
 
-    Falls back to the ionic form "2-azaniumyl{base}" if neutralization
-    or neutral naming fails.
+    The structured P-74.1.3 ionic form ((azaniumyl)…oate) is produced UPSTREAM
+    by route_charged GUARD 4 (called first in name_zwitterion); this function is
+    only reached when the chokepoint declined, so it returns the neutral form or
+    '' (honest-fail) — the carbon-counting "2-azaniumyl{base}" f-string band-aid
+    was DELETED (169.6-04, fix-methodology.md).
 
     Args:
         mol: RDKit Mol object
         style: 'pin' for systematic, others may use trivial
 
     Returns:
-        Neutral amino acid name (preferred) or ionic form (fallback)
+        Neutral amino acid name, or '' on failure (NO carbon-counting fallback).
     """
-    # Preferred: neutralize and name the neutral form
+    # Neutralize and name the neutral form (the P-74 neutral-form recommendation).
     neutral_mol = _neutralize_zwitterion(mol)
     if neutral_mol is not None:
         try:
@@ -410,24 +441,9 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         except (RecursionError, ValueError, RuntimeError):
             pass
 
-    # Fallback: ionic form "2-azaniumyl{base}"
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-
-    CHAIN_TO_CARBOXYLATE = {
-        2: 'acetate',
-        3: 'propanoate',
-        4: 'butanoate',
-        5: 'pentanoate',
-        6: 'hexanoate',
-    }
-
-    if carbon_count in CHAIN_TO_CARBOXYLATE:
-        base = CHAIN_TO_CARBOXYLATE[carbon_count]
-    else:
-        from ..data.chain_names import get_anoate_name
-        base = get_anoate_name(carbon_count)
-
-    return f'2-azaniumyl{base}'
+    # Honest-fail (no carbon-counting band-aid): the structured route_charged
+    # GUARD-4 path ran first; if both declined there is no valid name here.
+    return ''
 
 
 # === ZWITTERION NEUTRALIZATION HELPERS ===
@@ -576,37 +592,19 @@ def _infer_zwitterion_name(
 
     Returns:
         Inferred zwitterion name, or empty string on failure.
+
+    169.6-04: the hardcoded ``betaine`` SMARTS literal and the carbon-counting
+    ``ammonium {base}`` f-string band-aids were DELETED. The structured
+    P-74.1.3 form is produced UPSTREAM by route_charged GUARD 4 (called first in
+    name_zwitterion); this function is only reached when the chokepoint declined,
+    so it returns the neutral-form name or '' (honest-fail, fix-methodology.md).
     """
-    # Count total atoms for structural inference
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-
-    # Check for common zwitterion patterns
-
-    # Betaine pattern: R3N+-CH2-COO-
-    betaine_pattern = Chem.MolFromSmarts('[NX4+](C)(C)(C)CC([O-])=O')
-    if betaine_pattern and mol.HasSubstructMatch(betaine_pattern):
-        return 'betaine'
-
-    # For N+/O- zwitterions, best approach is to neutralize and name
-    # as the parent amino compound (IUPAC recommendation for amino acids)
+    # Neutralize and name the parent amino compound (the P-74 neutral-form
+    # recommendation for amino-acid-shaped zwitterions). No literal, no
+    # carbon-counting fallback.
     neutral_name = _name_as_neutral(mol, 'pin')
     if neutral_name:
         return neutral_name
-
-    # Fallback: systematic ammonium + carboxylate (with space!)
-    if carbon_count > 0:
-        from ..data.chain_names import get_anoate_name
-        CHAIN_TO_CARBOXYLATE = {
-            2: 'acetate', 3: 'propanoate', 4: 'butanoate',
-            5: 'pentanoate', 6: 'hexanoate',
-        }
-        base = CHAIN_TO_CARBOXYLATE.get(carbon_count)
-        if not base:
-            try:
-                base = get_anoate_name(carbon_count)
-            except ValueError:
-                return ''
-        return f'ammonium {base}'
 
     return ''
 

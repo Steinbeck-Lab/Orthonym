@@ -47,11 +47,17 @@ class TestNameSalt:
         assert 'acetate' in name
 
     def test_lithium_methoxide(self):
-        """Test alkali metal with alkoxide anion."""
+        """Test alkali metal with alkoxide anion.
+
+        169.6-04: the anion now routes through route_charged, which emits the
+        IUPAC-2013 PIN -olate form (``methanolate``, P-63.8.1) rather than the
+        retained ``methoxide``. Both are valid (the Blue Book lists ``sodium
+        methoxide`` (PIN) AND ``sodium methanolate``); ``lithium methanolate``
+        round-trips in OPSIN to C[O-].[Li+] (RT-verified strict equivalent)."""
         mol = Chem.MolFromSmiles('[Li+].[O-]C')
         name = name_salt(mol)
         assert 'lithium' in name
-        assert 'methoxide' in name
+        assert 'methoxide' in name or 'methanolate' in name
 
     def test_potassium_formate(self):
         """Test potassium formate salt."""
@@ -74,17 +80,21 @@ class TestNameZwitterion:
     def test_glycine_zwitterion_systematic(self):
         """Test glycine zwitterion with systematic naming.
 
-        Per IUPAC P-74 recommendation, amino acid zwitterions are named
-        as their neutral form. With unified fragment naming, the retained
-        name "glycine" is also acceptable (IUPAC P-74 allows retained names).
-        Both "2-aminoacetic acid" and "glycine" are valid IUPAC names.
+        169.6-04: with style='systematic' the retained-name lookup is skipped and
+        route_charged GUARD 4 produces the structured P-74.1.3 anion-is-parent
+        form ``2-(azaniumyl)ethanoate`` (the anion is the parent; the protonated
+        amine is the (azaniumyl) prefix). This round-trips in OPSIN to
+        [NH3+]CC(=O)[O-] (RT-verified). The older neutral-form ``2-aminoacetic
+        acid`` and the retained ``glycine`` also remain acceptable.
         """
         mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
         name = name_zwitterion(mol, style='systematic')
-        # Accept either systematic ("2-aminoacetic acid") or retained ("glycine")
-        is_systematic = 'amino' in name.lower() and ('acid' in name.lower() or 'anoic' in name.lower())
-        is_retained = name.lower() == 'glycine'
-        assert is_systematic or is_retained, f"Expected systematic amino acid name or 'glycine', got: {name}"
+        low = name.lower()
+        is_systematic = 'amino' in low and ('acid' in low or 'anoic' in low)
+        is_retained = low == 'glycine'
+        is_p74_ionic = 'azaniumyl' in low and ('oate' in low or 'anoate' in low)
+        assert is_systematic or is_retained or is_p74_ionic, \
+            f"Expected systematic / retained / P-74.1.3 ionic name, got: {name}"
 
     def test_glycine_zwitterion_trivial(self):
         """Test glycine zwitterion may use trivial name."""
@@ -208,13 +218,20 @@ from orthonym import name_compound  # noqa: E402
 
 
 class TestSUB01ZwitterionNegativeCanary:
-    """Retained zwitterion names SUB-01 MUST preserve."""
+    """Retained / structured zwitterion names."""
 
     def test_glycine_retained(self):
+        """Glycine retained name (P-74 allows it; OPSIN-parseable) is preserved
+        FIRST per D-06 (amino-acid zwitterions sequenced ahead of GUARD 4)."""
         assert name_compound("[NH3+]CC(=O)[O-]") == "glycine"
 
-    def test_betaine_retained(self):
-        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "betaine"
+    def test_betaine_structured_p74_1_3(self):
+        """169.6-04: the hardcoded ``betaine`` literal was DELETED (it is NOT
+        OPSIN-parseable — the validity gate suppressed it to 'unknown organic
+        compound'). route_charged GUARD 4 now produces the structured P-74.1.3
+        (trimethylazaniumyl)acetate, which round-trips in OPSIN to
+        C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
+        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
 
 
 class TestSUB01Zwitterion:
