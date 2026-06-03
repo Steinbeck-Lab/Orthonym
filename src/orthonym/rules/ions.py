@@ -457,29 +457,31 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         anion_site = anions[0]
         anion_type = classify_anion(mol, anion_site)
 
-        # Generate systematic name based on type
+        # CARBOXYLATE keeps its existing proven path FIRST (byte-identical: it
+        # carries the retained aromatic-carboxylate detection — benzoate /
+        # 2-naphthoate — that the systematic chokepoint name would not reproduce;
+        # Pitfall 4 / "the anion path must stay byte-identical"). route_charged
+        # also names carboxylates correctly, but routing them here would flip
+        # 2-naphthoate -> naphthalene-2-carboxylate (a style change, not a fix).
         if anion_type == 'carboxylate':
-            result = _name_carboxylate_systematic(mol, anion_site)
-        elif anion_type == 'alkoxide':
-            result = _name_alkoxide_systematic(mol, anion_site, style)
-        elif anion_type == 'phenolate':
-            result = _name_phenolate_systematic(mol, anion_site)
-        elif anion_type == 'carbanion':
-            result = _name_carbanion_systematic(mol, anion_site)
-        elif anion_type == 'thiolate':
-            result = _name_thiolate_systematic(mol, anion_site)
-        elif anion_type in ('sulfonate', 'sulfinate', 'phosphonate'):
-            # SUB-01/D-01: route S/P oxoacid anions through the general
-            # parent-selection pipeline + the structured ionic suffix instead
-            # of the carbon-counting alkoxide stub (the heptanolate bug).
-            # IN-01 (code review 2026-06-02): 'phosphate' removed — classify_anion
-            # only returns it for a C-bonded P ('phosphonate'); an O-P phosphate
-            # ESTER has no carbon on P, so it classifies as 'alkoxide' and stays
-            # on the existing path by design. 'phosphate' was therefore an
-            # unreachable arm here.
+            return _validate_anion_name(
+                mol, _name_carboxylate_systematic(mol, anion_site))
+
+        # 169.6-03 (CHOKE-01): for every OTHER single-anion class delegate to the
+        # SINGLE route_charged chokepoint. It generalizes _name_oxoacid_anion
+        # (neutralize -> re-enter the full pipeline -> re-apply the class-correct
+        # ionic suffix), so the alkoxide/phenolate/carbanion/thiolate
+        # carbon-counting stubs (the heptanolate bug class) are DELETED. '' on
+        # failure -> fall through to the legacy cascade below.
+        from .charged_router import route_charged
+        routed = route_charged(mol, style)
+        if routed:
+            return _validate_anion_name(mol, routed)
+
+        # Fall-through cascade (route_charged declined, e.g. metal/fragment).
+        if anion_type in ('sulfonate', 'sulfinate', 'phosphonate'):
             result = _name_oxoacid_anion(mol, style)
         else:
-            # Generic anion - try to name the neutral skeleton
             result = _try_neutralize_and_name(mol)
 
         return _validate_anion_name(mol, result)
@@ -581,15 +583,20 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
         cation_site = cations[0]
         cation_type = classify_cation(mol, cation_site)
 
-        # Generate systematic name based on type
+        # 169.6-03 (CHOKE-01): delegate to the SINGLE route_charged chokepoint
+        # FIRST (replacing the carbenium/onium/diazonium carbon-counting stubs,
+        # which are DELETED). route_charged neutralizes -> re-enters -> re-applies
+        # the class-keyed cation suffix (carbenium ane->ylium, diazonium append,
+        # aminium amine->aminium). On '' we fall through to the kept aminium
+        # primary path (neutralize-recurse) so aminium stays byte-identical.
+        from .charged_router import route_charged
+        routed = route_charged(mol, style)
+        if routed:
+            return _validate_cation_name(mol, routed)
+
+        # Fall-through cascade.
         if cation_type == 'aminium':
             result = _name_aminium_systematic(mol, cation_site)
-        elif cation_type == 'ylium':
-            result = _name_carbenium_systematic(mol, cation_site)
-        elif cation_type == 'onium':
-            result = _name_onium_systematic(mol, cation_site)
-        elif cation_type == 'diazonium':
-            result = _name_diazonium_systematic(mol, cation_site)
         else:
             # Generic cation - try to name the neutral skeleton
             result = _try_neutralize_and_name(mol)
@@ -1445,52 +1452,15 @@ def _find_carboxylate_chain(mol, anion_site: Dict):
     return chain, double_bond_locs
 
 
-def _name_alkoxide_systematic(mol, anion_site: Dict, style: str) -> str:
-    """Generate systematic name for alkoxide anion."""
-    # Count carbons
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-
-    if carbon_count < 1:
-        return ''  # No carbon chain - inorganic anion, not an alkoxide
-
-    from ..data.chain_names import get_chain_prefix as _gcp
-    base = _gcp(carbon_count) + 'an'
-
-    if style == 'pin':
-        return base + 'olate'
-    else:
-        # Common names: methoxide, ethoxide, etc.
-        COMMON_NAMES = {1: 'methoxide', 2: 'ethoxide', 3: 'propoxide', 4: 'butoxide'}
-        return COMMON_NAMES.get(carbon_count, base + 'oxide')
-
-
-def _name_phenolate_systematic(mol, anion_site: Dict) -> str:
-    """Generate systematic name for phenolate anion."""
-    # Check for substituents on the benzene ring
-    # For unsubstituted phenol: phenolate
-    return 'phenolate'
-
-
-def _name_carbanion_systematic(mol, anion_site: Dict) -> str:
-    """Generate systematic name for carbanion."""
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-    if carbon_count < 1:
-        return ''
-
-    from ..data.chain_names import get_chain_prefix as _gcp
-    base = _gcp(carbon_count) + 'an'
-    return base + 'ide'
-
-
-def _name_thiolate_systematic(mol, anion_site: Dict) -> str:
-    """Generate systematic name for thiolate anion."""
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-    if carbon_count < 1:
-        return ''
-
-    from ..data.chain_names import get_chain_name
-    base = get_chain_name(carbon_count)
-    return base + 'thiolate'
+# 169.6-03 (CHOKE-01, kill-list §2.1): the four carbon-counting ANION naming
+# stubs (alkoxide = the canonical `heptanolate` bug; phenolate = hardcoded
+# `return 'phenolate'`; carbanion; thiolate) were DELETED. They counted carbons
+# -> prefix+suffix and dropped connectivity / substituents / unsaturation /
+# locants. Their single caller (name_anion's single-anion dispatch) now delegates
+# to route_charged, which neutralizes -> re-enters the full pipeline -> re-applies
+# the class-correct ionic suffix (so a branched alkoxide names the FULL
+# substituted -olate; the heptanolate bug class is gone — not masked).
+# fix-methodology.md: the stubs ARE the band-aids; deleting them IS the fix.
 
 
 def _name_aminium_systematic(mol, cation_site: Dict) -> str:
@@ -1503,7 +1473,6 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     - R3NH+ -> neutralize, name, convert
     - R4N+ -> quaternary, use azanium naming
     """
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
     carbon_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == 'C']
 
@@ -1541,88 +1510,24 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     except (RecursionError, ValueError, RuntimeError):
         pass
 
-    # Fallback: old approach using simple alkyl counting
-    from ..data.chain_names import get_alkyl_name as _gal
-
-    if len(carbon_neighbors) == 1:
-        carbon_count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
-        alkyl = _gal(carbon_count)
-        return alkyl + 'aminium'
-
-    alkyl_names = []
-    for neighbor in carbon_neighbors:
-        count = _count_alkyl_carbons(mol, neighbor.GetIdx(), {cation_site['atom_idx']})
-        alkyl_names.append(_gal(count))
-
-    if len(set(alkyl_names)) == 1:
-        n = len(alkyl_names)
-        mult = SIMPLE_MULTIPLIERS.get(n, str(n))
-        return mult + alkyl_names[0] + 'aminium'
-    else:
-        alkyl_names.sort()
-        return ''.join(alkyl_names) + 'aminium'
+    # 169.6-03 (CHOKE-01, kill-list §2.1): the carbon-counting FALLBACK ("old
+    # approach using simple alkyl counting") was DELETED. Only the neutralize ->
+    # name_fragment_recursively -> name_aminium_cation PRIMARY path above is kept
+    # (it handles substituents/rings correctly: methylamine->methylaminium,
+    # pyrrolidine->pyrrolidineium). On failure return '' so the caller falls
+    # through to the legacy cascade (v18 byte-identical no-crash contract) —
+    # NOT a carbon-counted aminium misname.
+    return ''
 
 
-def _name_carbenium_systematic(mol, cation_site: Dict) -> str:
-    """Generate systematic name for carbenium (ylium) cation."""
-    # Count total carbons
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
-
-    NAMES = {1: 'methylium', 2: 'ethylium', 3: 'propylium', 4: 'butylium'}
-    if carbon_count in NAMES:
-        return NAMES[carbon_count]
-    # Use centralized chain naming for longer chains
-    from ..data.chain_names import get_chain_prefix
-    return get_chain_prefix(carbon_count) + 'ylium'
-
-
-def _name_onium_systematic(mol, cation_site: Dict) -> str:
-    """Generate systematic name for onium cation (oxonium, sulfonium, phosphonium)."""
-    element = cation_site['element']
-
-    ONIUM_NAMES = {
-        'O': 'oxonium',
-        'S': 'sulfonium',
-        'P': 'phosphonium',
-        'Se': 'selenonium',
-        'Te': 'telluronium'
-    }
-
-    base = ONIUM_NAMES.get(element, 'onium')
-
-    # Check for substituents
-    atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
-    carbon_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == 'C']
-
-    if len(carbon_neighbors) == 0:
-        return base
-    elif len(carbon_neighbors) == 1:
-        count = _count_alkyl_carbons(mol, carbon_neighbors[0].GetIdx(), {cation_site['atom_idx']})
-        from ..assembly.naming_utils import get_alkyl_name as _gname
-        try:
-            alkyl = _gname(count)
-        except (ValueError, KeyError):
-            alkyl = ''
-        return alkyl + base
-    else:
-        # Multiple substituents
-        return 'tri' + base if len(carbon_neighbors) == 3 else base
-
-
-def _name_diazonium_systematic(mol, cation_site: Dict) -> str:
-    """Generate systematic name for diazonium cation."""
-    # Find the attached group
-    atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
-
-    for neighbor in atom.GetNeighbors():
-        if neighbor.GetSymbol() == 'C':
-            if neighbor.GetIsAromatic():
-                return 'benzenediazonium'
-            else:
-                # Aliphatic diazonium
-                return 'diazonium'
-
-    return 'diazonium'
+# 169.6-03 (CHOKE-01, kill-list §2.1): the three carbon-counting CATION naming
+# stubs (carbenium = carbon-count -> ylium; onium = carbon-count + hardcoded
+# 'tri'; diazonium = literal 'benzenediazonium') were DELETED. Their single
+# caller (name_cation's single-cation dispatch) now delegates to route_charged,
+# which neutralizes -> re-enters -> re-applies the class-keyed cation suffix
+# (carbenium ane->ylium via the parent hydride; diazonium append;
+# P-73.2.2.1.1/.3). fix-methodology.md: the stubs ARE the band-aids; deletion IS
+# the fix.
 
 
 def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:

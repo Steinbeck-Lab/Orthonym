@@ -216,44 +216,26 @@ def _count_chain_carbons(mol, start_idx: int, exclude: set) -> int:
     return count
 
 
-def _get_chain_carbon_count(mol, radical_idx: int) -> int:
-    """Get the total carbon count for naming an alkyl radical."""
-    carbon_count = 0
-    radical_atom = mol.GetAtomWithIdx(radical_idx)
-
-    # If the radical atom is carbon, count it
-    if radical_atom.GetSymbol() == 'C':
-        carbon_count = 1
-
-        # Add carbons from neighbors
-        for neighbor in radical_atom.GetNeighbors():
-            if neighbor.GetSymbol() == 'C':
-                carbon_count += _count_chain_carbons(
-                    mol, neighbor.GetIdx(), {radical_idx}
-                )
-    else:
-        # For non-carbon radicals (like O in oxyl), count attached carbons
-        for neighbor in radical_atom.GetNeighbors():
-            if neighbor.GetSymbol() == 'C':
-                carbon_count += _count_chain_carbons(
-                    mol, neighbor.GetIdx(), {radical_idx}
-                )
-
-    return carbon_count
+# 169.6-03 (CHOKE-01, kill-list §2.2): the carbon-counting chain-counter that
+# fed the alkyl / -ylidene / -ylidyne radical naming was DELETED. The three
+# helpers below are now thin shims over route_charged (the single chokepoint),
+# which H-saturates the radical center, re-enters the FULL pipeline, and
+# re-applies the P-71 suffix — so a SUBSTITUTED/branched/unsaturated alkyl
+# radical is named correctly instead of by a bare carbon count.
 
 
 def name_alkyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name an alkyl radical (R.).
+    Name an alkyl radical (R.) via the route_charged chokepoint (P-71.1.1).
 
-    Monovalent carbon radicals with only alkyl substituents.
+    169.6-03: delegates to route_charged (neutralize the radical center ->
+    re-enter the full pipeline -> re-apply the -yl/-ylidene/-ylidyne suffix),
+    replacing the old carbon-counting body. Returns the radical name (e.g.
+    'methyl', 'propyl') or '' on fall-through.
 
     Args:
         mol: RDKit Mol object
-        radical_site: Dictionary from get_radical_sites
-
-    Returns:
-        Alkyl radical name (e.g., 'methyl', 'ethyl', 'propyl')
+        radical_site: Dictionary from get_radical_sites (kept for API stability)
 
     Example:
         >>> mol = Chem.MolFromSmiles('[CH3]')
@@ -261,18 +243,8 @@ def name_alkyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         >>> name_alkyl_radical(mol, sites[0])
         'methyl'
     """
-    n_electrons = radical_site['n_electrons']
-    radical_idx = radical_site['atom_idx']
-
-    carbon_count = _get_chain_carbon_count(mol, radical_idx)
-
-    if carbon_count == 0:
-        carbon_count = 1  # Fallback for edge cases
-
-    prefix = _get_chain_prefix(carbon_count)
-    suffix = get_radical_suffix(n_electrons)
-
-    return prefix + suffix
+    from .charged_router import route_charged
+    return route_charged(mol, 'pin')
 
 
 def name_acyl_radical(mol, radical_site: Dict[str, Any]) -> str:
@@ -378,16 +350,9 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
 
 def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name a divalent radical (R=C:).
+    Name a divalent (carbene-like) radical -> -ylidene, via route_charged (P-71).
 
-    Divalent (carbene-like) radicals named with -ylidene suffix.
-
-    Args:
-        mol: RDKit Mol object
-        radical_site: Dictionary from get_radical_sites
-
-    Returns:
-        Divalent radical name (e.g., 'methylidene', 'ethylidene')
+    169.6-03: delegates to the chokepoint (replacing the carbon-counting body).
 
     Example:
         >>> mol = Chem.MolFromSmiles('[CH2]')
@@ -395,29 +360,15 @@ def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:
         >>> name_divalent_radical(mol, sites[0])
         'methylidene'
     """
-    radical_idx = radical_site['atom_idx']
-    carbon_count = _get_chain_carbon_count(mol, radical_idx)
-
-    if carbon_count == 0:
-        carbon_count = 1
-
-    prefix = _get_chain_prefix(carbon_count)
-
-    return prefix + 'ylidene'
+    from .charged_router import route_charged
+    return route_charged(mol, 'pin')
 
 
 def name_trivalent_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name a trivalent radical (RC:).
+    Name a trivalent (carbyne-like) radical -> -ylidyne, via route_charged (P-71).
 
-    Trivalent (carbyne-like) radicals named with -ylidyne suffix.
-
-    Args:
-        mol: RDKit Mol object
-        radical_site: Dictionary from get_radical_sites
-
-    Returns:
-        Trivalent radical name (e.g., 'methylidyne')
+    169.6-03: delegates to the chokepoint (replacing the carbon-counting body).
 
     Example:
         >>> mol = Chem.MolFromSmiles('[CH]')
@@ -425,15 +376,8 @@ def name_trivalent_radical(mol, radical_site: Dict[str, Any]) -> str:
         >>> name_trivalent_radical(mol, sites[0])
         'methylidyne'
     """
-    radical_idx = radical_site['atom_idx']
-    carbon_count = _get_chain_carbon_count(mol, radical_idx)
-
-    if carbon_count == 0:
-        carbon_count = 1
-
-    prefix = _get_chain_prefix(carbon_count)
-
-    return prefix + 'ylidyne'
+    from .charged_router import route_charged
+    return route_charged(mol, 'pin')
 
 
 def name_aryl_radical(mol, radical_site: Dict[str, Any]) -> str:
@@ -518,37 +462,36 @@ def name_radical(mol, style: str = 'pin') -> str:
     if len(sites) == 1:
         site = sites[0]
         info = classify_radical(mol, site)
-        n_electrons = info['n_electrons']
         subtype = info['subtype']
 
-        # Route to appropriate naming function
+        # Route to appropriate naming function. The acyl/oxyl/aryl heteroatom-
+        # context subtypes keep their structured helpers (they are NOT plain
+        # parent-hydride -yl/-ylidene/-ylidyne loss and are not route_charged's
+        # scope).
         if subtype == 'oxyl':
             return name_oxyl_radical(mol, site)
         elif subtype == 'acyl':
             return name_acyl_radical(mol, site)
         elif subtype == 'aryl':
             return name_aryl_radical(mol, site)
-        elif n_electrons == 2:
-            return name_divalent_radical(mol, site)
-        elif n_electrons == 3:
-            return name_trivalent_radical(mol, site)
-        else:
-            # Monovalent alkyl (default)
-            return name_alkyl_radical(mol, site)
 
-    # Multiple radicals - combine names
-    # For now, name the first radical
-    # TODO: Handle diradicals and polyradicals properly
+        # 169.6-03 (CHOKE-01, kill-list §2.2): the alkyl / -ylidene / -ylidyne
+        # carbon-counting paths are DELETED. Delegate to route_charged, which
+        # H-saturates the radical center, re-enters the FULL pipeline (so
+        # substituents/unsaturation/branching are named correctly), and re-applies
+        # the P-71 -yl/-ylidene/-ylidyne suffix. On '' fall through to '' (no
+        # carbon-counted misname).
+        from .charged_router import route_charged
+        return route_charged(mol, style)
+
+    # Multiple radicals (diradicals/polyradicals): the oxyl/acyl helpers still
+    # apply to the first site; otherwise out of scope -> route_charged ('' on
+    # multi-radical, the v18 fall-through).
     first_site = sites[0]
     info = classify_radical(mol, first_site)
-
     if info['subtype'] == 'oxyl':
         return name_oxyl_radical(mol, first_site)
     elif info['subtype'] == 'acyl':
         return name_acyl_radical(mol, first_site)
-    elif info['n_electrons'] == 2:
-        return name_divalent_radical(mol, first_site)
-    elif info['n_electrons'] == 3:
-        return name_trivalent_radical(mol, first_site)
-    else:
-        return name_alkyl_radical(mol, first_site)
+    from .charged_router import route_charged
+    return route_charged(mol, style)

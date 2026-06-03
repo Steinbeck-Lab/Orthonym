@@ -662,11 +662,19 @@ class TestSUB01NegativeCanary:
         assert name_compound("[O-]C(=O)c1ccccc1") == "benzoate"
 
     def test_propanolate_unchanged(self):
-        # propan-1-olate / propanolate — the small-alkoxide retained path.
-        assert name_compound("CCC[O-]") == "propanolate"
+        # 169.6-03: the deleted carbon-counting _name_alkoxide_systematic stub
+        # emitted the locant-LESS 'propanolate'; the route_charged chokepoint
+        # names the IUPAC-mandated 'propan-1-olate' (PIN requires the locant).
+        # Verified RT-preserving: OPSIN parses both to the SAME InChI (q-1
+        # propan-1-olate), so this is a STRICT PIN improvement, not a regression.
+        assert name_compound("CCC[O-]") == "propan-1-olate"
 
     def test_propanethiolate_unchanged(self):
-        assert name_compound("CCC[S-]") == "propanethiolate"
+        # 169.6-03: chokepoint adds the IUPAC locant ('propane-1-thiolate'),
+        # replacing the deleted carbanion/thiolate stub's locant-less
+        # 'propanethiolate'. RT-preserving (same InChI under OPSIN) -> strict
+        # improvement.
+        assert name_compound("CCC[S-]") == "propane-1-thiolate"
 
 
 @pytest.mark.unit

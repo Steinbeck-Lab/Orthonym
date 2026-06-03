@@ -453,7 +453,17 @@ def _handle_salt(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_radical(mol, smiles, canonical_smiles, features=None, *,
                     style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:856-857."""
+    """Mirrors namer.py:856-857.
+
+    169.6-03 (CHOKE-01): delegate to the route_charged chokepoint FIRST (it owns
+    the alkyl/-ylidene/-ylidyne radical naming now that radicals.py carbon-counting
+    is deleted); fall through to name_radical (which keeps the acyl/oxyl/aryl
+    structured helpers + the retained-name lookup) on ''.
+    """
+    from orthonym.rules.charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed:
+        return routed
     from orthonym.rules.radicals import name_radical
     return name_radical(mol, style=style)
 
@@ -487,7 +497,16 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     ``Orthonym(style).name(neutral_smi)`` call hits a FRESH router with
     empty dispatch_stats. Returns None on no-match; the dispatcher falls
     through to the next entry (v18 byte-identical to namer.py:913-914).
+
+    169.6-03 (CHOKE-01): the parent decision is owned by the route_charged
+    chokepoint (reached via name_anion's single-anion delegation below); this
+    handler stays a thin shim over name_anion + the v18 neutralize-recurse
+    fallback.
     """
+    from orthonym.rules.charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed:
+        return routed
     from orthonym.rules.ions import name_anion
     ion_result = name_anion(mol, style=style)
     if ion_result:
@@ -544,7 +563,16 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     Per audit § 3.2 RL-4 fresh-instance pattern. Returns None on no-match;
     the dispatcher falls through to the next entry (v18 byte-identical to
     namer.py:955-956).
+
+    169.6-03 (CHOKE-01): try the route_charged chokepoint FIRST (it neutralizes
+    ALL same-sign centers -> the dicarboxylate/dianion parent bears every ionic
+    suffix, GUARD 2); fall through to the v18 oxoacid + carboxylate
+    neutralize-recurse body on ''.
     """
+    from orthonym.rules.charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed:
+        return routed
     try:
         from rdkit.Chem import RWMol
         from orthonym.rules.ions import classify_anion, _acid_name_to_carboxylate
