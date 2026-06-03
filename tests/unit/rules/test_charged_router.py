@@ -159,12 +159,13 @@ class TestDeferrals:
         """A dot-disconnected multi-fragment species -> '' (Plan 04)."""
         assert _rc("CC(=O)[O-].CC(=O)[O-]") == ""
 
-    def test_zwitterion_deferred(self):
-        """GUARD 4 (P-74.0) anion-is-parent override is Plan 04: a single fragment
-        with BOTH a cationic and anionic center -> '' (clean seam, not implemented
-        here)."""
-        assert _rc("C[N+](C)(C)CC(=O)[O-]") == ""
-        assert _rc("[NH3+]CC(=O)[O-]") == ""
+    def test_zwitterion_p74_1_2_skeletal_deferred(self):
+        """GUARD 4 (P-74.0): a P-74.1.2 zwitterion whose cation is SKELETAL to the
+        anion's parent ring (a pyridinium-2-carboxylate ring N+) is still deferred
+        to the legacy path (the cumulative ium+ate suffix is out of 169.6-04
+        scope) -> ''. (The P-74.1.3 separable-cation betaine is now IMPLEMENTED;
+        see test_zwitterion_salt.TestZwitterionGuard4.)"""
+        assert _rc("O=C([O-])c1cccc[n+]1C") == ""
 
     def test_neutral_internal_charge_not_routed(self):
         """A molecule whose only charge is an internal nitro/N-oxide bonding

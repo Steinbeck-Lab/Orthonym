@@ -1171,3 +1171,135 @@ def needs_recursive_naming(mol, sub_atoms: List[int]) -> bool:
         True if recursive naming may be needed, False for simple linear alkyls.
     """
     return not _is_linear_alkyl(mol, sub_atoms)
+
+
+# ============================================================================
+# CATION-AS-SUBSTITUENT PREFIX PRODUCER (P-74.0 / P-74.1.3) — 169.6-04
+# ============================================================================
+#
+# P-74.0 (verbatim, BlueBookV2 line 42411): "an anionic center has priority
+# over a cationic center in zwitterions ... anionic centers ... become the
+# parent structure, into which the cationic part is substituted." P-74.1.3
+# (line 42464): when the cationic and anionic centers sit on DIFFERENT parent
+# structures, the cation is "prefix[ed] ... to the name of the anionic parent
+# structure."
+#
+# This is the NEW structured producer the chokepoint had ZERO of before
+# (parent_to_prefix above is neutral-only — no aminiumyl/ammoniumyl/azaniumyl
+# capability). It is GENERAL (fix-methodology.md): no per-molecule branch, no
+# hardcoded f-string. It REPLACES the deleted salts.py betaine literal +
+# "2-azaniumyl{base}" carbon-counting f-string.
+#
+# FORM CHOICE (OPSIN-grounded, 169.6-04 deviation, documented in SUMMARY):
+# The Blue Book PIN for a quaternary-ammonium cation substituent is the
+# `-aminiumyl` form (`(N,N-dimethylmethanaminiumyl)acetate`, line 42470). OPSIN
+# 2.9.0 does NOT implement the `-aminiumyl` substituent-suffix form (verified:
+# `(N,N-dimethylmethanaminiumyl)acetate`, `(methanaminiumyl)acetate` are both
+# UNPARSEABLE), but it DOES round-trip the equivalent `azane`-based PIN form
+# `(trimethylazaniumyl)acetate` -> `C[N+](C)(C)CC(=O)[O-]` (and the multi-N-
+# substituent variants). Both name the SAME cation (P-74.1.3 lists
+# `(trimethylammoniumyl)`/azanium as the accepted equivalent). Accuracy is the
+# #1 priority (the contributor guide) and the byte-identical/RT gate forbids shipping an
+# OPSIN-unparseable string when a round-tripping equivalent exists, so the
+# producer emits the azane-based `…azaniumyl` form (RT=1) — a strict
+# improvement over the old `betaine`->`unknown organic compound` (RT=0).
+
+
+def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
+    """Build the cation-as-substituent prefix for a zwitterion (P-74.1.3).
+
+    The cationic atom (``cation_idx``, e.g. a quaternary ammonium N) is the
+    attachment atom of the substituent prefix; ``parent_attach_idx`` is its
+    neighbour that lies on the path into the anionic parent (the bond that is
+    "consumed" by the attachment). Every OTHER neighbour branch of the cation
+    atom becomes an N-substituent prefix, named by the existing structured
+    substituent machinery (``name_substituent_fragment``), then composed as:
+
+        {alphabetized, multiplied N-substituent prefixes}azaniumyl
+
+    ``azane`` (NH3) is the parent hydride of a nitrogen cation; ``azanium`` =
+    NH4+ (P-73.1.1.1); ``azaniumyl`` = the N-attached cationic substituent
+    (P-74.1.3, OPSIN-parseable equivalent of the `-aminiumyl` PIN — see module
+    note above). Structured, NOT a hardcoded f-string.
+
+    Args:
+        mol: RDKit Mol of the whole zwitterion.
+        cation_idx: Atom index of the (non-internal) cationic centre.
+        parent_attach_idx: Neighbour atom index on the path to the anion.
+
+    Returns:
+        The cation prefix WITHOUT enclosing marks (e.g. ``trimethylazaniumyl``),
+        or '' for an out-of-scope cation (ylide / non-N onium / amine-oxide /
+        1,n-dipolar — P-74.2 deferred, D-06 honest-fail).
+    """
+    cat = mol.GetAtomWithIdx(cation_idx)
+
+    # SCOPE (D-06): only a nitrogen cation maps to the azaniumyl family. Onium
+    # cations on other elements (oxonium/sulfonium/phosphonium), ylides and
+    # amine-oxides are deferred (return '' -> legacy fallthrough / honest-fail).
+    if cat.GetSymbol() != 'N' or cat.GetFormalCharge() <= 0:
+        return ''
+
+    # Collect each N-substituent branch (every neighbour except the one leading
+    # to the anionic parent). Each branch is named as a substituent prefix.
+    sub_prefixes: List[str] = []
+    for nb in cat.GetNeighbors():
+        if nb.GetIdx() == parent_attach_idx:
+            continue
+        frag_atoms = _collect_branch_atoms(mol, start_idx=nb.GetIdx(),
+                                           block_idx=cation_idx)
+        name = name_substituent_fragment(mol, frag_atoms, nb.GetIdx(), [])
+        if not name:
+            return ''  # an unnameable N-substituent -> bail (honest-fail)
+        sub_prefixes.append(name)
+
+    if not sub_prefixes:
+        # Bare protonated nitrogen with no extra substituents ([NH3+]-parent) is
+        # the `azaniumyl` group itself (P-74.1.3): e.g. glycine zwitterion's
+        # cation. The caller decides whether to use this or keep the amino-acid
+        # neutral/retained form (sequenced first, D-06).
+        return 'azaniumyl'
+
+    return _compose_n_substituent_prefix(sub_prefixes) + 'azaniumyl'
+
+
+def _collect_branch_atoms(mol, start_idx: int, block_idx: int) -> List[int]:
+    """Collect the connected atom branch rooted at ``start_idx`` WITHOUT crossing
+    back through ``block_idx`` (the cationic atom). Returns the branch atom
+    indices (the substituent fragment hanging off the cation centre)."""
+    visited = {block_idx}
+    stack = [start_idx]
+    frag: List[int] = []
+    while stack:
+        a = stack.pop()
+        if a in visited:
+            continue
+        visited.add(a)
+        frag.append(a)
+        for nn in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nn.GetIdx() not in visited:
+                stack.append(nn.GetIdx())
+    return frag
+
+
+def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:
+    """Compose multiple N-substituent prefixes into one alphabetized, multiplied
+    string (P-14.5.2 alphanumerical order; P-16.3.3 multiplying prefixes).
+
+    e.g. ['methyl','methyl','methyl'] -> 'trimethyl';
+         ['ethyl','methyl','methyl']  -> 'ethyldimethyl'.
+    """
+    from collections import Counter
+    from .naming_utils import get_multiplier_prefix, is_complex_substituent
+
+    counts = Counter(sub_prefixes)
+    # Alphabetize by the substituent name (ignoring the multiplier, per IUPAC).
+    parts = []
+    for name in sorted(counts.keys()):
+        count = counts[name]
+        mult = get_multiplier_prefix(count, name)
+        if is_complex_substituent(name) and count > 1:
+            parts.append((name, f"{mult}({name})"))
+        else:
+            parts.append((name, f"{mult}{name}"))
+    return ''.join(p[1] for p in parts)

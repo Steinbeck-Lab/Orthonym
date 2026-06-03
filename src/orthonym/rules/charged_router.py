@@ -39,9 +39,13 @@ P-73.7 / P-74), applied IN ORDER:
            N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O
            > S > Se > Te > C. When the charge sits on a skeletal heteroatom the
            senior element bearing it is the parent, not the longest carbon chain.
-  GUARD 4  zwitterion anion-is-parent override (P-74.0). DEFERRED to Plan 04 —
-           a clean seam is left here (``_is_zwitterion`` -> return '' so the
-           legacy path is unchanged this plan), NOT implemented.
+  GUARD 4  zwitterion anion-is-parent override (P-74.0). The anion is FORCED as
+           the parent; a separable cation (P-74.1.3, the betaine quaternary
+           ammonium) is demoted to a structured ``(…azaniumyl)`` substituent
+           prefix (``substituent_naming.cation_to_prefix``); a skeletal cation
+           (P-74.1.2, a ring N+ of pyridinium-2-carboxylate) is deferred to the
+           legacy path (the cumulative ium+ate suffix is out of scope this
+           plan). 169.6-04 (was a Plan-03 detect-and-defer seam).
 
 Returns '' on any failure / out-of-scope shape (metal complex, multi-fragment
 salt, zwitterion, malformed re-entered parent) so the caller falls through to the
@@ -141,13 +145,232 @@ def _is_malformed_parent(neutral_name: str) -> bool:
 
 
 def _is_zwitterion(sites) -> bool:
-    """GUARD 4 seam (P-74.0): a single fragment carrying BOTH a (non-internal)
-    cationic and a (non-internal) anionic center is a zwitterion. DEFERRED to
-    Plan 04 (the anion-is-parent override + the -aminiumyl prefix producer); here
-    we only DETECT it so route_charged can return '' and leave the legacy path
-    untouched this plan. NOT implemented — clean seam only.
+    """GUARD 4 (P-74.0): a single fragment carrying BOTH a (non-internal)
+    cationic and a (non-internal) anionic center is a zwitterion. Routed by
+    ``_route_zwitterion`` (anion-is-parent override + the structured cation
+    prefix producer); 169.6-04 (was a Plan-03 detect-and-defer seam).
     """
     return bool(sites.get('cations')) and bool(sites.get('anions'))
+
+
+def _cation_is_skeletal_to_anion_parent(mol, cation_idx: int, anion_idx: int) -> bool:
+    """P-74.1.2 vs P-74.1.3 discriminator.
+
+    P-74.1.2: the cationic atom is INSIDE the parent hydride that bears the
+    anionic characteristic group — i.e. it is a ring atom of the SAME ring
+    system the anion is attached to (the ring N+ of a pyridinium-2-carboxylate).
+    Such a cation is kept on the parent as an ``-ium`` suffix, NOT demoted to a
+    prefix.
+
+    P-74.1.3: the cationic atom sits on a DIFFERENT parent (a quaternary
+    ammonium hanging off the anion chain) -> the cation becomes a substituent
+    prefix.
+
+    Heuristic (structural, not per-molecule): the cation is skeletal iff it is a
+    ring atom AND the anion's attachment carbon is in the SAME ring system
+    (shares a ring with the cation). A non-ring (acyclic) quaternary ammonium is
+    always P-74.1.3 (the betaine case).
+    """
+    cat = mol.GetAtomWithIdx(cation_idx)
+    if not cat.IsInRing():
+        return False  # acyclic cation -> separate parent (P-74.1.3 betaine)
+    ri = mol.GetRingInfo()
+    # The anion's parent-attachment atom = the heavy neighbour of the anion atom
+    # (e.g. the carboxylate carbon). If that atom shares a ring with the cation,
+    # the cation is skeletal to the anion's parent ring system (P-74.1.2).
+    an = mol.GetAtomWithIdx(anion_idx)
+    anchor_atoms = [n.GetIdx() for n in an.GetNeighbors() if n.GetSymbol() != 'H']
+    for ar in ri.AtomRings():
+        if cation_idx in ar and any(a in ar for a in anchor_atoms):
+            return True
+    return False
+
+
+def _sever_cation_build_anion_parent(mol, cation_idx: int,
+                                     parent_attach_idx: int) -> str:
+    """Build the NEUTRAL anion-parent SMILES for P-74.1.3.
+
+    Breaks the bond between the cationic atom and ``parent_attach_idx`` (the
+    parent side of the attachment), discards the cation fragment, neutralizes
+    the anion (re-protonate -> the neutral acid/alcohol form), and returns the
+    canonical neutral SMILES of the parent fragment. Returns '' on failure.
+
+    The cation atoms are NOT named here (they are re-expressed by the
+    ``…azaniumyl`` prefix); only the anionic parent skeleton is named.
+    """
+    rw = Chem.RWMol(mol)
+    bond = rw.GetBondBetweenAtoms(cation_idx, parent_attach_idx)
+    if bond is None:
+        return ''
+    rw.RemoveBond(cation_idx, parent_attach_idx)
+    # Cap the parent side with an explicit H (the severed valence becomes C-H).
+    parent_atom = rw.GetAtomWithIdx(parent_attach_idx)
+    parent_atom.SetNumExplicitHs(parent_atom.GetNumExplicitHs() + 1)
+    # Neutralize every anion in place (re-protonate): the parent becomes the
+    # neutral acid / alcohol that the pipeline can name.
+    internal = _get_internal_charge_atoms(mol)
+    for atom in rw.GetAtoms():
+        ch = atom.GetFormalCharge()
+        if ch < 0 and atom.GetIdx() not in internal:
+            atom.SetFormalCharge(0)
+            atom.SetNumExplicitHs(atom.GetNumExplicitHs() + abs(ch))
+    built = rw.GetMol()
+    try:
+        frags = Chem.GetMolFrags(built, asMols=True, sanitizeFrags=False)
+        frag_idx_tuples = Chem.GetMolFrags(built, asMols=False, sanitizeFrags=False)
+    except Exception:
+        return ''
+    # Keep the fragment that does NOT contain the cationic atom (the anion
+    # parent). The cation fragment contains cation_idx.
+    parent_mol = None
+    for fr_mol, fr_idxs in zip(frags, frag_idx_tuples):
+        if cation_idx not in fr_idxs:
+            parent_mol = fr_mol
+            break
+    if parent_mol is None:
+        return ''
+    try:
+        Chem.SanitizeMol(parent_mol)
+    except Exception:
+        return ''
+    smi = Chem.MolToSmiles(parent_mol, canonical=True)
+    return smi or ''
+
+
+def _attachment_locant_on_anion_parent(mol, anion_idx: int,
+                                       parent_attach_idx: int):
+    """Locant of the cation-substituent attachment carbon on the anion parent.
+
+    For a carboxylate anion, C1 is the carboxyl carbon (the anion O's heavy
+    neighbour). The attachment locant = bond distance from that C1 to
+    ``parent_attach_idx`` + 1. Returns None if no chain path exists (the
+    substituent attaches off-chain — defer locant).
+    """
+    from rdkit.Chem import rdmolops
+    an = mol.GetAtomWithIdx(anion_idx)
+    anchors = [n.GetIdx() for n in an.GetNeighbors() if n.GetSymbol() != 'H']
+    if not anchors:
+        return None
+    c1 = anchors[0]  # the carboxyl / characteristic-group carbon = locant 1
+    path = rdmolops.GetShortestPath(mol, c1, parent_attach_idx)
+    if not path:
+        return None
+    return len(path)  # distance(c1, attach) + 1 = the 1-indexed locant
+
+
+def _parent_has_chain_locants(parent_anion_name: str) -> bool:
+    """True if the anion-parent name is a systematic chain name that admits a
+    substituent locant (``…anoate``). A retained 2-carbon ``acetate`` (and other
+    locant-free retained anion names) carries no chain numbering, so the
+    OPSIN-default position is used (no spurious locant)."""
+    return parent_anion_name.endswith('anoate')
+
+
+def _route_zwitterion(mol, sites, style: str) -> str:
+    """GUARD 4: zwitterion anion-is-parent override (P-74.0).
+
+    P-74.0 (verbatim): "anionic centers ... become the parent structure, into
+    which the cationic part is substituted." So: FORCE the anion as the parent.
+
+    - P-74.1.3 (cation on a DIFFERENT parent, e.g. the betaine quaternary
+      ammonium): name the anion parent (neutralize ALL charges -> re-enter ->
+      re-apply the anionic suffix) and PREFIX the structured cation-substituent
+      ``(…azaniumyl)`` produced by ``cation_to_prefix``.
+    - P-74.1.2 (cation INSIDE the anion's parent hydride, e.g. ring N+ of a
+      pyridinium-2-carboxylate): the cation is kept on the parent as an ``-ium``
+      suffix, NOT a prefix -> DEFER to the legacy path (returns '' here so the
+      existing pipeline names it; route_charged does not own the skeletal-ium
+      cumulative-suffix construction this plan — D-06 honest scope boundary).
+
+    Sequencing (D-06): amino-acid zwitterions + betaines first. Ylides /
+    amine-oxides / 1,n-dipolar (P-74.2) are out of scope -> '' (honest-fail).
+
+    Returns the IUPAC name, or '' to fall through to the legacy path.
+    """
+    from rdkit.Chem import rdmolops
+
+    cations = sites['cations']
+    anions = sites['anions']
+
+    # Scope (D-06): exactly one cationic and one anionic center (the amino-acid /
+    # betaine majority). Multi-center dipolar zwitterions are deferred.
+    if len(cations) != 1 or len(anions) != 1:
+        return ''
+
+    cation_idx = cations[0]['atom_idx']
+    anion_idx = anions[0]['atom_idx']
+
+    # P-74.1.2: cation skeletal to the anion's parent ring -> keep on parent as
+    # an -ium suffix. route_charged does NOT build the cumulative ium+ate suffix
+    # here; defer to the legacy path (honest scope boundary).
+    if _cation_is_skeletal_to_anion_parent(mol, cation_idx, anion_idx):
+        return ''
+
+    # P-74.1.3: separable cation -> substituent prefix on the anion parent.
+    # 1. The cation prefix (structured producer; '' on out-of-scope cation).
+    path = rdmolops.GetShortestPath(mol, cation_idx, anion_idx)
+    if len(path) < 2:
+        return ''
+    parent_attach_idx = path[1]  # the cation neighbour leading into the anion parent
+    from ..assembly.substituent_naming import cation_to_prefix
+    cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
+    if not cat_prefix:
+        return ''  # ylide / non-N onium / unnameable -> honest-fail
+
+    # 2. The anion parent name (P-74.0: the anion is the parent). The cationic
+    # part is a SEPARATE parent (P-74.1.3): SEVER the cation substituent from the
+    # anion parent (break the cation-atom <-> parent_attach bond, cap the parent
+    # side with H), keep ONLY the anion fragment, neutralize the anion, re-enter,
+    # then re-apply the anionic suffix. (Neutralizing the quaternary cation in
+    # place is impossible without breaking a bond — RDKit valence error — which
+    # is exactly why P-74.1.3 demotes it to a prefix instead.)
+    acls = classify_anion(mol, anions[0])
+
+    parent_smi = _sever_cation_build_anion_parent(mol, cation_idx,
+                                                  parent_attach_idx)
+    if not parent_smi:
+        return ''
+    try:
+        neutral_name = _reenter(parent_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not neutral_name or _is_malformed_parent(neutral_name):
+        return ''
+
+    if acls == 'carboxylate':
+        # CARBOXYLATE parent: use the proven retained-name-aware transform
+        # (name_carboxylate_anion handles 'ic acid'->'ate' as well as
+        # 'oic acid'->'oate': acetic acid->acetate, propanoic acid->propanoate),
+        # exactly as the deferred-carboxylate anion path does. The generic
+        # apply_ion_suffix_to_name map keys only 'oic acid'/'carboxylic acid' and
+        # cannot convert the retained 'acetic acid' (P-72.2.2.2.1.1).
+        from .ions import name_carboxylate_anion
+        parent_anion_name = name_carboxylate_anion(neutral_name)
+    else:
+        anion_total_charge = sum(a['charge'] for a in anions)
+        parent_anion_name = apply_ion_suffix_to_name(
+            neutral_name, anion_total_charge,
+            allowed_suffixes=_ANION_ALLOWED_SUFFIXES.get(acls),
+        )
+    if not parent_anion_name:
+        return ''
+
+    # 3. Compute the attachment locant on the anion parent chain (PIN cites all
+    # locants — the contributor guide pitfall 3). For a carboxylate parent C1 is the carboxyl
+    # carbon; the locant of the cation-substituent carbon = its bond distance
+    # from the carboxyl carbon + 1. Omit only when the parent is too short for an
+    # ambiguity (a 1-carbon attach on a 2-carbon acetate, where OPSIN's default
+    # is already correct and the retained 'acetate' carries no chain locant).
+    locant_prefix = ''
+    attach_locant = _attachment_locant_on_anion_parent(mol, anion_idx,
+                                                        parent_attach_idx)
+    if attach_locant is not None and attach_locant >= 2 \
+            and _parent_has_chain_locants(parent_anion_name):
+        locant_prefix = f'{attach_locant}-'
+
+    # 4. Compose: {locant}-(cation-prefix)anion-parent (P-74.1.3 — prefix the
+    # cation to the anionic parent). Enclosing marks per P-14.5.2 (complex prefix).
+    return f'{locant_prefix}({cat_prefix}){parent_anion_name}'
 
 
 def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
@@ -307,10 +530,12 @@ def route_charged(mol, style: str = 'pin') -> str:
     if n_anions == 0 and n_cations == 0 and not radical_sites:
         return ''  # nothing charged/radical here (internal-only charge -> neutral)
 
-    # GUARD 4 (P-74.0): zwitterion -> DEFERRED to Plan 04. Clean seam: bail so the
-    # legacy path is byte-identical this plan. (Do NOT implement anion-is-parent.)
+    # GUARD 4 (P-74.0): zwitterion anion-is-parent override. The anion is FORCED
+    # as the parent; a separable cation (P-74.1.3) is demoted to an (…azaniumyl)
+    # substituent prefix; a skeletal cation (P-74.1.2) is deferred to the legacy
+    # path. 169.6-04 (was a Plan-03 detect-and-defer seam).
     if _is_zwitterion(sites):
-        return ''
+        return _route_zwitterion(mol, sites, style)
 
     # A charged AND radical species (radical ion) is out of scope here -> bail.
     if radical_sites and (n_anions or n_cations):
