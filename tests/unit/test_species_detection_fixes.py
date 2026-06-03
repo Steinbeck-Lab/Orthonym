@@ -60,12 +60,15 @@ class TestSpeciesTypeDetection:
         mol = Chem.MolFromSmiles('[CH3]')
         assert detect_species_type(mol) == 'radical'
 
-    def test_large_organic_cation_is_neutral(self):
-        """Large organic molecule (>10 atoms) with single charge on N should
-        be reclassified as 'neutral' to use the normal naming pipeline."""
+    def test_large_organic_cation_stays_ion(self):
+        """169.6-04 (Task 3): the >10-HA size-cutoff band-aid that reclassified a
+        large single-charge cation as 'neutral' was REMOVED — it DROPPED the
+        charge (CCCCCCCCCCCC[NH3+] -> 'dodecane', discarding the amine).
+        route_charged now names it structurally (dodecan-1-aminium, RT=1), so the
+        species stays 'ion'."""
         # Dodecan-1-amine protonated: 12 carbons + N + H3+ > 10 heavy atoms
         mol = Chem.MolFromSmiles('CCCCCCCCCCCC[NH3+]')
-        assert detect_species_type(mol) == 'neutral'
+        assert detect_species_type(mol) == 'ion'
 
     def test_large_organic_anion_with_carboxylate_stays_ion(self):
         """Large carboxylate should remain 'ion' because carboxylate
@@ -86,11 +89,13 @@ class TestSpeciesTypeDetection:
         mol = Chem.MolFromSmiles('C[NH3+]')
         assert detect_species_type(mol) == 'ion'
 
-    def test_phenyl_hexylamine_cation_is_neutral(self):
-        """Aromatic + chain organic cation should be reclassified as 'neutral'."""
+    def test_phenyl_hexylamine_cation_stays_ion(self):
+        """169.6-04 (Task 3): an aromatic+chain organic cation stays 'ion' after
+        the size-cutoff removal (was forced 'neutral' -> 'unknown organic
+        compound'; route_charged now -> 6-phenylhexan-1-aminium, RT=1)."""
         # 6 ring C + 6 chain C + N = 13 heavy atoms
         mol = Chem.MolFromSmiles('c1ccc(cc1)CCCCCC[NH3+]')
-        assert detect_species_type(mol) == 'neutral'
+        assert detect_species_type(mol) == 'ion'
 
 
 # ============================================================

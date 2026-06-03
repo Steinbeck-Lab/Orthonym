@@ -101,40 +101,18 @@ def detect_species_type(mol) -> str:
                 return 'salt'
 
         if net_charge != 0:
-            species_type = 'ion'
-
-            # Guard: large organic molecules with a single minor charge on a
-            # heteroatom (protonated amine, quaternary N, etc.) are better
-            # served by the normal perceive/classify/assemble pipeline than
-            # by the ion naming path.  Ion naming is designed for small
-            # standalone ions (ammonium, acetate, methylium) not for
-            # "dodecylamine + H+" or "phenylhexylamine + H+".
-            #
-            # Keep carboxylates and alkoxides as ions because they have
-            # dedicated retained-name tables (acetate, benzoate, etc.).
-            heavy_atom_count = mol.GetNumHeavyAtoms()
-            charge_sites = [a for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
-
-            # Subtract internal charges (nitro, N-oxide, azide, diazo) from accounting.
-            # These are bonding features per IUPAC P-59, not ionic charges.
-            internal_atoms = _get_internal_charge_atoms(mol)
-            true_charge_sites = [a for a in charge_sites if a.GetIdx() not in internal_atoms]
-            true_abs_charge = sum(abs(a.GetFormalCharge()) for a in true_charge_sites)
-
-            from rdkit.Chem import MolFromSmarts
-            carboxylate_pat = MolFromSmarts('[O-]C=O')
-            alkoxide_pat = MolFromSmarts('[O-]')
-            has_carboxylate = mol.HasSubstructMatch(carboxylate_pat) if carboxylate_pat else False
-            has_alkoxide = mol.HasSubstructMatch(alkoxide_pat) if alkoxide_pat else False
-
-            if (heavy_atom_count > 10
-                    and true_abs_charge <= 1
-                    and len(true_charge_sites) <= 1
-                    and not has_carboxylate
-                    and not has_alkoxide):
-                species_type = 'neutral'
-
-            return species_type
+            # 169.6-04 (Task 3): the >10-HA size-cutoff band-aid that
+            # reclassified a large single-charge ion (protonated amine /
+            # quaternary N) as ``neutral`` was REMOVED. It DROPPED the charge
+            # (``CCCCCCCCCCCC[NH3+]`` -> ``dodecane``, discarding the amine).
+            # route_charged now names large ions structurally (neutralize ->
+            # re-enter -> re-apply the ionic suffix: dodecan-1-aminium), so the
+            # charge is preserved. Gate: the large-NEUTRAL negative-test set
+            # (tests/unit/test_size_cutoff_removal.py) stays byte-identical
+            # because this cutoff only ever fired on a CHARGED species (measured,
+            # RESEARCH A2). The OPSIN self-test 500 byte-identical gate confirms
+            # no neutral regression.
+            return 'ion'
 
         # Net charge is 0 but has charges -> possible zwitterion
         # Fall through to zwitterion check below
@@ -150,19 +128,16 @@ def detect_species_type(mol) -> str:
         if all_charged and all_charged.issubset(internal_atoms):
             return 'neutral'
 
-    # Large molecules with quaternary N+ zwitterion pattern (phospholipids):
-    # Route to normal pipeline -- zwitterion naming can't handle complex
-    # structures with 20+ heavy atoms and permanent quaternary N+ charges.
-    # These include phosphatidylcholines and other phospholipid zwitterions.
-    if has_any_charge and net_charge == 0:
-        heavy_atom_count = mol.GetNumHeavyAtoms()
-        has_quat_n = any(
-            a.GetSymbol() == 'N' and a.GetFormalCharge() > 0
-            and a.GetTotalNumHs() == 0
-            for a in mol.GetAtoms()
-        )
-        if heavy_atom_count > 20 and has_quat_n:
-            return 'neutral'
+    # 169.6-04 (Task 3): the >20-HA quaternary-N zwitterion size-cutoff band-aid
+    # (which reclassified large quat-N net-zero zwitterions — phosphatidyl-
+    # cholines etc. — as ``neutral``) was REMOVED. name_zwitterion now delegates
+    # to route_charged GUARD 4 (P-74.0 anion-is-parent), and where GUARD 4
+    # declines (the multifunctional phospholipid case) it falls through to the
+    # neutral-form path — so the charge is no longer silently dropped at
+    # perception time. Gate (RESEARCH A2, measured): the self-test-500 only
+    # contains nitro compounds at >20 HA, and those are already returned
+    # ``neutral`` by the all-internal-charge check above (P-59), so the
+    # byte-identical gate is unaffected by this removal.
 
     # Check for zwitterion (net zero but has both + and - atoms)
     # EXCLUDE functional groups with internal charges (nitro, azide, etc.)

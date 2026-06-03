@@ -83,9 +83,13 @@ class TestZwitterionLiteral:
         assert result != 'zwitterion'
 
     def test_betaine(self):
-        """Betaine should be named 'betaine', not 'zwitterion'."""
+        """169.6-04: the hardcoded 'betaine' literal was DELETED (it is NOT
+        OPSIN-parseable -> the validity gate suppressed it to 'unknown organic
+        compound'). route_charged GUARD 4 now emits the structured P-74.1.3
+        (trimethylazaniumyl)acetate, which round-trips in OPSIN to
+        C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
         result = self.namer.name('C[N+](C)(C)CC([O-])=O')
-        assert result == 'betaine'
+        assert result == '(trimethylazaniumyl)acetate'
 
     def test_glycine_zwitterion(self):
         """Glycine zwitterion should get a systematic name."""

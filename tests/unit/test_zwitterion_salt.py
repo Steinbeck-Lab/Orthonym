@@ -59,7 +59,10 @@ class TestCationToPrefixProducer:
         assert _cation_prefix("CC[N+](C)(C)CC(=O)[O-]") == "ethyldimethylazaniumyl"
 
     def test_bare_protonated_nitrogen(self):
-        """A bare [NH3+]- on the parent -> azaniumyl (no N-substituents)."""
+        """The producer itself yields ``azaniumyl`` for a bare [NH3+]- (no
+        N-substituents). NOTE: GUARD 4 does NOT route a protonated amine through
+        this producer (see TestZwitterionGuard4.test_protonated_amine_deferred);
+        the producer is exercised directly here to prove the azane base form."""
         assert _cation_prefix("[NH3+]CC(=O)[O-]") == "azaniumyl"
 
 
@@ -82,6 +85,16 @@ class TestZwitterionGuard4:
     def test_betaine_propanoate_homolog(self):
         """3-carbon betaine homolog -> 3-(trimethylazaniumyl)propanoate (RT)."""
         assert _rc("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
+
+    def test_protonated_amine_deferred(self):
+        """D-06: GUARD 4's azaniumyl prefix is the QUATERNARY-ammonium betaine
+        class. A PROTONATED amine (NH3+, >0 H) neutralizes to a free amino
+        SUBSTITUENT, so amino-acid zwitterions / zwitterionic peptides are named
+        by their established neutral / retained / peptide form -> route_charged
+        defers (''). (This keeps L-alanyl-L-valine, 2-amino-4-oxopentanoic acid
+        etc. byte-identical — no malformed 2-(azaniumyl)4-oxo... emission.)"""
+        assert _rc("[NH3+]CC(=O)[O-]") == ""                 # glycine zwitterion
+        assert _rc("CC(=O)CC([NH3+])C(=O)[O-]") == ""        # 2-amino-4-oxopentanoate
 
     def test_p74_1_2_ring_cation_deferred(self):
         """P-74.1.2: the cation N+ is SKELETAL to the anion's parent ring

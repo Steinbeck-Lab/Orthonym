@@ -280,7 +280,15 @@ def _is_cation_retained(mol, smiles, canonical_smiles, features=None, *, _style:
 
 
 def _is_anion_small(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-1; mirrors namer.py:877-914 (audit § 1 row 6; § 2.6 purity proof)."""
+    """Tier-1; mirrors namer.py:877-914 (audit § 1 row 6; § 2.6 purity proof).
+
+    169.6-04 (Task 3): the ``<= 25 HA`` size-cutoff band-aid was REMOVED — it
+    excluded large single anions from this handler so their charge was dropped
+    downstream. route_charged (reached via the handler -> name_anion delegation)
+    now names large anions structurally (neutralize -> re-enter -> -oate/-olate/
+    -sulfonate), so the predicate matches ANY single anion (no upper HA bound).
+    The class name ``anion_small`` is retained (it is the dispatch enum key).
+    """
     from orthonym.perception.ions import detect_species_type, get_ion_sites
     if detect_species_type(mol) != 'ion':
         return False
@@ -288,7 +296,6 @@ def _is_anion_small(mol, smiles, canonical_smiles, features=None, **kwargs) -> b
     return (
         len(sites['anions']) == 1
         and not sites['cations']
-        and mol.GetNumHeavyAtoms() <= 25
     )
 
 

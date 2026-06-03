@@ -299,6 +299,19 @@ def _route_zwitterion(mol, sites, style: str) -> str:
 
     cation_idx = cations[0]['atom_idx']
     anion_idx = anions[0]['atom_idx']
+    cation_atom = mol.GetAtomWithIdx(cation_idx)
+
+    # SCOPE (D-06): GUARD 4's (azaniumyl) prefix is for a cation on a DIFFERENT
+    # parent (P-74.1.3) — i.e. a QUATERNARY ammonium (0 H) that has NO neutral
+    # free-amine form, the betaine class. A PROTONATED amine (NH3+/NH2+/NH+, >0
+    # H) neutralizes to a free amino SUBSTITUENT on the parent, so an amino-acid
+    # zwitterion / zwitterionic peptide is named by its established neutral /
+    # retained / peptide form (P-74 neutral-form recommendation) — NOT the
+    # azaniumyl prefix. Defer those to the legacy path (which sequences amino-acid
+    # zwitterions + peptides correctly). Only the quaternary betaine class is
+    # owned here. (Betaine N+ totalH=0; glycine/dipeptide N+ totalH=3.)
+    if cation_atom.GetSymbol() == 'N' and cation_atom.GetTotalNumHs() > 0:
+        return ''
 
     # P-74.1.2: cation skeletal to the anion's parent ring -> keep on parent as
     # an -ium suffix. route_charged does NOT build the cumulative ium+ate suffix
@@ -312,6 +325,23 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     if len(path) < 2:
         return ''
     parent_attach_idx = path[1]  # the cation neighbour leading into the anion parent
+
+    # SCOPE (D-06): GUARD 4 confidently handles the amino-acid / betaine majority
+    # (a carboxylate anion) and clean hydroxy/thio anion parents. A phosphate /
+    # sulfate ESTER oxygen ([O-] bonded to P or to an S that bears =O) is
+    # mis-classified 'alkoxide' by classify_anion but is NOT a real alkoxide — a
+    # large multifunctional phospholipid is out of scope -> decline so the
+    # neutral-form path names it (honest-fail, not a malformed -olate).
+    anion_atom = mol.GetAtomWithIdx(anion_idx)
+    if anion_atom.GetSymbol() == 'O':
+        for nb in anion_atom.GetNeighbors():
+            if nb.GetSymbol() == 'P':
+                return ''  # phosphate ester O- -> out of scope
+            if nb.GetSymbol() == 'S' and any(
+                    b.GetBondType() == Chem.BondType.DOUBLE
+                    for b in nb.GetBonds()):
+                return ''  # sulfate/sulfonate ester O- -> out of scope
+
     from ..assembly.substituent_naming import cation_to_prefix
     cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
     if not cat_prefix:
@@ -370,7 +400,18 @@ def _route_zwitterion(mol, sites, style: str) -> str:
 
     # 4. Compose: {locant}-(cation-prefix)anion-parent (P-74.1.3 — prefix the
     # cation to the anionic parent). Enclosing marks per P-14.5.2 (complex prefix).
-    return f'{locant_prefix}({cat_prefix}){parent_anion_name}'
+    composed = f'{locant_prefix}({cat_prefix}){parent_anion_name}'
+
+    # Defensive: never ship a malformed composition where the prefix glues
+    # directly onto a parent locant with no separator ('(...)2-hydroxy...'). If
+    # the parent name carries its own leading locant but we computed no
+    # cation-locant prefix, the join is ambiguous -> decline (honest-fail, the
+    # neutral-form path names it). A clean name has the parent starting with a
+    # letter right after the ')'.
+    after_paren = parent_anion_name[:1]
+    if not locant_prefix and after_paren.isdigit():
+        return ''
+    return composed
 
 
 def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
