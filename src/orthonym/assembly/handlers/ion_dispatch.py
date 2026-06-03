@@ -11,9 +11,10 @@ ion). All four sub-types share the same body (the inner switch on
 ``features.species_type`` is preserved verbatim).
 
 IUPAC cites:
-- P-15.6 + P-73 (salts)
+- P-65.6.2.1 / P-63.8.1 / P-77 + P-72/P-73 (salts: cation word(s) + anion)
+  (D-09: corrected 169.6-04 — the old conjunctive-nomenclature cite was wrong)
 - P-74 (zwitterions)
-- P-15.7 (radicals)
+- P-71 (radicals)
 - P-72 + P-73 (anions / cations)
 
 Byte-identical contract: the inline pre-pool call site at composer.py:

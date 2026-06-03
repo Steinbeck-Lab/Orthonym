@@ -93,7 +93,7 @@ class StoutClass(_StrEnumBase):
     """
 
     # --- Tier-1 charged-species + dot-disconnected (audit § 1 rows 1-8) ---
-    SALT = "salt"                             # row 1; namer.py:852-854; P-15.6
+    SALT = "salt"                             # row 1; namer.py:852-854; P-65.6.2.1/P-63.8.1/P-77
     RADICAL = "radical"                       # row 2; namer.py:855-857; P-15.7
     ZWITTERION = "zwitterion"                 # row 3; namer.py:858-860; P-74
     ANION_RETAINED = "anion_retained"         # row 4; namer.py:861-871; P-72
@@ -828,7 +828,7 @@ _register_dispatch(
 _register_dispatch(
     class_id=StoutClass.SALT, priority=100, tier=1,
     predicate=_is_salt, handler=_handle_salt,
-    iupac_section="impl routing — charge detection per Blue Book P-15.6 salt detection",
+    iupac_section="impl routing — salt construction P-65.6.2.1/P-63.8.1/P-77 (cation word(s) + anion); ion names P-72/P-73 (D-09: corrected 169.6-04 from the wrong conjunctive-nomenclature cite)",
     description="Multi-component salt; routes to rules.salts.name_salt",
     side_effect_inventory=(),
 )

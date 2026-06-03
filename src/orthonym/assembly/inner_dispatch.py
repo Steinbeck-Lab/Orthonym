@@ -884,7 +884,7 @@ _register_inner(
     priority=50,
     predicate=_is_ion_dispatch,
     handler=name_ion_dispatch,
-    iupac_section="P-15.6/P-15.7/P-72/P-73/P-74",
+    iupac_section="P-65.6.2.1/P-63.8.1/P-77/P-71/P-72/P-73/P-74",
     description="Ion / salt / zwitterion / radical pre-pool bypass (D-09)",
     side_effect_inventory=(),
 )
