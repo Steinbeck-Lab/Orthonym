@@ -321,17 +321,25 @@ def route_charged(mol, style: str = 'pin') -> str:
         + sum(c['charge'] for c in sites['cations'])
     cation_class: Optional[str] = None
     allowed_suffixes = None
-    anion_class: Optional[str] = None
     cation_kind: Optional[str] = None
     add_h_for_cation = False
     radical_suffix = None
 
     if radical_sites:
-        # Radicals funnel through the chokepoint too (kill radicals.py carbon
-        # counting): neutralize -> re-enter -> append the P-71 -yl/-ylidene/
-        # -ylidyne suffix (applied AFTER re-entry below).
+        # Radicals funnel through the chokepoint too (kill radicals.py alkyl
+        # carbon counting): neutralize -> re-enter -> append the P-71 -yl/
+        # -ylidene/-ylidyne suffix (applied AFTER re-entry below). SCOPE: ONLY a
+        # carbon-centered ALKYL/-ylidene/-ylidyne radical. The acyl (R-C(=O).),
+        # oxyl (R-O.), and aryl subtypes are NOT a plain parent-hydride hydrogen
+        # loss (acyl -> -oyl on the acid name; oxyl -> -oxyl; aryl -> the ring
+        # radical) and keep their structured radicals.py helpers -> bail here so
+        # name_radical / _handle_radical fall through to them.
         if len(radical_sites) != 1:
             return ''  # di/poly-radicals out of scope -> legacy fallthrough
+        from .radicals import classify_radical
+        rinfo = classify_radical(mol, radical_sites[0])
+        if rinfo['subtype'] in ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl'):
+            return ''  # structured helpers / out of scope -> legacy fallthrough
         n_e = radical_sites[0]['n_electrons']
         radical_suffix = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}.get(n_e)
         if radical_suffix is None:
@@ -351,8 +359,16 @@ def route_charged(mol, style: str = 'pin') -> str:
     elif n_anions and not n_cations:
         if not _apply_guard3_reorder(mol, sites):
             return ''
-        aclasses = {classify_anion(mol, a) for a in sites['anions']}
-        anion_class = next(iter(aclasses)) if len(aclasses) == 1 else None
+        # CARBOXYLATE anions (mono + poly) are DEFERRED to the proven, retained-
+        # name-aware carboxylate path (_name_carboxylate_systematic), which keeps
+        # benzoate / 2-naphthoate / succinate / malonate byte-identical. The
+        # textual chokepoint seam would flip those retained names to the
+        # systematic -dioate form (a style change, NOT a fix), and the proven
+        # path already neutralizes->re-enters->ionizes correctly. route_charged
+        # OWNS only the deleted-stub classes (alkoxide/phenolate/carbanion/
+        # thiolate/aminide) + the S/P oxoacid anions.
+        if any(classify_anion(mol, a) == 'carboxylate' for a in sites['anions']):
+            return ''
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
     else:
         return ''  # defensive: mixed handled by zwitterion guard already
@@ -376,17 +392,8 @@ def route_charged(mol, style: str = 'pin') -> str:
         # otherwise. Structured (NOT carbon counting): operate on the parent name.
         return _apply_radical_suffix(neutral_name, radical_suffix)
 
-    # CARBOXYLATE / oxoacid anions reuse the PROVEN, byte-identical helpers
-    # (_acid_name_to_carboxylate handles 'ic acid'/'oic acid'/'carboxylic acid'
-    # AND the retained names acetic->acetate, formic->formate that the generic
-    # SUFFIX_MAP seam does not carry). This keeps the 169.5 anion path
-    # byte-identical instead of regressing acetate/formate to '' (Pitfall 4).
-    if anion_class == 'carboxylate':
-        from .ions import _acid_name_to_carboxylate
-        carboxylate_count = sum(
-            1 for a in sites['anions'] if classify_anion(mol, a) == 'carboxylate'
-        )
-        return _acid_name_to_carboxylate(neutral_name, carboxylate_count) or ''
+    # (CARBOXYLATE anions are deferred to the proven path earlier; they never
+    # reach this point — see the carboxylate guard in Step 3.)
 
     # AMINIUM (protonated amine, P-73.1.2.1) reuses the PROVEN name_aminium_cation
     # transform on the re-entered amine name (amine->aminium, ammonia->ammonium).

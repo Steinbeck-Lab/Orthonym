@@ -28,12 +28,20 @@ class TestPerClass:
         via neutralize (sulfonic acid) -> re-enter -> -sulfonate suffix."""
         assert _rc("CCS(=O)(=O)[O-]") == "ethanesulfonate"
 
-    def test_anion_carboxylate(self):
-        """P-72.2.2.2.1.1: carboxylate anion -oate, reusing the proven byte-
-        identical carboxylate helper (acetic acid -> acetate)."""
-        assert _rc("CC(=O)[O-]") == "acetate"
-        assert _rc("CCC(=O)[O-]") == "propanoate"
-        assert _rc("[O-]C=O") == "formate"
+    def test_anion_carboxylate_deferred_to_proven_path(self):
+        """CARBOXYLATE anions are DEFERRED ('') to the proven, retained-name-aware
+        _name_carboxylate_systematic path (benzoate / 2-naphthoate / succinate
+        stay byte-identical). route_charged owns only the deleted-stub classes +
+        S/P oxoacid anions; routing carboxylate here would flip retained names to
+        the systematic -oate form (a style change, not a fix)."""
+        assert _rc("CC(=O)[O-]") == ""
+        assert _rc("[O-]C(=O)CCC(=O)[O-]") == ""  # succinate stays on proven path
+
+    def test_anion_oxoacid_sulfonate(self):
+        """P-72.2.2.2.1.1: an S/P-oxoacid anion IS owned by route_charged (it
+        shares the deleted-stub neighborhood) -> -sulfonate."""
+        assert _rc("CCCS(=O)(=O)[O-]") == "propane-1-sulfonate" or \
+            "sulfonate" in _rc("CCCS(=O)(=O)[O-]")
 
     def test_cation_carbenium(self):
         """P-73.2.2.1.1: carbenium PIN is methylium (NOT 'carbenium'); class-keyed
@@ -42,9 +50,13 @@ class TestPerClass:
         assert _rc("CC[CH2+]") == "propylium"
 
     def test_dianion_via_guard2(self):
-        """P-72.7(a) (GUARD 2): a dicarboxylate dianion's parent bears BOTH
-        carboxylate centers -> butanedioate (both [O-] neutralized, then -dioate)."""
-        assert _rc("[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
+        """P-72.7(a) (GUARD 2): a fully-deprotonated S/P-oxoacid DIANION's parent
+        bears BOTH centers and keeps the charge -> ...phosphonate (both [O-]
+        neutralized to the acid, then the single ionic suffix re-applied). (The
+        CARBOXYLATE dianion is deferred to the proven path; see
+        test_anion_carboxylate_deferred_to_proven_path.)"""
+        out = _rc("CCP(=O)([O-])[O-]")
+        assert "phosphonate" in out and "acid" not in out
 
     def test_radical_monovalent(self):
         """P-71.1.1: a monovalent alkyl radical -> ...yl (the radical center is
@@ -97,15 +109,18 @@ class TestGuard2MultiCenter:
     center count before P-44 length -- realized by neutralizing ALL same-sign
     centers so the re-entered pipeline names the multi-suffix parent."""
 
-    def test_dicarboxylate_dianion(self):
-        assert _rc("[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
-
     def test_phosphonate_dianion_keeps_charge(self):
         """A fully-deprotonated S/P-oxoacid dianion ships the anion name
-        (methanephosphonate), NOT the neutral acid (P-72.7(a) / CR-02)."""
+        (methanephosphonate), NOT the neutral acid (P-72.7(a) / CR-02). GUARD 2:
+        BOTH [O-] are neutralized so the single phosphonate parent is named."""
         out = _rc("CP(=O)([O-])[O-]")
         assert "phosphonate" in out
         assert "acid" not in out
+
+    def test_carboxylate_dianion_deferred(self):
+        """A pure carboxylate dianion is deferred ('') to the proven path (which
+        emits the retained 'succinate'); route_charged does not own it."""
+        assert _rc("[O-]C(=O)CCC(=O)[O-]") == ""
 
 
 @pytest.mark.unit

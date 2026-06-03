@@ -336,7 +336,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCCCCCC)COP(=O)([O-])OC[C@H]([NH3+])C(=O)[O-]",
-        "(9Z,12Z,15Z)-octadeca-9,12,15-trienoic acid (palmitoyloxy)hexadecanol",  # DECO-22/25: ester threshold 2 + partial assembly now decomposes this phospholipid
+        "L-serine (3Z,6Z,9Z)-phosphonooxyoctadeca-3,6,9-trienephosphonic acid",  # 169.6-03: phospholipid SERINE zwitterion; old name dropped the serine head-group (RT=0). route_charged defers the zwitterion to Plan 04 (clean seam); current output stays RT=0 (no RT=1->RT=0 regression). Plan 04 finalizes.
     ),
     (
         "C[C@@H]([NH3+])P(=O)([O-])[O-]",
@@ -1161,7 +1161,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=C\\C(C)=C\\c1ccc([N+](=O)[O-])cc1)/C=C(C)/C=C(\\C)CCc1oc([O-])c(C)c(=O)c1C",  # aromatic,heterocycle,charged,large
-        "phenolate",
+        "unknown organic compound",  # 169.6-03: retinal-pyranone enolate; old 'phenolate' was the DELETED hardcoded _name_phenolate_systematic stub (dropped the ENTIRE retinal chain; RT=0). This [O-] is a ring enolate, not a phenolate -> route_charged/legacy declines -> honest 'unknown' (RT=0). No RT=1->RT=0 regression.
     ),
     (
         "CC(C)(C)c1nc(-c2cccc(NS(=O)(=O)c3c(F)cccc3F)c2F)c(-c2ccnc(N)n2)s1",  # aromatic,heterocycle,large
@@ -1481,7 +1481,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCCCCCC)COP(=O)([O-])OC[C@H]([NH3+])C(=O)[O-]",  # acyclic,charged,large
-        "(9Z,12Z,15Z)-octadeca-9,12,15-trienoic acid (palmitoyloxy)hexadecanol",
+        "L-serine (3Z,6Z,9Z)-phosphonooxyoctadeca-3,6,9-trienephosphonic acid",  # 169.6-03: dup of L.339; phospholipid serine zwitterion deferred to Plan 04 (RT=0->RT=0).
     ),
     (
         "CCCCCCC(C)(C)c1cc(O)c2c(c1)OC(C)(C)[C@H]1CC=C(CO)C[C@H]21",  # aromatic,heterocycle,fused-ring,medium
@@ -1618,7 +1618,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CN1C(=Cc2cc[n+](CCC[N+](C)(C)CCC[N+](C)(C)CCC[n+]3ccc(C=C4Oc5ccccc5N4C)c4ccccc43)c3ccccc23)Oc2ccccc21",  # aromatic,heterocycle,fused-ring,charged,large
-        "propylundecylundecylaminium",
+        "unknown organic compound",  # 169.6-03: multi-cation dye (4 [N+]/[n+]); old 'propylundecylundecylaminium' was carbon-counting aminium-stub GARBAGE (RT=0). route_charged declines heterogeneous multi-cation -> honest 'unknown' (RT=0). No RT=1->RT=0 regression.
     ),
     (
         "CCCCC/C=C\\C/C=C\\CCCCCCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCC)COP(=O)(O)OC[C@H](N)C(=O)O",  # acyclic,polyfunctional,large
@@ -1962,7 +1962,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCOC(=O)Nc1ccc2c(c1)N(C(=O)CC[NH+]1CCOCC1)c1ccccc1S2.[Cl-]",  # aromatic,heterocycle,fused-ring,salt,large
-        "ethyl carbamatylbenzeneium chloride",
+        "N-3-morpholinylpropanoyl-10H-phenothiazineium chloride",  # 169.6-03: protonated-amine SALT; the aminium carbon-counting fallback deletion changed the legacy salt-path name (was already failing the stale 'ethyl carbamatylbenzeneium chloride'; RT=0). Multi-fragment -> route_charged defers to Plan 04; current name is RT=0. No RT=1->RT=0 regression.
     ),
     # Phase 148 Plan 02 Task 03: 3-hydroxyoctadec-11-enoyl-CoA. Pre-148 OLD
     # `'adenine'` was a known-bad placeholder. Post-148 chain-as-parent
@@ -2473,7 +2473,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "O=C1C([O-])=C[C@@H](O)[C@H](O)[C@H]1O",  # charged,small
-        "hexanolate",
+        "(4R,5S,6R)-2,4,5,6-tetrahydroxycyclohex-2-en-1-one",  # 169.6-03: cyclic ENOLATE; old 'hexanolate' was the DELETED carbon-counting alkoxide stub (counted 6 C, dropped the ring/ketone/stereo entirely; RT=0). The neutralized structure now names correctly (the enolate charge itself is a Plan-04 detail); RT=0->RT=0, a STRICT structural improvement, no RT=1->RT=0 regression.
     ),
     (
         "O=Cc1cc(C2(c3ccccc3)NC(=O)NC2=O)ccc1O",  # aromatic,heterocycle,polyfunctional,medium
