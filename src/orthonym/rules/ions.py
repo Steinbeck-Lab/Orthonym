@@ -763,27 +763,106 @@ _OXOACID_NEUTRAL_SUFFIXES = frozenset({
 })
 
 
-def _ionize_acid_name(neutral_name: str, total_charge: int,
-                      allowed_suffixes: Optional[frozenset] = None) -> str:
-    """Apply the structured ionic-suffix transform to a re-entered neutral name.
+# =============================================================================
+# 169.6-02 (CHOKE-02, D-10/D-11): class-keyed cation re-application transforms.
+#
+# Three cation classes are NOT plain neutral->ionic suffix swaps (they cannot be
+# expressed in the flat _CATION_SUFFIX_MAP because the transform depends on the
+# CATION CLASS, and on WHICH neutral form was neutralized to — acid vs hydride;
+# CONTEXT D-02). They are encoded here as a STRUCTURED, declarative, class-keyed
+# table (the same single-source-of-truth pattern as _CATION_SUFFIX_MAP, NOT a
+# growing list of molecule-specific .replace calls — fix-methodology.md). Each
+# row carries its verbatim Blue Book authority; the longest matching neutral
+# suffix wins so 'carboxylic acid' is tried before 'ic acid'.
+#
+#   ylium     (carbenium)  parent-hydride 'ane'->'ylium'  methane->methylium
+#                          [P-73.2.2.1.1] — methylium is the PIN; "carbenium" is
+#                          NOT a substitutive PIN. Empty->'ium' is WRONG here.
+#   acylium                operates on the ACID name: 'oic acid'->'oylium',
+#                          'carboxylic acid'->'carbonylium'  [P-73.2.3.1]
+#   diazonium              append 'diazonium' to the hydride name (no elision,
+#                          consonant-initial)  [P-73.2.2.3]
+#
+# A trailing ('', suffix) row means "append <suffix> to the whole name" (no stem
+# removal) — used by diazonium, which never strips a neutral ending.
+_CLASS_KEYED_CATION_TRANSFORMS = {
+    # P-73.2.2.1.1: 'ane'->'ylium' (methane->methylium, ethane->ethylium,
+    # propane->propylium, cyclobutane->cyclobutylium). The general 'append ylium
+    # eliding final e' case is reached via the ('e','ylium') / ('','ylium') rows.
+    'ylium': (
+        ('ane', 'ylium'),     # P-73.2.2.1.1 (saturated terminal / Group-14)
+        ('ene', 'enylium'),   # P-73.2.2.1 general: keep unsaturation, append ylium with e-elision
+        ('yne', 'ynylium'),   # P-73.2.2.1 general
+        ('e', 'ylium'),       # P-73.2.2.1 general: elide a trailing 'e' then append ylium
+        ('', 'ylium'),        # P-73.2.2.1 general: no final 'e' -> append ylium
+    ),
+    # P-73.2.3.1: acid name -> acylium. 'oic acid'->'oylium',
+    # 'carboxylic acid'->'carbonylium' (butanoic acid->butanoylium,
+    # cyclohexanecarboxylic acid->cyclohexanecarbonylium).
+    'acylium': (
+        ('carboxylic acid', 'carbonylium'),  # P-73.2.3.1
+        ('oic acid', 'oylium'),              # P-73.2.3.1
+        ('ic acid', 'ylium'),                # P-73.2.3.1
+    ),
+    # P-73.2.2.3: append 'diazonium' to the hydride name (no e-elision; the
+    # suffix is consonant-initial). benzene->benzenediazonium,
+    # methane->methanediazonium.
+    'diazonium': (
+        ('', 'diazonium'),  # P-73.2.2.3
+    ),
+}
 
-    SUB-01/D-01 (A3 option-2): the general re-entry (Orthonym().name) rebuilds
-    features, so the structured ``apply_ion_suffix_modification`` seam is applied
-    to the neutral name's trailing acid suffix here. Single source of truth = the
-    canonical ``_ANION_SUFFIX_MAP``/``_CATION_SUFFIX_MAP`` driven through the
-    actual ``_apply_anion_modification``/``_apply_cation_modification`` seam
-    functions — NOT a per-molecule ``.replace`` band-aid.
 
-    ``allowed_suffixes`` (WR-05): when given, only those neutral suffixes are
-    considered for the trailing match. A caller that knows the chemical class
-    (e.g. _name_oxoacid_anion -> oxoacids only) passes the genuine subset so a
-    short bare key ("ol"/"amine") cannot mis-fire on a coincidental stem ending.
-    When None (the general case) the full map is used as before.
+def apply_ion_suffix_to_name(name: str, total_charge: int,
+                             allowed_suffixes: Optional[frozenset] = None,
+                             cation_class: Optional[str] = None) -> str:
+    """The SINGLE ionic-suffix re-application primitive for every charged class.
 
-    Returns the ionized name, or '' if no canonical suffix transform applies.
+    Generalized from ``_ionize_acid_name`` (169.6-02 / CHOKE-02). Re-applies the
+    class-correct ionic suffix to a re-entered NEUTRAL name (the output of
+    ``Orthonym(style).name(neutral_smiles)``). Drives the structured resolvers
+    seam (``_apply_anion_modification`` / ``_apply_cation_modification`` off the
+    canonical ``_ANION_SUFFIX_MAP`` / ``_CATION_SUFFIX_MAP``) — single source of
+    truth, NEVER a per-molecule ``.replace`` band-aid (fix-methodology.md).
+
+    Two paths:
+
+    1. ``cation_class`` in {ylium, acylium, diazonium} -> the class-keyed
+       transform table ``_CLASS_KEYED_CATION_TRANSFORMS`` (these are NOT plain
+       suffix swaps and depend on the neutralized form, CONTEXT D-02):
+         - ylium (carbenium): parent-hydride ``ane``->``ylium``
+           (``methane``->``methylium``; P-73.2.2.1.1; ``methylium`` is the PIN).
+         - acylium: on the ACID name, ``oic acid``->``oylium`` /
+           ``carboxylic acid``->``carbonylium`` (P-73.2.3.1).
+         - diazonium: append ``diazonium`` to the hydride name (P-73.2.2.3).
+
+    2. Otherwise the generic map-driven path (anion/protonated-amine etc.):
+       longest trailing neutral suffix in the relevant SUFFIX_MAP wins.
+
+    ``allowed_suffixes`` (GUARD 1 — the ``heptanolate`` fix): when given, ONLY
+    those neutral suffixes are eligible for the trailing match, so a name ending
+    "...sulfonic acid" with ``allowed_suffixes={"ol"}`` returns '' (it cannot
+    mis-fire to ``-olate``). ``classify_anion`` passes the per-class subset so a
+    sulfonate stem can never be mistaken for an alkoxide. Applies to the generic
+    (map) path only; the class-keyed cation path is already class-gated.
+
+    Returns the ionized name, or '' if no canonical transform applies (the caller
+    then falls through to the existing cascade — v18 byte-identical contract).
     """
-    if not neutral_name:
+    if not name:
         return ''
+
+    # --- Path 1: class-keyed cation transforms (NOT plain suffix swaps) -------
+    if total_charge > 0 and cation_class in _CLASS_KEYED_CATION_TRANSFORMS:
+        for neutral_suffix, ionic_suffix in _CLASS_KEYED_CATION_TRANSFORMS[cation_class]:
+            if neutral_suffix == '':
+                # Append-only row (e.g. diazonium): no stem removal, no elision.
+                return name + ionic_suffix
+            if name.endswith(neutral_suffix):
+                return name[:-len(neutral_suffix)] + ionic_suffix
+        return ''
+
+    # --- Path 2: generic structured-seam map (anion / protonated amine / ...) -
     from ..assembly.resolvers import (
         _ANION_SUFFIX_MAP, _CATION_SUFFIX_MAP, SuffixInfo,
         _apply_anion_modification, _apply_cation_modification,
@@ -796,11 +875,29 @@ def _ionize_acid_name(neutral_name: str, total_charge: int,
     )
     # Longest trailing suffix wins ("sulfonic acid" before "ol").
     for neutral_suffix in sorted(candidates, key=len, reverse=True):
-        if neutral_name.endswith(neutral_suffix):
+        if name.endswith(neutral_suffix):
             modified = apply(SuffixInfo(text=neutral_suffix, is_terminal=True))
             if modified.text and modified.text != neutral_suffix:
-                return neutral_name[:-len(neutral_suffix)] + modified.text
+                return name[:-len(neutral_suffix)] + modified.text
     return ''
+
+
+def _ionize_acid_name(neutral_name: str, total_charge: int,
+                      allowed_suffixes: Optional[frozenset] = None) -> str:
+    """Thin back-compat wrapper over ``apply_ion_suffix_to_name`` (169.6-02).
+
+    Kept so ``_name_oxoacid_anion`` (and any other existing caller) keeps working
+    byte-identical. The anion/generic map path is unchanged; this wrapper simply
+    forwards to the generalized primitive with no ``cation_class``.
+
+    SUB-01/D-01: single source of truth = the canonical
+    ``_ANION_SUFFIX_MAP``/``_CATION_SUFFIX_MAP`` driven through the actual
+    ``_apply_anion_modification``/``_apply_cation_modification`` seam — NOT a
+    per-molecule ``.replace`` band-aid. ``allowed_suffixes`` (WR-05) restricts the
+    trailing match to the caller's known chemical class.
+    """
+    return apply_ion_suffix_to_name(neutral_name, total_charge,
+                                    allowed_suffixes=allowed_suffixes)
 
 
 # WR-01 (code review 2026-06-02): a leading unsaturation marker (ane/ene/yne)
