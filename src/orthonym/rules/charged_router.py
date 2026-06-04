@@ -70,6 +70,27 @@ from ..perception.ions import get_ion_sites, _get_internal_charge_atoms
 
 
 # =============================================================================
+# Anti-hang complexity bound (169.6 follow-on). route_charged sends charged
+# species through the FULL select_parent/assembly pipeline, whose candidate
+# enumeration cost grows combinatorially with molecular size. On a pathological
+# large / highly-symmetric charged molecule that pipeline blows up (RDKit valence
+# churn) — the 169.5 carbon-counting stub used to absorb these instantly but
+# WRONGLY; deleting the stub (Plan 03) exposed the blowup and hung the full-corpus
+# benchmark for 14.5h with NO escape (the spin is signal-resistant, so the
+# per-compound timeout cannot interrupt it). Bound it: above this heavy-atom count
+# the router degrades GRACEFULLY (returns '' -> legacy fallback / honest
+# descriptive) — it does NOT hang and does NOT emit a wrong name.
+#
+# Regression-safe threshold: the LARGEST charged compound that round-trips in the
+# 169.5 baseline is 46 HA (p99=40); 50 leaves a margin above every RT-er while
+# catching the 27 charged giants >= 80 HA (up to 209) that never round-trip.
+# Independently corroborates HERITAGE's documented 44-atom hard limit. Raise it if
+# the router is later shown to name larger charged molecules in bounded time.
+# =============================================================================
+_MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
+
+
+# =============================================================================
 # GUARD 3 — element seniority for a skeletal (non-O, on-the-atom) charge.
 # P-72.7(d) / P-73.7(c) (SYNTHESIS §"TIER -1", verbatim order). Lower index =
 # more senior. Carbon is LAST: a charge on any heteroatom outranks a carbanion /
@@ -559,6 +580,13 @@ def route_charged(mol, style: str = 'pin') -> str:
 
     # --- Step 2: multi-fragment (dot-disconnected salt / arbitrary) -> Plan 04.
     if len(Chem.GetMolFrags(mol)) > 1:
+        return ''
+
+    # --- Anti-hang complexity bound (169.6 follow-on; see
+    # _MAX_CHARGED_ROUTE_HEAVY_ATOMS). The full-pipeline re-entry below can blow up
+    # combinatorially on a pathological large charged molecule. Degrade GRACEFULLY
+    # rather than hang. Regression-safe: largest RT-ing charged baseline cpd = 46 HA.
+    if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
     # --- Step 3: enumerate + classify ionic / radical centers.

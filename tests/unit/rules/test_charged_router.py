@@ -184,3 +184,32 @@ class TestFailSafe:
 
     def test_uncharged_nonradical(self):
         assert _rc("CCO") == ""  # neutral alcohol: nothing for the router to do
+
+
+@pytest.mark.unit
+class TestComplexityGuard:
+    """Anti-hang complexity bound (169.6 follow-on). route_charged degrades
+    GRACEFULLY (returns '') above _MAX_CHARGED_ROUTE_HEAVY_ATOMS rather than
+    blowing up the full-pipeline re-entry on a pathological large charged molecule
+    (the deleted carbon-counting stub used to absorb these instantly-but-wrongly;
+    its removal exposed a 14.5h full-corpus benchmark hang). Regression-safe: the
+    largest charged compound that round-trips in the 169.5 baseline is 46 HA."""
+
+    def test_threshold_is_regression_safe(self):
+        from orthonym.rules.charged_router import _MAX_CHARGED_ROUTE_HEAVY_ATOMS
+        # Must sit ABOVE the largest RT-ing charged baseline compound (46 HA) so
+        # no currently-round-tripping charged molecule is ever refused.
+        assert _MAX_CHARGED_ROUTE_HEAVY_ATOMS >= 47
+
+    def test_large_charged_bails_fast(self):
+        # A C54 carboxylate anion = 56 heavy atoms (> 50): the guard fires and
+        # returns '' (caller falls through). Without the guard this enters the
+        # full select_parent/assembly pipeline and hangs.
+        big = "C" * 54 + "(=O)[O-]"
+        assert Chem.MolFromSmiles(big).GetNumHeavyAtoms() > 50
+        assert _rc(big) == ""
+
+    def test_small_charged_below_bound_still_routes(self):
+        # A small alkoxide (6 HA, well under the bound) is a deleted-stub class
+        # the router owns -> unaffected by the guard.
+        assert _rc("CCCCCC[O-]") != ""
