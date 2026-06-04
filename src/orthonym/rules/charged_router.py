@@ -554,6 +554,37 @@ def _apply_guard3_reorder(mol, sites):
     return senior in _ELEMENT_SENIORITY
 
 
+import threading as _threading
+
+_route_reentry = _threading.local()
+# Legitimate route_charged nesting (a zwitterion -> its anion parent -> the
+# neutral re-entry) is <= 2 levels deep. Deeper recursion means the re-entered
+# form re-triggers charged/radical routing WITHOUT converging -- e.g. a radical
+# metal atom whose neutralization cannot remove the radical, so the re-entry is
+# still a radical: route_charged -> name_radical -> _reenter -> _handle_radical
+# -> name_radical -> route_charged -> ... forever (the `[99Tc]` 14.5h hang).
+# Bound it: beyond this depth route_charged bails to '' (legacy fallthrough)
+# instead of hanging. Thread-local so the benchmark's worker threads stay
+# independent.
+_MAX_ROUTE_DEPTH = 3
+
+
+def _reentry_guarded(fn):
+    """Bound route_charged recursion depth (anti-hang invariant: a species must
+    never loop through the chokepoint)."""
+    def _wrapped(mol, style: str = 'pin') -> str:
+        depth = getattr(_route_reentry, 'depth', 0)
+        if depth >= _MAX_ROUTE_DEPTH:
+            return ''
+        _route_reentry.depth = depth + 1
+        try:
+            return fn(mol, style)
+        finally:
+            _route_reentry.depth = depth
+    return _wrapped
+
+
+@_reentry_guarded
 def route_charged(mol, style: str = 'pin') -> str:
     """THE single mandatory parent-selection chokepoint (CHOKE-01 / CHOKE-02).
 

@@ -698,10 +698,27 @@ _INORGANIC_ELEMENTS = frozenset({
 })
 
 
+# Allowlist of elements Orthonym names inside an organic parent: the core
+# non-metals + the metalloids handled by skeletal-replacement ('a') nomenclature
+# (sila/germa/arsa/stiba/sela/tellura/bora). Anything OUTSIDE this set is
+# inorganic/metallic and out of scope for charged-species naming. Defined as an
+# ALLOWLIST so it is COMPLETE -- the legacy _INORGANIC_ELEMENTS frozenset (a
+# hardcoded 46-metal include-list) silently OMITTED Tc, U and the entire f-block,
+# which let a lone [99Tc] radical reach route_charged and infinite-loop. This
+# allowlist preserves the exact prior boundary (Sn/Pb/Tl/Al/Ga/In/Bi remain
+# metals; Si/Ge/As/Sb/Se/Te/B remain organic) while catching every missing metal.
+_ORGANIC_NONMETALS = frozenset({
+    'H', 'B', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl',
+    'Ge', 'As', 'Se', 'Br', 'Sb', 'Te', 'I',
+})
+
+
 def _has_metal(mol) -> bool:
-    """Check if molecule contains metallic/inorganic elements."""
+    """True if the molecule contains any metallic/inorganic element -- i.e. any
+    atom outside the organic non-metal/metalloid allowlist (_ORGANIC_NONMETALS).
+    Complete by construction (catches Tc/U/f-block, unlike the legacy metal list)."""
     for atom in mol.GetAtoms():
-        if atom.GetSymbol() in _INORGANIC_ELEMENTS:
+        if atom.GetSymbol() not in _ORGANIC_NONMETALS:
             return True
     return False
 

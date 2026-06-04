@@ -213,3 +213,24 @@ class TestComplexityGuard:
         # A small alkoxide (6 HA, well under the bound) is a deleted-stub class
         # the router owns -> unaffected by the guard.
         assert _rc("CCCCCC[O-]") != ""
+
+
+@pytest.mark.unit
+@pytest.mark.timeout(20)
+class TestMetalRadicalHangGuard:
+    """[99Tc] regression: a lone radical metal atom MUST NOT infinite-loop through
+    route_charged -> name_radical -> re-enter -> _handle_radical -> name_radical ->
+    route_charged (the 14.5h full-corpus hang). Two layered fixes: (a) complete
+    metal detection so route_charged bails on Tc/U/f-block (the legacy metal list
+    omitted them), and (b) the _MAX_ROUTE_DEPTH recursion guard as a backstop for
+    any non-metal species whose re-entered form re-triggers routing."""
+
+    def test_lone_metal_radical_bails_fast(self):
+        # Must bail to '' (metal -> out of scope) and NOT hang. The @timeout(20)
+        # marker fails the test if the recursion regresses.
+        assert _rc("[99Tc]") == ""
+        assert _rc("[U]") == ""
+
+    def test_recursion_depth_guard_present(self):
+        from orthonym.rules.charged_router import _MAX_ROUTE_DEPTH
+        assert isinstance(_MAX_ROUTE_DEPTH, int) and _MAX_ROUTE_DEPTH >= 1
