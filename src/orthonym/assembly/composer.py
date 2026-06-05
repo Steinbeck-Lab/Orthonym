@@ -3440,7 +3440,17 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    prefix_parts.append(p.text)
+                    # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): render the prefix LOCANT.
+                    # _generate_prefixes is inconsistent — alkyl prefixes embed the
+                    # locant in .text ('3-methyl') while FG prefixes keep it separate
+                    # ('chloro', locants=(2,)). The old .text-only append silently
+                    # dropped the FG locant (chloroacetamide -> PIN 2-chloroacetamide;
+                    # 3-chloropropanamide). Prepend .locants only when text lacks one.
+                    if p.locants and not str(p.text)[:1].isdigit():
+                        _loc = ",".join(str(_l) for _l in p.locants)
+                        prefix_parts.append(f"{_loc}-{p.text}")
+                    else:
+                        prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
                     # Insert hyphen before N-locant prefix (base_name may
@@ -3469,7 +3479,17 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    prefix_parts.append(p.text)
+                    # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): render the prefix LOCANT.
+                    # _generate_prefixes is inconsistent — alkyl prefixes embed the
+                    # locant in .text ('3-methyl') while FG prefixes keep it separate
+                    # ('chloro', locants=(2,)). The old .text-only append silently
+                    # dropped the FG locant (chloroacetamide -> PIN 2-chloroacetamide;
+                    # 3-chloropropanamide). Prepend .locants only when text lacks one.
+                    if p.locants and not str(p.text)[:1].isdigit():
+                        _loc = ",".join(str(_l) for _l in p.locants)
+                        prefix_parts.append(f"{_loc}-{p.text}")
+                    else:
+                        prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
                     # Insert hyphen before N-locant prefix (base_name may

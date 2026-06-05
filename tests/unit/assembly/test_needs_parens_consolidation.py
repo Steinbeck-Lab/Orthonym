@@ -23,18 +23,12 @@ _DIVERGENCE_INPUTS = ["trifluoromethyl", "tert-butyl", "chloromethyl", "methylsu
 
 @pytest.mark.unit
 @pytest.mark.parametrize("name", _DIVERGENCE_INPUTS)
-@pytest.mark.xfail(
-    strict=True,
-    reason="BBR-HYG(e): the divergent needs-parens predicates "
-    "(is_complex_substituent vs amides._has_positional_locants) are NOT yet "
-    "consolidated. Consolidation lands in BBR-ASM / Phase 171; when it does these "
-    "agree and xfail-strict flips to a failure -> remove this marker.",
-)
 def test_needs_parens_predicates_agree(name):
+    # Phase 171 BBR-ASM CONSOLIDATED the enclosing-mark decision onto ONE predicate:
+    # amides._has_positional_locants now delegates to is_complex_substituent (the same
+    # predicate get_multiplier_prefix uses for bis/tris), so the two views agree.
     from orthonym.assembly.naming_utils import is_complex_substituent
     from orthonym.rules.amides import _has_positional_locants
-    # Phase 171 makes the enclosing-mark decision come from ONE predicate, so these
-    # two views must agree. Today they diverge (xfail).
     assert is_complex_substituent(name) == _has_positional_locants(name)
 
 

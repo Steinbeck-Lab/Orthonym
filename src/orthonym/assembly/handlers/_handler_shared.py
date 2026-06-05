@@ -544,6 +544,14 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             for sub_atoms in sub_list:
                 branch_atoms.update(sub_atoms)
 
+    # DEF-4 (P-14.3.4, Phase 171 BBR-ASM): the locant-1 omission decision must use
+    # the MOLECULE-WIDE substituent count, not the per-FG-type count. Collect FG
+    # prefix specs here, then emit them after the loop once the total is known
+    # (composer.py:5044-5066 parity). Without this, a C1 substituent elides its
+    # locant whenever its own type-count is 1 even though another substituent exists
+    # (e.g. FCCCl -> '1-chloro-2-fluoroethane', not 'chloro-2-fluoroethane').
+    fg_prefix_specs = []  # list of (prefix_text, fg_locants)
+
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
             continue
@@ -642,21 +650,9 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                 multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
                 prefix_text = f"{multiplier}{prefix_text}"
 
-            # Omit locants when they are trivially unambiguous (centralized)
-            chain = getattr(features, 'principal_chain', [])
-            chain_len = len(chain)
-            omit_locants = should_omit_locant_one(
-                context="prefix",
-                chain_length=chain_len,
-                is_monosubstituted=(count == 1 and fg_locants == [1]
-                                    and features.principal_group is None),
-            )
-
-            prefixes.append(NameFragment(
-                text=prefix_text,
-                locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
-                fragment_type="prefix"
-            ))
+            # DEF-4: defer the locant-1 omission decision to the post-loop block,
+            # which knows the molecule-wide substituent count.
+            fg_prefix_specs.append((prefix_text, fg_locants))
         elif not prefix_text and matches:
             # By-design: FGs using functional class naming (ether, sulfoxide, etc.)
             # don't have prefix forms — handled by specialized naming paths
@@ -664,6 +660,34 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                 "DROP-16 substituent_skip: reason=no_fg_prefix_form fg_name=%s match_count=%d",
                 fg_name, len(matches),
             )
+
+    # DEF-4 (P-14.3.4, Phase 171 BBR-ASM): emit the collected FG prefixes using a
+    # MOLECULE-WIDE substituent count for the locant-1 omission decision. 'prefixes'
+    # already holds the alkyl/ring substituents; count their attachment positions
+    # plus the FG positions. The omission only fires for a genuinely single-
+    # substituent parent (total == 1); for >= 2 substituents every locant is cited
+    # (mirrors composer.py:5044-5066; gold FCCCl -> '1-chloro-2-fluoroethane').
+    chain_len = len(getattr(features, 'principal_chain', []))
+    existing_sub_positions = sum(len(p.locants) if p.locants else 1 for p in prefixes)
+    fg_sub_positions = sum(len(locs) if locs else 1 for _txt, locs in fg_prefix_specs)
+    total_substituents = existing_sub_positions + fg_sub_positions
+    for prefix_text, fg_locants in fg_prefix_specs:
+        # NOTE: do NOT add an outer `and total_substituents == 1` guard. The
+        # is_monosubstituted arg already encodes the single-substituent condition,
+        # and should_omit_locant_one Rule 1 (chain_length == 1) must still omit for
+        # methane regardless of substituent count (e.g. CBr4 -> 'tetrabromomethane',
+        # NOT '1,1,1,1-tetrabromomethane').
+        omit_locants = should_omit_locant_one(
+            context="prefix",
+            chain_length=chain_len,
+            is_monosubstituted=(total_substituents == 1 and fg_locants == [1]
+                                and features.principal_group is None),
+        )
+        prefixes.append(NameFragment(
+            text=prefix_text,
+            locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
+            fragment_type="prefix"
+        ))
 
     # --- Merge duplicate prefix names ---
     # If the same base prefix name appears multiple times (from different sources),

@@ -255,9 +255,17 @@ class TestIsComplexSubstituent:
         """2-propyl has a digit, so it's complex."""
         assert is_complex_substituent("2-propyl") is True
 
-    def test_name_with_hyphen_is_complex(self):
-        """Names with hyphens are complex."""
-        assert is_complex_substituent("tert-butyl") is True
+    def test_internal_hyphen_is_complex(self):
+        """A genuine compound substituent (locant + hyphen) is complex (P-16.3.3)."""
+        assert is_complex_substituent("1-methylpropyl") is True
+
+    def test_sec_tert_retained_names_are_simple(self):
+        """Phase 171 BBR-ASM (P-16.3.4): the leading italic sec-/tert- prefix on an
+        otherwise-simple retained name does NOT make it complex — di-tert-butyl /
+        N-tert-butyl, NOT bis(tert-butyl) / N-(tert-butyl). The earlier blanket
+        'any hyphen -> complex' rule over-parenthesised these."""
+        assert is_complex_substituent("tert-butyl") is False
+        assert is_complex_substituent("sec-butyl") is False
 
     def test_isopropyl_is_simple(self):
         """isopropyl has no digits or hyphens, so it's simple."""

@@ -20,6 +20,7 @@ from ..assembly.naming_utils import (
     get_alkyl_name,
     get_multiplier_prefix,
     alpha_sort_key,
+    is_complex_substituent,
     ALKYL_NAMES,
 )
 
@@ -30,12 +31,18 @@ _POSITIONAL_LOCANT_RE = re.compile(r'(?:^|\b)\d')
 
 
 def _has_positional_locants(name: str) -> bool:
-    """Check if a substituent name contains positional locants (digits).
+    """Whether an N-substituent needs enclosing marks (parentheses).
 
-    Returns True for names like "4-methylcyclohexyl" or "3,5-dimethylcyclohexyl"
-    but False for retained names like "tert-butyl", "sec-butyl", "isopropyl".
+    Phase 171 BBR-ASM (DEF-8 consolidation): this is no longer a divergent
+    digit-only test. The audit (06 §3.1) found that the parenthesization decision
+    here disagreed with the bis/tris multiplier decision (get_multiplier_prefix ->
+    is_complex_substituent) for digit-less complex substituents like 'chloroethyl'
+    -> 'N,N-bischloroethyl' (malformed; PIN 'N,N-bis(2-chloroethyl)'). The fix is
+    to unify both decisions onto the ONE correct predicate is_complex_substituent
+    (P-16.3.5 / P-16.5.1.1). This delegate is retained so the consolidation tripwire
+    (tests/unit/assembly/test_needs_parens_consolidation.py) sees the two views agree.
     """
-    return bool(_POSITIONAL_LOCANT_RE.search(name))
+    return is_complex_substituent(name)
 
 
 # Standard stems - delegated to centralized chain_names module
@@ -410,11 +417,14 @@ def format_n_substitution(substituents: List[Dict]) -> str:
     parts = []
     for name in sorted(groups.keys(), key=alpha_sort_key):
         count = groups[name]
-        # IUPAC P-14.5.2: compound substituents with positional locants
-        # (e.g., "4-methylcyclohexyl") must be enclosed in parentheses.
-        # Retained names like "tert-butyl" do NOT get brackets.
-        has_locants = _has_positional_locants(name)
-        display_name = f"({name})" if has_locants else name
+        # IUPAC P-16.3.5 / P-16.5.1.1 (Phase 171 BBR-ASM, DEF-8): a complex
+        # (substituted/compound) substituent is enclosed in parentheses whenever
+        # cited — at count 1 AND when multiplied with bis/tris. The paren decision
+        # MUST use the SAME predicate (is_complex_substituent) that
+        # get_multiplier_prefix uses to choose bis/tris, otherwise digit-less complex
+        # names glue ('N,N-bischloroethyl' instead of 'N,N-bis(2-chloroethyl)').
+        is_complex = is_complex_substituent(name)
+        display_name = f"({name})" if is_complex else name
         # Apply P-16.3.3 bracket escalation for N-substituents with parens
         from ..assembly.naming_utils import _wrap_n_substituent
         display_name = _wrap_n_substituent(display_name)

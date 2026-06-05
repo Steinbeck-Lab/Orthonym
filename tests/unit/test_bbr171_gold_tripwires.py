@@ -50,20 +50,17 @@ def test_def1_nonylcyclohexane(namer):
 
 # --- DEF-4 — locant-1 elision uses molecule-wide count (P-14.3.4), WS-3 ---
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): _generate_prefixes must feed the molecule-wide total substituent count.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: molecule-wide locant-1 count + Rule 5 chain==2
 def test_def4_1_chloropentane(namer):
     assert namer.name("ClCCCCC") == "1-chloropentane"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): P-14.3.4 locant-1 not elided on multi-substituent parents.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED
 def test_def4_1_chloro_2_fluoropropane(namer):
     assert namer.name("ClCC(F)C") == "1-chloro-2-fluoropropane"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): P-14.3.4 locant-1 on a 2-substituent ethane parent.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED
 def test_def4_1_chloro_2_fluoroethane(namer):
     assert namer.name("FCCCl") == "1-chloro-2-fluoroethane"
 
@@ -78,20 +75,17 @@ def test_def3_carboxyethanesulfonate(namer):
 
 # --- DEF-8 — assembly: bis()/enclosing marks + P-46 compound-substituent locants, WS-3 ---
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): bis()+enclosing parens via one predicate (is_complex_substituent) + P-46 locant.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: one paren predicate + P-46 + amide locant
 def test_def8_bis_chloroethyl_acetamide(namer):
     assert namer.name("O=C(CCl)N(CCCl)CCCl") == "2-chloro-N,N-bis(2-chloroethyl)acetamide"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): P-46 compound-substituent numbering (attachment = locant 1) + enclosing parens.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: P-46 attachment=locant-1 + enclosing parens
 def test_def8_4_chlorobutylbenzene(namer):
     assert namer.name("ClCCCCc1ccccc1") == "(4-chlorobutyl)benzene"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-3 BBR-ASM (171-02): selenide enclosing parens '(methylselanyl)' (DEF-8); 169.7 RT-fixed the rest.")
+@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: selanyl/tellanyl now complex -> enclosing parens
 def test_def8_methylselanyl_propane(namer):
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"
 

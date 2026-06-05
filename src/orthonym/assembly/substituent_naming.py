@@ -312,6 +312,115 @@ def _build_alkenyl_name(
     return name
 
 
+_HALOGEN_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+
+
+def _name_saturated_substituted_chain(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Name a saturated linear carbon chain bearing only halogen substituents,
+    numbered from the attachment point (IUPAC P-46.1.8: the free valence takes
+    locant 1; P-46 substituents are numbered from there).
+
+    Fixes the DEF-8 / §3.5 defect: the recursive path (Step 3-5) extracts the
+    fragment and renames it as a FREE molecule, losing the attachment constraint
+    ('CCCCCl' -> '1-chlorobutane' -> 'chlorobutyl', locant dropped). Here the
+    backbone is numbered so the attachment carbon is locant 1, so a chloro four
+    carbons away is '4-' -> '4-chlorobutyl'; 'ClCC(Cl)C-' -> '2,3-dichloropropyl';
+    '-CH2CH2Cl' -> '2-chloroethyl'.
+
+    Returns None (fall through to the richer recursive path) for anything that is
+    not a LINEAR all-carbon backbone + terminal halogens with a TERMINAL (primary)
+    attachment — branched backbones, other heteroatoms, rings, and secondary
+    attachment keep their existing naming.
+    """
+    if not sub_atoms:
+        return None
+    sub_set = set(sub_atoms)
+    ring_info = mol.GetRingInfo()
+
+    backbone = []                # carbon backbone atom indices
+    halogens = []                # (halogen_idx, attached_carbon_idx)
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if ring_info.NumAtomRings(idx) > 0:
+            return None          # ring -> not a simple chain
+        sym = atom.GetSymbol()
+        if sym == 'C':
+            backbone.append(idx)
+        elif sym in _HALOGEN_PREFIX:
+            c_nbrs = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in sub_set]
+            if len(c_nbrs) != 1:
+                return None      # bridging/abnormal halogen
+            halogens.append((idx, c_nbrs[0]))
+        else:
+            return None          # any other heteroatom -> richer case, fall through
+
+    if not backbone or not halogens:
+        return None              # plain alkyl is the fast path; need >=1 halogen here
+    backbone_set = set(backbone)
+    if any(c not in backbone_set for _h, c in halogens):
+        return None
+
+    # Linear backbone: each backbone carbon has <= 2 backbone-carbon neighbours.
+    for idx in backbone:
+        c_nbrs = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                     if n.GetIdx() in backbone_set)
+        if c_nbrs > 2:
+            return None          # branched backbone -> fall through
+
+    # Attachment must be a backbone terminal (primary substituent).
+    if attach_idx not in backbone_set:
+        return None
+    attach_c_nbrs = sum(1 for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                        if n.GetIdx() in backbone_set)
+    if attach_c_nbrs != 1:
+        return None              # secondary/internal attachment -> fall through
+
+    # Trace the backbone from the attachment terminal (attach = locant 1).
+    ordered = [attach_idx]
+    visited = {attach_idx}
+    current = attach_idx
+    while len(ordered) < len(backbone):
+        nxt = None
+        for n in mol.GetAtomWithIdx(current).GetNeighbors():
+            ni = n.GetIdx()
+            if ni in backbone_set and ni not in visited:
+                nxt = ni
+                break
+        if nxt is None:
+            break
+        ordered.append(nxt)
+        visited.add(nxt)
+        current = nxt
+    if len(ordered) != len(backbone):
+        return None              # disconnected backbone -> fall through
+
+    pos = {idx: i + 1 for i, idx in enumerate(ordered)}   # attach = 1
+
+    from collections import defaultdict
+    from ..data.chain_names import get_chain_prefix
+    groups: dict = defaultdict(list)
+    for h_idx, c_idx in halogens:
+        groups[_HALOGEN_PREFIX[mol.GetAtomWithIdx(h_idx).GetSymbol()]].append(pos[c_idx])
+
+    _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+    # Alphabetical order of the (base) halogen prefixes (P-14.5.1: the di/tri
+    # multiplier on a simple substituent is ignored for ordering).
+    part_strings = []
+    for prefix in sorted(groups.keys()):
+        locs = sorted(groups[prefix])
+        loc_str = ",".join(str(loc) for loc in locs)
+        mult = _MULT.get(len(locs), f"{len(locs)}")
+        part_strings.append(f"{loc_str}-{mult}{prefix}")
+
+    stem = get_chain_prefix(len(backbone))
+    return f"{'-'.join(part_strings)}{stem}yl"
+
+
 # ============================================================================
 # Fragment SMILES Extraction
 # ============================================================================
@@ -1122,6 +1231,14 @@ def name_substituent_fragment(
     unsat_name = _name_unsaturated_chain(mol, sub_atoms, attach_idx, parent_set)
     if unsat_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, unsat_name)
+
+    # Step 2c (Phase 171 BBR-ASM, DEF-8 / P-46): saturated linear chain with halogen
+    # substituents, numbered from the attachment point. MUST precede the recursive
+    # path, which renames the extracted fragment as a free molecule and loses the
+    # attachment constraint ('CCCCCl' -> '1-chlorobutane' -> 'chlorobutyl', no locant).
+    halo_name = _name_saturated_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
+    if halo_name is not None:
+        return _add_substituent_stereo(mol, sub_atoms, halo_name)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)

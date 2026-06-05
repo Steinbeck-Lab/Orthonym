@@ -43,17 +43,9 @@ def test_azidomethane_not_diazabutane(namer):
     assert namer.name("CN=[N+]=[N-]") == "azidomethane"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="169.7 BBR-PERC Plan-02 FIXED perception+naming: CCC[Se]C now ships "
-    "'1-methylselanylpropane' (RT-passes; was 'unknown'). The ONLY residual gap "
-    "vs the gold PIN is the enclosing parens '(methylselanyl)' — a DEF-8 "
-    "needs-parens divergence (the chain handler omits the marks the polyfunctional "
-    "path adds). That consolidation is Phase 171 / BBR-ASM (CONTEXT D-14 scope "
-    "guard). Flip + remove this marker when Phase 171 lands the parens.",
-)
+@pytest.mark.unit  # Phase 171 BBR-ASM FIXED the enclosing parens (selanyl now classed complex)
 def test_methyl_propyl_selenide(namer):
-    # DEF-5: selenide is the Se analogue of an ether (P-63.6). 169.7 delivers the
-    # perception + (methylselanyl) naming + locant + shipping; the parens are P-171.
+    # DEF-5: selenide is the Se analogue of an ether (P-63.6). 169.7 delivered the
+    # perception + (methylselanyl) naming + locant; Phase 171 BBR-ASM added the
+    # enclosing parens by adding selanyl/tellanyl to the complex-substituent suffixes.
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"

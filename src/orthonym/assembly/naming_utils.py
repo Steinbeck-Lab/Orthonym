@@ -81,7 +81,18 @@ _ALKYL_ROOTS_FULL = (
     'hexadecyl', 'heptadecyl', 'octadecyl', 'nonadecyl', 'icosyl',
 )
 
-_COMPOUND_S_SUFFIXES_COMPLEX = ('sulfinyl', 'sulfonyl', 'sulfanyl')
+# Chalcogen compound-substituent suffixes that, fused to an alkyl root, form a
+# COMPLEX (compound) substituent requiring enclosing marks per IUPAC P-16.3.3 /
+# P-63.6 — '(methylsulfanyl)', '(methylselanyl)', '(methyltellanyl)'. Phase 171
+# BBR-ASM (DEF-8): the Se/Te analogues (selanyl/tellanyl + the oxidized
+# seleninyl/selenonyl/tellurinyl/telluronyl) were missing, so 'methylselanyl' was
+# wrongly classed simple -> '1-methylselanylpropane' instead of PIN
+# '1-(methylselanyl)propane'.
+_COMPOUND_S_SUFFIXES_COMPLEX = (
+    'sulfinyl', 'sulfonyl', 'sulfanyl',
+    'seleninyl', 'selenonyl', 'selanyl',
+    'tellurinyl', 'telluronyl', 'tellanyl',
+)
 
 # Functional group prefixes that, when fused with alkyl roots, form compound
 # substituents requiring enclosing marks per IUPAC P-14.5.2.
@@ -186,8 +197,16 @@ def should_omit_locant_one(
             return False  # Position matters in heterocycles
         return True  # Symmetric carbocyclic: omit
 
-    # Rule 5: Monosubstituted hydrocarbon chain at position 1
-    if context == "prefix" and not is_ring and is_monosubstituted and chain_length > 1:
+    # Rule 5: Monosubstituted hydrocarbon chain at position 1.
+    # P-14.3.4 (PIN): the locant '1' is omitted ONLY where the position is
+    # unambiguous — methane (Rule 1, chain_length==1) and ETHANE (chain_length==2,
+    # the two carbons are equivalent so there is a single monosubstitution product
+    # -> 'chloroethane'). For propane and longer the terminal substituent is
+    # distinguishable from interior positions ('1-chloropropane' != '2-chloropropane',
+    # '1-chloropentane' is the PIN), so the locant MUST be cited. Phase 171 DEF-4
+    # (BlueBookV2 P-14.3.4 @2869; gold 'ClCCCCC' -> '1-chloropentane'). Previously this
+    # used `chain_length > 1`, which wrongly elided the locant for all chains.
+    if context == "prefix" and not is_ring and is_monosubstituted and chain_length == 2:
         return True
 
     # Rule 6: Mono-cycloalkene bond locant
@@ -557,8 +576,19 @@ def is_complex_substituent(name: str) -> bool:
     # Check for digits (indicates locants within the substituent name)
     if any(ch.isdigit() for ch in name):
         return True
-    # Check for hyphens (indicates compound substituent)
-    if "-" in name:
+    # Check for hyphens (indicates compound substituent) — EXCEPT a leading
+    # italicized 'sec-'/'tert-' detachable prefix on an otherwise-simple retained
+    # name (tert-butyl, sec-butyl). IUPAC P-16.3.4 treats these as SIMPLE for
+    # multiplication (di-tert-butyl, NOT bis(tert-butyl)) and does not enclose them
+    # in marks (N-tert-butyl, NOT N-(tert-butyl)). Phase 171 BBR-ASM: without this,
+    # coupling the paren/bis decision to is_complex_substituent over-parenthesised
+    # tert-butyl. The leading-digit case above still catches genuine compounds.
+    _hyphen_probe = name.lower()
+    for _retained_prefix in ("sec-", "tert-"):
+        if _hyphen_probe.startswith(_retained_prefix):
+            _hyphen_probe = _hyphen_probe[len(_retained_prefix):]
+            break
+    if "-" in _hyphen_probe:
         return True
     # Check for embedded multiplier + substituent name patterns (IUPAC P-14.5.2)
     if _MULT_SUBSTITUENT_RE.match(name):
@@ -851,6 +881,20 @@ def alpha_sort_key(substituent_name: str) -> str:
         'butyl'
     """
     text = substituent_name.lower()
+
+    # P-14.5.2 (Phase 171 BBR-ASM, DEF-8): a COMPOUND substituent cited as a
+    # fully-enclosed unit is alphabetized on the first letter of its COMPLETE name —
+    # its INTERNAL multiplying prefix (di/tri…) is part of the name and is NOT ignored
+    # ('(2,4-dimethylpentyl)' sorts at 'd', before 'ethyl'). Contrast P-14.5.1: a bare
+    # 'di'/'tri' multiplying SEPARATE simple prefixes on the parent IS ignored
+    # ('2,2-dimethyl' sorts at 'm'). The enclosing marks disambiguate the two rules,
+    # so only fully-enclosed input takes the complete-name path.
+    if (text.startswith('(') and text.endswith(')')) or (text.startswith('[') and text.endswith(']')):
+        inner = text[1:-1]
+        inner = _LOCANT_PREFIX_RE.sub('', inner)  # drop leading positional locants only
+        if (inner.startswith('(') and inner.endswith(')')) or (inner.startswith('[') and inner.endswith(']')):
+            inner = inner[1:-1]
+        return inner  # complete name; internal multiplying prefix NOT stripped
 
     # Strip enclosing parentheses if present
     # e.g., "(N,N-dimethylamino)" -> "N,N-dimethylamino"
