@@ -947,6 +947,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- BBR-PERC (Phase 169.7): hydroxylamine handler. Parent hydride "hydroxylamine"
+#     (P-68.3.1.1) with N-/O- substituent locants. Fires when the perceived
+#     hydroxylamine FG is the PCG (senior to amine in SENIORITY_ORDER) — otherwise
+#     the N,O are dropped and the molecule names as the bare chain (CCCNO -> propane).
+from .handlers.hydroxylamine import _is_hydroxylamine, name_hydroxylamine  # noqa: E402
+
+_register_inner(
+    handler_id="hydroxylamine",
+    priority=5250,
+    predicate=_is_hydroxylamine,
+    handler=name_hydroxylamine,
+    iupac_section="P-68.3.1.2.1",
+    description="Substituted hydroxylamine (N-/O- substituents on the hydroxylamine parent)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-04: ring_ester (Tier-2 mid-tier direct-return; audit
 #     § 1 + § 3). Predicate:
 #       principal_group == 'ester'

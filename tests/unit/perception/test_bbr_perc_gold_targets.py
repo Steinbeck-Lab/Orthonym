@@ -28,15 +28,9 @@ def namer():
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="169.7 BBR-PERC Plan-02: hydroxylamine SMARTS not yet added — "
-    "currently the N,O are silently dropped and CCCNO names 'propane'. "
-    "Flips to PASS when the missing-class SMARTS land; then remove this marker.",
-)
 def test_propylhydroxylamine_perceived(namer):
-    # DEF-5: hydroxylamine (R-NH-OH) is a recognised class (P-68.3); today both
-    # the N and O are dropped and the molecule names as the bare alkane.
+    # DEF-5: hydroxylamine (R-NH-OH) is a recognised class (P-68.3). FIXED in
+    # 169.7 Plan-02 (hydroxylamine SMARTS + handler). Permanent green tripwire.
     assert namer.name("CCCNO") == "N-propylhydroxylamine"
 
 
@@ -56,11 +50,14 @@ def test_azidomethane_not_diazabutane(namer):
 @pytest.mark.unit
 @pytest.mark.xfail(
     strict=True,
-    reason="169.7 BBR-PERC Plan-02: selenide (R-Se-R) SMARTS not yet defined "
-    "(the resolver references a 'selenoether' that never existed). Today "
-    "CCC[Se]C names 'unknown organic compound'. Flips to PASS when the "
-    "selenide class lands; then remove this marker.",
+    reason="169.7 BBR-PERC Plan-02 FIXED perception+naming: CCC[Se]C now ships "
+    "'1-methylselanylpropane' (RT-passes; was 'unknown'). The ONLY residual gap "
+    "vs the gold PIN is the enclosing parens '(methylselanyl)' — a DEF-8 "
+    "needs-parens divergence (the chain handler omits the marks the polyfunctional "
+    "path adds). That consolidation is Phase 171 / BBR-ASM (CONTEXT D-14 scope "
+    "guard). Flip + remove this marker when Phase 171 lands the parens.",
 )
 def test_methyl_propyl_selenide(namer):
-    # DEF-5: selenide is the Se analogue of an ether (P-63.6).
+    # DEF-5: selenide is the Se analogue of an ether (P-63.6). 169.7 delivers the
+    # perception + (methylselanyl) naming + locant + shipping; the parens are P-171.
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"

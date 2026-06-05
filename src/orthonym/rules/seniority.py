@@ -58,6 +58,13 @@ SENIORITY_ORDER = [
     "phosphonic_acid",
     "phosphinic_acid",
     "boronic_acid",    # P-68.3 boron acid
+    # BBR-PERC (169.7): free inorganic oxoacids — P-67 functional parents. Ranked in
+    # the acid tier so they win PCG when perceived; NAMING is P-67 (downstream). Listed
+    # so get_principal_group recognizes them (no KeyError) and they are not silently dropped.
+    "phosphoric_acid",
+    "sulfuric_acid",
+    "nitric_acid",
+    "carbonic_acid",
 
     # Acid derivatives
     "anhydride",
@@ -117,6 +124,10 @@ SENIORITY_ORDER = [
     "hydroperoxide",   # IUPAC P-43 Table 5.1: Class 19 (higher than thiol)
     "thiol",
     "selenol",
+    "tellurol",        # BBR-PERC (169.7): Te analogue of -ol/-selenol (P-63.1.5)
+
+    # Hydroxylamines (BBR-PERC, 169.7: P-68.3 class 21; ranked just above amines)
+    "hydroxylamine",
 
     # Amines
     "primary_amine",
@@ -143,6 +154,9 @@ SENIORITY_ORDER = [
     "sulfoxide",
     "sulfone",
     "thioether",  # Also called sulfide
+    # BBR-PERC (169.7): Se/Te ether analogues, same tier as thioether (P-63.6)
+    "selenoether",
+    "telluroether",
 
     # Phosphorus compounds (functional class or substitutive naming)
     "phosphine_oxide",
@@ -223,7 +237,18 @@ SUFFIX_FORMS = {
     "alcohol": ("ol", "ol"),  # PERC-05: generic catch-all suffix form
     "thiol": ("thiol", "thiol"),
     "selenol": ("selenol", "selenol"),
+    "tellurol": ("tellurol", "tellurol"),  # BBR-PERC (169.7): Te -ol analogue (P-63.1.5)
     "hydroperoxide": ("peroxol", "peroxol"),
+    # BBR-PERC (169.7): hydroxylamine + free oxoacids + Se/Te ethers are named via
+    # their handler / functional-parent (P-67/P-68.3) / functional-class (P-63.6) paths,
+    # NOT as a chain suffix — None per the SUFFIX_FORMS contract (like thioether).
+    "hydroxylamine": None,
+    "phosphoric_acid": None,
+    "sulfuric_acid": None,
+    "nitric_acid": None,
+    "carbonic_acid": None,
+    "selenoether": None,
+    "telluroether": None,
     "primary_amine": ("amine", "amine"),
     "secondary_amine": ("amine", "amine"),
     "tertiary_amine": ("amine", "amine"),
@@ -300,7 +325,15 @@ PREFIX_FORMS = {
     "alcohol": "hydroxy",  # PERC-05: generic catch-all prefix form
     "thiol": "sulfanyl",
     "selenol": "selanyl",
+    "tellurol": "tellanyl",   # BBR-PERC (169.7): Te analogue of sulfanyl/selanyl (P-63.1.5)
     "hydroperoxide": "hydroperoxy",
+    # BBR-PERC (169.7): hydroxylamine + free oxoacids are functional parents
+    # (P-67/P-68.3); not expressed as detachable prefixes (None, like thioether).
+    "hydroxylamine": None,
+    "phosphoric_acid": None,
+    "sulfuric_acid": None,
+    "nitric_acid": None,
+    "carbonic_acid": None,
     "primary_amine": "amino",
     "secondary_amine": "amino",
     "tertiary_amine": "amino",
@@ -348,6 +381,10 @@ PREFIX_FORMS = {
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,  # IUPAC P-63.2: functional class naming (dialkyl sulfide)
+    # BBR-PERC (169.7): Se/Te ethers use the dynamic (alkyl)selanyl/tellanyl generator
+    # in substituent_prefix_forms.get_substituent_prefix_form (parallel to thioether).
+    "selenoether": None,  # IUPAC P-63.6: (alkyl)selanyl substitutive prefix
+    "telluroether": None,  # IUPAC P-63.6: (alkyl)tellanyl substitutive prefix
     # Sulfur oxidation states (IUPAC P-63.6)
     "sulfoxide": "sulfinyl",  # IUPAC P-63.6: bivalent prefix for -S(=O)-
     "sulfone": "sulfonyl",    # IUPAC P-63.6: bivalent prefix for -S(=O)2-

@@ -5556,6 +5556,20 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
         return _name_c_attached_chain_substituent_fallback(
             mol, sub_atoms, sub_set, chain_set, attach_atom
         )
+    # BBR-PERC (169.7): Se/Te-attached substituent → (alkyl)selanyl/tellanyl (P-63.6).
+    # Without this branch a -Se-R / -Te-R substituent falls through to the Tier-4
+    # recursive namer, producing an OPSIN-unparseable "methaneselenolyl" form that the
+    # validity gate then suppresses to "unknown". Reuses the chalcogen-agnostic prefix
+    # builder (the chalcogen is the attach atom; it walks the chalcogen's C neighbours).
+    if symbol in ('Se', 'Te'):
+        from .substituent_prefix_forms import get_sulfanyl_prefix
+        suffix = 'selanyl' if symbol == 'Se' else 'tellanyl'
+        nbr_idxs = [n.GetIdx() for n in atom.GetNeighbors()]
+        if len(nbr_idxs) >= 2:
+            return get_sulfanyl_prefix(
+                mol, (attach_atom, nbr_idxs[0], nbr_idxs[1]),
+                principal_chain, suffix=suffix,
+            )
 
     return None
 

@@ -1023,13 +1023,13 @@ class TestPhase160_2_Registrations:
         from orthonym.assembly.handlers.general_acyclic import name_general_acyclic
         assert INNER_DISPATCH_TABLE["general_acyclic"].handler is name_general_acyclic
 
-    def test_inner_dispatch_table_size_35(self):
+    def test_inner_dispatch_table_size_36(self):
         from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
-        # 33 through Phase 160.2 (general_acyclic@99999) + 2 NEW: imidate@2900
-        # (Phase 163 AUDIT-FRN § 7) + chalcogen_ester@2950 (Phase 163.1 closure
-        # — selenoester / telluroester functional-class handler). Bumps per
-        # ADR-19-09 additive seniority-extension.
-        assert len(INNER_DISPATCH_TABLE) == 35
+        # 33 through Phase 160.2 (general_acyclic@99999) + imidate@2900
+        # (Phase 163 AUDIT-FRN § 7) + chalcogen_ester@2950 (Phase 163.1 closure)
+        # + hydroxylamine@5250 (Phase 169.7 BBR-PERC — substituted-hydroxylamine
+        # handler, P-68.3.1.2.1). 35 → 36.
+        assert len(INNER_DISPATCH_TABLE) == 36
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1056,9 +1056,10 @@ class TestPhase160_2_Registrations:
         from orthonym.assembly.inner_dispatch import _SORTED_ENTRIES_CACHE
         # Eagerly populated tuple per WR-06 + RESEARCH §5; size matches
         # INNER_DISPATCH_TABLE which Phase 163 grew 33 → 34 (imidate@2900,
-        # AUDIT-FRN § 7) and Phase 163.1 grew 34 → 35 (chalcogen_ester@2950).
+        # AUDIT-FRN § 7), Phase 163.1 grew 34 → 35 (chalcogen_ester@2950), and
+        # Phase 169.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC).
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 35
+        assert len(_SORTED_ENTRIES_CACHE) == 36
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)

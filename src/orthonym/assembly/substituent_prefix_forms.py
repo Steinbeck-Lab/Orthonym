@@ -518,24 +518,33 @@ def get_sulfanyl_prefix(
     mol,
     thioether_atoms: tuple,
     principal_chain: Optional[List[int]] = None,
+    suffix: str = "sulfanyl",
 ) -> Optional[str]:
-    """Generate (alkyl)sulfanyl prefix for thioether as non-principal group (IUPAC P-63.2.5).
+    """Generate (alkyl)sulfanyl/selanyl/tellanyl prefix for a chalcogen ether as
+    non-principal group (IUPAC P-63.2.5 / P-63.6).
 
-    IUPAC P-63.2.5: ``R-S-R'`` when not the principal group is expressed as
-    an (alkyl)sulfanyl prefix on the parent chain.
+    IUPAC P-63.2.5: ``R-S-R'`` (or ``R-Se-R'`` / ``R-Te-R'``) when not the
+    principal group is expressed as an (alkyl)chalcogenyl prefix on the parent
+    chain. The algorithm is chalcogen-agnostic (it walks the C neighbours of the
+    chalcogen atom at ``thioether_atoms[0]``); only the suffix differs:
+    ``sulfanyl`` (S), ``selanyl`` (Se), ``tellanyl`` (Te).
 
-    SMARTS ``[SX2]([#6])[#6]`` matches (S, C1, C2).
+    SMARTS ``[SX2]([#6])[#6]`` / ``[SeX2]([#6])[#6]`` / ``[TeX2]([#6])[#6]``
+    each match (chalcogen, C1, C2).
 
     Lifted from rules/polyfunctional._get_sulfanyl_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4.
+    None-guard at function entry per Phase 160.1 RESEARCH §4. BBR-PERC (169.7)
+    added the ``suffix`` param (default "sulfanyl" → backward-compatible).
 
     Args:
         mol: RDKit Mol object.
-        thioether_atoms: Atom indices from thioether SMARTS match.
+        thioether_atoms: Atom indices from the chalcogen-ether SMARTS match.
         principal_chain: Atom indices of the principal chain; may be None.
+        suffix: chalcogen prefix stem ("sulfanyl" | "selanyl" | "tellanyl").
 
     Returns:
-        Compound prefix string (e.g., ``"methylsulfanyl"``), or None on failure.
+        Compound prefix string (e.g., ``"methylsulfanyl"`` / ``"methylselanyl"``),
+        or None on failure.
     """
     chain_set: Set[int] = set(principal_chain) if principal_chain else set()
 
@@ -572,10 +581,10 @@ def get_sulfanyl_prefix(
     if carbon_count == 0:
         return None
 
-    # Build compound prefix: methylsulfanyl, ethylsulfanyl, etc.
+    # Build compound prefix: methylsulfanyl / methylselanyl / methyltellanyl, etc.
     try:
         alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfanyl"
+        return f"{alkyl}{suffix}"
     except (ValueError, KeyError):
         return None
 
@@ -972,6 +981,11 @@ def get_substituent_prefix_form(
         return get_sulfonyl_prefix(mol, atoms, principal_chain)
     if fg_name == "thioether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain)
+    # BBR-PERC (169.7): Se/Te ether analogues → (alkyl)selanyl/tellanyl (P-63.6).
+    if fg_name == "selenoether":
+        return get_sulfanyl_prefix(mol, atoms, principal_chain, suffix="selanyl")
+    if fg_name == "telluroether":
+        return get_sulfanyl_prefix(mol, atoms, principal_chain, suffix="tellanyl")
 
     # --- Dynamic (NEW Plan-02-02) — rows 4, 5, 11 ---
     if fg_name == "secondary_amide":
@@ -1018,6 +1032,7 @@ _PREFIX_FORM_FG_NAMES = (
     "primary_amide", "secondary_amide", "tertiary_amide",
     "nitrile",
     "sulfoxide", "sulfone", "thioether",
+    "selenoether", "telluroether",  # BBR-PERC (169.7)
     "carbamate", "urea",
     "isocyanate", "isothiocyanate",
 )

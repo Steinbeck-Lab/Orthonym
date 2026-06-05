@@ -1083,6 +1083,25 @@ def name_substituent_fragment(
     if retained:
         return _add_substituent_stereo(mol, sub_atoms, retained)
 
+    # Step 1b (BBR-PERC, 169.7): chalcogen-ether substituent -Se-R / -Te-R →
+    # (alkyl)selanyl / (alkyl)tellanyl (P-63.6). Without this, Step 4's recursive
+    # path names it as the parent hydride "methaneselenol" → "methaneselenolyl",
+    # which OPSIN cannot parse (so the validity gate then suppresses the whole
+    # name to "unknown"). The chalcogen-agnostic prefix builder walks the C
+    # neighbours of the attach chalcogen; the substituent C (not on the parent
+    # chain) is named the (alkyl) stem.
+    _attach = mol.GetAtomWithIdx(attach_idx)
+    if _attach.GetSymbol() in ('Se', 'Te'):
+        from .substituent_prefix_forms import get_sulfanyl_prefix
+        _suffix = 'selanyl' if _attach.GetSymbol() == 'Se' else 'tellanyl'
+        _nbrs = [n.GetIdx() for n in _attach.GetNeighbors()]
+        if len(_nbrs) >= 2:
+            _chal = get_sulfanyl_prefix(
+                mol, (attach_idx, _nbrs[0], _nbrs[1]), parent_chain, suffix=_suffix
+            )
+            if _chal:
+                return _add_substituent_stereo(mol, sub_atoms, _chal)
+
     # Step 2: Fast path -- linear saturated alkyl (no branching, no unsaturation)
     if _is_linear_alkyl(mol, sub_atoms):
         carbon_count = sum(

@@ -139,24 +139,35 @@ class TestPhosphateSpecificityChain:
 
 class TestPhosphoricAcidDocumentedBehavior:
     """
-    Phosphoric acid OP(=O)(O)O matches the phosphonic_acid SMARTS.
+    Phosphoric acid OP(=O)(O)O is the free inorganic oxoacid (P-67), NOT a
+    carbon phosphonic acid (P-65.3, which requires a C-P bond).
 
-    This is intentional per codebase comment at functional_groups.py:273-276:
-    phosphonic_acid is NOT suppressed because the naming pipeline uses its
-    "phosphono" prefix. Full phosphate principal group naming is deferred.
+    BBR-PERC / DEF-4 (Phase 169.7) FIXED the prior false match: the phosphonic_acid
+    SMARTS now carries a recursive-env `$([PX4][#6])` carbon-attachment constraint,
+    and a dedicated `phosphoric_acid` SMARTS perceives the free oxoacid. This
+    corrects the audit's documented `OP(=O)(O)O -> trihydrophosphate` mis-cast.
     """
 
-    def test_phosphoric_acid_matches_phosphonic_acid(self):
-        """OP(=O)(O)O matches phosphonic_acid SMARTS (documented intentional behavior)."""
+    def test_phosphoric_acid_is_not_phosphonic_acid(self):
+        """OP(=O)(O)O perceives `phosphoric_acid`, NOT the carbon-acid `phosphonic_acid` (DEF-4 fix)."""
         mol = Chem.MolFromSmiles("OP(=O)(O)O")
         assert mol is not None
         fgs = detect_functional_groups(mol)
-        # Phosphoric acid has P(=O)(OH)(OH)OH pattern which matches
-        # the phosphonic_acid SMARTS [PX4](=O)([OX2H1])[OX2H1]
-        assert "phosphonic_acid" in fgs, (
-            f"Phosphoric acid should match phosphonic_acid SMARTS (intentional), "
+        # Post-169.7: the C-attachment constraint excludes the inorganic oxoacid.
+        assert "phosphonic_acid" not in fgs, (
+            f"Phosphoric acid must NOT match the carbon-acid phosphonic_acid SMARTS "
+            f"(P-65.3 requires a C-P bond); got {sorted(fgs.keys())}"
+        )
+        assert "phosphoric_acid" in fgs, (
+            f"Phosphoric acid must perceive its own `phosphoric_acid` class (P-67); "
             f"got {sorted(fgs.keys())}"
         )
+
+    def test_carbon_phosphonic_acid_still_matches(self):
+        """A genuine C-attached phosphonic acid (CCP(=O)(O)O) still matches (regression guard)."""
+        mol = Chem.MolFromSmiles("CCP(=O)(O)O")
+        fgs = detect_functional_groups(mol)
+        assert "phosphonic_acid" in fgs and "phosphoric_acid" not in fgs
 
 
 # ---------------------------------------------------------------------------

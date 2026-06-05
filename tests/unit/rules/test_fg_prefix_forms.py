@@ -40,6 +40,14 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     'iminoester',        # P-65.1.7: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
     'selenoester',       # P-65.3: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester
     'telluroester',      # P-65.3: functional class (Te-alkyl alkanetelluroate); chalcogen analog of ester
+    # BBR-PERC (Phase 169.7): functional parents (P-67/P-68.3) + Se/Te ethers (P-63.6).
+    'hydroxylamine',     # P-68.3: parent hydride "hydroxylamine"; named via the hydroxylamine handler
+    'phosphoric_acid',   # P-67: free inorganic oxoacid functional parent
+    'sulfuric_acid',     # P-67: free inorganic oxoacid functional parent
+    'nitric_acid',       # P-67: free inorganic oxoacid functional parent
+    'carbonic_acid',     # P-65.2.1: functional parent (HO-C(=O)-OH)
+    'selenoether',       # P-63.6: functional class / substitutive (alkyl)selanyl
+    'telluroether',      # P-63.6: functional class / substitutive (alkyl)tellanyl
 })
 
 

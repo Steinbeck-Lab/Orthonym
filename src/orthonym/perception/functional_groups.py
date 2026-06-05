@@ -14,6 +14,19 @@ from rdkit import Chem
 # SMARTS patterns ordered by IUPAC seniority (P-41 to P-43)
 # First match = highest priority = principal group
 FUNCTIONAL_GROUP_SMARTS = {
+    # === CHARGED CHARACTERISTIC GROUPS (BBR-PERC/DEF-1, 169.7: P-41 classes 4/6) ===
+    # Added so the NEUTRAL FG layer can PERCEIVE ionic groups too — a charged molecule
+    # that reaches this detector with a residual charge (the D-1 mis-route exposure) no
+    # longer silently loses its group. The normal charged path neutralizes BEFORE this
+    # detector runs (charged_router re-enters Orthonym().name on the neutral form), so
+    # these fire only on the mis-route case. Every pattern requires a formal charge, so
+    # NEUTRAL molecules never match. Suffixes: P-72 (anions) / P-73 (cations).
+    "carboxylate": "[#6][CX3](=O)[O-]",            # P-72.2.2.2.1.1 (-oate)
+    "sulfonate": "[#6][SX4](=O)(=O)[O-]",          # P-72.2.2.2.1.1 (-sulfonate)
+    "phosphonate": "[#6][PX4](=O)([O-,OX2H1])[O-]",# P-72 (-phosphonate; mono/di-deprotonated)
+    "thiolate": "[#6][S-]",                        # P-72.2.2.2.2 (-thiolate)
+    "phenolate": "[c][O-]",                        # P-72.2.2.2.2 (aromatic-O anion)
+    "ammonium": "[NX4+]",                          # P-73.1.2.1 (protonated/quaternary N+)
     # === ACIDS (highest priority) ===
     "carboxylic_acid": "[CX3](=O)[OX2H1]",
     # Thiocarboxylic acids (IUPAC P-65.3) -- rank just below carboxylic acid
@@ -29,13 +42,29 @@ FUNCTIONAL_GROUP_SMARTS = {
     "ditelluroic_acid": "[CX3](=[TeX1])[TeX2H1]",# R-C(=Te)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
     # Carbamic acid (IUPAC P-65.2.3): N-C(=O)-OH (free acid, not ester)
     "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
-    "sulfonic_acid": "[SX4](=O)(=O)[OX2H1]",
-    "sulfinic_acid": "[SX3](=O)[OX2H1]",
+    # BBR-PERC/DEF-4 (169.7): require a C neighbour on S/P (P-65.3: sulfonic/phosphonic
+    # are CARBON acids). Recursive-env `$(...)` adds the constraint WITHOUT changing the
+    # match-tuple arity, so inorganic oxoacids (sulfamic NS(=O)(=O)O, phosphoric OP(=O)(O)O)
+    # stop false-matching while C-attached acids still match. Free inorganic oxoacids are
+    # perceived by their own keys below (P-67) and named as functional parents (P-42/P-67).
+    "sulfonic_acid": "[SX4;$([SX4][#6])](=O)(=O)[OX2H1]",
+    "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
-    "phosphonic_acid": "[PX4](=O)([OX2H1])[OX2H1]",
+    "phosphonic_acid": "[PX4;$([PX4][#6])](=O)([OX2H1])[OX2H1]",
     # Phosphinic acid: R2P(=O)(OH) - two C attached to P
     "phosphinic_acid": "[PX4](=O)([OX2H1])([#6])[#6]",
-    
+    # === FREE INORGANIC OXOACIDS (BBR-PERC/DEF-2, 169.7: P-67 functional parents) ===
+    # Perceived so they are NOT silently dropped or mis-cast as carbon acids (the old
+    # `OP(=O)(O)O → trihydrophosphate` malformed bug; now blocked by the [#6]-tightened
+    # phosphonic_acid above). NO carbon on the central atom (that is what distinguishes
+    # them from the carbon acids). NAMING is P-67 functional-parent (downstream); here
+    # the goal is perception completeness + correct mis-cast prevention. The resolver
+    # below suppresses the carbon-acid generics on their atoms for robustness.
+    "phosphoric_acid": "[OX2H1][PX4](=O)([OX2H1])[OX2H1]",   # HO-P(=O)(OH)OH (P-67)
+    "sulfuric_acid": "[OX2H1][SX4](=O)(=O)[OX2H1]",          # HO-S(=O)2-OH (P-67)
+    "nitric_acid": "[OX2H1][NX3+](=O)[O-]",                  # HO-N(+)(=O)O- (P-67)
+    "carbonic_acid": "[OX2H1][CX3](=O)[OX2H1]",              # HO-C(=O)-OH (P-65.2.1)
+
     # === ACID DERIVATIVES ===
     "anhydride": "[CX3](=O)[OX2][CX3](=O)",
     "ester": "[CX3](=O)[OX2][#6]",
@@ -126,11 +155,22 @@ FUNCTIONAL_GROUP_SMARTS = {
     "enol": "[OX2H][CX3]=[CX3]",
     "thiol": "[SX2H][#6]",
     "selenol": "[SeX2H]",
-    
+    # BBR-PERC/DEF-2 (169.7): tellurol — Te analogue of -ol/-thiol/-selenol (P-63.1.5).
+    # Defines the resolver ref at line ~298 (was a dead ref, audit Dim-02 §4 #2).
+    "tellurol": "[TeX2H1][#6]",
+
     # === HYDROPEROXIDES ===
     "hydroperoxide": "[OX2H][OX2][#6]",
     "peroxide": "[#6][OX2][OX2][#6]",
     
+    # === HYDROXYLAMINES (BBR-PERC/DEF-2, 169.7: P-68.3 class 21) ===
+    # R-NH-OH / R2N-OH — the N bears an -OH and >=1 carbon. MUST be checked before
+    # amines/alcohol (resolver suppresses those on its atoms). Excludes hydroxamic
+    # acid (C(=O)-NH-OH, carbonyl present) and oxime (C=N-OH) via the carbonyl/=*
+    # recursive exclusions. The O is on N (not C) so the `[OX2H][CX4]` alcohol never
+    # matches it. Specifying only the OH + one C neighbour leaves the 3rd N connection
+    # free (implicit H for R-NH-OH, or a 2nd C for R2N-OH) — so it matches BOTH forms.
+    "hydroxylamine": "[OX2H1][NX3;!$([NX3][CX3]=[OX1,SX1,SeX1,TeX1]);!$([NX3]=*)][#6]",
     # === AMINES ===
     "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
     "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
@@ -148,6 +188,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     "vinyl_ether": "[OX2]([#6])[CX3]=[CX3]",
     "aromatic_ether": "[OX2]([#6])[cX3]",
     "thioether": "[SX2]([#6])[#6]",
+    # BBR-PERC/DEF-2 (169.7): selenide/telluride — Se/Te ether analogues (P-63.6).
+    # Named selenoether/telluroether to match (and make LIVE) the dead resolver refs
+    # at lines ~284-285 (audit Dim-02 §4 #2). Prefix form = (alkyl)selanyl/tellanyl.
+    "selenoether": "[SeX2]([#6])[#6]",   # R-Se-R' (P-63.6); selanyl prefix
+    "telluroether": "[TeX2]([#6])[#6]",  # R-Te-R' (P-63.6 parallel); tellanyl prefix
     "disulfide": "[#6][SX2][SX2][#6]",  # DATA-05b: P-63.6.2
 
     # === PHOSPHORUS COMPOUNDS (check more specific first) ===
@@ -189,7 +234,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     "azo": "[#6][NX2]=[NX2][#6]",
 
     # === OTHER ===
-    "nitro": "[NX3+](=O)[O-]",
+    # BBR-PERC/DEF-4 (169.7): C-attached nitro only (P-65.3.1) via recursive-env so the
+    # match-tuple arity is unchanged; stops nitrate ESTERS (R-O-NO2, CCO[N+](=O)[O-]) from
+    # false-matching as nitro. Aliphatic + aromatic C both satisfy [#6].
+    "nitro": "[NX3+;$([NX3+][#6])](=O)[O-]",
     "nitroso": "[NX2]=[OX1]",
     "azido": "[N;+0]=[N+]=[N-]",  # SUB-01/C2: organic azide R-N=[N+]=[N-] (attach N is NX2 neutral; the old [NX1]=... never matched RDKit canonical azides)
     "diazo": "[#6]=[NX2+]=[NX1-]",  # DATA-05a: P-61.5 diazo group
@@ -233,6 +281,20 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     results = _resolve_fg_collisions(results)
 
     return dict(results)
+
+
+def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:
+    """BBR-PERC (Phase 169.7) — the single shared feature-perception entry point.
+
+    The ONE place every route (neutral and charged) reads functional-group classes
+    from, so a mis-route can never produce a DIFFERENT feature set (audit Dim-02 §4
+    #1: "two parallel detectors with disjoint coverage"). Today it is a thin wrapper
+    over ``detect_functional_groups`` (which now includes the charged + missing-class
+    SMARTS); the orthogonal charge-SITE scan (``ions.get_ion_sites``) stays separate
+    — it answers "where are the charges", not "what FG classes are present". Keeping
+    a single accessor lets future consolidation route through one function.
+    """
+    return detect_functional_groups(mol)
 
 
 def _resolve_fg_collisions(results):
@@ -349,6 +411,21 @@ def _resolve_fg_collisions(results):
         ('enol', ['alcohol']),
         # PERC-05: hydroxamic acid suppresses generic alcohol too
         ('hydroxamic_acid', ['alcohol']),
+        # BBR-PERC (169.7): hydroxylamine (R-NH-OH) suppresses amine + alcohol on its
+        # N/O atoms (the N is an amine-N and the O an -OH to the generic patterns).
+        ('hydroxylamine', ['primary_amine', 'secondary_amine', 'tertiary_amine',
+                           'aromatic_amine', 'alcohol', 'primary_alcohol',
+                           'secondary_alcohol', 'tertiary_alcohol']),
+        # BBR-PERC (169.7): carbonic acid (HO-C(=O)-OH) suppresses the carboxylic_acid
+        # + ester generics on its carbon (it is a P-65.2.1 functional parent, not a
+        # carboxylic acid).
+        ('carbonic_acid', ['carboxylic_acid', 'ester']),
+        # BBR-PERC (169.7): free inorganic oxoacids suppress the (now [#6]-tightened)
+        # carbon-acid + ester generics on their atoms for robustness (P-67 parents).
+        ('phosphoric_acid', ['phosphonic_acid', 'phosphate_monoester',
+                             'phosphate_diester', 'phosphate_triester']),
+        ('sulfuric_acid', ['sulfonic_acid']),
+        ('nitric_acid', ['nitro', 'nitroso']),
     ]:
         if fg_specific in results:
             specific_atoms = set()
