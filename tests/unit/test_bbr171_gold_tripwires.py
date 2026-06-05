@@ -11,7 +11,7 @@ post-processing — the fixes are upstream (parent selection / assembly / charge
 
 Phase-171 gold targets (def_id / SMILES / PIN / Blue Book / owning workstream):
   DEF-1  CCCCCCCc1ccccc1        -> heptylbenzene                         (P-44.1.2.2)  WS-1
-  DEF-1  CCCCCCCCC1CCCCC1       -> nonylcyclohexane                      (P-44.1.2.2)  WS-1
+  DEF-1  CCCCCCCCC1CCCCC1       -> octylcyclohexane                      (P-44.1.2.2)  WS-1
   DEF-4  ClCCCCC                -> 1-chloropentane                       (P-14.3.4)    WS-3
   DEF-4  ClCC(F)C               -> 1-chloro-2-fluoropropane              (P-14.3.4)    WS-3
   DEF-4  FCCCl                  -> 1-chloro-2-fluoroethane               (P-14.3.4)    WS-3
@@ -36,16 +36,16 @@ def namer():
 
 # --- DEF-1 — parent spine: ring senior to chain regardless of size (P-44.1.2.2), WS-1 ---
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-1 BBR-PARENT (171-03): delete the len(ring)>=chain_len size gate. Flip + remove marker when it lands.")
+@pytest.mark.unit  # WS-1 BBR-PARENT (171-03) FIXED: deleted the len(ring)>=chain_len size gate (P-44.1.2.2)
 def test_def1_heptylbenzene(namer):
     assert namer.name("CCCCCCCc1ccccc1") == "heptylbenzene"
 
 
-@pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-1 BBR-PARENT (171-03): ring senior regardless of size (P-44.1.2.2).")
-def test_def1_nonylcyclohexane(namer):
-    assert namer.name("CCCCCCCCC1CCCCC1") == "nonylcyclohexane"
+@pytest.mark.unit  # WS-1 BBR-PARENT (171-03) FIXED: ring senior regardless of size (P-44.1.2.2)
+def test_def1_octylcyclohexane(namer):
+    # Gold PIN corrected in 171: CCCCCCCCC1CCCCC1 has 8 non-ring carbons (octyl),
+    # RT-verified to the exact input; the curated 'nonylcyclohexane' was off by one.
+    assert namer.name("CCCCCCCCC1CCCCC1") == "octylcyclohexane"
 
 
 # --- DEF-4 — locant-1 elision uses molecule-wide count (P-14.3.4), WS-3 ---

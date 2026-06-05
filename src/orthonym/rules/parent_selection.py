@@ -699,29 +699,25 @@ def select_parent(
             reasoning=f"P-31.1.3.4: {np_info['scaffold_class']} NP backbone - ring is parent"
         )
 
-    # No principal group (hydrocarbon) - compare ring vs chain size
+    # No principal group (hydrocarbon): a ring/ring system is senior to a chain
+    # REGARDLESS of size or degree of hydrogenation (P-44.1.2.2; BlueBookV2 ~19337,
+    # ex. "heptylbenzene" (PIN) NOT "1-phenylheptane"). Phase 171 DEF-1: deleted the
+    # `total_ring_atoms >= chain_len` size gate that let a longer chain win — the
+    # heptylbenzene / nonylcyclohexane / undecylnaphthalene bug. The ring only loses
+    # to a chain bearing a higher-seniority skeletal element/class, which is decided
+    # earlier (P-44.1.1 PG-count / P-44.1.2 senior atom); in the no-PG hydrocarbon
+    # case ring and chain share the senior element (C), so the ring always wins.
     if not principal_group or not principal_group_atoms:
         best_ring, other_rings = _select_best_ring_system(mol, ring_systems)
         total_ring_atoms = len(best_ring)
         chain_len = len(principal_chain)
-        if total_ring_atoms >= chain_len:
-            # Ring wins on tie (P-44.1.2.2, P-52.2.8)
-            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
-            return ParentSelectionResult(
-                parent_type='ring',
-                parent_atoms=list(sorted(best_ring)),
-                substituent_rings=other_ring_tuples,
-                reasoning=f"P-44.1.2.2: no PG, ring ({total_ring_atoms}) >= chain ({chain_len})"
-            )
-        else:
-            # Chain is genuinely longer - chain is parent
-            all_ring_tuples = [tuple(sorted(best_ring))] + [tuple(sorted(r)) for r in other_rings]
-            return ParentSelectionResult(
-                parent_type='chain',
-                parent_atoms=principal_chain,
-                substituent_rings=all_ring_tuples,
-                reasoning=f"P-44.3: no PG, chain ({chain_len}) > ring ({total_ring_atoms})"
-            )
+        other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+        return ParentSelectionResult(
+            parent_type='ring',
+            parent_atoms=list(sorted(best_ring)),
+            substituent_rings=other_ring_tuples,
+            reasoning=f"P-44.1.2.2: no PG, ring senior to chain regardless of size (ring={total_ring_atoms}, chain={chain_len})"
+        )
 
     # Check where principal group is located
     pg_on_ring = is_principal_group_on_ring(

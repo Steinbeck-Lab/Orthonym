@@ -1838,6 +1838,14 @@ class Orthonym:
                             break
 
                     # Guard (a): senior system must be >= 3 atoms larger
+                    # (Phase 171 P-1 DEFERRED: the audit-recommended "P-44.2 winner is
+                    # authoritative even for an equal-size senior heterocycle" — e.g.
+                    # cyclohexylpyridine not pyridinylcyclohexane — was trialled via a
+                    # heteroatom-senior trigger here but REGRESSED the OPSIN-self-test-500
+                    # by 1 (an among-rings edge whose heterocycle-parent form breaks RT)
+                    # while moving no gold row. Reverted per the 0-regression hard gate;
+                    # deferred to a dedicated among-rings pass with gold coverage + the
+                    # regressing case understood. See 171-VERIFICATION.md.)
                     size_diff = len(senior_set) - default_system_size
                     size_ok = size_diff >= 3
 
