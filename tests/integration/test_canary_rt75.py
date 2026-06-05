@@ -792,7 +792,9 @@ CANARY_COMPOUNDS = [
     (
         r"CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",  # Sentinel: fragment_loss - heptanoyl pyrrolidinone
         # Phase 139.1-01: decomposition now produces more complete fragment name
-        "N-heptanoyl(2S)-5-amino-3-oxoazole",
+        # Phase 170 WS-4 (DEF-6): ring ketone -> -one suffix (this sentinel name
+        # is malformed both before & after — RT=False unchanged, no RT regression).
+        "N-heptanoyl(2S)-5-aminoazol-3-one",
     ),
     # Failure taxonomy sentinels: stereo_mismatch (2 compounds)
     (
@@ -1540,7 +1542,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H]1O[C@@H](O)[C@H](O)[C@H](O)[C@@H]1O",  # heterocycle,small,carbohydrate
-        "(2R,3S,4R,5R,6R)-3,4,5,6-tetrahydroxy-2-methyloxane",
+        # Phase 170 WS-4 (DEF-6): the 4 ring -OH are the principal group -> -tetraol
+        # SUFFIX (P-33), not hydroxy prefixes. OPSIN-RT verified.
+        "(2R,3S,4R,5R,6R)-2-methyloxane-3,4,5,6-tetraol",
     ),
     (
         "CC1(C)[C@@H](Br)CC=C(C(Cl)CCl)[C@@H]1Cl",  # small
@@ -1595,7 +1599,9 @@ CANARY_COMPOUNDS = [
         # SUB-02 (169.5): substituent prefix glues to the descriptor
         # (IUPAC-standard 'trimethylbicyclo', was the non-standard
         # 'trimethyl-bicyclo'); both OPSIN-RT, the no-hyphen form is correct.
-        "(1R,5R)-4,7,7-trimethylbicyclo[3.1.1]hept-3-ene",
+        # Phase 170 WS-6 (DEF-7): P-14.4 von Baeyer numbering gives the ene + gem-
+        # dimethyl the lowest locants -> the actual alpha-pinene PIN. OPSIN-RT verified.
+        "(1R,5R)-2,6,6-trimethylbicyclo[3.1.1]hept-2-ene",
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](C)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -1803,7 +1809,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1CC(S)C(C)O1",  # heterocycle,small
-        "2,5-dimethyl-3-sulfanyloxolane",
+        # Phase 170 WS-4 (DEF-6): ring -SH is the principal group -> -thiol SUFFIX
+        # (P-33), not a sulfanyl prefix. OPSIN-RT verified.
+        "2,5-dimethyloxolane-3-thiol",
     ),
     (
         "NC(=O)CC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CS)C(=O)O",  # heterocycle,polyfunctional,medium
@@ -1927,7 +1935,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCc1cc(O)c(CC)c(=O)o1",  # aromatic,heterocycle,small
-        "3-ethyl-4-hydroxy-2-oxo-6-propyl-2H-pyran",
+        # Phase 170 WS-4 (DEF-6): ring -OH expressed as the -ol SUFFIX (P-33).
+        # OPSIN-RT verified (the 2-oxo remains a prefix as before).
+        "3-ethyl-2-oxo-6-propyl-2H-pyran-4-ol",
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2539,7 +2549,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1cnc(N)c(C)n1",  # aromatic,heterocycle,small
-        "3-amino-2,6-dimethylpyrazine",
+        # Phase 170 WS-4 (DEF-6): ring -NH2 is the principal group -> -amine SUFFIX
+        # (P-33), not an amino prefix. OPSIN-RT verified.
+        "2,6-dimethylpyrazin-3-amine",
     ),
     (
         "CCCCCCCCCCCCCO",  # acyclic,small
@@ -3045,9 +3057,10 @@ _OPSIN_LIMITATIONS: dict[str, str] = {
         "PERC-06: diol reclassified as non-polyfunctional (same parent class). "
         "Non-polyfunctional path drops second OH — Phase 131 assembly fix needed."
     ),
-    "N-heptanoyl(2S)-5-amino-3-oxoazole": (
+    "N-heptanoyl(2S)-5-aminoazol-3-one": (
         "Phase 139.1-01: middle fragment OH capping produces decomposed name for "
-        "heptanoyl-pyrrolidinone compound. OPSIN may not parse this format."
+        "heptanoyl-pyrrolidinone compound. OPSIN may not parse this format. "
+        "Phase 170 WS-4: ring ketone now -one suffix (still unparseable — pre-existing)."
     ),
     "(3R)-9-(1,3-dioxolan-5-yl)-3,7-dimethylnona-1,6-dien-3-ol": (
         "Phase 142-03: dioxolane ring correctly identified (was wrongly named as "

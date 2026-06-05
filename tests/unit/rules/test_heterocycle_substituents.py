@@ -37,19 +37,20 @@ class TestHeterocycleHalogens:
 
 
 class TestHeterocycleExistingPatterns:
-    """Existing patterns (amino, hydroxy, etc.) must not regress."""
+    """Ring principal characteristic groups are expressed as SUFFIXES (P-33),
+    not detachable prefixes. Phase 170 WS-4 / BBR-RSFX (DEF-6): the prior
+    `amino`/`hydroxy`-as-prefix forms were the defect the Blue Book audit flagged;
+    the PIN is the suffix form. Both corrected names OPSIN-round-trip."""
 
     def test_aminopyridine(self):
-        """3-aminopyridine: NH2 on pyridine."""
+        """4-aminopyridine: NH2 is the principal group -> -amine suffix (PIN)."""
         result = name_compound("Nc1ccncc1")
-        assert "amino" in result, f"Expected 'amino' in '{result}'"
+        assert result == "pyridin-4-amine", f"Expected 'pyridin-4-amine', got '{result}'"
 
     def test_hydroxypyridine(self):
-        """3-hydroxypyridine: OH on pyridine."""
+        """4-hydroxypyridine: OH is the principal group -> -ol suffix (PIN)."""
         result = name_compound("Oc1ccncc1")
-        assert "hydroxy" in result or "pyridinol" in result, (
-            f"Expected 'hydroxy' or 'pyridinol' in '{result}'"
-        )
+        assert result == "pyridin-4-ol", f"Expected 'pyridin-4-ol', got '{result}'"
 
 
 class TestUnsubstitutedHeterocycles:

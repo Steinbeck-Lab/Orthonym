@@ -18,10 +18,13 @@ Examples:
 
 from typing import List, Optional, Set, Tuple, Dict
 from collections import deque
+from functools import cmp_to_key
+from itertools import permutations
 from rdkit import Chem
 from rdkit.Chem import BondType
 
 from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms, find_ring_bridgeheads
+from .locants import compare_locant_sets
 
 
 # ============================================================================
@@ -462,9 +465,15 @@ def get_bicyclo_ring_atoms(mol) -> Optional[Set[int]]:
 # Bicyclo Numbering
 # ============================================================================
 
-def get_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
+def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> Optional[Dict[int, int]]:
     """
     Generate IUPAC numbering for a bicyclo system.
+
+    ``suffix_ring_atoms`` (WS-6 / BBR-RCON): ring atoms that bear the principal
+    characteristic group (e.g. the ring carbon double-bonded to =O of a ketone, or
+    the ring carbon bearing an exocyclic -OH). When given, the admissible numbering
+    that gives those atoms the lowest locants (after heteroatoms) is chosen per
+    P-14.4(c).
 
     IUPAC bicyclo numbering rules:
     1. Start at one bridgehead atom (position 1)
@@ -497,54 +506,131 @@ def get_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     if len(bridgeheads) != 2:
         return None
 
-    bh1, bh2 = bridgeheads[0], bridgeheads[1]
+    ring_atoms = get_bicyclo_ring_atoms(mol) or set()
+    suffix_set = {i for i in (suffix_ring_atoms or set()) if i in ring_atoms}
 
-    # Get all paths between bridgeheads
+    # WS-6 / BBR-RCON (DEF-7): enumerate the ADMISSIBLE von Baeyer numberings
+    # (P-23.2.3 keeps the descriptor: bridgeheads at 1 and 1+longest, main bridges
+    # before the secondary bridge) and pick the one with the lowest locants in
+    # P-14.4 order: heteroatoms -> principal-group suffix -> ene/yne -> substituents.
+    # The LEGACY topology-only numbering is candidate 0, so when every P-14.4 tier
+    # ties (unsubstituted / symmetric rings) it wins the stable sort and the output
+    # is byte-identical to before this change (regression containment).
+    candidates: List[Dict[int, int]] = []
+    legacy = _legacy_bicyclo_numbering(mol)
+    if legacy:
+        candidates.append(legacy)
+    candidates.extend(_enumerate_bicyclo_numberings(mol, bridgeheads))
+    if not candidates:
+        return None
+
+    # P-14.4 feature atom-sets (structural; derived from mol, version-stable).
+    hetero = {i for i in ring_atoms if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+    ring_multibonds = []
+    for b in mol.GetBonds():
+        a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if a1 in ring_atoms and a2 in ring_atoms and b.GetBondTypeAsDouble() >= 2.0:
+            ring_multibonds.append((a1, a2))
+    sub_bearing = set()
+    for i in ring_atoms:
+        if i in suffix_set:
+            continue  # the suffix atom is ranked in its own tier, not as a substituent
+        atom = mol.GetAtomWithIdx(i)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in ring_atoms and nbr.GetAtomicNum() > 1:
+                sub_bearing.add(i)
+                break
+
+    def _key_lists(a2l):
+        het = sorted(a2l[i] for i in hetero if i in a2l)
+        suf = sorted(a2l[i] for i in suffix_set if i in a2l)
+        ene = sorted(min(a2l[a], a2l[b]) for a, b in ring_multibonds if a in a2l and b in a2l)
+        sub = sorted(a2l[i] for i in sub_bearing if i in a2l)
+        return (het, suf, ene, sub)
+
+    def _cmp(x, y):
+        for sx, sy in zip(_key_lists(x), _key_lists(y)):
+            c = compare_locant_sets(sx, sy)
+            if c != 0:
+                return c
+        return 0
+
+    candidates.sort(key=cmp_to_key(_cmp))
+    return candidates[0]
+
+
+def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
+    """Pre-WS-6 topology-only numbering (bridgeheads[0] = C1; longest -> second ->
+    shortest bridge, all in bh1->bh2 path order). Preserved verbatim as the
+    tie-break default so unsubstituted / symmetric bicyclics stay byte-identical."""
+    bridgeheads = list(find_true_bridgeheads(mol))
+    if len(bridgeheads) != 2:
+        return None
+    bh1, bh2 = bridgeheads[0], bridgeheads[1]
     paths = find_bridge_paths(mol, bh1, bh2)
     if len(paths) != 3:
         return None
-
-    # Sort paths by length (longest first)
-    # Path length is the total path including bridgeheads
-    # Bridge length = path_length - 2
     paths_sorted = sorted(paths, key=lambda p: len(p), reverse=True)
-
-    # Assign locants
     atom_to_locant: Dict[int, int] = {}
     current_locant = 1
-
-    # Position 1 is first bridgehead
     atom_to_locant[bh1] = current_locant
     current_locant += 1
-
-    # Number along longest bridge (excluding bridgeheads already numbered)
-    longest_path = paths_sorted[0]
-    # The path goes bh1 -> ... -> bh2
-    # Number the middle atoms (not bh1 at start)
-    for atom_idx in longest_path[1:-1]:  # exclude both bridgeheads
+    for atom_idx in paths_sorted[0][1:-1]:
         atom_to_locant[atom_idx] = current_locant
         current_locant += 1
-
-    # The other bridgehead gets the next number
     atom_to_locant[bh2] = current_locant
     current_locant += 1
-
-    # Number along second longest bridge (excluding bridgeheads)
-    second_path = paths_sorted[1]
-    # This path also goes bh1 -> ... -> bh2, but we only number middle atoms
-    for atom_idx in second_path[1:-1]:  # exclude both bridgeheads
+    for atom_idx in paths_sorted[1][1:-1]:
         if atom_idx not in atom_to_locant:
             atom_to_locant[atom_idx] = current_locant
             current_locant += 1
-
-    # Number shortest bridge (excluding bridgeheads)
-    shortest_path = paths_sorted[2]
-    for atom_idx in shortest_path[1:-1]:  # exclude both bridgeheads
+    for atom_idx in paths_sorted[2][1:-1]:
         if atom_idx not in atom_to_locant:
             atom_to_locant[atom_idx] = current_locant
             current_locant += 1
-
     return atom_to_locant
+
+
+def _enumerate_bicyclo_numberings(mol, bridgeheads) -> List[Dict[int, int]]:
+    """All admissible von Baeyer numberings for a simple bicyclic (P-23.2.3):
+    start at either bridgehead; assign the 3 bridges to (first, second, third)
+    with non-increasing interior length (permuting only EQUAL-length bridges, so
+    the descriptor is preserved); number the first bridge start->other, the second
+    segment from the other (higher) bridgehead back, and the secondary bridge from
+    the start (bridgehead-1) side."""
+    bh_a, bh_b = bridgeheads[0], bridgeheads[1]
+    out: List[Dict[int, int]] = []
+    for start, other in ((bh_a, bh_b), (bh_b, bh_a)):
+        spaths = find_bridge_paths(mol, start, other)
+        if len(spaths) != 3:
+            continue
+        for perm in permutations(spaths):
+            lens = [len(p) - 2 for p in perm]
+            if not (lens[0] >= lens[1] >= lens[2]):
+                continue
+            first, second, third = perm
+            a2l: Dict[int, int] = {}
+            loc = 1
+            a2l[start] = loc
+            loc += 1
+            for idx in first[1:-1]:
+                if idx not in a2l:
+                    a2l[idx] = loc
+                    loc += 1
+            if other not in a2l:
+                a2l[other] = loc
+                loc += 1
+            for idx in reversed(second[1:-1]):  # second segment: from the higher bridgehead back
+                if idx not in a2l:
+                    a2l[idx] = loc
+                    loc += 1
+            for idx in third[1:-1]:  # secondary bridge: from the bridgehead-1 side
+                if idx not in a2l:
+                    a2l[idx] = loc
+                    loc += 1
+            if a2l and len(a2l) == len(set(a2l.values())):
+                out.append(a2l)
+    return out
 
 
 # ============================================================================
@@ -701,7 +787,7 @@ def detect_bicyclo_unsaturation(mol, ring_atoms: Set[int]) -> Dict:
 # Complete Bicyclo Naming Data
 # ============================================================================
 
-def get_complete_bicyclo_data(mol) -> Optional[Dict]:
+def get_complete_bicyclo_data(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> Optional[Dict]:
     """
     Generate complete bicyclo naming data including substituents and unsaturation.
 
@@ -729,8 +815,9 @@ def get_complete_bicyclo_data(mol) -> Optional[Dict]:
     if not ring_atoms:
         return None
 
-    # Get numbering
-    atom_to_locant = get_bicyclo_numbering(mol)
+    # Get numbering (WS-6: P-14.4-lowest among admissible numberings, given the
+    # principal-group ring atoms so the suffix takes the lowest locant)
+    atom_to_locant = get_bicyclo_numbering(mol, suffix_ring_atoms=suffix_ring_atoms)
     if not atom_to_locant:
         return None
 

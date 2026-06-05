@@ -108,22 +108,23 @@ class TestHeterocycleSubstituents:
         assert 'oxolan' in name, f"Expected 'oxolan' in '{name}'"
 
     def test_aminopyridine(self):
-        """Aminopyridine must contain 'amino' prefix."""
+        """Aminopyridine: NH2 is the principal group -> -amine SUFFIX (P-33, PIN).
+        Phase 170 WS-4 / DEF-6 corrected the prior 'amino'-prefix defect;
+        'pyridin-4-amine' OPSIN-round-trips."""
         name = name_compound('Nc1ccncc1')
-        assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'pyridine' in name, f"Expected 'pyridine' in '{name}'"
+        assert name == 'pyridin-4-amine', f"Expected 'pyridin-4-amine', got '{name}'"
 
     def test_methylpiperidine(self):
-        """Methylpiperidine must contain 'methyl' prefix."""
+        """Methylpiperidine must contain 'methyl' prefix (no principal group)."""
         name = name_compound('CC1CCCCN1')
         assert 'methyl' in name, f"Expected 'methyl' in '{name}'"
         assert 'piperidine' in name, f"Expected 'piperidine' in '{name}'"
 
     def test_aminooxane(self):
-        """Aminooxane must contain 'amino' prefix."""
+        """Aminooxane: NH2 is the principal group -> -amine SUFFIX (P-33, PIN).
+        Phase 170 WS-4 / DEF-6; 'oxan-4-amine' OPSIN-round-trips."""
         name = name_compound('NC1CCOCC1')
-        assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'oxane' in name, f"Expected 'oxane' in '{name}'"
+        assert name == 'oxan-4-amine', f"Expected 'oxan-4-amine', got '{name}'"
 
     def test_methyloxolane(self):
         """Methyloxolane must contain 'methyl' prefix."""
@@ -153,10 +154,11 @@ class TestRingSubstituentEdgeCases:
         assert 'oxolan' in name, f"Expected 'oxolan' in '{name}'"
 
     def test_hydroxypyridine(self):
-        """Hydroxypyridine must contain 'hydroxy' prefix."""
+        """Hydroxypyridine: OH is the principal group -> -ol SUFFIX (P-33, PIN).
+        Phase 170 WS-4 / DEF-6 corrected the prior 'hydroxy'-prefix defect;
+        'pyridin-4-ol' OPSIN-round-trips."""
         name = name_compound('Oc1ccncc1')
-        assert 'hydroxy' in name, f"Expected 'hydroxy' in '{name}'"
-        assert 'pyridine' in name, f"Expected 'pyridine' in '{name}'"
+        assert name == 'pyridin-4-ol', f"Expected 'pyridin-4-ol', got '{name}'"
 
     def test_methylindole_5(self):
         """5-methylindole must contain 'methyl' and '1H-indole'."""

@@ -2983,8 +2983,31 @@ def _assemble_complete_bicyclo_name(mol, features):
     for r in ri.AtomRings():
         ring_atoms.update(r)
 
+    # WS-6 / BBR-RCON (DEF-7): identify the ring atoms bearing the principal
+    # characteristic group so von Baeyer numbering gives the suffix the lowest
+    # locant (P-14.4(c)). Same extraction as the cyclo/heterocycle paths: a ring C
+    # whose FG-match heteroatom is exocyclic (the ketone carbonyl C, a C-OH, ...).
+    suffix_ring_atoms = set()
+    _pg = getattr(features, 'principal_group', None)
+    _fgs = getattr(features, 'functional_groups', None) or {}
+    if _pg and _pg in _fgs:
+        for match in _fgs[_pg]:
+            match_set = set(match)
+            for aidx in match:
+                if aidx not in ring_atoms:
+                    continue
+                a = mol.GetAtomWithIdx(aidx)
+                if a.GetSymbol() != 'C':
+                    continue
+                for nbr in a.GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if (nidx not in ring_atoms and nidx in match_set
+                            and nbr.GetSymbol() != 'C'):
+                        suffix_ring_atoms.add(aidx)
+                        break
+
     # Get complete bicyclo data
-    bicyclo_data = get_complete_bicyclo_data(mol)
+    bicyclo_data = get_complete_bicyclo_data(mol, suffix_ring_atoms=suffix_ring_atoms or None)
     if not bicyclo_data:
         # Fall back to simple naming
         fallback_name = name_bicyclo_system(mol)
@@ -3358,13 +3381,16 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
         )
 
     if substituents and atom_to_locant:
-        # Generate substituted name with N-locants and C-locants
+        # Generate substituted name with N-locants and C-locants.
+        # WS-4 / BBR-RSFX: pass the principal group so a senior FG on the ring is
+        # emitted as a suffix (-one/-ol/-amine), not a detachable prefix.
         return name_substituted_heterocycle(
             features.mol,
             features.principal_ring,
             parent_name,
             substituents,
-            atom_to_locant
+            atom_to_locant,
+            principal_group=getattr(features, 'principal_group', None)
         )
 
     # No substituents - return parent name directly

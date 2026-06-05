@@ -1905,19 +1905,47 @@ class Orthonym:
                                 sub_positions.add(idx)
                                 break
 
-                    # Orient considering substituents for lowest locants
+                    # WS-4 / BBR-RSFX (DEF-6): identify the ring atoms bearing the
+                    # principal characteristic group so the suffix gets the lowest
+                    # locant (P-14.4(c)), after the heteroatom. Same extraction as
+                    # the cycloalkene branch: a ring C whose FG-match heteroatom is
+                    # exocyclic (C=O ketone, C-OH alcohol/phenol, C-NH2 amine, ...).
+                    pg_ring_atoms = set()
+                    if (features.principal_group
+                            and features.principal_group in features.functional_groups):
+                        for match in features.functional_groups[features.principal_group]:
+                            match_set = set(match)
+                            for atom_idx in match:
+                                if atom_idx not in ring_set:
+                                    continue
+                                atom = features.mol.GetAtomWithIdx(atom_idx)
+                                if atom.GetSymbol() != 'C':
+                                    continue
+                                for nbr in atom.GetNeighbors():
+                                    nbr_idx = nbr.GetIdx()
+                                    if (nbr_idx not in ring_set
+                                            and nbr_idx in match_set
+                                            and nbr.GetSymbol() != 'C'):
+                                        pg_ring_atoms.add(atom_idx)
+                                        break
+
+                    # Orient considering heteroatoms, the principal group, then
+                    # other substituents for lowest locants (P-14.4 order).
                     oriented, atom_to_locant = orient_heterocycle_with_substituents(
-                        features.mol, features.principal_ring, sub_positions
+                        features.mol, features.principal_ring, sub_positions,
+                        principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
                     )
                     features.oriented_heterocycle = oriented
                     features.heterocycle_atom_to_locant = atom_to_locant
 
-                    # Get substituent details for naming
+                    # Get substituent details for naming; pass the principal group so
+                    # a senior FG on the ring is emitted as a SUFFIX, not a prefix.
                     features.heterocycle_substituents = get_heterocycle_substituents(
                         features.mol,
                         features.principal_ring,
                         oriented,
-                        atom_to_locant
+                        atom_to_locant,
+                        principal_group=features.principal_group
                     )
                 else:
                     # Non-benzene, non-heterocyclic ring: detect substituents and orient

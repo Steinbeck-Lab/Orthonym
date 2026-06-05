@@ -594,16 +594,22 @@ class TestBicycloDiketoneSuffix:
     before the consonant-initial '-dione' (IUPAC P-16.3.3)."""
 
     def test_bicyclo_diketone_names_both_carbonyls(self):
-        # Before the fix only the FIRST ketone was emitted ('...octan-3-one');
-        # now both are, with the 'di' multiplier and the terminal 'e' RETAINED
-        # before the consonant-initial '-dione' (IN-06 elision rule).
+        # Both carbonyls emitted with the 'di' multiplier; terminal 'e' RETAINED
+        # before the consonant-initial '-dione' (IN-06 / P-16.3.3 elision rule).
+        # Phase 170 WS-6 (DEF-7): von Baeyer numbering now obeys P-14.4, giving the
+        # carbonyls the LOWEST locants {2,6} (compare_locant_sets([2,6],[3,8]) < 0).
+        # The prior '3,8-dione' was the topology-only numbering the audit flagged
+        # (RT-valid but non-PIN). Verified: 'bicyclo[2.2.2]octane-2,6-dione'
+        # OPSIN-round-trips to the input.
         name = name_compound("O=C1CC2CCC1C(=O)C2")
-        assert name == "bicyclo[2.2.2]octane-3,8-dione"
+        assert name == "bicyclo[2.2.2]octane-2,6-dione"
         assert "dione" in name           # WR-03: both carbonyls multiplied
         assert "octane-" in name         # IN-06: parent 'e' kept before 'dione'
 
     def test_bicyclo_monoketone_elides_e(self):
-        # A single ring ketone keeps eliding the 'e' before the vowel-initial
-        # '-one' ('...heptan-3-one'), unchanged by the WR-03/IN-06 fix.
+        # A single ring ketone elides the 'e' before the vowel-initial '-one'.
+        # Phase 170 WS-6 (DEF-7): P-14.4 numbering gives the ketone the lowest
+        # locant (2, not the prior topology-only 3). This is the DEF-7 gold target
+        # () — PIN 'bicyclo[2.2.1]heptan-2-one'.
         name = name_compound("O=C1CC2CCC1C2")
-        assert name == "bicyclo[2.2.1]heptan-3-one"
+        assert name == "bicyclo[2.2.1]heptan-2-one"

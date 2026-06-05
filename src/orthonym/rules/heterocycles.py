@@ -239,15 +239,25 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
 def orient_heterocycle_with_substituents(
     mol,
     ring_atoms,
-    substituent_positions: Optional[Set[int]] = None
+    substituent_positions: Optional[Set[int]] = None,
+    principal_group_atoms: Optional[Set[int]] = None
 ) -> Tuple[List[int], Dict[int, int]]:
     """
-    Orient heterocycle considering both heteroatoms AND substituent positions.
+    Orient heterocycle considering heteroatoms, the principal characteristic
+    group, AND other substituent positions.
 
-    IUPAC Rule: For substituted heterocycles, after fixing the heteroatom at
-    position 1, choose the numbering direction that gives lowest locants to:
-    1. Other heteroatoms (if any)
-    2. Substituents (if heteroatom locants are equal)
+    IUPAC Rule (P-14.4 low-locant order, applied to a ring whose senior
+    heteroatom is fixed at position 1 per P-31.1.4.3.3): after fixing the
+    heteroatom at position 1, choose the numbering direction that gives lowest
+    locants to, IN THIS ORDER:
+    1. Other heteroatoms (if any)                          [P-31.1.4.3.3]
+    2. The principal characteristic group (suffix)         [P-14.4(c)]
+    3. Other substituents (if the above tie)               [P-14.4(g)]
+
+    ``principal_group_atoms`` is the set of RING atom indices that bear the
+    principal characteristic group (e.g. the ring carbon double-bonded to =O for
+    a ketone, or the ring carbon bearing -OH for an -ol). When None/empty the
+    behaviour is exactly the prior heteroatom-then-substituent order.
 
     Args:
         mol: RDKit Mol object
@@ -318,23 +328,29 @@ def orient_heterocycle_with_substituents(
     cw_hetero_locants = sorted([cw_map[idx] for idx, _ in heteroatoms if idx != start_idx])
     ccw_hetero_locants = sorted([ccw_map[idx] for idx, _ in heteroatoms if idx != start_idx])
 
-    hetero_comparison = _compare_locant_sets(cw_hetero_locants, ccw_hetero_locants)
+    # Tiered lowest-locant comparison in P-14.4 order:
+    #   (1) other heteroatoms  ->  (2) principal group (suffix)  ->  (3) substituents
+    # First point of difference wins (compare_locant_sets), exactly mirroring the
+    # carbocyclic orient_cycloalkene Path A (pg before generic substituents).
+    pg_set = principal_group_atoms or set()
 
-    if hetero_comparison < 0:
-        oriented = cw
-    elif hetero_comparison > 0:
-        oriented = ccw
-    else:
-        # Heteroatom locants are equal - compare substituent locants
-        cw_sub_locants = sorted([cw_map[idx] for idx in substituent_positions if idx in cw_map])
-        ccw_sub_locants = sorted([ccw_map[idx] for idx in substituent_positions if idx in ccw_map])
+    def _direction_key(loc_map):
+        hetero = sorted(loc_map[idx] for idx, _ in heteroatoms if idx != start_idx)
+        pg = sorted(loc_map[idx] for idx in pg_set if idx in loc_map)
+        sub = sorted(loc_map[idx] for idx in substituent_positions if idx in loc_map)
+        return hetero, pg, sub
 
-        sub_comparison = _compare_locant_sets(cw_sub_locants, ccw_sub_locants)
+    cw_h, cw_pg, cw_sub = _direction_key(cw_map)
+    ccw_h, ccw_pg, ccw_sub = _direction_key(ccw_map)
 
-        if sub_comparison <= 0:
-            oriented = cw
-        else:
-            oriented = ccw
+    cmp = _compare_locant_sets(cw_h, ccw_h)
+    if cmp == 0:
+        cmp = _compare_locant_sets(cw_pg, ccw_pg)
+    if cmp == 0:
+        cmp = _compare_locant_sets(cw_sub, ccw_sub)
+
+    # cmp <= 0 keeps cw (preserves the prior tie-goes-to-cw behaviour).
+    oriented = cw if cmp <= 0 else ccw
 
     atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(oriented, 1)}
     return oriented, atom_to_locant
@@ -719,7 +735,8 @@ def get_heterocycle_substituents(
     mol,
     ring_atoms,
     oriented_ring: List[int],
-    atom_to_locant: Dict[int, int]
+    atom_to_locant: Dict[int, int],
+    principal_group: Optional[str] = None
 ) -> Dict[int, List[Dict]]:
     """
     Find substituents attached to a heterocyclic ring.
@@ -759,6 +776,18 @@ def get_heterocycle_substituents(
     """
     from ..perception.chains import classify_substituent
     from ..perception.rings import get_containing_ring_system
+    from .seniority import get_prefix, get_suffix
+
+    # WS-4 / BBR-RSFX (DEF-6): when a senior characteristic group sits on the ring,
+    # express it as a SUFFIX (P-33), not a detachable prefix. We recognise the
+    # principal group GENERICALLY off the seniority tables: a no-carbon substituent
+    # whose prefix form equals get_prefix(principal_group) AND whose class has a ring
+    # suffix form (get_suffix(..., is_ring=True)) is the principal-group suffix
+    # (oxo->one, hydroxy->ol, amino->amine, sulfanyl->thiol, ...). Subordinate
+    # same-prefix groups keep the prefix because only the principal group's prefix
+    # matches. No per-FG `if`.
+    pg_prefix = get_prefix(principal_group) if principal_group else None
+    pg_ring_suffix = get_suffix(principal_group, is_ring=True) if principal_group else None
 
     # Use the complete ring system as BFS boundary (IUPAC P-25.3)
     # This prevents walking into fused partner rings (e.g., caffeine's
@@ -816,11 +845,27 @@ def get_heterocycle_substituents(
                 'is_ring': is_ring,
                 'ring_name': ring_name,
             }
-            if hetero_sub_name:
-                sub_info['hetero_name'] = hetero_sub_name
-            if suffix_info:
+            # WS-4 / BBR-RSFX (DEF-6): is THIS no-carbon group the principal group?
+            # If its prefix form matches the principal group's prefix and that class
+            # has a ring suffix, emit it as the suffix (-one/-ol/-amine/...) instead
+            # of a prefix. The matched ring-suffix takes priority over carbon-suffix
+            # detection (suffix_info), since the principal group is, by seniority,
+            # senior to or equal to those.
+            is_principal_suffix = (
+                pg_ring_suffix is not None
+                and hetero_sub_name is not None
+                and hetero_sub_name == pg_prefix
+            )
+
+            if is_principal_suffix:
                 sub_info['is_suffix'] = True
-                sub_info['suffix_name'] = suffix_info['suffix_name']
+                sub_info['suffix_name'] = pg_ring_suffix
+            else:
+                if hetero_sub_name:
+                    sub_info['hetero_name'] = hetero_sub_name
+                if suffix_info:
+                    sub_info['is_suffix'] = True
+                    sub_info['suffix_name'] = suffix_info['suffix_name']
 
             if locant not in substituents:
                 substituents[locant] = []
@@ -971,7 +1016,8 @@ def name_substituted_heterocycle(
     ring_atoms,
     parent_name: str,
     substituents: Dict[int, List[Dict]],
-    atom_to_locant: Dict[int, int]
+    atom_to_locant: Dict[int, int],
+    principal_group: Optional[str] = None
 ) -> str:
     """
     Assemble complete name for a substituted heterocycle.
@@ -1150,17 +1196,25 @@ def name_substituted_heterocycle(
 
     # Add suffix-type functional groups
     if suffix_fg:
-        # Pick highest-priority suffix
+        from .seniority import get_suffix as _get_ring_suffix
+        # WS-4 / BBR-RSFX: the PRINCIPAL group's ring suffix wins (it is, by
+        # seniority, senior to any co-present carb* suffix). Otherwise fall back
+        # to the fixed carb* priority list.
+        pg_ring_suffix = _get_ring_suffix(principal_group, is_ring=True) if principal_group else None
         _SUFFIX_PRIORITY = [
             'carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde',
         ]
         chosen_suffix = None
         chosen_locants = []
-        for suf in _SUFFIX_PRIORITY:
-            if suf in suffix_fg:
-                chosen_suffix = suf
-                chosen_locants = sorted(suffix_fg[suf])
-                break
+        if pg_ring_suffix and pg_ring_suffix in suffix_fg:
+            chosen_suffix = pg_ring_suffix
+            chosen_locants = sorted(suffix_fg[pg_ring_suffix])
+        if not chosen_suffix:
+            for suf in _SUFFIX_PRIORITY:
+                if suf in suffix_fg:
+                    chosen_suffix = suf
+                    chosen_locants = sorted(suffix_fg[suf])
+                    break
         if not chosen_suffix:
             chosen_suffix = next(iter(suffix_fg))
             chosen_locants = sorted(suffix_fg[chosen_suffix])
@@ -1168,7 +1222,15 @@ def name_substituted_heterocycle(
         count = len(chosen_locants)
         multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
-        combined = f"{combined}-{locant_str}-{multiplier}{chosen_suffix}"
+        suffix_token = f"{multiplier}{chosen_suffix}"
+        # IUPAC P-16.3.3: elide the parent's terminal 'e' before a suffix token
+        # that begins with a vowel (piperidine -> piperidin-4-one,
+        # pyridine -> pyridin-2-ol). A consonant-initial token (multiplied
+        # 'dione'/'triol', or 'carb*') keeps the 'e' (piperidine-2,6-dione,
+        # pyridine-3-carbaldehyde).
+        if combined and combined[-1] == 'e' and suffix_token[:1].lower() in 'aeiouy':
+            combined = combined[:-1]
+        combined = f"{combined}-{locant_str}-{suffix_token}"
 
         # Remaining suffix FGs become prefixes (carboxy, formyl, etc.)
         _SUFFIX_TO_PREFIX = {
