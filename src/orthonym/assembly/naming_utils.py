@@ -729,6 +729,19 @@ def _wrap_n_substituent(name: str) -> str:
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 
+    BBR-HYG(e) / DEF-8 inventory (Phase 169.7 — begin; consolidation lands in
+    BBR-ASM / Phase 171). This is the ONE correct substituent-prefix + needs-parens
+    reference (P-16.3.5 / P-16.3.3). Phase 171 consolidates the divergent
+    needs-parens / enclosing-mark / prefix-assembly predicates onto THIS function;
+    do NOT add a 4th. The divergent predicates as of 169.7:
+      - rules/amides.py:32           _has_positional_locants(name)   (digit-only locant test)
+      - assembly/naming_utils.py:525 is_complex_substituent(name)    (complex-substituent test)
+      - assembly/naming_utils.py:461 apply_enclosing_marks(name, depth)
+      - rules/ortho_fused.py:505     format_substituent_prefix(substituents)  (different signature)
+    They DISAGREE today (e.g. on 'trifluoromethyl'/'tert-butyl': is_complex_substituent
+    True but _has_positional_locants False) — see
+    tests/unit/assembly/test_needs_parens_consolidation.py (xfail-strict tripwire).
+
     Produces a formatted substituent prefix ready for insertion into an
     IUPAC name. Handles simple and complex substituents differently:
     - Simple: locants + multiplier + name (e.g., '2,2-dimethyl')

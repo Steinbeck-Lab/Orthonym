@@ -1,9 +1,18 @@
 """
-Tests verifying DATA-01: hydroperoxide outranks thiol in IUPAC P-43 Table 5.1 seniority.
+Tests verifying the thiol-vs-hydroperoxide seniority (BBR-HYG/D-09, Phase 169.7).
 
-Per IUPAC 2013 Blue Book P-43, hydroperoxide (Class 19) has higher seniority than
-thiol (Class 20). This means for molecules containing both -SH and -OOH, the
-principal characteristic group should be hydroperoxide, not thiol.
+CORRECTION: the prior version of this file asserted the INVERSE (hydroperoxide
+outranks thiol, mis-citing "P-43 Table 5.1 Class 19/20"). That was the audit's
+DISC-04 inversion bug. Per IUPAC 2013 Blue Book P-41 Table 4.1 (BlueBookV2 lines
+~18190-18191, verbatim):
+
+    17  Hydroxy compounds and chalcogen analogues  (alcohols, phenols, -ol, -thiol,
+        -selenol, -tellurol)
+    18  Hydroperoxides (peroxols), i.e. -OOH
+
+so class 17 (hydroxy + thiol/selenol/tellurol) is SENIOR to class 18 (hydroperoxide).
+The 169.7 swap moved hydroperoxide BELOW the chalcogen-ols; these tests now assert
+the corrected order.
 """
 import pytest
 from rdkit import Chem
@@ -13,55 +22,46 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 
 class TestHydroperoxideThiolSeniority:
-    """Verify hydroperoxide is ranked above thiol in SENIORITY_ORDER."""
+    """Verify thiol/selenol (class 17) are ranked ABOVE hydroperoxide (class 18)."""
 
-    def test_hydroperoxide_before_thiol_in_order(self):
-        """Hydroperoxide must have a lower index (higher seniority) than thiol."""
-        hp_idx = SENIORITY_ORDER.index("hydroperoxide")
+    def test_thiol_before_hydroperoxide_in_order(self):
+        """Thiol (class 17) must have a lower index (higher seniority) than
+        hydroperoxide (class 18) — P-41 Table 4.1."""
         th_idx = SENIORITY_ORDER.index("thiol")
-        assert hp_idx < th_idx, (
-            f"hydroperoxide (idx={hp_idx}) should come before thiol (idx={th_idx})"
-        )
-
-    def test_hydroperoxide_before_selenol_in_order(self):
-        """Hydroperoxide must also outrank selenol (which is below thiol)."""
         hp_idx = SENIORITY_ORDER.index("hydroperoxide")
-        se_idx = SENIORITY_ORDER.index("selenol")
-        assert hp_idx < se_idx, (
-            f"hydroperoxide (idx={hp_idx}) should come before selenol (idx={se_idx})"
+        assert th_idx < hp_idx, (
+            f"thiol (idx={th_idx}) should come before hydroperoxide (idx={hp_idx})"
         )
 
-    def test_combined_sh_ooh_selects_hydroperoxide(self):
-        """For a molecule with both -SH and -OOH, principal group = hydroperoxide."""
-        # 2-(hydroperoxy)ethanethiol: OOCCS
-        smiles = "OOCCS"
+    def test_selenol_before_hydroperoxide_in_order(self):
+        """Selenol (class 17 chalcogen analogue) also outranks hydroperoxide."""
+        se_idx = SENIORITY_ORDER.index("selenol")
+        hp_idx = SENIORITY_ORDER.index("hydroperoxide")
+        assert se_idx < hp_idx, (
+            f"selenol (idx={se_idx}) should come before hydroperoxide (idx={hp_idx})"
+        )
+
+    def test_combined_sh_ooh_selects_thiol(self):
+        """For a molecule with both -SH and -OOH, the principal group is THIOL
+        (class 17), with -OOH expressed as the hydroperoxy prefix (P-41 Table 4.1)."""
+        smiles = "OOCCS"  # 2-hydroperoxyethane-1-thiol
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, f"Failed to parse SMILES: {smiles}"
         fgs = detect_functional_groups(mol)
         principal, matches = get_principal_group(mol, fgs)
-        assert principal == "hydroperoxide", (
-            f"Expected 'hydroperoxide' as principal group, got '{principal}'. "
-            f"Detected FGs: {list(fgs.keys())}"
+        assert principal == "thiol", (
+            f"Expected 'thiol' (class 17, senior to hydroperoxide class 18) as "
+            f"principal group, got '{principal}'. Detected FGs: {list(fgs.keys())}"
         )
 
     def test_pure_thiol_still_selects_thiol(self):
         """Ethanethiol (CCS) should still select thiol as principal group."""
-        smiles = "CCS"
-        mol = Chem.MolFromSmiles(smiles)
-        assert mol is not None
-        fgs = detect_functional_groups(mol)
-        principal, matches = get_principal_group(mol, fgs)
-        assert principal == "thiol", (
-            f"Expected 'thiol' as principal group, got '{principal}'"
-        )
+        fgs = detect_functional_groups(Chem.MolFromSmiles("CCS"))
+        principal, _ = get_principal_group(Chem.MolFromSmiles("CCS"), fgs)
+        assert principal == "thiol"
 
     def test_pure_hydroperoxide_selects_hydroperoxide(self):
-        """Ethyl hydroperoxide (CCOO) should select hydroperoxide as principal group."""
-        smiles = "CCOO"
-        mol = Chem.MolFromSmiles(smiles)
-        assert mol is not None
-        fgs = detect_functional_groups(mol)
-        principal, matches = get_principal_group(mol, fgs)
-        assert principal == "hydroperoxide", (
-            f"Expected 'hydroperoxide' as principal group, got '{principal}'"
-        )
+        """Ethyl hydroperoxide (CCOO) should still select hydroperoxide."""
+        fgs = detect_functional_groups(Chem.MolFromSmiles("CCOO"))
+        principal, _ = get_principal_group(Chem.MolFromSmiles("CCOO"), fgs)
+        assert principal == "hydroperoxide"

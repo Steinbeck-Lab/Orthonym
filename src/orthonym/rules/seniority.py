@@ -121,10 +121,15 @@ SENIORITY_ORDER = [
     "phenol",
     "enol",
     "alcohol",         # PERC-05: generic catch-all, same seniority tier as other alcohols
-    "hydroperoxide",   # IUPAC P-43 Table 5.1: Class 19 (higher than thiol)
+    # Class 17 "Hydroxy compounds and chalcogen analogues" (alcohols/phenols/thiol/
+    # selenol/tellurol) — all senior to class 18 hydroperoxide. BBR-HYG/DEF-D-09 (169.7):
+    # hydroperoxide MOVED below the chalcogen-ols (was incorrectly above thiol with a
+    # factually-wrong "Class 19" comment). Verified BlueBookV2 P-41 Table 4.1 lines
+    # ~18190-18191: "17 Hydroxy compounds and chalcogen analogues" then "18 Hydroperoxides".
     "thiol",
     "selenol",
     "tellurol",        # BBR-PERC (169.7): Te analogue of -ol/-selenol (P-63.1.5)
+    "hydroperoxide",   # P-41 Table 4.1 class 18 (peroxol -OOH); junior to class-17 hydroxy/thiol
 
     # Hydroxylamines (BBR-PERC, 169.7: P-68.3 class 21; ranked just above amines)
     "hydroxylamine",

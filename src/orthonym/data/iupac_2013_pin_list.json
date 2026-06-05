@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 105,
+  "total_entries": 109,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},
@@ -108,6 +108,10 @@
     {"name": "aspirin", "smiles": "CC(=O)Oc1ccccc1C(=O)O", "pin": false, "citation": "P-65.6.3.2", "note": "Phase 167 HYG-03: brand name, not IUPAC; PIN is 2-acetyloxybenzoic acid (acetyloxy is the PIN acyloxy form per P-65.6.3.2). OPSIN-RT-verified."},
     {"name": "ethylene glycol", "smiles": "OCCO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: acceptable in general nomenclature but not the PIN; PIN is ethane-1,2-diol. OPSIN-RT-verified."},
     {"name": "propylene glycol", "smiles": "CC(O)CO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: not the PIN; PIN is propane-1,2-diol. OPSIN-RT-verified."},
-    {"name": "neopentyl glycol", "smiles": "CC(C)(CO)CO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: deprecated glycol name; PIN is 2,2-dimethylpropane-1,3-diol. OPSIN-RT-verified."}
+    {"name": "neopentyl glycol", "smiles": "CC(C)(CO)CO", "pin": false, "citation": "P-66.6.3", "note": "Phase 167 HYG-03: deprecated glycol name; PIN is 2,2-dimethylpropane-1,3-diol. OPSIN-RT-verified."},
+    {"name": "styrene", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: retained name acceptable only in general nomenclature; the PIN is ethenylbenzene (BlueBookV2 line 2002, verbatim). Deny so PIN style emits the systematic name. OPSIN-RT-verified."},
+    {"name": "styrol", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: OPSIN-imported synonym of styrene; not the PIN (ethenylbenzene). Deny alongside styrene/vinylbenzene so the systematic PIN emerges."},
+    {"name": "vinylbenzene", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: acceptable substitutive name in general nomenclature (BlueBookV2 line 2002) but NOT the PIN; the PIN is ethenylbenzene. Deny so PIN style emits ethenylbenzene."},
+    {"name": "carbon tetrachloride", "smiles": "ClC(Cl)(Cl)Cl", "pin": false, "citation": "P-21.1", "note": "Phase 169.7 BBR-HYG: traditional name, not the PIN; the PIN is tetrachloromethane (substitutive halide naming). Deny so PIN style emits the systematic name. OPSIN-RT-verified."}
   ]
 }
