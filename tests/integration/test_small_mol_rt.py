@@ -520,10 +520,13 @@ class TestOther:
         assert "biphenyl" in name or "phenyl" in name
 
     def test_082_tert_butylphenylacetic_acid(self):
-        """#82: CC(C)(C)c1ccc(CC(=O)O)cc1 -> 2-(4-(tert-butyl)phenyl)ethanoic acid [RT]."""
+        """#82: CC(C)(C)c1ccc(CC(=O)O)cc1 -> 2-(4-tert-butylphenyl)ethanoic acid [RT].
+
+        Phase 171 P-16.3.4: tert-butyl is a simple substituent — no enclosing marks.
+        """
         assert name_compound(
             "CC(C)(C)c1ccc(CC(=O)O)cc1"
-        ) == "2-(4-(tert-butyl)phenyl)ethanoic acid"
+        ) == "2-(4-tert-butylphenyl)ethanoic acid"
 
 
 # ============================================================================

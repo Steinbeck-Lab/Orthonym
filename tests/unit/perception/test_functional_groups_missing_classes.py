@@ -67,11 +67,11 @@ def test_chalcogen_ether_negatives(smi):
 
 @pytest.mark.unit
 def test_selenide_ships_and_round_trips(namer):
-    # 169.7 delivers perception + (methylselanyl) naming + locant + shipping
-    # (the gold-exact enclosing parens are Phase 171 / DEF-8 — see gold tripwire).
+    # 169.7 delivered perception + (methylselanyl) naming + locant; Phase 171 BBR-ASM
+    # added the gold-exact enclosing parens (selanyl/tellanyl now classed complex).
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     name = namer.name("CCC[Se]C")
-    assert name == "1-methylselanylpropane"
+    assert name == "1-(methylselanyl)propane"
     assert opsin_roundtrip_check("CCC[Se]C", name)["passed"]
 
 

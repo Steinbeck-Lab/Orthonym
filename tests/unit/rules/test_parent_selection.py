@@ -1845,22 +1845,23 @@ class TestTotalRingAtomMetric:
 
 @pytest.mark.unit
 class TestNoPGSizeComparison:
-    """Tests for the hydrocarbon (no principal group) path.
+    """Tests for the hydrocarbon (no principal group) ring-vs-chain path.
 
-    IUPAC P-44.1.2.2: When no principal group is present, the ring-vs-chain
-    comparison should still consider size. Ring wins on tie.
-
-    Current bug: no-PG path unconditionally returns ring, even when chain
-    is much longer (e.g., cyclopropane + decane).
+    IUPAC P-44.1.2.2 (CORRECTED — Phase 171 DEF-1): a ring or ring system is
+    senior to a chain REGARDLESS of the number of skeletal atoms. The ring is
+    ALWAYS the parent in the no-PG hydrocarbon case (heptylbenzene, not
+    1-phenylheptane). The earlier tests in this class asserted "chain wins when
+    much longer" citing P-44.3(a) — that was the size-gate BUG the V20 Blue Book
+    audit (DEF-1) identified (the code mis-cited P-44.3); deleting the
+    `len(ring) >= chain_len` gate is the fix. These tests now assert ring-wins.
     """
 
-    def test_cyclopropane_decane_chain_wins(self):
+    def test_cyclopropane_decane_ring_wins(self):
         """Cyclopropane (3 atoms) + decane (10 atoms), no PG.
 
-        Current: ring wins unconditionally (no size comparison).
-        Correct: chain (10) > ring (3) -> chain should be parent.
-
-        IUPAC P-44.3(a): chain is longer -> chain is parent.
+        P-44.1.2.2: ring is senior to a chain REGARDLESS of size -> the ring
+        (cyclopropane) is the parent: decylcyclopropane (OPSIN-RT-verified), NOT
+        1-cyclopropyldecane. (Was the DEF-1 size-gate bug: 'chain wins when longer'.)
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CC1CCCCCCCCCC'
@@ -1868,9 +1869,9 @@ class TestNoPGSizeComparison:
         assert pg is None or not pa, "No principal group expected"
 
         result = select_parent(mol, ring_systems, chain, pg, pa)
-        assert result.parent_type == 'chain', (
-            f"Cyclopropane (3) + decane (10): chain should win. "
-            f"Got: {result.parent_type} -- {result.reasoning}"
+        assert result.parent_type == 'ring', (
+            f"Cyclopropane (3) + decane (10): ring is senior regardless of size "
+            f"(P-44.1.2.2). Got: {result.parent_type} -- {result.reasoning}"
         )
 
     def test_cyclohexane_ethyl_ring_wins(self):
@@ -1909,13 +1910,11 @@ class TestNoPGSizeComparison:
             f"Got: {result.parent_type} -- {result.reasoning}"
         )
 
-    def test_cyclobutane_octane_chain_wins(self):
+    def test_cyclobutane_octane_ring_wins(self):
         """Cyclobutane (4 atoms) + octane (8 atoms), no PG.
 
-        Current: ring wins unconditionally.
-        Correct: chain (8) > ring (4) -> chain should be parent.
-
-        IUPAC P-44.3(a).
+        P-44.1.2.2: ring senior regardless of size -> octylcyclobutane
+        (OPSIN-RT-verified), NOT 1-cyclobutyloctane. (Was the DEF-1 size-gate bug.)
         """
         mol, ring_systems, chain, pg, pa, all_ring = _setup_parent_selection(
             'C1CCC1CCCCCCCC'
@@ -1923,9 +1922,9 @@ class TestNoPGSizeComparison:
         assert pg is None or not pa, "No principal group expected"
 
         result = select_parent(mol, ring_systems, chain, pg, pa)
-        assert result.parent_type == 'chain', (
-            f"Cyclobutane (4) + octane (8): chain should win. "
-            f"Got: {result.parent_type} -- {result.reasoning}"
+        assert result.parent_type == 'ring', (
+            f"Cyclobutane (4) + octane (8): ring senior regardless of size "
+            f"(P-44.1.2.2). Got: {result.parent_type} -- {result.reasoning}"
         )
 
 

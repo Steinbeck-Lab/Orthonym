@@ -553,7 +553,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)(C)c1ccc(CC(=O)O)cc1",
-        "2-(4-(tert-butyl)phenyl)ethanoic acid",
+        "2-(4-tert-butylphenyl)ethanoic acid",  # P-16.3.4 (Phase 171): tert-butyl is simple, no enclosing marks
     ),
     (
         r"CCCCC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O",
@@ -1983,7 +1983,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCC(C)CI",  # acyclic,small
-        "iodo-2-methylundecane",
+        "1-iodo-2-methylundecane",  # P-14.3.4 (Phase 171 DEF-4): locant-1 cited on multi-substituent parent
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium

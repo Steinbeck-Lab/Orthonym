@@ -111,14 +111,28 @@ class TestPrefixContext:
             is_monosubstituted=False,
         ) is False
 
-    def test_monosubstituted_chain_at_pos1_omits(self):
-        """Monosubstituted chain at position 1: omit locant."""
+    def test_monosubstituted_ethane_at_pos1_omits(self):
+        """Monosubstituted ETHANE (chain_length==2): omit locant — both carbons are
+        equivalent so there is a single monosubstitution product (chloroethane).
+        P-14.3.4 (Phase 171 DEF-4)."""
+        assert should_omit_locant_one(
+            context="prefix",
+            is_ring=False,
+            is_monosubstituted=True,
+            chain_length=2,
+        ) is True
+
+    def test_monosubstituted_longer_chain_at_pos1_cites(self):
+        """Monosubstituted chain length >= 3 at position 1: CITE the locant. The
+        terminal position is distinguishable from interior positions
+        (1-chloropropane != 2-chloropropane; 1-chloropentane is the PIN). P-14.3.4
+        (Phase 171 DEF-4 — the old `chain_length > 1` rule wrongly elided these)."""
         assert should_omit_locant_one(
             context="prefix",
             is_ring=False,
             is_monosubstituted=True,
             chain_length=5,
-        ) is True
+        ) is False
 
     def test_polysubstituted_chain_keeps(self):
         """Multiple substituents on chain: keep locants."""
