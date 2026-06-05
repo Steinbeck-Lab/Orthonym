@@ -57,8 +57,10 @@ class TestBenzeneRetainedNames:
 
     @pytest.mark.unit
     def test_styrene(self):
-        """Ethenylbenzene should return retained name 'styrene'."""
-        assert name_compound("C=Cc1ccccc1") == "styrene"
+        """In PIN style the systematic 'ethenylbenzene' is emitted, NOT the retained
+        'styrene' (BBR-HYG, Phase 169.7; P-31.1.3.4, BlueBookV2 line 2002: styrene is
+        retained for general nomenclature only, ethenylbenzene is the PIN)."""
+        assert name_compound("C=Cc1ccccc1") == "ethenylbenzene"
 
     @pytest.mark.unit
     def test_cumene(self):

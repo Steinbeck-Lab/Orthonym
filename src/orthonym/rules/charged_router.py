@@ -89,6 +89,19 @@ from ..perception.ions import get_ion_sites, _get_internal_charge_atoms
 # =============================================================================
 _MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
 
+# BBR-CHG-169.6-caveats (Phase 169.7): canonical SMILES of retained charged species
+# that LACK a valid systematic PIN — their neutralize->re-name chokepoint path yields
+# an OPSIN-unparseable form (the 169.6 'unknown'/wrong-retained regression). These use
+# their sanctioned retained name (P-72/P-73/P-74). NARROW by design: alkoxides and
+# carboxylate (poly)anions have valid systematic PINs (SUB-01 -olate / deferred -ate)
+# and are NOT here, so GUARD 1/2 routing is preserved. Add a species here ONLY if its
+# chokepoint systematic form is genuinely OPSIN-unparseable (verify before adding).
+_RETAINED_FIRST_CHARGED = frozenset({
+    '[SH3+]',                                     # sulfonium (P-73.1.1.1)
+    'N[O-]',                                      # aminoxide (P-74)
+    'O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F',     # bistriflimide (P-72)
+})
+
 
 # =============================================================================
 # GUARD 3 — element seniority for a skeletal (non-O, on-the-atom) charge.
@@ -620,19 +633,21 @@ def route_charged(mol, style: str = 'pin') -> str:
     if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
-    # --- Step 2b (BBR-CHG-169.6-caveats, Phase 169.7): consult the charged
-    # retained-name lookup FIRST. A sanctioned retained cation/anion name
-    # (sulfonium P-73.1.1.1, aminoxide/bistriflimide P-72/P-74) must take precedence
-    # over the neutralize -> re-name -> re-apply-suffix path, which produced an
-    # OPSIN-unparseable systematic form that the SUB-03 gate then suppressed to
-    # 'unknown' (the documented 169.6 regression, audit Dim-08 §B Cause 1). There is
-    # no rule forcing systematic re-derivation over a retained name. RT-safe by
-    # construction (every entry is RT-verified).
-    from ..data.ion_retained_names import get_cation_name, get_anion_name
+    # --- Step 2b (BBR-CHG-169.6-caveats, Phase 169.7): retained-name-first ONLY for
+    # the CATEGORY of retained charged species that LACK a valid systematic PIN — i.e.
+    # whose neutralize -> re-name -> re-apply-suffix path produces an OPSIN-unparseable
+    # systematic form that the SUB-03 gate then suppresses to 'unknown' (the documented
+    # 169.6 regression, audit Dim-08 §B Cause 1; sulfonium P-73.1.1.1, aminoxide/
+    # bistriflimide P-72/P-74). This is DELIBERATELY NARROW: species WITH a valid
+    # systematic PIN that the chokepoint already produces — alkoxides (-> -olate, the
+    # SUB-01 systematic) and carboxylate (poly)anions (-> deferred -ate) — are NOT here
+    # and keep their 169.6 chokepoint/defer routing (GUARD 1/2). RT-safe by construction.
     _canon = Chem.MolToSmiles(mol)
-    _retained = get_cation_name(_canon) or get_anion_name(_canon)
-    if _retained:
-        return _retained
+    if _canon in _RETAINED_FIRST_CHARGED:
+        from ..data.ion_retained_names import get_cation_name, get_anion_name
+        _retained = get_cation_name(_canon) or get_anion_name(_canon)
+        if _retained:
+            return _retained
 
     # --- Step 3: enumerate + classify ionic / radical centers.
     sites = get_ion_sites(mol)  # excludes internal nitro/azide/N-oxide/diazo (P-59)
