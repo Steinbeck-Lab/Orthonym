@@ -219,6 +219,20 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             return None
 
     # ----------------------------------------------------------------
+    # Gate 2b (BBR-PERC/DEF-3, Phase 169.7): no prefix-only characteristic-group
+    # atoms. Azide / diazo / nitroso / nitrite / nitro / N-oxide heteroatoms are
+    # characteristic groups (P-59 / P-65.5 / P-61), NOT chain skeletal atoms —
+    # skeletal replacement must not walk them into an aza/oxa chain (e.g.
+    # CN=[N+]=[N-] -> wrong '2,3-diazabutane'; should be 'azidomethane' via the
+    # substitutive azido prefix). This is the STRUCTURAL gate (CONTEXT D-04):
+    # derived from perception's own FG matches, NOT an extension of the per-FG
+    # _PRIORITY_FG_SMARTS blocklist above.
+    # ----------------------------------------------------------------
+    from ..perception.functional_groups import get_chain_excluded_atoms
+    if get_chain_excluded_atoms(mol):
+        return None
+
+    # ----------------------------------------------------------------
     # Gate 3: Check terminal functional groups
     # Terminal OH is allowed (suffix integration). Other terminal FGs
     # (NH2, SH) cause fallback to substitutive naming.

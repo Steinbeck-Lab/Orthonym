@@ -800,7 +800,15 @@ def select_parent(
         # Phase 91.1 lesson: skeletal chain must go through the FULL cascade.
         # Guard 4: bridging heteroatom prevents picking up terminal FG atoms.
         candidate_chain = principal_chain
-        skeletal_chain = find_longest_skeletal_chain(mol, exclude_atoms=all_ring_atoms)
+        # BBR-PERC/DEF-3 (169.7): union the prefix-only FG atoms (azide/diazo/nitroso/
+        # nitrite/nitro/N-oxide) into the chain-walk exclusion so they are never absorbed
+        # into a parent skeletal chain (P-59/P-65.5/P-61). chains.py stays a pure graph
+        # walker; FG-awareness lives here, at the parent-selection boundary (audit Dim-02 D-3).
+        from ..perception.functional_groups import get_chain_excluded_atoms
+        _fg_excluded = get_chain_excluded_atoms(mol)
+        skeletal_chain = find_longest_skeletal_chain(
+            mol, exclude_atoms=all_ring_atoms | _fg_excluded
+        )
         if (skeletal_chain
                 and len(skeletal_chain) > len(principal_chain)
                 and principal_group_atoms

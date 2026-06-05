@@ -168,6 +168,21 @@ SENIORITY_ORDER = [
     "primary_phosphine",
 ]
 
+# BBR-PERC/DEF-3 (Phase 169.7): groups present in SENIORITY_ORDER for ranking but
+# which are ALWAYS detachable prefixes — never a principal (suffix) group (P-33).
+# get_principal_group skips these so a prefix-only-only molecule is named with the
+# group as a prefix (azidomethane) instead of dropping it. These mirror the
+# "Pseudohalides and special groups (prefix-only)" block in SENIORITY_ORDER above.
+_PREFIX_ONLY_PRINCIPAL = frozenset({
+    "azido",         # P-65.5
+    "azo",           # P-67.2
+    "cyanate",       # P-65.5
+    "thiocyanate",   # P-65.5
+    "diazo",         # P-61.5
+    "disulfide",     # P-63.6.2
+    "hydrazine_fg",  # P-62.4
+})
+
 # ASML-18 / D-08: Map subtypes to canonical parent for seniority comparison.
 # IUPAC P-65.1: All alcohol types have equal seniority; all amine types have equal seniority.
 # Used only in get_principal_group() for equalization; SENIORITY_ORDER stays intact per D-09.
@@ -450,6 +465,17 @@ def get_principal_group(
     """
     for fg_name in SENIORITY_ORDER:
         if fg_name in functional_groups and functional_groups[fg_name]:
+            # BBR-PERC/DEF-3 (169.7): a principal characteristic group MUST be
+            # suffix-capable (P-33). The pseudohalide / special prefix-only groups
+            # (azido/azo/cyanate/thiocyanate/diazo/disulfide/hydrazine) are kept in
+            # SENIORITY_ORDER for RANKING but can never be the principal group — they
+            # are always detachable prefixes (P-59/P-65.5/P-61/P-62.4/P-63.6.2/P-67.2).
+            # Skipping them here makes a molecule whose ONLY group is prefix-only return
+            # (None, []), so the FG is emitted as a prefix (e.g. azidomethane) instead
+            # of being consumed-as-principal-then-dropped (-> bare 'methane'). Matches
+            # this function's contract: "the group that will be expressed as a suffix".
+            if fg_name in _PREFIX_ONLY_PRINCIPAL:
+                continue
             return fg_name, functional_groups[fg_name]
 
     return None, []

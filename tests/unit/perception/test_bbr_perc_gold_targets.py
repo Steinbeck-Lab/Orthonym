@@ -35,15 +35,11 @@ def test_propylhydroxylamine_perceived(namer):
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="169.7 BBR-PERC Plan-03: azide N's are walked into a fictional aza "
-    "chain (CN=[N+]=[N-] -> '2,3-diazabutane'). Flips to PASS when the "
-    "structural chain-exclusion lands; then remove this marker.",
-)
 def test_azidomethane_not_diazabutane(namer):
     # DEF-5: azide is a prefix-only characteristic group (P-66.4.1 / P-65.5);
-    # its N's must NOT be absorbed into the skeletal/parent chain.
+    # its N's must NOT be absorbed into the skeletal/parent chain. FIXED in 169.7
+    # Plan-03 (structural chain-exclusion + prefix-only get_principal_group skip).
+    # Permanent green tripwire.
     assert namer.name("CN=[N+]=[N-]") == "azidomethane"
 
 

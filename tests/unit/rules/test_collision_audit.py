@@ -100,14 +100,9 @@ class TestImideCollisions:
 class TestAzidoCollisions:
     """Azido (N=N+=N-) detection and imine collision."""
 
-    @pytest.mark.xfail(
-        reason="Azido SMARTS [NX1]=[NX2+]=[NX1-] has incorrect atom degree: "
-               "first N is NX2 (bonded to C and N+), not NX1. "
-               "Fix deferred: SMARTS pattern change is out of scope for Plan 03.",
-        strict=True,
-    )
     def test_azido_detected(self):
-        """Methyl azide should detect azido FG."""
+        """Methyl azide detects azido FG (SMARTS [N;+0]=[N+]=[N-] fixed in SUB-01;
+        the stale xfail referencing the old [NX1]=... pattern is removed in 169.7)."""
         fgs = _detect("CN=[N+]=[N-]")
         assert "azido" in fgs
 

@@ -7,7 +7,7 @@ all others become prefixes.
 """
 
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 from rdkit import Chem
 
 
@@ -241,6 +241,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     "nitroso": "[NX2]=[OX1]",
     "azido": "[N;+0]=[N+]=[N-]",  # SUB-01/C2: organic azide R-N=[N+]=[N-] (attach N is NX2 neutral; the old [NX1]=... never matched RDKit canonical azides)
     "diazo": "[#6]=[NX2+]=[NX1-]",  # DATA-05a: P-61.5 diazo group
+    # BBR-PERC/DEF-3 (169.7): nitrite ester R-O-N=O (P-65.5). Added so its O,N are
+    # excludable from the skeletal-replacement backbone (see get_chain_excluded_atoms).
+    "nitrite": "[#6][OX2][NX2]=[OX1]",
 }
 
 # Pre-compile all SMARTS patterns once at module load (avoid recompilation per molecule)
@@ -295,6 +298,35 @@ def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:
     a single accessor lets future consolidation route through one function.
     """
     return detect_functional_groups(mol)
+
+
+# BBR-PERC/DEF-3 (Phase 169.7): prefix-only characteristic groups whose heteroatoms
+# (N/O) are NOT skeletal/parent-chain atoms (P-59 / P-65.5 / P-61). They must never be
+# walked into an aza/oxa chain (e.g. azidomethane CN=[N+]=[N-] -> wrong '2,3-diazabutane').
+_CHAIN_EXCLUDED_FG = frozenset({
+    "azido", "diazo", "nitroso", "nitrite", "nitro",
+    "n_oxide_aromatic", "n_oxide_aliphatic",
+})
+
+
+def get_chain_excluded_atoms(mol) -> Set[int]:
+    """Return the N/O atom indices of every prefix-only characteristic group
+    (``_CHAIN_EXCLUDED_FG``) present in *mol*.
+
+    These graph indices, derived from perception's OWN ``detect_functional_groups``
+    matches (NOT a per-FG SMARTS blocklist — CONTEXT D-04), are the atoms that must
+    be excluded from skeletal/parent-chain finding. Only the heteroatoms (N=7, O=8)
+    of each match are returned, so the carbon attachment point is preserved (the
+    chain can still terminate there).
+    """
+    results = detect_functional_groups(mol)
+    excluded: Set[int] = set()
+    for fg_name in _CHAIN_EXCLUDED_FG:
+        for match in results.get(fg_name, []):
+            for idx in match:
+                if mol.GetAtomWithIdx(idx).GetAtomicNum() in (7, 8):
+                    excluded.add(idx)
+    return excluded
 
 
 def _resolve_fg_collisions(results):
