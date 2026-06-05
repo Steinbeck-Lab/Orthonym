@@ -620,6 +620,20 @@ def route_charged(mol, style: str = 'pin') -> str:
     if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
+    # --- Step 2b (BBR-CHG-169.6-caveats, Phase 169.7): consult the charged
+    # retained-name lookup FIRST. A sanctioned retained cation/anion name
+    # (sulfonium P-73.1.1.1, aminoxide/bistriflimide P-72/P-74) must take precedence
+    # over the neutralize -> re-name -> re-apply-suffix path, which produced an
+    # OPSIN-unparseable systematic form that the SUB-03 gate then suppressed to
+    # 'unknown' (the documented 169.6 regression, audit Dim-08 §B Cause 1). There is
+    # no rule forcing systematic re-derivation over a retained name. RT-safe by
+    # construction (every entry is RT-verified).
+    from ..data.ion_retained_names import get_cation_name, get_anion_name
+    _canon = Chem.MolToSmiles(mol)
+    _retained = get_cation_name(_canon) or get_anion_name(_canon)
+    if _retained:
+        return _retained
+
     # --- Step 3: enumerate + classify ionic / radical centers.
     sites = get_ion_sites(mol)  # excludes internal nitro/azide/N-oxide/diazo (P-59)
     n_anions = len(sites['anions'])

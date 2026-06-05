@@ -26,6 +26,39 @@ from .ions import name_anion, name_cation
 from ..data.ion_retained_names import INORGANIC_CATIONS, INORGANIC_ANIONS
 
 
+# === VARIABLE-VALENCE METALS (BBR-CHG-169.6-caveat / D-13) ===
+# Metals that exhibit more than one common oxidation state and therefore carry a
+# Stock oxidation-state numeral in their salt cation word (IR-5.4.2.2 / P-65.6.2.1):
+# e.g. gold(I) chloride, iron(II/III). FIXED-valence metals (group 1/2, Al, Zn, Ag,
+# Sc, Ge, ...) do NOT carry a Stock numeral (sodium chloride, calcium dichloride).
+# This restores the 169.6-pre 'gold(I) chloride' that the salt path regressed to
+# 'gold chloride' (audit Dim-08 §B Cause 2, with the framing correction).
+_VARIABLE_VALENCE_METALS = frozenset({
+    "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu",          # 3d transition (variable)
+    "Mo", "W", "Tc", "Re", "Ru", "Os", "Rh", "Ir", "Pd", "Pt",  # 4d/5d transition
+    "Au", "Hg", "Sn", "Pb", "Tl", "Sb", "Bi", "Ce", "Eu", "Sm", "Yb", "U",
+})
+
+
+def _with_stock_if_variable_valence(frag_mol, word: str) -> str:
+    """Append the Stock oxidation-state numeral to a salt cation word IFF the cation
+    is a MONATOMIC variable-valence metal (IR-5.4.2.2). For a monatomic metal cation
+    the oxidation state equals the formal charge. Fixed-valence metals are unchanged."""
+    if frag_mol.GetNumHeavyAtoms() != 1:
+        return word
+    atom = frag_mol.GetAtomWithIdx(0)
+    if atom.GetSymbol() not in _VARIABLE_VALENCE_METALS:
+        return word
+    ox = atom.GetFormalCharge()
+    if ox <= 0:
+        return word
+    try:
+        from .organometallics import _to_roman
+        return f"{word}({_to_roman(ox)})"
+    except (ValueError, ImportError):
+        return word
+
+
 # === STOICHIOMETRIC PREFIXES ===
 
 STOICHIOMETRIC_PREFIXES = {
@@ -227,7 +260,9 @@ def name_salt(mol, style: str = 'pin') -> str:
 
         word = get_cation_word(frag_mol)
         if word:
-            cation_names.append(word)
+            # D-13: variable-valence metal cations carry the Stock oxidation state
+            # (gold(I) chloride); fixed-valence metals (Na/K/Ca/...) do not.
+            cation_names.append(_with_stock_if_variable_valence(frag_mol, word))
         elif smiles in INORGANIC_CATIONS:
             cation_names.append(INORGANIC_CATIONS[smiles])
         else:
