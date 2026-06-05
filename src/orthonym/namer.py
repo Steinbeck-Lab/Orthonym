@@ -260,7 +260,28 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # phase's "0-regression by construction" guarantee.
     if _validity_gate_status(name) != "rejected":
         return name  # OPSIN parses it (or could not be consulted) -> ship as-is
-    # Definitively unparseable -> suppress to the honest descriptive fallback.
+    # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
+    # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
+    # constitutional form parses — then the name is correct by construction
+    # (P-91/P-93) and OPSIN's narrower generation-side stereo grammar must NOT gate
+    # Orthonym correctness (audit Dim-08 §C; the verbatim Blue Book PIN
+    # `(1s,4s)-cyclohexane-1,4-diol` was being suppressed to `unknown`). The
+    # constitutional gate stays STRICT: a name whose stereo-stripped form ALSO fails
+    # to parse is still suppressed. strip_stereo is read-only — the shipped name keeps
+    # its stereo descriptors.
+    from .rules.stereochemistry import strip_stereo
+    _stripped = strip_stereo(name)
+    if _stripped != name and _validity_gate_status(_stripped) == "parsed":
+        if stats is not None:
+            stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
+        return name  # ship the full stereo name — only the stereo layer is OPSIN-narrow
+    # NOTE (D-06, deferred): a bare radical/substituent name OPSIN rejects as
+    # "not a complete molecule" is intentionally NOT un-suppressed here. Doing so
+    # without the P-71 non-terminal-locant fix (_apply_radical_suffix ships e.g.
+    # `propyl` for the isopropyl radical, should be `propan-2-yl`) would ship a WRONG
+    # name — worse than the honest fallback. Radical un-suppression must land WITH that
+    # locant fix (audit Dim-08 §B); radicals stay suppressed here.
+    # Definitively unparseable (constitutional defect) -> suppress to the honest fallback.
     if stats is not None:
         stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1
     logger.warning("OPSIN validity gate suppressed unparseable name: %r", name[:60])

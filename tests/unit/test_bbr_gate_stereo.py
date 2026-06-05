@@ -58,15 +58,45 @@ def gate_enabled_real_policy(monkeypatch):
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="169.7 BBR-GATE Plan-04: the SUB-03 validity gate suppresses the "
-    "correct-by-construction (1s,4s)-cyclohexane-1,4-diol because OPSIN rejects "
-    "the lowercase-r/s stereo block (the stereo-stripped form parses). Flips to "
-    "PASS when the gate decides on WHERE OPSIN fails; then remove this marker.",
-)
 def test_cyclohexanediol_not_gate_suppressed(gate_enabled_real_policy):
     # DEF-9: the raw name is already correct; with the gate ENABLED and OPSIN
-    # rejecting the stereo block, today it is suppressed to the descriptive
-    # fallback. Plan 04 ships it because the stereo-stripped form parses.
+    # rejecting the stereo block but PARSING the stereo-stripped form, Plan 04's
+    # where-it-fails logic ships the full name. FIXED — permanent green tripwire.
     assert Orthonym().name("O[C@H]1CC[C@@H](O)CC1") == "(1s,4s)-cyclohexane-1,4-diol"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("name,expected", [
+    ("(1s,4s)-cyclohexane-1,4-diol", "cyclohexane-1,4-diol"),
+    ("(2R,3S)-butane-2,3-diol", "butane-2,3-diol"),
+    ("(E)-but-2-enoic acid", "but-2-enoic acid"),
+    ("hexane", "hexane"),                                       # no over-stripping
+    ("1-(2-chloroethyl)-4-methylbenzene", "1-(2-chloroethyl)-4-methylbenzene"),  # substituent group kept
+])
+def test_strip_stereo(name, expected):
+    from orthonym.rules.stereochemistry import strip_stereo
+    assert strip_stereo(name) == expected
+
+
+@pytest.mark.unit
+def test_constitutional_fail_still_suppressed(monkeypatch):
+    """A name whose stereo-STRIPPED form ALSO fails to parse (a genuine constitutional
+    defect, no rescuing stereo block) is STILL suppressed — the gate stays strict."""
+    import orthonym.namer as namer
+    monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True, raising=False)
+    # A malformed constitutional name with NO leading stereo block: strip_stereo is a
+    # no-op, so the where-it-fails carve-out cannot rescue it -> suppressed.
+    monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected", raising=False)
+    out = namer._final_opsin_validity_gate("2-methylhept9ol", "CCCCCCCC")
+    assert out != "2-methylhept9ol"  # suppressed to the descriptive fallback
+
+
+@pytest.mark.unit
+def test_fail_open_when_jar_absent(monkeypatch):
+    """OPSIN-unavailable (no JAR) -> fail-OPEN: the name ships unchanged (preserved)."""
+    import orthonym.namer as namer
+    monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: False, raising=False)
+    out = namer._final_opsin_validity_gate("anything-at-all", "CCO")
+    assert out == "anything-at-all"

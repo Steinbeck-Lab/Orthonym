@@ -307,6 +307,40 @@ _STEREO_EMBEDDED_RE = re.compile(
 # Pattern C — carbohydrate / amino-acid traditional notation
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa)-[DL]-', re.IGNORECASE)
 
+# BBR-GATE (Phase 169.7): a LEADING stereo / relative-configuration descriptor-block
+# matcher for strip_stereo. Mirrors  (the
+# validation precedent). Matches a leading (...)- block whose contents are PURELY
+# stereo descriptors (digits, optional composite-locant letter, r/s/e/z/R/S/E/Z/*,
+# RS/SR, commas/hyphens/+/space), OR a bare rel-/rac-/cis-/trans-/(±)- prefix. A
+# substituent enclosing group like "(2-chloroethyl)-" does NOT match (its content has
+# non-descriptor letters). Deliberately SEPARATE from _STEREO_PREFIX_RE (do NOT broaden
+# that one — Phase 153 D-03).
+_STRIP_STEREO_LEADING_RE = re.compile(
+    r"^(\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)|rel|rac|cis|trans|\(±\))-",
+    re.IGNORECASE,
+)
+
+
+def strip_stereo(name: str) -> str:
+    """Return *name* with leading stereo / relative-config descriptor blocks removed
+    (to a fixpoint) — the BBR-GATE "where does OPSIN fail" probe (CONTEXT D-05).
+
+    READ-ONLY: this is NOT a postprocessor on shipped names. The validity gate uses it
+    only to test whether a name's CONSTITUTIONAL (stereo-stripped) form parses; the
+    SHIPPED name keeps its stereo. Strips leading ``(2R)-`` / ``(1s,4s)-`` / ``(E)-`` /
+    ``rel-`` / ``rac-`` / ``cis-`` / ``trans-`` / ``(±)-`` blocks; leaves a name with no
+    leading descriptor (``hexane``) and substituent enclosing groups (``(2-chloroethyl)``)
+    untouched.
+    """
+    if not name:
+        return name
+    s = name.strip()
+    prev = None
+    while prev != s:
+        prev = s
+        s = _STRIP_STEREO_LEADING_RE.sub("", s).strip()
+    return s
+
 
 def needs_stereo_injection(mol, name: str) -> bool:
     """Return True iff *mol* carries CIP stereo not represented in *name*.
