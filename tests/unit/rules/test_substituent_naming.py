@@ -124,9 +124,15 @@ class TestParentToPrefix:
         assert result == "3-carboxypropyl"
 
     def test_aldehyde_to_oxo(self):
-        """propanal -> 1-oxopropyl."""
+        """propanal -> 3-oxopropyl (Phase 172 MBA-02 fix).
+
+        The former -CHO carbon sits at the chain terminus opposite the attachment
+        (attachment = locant 1, P-29), so oxo is at C3 (= chain_length), NOT C1.
+        '1-oxopropyl' (oxo at the acyl carbon) is explicitly NOT a preferred IUPAC
+        prefix (BlueBookV2.md Table-28.1 note m) -- it is the CAS acyl form.
+        """
         result = parent_to_prefix("propanal", chain_length=3)
-        assert result == "1-oxopropyl"
+        assert result == "3-oxopropyl"
 
     def test_methane_to_methyl(self):
         """methane -> methyl."""

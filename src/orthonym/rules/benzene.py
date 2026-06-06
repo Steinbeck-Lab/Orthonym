@@ -1250,13 +1250,22 @@ _FG_SUB_PREFIX = {
         5: "4-carboxybutyl",     # -(CH2)4COOH
     },
     'aldehyde': {
+        # -CHO on the ring carbon (carbon NOT absorbable) -> formyl (P-66.6.1.1.3).
         1: "formyl",             # -CHO
-        2: "oxoethyl",           # -CH2CHO (2-oxoethyl)
-        3: "oxopropyl",          # -(CH2)2CHO
+        # Moving-base-atom: the -CHO carbon is absorbed into the chain and expressed
+        # as 'oxo' at the terminal carbon (= chain length, opposite the attachment).
+        # '1-oxo...yl' (oxo at the acyl carbon) is the disfavoured CAS form (P-66 note m).
+        2: "2-oxoethyl",         # -CH2CHO
+        3: "3-oxopropyl",        # -(CH2)2CHO
     },
     'alcohol': {
+        # NOTE (Phase 172): the locant-drop here (hydroxyethyl vs 2-hydroxyethyl) is a
+        # real DEF-4-family defect, but alcohol is NOT a moving-base-atom FG (no central
+        # carbon migrates) and the sibling parent_to_prefix alcohol branch drops the
+        # locant too -- fixing only this copy creates an inconsistency. Deferred to a
+        # uniform DEF-4 alcohol-locant pass (out of Phase-172 MBA scope). Left as-is.
         1: "hydroxymethyl",      # -CH2OH
-        2: "hydroxyethyl",       # -CH2CH2OH (2-hydroxyethyl)
+        2: "hydroxyethyl",       # -CH2CH2OH
         3: "hydroxypropyl",      # -(CH2)2CH2OH
     },
 }
@@ -1288,16 +1297,20 @@ def _name_functionalized_chain_substituent(carbon_count: int, functional_group: 
             return f"carboxy{alkyl}"
 
     if functional_group == 'alcohol' and carbon_count > 0:
+        # NOTE (Phase 172): alcohol locant-drop left as-is (out of MBA scope; see the
+        # _FG_SUB_PREFIX['alcohol'] note). Uniform DEF-4 alcohol fix deferred.
         alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
         if alkyl:
             return f"hydroxy{alkyl}"
 
     if functional_group == 'aldehyde' and carbon_count > 0:
         if carbon_count == 1:
-            return "formyl"
+            return "formyl"  # -CHO on the ring carbon (P-66.6.1.1.3); not absorbable
         alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
         if alkyl:
-            return f"oxo{alkyl}"
+            # Moving-base-atom: -CHO carbon absorbed -> 'oxo' at the terminal carbon
+            # (= carbon_count). '1-oxo...yl' acyl form is non-PIN (P-66 note m).
+            return f"{carbon_count}-oxo{alkyl}"
 
     # Cannot name this chain
     return None

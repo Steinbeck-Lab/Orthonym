@@ -305,7 +305,10 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_aldehyde_to_oxo(self):
-        assert parent_to_prefix("propanal", 3) == "1-oxopropyl"
+        # Phase 172 MBA-02: the absorbed -CHO carbon sits at the terminus opposite
+        # the attachment (= chain_length), so oxo is at C3, not the acyl C1.
+        # '1-oxopropyl' is NOT a preferred IUPAC prefix (BlueBookV2.md Table-28.1 note m).
+        assert parent_to_prefix("propanal", 3) == "3-oxopropyl"
 
     @pytest.mark.integration
     def test_amine_to_amino(self):

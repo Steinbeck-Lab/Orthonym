@@ -672,7 +672,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         return f"amino{stem}yl"
 
     # ---- Aldehyde: ends in -al or -anal ----
-    # e.g., "propanal" -> "1-oxopropyl"
+    # e.g., "propanal" -> "3-oxopropyl"  (moving-base-atom: the -CHO carbon is
+    # absorbed into the substituent chain and expressed as 'oxo', NOT 'formyl').
     if (name.endswith('al') and not name.endswith('nal')) or name.endswith('anal'):
         if name.endswith('anal'):
             stem = name[:-4]  # remove "anal"
@@ -684,8 +685,12 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
                 stem = base[:-1]
             else:
                 stem = base
-        # Aldehyde: oxo at C-1
-        return f"1-oxo{stem}yl"
+        # IUPAC P-66.6.1 + Table-28.1 note (m): the former -CHO carbon sits at the
+        # chain terminus OPPOSITE the attachment (attachment = locant 1, P-29 /
+        # P-31.1.4.3.4), so the oxo locant is the LAST carbon = chain_length.
+        # '1-oxo...yl' (oxo at the attachment/acyl carbon) is the disfavoured CAS
+        # acyl form, explicitly NOT a preferred IUPAC prefix.
+        return f"{chain_length}-oxo{stem}yl"
 
     # ---- Ester: -oate suffix ---- (IUPAC P-65.6.3)
     # e.g., "propanoate" -> carboxy prefix form
