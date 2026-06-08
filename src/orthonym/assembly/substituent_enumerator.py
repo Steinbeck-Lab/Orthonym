@@ -321,6 +321,25 @@ def name_substituent(mol, frag_atoms, attach_idx):
     except Exception:
         pass
 
+    # ---- Tier 1.5 (Phase 173.5 L1): monocyclic heteroaryl PIN locant ----
+    # A heteroaryl ring substituent (pyridine, imidazole, furan, ...) takes
+    # free-valence numbering — pyridin-3-yl, 1H-imidazol-5-yl — instead of the
+    # locant-less parent_to_prefix form (pyridinyl / imidazolyl) that the cache
+    # (Tier 2) or recursive namer (Tier 4) would otherwise emit. Guarded:
+    # returns None (so we fall through unchanged) unless the locant is provably
+    # PIN-correct (IUPAC P-31.1.4.3.4).
+    if attach_idx is not None:
+        try:
+            from ..rules.ring_substituents import pin_heteroaryl_substituent_name
+            for ring in mol.GetRingInfo().AtomRings():
+                if attach_idx in ring and set(ring) <= frag_atoms_set:
+                    pin = pin_heteroaryl_substituent_name(mol, ring, attach_idx)
+                    if pin is not None:
+                        return pin
+                    break
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

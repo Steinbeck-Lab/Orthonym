@@ -48,7 +48,7 @@ from orthonym import name_compound
 CANARY_COMPOUNDS = [
     (
         "COc1cc(CC(=O)C(=O)c2c(O)cc(O)c(OC)c2O)cc(OC)c1O",
-        "1-(2,4,6-trihydroxy-3-methoxyphenyl)-3-(4-hydroxy-3,5-dimethoxyphenyl)propane-1,2-dione",
+        "3-(4-hydroxy-3,5-dimethoxyphenyl)-1-(2,4,6-trihydroxy-3-methoxyphenyl)propane-1,2-dione",
     ),
     (
         "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",
@@ -192,7 +192,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(Br)cc1)C(=O)O",
-        "(2S)-3-(4-bromophenyl)-2-aminopropanoic acid",
+        "(2S)-2-amino-3-(4-bromophenyl)propanoic acid",
     ),
     (
         "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCCCCCCCCCCCCC(=O)[O-]",
@@ -280,7 +280,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)C(=O)O",
-        "(2S)-2-(octadecanoylamino)-3-hydroxypropanoic acid",
+        "(2S)-3-hydroxy-2-(octadecanoylamino)propanoic acid",
     ),
     (
         "CCCC(O)CC(O)C(O)C/C=C/CCCCCCCC(=O)O",
@@ -344,7 +344,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@H](Cc1ccc(O)cc1)C(=O)O",
-        "(2R)-3-(4-hydroxyphenyl)-2-aminopropanoic acid",
+        "(2R)-2-amino-3-(4-hydroxyphenyl)propanoic acid",
     ),
     # --- Phase 49: Missing Compound Classes (CLS-01 to CLS-05) ---
     # CLS-01: Acetals
@@ -598,7 +598,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
+        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
     ),
     (
         "O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1",
@@ -627,8 +627,7 @@ CANARY_COMPOUNDS = [
     # Phase 66: Medium Molecule Completeness (2 compounds)
     (
         r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-"
-        "11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
+        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
     ),
     (
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
@@ -657,7 +656,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1cc(CC(O)C(=O)O)ccc1OS(=O)(=O)O",
-        "3-(3-methoxy-4-(sulfooxy)phenyl)-2-hydroxypropanoic acid",
+        "2-hydroxy-3-(3-methoxy-4-(sulfooxy)phenyl)propanoic acid",
     ),
     (
         "CCN(CC)Cc1ccccc1",
@@ -999,7 +998,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Nc1ccc(-c2ccco2)cc1",
-        "1-amino-4-furanylbenzene",
+        "1-amino-4-(furan-2-yl)benzene",
     ),
     (
         "O=C(O)CCC/C=C\\CCCC(=O)O",
@@ -1239,7 +1238,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
-        "(2S)-3-(docosanoyloxy)-1-(decanoyloxy)propan-2-ol",
+        "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
     ),
     # --- Phase 107-02 RT canary compounds ---
     # FIX-10: fused ring dictionary (dibenzofuran) - RT validated
@@ -1406,7 +1405,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",  # aromatic,polyfunctional,medium
-        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
+        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
     ),
     (
         "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",  # acyclic,medium
@@ -1548,7 +1547,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1(C)[C@@H](Br)CC=C(C(Cl)CCl)[C@@H]1Cl",  # small
-        "(4S,6S)-1-(1,2-dichloroethyl)-4-bromo-6-chloro-5,5-dimethylcyclohexene",
+        "(4S,6S)-4-bromo-6-chloro-1-(1,2-dichloroethyl)-5,5-dimethylcyclohexene",
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -1697,7 +1696,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(O)cc1)c1ccc(O)c(O)c1O",  # aromatic,medium
-        "(2E)-1-(2,3,4-trihydroxyphenyl)-3-(4-hydroxyphenyl)prop-2-en-1-one",
+        "(2E)-3-(4-hydroxyphenyl)-1-(2,3,4-trihydroxyphenyl)prop-2-en-1-one",
     ),
     (
         "CNC(=N)N",  # acyclic,small
@@ -1859,7 +1858,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "Cc1cc(C)c(C[C@H](N)C(=O)O)c(C)c1",  # aromatic,polyfunctional,small
-        "(2S)-3-(2,4,6-trimethylphenyl)-2-aminopropanoic acid",
+        "(2S)-2-amino-3-(2,4,6-trimethylphenyl)propanoic acid",
     ),
     (
         "Oc1ccc(CCC(O)CC/C=C/c2ccccc2)cc1",  # aromatic,medium
@@ -2009,7 +2008,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(O)cc1)C(=O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO",  # aromatic,medium
-        "(1E,5R,6S,7R,8R)-1-(4-hydroxyphenyl)-5,6,7,8,9-pentahydroxynon-1-ene-3,4-dione",
+        "(1E,5R,6S,7R,8R)-5,6,7,8,9-pentahydroxy-1-(4-hydroxyphenyl)non-1-ene-3,4-dione",
     ),
     (
         "C[C@@H]1C=C[C@H]2C3C1CC[C@@](C)(O)O[C@@H]3OC(=O)[C@@H]2C",  # heterocycle,fused-ring,medium
@@ -2157,7 +2156,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1cc(OC)c(OC)c(OC)c1/C=C/C(=O)c1c(O)c(OC)c(OC)c(OC)c1OC",  # aromatic,large
-        "(2E)-3-(2,3,4,6-tetramethoxyphenyl)-1-(2-hydroxy-3,4,5,6-tetramethoxyphenyl)prop-2-en-1-one",
+        "(2E)-1-(2-hydroxy-3,4,5,6-tetramethoxyphenyl)-3-(2,3,4,6-tetramethoxyphenyl)prop-2-en-1-one",
     ),
     (
         "O=Cc1cccc(C(=O)O)c1",  # aromatic,polyfunctional,small
@@ -2365,7 +2364,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(C(=O)O)c1ccccc1F",  # aromatic,polyfunctional,small
-        "2-(2-fluorophenyl)-2-aminoethanoic acid",
+        "2-amino-2-(2-fluorophenyl)ethanoic acid",
     ),
     (
         "CC(C)C(O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
@@ -2401,7 +2400,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(O)c(OS(=O)(=O)O)c1)C(=O)O",  # aromatic,polyfunctional,medium
-        "(2S)-3-(4-hydroxy-3-(sulfooxy)phenyl)-2-aminopropanoic acid",
+        "(2S)-2-amino-3-(4-hydroxy-3-(sulfooxy)phenyl)propanoic acid",
     ),
     (
         "O=CC(=O)C[C@H](O)CO",  # acyclic,polyfunctional,small
@@ -2731,15 +2730,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(O)c(O)c1)c1cc(O)c(O)cc1O",  # aromatic,medium
-        "(2E)-1-(2,4,5-trihydroxyphenyl)-3-(3,4-dihydroxyphenyl)prop-2-en-1-one",
+        "(2E)-3-(3,4-dihydroxyphenyl)-1-(2,4,5-trihydroxyphenyl)prop-2-en-1-one",
     ),
     (
         "[NH3+]C(CC(=O)[O-])c1ccc(O)cc1",  # aromatic,small
-        "3-(4-hydroxyphenyl)-3-aminopropanoic acid",
+        "3-amino-3-(4-hydroxyphenyl)propanoic acid",
     ),
     (
         "O=C(CO)c1ccc(O)cc1",  # aromatic,small
-        "1-(4-hydroxyphenyl)-2-hydroxyethan-1-one",
+        "2-hydroxy-1-(4-hydroxyphenyl)ethan-1-one",
     ),
     (
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large

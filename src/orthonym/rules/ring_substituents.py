@@ -252,6 +252,174 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
     return None
 
 
+# IUPAC P-31.1.4.3.4 / P-29.3.5: PIN substituent stems for monocyclic
+# heteroarenes (ring name with the trailing 'e' removed). Only these rings are
+# claimed by pin_heteroaryl_substituent_name(); anything else guards to None.
+_PIN_HETEROARYL_STEMS: Dict[str, str] = {
+    'pyridine': 'pyridin',
+    'pyrimidine': 'pyrimidin',
+    'pyrazine': 'pyrazin',
+    'pyridazine': 'pyridazin',
+    'furan': 'furan',
+    'thiophene': 'thiophen',
+    'pyrrole': 'pyrrol',
+    'imidazole': 'imidazol',
+}
+
+# Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:
+# F > Cl > Br > I > O > S > Se > Te > N > P > ...). Lower value = senior.
+_HETEROATOM_SENIORITY: Dict[str, int] = {
+    'F': 0, 'Cl': 1, 'Br': 2, 'I': 3,
+    'O': 4, 'S': 5, 'Se': 6, 'Te': 7,
+    'N': 8, 'P': 9, 'As': 10, 'Sb': 11, 'Bi': 12,
+    'Si': 13, 'Ge': 14, 'Sn': 15, 'Pb': 16, 'B': 17,
+}
+
+
+def pin_heteroaryl_substituent_name(
+    mol,
+    ring_atoms: Tuple[int, ...],
+    attachment_atom: int,
+) -> Optional[str]:
+    """PIN substituent name for a monocyclic heteroaromatic ring substituent.
+
+    Computes free-valence-aware numbering per IUPAC 2013 P-31.1.4.3.4: when a
+    ring is detached as a substituent it is renumbered so low locants go, in
+    order of decreasing priority, to (1) the heteroatoms as a set, (2) the
+    heteroatoms in element-seniority order, (3) the indicated hydrogen, and
+    (4) the free valence (point of attachment). The result is
+    ``{nH-}{stem}-{locant}-yl``.
+
+    Example: ``c1cnc[nH]1`` attached at the carbon next to the NH numbers as
+    ``1H-imidazol-5-yl`` — the indicated H at locant 1 outranks the lower
+    free-valence locant that the alternative ``3H-imidazol-4-yl`` numbering
+    would give.
+
+    Deliberately *guarded*: returns ``None`` (so the caller keeps its existing
+    locant-less form, guaranteeing zero regression) whenever the PIN locant is
+    not provably correct —
+      * the ring is not one of the supported monocyclic heteroarenes;
+      * it is a pyrazole (which identify_ring_system() reports as 'imidazole');
+      * the ring carries any substituent other than the single attachment;
+      * the ring is not a simple aromatic monocycle;
+      * ``attachment_atom`` is not a ring atom.
+
+    Args:
+        mol: RDKit Mol of the whole molecule.
+        ring_atoms: Atom indices forming the candidate ring.
+        attachment_atom: Ring atom index bearing the free valence (bonded to
+            the parent structure).
+
+    Returns:
+        The PIN substituent name, or None when not provably PIN-correct.
+    """
+    ring_list = list(ring_atoms)
+    n = len(ring_list)
+    ring_set = set(ring_list)
+
+    # --- Guard: attachment must be a ring atom -------------------------------
+    if attachment_atom not in ring_set:
+        return None
+
+    # --- Guard: supported, correctly-identified heteroarene ------------------
+    ring_name = identify_ring_system(mol, tuple(ring_list))
+    stem = _PIN_HETEROARYL_STEMS.get(ring_name)
+    if stem is None:
+        return None
+
+    # --- Guard: aromatic simple monocycle ------------------------------------
+    if not all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list):
+        return None
+    ring_adj: Dict[int, List[int]] = {}
+    for idx in ring_list:
+        nbrs = [nbr.GetIdx() for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if nbr.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return None  # fusion atom / spiro / not a simple ring
+        ring_adj[idx] = nbrs
+
+    het_atoms = [i for i in ring_list
+                 if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+
+    # --- Guard: imidazole vs pyrazole ----------------------------------------
+    # identify_ring_system() reports BOTH 5-membered N,N arenes as 'imidazole'.
+    # Genuine imidazole has its two ring N's NON-adjacent (1,3); pyrazole has
+    # them adjacent (1,2). Refuse the adjacent-N case so we never emit an
+    # imidazol-*-yl name for a pyrazole.
+    if ring_name == 'imidazole':
+        n_idx = [i for i in het_atoms
+                 if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(n_idx) != 2 or mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
+            return None
+
+    # --- Guard: no ring substituent other than the single attachment ---------
+    for idx in ring_list:
+        heavy_exo = sum(
+            1 for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1
+        )
+        if idx == attachment_atom:
+            if heavy_exo < 1:
+                return None  # no parent bond at the claimed attachment
+        elif heavy_exo:
+            return None  # an extra ring substituent we do not number
+
+    # --- Indicated-hydrogen atom (the ring NH, if any) -----------------------
+    indicated_h_atoms = [
+        i for i in het_atoms
+        if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1
+    ]
+    if len(indicated_h_atoms) > 1:
+        return None  # ambiguous indicated H; do not guess
+    indicated_h_atom = indicated_h_atoms[0] if indicated_h_atoms else None
+
+    # --- Build the cyclic atom order -----------------------------------------
+    order = [ring_list[0], ring_adj[ring_list[0]][0]]
+    while len(order) < n:
+        prev, curr = order[-2], order[-1]
+        nxt = [x for x in ring_adj[curr] if x != prev]
+        if not nxt:
+            return None
+        order.append(nxt[0])
+    if len(order) != n:
+        return None
+
+    # --- Enumerate all 2n numberings; take the lexicographic-min key ---------
+    best_key = None
+    best = None  # (free_valence_locant, indicated_h_locant)
+    for start in range(n):
+        for direction in (1, -1):
+            atom_to_pos = {
+                order[(start + direction * p) % n]: p + 1
+                for p in range(n)
+            }
+            het_locs = tuple(sorted(atom_to_pos[i] for i in het_atoms))
+            seniority_locs = tuple(
+                atom_to_pos[i] for i in sorted(
+                    het_atoms,
+                    key=lambda a: (
+                        _HETEROATOM_SENIORITY.get(
+                            mol.GetAtomWithIdx(a).GetSymbol(), 99),
+                        atom_to_pos[a],
+                    ),
+                )
+            )
+            ih_loc = (atom_to_pos[indicated_h_atom]
+                      if indicated_h_atom is not None else 0)
+            fv_loc = atom_to_pos[attachment_atom]
+
+            key = (het_locs, seniority_locs, ih_loc, fv_loc)
+            if best_key is None or key < best_key:
+                best_key = key
+                best = (fv_loc, ih_loc)
+
+    if best is None:
+        return None
+    attach_locant, ih_locant = best
+    prefix = f"{ih_locant}H-" if indicated_h_atom is not None else ""
+    return f"{prefix}{stem}-{attach_locant}-yl"
+
+
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -304,6 +472,19 @@ def get_ring_substituent_name(
         ring_size = len(ring_atoms)
         prefix = _get_chain_prefix(ring_size)
         return f'cyclo{prefix}yl'
+
+    # IUPAC P-31.1.4.3.4: a monocyclic heteroaryl substituent takes
+    # free-valence numbering (pyridin-3-yl, 1H-imidazol-5-yl, furan-2-yl, ...),
+    # which supersedes both the legacy POSITION_SPECIFIC forms (3-pyridyl) and
+    # the locant-less dictionary forms (imidazolyl). Guarded — returns None and
+    # falls through to the legacy forms below whenever the locant is not
+    # provably PIN-correct (benzene, saturated rings, substituted rings, etc.).
+    if attachment_point is not None:
+        pin_name = pin_heteroaryl_substituent_name(
+            mol, ring_atoms, attachment_point
+        )
+        if pin_name is not None:
+            return pin_name
 
     # Check for position-specific name
     if ring_name in POSITION_SPECIFIC_RINGS and attachment_point is not None:

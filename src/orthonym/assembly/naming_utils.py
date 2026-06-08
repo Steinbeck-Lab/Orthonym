@@ -108,6 +108,10 @@ _COMPOUND_FG_PREFIXES = (
 # Used by alpha_sort_key() — pre-compiled regex patterns
 _LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
 _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
+# Leading indicated-hydrogen descriptor (e.g. '1H-', '2H-'). Like a locant, the
+# italic indicated H is IGNORED for alphabetization (IUPAC P-14.5.2), so
+# '(1H-imidazol-5-yl)' must sort at 'i', not at the leading digit '1'.
+_INDICATED_H_PREFIX_RE = re.compile(r'^\d+[hH]-')
 
 
 # ============================================================================
@@ -882,36 +886,35 @@ def alpha_sort_key(substituent_name: str) -> str:
     """
     text = substituent_name.lower()
 
+    # Leading positional descriptors are ALWAYS ignored for alphabetization
+    # (P-14.5.2): a parent locant ('3-'), a compound locant set ('2,4-'), and
+    # the italic indicated-hydrogen descriptor ('1H-'). Strip them up front so
+    # the enclosed-vs-simple decision below sees the bare substituent name —
+    # this is what makes '3-(1H-imidazol-5-yl)' and '(1H-imidazol-5-yl)' yield
+    # the same key, and '2-(2,4-dihydroxyphenyl)' route to the complete-name
+    # branch just like the bare '(2,4-dihydroxyphenyl)'.
+    text = _LOCANT_PREFIX_RE.sub('', text)
+    text = _INDICATED_H_PREFIX_RE.sub('', text)
+
     # P-14.5.2 (Phase 171 BBR-ASM, DEF-8): a COMPOUND substituent cited as a
-    # fully-enclosed unit is alphabetized on the first letter of its COMPLETE name —
-    # its INTERNAL multiplying prefix (di/tri…) is part of the name and is NOT ignored
-    # ('(2,4-dimethylpentyl)' sorts at 'd', before 'ethyl'). Contrast P-14.5.1: a bare
-    # 'di'/'tri' multiplying SEPARATE simple prefixes on the parent IS ignored
-    # ('2,2-dimethyl' sorts at 'm'). The enclosing marks disambiguate the two rules,
-    # so only fully-enclosed input takes the complete-name path.
+    # fully-enclosed unit is alphabetized on the first letter of its COMPLETE
+    # name — its INTERNAL multiplying prefix (di/tri…) is part of the name and
+    # is NOT ignored ('(2,4-dimethylpentyl)' sorts at 'd', before 'ethyl';
+    # '2-(2,4-dihydroxyphenyl)' sorts at 'd', before 'hydroxy'). Contrast
+    # P-14.5.1: a bare 'di'/'tri' multiplying SEPARATE simple prefixes on the
+    # parent IS ignored ('2,2-dimethyl' sorts at 'm'). The enclosing marks
+    # disambiguate the two rules, so only fully-enclosed input takes the
+    # complete-name path.
     if (text.startswith('(') and text.endswith(')')) or (text.startswith('[') and text.endswith(']')):
         inner = text[1:-1]
-        inner = _LOCANT_PREFIX_RE.sub('', inner)  # drop leading positional locants only
+        inner = _LOCANT_PREFIX_RE.sub('', inner)       # drop the inner positional locant
+        inner = _INDICATED_H_PREFIX_RE.sub('', inner)  # and a leading '1H-' descriptor
         if (inner.startswith('(') and inner.endswith(')')) or (inner.startswith('[') and inner.endswith(']')):
             inner = inner[1:-1]
         return inner  # complete name; internal multiplying prefix NOT stripped
 
-    # Strip enclosing parentheses if present
-    # e.g., "(N,N-dimethylamino)" -> "N,N-dimethylamino"
-    if text.startswith('(') and text.endswith(')'):
-        text = text[1:-1]
-
-    # Strip leading locants (digits and commas followed by hyphen)
-    # e.g., "3-methyl" -> "methyl", "2,2-dimethyl" -> "dimethyl"
-    # This handles formatted prefix strings that include locants
-    text = _LOCANT_PREFIX_RE.sub('', text)
-
-    # Strip enclosing parentheses again after locant removal
-    # e.g., "4-(methylsulfinyl)" -> "(methylsulfinyl)" after locant strip -> "methylsulfinyl"
-    if text.startswith('(') and text.endswith(')'):
-        text = text[1:-1]
-
-    # Strip N-locant prefixes (N- or N,N-) for alphabetization
+    # ---- Simple (non-enclosed) prefix: P-14.5.1 ----
+    # Strip N-locant prefixes (N- or N,N-)
     # e.g., "N,N-dimethylamino" -> "dimethylamino" -> "amino" (after multi-prefix strip)
     text = _N_LOCANT_PREFIX_RE.sub('', text)
 
@@ -920,12 +923,10 @@ def alpha_sort_key(substituent_name: str) -> str:
         if text.startswith(prefix):
             return text[len(prefix):]
 
-    # Handle non-hyphenated multiplicative prefixes
-    # Sort by longest prefix first to avoid partial matches
-    # (e.g., 'tetra' before 'tri', 'tetrakis' before 'tetra')
-    # Note: This correctly strips 'tri' from 'trioxo' -> 'oxo' per IUPAC P-14.4.
-    # The result is used ONLY as a sort key (in key= parameter of sorted/sort),
-    # never for text reconstruction. All callers confirmed to use key= only.
+    # Handle non-hyphenated multiplicative prefixes (di-, tri-, ...): for a
+    # SIMPLE prefix these are ignored (P-14.5.1). Sort by longest prefix first
+    # to avoid partial matches (e.g., 'tetra' before 'tri'). The result is a
+    # sort key only, never reconstructed.
     for prefix in _SORTED_ALPHA_PREFIXES:
         if text.startswith(prefix):
             remainder = text[len(prefix):]
