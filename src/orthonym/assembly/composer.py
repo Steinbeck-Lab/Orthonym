@@ -271,7 +271,7 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
         exclude_atoms=exclude_atoms,
     )
 
-    enriched_name = f"{prefix_str}{base_name}" if prefix_str else base_name
+    enriched_name = _join_prefix_to_name(prefix_str, base_name)  # L2 (P-16.3.3): hyphen before digit-leading parent
 
     # Observational coverage logging (ARCH-06)
     if logger.isEnabledFor(logging.DEBUG):
@@ -2035,7 +2035,7 @@ def _build_n_substituted_name(tagged_subs: list, base_name: str) -> str:
             prefix_parts.append(f"{locant_str}-{mult}{name}")
 
     prefix = "-".join(prefix_parts)
-    return f"{prefix}{base_name}"
+    return _join_prefix_to_name(prefix, base_name)  # L2 (P-16.3.3)
 
 
 def _name_simple_molecule(features: Any) -> str:
@@ -2698,7 +2698,7 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
 
     # Join prefix parts and prepend to ring name
     prefix_str = "-".join(prefix_parts)
-    return f"{prefix_str}{ring_name}" if prefix_str else ring_name
+    return _join_prefix_to_name(prefix_str, ring_name)  # L2 (P-16.3.3)
 
 
 def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[str]:
@@ -2946,13 +2946,13 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
     # Join prefixes with hyphens
     prefix_str = "-".join(prefix_parts)
 
-    # Ensure hyphen before ring parent when prefix ends with letter/paren
-    if prefix_str and ring_parent:
-        if prefix_str[-1] == ')' or prefix_str[-1].isalpha():
-            return f"{prefix_str}{ring_parent}"
-        else:
-            return f"{prefix_str}{ring_parent}"
-    return f"{prefix_str}{ring_parent}"
+    # P-16.3.3 (L2, Phase 173.5): a hyphen separates the prefix block from a
+    # ring parent that starts with a locant (e.g. 2,2,7,7-tetramethyl-1,6-
+    # dioxaspiro[4.4]nonane). The prior if/else here was dead scaffolding (both
+    # branches concatenated WITHOUT a hyphen). Route through the one correct
+    # join helper — byte-identical for letter-leading parents, correct for
+    # digit-leading (spiro / Hantzsch-Widman / von Baeyer) parents.
+    return _join_prefix_to_name(prefix_str, ring_parent)
 
 
 def _assemble_complete_bicyclo_name(mol, features):
@@ -3898,7 +3898,7 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
     )
 
     if prefix_str:
-        return f"{prefix_str}{base_name}"
+        return _join_prefix_to_name(prefix_str, base_name)  # L2 (P-16.3.3)
 
     return base_name
 
