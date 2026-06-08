@@ -13,6 +13,7 @@ Keys are canonical SMILES (verified with RDKit), values contain:
 - iupac_locants: Mapping from canonical atom index to IUPAC peripheral locant
 """
 
+from collections import Counter
 from typing import Dict, Optional, Tuple, List, Any, Union
 from rdkit import Chem
 
@@ -1817,6 +1818,159 @@ def _get_substructure_patterns() -> Dict[str, Chem.Mol]:
     return _SUBSTRUCTURE_PATTERNS
 
 
+# =========================================================================
+# HYG-01 (Phase 173): connectivity-hash-bucketed ring lookup
+# -------------------------------------------------------------------------
+# match_fused_heterocycle_core previously scanned ALL ~150 catalog patterns
+# with HasSubstructMatch for every query (O(N)). HYG-01 buckets the
+# canonical-SMILES-keyed catalog (the RING-03 key) by a connectivity hash
+# (cycle rank + heteroatom-element set) and prunes by necessary substructure
+# conditions, so a query only tests the patterns that *could* match.
+#
+# Byte-identical by construction: every condition used to bucket/prune is a
+# proven NECESSARY condition for subgraph isomorphism, so no real match is
+# ever discarded; candidates are scanned in catalog insertion order with the
+# same strict-`>` largest-match-wins / first-at-max tie-break as the old loop.
+# Proofs (each a necessary condition for pattern ⊑ query):
+#   * cycle rank: circuit rank is monotonic under subgraph (the cycle space of
+#     a subgraph is a subspace of the host's) ⇒ rank(pattern) ≤ rank(query).
+#   * per-element heavy-atom count: each pattern atom maps to a distinct query
+#     atom of the SAME element ⇒ count(e, pattern) ≤ count(e, query) ∀e
+#     (this subsumes the heteroatom-set ⊆ condition used for bucketing).
+#   * total heavy-atom count: ≤, for the same reason.
+# A HARD old-vs-new equivalence test (tests/unit/data/) gates this.
+# =========================================================================
+
+class _PatternRec:
+    """A catalog pattern enriched with the descriptors HYG-01 buckets/prunes on."""
+
+    __slots__ = ('index', 'smiles', 'pattern', 'name', 'parent_atoms',
+                 'elem_counts', 'num_heavy', 'rank', 'hetset', 'has_exocyclic')
+
+    def __init__(self, index, smiles, pattern, name, parent_atoms,
+                 elem_counts, num_heavy, rank, hetset, has_exocyclic):
+        self.index = index
+        self.smiles = smiles
+        self.pattern = pattern
+        self.name = name
+        self.parent_atoms = parent_atoms
+        self.elem_counts = elem_counts
+        self.num_heavy = num_heavy
+        self.rank = rank
+        self.hetset = hetset
+        self.has_exocyclic = has_exocyclic
+
+
+# Lazily-built connectivity-hash index. Bucket key = (cycle_rank, hetset).
+_PATTERN_BUCKETS: Dict[Tuple[int, frozenset], List['_PatternRec']] = {}
+_REC_BY_SMILES: Dict[str, '_PatternRec'] = {}
+# Fast-path index: catalog rec keyed by ring_skeleton_key(pattern). Computed
+# with the SAME function used on the query, so the keys are comparable.
+_REC_BY_SKELETON: Dict[str, '_PatternRec'] = {}
+
+
+def _build_pattern_index() -> None:
+    """Build the bucketed pattern index once (mirrors _SUBSTRUCTURE_PATTERNS).
+
+    Iterates FUSED_HETEROCYCLE_DATA in INSERTION ORDER and records each pattern's
+    catalog index so the bucket scan can reproduce the old loop's tie-break.
+    """
+    global _PATTERN_BUCKETS, _REC_BY_SMILES, _REC_BY_SKELETON
+    if _PATTERN_BUCKETS:
+        return
+    for idx, (smiles, data) in enumerate(FUSED_HETEROCYCLE_DATA.items()):
+        pattern = Chem.MolFromSmiles(smiles)
+        if pattern is None:
+            # Match _get_substructure_patterns: skip unparseable keys. The
+            # catalog index still advances so ordering stays aligned with the
+            # original full-scan order.
+            continue
+        elem_counts = Counter(a.GetSymbol() for a in pattern.GetAtoms())
+        hetset = frozenset(s for s in elem_counts if s not in ('C', 'H'))
+        rank = pattern.GetRingInfo().NumRings()
+        has_exocyclic = any(not a.IsInRing() for a in pattern.GetAtoms())
+        rec = _PatternRec(
+            index=idx,
+            smiles=smiles,
+            pattern=pattern,
+            name=data['name'],
+            parent_atoms=data['parent_atoms'],
+            elem_counts=elem_counts,
+            num_heavy=pattern.GetNumAtoms(),  # heavy atoms (implicit H)
+            rank=rank,
+            hetset=hetset,
+            has_exocyclic=has_exocyclic,
+        )
+        _PATTERN_BUCKETS.setdefault((rank, hetset), []).append(rec)
+        _REC_BY_SMILES[smiles] = rec
+        # Index all-ring entries by their skeleton key for the O(1) fast path.
+        # First-writer-wins keeps the lowest catalog index on a key collision,
+        # mirroring the bucket scan's first-at-max tie-break.
+        if not has_exocyclic:
+            skel = ring_skeleton_key(pattern)
+            if skel is not None and skel not in _REC_BY_SKELETON:
+                _REC_BY_SKELETON[skel] = rec
+
+
+def _gather_candidates(q_rank: int, q_hetset: frozenset) -> List['_PatternRec']:
+    """Return catalog patterns whose bucket key clears the necessary conditions.
+
+    A pattern can substructure-match the query only if its cycle rank is ≤ the
+    query's and its heteroatom-element set is ⊆ the query's. Both are encoded in
+    the bucket key, so we collect only the qualifying buckets (a tiny constant
+    number) instead of scanning the whole table. Returned in catalog insertion
+    order to preserve the largest-match / first-at-max tie-break.
+    """
+    _build_pattern_index()
+    out: List['_PatternRec'] = []
+    for (rank, hetset), recs in _PATTERN_BUCKETS.items():
+        if rank <= q_rank and hetset <= q_hetset:
+            out.extend(recs)
+    out.sort(key=lambda rec: rec.index)
+    return out
+
+
+def ring_skeleton_key(mol: Chem.Mol) -> Optional[str]:
+    """Return the RDKit canonical SMILES of the molecule's ring system (RING-03 key).
+
+    Extracts the subgraph induced by ring atoms + ring bonds and canonicalises
+    it — a path-independent identifier for the ring skeleton of a (possibly
+    substituted) molecule. This is the substructure analogue of the
+    whole-molecule canonical-SMILES key used by get_fused_heterocycle_name, and
+    the key HYG-01's O(1) fast path looks up. Returns None for acyclic input.
+    """
+    if mol is None:
+        return None
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumRings() == 0:
+        return None
+    ring_atoms = set()
+    for ring in ring_info.AtomRings():
+        ring_atoms.update(ring)
+    if not ring_atoms:
+        return None
+    ring_bonds = [
+        b.GetIdx() for b in mol.GetBonds()
+        if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
+    ]
+    if not ring_bonds:
+        return None
+    # Use MolFragmentToSmiles (NOT PathToSubmol + MolToSmiles): it writes the
+    # fragment SMILES from the parent mol's ALREADY-PERCEIVED aromaticity, so it
+    # never re-sanitizes a fresh fragment. Re-sanitizing an extracted ring whose
+    # aromaticity only kekulizes in the full-molecule context aborts at the C++
+    # level (uncatchable core dump) — this avoids that entirely. The fast path
+    # is opportunistic: any non-match (or None) simply falls through to the
+    # byte-identical bucket scan, so a divergent key never affects correctness.
+    try:
+        return Chem.MolFragmentToSmiles(
+            mol, atomsToUse=sorted(ring_atoms), bondsToUse=ring_bonds,
+            canonical=True,
+        )
+    except Exception:
+        return None
+
+
 def get_fused_heterocycle_name(mol: Chem.Mol) -> Optional[Tuple[str, Optional[int]]]:
     """
     Get retained name for an exact fused heterocycle match.
@@ -1884,26 +2038,94 @@ def match_fused_heterocycle_core(
     if mol is None:
         return None
 
-    patterns = _get_substructure_patterns()
+    # ---- query descriptors (computed once) ----
+    q_rank = mol.GetRingInfo().NumRings()
+    if q_rank == 0:
+        # Every catalog pattern is a ring system (rank >= 2); the cycle-rank
+        # necessary condition means none can match an acyclic query. The old
+        # full scan returned None here too — fast exit, byte-identical.
+        return None
+    q_elem = Counter(a.GetSymbol() for a in mol.GetAtoms())
+    q_hetset = frozenset(s for s in q_elem if s not in ('C', 'H'))
+    q_heavy = mol.GetNumAtoms()
+
+    candidates = _gather_candidates(q_rank, q_hetset)
+
+    def _prefilter(rec: '_PatternRec') -> bool:
+        # Necessary conditions for rec.pattern ⊑ mol (never prunes a real match).
+        if rec.num_heavy > q_heavy:
+            return False
+        for sym, cnt in rec.elem_counts.items():
+            if q_elem.get(sym, 0) < cnt:
+                return False
+        return True
+
+    # ---- O(1) ring-skeleton fast path (RING-03 key) ----
+    # If the query's ring skeleton is an exact catalog entry, that entry is the
+    # winner UNLESS some entry that is larger — or equal-size but earlier in
+    # catalog order — also matches (which would win/tie under the old loop).
+    # We confirm against only that small superior set; otherwise fall through.
+    # Restricted to all-ring skeleton entries: an exocyclic-bearing entry's
+    # standalone canonical SMILES need not equal the bare ring skeleton.
+    skel = ring_skeleton_key(mol)
+    if skel is not None:
+        skel_rec = _REC_BY_SKELETON.get(skel)
+        if (skel_rec is not None and not skel_rec.has_exocyclic
+                and _prefilter(skel_rec)
+                and mol.HasSubstructMatch(skel_rec.pattern)):
+            beaten = False
+            for rec in candidates:
+                if rec is skel_rec:
+                    continue
+                superior = (rec.parent_atoms > skel_rec.parent_atoms
+                            or (rec.parent_atoms == skel_rec.parent_atoms
+                                and rec.index < skel_rec.index))
+                if superior and _prefilter(rec) and mol.HasSubstructMatch(rec.pattern):
+                    beaten = True
+                    break
+            if not beaten:
+                skel_matches = mol.GetSubstructMatches(skel_rec.pattern)
+                if skel_matches:
+                    return _build_core_result(
+                        skel_rec.name, list(skel_matches[0]), skel_rec.smiles)
+
+    # ---- bucket-pruned scan (byte-identical to the old full scan) ----
     best_match: Optional[Tuple[str, List[int], int, str]] = None
 
-    # Find the largest matching core
-    for smiles, pattern in patterns.items():
-        if mol.HasSubstructMatch(pattern):
-            matches = mol.GetSubstructMatches(pattern)
+    # Find the largest matching core (insertion order; first-at-max wins)
+    for rec in candidates:
+        if best_match is not None and rec.parent_atoms < best_match[2]:
+            # Strictly smaller than the current best can never replace it
+            # (strict-`>` update) nor tie it — skip the expensive match.
+            continue
+        if not _prefilter(rec):
+            continue
+        if mol.HasSubstructMatch(rec.pattern):
+            matches = mol.GetSubstructMatches(rec.pattern)
             if matches:
                 match = matches[0]  # Take first match
-                data = FUSED_HETEROCYCLE_DATA[smiles]
-                core_size = data['parent_atoms']
+                core_size = rec.parent_atoms
 
                 # Keep the largest matching core
                 if best_match is None or core_size > best_match[2]:
-                    best_match = (data['name'], list(match), core_size, smiles)
+                    best_match = (rec.name, list(match), core_size, rec.smiles)
 
     if best_match is None:
         return None
 
     name, match_atoms, _, core_smiles = best_match
+    return _build_core_result(name, match_atoms, core_smiles)
+
+
+def _build_core_result(
+    name: str, match_atoms: List[int], core_smiles: str
+) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
+    """Build the (name, atom_mapping, core_smiles) result from a matched core.
+
+    Shared by both match_fused_heterocycle_core paths; preserves the exact
+    pre-computed-IUPAC-locant mapping logic (and the missing-mapping warning)
+    of the original implementation.
+    """
     data = FUSED_HETEROCYCLE_DATA[core_smiles]
 
     # Get pre-computed IUPAC locant mapping
