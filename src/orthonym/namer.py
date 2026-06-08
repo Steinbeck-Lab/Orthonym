@@ -19,6 +19,15 @@ from typing import Optional, List, Dict, Any
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
+from .errors import (
+    OrthonymLimitError,
+    classify_scope_limit,
+    classify_failure_limit,
+    is_failure_name,
+    _ORGANIC_ELEMENTS,
+    _METAL_NAMES,
+)
+
 logger = logging.getLogger(__name__)
 
 # Phase 168 D-08: env-var override for the triviality controller. Read at import
@@ -1154,23 +1163,39 @@ class Orthonym:
         """
         return dict(self._grammar_stats)
 
-    def name(self, smiles: str) -> str:
+    def name(self, smiles: str, *, raise_on_limit: bool = False) -> str:
         """
         Generate IUPAC name from SMILES.
 
         Args:
             smiles: SMILES string representing the molecule
+            raise_on_limit: HYG-02 (Phase 173) opt-in. When True, a provably
+                out-of-scope input raises ``OrthonymLimitError(code, message)``
+                instead of returning a plausible-but-wrong / descriptive string
+                — letting a caller distinguish "can't handle" from "got it
+                wrong". Default False preserves the always-emit behaviour
+                byte-for-byte (no limit is ever substituted into the result).
 
         Returns:
             IUPAC systematic name
 
         Raises:
             ValueError: If SMILES is invalid
+            OrthonymLimitError: If raise_on_limit and the input is out of scope
         """
         # Start runtime fragment cache session (only at top-level depth)
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         start_naming_session()
         try:
+            # HYG-02: structural scope pre-check (opt-in). Only the wildcard
+            # class is refused here — the one class with zero in-scope risk.
+            if raise_on_limit:
+                _probe = Chem.MolFromSmiles(smiles)
+                if _probe is not None:
+                    _scope = classify_scope_limit(_probe)
+                    if _scope is not None:
+                        _scope.smiles = smiles
+                        raise _scope
             result = self._name_impl(smiles)
             # Universal stereo backstop (Phase 140, STER-16)
             # Only apply at top level -- decomposition fragments handle stereo
@@ -1197,6 +1222,13 @@ class Orthonym:
                         result = _final_opsin_validity_gate(
                             result, smiles, self._grammar_stats,
                         )
+            # HYG-02: post-failure limit (opt-in). If naming produced no real
+            # name, map the failure to a named code. Keyed off an actual failure
+            # so it can never fire on a successfully-named compound.
+            if raise_on_limit and is_top_level_naming() and is_failure_name(result):
+                _probe = Chem.MolFromSmiles(smiles)
+                if _probe is not None:
+                    raise classify_failure_limit(_probe, smiles=smiles)
             return result
         finally:
             end_naming_session()
@@ -1274,6 +1306,20 @@ class Orthonym:
             metadata['ml_model_version'] = (
                 self._last_ml_result.model_version if ml_used else None
             )
+
+            # HYG-02 (Phase 173): informational limit annotation (additive — does
+            # not change 'name'). None for in-scope inputs; otherwise the named
+            # out-of-scope code (scope pre-check, else failure mapping).
+            _limit = None
+            _probe = Chem.MolFromSmiles(smiles)
+            if _probe is not None:
+                _lim = classify_scope_limit(_probe)
+                if _lim is None and is_failure_name(metadata.get('name')):
+                    _lim = classify_failure_limit(_probe, smiles=smiles)
+                if _lim is not None:
+                    _limit = _lim.as_dict()
+            metadata['limit'] = _limit
+
             return metadata
         finally:
             end_naming_session()
@@ -2246,7 +2292,8 @@ def name_compound(smiles: str, style: str = "pin",
                    allow_ml_fallback: bool = False,
                    opsin_parse_required: bool = True,
                    enable_triviality_controller: bool = False,
-                   enable_group_splitting: bool = False):
+                   enable_group_splitting: bool = False,
+                   raise_on_limit: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -2306,7 +2353,7 @@ def name_compound(smiles: str, style: str = "pin",
             }
 
     try:
-        result = namer.name(smiles)
+        result = namer.name(smiles, raise_on_limit=raise_on_limit)
         if result:
             # Check if result contains 'unknown' as a component (partial failure)
             if 'unknown' in result.lower():
@@ -2343,29 +2390,10 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
         return None
 
 
-# Metals and inorganic elements (not C, H, N, O, S, P, Se, halogens)
-_ORGANIC_ELEMENTS = {
-    'C', 'H', 'N', 'O', 'S', 'P', 'Se', 'F', 'Cl', 'Br', 'I', 'B', 'Si',
-}
-
-# Metal element -> name mapping for descriptive messages
-_METAL_NAMES = {
-    'Li': 'lithium', 'Na': 'sodium', 'K': 'potassium', 'Rb': 'rubidium',
-    'Cs': 'cesium', 'Be': 'beryllium', 'Mg': 'magnesium', 'Ca': 'calcium',
-    'Sr': 'strontium', 'Ba': 'barium', 'Al': 'aluminium', 'Ga': 'gallium',
-    'In': 'indium', 'Tl': 'thallium', 'Sn': 'tin', 'Pb': 'lead',
-    'Bi': 'bismuth', 'Ti': 'titanium', 'V': 'vanadium', 'Cr': 'chromium',
-    'Mn': 'manganese', 'Fe': 'iron', 'Co': 'cobalt', 'Ni': 'nickel',
-    'Cu': 'copper', 'Zn': 'zinc', 'Zr': 'zirconium', 'Mo': 'molybdenum',
-    'Ru': 'ruthenium', 'Rh': 'rhodium', 'Pd': 'palladium', 'Ag': 'silver',
-    'Cd': 'cadmium', 'W': 'tungsten', 'Re': 'rhenium', 'Os': 'osmium',
-    'Ir': 'iridium', 'Pt': 'platinum', 'Au': 'gold', 'Hg': 'mercury',
-    'Sb': 'antimony', 'Te': 'tellurium', 'Yb': 'ytterbium', 'La': 'lanthanum',
-    'Ce': 'cerium', 'Nd': 'neodymium', 'Sm': 'samarium', 'Eu': 'europium',
-    'Gd': 'gadolinium', 'Tb': 'terbium', 'Dy': 'dysprosium', 'Ho': 'holmium',
-    'Er': 'erbium', 'Tm': 'thulium', 'Lu': 'lutetium', 'Sc': 'scandium',
-    'Y': 'yttrium',
-}
+# Metals/inorganic elements and the metal-name map now live in orthonym.errors
+# (single source of truth) and are re-exported via the module-top import so
+# ml_fallback.quality_gate and data.cation_words keep importing them from
+# orthonym.namer. _ORGANIC_ELEMENTS / _METAL_NAMES are bound at module top.
 
 
 def _descriptive_fallback(smiles: str) -> str:
@@ -2375,55 +2403,49 @@ def _descriptive_fallback(smiles: str) -> str:
     'gold compound (not supported)'. For organic molecules that failed
     naming, returns 'unknown organic compound'.
 
+    HYG-02 (Phase 173): this now delegates to ``errors.classify_failure_limit``
+    — the single classifier that also backs the named ``OrthonymLimitError``
+    catalog. The returned ``.message`` is byte-identical to the strings this
+    function returned before (so the default always-emit output is unchanged);
+    the structured code/ref it carries is surfaced only via the opt-in
+    ``raise_on_limit`` / ``classify_limit`` paths.
+
     Args:
         smiles: The SMILES string that could not be named.
 
     Returns:
-        A descriptive string (never bare 'unknown').
+        A descriptive string (never bare 'unknown' for a parseable molecule).
     """
     try:
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None or mol.GetNumAtoms() == 0:
-            return "unknown"
-
-        # Check for wildcard atoms (*)
-        has_wildcard = any(a.GetAtomicNum() == 0 for a in mol.GetAtoms())
-        if has_wildcard:
-            return "compound with wildcard atoms (not supported)"
-
-        # Check for non-organic elements.
-        # IMPORTANT: iterate atoms in atom-index order to ensure deterministic
-        # output across runs. A previous implementation iterated over a set()
-        # of element symbols, which under Python's randomized hash returned a
-        # different metal name on every run for multi-metal compounds — that
-        # broke byte-identical reproducibility. Atom-index order is stable
-        # (defined by canonical SMILES) and semantically intuitive: the
-        # fallback names the molecule after the first metal encountered in
-        # the structure, mirroring how a chemist reading the formula would.
-        non_organic_in_order: list = []
-        seen: set = set()
-        for atom in mol.GetAtoms():
-            sym = atom.GetSymbol()
-            if sym in _ORGANIC_ELEMENTS or sym in seen:
-                continue
-            seen.add(sym)
-            non_organic_in_order.append(sym)
-
-        if non_organic_in_order:
-            # Find the first metal in atom-index order
-            metal_name = None
-            for elem in non_organic_in_order:
-                if elem in _METAL_NAMES:
-                    metal_name = _METAL_NAMES[elem]
-                    break
-
-            if metal_name:
-                return f"{metal_name} compound (not supported)"
-            else:
-                # Non-organic but unknown element
-                return "inorganic compound (not supported)"
-
-        # Organic compound that failed naming
-        return "unknown organic compound"
     except Exception:
         return "unknown"
+    return classify_failure_limit(mol, smiles=smiles).message
+
+
+def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
+    """Diagnostic: return the OrthonymLimitError for an out-of-scope input, else None.
+
+    Lets a caller probe "can Orthonym handle this?" without triggering an
+    exception. Returns a scope limit for structurally-refused inputs (wildcards);
+    otherwise runs the default namer and, if it fails to produce a real name,
+    returns the failure-mapped limit. Returns None for in-scope inputs and for
+    unparseable SMILES (which are a parse error, not a scope limit).
+    """
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+    except Exception:
+        mol = None
+    if mol is None:
+        return None
+    scope = classify_scope_limit(mol)
+    if scope is not None:
+        scope.smiles = smiles
+        return scope
+    try:
+        produced = Orthonym().name(smiles)
+    except Exception:
+        produced = None
+    if is_failure_name(produced):
+        return classify_failure_limit(mol, smiles=smiles)
+    return None
