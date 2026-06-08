@@ -145,6 +145,18 @@ _ANION_ALLOWED_SUFFIXES = {
     # 'carbanion' -> None (bare -> -ide via the resolvers empty-suffix path).
 }
 
+# T3 (Phase 173.6): anion class -> the FG name forced as principal when a SENIOR
+# neutral acid (carboxylic) would otherwise hijack the re-entry's principal slot.
+# Per P-72/P-74 the CHARGED group is the principal characteristic group of an
+# anion: O=C(O)CCS(=O)(=O)[O-] -> 2-carboxyethanesulfonate (carboxy PREFIX,
+# sulfonate suffix), not the carboxylic-principal 'propanoate' the neutral
+# seniority (P-41 carboxylic > sulfonic) yields for the di-acid skeleton.
+_ANION_PRINCIPAL_FG = {
+    'sulfonate': 'sulfonic_acid',
+    'sulfinate': 'sulfinic_acid',
+    'phosphonate': 'phosphonic_acid',
+}
+
 # CATION class -> (cation_class arg for apply_ion_suffix_to_name, allowed_suffixes).
 # The class-keyed cation transforms (ylium/acylium/diazonium) are NOT plain suffix
 # swaps (Plan-02 _CLASS_KEYED_CATION_TRANSFORMS); they are passed via cation_class.
@@ -518,6 +530,16 @@ def _reenter(neutral_smi: str, style: str) -> str:
     return Orthonym(style=style, _disable_opsin_validity_gate=True).name(neutral_smi)
 
 
+def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
+    """T3 (Phase 173.6): re-enter the neutral skeleton with the anion's acid group
+    FORCED as the principal characteristic group (P-72/P-74). Used only when the
+    default re-entry let a senior neutral acid (carboxylic) take the principal slot,
+    so the S/P-oxoacid suffix never appeared and the ionize step found no match."""
+    from ..namer import Orthonym
+    return Orthonym(style=style, _disable_opsin_validity_gate=True,
+                     _principal_group_override=principal_fg).name(neutral_smi)
+
+
 def _classify_single_anion(mol, sites):
     """Return (cation_class, allowed_suffixes) for a single-/multi-anion fragment.
 
@@ -595,6 +617,42 @@ def _reentry_guarded(fn):
         finally:
             _route_reentry.depth = depth
     return _wrapped
+
+
+def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
+    """Protonated-amine cation: '-aminium' suffix vs 'azaniumyl' prefix.
+
+    P-73.1.2.1: when the amine IS the principal characteristic group the parent
+    name ends in '-amine' (or is a bare hydride / 'ammonia'); the cation is the
+    '-aminium' suffix -- the proven ``name_aminium_cation`` transform
+    (cysteamine -> cysteaminium).
+
+    P-73.1.1.1 / P-74: when a SENIOR characteristic group owns the suffix
+    (-oic acid / -ol / -one / -amide ...), the neutral pipeline already expresses
+    the amine as an 'amino' substituent PREFIX, with its locant, N-substituents
+    and enclosing marks placed correctly. The protonated nitrogen is then the
+    cationic substituent prefix 'azaniumyl' (azanium = NH4+, P-73.1.1.1;
+    'azaniumyl' = the N-attached cation, the OPSIN-parseable form of the
+    -aminiumyl PIN). The correct cation name therefore UPGRADES that prefix in
+    place, KEEPING the senior suffix: '2-aminooctanoic acid' ->
+    '2-azaniumyloctanoic acid'.
+
+    This REPLACES the broken ``name + 'ium'`` fallback (ions.name_aminium_cation)
+    which appended 'ium' to the whole senior-group name ('...octanoic acidium').
+
+    Guarded so the neutral name's locant / N-substituents carry over
+    unambiguously: exactly ONE cationic site and exactly ONE 'amino' prefix
+    token. Any other shape (multi-amine, ring-N protonation with no 'amino'
+    prefix, ambiguous) falls back to the existing suffix transform --
+    byte-identical, no regression.
+    """
+    from .ions import name_aminium_cation
+    low = neutral_name.strip().lower()
+    is_principal = (low == 'ammonia' or low.endswith('amine')
+                    or low.endswith('amin') or low.endswith('ane'))
+    if (not is_principal) and n_cation_sites == 1 and low.count('amino') == 1:
+        return neutral_name.replace('amino', 'azaniumyl', 1)
+    return name_aminium_cation(neutral_name) or ''
 
 
 @_reentry_guarded
@@ -678,6 +736,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     cation_kind: Optional[str] = None
     add_h_for_cation = False
     radical_suffix = None
+    anion_override_fg: Optional[str] = None  # T3: forced principal FG for the retry
 
     if radical_sites:
         # Radicals funnel through the chokepoint too (kill radicals.py alkyl
@@ -724,6 +783,11 @@ def route_charged(mol, style: str = 'pin') -> str:
         if any(classify_anion(mol, a) == 'carboxylate' for a in sites['anions']):
             return ''
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
+        # T3: remember the anion's acid FG so Step 6 can force it as principal if a
+        # senior neutral acid (carboxylic) hijacks the re-entry's principal slot.
+        _acls = {classify_anion(mol, a) for a in sites['anions']}
+        if len(_acls) == 1:
+            anion_override_fg = _ANION_PRINCIPAL_FG.get(next(iter(_acls)))
     else:
         return ''  # defensive: mixed handled by zwitterion guard already
 
@@ -755,14 +819,37 @@ def route_charged(mol, style: str = 'pin') -> str:
     # the funnel — so deleting the stub's carbon-counting FALLBACK (Task 2) keeps
     # the aminium output byte-identical (methylaminium / pyrrolidineium etc.).
     if cation_kind == 'aminium':
-        from .ions import name_aminium_cation
-        return name_aminium_cation(neutral_name) or ''
+        # T1 (Phase 173.6): a senior-group protonated amine becomes an 'azaniumyl'
+        # substituent prefix (P-73.1.1/P-74), not 'ium' appended to the parent;
+        # a principal amine keeps the proven '-aminium' suffix.
+        return _aminium_or_azaniumyl(neutral_name, len(sites['cations'])) or ''
 
-    return apply_ion_suffix_to_name(
+    ionized = apply_ion_suffix_to_name(
         neutral_name, total_charge,
         allowed_suffixes=allowed_suffixes,
         cation_class=cation_class,
     )
+    if ionized:
+        return ionized
+
+    # T3 (Phase 173.6): the first re-entry let a SENIOR neutral acid (carboxylic,
+    # P-41) take the principal slot, so the anion's S/P-oxoacid suffix never appeared
+    # and the ionize match failed. Per P-72/P-74 the CHARGED group IS the principal
+    # characteristic group of an anion -> re-enter with the anion's acid FG forced as
+    # principal (carboxylic acid demoted to a 'carboxy' prefix) and ionize that:
+    # O=C(O)CCS(=O)(=O)[O-] -> '2-carboxyethanesulfonic acid' -> '2-carboxyethanesulfonate'.
+    if anion_override_fg is not None:
+        try:
+            forced = _reenter_forced(neutral_smi, style, anion_override_fg)
+        except (RecursionError, ValueError, RuntimeError):
+            forced = ''
+        if forced and not _is_malformed_parent(forced):
+            return apply_ion_suffix_to_name(
+                forced, total_charge,
+                allowed_suffixes=allowed_suffixes,
+                cation_class=cation_class,
+            )
+    return ''
 
 
 def _apply_radical_suffix(neutral_name: str, radical_suffix: str) -> str:

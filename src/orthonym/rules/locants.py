@@ -226,6 +226,21 @@ def orient_chain(
     # --- Criterion (a): Lowest locants for principal characteristic group ---
     if principal_group_atoms:
         pg_on_chain = principal_group_atoms & chain_set
+        if not pg_on_chain:
+            # P-14.4(a) / P-31.1.4: a principal group whose defining atoms are NOT
+            # chain atoms (-SO3H / -PO3H2: the S/P and its O's hang OFF a chain
+            # carbon) is located by the CHAIN CARBON that bears it. Without this,
+            # criterion (a) was skipped for such groups and a mere substituent stole
+            # C1 ('1-hydroxyethanesulfonic acid' instead of the PIN
+            # '2-hydroxyethanesulfonic acid'). Anchor on the attachment carbon(s) so
+            # the principal group still drives the lowest-locant rule. (Groups whose
+            # match includes the chain carbon -- acids/ketones/alcohols/amines -- keep
+            # a non-empty pg_on_chain above and are unaffected: byte-identical.)
+            pg_on_chain = {
+                a for a in chain
+                if any(nb.GetIdx() in principal_group_atoms
+                       for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+            }
         if pg_on_chain:
             fwd_locants = sorted(fwd_map[a] for a in pg_on_chain)
             rev_locants = sorted(rev_map[a] for a in pg_on_chain)

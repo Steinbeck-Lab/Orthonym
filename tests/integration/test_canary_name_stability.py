@@ -765,8 +765,11 @@ NAME_STABILITY_CANARY = [
     ),
     # fragment_loss compounds (8)
     (
+        # Phase 173.6 T3: was the fragment-loss bug 'ethanolate' (dropped the
+        # sulfonate); orient_chain now anchors the sulfonate on C1 -> correct,
+        # RT-True '2-oxoethanesulfonate' (oxo at C2). Intended improvement.
         "O=CCS(=O)(=O)[O-]",
-        "ethanolate",
+        "2-oxoethanesulfonate",
     ),
     (
         "Cc1cc(=O)c2c(O)cc(O)cc2o1",

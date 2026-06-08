@@ -861,7 +861,8 @@ class Orthonym:
                  allow_ml_fallback: bool = False,
                  opsin_parse_required: bool = True,
                  enable_triviality_controller: bool = False,
-                 enable_group_splitting: bool = False):
+                 enable_group_splitting: bool = False,
+                 _principal_group_override: Optional[str] = None):
         """
         Initialize namer.
 
@@ -903,6 +904,11 @@ class Orthonym:
         # so they must not be gated). Final top-level name() calls leave this
         # False -> the gate applies.
         self._disable_opsin_validity_gate: bool = _disable_opsin_validity_gate
+        # Phase 173.6 T3: scoped principal-group override (FG name). Set ONLY by the
+        # charged chokepoint's S/P-oxoacid-anion re-entry (_reenter_forced) so the
+        # anionic group is forced as the principal characteristic group per P-72/P-74.
+        # None for every normal name() call -> byte-identical production behaviour.
+        self._principal_group_override: Optional[str] = _principal_group_override
         # Phase 162 ML Fallback Gate per MLF-01 + D-08 (kwargs stored;
         # the wrapper at _name_impl():1248 lands in Plan-03 T01).
         self._allow_ml_fallback: bool = allow_ml_fallback
@@ -1730,6 +1736,15 @@ class Orthonym:
             features.mol,
             features.functional_groups
         )
+        # Phase 173.6 T3: scoped principal-group override (P-72/P-74). When the
+        # charged chokepoint re-enters an S/P-oxoacid anion that coexists with a
+        # SENIOR neutral acid (carboxylic), it forces the anion's acid group
+        # (sulfonic/sulfinic/phosphonic) as principal so it becomes the suffix and
+        # the carboxylic acid is demoted to a 'carboxy' prefix. Default None.
+        if (self._principal_group_override
+                and features.functional_groups.get(self._principal_group_override)):
+            pg_name = self._principal_group_override
+            pg_atoms = features.functional_groups[self._principal_group_override]
         features.principal_group = pg_name
         features.principal_group_atoms = pg_atoms
 

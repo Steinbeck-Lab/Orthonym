@@ -66,9 +66,11 @@ def test_def4_1_chloro_2_fluoroethane(namer):
 
 
 # --- DEF-3 — charged class-before-neutralize (P-72.7/P-41), WS-2 ---
-
+# FIXED in Phase 173.6 (T3): the charged chokepoint re-enters with the anion's acid
+# forced as principal (P-72/P-74) and orient_chain anchors the sulfonic-acid locant
+# on its attachment carbon, so the neutral COOH is demoted to a 'carboxy' prefix and
+# the sulfonate is the suffix at C1. xfail removed (was strict -> XPASS failed the run).
 @pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason="WS-2 BBR-CHG (171-04): classify the ionic FG class WITH the charge present so sulfonate stays senior.")
 def test_def3_carboxyethanesulfonate(namer):
     assert namer.name("O=C(O)CCS(=O)(=O)[O-]") == "2-carboxyethanesulfonate"
 
