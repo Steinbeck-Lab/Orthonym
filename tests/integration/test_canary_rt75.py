@@ -1323,7 +1323,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=C1C=C[C@H](C(C)C)CC1",
-        "(3S)-3-isopropyl-6-methylidenecyclohexene",
+        "(3S)-3-isopropyl-6-methylidenecyclohex-1-ene",
     ),
     (
         "Cc1ccc(OC(=O)C(C)C)cc1",
@@ -1554,7 +1554,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1(C)[C@@H](Br)CC=C(C(Cl)CCl)[C@@H]1Cl",  # small
-        "(4S,6S)-4-bromo-6-chloro-1-(1,2-dichloroethyl)-5,5-dimethylcyclohexene",
+        "(4S,6S)-4-bromo-6-chloro-1-(1,2-dichloroethyl)-5,5-dimethylcyclohex-1-ene",
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -2863,7 +2863,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1=CCCC1(C)C",  # small
-        "1,5,5-trimethylcyclopentene",
+        "1,5,5-trimethylcyclopent-1-ene",
     ),
     (
         "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCCCCCC",  # acyclic,large

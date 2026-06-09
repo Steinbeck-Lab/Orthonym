@@ -925,8 +925,16 @@ def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
             multiplier
         )
     else:
-        # No suffix = hydrocarbon, build name with unsaturation
-        name = _build_hydrocarbon_name(stem, double_locants, triple_locants)
+        # No suffix = hydrocarbon, build name with unsaturation.
+        # WSD-06 (NUM-01): a substituted cycloalkene must keep its ring ene-locant
+        # (`3-bromocyclohex-1-ene`), so the bond-locant is omittable ONLY when the
+        # ring is unsubstituted (no substituent prefixes). Acyclic / non-cyclo stems
+        # pass None to preserve the existing count-proxy behavior.
+        _ring_bond_omittable = (not prefix_str) if stem.startswith("cyclo") else None
+        name = _build_hydrocarbon_name(
+            stem, double_locants, triple_locants,
+            ring_bond_locant_omittable=_ring_bond_omittable,
+        )
 
     # Add prefixes with proper hyphenation at boundary
     if prefix_str:

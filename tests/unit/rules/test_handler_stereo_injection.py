@@ -563,12 +563,19 @@ def test_cycloalkene_ring_only_stereo_still_injects():
 
 def test_gate_real_coverage_allows_full_name():
     """G-02: When the chosen Tier-A candidate covers all heavy atoms of the
-    molecule (e.g., D-proline / pyrrolidine-2-carboxylic acid, 8 heavy atoms,
-    all covered by ring + carboxylic-acid substituent), the BL-01 real-coverage
-    gate must allow the predicate-first injector to run."""
+    molecule (oxolane-2-carboxylic acid, 8 heavy atoms, all covered by ring +
+    carboxylic-acid substituent), the BL-01 real-coverage gate must allow the
+    predicate-first injector to run and emit the (2R/S)- prefix.
+
+    WSD-07 (Phase 175): the original vehicle was D-proline, but proline is a
+    STANDARD amino acid and now correctly resolves to its retained PIN
+    'D-proline' (OPSIN-RT-verified) instead of the systematic
+    'pyrrolidine-2-carboxylic acid'. Switched to oxolane-2-carboxylic acid — a
+    full-coverage heterocyclic acid that is NOT an amino acid, so it still
+    exercises the systematic-stereo-injection path this gate test targets."""
     from orthonym import name_compound
-    # CHEBI:16313 -- D-proline. 8 heavy atoms; pyrrolidine ring (5) + COOH (3).
-    name = name_compound("O=C(O)[C@H]1CCCN1")
+    # Oxolane-2-carboxylic acid: 8 heavy atoms; oxolane ring (5) + COOH (3).
+    name = name_compound("O=C(O)[C@H]1CCCO1")
     assert name and name != "unknown"
     import re
     assert re.match(r"^\(2[RS]\)-", name), (

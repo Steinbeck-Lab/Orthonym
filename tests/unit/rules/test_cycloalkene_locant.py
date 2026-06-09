@@ -18,11 +18,9 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestCycloalkeneLocant:
-    @pytest.mark.xfail(reason="WSD-06 fix lands in Plan 175-07", strict=False)
     def test_bromocyclohexene_keeps_locants(self):
         assert name_compound("BrC1CCCC=C1").strip().lower() == "3-bromocyclohex-1-ene"
 
-    @pytest.mark.xfail(reason="WSD-06 fix lands in Plan 175-07", strict=False)
     def test_distinct_isomers_do_not_collide(self):
         # Distinct molecules must NOT share a name. Today both -> 'methylcyclohexene'.
         a = name_compound("CC1CC=CCC1").strip().lower()   # 4-methylcyclohex-1-ene
