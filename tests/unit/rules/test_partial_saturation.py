@@ -15,6 +15,8 @@ hydrogen to specified positions of an otherwise unsaturated parent structure.
 import pytest
 from rdkit import Chem
 
+from orthonym import name_compound
+
 from orthonym.rules.partial_saturation import (
     detect_partial_saturation,
     get_saturation_prefix,
@@ -420,3 +422,29 @@ class TestIUPACCompliance:
         assert 'dihydro' in result  # saturation prefix
         assert '1H' in result  # indicated H
         assert result.endswith('indole')  # parent
+
+
+class TestWSD02TetralinNoPhantomAlkyl:
+    """WSD-02 (RING-04): a partially-saturated fused carbocycle names without a
+    phantom alkyl substituent (the saturated bridge / aromatic half is part of
+    the fused parent, never a chain substituent)."""
+
+    @pytest.mark.unit
+    def test_tetralin_no_phantom_butyl(self):
+        # Was '4-butyl-1,2,3,4-tetrahydronaphthalene' (C10H12 named as C14H20).
+        assert name_compound('C1CCc2ccccc2C1') == '1,2,3,4-tetrahydronaphthalene'
+
+    @pytest.mark.unit
+    def test_decalin_unchanged(self):
+        # PROTECT: fully-saturated (no aromatic ring) -> veto stays -> PIN-correct path.
+        assert name_compound('C1CCC2CCCCC2C1') == 'decahydronaphthalene'
+
+    @pytest.mark.unit
+    def test_indane_retained(self):
+        # PROTECT: retained name (partial-sat namer returns None -> defers).
+        assert name_compound('C1Cc2ccccc2C1') == 'indane'
+
+    @pytest.mark.unit
+    def test_substituted_tetralin_keeps_real_substituent_no_butyl(self):
+        # A real substituent on the saturated ring is kept; no phantom butyl.
+        assert name_compound('CC1CCc2ccccc2C1') == '1-methyl-1,2,3,4-tetrahydronaphthalene'

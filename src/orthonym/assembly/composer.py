@@ -240,6 +240,20 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
         parent_atoms = set(features.principal_ring)
         atom_to_locant = features.atom_to_locant
 
+    # WSD-02 (RING-04): a partially-saturated fused carbocycle's parent name
+    # (e.g. `1,2,3,4-tetrahydronaphthalene`) covers the ENTIRE fused ring system.
+    # oriented_ring / principal_ring is only ONE SSSR ring, so leaving it as the
+    # parent makes substituent discovery mis-trace the REST of the fused system
+    # (tetralin's aromatic half) as a phantom alkyl (`4-butyl-`). Use the full
+    # ring-atom union as the parent so only TRUE exocyclic substituents enrich.
+    # Hard invariant (D-04): a fused ring atom never becomes a chain substituent.
+    if handler_id == "partial_sat" and getattr(features, 'mol', None) is not None:
+        ring_union = set()
+        for _r in features.mol.GetRingInfo().AtomRings():
+            ring_union.update(_r)
+        if ring_union:
+            parent_atoms = ring_union
+
     if not parent_atoms:
         return base_name
 

@@ -48,7 +48,30 @@ def _is_partial_sat(features: Any) -> bool:
     if mol is None:
         return False
     if cached_is_complex_ring_system(features):
-        return False
+        # WSD-02 (RING-04): an ortho-fused tetralin is ALWAYS "complex", which
+        # used to veto the (correct) partially-saturated-carbocycle namer and let
+        # the generic path re-emit the saturated bridge as a phantom alkyl
+        # (`4-butyl-1,2,3,4-tetrahydronaphthalene`). Lift the veto ONLY for the
+        # hydro-PAH class: a fused system that retains >= 1 fully-aromatic ring
+        # AND has >= 1 fully-saturated carbocyclic ring. Decalin (no aromatic
+        # ring) keeps the veto and its PIN-correct `decahydronaphthalene` path;
+        # indane is safe because `name_partially_saturated_carbocycle` returns
+        # None for it (the handler then defers to the retained-name path).
+        rings = mol.GetRingInfo().AtomRings()
+        ring_atom_idxs = set().union(*rings) if rings else set()
+        # Atom-level mix test (a fused tetralin has NO fully-saturated SSSR ring —
+        # its sp3 ring shares the two aromatic fusion carbons), so require an
+        # aromatic ring ATOM AND an sp3 ring CARBON anywhere in the ring system.
+        has_aromatic_ring_atom = any(
+            mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_atom_idxs
+        )
+        has_sp3_ring_carbon = any(
+            (not mol.GetAtomWithIdx(i).GetIsAromatic())
+            and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+            for i in ring_atom_idxs
+        )
+        if not (has_aromatic_ring_atom and has_sp3_ring_carbon):
+            return False
     return True
 
 
