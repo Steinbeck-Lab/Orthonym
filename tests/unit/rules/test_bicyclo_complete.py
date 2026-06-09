@@ -420,3 +420,45 @@ class TestBicycloNameFormat:
 
         assert saturated.lower().endswith('ane'), f"Expected -ane ending: {saturated}"
         assert unsaturated.lower().endswith('ene'), f"Expected -ene ending: {unsaturated}"
+
+
+class TestWSD01VonBaeyerFGSuffix:
+    """WSD-01 (Phase 175): a COOH/CN/CHO/amine on a von Baeyer cage emits the
+    correct FG suffix at the correct locant, not a phantom 'methyl' (RING-01),
+    and the alcohol/amine are suffixes not prefixes (RING-02/RING-09)."""
+
+    @pytest.mark.unit
+    def test_carboxylic_acid_suffix(self):
+        assert name_compound('O=C(O)C1CC2CCC1C2') == 'bicyclo[2.2.1]heptane-2-carboxylic acid'
+
+    @pytest.mark.unit
+    def test_nitrile_suffix(self):
+        assert name_compound('N#CC1CC2CCC1C2') == 'bicyclo[2.2.1]heptane-2-carbonitrile'
+
+    @pytest.mark.unit
+    def test_aldehyde_suffix(self):
+        assert name_compound('O=CC1CC2CCC1C2') == 'bicyclo[2.2.1]heptane-2-carbaldehyde'
+
+    @pytest.mark.unit
+    def test_tricyclo_amine_suffix(self):
+        # RING-09: amine on adamantane cage, was dropped entirely.
+        assert name_compound('NC1C2CC3CC(C2)CC1C3') in {
+            'tricyclo[3.3.1.1(3,7)]decan-2-amine', 'adamantan-2-amine'}
+
+    @pytest.mark.unit
+    def test_bicyclo_alcohol_is_suffix(self):
+        # RING-02: -ol suffix, not 2-hydroxy- prefix.
+        assert name_compound('OC1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-ol'
+
+    @pytest.mark.unit
+    def test_protect_norbornanone_locant(self):
+        # Ketone suffix unchanged; locant stays 2 (Phase-170 numbering kept).
+        assert name_compound('O=C1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-one'
+
+    @pytest.mark.unit
+    def test_protect_camphor_retained(self):
+        assert name_compound('CC1(C)C2CCC1(C)C(=O)C2') == 'camphor'
+
+    @pytest.mark.unit
+    def test_protect_norbornene(self):
+        assert name_compound('C1CC2C=CC1C2') == 'bicyclo[2.2.1]hept-2-ene'
