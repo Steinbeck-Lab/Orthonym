@@ -915,7 +915,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O[C@H]1[C@H](O)[C@@H](O)[C@@H]2O[C@@H]2[C@@H]1O",
-        "(1R,2R,3S,4S,5R,6S)-2,3,4,5-tetrahydroxy-7-oxa-bicyclo[4.1.0]heptane",
+        # WSD-01 (Phase 175) re-baseline: the four -OH are now the principal
+        # characteristic group expressed as the '-tetraol' SUFFIX (P-14.4 c),
+        # not a 'tetrahydroxy' prefix. RT-neutral (both forms OPSIN-L1-match).
+        "(1R,2R,3S,4S,5R,6S)-7-oxa-bicyclo[4.1.0]heptane-2,3,4,5-tetraol",
     ),
     # --- Phase 102-04: v11.0 canary expansion (80 newly identified RT-matching compounds) ---
     (
