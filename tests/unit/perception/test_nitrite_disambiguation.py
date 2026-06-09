@@ -16,12 +16,10 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestNitriteDisambiguation:
-    @pytest.mark.xfail(reason="WSD-05 fix lands in Plan 175-05", strict=False)
     def test_ethyl_nitrite(self):
         # R-O-N=O is a nitrous-acid ester, not a C-nitroso compound.
         assert name_compound("CCON=O").strip().lower() == "ethyl nitrite"
 
-    @pytest.mark.xfail(reason="WSD-05 fix lands in Plan 175-05", strict=False)
     def test_methyl_nitrite(self):
         assert name_compound("CON=O").strip().lower() == "methyl nitrite"
 

@@ -866,6 +866,24 @@ _register_inner(
     side_effect_inventory=(),  # D-07 predicate purity invariant
 )
 
+# --- WSD-05 (Phase 175): nitrite_ester (P-67 functional-class). Priority 2960
+#     in the specialty-intercept tier (after chalcogen_ester@2950, before
+#     tier_a_ring@4500). Co-shipped with the nitroso [#6] guard so R-O-N=O ->
+#     "<alkyl> nitrite" instead of leaving CCON=O nameless.
+from .handlers.nitrite_ester import (  # noqa: E402
+    _is_nitrite_ester, name_nitrite_ester,
+)
+
+_register_inner(
+    handler_id="nitrite_ester",
+    priority=2960,
+    predicate=_is_nitrite_ester,
+    handler=name_nitrite_ester,
+    iupac_section="P-67",
+    description="Nitrite ester (<alkyl> nitrite) functional-class handler (WSD-05)",
+    side_effect_inventory=(),  # D-07 predicate purity invariant
+)
+
 # --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
 #     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 #     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS

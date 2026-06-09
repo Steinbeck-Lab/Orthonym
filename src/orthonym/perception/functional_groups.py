@@ -238,7 +238,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # match-tuple arity is unchanged; stops nitrate ESTERS (R-O-NO2, CCO[N+](=O)[O-]) from
     # false-matching as nitro. Aliphatic + aromatic C both satisfy [#6].
     "nitro": "[NX3+;$([NX3+][#6])](=O)[O-]",
-    "nitroso": "[NX2]=[OX1]",
+    # WSD-05 (PERC-03): [#6] C-attachment guard, uniform with the sibling `nitro`.
+    # Without it the N=O of a nitrite ester (R-O-N=O) false-matched `nitroso` and
+    # won the collision -> `nitrosoethane` for ethyl nitrite. The guard limits
+    # `nitroso` to a genuine C-nitroso (N bonded to carbon, P-66.5.2).
+    "nitroso": "[NX2;$([NX2][#6])]=[OX1]",
     "azido": "[N;+0]=[N+]=[N-]",  # SUB-01/C2: organic azide R-N=[N+]=[N-] (attach N is NX2 neutral; the old [NX1]=... never matched RDKit canonical azides)
     "diazo": "[#6]=[NX2+]=[NX1-]",  # DATA-05a: P-61.5 diazo group
     # BBR-PERC/DEF-3 (169.7): nitrite ester R-O-N=O (P-65.5). Added so its O,N are
@@ -458,6 +462,10 @@ def _resolve_fg_collisions(results):
                              'phosphate_diester', 'phosphate_triester']),
         ('sulfuric_acid', ['sulfonic_acid']),
         ('nitric_acid', ['nitro', 'nitroso']),
+        # WSD-05 (PERC-03): a nitrite ester (R-O-N=O) suppresses any residual
+        # `nitroso` on its atoms — makes the O-vs-C precedence explicit/robust on
+        # top of the [#6] guard above.
+        ('nitrite', ['nitroso']),
     ]:
         if fg_specific in results:
             specific_atoms = set()
