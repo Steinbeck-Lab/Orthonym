@@ -228,11 +228,15 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # IUPAC peripheral numbering: 1-2-3-4-4a-5-6-7-8-8a (10 positions)
     # =========================================================================
 
-    # 1,5-naphthyridine
+    # 1,6-naphthyridine  [WSD-03 (Phase 175): label corrected from the wrong
+    # '1,5-naphthyridine'. OPSIN confirms this key (c1cnc2ccncc2c1) IS
+    # 1,6-naphthyridine; the iupac_locants below already place the N's at
+    # positions 1 (idx 2) and 6 (idx 6), so only the name/comment were wrong.
+    # The true 1,5-naphthyridine is keyed c1cnc2cccnc2c1 below.]
     # Canonical: c1cnc2ccncc2c1
-    # N atoms at idx 2 (position 1) and idx 6 (position 5)
+    # N atoms at idx 2 (position 1) and idx 6 (position 6)
     'c1cnc2ccncc2c1': {
-        'name': '1,5-naphthyridine',
+        'name': '1,6-naphthyridine',
         'tautomer_locant': None,
         'ring_system': 'naphthyridine',
         'parent_atoms': 10,
@@ -798,14 +802,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
     },
 
-    # Pyrido[3,4-b]pyridine (1,6-naphthyridine isomer)
-    # Canonical: c1cnc2cccnc2c1
+    # 1,5-naphthyridine  [WSD-03 (Phase 175): label corrected from the wrong
+    # 'pyrido[3,4-b]pyridine'. OPSIN confirms this key (c1cnc2cccnc2c1) IS
+    # 1,5-naphthyridine (P-25.1.1 prefers the retained naphthyridine parent over
+    # the pyrido[...]pyridine fusion construction). iupac_locants updated to the
+    # 1,5 numbering: N (idx 2, idx 7) -> positions 1 and 5.]
+    # Canonical: c1cnc2cccnc2c1   (N atoms at idx 2 -> position 1, idx 7 -> position 5)
     'c1cnc2cccnc2c1': {
-        'name': 'pyrido[3,4-b]pyridine',
+        'name': '1,5-naphthyridine',
         'tautomer_locant': None,
         'ring_system': 'naphthyridine',
         'parent_atoms': 10,
-        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 1},
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4},
     },
 
     # Pyrido[2,3-b]pyrazine
