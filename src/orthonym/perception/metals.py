@@ -60,6 +60,15 @@ METAL_ELEMENT_SYMBOLS: FrozenSet[str] = frozenset({
 })
 
 
+# WSD-04 (RING-06): Group-14/13 metalloids that, when a ring member of a covalent
+# heterocycle, are a Hantzsch-Widman ring parent (silolane/silole/borole/stannole),
+# NOT an organometallic complex. detect_metal_complex defers these to the
+# heterocycle path. Scope per the requirement: Si/Ge/Sn/Pb (Group 14) + B (Group 13).
+# Deliberately EXCLUDES P (a separate phosphine-handler concern) and Al/Ga/In/Tl
+# (kept under organometallic handling — out of WSD-04 scope).
+_GROUP_14_13_RING_DEFER: FrozenSet[str] = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'B'})
+
+
 @dataclass(frozen=True)
 class LigandGroup:
     """A contiguous set of ligand atoms coordinated to a single metal."""
@@ -192,6 +201,20 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # Grignard topology: 1 organic ligand + 1 halide ligand.
     if len(frags) == 1 and not is_multimetal:
         metal_idx = metal_atom_indices[0]
+        # WSD-04 (RING-06): a single ring-member Group-14/13 metalloid
+        # (Si/Ge/Sn/Pb/B) in a covalent heterocycle is NOT an organometallic
+        # complex — it is a Hantzsch-Widman ring parent (silolane / silole /
+        # borole / stannole). Defer to the heterocycle path (CFR cascade-continue)
+        # so the ring is not opened to a Si-anchored chain (`butylsilane`).
+        # Scope: Si/Ge/Sn/Pb/B only (NOT P; NOT Al/Ga/In/Tl, which stay claimed).
+        # Cp sandwiches are dot-separated (handled by Tier-1/4 above) and their
+        # metal is NOT a ring atom, so this never mis-defers a real complex.
+        if all(
+            mol.GetAtomWithIdx(i).GetSymbol() in _GROUP_14_13_RING_DEFER
+            and mol.GetAtomWithIdx(i).IsInRing()
+            for i in metal_atom_indices
+        ):
+            return None
         sigma_groups = _build_sigma_ligand_groups(mol, metal_idx)
         if sigma_groups is not None:
             return MetalComplex(

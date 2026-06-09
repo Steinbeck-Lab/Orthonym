@@ -1977,19 +1977,13 @@ def get_polycyclic_stereo(mol, numbering: Dict[int, int]) -> str:
 # Functional Group Detection on Ring System (Plan 16-09)
 # ============================================================================
 
-# FG seniority for determining principal group on polycyclic rings.
-# Higher index = higher seniority. Order follows IUPAC P-41 (the same relative
-# order as seniority.SENIORITY_ORDER): carboxylic_acid > nitrile > aldehyde >
-# ketone > alcohol > amine. WSD-01 (Phase 175) added 'nitrile' (between aldehyde
-# and carboxylic_acid) and 'amine' (below alcohol); the pre-existing
-# alcohol<ketone<aldehyde<carboxylic_acid relative order is preserved.
+# FG seniority for determining principal group on polycyclic rings
+# Higher index = higher seniority
 _FG_SENIORITY = {
-    'amine': 1,
-    'alcohol': 2,
-    'ketone': 3,
-    'aldehyde': 4,
-    'nitrile': 5,
-    'carboxylic_acid': 6,
+    'alcohol': 1,
+    'ketone': 2,
+    'aldehyde': 3,
+    'carboxylic_acid': 4,
 }
 
 
@@ -2164,87 +2158,6 @@ def _detect_ring_functional_groups(
             'suffix': 'carbaldehyde',
             'suffix_type': 'appended',
             'prefix_name': 'formyl',
-        })
-
-    # --- 5. Detect -NH2 / -NHR attached to ring carbons (amine) [WSD-01/RING-09] ---
-    # Mirrors the alcohol block: a single-bonded exocyclic N that is a genuine
-    # primary/secondary amine (sp3, >=1 H, not an amide/imine/nitrile N).
-    amine_locants = []
-    for atom_idx in ring_atoms:
-        atom = mol.GetAtomWithIdx(atom_idx)
-        if atom.GetSymbol() != 'C':
-            continue
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-            if nbr_idx in ring_atoms:
-                continue
-            if neighbor.GetSymbol() != 'N':
-                continue
-            bond = mol.GetBondBetweenAtoms(atom_idx, nbr_idx)
-            if not (bond and bond.GetBondTypeAsDouble() == 1.0):
-                continue
-            # primary/secondary amine N: has >=1 H and only single bonds
-            if neighbor.GetTotalNumHs() < 1:
-                continue
-            if any(b.GetBondTypeAsDouble() != 1.0 for b in neighbor.GetBonds()):
-                continue
-            # exclude amide/imide N (a neighbor C bearing a double bond to O/S/N)
-            is_amide = False
-            for nn in neighbor.GetNeighbors():
-                if nn.GetIdx() == atom_idx or nn.GetSymbol() != 'C':
-                    continue
-                if any(b.GetBondTypeAsDouble() == 2.0
-                       and b.GetOtherAtom(nn).GetSymbol() in ('O', 'S', 'N')
-                       for b in nn.GetBonds()):
-                    is_amide = True
-                    break
-            if is_amide:
-                continue
-            locant = numbering.get(atom_idx, 0)
-            if locant > 0:
-                amine_locants.append(locant)
-                fg_atoms.add(nbr_idx)  # track the amine N
-
-    if amine_locants:
-        amine_locants.sort()
-        detected_fgs.append({
-            'seniority': _FG_SENIORITY['amine'],
-            'type': 'amine',
-            'locants': amine_locants,
-            'suffix': 'amine',
-            'suffix_type': 'inline',
-            'prefix_name': 'amino',
-        })
-
-    # --- 6. Detect exocyclic -C#N on ring carbons (nitrile) [WSD-01] ---
-    # Mirrors the aldehyde block: the nitrile carbon is exocyclic; the suffix
-    # attaches to the ring carbon it is bonded to.
-    nitrile_locants = []
-    nitrile_pattern = Chem.MolFromSmarts('[CX2]#[NX1]')
-    if nitrile_pattern is not None:
-        for match in mol.GetSubstructMatches(nitrile_pattern):
-            c_idx, n_idx = match[0], match[1]
-            if c_idx in ring_atoms:
-                continue  # nitrile C must NOT be in the ring
-            c_atom = mol.GetAtomWithIdx(c_idx)
-            for neighbor in c_atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx in ring_atoms and nbr_idx in numbering:
-                    locant = numbering[nbr_idx]
-                    if locant not in nitrile_locants:
-                        nitrile_locants.append(locant)
-                        fg_atoms.add(c_idx)  # nitrile C
-                        fg_atoms.add(n_idx)  # nitrile N
-
-    if nitrile_locants:
-        nitrile_locants.sort()
-        detected_fgs.append({
-            'seniority': _FG_SENIORITY['nitrile'],
-            'type': 'nitrile',
-            'locants': nitrile_locants,
-            'suffix': 'carbonitrile',
-            'suffix_type': 'appended',
-            'prefix_name': 'cyano',
         })
 
     # --- No FGs detected ---

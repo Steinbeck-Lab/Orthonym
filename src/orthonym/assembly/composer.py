@@ -102,11 +102,7 @@ from ..rules.spiro import is_spiro_system, name_spiro_system
 from ..rules.fused_rings import classify_fused_system, name_fused_heterocycle, name_ortho_fused_bicyclic
 
 # Polycyclic system imports (Phase 16)
-from ..rules.polycyclic import (
-    name_polycyclic_complete,
-    is_polycyclic_system,
-    _detect_ring_functional_groups,
-)
+from ..rules.polycyclic import name_polycyclic_complete, is_polycyclic_system
 from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
 
 # Partial saturation imports for fused heterocycles
@@ -239,20 +235,6 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
     elif getattr(features, 'principal_ring', None):
         parent_atoms = set(features.principal_ring)
         atom_to_locant = features.atom_to_locant
-
-    # WSD-02 (RING-04): a partially-saturated fused carbocycle's parent name
-    # (e.g. `1,2,3,4-tetrahydronaphthalene`) covers the ENTIRE fused ring system.
-    # oriented_ring / principal_ring is only ONE SSSR ring, so leaving it as the
-    # parent makes substituent discovery mis-trace the REST of the fused system
-    # (tetralin's aromatic half) as a phantom alkyl (`4-butyl-`). Use the full
-    # ring-atom union as the parent so only TRUE exocyclic substituents enrich.
-    # Hard invariant (D-04): a fused ring atom never becomes a chain substituent.
-    if handler_id == "partial_sat" and getattr(features, 'mol', None) is not None:
-        ring_union = set()
-        for _r in features.mol.GetRingInfo().AtomRings():
-            ring_union.update(_r)
-        if ring_union:
-            parent_atoms = ring_union
 
     if not parent_atoms:
         return base_name
@@ -3012,27 +2994,17 @@ def _assemble_complete_bicyclo_name(mol, features):
         for match in _fgs[_pg]:
             match_set = set(match)
             for aidx in match:
+                if aidx not in ring_atoms:
+                    continue
                 a = mol.GetAtomWithIdx(aidx)
-                if aidx in ring_atoms:
-                    # ring-member FG carbon (e.g. the ketone carbonyl C): its
-                    # exocyclic non-C heteroatom is in the match.
-                    if a.GetSymbol() != 'C':
-                        continue
-                    for nbr in a.GetNeighbors():
-                        nidx = nbr.GetIdx()
-                        if (nidx not in ring_atoms and nidx in match_set
-                                and nbr.GetSymbol() != 'C'):
-                            suffix_ring_atoms.add(aidx)
-                            break
-                else:
-                    # WSD-01: EXOCYCLIC FG carbon/heteroatom (the COOH/CHO/CN
-                    # carbon, or an amine N) -> bias numbering to the RING carbon
-                    # it attaches to so the suffix gets the lowest locant (P-14.4 c).
-                    for nbr in a.GetNeighbors():
-                        nidx = nbr.GetIdx()
-                        if nidx in ring_atoms and mol.GetAtomWithIdx(nidx).GetSymbol() == 'C':
-                            suffix_ring_atoms.add(nidx)
-                            break
+                if a.GetSymbol() != 'C':
+                    continue
+                for nbr in a.GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if (nidx not in ring_atoms and nidx in match_set
+                            and nbr.GetSymbol() != 'C'):
+                        suffix_ring_atoms.add(aidx)
+                        break
 
     # Get complete bicyclo data
     bicyclo_data = get_complete_bicyclo_data(mol, suffix_ring_atoms=suffix_ring_atoms or None)
@@ -3060,23 +3032,6 @@ def _assemble_complete_bicyclo_name(mol, features):
     if retained_name and not has_substituents and not has_unsaturation:
         return (retained_name, ring_atoms, atom_to_locant, True)
 
-    # WSD-01: detect ring functional groups via the capable polycyclic logic
-    # (ketone/alcohol/aldehyde/carboxylic_acid/amine/nitrile) so a COOH/CHO/CN/
-    # amine on a 2-ring von Baeyer system emits the correct SUFFIX, not a phantom
-    # 'methyl' (the carbon-only counter bug). get_bicyclo_numbering (Phase 170,
-    # P-14.4) stays the numbering source.
-    _bicyclo_ring_atoms = set(atom_to_locant.keys()) or ring_atoms
-    fg_info = _detect_ring_functional_groups(mol, _bicyclo_ring_atoms, atom_to_locant)
-    fg_atoms = fg_info.get('fg_atoms', set())
-    # Drop substituents whose atoms ARE FG atoms (the COOH/CHO/CN carbon, amine N)
-    # so the carbon-only counter no longer collapses a 1-C FG to 'methyl'.
-    if fg_atoms:
-        substituents = {
-            ra: [s for s in subs if not (set(s.get('atoms', [])) & fg_atoms)]
-            for ra, subs in substituents.items()
-        }
-        substituents = {ra: subs for ra, subs in substituents.items() if subs}
-
     # Get key data
     descriptor = bicyclo_data.get('descriptor')
     carbon_count = bicyclo_data.get('carbon_count', 0)
@@ -3089,16 +3044,14 @@ def _assemble_complete_bicyclo_name(mol, features):
         unsaturation, atom_to_locant, parent_stem
     )
 
-    # Build substituent prefix (including any NON-principal FG prefixes, e.g. a
-    # hydroxy on a bicyclo-carboxylic-acid, so a demoted FG is not dropped).
-    sub_prefix = _build_bicyclo_substituent_prefix(
-        mol, substituents, atom_to_locant, fg_prefixes=fg_info.get('prefixes')
-    )
+    # Build substituent prefix
+    sub_prefix = _build_bicyclo_substituent_prefix(mol, substituents, atom_to_locant)
 
-    # WSD-01: principal characteristic group suffix for ANY ring FG
-    # (-one/-ol/-amine inline; -carboxylic acid/-carbaldehyde/-carbonitrile
-    # appended), built from the capable _detect_ring_functional_groups result.
-    principal_suffix = _build_bicyclo_principal_suffix(fg_info.get('suffix'))
+    # SUB-02 (A-fix): principal characteristic group suffix (e.g. '-6-one' for
+    # camphor). The bicyclo assembler historically had NO suffix machinery and
+    # silently dropped a ring ketone. Scoped to ketone (the functional atom is
+    # the ring carbon itself, never double-counted in substituents).
+    principal_suffix = _build_bicyclo_principal_suffix(mol, features, atom_to_locant)
 
     # Collect stereodescriptors
     stereo_prefix = ""
@@ -3247,8 +3200,7 @@ def _build_bicyclo_unsaturation_suffix(
 def _build_bicyclo_substituent_prefix(
     mol,
     substituents: Dict[int, List[Dict]],
-    atom_to_locant: Dict[int, int],
-    fg_prefixes: Optional[List[Dict]] = None,
+    atom_to_locant: Dict[int, int]
 ) -> str:
     """
     Build substituent prefix string for bicyclo naming.
@@ -3259,15 +3211,11 @@ def _build_bicyclo_substituent_prefix(
         mol: RDKit Mol object
         substituents: Dict from get_bicyclo_substituents
         atom_to_locant: Mapping from atom index to IUPAC locant
-        fg_prefixes: Optional non-principal functional-group prefixes
-            (``[{'name','locant'}, ...]`` from _detect_ring_functional_groups) so a
-            demoted ring FG (e.g. hydroxy on a bicyclo-carboxylic-acid) is emitted
-            as a prefix, not dropped (WSD-01).
 
     Returns:
         Formatted prefix string (e.g., '3,7,7-trimethyl-')
     """
-    if not substituents and not fg_prefixes:
+    if not substituents:
         return ""
 
     # Group substituents by name
@@ -3299,15 +3247,6 @@ def _build_bicyclo_substituent_prefix(
             alkyl_name = get_alkyl_name(carbon_count)
             sub_groups[alkyl_name].append(locant)
 
-    # WSD-01: fold in non-principal ring-FG prefixes (hydroxy/oxo/amino/...) so a
-    # demoted functional group on a bicyclic parent is named, not dropped.
-    if fg_prefixes:
-        for fg in fg_prefixes:
-            name = fg.get('name')
-            locant = fg.get('locant')
-            if name and locant is not None:
-                sub_groups[name].append(locant)
-
     if not sub_groups:
         return ""
 
@@ -3331,53 +3270,65 @@ def _build_bicyclo_substituent_prefix(
 
 
 def _build_bicyclo_principal_suffix(
-    suffix_info: Optional[Dict]
+    mol, features, atom_to_locant: Dict[int, int]
 ) -> Tuple[str, bool]:
-    """WSD-01 (Phase 175): format the principal-characteristic-group suffix for a
-    von Baeyer (bicyclo) parent from a ``_detect_ring_functional_groups`` suffix
-    dict ``{'suffix','locants','type'}``. Supersedes the old ketone-only builder
-    so COOH / CHO / CN / amine / OH on a 2-ring system are all expressed as the
-    correct suffix instead of collapsing to a phantom ``methyl``.
+    """SUB-02 (A-fix): principal-characteristic-group suffix for a bicyclo parent.
 
     Returns ``(suffix, elide_terminal_e)``:
-      * inline groups (``one`` / ``ol`` / ``amine``) replace the parent's trailing
-        ``e`` (``heptan-2-one``, ``heptan-2-amine``); the consonant-initial
-        multiplied form (``dione`` / ``diol`` / ``diamine``) keeps the ``e``
-        (``heptane-2,6-dione``) per IUPAC P-16.3.3.
-      * appended groups (``carboxylic acid`` / ``carbaldehyde`` / ``carbonitrile``)
-        attach to the full parent with a hyphen and never elide
-        (``heptane-2-carboxylic acid``, ``heptane-2,3-dicarboxylic acid``).
+      * ``suffix`` — ``''`` (no expressible principal group), ``'-6-one'`` (one
+        ring ketone), or ``'-2,6-dione'`` (a bicyclic DI/poly-ketone with the
+        correct multiplier);
+      * ``elide_terminal_e`` — whether the parent's trailing ``e`` must be
+        dropped before this suffix. Per IUPAC P-16.3.3 the vowel-initial
+        ``-one`` elides (``heptan-6-one``) but the consonant-initial multiplied
+        ``-dione``/``-trione`` does NOT (``heptane-2,6-dione``).
 
-    Seniority + multi-FG selection (the senior group becomes the suffix, the rest
-    prefixes) is done upstream in ``_detect_ring_functional_groups`` per P-41;
-    this is a pure formatter.
+    WR-03 + IN-06 (code review 2026-06-02): the old version returned the FIRST
+    carbonyl ring-carbon only (dropping the second ketone of a diketone, with no
+    multiplier) and the caller unconditionally stripped a trailing ``e``
+    (mis-eliding the consonant-initial multiplied suffix). Both are fixed by
+    collecting ALL ring carbonyl locants here and surfacing the elision rule.
+
+    SCOPE: ketone only. The carbonyl carbon IS a ring (von Baeyer skeleton)
+    atom, so the suffix attaches to its locant and the group is never
+    double-counted in the substituent prefix (a 0-H carbonyl O is skipped by
+    _build_bicyclo_substituent_prefix). Other ring-suffix groups (ol/al/acid/
+    nitrile) need substituent de-duplication or have an exocyclic functional
+    carbon and remain out of this minimal scope (a documented follow-on).
     """
-    if not suffix_info:
+    pg = getattr(features, 'principal_group', None)
+    pg_atoms = getattr(features, 'principal_group_atoms', None)
+    if pg != 'ketone' or not pg_atoms:
         return "", False
-    suffix_text = suffix_info.get('suffix')
-    if not suffix_text:
+    # Collect EVERY ring carbonyl-carbon locant (a bicyclic diketone has >1).
+    locants = set()
+    for match in pg_atoms:
+        for idx in match:
+            if idx not in atom_to_locant:
+                continue
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            # the carbonyl carbon = the matched ring C double-bonded to an O
+            has_carbonyl = any(
+                b.GetBondTypeAsDouble() == 2.0
+                and b.GetOtherAtom(atom).GetSymbol() == 'O'
+                for b in atom.GetBonds()
+            )
+            if has_carbonyl:
+                locants.add(atom_to_locant[idx])
+    if not locants:
         return "", False
-    locants = sorted(suffix_info.get('locants', []))
-    suffix_type = suffix_info.get('type', 'inline')
-    count = len(locants)
+    sorted_locants = sorted(locants)
+    locant_str = ",".join(str(loc) for loc in sorted_locants)
     # Principal-group suffixes always take the SIMPLE multiplier (di/tri), never
     # bis/tris (those are for complex substituents).
-    multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-    locant_str = ",".join(str(loc) for loc in locants)
-
-    if suffix_type == 'appended':
-        # consonant-initial 'carb...' -> never elide the parent 'e'.
-        if locants:
-            return f"-{locant_str}-{multiplier}{suffix_text}", False
-        return f"-{multiplier}{suffix_text}", False
-
-    # inline (one/ol/amine): elide the parent 'e' only before the bare,
-    # vowel-initial suffix; the multiplied di*/tri* form is consonant-initial.
-    if locants:
-        suffix_str = f"-{locant_str}-{multiplier}{suffix_text}"
-    else:
-        suffix_str = f"-{multiplier}{suffix_text}"
-    return suffix_str, (not multiplier)
+    multiplier = SIMPLE_MULTIPLIERS.get(len(sorted_locants), "") if len(sorted_locants) > 1 else ""
+    suffix_word = f"{multiplier}one"
+    # Elide the parent 'e' only before the vowel-initial bare '-one'; the
+    # multiplied 'dione'/'trione' begins with a consonant, so keep the 'e'.
+    elide_terminal_e = not multiplier
+    return f"-{locant_str}-{suffix_word}", elide_terminal_e
 
 
 def _assemble_heterocycle_name(features: Any, style: str) -> str:

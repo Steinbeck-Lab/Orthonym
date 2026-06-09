@@ -17,8 +17,15 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestSilacycleRing:
-    @pytest.mark.xfail(reason="WSD-04 fix lands in Plan 175-03", strict=False)
     def test_silolane_named_as_ring(self):
-        # Currently 'butylsilane' (ring opened to a Si-anchored chain).
+        # WSD-04 fixed (Plan 175-03): was 'butylsilane' (ring opened).
         name = name_compound("C1CCC[SiH2]1").strip().lower()
         assert name in {"silolane", "1-silacyclopentane"}, f"Si ring opened: {name!r}"
+
+    def test_silole_named_as_ring(self):
+        assert name_compound("C1=CC=C[SiH2]1").strip().lower() in {"silole", "1h-silole"}
+
+    def test_phospholane_untouched(self):
+        # OUT OF SCOPE: P is not Group-14/13; the WSD-04 guard must not perturb it.
+        name = name_compound("C1CCC[PH]1").strip().lower()
+        assert "silolane" not in name  # whatever it is, it's not mis-routed by WSD-04
