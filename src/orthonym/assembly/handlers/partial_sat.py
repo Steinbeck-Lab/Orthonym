@@ -70,7 +70,13 @@ def _is_partial_sat(features: Any) -> bool:
             and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
             for i in ring_atom_idxs
         )
-        if not (has_aromatic_ring_atom and has_sp3_ring_carbon):
+        # WSD-02 (code-review HI-01): restrict to the 2-ring tetralin topology the
+        # partial-saturation namer numbers correctly. A 3+-ring acene (e.g.
+        # 9,10-dihydroanthracene) gets a WRONG hydro-locant from this path
+        # (`1,2-dihydroanthracene`), a confidently-wrong-different-molecule name —
+        # so 3+-ring fused systems keep the veto and defer to the existing path.
+        only_two_rings = len(rings) == 2
+        if not (has_aromatic_ring_atom and has_sp3_ring_carbon and only_two_rings):
             return False
     return True
 
