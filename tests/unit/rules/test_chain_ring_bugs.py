@@ -146,8 +146,9 @@ class TestAminoAcidRingAtomLeakage:
         )
 
     def test_tyrosine_has_phenyl_or_hydroxyphenyl(self):
-        """Tyrosine name should reference the hydroxyphenyl substituent."""
+        """WSD-07 (Phase 175): free L-tyrosine resolves to its retained PIN
+        'tyrosine' (OPSIN-round-trip-verified), so no ring atoms can leak into a
+        chain name (the original leakage concern is moot for the retained form).
+        Was the systematic '...(4-hydroxyphenyl)propanoic acid'."""
         name = name_compound("N[C@@H](Cc1ccc(O)cc1)C(=O)O")
-        assert "phenyl" in name.lower(), (
-            f"Expected 'phenyl' in tyrosine name, got: {name}"
-        )
+        assert name == "tyrosine", f"Expected retained 'tyrosine', got: {name}"

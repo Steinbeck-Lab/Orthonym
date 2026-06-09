@@ -23,20 +23,19 @@ class TestDicarboxylicAminoAcidBailout:
         assert result == "glutamic acid"
 
     def test_aspartic_acid_stereo(self):
-        """Stereo aspartic acid should produce name containing 'dioic'."""
+        """WSD-07 (Phase 175): a stereo-tagged free aspartic acid resolves to the
+        retained PIN 'aspartic acid' (OPSIN-round-trip-verified), not the old
+        systematic 'aminobutanedioic acid' bailout (standard AAs use the retained
+        name with the configurational descriptor, P-103.1.1.1)."""
         result = name_compound("N[C@@H](CC(=O)O)C(=O)O")
-        assert result is not None
-        assert "dioic" in result, f"Expected 'dioic' in name, got: {result}"
-        # Should produce "(2S)-2-aminobutanedioic acid"
-        assert "aminobutanedioic acid" in result
+        assert result == "aspartic acid", f"Expected 'aspartic acid', got: {result}"
 
     def test_glutamic_acid_stereo(self):
-        """Stereo glutamic acid should produce name containing 'dioic'."""
+        """WSD-07 (Phase 175): a stereo-tagged free glutamic acid resolves to the
+        retained PIN 'glutamic acid' (OPSIN-round-trip-verified), not the old
+        systematic 'aminopentanedioic acid' bailout."""
         result = name_compound("N[C@@H](CCC(=O)O)C(=O)O")
-        assert result is not None
-        assert "dioic" in result, f"Expected 'dioic' in name, got: {result}"
-        # Should produce "(2S)-2-aminopentanedioic acid"
-        assert "aminopentanedioic acid" in result
+        assert result == "glutamic acid", f"Expected 'glutamic acid', got: {result}"
 
     def test_mono_cooh_amino_acid_unchanged(self):
         """Mono-COOH amino acid should NOT bail out -- regression guard.

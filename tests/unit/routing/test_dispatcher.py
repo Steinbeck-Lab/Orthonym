@@ -68,7 +68,7 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         )),
         (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "glycylglycine")),
         (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
-        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "(2S)-2-aminopropanoic acid")),
+        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "alanine")),  # WSD-07: retained PIN (was systematic '(2S)-2-aminopropanoic acid')
         (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOC",                 "2,5-dioxahexane")),
         (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                               "[3.3]orthocyclophane")),

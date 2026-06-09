@@ -12,28 +12,22 @@ from orthonym.namer import name_compound
 class TestAminoAcidSystematicStereo:
     """Systematic amino acid names include CIP stereo prefix."""
 
-    def test_l_alanine_has_stereo(self):
-        """L-alanine SMILES produces name with (2R)- or (2S)- prefix."""
-        name = name_compound("[C@@H](N)(C)C(=O)O")
-        assert re.match(r"^\(\d*[RS]\)-", name), f"Expected stereo prefix, got: {name}"
-        assert "aminopropanoic acid" in name
+    # WSD-07 (Phase 175): a stereo-tagged free STANDARD amino acid now resolves to
+    # its retained PIN with the configurational descriptor (P-103.1.1.1: L implicit,
+    # D explicit), not the old wrong-parent systematic '(2S)-2-aminopropanoic acid'.
+    # Both retained forms are OPSIN-round-trip-verified.
+    def test_alanine_enantiomers_resolve_to_retained_pin(self):
+        """The two alanine enantiomers resolve to 'alanine' (L) and 'D-alanine'."""
+        # CIP-based: [C@@H](N)(C)C(=O)O is the R (D) enantiomer; [C@H](...) is S (L).
+        assert name_compound("[C@@H](N)(C)C(=O)O") == "D-alanine"
+        assert name_compound("[C@H](N)(C)C(=O)O") == "alanine"
 
-    def test_d_alanine_has_stereo(self):
-        """D-alanine SMILES produces name with opposite stereo from L."""
-        name = name_compound("[C@H](N)(C)C(=O)O")
-        assert re.match(r"^\(\d*[RS]\)-", name), f"Expected stereo prefix, got: {name}"
-        assert "aminopropanoic acid" in name
-
-    def test_l_and_d_alanine_different_stereo(self):
-        """L and D alanine produce different stereodescriptors."""
-        l_name = name_compound("[C@@H](N)(C)C(=O)O")
-        d_name = name_compound("[C@H](N)(C)C(=O)O")
-        # Extract stereo descriptors
-        l_match = re.match(r"\((\d*[RS])\)-", l_name)
-        d_match = re.match(r"\((\d*[RS])\)-", d_name)
-        assert l_match and d_match
-        assert l_match.group(1) != d_match.group(1), \
-            f"L and D should differ: {l_name} vs {d_name}"
+    def test_l_and_d_alanine_different_names(self):
+        """L and D alanine produce different (retained) names — stereo not dropped."""
+        l_name = name_compound("[C@H](N)(C)C(=O)O")    # alanine (L implicit)
+        d_name = name_compound("[C@@H](N)(C)C(=O)O")   # D-alanine
+        assert l_name != d_name, f"L and D should differ: {l_name} vs {d_name}"
+        assert "alanine" in l_name and "alanine" in d_name
 
     def test_glycine_no_stereo(self):
         """Glycine (achiral) has no stereo prefix."""
@@ -83,3 +77,39 @@ class TestAminoAcidTrivialStereo:
                 atom = mol.GetAtomWithIdx(idx)
                 assert atom.GetSymbol() == 'C'
                 break
+
+
+class TestWSD07RetainedStereo:
+    """WSD-07 (Phase 175): a stereo-tagged free STANDARD amino acid resolves to its
+    retained PIN with the configurational descriptor (P-103.1.1.1), not a
+    wrong-parent systematic name; a diastereomer the bare name cannot represent
+    DEFERS to the systematic namer."""
+
+    def test_true_l_isoleucine(self):
+        assert name_compound("CC[C@H](C)[C@H](N)C(=O)O") == "isoleucine"
+
+    def test_d_alanine(self):
+        assert name_compound("C[C@@H](N)C(=O)O") == "D-alanine"
+
+    def test_l_alanine_implicit(self):
+        assert name_compound("C[C@H](N)C(=O)O") == "alanine"
+
+    def test_allo_isoleucine_defers(self):
+        # D-allo-isoleucine (2-centre diastereomer) must NOT emit 'isoleucine';
+        # full-stereo verification fails -> systematic name.
+        name = name_compound("CC[C@H](C)[C@@H](N)C(=O)O")
+        assert "isoleucine" not in name.lower(), f"allo-Ile should defer, got: {name}"
+
+    def test_glycine_achiral(self):
+        assert name_compound("NCC(=O)O") == "glycine"
+
+    def test_peptide_not_regressed(self):
+        # get_amino_acid_name is shared by name_peptide; the default (no-descriptor)
+        # path must keep peptides intact.
+        assert name_compound("NCC(=O)NCC(=O)O") == "glycylglycine"
+
+    def test_nonstandard_aa_keeps_systematic(self):
+        # A non-standard AA (D-2-aminobutanoic acid) keeps the systematic name —
+        # 'D-butyrine' is not OPSIN-parseable, so the descriptor path is restricted
+        # to STANDARD amino acids.
+        assert name_compound("CC[C@@H](N)C(=O)O") == "(2R)-2-aminobutanoic acid"

@@ -185,17 +185,24 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     # 141-02: Try SMILES lookup BEFORE the SMARTS pattern gate.
     # Many OPSIN amino acid entries (taurine, creatine, etc.) don't match the
     # alpha-amino acid SMARTS but are still valid amino acid trivial names.
-    trivial = get_amino_acid_name(canonical_smiles)
+    # WSD-07: stereo-aware retained-name lookup — the stereo-strip fallback finds
+    # CIP-tagged standard AAs (which miss the stereo-free keys) and emits the L/D
+    # configurational descriptor (P-103.1.1.1: L implicit, D explicit); a
+    # diastereomer the bare name cannot represent (e.g. allo-isoleucine) returns
+    # None and falls through to the systematic namer. This replaces the prior
+    # whole-graph CIP-prefix injection (which would emit a non-PIN '(2S)alanine').
+    #
+    # GATED to TOP-LEVEL naming: at decomposition depth (a peptide/conjugate
+    # fragment re-entering naming) the descriptor path is OFF so the call is
+    # byte-identical to the original stereo-free exact lookup — this preserves the
+    # decomposition/peptide assembly that relies on the prior None-on-stereo-miss
+    # behavior (e.g. the prolyl-glutaminyl-cysteine tripeptide must stay a peptide,
+    # not a systematic monomer).
+    from ..assembly.fragment_naming import is_top_level_naming
+    trivial = get_amino_acid_name(
+        canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
+    )
     if trivial:
-        # STER-09 / D-03: Inject stereo for trivial names (IUPAC P-91)
-        from ..perception.stereo import assign_stereochemistry
-        from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-        assign_stereochemistry(mol)
-        locant_map = _build_amino_acid_locant_map(mol)
-        descriptors = collect_stereodescriptors(mol, locant_map)
-        if descriptors:
-            stereo_prefix = format_stereodescriptor_string(descriptors)
-            return f"{stereo_prefix}{trivial}"
         return trivial
 
     # Check if it matches the alpha-amino acid pattern for systematic naming

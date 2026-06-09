@@ -344,7 +344,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@H](Cc1ccc(O)cc1)C(=O)O",
-        "(2R)-2-amino-3-(4-hydroxyphenyl)propanoic acid",
+        # WSD-07 (Phase 175) re-baseline: a top-level free amino acid now resolves
+        # to its retained PIN with the configurational descriptor (D-tyrosine,
+        # P-103.1.1.1) instead of the systematic substitutive name. RT-verified
+        # (OPSIN parses 'D-tyrosine' to the input, InChI-L1 match).
+        "D-tyrosine",
     ),
     # --- Phase 49: Missing Compound Classes (CLS-01 to CLS-05) ---
     # CLS-01: Acetals

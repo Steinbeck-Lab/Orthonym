@@ -176,25 +176,123 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
     return generated
 
 
-def get_amino_acid_name(canonical_smiles: str) -> Optional[str]:
+# WSD-07 (Phase 175): L-form isomeric SMILES for standard amino acids with >1
+# stereocentre, where the alpha-carbon L/D descriptor alone cannot distinguish the
+# named (threo) diastereomer from its allo form. Full-stereo verification compares
+# the input's isomeric canonical SMILES against the L-form and its enantiomer (D-);
+# anything else (an allo diastereomer) DEFERS — never a wrong-config retained name.
+_MULTI_STEREO_AA_LFORM: Dict[str, str] = {
+    "isoleucine": "CC[C@H](C)[C@H](N)C(=O)O",
+    "threonine": "C[C@@H](O)[C@H](N)C(=O)O",
+}
+
+
+def _enantiomer_canon(smiles: str) -> Optional[str]:
+    """Canonical isomeric SMILES of the mirror image (all tetrahedral centres inverted)."""
+    from rdkit import Chem
+    m = Chem.MolFromSmiles(smiles)
+    if m is None:
+        return None
+    for a in m.GetAtoms():
+        t = a.GetChiralTag()
+        if t == Chem.ChiralType.CHI_TETRAHEDRAL_CW:
+            a.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+        elif t == Chem.ChiralType.CHI_TETRAHEDRAL_CCW:
+            a.SetChiralTag(Chem.ChiralType.CHI_TETRAHEDRAL_CW)
+    return Chem.MolToSmiles(m, canonical=True)
+
+
+def _aa_config_descriptor(mol, name: str) -> Optional[str]:
+    """Recover the L/D configurational descriptor for a standard amino acid (WSD-07).
+
+    Returns "" (achiral, or L which is implicit in the bare retained name),
+    "D-" (explicit), or None to DEFER — the input is a diastereomer the bare
+    retained name cannot represent (e.g. allo-isoleucine).
+    """
+    from rdkit import Chem
+    lform = _MULTI_STEREO_AA_LFORM.get(name)
+    if lform is not None:
+        # Multi-stereocentre: emit only for a clean L or D enantiomer; an allo
+        # diastereomer matches neither reference -> defer.
+        input_canon = Chem.MolToSmiles(mol, canonical=True)  # isomeric (default)
+        if input_canon == Chem.CanonSmiles(lform):
+            return ""
+        if input_canon == _enantiomer_canon(lform):
+            return "D-"
+        return None
+    # Single-stereocentre: alpha-carbon CIP via the peptide descriptor logic
+    # (lazy import avoids the data<->rules circular import at module load).
+    from ..rules.peptides import _get_stereo_prefix
+    return "D-" if _get_stereo_prefix(mol, name) == "D-" else ""
+
+
+def get_amino_acid_name(
+    canonical_smiles: str, mol=None, with_descriptor: bool = False,
+) -> Optional[str]:
     """
     Get the trivial name for an amino acid if it's a standard one.
 
     Args:
-        canonical_smiles: Canonical SMILES of the amino acid
+        canonical_smiles: Canonical SMILES of the amino acid.
+        mol: optional RDKit Mol (rebuilt from ``canonical_smiles`` if None) —
+            needed for the stereo-strip fallback / descriptor recovery.
+        with_descriptor: when True (free-amino-acid naming path, WSD-07), also
+            recover and emit the L/D configurational descriptor (P-103.1.1.1; L
+            implicit, D explicit) and DEFER (return None) for a diastereomer the
+            bare retained name cannot represent. Default False preserves the
+            bare-name contract used by ``name_peptide`` (which adds its own stereo).
 
     Returns:
-        Trivial name if found, None otherwise
+        Trivial name (optionally with a D- descriptor) if found, None otherwise.
     """
-    # Check standard amino acids first
+    name = None
+    is_standard = False
+    # Exact-string lookup first (back-compat; the keys are stereo-free).
     if canonical_smiles in STANDARD_AMINO_ACIDS:
-        return STANDARD_AMINO_ACIDS[canonical_smiles]
+        name = STANDARD_AMINO_ACIDS[canonical_smiles]
+        is_standard = True
+    elif canonical_smiles in NON_STANDARD_AMINO_ACIDS:
+        name = NON_STANDARD_AMINO_ACIDS[canonical_smiles]
 
-    # Check non-standard
-    if canonical_smiles in NON_STANDARD_AMINO_ACIDS:
-        return NON_STANDARD_AMINO_ACIDS[canonical_smiles]
+    # WSD-07: stereo-strip fallback (lifted from rules/peptides.py) — a CIP-tagged
+    # amino acid misses the stereo-free keys, so strip isomeric info and re-look-up.
+    # GATED to the free-AA path (with_descriptor): the DEFAULT path stays
+    # byte-identical (returns None on a stereo-tagged miss) so name_peptide — which
+    # has its OWN strip fallback at peptides.py:320-326 and relies on the None to
+    # drive residue/decomposition decisions — is completely unaffected. STANDARD
+    # amino acids only: their L/D retained forms are OPSIN-parseable PINs, whereas a
+    # non-standard 'D-<name>' (e.g. D-butyrine) is NOT and would be suppressed to
+    # 'unknown' (worse than the systematic name) — non-standard AAs keep the
+    # original behavior (defer to the systematic namer).
+    if name is None and with_descriptor:
+        from rdkit import Chem
+        m = mol if mol is not None else Chem.MolFromSmiles(canonical_smiles)
+        if m is not None:
+            nostereo = Chem.MolToSmiles(m, isomericSmiles=False, canonical=True)
+            nostereo_mol = Chem.MolFromSmiles(nostereo)
+            if nostereo_mol is not None:
+                ns = Chem.MolToSmiles(nostereo_mol, canonical=True)
+                if ns in STANDARD_AMINO_ACIDS:
+                    name = STANDARD_AMINO_ACIDS[ns]
+                    is_standard = True
 
-    return None
+    if name is None or not with_descriptor:
+        return name
+
+    # WSD-07 descriptor path: STANDARD amino acids only (see note above). A
+    # non-standard exact-match returns its bare name unchanged (original behavior).
+    if not is_standard:
+        return name
+
+    # Recover the configurational descriptor + full-stereo verify.
+    from rdkit import Chem
+    m = mol if mol is not None else Chem.MolFromSmiles(canonical_smiles)
+    if m is None:
+        return name
+    desc = _aa_config_descriptor(m, name)
+    if desc is None:
+        return None  # diastereomer -> defer to the systematic namer
+    return f"D-{name}" if desc == "D-" else name
 
 
 def is_standard_amino_acid(canonical_smiles: str) -> bool:
