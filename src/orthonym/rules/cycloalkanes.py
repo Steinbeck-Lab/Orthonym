@@ -304,6 +304,22 @@ def _orient_cycloalkane_with_pg(
     return tied[0][0]
 
 
+def ring_double_bond_locant(pos1: int, pos2: int, n: int) -> int:
+    """Locant of a ring double bond between two oriented positions (0-based).
+
+    Ring bonds connect consecutive positions; the locant is the lower
+    position + 1 — EXCEPT the ring-closure bond (positions 0 and n-1), whose
+    locant is n (a 6-ring bond between C6 and C1 is the 6-ene bond, never
+    1-ene). The naive ``min(pos)+1`` called the closure bond "1", which let
+    the orientation comparator pick a direction whose emitted ``1-ene``
+    described a DIFFERENT structure (canary rt75_0019 RT True->False).
+    """
+    lo, hi = (pos1, pos2) if pos1 < pos2 else (pos2, pos1)
+    if lo == 0 and hi == n - 1:
+        return n
+    return lo + 1
+
+
 def _prefix_name_for_sort(mol, sub_atoms: List[int], ring_list: List[int]) -> Optional[str]:
     """Best-effort prefix name for alphabetic tie-breaking (tier (g)).
 
@@ -384,13 +400,14 @@ def orient_cycloalkene(
                     if atom in oriented
                 )
 
-                # Calculate double bond locants
+                # Calculate double bond locants (wrap-aware: the closure
+                # bond positions (0, n-1) is locant n, not 1)
                 db_locants = []
                 for a1, a2 in double_bond_atoms:
                     if a1 in oriented and a2 in oriented:
                         pos1 = oriented.index(a1)
                         pos2 = oriented.index(a2)
-                        db_locants.append(min(pos1, pos2) + 1)
+                        db_locants.append(ring_double_bond_locant(pos1, pos2, n))
                 db_locants.sort()
 
                 # Calculate substituent locants
@@ -444,13 +461,12 @@ def orient_cycloalkene(
 
                 sub_locants.sort()
 
-                # Calculate locants for all double bonds
+                # Calculate locants for all double bonds (wrap-aware)
                 db_locants = []
                 for a1, a2 in double_bond_atoms:
                     pos1 = oriented.index(a1)
                     pos2 = oriented.index(a2)
-                    # Lower position is the locant
-                    db_locants.append(min(pos1, pos2) + 1)
+                    db_locants.append(ring_double_bond_locant(pos1, pos2, n))
 
                 db_locants.sort()
 

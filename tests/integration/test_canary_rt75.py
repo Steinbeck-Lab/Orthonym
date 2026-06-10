@@ -124,7 +124,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=CC1=CC(O)C(O)C(O)C1O",
-        "3,4,5,6-tetrahydroxycyclohex-1-enecarbaldehyde",
+        # Re-baselined v21 WS-A.1 S4: the appended-suffix anchor now routes
+        # through orient_cycloalkene Path A and the suffix locant is cited
+        # explicitly (P-31.1.4.3.4). OPSIN RT-verifies True; same structure,
+        # same numbering as the old form.
+        "3,4,5,6-tetrahydroxycyclohex-1-ene-1-carbaldehyde",
     ),
     (
         "COc1cc(C=CC(=O)O)cc(O)c1O",

@@ -381,6 +381,65 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     elif (not features.principal_chain
           and getattr(features, 'oriented_ring', None)
           and features.principal_group_atoms
+          and fg_name in TERMINAL_GROUPS):
+        # v21 WS-A.1 S4: terminal groups appended to a RING parent
+        # (-carbaldehyde / -carboxylic acid / -carbonitrile). Count and
+        # locate only RING-ANCHORED matches (the exocyclic suffix carbon
+        # bonded to a ring atom); a match wholly inside a demoted chain
+        # substituent is expressed there (oxo/cyano prefix), never as a
+        # second ring suffix ('cyclopentanedicarbaldehyde' bug).
+        from ..composer import ring_anchored_pg_atoms
+        oriented_ring = features.oriented_ring
+        ring_set_local = set(oriented_ring)
+        ring_idx_to_locant = {
+            atom_idx: pos + 1
+            for pos, atom_idx in enumerate(oriented_ring)
+        }
+        mol = features.mol
+        anchored_locants = []
+        for match in features.principal_group_atoms:
+            match_set = set(match)
+            anchor_locant = None
+            for atom_idx in match:
+                if atom_idx in ring_idx_to_locant:
+                    anchor_locant = ring_idx_to_locant[atom_idx]
+                    break
+                atom = mol.GetAtomWithIdx(atom_idx)
+                if atom.GetSymbol() != 'C':
+                    continue
+                for nbr in atom.GetNeighbors():
+                    if nbr.GetIdx() in ring_idx_to_locant:
+                        anchor_locant = ring_idx_to_locant[nbr.GetIdx()]
+                        break
+                if anchor_locant is not None:
+                    break
+            if anchor_locant is not None:
+                anchored_locants.append(anchor_locant)
+        anchored_locants = sorted(set(anchored_locants))
+        if anchored_locants:
+            fg_count = len(anchored_locants)
+            # Locant presentation: the bare mono case keeps the historical
+            # locant-free form (cyclohexanecarbaldehyde); cite locants when
+            # the suffix is multiplied or the ring carries other cited
+            # substituents (2-(7-oxoheptyl)cyclopentane-1-carbaldehyde).
+            other_subs_exist = False
+            ring_subs = getattr(features, 'ring_substituents', None) or {}
+            anchored_atoms = ring_anchored_pg_atoms(
+                mol, features.principal_group_atoms, ring_set_local
+            )
+            for _pos, sub_list in ring_subs.items():
+                for sub_atoms in sub_list:
+                    if not (set(sub_atoms) <= anchored_atoms):
+                        other_subs_exist = True
+                        break
+                if other_subs_exist:
+                    break
+            if fg_count > 1 or other_subs_exist:
+                locants = tuple(anchored_locants)
+
+    elif (not features.principal_chain
+          and getattr(features, 'oriented_ring', None)
+          and features.principal_group_atoms
           and fg_name not in TERMINAL_GROUPS):
         # Ring compounds: build idx_to_locant from oriented_ring and compute
         # suffix locants.  This mirrors the logic in _get_fg_locants() but

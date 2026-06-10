@@ -6348,6 +6348,35 @@ def _detect_fg_only_prefix(mol, frag_atoms, attach_mol_idx):
     return None
 
 
+def ring_anchored_pg_atoms(mol, pg_matches, ring_atom_set: set) -> set:
+    """Atoms of principal-group matches ANCHORED to the parent ring.
+
+    A match is ring-anchored when it contains a ring atom (inline suffixes:
+    ring C=O ketone, ring C-OH alcohol) or when one of its carbons is bonded
+    directly to a ring atom (appended suffixes: -carbaldehyde, -carboxylic
+    acid, -carbonitrile, whose match atoms are all exocyclic).
+
+    P-44.1.2.2 co-delivery (v21 WS-A.1 S4): only ring-anchored matches are
+    expressed as the ring suffix. A PG match wholly inside a demoted chain
+    substituent (e.g., the terminal CHO of a 7-oxoheptyl chain) must stay
+    with the substituent and be named there (oxo/cyano/... prefix).
+    """
+    anchored: set = set()
+    for match in (pg_matches or []):
+        match_set = set(match)
+        if match_set & ring_atom_set:
+            anchored.update(match_set)
+            continue
+        for atom_idx in match:
+            atom = mol.GetAtomWithIdx(atom_idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            if any(nbr.GetIdx() in ring_atom_set for nbr in atom.GetNeighbors()):
+                anchored.update(match_set)
+                break
+    return anchored
+
+
 def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     """
     Generate prefix fragments for ALL substituents on rings (alkyl, heteroatom, compound).
@@ -6378,15 +6407,18 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     ring_atoms_tuple = tuple(oriented_ring)
     sub_infos = extract_ring_substituents(mol, ring_atoms_tuple, oriented_ring)
 
-    # Collect principal group atoms to skip substituents overlapping with them
-    pg_atom_set = set()
-    if features.principal_group_atoms:
-        for match in features.principal_group_atoms:
-            pg_atom_set.update(match)
+    # Collect principal group atoms to skip substituents overlapping with them.
+    # v21 WS-A.1 S4: only RING-ANCHORED matches count — they are the suffix.
+    # A PG match wholly inside a chain substituent (terminal CHO of an
+    # oxoalkyl chain) must NOT suppress that substituent (it previously
+    # dropped the whole chain: 'cyclopentanedicarbaldehyde' bug).
+    ring_set = set(oriented_ring)
+    pg_atom_set = ring_anchored_pg_atoms(
+        mol, features.principal_group_atoms, ring_set
+    )
 
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
-    ring_set = set(oriented_ring)
 
     # DROP-07 fix: track FG-only substituents handled here to prevent
     # double-emission in the global FG prefix loop of _generate_prefixes()

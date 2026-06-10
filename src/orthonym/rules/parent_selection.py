@@ -821,6 +821,32 @@ def select_parent(
         chain_len = len(candidate_chain)
         chain_set = set(candidate_chain)
 
+        # P-44.1.2.2 (v21 WS-A.1 S4): a ring or ring system is senior to a
+        # chain of the SAME class, regardless of size or hydrogenation, and
+        # this decision precedes the P-44.1(c) length comparison. Tight
+        # same-class gate: fires only when the best ring and the candidate
+        # chain are BOTH all-carbon skeletons. Heteroatom-bridged skeletal
+        # chains (oxa/aza/ester chains, assigned to candidate_chain by the
+        # P-44.3(b) block above) have a different senior element and fall
+        # through to the existing cascade, keeping the P-44.3 path reachable.
+        ring_all_carbon = all(
+            mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in best_ring
+        )
+        chain_all_carbon = all(
+            mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in candidate_chain
+        )
+        if ring_all_carbon and chain_all_carbon:
+            other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
+            return ParentSelectionResult(
+                parent_type='ring',
+                parent_atoms=list(sorted(best_ring)),
+                substituent_rings=other_ring_tuples,
+                reasoning=(
+                    "P-44.1.2.2: ring senior to chain (same class, both "
+                    f"carbon-based; ring={ring_size}, chain={chain_len})"
+                )
+            )
+
         # P-44.1 cascade: criteria (c) through (i)
         cascade_result = _compare_chain_length(chain_len, ring_size)        # P-44.1(c)
         if cascade_result == 0:

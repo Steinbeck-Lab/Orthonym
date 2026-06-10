@@ -2028,13 +2028,30 @@ class Orthonym:
                     # group's characteristic heteroatom (e.g., C=O for ketone,
                     # C-OH for alcohol). The characteristic heteroatom must be
                     # bonded DIRECTLY to a ring carbon (not via an exocyclic C).
-                    # Exocyclic groups (aldehyde -CHO, -COOH) use -carbaldehyde/
-                    # -carboxylic acid suffixes and don't override ring numbering.
                     pg_ring_atoms = set()
                     if features.principal_group and features.principal_group in features.functional_groups:
                         ring_set = set(features.principal_ring)
                         for match in features.functional_groups[features.principal_group]:
                             match_set = set(match)
+                            if not (match_set & ring_set):
+                                # v21 WS-A.1 S4: wholly-exocyclic match = an
+                                # APPENDED suffix (-carbaldehyde, -carboxylic
+                                # acid, -carbonitrile). Its expressed-suffix
+                                # ANCHOR (the ring atom bonded to the match
+                                # carbon) takes the lowest locant per
+                                # P-31.1.4.2.4 (2-methylcyclohexane-1-
+                                # carbaldehyde, never 1-methyl-2-). Matches
+                                # with no ring contact at all (a CHO at the
+                                # end of a demoted chain) contribute nothing.
+                                for atom_idx in match:
+                                    atom = features.mol.GetAtomWithIdx(atom_idx)
+                                    if atom.GetSymbol() != 'C':
+                                        continue
+                                    for nbr in atom.GetNeighbors():
+                                        if nbr.GetIdx() in ring_set:
+                                            pg_ring_atoms.add(nbr.GetIdx())
+                                            break
+                                continue
                             for atom_idx in match:
                                 if atom_idx in ring_set:
                                     atom = features.mol.GetAtomWithIdx(atom_idx)
@@ -2066,15 +2083,19 @@ class Orthonym:
                             features.ring_substituents,
                             principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
                         )
-                        # Calculate ring double bond locants
+                        # Calculate ring double bond locants (wrap-aware:
+                        # the closure bond positions (0, n-1) is locant n)
                         if features.oriented_ring and features.ring_double_bonds:
+                            from .rules.cycloalkanes import ring_double_bond_locant
                             oriented = features.oriented_ring
+                            n_ring = len(oriented)
                             locants = []
                             for a1, a2 in features.ring_double_bonds:
                                 pos1 = oriented.index(a1)
                                 pos2 = oriented.index(a2)
-                                # Lower position is the locant
-                                locants.append(min(pos1, pos2) + 1)
+                                locants.append(
+                                    ring_double_bond_locant(pos1, pos2, n_ring)
+                                )
                             features.ring_double_bond_locants = sorted(locants)
 
         # Find principal chain (for acyclic molecules or chain-is-parent cyclic molecules)
