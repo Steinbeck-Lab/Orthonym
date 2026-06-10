@@ -2022,42 +2022,43 @@ class Orthonym:
                         features.mol, features.principal_ring
                     )
 
+                    # Determine principal group atoms on the ring
+                    # IUPAC P-31.1.3.4 / P-31.1.4: principal group gets lowest locant
+                    # We identify ring C atoms that directly bear the principal
+                    # group's characteristic heteroatom (e.g., C=O for ketone,
+                    # C-OH for alcohol). The characteristic heteroatom must be
+                    # bonded DIRECTLY to a ring carbon (not via an exocyclic C).
+                    # Exocyclic groups (aldehyde -CHO, -COOH) use -carbaldehyde/
+                    # -carboxylic acid suffixes and don't override ring numbering.
+                    pg_ring_atoms = set()
+                    if features.principal_group and features.principal_group in features.functional_groups:
+                        ring_set = set(features.principal_ring)
+                        for match in features.functional_groups[features.principal_group]:
+                            match_set = set(match)
+                            for atom_idx in match:
+                                if atom_idx in ring_set:
+                                    atom = features.mol.GetAtomWithIdx(atom_idx)
+                                    if atom.GetSymbol() != 'C':
+                                        continue
+                                    # Check if this ring C is bonded to a non-ring
+                                    # HETEROATOM that is in the FG match
+                                    for nbr in atom.GetNeighbors():
+                                        nbr_idx = nbr.GetIdx()
+                                        if (nbr_idx not in ring_set
+                                                and nbr_idx in match_set
+                                                and nbr.GetSymbol() != 'C'):
+                                            pg_ring_atoms.add(atom_idx)
+                                            break
+
                     # Orient the ring based on type
                     if features.ring_type == 'cycloalkane':
                         features.oriented_ring = orient_cycloalkane(
                             features.mol,
                             features.principal_ring,
-                            features.ring_substituents
+                            features.ring_substituents,
+                            principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
                         )
                     elif features.ring_type == 'cycloalkene':
-                        # Determine principal group atoms on the ring
-                        # IUPAC P-31.1.3.4: principal group gets lowest locant
-                        # We identify ring C atoms that directly bear the principal
-                        # group's characteristic heteroatom (e.g., C=O for ketone,
-                        # C-OH for alcohol). The characteristic heteroatom must be
-                        # bonded DIRECTLY to a ring carbon (not via an exocyclic C).
-                        # Exocyclic groups (aldehyde -CHO, -COOH) use -carbaldehyde/
-                        # -carboxylic acid suffixes and don't override ring numbering.
-                        pg_ring_atoms = set()
-                        if features.principal_group and features.principal_group in features.functional_groups:
-                            ring_set = set(features.principal_ring)
-                            for match in features.functional_groups[features.principal_group]:
-                                match_set = set(match)
-                                for atom_idx in match:
-                                    if atom_idx in ring_set:
-                                        atom = features.mol.GetAtomWithIdx(atom_idx)
-                                        if atom.GetSymbol() != 'C':
-                                            continue
-                                        # Check if this ring C is bonded to a non-ring
-                                        # HETEROATOM that is in the FG match
-                                        for nbr in atom.GetNeighbors():
-                                            nbr_idx = nbr.GetIdx()
-                                            if (nbr_idx not in ring_set
-                                                    and nbr_idx in match_set
-                                                    and nbr.GetSymbol() != 'C'):
-                                                pg_ring_atoms.add(atom_idx)
-                                                break
-
                         features.oriented_ring = orient_cycloalkene(
                             features.mol,
                             features.principal_ring,

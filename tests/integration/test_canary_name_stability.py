@@ -122,7 +122,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC[C@H](O)C(=O)N[C@@H](COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O)[C@H](O)CCCCCCCCCCCCCCC",
-        "N-[(2S)-2-hydroxytetracosanoyl](1S,2R,3S,4S,5R,6R)-aminocyclohexane-2,3,4,5,6-pentaol",
+        # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c)): the cyclohexane -ol suffix
+        # set now takes the lowest locants {1,2,3,4,5}, not {2,3,4,5,6}.
+        # Wrong-both-ways row (unbracketed N-acyl prefix; OPSIN-unparseable
+        # either way, RT=False→False); the new ring numbering is the PIN.
+        "N-[(2S)-2-hydroxytetracosanoyl](1R,2S,3S,4R,5R,6S)-aminocyclohexane-1,2,3,4,5-pentaol",
     ),
     (
         "CSCC[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",
@@ -425,7 +429,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCCC(O)C(O)C(=O)N[C@@H](COP(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1OC1O[C@H](COP(=O)([O-])O[C@@H]2[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@@H]1O)[C@H](O)C(O)CCCCCCCCCCCCCC",
-        "N-2,3-dihydroxyhexacosanoyl(1R,2R,3S,4R,5R,6R)-aminocyclohexane-3,4,5,6-tetraol",
+        # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c)): -ol suffix set now {1,2,3,4}
+        # not {3,4,5,6}. Wrong-both-ways (OPSIN-unparseable), RT=False→False.
+        "N-2,3-dihydroxyhexacosanoyl(1S,2R,3R,4R,5R,6R)-aminocyclohexane-1,2,3,4-tetraol",
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]2O)[C@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O[C@]3(C(=O)O)C[C@H](O)[C@@H](NC(=O)CO)[C@H]([C@H](O)[C@H](O)CO)O3)[C@H]2O)[C@@H](CO)O[C@H]1O",
@@ -982,9 +988,15 @@ NAME_STABILITY_CANARY = [
         "CC(C)(COP(=O)([O-])OP(=O)([O-])OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)([O-])[O-])[C@@H](O)C(=O)NCCC(=O)NCCSC(=O)C1C(=O)CCCC1O",  # aromatic,heterocycle,fused-ring,polyfunctional,charged,large,carbohydrate
         "N-[(2R)-2-hydroxy-3,3-dimethylbutanoyl]amino-1-hydroxy-3-oxocyclohexane",
     ),
+    # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c) suffix-locant priority): the
+    # ring -ol suffix now takes locant 1 (was 4). Both OLD and NEW forms are
+    # wrong-both-ways (dangling 'hydroxy-' without a locant, partial
+    # secosteroid coverage) and OPSIN RT=False either way; the NEW form has
+    # the correct ring numbering. The dangling-hydroxy emitter defect is
+    # pre-existing and tracked separately.
     (
         "[2H]C([2H])=C1CC[C@H](O)C/C1=C([2H])\\C=C1/CCC[C@]2(C)[C@@H]([C@H](C)CC[C@@H](O)C(C)(C)O)CC[C@@H]12",  # fused-ring,medium
-        "(2E,4S)-hydroxy-1-methylidenecyclohexan-4-ol",
+        "(1S,3E)-hydroxy-4-methylidenecyclohexan-1-ol",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO[C@H]1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H]1O)[C@H](O)[C@H](O)CCCCCCCCCCCCCC",  # heterocycle,large,carbohydrate
@@ -2252,7 +2264,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCCCCC(O)C(=O)N[C@@H](COP(=O)(O)O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1OC1O[C@H](COP(=O)(O)O[C@@H]2[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]2O)[C@@H](O)[C@H](O)[C@@H]1O)[C@H](O)CCCCCCCCCCCCCCC",  # heterocycle,large,carbohydrate
-        "N-2-hydroxyhexacosanoyl(1R,2R,3S,4R,5R,6R)-aminocyclohexane-3,4,5,6-tetraol",
+        # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c)): -ol suffix set now {1,2,3,4}
+        # not {3,4,5,6}. Wrong-both-ways (OPSIN-unparseable), RT=False→False.
+        "N-2-hydroxyhexacosanoyl(1S,2R,3R,4R,5R,6R)-aminocyclohexane-1,2,3,4-tetraol",
     ),
     (
         "COc1ccc(CCNCC(O)COc2cccc(C)c2)cc1OC",  # aromatic,medium

@@ -16,14 +16,14 @@
       "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
       "source_corpus": "",
       "source_id": "CHEBI:18515",
-      "comment": "(1S,2S,4R)-1-hydroxy-1-methyl-4-(prop-1-en-2-yl)cyclohexan-2-ol"
+      "comment": "(1S,2S,5R)-2-hydroxy-2-methyl-5-(prop-1-en-2-yl)cyclohexan-1-ol (v21 S3 P-31.1.4 renumbering; ol suffix at C1)"
     },
     {
       "smiles": "C=C(C)[C@H]1CC[C@@H](C)CC1=O",
       "expected_stereo_prefix_pattern": "^\\([0-9RS,]+\\)-",
       "source_corpus": "",
       "source_id": "CHEBI:37047",
-      "comment": "(1R,4R)-4-methyl-1-(prop-1-en-2-yl)cyclohexan-2-one (a dihydrocarvone)"
+      "comment": "(2R,5R)-5-methyl-2-(prop-1-en-2-yl)cyclohexan-1-one (a dihydrocarvone; v21 S3 P-31.1.4 renumbering, one suffix at C1)"
     },
     {
       "smiles": "C=C(C)[C@H]1CC[C@@H](C)[C@@H](O)C1",

@@ -1219,7 +1219,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H]1CC(=O)CC(C)(C)C1=O",
-        "(1R)-1,3,3-trimethylcyclohexane-2,5-dione",
+        # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c) suffix-locant priority):
+        # dione anchors must take {1,4}, not {2,5}. Both forms OPSIN
+        # RT-verify True; the new form is the PIN numbering.
+        "(6R)-2,2,6-trimethylcyclohexane-1,4-dione",
     ),
     (
         "CC(C)CC(=O)[C@@H](C)CCC(C)(C)O",
@@ -1697,7 +1700,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C=C[C@@]1(C)CCC(=O)C[C@H]1C(=C)C",  # small
-        "(1R,2S)-1-ethenyl-1-methyl-2-(prop-1-en-2-yl)cyclohexan-4-one",
+        # Re-baselined v21 WS-A.1 S3 (P-31.1.4(c) suffix-locant priority):
+        # the ketone suffix must take locant 1, not 4. Both forms OPSIN
+        # RT-verify True; stereo descriptors track the renumbering.
+        "(3S,4R)-4-ethenyl-4-methyl-3-(prop-1-en-2-yl)cyclohexan-1-one",
     ),
     (
         "O=C1C(CO)=C[C@@H](O)[C@@H](O)[C@H]1Br",  # small

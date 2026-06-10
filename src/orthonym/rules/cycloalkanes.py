@@ -117,7 +117,8 @@ def _bfs_substituent(mol, start_idx: int, exclude_atoms: Set[int]) -> List[int]:
 def orient_cycloalkane(
     mol,
     ring_atoms: Tuple[int, ...],
-    substituent_positions: Dict[int, List[List[int]]]
+    substituent_positions: Dict[int, List[List[int]]],
+    principal_group_atoms: Optional[Set[int]] = None
 ) -> List[int]:
     """
     Orient a cycloalkane ring to give lowest locants to substituents.
@@ -126,10 +127,18 @@ def orient_cycloalkane(
     - Single substituent: that carbon is position 1
     - Multiple substituents: apply first-point-of-difference rule
 
+    When the principal characteristic group sits on ring atoms (expressed as
+    a suffix: -ol, -one, -amine, ...), P-31.1.4 numbering applies instead:
+    the suffix anchor takes the lowest locant before any detachable prefix.
+
     Args:
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices in the ring
         substituent_positions: Dict mapping ring atom index to substituent lists
+        principal_group_atoms: Optional set of ring atom indices bearing the
+            principal characteristic group (e.g., the ring C of C-OH / C=O /
+            C-NH2). Exocyclic-carbon suffixes (-carbaldehyde, -carboxylic
+            acid) must NOT be included — they do not seize ring numbering.
 
     Returns:
         List of ring atom indices reordered so position 1 is first
@@ -139,6 +148,14 @@ def orient_cycloalkane(
 
     # Get substituted positions (indices in ring_list)
     substituted_atom_indices = set(substituent_positions.keys())
+
+    # --- P-31.1.4: principal group on ring -> suffix-locant priority ---
+    if principal_group_atoms:
+        pg_set = {a for a in principal_group_atoms if a in ring_list}
+        if pg_set:
+            return _orient_cycloalkane_with_pg(
+                mol, ring_list, substituent_positions, pg_set
+            )
 
     if not substituted_atom_indices:
         # Unsubstituted - any orientation is fine
@@ -214,6 +231,103 @@ def orient_cycloalkane(
 
     best_candidates.sort(key=sort_key)
     return best_candidates[0][0]
+
+
+def _orient_cycloalkane_with_pg(
+    mol,
+    ring_list: List[int],
+    substituent_positions: Dict[int, List[List[int]]],
+    pg_set: Set[int]
+) -> List[int]:
+    """
+    P-31.1.4 numbering for a saturated ring whose principal characteristic
+    group sits on ring atoms (suffix expression: -ol, -one, -amine, ...).
+
+    Tier order, first-decision-wins (P-31.1.4.2.4 / P-31.1.4.3.4):
+      (c) lowest locants to the suffix anchor atoms,
+      (f) lowest locants to the detachable-prefix-only set — the suffix
+          expression itself (the heteroatom-rooted substituent list at a PG
+          position) is NOT a prefix and is excluded from this set,
+      (g) lowest locant to the prefix cited first in alphanumerical order.
+    """
+    n = len(ring_list)
+    candidates = []
+
+    for start_pos in range(n):
+        for direction in (1, -1):
+            oriented = _build_oriented_ring(ring_list, start_pos, direction)
+
+            # (c) suffix-anchor locants
+            pg_locants = sorted(oriented.index(a) + 1 for a in pg_set)
+
+            # (f) prefix-only entries: at a PG position, the heteroatom-rooted
+            # list IS the suffix (C-OH / C=O / C-NH2) and does not count;
+            # carbon-rooted lists there are genuine prefixes and still count.
+            prefix_entries = []  # (locant, sub_atoms)
+            for i, atom_idx in enumerate(oriented):
+                for sub_atoms in substituent_positions.get(atom_idx, ()):
+                    if (atom_idx in pg_set and sub_atoms
+                            and mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol() != 'C'):
+                        continue
+                    prefix_entries.append((i + 1, sub_atoms))
+            prefix_locants = sorted(loc for loc, _ in prefix_entries)
+
+            candidates.append((oriented, pg_locants, prefix_locants, prefix_entries))
+
+    best = candidates[0]
+    for cand in candidates[1:]:
+        cmp = _compare_locant_sets(cand[1], best[1])
+        if cmp == 0:
+            cmp = _compare_locant_sets(cand[2], best[2])
+        if cmp < 0:
+            best = cand
+
+    tied = [
+        cand for cand in candidates
+        if _compare_locant_sets(cand[1], best[1]) == 0
+        and _compare_locant_sets(cand[2], best[2]) == 0
+    ]
+    if len(tied) == 1:
+        return tied[0][0]
+
+    # (g) cite each candidate's prefixes in alphabetical order and compare
+    # the (name, locant) vectors — the first-cited name's locant decides.
+    def alpha_citation_key(cand):
+        entries = []
+        for locant, sub_atoms in cand[3]:
+            name = _prefix_name_for_sort(mol, sub_atoms, ring_list)
+            entries.append((alpha_sort_key(name) if name else 'zzzzz', locant))
+        entries.sort()
+        return entries
+
+    tied.sort(key=alpha_citation_key)
+    return tied[0][0]
+
+
+def _prefix_name_for_sort(mol, sub_atoms: List[int], ring_list: List[int]) -> Optional[str]:
+    """Best-effort prefix name for alphabetic tie-breaking (tier (g)).
+
+    Mirrors the legacy pos1 naming: recursive fragment naming for branched
+    all-C/H substituents, straight alkyl name by carbon count otherwise.
+    Returns None when no name can be derived (sorts last).
+    """
+    if not sub_atoms:
+        return None
+    carbon_count = sum(
+        1 for idx in sub_atoms
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    )
+    all_c_h = all(
+        mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+        for i in sub_atoms
+    )
+    name = None
+    if all_c_h and len(sub_atoms) > 1:
+        from ..assembly.substituent_naming import name_substituent_fragment
+        name = name_substituent_fragment(mol, sub_atoms, sub_atoms[0], ring_list)
+    if name is None and all_c_h:
+        name = _get_alkyl_name(carbon_count)
+    return name
 
 
 def orient_cycloalkene(
