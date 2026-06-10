@@ -22,7 +22,10 @@ COMPLEX_N_SUBSTITUENT_CASES = [
     ("CC(=O)NC(C)C", "isopropyl", "branched substituent (isopropyl retained name)"),
     ("CC(=O)NC(C)(C)C", "tert-butyl", "branched substituent (tert-butyl)"),
     ("CC(=O)Nc1ccncc1", "pyridin", "heterocyclic substituent"),
-    ("CC(=O)Nc1ccc(C)cc1", "tolu", "substituted aryl substituent (tolyl/toluenyl)"),
+    # WS-A.2 re-baseline: the old expectation 'tolu' locked the WRONG form
+    # 'N-(4-methyltoluenyl)acetamide' (toluenyl is non-PIN and double-counts
+    # the methyl). PIN is N-(4-methylphenyl)acetamide (OPSIN-verified).
+    ("CC(=O)Nc1ccc(C)cc1", "4-methylphenyl", "substituted aryl substituent (PIN form)"),
 ]
 
 

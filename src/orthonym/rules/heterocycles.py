@@ -837,6 +837,27 @@ def get_heterocycle_substituents(
             is_ring = classification['type'] == 'ring'
             ring_name = classification['name'] if is_ring else None
 
+            # WS-A.2: a demoted ring substituent must carry its OWN
+            # substituent prefixes ('2-oxocyclohexyl', not the FG-dropping
+            # bare 'cyclohexyl'). Guarded primitive: None -> keep the bare
+            # legacy form (zero regression); the coverage check requires the
+            # decorated name to account for exactly the substituent atoms.
+            if is_ring and ring_name:
+                from .ring_substituents import decorated_ring_substituent_name
+                _sub_ring = classification.get('ring_atoms')
+                if _sub_ring:
+                    _att = next(
+                        (a for a in _sub_ring
+                         if any(nb.GetIdx() == ring_atom_idx for nb in
+                                mol.GetAtomWithIdx(a).GetNeighbors())),
+                        None)
+                    if _att is not None:
+                        _dec = decorated_ring_substituent_name(
+                            mol, _sub_ring, _att,
+                            expected_atoms=set(sub_atoms))
+                        if _dec is not None:
+                            ring_name = _dec
+
             sub_info = {
                 'atoms': sub_atoms,
                 'is_on_nitrogen': is_nitrogen,

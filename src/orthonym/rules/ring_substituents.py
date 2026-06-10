@@ -869,6 +869,327 @@ def get_ring_attachment_atom(
     return None
 
 
+def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
+                                   ring_atom_set: Set[int],
+                                   skip_atoms: Set[int]):
+    """Detect the supported simple substituents anchored at one ring atom.
+
+    Returns (prefixes, covered_atoms) where prefixes is a list of prefix
+    strings and covered_atoms the exocyclic atom indices they account for —
+    or None if the atom carries ANY exocyclic group outside the supported
+    table (the caller must then guard out to its legacy form; emitting a
+    partially-decorated name would be structurally wrong).
+
+    v1 table (per the WS-A.2 flip-population scope — covers the head of the
+    distribution): oxo, cyano, halogen, hydroxy, methoxy/simple n-alkoxy,
+    amino (-NH2), nitro, unbranched pure alkyl. Deliberately NOT supported
+    (guard out): esters/amides/acyl, sulfonyl, nested ring substituents,
+    branched alkyl, anything charged or exotic.
+    """
+    _HAL = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    _ALKYL = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl',
+              5: 'pentyl', 6: 'hexyl', 7: 'heptyl', 8: 'octyl'}
+    _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy', 4: 'butoxy'}
+
+    def _linear_carbon_chain(start_idx, exclude):
+        """Length of a pure, UNBRANCHED, saturated C/H chain from start_idx,
+        or None if branched/heteroatom/unsaturated/cyclic."""
+        length = 0
+        prev = None
+        cur = start_idx
+        while True:
+            atom = mol.GetAtomWithIdx(cur)
+            if (atom.GetSymbol() != 'C' or atom.GetIsAromatic()
+                    or atom.IsInRing() or atom.GetFormalCharge() != 0):
+                return None
+            nxt = [n.GetIdx() for n in atom.GetNeighbors()
+                   if n.GetIdx() != prev and n.GetIdx() not in exclude]
+            for n_idx in nxt:
+                bond = mol.GetBondBetweenAtoms(cur, n_idx)
+                if bond.GetBondTypeAsDouble() != 1.0:
+                    return None
+            length += 1
+            if not nxt:
+                return length
+            if len(nxt) > 1:
+                return None
+            prev, cur = cur, nxt[0]
+
+    def _chain_atoms(start_idx, prev_idx):
+        out = []
+        prev, cur = prev_idx, start_idx
+        while cur is not None:
+            out.append(cur)
+            nxt = [n.GetIdx() for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+                   if n.GetIdx() != prev and n.GetIdx() not in ring_atom_set]
+            prev, cur = cur, (nxt[0] if nxt else None)
+        return out
+
+    prefixes: List[str] = []
+    covered: Set[int] = set()
+    atom = mol.GetAtomWithIdx(ring_atom_idx)
+    for nbr in atom.GetNeighbors():
+        ni = nbr.GetIdx()
+        if ni in ring_atom_set or ni in skip_atoms:
+            continue
+        bond = mol.GetBondBetweenAtoms(ring_atom_idx, ni)
+        sym = nbr.GetSymbol()
+        order = bond.GetBondTypeAsDouble()
+        charge = nbr.GetFormalCharge()
+        # oxo (exocyclic =O)
+        if (sym == 'O' and order == 2.0 and charge == 0
+                and nbr.GetTotalNumHs() == 0 and nbr.GetDegree() == 1):
+            prefixes.append('oxo')
+            covered.add(ni)
+            continue
+        # halogen
+        if sym in _HAL and order == 1.0 and nbr.GetDegree() == 1 and charge == 0:
+            prefixes.append(_HAL[sym])
+            covered.add(ni)
+            continue
+        # hydroxy / simple n-alkoxy
+        if sym == 'O' and order == 1.0 and charge == 0:
+            o_nbrs = [n for n in nbr.GetNeighbors() if n.GetIdx() != ring_atom_idx]
+            if nbr.GetTotalNumHs() == 1 and not o_nbrs:
+                prefixes.append('hydroxy')
+                covered.add(ni)
+                continue
+            if len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C':
+                chain = _linear_carbon_chain(o_nbrs[0].GetIdx(), {ni} | ring_atom_set)
+                if chain is not None and chain in _ALKOXY:
+                    prefixes.append(_ALKOXY[chain])
+                    covered.add(ni)
+                    covered.update(_chain_atoms(o_nbrs[0].GetIdx(), ni))
+                    continue
+            return None
+        # amino (-NH2)
+        if (sym == 'N' and order == 1.0 and charge == 0
+                and nbr.GetTotalNumHs() == 2 and nbr.GetDegree() == 1):
+            prefixes.append('amino')
+            covered.add(ni)
+            continue
+        # nitro (-[N+](=O)[O-])
+        if sym == 'N' and charge == 1 and nbr.GetDegree() == 3:
+            n_os = [n for n in nbr.GetNeighbors() if n.GetIdx() != ring_atom_idx]
+            if (len(n_os) == 2
+                    and all(x.GetSymbol() == 'O' and x.GetDegree() == 1 for x in n_os)
+                    and sorted(x.GetFormalCharge() for x in n_os) == [-1, 0]):
+                prefixes.append('nitro')
+                covered.add(ni)
+                covered.update(x.GetIdx() for x in n_os)
+                continue
+            return None
+        # cyano (-C#N) or unbranched pure alkyl
+        if sym == 'C' and order == 1.0 and charge == 0:
+            c_nbrs = [x for x in nbr.GetNeighbors() if x.GetIdx() != ring_atom_idx]
+            if (len(c_nbrs) == 1 and c_nbrs[0].GetSymbol() == 'N'
+                    and c_nbrs[0].GetDegree() == 1
+                    and mol.GetBondBetweenAtoms(ni, c_nbrs[0].GetIdx())
+                          .GetBondTypeAsDouble() == 3.0):
+                prefixes.append('cyano')
+                covered.add(ni)
+                covered.add(c_nbrs[0].GetIdx())
+                continue
+            chain = _linear_carbon_chain(ni, ring_atom_set)
+            if chain is not None and chain in _ALKYL:
+                prefixes.append(_ALKYL[chain])
+                covered.update(_chain_atoms(ni, ring_atom_idx))
+                continue
+            return None
+        # anything else exocyclic -> unsupported
+        return None
+    return prefixes, covered
+
+
+def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
+                                    expected_atoms: Optional[Set[int]] = None
+                                    ) -> Optional[str]:
+    """PIN substituent name for a MONOCYCLIC ring substituent carrying its own
+    substituent prefixes: ``2-nitrothiophen-3-yl``, ``2-oxocyclohexyl``,
+    ``3-chloro-2-methylphenyl``.
+
+    When ``expected_atoms`` is given, the name is returned only if the ring
+    plus the detected decoration atoms account for EXACTLY that set — callers
+    naming a specific fragment use this so the emitted name can never cover
+    more or less than the fragment.
+
+    This is the WS-A.2 demoted-ring emitter: when parent selection demotes a
+    decorated ring to a substituent, its decoration must be carried (the
+    Phase-171 / rt75_0582 class of regression: a parent flip that silently
+    drops the demoted ring's groups).
+
+    Numbering per P-14.4 (BlueBookV2.md:3221), applied in order:
+      1. ring heteroatoms low (set, then element seniority) — criterion (a);
+      2. free valence (attachment) low — criterion (c), which OUTRANKS the
+         detachable prefixes (cf. '6-carboxynaphthalen-2-yl', :3262);
+      3. detachable-prefix locant set low (first point of difference) — (f);
+      4. first-cited (alphabetically) prefix low — (g).
+
+    Deliberately GUARDED — returns None (caller keeps its legacy form, so the
+    change is zero-regression by construction) when:
+      * the ring is not a simple monocycle (fused/spiro/bridged atoms);
+      * the ring is an N-H azole or otherwise needs indicated hydrogen;
+      * the ring has mixed saturation (would need ene-locants in the stem);
+      * any ring atom carries an exocyclic group outside the supported table;
+      * the ring carries no supported decoration at all (bare rings keep
+        their existing forms — this function only DECORATES);
+      * the stem is not confidently known.
+    """
+    ring_list = list(ring_atoms)
+    n = len(ring_list)
+    ring_set = set(ring_list)
+    if attachment_atom not in ring_set or not (3 <= n <= 8):
+        return None
+
+    # --- simple monocycle: every ring atom has exactly 2 ring neighbours ----
+    ring_adj: Dict[int, List[int]] = {}
+    for idx in ring_list:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetFormalCharge() != 0:
+            return None
+        nbrs = [nbr.GetIdx() for nbr in atom.GetNeighbors()
+                if nbr.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return None
+        # fused/spiro guard: ring atom must not belong to any other ring
+        if mol.GetRingInfo().NumAtomRings(idx) != 1:
+            return None
+        ring_adj[idx] = nbrs
+
+    # --- classify the ring & pick the stem ----------------------------------
+    het = [i for i in ring_list if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+    aromatic = all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list)
+    saturated = all(
+        not mol.GetBondBetweenAtoms(a, b).GetIsAromatic()
+        and mol.GetBondBetweenAtoms(a, b).GetBondTypeAsDouble() == 1.0
+        for a in ring_list for b in ring_adj[a] if a < b)
+
+    if het:
+        # N-H ring atoms (pyrrole-type) need indicated hydrogen -> guard out
+        if any(mol.GetAtomWithIdx(i).GetSymbol() == 'N'
+               and mol.GetAtomWithIdx(i).GetTotalNumHs() > 0
+               for i in het):
+            return None
+        if not aromatic and not saturated:
+            return None  # partially unsaturated heterocycle: ene-locants needed
+        ring_name = identify_ring_system(mol, tuple(ring_list))
+        _HET_STEMS = {
+            # aromatic (no indicated-H needed)
+            'pyridine': 'pyridin', 'furan': 'furan', 'thiophene': 'thiophen',
+            'pyrimidine': 'pyrimidin', 'pyrazine': 'pyrazin',
+            'pyridazine': 'pyridazin',
+            # saturated
+            'oxane': 'oxan', 'oxolane': 'oxolan', 'piperidine': 'piperidin',
+            'pyrrolidine': 'pyrrolidin', 'morpholine': 'morpholin',
+        }
+        stem = _HET_STEMS.get(ring_name)
+        if stem is None:
+            return None
+    else:
+        if aromatic and n == 6:
+            stem = 'phenyl'
+        elif saturated:
+            stem = 'cyclo' + _get_chain_prefix(n) + 'yl'
+        else:
+            return None  # mixed-saturation carbocycle: ene-locants needed
+
+    # --- per-atom substituent detection (whole-ring guard) ------------------
+    parent_nbrs = {nbr.GetIdx() for nbr in
+                   mol.GetAtomWithIdx(attachment_atom).GetNeighbors()
+                   if nbr.GetIdx() not in ring_set}
+    atom_prefixes: Dict[int, List[str]] = {}
+    covered_all: Set[int] = set()
+    for idx in ring_list:
+        skip = parent_nbrs if idx == attachment_atom else set()
+        res = _ring_atom_simple_substituents(mol, idx, ring_set, skip_atoms=skip)
+        if res is None:
+            return None
+        atom_prefixes[idx] = res[0]
+        covered_all |= res[1]
+
+    if not any(atom_prefixes.values()):
+        return None  # nothing to decorate: keep legacy form
+
+    if expected_atoms is not None and (ring_set | covered_all) != set(expected_atoms):
+        return None  # name would not cover exactly the requested fragment
+
+    # --- enumerate numberings per P-14.4 -------------------------------------
+    def _walk(start, second):
+        order = {1: start}
+        prev, cur = start, second
+        pos = 2
+        while pos <= n:
+            order[pos] = cur
+            nxt = [x for x in ring_adj[cur] if x != prev]
+            prev, cur = cur, nxt[0]
+            pos += 1
+        return order
+
+    candidates = []
+    if het:
+        for start in ring_list:
+            for second in ring_adj[start]:
+                candidates.append(_walk(start, second))
+        # (1) heteroatom locant set low
+        def het_locs(o):
+            return tuple(sorted(p for p, i in o.items()
+                                if mol.GetAtomWithIdx(i).GetSymbol() != 'C'))
+        best = min(het_locs(o) for o in candidates)
+        candidates = [o for o in candidates if het_locs(o) == best]
+        # (1b) element seniority at the heteroatom positions: F,Cl,Br,I,O,S,
+        # Se,Te,N,P (P-22.2.3.1); lower rank = more senior = lower locant.
+        _SENIORITY = ['F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P']
+        def het_rank_seq(o):
+            return tuple(
+                _SENIORITY.index(mol.GetAtomWithIdx(o[p]).GetSymbol())
+                if mol.GetAtomWithIdx(o[p]).GetSymbol() in _SENIORITY else 99
+                for p in sorted(o)
+                if mol.GetAtomWithIdx(o[p]).GetSymbol() != 'C')
+        best = min(het_rank_seq(o) for o in candidates)
+        candidates = [o for o in candidates if het_rank_seq(o) == best]
+        # (2) free valence low
+        def att_loc(o):
+            return next(p for p, i in o.items() if i == attachment_atom)
+        best = min(att_loc(o) for o in candidates)
+        candidates = [o for o in candidates if att_loc(o) == best]
+        attachment_locant = best
+    else:
+        for second in ring_adj[attachment_atom]:
+            candidates.append(_walk(attachment_atom, second))
+        attachment_locant = 1
+
+    # (3) prefix locant set low (first point of difference)
+    def prefix_locs(o):
+        return tuple(sorted(p for p, i in o.items() for _ in atom_prefixes[i]))
+    best = min(prefix_locs(o) for o in candidates)
+    candidates = [o for o in candidates if prefix_locs(o) == best]
+    # (4) first-cited (alphabetical) prefix low
+    def alpha_keyed(o):
+        pairs = sorted(
+            (name, p) for p, i in o.items() for name in atom_prefixes[i])
+        return tuple(p for _name, p in pairs)
+    best = min(alpha_keyed(o) for o in candidates)
+    order = next(o for o in candidates if alpha_keyed(o) == best)
+
+    # --- assemble -------------------------------------------------------------
+    groups: Dict[str, List[int]] = {}
+    for p, i in order.items():
+        for name in atom_prefixes[i]:
+            groups.setdefault(name, []).append(p)
+    from ..assembly.naming_utils import get_multiplier_prefix
+    parts = []
+    for name in sorted(groups):  # alphabetical citation order
+        locs = sorted(groups[name])
+        loc_str = ','.join(str(loc) for loc in locs)
+        mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
+        parts.append(f'{loc_str}-{mult}{name}')
+    prefix_str = '-'.join(parts)
+
+    if het:
+        return f'{prefix_str}{stem}-{attachment_locant}-yl'
+    return f'{prefix_str}{stem}'
+
+
 def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> List[str]:
     """Characteristic-group prefixes carried by a single ring atom when its
     ring is demoted to a substituent.

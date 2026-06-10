@@ -340,6 +340,27 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.6 (WS-A.2): decorated monocyclic ring substituent ----
+    # A ring fragment carrying its own substituents must keep them with
+    # attachment-correct numbering ('2-oxocyclohexyl'), instead of the
+    # cache/recursive parent_to_prefix form that keeps the PARENT numbering
+    # ('1-oxocyclohexyl' — structurally impossible) or drops the group.
+    # Guarded: returns None (fall through unchanged) unless the ring is a
+    # supported simple monocycle AND the decorated name covers EXACTLY the
+    # fragment atoms (P-14.4 numbering; see rules/ring_substituents.py).
+    if attach_idx is not None:
+        try:
+            from ..rules.ring_substituents import decorated_ring_substituent_name
+            for ring in mol.GetRingInfo().AtomRings():
+                if attach_idx in ring and set(ring) <= frag_atoms_set:
+                    dec = decorated_ring_substituent_name(
+                        mol, ring, attach_idx, expected_atoms=frag_atoms_set)
+                    if dec is not None:
+                        return dec
+                    break
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

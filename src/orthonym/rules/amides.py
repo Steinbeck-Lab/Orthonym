@@ -172,6 +172,22 @@ def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optiona
     sub_set = set(sub_atoms)
     # attach_idx is the first atom in BFS order (directly bonded to nitrogen)
     attach_idx = sub_atoms[0]
+
+    # WS-A.2: when the decorated-ring primitive can name the WHOLE fragment
+    # (ring + its substituents, coverage-checked), use that name directly and
+    # skip _enrich_ring_n_substituent — the enricher would prepend the same
+    # prefixes a second time ('4-methyl' + '4-methylphenyl'). This also
+    # replaces the pre-existing double-count of the enricher around retained
+    # forms ('4-methyl' + 'toluenyl').
+    from ..rules.ring_substituents import decorated_ring_substituent_name
+    for ring in mol.GetRingInfo().AtomRings():
+        if attach_idx in ring and set(ring) <= sub_set:
+            dec = decorated_ring_substituent_name(
+                mol, ring, attach_idx, expected_atoms=sub_set)
+            if dec is not None:
+                return dec
+            break
+
     result = name_substituent(mol, sub_set, attach_idx)
     if result:
         result = _enrich_ring_n_substituent(mol, result, sub_atoms)

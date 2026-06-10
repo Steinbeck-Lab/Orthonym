@@ -168,20 +168,21 @@ class TestHeteroatomVarietyTermByTerm:
         assert score_pyr < score_benz
 
     def test_score_tuple_length(self):
-        """Score tuple should have the correct new length (17 elements).
+        """Score tuple should have the correct new length.
 
-        6 original fields + 10 variety fields + 1 type_rank = 17.
+        6 fixed fields + 20 variety fields + 1 type_rank + 2 unsaturation
+        (WS-A.1 S1, P-44.4.1) = 29.
         """
         mol = Chem.MolFromSmiles("c1ccncc1")
         from orthonym.perception.rings import get_ring_systems
         rs = get_ring_systems(mol)
         score = ring_system_score(mol, rs[0])
-        # 6 fixed fields + 20 heteroatom variety elements + 1 type_rank = 27
-        assert len(score) == 27, f"Expected 27-element tuple, got {len(score)}"
+        # 6 fixed + 20 variety + 1 type_rank + 2 unsaturation (S1) = 29
+        assert len(score) == 29, f"Expected 29-element tuple, got {len(score)}"
 
     def test_empty_system_sentinel_length(self):
-        """Empty system sentinel should match score tuple length (27)."""
+        """Empty system sentinel should match score tuple length (29)."""
         mol = Chem.MolFromSmiles("C")
         score = ring_system_score(mol, set())
-        # 6 fixed fields + 20 heteroatom variety elements + 1 type_rank = 27
-        assert len(score) == 27, f"Expected 27-element sentinel, got {len(score)}"
+        # 6 fixed + 20 variety + 1 type_rank + 2 unsaturation (S1) = 29
+        assert len(score) == 29, f"Expected 29-element sentinel, got {len(score)}"
