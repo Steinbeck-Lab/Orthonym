@@ -321,19 +321,31 @@ def ring_system_score(
 
     IUPAC P-44.2: General criteria (P-44.2.1) are applied BEFORE type
     hierarchy (P-44.2.2). Type hierarchy is a tiebreaker within the
-    same general criteria class.
+    same general criteria class. P-44.4.1 unsaturation is a FURTHER
+    tiebreaker, applied only after P-44.2.2 type seniority (so e.g.
+    spiro > phane > fused stays senior to a mere double-bond difference).
 
-    Tuple ordering (17 elements):
+    Tuple ordering (29 elements):
     - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
     - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
     - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
     - [3]  -num_rings: P-44.2.1(d) more rings = senior (negated)
     - [4]  -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
     - [5]  -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
-    - [6..15] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
-              (-count_N, -count_F, -count_Cl, -count_Br, -count_I,
-               -count_O, -count_S, -count_Se, -count_Te, -count_P)
-    - [16] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
+    - [6..25] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
+              (20 elements: -count_N, -count_F, -count_Cl, -count_Br, -count_I,
+               -count_O, -count_S, -count_Se, -count_Te, -count_P, ...)
+    - [26] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
+    - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
+    - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
+
+    The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
+    tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
+    list-order winner ``phenylcyclohexane``; benzene now wins on unsaturation
+    (P-44.4.1.1) -> ``cyclohexylbenzene``. Appended AFTER type_rank so it can
+    never override P-44.2.2 type seniority. RDKit reports benzene bonds as
+    AROMATIC, so the counter must treat AROMATIC as multiple (a naive
+    DOUBLE-only count gives benzene zero).
 
     Args:
         mol: RDKit Mol object
@@ -343,7 +355,7 @@ def ring_system_score(
         Tuple suitable for comparison with min() to select most senior
     """
     if not system_atoms:
-        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999,)
+        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999, 0, 0)
 
     # 1. Type rank
     type_rank = int(classify_ring_system_type(mol, system_atoms))
@@ -378,6 +390,21 @@ def ring_system_score(
     # Number of skeletal atoms
     num_skeletal_atoms = len(system_atoms)
 
+    # P-44.4.1 unsaturation (aromatic-aware): count ring bonds that are
+    # DOUBLE / TRIPLE / AROMATIC. RDKit kekulizes benzene to AROMATIC bonds,
+    # so AROMATIC must count as multiple or an aromatic ring scores zero.
+    num_multiple_bonds = 0
+    num_double_bonds = 0
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a not in system_atoms or b not in system_atoms:
+            continue
+        bt = bond.GetBondType()
+        if bond.GetIsAromatic() or bt in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+            num_multiple_bonds += 1
+            if bond.GetIsAromatic() or bt == Chem.BondType.DOUBLE:
+                num_double_bonds += 1
+
     # P-44.2.1(g): heteroatom variety -- term-by-term comparison by seniority
     # Build tuple: (-count_of_N, -count_of_F, ..., -count_of_P)
     # Negated so min() selects ring with MORE of the most-senior element
@@ -396,6 +423,8 @@ def ring_system_score(
         -num_heteroatoms,                   # P-44.2.1(f): more heteroatoms
         *heteroatom_variety_tuple,          # P-44.2.1(g): 20 elements, term-by-term
         type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
+        -num_multiple_bonds,                # P-44.4.1.1: max ring multiple bonds
+        -num_double_bonds,                  # P-44.4.1.2: then max double bonds
     )
 
 
