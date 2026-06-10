@@ -129,7 +129,11 @@ class TestBGroupRegression:
         # B2: Glycoside -> (oxan-2-yl)oxy
         (
             "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-            "((2R,4R,6S)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid)-4-methylbenzene-1,2-diol",  # ASML-13: phenol suffix routing + decomposition
+            # v21 WS-A.1 S2: the oxane bearing the acid PCG is now the parent
+            # (P-44.1.1; the old snapshot was a malformed parent-as-prefix
+            # form). The aryloxy linkage is still mis-expressed ('6-phenyl' --
+            # known emitter guard-out); RT-False both before and after.
+            "(2R,4R,6R)-3,4,5-trihydroxy-6-phenyloxane-2-carboxylic acid",
             "B2-oxanyloxy",
         ),
         # B3: Galloyl ester chain -> tetradecoxy

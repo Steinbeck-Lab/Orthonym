@@ -1880,38 +1880,26 @@ class Orthonym:
                 # xanthene) take precedence over small monocyclic rings
                 # (benzene) per IUPAC P-44.2.
                 #
-                # Guards (all must pass to switch):
-                # (a) Senior system must be significantly larger (>= 3
-                #     atoms) than the default — marginal differences
-                #     (1-2 atoms) cause churn without improving names.
-                # (b) Principal FG must NOT be attached to the default
-                #     ring system — per P-44.1, the parent must contain
-                #     the principal characteristic group.
+                # WS-A.1 S2: select_principal_ring_system (P-44.2, with the S1
+                # P-44.4.1 unsaturation tiebreak) is now AUTHORITATIVE among ring
+                # systems. The legacy ``size_diff >= 3`` heuristic that DISCARDED
+                # the P-44.2 winner for equal/near-equal senior systems is deleted
+                # (it produced (furan-2-yl)benzene instead of 2-phenylfuran and
+                # pyridinylcyclohexane instead of 4-cyclohexylpyridine). Gated only
+                # by the two correctness guards below; verified on the among-rings
+                # PIN gold corpus ().
                 if principal and len(features.ring_systems) >= 2:
                     senior_set = set(principal)
                     # Find the ring system that contains the default ring
                     default_system = set(atom_rings[0])
-                    default_system_size = len(atom_rings[0])
                     for rs in features.ring_systems:
                         if set(atom_rings[0]).issubset(rs):
                             default_system = rs
-                            default_system_size = len(rs)
                             break
 
-                    # Guard (a): senior system must be >= 3 atoms larger
-                    # (Phase 171 P-1 DEFERRED: the audit-recommended "P-44.2 winner is
-                    # authoritative even for an equal-size senior heterocycle" — e.g.
-                    # cyclohexylpyridine not pyridinylcyclohexane — was trialled via a
-                    # heteroatom-senior trigger here but REGRESSED the OPSIN-self-test-500
-                    # by 1 (an among-rings edge whose heterocycle-parent form breaks RT)
-                    # while moving no gold row. Reverted per the 0-regression hard gate;
-                    # deferred to a dedicated among-rings pass with gold coverage + the
-                    # regressing case understood. See 171-VERIFICATION.md.)
-                    size_diff = len(senior_set) - default_system_size
-                    size_ok = size_diff >= 3
-
-                    # Guard (b): PG must not be on the default system
-                    # (P-44.1: parent must contain the principal group)
+                    # Guard (a) P-44.1: the principal characteristic group must be
+                    # IN the parent. If the PG sits on the default ring system,
+                    # that ring stays parent regardless of P-44.2 ring seniority.
                     from .rules.parent_selection import is_principal_group_on_ring
                     pg_on_default = False
                     if features.principal_group_atoms:
@@ -1921,7 +1909,16 @@ class Orthonym:
                             features.principal_group,
                         )
 
-                    if size_ok and not pg_on_default:
+                    # Guard (b) Phase-171 / CHEBI:59269: when the CHAIN is the
+                    # parent, both rings are mere substituents; reassigning
+                    # principal_ring here perturbs stereodescriptor emission on the
+                    # chain handler (the documented +1 self-test regressor of the
+                    # 171 P-1 trial). Among-ring seniority does not decide a chain
+                    # parent — keep the default ring. (See test_among_rings_gold.py
+                    # TestPhase171StereoGuard.)
+                    if (not pg_on_default
+                            and not features.chain_is_parent
+                            and senior_set != default_system):
                         best_ring = atom_rings[0]
                         best_overlap = 0
                         for ring in atom_rings:

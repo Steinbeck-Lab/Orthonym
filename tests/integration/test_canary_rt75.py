@@ -763,7 +763,12 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1",  # Sentinel: substituent_loss - phenoxy maleimide
-        "1-ethenyl-4-(2-methylbut-2-enoxy)benzene",
+        # v21 WS-A.1 S2: the senior N-heterocycle (maleimide) is now the
+        # parent per P-44.2.1(b) (old form named only the benzene side and
+        # ignored the imide ring entirely). Both forms RT-False (multi-defect:
+        # the prenyloxyphenyl decoration is still dropped) -- the sentinel
+        # tracks the substituent_loss class either way.
+        "3-isobutyl-2,5-dioxo-4-phenylazole",
     ),
     (
         "COc1ccc(C(=O)N2CCCC2=O)cc1",  # Sentinel: substituent_loss - methoxybenzamide pyrrolidinone
@@ -2468,7 +2473,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=[N+]([O-])c1sccc1-c1ncccn1",  # aromatic,heterocycle,small
-        "2-nitro-3-pyrimidinylthiophene",
+        # v21 WS-A.1 S2 + WS-A.2: pyrimidine is the senior parent
+        # (P-44.2.1(b)) and the demoted thiophene keeps its nitro. This IS
+        # the OPSIN-verified PIN (RT True before and after); also a target
+        # row in 
+        "2-(2-nitrothiophen-3-yl)pyrimidine",
     ),
     (
         "COc1cc(O)cc(O)c1C(=O)CC(=O)c1ccccc1",  # aromatic,medium
