@@ -867,3 +867,66 @@ def get_ring_attachment_atom(
                 return ring_idx
 
     return None
+
+
+def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> List[str]:
+    """Characteristic-group prefixes carried by a single ring atom when its
+    ring is demoted to a substituent.
+
+    When a ring is named as a substituent of a chain parent, the ring's own
+    characteristic groups must still appear as prefixes inside the enclosing
+    marks (e.g. ``4-(2-oxocyclohexyl)butanoic acid``, not the FG-dropped
+    ``4-cyclohexylbutanoic acid``). This is the shared chemistry primitive that
+    every ring-as-substituent emitter consults so the rule is applied once and
+    identically.
+
+    Scope (deliberately narrow — the previously *dropped* classes only):
+      * ``oxo``  (P-66.6.1) — the ring atom is a carbonyl carbon: an exocyclic
+        double bond to an oxygen that bears no H and is otherwise terminal.
+      * ``cyano`` (P-66.5.1) — the ring atom bears an exocyclic nitrile carbon
+        (single bond to a C that is triple-bonded to a terminal N).
+
+    Intentionally NOT handled here:
+      * ``hydroxy`` / alkoxy / halogen / amino / alkyl — already emitted by the
+        existing composer / benzene substituent branches; claiming them here
+        would double-count.
+      * ``carboxy`` — ring-COOH demotion is gated on the WS-A.1 parent
+        chokepoint (the ring is currently selected as parent and never reaches
+        an emitter); emitting it before that lands would be unreachable-or-wrong.
+      * ester ``-C(=O)O-`` carbonyls — neither oxo nor cyano.
+
+    Args:
+        mol: RDKit Mol.
+        ring_atom_idx: the ring atom to inspect.
+        ring_atom_set: atom indices of the whole ring system (to identify
+            which neighbours are exocyclic).
+
+    Returns:
+        Sorted list of prefix strings (``[]`` when the atom carries none).
+    """
+    prefixes: List[str] = []
+    atom = mol.GetAtomWithIdx(ring_atom_idx)
+    for nbr in atom.GetNeighbors():
+        ni = nbr.GetIdx()
+        if ni in ring_atom_set:
+            continue
+        bond = mol.GetBondBetweenAtoms(ring_atom_idx, ni)
+        sym = nbr.GetSymbol()
+        # oxo: exocyclic =O, terminal, no H (the ring atom is the carbonyl C)
+        if (sym == 'O' and bond is not None
+                and bond.GetBondTypeAsDouble() == 2.0
+                and nbr.GetTotalNumHs() == 0
+                and nbr.GetDegree() == 1):
+            prefixes.append('oxo')
+            continue
+        # cyano: exocyclic C, single bond, triple-bonded to a terminal N
+        if (sym == 'C' and bond is not None
+                and bond.GetBondTypeAsDouble() == 1.0):
+            c_nbrs = [x for x in nbr.GetNeighbors() if x.GetIdx() != ring_atom_idx]
+            if (len(c_nbrs) == 1 and c_nbrs[0].GetSymbol() == 'N'
+                    and c_nbrs[0].GetDegree() == 1):
+                cn_bond = mol.GetBondBetweenAtoms(ni, c_nbrs[0].GetIdx())
+                if cn_bond is not None and cn_bond.GetBondTypeAsDouble() == 3.0:
+                    prefixes.append('cyano')
+                    continue
+    return sorted(prefixes)

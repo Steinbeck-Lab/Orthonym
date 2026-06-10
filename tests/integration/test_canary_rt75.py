@@ -773,7 +773,12 @@ CANARY_COMPOUNDS = [
     (
         r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # Sentinel: parent_mismatch - cyclohexanone chain
         # Phase 103-03: chain tiebreaker refinements change parent chain selection
-        "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid",
+        # v21 WS-D.1: the demoted ring's ketone is now emitted as the prefix
+        # 2-oxo (P-66.6.1) instead of being silently dropped. The new name is
+        # strictly closer to the true structure (adds O3, matching the ring
+        # ketone; the remaining exocyclic-alkene defect is pre-existing and
+        # orthogonal). Re-baselined per the changed-row RT-verify discipline.
+        "3-(2-aminoethyl)-5-(3,5-dimethyl-2-oxocyclohexyl)pentanoic acid",
     ),
     (
         "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic

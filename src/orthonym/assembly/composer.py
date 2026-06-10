@@ -4666,12 +4666,26 @@ def _build_substituted_ring_name(
     if attachment_idx is None:
         return base_name
 
-    # Only handle 6-membered carbocyclic rings (benzene-like) for now
-    if len(ring_atoms) != 6:
-        return base_name
-    # Check it's all carbons
+    # Carbocyclic monocyclic rings only. 6-membered rings keep their existing
+    # behaviour (alkyl/halo/hydroxy already enumerated). Other sizes (3-8) are
+    # admitted ONLY when the ring carries a previously-dropped FG prefix
+    # (oxo/cyano) — so the widening cannot silently activate alkyl/halo
+    # emission across the whole small-ring population, which would be an
+    # unbudgeted canary change (V21 WS-D.1 skeptic guard).
     if not all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms):
         return base_name
+    ring_size = len(ring_atoms)
+    if ring_size != 6:
+        from ..rules.ring_substituents import ring_atom_fg_prefixes
+        if not (3 <= ring_size <= 8):
+            return base_name
+        # FG-gated widening applies to true monocycles only (the FG locant is
+        # computed by attachment-relative single-ring numbering, unprovable
+        # for fused systems; D-09 missing > wrong).
+        if set(ring_atoms) != ring_atom_set:
+            return base_name
+        if not any(ring_atom_fg_prefixes(mol, a, ring_atom_set) for a in ring_atoms):
+            return base_name
 
     # Try both numbering directions and pick lowest locant set
     numberings = _number_ring_from_attachment(mol, ring_atoms, attachment_idx)
@@ -4686,7 +4700,7 @@ def _build_substituted_ring_name(
     best_locant_set = None
 
     for ring_order in numberings:
-        if len(ring_order) != 6:
+        if len(ring_order) != len(ring_atoms):
             continue
         sub_groups = _detect_ring_substituents(
             mol, ring_order, ring_atom_set, chain_set
@@ -4782,10 +4796,26 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy'}
 
+    from ..rules.ring_substituents import ring_atom_fg_prefixes
+
+    # FG prefixes (oxo/cyano) use the attachment-relative single-ring
+    # numbering below, which is only provably correct when the numbered ring
+    # IS the complete ring system (a true monocycle). For a ring inside a
+    # fused system the emitted locant would be wrong (D-09: missing > wrong),
+    # so FG emission is guarded off there and the legacy form is kept.
+    _fg_ring_is_monocyclic = set(ring_order.values()) == set(ring_atom_set)
+
     sub_groups = defaultdict(list)
     for ring_pos, atom_idx in ring_order.items():
+        # Characteristic groups carried by the ring atom itself (oxo, cyano)
+        # via the shared primitive — applies even to the attachment atom
+        # (e.g. 1-cyanocyclohexyl), unlike the neighbour-substituent scan
+        # below which skips the chain attachment point.
+        if _fg_ring_is_monocyclic:
+            for fg in ring_atom_fg_prefixes(mol, atom_idx, ring_atom_set):
+                sub_groups[fg].append(ring_pos)
         if ring_pos == 1:
-            continue  # Skip attachment point
+            continue  # Skip attachment point for substituent-on-ring detection
         atom = mol.GetAtomWithIdx(atom_idx)
         for nbr in atom.GetNeighbors():
             ni = nbr.GetIdx()

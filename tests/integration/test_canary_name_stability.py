@@ -1108,7 +1108,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",  # polyfunctional,medium
-        "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid",
+        "3-(2-aminoethyl)-5-(3,5-dimethyl-2-oxocyclohexyl)pentanoic acid",
     ),
     (
         "C/N=C(\\N)NCCCCN",  # acyclic,small
@@ -1808,7 +1808,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCC[C@H](O)/C=C/[C@H]1CCC(=O)[C@@H]1C/C=C\\CCCC(=O)O",  # polyfunctional,medium
-        "(5Z)-7-cyclopentylhept-5-enoic acid",
+        "(5Z)-7-(2-oxocyclopentyl)hept-5-enoic acid",
     ),
     (
         "O=C[C@H](O)[C@@H](O)[C@H](O[C@H]1O[C@H](CO)[C@@H](O[C@H]2O[C@H](CO)[C@@H](O[C@H]3O[C@H](CO)[C@@H](O[C@H]4O[C@H](CO)[C@@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4O)[C@H](O)[C@H]3O)[C@H](O)[C@H]2O)[C@H](O)[C@H]1O)[C@H](O)CO",  # heterocycle,large,carbohydrate
@@ -1856,7 +1856,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCC[C@@](C)(O)C/C=C/[C@H]1[C@H](CCCCCCC(=O)OC)C(=O)C[C@@H]1O",  # polyfunctional,medium
-        "(cyclopentanecarbonyloxy)-7-cyclopentylheptanone",
+        "(cyclopentanecarbonyloxy)-7-(4-hydroxy-2-oxocyclopentyl)heptanone",
     ),
     (
         "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCCCCCC)COP(=O)([O-])OCC[N+](C)(C)C",  # acyclic,large
@@ -2679,7 +2679,7 @@ P44_3_CANARY = [
     # Row 4: cyclohexanone + chain with acid and amide
     (
         r"CC1C/C(=C\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1",
-        "3-(2-aminoethyl)-5-(3,5-dimethylcyclohexyl)pentanoic acid",
+        "3-(2-aminoethyl)-5-(3,5-dimethyl-2-oxocyclohexyl)pentanoic acid",
     ),
     # Row 48: diaminotoluene + phenylpropyl chain
     (
