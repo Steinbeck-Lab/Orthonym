@@ -21,8 +21,26 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem as _Chem
 
 from ..data.trivial_acids import get_acylate_name, TRIVIAL_ACID_TO_ACYLATE
-from ..data.sugar_names import lookup_sugar, sugar_to_glycosyloxy_prefix
+from ..data.sugar_names import (
+    lookup_sugar,
+    sugar_to_glycosyloxy_prefix,
+    recognize_sugar_skeleton,
+    sugar_to_glycoside_class_name,
+)
 from ..assembly.naming_utils import _wrap_n_substituent
+
+# Phase 176 / D-09: structural seniority guard primitives. The aglycone is in
+# scope to flip to the functional-class form iff its principal characteristic
+# group is hydroxy-class or junior (rank >= primary_alcohol). This is a
+# structural decision via get_principal_group, NOT a string match on the name.
+from ..perception.functional_groups import detect_functional_groups
+from ..rules.seniority import get_principal_group, SENIORITY_ORDER
+
+# The top of the hydroxy band (P-44.1). primary_alcohol (== 54) admits
+# methanol/ethanol/2-aminoethanol/phenol; everything senior to hydroxy (ketone,
+# aldehyde, acid, ...) has a strictly smaller rank and is gated out (Pitfall 5:
+# this is primary_alcohol, NOT phenol/57 -- 57 would wrongly block ethanol).
+HYDROXY_TOP = SENIORITY_ORDER.index("primary_alcohol")
 
 
 # ============================================================================
@@ -220,6 +238,7 @@ def assemble_fragment_name(
     bond_type: str,
     fragment_names: Dict[str, str],
     style: str = "pin",
+    fragment_smiles: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Assemble fragment names into a multi-component IUPAC name.
 
@@ -233,6 +252,11 @@ def assemble_fragment_name(
             For amides: {"acid": "acetic acid", "amine": "methylamine"}
             For glycosides: {"sugar": "...", "aglycone": "..."}
         style: Naming style ("pin" for preferred IUPAC names).
+        fragment_smiles: Optional dict mapping fragment roles to their SMILES,
+            keyed by the same side keys as fragment_names. Phase 176 / D-03:
+            only the glycoside assembler consumes this (the sugar-skeleton
+            deriver and the aglycone seniority guard both need structure); all
+            other assemblers ignore it, keeping them byte-identical.
 
     Returns:
         Assembled multi-component name, or None if assembly fails.
@@ -246,10 +270,18 @@ def assemble_fragment_name(
     if not bond_type or not fragment_names:
         return None
 
+    # Phase 176 / D-03: the glycoside assembler needs the fragment SMILES to
+    # derive the sugar skeleton and run the aglycone seniority guard. Special-
+    # case it so every other assembler keeps its two-arg (fragment_names, style)
+    # signature byte-identical.
+    if bond_type == "glycosidic":
+        return _assemble_glycoside(
+            fragment_names, style, fragment_smiles=fragment_smiles
+        )
+
     assemblers = {
         "ester": _assemble_ester,
         "amide": _assemble_amide,
-        "glycosidic": _assemble_glycoside,
         "carbamate": _assemble_carbamate,
         "ether": _assemble_ether,
         "thioester": _assemble_thioester,
@@ -673,25 +705,107 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
     return result
 
 
-def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble glycoside name using sugar prefix + aglycone parent.
+def _aglycone_to_substituent(
+    aglycone_name: str, aglycone_smiles: Optional[str]
+) -> Optional[str]:
+    """Convert an aglycone fragment to a monovalent substituent prefix (D-08/D-09).
+
+    The aglycone arrives from the glycoside cleavage as an *alcohol* (the
+    glycosidic oxygen stays with it as -OH), so it is named e.g. ``methanol``,
+    ``ethanol``, ``2-aminoethanol``, ``phenol``. For the functional-class
+    glycoside form it must be cited as a preceding monovalent substituent word
+    (``methyl``, ``ethyl``, ``2-aminoethyl``, ``phenyl``).
+
+    Structural seniority guard (D-09, P-102.5.6.1.1): if the aglycone bears a
+    characteristic group *senior to hydroxy* (ketone, aldehyde, acid, ...), the
+    functional-class glycoside form is NOT used -- the ``-ose`` ending is
+    retained and the aglycone is cited as an O-substituent instead. We detect
+    that structurally via ``get_principal_group`` (NOT by string-matching the
+    name) and return ``None`` so the caller falls back to the legacy
+    ``(glycosyloxy)R`` form. Returning ``None`` is also the response to any
+    unconvertible aglycone (Tier-4-recursive / unparseable).
+
+    Args:
+        aglycone_name: The aglycone fragment name (an alcohol/phenol name).
+        aglycone_smiles: The aglycone fragment SMILES (needed for the
+            structural seniority decision). When absent, the guard cannot run
+            and we fail closed (return None -> legacy form).
+
+    Returns:
+        The substituent prefix (e.g. "methyl", "phenyl", "2-aminoethyl"), or
+        None when the aglycone is senior to hydroxy or cannot be converted.
+    """
+    if not aglycone_name:
+        return None
+
+    # Structural seniority guard (D-09). Without the SMILES we cannot make the
+    # structural decision, so fail closed to the legacy form.
+    if not aglycone_smiles:
+        return None
+    aglycone_mol = _Chem.MolFromSmiles(aglycone_smiles)
+    if aglycone_mol is None:
+        return None
+    try:
+        pg, _atoms = get_principal_group(
+            aglycone_mol, detect_functional_groups(aglycone_mol)
+        )
+    except Exception:
+        return None
+    if pg is not None:
+        # rank >= HYDROXY_TOP (primary_alcohol == 54) => hydroxy-class or junior
+        # => in scope to flip. Anything senior to hydroxy => keep legacy form.
+        rank = SENIORITY_ORDER.index(pg) if pg in SENIORITY_ORDER else 999
+        if rank < HYDROXY_TOP:
+            return None  # senior aglycone -> D-09 PROTECT, keep legacy
+
+    # Convert the alcohol/phenol aglycone name to its substituent prefix.
+    # Pitfall 4: use _alcohol_to_alkyl (NOT _amine_to_prefix) -- the aglycone
+    # arrives as an alcohol (methanol->methyl, 2-aminoethanol->2-aminoethyl,
+    # phenol->phenyl, ethanol->ethyl).
+    prefix = _alcohol_to_alkyl(aglycone_name)
+    if not prefix:
+        return None
+    return prefix
+
+
+def _assemble_glycoside(
+    fragment_names: Dict[str, str],
+    style: str,
+    fragment_smiles: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """Assemble glycoside name (Phase 176 / WSD-08: functional-class form).
+
+    Emits the Blue-Book functional-class two-word form
+    ``<aglycone-substituent> <sugar>oside`` (P-102.5.6.2.2), e.g.
+    ``methyl beta-D-glucopyranoside``, when the self-gating triad (D-10) holds:
+
+      1. the sugar skeleton is recognized (lookup_sugar catalog fast-path FIRST
+         per D-05, then the structure-derived recognize_sugar_skeleton); AND
+      2. the aglycone resolves to a monovalent substituent prefix without a
+         group senior to hydroxy (D-08/D-09 via _aglycone_to_substituent); AND
+      3. there is exactly one sugar unit (this single-glycosidic-bond assembler
+         -- _assemble_multi_glycoside handles >=2, untouched).
+
+    If ANY gate fails -- including the back-compat case where no fragment_smiles
+    was threaded -- it falls through to the EXISTING legacy substitutive form
+    ``(glycosyloxy)aglycone``. Zero regression is the default failure mode (D-10,
+    the project guarded-primitive standard).
 
     Accepts both key conventions from the decomposition engine:
     - Engine convention: {"acid": sugar_name, "alkyl": aglycone_name}
     - Explicit convention: {"sugar": sugar_name, "aglycone": aglycone_name}
 
-    The sugar name should ideally already be a glycosyloxy prefix
-    (e.g., "beta-D-glucopyranosyloxy"). If it already ends in "oxy",
-    it's used as-is. Otherwise, basic concatenation is used as fallback.
-
-    Output format: "(glycosyloxy-prefix)aglycone-name"
-
     Args:
         fragment_names: Fragment name dict with sugar/aglycone info.
         style: Naming style.
+        fragment_smiles: Optional dict of fragment SMILES keyed by side
+            (D-03). Required for the functional-class flip; when None the
+            legacy form is emitted (back-compat).
 
     Returns:
-        Glycoside name like "(beta-D-glucopyranosyloxy)phenol", or None.
+        Functional-class name like "methyl beta-D-glucopyranoside" when the
+        triad holds, else the legacy "(beta-D-glucopyranosyloxy)phenol" form,
+        or None if neither can be built.
     """
     # Accept both key conventions
     sugar_name = fragment_names.get("sugar") or fragment_names.get("acid")
@@ -700,6 +814,52 @@ def _assemble_glycoside(fragment_names: Dict[str, str], style: str) -> Optional[
     if not sugar_name or not aglycone_name:
         return None
 
+    # --- Functional-class flip attempt (D-01/D-02/D-10) -------------------
+    # Only attempted when the fragment SMILES were threaded (D-03). Every gate
+    # failure falls through to the legacy logic below (zero regression).
+    if fragment_smiles:
+        sugar_smiles = fragment_smiles.get("sugar") or fragment_smiles.get("acid")
+        aglycone_smiles = (
+            fragment_smiles.get("aglycone") or fragment_smiles.get("alkyl")
+        )
+
+        # SUGAR gate (D-05): catalog fast-path FIRST, then the deriver on miss.
+        sugar_tuple = None
+        if sugar_smiles:
+            sugar_mol = _Chem.MolFromSmiles(sugar_smiles)
+            if sugar_mol is not None:
+                try:
+                    canonical = _Chem.MolToSmiles(sugar_mol)
+                except Exception:
+                    canonical = None
+                if canonical:
+                    sugar_tuple = lookup_sugar(canonical)
+                if sugar_tuple is None:
+                    sugar_tuple = recognize_sugar_skeleton(sugar_mol)
+
+        # AGLYCONE gate (D-08/D-09): substituent prefix + structural seniority.
+        aglycone_prefix = _aglycone_to_substituent(aglycone_name, aglycone_smiles)
+
+        # SINGLE-SUGAR gate (D-10): this assembler is only reached for the
+        # single-glycosidic-bond path (>=2 -> _assemble_multi_glycoside, which
+        # is untouched). Defensive guard: a multi-sugar prefix would carry the
+        # glycosyloxy stem more than once.
+        single_sugar = (
+            sugar_name.count("glycosyloxy")
+            + sugar_name.count("pyranosyloxy")
+            + sugar_name.count("furanosyloxy")
+        ) <= 1
+
+        if sugar_tuple is not None and aglycone_prefix and single_sugar:
+            anomer, config, base = sugar_tuple
+            head = sugar_to_glycoside_class_name(anomer, config, base)
+            if head:
+                # Two-word functional-class form: "<substituent> <sugar>oside".
+                # The alpha/beta + D/L descriptors come from the sugar tuple and
+                # are never dropped (D-11).
+                return f"{aglycone_prefix} {head}"
+
+    # --- Legacy substitutive fallback (unchanged; zero-regression default) -
     # If sugar_name already ends in "oxy" (glycosyloxy prefix), use as-is
     if sugar_name.endswith("oxy"):
         sugar_prefix = sugar_name
