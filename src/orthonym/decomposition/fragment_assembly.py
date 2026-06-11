@@ -765,6 +765,16 @@ def _aglycone_to_substituent(
     prefix = _alcohol_to_alkyl(aglycone_name)
     if not prefix:
         return None
+    # _alcohol_to_alkyl is best-effort and returns its INPUT unchanged when it
+    # cannot convert (e.g. the diol "hydroquinone" -> "hydroquinone", which is
+    # NOT a monovalent substituent prefix). A real substituent prefix ends in
+    # "-yl"; if the converter could not produce one, fail closed to the legacy
+    # (glycosyloxy)R form (D-10 zero-regression default) rather than emit a
+    # malformed two-word name that the validity gate would then reject as
+    # "unknown". All four in-scope aglycones convert to a -yl prefix
+    # (methyl/ethyl/2-aminoethyl/phenyl/2-naphthyl).
+    if not prefix.endswith("yl"):
+        return None
     return prefix
 
 

@@ -1,4 +1,4 @@
-CIP Validation Suite Results -- 2026-05-09 13:49:51 UTC
+CIP Validation Suite Results -- 2026-06-11 19:23:16 UTC
 RDKit rdCIPLabeler.AssignCIPLabels() (RDKit 2026.03.1)
 
   Total compounds:       300
