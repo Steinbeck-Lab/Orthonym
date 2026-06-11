@@ -494,18 +494,43 @@ def _alphabetical_tiebreaker(
         # Count carbon atoms in the first substituent group at this position
         # (sufficient for the alphabetical comparison of simple alkyls)
         for sub_atoms in sub_groups:
-            carbon_count = sum(
-                1 for a in sub_atoms
-                if mol.GetAtomWithIdx(a).GetSymbol() == "C"
-            )
-            if carbon_count > 0:
-                name = get_alkyl_name(carbon_count)
-            else:
-                # Non-carbon substituent (e.g., halogen): use atom symbol
-                if sub_atoms:
-                    name = mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol().lower()
+            name = None
+            # WS-A task 9 (P-14.5.2): a RING substituent must be compared by
+            # its REAL cited prefix name, not a name fabricated from its
+            # carbon count (phenyl is NOT 'hexyl', thiophen-2-yl is NOT
+            # 'butyl' — the fabricated keys inverted the orientation of
+            # 1-phenyl-4-(thiophen-2-yl)butane-1,4-dione). Derive the
+            # attachment as the fragment atom bonded to the chain atom
+            # (sub_atoms comes from a set — position 0 is arbitrary).
+            if sub_atoms and any(
+                    mol.GetAtomWithIdx(a).IsInRing() for a in sub_atoms):
+                try:
+                    attach_idx = next(
+                        (a for a in sub_atoms
+                         if any(nbr.GetIdx() == atom_idx
+                                for nbr in mol.GetAtomWithIdx(a).GetNeighbors())),
+                        None,
+                    )
+                    if attach_idx is not None:
+                        from ..assembly.substituent_enumerator import (
+                            name_substituent,
+                        )
+                        name = name_substituent(mol, list(sub_atoms), attach_idx)
+                except Exception:
+                    name = None
+            if not name:
+                carbon_count = sum(
+                    1 for a in sub_atoms
+                    if mol.GetAtomWithIdx(a).GetSymbol() == "C"
+                )
+                if carbon_count > 0:
+                    name = get_alkyl_name(carbon_count)
                 else:
-                    name = "zzz"
+                    # Non-carbon substituent (e.g., halogen): use atom symbol
+                    if sub_atoms:
+                        name = mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol().lower()
+                    else:
+                        name = "zzz"
             entries.append((alpha_sort_key(name), locant))
 
     # Sort by alpha key first, then by locant

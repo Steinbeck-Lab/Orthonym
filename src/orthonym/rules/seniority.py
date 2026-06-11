@@ -31,6 +31,15 @@ from typing import Optional, Tuple, List, Dict
 # Source: 
 PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     "disulfide": [1, 2],  # [#6][SX2][SX2][#6] -- the two S sulfurs
+    # WS-A task 9: the ketone family SMARTS '[#6][CX3](=X)[#6]' leads with a
+    # FLANKING carbon; the locant-bearing atom is the carbonyl/thiocarbonyl
+    # carbon at match index 1. Without these entries every on-ring/on-chain/
+    # locant computation used the flanking atom (an aryl ketone's "attachment"
+    # was the benzene ring atom itself -> false pg_on_ring -> wrong parent).
+    "ketone": [1],
+    "thioketone": [1],
+    "selenoketone": [1],
+    "telluroketone": [1],
 }
 
 # Functional group seniority order (highest priority first)

@@ -264,6 +264,13 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'thiophene': 'thiophen',
     'pyrrole': 'pyrrol',
     'imidazole': 'imidazol',
+    # WS-A task 9: fully-SATURATED retained monocycles take the same
+    # free-valence numbering (P-29.2): pyrrolidin-1-yl, morpholin-4-yl,
+    # piperidin-1-yl, piperazin-1-yl.
+    'pyrrolidine': 'pyrrolidin',
+    'morpholine': 'morpholin',
+    'piperidine': 'piperidin',
+    'piperazine': 'piperazin',
 }
 
 # Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:
@@ -327,9 +334,24 @@ def pin_heteroaryl_substituent_name(
     if stem is None:
         return None
 
-    # --- Guard: aromatic simple monocycle ------------------------------------
-    if not all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list):
-        return None
+    # --- Guard: aromatic OR fully saturated simple monocycle -----------------
+    # WS-A task 9: fully-saturated heterocyclic monocycles (pyrrolidine,
+    # morpholine, piperidine, piperazine) use the SAME free-valence numbering
+    # cascade — minus indicated hydrogen, an aromatic-only concept. Mixed
+    # saturation stays guarded out (None -> legacy form).
+    _is_aromatic_ring = all(
+        mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list
+    )
+    if not _is_aromatic_ring:
+        from rdkit import Chem as _Chem
+        if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list):
+            return None
+        for i in ring_list:
+            for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nbr.GetIdx() in ring_set:
+                    bond = mol.GetBondBetweenAtoms(i, nbr.GetIdx())
+                    if bond.GetBondType() != _Chem.BondType.SINGLE:
+                        return None
     ring_adj: Dict[int, List[int]] = {}
     for idx in ring_list:
         nbrs = [nbr.GetIdx() for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
@@ -364,14 +386,17 @@ def pin_heteroaryl_substituent_name(
         elif heavy_exo:
             return None  # an extra ring substituent we do not number
 
-    # --- Indicated-hydrogen atom (the ring NH, if any) -----------------------
-    indicated_h_atoms = [
-        i for i in het_atoms
-        if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1
-    ]
-    if len(indicated_h_atoms) > 1:
-        return None  # ambiguous indicated H; do not guess
-    indicated_h_atom = indicated_h_atoms[0] if indicated_h_atoms else None
+    # --- Indicated-hydrogen atom (the ring NH, if any; AROMATIC only) --------
+    if _is_aromatic_ring:
+        indicated_h_atoms = [
+            i for i in het_atoms
+            if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1
+        ]
+        if len(indicated_h_atoms) > 1:
+            return None  # ambiguous indicated H; do not guess
+        indicated_h_atom = indicated_h_atoms[0] if indicated_h_atoms else None
+    else:
+        indicated_h_atom = None  # saturated rings have no indicated H
 
     # --- Build the cyclic atom order -----------------------------------------
     order = [ring_list[0], ring_adj[ring_list[0]][0]]
@@ -420,6 +445,140 @@ def pin_heteroaryl_substituent_name(
     return f"{prefix}{stem}-{attach_locant}-yl"
 
 
+def name_ring_system_substituent(
+    mol,
+    frag_atoms,
+    attach_idx: int,
+) -> Optional[str]:
+    """Name a RING-CONTAINING substituent fragment (WS-A task 9 chokepoint).
+
+    The single delegate used by every ring-parent path (fused-heterocycle
+    parents, PAH parents) when a substituent fragment contains ring atoms.
+    Chooses the producer:
+
+    - fragment IS exactly one ring system rooted at a ring atom ->
+      ``get_ring_substituent_name`` (PIN free-valence locant, P-29.2:
+      naphthalen-2-yl, pyridin-2-yl, 1H-indol-2-yl, ...);
+    - anything else (ring + chain linker, chain-rooted) -> the universal
+      ``substituent_enumerator.name_substituent``.
+
+    Returns None when no trustworthy name can be produced — callers must
+    treat None as "do not emit", never fabricate a carbon-count alkyl name
+    for a ring fragment (the historical phenyl->'hexyl' corruption).
+    """
+    ring_info = mol.GetRingInfo()
+    frag_atoms = list(frag_atoms)
+    frag_set = set(frag_atoms)
+
+    # Normalize: some callers pass the PARENT-side attachment atom
+    # (SubstituentInfo.attach_mol_idx). The free-valence atom must be the
+    # FRAGMENT-side atom bonded to it.
+    if attach_idx not in frag_set:
+        attach_idx = next(
+            (n.GetIdx()
+             for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+             if n.GetIdx() in frag_set),
+            None,
+        )
+        if attach_idx is None:
+            return None
+
+    name: Optional[str] = None
+    frag_ring_atoms = {a for a in frag_atoms if ring_info.NumAtomRings(a) > 0}
+    if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
+        try:
+            name = get_ring_substituent_name(mol, tuple(frag_atoms), attach_idx)
+        except Exception:
+            name = None
+    elif frag_ring_atoms and ring_info.NumAtomRings(attach_idx) == 0:
+        # Chain-ROOTED fragment carrying a ring system, e.g. -CH2-naphthalene.
+        # P-29.1.2 compound substituent: '(naphthalen-2-yl)methyl'. The
+        # generic recursive namer mis-roots these (it names the fragment as a
+        # molecule and appends -yl: '2-methylnaphthalenyl'), so build the
+        # carrier+ring form here under tight guards; anything more complex
+        # falls through to the universal producer (status quo).
+        name = _compound_ring_on_chain_substituent(
+            mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info
+        )
+    if not name:
+        from ..assembly.substituent_enumerator import name_substituent
+        name = name_substituent(mol, frag_atoms, attach_idx)
+    if name and name != 'substituent' and ' ' not in name:
+        return name
+    return None
+
+
+def _compound_ring_on_chain_substituent(
+    mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info
+) -> Optional[str]:
+    """Build '(ring-yl)alkyl' for an unbranched all-carbon carrier rooted at
+    the attachment with exactly ONE ring system hanging off it. Returns None
+    (caller falls back) whenever any guard fails — never guesses."""
+    carrier = frag_set - frag_ring_atoms
+    # Guards: all-carbon, fully SATURATED, undecorated carrier; attach is a
+    # carrier atom. The saturation guard is load-bearing: get_alkyl_name
+    # cannot express -ene/-yne, so an unsaturated carrier here silently
+    # described a DIFFERENT molecule (canary rt75_0430: (2E)-prop-2-enyl
+    # emitted as 'propyl', RT True->False).
+    if attach_idx not in carrier:
+        return None
+    for a in carrier:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetSymbol() != 'C':
+            return None
+        for b in atom.GetBonds():
+            if (b.GetOtherAtom(atom).GetIdx() in frag_set
+                    and b.GetBondTypeAsDouble() != 1.0):
+                return None
+    # Carrier must be a simple path rooted at attach.
+    adj = {
+        a: [n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
+            if n.GetIdx() in carrier]
+        for a in carrier
+    }
+    if len(adj.get(attach_idx, [])) > 1:
+        return None
+    path = [attach_idx]
+    while True:
+        nxt = [n for n in adj[path[-1]] if n not in path]
+        if not nxt:
+            break
+        if len(nxt) > 1:
+            return None
+        path.append(nxt[0])
+    if len(path) != len(carrier):
+        return None
+    # Exactly one ring system, attached to exactly one carrier atom.
+    ring_attach_positions = []
+    ring_side_atoms = []
+    for pos, c in enumerate(path, start=1):
+        for n in mol.GetAtomWithIdx(c).GetNeighbors():
+            if n.GetIdx() in frag_ring_atoms:
+                ring_attach_positions.append(pos)
+                ring_side_atoms.append(n.GetIdx())
+    if len(ring_attach_positions) != 1:
+        return None
+    # No stray decorations: every fragment atom is carrier or ring.
+    if carrier | frag_ring_atoms != frag_set:
+        return None
+    ring_name = name_ring_system_substituent(
+        mol, sorted(frag_ring_atoms), ring_side_atoms[0]
+    )
+    if not ring_name:
+        return None
+    try:
+        from ..assembly.naming_utils import get_alkyl_name
+        alkyl = get_alkyl_name(len(path))
+    except Exception:
+        return None
+    if not alkyl:
+        return None
+    loc = ring_attach_positions[0]
+    if len(path) == 1:
+        return f'({ring_name})methyl'
+    return f'{loc}-({ring_name}){alkyl}'
+
+
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -452,6 +611,17 @@ def get_ring_substituent_name(
         if frag_smi:
             from ..data import get_retained_name
             retained = get_retained_name(frag_smi)
+            # WS-A task 9: the fused-heterocycle catalog name carries the
+            # indicated-hydrogen / numbering prefix the plain retained table
+            # drops ('1-benzofuran' vs 'benzofuran', '1H-indole' vs
+            # 'indole') — prefer it for PIN substituent stems.
+            try:
+                from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+                _fh_entry = FUSED_HETEROCYCLE_DATA.get(frag_smi)
+                if _fh_entry and _fh_entry.get('name'):
+                    retained = _fh_entry['name']
+            except ImportError:
+                pass
             if retained:
                 # Convert retained name to substituent form:
                 # naphthalene -> naphthalen-{locant}-yl
@@ -462,7 +632,7 @@ def get_ring_substituent_name(
                 # Determine attachment locant for position-specific naming
                 if attachment_point is not None:
                     attach_locant = _get_polycyclic_attachment_locant(
-                        mol, ring_atoms, attachment_point
+                        mol, ring_atoms, attachment_point, ring_name=retained
                     )
                     if attach_locant is not None:
                         return f'{stem}-{attach_locant}-yl'
@@ -502,7 +672,15 @@ def get_ring_substituent_name(
     # Fallback: convert ring name to substituent form
     # Generally: remove 'e' and add 'yl' (benzene -> benzyl, but benzene -> phenyl is special)
     if ring_name.endswith('ane'):
-        return ring_name[:-1] + 'yl'  # cyclohexane -> cyclohexanyl (but we have cyclohexyl in dict)
+        if ring_name.startswith('cyclo'):
+            # P-29.2: carbocyclic cycloalkanes drop '-ane' entirely:
+            # cyclononane -> cyclononyl, cyclododecane -> cyclododecyl
+            # (sizes 3-8 hit RING_SUBSTITUENT_NAMES above; >=9 land here —
+            # the old [:-1] kept 'an': 'cyclododecanyl', WS-A task 9).
+            return ring_name[:-3] + 'yl'
+        # Hantzsch-Widman '-ane' heterocycles elide only the final 'e':
+        # azepane -> azepanyl, oxocane -> oxocanyl
+        return ring_name[:-1] + 'yl'
     elif ring_name.endswith('ene'):
         return ring_name[:-1] + 'yl'  # cyclohexene -> cyclohexenyl
     elif ring_name.endswith('ine'):
@@ -514,7 +692,8 @@ def get_ring_substituent_name(
 def _get_polycyclic_attachment_locant(
     mol,
     ring_atoms: Tuple[int, ...],
-    attachment_atom: int
+    attachment_atom: int,
+    ring_name: Optional[str] = None
 ) -> Optional[int]:
     """
     Determine the IUPAC locant for an attachment point on a polycyclic ring system.
@@ -533,17 +712,68 @@ def _get_polycyclic_attachment_locant(
     """
     from rdkit import Chem
 
-    # Try to get IUPAC numbering from fused heterocycle data
+    # Try to get IUPAC numbering from fused heterocycle data.
+    # WS-A task 9: 'iupac_locants' is keyed by the atom indices of the DATA
+    # ENTRY's reference SMILES, NOT this molecule's indices. The old direct
+    # `attachment_atom in iupac_locants` lookup compared across index spaces
+    # and returned whatever locant collided ('1H-indol-3-yl' for a C2
+    # attachment). Translate via substructure match of the reference onto
+    # THIS ring system, minimized over automorphisms (P-29.2 lowest
+    # free-valence locant).
     frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
     try:
         from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         if frag_smi in FUSED_HETEROCYCLE_DATA:
             entry = FUSED_HETEROCYCLE_DATA[frag_smi]
             iupac_locants = entry.get('iupac_locants', {})
-            if iupac_locants and attachment_atom in iupac_locants:
-                return iupac_locants[attachment_atom]
+            ref = Chem.MolFromSmiles(frag_smi) if iupac_locants else None
+            if ref is not None:
+                ring_atom_set = set(ring_atoms)
+                best_het_locant = None
+                for match in mol.GetSubstructMatches(ref, uniquify=False):
+                    if set(match) != ring_atom_set:
+                        continue
+                    for ref_idx, mol_idx in enumerate(match):
+                        if mol_idx != attachment_atom:
+                            continue
+                        loc = iupac_locants.get(ref_idx)
+                        if isinstance(loc, int) and (
+                                best_het_locant is None
+                                or loc < best_het_locant):
+                            best_het_locant = loc
+                if best_het_locant is not None:
+                    return best_het_locant
     except ImportError:
         pass
+
+    # WS-A task 9: carbocyclic polycyclic aromatics (naphthalene, anthracene,
+    # ...) have authoritative IUPAC numbering in the PAH machinery. P-29.2:
+    # the free valence takes the LOWEST locant the numbering allows, so
+    # minimize over ALL automorphic substructure matches of THIS ring system
+    # (naphthalen-2-yl, never the symmetry-equivalent -6-yl).
+    if ring_name is not None:
+        try:
+            from .polycyclics import POLYCYCLIC_DATA, _map_pah_atoms_to_iupac
+            pah_data = POLYCYCLIC_DATA.get(ring_name)
+            if pah_data:
+                pattern = Chem.MolFromSmarts(pah_data['smarts'])
+                if pattern is not None:
+                    ring_atom_set = set(ring_atoms)
+                    best_locant: Optional[int] = None
+                    for match in mol.GetSubstructMatches(pattern, uniquify=False):
+                        if set(match) != ring_atom_set:
+                            continue
+                        mapping = _map_pah_atoms_to_iupac(
+                            mol, ring_name, list(match)
+                        )
+                        loc = mapping.get(attachment_atom) if mapping else None
+                        if isinstance(loc, int) and (
+                                best_locant is None or loc < best_locant):
+                            best_locant = loc
+                    if best_locant is not None:
+                        return best_locant
+        except ImportError:
+            pass
 
     # For monocyclic heterocycles with retained names (e.g. 1,3-dioxolane),
     # use proper IUPAC numbering: start from highest-priority heteroatom,
@@ -613,8 +843,19 @@ def _get_polycyclic_attachment_locant(
         if best_path and attachment_atom in best_path:
             return best_path.index(attachment_atom) + 1  # 1-indexed
 
-    # Fallback for all-carbon rings or polycyclic systems:
-    # use the canonical atom order within the ring system.
+    # Fallback: canonical atom order within the ring system. ONLY valid for
+    # monocyclic fragments (any rotation is a legal numbering start there up
+    # to direction). For MULTI-ring systems this would fabricate a locant
+    # from the arbitrary atom-index order — a wrong locant is worse than a
+    # locant-less name, so return None and let the caller emit the bare
+    # '{stem}-yl' form (WS-A task 9).
+    ri_local = mol.GetRingInfo()
+    n_rings_in_fragment = sum(
+        1 for r in ri_local.AtomRings() if set(r) <= ring_set
+    )
+    if n_rings_in_fragment > 1:
+        return None
+
     ring_list = sorted(ring_atoms)
     if attachment_atom in ring_list:
         return ring_list.index(attachment_atom) + 1  # 1-indexed

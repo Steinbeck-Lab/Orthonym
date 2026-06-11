@@ -814,6 +814,24 @@ def get_heterocycle_substituents(
             # BFS to find full substituent
             sub_atoms = _bfs_substituent(mol, nbr_idx, ring_set)
 
+            # WS-A task 9 (P-66.6.3): an ACYL group on a ring NITROGEN is an
+            # AMIDE — the amide machinery names it ('-oyl' forms / parent
+            # ketone), never this collector (which produced garbled
+            # 'dienalyl'/alkyl forms and, once it claimed the atoms, its
+            # full coverage let the wrong candidate win the pool). Skip the
+            # fragment entirely: the heterocycle candidate's coverage drops
+            # and the amide path wins, as it did before the WS-A chokepoint.
+            if is_nitrogen:
+                _nbr_atom = mol.GetAtomWithIdx(nbr_idx)
+                _is_acyl = _nbr_atom.GetSymbol() == 'C' and any(
+                    b.GetOtherAtom(_nbr_atom).GetSymbol() in ('O', 'S', 'Se', 'Te')
+                    and b.GetBondTypeAsDouble() == 2.0
+                    and b.GetOtherAtom(_nbr_atom).GetIdx() in set(sub_atoms)
+                    for b in _nbr_atom.GetBonds()
+                )
+                if _is_acyl:
+                    continue
+
             # Count carbon atoms for alkyl naming
             carbon_count = sum(
                 1 for idx in sub_atoms
@@ -1171,10 +1189,13 @@ def name_substituted_heterocycle(
     # Build prefix parts
     prefix_parts = []
 
-    # Format N-substituent prefixes
+    # Format N-substituent prefixes (numeric ring locants = PIN, P-14.3.2)
     for name, locants in n_groups.items():
         count = len(locants)
-        prefix = _format_n_substituent(name, count)
+        numeric = [loc for loc in locants if loc is not None]
+        prefix = _format_n_substituent(
+            name, count, locants=numeric if len(numeric) == count else None
+        )
         prefix_parts.append((prefix, name))
 
     # Format C-substituent prefixes
@@ -1278,14 +1299,34 @@ def name_substituted_heterocycle(
     return combined
 
 
-def _format_n_substituent(name: str, count: int) -> str:
+def _format_n_substituent(name: str, count: int, locants=None) -> str:
     """
     Format an N-substituent prefix.
 
-    Single: N-methyl
-    Multiple same: N,N-dimethyl
+    WS-A task 9 (P-14.3.2): when the ring nitrogen's NUMERIC locants are
+    known they are the PIN citation ('4-cyclohexylmorpholine',
+    '1-(naphthalen-2-yl)pyrrolidine'); the italic-N form ('N-methyl') is
+    the fallback when no numbering is available. Complex substituent
+    names get the same P-16.3.3 enclosure as C-substituents.
     """
-    from ..assembly.naming_utils import _wrap_n_substituent
+    from ..assembly.naming_utils import (
+        _wrap_n_substituent, is_complex_substituent,
+    )
+    if locants:
+        from ..assembly.naming_utils import _has_stereo_prefix
+        display = name
+        if _has_stereo_prefix(name):
+            # '(S)-sec-butyl' under a numeric locant needs P-16.3.3
+            # brackets: '1-[(S)-sec-butyl]...' (the naive startswith('(')
+            # check skipped enclosure and emitted '1-(S)-sec-butyl...').
+            display = f'[{name}]'
+        elif is_complex_substituent(name) and not name.startswith('('):
+            display = f'[{name}]' if '(' in name else f'({name})'
+        locant_str = ",".join(str(loc) for loc in sorted(locants))
+        if count == 1:
+            return f"{locant_str}-{display}"
+        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+        return f"{locant_str}-{multiplier}{display}"
     wrapped = _wrap_n_substituent(name)
     if count == 1:
         return f"N-{wrapped}"
@@ -1311,12 +1352,33 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     # Wrap compound names in enclosing marks to prevent locant ambiguity
     display_name = name
     from ..assembly.naming_utils import is_complex_substituent, _has_stereo_prefix
+
+    def _fully_enclosed(n: str) -> bool:
+        # True only when ONE outer pair of parens spans the whole name —
+        # '(pyridin-2-yl)' yes; '(naphthalen-2-yl)methyl' NO (the marks
+        # close before 'methyl', so the name still needs enclosure).
+        if not (n.startswith('(') and n.endswith(')')):
+            return False
+        depth = 0
+        for i, ch in enumerate(n):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return i == len(n) - 1
+        return False
+
     if _has_stereo_prefix(name):
         # Name has CIP stereo prefix like "(R)-sec-butyl":
         # use square brackets per IUPAC P-16.3.3
         display_name = f'[{name}]'
-    elif not name.startswith('('):
-        if is_complex_substituent(name):
+    elif not _fully_enclosed(name) and is_complex_substituent(name):
+        if '(' in name:
+            # P-16.3.3 nesting: a name already containing parentheses is
+            # enclosed in the next mark up ([(naphthalen-2-yl)methyl]).
+            display_name = f'[{name}]'
+        else:
             display_name = f'({name})'
     if count == 1:
         return f"{locant_str}-{display_name}"

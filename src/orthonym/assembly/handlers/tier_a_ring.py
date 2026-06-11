@@ -114,10 +114,63 @@ def name_tier_a_ring(
     _tier_a_pool = get_current_pool()
     _tier_a_pool_count_before_complex = len(_tier_a_pool.all_candidates())
 
+    # WS-A task 9 (A-i): the whole-molecule complex-ring path must not
+    # preempt the P-44 parent decision. With >=2 ring systems, skip it when
+    # the parent is NOT the fused/complex system:
+    #   (a) the among-rings senior system (P-44.2) is a MONOCYCLE
+    #       (2-(1-benzofuran-2-yl)pyridine: pyridine is the parent), or
+    #   (b) the principal characteristic group sits on a ring system other
+    #       than the senior one (P-44.1 — that system is the parent).
+    _skip_complex_non_senior = False
+    _ring_systems = getattr(features, 'ring_systems', None) or []
+    if features.is_cyclic and len(_ring_systems) >= 2:
+        _senior = getattr(features, 'senior_ring_system', None)
+        # The among-rings P-44.2 decision applies to SEPARATE ring systems
+        # only. Spiro rings share an ATOM (one ring SYSTEM per P-24) yet may
+        # arrive as two entries here — skipping the complex path for them
+        # dropped half the molecule ('(3R,6S)-oxan-3-ol' for a dioxaspiro
+        # parent, self-test RT True->False). Any atom overlap between ring
+        # systems disables the skip.
+        _systems_overlap = False
+        for _i in range(len(_ring_systems)):
+            for _j in range(_i + 1, len(_ring_systems)):
+                if set(_ring_systems[_i]) & set(_ring_systems[_j]):
+                    _systems_overlap = True
+                    break
+            if _systems_overlap:
+                break
+        if _senior and not _systems_overlap:
+            _senior_set = set(_senior)
+            _ri = features.mol.GetRingInfo()
+            _n_rings_in_senior = sum(
+                1 for _r in _ri.AtomRings() if set(_r) <= _senior_set
+            )
+            if _n_rings_in_senior <= 1:
+                _skip_complex_non_senior = True
+            elif getattr(features, 'principal_group_atoms', None):
+                from ...rules.parent_selection import is_principal_group_on_ring
+                _pg_on_senior = is_principal_group_on_ring(
+                    features.mol, _senior_set,
+                    features.principal_group_atoms,
+                    features.principal_group,
+                )
+                _pg_on_other = any(
+                    is_principal_group_on_ring(
+                        features.mol, _rs,
+                        features.principal_group_atoms,
+                        features.principal_group,
+                    )
+                    for _rs in _ring_systems
+                    if not (set(_rs) & _senior_set)
+                )
+                if _pg_on_other and not _pg_on_senior:
+                    _skip_complex_non_senior = True
+
     # === Sub-path 1: complex_ring (composer.py:1025-1077 verbatim) ===
     if (
         features.is_cyclic
         and not getattr(features, 'chain_is_parent', False)
+        and not _skip_complex_non_senior
         and _is_complex_ring_system(features.mol)
     ):
         complex_result = _assemble_complex_ring_name(features.mol, features)

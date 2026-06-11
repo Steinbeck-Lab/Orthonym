@@ -124,6 +124,38 @@ def acid_fragment_has_ring(mol, acid_atoms: List[int]) -> bool:
     return False
 
 
+def acid_is_ring_acid(mol, acid_atoms: List[int]) -> bool:
+    """True iff the acid's carbonyl carbon is DIRECTLY bonded to a ring atom.
+
+    WS-A task 9: only then do the ring-acid forms apply (benzoic,
+    cyclohexanecarboxylic — P-65.1.7). An acid fragment that merely CONTAINS
+    a ring further down the chain (cyclohexyl-CH2CH2CH2-COO-) is a CHAIN
+    acid with a ring substituent ('4-cyclohexylbutanoate'); naming it
+    'cyclohexanecarboxylate' described a different molecule.
+    """
+    acid_set = set(acid_atoms)
+    ring_info = mol.GetRingInfo()
+    for idx in acid_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        is_carbonyl = any(
+            b.GetOtherAtom(atom).GetSymbol() == 'O'
+            and b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(atom).GetIdx() in acid_set
+            for b in atom.GetBonds()
+        )
+        if not is_carbonyl:
+            continue
+        if ring_info.NumAtomRings(idx) > 0:
+            return True  # lactone-like / carbonyl in ring
+        return any(
+            nbr.GetIdx() in acid_set and nbr.IsInRing()
+            for nbr in atom.GetNeighbors()
+        )
+    return False
+
+
 def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
     """
     Name the acid portion of an ester when it contains a ring.
@@ -264,8 +296,10 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     Returns:
         Acid stem name (e.g., "acetic", "propanoic", "benzoic")
     """
-    # Check if acid fragment contains ring atoms
-    if acid_fragment_has_ring(mol, acid_atoms):
+    # Check if acid fragment IS a ring acid (carbonyl C bonded to the ring —
+    # WS-A task 9: a ring merely elsewhere in the fragment is a chain acid
+    # with a ring substituent, never 'Xcarboxylic').
+    if acid_is_ring_acid(mol, acid_atoms):
         ring_name = get_ring_acid_name(mol, acid_atoms)
         if ring_name:
             return ring_name
@@ -537,6 +571,29 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     # Check if alkyl fragment contains a ring
     has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in alkyl_atoms)
 
+    # WS-A task 9: the ring-branch shortcuts below ('benzyl',
+    # 'n-phenylalkyl') and the carbon-count tail name SATURATED carriers
+    # only — an unsaturated non-ring carbon makes every count-based form
+    # describe a DIFFERENT molecule ((2E)-prop-2-enyl emitted as 'propyl',
+    # canary rt75_0430 RT True->False once the ester path was unlocked).
+    # Refuse and let name_ester defer to the general pipeline.
+    _has_nonring_unsat = False
+    for idx in alkyl_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            continue
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
+            if (nbr.GetIdx() in alkyl_set
+                    and not bond.GetIsAromatic()
+                    and bond.GetBondTypeAsDouble() != 1.0):
+                _has_nonring_unsat = True
+                break
+        if _has_nonring_unsat:
+            break
+    if has_ring and _has_nonring_unsat:
+        return ""
+
     if has_ring:
         # Try to name the ring-containing alkyl fragment
         # Common case: phenyl (benzene ring)
@@ -719,9 +776,15 @@ def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]
     if carbonyl_c is None:
         return None
 
-    # BFS/DFS to find the longest carbon chain from carbonyl_c
+    # BFS/DFS to find the longest carbon chain from carbonyl_c.
+    # WS-A task 9: a parent CHAIN never runs through ring atoms — rings
+    # attach as substituents (the walk previously absorbed a cyclohexyl
+    # into the "chain", mis-counting the acid length).
     acid_carbons = {idx for idx in acid_atoms
-                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'}
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                    and not mol.GetAtomWithIdx(idx).IsInRing()}
+    if carbonyl_c not in acid_carbons:
+        return None
 
     best_path = [carbonyl_c]
     queue = deque([(carbonyl_c, [carbonyl_c])])
@@ -770,9 +833,11 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
 
-    # Guard: if acid portion contains a ring but ring naming fails,
-    # return None to let complex ring naming handle it
-    if acid_fragment_has_ring(mol, acid_atoms):
+    # Guard: a true RING ACID (carbonyl bonded to the ring) whose ring
+    # naming fails defers to complex naming. WS-A task 9: an acid that
+    # merely CONTAINS a ring down-chain is a chain acid with a ring
+    # substituent — it takes the chain path below.
+    if acid_is_ring_acid(mol, acid_atoms):
         ring_acid_name = get_ring_acid_name(mol, acid_atoms)
         if ring_acid_name is None:
             # Complex ring acid (fused heterocycle etc.) - defer to complex naming
@@ -786,7 +851,9 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     # Find the principal chain in the acid fragment to correctly identify
     # chain length (excluding branch carbons) and discover substituents.
     acid_set = set(acid_atoms)
-    acid_has_ring = acid_fragment_has_ring(mol, acid_atoms)
+    # WS-A task 9: chain-vs-ring acid naming is decided by the CARBONYL
+    # bond, not mere ring presence (see acid_is_ring_acid).
+    acid_has_ring = acid_is_ring_acid(mol, acid_atoms)
     acid_principal_chain = None
     acid_prefix_str = ""
 

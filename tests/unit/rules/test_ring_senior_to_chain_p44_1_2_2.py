@@ -45,13 +45,6 @@ class TestRingSeniorToChainGold:
 
 @pytest.mark.unit
 class TestRingSeniorToChainProtect:
-    @pytest.mark.xfail(
-        reason="Pre-existing P-44.3 different-element defect (already red on "
-        "HEAD: names '(2,5,8,11-tetraoxadodecyl)cyclohexane'). S4's same-class "
-        "gate must not touch this row either way; the oxa-chain-vs-carbocycle "
-        "decision is a Task-9/among-rings-reds root-cause pass.",
-        strict=True,
-    )
     def test_tetraoxadodecane_keeps_chain_parent(self):
         # Heteroatom (oxa) skeletal chain is a DIFFERENT element class than the
         # carbocycle -> P-44.3 chain path stays reachable, ring must NOT win.
@@ -82,13 +75,6 @@ class TestRingSeniorToChainEsterInvestigate:
     surfaces it, otherwise tracked as a separate routing defect.
     """
 
-    @pytest.mark.xfail(
-        reason="Pre-existing ester-routing defect (already red on HEAD: names "
-        "'methyl cyclohexanecarboxylate'). The ester PG is on the chain, so "
-        "the PG-count branch should resolve this BEFORE the S4 cascade; the "
-        "miss is upstream ester routing, tracked separately.",
-        strict=True,
-    )
     def test_methyl_cyclohexylbutanoate(self):
         assert (
             name_compound("COC(=O)CCCC1CCCCC1").strip()

@@ -172,9 +172,16 @@ FUNCTIONAL_GROUP_SMARTS = {
     # free (implicit H for R-NH-OH, or a 2nd C for R2N-OH) — so it matches BOTH forms.
     "hydroxylamine": "[OX2H1][NX3;!$([NX3][CX3]=[OX1,SX1,SeX1,TeX1]);!$([NX3]=*)][#6]",
     # === AMINES ===
-    "primary_amine": "[NX3;H2;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
-    "secondary_amine": "[NX3;H1;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
-    "tertiary_amine": "[NX3;H0;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
+    # WS-A task 9 (P-66.6.1): the N carries !R — a RING nitrogen is a
+    # skeletal heteroatom of a ring parent hydride (morpholine, pyrrolidine,
+    # piperidine), never an amine characteristic group. Without it the
+    # ring N matched tertiary_amine, became the principal group, and the
+    # amine emitter CUT the ring ('N,N-dibutyl-N-cyclohexylcyclohexan-1-
+    # amine' for cyclohexylmorpholine). Only the N is !R: the carbon
+    # neighbours may be ring atoms (N-cyclohexylamines still match).
+    "primary_amine": "[NX3;H2;!R;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])][#6]",  # PERC-02: sp2/sp3, excludes amide/urea/guanidine N
+    "secondary_amine": "[NX3;H1;!R;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
+    "tertiary_amine": "[NX3;H0;!R;!$([NX3][CX3]=O);!$([NX3][CX3]=[NX2])]([CX4,cX3,$([CX3]=[CX3;!R])])([CX4,cX3,$([CX3]=[CX3;!R])])[CX4,cX3,$([CX3]=[CX3;!R])]",  # DATA-02+PERC-07: sp3, aromatic, or acyclic vinyl C; exclude amides/guanidines
     "aromatic_amine": "[NX3H2][cX3]",
     
     # === IMINES ===

@@ -327,6 +327,81 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     return f"{locant_str}-{prefix_form}"
 
 
+# WS-A task 9 / P-66.6.1.2: FGs whose PREFIX_FORMS string ('oxo',
+# 'hydroxy') decorates a SKELETAL atom — valid only when the FG center
+# carbon is part of the parent ring. Carbon-including prefixes
+# (carboxylic_acid->carboxy, nitrile->cyano, amide->carbamoyl) are correct
+# exocyclic by design and MUST NOT be listed here.
+_SKELETON_DECORATION_FGS = {
+    'aldehyde',
+    'ketone', 'thioketone', 'selenoketone', 'telluroketone',
+    'alcohol', 'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol',
+}
+
+
+def _exocyclic_component(mol, start: int, ring_set: set) -> set:
+    """Connected exocyclic component containing ``start`` (BFS that never
+    enters the parent ring)."""
+    visited = {start}
+    queue = [start]
+    while queue:
+        cur = queue.pop()
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in visited and ni not in ring_set:
+                visited.add(ni)
+                queue.append(ni)
+    return visited
+
+
+def _name_exocyclic_decoration(
+    mol, center: int, ring_set: set, atom_to_locant: dict, fg_name: str
+):
+    """Name an exocyclic decoration-FG branch with its carbon-including
+    substituent prefix (P-66.6.1.2; Phase-172/MBA-02 table: formyl /
+    n-oxoalkyl / hydroxyalkyl).
+
+    Returns (formatted_prefix_or_None, component_atoms). A None prefix means
+    the branch could not be faithfully named — the caller must leave its
+    atoms to the universal pipeline, never emit a skeleton-decoration
+    prefix for it.
+    """
+    comp = _exocyclic_component(mol, center, ring_set)
+    ring_attach_loc = None
+    for a in comp:
+        for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in ring_set and ni in atom_to_locant:
+                ring_attach_loc = atom_to_locant[ni]
+                break
+        if ring_attach_loc is not None:
+            break
+    if ring_attach_loc is None:
+        return None, comp
+    # Guard: the branch must be exactly chain-C + oxygen(s) — anything else
+    # (rings, N, S decorations) is beyond the table's vocabulary.
+    for a in comp:
+        sym = mol.GetAtomWithIdx(a).GetSymbol()
+        if sym not in ('C', 'O', 'H'):
+            return None, comp
+        if mol.GetAtomWithIdx(a).IsInRing():
+            return None, comp
+    carbon_count = sum(
+        1 for a in comp if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+    )
+    if fg_name == 'aldehyde':
+        table_key = 'aldehyde'
+    elif fg_name.endswith('alcohol'):
+        table_key = 'alcohol'
+    else:
+        return None, comp  # ketone family: no faithful table row yet
+    from .benzene import _name_functionalized_chain_substituent
+    sub_name = _name_functionalized_chain_substituent(carbon_count, table_key)
+    if not sub_name:
+        return None, comp
+    return format_fg_prefix(sub_name, [ring_attach_loc], 1), comp
+
+
 def _find_fg_center_atom(mol, match: tuple, fg_name: str) -> Optional[int]:
     """
     Find the functional group CENTER atom in a SMARTS match.
@@ -544,6 +619,13 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # --- Step 5: Generate non-principal FG prefixes with ring locants ---
     all_prefixes = []
+    # WS-A task 9 consumption plumbing: atoms named by an exocyclic
+    # carbon-including prefix (formyl/n-oxoalkyl/...) must be consumed even
+    # when outside the SMARTS match (the CH2 of -CH2CHO); atoms of a branch
+    # we could NOT faithfully name must NOT be consumed (the universal
+    # pipeline names them instead of them silently vanishing).
+    _extra_consumed: set = set()
+    _do_not_consume: set = set()
     for fg_name, matches in non_principal.items():
         if not matches:
             continue
@@ -573,7 +655,38 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         prefix_form = get_prefix(fg_name)
         if prefix_form:
             fg_locants = []
+            _diverted = 0
             for match in matches:
+                # WS-A task 9 / P-66.6.1.2: skeleton-decoration prefixes
+                # ('oxo', 'hydroxy') are valid ONLY when the FG center carbon
+                # is IN the ring skeleton. The old context-blind path rewrote
+                # an exocyclic -CHO as a ring ketone '4-oxo...' — a
+                # structurally DIFFERENT molecule — by re-anchoring the
+                # locant on the ring neighbor. An exocyclic center must emit
+                # the carbon-including substituent prefix instead (formyl /
+                # n-oxoalkyl / hydroxymethyl, the Phase-172/MBA-02 table).
+                if fg_name in _SKELETON_DECORATION_FGS:
+                    center = _find_fg_center_atom(mol, match, fg_name)
+                    if center is not None:
+                        if center in atom_to_locant:
+                            # Locant from the CENTER atom (also fixes ring
+                            # ketones citing the flanking match atom).
+                            fg_locants.append(atom_to_locant[center])
+                            continue
+                        if center not in ring_set:
+                            _diverted += 1
+                            exo_prefix, exo_atoms = _name_exocyclic_decoration(
+                                mol, center, ring_set, atom_to_locant, fg_name
+                            )
+                            if exo_prefix is not None:
+                                all_prefixes.append(exo_prefix)
+                                _extra_consumed.update(exo_atoms)
+                            else:
+                                # Cannot produce a faithful name — leave the
+                                # branch to the universal pipeline rather
+                                # than emit a structurally wrong prefix.
+                                _do_not_consume.update(exo_atoms)
+                            continue
                 for atom_idx in match:
                     if atom_idx in atom_to_locant:
                         fg_locants.append(atom_to_locant[atom_idx])
@@ -585,9 +698,11 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
                             fg_locants.append(atom_to_locant[nidx])
                             break
             fg_locants = sorted(set(fg_locants))
-            fg_count = len(fg_locants) if fg_locants else len(matches)
-            formatted = format_fg_prefix(prefix_form, fg_locants, fg_count)
-            all_prefixes.append(formatted)
+            _remaining = len(matches) - _diverted
+            if fg_locants or _remaining > 0:
+                fg_count = len(fg_locants) if fg_locants else _remaining
+                formatted = format_fg_prefix(prefix_form, fg_locants, fg_count)
+                all_prefixes.append(formatted)
 
     # --- Step 6: Discover substituents on the ring via universal pipeline ---
     # Collect atoms consumed by the principal group and non-principal FGs
@@ -602,6 +717,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
+    # WS-A task 9: see Step-5 plumbing comment.
+    consumed_atoms |= _extra_consumed
+    consumed_atoms -= _do_not_consume
 
     try:
         from ..assembly.composer import _integrate_universal_prefixes

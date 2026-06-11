@@ -544,6 +544,38 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
             'atoms': [start_idx]
         }
 
+    # WS-A task 9: ring-system substituents (phenyl, pyridin-2-yl,
+    # naphthalen-2-yl, ...) must NEVER reach the chain identifiers below —
+    # the alkyl namer counted an all-C/H RING as a chain (phenyl -> 'hexyl',
+    # a DIFFERENT molecule) and silently dropped heteroaryl fragments.
+    # Collect the fragment; if it contains ring atoms, delegate to the
+    # single ring-substituent chokepoint.
+    _visited = {start_idx}
+    _queue = deque([start_idx])
+    _frag_atoms = []
+    while _queue:
+        _cur = _queue.popleft()
+        _frag_atoms.append(_cur)
+        for _nbr in mol.GetAtomWithIdx(_cur).GetNeighbors():
+            _ni = _nbr.GetIdx()
+            if _ni not in _visited and _ni not in core_atoms:
+                _visited.add(_ni)
+                _queue.append(_ni)
+    _ring_info = mol.GetRingInfo()
+    if any(_ring_info.NumAtomRings(a) > 0 for a in _frag_atoms):
+        _frag_set = set(_frag_atoms)
+        # A ring straddling the core boundary = incomplete core mapping ->
+        # this is a mis-mapped core atom, not a substituent.
+        for _r in _ring_info.AtomRings():
+            _r_set = set(_r)
+            if (_r_set & _frag_set) and (_r_set & core_atoms):
+                return None
+        from .ring_substituents import name_ring_system_substituent
+        _ring_sub_name = name_ring_system_substituent(mol, _frag_atoms, start_idx)
+        if _ring_sub_name:
+            return {'name': _ring_sub_name, 'atoms': _frag_atoms}
+        return None
+
     # Carbon-based groups (alkyl or functionalized chain)
     if symbol == 'C':
         alkyl = _identify_pah_alkyl_group(mol, start_idx, core_atoms)

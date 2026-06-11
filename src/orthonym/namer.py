@@ -1846,6 +1846,44 @@ class Orthonym:
             # These take precedence over single-ring classification
             from .rules.polycyclics import identify_polycyclic, get_polycyclic_substituents
             pah_name = identify_polycyclic(features.mol)
+            if pah_name and len(features.ring_systems) >= 2:
+                # WS-A task 9 (A-i): the PAH early-return must not preempt the
+                # P-44 parent decision. With >=2 ring systems, take the PAH
+                # route ONLY when the PAH system survives:
+                #   (a) P-44.1 — a principal characteristic group on a
+                #       DIFFERENT ring system makes that system the parent
+                #       (2-(naphthalen-2-yl)cyclohexan-1-ol, not naphthalene);
+                #   (b) P-44.2 — the among-rings winner must BE the PAH
+                #       system (2-(naphthalen-2-yl)furan: furan is senior).
+                from .rules.polycyclics import get_polycyclic_core_atoms
+                from .rules.ring_selection import select_principal_ring_system
+                from .rules.parent_selection import is_principal_group_on_ring
+                _core = get_polycyclic_core_atoms(features.mol, pah_name)
+                _core_set = set(_core) if _core else set()
+                if _core_set:
+                    if features.principal_group_atoms:
+                        _pg_on_pah = is_principal_group_on_ring(
+                            features.mol, _core_set,
+                            features.principal_group_atoms,
+                            features.principal_group,
+                        )
+                        _pg_on_other = any(
+                            is_principal_group_on_ring(
+                                features.mol, rs,
+                                features.principal_group_atoms,
+                                features.principal_group,
+                            )
+                            for rs in features.ring_systems
+                            if not (set(rs) & _core_set)
+                        )
+                        if _pg_on_other and not _pg_on_pah:
+                            pah_name = None
+                    if pah_name:
+                        _senior = select_principal_ring_system(
+                            features.mol, features.ring_systems
+                        )
+                        if _senior and not (set(_senior) & _core_set):
+                            pah_name = None
             if pah_name:
                 features.polycyclic_name = pah_name
                 features.polycyclic_substituents = get_polycyclic_substituents(
@@ -2119,8 +2157,24 @@ class Orthonym:
                 # Collect principal group atom indices for orientation
                 pg_atom_set: set = set()
                 if features.principal_group and features.principal_group in features.functional_groups:
+                    from .rules.parent_selection import (
+                        SKELETAL_SUFFIX_PGS, _pg_attachment_atoms,
+                    )
                     for match in features.functional_groups[features.principal_group]:
-                        pg_atom_set.update(match)
+                        if features.principal_group in SKELETAL_SUFFIX_PGS:
+                            # WS-A task 9: the -one family's locant atom is
+                            # the carbonyl carbon (PG_ATTACHMENT_INDICES);
+                            # feeding the whole match (incl. the FLANKING
+                            # carbon) made orientation criterion (a) tie at
+                            # {1,2} both ways for 2-carbon ketone chains and
+                            # fall through to alphabetics ('...ethan-2-one').
+                            pg_atom_set.update(
+                                _pg_attachment_atoms(
+                                    features.principal_group, match
+                                )
+                            )
+                        else:
+                            pg_atom_set.update(match)
 
                 # Get initial substituents for orientation criterion (d)
                 # This is needed BEFORE orientation to apply lowest-locant rule

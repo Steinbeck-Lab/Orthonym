@@ -709,35 +709,52 @@ def _identify_fused_substituent(
             return func_chain
 
         # General fallback: collect all substituent atoms and delegate to
-        # universal naming (Phase 85 USUB-05 gap closure)
-        # Guards:
-        #   1. start_idx must NOT be a ring atom (ring atoms misidentified as subs
-        #      when core mapping is incomplete -- e.g., coumarin with 3-ring system)
-        #   2. Fragment must NOT contain ring atoms (those need specialized ring naming)
-        #   3. Only common organic elements, no exotic (As, Se, etc.)
-        #   4. Modest size (<=25 atoms)
+        # universal naming (Phase 85 USUB-05 gap closure; WS-A task 9 extends
+        # it to RING-SYSTEM substituents — the old blanket ring guards
+        # silently DROPPED the fragment, naming 2-(pyridin-2-yl)quinoline as
+        # bare 'quinoline').
+        # Guards kept (retargeted precisely):
+        #   1. A ring that STRADDLES the core boundary means the core mapping
+        #      is incomplete (coumarin 3-ring case) -> not a substituent.
+        #   2. Only common organic elements, no exotic (As, Se, etc.)
+        #   3. Modest size (<=25 atoms)
         _ring_info = mol.GetRingInfo()
-        if _ring_info.NumAtomRings(start_idx) > 0:
-            return None  # Start atom is in a ring, not a substituent
         _COMMON_ORGANIC = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
         sub_atoms = _bfs_collect_all(mol, start_idx, excluded)
-        # Reject if any collected atom is in a ring (ring-crossing BFS artifact)
-        _frag_has_ring = any(_ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms)
-        if sub_atoms and len(sub_atoms) <= 25 and not _frag_has_ring:
-            all_common = all(
-                mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC
-                for idx in sub_atoms
+        if not sub_atoms or len(sub_atoms) > 25:
+            return None
+        _sub_set = set(sub_atoms)
+        # Guard 1: any ring spanning fragment AND core = incomplete core mapping
+        for _r in _ring_info.AtomRings():
+            _r_set = set(_r)
+            if (_r_set & _sub_set) and (_r_set & excluded):
+                return None
+        if not all(
+            mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC
+            for idx in sub_atoms
+        ):
+            return None
+
+        if any(_ring_info.NumAtomRings(a) > 0 for a in sub_atoms):
+            # Ring-containing substituent (pyridinyl, naphthalenyl, indolyl,
+            # naphthalenylmethyl, ...) -> the single WS-A delegate.
+            from .ring_substituents import name_ring_system_substituent
+            fallback_name = name_ring_system_substituent(
+                mol, sub_atoms, start_idx
             )
-            if all_common:
-                from ..assembly.substituent_enumerator import name_substituent
-                fallback_name = name_substituent(mol, sub_atoms, start_idx)
-                # Reject generic descriptive fallbacks -- those indicate unnameable
-                if fallback_name and fallback_name != "substituent":
-                    return {
-                        'name': fallback_name,
-                        'type': 'functionalized',
-                        'atoms': list(sub_atoms),
-                    }
+        else:
+            from ..assembly.substituent_enumerator import name_substituent
+            fallback_name = name_substituent(mol, sub_atoms, start_idx)
+            if fallback_name == "substituent" or (
+                    fallback_name and ' ' in fallback_name):
+                fallback_name = None
+        # Reject generic descriptive fallbacks -- those indicate unnameable
+        if fallback_name:
+            return {
+                'name': fallback_name,
+                'type': 'functionalized',
+                'atoms': list(sub_atoms),
+            }
         return None
 
     # Oxygen groups (oxo C=O, hydroxyl -OH)

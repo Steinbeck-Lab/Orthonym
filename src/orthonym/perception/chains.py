@@ -750,13 +750,27 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
             break
 
     if contained_ring:
-        # This is a ring substituent
-        # Get the ring substituent name (phenyl, cyclohexyl, piperidinyl, etc.)
-        ring_name = get_ring_substituent_name(mol, contained_ring)
+        # This is a ring substituent. WS-A task 9: name the WHOLE fragment
+        # through the single ring-substituent chokepoint with its attachment
+        # atom — the old per-first-SSSR-ring lookup truncated a fused system
+        # to its first ring (naphthalenyl -> 'phenyl', a DIFFERENT group) and
+        # never carried the P-29.2 free-valence locant.
+        attach_idx = next(
+            (a for a in sub_atoms
+             for nbr in mol.GetAtomWithIdx(a).GetNeighbors()
+             if nbr.GetIdx() in parent_atoms),
+            sub_atoms[0],
+        )
+        from ..rules.ring_substituents import name_ring_system_substituent
+        ring_name = name_ring_system_substituent(mol, sub_atoms, attach_idx)
+        if not ring_name and set(contained_ring) == sub_set:
+            # Last resort: legacy single-ring lookup (locant-less). Only
+            # sound when the fragment IS that single ring.
+            ring_name = get_ring_substituent_name(mol, contained_ring)
 
         return {
             'type': 'ring',
-            'name': ring_name,
+            'name': ring_name or '',
             'atoms': sub_atoms,
             'ring_atoms': contained_ring,
         }

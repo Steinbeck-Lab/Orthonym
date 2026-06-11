@@ -211,6 +211,57 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
     # Get chain prefix (stem)
     stem = get_chain_prefix(chain_length)
 
+    # WS-A task 9 / P-15.4: a skeletal chain with embedded heteroatoms
+    # (the P-44.3 replacement-nomenclature parent) cites them as 'oxa'/
+    # 'aza'/'thia' prefixes with their locants — the bare carbon stem
+    # silently described a DIFFERENT molecule ('dodecane' for a chain
+    # with 4 O). Heteroatom locants come from the oriented chain.
+    _het_positions = {}
+    for _pos, _aidx in enumerate(features.principal_chain, start=1):
+        _sym = features.mol.GetAtomWithIdx(_aidx).GetSymbol()
+        if _sym != 'C':
+            _het_positions.setdefault(_sym, []).append(_pos)
+    if _het_positions:
+        _REPL = {'O': 'oxa', 'S': 'thia', 'Se': 'selena', 'Te': 'tellura',
+                 'N': 'aza', 'P': 'phospha', 'Si': 'sila', 'B': 'bora'}
+        if not all(_sym in _REPL for _sym in _het_positions):
+            _het_positions = {}
+    if _het_positions:
+        from ...rules.locants import compare_locant_sets
+        # P-31.1.4.2.3: heteroatom replacement terms get LOWEST locants
+        # before detachable prefixes — re-orient (reverse) when reversal
+        # lowers the heteroatom locant set.
+        _n = chain_length
+        _all_locs = sorted(
+            loc for locs in _het_positions.values() for loc in locs
+        )
+        _rev_locs = sorted(_n + 1 - loc for loc in _all_locs)
+        if compare_locant_sets(_rev_locs, _all_locs) < 0:
+            features.principal_chain = list(reversed(features.principal_chain))
+            from ...rules.locants import build_atom_to_locant
+            features.atom_to_locant = build_atom_to_locant(
+                features.principal_chain
+            )
+            _het_positions = {
+                _sym: sorted(_n + 1 - loc for loc in locs)
+                for _sym, locs in _het_positions.items()
+            }
+        # Citation: seniority order O > S > Se > Te > N > P > Si > B
+        # (P-15.4.3.1), each term with its locants and multiplier.
+        _SENIORITY = ['O', 'S', 'Se', 'Te', 'N', 'P', 'Si', 'B']
+        _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
+                 6: 'hexa', 7: 'hepta', 8: 'octa'}
+        _terms = []
+        for _sym in _SENIORITY:
+            if _sym not in _het_positions:
+                continue
+            _locs = sorted(_het_positions[_sym])
+            _mult = _MULT.get(len(_locs), str(len(_locs)))
+            _terms.append(
+                f"{','.join(str(x) for x in _locs)}-{_mult}{_REPL[_sym]}"
+            )
+        stem = ''.join(_terms) + stem
+
     # Get bond locants if we have atom_to_locant mapping
     double_locants = []
     triple_locants = []

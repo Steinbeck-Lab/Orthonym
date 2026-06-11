@@ -3667,7 +3667,21 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         return None
 
     nitrogen = mol.GetAtomWithIdx(n_idx)
+
+    # WS-A task 9 (P-66.6.1): a RING nitrogen is a skeletal heteroatom of a
+    # ring parent hydride, never an amine. Walking its "substituents" from
+    # here CUT the ring open ('N,N-dibutyl...' from morpholine). The amine
+    # SMARTS now excludes ring N (perception keystone); this emitter-level
+    # gate is defense-in-depth for any legacy caller.
+    if nitrogen.IsInRing():
+        return None
+
     chain_set = set(features.principal_chain) if features.principal_chain else set()
+    # WS-A task 9: when a RING is the parent, its atoms must not be
+    # re-enumerated as N-substituents (the parent cyclohexane was emitted
+    # AGAIN as 'N-cyclohexyl').
+    if getattr(features, 'principal_ring', None):
+        chain_set |= set(features.principal_ring)
 
     # Find N-substituents: carbon neighbors of N that are NOT on the principal chain
     from collections import deque

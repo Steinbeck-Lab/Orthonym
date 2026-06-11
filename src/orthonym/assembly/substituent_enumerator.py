@@ -950,6 +950,25 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
     except Exception:
         pass
 
+    # WS-A task 9: ring-containing fragments go to the single
+    # ring-substituent chokepoint (P-29.2 free-valence locant:
+    # naphthalen-2-yl, pyridin-2-yl, ...) — composition-based naming below
+    # would count a ring's carbons as a chain. Recursion-safe:
+    # name_ring_system_substituent only uses get_ring_substituent_name and
+    # the name_substituent cascade, never this router.
+    try:
+        _ri = mol.GetRingInfo()
+        if attach_idx is not None and any(
+                _ri.NumAtomRings(a) > 0 for a in frag_atom_set):
+            from ..rules.ring_substituents import name_ring_system_substituent
+            _ring_nm = name_ring_system_substituent(
+                mol, sorted(frag_atom_set), attach_idx
+            )
+            if _ring_nm:
+                return _ring_nm
+    except Exception:
+        pass
+
     # Classify the fragment by composition
     category = _classify_fragment(mol, frag_mol, frag_atoms)
 

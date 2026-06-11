@@ -31,6 +31,19 @@ from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
 from .seniority import PG_ATTACHMENT_INDICES
 
+# WS-A task 9 (P-66.6.1): these suffixes decorate a SKELETAL atom of the
+# parent — there is no exocyclic-carbon '-one' suffix (unlike the carbo-
+# suffixes -carboxylic acid / -carbaldehyde / -carbonitrile, whose carbon
+# is exocyclic by design). For these PGs, "on ring" means the suffix atom
+# IS a ring atom; the bonded-to-ring relaxation is invalid and mis-parented
+# every aryl ketone (O=C(c1ccccc1)Cc1cnc[nH]1 named bare 'benzene').
+SKELETAL_SUFFIX_PGS = {
+    "ketone",
+    "thioketone",
+    "selenoketone",
+    "telluroketone",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -207,6 +220,11 @@ def is_principal_group_on_ring(
             # Self-check: attachment atom itself may be a ring atom
             if attachment_atom in ring_atoms_set:
                 return True
+
+            # WS-A task 9: skeletal suffixes (-one family) have no exocyclic
+            # form — membership above is the ONLY way they can be on-ring.
+            if principal_group in SKELETAL_SUFFIX_PGS:
+                continue
 
             # Check if attachment atom is directly bonded to a ring atom
             atom = mol.GetAtomWithIdx(attachment_atom)
@@ -584,6 +602,25 @@ def _compare_substituent_locants(
     return -cmp
 
 
+def _count_bridging_heteroatoms(mol, chain: List[int]) -> int:
+    """Count bridging heteroatoms (non-C with >=2 chain neighbours) in a
+    skeletal chain. WS-A task 9: P-51.4 admits chain replacement
+    nomenclature ('2,5,8,11-tetraoxadodecane') at >= 4 hetero units — the
+    no-PG skeletal-chain candidacy gate."""
+    chain_set = set(chain)
+    count = 0
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() == 6:
+            continue
+        chain_nbrs = sum(
+            1 for nbr in atom.GetNeighbors() if nbr.GetIdx() in chain_set
+        )
+        if chain_nbrs >= 2:
+            count += 1
+    return count
+
+
 def _has_bridging_heteroatom(mol, chain: List[int]) -> bool:
     """Check if a skeletal chain contains a genuine bridging heteroatom.
 
@@ -709,6 +746,45 @@ def select_parent(
     # case ring and chain share the senior element (C), so the ring always wins.
     if not principal_group or not principal_group_atoms:
         best_ring, other_rings = _select_best_ring_system(mol, ring_systems)
+
+        # WS-A task 9 / P-44.3 + P-51.4: the comment below's own carve-out —
+        # the ring DOES lose to a chain bearing a senior skeletal element.
+        # With no PG, when a heteroatom skeletal chain admissible for chain
+        # replacement nomenclature exists (>= 4 bridging hetero units,
+        # P-51.4) and the best ring is all-carbon, the O/N-bearing chain is
+        # senior (P-44.3: O > C): 1-cyclohexyl-2,5,8,11-tetraoxadodecane,
+        # NOT (2,5,8,11-tetraoxadodecyl)cyclohexane. Mono/di/tri-ethers
+        # (< 4 hetero units) keep the substitutive alkoxy path and the ring
+        # stays parent (butoxycyclohexane).
+        _ring_all_c = all(
+            mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in best_ring
+        )
+        if _ring_all_c:
+            from ..perception.functional_groups import get_chain_excluded_atoms
+            _all_ring_atoms_local = set()
+            for _rs in ring_systems:
+                _all_ring_atoms_local.update(_rs)
+            _sk = find_longest_skeletal_chain(
+                mol,
+                exclude_atoms=_all_ring_atoms_local | get_chain_excluded_atoms(mol),
+            )
+            if (_sk
+                    and len(_sk) > len(principal_chain)
+                    and _count_bridging_heteroatoms(mol, _sk) >= 4):
+                _other = [tuple(sorted(r)) for r in other_rings]
+                return ParentSelectionResult(
+                    parent_type='chain',
+                    parent_atoms=_sk,
+                    substituent_rings=(
+                        [tuple(sorted(best_ring))] + _other
+                    ),
+                    reasoning=(
+                        "P-44.3/P-51.4: no PG, replacement-nomenclature "
+                        f"hetero chain (len={len(_sk)}) senior to all-carbon "
+                        f"ring (ring={len(best_ring)})"
+                    ),
+                )
+
         total_ring_atoms = len(best_ring)
         chain_len = len(principal_chain)
         other_ring_tuples = [tuple(sorted(r)) for r in other_rings]
@@ -935,6 +1011,10 @@ def _count_pg_on_ring(
             if attachment in ring_atoms:
                 count += 1
                 break
+            # WS-A task 9: skeletal suffixes (-one family) count on-ring
+            # ONLY by membership — no bonded-to-ring relaxation.
+            if principal_group in SKELETAL_SUFFIX_PGS:
+                continue
             atom = mol.GetAtomWithIdx(attachment)
             hit = False
             for neighbor in atom.GetNeighbors():
