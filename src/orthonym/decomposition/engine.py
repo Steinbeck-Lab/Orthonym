@@ -970,7 +970,13 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     fragments.sort(key=_frag_sort_key)
 
     # Name each fragment with fallback (Phase 127: D-01)
+    # Phase 176 / D-03: build a parallel fragment_smiles dict in lockstep with
+    # fragment_names, keyed by the SAME frag["side"], so the glycoside assembler
+    # can inspect fragment structure (the sugar-skeleton deriver and the
+    # aglycone seniority guard both need the SMILES, not just the names). This
+    # is purely additive -- non-glycoside callers never read fragment_smiles.
     fragment_names = {}
+    fragment_smiles = {}
     for frag in fragments:
         frag_name = None
 
@@ -985,6 +991,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         if not frag_name or "unknown" in frag_name.lower():
             return None  # Truly unnameable -- abort
         fragment_names[frag["side"]] = frag_name
+        fragment_smiles[frag["side"]] = frag["smiles"]
 
     # --- Seniority-based substitutive assembly for swapped-role bonds ---
     # When _maybe_swap_parent_roles() detected that the non-acid fragment
@@ -1087,7 +1094,11 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             pass  # Any failure: fall through to normal assembly
 
     # Assemble (delegate to fragment_assembly module)
-    return assemble_fragment_name(bond["type"], fragment_names, style=style)
+    # Phase 176 / D-03: thread fragment_smiles additively; only the glycoside
+    # assembler reads it, every other assembler ignores the kwarg.
+    return assemble_fragment_name(
+        bond["type"], fragment_names, style=style, fragment_smiles=fragment_smiles
+    )
 
 
 # ---------------------------------------------------------------------------
