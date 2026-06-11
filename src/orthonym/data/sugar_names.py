@@ -27,8 +27,12 @@ import logging
 from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 logger = logging.getLogger(__name__)
+
+# Idempotent CIP-assignment marker (mirrors perception/stereo.py:15).
+_CIP_ASSIGNED_PROP = "_Orthonym_CIPAssigned"
 
 
 # ============================================================================
@@ -407,3 +411,315 @@ def sugar_to_glycosyloxy_prefix(
         return f"{anomer}-{config}-{glycosyloxy}"
     else:
         return glycosyloxy
+
+
+def sugar_to_glycoside_class_name(
+    anomer: Optional[str], config: Optional[str], base_name: str
+) -> str:
+    """Convert sugar info to a functional-class glycoside head word.
+
+    Transforms the base sugar name ending from ``-ose`` to ``-oside``
+    (so ``glucopyranose`` -> ``glucopyranoside``, ``fructofuranose`` ->
+    ``fructofuranoside``) and prepends the ASCII ``anomer-config-`` descriptor
+    cluster when both are present (P-102.5.6.2.2 / D-07).
+
+    The descriptors stay ASCII (``beta-D-``), never Greek ``β`` — the gold
+    harness ``normalize()`` does not transliterate (Pitfall 6).
+
+    Args:
+        anomer: Anomeric descriptor ("alpha", "beta", or "").
+        config: Configurational descriptor ("D", "L", or "").
+        base_name: Sugar base name (e.g., "glucopyranose").
+
+    Returns:
+        The glycoside head word, e.g. "beta-D-glucopyranoside".
+
+    Examples:
+        >>> sugar_to_glycoside_class_name("beta", "D", "glucopyranose")
+        'beta-D-glucopyranoside'
+        >>> sugar_to_glycoside_class_name("alpha", "L", "rhamnopyranose")
+        'alpha-L-rhamnopyranoside'
+        >>> sugar_to_glycoside_class_name("", "", "glucopyranose")
+        'glucopyranoside'
+    """
+    # Convert -ose ending to -oside; "glucopyranose" -> "glucopyranoside".
+    if base_name.endswith("ose"):
+        stem = base_name[:-1] + "ide"  # -ose -> -oside
+    else:
+        stem = base_name + "oside"
+
+    if anomer and config:
+        return f"{anomer}-{config}-{stem}"
+    return stem
+
+
+# ============================================================================
+# Structure-derived sugar-skeleton recognizer (Phase 176, WSD-08)
+# ============================================================================
+#
+# recognize_sugar_skeleton derives (anomer, config, base) directly from a
+# molecule's CIP-stereocenter fingerprint, generalizing the exact-stereo
+# catalog (lookup_sugar) past its keyed SMILES.  It is hard-gated (D-13) to
+# reproduce ALL_SUGAR_NAMES for every structurally-clean stereo entry, and
+# fails closed (returns None) on any deviation from the clean hexose/pentose
+# OH/H/CH2OH fingerprint (deoxy / amino / N-acetyl / uronic / C-modified,
+# per D-06).  The fingerprint -> tuple map is built once from the catalog so
+# the deriver remains a general structural map, NOT a per-molecule shortcut
+# (the contributor guide root-cause mandate).
+#
+# alpha/beta is the configuration-RELATIVE anomeric relationship of
+# P-102.3.4.2 — it is NOT the raw anomeric CIP label (which inverts between
+# D and L).  We therefore do not read raw anomeric CIP; we map the full
+# ordered ring-stereocenter CIP fingerprint to the catalog tuple, which is
+# gate-proven distinguishing across all clean entries.
+
+
+def _ensure_cip(mol) -> None:
+    """Assign CIP labels once (idempotent), mirroring perception/stereo.py."""
+    if mol.HasProp(_CIP_ASSIGNED_PROP):
+        return
+    try:
+        rdCIPLabeler.AssignCIPLabels(mol)
+    except (ValueError, RuntimeError, KeyError) as exc:
+        logger.debug("CIP assignment failed in sugar deriver: %s", exc)
+    mol.SetProp(_CIP_ASSIGNED_PROP, "1")
+
+
+def _is_clean_sugar_ring(mol, ring) -> bool:
+    """True iff `ring` is the clean hexose/pentose OH/H/CH2OH fingerprint (D-06).
+
+    A single 5- or 6-membered ring with exactly one ring oxygen, every ring
+    carbon bearing only OH (or one exocyclic CH2OH-rooted carbon chain), no
+    nitrogen anywhere, no deoxy ring-CH3, and no carbonyl/carboxyl. Anything
+    else (deoxy/amino/N-acetyl/uronic/C-modified) returns False so the deriver
+    fails closed.
+    """
+    ringset = set(ring)
+    if len(ringset) not in (5, 6):
+        return False
+    # No nitrogen anywhere (amino / N-acetyl sugars).
+    if any(a.GetSymbol() == "N" for a in mol.GetAtoms()):
+        return False
+    # No double bonds anywhere (carbonyl / carboxyl uronic acids, glycals).
+    if any(b.GetBondTypeAsDouble() == 2.0 for b in mol.GetBonds()):
+        return False
+    ring_oxygens = [i for i in ringset if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return False
+    for idx in ringset:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != "C":
+            continue
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ringset:
+                continue
+            sym = nbr.GetSymbol()
+            if sym == "O":
+                continue  # exocyclic hydroxyl / anomeric-O
+            if sym == "C":
+                # exocyclic carbon must be CH2OH-rooted (carries an O neighbor);
+                # a bare CH3 marks a 6-deoxy sugar (rhamnose/fucose).
+                if not any(nn.GetSymbol() == "O" for nn in nbr.GetNeighbors()):
+                    return False
+            else:
+                return False
+    return True
+
+
+def _locate_anomeric_carbon(mol, ring, ring_oxygen):
+    """Self-locate the anomeric carbon: ring C bonded to ring-O AND exocyclic O.
+
+    Returns the single anomeric carbon index, or None when zero or more than
+    one such carbon exists (out of the clean acetal fingerprint -> fail closed).
+    """
+    ringset = set(ring)
+    candidates = []
+    for idx in ringset:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != "C":
+            continue
+        nbr_idx = {n.GetIdx() for n in atom.GetNeighbors()}
+        if ring_oxygen not in nbr_idx:
+            continue
+        has_exocyclic_o = any(
+            n.GetIdx() not in ringset and n.GetSymbol() == "O"
+            for n in atom.GetNeighbors()
+        )
+        if has_exocyclic_o:
+            candidates.append(idx)
+    if len(candidates) != 1:
+        return None
+    return candidates[0]
+
+
+def _exocyclic_carbon_descriptor(mol, ring_idx, ringset):
+    """Describe a ring carbon's exocyclic carbon substituent (chain + CIP).
+
+    Captures the exocyclic side-chain richness so pentose vs hexose furanoses
+    (CH2OH vs CH(OH)-CH2OH tails) are distinguished. Returns a sorted tuple of
+    per-substituent (depth, CIP) chain descriptors.
+    """
+    atom = mol.GetAtomWithIdx(ring_idx)
+    substituents = []
+    for nbr in atom.GetNeighbors():
+        if nbr.GetIdx() in ringset or nbr.GetSymbol() != "C":
+            continue
+        chain = []
+        visited = {ring_idx}
+        stack = [(nbr, 1)]
+        while stack:
+            cur, depth = stack.pop()
+            if cur.GetIdx() in visited:
+                continue
+            visited.add(cur.GetIdx())
+            if cur.GetSymbol() != "C":
+                continue
+            cip = cur.GetProp("_CIPCode") if cur.HasProp("_CIPCode") else "-"
+            chain.append((depth, cip))
+            for nn in cur.GetNeighbors():
+                if nn.GetIdx() not in visited and nn.GetSymbol() == "C":
+                    stack.append((nn, depth + 1))
+        substituents.append(tuple(sorted(chain)))
+    return tuple(sorted(substituents))
+
+
+def _ring_cip_fingerprint(mol, ring, ring_oxygen, anomeric_idx):
+    """Build the canonical, order-invariant ring-stereocenter CIP fingerprint.
+
+    Walks the ring in both directions from the anomeric carbon and takes the
+    lexicographically smaller ordered sequence, so the fingerprint is
+    independent of atom numbering / SMILES writing. Each ring position
+    contributes its CIP code plus exocyclic carbon-chain descriptor.
+    """
+    ringset = set(ring)
+    adjacency = {
+        idx: [
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if n.GetIdx() in ringset
+        ]
+        for idx in ringset
+    }
+
+    def walk(start, second):
+        order = [start]
+        prev, cur = start, second
+        while cur != start:
+            order.append(cur)
+            nxt = [x for x in adjacency[cur] if x != prev]
+            if not nxt:
+                break
+            prev, cur = cur, nxt[0]
+        return order
+
+    def feature(idx):
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == "O":
+            return ("O",)
+        cip = atom.GetProp("_CIPCode") if atom.HasProp("_CIPCode") else "-"
+        return (cip, _exocyclic_carbon_descriptor(mol, idx, ringset))
+
+    sequences = []
+    for second in adjacency[anomeric_idx]:
+        order = walk(anomeric_idx, second)
+        sequences.append(tuple(feature(i) for i in order))
+    if not sequences:
+        return None
+    return (len(ringset),) + min(sequences)
+
+
+def _build_skeleton_fingerprint_index():
+    """Build the fingerprint -> (anomer, config, base) map from the catalog.
+
+    Iterates ALL_SUGAR_NAMES, keeps only structurally-clean stereo ring sugars,
+    and maps each one's canonical CIP fingerprint to its catalog tuple. This is
+    the ground-truth index the deriver looks up; the D-13 test proves it
+    reproduces the catalog with no collisions.
+    """
+    index: Dict[tuple, Tuple[str, str, str]] = {}
+    for smiles, value in ALL_SUGAR_NAMES.items():
+        if "@" not in smiles:
+            continue
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            continue
+        ri = mol.GetRingInfo()
+        if ri.NumRings() != 1:
+            continue
+        ring = ri.AtomRings()[0]
+        if not _is_clean_sugar_ring(mol, ring):
+            continue
+        ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+        if len(ring_oxygens) != 1:
+            continue
+        anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygens[0])
+        if anomeric_idx is None:
+            continue
+        _ensure_cip(mol)
+        fingerprint = _ring_cip_fingerprint(mol, ring, ring_oxygens[0], anomeric_idx)
+        if fingerprint is None:
+            continue
+        existing = index.get(fingerprint)
+        if existing is not None and existing != value:
+            # Fingerprint collision between distinct catalog tuples — the map is
+            # ambiguous; drop both so the deriver fails closed rather than
+            # emitting a wrong tuple (the D-13 test will surface this).
+            logger.warning(
+                "sugar skeleton fingerprint collision: %s vs %s",
+                existing, value,
+            )
+            index[fingerprint] = None  # type: ignore[assignment]
+            continue
+        index[fingerprint] = value
+    return index
+
+
+_SKELETON_FINGERPRINT_INDEX = _build_skeleton_fingerprint_index()
+
+
+def recognize_sugar_skeleton(
+    mol, anomeric_idx: Optional[int] = None
+) -> Optional[Tuple[str, str, str]]:
+    """Derive (anomer, config, base) from a sugar's structure (P-102.3.4.2).
+
+    Generalizes the exact-stereo ``lookup_sugar`` catalog: it maps the
+    molecule's canonical ring-stereocenter CIP fingerprint to the catalog
+    ``(anomer, config, base)`` tuple. Hard-gated (D-13) to reproduce every
+    structurally-clean stereo catalog entry; returns ``None`` (never a wrong
+    tuple) on any deviation from the clean hexose/pentose OH/H/CH2OH
+    fingerprint — deoxy / amino / N-acetyl / uronic / C-modified / non-6-ring
+    sugars defer to the catalog or Phase 183 (D-06, fail-closed).
+
+    Args:
+        mol: RDKit Mol of the free-sugar fragment (anomeric -OH present).
+        anomeric_idx: Optional anomeric carbon index. When None (the robust
+            default), the deriver self-locates the anomeric carbon inside the
+            fragment (ring C bonded to ring O AND an exocyclic O).
+
+    Returns:
+        ``(anomer, config, base_name)`` identical in shape to ``lookup_sugar``,
+        or ``None`` on out-of-scope / ambiguous input.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if not _is_clean_sugar_ring(mol, ring):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    ring_oxygen = ring_oxygens[0]
+
+    if anomeric_idx is None:
+        anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None or anomeric_idx not in set(ring):
+        return None
+
+    _ensure_cip(mol)
+    fingerprint = _ring_cip_fingerprint(mol, ring, ring_oxygen, anomeric_idx)
+    if fingerprint is None:
+        return None
+    return _SKELETON_FINGERPRINT_INDEX.get(fingerprint)
