@@ -84,15 +84,18 @@ def get_rdkit_cip_labels(mol) -> Dict[int, str]:
                 labels[atom.GetIdx() + 1] = code
 
     # Bond stereochemistry: E, Z
+    # FAIR both-endpoint keying (Phase 177 / D-14): the CIP Validation Suite and
+    # centres both label a C=C/C=N at BOTH 1-based atom endpoints (e.g. "7E 8E").
+    # The legacy keying used only key = min(begin_idx, end_idx), scoring the upper
+    # endpoint as <none> and artificially deflating RDKit to 182/290. Keying both
+    # endpoints (matching the suite + centres convention) lifts the RDKit baseline
+    # to 235/290 -- the +53 is a pure keying-artifact removal, NOT an engine change.
     for bond in mol.GetBonds():
         if bond.HasProp("_CIPCode"):
             code = bond.GetProp("_CIPCode")
             if code in ("E", "Z"):
-                # Use the lower-numbered atom (1-based) as the key
-                begin_idx = bond.GetBeginAtomIdx() + 1
-                end_idx = bond.GetEndAtomIdx() + 1
-                key = min(begin_idx, end_idx)
-                labels[key] = code
+                labels[bond.GetBeginAtomIdx() + 1] = code
+                labels[bond.GetEndAtomIdx() + 1] = code   # BOTH endpoints (fair)
 
     return labels
 
@@ -176,6 +179,104 @@ def compare_labels(
             )
 
     return len(mismatches) == 0, mismatches
+
+
+# ---------------------------------------------------------------------------
+# Suite pass-count helpers (Phase 177 / D-14, D-17)
+# ---------------------------------------------------------------------------
+
+
+def score_suite(cip_data: List[Dict], label_fn) -> int:
+    """Count compounds whose labels (from label_fn) match the expected suite.
+
+    label_fn(mol) -> {1-based-atom-idx: descriptor}. Skips invalid SMILES and
+    compounds with no expected labels (consistent with the documented gate
+    numbers: min-keyed RDKit 182, fair-keyed RDKit 235, centres 281).
+    """
+    pass_count = 0
+    for entry in cip_data:
+        mol = Chem.MolFromSmiles(entry["smiles"])
+        if mol is None:
+            continue
+        expected = parse_expected_labels(entry["expected_labels"])
+        if not expected:
+            continue
+        actual = label_fn(mol)
+        all_match, _ = compare_labels(expected, actual)
+        if all_match:
+            pass_count += 1
+    return pass_count
+
+
+def get_rdkit_cip_labels_minkeyed(mol) -> Dict[int, str]:
+    """Legacy min-keyed labeller (documents the 182 baseline / centres-OFF value).
+
+    Identical to get_rdkit_cip_labels EXCEPT it keys E/Z bonds at
+    min(begin, end) -- the pre-Phase-177 keying artifact. Retained ONLY to
+    assert the 182 legacy number stays stable as the 'centres OFF' gate value.
+    """
+    try:
+        rdCIPLabeler.AssignCIPLabels(mol)
+    except Exception:
+        return {}
+    labels: Dict[int, str] = {}
+    for atom in mol.GetAtoms():
+        if atom.HasProp("_CIPCode"):
+            code = atom.GetProp("_CIPCode")
+            if code in ("R", "S", "r", "s"):
+                labels[atom.GetIdx() + 1] = code
+    for bond in mol.GetBonds():
+        if bond.HasProp("_CIPCode"):
+            code = bond.GetProp("_CIPCode")
+            if code in ("E", "Z"):
+                key = min(bond.GetBeginAtomIdx() + 1, bond.GetEndAtomIdx() + 1)
+                labels[key] = code
+    return labels
+
+
+def score_suite_centres(cip_data: List[Dict]) -> Optional[int]:
+    """Count suite matches using centres in a SINGLE batched JVM invocation.
+
+    Mirrors the D-12 design (one JVM for the whole batch, ~3.2 s for 290
+    compounds) rather than spawning a JVM per molecule. Sends every valid,
+    expected-labelled compound's ORIGINAL suite SMILES (the suite's atom
+    numbering is keyed to that SMILES, not RDKit's canonical reordering) to
+    centres at once, then compares the engine's per-atom label map (already in
+    the suite's 1-based both-endpoint convention) against the expected labels.
+
+    Returns the pass count, or None when the engine is unavailable.
+    """
+    from orthonym.perception.centres_bridge import (
+        centres_label_batch,
+        _find_centres_jar,
+        _java_available,
+    )
+    if _find_centres_jar() is None or not _java_available():
+        return None
+
+    todo: List[Tuple[str, Dict[int, str]]] = []
+    for entry in cip_data:
+        if Chem.MolFromSmiles(entry["smiles"]) is None:
+            continue
+        expected = parse_expected_labels(entry["expected_labels"])
+        if not expected:
+            continue
+        todo.append((entry["smiles"], expected))
+
+    # De-duplicate identical SMILES for the single batch call (positional map
+    # in the bridge keys on the SMILES string).
+    smiles_list = list({smi for smi, _ in todo})
+    batch = centres_label_batch(smiles_list)
+    if batch is None:
+        return None
+
+    pass_count = 0
+    for smi, expected in todo:
+        actual = batch.get(smi, {})
+        all_match, _ = compare_labels(expected, actual)
+        if all_match:
+            pass_count += 1
+    return pass_count
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +466,41 @@ class TestCIPValidationSuite:
                 f"Expected at least 150 CIP passes, got {pass_count}/{tested}. "
                 f"This may indicate a fundamental issue with the test harness."
             )
+
+    def test_fair_keying_baseline_235(self, cip_data):
+        """Fair both-endpoint keying lifts RDKit 182 -> 235 (D-14 keying artifact).
+
+        The legacy min-keyed RDKit baseline (182) is retained as the documented
+        'centres OFF' gate value; the fair both-endpoint keying (now used by
+        get_rdkit_cip_labels) is the apples-to-apples RDKit reference (235).
+        The +53 is a pure keying-artifact removal, NOT an engine change.
+        """
+        min_keyed = score_suite(cip_data, get_rdkit_cip_labels_minkeyed)
+        fair_keyed = score_suite(cip_data, get_rdkit_cip_labels)
+        print(f"\nRDKit min-keyed (legacy, centres-OFF gate value): {min_keyed}/290")
+        print(f"RDKit fair both-endpoint keyed (D-14 baseline):    {fair_keyed}/290")
+        assert min_keyed == 182, (
+            f"Legacy min-keyed RDKit baseline drifted: expected 182, got {min_keyed}"
+        )
+        assert fair_keyed == 235, (
+            f"Fair both-endpoint RDKit baseline drifted: expected 235, got {fair_keyed}"
+        )
+
+    def test_centres_engine_281(self, cip_data):
+        """centres ON scores 281/290 -- the genuine +46 over fair-keyed RDKit (D-17).
+
+        Uses a SINGLE batched JVM invocation (D-12). Skips cleanly when Java /
+        the centres jar is absent (graceful fallback is exercised by
+        tests/integration/test_centres_bridge.py).
+        """
+        centres_pass = score_suite_centres(cip_data)
+        if centres_pass is None:
+            pytest.skip("centres jar or Java runtime not available")
+        print(f"\ncentres engine pass count: {centres_pass}/290")
+        assert centres_pass == 281, (
+            f"centres CIP-suite pass count drifted: expected 281, got {centres_pass}. "
+            f"(fair-keyed RDKit baseline is 235; the +46 engine gain is 281-235.)"
+        )
 
     def test_stereo_type_coverage(self, cip_data):
         """Verify the CIP Validation Suite covers multiple stereo types."""

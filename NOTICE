@@ -1,0 +1,41 @@
+Orthonym — Third-Party Vendored Artifacts
+==========================================
+
+This file records the provenance and licensing of third-party binary
+artifacts vendored into this repository and invoked at runtime via
+subprocess (no source linkage, no relicensing burden).
+
+
+centres-cli-1.2.1.jar
+---------------------
+- Component:  centres (CIP — Cahn-Ingold-Prelog stereo descriptor labeller)
+- Project:    SiMolecule / centres  (reference implementation of the
+              Hanson et al. 2018 CIP algorithm; CDK backend)
+- Version:    1.2.1
+- Main-Class: com.simolecule.centres.LabelCip
+- Size:       2,291,742 bytes (vendored UNMODIFIED, byte-identical to the
+              verified copy at )
+- License:    LGPL-3.0 (GNU Lesser General Public License, version 3)
+- Usage:      Invoked out-of-process as an unmodified standalone jar via a
+              subprocess (`java -jar centres-cli-1.2.1.jar -i smi <file>`)
+              by src/orthonym/perception/centres_bridge.py. Orthonym does
+              NOT link against, statically embed, or modify the jar. Use of an
+              unmodified LGPL-3.0 jar over a subprocess interface imposes no
+              relicensing obligation on Orthonym (same posture as the bundled
+              OPSIN jar below).
+- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default OFF).
+              When the jar or a Java runtime is absent, Orthonym falls back to
+              RDKit's rdCIPLabeler and never hard-fails a name on a missing JVM.
+- Source:     https://github.com/SiMolecule/centres
+
+
+opsin-cli-2.9.0-jar-with-dependencies.jar
+-----------------------------------------
+- Component:  OPSIN (Open Parser for Systematic IUPAC Nomenclature)
+- Project:    University of Cambridge, Centre for Molecular Informatics
+- Version:    2.9.0
+- License:    MIT
+- Usage:      Invoked out-of-process via subprocess for name->structure
+              round-trip validation and the OPSIN grammar validity gate.
+              Vendored unmodified; used as a standalone executable jar.
+- Source:     https://github.com/dan2097/opsin
