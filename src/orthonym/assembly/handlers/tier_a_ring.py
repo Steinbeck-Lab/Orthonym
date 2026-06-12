@@ -56,6 +56,33 @@ def _is_tier_a_ring(features: Any) -> bool:
     return True
 
 
+def _benzene_is_phenol(features: Any) -> bool:
+    """Phase 177 WSB-01 (D-05): True iff a hydroxyl (-OH) is directly bonded to
+    an aromatic ring carbon of the benzene parent.
+
+    Phenol benzene is EXCLUDED from the backstop inject allowlist (peptides /
+    tyrosine-type compounds and ring-OH parents are already configured or carry
+    no authoritative orientation for injection per D-05). Pure read-only.
+    """
+    mol = getattr(features, 'mol', None)
+    ring = getattr(features, 'benzene_ring', None) or getattr(
+        features, 'principal_ring', None)
+    if mol is None or not ring:
+        return False
+    ring_set = set(ring)
+    for idx in ring_set:
+        atom = mol.GetAtomWithIdx(idx)
+        if not atom.GetIsAromatic():
+            continue
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ring_set:
+                continue
+            if nbr.GetSymbol() == 'O' and nbr.GetTotalNumHs() >= 1 \
+                    and nbr.GetDegree() == 1:
+                return True
+    return False
+
+
 def name_tier_a_ring(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
@@ -294,6 +321,18 @@ def name_tier_a_ring(
         log_confidence(best)
         from ..fragment_naming import is_top_level_naming
         if is_top_level_naming():
+            # Phase 177 WSB-01 (D-04/D-05): thread the authoritative benzene
+            # atom_to_locant + phenol flag onto the winning candidate as POST-HOC
+            # fields (never into compute_confidence — byte-identity Risk 1) so
+            # the namer backstop can inject a missed stereodescriptor on the
+            # NON-PHENOL benzene cohort. complex_ring / heterocycle stay log-only
+            # (no map threaded -> backstop sees atom_to_locant=None).
+            if best.handler == 'benzene':
+                _bz_map = getattr(features, 'benzene_atom_to_locant', None)
+                if _bz_map:
+                    best.atom_to_locant = dict(_bz_map)
+                    # Phenol detection: an -OH directly on the benzene ring.
+                    best.is_phenol_benzene = _benzene_is_phenol(features)
             store_confidence(best)
         # D-10 PRESERVED: low-heavy-atom rescue fallback.
         _MIN_RATIO_FALLBACK = 0.20

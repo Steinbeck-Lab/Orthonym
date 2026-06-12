@@ -1112,8 +1112,25 @@ def _add_substituent_stereo(mol, sub_atoms, name):
         return name
 
     if len(stereo_atoms) == 1:
-        # Single stereocenter: just (R) or (S), no locant needed
+        # Single stereocenter.
         _, cip = stereo_atoms[0]
+        # STEREO-03 (Phase 177 WSB-02 D-09): a stereogenic substituent whose
+        # name is a NON-PIN retained form that carries no numbering for the
+        # descriptor must use the PIN systematic form so the stereodescriptor
+        # gets its required locant. `sec-butyl` is retained but NOT a preferred
+        # IUPAC name (P-29.6.2.3 / BlueBook "butan-2-yl (preferred prefix)"); a
+        # stereogenic one is the PIN `(2S)-butan-2-yl`, not `(S)-sec-butyl`.
+        # Scoped to the stereogenic case (where the locant is mandatory) so
+        # non-stereo `sec-butyl` outputs are unaffected.
+        _PIN_STEREO_RETAINED = {
+            # non-PIN retained form -> (PIN systematic form, descriptor locant)
+            'sec-butyl': ('butan-2-yl', 2),
+        }
+        if name in _PIN_STEREO_RETAINED:
+            pin_form, loc = _PIN_STEREO_RETAINED[name]
+            return f"({loc}{cip})-{pin_form}"
+        # Otherwise: a single stereocenter on a parent-hydride-style substituent
+        # takes the bare "(R)-"/"(S)-" (no locant) per P-91 unique-position rule.
         return f"({cip})-{name}"
 
     # Multiple stereocenters within one substituent.

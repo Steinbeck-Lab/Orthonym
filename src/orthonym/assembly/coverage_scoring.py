@@ -88,6 +88,18 @@ class CandidateName:
     # coarse tree. pool.best().node_scores surfaces the winner's map for the
     # Plan 04 SCORE-06 measurement.
     node_scores: Optional[dict] = None
+    # Phase 177 WSB-01 (D-04): authoritative {atom_idx: 1-indexed locant} for the
+    # parent structure, threaded to the namer backstop _final_stereo_check so it
+    # can inject stereodescriptors on the chain / non-phenol-benzene cohort.
+    # POST-HOC — NEVER passed into compute_confidence() (byte-identity Risk 1),
+    # same mitigation as parent_atom_indices / ring_info / tree / node_scores.
+    # None for direct-return handlers / complex_ring / polycyclic / phenol benzene
+    # (no authoritative map -> backstop stays log-only there, D-05/D-06).
+    atom_to_locant: Optional[Dict[int, int]] = None
+    # Phase 177 WSB-01 (D-05): True when the benzene parent is a PHENOL, so the
+    # backstop excludes it from the inject allowlist (phenol benzene stays
+    # log-only). None/False otherwise. POST-HOC, never into compute_confidence.
+    is_phenol_benzene: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------
@@ -604,12 +616,18 @@ def retrieve_confidence() -> dict:
             'confidence': 0.0,
             'factors': {},
             'handler': 'unknown',
+            'atom_to_locant': None,
+            'is_phenol_benzene': None,
         }
     return {
         'name': candidate.name,
         'confidence': candidate.confidence,
         'factors': dict(candidate.factors),
         'handler': candidate.handler,
+        # Phase 177 WSB-01 (D-04): surface the POST-HOC authoritative parent
+        # locant map + phenol flag for the namer backstop.
+        'atom_to_locant': getattr(candidate, 'atom_to_locant', None),
+        'is_phenol_benzene': getattr(candidate, 'is_phenol_benzene', None),
     }
 
 

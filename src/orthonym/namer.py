@@ -79,41 +79,74 @@ from .routing.dispatch_table import StoutClass, ClassDispatchResult
 # ---------------------------------------------------------------------------
 
 
-def _final_stereo_check(mol, name: str, handler: str = 'unknown') -> str:
-    """Universal stereo backstop: detect missing stereodescriptors in name.
+def _final_stereo_check(
+    mol,
+    name: str,
+    handler: str = 'unknown',
+    atom_to_locant: Optional[Dict[int, int]] = None,
+    is_phenol_benzene: Optional[bool] = None,
+) -> str:
+    """Universal stereo backstop: inject (or log) missing stereodescriptors.
 
     Runs AFTER all handler-specific stereo injection. Only activates when
-    a handler missed stereo. Logs WARNING to flag handler gaps for future fixes.
+    a handler missed stereo (predicate `needs_stereo_injection` True).
 
-    This is an architectural safety net per Phase 140 D-02 + Phase 152 D-04.
-    Detection is delegated to rules.stereochemistry.needs_stereo_injection
-    so that the new handler-level injector and this backstop share one
-    predicate. Behavior is byte-identical to pre-152: backstop continues to
-    fire WARNING for any handler that did NOT inject stereo (e.g.
-    complex_ring, polycyclic, retained-name, decomposition fragments).
+    Phase 177 WSB-01 (D-04/D-05/D-06): the backstop is flipped from detect-only
+    to REAL injection on the only cohort carrying an authoritative parent
+    locant map — `chain` and NON-phenol `benzene` (threaded via the per-call
+    confidence dict as a POST-HOC CandidateName field). When the (now D/L-aware,
+    Plan 01 Pattern D) predicate fires AND the handler is allow-listed AND a
+    valid `atom_to_locant` is threaded, it calls the existing
+    `inject_stereo_from_locant_map` (whose D-09 guard rejects None/empty/non-
+    positive maps, degrading to a no-op).
 
-    It does NOT inject stereo with raw atom-index locants (Phase 140 D-02 +
-    Phase 152 D-09) because those don't correspond to IUPAC numbering for
-    the named parent structure -- injecting them would produce incorrect
-    names. Handler-specific injection (Phase 152: benzene / heterocycle /
-    cycloalkane / cycloalkene via inject_stereo_from_locant_map; legacy:
-    _inject_stereo_if_missing for 33+ direct-return sites) remains the
-    primary stereo injection mechanism.
+    For `complex_ring`, `polycyclic`, `heterocycle`, `unknown`, phenol benzene,
+    or no map -> it stays LOG-ONLY (the pre-177 detect-only behavior): no
+    authoritative numbering exists for those, and a fabricated locant is worse
+    than a missing one (D-06/D-09: missing beats wrong). This is the path the
+    E-stilbene `unknown` case keeps (descriptor-less output is EXPECTED per the
+    WSB-01 LOG-ONLY PROTECT, not a regression — the lipid/steroid reservoir flip
+    is WS-C-gated, D-16).
 
     Args:
         mol: RDKit Mol object (with stereo info from original SMILES)
         name: Generated IUPAC name (may or may not contain stereo)
         handler: Name of the handler that produced this name (for attribution)
+        atom_to_locant: Authoritative {atom_idx: 1-indexed locant} for the parent
+            (threaded POST-HOC from the winning candidate). None for non-allow-
+            listed handlers -> log-only.
+        is_phenol_benzene: True when a benzene parent is a phenol (excluded from
+            the inject allowlist per D-05).
 
     Returns:
-        Original name unchanged.  Logs WARNING if stereo gap detected.
+        The name with injected stereodescriptors (allow-listed cohort) or the
+        original name unchanged (log-only cohort).
     """
-    from .rules.stereochemistry import needs_stereo_injection
+    from .rules.stereochemistry import (
+        needs_stereo_injection, inject_stereo_from_locant_map,
+    )
 
     if not needs_stereo_injection(mol, name):
         return name
 
-    # Predicate said True -> stereo was needed but not injected.  Log gap.
+    # WSB-01 (D-05): inject allowlist = chain + NON-phenol benzene ONLY, and
+    # only when an authoritative atom_to_locant has been threaded.
+    _allow_inject = (
+        atom_to_locant
+        and (
+            handler == 'chain'
+            or (handler in ('benzene', 'direct') and not is_phenol_benzene)
+        )
+    )
+    if _allow_inject:
+        injected = inject_stereo_from_locant_map(name, mol, atom_to_locant)
+        if injected and injected != name:
+            return injected
+        # The D-09 guard inside the injector rejected the map (None/empty/
+        # non-positive) or there was nothing to inject -> fall through to the
+        # log-only branch (a missing descriptor beats a wrong one).
+
+    # Predicate said True but no authoritative injection happened -> log gap.
     n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
     n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
     logger.warning(
@@ -1210,8 +1243,15 @@ class Orthonym:
                 mol = Chem.MolFromSmiles(smiles)
                 if mol is not None:
                     from .assembly.coverage_scoring import retrieve_confidence
-                    handler = retrieve_confidence().get('handler', 'unknown')
-                    result = _final_stereo_check(mol, result, handler=handler)
+                    _conf = retrieve_confidence()
+                    handler = _conf.get('handler', 'unknown')
+                    # Phase 177 WSB-01 (D-04): thread the authoritative parent
+                    # map + phenol flag to the backstop.
+                    result = _final_stereo_check(
+                        mol, result, handler=handler,
+                        atom_to_locant=_conf.get('atom_to_locant'),
+                        is_phenol_benzene=_conf.get('is_phenol_benzene'),
+                    )
                     # Universal OPSIN-grammar backstop (Phase 156, D-13).
                     # Order: stereo-backstop -> grammar-backstop. Stereo
                     # may have repositioned descriptors that grammar
@@ -1274,8 +1314,15 @@ class Orthonym:
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
                 if mol is not None:
-                    handler = retrieve_confidence().get('handler', 'unknown')
-                    name = _final_stereo_check(mol, name, handler=handler)
+                    _conf = retrieve_confidence()
+                    handler = _conf.get('handler', 'unknown')
+                    # Phase 177 WSB-01 (D-04): thread the authoritative parent
+                    # map + phenol flag to the backstop.
+                    name = _final_stereo_check(
+                        mol, name, handler=handler,
+                        atom_to_locant=_conf.get('atom_to_locant'),
+                        is_phenol_benzene=_conf.get('is_phenol_benzene'),
+                    )
                     # Universal OPSIN-grammar backstop (Phase 156, D-13).
                     name = _final_grammar_check(
                         name, smiles, handler,
@@ -1506,6 +1553,32 @@ class Orthonym:
             self._classify(features)
             assembled = assemble_name(features, style=self.style)
             name = assembled
+
+            # Phase 177 WSB-01 (D-04/D-05): thread the authoritative chain
+            # atom_to_locant to the backstop. The general/chain pipeline does
+            # NOT call store_confidence (only the ring path does), so the
+            # backstop would otherwise see handler='unknown' and stay log-only.
+            # When the parent is a CHAIN we publish a minimal POST-HOC candidate
+            # carrying handler='chain' + the authoritative map so the backstop
+            # can inject a missed stereodescriptor. The map is built in
+            # _perceive at the chain-orientation site (features.atom_to_locant);
+            # it is never recomputed and never passed into compute_confidence
+            # (byte-identity Risk 1).
+            if (getattr(features, 'chain_is_parent', False)
+                    and getattr(features, 'atom_to_locant', None)):
+                from .assembly.coverage_scoring import (
+                    CandidateName, store_confidence, retrieve_confidence,
+                )
+                _existing = retrieve_confidence()
+                # Only publish when no richer candidate was already stored for
+                # this call (e.g. a ring/Tier-A candidate) — never clobber it.
+                if not _existing.get('name'):
+                    store_confidence(CandidateName(
+                        name=name,
+                        handler='chain',
+                        confidence=1.0,
+                        atom_to_locant=dict(features.atom_to_locant),
+                    ))
 
         # ============================================================
         # Post-dispatch quality gates — preserved VERBATIM from v18

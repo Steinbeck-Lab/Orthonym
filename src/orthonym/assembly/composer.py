@@ -3456,6 +3456,81 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     return parent_name
 
 
+def _amide_acyl_parent_locants(mol, amide_atoms) -> Optional[Dict[int, int]]:
+    """Phase 177 WSB-02 (D-09, STEREO-03 hoisting fix): build an atom_to_locant
+    restricted to the amide ACYL parent (the carbonyl carbon + its acyl carbon
+    chain), EXCLUDING the nitrogen and the N-substituent.
+
+    The general chain perception may pick the longer N-substituent chain as
+    `features.atom_to_locant` (e.g. for `CC(=O)N[C@@H](C)CC` it maps the butyl
+    chain), so `_inject_stereo_if_missing` would HOIST the N-substituent's
+    stereocenter to the parent front as a spurious `(2S)-`. Restricting the
+    parent collection to the acyl side keeps the substituent's descriptor in its
+    own bracket (the substituent-naming path emits it) and prevents the hoist.
+
+    Returns {acyl_atom_idx: 1-indexed locant} with the carbonyl carbon at locant
+    1 (acid/amide numbering, P-66.1), or None when the acyl parent cannot be
+    resolved (caller then falls back to the default features.* map).
+    """
+    if not amide_atoms:
+        return None
+    # Identify the carbonyl carbon: the C in amide_atoms bonded to BOTH a
+    # chalcogen (=O/=S/=Se/=Te) and the amide nitrogen.
+    carbonyl_c = None
+    nitrogen = None
+    amide_set = set(amide_atoms)
+    for idx in amide_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        nbr_syms = {n.GetSymbol() for n in atom.GetNeighbors()}
+        if 'N' in nbr_syms and (nbr_syms & {'O', 'S', 'Se', 'Te'}):
+            carbonyl_c = idx
+            for n in atom.GetNeighbors():
+                if n.GetSymbol() == 'N':
+                    nitrogen = n.GetIdx()
+            break
+    if carbonyl_c is None or nitrogen is None:
+        return None
+    # BFS the acyl carbon chain from the carbonyl carbon, never crossing the
+    # nitrogen and never leaving carbon (the acyl parent is a carbon chain;
+    # heteroatom branches are handled as substituents elsewhere).
+    acyl_atoms = []
+    seen = {nitrogen}
+    stack = [carbonyl_c]
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        atom = mol.GetAtomWithIdx(cur)
+        if atom.GetSymbol() != 'C':
+            continue
+        acyl_atoms.append(cur)
+        for n in atom.GetNeighbors():
+            if n.GetIdx() not in seen and n.GetSymbol() == 'C':
+                stack.append(n.GetIdx())
+    if not acyl_atoms:
+        return None
+    # Number from the carbonyl carbon (locant 1) outward along the chain. For a
+    # straight acyl chain this is the standard acid/amide numbering; the
+    # ordering is a simple BFS distance which is sufficient here because the
+    # restricted map's ONLY consumer is the parent stereo collection (whether a
+    # PARENT carbon is stereogenic), not name construction.
+    from collections import deque
+    dist = {carbonyl_c: 1}
+    q = deque([carbonyl_c])
+    acyl_set = set(acyl_atoms)
+    while q:
+        cur = q.popleft()
+        for n in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = n.GetIdx()
+            if ni in acyl_set and ni not in dist:
+                dist[ni] = dist[cur] + 1
+                q.append(ni)
+    return dist
+
+
 def _assemble_amide_name(features: Any, style: str) -> str:
     """
     Assemble name for amide compounds with N-substitution handling.
@@ -3556,6 +3631,12 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     if not has_chain_unsaturation:
         base_name = name_amide(mol, amide_atoms, suffix_form=amide_suffix_form)
         if base_name:
+            # STEREO-03 (Phase 177 WSB-02 D-09): restrict the parent-level stereo
+            # collection to the ACYL parent so an N-substituent's stereocenter is
+            # NOT hoisted to the parent front (the substituent emits its own
+            # descriptor in its bracket). Falls back to features.* when the acyl
+            # parent cannot be resolved.
+            _acyl_locants = _amide_acyl_parent_locants(mol, amide_atoms)
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: _generate_prefixes returns NameFragments whose .text
             # already includes locants (e.g., "2-methyl"), so use .text
@@ -3580,8 +3661,13 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     # Insert hyphen before N-locant prefix (base_name may
                     # start with "N-" or "N,N-" from name_amide())
                     sep = "-" if base_name[:1] == "N" else ""
-                    return _inject_stereo_if_missing(features, f"{prefix_str}{sep}{base_name}")
-            return _inject_stereo_if_missing(features, base_name)
+                    return _inject_stereo_if_missing(
+                        features, f"{prefix_str}{sep}{base_name}",
+                        atom_to_locant=_acyl_locants,
+                    )
+            return _inject_stereo_if_missing(
+                features, base_name, atom_to_locant=_acyl_locants,
+            )
 
     # Unsaturated chain amides: use general assembly fragments for correct stereo + unsaturation
     fragments = []

@@ -440,10 +440,24 @@ def format_n_substitution(substituents: List[Dict]) -> str:
         # get_multiplier_prefix uses to choose bis/tris, otherwise digit-less complex
         # names glue ('N,N-bischloroethyl' instead of 'N,N-bis(2-chloroethyl)').
         is_complex = is_complex_substituent(name)
-        display_name = f"({name})" if is_complex else name
-        # Apply P-16.3.3 bracket escalation for N-substituents with parens
         from ..assembly.naming_utils import _wrap_n_substituent
-        display_name = _wrap_n_substituent(display_name)
+        if is_complex:
+            # P-16.3.3 bracket escalation: if the substituent ALREADY carries an
+            # inner "(...)" (e.g. a "(2S)-" stereo descriptor), the outer
+            # enclosure must escalate to square brackets — "[(2S)-butan-2-yl]",
+            # NOT "((2S)-butan-2-yl)". _wrap_n_substituent picks [] when an inner
+            # paren is present and () otherwise. Applying it to the BARE name (not
+            # a pre-parenthesised one) lets it make that choice correctly; a
+            # pre-wrap "(name)" would be mis-read as already-balanced and the
+            # escalation would be skipped.
+            if '(' in name:
+                display_name = _wrap_n_substituent(name)
+            else:
+                display_name = f"({name})"
+        else:
+            # Simple substituent: no enclosing marks, but still allow bracket
+            # escalation when a stereo descriptor introduced an inner paren.
+            display_name = _wrap_n_substituent(name)
         if count == 1:
             parts.append(f"N-{display_name}")
         else:
