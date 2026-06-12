@@ -6,6 +6,7 @@ Chem.AssignStereochemistry() which fails on complex molecules.
 """
 
 import logging
+import os
 from typing import List, Dict, Optional
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
@@ -13,6 +14,16 @@ from rdkit.Chem import rdCIPLabeler
 logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
+
+# WSB-03 (Phase 177, D-13): opt-in centres CIP engine. Read once at import time
+# (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER). Default OFF ->
+# the CIP path is byte-identical to HEAD (rdCIPLabeler only). When ON, centres
+# is the source-of-truth IF its jar + a Java runtime are present; otherwise the
+# code falls through to rdCIPLabeler UNCHANGED (never hard-fail a name on a
+# missing JVM).
+_USE_CENTRES_CIP = os.environ.get(
+    "ORTHONYM_USE_CENTRES_CIP", ""
+).strip().lower() in ("1", "true", "yes", "on")
 
 
 def assign_stereochemistry(mol) -> None:
@@ -35,6 +46,22 @@ def assign_stereochemistry(mol) -> None:
     """
     if mol.HasProp(_CIP_ASSIGNED_PROP):
         return
+
+    # WSB-03 (D-13): when the centres gate is ON AND the engine is available,
+    # centres is the CIP source-of-truth (it sets the same _CIPCode props the
+    # downstream consumers read). If the gate is OFF (default) or centres is
+    # unavailable (jar/Java absent), this branch is skipped and the path below
+    # is byte-identical to HEAD -- a missing JVM never hard-fails a name.
+    if _USE_CENTRES_CIP:
+        try:
+            from .centres_bridge import centres_label_mol
+            if centres_label_mol(mol):
+                mol.SetProp(_CIP_ASSIGNED_PROP, '1')
+                return
+        except Exception as exc:  # pragma: no cover - defensive; fall back to RDKit
+            logger.warning(
+                "centres CIP path errored (%s); falling back to rdCIPLabeler", exc,
+            )
 
     try:
         rdCIPLabeler.AssignCIPLabels(mol)

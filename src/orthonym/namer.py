@@ -1784,10 +1784,14 @@ class Orthonym:
         features.double_bonds = self._find_double_bonds(mol)
         features.triple_bonds = self._find_triple_bonds(mol)
 
-        # Assign CIP stereochemistry labels BEFORE extracting stereo info
-        # rdCIPLabeler sets _CIPCode on atoms (R/S) and bonds (E/Z)
-        rdCIPLabeler.AssignCIPLabels(mol)
-        mol.SetProp(_CIP_ASSIGNED_PROP, '1')  # Mark as done for idempotent guard
+        # Assign CIP stereochemistry labels BEFORE extracting stereo info.
+        # WSB-03 (D-13, Pitfall 2): route the SECOND CIP chokepoint through the
+        # single source-of-truth assign_stereochemistry() so this path can never
+        # disagree with perception/stereo.py under ORTHONYM_USE_CENTRES_CIP=1.
+        # assign_stereochemistry sets _CIPCode (rdCIPLabeler by default; centres
+        # when gated ON + available) AND the _CIP_ASSIGNED_PROP idempotent marker
+        # itself, so the explicit SetProp is no longer needed here.
+        assign_stereochemistry(mol)
 
         # Extract stereochemistry (now depends on _CIPCode being set)
         features.stereocenters = get_stereocenters(mol)
