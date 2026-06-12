@@ -1149,31 +1149,41 @@ def _name_oxime_or_hydrazone(features: Any, fg_type: str) -> Optional[str]:
     if not parent_name:
         return None
 
-    # Merge C=N stereo descriptor into the parent name if captured
+    # Merge C=N stereo descriptor into the parent name if captured.
+    # Phase 177 STEREO-04 (D-11): derive the C=N carbon's locant from the parent's
+    # atom_to_locant (P-68.3.1.1), NOT from a ketone-only `(\d+)-on` regex.  The old
+    # regex never matched aldehyde (`-al`) parents, so `C/C=N/O` shipped
+    # `acetaldehyde oxime` with the E/Z descriptor dropped.  c_idx (the C=N carbon)
+    # and cn_stereo_tag (the E/Z label) are captured above and reused unchanged.
     if cn_stereo_tag and parent_name:
         import re
-        # Find the ketone locant from the parent name (e.g., "3-one" -> locant "3")
-        one_match = re.search(r'(\d+)-on', parent_name)
-        if one_match:
-            cn_locant = one_match.group(1)
+        atl = getattr(features, 'atom_to_locant', None) or {}
+        cn_locant = atl.get(c_idx)
+        # Mononuclear / terminal C=N at locant 1 takes the BARE descriptor (no
+        # locant) per P-68.3.1.1 — matches OPSIN-verified `(E)-acetaldehyde oxime`.
+        # If the locant cannot be resolved we likewise omit it (D-09: a missing
+        # locant beats a wrong one) rather than fabricating the old ketone parse.
+        if cn_locant == 1 or cn_locant is None:
+            cn_desc = cn_stereo_tag
+        else:
             cn_desc = f"{cn_locant}{cn_stereo_tag}"
 
-            # If parent already has a stereo prefix like (6E), merge
-            stereo_match = re.match(r'\(([^)]+)\)-(.*)', parent_name)
-            if stereo_match:
-                existing_stereo = stereo_match.group(1)
-                rest = stereo_match.group(2)
-                all_descs = existing_stereo.split(',')
-                all_descs.append(cn_desc)
-                # Sort by leading locant number
-                all_descs.sort(
-                    key=lambda d: int(re.match(r'(\d+)', d).group(1))
-                    if re.match(r'(\d+)', d) else 999
-                )
-                parent_name = f"({','.join(all_descs)})-{rest}"
-            else:
-                # No existing stereo prefix -- add one
-                parent_name = f"({cn_desc})-{parent_name}"
+        # If parent already has a stereo prefix like (6E), merge into the block.
+        stereo_match = re.match(r'\(([^)]+)\)-(.*)', parent_name)
+        if stereo_match:
+            existing_stereo = stereo_match.group(1)
+            rest = stereo_match.group(2)
+            all_descs = existing_stereo.split(',')
+            all_descs.append(cn_desc)
+            # Sort by leading locant number (bare descriptors sort last).
+            all_descs.sort(
+                key=lambda d: int(re.match(r'(\d+)', d).group(1))
+                if re.match(r'(\d+)', d) else 999
+            )
+            parent_name = f"({','.join(all_descs)})-{rest}"
+        else:
+            # No existing stereo prefix -- add one
+            parent_name = f"({cn_desc})-{parent_name}"
 
     return f"{parent_name} {fg_type}"
 
