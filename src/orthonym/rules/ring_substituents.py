@@ -1442,20 +1442,23 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
     every ring-as-substituent emitter consults so the rule is applied once and
     identically.
 
-    Scope (deliberately narrow — the previously *dropped* classes only):
+    Scope (the previously *dropped* characteristic groups):
       * ``oxo``  (P-66.6.1) — the ring atom is a carbonyl carbon: an exocyclic
         double bond to an oxygen that bears no H and is otherwise terminal.
       * ``cyano`` (P-66.5.1) — the ring atom bears an exocyclic nitrile carbon
         (single bond to a C that is triple-bonded to a terminal N).
+      * ``carboxy`` (P-65.1.7.2.1) — the ring atom bears an exocyclic
+        carboxylic-acid carbon (an exocyclic C with =O carrying no H AND -OH).
+        The S2 parent chokepoint (commit 835faffa) now demotes the ring-acid
+        parent, so this branch is reachable. Esters ``-C(=O)OR`` are EXCLUDED
+        (the second O carries no H) and stay alkoxycarbonyl / out of scope.
 
     Intentionally NOT handled here:
       * ``hydroxy`` / alkoxy / halogen / amino / alkyl — already emitted by the
         existing composer / benzene substituent branches; claiming them here
         would double-count.
-      * ``carboxy`` — ring-COOH demotion is gated on the WS-A.1 parent
-        chokepoint (the ring is currently selected as parent and never reaches
-        an emitter); emitting it before that lands would be unreachable-or-wrong.
-      * ester ``-C(=O)O-`` carbonyls — neither oxo nor cyano.
+      * ester ``-C(=O)O-`` carbonyls — excluded by the carboxy hydroxyl-O guard;
+        they belong to the alkoxycarbonyl / ester pathway, not here.
 
     Args:
         mol: RDKit Mol.
@@ -1491,4 +1494,25 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
                 if cn_bond is not None and cn_bond.GetBondTypeAsDouble() == 3.0:
                     prefixes.append('cyano')
                     continue
+        # carboxy (P-65.1.7.2.1): the ring atom bears an exocyclic carboxylic-acid
+        # carbon — an exocyclic C (single bond) that carries =O (terminal, no H) AND
+        # -OH (the second O carries an H). The H on the second O is the ester-exclusion
+        # guard: -C(=O)OR esters have GetTotalNumHs()==0 on that O and must stay
+        # alkoxycarbonyl / out of scope. Lactone/anhydride topologies that slip past
+        # here are caught by the None-return of decorated_ring_substituent_name (the
+        # carry-all-or-None safety net). BlueBookV2:1804 (-COOH), :5154/:3262 (carboxy).
+        if (sym == 'C' and bond is not None
+                and bond.GetBondTypeAsDouble() == 1.0):
+            c_nbrs = [x for x in nbr.GetNeighbors() if x.GetIdx() != ring_atom_idx]
+            has_carbonyl_O = any(
+                x.GetSymbol() == 'O' and x.GetDegree() == 1 and x.GetTotalNumHs() == 0
+                and mol.GetBondBetweenAtoms(ni, x.GetIdx()).GetBondTypeAsDouble() == 2.0
+                for x in c_nbrs)
+            has_hydroxyl_O = any(
+                x.GetSymbol() == 'O' and x.GetTotalNumHs() >= 1
+                and mol.GetBondBetweenAtoms(ni, x.GetIdx()).GetBondTypeAsDouble() == 1.0
+                for x in c_nbrs)
+            if has_carbonyl_O and has_hydroxyl_O:
+                prefixes.append('carboxy')
+                continue
     return sorted(prefixes)
