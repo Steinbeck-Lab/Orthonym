@@ -278,11 +278,13 @@ def name_substituent(mol, frag_atoms, attach_idx):
         IUPAC 2013 P-31.1 (detachable prefixes)
         Phase 85 design: five-tier cascade with guaranteed fallback
     """
+    import re as _re
     from .fragment_naming import FRAGMENT_NAME_CACHE
     from .substituent_naming import (
         parent_to_prefix,
         _check_retained_substituent,
         _is_linear_alkyl,
+        _add_substituent_stereo,
     )
 
     frag_atoms_set = set(frag_atoms)
@@ -290,6 +292,40 @@ def name_substituent(mol, frag_atoms, attach_idx):
     # Edge case: empty fragment
     if not frag_atoms_set:
         return "substituent"
+
+    # ---- D-08 (Phase 177 WSB-02): stereo-dropping tier double-apply guard ----
+    # Tiers 0.5/1/1.5/1.6/2/3 build their prefix from a canonicalised fragment
+    # (e.g. Tier-2's MolFragmentToSmiles strips @/@@ before the cache lookup),
+    # so they SHORT-CIRCUIT Tier-4 — the only tier that natively reaches
+    # _add_substituent_stereo. Without this guard a stereogenic substituent that
+    # resolves via an early tier ships descriptor-less. _stereo_route() routes a
+    # tier return through _add_substituent_stereo IFF the fragment carries CIP
+    # stereo AND the candidate prefix does not ALREADY carry a "(...)" stereo
+    # block (the re.match double-apply guard — RESEARCH Q#2: a fragment-scope
+    # check, NOT a needs_stereo_injection call).
+    _STEREO_BLOCK_RE = _re.compile(r'^\(\d*[a-z]?[RSrsEZez](,\d*[a-z]?[RSrsEZez])*\)-')
+
+    def _frag_has_cip_stereo() -> bool:
+        for _i in frag_atoms_set:
+            _a = mol.GetAtomWithIdx(_i)
+            if _a.HasProp('_CIPCode'):
+                return True
+        for _b in mol.GetBonds():
+            if (_b.GetBeginAtomIdx() in frag_atoms_set
+                    and _b.GetEndAtomIdx() in frag_atoms_set
+                    and _b.HasProp('_CIPCode')):
+                return True
+        return False
+
+    def _stereo_route(prefix: str) -> str:
+        # Route a stereo-dropping tier's return through the substituent stereo
+        # emitter, unless the prefix already carries a leading "(...)" descriptor
+        # (double-apply guard) or the fragment has no CIP stereo.
+        if not prefix or _STEREO_BLOCK_RE.match(prefix):
+            return prefix
+        if not _frag_has_cip_stereo():
+            return prefix
+        return _add_substituent_stereo(mol, list(frag_atoms_set), prefix)
 
     # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
     # PURE read-only check. Returns the IUPAC-canonical prefix form for any
@@ -303,7 +339,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
             mol, frag_atoms_set, attach_idx
         )
         if prefix_form is not None:
-            return prefix_form
+            return _stereo_route(prefix_form)
     except Exception:
         # Defensive: any unexpected SMARTS / RDKit error falls through to Tier-1
         pass
@@ -317,7 +353,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
             mol, list(frag_atoms_set), attach_idx
         )
         if retained:
-            return retained
+            return _stereo_route(retained)
     except Exception:
         pass
 
@@ -335,7 +371,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
                 if attach_idx in ring and set(ring) <= frag_atoms_set:
                     pin = pin_heteroaryl_substituent_name(mol, ring, attach_idx)
                     if pin is not None:
-                        return pin
+                        return _stereo_route(pin)
                     break
         except Exception:
             pass
@@ -356,7 +392,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
                     dec = decorated_ring_substituent_name(
                         mol, ring, attach_idx, expected_atoms=frag_atoms_set)
                     if dec is not None:
-                        return dec
+                        return _stereo_route(dec)
                     break
         except Exception:
             pass
@@ -376,7 +412,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
                     )
                     prefix = parent_to_prefix(cached, chain_length=carbon_count)
                     if prefix:
-                        return prefix
+                        return _stereo_route(prefix)
     except Exception:
         pass  # Cache miss is fine, continue to next tier
 
@@ -388,7 +424,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
                 if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
             )
             if carbon_count > 0:
-                return get_alkyl_name(carbon_count)
+                return _stereo_route(get_alkyl_name(carbon_count))
     except Exception:
         pass
 

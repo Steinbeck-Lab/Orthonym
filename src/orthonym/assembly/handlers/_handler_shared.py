@@ -876,6 +876,22 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     if not descriptors:
         return None
 
+    # STEREO-06 (Phase 177 WSB-02 D-10): mononuclear-parent locant omission.
+    # When the parent hydride is a single skeletal atom (len(atom_to_locant)==1)
+    # and the lone stereodescriptor's locant is that unique position, the locant
+    # is omitted per P-91 (a unique position carries no locant) -> bare "(R)-".
+    # Example: [C@H](Br)(Cl)F has parent methane {C_idx: 1}; the descriptor
+    # (1,'R') must format as "(R)-", not the spurious "(1R)-".
+    if (
+        len(atom_to_locant) == 1
+        and len(descriptors) == 1
+        and isinstance(descriptors[0][0], int)
+        and descriptors[0][0] == next(iter(atom_to_locant.values()))
+    ):
+        # Strip the locant: emit the bare descriptor "(R)-".
+        cip = descriptors[0][1]
+        return NameFragment(text=f"({cip})-", fragment_type="stereo")
+
     # Format as "(2R,3S)-" etc
     text = format_stereodescriptor_string(descriptors)
 
@@ -1002,6 +1018,44 @@ def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
             prefix_texts.append(f"{loc_str}-{text}")
         else:
             prefix_texts.append(text)
+
+    # P-16.5.1.3.1 (Phase 177 WSB-02 D-10, STEREO-06 enclosing half):
+    # On a MONONUCLEAR parent hydride (one skeletal atom — methane "meth")
+    # with two or more simple substituents, the first cited substituent has no
+    # enclosing marks; the second is enclosed in parentheses. The Blue Book
+    # PIN for HCBrClF is "bromo(chloro)fluoromethane" — only the SECOND simple
+    # substituent (chloro) carries marks; the trailing fluoro stays bare to
+    # avoid the consecutive ")(" marks (P-16.3.4). Scoped to the truly
+    # mononuclear "meth" hydrocarbon parent (no suffix) so existing multi-atom
+    # outputs are byte-identical. Only simple prefixes (no locant, no existing
+    # enclosing marks) are eligible.
+    _is_mononuclear_parent = (
+        parent_frag is not None
+        and parent_frag.text == "meth"
+        and suffix_frag is None
+    )
+    # Eligible only when every prefix is a DISTINCT single-occurrence simple
+    # substituent. A multiplied prefix (dichloro/trifluoro) keeps the original
+    # unenclosed concatenation (bromodichloromethane), since the rule explicitly
+    # excludes multiplicative prefixes from the parentheses and the Blue Book
+    # lists those forms bare.
+    _MULTIPLIER_PREFIXES = (
+        'di', 'tri', 'tetra', 'penta', 'hexa', 'hepta', 'octa', 'nona', 'deca',
+    )
+    if _is_mononuclear_parent and len(prefix_texts) >= 2:
+        def _is_simple_prefix(t: str) -> bool:
+            # simple = no locant prefix, no enclosing marks, no compound hyphen,
+            # no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
+            if (re.match(r'^\d', t) or '(' in t or '[' in t or '-' in t):
+                return False
+            if any(t.startswith(mp) for mp in _MULTIPLIER_PREFIXES):
+                return False
+            return True
+        if all(_is_simple_prefix(t) for t in prefix_texts):
+            # Enclose only the second cited substituent (P-16.5.1.3.1 +
+            # P-16.3.4 consecutive-mark avoidance for the trailing prefix).
+            prefix_texts = [prefix_texts[0], f"({prefix_texts[1]})"] + prefix_texts[2:]
+
     prefix_str = _join_prefixes(prefix_texts)
 
     # Extract parent info: stem is in text, bond locants in locants

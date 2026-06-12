@@ -1118,41 +1118,22 @@ def _add_substituent_stereo(mol, sub_atoms, name):
 
     # Multiple stereocenters within one substituent.
     #
-    # WR-06 (code review 2026-06-02): KNOWN LIMITATION — the locants below are a
-    # raw atom-index POSITION, NOT IUPAC substituent numbering. Two things are
-    # wrong and BOTH need the proper fix, which is out of scope for a code-review
-    # patch (it is a recursion-contract change with high blast radius). This
-    # branch fires ~25/1282 canary rows whose current outputs the canary
-    # ACCEPTS, so changing the locant behavior here carries real regression risk
-    # — which is exactly why it is documented + xfail-tracked rather than
-    # hot-patched. Malformed cases are additionally OPSIN-gated by SUB-03 in
-    # production. The two defects:
-    #   1. The numbering must come from the SAME chain/ring numbering the
-    #      substituent's NAME used (PIN allows both "1-rooted" prefixes and
-    #      "alkan-2-yl" forms, which assign different locants to the same atom),
-    #      threaded out of name_fragment_recursively / parent_to_prefix. Counting
-    #      sorted atom indices here also (wrongly) numbers terminal heteroatoms
-    #      (a leading Cl becomes "position 1").
-    #   2. The recursive naming path can ALREADY have injected a stereo
-    #      descriptor, so prepending here double-applies it
-    #      (e.g. "(2R,3R)-(2R)-2-bromochloropropyl").
-    # Re-deriving an independent numbering (e.g. BFS-from-attachment) would just
-    # be a DIFFERENT wrong heuristic — a band-aid the fix-methodology forbids — so
-    # the current positional behavior is preserved verbatim and the limitation is
-    # tracked by an xfail (tests/.../test_substituent_naming + the V20 audit).
-    # NB: this is independent of the SUB-04/D-15 r/s casing fix above, which has
-    # one correct source (perception/stereo.py) and is unaffected.
-    sorted_atoms = sorted(sub_atoms)
-    idx_to_internal = {idx: pos + 1 for pos, idx in enumerate(sorted_atoms)}
-
-    descs = []
-    for atom_idx, cip in stereo_atoms:
-        locant = idx_to_internal.get(atom_idx, 0)
-        descs.append((locant, cip))
-    descs.sort(key=lambda x: x[0])
-
-    desc_str = ",".join(f"{loc}{cip}" for loc, cip in descs)
-    return f"({desc_str})-{name}"
+    # WR-06 fix (Phase 177 WSB-02 D-07/D-09): the former raw-atom-index
+    # positional locants (`idx_to_internal = {idx: pos+1 for ...}`) were WRONG —
+    # they number a leading heteroatom "1" and bear no relation to the IUPAC
+    # numbering the substituent's NAME actually used. The correct locant must be
+    # threaded from the SAME chain/ring numbering the substituent name used
+    # (name_fragment_recursively / parent_to_prefix), which is not available at
+    # this signature without a recursion-contract change. Re-deriving an
+    # independent numbering (e.g. BFS-from-attachment) is explicitly rejected as
+    # "a DIFFERENT wrong heuristic — a band-aid the fix-methodology forbids."
+    #
+    # Per D-09 (missing beats wrong): when the substituent's own numbering
+    # cannot be threaded, emit NO multi-centre stereo block — return the name
+    # unchanged. A multi-centre stereo descriptor placed with fabricated locants
+    # is worse than none (it would round-trip to the WRONG diastereomer). The
+    # single-centre branch above still emits the correct unlocanted "(R)-"/"(S)-".
+    return name
 
 
 # ============================================================================
