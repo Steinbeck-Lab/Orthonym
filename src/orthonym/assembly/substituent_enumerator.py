@@ -320,12 +320,16 @@ def name_substituent(mol, frag_atoms, attach_idx):
     def _stereo_route(prefix: str) -> str:
         # Route a stereo-dropping tier's return through the substituent stereo
         # emitter, unless the prefix already carries a leading "(...)" descriptor
-        # (double-apply guard) or the fragment has no CIP stereo.
+        # (double-apply guard) or the fragment has no CIP stereo. `attach_idx` is
+        # threaded so the emitter can derive the located descriptor (PIN name +
+        # attachment locant) for an acyclic-alkyl substituent from STRUCTURE.
         if not prefix or _STEREO_BLOCK_RE.match(prefix):
             return prefix
         if not _frag_has_cip_stereo():
             return prefix
-        return _add_substituent_stereo(mol, list(frag_atoms_set), prefix)
+        return _add_substituent_stereo(
+            mol, list(frag_atoms_set), prefix, attach_idx=attach_idx
+        )
 
     # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
     # PURE read-only check. Returns the IUPAC-canonical prefix form for any

@@ -1067,15 +1067,128 @@ def _check_retained_substituent(
 # ============================================================================
 
 
-def _add_substituent_stereo(mol, sub_atoms, name):
+def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
+    """Derive ``(<alkan>, k)`` for a single-stereocentre acyclic-alkyl substituent.
+
+    GENERAL structure-derived located-descriptor rule (P-29.2 / P-31.1.4.3 /
+    P-91), replacing the former hardcoded ``sec-butyl -> butan-2-yl`` table.
+
+    When the substituent is an ACYCLIC, all-carbon, SATURATED group whose single
+    stereocentre is its ATTACHMENT carbon, its PIN is ``<alkan>-<k>-yl`` where:
+
+    - the parent of the substituent is its LONGEST carbon chain through the
+      attachment carbon (P-29.2: the principal chain of a substituent group
+      includes the atom with the free valence and is the longest such chain);
+    - ``k`` is the attachment carbon's locant under the numbering that gives the
+      free-valence (attachment) atom the LOWEST locant (P-31.1.4.3.4).
+
+    Worked examples derived purely from structure (no name table):
+      - ``[C@@H](C)CC``  -> ("butan", 2)   => butan-2-yl
+      - ``[C@@H](C)CCC`` -> ("pentan", 2)  => pentan-2-yl
+
+    Returns ``(systematic_name, k)`` or ``None`` when the substituent is not a
+    single-stereocentre acyclic alkyl, or when the longest chain does not pass
+    through the attachment carbon (e.g. the stereocentre is not the attachment
+    atom). Per D-09 (missing beats wrong) the caller then emits no located form.
+
+    Args:
+        mol: RDKit Mol (CIP labels already assigned).
+        sub_atoms: Atom indices of the substituent fragment.
+        attach_idx: The substituent's attachment atom (bonded to the parent).
+
+    Returns:
+        ``(name, k)`` tuple, or None.
+    """
+    if attach_idx is None or not sub_atoms:
+        return None
+
+    sub_set = set(sub_atoms)
+    if attach_idx not in sub_set:
+        return None
+
+    # Acyclic, all-carbon, fully saturated within the fragment (no ring, no
+    # heteroatom, no C=C/C#C). A genuine secondary acyclic alkyl is sp3.
+    ring_info = mol.GetRingInfo()
+    for idx in sub_set:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None
+        if ring_info.NumAtomRings(idx) > 0:
+            return None
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in sub_set:
+                bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if bond and bond.GetBondTypeAsDouble() != 1.0:
+                    return None
+
+    # The attachment carbon must be the stereocentre (a secondary acyclic alkyl).
+    attach_atom = mol.GetAtomWithIdx(attach_idx)
+    if not attach_atom.HasProp('_CIPCode'):
+        return None
+
+    # Longest carbon chain WITHIN the fragment that passes through the attachment
+    # carbon. DFS the two longest arms out of the attachment atom and join them;
+    # the attachment carbon is an interior or terminal vertex of that chain.
+    def _longest_arm(start, came_from):
+        # Longest simple path of carbons starting at `start`, not revisiting
+        # `came_from` or stepping outside the fragment.
+        best = [start]
+        stack_atom = mol.GetAtomWithIdx(start)
+        for nbr in stack_atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in sub_set and nidx != came_from:
+                arm = _longest_arm(nidx, start)
+                if len(arm) + 1 > len(best):
+                    best = [start] + arm
+        return best
+
+    # Arms emanating from the attachment carbon (excluding each other).
+    arm_lengths = []  # (length, path) for each neighbour-rooted arm
+    for nbr in attach_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx in sub_set:
+            arm = _longest_arm(nidx, attach_idx)
+            arm_lengths.append(arm)
+
+    arm_lengths.sort(key=len, reverse=True)
+    if len(arm_lengths) >= 2:
+        # Two longest arms joined through the attachment carbon.
+        left = list(reversed(arm_lengths[0]))
+        right = arm_lengths[1]
+        chain = left + [attach_idx] + right
+    elif len(arm_lengths) == 1:
+        chain = [attach_idx] + arm_lengths[0]
+    else:
+        chain = [attach_idx]
+
+    chain_len = len(chain)
+    if chain_len < 2:
+        return None
+
+    # Position of the attachment carbon in the chain (1-based), lowest-locant end.
+    pos_from_start = chain.index(attach_idx) + 1
+    pos_from_end = chain_len - chain.index(attach_idx)
+    k = min(pos_from_start, pos_from_end)
+
+    from ..data.chain_names import get_chain_prefix
+    try:
+        stem = get_chain_prefix(chain_len)
+    except (ValueError, KeyError):
+        return None
+    return (f"{stem}an-{k}-yl", k)
+
+
+def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
     """Add CIP stereodescriptors to a substituent name if stereocenters exist.
 
     When a substituent contains one or more stereocenters with defined CIP
-    labels (R/S), the descriptor is prepended: e.g. "sec-butyl" becomes
-    "(R)-sec-butyl", "1-methylpropyl" becomes "(1R)-1-methylpropyl".
+    labels (R/S), the descriptor is prepended: e.g. a stereogenic secondary
+    acyclic alkyl becomes "(2S)-butan-2-yl"; a parent-hydride-style substituent
+    with a unique stereo position becomes "(R)-name".
 
-    For a single stereocenter the format is "(R)-name" or "(S)-name".
-    For multiple stereocenters the format uses locants: "(1R,2S)-name".
+    For a single stereocenter the format is "(R)-name" or "({k}R)-name".
+    For multiple stereocenters the format uses locants threaded from the
+    substituent's own numbering (or emits none — D-09).
 
     This is a systemic fix: any substituent on any parent (chain, ring,
     heterocycle) that has a stereocenter gets the descriptor.
@@ -1084,6 +1197,11 @@ def _add_substituent_stereo(mol, sub_atoms, name):
         mol: RDKit Mol object (CIP labels must already be assigned).
         sub_atoms: Atom indices of the substituent fragment.
         name: The substituent name without stereo (e.g., "sec-butyl").
+        attach_idx: The substituent's attachment atom index, when known. Used to
+            derive the located descriptor (locant + PIN systematic name) for an
+            acyclic-alkyl substituent from STRUCTURE. None when the caller has no
+            attachment context (then the located form is not derivable and the
+            bare "(R)-"/"(S)-" form is used per the unique-position rule).
 
     Returns:
         Name with stereo prefix if stereocenters found, otherwise unchanged.
@@ -1113,24 +1231,26 @@ def _add_substituent_stereo(mol, sub_atoms, name):
 
     if len(stereo_atoms) == 1:
         # Single stereocenter.
-        _, cip = stereo_atoms[0]
-        # STEREO-03 (Phase 177 WSB-02 D-09): a stereogenic substituent whose
-        # name is a NON-PIN retained form that carries no numbering for the
-        # descriptor must use the PIN systematic form so the stereodescriptor
-        # gets its required locant. `sec-butyl` is retained but NOT a preferred
-        # IUPAC name (P-29.6.2.3 / BlueBook "butan-2-yl (preferred prefix)"); a
-        # stereogenic one is the PIN `(2S)-butan-2-yl`, not `(S)-sec-butyl`.
-        # Scoped to the stereogenic case (where the locant is mandatory) so
-        # non-stereo `sec-butyl` outputs are unaffected.
-        _PIN_STEREO_RETAINED = {
-            # non-PIN retained form -> (PIN systematic form, descriptor locant)
-            'sec-butyl': ('butan-2-yl', 2),
-        }
-        if name in _PIN_STEREO_RETAINED:
-            pin_form, loc = _PIN_STEREO_RETAINED[name]
+        s_idx, cip = stereo_atoms[0]
+        # STEREO-03 (Phase 177 WSB-02 D-09): a stereogenic acyclic-alkyl
+        # substituent needs the PIN systematic name + the descriptor at its
+        # attachment locant (P-29.2 / P-31.1.4.3.4 / P-91). The name and the
+        # locant are derived FROM STRUCTURE (the substituent atoms + attachment
+        # atom) by `_acyclic_alkyl_located_stereo_name` — NOT a hardcoded
+        # name->PIN table and NOT a BFS-from-attachment heuristic. This covers
+        # sec-butyl (-> butan-2-yl, k=2), pentan-2-yl (-> pentan-2-yl, k=2), and
+        # any stereogenic secondary acyclic alkyl. Examples (BlueBook P-29.6.2.3:
+        # `butan-2-yl` is the preferred prefix; `sec-butyl` is NOT a PIN):
+        #   CC(=O)N[C@@H](C)CC  -> N-[(2S)-butan-2-yl]acetamide
+        #   CC(=O)N[C@@H](C)CCC -> N-[(2S)-pentan-2-yl]acetamide
+        located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
+        if located is not None and s_idx == attach_idx:
+            pin_form, loc = located
             return f"({loc}{cip})-{pin_form}"
         # Otherwise: a single stereocenter on a parent-hydride-style substituent
-        # takes the bare "(R)-"/"(S)-" (no locant) per P-91 unique-position rule.
+        # (or any case where a structure-derived located form is not available)
+        # takes the bare "(R)-"/"(S)-" (no locant) per the P-91 unique-position
+        # rule. Per D-09 a missing locant is never fabricated.
         return f"({cip})-{name}"
 
     # Multiple stereocenters within one substituent.
@@ -1193,7 +1313,7 @@ def name_substituent_fragment(
     # alkyl fast path, which cannot distinguish e.g. propyl from isopropyl.
     retained = _check_retained_substituent(mol, sub_atoms, attach_idx)
     if retained:
-        return _add_substituent_stereo(mol, sub_atoms, retained)
+        return _add_substituent_stereo(mol, sub_atoms, retained, attach_idx=attach_idx)
 
     # Step 1b (BBR-PERC, 169.7): chalcogen-ether substituent -Se-R / -Te-R →
     # (alkyl)selanyl / (alkyl)tellanyl (P-63.6). Without this, Step 4's recursive
@@ -1212,7 +1332,7 @@ def name_substituent_fragment(
                 mol, (attach_idx, _nbrs[0], _nbrs[1]), parent_chain, suffix=_suffix
             )
             if _chal:
-                return _add_substituent_stereo(mol, sub_atoms, _chal)
+                return _add_substituent_stereo(mol, sub_atoms, _chal, attach_idx=attach_idx)
 
     # Step 2: Fast path -- linear saturated alkyl (no branching, no unsaturation)
     if _is_linear_alkyl(mol, sub_atoms):
@@ -1233,7 +1353,7 @@ def name_substituent_fragment(
     # (e.g., "prop-1-enyl" instead of "prop-2-en-1-yl" for allyl).
     unsat_name = _name_unsaturated_chain(mol, sub_atoms, attach_idx, parent_set)
     if unsat_name is not None:
-        return _add_substituent_stereo(mol, sub_atoms, unsat_name)
+        return _add_substituent_stereo(mol, sub_atoms, unsat_name, attach_idx=attach_idx)
 
     # Step 2c (Phase 171 BBR-ASM, DEF-8 / P-46): saturated linear chain with halogen
     # substituents, numbered from the attachment point. MUST precede the recursive
@@ -1241,7 +1361,7 @@ def name_substituent_fragment(
     # attachment constraint ('CCCCCl' -> '1-chlorobutane' -> 'chlorobutyl', no locant).
     halo_name = _name_saturated_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
     if halo_name is not None:
-        return _add_substituent_stereo(mol, sub_atoms, halo_name)
+        return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
@@ -1288,7 +1408,7 @@ def name_substituent_fragment(
     )
     prefix_name = parent_to_prefix(parent_name, chain_length=carbon_count)
 
-    return _add_substituent_stereo(mol, sub_atoms, prefix_name)
+    return _add_substituent_stereo(mol, sub_atoms, prefix_name, attach_idx=attach_idx)
 
 
 # ============================================================================
