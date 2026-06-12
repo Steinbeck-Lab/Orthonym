@@ -26,7 +26,9 @@ from typing import List, Optional
 from .name_tree import NameTreeNode, _alphabetize_prefixes, _normalize_locants
 
 
-def _synthesize_root_fragment(fragments: List["object"]) -> str:
+def _synthesize_root_fragment(
+    fragments: List["object"], is_mononuclear_parent: bool = False
+) -> str:
     """Pre-assemble the final name string for the byte-identical ``fragment_legacy``.
 
     ``name_tree_to_string`` short-circuits on a ``str`` ``fragment_legacy`` by
@@ -34,12 +36,19 @@ def _synthesize_root_fragment(fragments: List["object"]) -> str:
     argument today, so the carried string is style-independent and
     byte-identical to the production path. ``_assemble_fragments`` does not
     mutate its input (verified), so this stays pure.
+
+    ``is_mononuclear_parent`` is threaded so the carried string stays
+    byte-identical to the production ``assembled`` for P-16.5.1.3.1 mononuclear
+    parents (otherwise the structured carrier and the production name would
+    disagree on ``bromo(chloro)methanol`` vs ``bromochloromethan-1-ol``).
     """
     # Lazy import to avoid the composer.py -> name_tree_to_string -> composer.py
     # import cycle (PATTERNS § Lazy Import; mirrors name_tree.py:165-168).
     from .composer import _assemble_fragments
 
-    return _assemble_fragments(list(fragments), "pin")
+    return _assemble_fragments(
+        list(fragments), "pin", is_mononuclear_parent=is_mononuclear_parent
+    )
 
 
 def fragments_to_tree(
@@ -47,6 +56,7 @@ def fragments_to_tree(
     *,
     class_id: str = "",
     section_cite: Optional[str] = None,
+    is_mononuclear_parent: bool = False,
 ) -> NameTreeNode:
     """Derive a structured ``NameTreeNode`` from a ``List[NameFragment]`` (pure).
 
@@ -108,7 +118,9 @@ def fragments_to_tree(
         class_id=class_id,
         iupac_section_cite=section_cite,
         # D-02 byte-identical carrier (verbatim via name_tree_to_string str path).
-        fragment_legacy=_synthesize_root_fragment(fragments),
+        fragment_legacy=_synthesize_root_fragment(
+            fragments, is_mononuclear_parent=is_mononuclear_parent
+        ),
     )
 
 

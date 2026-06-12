@@ -149,8 +149,17 @@ def name_general_acyclic(
         if stereo:
             fragments.append(stereo)
 
-    # Assemble in correct order
-    assembled = _assemble_fragments(fragments, style)
+    # Assemble in correct order.
+    # P-16.5.1.3.1 mononuclear enclosing rule is keyed on a STRUCTURAL property:
+    # the perceived parent skeleton has exactly ONE heavy atom (parent atom count
+    # == 1), of ANY element. Detect it here — where `features` is available — and
+    # thread the boolean into the assembler. This replaces the former
+    # stem-string (`parent_frag.text == "meth"`) + no-suffix gate, which was a
+    # molecule-class band-aid.
+    is_mononuclear_parent = (_get_parent_atom_count(features) == 1)
+    assembled = _assemble_fragments(
+        fragments, style, is_mononuclear_parent=is_mononuclear_parent
+    )
 
     # Observational coverage logging for fallback chain/ring path (ARCH-06)
     if logger.isEnabledFor(logging.DEBUG):
@@ -218,7 +227,8 @@ def name_general_acyclic(
     # mismatched general_acyclic tree.
     from ..name_tree_builder import fragments_to_tree
     tree = fragments_to_tree(
-        fragments, class_id="general_acyclic", section_cite="P-14+P-23+P-44"
+        fragments, class_id="general_acyclic", section_cite="P-14+P-23+P-44",
+        is_mononuclear_parent=is_mononuclear_parent,
     )
     pool.add(assembled, "chain", features, tree=tree)
     best = pool.best()

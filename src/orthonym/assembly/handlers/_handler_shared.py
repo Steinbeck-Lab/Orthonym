@@ -898,7 +898,11 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     return NameFragment(text=text, fragment_type="stereo")
 
 
-def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
+def _assemble_fragments(
+    fragments: List["NameFragment"],
+    style: str,
+    is_mononuclear_parent: bool = False,
+) -> str:
     """
     Assemble fragments into final name string.
 
@@ -911,6 +915,17 @@ def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
     For unsaturated hydrocarbons, includes bond locants:
     - but-1-ene (not butene or 1-butene)
     - pent-1-en-4-yne (enyne)
+
+    Args:
+        fragments: The NameFragment list (parent/suffix/prefix/stereo).
+        style: Naming style ("pin").
+        is_mononuclear_parent: True when the perceived parent skeleton has
+            exactly ONE heavy (non-H) atom, of ANY element (C, Si, P, B, Ge,
+            Sn, ...), regardless of whether a characteristic-group suffix is
+            present. Computed structurally by the caller from `features` (parent
+            atom count == 1) — NOT by string-matching the stem. Governs the
+            P-16.5.1.3.1 mononuclear enclosing rule below. Default False so the
+            other (multi-atom) callers are byte-identical.
     """
     from ..composer import (
         NameFragment,
@@ -1019,42 +1034,48 @@ def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
         else:
             prefix_texts.append(text)
 
-    # P-16.5.1.3.1 (Phase 177 WSB-02 D-10, STEREO-06 enclosing half):
-    # On a MONONUCLEAR parent hydride (one skeletal atom — methane "meth")
-    # with two or more simple substituents, the first cited substituent has no
-    # enclosing marks; the second is enclosed in parentheses. The Blue Book
-    # PIN for HCBrClF is "bromo(chloro)fluoromethane" — only the SECOND simple
-    # substituent (chloro) carries marks; the trailing fluoro stays bare to
-    # avoid the consecutive ")(" marks (P-16.3.4). Scoped to the truly
-    # mononuclear "meth" hydrocarbon parent (no suffix) so existing multi-atom
-    # outputs are byte-identical. Only simple prefixes (no locant, no existing
-    # enclosing marks) are eligible.
-    _is_mononuclear_parent = (
-        parent_frag is not None
-        and parent_frag.text == "meth"
-        and suffix_frag is None
-    )
-    # Eligible only when every prefix is a DISTINCT single-occurrence simple
-    # substituent. A multiplied prefix (dichloro/trifluoro) keeps the original
-    # unenclosed concatenation (bromodichloromethane), since the rule explicitly
-    # excludes multiplicative prefixes from the parentheses and the Blue Book
-    # lists those forms bare.
+    # P-16.5.1.3.1 (BlueBookV2 7272, verbatim): "For mononuclear parent hydrides
+    # with two or more substituents the FIRST cited substituent never has
+    # enclosing marks unless it includes a locant. The SECOND AND FURTHER
+    # substituents are EACH enclosed with parentheses even for simple
+    # substituents. When the simple substituent groups are accompanied by
+    # multiplicative prefixes such as 'di' and 'tri', the multiplicative prefixes
+    # are not included in the parentheses."
+    #
+    # Worked PINs: bromo(chloro)(fluoro)methane, bromo(chloro)(fluoro)(iodo)-
+    # methane, chloro(methyl)silane, butyl(ethyl)(methyl)(propyl)silane,
+    # cyclopropyl(phenyl)methanol [SUFFIXED], methyl(phenyl)phosphinic acid
+    # [SUFFIXED]. The rule governs ANY mononuclear parent (C, Si, P, B, Ge, Sn,
+    # ...) REGARDLESS of whether a characteristic-group suffix is present — hence
+    # `is_mononuclear_parent` is detected STRUCTURALLY by the caller (parent atom
+    # count == 1), never by string-matching the stem or gating on suffix absence.
+    #
+    # Conservative scope (documented carry-forward): when ANY simple prefix is
+    # multiplied (dichloro/trifluoro/...), ALL prefixes are left bare/unenclosed
+    # — the common-PIN form `bromodichlorofluoromethane`. The `di(chloro)`
+    # refinement (enclose the simple stem while excluding the multiplier from the
+    # marks) is explicitly deferred; the PROTECT gold row `C(Br)(Cl)(Cl)F` ->
+    # `bromodichlorofluoromethane` enforces this branch.
     _MULTIPLIER_PREFIXES = (
         'di', 'tri', 'tetra', 'penta', 'hexa', 'hepta', 'octa', 'nona', 'deca',
     )
-    if _is_mononuclear_parent and len(prefix_texts) >= 2:
+    if is_mononuclear_parent and len(prefix_texts) >= 2:
         def _is_simple_prefix(t: str) -> bool:
-            # simple = no locant prefix, no enclosing marks, no compound hyphen,
-            # no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
+            # simple = no locant prefix, no existing enclosing marks, no compound
+            # hyphen, no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
+            # A locant-bearing first substituent already routes through the
+            # `re.match(r'^\d', ...)` path above and is excluded here (the Blue
+            # Book exempts only the locant-bearing first prefix from this rule).
             if (re.match(r'^\d', t) or '(' in t or '[' in t or '-' in t):
                 return False
             if any(t.startswith(mp) for mp in _MULTIPLIER_PREFIXES):
                 return False
             return True
         if all(_is_simple_prefix(t) for t in prefix_texts):
-            # Enclose only the second cited substituent (P-16.5.1.3.1 +
-            # P-16.3.4 consecutive-mark avoidance for the trailing prefix).
-            prefix_texts = [prefix_texts[0], f"({prefix_texts[1]})"] + prefix_texts[2:]
+            # FIRST cited bare; SECOND AND FURTHER each enclosed (P-16.5.1.3.1).
+            prefix_texts = [prefix_texts[0]] + [
+                f"({t})" for t in prefix_texts[1:]
+            ]
 
     prefix_str = _join_prefixes(prefix_texts)
 
@@ -1071,6 +1092,15 @@ def _assemble_fragments(fragments: List["NameFragment"], style: str) -> str:
     if suffix_frag and suffix_frag.text:
         suffix_text = suffix_frag.text
         suffix_locants = list(suffix_frag.locants) if suffix_frag.locants else []
+
+        # P-14.3.4.4 / P-16.5.1.3.1: on a MONONUCLEAR parent there is only one
+        # skeletal position, so a single-group suffix locant (always "1") is
+        # meaningless and is omitted — `methanol`, not `methan-1-ol`
+        # (cf. cyclopropyl(phenyl)methanol). This applies to ANY mononuclear
+        # parent element and is keyed off the structural `is_mononuclear_parent`,
+        # not the stem string. Multi-group suffixes keep their locants.
+        if is_mononuclear_parent and len(suffix_locants) == 1:
+            suffix_locants = []
 
         # Determine multiplier for multiple functional groups
         # Use suffix_frag.count (set by _generate_suffix) which includes terminal
