@@ -307,6 +307,24 @@ _STEREO_EMBEDDED_RE = re.compile(
 # Pattern C — carbohydrate / amino-acid traditional notation
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa)-[DL]-', re.IGNORECASE)
 
+# Phase 177 WS-B.0 (D-01): Pattern D — a leading/embedded D-/L- configurational
+# token (D-alanine, d-glyceraldehyde, L-valine) AND peptide acyl chains
+# (L-valyl-… / D-glucosaminyl-…) are treated as stereo-already-present, alongside
+# the existing alpha/beta-anomeric Pattern C.  These names already encode their
+# configuration via the D/L (or L-…yl-) descriptor, so the injector must NOT
+# double-encode them with a (nR)/(nS) block.  Anchored at name-start OR after a
+# separator (whitespace / hyphen) — a bare [dDlL]- anywhere is too broad
+# (RESEARCH Assumption A1).  This is the load-bearing protection for the Plan-02
+# backstop flip: peptides report complex_ring/unknown/direct (NOT heterocycle),
+# so the allowlist exclusion alone is NOT sufficient — this predicate is.
+# Case-insensitive: the traditional notation appears as upper-case (D-alanine,
+# L-valine) AND lower-case (d-glyceraldehyde — which is exactly what Orthonym
+# emits for its retained glyceraldehyde name).  The leading anchor keeps it from
+# matching a stray 'l'/'d' mid-token.
+_DL_CONFIG_RE = re.compile(r'(^|[\s\-])([DL])-', re.I)
+# Peptide acyl chain (L-valyl- / D-glucosaminyl-) — case-insensitive.
+_PEPTIDE_ACYL_RE = re.compile(r'\b[DL]-[a-z]+yl-', re.I)
+
 # BBR-GATE (Phase 169.7): a LEADING stereo / relative-configuration descriptor-block
 # matcher for strip_stereo. Mirrors  (the
 # validation precedent). Matches a leading (...)- block whose contents are PURELY
@@ -372,6 +390,15 @@ def needs_stereo_injection(mol, name: str) -> bool:
         return False
     # Pattern C — carbohydrate / amino acid traditional notation
     if _CARBOHYDRATE_STEREO_RE.search(name):
+        return False
+    # Pattern D (Phase 177 WS-B.0 / D-01) — a D/L configurational token or a
+    # peptide acyl chain means the name already carries its configuration.
+    # SHARED primitive (D-02): both the namer backstop (_final_stereo_check) and
+    # inject_stereo_from_locant_map delegate detection here, so this suppresses
+    # both injection seams uniformly.  Load-bearing for the Plan-02 backstop flip
+    # (peptides report complex_ring/unknown/direct, NOT heterocycle — RESEARCH
+    # Pitfall 1 — so the inject-allowlist exclusion is not sufficient on its own).
+    if _DL_CONFIG_RE.search(name) or _PEPTIDE_ACYL_RE.search(name):
         return False
 
     # Idempotent CIP assignment (D-05 read-only — assign_stereochemistry uses
