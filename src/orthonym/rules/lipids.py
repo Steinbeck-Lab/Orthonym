@@ -20,6 +20,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
+from ..data.chain_names import get_chain_prefix
 from ..data.sugar_names import sugar_to_glycosyloxy_prefix
 from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
@@ -324,6 +325,80 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     return f"[{glyceryl}] {head_alkyl} phosphate"
 
 
+# --------------------------------------------------------------------------- #
+# Sphingolipid / ceramide assembler (P-107.4.3) — amide PCG, sphingoid N-substituent
+# --------------------------------------------------------------------------- #
+def _acid_to_amide(acid_name: str) -> Optional[str]:
+    s = acid_name[:-5] if acid_name.endswith(" acid") else acid_name
+    if s.endswith("oic"):
+        return s[:-3] + "amide"
+    if s.endswith("ic"):
+        return s[:-2] + "amide"
+    return None
+
+
+def _sphingoid_prefixes(match) -> str:
+    """Build the C1/C3 detachable prefixes (hydroxy / glycosyloxy) for the sphingoid -yl."""
+    ohs, others = [], []
+    for loc in (1, 3):
+        s = match.sites.get(loc)
+        if s is None:
+            continue
+        if s[0] == "free_oh":
+            ohs.append(loc)
+        elif s[0] == "glycosyl":
+            anomer, config, base = s[2]
+            gly = sugar_to_glycosyloxy_prefix(anomer, config, base)
+            others.append((_alpha_key(gly), f"{loc}-({gly})"))
+    parts = []
+    if len(ohs) == 2:
+        parts.append(("hydroxy", f"{ohs[0]},{ohs[1]}-dihydroxy"))
+    elif len(ohs) == 1:
+        parts.append(("hydroxy", f"{ohs[0]}-hydroxy"))
+    parts.extend(others)
+    parts.sort(key=lambda t: t[0])
+    return "-".join(r for _, r in parts)
+
+
+def _assemble_ceramide(mol, match, style) -> Optional[str]:
+    n_acyl = next((s for s in match.sites.values() if s[0] == "n_acyl"), None)
+    if n_acyl is None:
+        return None
+    _, acyl_c, n_idx = n_acyl
+
+    # amide parent = the fatty acid named then converted -oic acid -> -amide
+    acid = _acid_fragment_name(mol, acyl_c, n_idx)
+    amide = _acid_to_amide(acid) if acid else None
+    if amide is None:
+        return None
+
+    # sphingoid N-substituent: <prefixes><stem><ene>-2-yl
+    clen = match.extra.get("chain_length")
+    dbs = match.extra.get("double_bonds", [])
+    chain_pos = match.extra.get("chain_pos")
+    if not clen or chain_pos is None:
+        return None
+    stem = get_chain_prefix(clen)
+    yl = "-2-yl"  # sphingoid attaches to the amide N at C-2
+    if not dbs:
+        sub_core = f"{stem}an{yl}"
+    elif len(dbs) == 1:
+        sub_core = f"{stem}-{dbs[0]}-en{yl}"
+    else:
+        mult = {2: "di", 3: "tri", 4: "tetra"}.get(len(dbs), "")
+        sub_core = f"{stem}a-{','.join(map(str, dbs))}-{mult}en{yl}"
+
+    prefixes = _sphingoid_prefixes(match)
+    substituent = f"{prefixes}{sub_core}" if prefixes else sub_core
+
+    # stereo block: R/S at C2,C3 + E/Z of chain double bonds, from the ceramide mol
+    descriptors = collect_stereodescriptors(mol, dict(chain_pos), include_near_parent_ez=True)
+    if descriptors:
+        substituent = format_stereodescriptor_string(descriptors) + substituent
+
+    return f"N-[{substituent}]{amide}"
+
+
 def name_lipid(mol, style: str = "pin") -> Optional[str]:
     """Name a lipid on its detected backbone (Form B), or None (cascade-continue)."""
     from ..perception.lipids import detect_lipid_backbone
@@ -334,5 +409,6 @@ def name_lipid(mol, style: str = "pin") -> Optional[str]:
         return _assemble_glyceride(mol, match, style)
     if match.family == "phospholipid":
         return _assemble_phospholipid(mol, match, style)
-    # TODO Plan 05: sphingolipid amide PCG (ceramide)
+    if match.family == "sphingolipid":
+        return _assemble_ceramide(mol, match, style)
     return None

@@ -332,6 +332,26 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
             # already names; claiming it risks regression (D-06/D-11). Documented in SUMMARY.
             return None
 
+        # Walk the linear sphingoid chain C1->Cn (C1 = the CH2-O end) for the
+        # substituent stem length + double-bond locants. Branched sphingoid → defer.
+        chain = [c1, c2, c3]
+        prev, cur = c2, c3
+        while True:
+            nxts = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+                    if nb.GetAtomicNum() == 6 and nb.GetIdx() != prev and nb.GetIdx() not in chain]
+            if len(nxts) != 1:
+                if len(nxts) > 1:
+                    return None  # branched sphingoid → honest-gate (D-06/D-11)
+                break
+            prev, cur = cur, nxts[0]
+            chain.append(cur)
+        chain_pos = {idx: i + 1 for i, idx in enumerate(chain)}  # C1=1 ...
+        double_bonds = []
+        for i in range(len(chain) - 1):
+            b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+            if b is not None and b.GetBondType() == Chem.BondType.DOUBLE:
+                double_bonds.append(i + 1)  # locant = lower carbon position
+
         _ensure_cip(mol)
         cip = {c2: _cip(a_c2), c3: _cip(a_c3)}
         return BackboneMatch(
@@ -341,7 +361,8 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
             sites=sites,
             backbone_atom_to_locant={c1: 1, c2: 2, c3: 3},
             cip=cip,
-            extra={"amino_n": n},
+            extra={"amino_n": n, "chain": chain, "chain_pos": chain_pos,
+                   "chain_length": len(chain), "double_bonds": double_bonds},
         )
     return None
 
