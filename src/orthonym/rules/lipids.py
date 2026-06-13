@@ -174,18 +174,13 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
 
     # --- ester suffix ---
     acylates = [acylate_by_loc[loc] for loc in acyl_locants]
-    if len(set(acylates)) == 1:
-        suffix = _multiplied_acylate(acylates[0], n_acyl)
-    else:
-        # mixed acyls: alphabetized locant-prefixed list (Blue Book P-107.2 form)
-        parts = sorted(
-            ((loc, acylate_by_loc[loc]) for loc in acyl_locants),
-            key=lambda t: _alpha_key(t[1]),
-        )
-        suffix = " ".join(
-            f"{loc}-[{ac}]" if is_complex_substituent(ac) else f"{loc}-{ac}"
-            for loc, ac in parts
-        )
+    if len(set(acylates)) != 1 and n_acyl > 1:
+        # Mixed (different) acyls: the multi-locant-ester functional-class form
+        # (`propane-1,2,3-triyl 1-X 2-Y ...`) is NOT OPSIN-parseable, so naming it
+        # here would regress rows the general (acyloxy)-prefix path already round-
+        # trips. Honest-gate to None (D-11) → cascade to the general pipeline.
+        return None
+    suffix = _multiplied_acylate(acylates[0], n_acyl)
 
     # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
     prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)
