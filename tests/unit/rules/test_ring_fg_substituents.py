@@ -76,14 +76,15 @@ class TestRingAtomFgPrefixes:
             mol, lambda m, a, n: n.GetSymbol() == "O")
         assert ring_atom_fg_prefixes(mol, idx, ring) == []
 
-    def test_carboxy_not_emitted_yet(self):
-        # Ring-COOH demotion is WS-A.2-gated (needs the parent chokepoint);
-        # the primitive must NOT emit 'carboxy' until that lands.
+    def test_carboxy_emitted(self):
+        # Phase 178 (D-08, P-65.1.7.2.1): ring-COOH demotion is now reachable
+        # (the S2 parent chokepoint landed), so the primitive emits 'carboxy'
+        # for a ring atom bearing an exocyclic free carboxylic-acid carbon.
         mol = Chem.MolFromSmiles("OC(=O)C1CCCCC1C")
         idx, ring = _ring_atom_with_exocyclic(
             mol, lambda m, a, n: n.GetSymbol() == "C"
             and any(x.GetSymbol() == "O" for x in n.GetNeighbors()))
-        assert ring_atom_fg_prefixes(mol, idx, ring) == []
+        assert ring_atom_fg_prefixes(mol, idx, ring) == ["carboxy"]
 
     def test_ester_carbonyl_not_cyano_not_oxo(self):
         mol = Chem.MolFromSmiles("COC(=O)C1CCCCC1C")
