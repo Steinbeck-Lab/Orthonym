@@ -754,6 +754,49 @@ def assemble_name(features: Any, style: str = "pin", _composing_ion: bool = Fals
         pop_pool()
 
 
+def _serializer_flip_or_name(result: Any, style: str) -> str:
+    """Phase 179 (WSA-03) production flip seam.
+
+    For a ``NamingResult`` whose tree class is in
+    ``SERIALIZER_PRODUCTION_CLASSES`` (general_acyclic), return the name-tree
+    serializer's explicit-field rendering — BUT only when it is byte-identical
+    to the handler's legacy ``name`` (the staleness guard from
+    ``namer.py:1183-1188``). On any mismatch, serializer exception, missing
+    tree, or non-flipped class, return the legacy ``name`` unchanged.
+
+    Production output is therefore byte-identical BY CONSTRUCTION; the flip only
+    changes WHICH path produced an identical string for the flipped classes (the
+    name-tree serializer becomes the production composition site). The
+    byte-identical guard also catches degenerate empty-name rows: a divergent
+    serialization is dropped in favour of the legacy ``name``.
+    """
+    name = result.name
+    tree = getattr(result, 'tree', None)
+    if tree is None:
+        return name
+    from .name_tree_to_string import (
+        SERIALIZER_PRODUCTION_CLASSES,
+        name_tree_to_string,
+    )
+    if getattr(tree, 'class_id', '') not in SERIALIZER_PRODUCTION_CLASSES:
+        return name
+    try:
+        serialized = name_tree_to_string(tree, style=style)
+    except Exception as exc:  # fail SAFE, never SILENT (mirrors the WR-05 pattern)
+        logger.warning(
+            "Phase 179 serializer flip failed on %s: %s; falling back to legacy name",
+            getattr(tree, 'class_id', '?'), exc,
+        )
+        return name
+    if serialized == name:
+        return serialized
+    logger.debug(
+        "Phase 179 serializer flip diverged on %s (serialized=%r != name=%r); keeping legacy",
+        getattr(tree, 'class_id', '?'), serialized, name,
+    )
+    return name
+
+
 def _emit_ion_with_tree(ion_name: str) -> str:
     """Phase 165 SC-3 / Pitfall 4: the ion/salt/radical pre-pool bypass returns
     before dispatch_inner and never writes the name_with_tree capture slot. Write
@@ -920,7 +963,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         # handlers that do NOT inject stereo are polyfunctional,
         # multi_ester, ester, simple_molecule (final string is direct
         # from pool.best().name in their inline branches).
-        return _inner_result.result.name
+        # Phase 179 (WSA-03): route flipped classes through the name-tree
+        # serializer (byte-identical fallback to .name otherwise).
+        return _serializer_flip_or_name(_inner_result.result, style)
 
     # [Phase 160 + 160.1 + 160.2: 32 handler classes dispatched via inner_dispatch
     #  (oxime, hydrazone, n_oxide, isocyanate, isothiocyanate, carbamic_acid,
@@ -1053,7 +1098,10 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                     "Phase 168 Stage-B re-render failed on _fallback surface: %s; "
                     "falling back to systematic name", exc,
                 )
-        return _fallback.name
+        # Phase 179 (WSA-03): the general_acyclic safety-net seam — route flipped
+        # classes through the serializer (byte-identical fallback otherwise). The
+        # triviality-controller branch above runs first when its flag is ON.
+        return _serializer_flip_or_name(_fallback, style)
     # Truly empty result — degenerate molecule. Return empty string preserving
     # pre-amendment behavior (chain-fallback section returned pool.best().name
     # which was '' when nothing fired).

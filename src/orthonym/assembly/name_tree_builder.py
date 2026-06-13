@@ -135,6 +135,23 @@ def fragments_to_tree(
             from .naming_utils import get_multiplier_prefix
             suffix_multiplier = get_multiplier_prefix(_suffix_count, suffix_frag.text)
 
+    # Phase 179 (WSA-03) production flip: for a class in
+    # SERIALIZER_PRODUCTION_CLASSES the str carrier is DROPPED (fragment_legacy
+    # =None) so name_tree_to_string runs the explicit-field path (the structured
+    # fields above are byte-identical-complete per Plan 01) instead of returning
+    # the legacy string verbatim. This is HALF of the single-source-of-truth
+    # coupling (the other half is the composer seam routing); both gate on the
+    # SAME frozenset so the flip cannot be a silent no-op (Pitfall 2). Carrier
+    # classes keep the byte-identical str carrier (D-02 unchanged).
+    from .name_tree_to_string import SERIALIZER_PRODUCTION_CLASSES
+    fragment_legacy = (
+        None
+        if class_id in SERIALIZER_PRODUCTION_CLASSES
+        else _synthesize_root_fragment(
+            fragments, is_mononuclear_parent=is_mononuclear_parent
+        )
+    )
+
     return NameTreeNode(
         parent_stem=parent_frag.text if parent_frag else "",
         suffix=suffix_frag.text if suffix_frag else None,
@@ -145,10 +162,7 @@ def fragments_to_tree(
         class_id=class_id,
         iupac_section_cite=section_cite,
         multiplicative_prefix=suffix_multiplier,
-        # D-02 byte-identical carrier (verbatim via name_tree_to_string str path).
-        fragment_legacy=_synthesize_root_fragment(
-            fragments, is_mononuclear_parent=is_mononuclear_parent
-        ),
+        fragment_legacy=fragment_legacy,
     )
 
 
