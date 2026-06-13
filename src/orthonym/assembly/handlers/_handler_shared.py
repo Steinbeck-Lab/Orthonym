@@ -927,8 +927,11 @@ def _assemble_fragments(
             P-16.5.1.3.1 mononuclear enclosing rule below. Default False so the
             other (multi-atom) callers are byte-identical.
     """
-    from ..composer import (
-        NameFragment,
+    from ..composer import NameFragment
+    # Phase 179 (D-03): the composition-grammar primitives now live in the leaf
+    # module composition_primitives.py (single source of truth shared with the
+    # name-tree serializer). NameFragment stays in composer.
+    from ..composition_primitives import (
         _build_hydrocarbon_name,
         _build_unsaturation_infix,
         _estimate_parent_size_from_name,

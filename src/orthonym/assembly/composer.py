@@ -60,6 +60,17 @@ from .naming_utils import (
     TERMINAL_FG_TYPES,
     BRANCH_HANDLED_FGS,
 )
+# Phase 179 (D-03): the name-composition grammar primitives were lifted VERBATIM
+# into the leaf module composition_primitives.py (single source of truth, shared
+# with the name-tree serializer). Re-export them here under their original names
+# so existing composer call sites resolve unchanged.
+from .composition_primitives import (
+    _estimate_parent_size_from_name,
+    _build_unsaturation_infix,
+    _build_hydrocarbon_name,
+    _join_prefixes,
+    _join_prefix_to_name,
+)
 from ..data.chain_names import get_chain_prefix
 from .substituent_naming import name_substituent_fragment, _is_linear_alkyl, _name_aryl_methyl_ether
 from .substituent_enumerator import (
@@ -6743,268 +6754,12 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
     return name
 
 
-def _estimate_parent_size_from_name(parent_name: str) -> int:
-    """Estimate the number of atoms in the parent from its name.
-
-    Used by collision detection to determine if a locant exceeds the parent
-    structure capacity.  Returns a conservative estimate; unknown parents
-    default to 100 (effectively disabling capacity validation).
-
-    Args:
-        parent_name: The parent fragment text (e.g., 'cyclohex', 'benz', 'prop').
-
-    Returns:
-        Estimated atom count in the parent structure.
-    """
-    lower = parent_name.lower()
-
-    # Common ring systems with fixed sizes
-    _RING_SIZES = {
-        'benzene': 6, 'phenyl': 6, 'benz': 6,
-        'cycloprop': 3, 'cyclobut': 4, 'cyclopent': 5,
-        'cyclohex': 6, 'cyclohept': 7, 'cycloocta': 8,
-        'cyclonon': 9, 'cyclodec': 10,
-        'naphthal': 10, 'naphthyl': 10,
-        'indol': 9, 'indene': 9,
-        'quinol': 10, 'isoquinol': 10,
-        'pyrid': 6, 'pyrimid': 6, 'pyrazin': 6,
-        'pyrrol': 5, 'furan': 5, 'thiophen': 5,
-        'imidazol': 5, 'pyrazol': 5, 'oxazol': 5,
-        'thiazol': 5, 'triazin': 6,
-    }
-    for key, size in _RING_SIZES.items():
-        if key in lower:
-            return size
-
-    # Try chain prefix matching using FIRST_20 from chain_names
-    from ..data.chain_names import FIRST_20
-    # Check longest prefixes first to avoid partial matches (e.g., "eth" in "meth")
-    for length in sorted(FIRST_20.keys(), reverse=True):
-        prefix = FIRST_20[length]
-        if lower.startswith(prefix) or lower == prefix:
-            return length
-
-    # Safe fallback: return large value to disable capacity validation
-    # for unknown parent structures.
-    import logging
-    logging.getLogger(__name__).debug(
-        "Unknown parent '%s' -- skipping locant capacity validation (fallback=100)",
-        parent_name,
-    )
-    return 100
-
-
-# Phase 160.2 Plan-02-01: _assemble_fragments lifted to handlers/_handler_shared.py per CONTEXT D-02 + D-03.
-
-
-def _build_unsaturation_infix(
-    double_locants: List[int],
-    triple_locants: List[int]
-) -> str:
-    """
-    Build the unsaturation infix (e.g., 'an', '-1-en', '-1-en-4-yn').
-
-    This is used when there's a functional group suffix. The unsaturation
-    part is inserted between the stem and the suffix locants.
-
-    The infix is assembled structurally so that hyphens are inserted only
-    where needed -- no post-hoc band-aid cleanup required.
-
-    IUPAC P-31.1.3.4: when total unsaturation locant count >= 2, prefix
-    with 'a' for euphony (e.g., 'a-1,3-dien' not '-1,3-dien').
-
-    Args:
-        double_locants: Sorted list of locants for double bonds.
-        triple_locants: Sorted list of locants for triple bonds.
-
-    Returns:
-        Unsaturation infix string (may be empty for saturated).
-
-    Examples:
-        >>> _build_unsaturation_infix([], [])
-        'an'
-        >>> _build_unsaturation_infix([1], [])
-        '-1-en'
-        >>> _build_unsaturation_infix([1], [4])
-        '-1-en-4-yn'
-        >>> _build_unsaturation_infix([1, 3], [])
-        'a-1,3-dien'
-        >>> _build_unsaturation_infix([], [1, 3])
-        'a-1,3-diyn'
-        >>> _build_unsaturation_infix([1, 3], [5])
-        'a-1,3-dien-5-yn'
-    """
-    num_double = len(double_locants)
-    num_triple = len(triple_locants)
-
-    if num_double == 0 and num_triple == 0:
-        return "an"  # Saturated
-
-    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
-    # used when total unsaturation locants >= 2 (diene, diyne, enyne etc.)
-    total_locants = num_double + num_triple
-    needs_a = (total_locants >= 2) and (num_double > 1 or num_triple > 1)
-
-    # Build segments: each is a tuple (locant_str, multiplier, bond_type)
-    segments = []
-
-    if num_double > 0:
-        loc_str = ",".join(str(loc) for loc in double_locants)
-        multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double)) if num_double > 1 else ""
-        segments.append((loc_str, multiplier, "en"))
-
-    if num_triple > 0:
-        loc_str = ",".join(str(loc) for loc in triple_locants)
-        multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple)) if num_triple > 1 else ""
-        segments.append((loc_str, multiplier, "yn"))
-
-    # Assemble: "a" (if needed) then each segment as "-locants-[mult]bond"
-    # joined with hyphens between them.
-    result_parts = []
-    if needs_a:
-        result_parts.append("a")
-
-    for loc_str, mult, bond in segments:
-        result_parts.append(loc_str)
-        result_parts.append(f"{mult}{bond}")
-
-    # Join all parts with hyphens; prepend leading hyphen if no 'a' connector
-    result = "-".join(result_parts)
-    if not needs_a:
-        result = "-" + result
-
-    return result
-
-
-def _build_hydrocarbon_name(
-    stem: str,
-    double_locants: List[int],
-    triple_locants: List[int],
-    ring_bond_locant_omittable: Optional[bool] = None,
-) -> str:
-    """
-    Build a complete hydrocarbon name (no functional group suffix).
-
-    This handles:
-    - Saturated: stem + 'ane' (butane, cyclohexane)
-    - Alkenes: stem + '-locant-ene' (but-1-ene) or stem + 'ene' (ethene, cyclohexene)
-    - Alkynes: stem + '-locant-yne' (but-1-yne) or stem + 'yne' (ethyne)
-    - Enynes: stem + '-double-en-triple-yne' (pent-1-en-4-yne)
-    - Cycloalkenes: stem + 'ene' for mono (cyclohexene), stem + 'a-locants-diene' for di
-
-    For 2-carbon compounds (ethene, ethyne), locants are omitted since
-    there's only one possible position for the multiple bond.
-
-    For mono-cycloalkenes (single double bond in ring), locants are omitted
-    per IUPAC convention (cyclohexene, not cyclohex-1-ene).
-
-    The name is assembled structurally so that hyphens are inserted only
-    where needed -- no post-hoc band-aid cleanup required.
-
-    Args:
-        stem: Chain prefix (e.g., 'but', 'pent', 'cyclohex').
-        double_locants: Sorted list of locants for double bonds.
-        triple_locants: Sorted list of locants for triple bonds.
-
-    Returns:
-        Complete hydrocarbon name.
-
-    Examples:
-        >>> _build_hydrocarbon_name("but", [], [])
-        'butane'
-        >>> _build_hydrocarbon_name("eth", [1], [])
-        'ethene'
-        >>> _build_hydrocarbon_name("but", [1], [])
-        'but-1-ene'
-        >>> _build_hydrocarbon_name("but", [2], [])
-        'but-2-ene'
-        >>> _build_hydrocarbon_name("pent", [1], [4])
-        'pent-1-en-4-yne'
-        >>> _build_hydrocarbon_name("cyclohex", [], [])
-        'cyclohexane'
-        >>> _build_hydrocarbon_name("cyclohex", [1], [])
-        'cyclohexene'
-        >>> _build_hydrocarbon_name("cyclohex", [1, 3], [])
-        'cyclohexa-1,3-diene'
-    """
-    num_double = len(double_locants)
-    num_triple = len(triple_locants)
-
-    # Check if this is a cyclic compound
-    is_cyclic = stem.startswith("cyclo")
-
-    if num_double == 0 and num_triple == 0:
-        # Saturated hydrocarbon
-        return f"{stem}ane"
-
-    # Centralized bond locant elision: ethene/ethyne (2-carbon) and mono-cycloalkenes.
-    # WSD-06 (NUM-01): the ring ene-locant is omitted only for an UNSUBSTITUTED
-    # cycloalkene (P-14.3.4.2(d)); a substituent makes the double-bond position
-    # distinctive, so it must be cited (`3-bromocyclohex-1-ene`, not
-    # `bromocyclohexene`). The caller passes ``ring_bond_locant_omittable`` (False
-    # when the ring carries a substituent); the old ``num_double==1`` count proxy is
-    # the fallback for callers that don't supply it.
-    _chain_len = 2 if stem == "eth" else 0
-    _ring_mono = (
-        ring_bond_locant_omittable
-        if (is_cyclic and ring_bond_locant_omittable is not None)
-        else (num_double == 1 and num_triple == 0)
-    )
-    omit_bond_locant = should_omit_locant_one(
-        context="bond",
-        chain_length=_chain_len,
-        is_ring=is_cyclic,
-        is_monosubstituted=_ring_mono,
-    )
-
-    # Determine if the 'a' euphonic connector is needed (IUPAC P-31.1.3.4):
-    # used when multiple bonds have multiplied locants (diene, diyne, etc.)
-    needs_a = (num_double > 1) or (num_triple > 1 and num_double == 0)
-
-    # Build segments as structured data, then join cleanly
-    # Each segment: (locant_str_or_None, multiplier, bond_suffix)
-    segments = []
-
-    if num_double > 0:
-        if num_double == 1:
-            if omit_bond_locant:
-                segments.append((None, "", "en"))
-            else:
-                loc_str = ",".join(str(loc) for loc in double_locants)
-                segments.append((loc_str, "", "en"))
-        else:
-            loc_str = ",".join(str(loc) for loc in double_locants)
-            mult = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
-            segments.append((loc_str, mult, "en"))
-
-    if num_triple > 0:
-        if num_triple == 1:
-            if omit_bond_locant and num_double == 0:
-                segments.append((None, "", "yn"))
-            else:
-                loc_str = ",".join(str(loc) for loc in triple_locants)
-                segments.append((loc_str, "", "yn"))
-        else:
-            loc_str = ",".join(str(loc) for loc in triple_locants)
-            mult = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
-            segments.append((loc_str, mult, "yn"))
-
-    # Assemble: stem [+ "a" if needed] [+ segments joined with hyphens] + "e"
-    result = stem
-    if needs_a:
-        result += "a"
-
-    for loc_str, mult, bond in segments:
-        if loc_str is not None:
-            result += f"-{loc_str}-{mult}{bond}"
-        else:
-            # No locant: directly append bond suffix (ethene, cyclohexene)
-            result += f"{mult}{bond}"
-
-    # Final terminal 'e' for the hydrocarbon ending
-    result += "e"
-
-    return result
+# Phase 179 (D-03): _estimate_parent_size_from_name, _build_unsaturation_infix,
+# and _build_hydrocarbon_name were lifted VERBATIM to composition_primitives.py
+# (the single shared composition-grammar source). They are re-exported via the
+# top-of-module `from .composition_primitives import (...)` so all composer call
+# sites resolve unchanged. _assemble_fragments itself lives in
+# handlers/_handler_shared.py per CONTEXT D-02 (Phase 160.2).
 
 
 def _split_parent_stem(parent: str) -> tuple:
@@ -7036,74 +6791,8 @@ def _split_parent_stem(parent: str) -> tuple:
 # Note: alpha_sort_key is imported from naming_utils for IUPAC-compliant sorting.
 
 
-def _join_prefixes(prefix_texts: List[str]) -> str:
-    """
-    Join multiple prefix strings with proper IUPAC hyphenation.
-
-    When concatenating prefixes like "3-ethyl" and "4-methyl", the result
-    should be "3-ethyl-4-methyl" (with hyphen between letter and digit).
-
-    Args:
-        prefix_texts: List of prefix strings (e.g., ["3-ethyl", "4-methyl"])
-
-    Returns:
-        Concatenated string with proper hyphenation
-
-    Examples:
-        >>> _join_prefixes(["3-ethyl", "4-methyl"])
-        '3-ethyl-4-methyl'
-        >>> _join_prefixes(["2,2-dimethyl"])
-        '2,2-dimethyl'
-        >>> _join_prefixes([])
-        ''
-    """
-    if not prefix_texts:
-        return ""
-
-    if len(prefix_texts) == 1:
-        return prefix_texts[0]
-
-    # Join with hyphens where needed
-    result = prefix_texts[0]
-    for i in range(1, len(prefix_texts)):
-        current = prefix_texts[i]
-        # If result ends with letter and current starts with digit, add hyphen
-        if result and current:
-            last_char = result[-1]
-            first_char = current[0]
-            if (last_char.isalpha() or last_char in (')', ']')) and first_char.isdigit():
-                result += "-"
-            elif (last_char.isalpha() or last_char in (')', ']')) and first_char == 'N':
-                result += "-"
-        result += current
-
-    return result
-
-
-def _join_prefix_to_name(prefix_str: str, name: str) -> str:
-    """
-    Join a prefix string to a parent/suffix name with proper IUPAC hyphenation.
-
-    Ensures a hyphen is inserted when:
-    - The prefix ends with a letter and the name starts with a digit
-
-    This prevents broken names like 'pentabutyl1,4,7,10,13-pentaaza'
-    by inserting a hyphen: 'pentabutyl-1,4,7,10,13-pentaaza'.
-
-    Args:
-        prefix_str: The assembled prefix string (e.g., '3-ethyl-4-methyl')
-        name: The parent+suffix name (e.g., 'propan-1-ol')
-
-    Returns:
-        Properly hyphenated combined name
-    """
-    if not prefix_str or not name:
-        return prefix_str + name
-
-    if (prefix_str[-1].isalpha() or prefix_str[-1] in (')', ']')) and name[0].isdigit():
-        return f"{prefix_str}-{name}"
-
-    return f"{prefix_str}{name}"
+# Phase 179 (D-03): _join_prefixes and _join_prefix_to_name were lifted VERBATIM
+# to composition_primitives.py and are re-exported via the top-of-module import.
 
 
 def _build_long_chain_prefix(length: int) -> str:
