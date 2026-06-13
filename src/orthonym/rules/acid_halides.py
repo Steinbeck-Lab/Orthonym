@@ -171,22 +171,32 @@ def _name_ring_attached_acid_halide(mol, features, matches, halide_word,
     return f"carbonyl {halide_word}"
 
 
-def _build_acyl_name(chain_length: int) -> str:
+def _build_acyl_name(chain_length: int, unsaturation=None) -> str:
     """Build the acyl name from chain length.
 
     Args:
         chain_length: Number of carbons including the carbonyl carbon.
+        unsaturation: Optional list of ``(double_bond_locant, 'E'|'Z'|'')`` tuples
+            (locants from the carbonyl carbon = 1). None → saturated form,
+            byte-identical to the prior bare-int behavior.
 
     Returns:
-        Acyl name string (e.g., 'acetyl', 'propanoyl', 'butanoyl').
+        Acyl name string (e.g., 'acetyl', 'propanoyl', 'butanoyl',
+        '(9Z)-octadec-9-enoyl').
     """
-    # Check retained names first
-    if chain_length in RETAINED_ACYL_NAMES:
-        return RETAINED_ACYL_NAMES[chain_length]
+    if not unsaturation:
+        # Check retained names first
+        if chain_length in RETAINED_ACYL_NAMES:
+            return RETAINED_ACYL_NAMES[chain_length]
+        # Systematic: {chain_prefix}anoyl
+        prefix = get_chain_prefix(chain_length)
+        return f"{prefix}anoyl"
 
-    # Systematic: {chain_prefix}anoyl
-    prefix = get_chain_prefix(chain_length)
-    return f"{prefix}anoyl"
+    # Unsaturated: derive the acyl (-oyl) form from the systematic -oate stem
+    # (reuse the chain en-locant grammar; do not hand-roll it). '...oate' -> '...oyl'.
+    from ..data.chain_names import get_enoate_name
+    oate = get_enoate_name(chain_length, unsaturation)
+    return oate[:-4] + "oyl" if oate.endswith("oate") else oate
 
 
 def _name_diacid_halide(chain_length: int, halide_word: str, num_groups: int) -> str:

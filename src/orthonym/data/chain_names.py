@@ -370,3 +370,35 @@ def get_anoate_name(n: int) -> str:
     """
     prefix = get_chain_prefix(n)
     return prefix + "anoate"
+
+
+_ENE_MULTIPLIER = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+
+
+def get_enoate_name(n: int, unsaturation=None) -> str:
+    """Systematic (un)saturated ``-oate`` stem, with leading (E/Z) stereo block.
+
+    Args:
+        n: Number of carbons including the carbonyl carbon.
+        unsaturation: Optional list of ``(double_bond_locant, 'E'|'Z'|'')`` tuples
+            (locants counted from the carbonyl carbon = 1). None/empty → the
+            saturated ``-anoate`` form (identical to :func:`get_anoate_name`).
+
+    Returns:
+        e.g. ``'octadecanoate'`` (saturated), ``'(9Z)-octadec-9-enoate'`` (1 db),
+        ``'(9Z,12Z)-octadeca-9,12-dienoate'`` (2 db). Mirrors the systematic form
+        the chain/ester pipeline already emits for unsaturated fatty esters.
+    """
+    if not unsaturation:
+        return get_anoate_name(n)
+    prefix = get_chain_prefix(n)
+    locs = sorted(unsaturation, key=lambda t: t[0])
+    k = len(locs)
+    locants = ",".join(str(loc) for loc, _ in locs)
+    if k == 1:
+        core = f"{prefix}-{locants}-enoate"
+    else:
+        mult = _ENE_MULTIPLIER.get(k, "")
+        core = f"{prefix}a-{locants}-{mult}enoate"
+    block = ",".join(f"{loc}{geom}" for loc, geom in locs if geom in ("E", "Z"))
+    return f"({block})-{core}" if block else core

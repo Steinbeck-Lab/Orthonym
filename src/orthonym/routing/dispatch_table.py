@@ -118,6 +118,7 @@ class StoutClass(_StrEnumBase):
 
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
+    LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
     ML_FALLBACK = "ml_fallback"                   # Phase 162 telemetry tag (CONTEXT D-03; NOT a CFR dispatch entry — increment via _cfr_router._increment_stat at namer.py:1248 wrapper, no _register_dispatch call)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
@@ -343,6 +344,24 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         return False
     from orthonym.data.sugar_names import lookup_sugar
     return lookup_sugar(canonical_smiles) is not None
+
+
+def _is_lipid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Tier-1; predicate IS handler (Phase 180 P-107). PURE: no mol mutation beyond
+    the idempotent CIP prop that the deriver owns (D-26). RESOLVED A1: registered
+    Tier-1 @250 so phosphatidylcholine (zwitterion) is reached before ZWITTERION@300,
+    which returns '' (not None) and would otherwise terminate the cascade."""
+    if mol is None:
+        return False
+    from orthonym.perception.lipids import detect_lipid_backbone
+    return detect_lipid_backbone(mol) is not None
+
+
+def _handle_lipid(mol, smiles, canonical_smiles, features=None, *,
+                  style: str = "pin", **kwargs) -> Optional[str]:
+    """Routes a clean lipid backbone to rules.lipids.name_lipid; None → cascade-continue."""
+    from orthonym.rules.lipids import name_lipid
+    return name_lipid(mol, style=style)
 
 
 def _is_natural_product(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -837,6 +856,13 @@ _register_dispatch(
     predicate=_is_radical, handler=_handle_radical,
     iupac_section="impl routing — radical-electron detection per Blue Book P-15.7",
     description="Single radical species; routes to rules.radicals.name_radical",
+    side_effect_inventory=(),
+)
+_register_dispatch(
+    class_id=StoutClass.LIPID, priority=250, tier=1,
+    predicate=_is_lipid, handler=_handle_lipid,
+    iupac_section="Blue Book P-107 lipids (glycerides P-107.2 / phosphatidic acids P-107.3 / glycolipids P-107.4)",
+    description="Lipid backbone (glycerol / glycero-phospho-X / sphingoid); routes to rules.lipids.name_lipid",
     side_effect_inventory=(),
 )
 _register_dispatch(

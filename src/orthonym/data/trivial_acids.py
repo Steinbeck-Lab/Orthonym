@@ -101,12 +101,15 @@ def get_acylate_name(acid_name: str) -> str:
     return acid_name + "ate"
 
 
-def get_systematic_acylate(chain_length: int) -> str:
+def get_systematic_acylate(chain_length: int, unsaturation=None) -> str:
     """
     Get the systematic IUPAC acylate name for a chain length.
 
     Args:
         chain_length: Number of carbons in the acid chain (including C=O)
+        unsaturation: Optional list of ``(double_bond_locant, 'E'|'Z'|'')`` tuples
+            (locants from the carbonyl carbon = 1). None → saturated form,
+            byte-identical to the prior bare-int behavior.
 
     Returns:
         Systematic acylate name
@@ -116,10 +119,16 @@ def get_systematic_acylate(chain_length: int) -> str:
         'ethanoate'
         >>> get_systematic_acylate(3)
         'propanoate'
+        >>> get_systematic_acylate(18, unsaturation=[(9, 'Z')])
+        '(9Z)-octadec-9-enoate'
     """
-    if chain_length in CHAIN_TO_ACYLATE:
-        return CHAIN_TO_ACYLATE[chain_length]
+    if not unsaturation:
+        if chain_length in CHAIN_TO_ACYLATE:
+            return CHAIN_TO_ACYLATE[chain_length]
+        # For longer chains, use centralized chain naming
+        from .chain_names import get_anoate_name
+        return get_anoate_name(chain_length)
 
-    # For longer chains, use centralized chain naming
-    from .chain_names import get_anoate_name
-    return get_anoate_name(chain_length)
+    # Unsaturated: systematic -oate stem with leading (E/Z) block (no trivial map).
+    from .chain_names import get_enoate_name
+    return get_enoate_name(chain_length, unsaturation)

@@ -106,8 +106,8 @@ class TestGlycoLipids:
         """3-O-beta-D-galactopyranosyl-1,2-di-O-octadecanoyl-sn-glycerol →
         (2S)-3-(beta-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate (Blue Book P-107.4.2)."""
         from orthonym.rules.lipids import name_lipid  # noqa: F401
-        smiles = ("CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](COC(=O)CCCCCCCCCCCCCCCCC)"
-                  "OC[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O")
+        smiles = ("CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](OC(=O)CCCCCCCCCCCCCCCCC)"
+                  "CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O")
         assert name_compound(smiles) == (
             "(2S)-3-(beta-D-galactopyranosyloxy)propane-1,2-diyl dioctadecanoate")
 

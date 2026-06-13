@@ -76,7 +76,7 @@ LIPID_CASES = [
     ("galactosylceramide",
      "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@H](CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)NC(=O)CCCCCCCCCCCCCCC"),
     ("galactosyldiacylglycerol",
-     "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](COC(=O)CCCCCCCCCCCCCCCCC)OC[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O"),
+     "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](OC(=O)CCCCCCCCCCCCCCCCC)CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O"),
 ]
 
 
