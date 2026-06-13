@@ -135,11 +135,19 @@ class TestDispatchTableIntegrity:
           fire BEFORE the dense outer cascade. Spacing rule does not apply
           across the sub-100 -> 100 boundary because the architectural intent
           is "intercept before dense cascade", not "insert within it".
+        - Phase 180 LIPID @ 250 (Tier-1): a deliberate half-step interceptor
+          inserted BETWEEN RADICAL@200 and ZWITTERION@300 (no hundreds slot is
+          available there). It MUST precede ZWITTERION@300 because PC is a
+          zwitterion and ZWITTERION returns '' (terminating the cascade), so a
+          Tier-2 slot would be unreachable for phospholipids (180 RESOLVED A1).
+          Its hard-gate detector fires only on clean lipid backbones, so the
+          half-step does not affect insertability of the dense region.
         """
+        LIPID_HALF_STEP = 250  # Phase 180 Tier-1 interceptor (documented exception)
         outer = sorted(
             e.priority
             for e in DISPATCH_TABLE.values()
-            if 100 <= e.priority < 10000  # dense region per docstring
+            if 100 <= e.priority < 10000 and e.priority != LIPID_HALF_STEP  # dense region
         )
         for prev, curr in zip(outer, outer[1:]):
             assert curr - prev >= 100, (

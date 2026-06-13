@@ -125,7 +125,8 @@ def _glyceride_numbering(mol, match):
     loc_to_atom = {v: k for k, v in match.position_locants.items()}
     for loc, site in match.sites.items():
         atom_site[loc_to_atom[loc]] = site
-    acyl_atoms = {a for a, s in atom_site.items() if s[0] in ("acyl", "phospho")}
+    # Ester (acyl) is the PCG → lowest locants; phospho/glyco/OH become prefixes.
+    acyl_atoms = {a for a, s in atom_site.items() if s[0] == "acyl"}
     t1, t2 = terminals
     candidates = [{t1: 1, central: 2, t2: 3}, {t2: 1, central: 2, t1: 3}]
 
@@ -146,6 +147,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
                         key=lambda a: num[a])
     oh_atoms = [a for a, s in atom_site.items() if s[0] == "free_oh"]
     glyco_atoms = [a for a, s in atom_site.items() if s[0] == "glycosyl"]
+    phospho_atoms = [a for a, s in atom_site.items() if s[0] == "phospho"]
 
     if not acyl_atoms:
         return None  # no ester PCG → not a glyceride (glycerol itself / phospho handled elsewhere)
@@ -184,8 +186,10 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
             for loc, ac in parts
         )
 
-    # --- prefixes (free-OH, glycosyl) on the non-acyl positions ---
-    prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site)
+    # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
+    prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)
+    if prefix is None:
+        return None  # unrecognized neutral phospho head group → defer (D-11)
 
     name = f"{prefix}{attach} {suffix}"
 
@@ -209,28 +213,117 @@ def _alpha_key(acylate: str) -> str:
     return s.lower()
 
 
-def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site) -> str:
-    """Build the detachable-prefix string (hydroxy / glycosyloxy) preceding the attachment."""
-    subs = []  # (sorted_locants_tuple, alpha_key, rendered)
+# Head-group → alkoxy substituent for the substitutive (neutral) phosphoryloxy prefix.
+_HEAD_GROUP_ALKOXY = {
+    "ethanolamine": "2-aminoethoxy",
+}
+
+
+def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms=()) -> Optional[str]:
+    """Build the detachable-prefix string (hydroxy / glycosyloxy / phosphoryloxy)
+    preceding the attachment. Returns None if a phospho head group is unrecognized
+    in the substitutive (neutral) regime (honest-gate, D-11)."""
+    subs = []  # (alpha_key, rendered)
     if oh_atoms:
         locs = sorted(num[a] for a in oh_atoms)
         mult = {1: "", 2: "di", 3: "tri"}[len(locs)]
         rendered = f"{','.join(str(x) for x in locs)}-{mult}hydroxy"
-        subs.append((locs[0], "hydroxy", rendered))
+        subs.append(("hydroxy", rendered))
     for a in glyco_atoms:
         anomer, config, base = atom_site[a][2]
         gly = sugar_to_glycosyloxy_prefix(anomer, config, base)
-        rendered = f"{num[a]}-({gly})"
-        subs.append((num[a], _alpha_key(gly), rendered))
+        subs.append((_alpha_key(gly), f"{num[a]}-({gly})"))
+    for a in phospho_atoms:
+        head_desc = atom_site[a][3]
+        head_alkoxy = _HEAD_GROUP_ALKOXY.get(head_desc)
+        if head_alkoxy is None:
+            return None  # neutral substitutive form not RT-verified for this head → defer (D-11)
+        # P-16.3.3 nested enclosure: {[(<head-alkoxy>)hydroxyphosphoryl]oxy}
+        rendered = f"{num[a]}-{{[({head_alkoxy})hydroxyphosphoryl]oxy}}"
+        subs.append(("phosphoryl", rendered))
     if not subs:
         return ""
-    subs.sort(key=lambda t: t[1])  # alphabetical by substituent name
-    return "".join(r for _, _, r in subs)
+    subs.sort(key=lambda t: t[0])  # alphabetical by substituent name
+    return "".join(r for _, r in subs)
 
 
 # --------------------------------------------------------------------------- #
 # Public dispatcher
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Phospholipid assembler (P-107.3) — functional-class phosphate diester
+# --------------------------------------------------------------------------- #
+# Cationic head groups that use the P-68 functional-class "phosphate" (zwitterion) form.
+# Neutral heads (ethanolamine, ...) route to the substitutive 'hydroxyphosphoryl-oxy'
+# form instead (see _build_glycerol_prefixes / _HEAD_GROUP_ALKOXY).
+_HEAD_GROUP_ALKYL = {
+    "choline": "2-(trimethylazaniumyl)ethyl",
+}
+
+
+def _bis_enclose(inner: str, mult: str) -> str:
+    """Enclose a multiplied compound substituent: brackets if it has parens, else parens."""
+    if "(" in inner or "[" in inner:
+        return f"{mult}[{inner}]"
+    return f"{mult}({inner})"
+
+
+def _assemble_phospholipid(mol, match, style) -> Optional[str]:
+    central = _central_carbon(mol, match.core_atoms)
+    loc_to_atom = {v: k for k, v in match.position_locants.items()}
+    atom_site = {loc_to_atom[loc]: site for loc, site in match.sites.items()}
+
+    phospho_atoms = [a for a, s in atom_site.items() if s[0] == "phospho"]
+    acyl_atoms = [a for a, s in atom_site.items() if s[0] == "acyl"]
+    if len(phospho_atoms) != 1 or len(acyl_atoms) != 2:
+        return None  # only the diacyl-phospho (canonical phospholipid) regime here
+    phospho_atom = phospho_atoms[0]
+    head_desc = atom_site[phospho_atom][3]
+
+    # Cationic head (choline): the internal N+/[O-] zwitterion is captured by the
+    # P-68 functional-class "phosphate" form. Neutral heads (ethanolamine, ...) need
+    # the substitutive 'hydroxyphosphoryl-oxy' prefix form → route to the glyceride
+    # assembler (phospho handled as a C-3 prefix). RESOLVED: OPSIN's functional-class
+    # "phosphate" yields the anionic/zwitterion form (matches PC, not neutral PE).
+    head_alkyl = _HEAD_GROUP_ALKYL.get(head_desc)
+    if head_alkyl is None:
+        return _assemble_glyceride(mol, match, style)  # neutral substitutive form (or None if unrecognized)
+
+    # Glyceryl propyl: local C1 = phospho-attached carbon, C2 = central, C3 = other terminal.
+    other_terminal = [a for a in match.core_atoms if a not in (central, phospho_atom)]
+    if len(other_terminal) != 1:
+        return None
+    other_terminal = other_terminal[0]
+    local = {phospho_atom: 1, central: 2, other_terminal: 3}
+
+    # (acyloxy) prefixes at the two acyl positions (local locants 2 and 3)
+    acyloxy_by_loc = {}
+    for a in acyl_atoms:
+        ax = _acyloxy_for_site(mol, atom_site[a])
+        if ax is None:
+            return None
+        acyloxy_by_loc[local[a]] = ax
+    acyl_locs = sorted(acyloxy_by_loc)
+    locant_str = ",".join(str(x) for x in acyl_locs)
+    names = [acyloxy_by_loc[l] for l in acyl_locs]
+    if len(set(names)) == 1:
+        gly_subs = f"{locant_str}-{_bis_enclose(names[0], 'bis')}"
+    else:
+        parts = sorted(((l, acyloxy_by_loc[l]) for l in acyl_locs), key=lambda t: _alpha_key(t[1]))
+        gly_subs = "".join(
+            f"{l}-{('[' + ax + ']') if ('(' in ax or '[' in ax) else '(' + ax + ')'}"
+            for l, ax in parts
+        )
+    glyceryl = f"{gly_subs}propyl"
+    # backbone C-2 R/S (local locant 2 = central) inside the glyceryl substituent
+    descriptors = collect_stereodescriptors(mol, {central: 2}, include_near_parent_ez=False)
+    if descriptors:
+        glyceryl = format_stereodescriptor_string(descriptors) + glyceryl
+
+    # P-68 functional-class diester: [<glyceryl>] <head-alkyl> phosphate (glyceryl bracketed first)
+    return f"[{glyceryl}] {head_alkyl} phosphate"
+
+
 def name_lipid(mol, style: str = "pin") -> Optional[str]:
     """Name a lipid on its detected backbone (Form B), or None (cascade-continue)."""
     from ..perception.lipids import detect_lipid_backbone
@@ -239,6 +332,7 @@ def name_lipid(mol, style: str = "pin") -> Optional[str]:
         return None
     if match.family == "glyceride":
         return _assemble_glyceride(mol, match, style)
-    # TODO Plan 04: phospholipid functional-class phosphate diester
+    if match.family == "phospholipid":
+        return _assemble_phospholipid(mol, match, style)
     # TODO Plan 05: sphingolipid amide PCG (ceramide)
     return None

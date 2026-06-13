@@ -41,16 +41,21 @@ class TestAcyloxyBracketFormat:
         )
 
     def test_polyol_ester_acyloxy_brackets(self):
-        """Triacetin-type compound has correct multiplicative acyloxy brackets."""
-        # 1,2,3-tri(acetyloxy)propane  (glycerol triacetate)
-        name = name_compound("CC(=O)OCC(OC(C)=O)COC(C)=O")
-        assert "(acetyloxy)" in name, (
-            f"Expected '(acetyloxy)' in '{name}'"
-        )
-        # Should have multiplier prefix (tri or similar)
-        assert "tri" in name.lower(), (
-            f"Expected multiplier 'tri' in '{name}'"
-        )
+        """Non-glycerol polyol ester keeps the multiplicative (acyloxy) prefix form.
+
+        Phase 180 update: glycerol triacetate (triacetin) is a triacylglycerol and
+        now routes through the P-107 lipid assembler to the Form B systematic ester
+        name ``propane-1,2,3-triyl triacetate`` (OPSIN-RT-verified). The general
+        multiplicative-(acyloxy) formatting is unchanged for NON-glycerol polyols,
+        verified here on erythritol tetraacetate (the lipid detector hard-gates it
+        out: not a propane-1,2,3-triol core → returns None → general pipeline).
+        """
+        # glycerol triacetate is now the lipid Form B (intended Phase-180 behavior)
+        assert name_compound("CC(=O)OCC(OC(C)=O)COC(C)=O") == "propane-1,2,3-triyl triacetate"
+        # erythritol tetraacetate: NOT a glyceride -> general (acyloxy) multiplier form retained
+        name = name_compound("CC(=O)OCC(OC(C)=O)C(OC(C)=O)COC(C)=O")
+        assert "(acetyloxy)" in name, f"Expected '(acetyloxy)' in '{name}'"
+        assert "tetrakis" in name.lower(), f"Expected 'tetrakis' in '{name}'"
 
 
 @pytest.mark.unit
