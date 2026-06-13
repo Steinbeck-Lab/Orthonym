@@ -320,7 +320,7 @@ def name_natural_product(mol) -> Optional[str]:
                 scaffold_class=scaffold_info.get("scaffold_name"),
             )
             if unsaturation["ene"] or unsaturation["yne"]:
-                stereo_prefix = _collect_np_stereo(mol, numbering)
+                stereo_prefix, ring_ab = _collect_np_stereo(mol, numbering, scaffold_info)
                 return _assemble_np_name(
                     scaffold_info["scaffold_stem"],
                     scaffold_info["scaffold_name"],
@@ -329,6 +329,7 @@ def name_natural_product(mol) -> Optional[str]:
                     unsaturation=unsaturation,
                     stereo_prefix=stereo_prefix,
                     modification_prefix=modification_prefix,
+                    ring_ab=ring_ab,
                 )
         # Coverage gate: reject bare scaffold if it covers too little
         total_heavy = mol.GetNumHeavyAtoms()
@@ -410,8 +411,8 @@ def name_natural_product_with_substituents(
 
     matched_set = set(scaffold_info["matched_atoms"])
 
-    # Collect stereodescriptors from the scaffold numbering
-    stereo_prefix = _collect_np_stereo(mol, numbering)
+    # Collect stereodescriptors from the scaffold numbering (steroid → α/β ring_ab + side R/S)
+    stereo_prefix, ring_ab = _collect_np_stereo(mol, numbering, scaffold_info)
 
     # 0. Find ester decorations first (they consume atoms that would otherwise
     #    be counted as hydroxyls or ketones)
@@ -477,7 +478,7 @@ def name_natural_product_with_substituents(
         return _assemble_np_ester_name(
             scaffold_stem, scaffold_name, hydroxyls, ketones,
             unsaturation, esters, stereo_prefix=stereo_prefix,
-            methyls=methyls, halogens=halogens,
+            methyls=methyls, halogens=halogens, ring_ab=ring_ab,
         )
 
     # If no decorations found, return bare scaffold name
@@ -493,7 +494,7 @@ def name_natural_product_with_substituents(
         scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
         stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
         epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
-        modification_prefix=modification_prefix,
+        modification_prefix=modification_prefix, ring_ab=ring_ab,
     )
 
 
@@ -529,27 +530,45 @@ def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
     return target_to_iupac
 
 
-def _collect_np_stereo(mol, numbering: Dict[int, int]) -> str:
+def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[Dict] = None):
     """Collect stereodescriptors for a natural product using IUPAC locants.
 
-    Uses RDKit CIP labeling and the scaffold numbering map to produce
-    a stereodescriptor prefix like "(5R,8S,9S,10R,13S,14S)-".
+    Returns a 2-tuple ``(leading_prefix, ring_ab)``:
+
+    - For a steroid where the P-101.2.6 α/β converter resolves (Phase 181, WSC-02):
+      ``leading_prefix`` is the acyclic side-chain R/S block (e.g. ``"(22R)-"`` or "")
+      and ``ring_ab`` is ``{locant: 'alpha'/'beta'}`` for the cited ring stereocentres.
+      The assembler interleaves ``ring_ab`` INLINE at each locant + on the stem (D-04/D-06).
+    - For a non-steroid NP, or a steroid where the converter signals the per-molecule
+      no-mix fallback (D-08), ``leading_prefix`` is the existing whole-graph R/S block
+      (e.g. ``"(5R,8S,...)-"``, byte-identical to prior behaviour) and ``ring_ab`` is ``{}``.
 
     Args:
         mol: RDKit Mol object with stereocenters.
         numbering: Dict mapping atom index -> IUPAC locant.
+        scaffold_info: detect_natural_product() result; gates the steroid α/β branch.
 
     Returns:
-        Stereo prefix string (e.g., "(5R,8S)-") or empty string if
-        no stereocenters have defined CIP labels.
+        (leading_prefix: str, ring_ab: Dict[int, str]).
     """
     from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
     assign_stereochemistry(mol)
+
+    # Phase 181 (WSC-02): steroid ring-face α/β branch (D-08 gate). Root-cause at the
+    # emitter; the converter round-trips through OPSIN by construction. None ⇒ fall back
+    # to the existing whole-graph R/S string (never mix ring α/β with ring R/S).
+    if scaffold_info is not None and scaffold_info.get("scaffold_class") == "steroid":
+        from .steroid_stereo import collect_steroid_alpha_beta
+        ab = collect_steroid_alpha_beta(mol, scaffold_info, numbering)
+        if ab is not None:
+            side_rs = ab.get("side_rs") or []
+            leading = format_stereodescriptor_string(side_rs) if side_rs else ""
+            return leading, ab.get("ring_ab", {})
+
     descriptors = collect_stereodescriptors(mol, numbering)
-    if descriptors:
-        return format_stereodescriptor_string(descriptors)
-    return ""
+    leading = format_stereodescriptor_string(descriptors) if descriptors else ""
+    return leading, {}
 
 
 def _find_hydroxyls(
@@ -1129,6 +1148,7 @@ def _assemble_np_name(
     n_alkyls: Optional[List[Tuple[int, str]]] = None,
     methoxys: Optional[List[int]] = None,
     modification_prefix: str = "",
+    ring_ab: Optional[Dict[int, str]] = None,
 ) -> str:
     """Assemble a decorated natural product name.
 
@@ -1165,6 +1185,12 @@ def _assemble_np_name(
     epoxy_bridges = epoxy_bridges or []
     n_alkyls = n_alkyls or []
     methoxys = methoxys or []
+    ring_ab = ring_ab or {}
+
+    # Phase 181 (WSC-02): render a ring locant with its ring-face α/β descriptor when one
+    # was cited (Latin, no hyphen between locant and greek per P-101.2.6.1.1); else plain.
+    def _greek_locant(loc):
+        return f"{loc}{ring_ab[loc]}" if loc in ring_ab else str(loc)
 
     # --- Build prefix parts in alphabetical order (IUPAC P-14.5) ---
     # Collect all prefix entries as (sort_key, prefix_str) for alphabetical ordering
@@ -1182,14 +1208,14 @@ def _assemble_np_name(
             hal_by_type[hal_name].append(loc)
         for hal_name in sorted(hal_by_type.keys()):
             locs = sorted(hal_by_type[hal_name])
-            locant_str = ",".join(str(loc) for loc in locs)
+            locant_str = ",".join(_greek_locant(loc) for loc in locs)
             count = len(locs)
             multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
             prefix_entries.append((hal_name, f"{locant_str}-{multiplier}{hal_name}"))
 
     # Methoxy prefixes (e.g., "3-methoxy")
     if methoxys:
-        locant_str = ",".join(str(loc) for loc in methoxys)
+        locant_str = ",".join(_greek_locant(loc) for loc in methoxys)
         count = len(methoxys)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
@@ -1201,21 +1227,21 @@ def _assemble_np_name(
     # IUPAC P-35.2.1: principal group as suffix only.
     # IUPAC P-59.1: non-principal groups as prefixes only.
     if hydroxyls:
-        locant_str = ",".join(str(loc) for loc in hydroxyls)
+        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("hydroxy", f"{locant_str}-{multiplier}hydroxy"))
 
     # Methyl prefix (C-methyl on scaffold carbons)
     if methyls:
-        locant_str = ",".join(str(loc) for loc in methyls)
+        locant_str = ",".join(_greek_locant(loc) for loc in methyls)
         count = len(methyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methyl", f"{locant_str}-{multiplier}methyl"))
 
     # N-alkyl prefixes (e.g., "17-methyl" for N-methyl at position 17)
     for loc, alkyl_name in n_alkyls:
-        prefix_entries.append((alkyl_name, f"{loc}-{alkyl_name}"))
+        prefix_entries.append((alkyl_name, f"{_greek_locant(loc)}-{alkyl_name}"))
 
     # Sort alphabetically by name (IUPAC P-14.5)
     prefix_entries.sort(key=lambda x: x[0])
@@ -1281,15 +1307,31 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         ketone_suffix = f"-{locant_str}-{multiplier}one"
 
+    # Phase 181 (WSC-02): free ring-face descriptors not consumed by any substituent/suffix
+    # locant (typically C-5, and any cited inverted bridgehead with no decoration) are
+    # prepended to the stem as "{loc}{greek}-" — INLINE on the stem, NEVER a leading
+    # parenthesised block (the OPSIN-unparseable anti-pattern). The side-chain R/S block
+    # (stereo_prefix) stays at the very front (D-06).
+    _consumed = (set(hydroxyls) | set(methyls) | set(methoxys) | set(ketones)
+                 | {loc for loc, _ in halogens} | {loc for loc, _ in n_alkyls})
+    _free = sorted(loc for loc in ring_ab if loc not in _consumed)
+    stem_stereo = "".join(f"{loc}{ring_ab[loc]}-" for loc in _free)
+
+    def _stemjoin(pre, body):
+        """Splice the stem-stereo prefix between the prefix block and the stem core,
+        inserting a hyphen when a non-empty prefix would otherwise abut a digit."""
+        if stem_stereo and pre and not pre.endswith("-"):
+            return f"{pre}-{stem_stereo}{body}"
+        return f"{pre}{stem_stereo}{body}"
+
     # --- Combine suffix for -ol (hydroxyl as suffix) when no ketone ---
     # IUPAC convention: if hydroxyl is the only principal group, use -ol suffix
     # But if ketone is present, hydroxyl becomes a prefix
     # For NP names: hydroxyl is always prefix, ketone always suffix
     # If neither ketone nor hydroxyl, and no unsaturation -> bare scaffold name
     if not prefix and not ketone_suffix and not ene_locs and not yne_locs:
-        if modification_prefix:
-            return stereo_prefix + modification_prefix + scaffold_name
-        return stereo_prefix + scaffold_name
+        # Bare scaffold (+ optional free ring-face config on the stem, e.g. "5alpha-cholestane").
+        return f"{stereo_prefix}{_stemjoin(modification_prefix, scaffold_name)}"
 
     # Build non-OH prefix (methyl, halogen only) for use with -ol suffix
     non_oh_prefix_entries = [
@@ -1300,31 +1342,31 @@ def _assemble_np_name(
     # If only hydroxyls and no ketone -> use -ol suffix instead of prefix
     # Methyl/halogen prefixes are still included as prefixes
     if hydroxyls and not ketones:
-        locant_str = ",".join(str(loc) for loc in hydroxyls)
+        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         ol_suffix = f"-{locant_str}-{multiplier}ol"
-        # non-OH prefix + modification_prefix + effective_stem + unsaturation + -ol
-        # e.g., "4-methylcholest-5-en-3-ol" or "cholesta-5,7-dien-3-ol"
-        return f"{stereo_prefix}{non_oh_prefix}{modification_prefix}{effective_stem}{unsat_suffix}{ol_suffix}"
+        # non-OH prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + -ol
+        # e.g., "4-methylcholest-5-en-3-ol" or "5alpha-cholestan-3beta-ol"
+        return f"{stereo_prefix}{_stemjoin(non_oh_prefix + modification_prefix, effective_stem)}{unsat_suffix}{ol_suffix}"
 
-    # General case: prefix + modification_prefix + effective_stem + unsaturation + ketone
-    # e.g., "17-hydroxy-19-norandr-4-en-3-one" for norethisterone-type
+    # General case: prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + ketone
+    # e.g., "17beta-hydroxy-5alpha-androstan-3-one"
     if unsat_suffix == "an":
         # Saturated: prefix + modification_prefix + stem + "an" + ketone
         # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-one, -ol, -yl)
         # Keep 'e' only when no suffix follows (bare saturated name)
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{modification_prefix}{stem}{unsat_suffix}{ketone_suffix}"
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{prefix}{modification_prefix}{stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}e"
     else:
         # Unsaturated: prefix + modification_prefix + effective_stem + unsaturation + ketone
         # If no suffix follows, add terminal 'e' (IUPAC: "ene"/"yne" not "en"/"yn")
         if ketone_suffix:
-            return f"{stereo_prefix}{prefix}{modification_prefix}{effective_stem}{unsat_suffix}{ketone_suffix}"
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{prefix}{modification_prefix}{effective_stem}{unsat_suffix}e"
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}e"
 
 
 def _find_ester_decorations(
@@ -1494,6 +1536,7 @@ def _assemble_np_ester_name(
     stereo_prefix: str = "",
     methyls: Optional[List[int]] = None,
     halogens: Optional[List[Tuple[int, str]]] = None,
+    ring_ab: Optional[Dict[int, str]] = None,
 ) -> str:
     """Assemble a functional class ester name for a natural product.
 
@@ -1526,6 +1569,12 @@ def _assemble_np_ester_name(
 
     methyls = methyls or []
     halogens = halogens or []
+    ring_ab = ring_ab or {}
+
+    # Phase 181 (WSC-02): render a ring locant with its ring-face α/β descriptor (Latin,
+    # no locant-greek hyphen) when cited; else plain.
+    def _greek_locant(loc):
+        return f"{loc}{ring_ab[loc]}" if loc in ring_ab else str(loc)
 
     # --- Build prefix (all non-ester decorations become prefixes) ---
     prefix_parts = []
@@ -1537,34 +1586,47 @@ def _assemble_np_ester_name(
             hal_by_type[hal_name].append(loc)
         for hal_name in sorted(hal_by_type.keys()):
             locs = sorted(hal_by_type[hal_name])
-            locant_str = ",".join(str(loc) for loc in locs)
+            locant_str = ",".join(_greek_locant(loc) for loc in locs)
             count = len(locs)
             multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
             prefix_parts.append(f"{locant_str}-{multiplier}{hal_name}")
 
     # Hydroxyl groups -> "hydroxy" prefix
     if hydroxyls:
-        locant_str = ",".join(str(loc) for loc in hydroxyls)
+        locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}hydroxy")
 
     # Methyl prefixes
     if methyls:
-        locant_str = ",".join(str(loc) for loc in methyls)
+        locant_str = ",".join(_greek_locant(loc) for loc in methyls)
         count = len(methyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}methyl")
 
     # Ketone groups -> "oxo" prefix (NOT "-one" suffix in functional class format)
     if ketones:
-        locant_str = ",".join(str(loc) for loc in ketones)
+        locant_str = ",".join(_greek_locant(loc) for loc in ketones)
         count = len(ketones)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_parts.append(f"{locant_str}-{multiplier}oxo")
 
     # Join multiple prefix parts with hyphen: "3-hydroxy" + "7-oxo" -> "3-hydroxy-7-oxo"
     prefix = "-".join(prefix_parts)
+
+    # Phase 181 (WSC-02): free ring-face descriptors not consumed by any prefix/ester locant
+    # (e.g. "5alpha-") are prepended to the stem INLINE (never a leading parenthesis).
+    _ester_consumed_base = (set(hydroxyls) | set(methyls) | set(ketones)
+                            | {loc for loc, _ in halogens})
+
+    def _ester_stemjoin(pre, body, ester_locs):
+        consumed = _ester_consumed_base | set(ester_locs)
+        free = sorted(loc for loc in ring_ab if loc not in consumed)
+        stereo = "".join(f"{loc}{ring_ab[loc]}-" for loc in free)
+        if stereo and pre and not pre.endswith("-"):
+            return f"{pre}-{stereo}{body}"
+        return f"{pre}{stereo}{body}"
 
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
@@ -1611,11 +1673,11 @@ def _assemble_np_ester_name(
 
     if len(esters) == 1:
         # Single ester: stem-unsaturation-locant-yl acylate
-        yl_suffix = f"-{ester_locants[0]}-yl"
+        yl_suffix = f"-{_greek_locant(ester_locants[0])}-yl"
         acylate_word = acylate_names[0]
     elif len(set(acylate_names)) == 1:
         # Multiple esters with same acid: stem-unsaturation-locant,locant-diyl diacylate
-        locant_str = ",".join(str(loc) for loc in ester_locants)
+        locant_str = ",".join(_greek_locant(loc) for loc in ester_locants)
         count = len(esters)
         yl_multi = SIMPLE_MULTIPLIERS.get(count, str(count))
         yl_suffix = f"-{locant_str}-{yl_multi}yl"
@@ -1628,7 +1690,7 @@ def _assemble_np_ester_name(
         acyloxy_parts = []
         for ester in esters:
             acyloxy = _acylate_to_acyloxy(ester["acylate"])
-            acyloxy_parts.append(f"{ester['locant']}-({acyloxy})")
+            acyloxy_parts.append(f"{_greek_locant(ester['locant'])}-({acyloxy})")
 
         # Sort alphabetically by acyloxy name for IUPAC ordering
         acyloxy_parts.sort(key=lambda p: p.split("(")[1])
@@ -1636,19 +1698,13 @@ def _assemble_np_ester_name(
         # Build acyloxy prefix string
         acyloxy_prefix = "-".join(acyloxy_parts)
 
-        # Combine: all prefixes + acyloxy + stem + unsaturation + "e"
+        # Combine: all prefixes + acyloxy + [stem-stereo] + stem + unsaturation + "e"
         all_prefix = "-".join(p for p in [prefix, acyloxy_prefix] if p)
+        ester_consumed = set(ester_locants)
+        return f"{stereo_prefix}{_ester_stemjoin(all_prefix, stem, ester_consumed)}{unsat_suffix}e"
 
-        if unsat_suffix == "an":
-            return f"{stereo_prefix}{all_prefix}{stem}{unsat_suffix}e"
-        else:
-            return f"{stereo_prefix}{all_prefix}{stem}{unsat_suffix}e"
-
-    # --- Assemble: stereo_prefix + prefix + stem + unsaturation + yl + space + acylate ---
+    # --- Assemble: stereo_prefix + prefix + [stem-stereo] + stem + unsaturation + yl + space + acylate ---
     # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-yl starts with 'y')
-    if unsat_suffix == "an":
-        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{yl_suffix}"
-    else:
-        parent = f"{stereo_prefix}{prefix}{stem}{unsat_suffix}{yl_suffix}"
+    parent = f"{stereo_prefix}{_ester_stemjoin(prefix, stem, set(ester_locants))}{unsat_suffix}{yl_suffix}"
 
     return f"{parent} {acylate_word}"

@@ -78,11 +78,11 @@ STEROID_CASES = [
      "C[C@]12CC[C@H]3[C@@H](CC=C4C[C@@H](O)CC[C@]34C)[C@@H]1CCC2"),
     ("5alpha-pregnane-3beta,20-diol",
      "CC([C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O"),
-    ("(22R)-cholest-5-ene-3beta,20,22-triol",
+    ("(20R,22R)-cholest-5-ene-3beta,20,22-triol",
      "CC(C)CC[C@H]([C@@](C)([C@H]1CC[C@H]2[C@@H]3CC=C4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O)O"),
-    ("(24S)-stigmast-5-en-3beta-ol",
-     "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)C(C)C"),
-    ("3-oxo-5alpha-androstan-17beta-ol",
+    ("5alpha-androstan-17beta-ol",
+     "C[C@@]12[C@H](CC[C@H]1[C@@H]1CC[C@H]3CCCC[C@]3(C)[C@H]1CC2)O"),
+    ("17beta-hydroxy-5alpha-androstan-3-one",
      "O=C1C[C@@H]2CC[C@H]3[C@@H]4CC[C@@H]([C@@]4(C)CC[C@@H]3[C@]2(CC1)C)O"),
 ]
 
