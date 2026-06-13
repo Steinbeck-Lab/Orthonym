@@ -206,9 +206,19 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
     if 5 in target_ab:                                       # D-04a: C-5 always when chiral
         cited.add(5)
     cited |= decorated                                       # D-04b: substituent/suffix-bearing
-    for loc in target_ab:                                    # D-04c: inverted vs implied parent
+
+    # D-04c / D-08: every IMPLIED (non-cited) ring stereocentre — bridgeheads C-8/9/10/13/14
+    # and other fixed centres — must match the implied-stereoparent reference. If any differs,
+    # we cannot represent it with the suppressed natural config, so fall back to the whole-graph
+    # R/S string (which represents ANY configuration). This (a) names genuinely inverted steroids
+    # correctly via R/S and (b) guards against substructure-match orientation ambiguity at the
+    # symmetric bridgeheads — we NEVER emit a wrong α/β bridgehead (the documented RT-breaker).
+    # Cited centres (C-5 + decorated) are oriented unambiguously by their unique substituents.
+    for loc in target_ab:
+        if loc in cited:
+            continue
         if ref.get(loc) is not None and target_ab[loc] != ref[loc]:
-            cited.add(loc)
+            return None
 
     ring_ab = {loc: target_ab[loc] for loc in cited}
 

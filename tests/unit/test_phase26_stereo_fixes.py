@@ -71,10 +71,14 @@ class TestSteroidStereoPresence:
     """Test that stereo SMILES produce names with R/S stereodescriptors."""
 
     def test_androstandiol_has_stereo_prefix(self):
-        """Androstan-3,17-diol with stereocenters should have (xR/xS) prefix."""
+        """Androstan-3,17-diol with stereocenters carries stereo descriptors.
+
+        Phase 181 (WSC-02): steroid ring stereocentres now emit ring-face α/β
+        (`5beta-androstan-3alpha,17alpha-diol`) rather than a whole-graph (R/S) block.
+        """
         name = name_compound(ANDROSTANDIOL_SMILES)
-        assert re.search(r"\(\d+[RS]", name), (
-            f"Expected stereo prefix with R/S in name, got: {name}"
+        assert re.search(r"\d+(alpha|beta)", name) or re.search(r"\(\d+[RS]", name), (
+            f"Expected stereo descriptors (α/β or R/S) in name, got: {name}"
         )
 
     def test_stigmast_diol_has_stereo_prefix(self):
@@ -112,36 +116,35 @@ class TestSteroidStereoPresence:
 
 @pytest.mark.unit
 class TestSteroidStereoFormat:
-    """Test that stereo descriptors follow correct IUPAC format."""
+    """Test that steroid ring-face α/β descriptors follow the P-101.2.6 format.
 
-    def test_stereo_descriptors_uppercase(self):
-        """Stereo descriptors in prefix should be uppercase R/S, not lowercase."""
+    Phase 181 (WSC-02): a steroid whose ring stereocentres resolve emits Latin α/β
+    descriptors INLINE — on the stem (`5beta-`) and at each substituent/suffix locant
+    (`3alpha`, `17alpha`) — NOT a leading whole-graph `(R/S)-` parenthesised block.
+    """
+
+    def test_alpha_beta_descriptors_lowercase_latin(self):
+        """Ring-face descriptors are lowercase Latin 'alpha'/'beta' tokens at locants."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # Extract the stereo prefix block
-        prefix_match = re.match(r"\(([^)]+)\)-", name)
-        assert prefix_match is not None, f"No stereo prefix found in: {name}"
-        prefix_content = prefix_match.group(1)
-        # All R/S letters in prefix should be uppercase
-        stereo_letters = re.findall(r"[RSrs]", prefix_content)
-        assert len(stereo_letters) > 0, f"No R/S letters found in prefix: {prefix_content}"
-        assert all(c.isupper() for c in stereo_letters), (
-            f"Expected uppercase R/S, found: {stereo_letters} in {prefix_content}"
+        tokens = re.findall(r"\d+(alpha|beta)", name)
+        assert len(tokens) > 0, f"No α/β ring-face descriptors found in: {name}"
+
+    def test_inline_alpha_beta_format(self):
+        """α/β attach inline as '{locant}{greek}' with no hyphen between locant and greek."""
+        name = name_compound(ANDROSTANDIOL_SMILES)
+        # e.g. "5beta-androstan-3alpha,17alpha-diol"
+        assert re.search(r"\d+(alpha|beta)", name), f"No inline α/β in: {name}"
+        # NEVER a leading parenthesised greek block (the OPSIN-unparseable anti-pattern)
+        assert not re.match(r"^\(\d+(alpha|beta)", name), (
+            f"α/β must not be a leading parenthesis block: {name}"
         )
 
-    def test_stereo_prefix_format(self):
-        """Stereo prefix should be '(locantR/S,...)-' with trailing hyphen."""
+    def test_stem_prefix_starts_name(self):
+        """A free ring-face descriptor (e.g. 5beta-) is prepended to the stem, name-initial."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # Should match pattern like "(3R,5R,...)-"
-        assert re.match(r"\(\d+[RS](,\d+[RS])*\)-", name), (
-            f"Stereo prefix format incorrect in: {name}"
-        )
-
-    def test_stereo_prefix_before_name_body(self):
-        """Stereo prefix should appear before the rest of the name."""
-        name = name_compound(ANDROSTANDIOL_SMILES)
-        # After the closing ")-", the name body should follow
-        assert re.match(r"\([^)]+\)-[a-z]", name), (
-            f"Expected stereo prefix followed by name body, got: {name}"
+        # "5beta-androstan-..." — starts with a locant+greek stem prefix
+        assert re.match(r"\d+(alpha|beta)-[a-z]", name), (
+            f"Expected a '{{locant}}{{greek}}-' stem prefix, got: {name}"
         )
 
 
@@ -196,12 +199,14 @@ class TestSteroidStereoOPSIN:
     """
 
     def test_androstandiol_opsin_roundtrip(self):
-        """OPSIN parses stereo-annotated androstan-3,17-diol and matches."""
+        """OPSIN parses the α/β-annotated androstan-3,17-diol and matches (WSC-02).
+
+        Phase 181: the name is now `5beta-androstan-3alpha,17alpha-diol`; OPSIN parses the
+        ring-face descriptors and returns SMILES that canonicalizes to the input structure.
+        """
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # Verified: OPSIN parses "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol"
-        # and returns SMILES that canonicalizes to the same structure.
         assert "androstan" in name
-        assert re.search(r"\(\d+[RS]", name)
+        assert re.search(r"\d+(alpha|beta)", name), f"expected ring-face α/β in {name}"
 
     # Stigmast-5-en-3,7-diol: OPSIN cannot parse stereo-annotated cholest-5-en-3,7-diol
     # (OPSIN returns empty output for cholestane stereo prefixes with >8 descriptors).
