@@ -170,11 +170,19 @@ class ParentSelectionResult:
         parent_atoms: Atom indices of the parent structure
         substituent_rings: Rings that become substituents (when chain is parent)
         reasoning: Explanation for debugging
+        principal_ring_system: The senior ring system chosen by the single
+            authoritative among-rings computation (P-44.2). Populated once by
+            namer._classify (Phase 178 D-03 chokepoint consolidation); the
+            derived ``senior_ring_system`` / ``principal_ring`` feature fields
+            are read from this one value. ``None`` until populated (e.g. pure
+            acyclic, or before the post-pass runs).
     """
     parent_type: str  # 'ring' or 'chain'
     parent_atoms: List[int]
     substituent_rings: List[Tuple[int, ...]]  # Rings that become substituents
     reasoning: str  # For debugging
+    # D-03 (Phase 178): one authoritative principal-ring-system computation.
+    principal_ring_system: Optional[Tuple[int, ...]] = None
 
 
 def is_principal_group_on_ring(

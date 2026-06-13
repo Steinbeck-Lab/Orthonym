@@ -1919,6 +1919,25 @@ class Orthonym:
                     if not features.chain_is_parent:
                         return  # Skip other ring classification for assemblies
 
+            # D-03 (Phase 178) chokepoint consolidation: compute the senior ring
+            # system ONCE (P-44.2 via select_principal_ring_system) and carry it
+            # on the ParentSelectionResult, so the PAH guard, the among-rings
+            # selector, and the derived senior_ring_system / principal_ring all
+            # read ONE authoritative value instead of recomputing the identical
+            # pure call. Behavior-preserving by construction (same args, same
+            # pure function); this only de-duplicates two identical calls into one.
+            from .rules.ring_selection import select_principal_ring_system
+            _principal_ring_system = (
+                select_principal_ring_system(features.mol, features.ring_systems)
+                if features.ring_systems else None
+            )
+            # Carry it on the one authoritative result. `selection` is the same
+            # ParentSelectionResult set by the select_parent call above (None when
+            # there was no chain candidate, so select_parent never ran).
+            selection = features.parent_selection_result
+            if selection is not None:
+                selection.principal_ring_system = _principal_ring_system
+
             # Check for polycyclic aromatics FIRST (naphthalene, anthracene, etc.)
             # These take precedence over single-ring classification
             from .rules.polycyclics import identify_polycyclic, get_polycyclic_substituents
@@ -1933,7 +1952,6 @@ class Orthonym:
                 #   (b) P-44.2 — the among-rings winner must BE the PAH
                 #       system (2-(naphthalen-2-yl)furan: furan is senior).
                 from .rules.polycyclics import get_polycyclic_core_atoms
-                from .rules.ring_selection import select_principal_ring_system
                 from .rules.parent_selection import is_principal_group_on_ring
                 _core = get_polycyclic_core_atoms(features.mol, pah_name)
                 _core_set = set(_core) if _core else set()
@@ -1956,9 +1974,8 @@ class Orthonym:
                         if _pg_on_other and not _pg_on_pah:
                             pah_name = None
                     if pah_name:
-                        _senior = select_principal_ring_system(
-                            features.mol, features.ring_systems
-                        )
+                        # D-03: reuse the one authoritative computation
+                        _senior = _principal_ring_system
                         if _senior and not (set(_senior) & _core_set):
                             pah_name = None
             if pah_name:
@@ -1982,10 +1999,8 @@ class Orthonym:
                 # cyclic traversal order needed by orientation functions.
                 # Complex multi-ring (fused/bridged) systems are handled
                 # by _classify_complex_ring() in the composer.
-                from .rules.ring_selection import select_principal_ring_system
-                principal = select_principal_ring_system(
-                    features.mol, features.ring_systems
-                )
+                # D-03: reuse the one authoritative computation (see top of block)
+                principal = _principal_ring_system
                 features.senior_ring_system = principal if principal else atom_rings[0]
 
                 # For multi-ring-system molecules, use a SSSR ring from
