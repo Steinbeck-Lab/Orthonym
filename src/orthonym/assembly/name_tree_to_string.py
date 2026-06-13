@@ -65,6 +65,19 @@ class NameTreeSerializerError(ValueError):
     """
 
 
+# Phase 179 (WSA-03): the set of class_ids whose ``NameTreeNode`` carries a BARE
+# parent-hydride stem ("but", "meth", "cyclodec") and is therefore assembled by
+# the full hydride grammar (-ane/-ene/-yne + suffix infix). Every OTHER node
+# reaching ``_assemble_explicit_fields`` carries a COMPLETE name in ``parent_stem``
+# (a retained name like "acetic acid"/"phenol", an organometallic like
+# "tetramethylstannane", or a coarse fallback) and is assembled by the
+# pass-through branch (no hydride ending appended). This is ALSO the production
+# flip set: Plan 02 couples the carrier-drop + seam routing to this SAME frozenset
+# (single source of truth — prevents "flip does nothing"). Defined here so the
+# serializer's two-branch dispatch and the Plan-02 flip share one definition.
+SERIALIZER_PRODUCTION_CLASSES = frozenset({"general_acyclic"})
+
+
 def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
     """Phase 160 D-04 + IUPAC P-14.5 Pass-2 serializer.
 
@@ -134,71 +147,193 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
     return _assemble_explicit_fields(node, style)
 
 
-def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
-    """Assemble name from explicit NameTreeNode fields (non-legacy path).
+def _prefix_node_text(sub: NameTreeNode, style: str) -> str:
+    """Return the substituent text for a prefix sub-node.
 
-    Implementation order (per IUPAC P-14.5)::
-
-        stereo + prefixes + indicated_h + parent_stem + locants + suffix
-
-    where:
-      - prefixes are alphabetized via ``_alphabetize_prefixes`` (P-13).
-      - Each prefix subtree is recursively serialized via name_tree_to_string.
-      - Multiplicative prefix (di-/tri-/bis-/tris-) is applied per P-14.2.2.
-      - Parenthesization hint forces parentheses for complex prefixes per
-        P-14.5.1 / P-51.3.5.
-      - Suffix locants override colliding prefix locants per P-14.7.
-
-    Per Plan-02 wave: this path is NOT exercised by first-wave handlers
-    (all return tree=None). Plan-04 --dump-tree CLI tests + v19+
-    tree-populated handlers are the consumers.
+    Production ``general_acyclic`` prefix nodes (built by ``fragments_to_tree``)
+    carry the FULL substituent string in ``parent_stem`` with
+    ``fragment_legacy=None`` — used DIRECTLY here (NOT run through the hydride
+    builder, which would wrongly append 'ane' to a substituent like 'methyl').
+    A ``str`` ``fragment_legacy`` carrier short-circuits (other trees). A nested
+    complex substituent (one carrying its own prefixes/suffix) recurses through
+    the full serializer.
     """
-    # Pass-1: recursively serialize each prefix subtree (alphabetize per
-    # P-13). Subtree serialization handles its own multiplicative-prefix,
-    # parenthesization, and locant prefix.
-    prefix_strs: List[str] = []
-    for sub in _alphabetize_prefixes(node.prefixes):
-        sub_str = name_tree_to_string(sub, style)
-        if sub.parenthesization_hint:
-            sub_str = f"({sub_str})"
-        if sub.multiplicative_prefix:
-            sub_str = f"{sub.multiplicative_prefix}{sub_str}"
-        if sub.locants:
-            sub_str = f"{_format_locant_set(sub.locants)}-{sub_str}"
-        prefix_strs.append(sub_str)
+    if isinstance(sub.fragment_legacy, str):
+        return sub.fragment_legacy
+    if sub.prefixes or sub.suffix:
+        return name_tree_to_string(sub, style)
+    return sub.parent_stem
 
-    # Pass-2: compose the parent fragment with locants + unsaturation infix
-    # + indicated_h.
-    parent_text = node.parent_stem
 
-    # Indicated hydrogen prepend (e.g., "1H-pyrrol-"): per P-25.7.
-    if node.indicated_h:
-        ih_str = ",".join(f"{i}H" for i in node.indicated_h)
-        parent_text = f"{ih_str}-{parent_text}"
+def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
+    """Assemble a name from explicit ``NameTreeNode`` fields, byte-identically to
+    the legacy ``_assemble_fragments`` (CONTEXT D-02 / D-03, Phase 179 WSA-03).
 
-    # Unsaturation infix (double + triple bond locants): per P-31.1.
-    parent_text = _apply_unsaturation_infix(
-        parent_text, node.unsaturation_locants,
+    Mirrors ``handlers/_handler_shared.py:_assemble_fragments`` term-for-term,
+    reusing the SAME shared grammar from ``composition_primitives`` (one
+    composition logic, not two — the no-band-aid mandate). Composition order
+    (IUPAC P-14.5)::
+
+        stereo + prefixes(alphabetized, enclosed, joined) + parent
+               + unsaturation-infix + suffix(with locants/multiplier)
+
+    The 8 verified gaps (179-RESEARCH) are each closed by a CALL to a shared
+    primitive, not a local reimplementation: #1 P-14.7 collision, #2 prefix
+    already-has-locant guard, #3 P-16.5.1.3.1 mononuclear enclosing, #4 inter-
+    prefix hyphenation, #5 full suffix grammar (multiplier + P-16.7.1 elision),
+    #6 unsaturation infix, #7 prefix->parent hyphenation, #8 stereo prepend.
+    """
+    import re
+
+    from .composition_primitives import (
+        _build_unsaturation_infix,
+        _build_hydrocarbon_name,
+        _join_prefixes,
+        _join_prefix_to_name,
+        _estimate_parent_size_from_name,
+        apply_mononuclear_enclosing,
+        resolve_suffix_prefix_collision,
+        is_ring_parent_name,
+        _MONONUCLEAR_STEMS,
+    )
+    from .naming_utils import format_suffix_with_locants, get_multiplier_prefix
+
+    stem = node.parent_stem
+
+    # A node uses the BARE-HYDRIDE-STEM grammar (-ane/-ene/-yne + suffix infix)
+    # only when its class is in SERIALIZER_PRODUCTION_CLASSES (general_acyclic).
+    # Every other node carries a COMPLETE name in parent_stem (retained name,
+    # organometallic, coarse fallback) and must NOT get a hydride ending
+    # appended (otherwise "acetic acid" -> "acetic acidane").
+    hydride_parent = node.class_id in SERIALIZER_PRODUCTION_CLASSES
+
+    # Unsaturation: node.unsaturation_locants = (double_locants, triple_locants).
+    double_locants = (
+        list(node.unsaturation_locants[0])
+        if node.unsaturation_locants and node.unsaturation_locants[0] else []
+    )
+    triple_locants = (
+        list(node.unsaturation_locants[1])
+        if node.unsaturation_locants and len(node.unsaturation_locants) > 1
+        and node.unsaturation_locants[1] else []
     )
 
-    # Parent locant prefix (e.g., "propan-1-"): per P-14.5.
-    if node.locants and not node.suffix:
-        # When there's no suffix, locants attach to the parent stem.
-        parent_text = f"{_format_locant_set(node.locants)}-{parent_text}"
+    # D-09 (DERIVE, no field-add): a mononuclear parent is a single-heavy-atom
+    # hydride stem with no unsaturation (only "meth" reachable in general_acyclic).
+    is_mononuclear = (
+        hydride_parent
+        and stem in _MONONUCLEAR_STEMS
+        and not double_locants
+        and not triple_locants
+    )
 
-    # Suffix locants override colliding prefix locants per IUPAC P-14.7.
-    # (First-wave path: collision logic is deferred to Plan-04+ since
-    # no handler populates explicit trees in Plan-02/03.)
-    suffix_str = _format_suffix(node.suffix, node.locants) if node.suffix else ""
+    # --- prefixes -> (text, locants) pairs (mirror _assemble_fragments:1019-1035) ---
+    prefix_pairs: List[Tuple[str, tuple]] = []
+    for sub in _alphabetize_prefixes(node.prefixes):
+        text = _prefix_node_text(sub, style)
+        if sub.parenthesization_hint:
+            text = f"({text})"
+        if sub.multiplicative_prefix:
+            text = f"{sub.multiplicative_prefix}{text}"
+        prefix_pairs.append((text, tuple(sub.locants)))
 
-    # Assemble: prefixes + parent + suffix.
-    assembled = "".join(prefix_strs) + parent_text + suffix_str
+    # gap #1: P-14.7 suffix<->prefix locant collision (hydride ring parents only;
+    # the general_acyclic-chain path is a no-op early return inside the resolver).
+    if (hydride_parent and node.suffix and node.locants and prefix_pairs
+            and is_ring_parent_name(stem)):
+        prefix_pairs = resolve_suffix_prefix_collision(
+            list(node.locants), prefix_pairs,
+            is_ring=True, parent_size=_estimate_parent_size_from_name(stem),
+        )
 
-    # Stereo prepend (e.g., "(2R)-"): per P-91 / P-14.5.
+    # gap #2: already-has-locant guard before prepending a prefix locant
+    # (a prefix whose text already starts with a digit is left untouched).
+    prefix_texts: List[str] = []
+    for text, locants in prefix_pairs:
+        already_has_locant = bool(re.match(r'^\d', text))
+        if locants and not already_has_locant:
+            loc_str = ",".join(str(l) for l in locants)
+            prefix_texts.append(f"{loc_str}-{text}")
+        else:
+            prefix_texts.append(text)
+
+    # gap #3: P-16.5.1.3.1 mononuclear enclosing marks (+ multiplier carve-out).
+    prefix_texts = apply_mononuclear_enclosing(prefix_texts, is_mononuclear)
+
+    # gap #4: inter-prefix hyphenation.
+    prefix_str = _join_prefixes(prefix_texts)
+
+    # --- parent + suffix ---
+    if hydride_parent:
+        # BARE hydride stem -> full grammar (mirror _assemble_fragments:1092-1131).
+        if node.suffix:
+            suffix_text = node.suffix
+            suffix_locants = list(node.locants) if node.locants else []
+            # gap #5: on a mononuclear parent a single suffix locant ("1") is
+            # meaningless and is omitted (methanol, not methan-1-ol).
+            if is_mononuclear and len(suffix_locants) == 1:
+                suffix_locants = []
+            # Suffix-group multiplicity: a TERMINAL multi-group suffix (dioic
+            # acid, dial, dinitrile) carries no locants, so len() under-counts.
+            # The count is preserved on node.multiplicative_prefix (set by
+            # fragments_to_tree from the suffix fragment's count); otherwise
+            # derive it from the locant count. (NameTreeNode has no `count`
+            # field — D-09 reuse of an existing field, no schema add.)
+            if node.multiplicative_prefix:
+                multiplier = node.multiplicative_prefix
+            else:
+                count = len(suffix_locants)
+                multiplier = get_multiplier_prefix(count, suffix_text) if count > 1 else ""
+            # gap #6: unsaturation infix (en/yn + euphonic-a) feeds the grammar.
+            unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
+            # gap #5: full suffix grammar (multiplier + P-16.7.1 vowel elision).
+            name = format_suffix_with_locants(
+                stem, unsaturation_infix, suffix_text, suffix_locants, multiplier,
+            )
+        else:
+            # gap #6: hydrocarbon branch + WSD-06 ring-bond-locant omission
+            # (a SUBSTITUTED cycloalkene keeps its ene-locant; unsubstituted omits).
+            _ring_bond_omittable = (not prefix_str) if stem.startswith("cyclo") else None
+            name = _build_hydrocarbon_name(
+                stem, double_locants, triple_locants,
+                ring_bond_locant_omittable=_ring_bond_omittable,
+            )
+    else:
+        # COMPLETE name (retained / organometallic / coarse): parent_stem is
+        # already a finished hydride/parent word — pass it through verbatim, NO
+        # -ane/-ene/-yne ending. A preserved Type-1 principal-group suffix (e.g.
+        # naphthalen-2-ol) is attached with locants but no unsaturation infix
+        # (the retained stem subsumes its unsaturation).
+        if node.suffix:
+            suffix_locants = list(node.locants) if node.locants else []
+            if node.multiplicative_prefix:
+                multiplier = node.multiplicative_prefix
+            else:
+                count = len(suffix_locants)
+                multiplier = get_multiplier_prefix(count, node.suffix) if count > 1 else ""
+            name = format_suffix_with_locants(
+                stem, "", node.suffix, suffix_locants, multiplier,
+            )
+        else:
+            name = stem
+
+    # Indicated hydrogen (serializer-only; the legacy fragment assembler has no
+    # such field). Empty for general_acyclic and reset retained names; prepended
+    # otherwise per P-25.7.
+    if node.indicated_h:
+        ih_str = ",".join(f"{i}H" for i in node.indicated_h)
+        name = f"{ih_str}-{name}"
+
+    # gap #7: prefix -> parent hyphenation (hyphen between a letter/) and a digit).
+    if prefix_str:
+        name = _join_prefix_to_name(prefix_str, name)
+
+    # gap #8: stereo prepend with NO extra hyphen — the descriptor already
+    # carries its own trailing hyphen (e.g. "(2S)-").
     if node.stereo:
-        assembled = f"{node.stereo}-{assembled}"
+        name = f"{node.stereo}{name}"
 
-    return assembled
+    return name
 
 
 def _format_locant_set(locants: Tuple[int, ...]) -> str:
@@ -216,114 +351,14 @@ def _format_locant_set(locants: Tuple[int, ...]) -> str:
     return ",".join(str(l) for l in sorted(locants))
 
 
-def _apply_unsaturation_infix(
-    parent_text: str,
-    unsaturation_locants: Tuple[Tuple[int, ...], Tuple[int, ...]],
-) -> str:
-    """Apply double-/triple-bond infix to the parent stem per P-31.1.
-
-    The unsaturation tuple is ``(double_bond_locants, triple_bond_locants)``;
-    each is a sorted tuple of int locants. The infix transforms the parent
-    stem suffix:
-
-    - ``methan`` + ((), ()) -> ``methan``           (no unsaturation)
-    - ``propan`` + ((1,), ()) -> ``prop-1-en``      (one double bond)
-    - ``propan`` + ((1, 2), ()) -> ``propa-1,2-dien`` (cumulated double bonds)
-    - ``propan`` + ((), (1,)) -> ``prop-1-yn``      (one triple bond)
-    - ``propan`` + ((1,), (3,)) -> ``prop-1-en-3-yn`` (enyne)
-
-    Plan-02 wave: NOT exercised by first-wave handlers. Plan-04 +
-    v19 handlers exercise this branch via explicit-tree tests.
-
-    Note: For the first-wave/Plan-02 ship the unsaturation infix logic is
-    minimal — the composer.py:7706-7712 + _build_unsaturation_infix at
-    composer.py:7725 has more sophisticated stem-rewrite rules
-    (an / en / yn / adien / atrien etc.) which Plan-04+ formalizes here.
-    """
-    double_locants, triple_locants = unsaturation_locants
-
-    if not double_locants and not triple_locants:
-        return parent_text
-
-    # Minimal substitution: replace trailing 'an' with 'en' / 'yn' / etc.
-    # Plan-04+ formalizes the full P-31.1 grammar; first-wave handlers
-    # do NOT exercise this branch (all return tree=None).
-    if parent_text.endswith("an"):
-        stem = parent_text[:-2]
-    else:
-        stem = parent_text
-
-    # Build the unsaturation suffix.
-    infix_parts: List[str] = []
-    if double_locants:
-        double_count = len(double_locants)
-        multiplier = _unsaturation_multiplier(double_count, "en")
-        loc_str = _format_locant_set(double_locants)
-        infix_parts.append(f"{loc_str}-{multiplier}" if loc_str else multiplier)
-    if triple_locants:
-        triple_count = len(triple_locants)
-        multiplier = _unsaturation_multiplier(triple_count, "yn")
-        loc_str = _format_locant_set(triple_locants)
-        infix_parts.append(f"{loc_str}-{multiplier}" if loc_str else multiplier)
-
-    # When there are NO double bonds but triple bonds present, the parent
-    # keeps the 'a' (e.g., propan -> propa-1-yn would be wrong; it's prop-1-yn).
-    # When BOTH present, the stem keeps 'a' before en (e.g., propa-1-en-3-yn).
-    if double_locants and triple_locants:
-        return f"{stem}a-" + "-".join(infix_parts)
-    if double_locants:
-        # When n>1, the stem retains 'a' (propa-1,2-dien).
-        if len(double_locants) > 1:
-            return f"{stem}a-" + "-".join(infix_parts)
-        return f"{stem}-" + "-".join(infix_parts)
-    # triple only:
-    return f"{stem}-" + "-".join(infix_parts)
-
-
-def _unsaturation_multiplier(count: int, base: str) -> str:
-    """Build the unsaturation multiplier for ``base`` ('en' or 'yn').
-
-    Example::
-
-        >>> _unsaturation_multiplier(1, "en")
-        'en'
-        >>> _unsaturation_multiplier(2, "en")
-        'dien'
-        >>> _unsaturation_multiplier(3, "en")
-        'trien'
-    """
-    if count <= 1:
-        return base
-    if count == 2:
-        return f"di{base}"
-    if count == 3:
-        return f"tri{base}"
-    if count == 4:
-        return f"tetra{base}"
-    if count == 5:
-        return f"penta{base}"
-    return f"{count}{base}"
-
-
-def _format_suffix(suffix: str, locants: Tuple[int, ...]) -> str:
-    """Format the suffix with locants per P-14.5.
-
-    Plan-02 wave: NOT exercised by first-wave handlers (all return
-    tree=None). Plan-04 + v19 handlers exercise this branch via
-    explicit-tree tests.
-
-    For the first-wave/Plan-02 ship this is intentionally simple. The
-    composer.py:7714-7733 ``format_suffix_with_locants`` helper has more
-    nuanced rules (omit locant '1' for single-locant cases per
-    should_omit_locant_one; multiplicative prefix on suffix; etc.) which
-    are layered in by Plan-04+.
-    """
-    if not suffix:
-        return ""
-    if not locants:
-        return suffix
-    loc_str = _format_locant_set(locants)
-    return f"-{loc_str}-{suffix.lstrip('-')}"
+# Phase 179 (WSA-03): the placeholder ``_apply_unsaturation_infix``,
+# ``_unsaturation_multiplier``, and ``_format_suffix`` stubs were DELETED.
+# Their (divergent, never-production-exercised) logic is superseded by the
+# shared ``composition_primitives`` grammar (``_build_unsaturation_infix`` /
+# ``_build_hydrocarbon_name`` / ``format_suffix_with_locants``) that
+# ``_assemble_explicit_fields`` now calls — one composition logic, byte-
+# identical to the legacy assembler (CONTEXT D-02 / D-03, fix-methodology.md:
+# no second grammar, no postprocessor).
 
 
 __all__ = [

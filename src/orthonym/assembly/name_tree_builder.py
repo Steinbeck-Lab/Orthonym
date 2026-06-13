@@ -101,12 +101,39 @@ def fragments_to_tree(
         tuple(
             NameTreeNode(
                 parent_stem=p.text,
-                locants=_normalize_locants(p.locants),
+                # Phase 179 (WSA-03): preserve prefix locants VERBATIM (order +
+                # repeats), matching the legacy ``",".join(f.locants)`` at
+                # _handler_shared.py:1032. ``_normalize_locants`` (sorted+set-
+                # deduped) silently dropped the repeated locants a polysubstituted
+                # substituent needs — e.g. ``1,1,1,2,2,...-tridecafluoro`` collapsed
+                # to ``1,2,...``. Upstream already emits them ascending, so the
+                # well-formed single-occurrence cases are unchanged (byte-identical).
+                locants=tuple(p.locants),
                 multiplicative_prefix=(None if p.count <= 1 else get_multiplier(p.count)),
             )
             for p in prefix_frags
         )
     )
+
+    # Phase 179 (WSA-03): preserve the suffix-group multiplicity so the
+    # name-tree serializer (_assemble_explicit_fields) can reproduce a TERMINAL
+    # multi-group suffix (dioic acid / dial / dinitrile) whose locants are
+    # omitted. The legacy assembler computes the multiplier from
+    # ``max(len(suffix_locants), suffix_frag.count)`` at assembly time; that
+    # count is otherwise lost when the locked 12-field schema (AP-160-27) drops
+    # it. It is carried on the root's otherwise-unused ``multiplicative_prefix``
+    # — a coherent semantic (the multiplier of THIS node's head term, here the
+    # principal characteristic group). Empty/1-count suffixes carry None
+    # (byte-identical to today). Does NOT affect ``fragment_legacy`` (the
+    # carrier) nor the per-substring scorer (which reads parent/locant only).
+    suffix_multiplier: Optional[str] = None
+    if suffix_frag is not None:
+        _suffix_count = max(
+            len(suffix_frag.locants or ()), getattr(suffix_frag, "count", 1)
+        )
+        if _suffix_count > 1:
+            from .naming_utils import get_multiplier_prefix
+            suffix_multiplier = get_multiplier_prefix(_suffix_count, suffix_frag.text)
 
     return NameTreeNode(
         parent_stem=parent_frag.text if parent_frag else "",
@@ -117,6 +144,7 @@ def fragments_to_tree(
         unsaturation_locants=unsat,
         class_id=class_id,
         iupac_section_cite=section_cite,
+        multiplicative_prefix=suffix_multiplier,
         # D-02 byte-identical carrier (verbatim via name_tree_to_string str path).
         fragment_legacy=_synthesize_root_fragment(
             fragments, is_mononuclear_parent=is_mononuclear_parent

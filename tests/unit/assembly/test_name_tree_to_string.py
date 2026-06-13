@@ -41,10 +41,12 @@ class TestSerializerContract:
     """160-AUDIT-DECOMP.md § 5.4: top-level dispatch between legacy + explicit."""
 
     def test_explicit_field_simple_parent_only(self):
-        """Minimal explicit-field call: parent_stem only."""
-        n = NameTreeNode(parent_stem="ethan")
+        """Minimal explicit-field call: a bare hydride stem -> the saturated
+        hydrocarbon (Phase 179: a general_acyclic root carries the BARE stem,
+        e.g. 'eth', and assembles to stem+'ane' via the shared grammar)."""
+        n = NameTreeNode(parent_stem="eth", class_id="general_acyclic")
         out = name_tree_to_string(n)
-        assert out == "ethan"
+        assert out == "ethane"
 
     def test_explicit_field_parent_plus_suffix(self):
         """Parent + suffix: 'ethan' + '-ol' -> '...ethanol' (suffix appended)."""
@@ -54,13 +56,15 @@ class TestSerializerContract:
         assert "ethan" in out
         assert "ol" in out
 
-    def test_explicit_field_parent_with_locants_no_suffix(self):
-        """Parent + locants: prepended as locant set per P-14.5."""
-        n = NameTreeNode(parent_stem="prop", locants=(1, 2))
+    def test_explicit_field_parent_with_unsaturation(self):
+        """Parent + unsaturation bond locant (Phase 179: on a chain, bond
+        locants live in `unsaturation_locants`, NOT the generic `locants`
+        field, which carries SUFFIX locants — byte-identical to the legacy
+        assembler). prop + ((1,),()) -> prop-1-ene."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         unsaturation_locants=((1,), ()))
         out = name_tree_to_string(n)
-        # Output should contain "1,2" locants and "prop" stem.
-        assert "1,2" in out
-        assert "prop" in out
+        assert out == "prop-1-ene"
 
     def test_legacy_path_falls_through_to_assemble_fragments(self):
         """node.fragment_legacy is None + parent_stem present -> explicit branch."""
@@ -94,10 +98,13 @@ class TestExplicitFieldAssembly:
     """160-AUDIT-DECOMP.md § 5.4 + IUPAC P-14.5: explicit-field branch."""
 
     def test_stereo_prepended(self):
-        """stereo is prepended before everything."""
-        n = NameTreeNode(parent_stem="ethan", stereo="(2R)")
+        """stereo is prepended before everything, with NO extra hyphen — the
+        descriptor carries its own trailing hyphen (Phase 179 gap #8;
+        production stereo is e.g. '(2R)-')."""
+        n = NameTreeNode(parent_stem="eth", stereo="(2R)-")
         out = name_tree_to_string(n)
         assert out.startswith("(2R)-")
+        assert "(2R)--" not in out
 
     def test_indicated_h_prepended_to_parent(self):
         """indicated_h is prepended to parent_stem per P-25.7."""
@@ -152,16 +159,21 @@ class TestExplicitFieldAssembly:
         assert "(methylethyl)" in out
 
     def test_locants_formatted_comma_separated(self):
-        """Locants printed as comma-separated ascending integers."""
-        n = NameTreeNode(parent_stem="prop", locants=(1, 2))
+        """Suffix locants print as comma-separated ascending integers (Phase
+        179: locants render through the suffix grammar). prop + 'ol' (1,2)
+        -> propane-1,2-diol."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         suffix="ol", locants=(1, 2))
         out = name_tree_to_string(n)
-        assert "1,2" in out
+        assert out == "propane-1,2-diol"
 
     def test_locants_single_value(self):
-        """Single locant prints as a bare integer."""
-        n = NameTreeNode(parent_stem="prop", locants=(1,))
+        """Single suffix locant prints as a bare integer. prop + 'ol' (1,)
+        -> propan-1-ol."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         suffix="ol", locants=(1,))
         out = name_tree_to_string(n)
-        assert "1" in out
+        assert out == "propan-1-ol"
 
     def test_suffix_attached_after_parent(self):
         """Suffix is attached after the parent stem."""
@@ -183,48 +195,51 @@ class TestExplicitFieldAssembly:
 
 
 class TestUnsaturationInfix:
-    """IUPAC P-31.1 unsaturation infix per name_tree_to_string._apply_unsaturation_infix."""
+    """IUPAC P-31.1 unsaturation infix on a general_acyclic hydride parent
+    (Phase 179: bare stem + unsaturation_locants -> full -ene/-yne grammar via
+    the shared composition_primitives._build_hydrocarbon_name)."""
 
     def test_no_unsaturation_passthrough(self):
-        """((), ()) -> parent_stem unchanged."""
-        n = NameTreeNode(parent_stem="ethan", unsaturation_locants=((), ()))
+        """eth + ((), ()) -> ethane (saturated)."""
+        n = NameTreeNode(parent_stem="eth", class_id="general_acyclic",
+                         unsaturation_locants=((), ()))
         out = name_tree_to_string(n)
-        assert "ethan" in out
-        # No '-en-' or '-yn-' infix.
-        assert "-en-" not in out
-        assert "-yn-" not in out
+        assert out == "ethane"
 
     def test_single_double_bond(self):
-        """propan + ((1,), ()) -> prop-1-en (or similar)."""
-        n = NameTreeNode(parent_stem="propan", unsaturation_locants=((1,), ()))
+        """prop + ((1,), ()) -> prop-1-ene."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         unsaturation_locants=((1,), ()))
         out = name_tree_to_string(n)
-        # The minimal serializer in name_tree_to_string.py rewrites 'an' -> 'en'.
-        # Output should contain "en" suffix to parent.
-        assert "en" in out
+        assert out == "prop-1-ene"
 
     def test_single_triple_bond(self):
-        """propan + ((), (1,)) -> prop-1-yn."""
-        n = NameTreeNode(parent_stem="propan", unsaturation_locants=((), (1,)))
+        """prop + ((), (1,)) -> prop-1-yne."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         unsaturation_locants=((), (1,)))
         out = name_tree_to_string(n)
-        assert "yn" in out
+        assert out == "prop-1-yne"
 
     def test_two_double_bonds_dien(self):
-        """propan + ((1, 2), ()) -> propa-1,2-dien."""
-        n = NameTreeNode(parent_stem="propan", unsaturation_locants=((1, 2), ()))
+        """prop + ((1, 2), ()) -> propa-1,2-diene."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         unsaturation_locants=((1, 2), ()))
         out = name_tree_to_string(n)
-        assert "dien" in out
+        assert out == "propa-1,2-diene"
 
     def test_enyne_combination(self):
-        """propan + ((1,), (3,)) -> prop-1-en-3-yn (enyne)."""
-        n = NameTreeNode(parent_stem="propan", unsaturation_locants=((1,), (3,)))
+        """prop + ((1,), (3,)) -> prop-1-en-3-yne (enyne)."""
+        n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
+                         unsaturation_locants=((1,), (3,)))
         out = name_tree_to_string(n)
-        assert "en" in out and "yn" in out
+        assert out == "prop-1-en-3-yne"
 
     def test_three_double_bonds_trien(self):
-        """parent + ((1, 3, 5), ()) -> ...trien suffix."""
-        n = NameTreeNode(parent_stem="hexan", unsaturation_locants=((1, 3, 5), ()))
+        """hex + ((1, 3, 5), ()) -> hexa-1,3,5-triene."""
+        n = NameTreeNode(parent_stem="hex", class_id="general_acyclic",
+                         unsaturation_locants=((1, 3, 5), ()))
         out = name_tree_to_string(n)
-        assert "trien" in out
+        assert out == "hexa-1,3,5-triene"
 
 
 # ---------------------------------------------------------------------------
@@ -273,8 +288,9 @@ class TestNormalizeAndAlphaIntegration:
     """Serializer respects the contract that locants are pre-normalized."""
 
     def test_locants_already_sorted(self):
-        """If locants are sorted (caller-side _normalize_locants), output uses them as-is."""
-        n = NameTreeNode(parent_stem="prop", locants=(1, 2, 3))
+        """If suffix locants are sorted (caller-side _normalize_locants), the
+        output uses them as-is. prop + 'ol' (1,2,3) -> propane-1,2,3-triol."""
+        n = NameTreeNode(parent_stem="prop", suffix="ol", locants=(1, 2, 3))
         out = name_tree_to_string(n)
         assert "1,2,3" in out
 
