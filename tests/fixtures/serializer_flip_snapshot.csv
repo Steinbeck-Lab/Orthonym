@@ -1,0 +1,19 @@
+smiles,production_name,class_id
+CCCCO,butan-1-ol,general_acyclic
+CC(C)CC,2-methylbutane,general_acyclic
+CCCCC=O,pentanal,general_acyclic
+CC(=O)CCC,pentan-2-one,general_acyclic
+ClCCCCC,1-chloropentane,general_acyclic
+C(Br)(Cl)F,bromo(chloro)(fluoro)methane,general_acyclic
+C(Br)(Cl)(Cl)F,bromodichlorofluoromethane,general_acyclic
+CCC#CCC,hex-3-yne,general_acyclic
+C1CCCCCCCCC1,cyclodecane,general_acyclic
+C[C@H](O)CC,(2S)-butan-2-ol,general_acyclic
+C=CCCO,but-3-en-1-ol,general_acyclic
+CC(C)(C)O,2-methylpropan-2-ol,general_acyclic
+OC(=O)CCCCC(=O)O,hexanedioic acid,general_acyclic
+O=CCCC=O,butanedial,general_acyclic
+N#CCCCC#N,pentanedinitrile,general_acyclic
+NCCCCCCN,"hexane-1,6-diamine",general_acyclic
+c1ccc2ccccc2c1,naphthalene,coarse_fallback
+CCOC(C)=O,ethyl acetate,coarse_fallback
