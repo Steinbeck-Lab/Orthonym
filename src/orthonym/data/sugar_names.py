@@ -1075,6 +1075,40 @@ def _idealize_to_parent(mol):
     return m2
 
 
+def _mono_name_rt_ok(mol, name: str) -> bool:
+    """Return True iff the systematic-mono ``name`` OPSIN-round-trips to ``mol``.
+
+    Defense-in-depth RT backstop (WR-01) mirroring
+    ``rules.oligosaccharides._sugar_name_rt_ok`` and
+    ``rules.natural_products._alpha_beta_rt_ok``: the disaccharide path gates
+    every assembled name on an OPSIN round-trip, but the mono path shipped its
+    name ungated — which is precisely why a wrong systematic name (a slipped
+    modification class, a non-PIN ``2,6-deoxy`` rendering) could ship instead of
+    cascade-continuing.
+
+    Fail-OPEN: when OPSIN/Java is unavailable the round-trip cannot be checked,
+    so the name is shipped (the SUB-03 validity-gate posture; CI without Java is
+    unaffected).  When OPSIN IS available, a name that does not round-trip to the
+    input structure is rejected (-> ``None`` -> existing pipeline), guaranteeing
+    no wrong name ships even if a future modification class slips the classifier.
+
+    The import is lazy (and ``data`` -> ``validation`` is acyclic), so module
+    import stays cheap and free of cycles.
+    """
+    try:
+        from ..validation.opsin_roundtrip import (
+            opsin_roundtrip_check, _find_opsin_jar, _java_available,
+        )
+        if _find_opsin_jar() is None or not _java_available():
+            return True  # fail-OPEN
+        smi = Chem.MolToSmiles(mol)
+        return bool(opsin_roundtrip_check(smi, name).get("passed"))
+    except (OSError, ValueError, RuntimeError):
+        # Expected operational failures (subprocess / sanitize / indexing) ->
+        # fail-OPEN so a genuinely-absent or flaky OPSIN never suppresses a name.
+        return True
+
+
 def name_monosaccharide_systematic(mol) -> Optional[str]:
     """Systematic P-102.5 name for a non-cataloged deoxy/amino/uronic sugar ring.
 
@@ -1186,7 +1220,8 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     if ring_form not in base:
         return None
 
-    # (4) Assemble (D-04).
+    # (4) Assemble (D-04) -> a single `candidate`, gated by the RT backstop
+    # (WR-01) at the function tail so no wrong name ships.
     if uronic_locants:
         # A uronic sugar is named purely by the -uronic acid suffix; it must not
         # co-occur with deoxy/amino in this engine's scope (fail-closed if it does).
@@ -1195,27 +1230,38 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         uronic_base = _URONIC_STEM_MAP.get(base)
         if uronic_base is None:
             return None  # out-of-map skeleton has no verified uronic name (D-11)
-        return uronic_free_acid_name(anomer, config, uronic_base)
+        candidate = uronic_free_acid_name(anomer, config, uronic_base)
+    else:
+        # DEOXY / AMINO: build alphabetized detachable prefixes WITH structural
+        # locants (never string surgery on the derived base).  P-102.5.4 cites an
+        # amino sugar as ``x-amino-x-deoxy`` (the N replaces a C-OH, so each amino
+        # locant is also a deoxy locant).
+        prefix_terms = []  # (alpha-sort-key, rendered-term)
+        all_deoxy = sorted(set(deoxy_locants) | set(amino_locants))
+        if amino_locants:
+            prefix_terms.append(
+                ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
+            )
+        if all_deoxy:
+            prefix_terms.append(
+                ("deoxy", f"{','.join(str(x) for x in all_deoxy)}-deoxy")
+            )
+        # Alphabetize the detachable prefixes (amino < deoxy).
+        prefix_terms.sort(key=lambda t: t[0])
+        prefix_str = "-".join(term for _, term in prefix_terms)
 
-    # DEOXY / AMINO: build alphabetized detachable prefixes WITH structural
-    # locants (never string surgery on the derived base).  P-102.5.4 cites an
-    # amino sugar as ``x-amino-x-deoxy`` (the N replaces a C-OH, so each amino
-    # locant is also a deoxy locant).
-    prefix_terms = []  # (alpha-sort-key, rendered-term)
-    all_deoxy = sorted(set(deoxy_locants) | set(amino_locants))
-    if amino_locants:
-        prefix_terms.append(
-            ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
-        )
-    if all_deoxy:
-        prefix_terms.append(
-            ("deoxy", f"{','.join(str(x) for x in all_deoxy)}-deoxy")
-        )
-    # Alphabetize the detachable prefixes (amino < deoxy).
-    prefix_terms.sort(key=lambda t: t[0])
-    prefix_str = "-".join(term for _, term in prefix_terms)
+        descriptor = f"{anomer}-{config}-" if anomer and config else ""
+        if prefix_str:
+            candidate = f"{prefix_str}-{descriptor}{base}"
+        else:
+            candidate = f"{descriptor}{base}"
 
-    descriptor = f"{anomer}-{config}-" if anomer and config else ""
-    if prefix_str:
-        return f"{prefix_str}-{descriptor}{base}"
-    return f"{descriptor}{base}"
+    # RT backstop (WR-01, defense-in-depth): before shipping the systematic name,
+    # verify it OPSIN-round-trips to the input structure (fail-OPEN when Java/JAR
+    # absent).  This makes the whole engine fail-closed by construction even if a
+    # future modification class slips the structural classifier.
+    if candidate is None:
+        return None
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
