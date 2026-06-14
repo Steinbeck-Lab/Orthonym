@@ -182,8 +182,21 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
                 # Diazonium: R-N+=N or R-N=N+
                 return 'diazonium'
 
+        # Phase 184 WS-E.1 (P-73.1.2.1): a QUATERNARY ammonium N (formal charge
+        # +1, NO hydrogens to remove, degree >= 4) cannot be neutralized by the
+        # proton-removal path the protonated-amine cascade uses — removing a
+        # non-existent H leaves an over-valent neutral N and SanitizeMol raises
+        # (RESEARCH Pitfall 2). It is named systematically by DEMOTING N -> a
+        # carbon-context amine parent and appending '-ium' to the '-amine' suffix
+        # (name_quaternary_aminium), so it needs a discriminator distinct from the
+        # protonated-amine 'aminium' value.
+        if (atom.GetFormalCharge() == 1
+                and atom.GetTotalNumHs() == 0
+                and atom.GetDegree() >= 4):
+            return 'quaternary'
+
         # Protonated nitrogen -> aminium
-        # Includes primary (NH3+), secondary (NH2+), tertiary (NH+), quaternary (N+)
+        # Includes primary (NH3+), secondary (NH2+), tertiary (NH+)
         return 'aminium'
 
     elif element == 'C':
@@ -736,6 +749,12 @@ def _validate_cation_name(mol, result: str) -> str:
     if 'aminium' in result:
         from rdkit.Chem import MolFromSmarts
         # Match protonated or neutral amines: NH3+, NH2+R, NH+R2, N+R3, NH2, NHR, NR2
+        # Phase 184 WS-E.1 D-10: the H0 term of [NX4;H1,H2,H3,H0] ALREADY matches a
+        # QUATERNARY [NX4;H0] N+, so a systematic quaternary '-aminium' PIN (e.g.
+        # 'N,N,N-trimethylmethanaminium' from name_quaternary_aminium) is accepted
+        # here unchanged. This comment is defense-in-depth: a future tightening of
+        # this SMARTS MUST keep the H0 term or it will silently suppress the
+        # quaternary aminium suffix.
         amine_pattern = MolFromSmarts('[NX4;H1,H2,H3,H0]')
         has_protonated_amine = mol.HasSubstructMatch(amine_pattern) if amine_pattern else False
         neutral_amine = MolFromSmarts('[NX3;H1,H2,H3]')
@@ -1798,6 +1817,99 @@ def _name_aminium_systematic(mol, cation_site: Dict) -> str:
     # through to the legacy cascade (v18 byte-identical no-crash contract) —
     # NOT a carbon-counted aminium misname.
     return ''
+
+
+def name_quaternary_aminium(mol, cation_site: Dict) -> str:
+    """Systematic ``-aminium`` PIN for a STANDALONE quaternary ammonium cation.
+
+    Phase 184 WS-E.1 (P-73.1.2.1 method (1) + Table 7.4; BlueBookV2:41354,
+    41429-41438): a quaternary N (formal charge +1, 0 H, degree >= 4) is named by
+    treating the SENIOR carbon chain through N as the amine parent (``-amine``
+    suffix), the other three N-branches as ``N,N,N-``/``N,N-``/``N-`` substituent
+    prefixes, then appending ``-ium`` (``methanamine`` -> ``methanaminium``):
+
+      C[N+](C)(C)C   -> 'N,N,N-trimethylmethanaminium'
+      OCC[N+](C)(C)C -> '2-hydroxy-N,N,N-trimethylethan-1-aminium'
+      CC[N+](C)(C)CC -> 'N-ethyl-N,N-dimethylethanaminium'
+
+    Mechanism (D-05): the quaternary N CANNOT be neutralized — removing a
+    (non-existent) proton leaves an over-valent neutral N and SanitizeMol raises
+    (RESEARCH Pitfall 2). Instead the N is DEMOTED to a neutral carbon-context
+    amine parent: a ``tertiary_amine`` functional-group match is injected on the
+    ORIGINAL (still-charged) mol and forced as the principal group, so
+    ``find_principal_chain`` selects the senior chain THROUGH N as the parent and
+    the remaining N-branches become N-locant prefixes (NOT ``select_parent``, NOT
+    the ``azaniumyl`` prefix). The well-formed neutral amine name is then converted
+    to ``-aminium`` via ``name_aminium_cation`` (the existing amine->aminium text
+    transform). NO postprocessor, NO regex band-aid, NO per-molecule .replace.
+
+    Returns '' (fail-closed) when the cation is NOT a quaternary N or any step
+    fails, so callers fall through to the proven aminium / legacy cascade
+    (the v18 no-crash byte-identical contract).
+    """
+    if mol is None:
+        return ''
+    try:
+        atom = mol.GetAtomWithIdx(cation_site['atom_idx'])
+    except (RuntimeError, IndexError, KeyError, OverflowError):
+        return ''
+    # Guard: only a genuine quaternary N (degree-4, 0-H, +1) — otherwise return ''
+    # so the caller uses the proven protonated-amine path.
+    if not (atom.GetSymbol() == 'N'
+            and atom.GetFormalCharge() == 1
+            and atom.GetTotalNumHs() == 0
+            and atom.GetDegree() >= 4):
+        return ''
+    n_idx = cation_site['atom_idx']
+    carbon_neighbors = [nb.GetIdx() for nb in atom.GetNeighbors()
+                        if nb.GetSymbol() == 'C']
+    # A quaternary AMMONIUM PIN needs >= one carbon branch to form an amine parent
+    # (a heteroatom-only quaternary N is out of scope for this emitter).
+    if not carbon_neighbors:
+        return ''
+
+    try:
+        from ..namer import Orthonym
+        from ..assembly.composer import _assemble_amine_name
+
+        # Build features on the ORIGINAL (charged) mol so the N-substituent
+        # enumeration sees all branches; inject a tertiary_amine FG so the amine N
+        # becomes the principal group and find_principal_chain orients the parent
+        # chain with the N-bearing carbon as C1 (any senior neutral group such as
+        # an -OH is demoted to a detachable prefix per P-73.1.2.1).
+        namer = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True,
+            _principal_group_override='tertiary_amine',
+        )
+        canonical = Chem.MolToSmiles(mol, canonical=True)
+        features = namer._perceive(mol, canonical, canonical)
+        features.functional_groups = dict(features.functional_groups)
+        features.functional_groups['tertiary_amine'] = [
+            tuple([n_idx] + carbon_neighbors)
+        ]
+        # Drop the cationic 'ammonium' FG so the override resolves cleanly to the
+        # injected amine.
+        features.functional_groups.pop('ammonium', None)
+        namer._classify(features)
+
+        # Re-point the principal-group N-substituent set to EXCLUDE the carbon that
+        # find_principal_chain chose as the parent chain anchor, so the N-prefix
+        # multiplier counts exactly the off-chain branches (P-73.1.2.1 N-locants).
+        chain_set = set(features.principal_chain or [])
+        nsub_carbons = [c for c in carbon_neighbors if c not in chain_set]
+        features.principal_group_atoms = [tuple([n_idx] + nsub_carbons)]
+
+        amine_name = _assemble_amine_name(features, 'pin')
+        if not amine_name:
+            return ''
+        # amine -> aminium (P-73.1.2.1): methanamine -> methanaminium,
+        # ethan-1-amine -> ethan-1-aminium.
+        aminium = name_aminium_cation(amine_name)
+        if not aminium or 'aminium' not in aminium:
+            return ''
+        return aminium
+    except (RecursionError, ValueError, RuntimeError, KeyError, AttributeError):
+        return ''
 
 
 # 169.6-03 (CHOKE-01, kill-list §2.1): the three carbon-counting CATION naming

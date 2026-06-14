@@ -4017,7 +4017,15 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     n_prefix = "-".join(n_prefix_parts)
 
     # Get base amine name from the general assembly
-    # Build name using standard fragments
+    # Build name using standard fragments. Phase 184 WS-E.1: the parent + suffix
+    # (+ stereo) form the BASE; the C-substituent (hydroxy/chloro/...) prefixes are
+    # rendered SEPARATELY and merged with the N-substituent prefix block below so
+    # the detachable prefixes alphabetize together (P-14.5.2). The previous
+    # `f"{n_prefix}{base_name}"` blindly PREPENDED the N-prefix to a base_name that
+    # already carried the C-prefixes, producing malformed concatenations like
+    # `N,N-dimethyl2-chloroethan-1-amine` (no hyphen, wrong order). Mirror the amide
+    # handler (composer.py:3700-3726), which alphabetizes the C-prefixes and joins
+    # them before the N-locant block with a hyphen separator.
     fragments = []
     if features.principal_chain:
         parent = _generate_chain_parent(features)
@@ -4033,23 +4041,37 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         if suffix:
             fragments.append(suffix)
 
-    # Generate non-N prefixes (halogens, hydroxy, etc.)
-    other_prefixes = _generate_prefixes(features)
-    fragments.extend(other_prefixes)
-
-    # Generate stereodescriptors
+    # Generate stereodescriptors (part of the BASE, not a detachable prefix)
     if features.stereocenters or getattr(features, 'double_bond_stereo', None):
         stereo = _generate_stereodescriptors(features)
         if stereo:
             fragments.append(stereo)
 
     base_name = _assemble_fragments(fragments, style)
+    if not base_name:
+        return None
 
-    # Prepend N-prefix
-    if base_name:
-        return f"{n_prefix}{base_name}"
+    # Generate non-N (C-substituent) prefixes (halogens, hydroxy, etc.) as their
+    # own alphabetized block, mirroring the amide handler's prefix rendering.
+    other_prefixes = _generate_prefixes(features)
+    c_prefix_parts = []
+    for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
+        # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): _generate_prefixes is inconsistent —
+        # alkyl prefixes embed the locant in .text ('3-methyl') while FG prefixes
+        # keep it separate ('hydroxy', locants=(2,)). Prepend .locants only when the
+        # text lacks a leading digit (same shape as amide handler composer.py:3713).
+        if p.locants and not str(p.text)[:1].isdigit():
+            _loc = ",".join(str(_l) for _l in p.locants)
+            c_prefix_parts.append(f"{_loc}-{p.text}")
+        else:
+            c_prefix_parts.append(p.text)
 
-    return None
+    # Merge: C-substituent prefixes (alphabetized) + N-locant prefix block + base.
+    # Insert a hyphen before the N-locant block (it starts with 'N'/'N,N-').
+    if c_prefix_parts:
+        c_prefix_str = "-".join(c_prefix_parts)
+        return f"{c_prefix_str}-{n_prefix}{base_name}"
+    return f"{n_prefix}{base_name}"
 
 
 def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
