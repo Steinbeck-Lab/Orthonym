@@ -321,16 +321,24 @@ def name_natural_product(mol) -> Optional[str]:
             )
             if unsaturation["ene"] or unsaturation["yne"]:
                 stereo_prefix, ring_ab = _collect_np_stereo(mol, numbering, scaffold_info)
-                return _assemble_np_name(
-                    scaffold_info["scaffold_stem"],
-                    scaffold_info["scaffold_name"],
-                    hydroxyls=[],
-                    ketones=[],
-                    unsaturation=unsaturation,
-                    stereo_prefix=stereo_prefix,
-                    modification_prefix=modification_prefix,
-                    ring_ab=ring_ab,
-                )
+
+                def _assemble_unsat(sp, rab):
+                    return _assemble_np_name(
+                        scaffold_info["scaffold_stem"],
+                        scaffold_info["scaffold_name"],
+                        hydroxyls=[],
+                        ketones=[],
+                        unsaturation=unsaturation,
+                        stereo_prefix=sp,
+                        modification_prefix=modification_prefix,
+                        ring_ab=rab,
+                    )
+
+                name_ab = _assemble_unsat(stereo_prefix, ring_ab)
+                # Phase 181 D-08: ship α/β only if it OPSIN-round-trips, else whole-graph R/S.
+                if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
+                    return _assemble_unsat(_whole_graph_rs_prefix(mol, numbering), {})
+                return name_ab
         # Coverage gate: reject bare scaffold if it covers too little
         total_heavy = mol.GetNumHeavyAtoms()
         if total_heavy > 10:
@@ -473,14 +481,6 @@ def name_natural_product_with_substituents(
     n_alkyls = _find_n_alkyl(mol, matched_set, numbering,
                              exclude_atoms=all_exclude)
 
-    # 4. If esters found, use functional class format (IUPAC P-65.6)
-    if esters:
-        return _assemble_np_ester_name(
-            scaffold_stem, scaffold_name, hydroxyls, ketones,
-            unsaturation, esters, stereo_prefix=stereo_prefix,
-            methyls=methyls, halogens=halogens, ring_ab=ring_ab,
-        )
-
     # If no decorations found, return bare scaffold name
     if (not hydroxyls and not ketones and not methyls and not halogens
             and not unsaturation["ene"] and not unsaturation["yne"]
@@ -489,13 +489,30 @@ def name_natural_product_with_substituents(
             return modification_prefix + scaffold_name
         return scaffold_name
 
-    # 5. Assemble the decorated name (substitutive format)
-    return _assemble_np_name(
-        scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
-        stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
-        epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
-        modification_prefix=modification_prefix, ring_ab=ring_ab,
-    )
+    # 4/5. Assemble the name. `ring_ab` non-empty ⇒ the steroid α/β path fired; we ship α/β
+    # ONLY if it OPSIN-round-trips, else fall back to the whole-graph R/S name (Phase 181 D-08).
+    # This makes α/β strictly non-regressing: the few decorated steroids whose α/β name OPSIN
+    # cannot parse (complex polysubstituted pregnanes) or whose decorated ring-fusion α/β is
+    # ambiguous keep the existing R/S name that OPSIN does round-trip. Fail-OPEN when OPSIN is
+    # absent (same posture as the SUB-03 validity gate) so the path is verifiable, not mandatory.
+    def _assemble_steroid(sp, rab):
+        if esters:
+            return _assemble_np_ester_name(
+                scaffold_stem, scaffold_name, hydroxyls, ketones,
+                unsaturation, esters, stereo_prefix=sp,
+                methyls=methyls, halogens=halogens, ring_ab=rab,
+            )
+        return _assemble_np_name(
+            scaffold_stem, scaffold_name, hydroxyls, ketones, unsaturation,
+            stereo_prefix=sp, methyls=methyls, halogens=halogens,
+            epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
+            modification_prefix=modification_prefix, ring_ab=rab,
+        )
+
+    name_ab = _assemble_steroid(stereo_prefix, ring_ab)
+    if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
+        return _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+    return name_ab
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +586,34 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
     descriptors = collect_stereodescriptors(mol, numbering)
     leading = format_stereodescriptor_string(descriptors) if descriptors else ""
     return leading, {}
+
+
+def _whole_graph_rs_prefix(mol, numbering: Dict[int, int]) -> str:
+    """Build the legacy whole-graph R/S leading block (the α/β fallback name, Phase 181)."""
+    from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+
+    descriptors = collect_stereodescriptors(mol, numbering)
+    return format_stereodescriptor_string(descriptors) if descriptors else ""
+
+
+def _alpha_beta_rt_ok(mol, name: str) -> bool:
+    """Return True iff the steroid α/β `name` OPSIN-round-trips to `mol` (Phase 181 D-08).
+
+    Fail-OPEN: when OPSIN/Java is unavailable the round-trip cannot be checked, so we ship
+    the α/β name (the same posture as the SUB-03 validity gate, which cannot suppress without
+    OPSIN). When OPSIN IS available, an α/β name that does not round-trip is rejected so the
+    caller falls back to the whole-graph R/S name — guaranteeing zero RT regression.
+    """
+    try:
+        from ..validation.opsin_roundtrip import (
+            opsin_roundtrip_check, _find_opsin_jar, _java_available,
+        )
+        if _find_opsin_jar() is None or not _java_available():
+            return True
+        smi = Chem.MolToSmiles(mol)
+        return bool(opsin_roundtrip_check(smi, name).get("passed"))
+    except Exception:
+        return True
 
 
 def _find_hydroxyls(

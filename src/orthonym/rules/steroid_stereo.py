@@ -177,6 +177,34 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
     ringorder, loc2idx, idx2loc = wiring
     ringset = set(ringorder)
 
+    # Canonical-stereoparent gate (D-08): the ABO numbering models only the unmodified
+    # androstane/cholestane/pregnane ring skeleton. Molecules carrying EXTRA ring carbons
+    # (e.g. 4,4,14-trimethyl lanostane/cycloartane triterpenoids mis-detected by the broad
+    # steroid query) or O/N ring-bridges (epoxy/ether) are NOT P-101.2.6 stereoparents — their
+    # ABO-derived α/β is unreliable and regresses RT. Decline α/β for them and fall back to the
+    # whole-graph R/S string (which OPSIN round-trips). Root-cause exclusion, not a per-molecule
+    # band-aid: the signal is "a ring atom bears an exocyclic substituent the parent hydride
+    # does not have at that position" restricted to extra C-methyls and hetero ring-bridges.
+    matched = set(scaffold_info.get("matched_atoms", ()))
+    for idx in matched:
+        atom = mol.GetAtomWithIdx(idx)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in matched:
+                continue
+            # extra ring-methyl (terminal CH3 directly on a skeletal carbon → triterpenoid)
+            if nbr.GetAtomicNum() == 6 and nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 3:
+                return None
+        # epoxy / hetero ring-bridge: an O/N bonded to TWO skeletal atoms (3-membered or larger bridge)
+        if atom.GetAtomicNum() in (7, 8):
+            if sum(1 for n in atom.GetNeighbors() if n.GetIdx() in matched) >= 2:
+                return None
+    # also catch an exocyclic bridging O/N (epoxy) whose own atom is outside `matched`
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() in (7, 8) and atom.GetIdx() not in matched:
+            ring_nbrs = [n for n in atom.GetNeighbors() if n.GetIdx() in matched]
+            if len(ring_nbrs) >= 2:
+                return None
+
     # Defined ring stereocentres = ABO locants whose target atom carries a tetrahedral chiral tag.
     ring_stereo_locants = [
         loc for loc in ringorder
