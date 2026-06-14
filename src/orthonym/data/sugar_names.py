@@ -659,11 +659,19 @@ def _locate_anomeric_carbon(mol, ring, ring_oxygen):
 
 
 def _exocyclic_carbon_descriptor(mol, ring_idx, ringset):
-    """Describe a ring carbon's exocyclic carbon substituent (chain + CIP).
+    """Describe a ring carbon's exocyclic carbon substituent (chain + CIP + O).
 
     Captures the exocyclic side-chain richness so pentose vs hexose furanoses
     (CH2OH vs CH(OH)-CH2OH tails) are distinguished. Returns a sorted tuple of
-    per-substituent (depth, CIP) chain descriptors.
+    per-substituent chain descriptors, each entry ``(depth, CIP, has_O)``.
+
+    ``has_O`` records whether the exocyclic carbon carries an oxygen neighbour.
+    Without it (CR-02b) a 6-deoxy CH3 tail and a clean CH2OH tail produce an
+    IDENTICAL ``(depth, CIP)`` descriptor — so a NON-idealized deoxy ring would
+    collide with a clean hexose fingerprint and recover the wrong parent.
+    Encoding the O-distinction makes a leftover deoxy tail structurally distinct
+    from a clean CH2OH tail; the clean catalog entries (all CH2OH-rooted) keep
+    matching, the fix only ADDS discriminating power (D-13 gate stays green).
     """
     atom = mol.GetAtomWithIdx(ring_idx)
     substituents = []
@@ -681,7 +689,8 @@ def _exocyclic_carbon_descriptor(mol, ring_idx, ringset):
             if cur.GetSymbol() != "C":
                 continue
             cip = cur.GetProp("_CIPCode") if cur.HasProp("_CIPCode") else "-"
-            chain.append((depth, cip))
+            has_o = any(n.GetSymbol() == "O" for n in cur.GetNeighbors())
+            chain.append((depth, cip, has_o))
             for nn in cur.GetNeighbors():
                 if nn.GetIdx() not in visited and nn.GetSymbol() == "C":
                     stack.append((nn, depth + 1))
@@ -975,20 +984,31 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
 def _idealize_to_parent(mol):
     """Physically restore a modified sugar ring to its parent aldose skeleton.
 
-    Builds a ``Chem.RWMol`` copy and edits it back to the clean hexose/pentose
-    OH/H/CH2OH skeleton (RESEARCH §1, all three edits VERIFIED to reproduce the
-    canonical SMILES of clean beta-D-glucopyranose):
+    Builds a ``Chem.RWMol`` copy and applies *every* classified modification
+    edit back toward the clean hexose/pentose OH/H/CH2OH skeleton (RESEARCH §1,
+    each edit VERIFIED to reproduce the canonical SMILES of clean
+    beta-D-glucopyranose):
 
-    * DEOXY  -> add an exocyclic O to the bare terminal ring-attached methyl C
+    * DEOXY  -> add an exocyclic O to each bare terminal ring-attached methyl C
       (CH3 -> CH2OH);
-    * URONIC -> ``RemoveAtom`` the double-bonded O on the ring-attached COOH
+    * URONIC -> ``RemoveAtom`` the double-bonded O on each ring-attached COOH
       carbon (COOH -> CH2OH);
-    * AMINO  -> ``SetAtomicNum(8)`` on the (single) ring/exocyclic nitrogen
+    * AMINO  -> ``SetAtomicNum(8)`` on each (bare primary) nitrogen
       (C-N -> C-OH).
+
+    A modified sugar may carry SEVERAL of these at once (e.g. a 6-deoxy-2-amino
+    hexose).  Treating them as mutually exclusive ``if/elif/else`` (CR-02a) only
+    idealizes ONE position and leaves the rest, producing a structure whose
+    fingerprint does NOT represent the true idealized parent — and shipping a
+    wrong recovered base/anomer/config.  We therefore enumerate ALL modification
+    sites up-front (on the un-edited copy, so index/degree tests are stable) and
+    apply every edit; nothing is left un-idealized.  The downstream
+    ``_is_clean_sugar_ring`` re-check + the fingerprint lookup then either
+    recover a clean parent or fail closed (never a partially-idealized guess).
 
     Idealization MUST be physical, not analytic: the raw modified-sugar CIP
     fingerprint does NOT match the clean parent (Pitfall 1 — e.g. the uronic C6
-    carboxyl re-ranks C5 R->S).  After the edit the molecule is sanitized and
+    carboxyl re-ranks C5 R->S).  After the edits the molecule is sanitized and
     re-CIP'd by the caller before fingerprinting.
 
     Mirrors the in-tree RWMol-edit-then-sanitize analog
@@ -999,44 +1019,47 @@ def _idealize_to_parent(mol):
     if mol is None:
         return None
     rw = Chem.RWMol(mol)
-    has_n = any(a.GetSymbol() == "N" for a in rw.GetAtoms())
-    has_carbonyl = any(
-        b.GetBondType() == Chem.BondType.DOUBLE
-        and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "O"}
-        for b in rw.GetBonds()
-    )
+
+    # Enumerate ALL modification sites on the un-edited copy so the structural
+    # predicates (degree, neighbour symbols, double bonds) are evaluated against
+    # the original molecule and are not perturbed by an earlier edit.
+    nitrogen_idxs = [a.GetIdx() for a in rw.GetAtoms() if a.GetSymbol() == "N"]
+    # Uronic carboxyl carbons: a carbon with two O neighbours and a C=O bond;
+    # record the double-bonded O to remove (COOH -> CH2OH).
+    carbonyl_o_idxs = []
+    for a in rw.GetAtoms():
+        if a.GetSymbol() != "C":
+            continue
+        if sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") != 2:
+            continue
+        for b in a.GetBonds():
+            if b.GetBondType() == Chem.BondType.DOUBLE:
+                other = b.GetOtherAtom(a)
+                if other.GetSymbol() == "O":
+                    carbonyl_o_idxs.append(other.GetIdx())
+    # Deoxy: bare terminal (degree-1) carbons get an exocyclic O (CH3 -> CH2OH).
+    deoxy_methyl_idxs = [
+        a.GetIdx()
+        for a in rw.GetAtoms()
+        if a.GetSymbol() == "C" and a.GetDegree() == 1
+    ]
+
     try:
-        if has_n:
-            # amino: ring/exocyclic N -> O (C-N -> C-OH).
-            for a in rw.GetAtoms():
-                if a.GetSymbol() == "N":
-                    a.SetAtomicNum(8)
-                    break
-        elif has_carbonyl:
-            # uronic: reduce the ring-attached COOH carbonyl (remove the =O atom).
-            cc = next(
-                a.GetIdx()
-                for a in rw.GetAtoms()
-                if a.GetSymbol() == "C"
-                and sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") == 2
-            )
-            dbl = next(
-                b.GetOtherAtom(rw.GetAtomWithIdx(cc)).GetIdx()
-                for b in rw.GetAtomWithIdx(cc).GetBonds()
-                if b.GetBondType() == Chem.BondType.DOUBLE
-            )
-            rw.RemoveAtom(dbl)
-        else:
-            # deoxy: add an exocyclic O on the bare terminal (degree-1) carbon.
-            methyl = next(
-                a.GetIdx()
-                for a in rw.GetAtoms()
-                if a.GetSymbol() == "C" and a.GetDegree() == 1
-            )
+        # AMINO: every (bare) nitrogen -> O.  No index shift.
+        for idx in nitrogen_idxs:
+            rw.GetAtomWithIdx(idx).SetAtomicNum(8)
+        # DEOXY: add the exocyclic O on each bare terminal carbon.  Additions
+        # append new indices and never shift existing ones, so do them before
+        # any RemoveAtom.
+        for methyl in deoxy_methyl_idxs:
             o = rw.AddAtom(Chem.Atom(8))
             rw.AddBond(methyl, o, Chem.BondType.SINGLE)
-    except StopIteration:
-        return None  # the expected modification atom was not found -> fail-closed
+        # URONIC: remove each carbonyl =O.  RemoveAtom re-indexes higher atoms,
+        # so delete in descending order to keep the remaining indices valid.
+        for o_idx in sorted(set(carbonyl_o_idxs), reverse=True):
+            rw.RemoveAtom(o_idx)
+    except (StopIteration, RuntimeError, ValueError):
+        return None  # an expected modification atom was not found -> fail-closed
     m2 = rw.GetMol()
     try:
         Chem.SanitizeMol(m2)
