@@ -56,15 +56,20 @@ class TestQuaternaryAminium:
     @pytest.mark.xfail(
         strict=False,
         reason="A1 (184-RESEARCH): OPSIN-RT-verify parent-chain + N-locant "
-        "alphabetization (diethyl before methyl) in Plan 184-02; does not block "
-        "Wave 0.",
+        "alphabetization in Plan 184-02; does not block Wave 0.",
     )
-    def test_diethylmethyl_quaternary(self):
-        """P-73.1.2.1: N-substituent alphabetization (di- ignored -> ethyl <
-        methyl). CC[N+](C)(C)CC: parent = ethanamine (2C chain through N), the
-        other three branches = 2 ethyl + 1 methyl ->
-        ``N,N-diethyl-N-methylethanaminium``."""
-        assert Orthonym().name("CC[N+](C)(C)CC") == "N,N-diethyl-N-methylethanaminium"
+    def test_ethyldimethyl_quaternary(self):
+        """P-73.1.2.1: N-substituent alphabetization (ethyl < methyl, di-
+        ignored). CC[N+](C)(C)CC is N bonded to TWO ethyls + TWO methyls: parent
+        = ethanaminium (one ethyl is the 2C chain through N), the other three
+        branches = 1 ethyl + 2 methyl -> ``N-ethyl-N,N-dimethylethanaminium``.
+
+        NOTE: the verbatim CONTEXT D-04 / RESEARCH A1 string
+        ``N,N-diethyl-N-methylethanaminium`` does NOT round-trip to this SMILES
+        (it parses to CC[N+](C)(CC)CC = three ethyls + one methyl). Corrected to
+        the OPSIN-RT-confirmed PIN for the SMILES this phase actually targets
+        (Rule 1 data fix; see 184-00 SUMMARY deviations)."""
+        assert Orthonym().name("CC[N+](C)(C)CC") == "N-ethyl-N,N-dimethylethanaminium"
 
 
 @pytest.mark.unit
