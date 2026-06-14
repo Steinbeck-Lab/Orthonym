@@ -500,6 +500,65 @@ def uronic_glycoside_head(
     return head
 
 
+def uronic_free_acid_name(
+    anomer: Optional[str], config: Optional[str], base_name: str
+) -> Optional[str]:
+    """Convert a uronic-acid sugar tuple to its FREE-acid (non-glycoside) name.
+
+    The catalog base for a uronic acid is ``glucuronopyranose``
+    (``URONIC_ACID_NAMES`` :137); but that string is OPSIN-UNPARSEABLE — emitting
+    it as a free name yields ``unknown organic compound`` (D-10). The correct
+    IUPAC free-acid form is ``glucopyranuronic acid``: the parent hexose stem
+    keeps its ``-pyranose`` ring designator, the final ``-e`` is elided, and the
+    C6-carboxyl is named with the ``-uronic acid`` suffix
+    (``glucopyranose`` -> ``glucopyran`` + ``uronic acid`` =
+    ``glucopyranuronic acid``).
+
+    This is the FREE-acid sibling of :func:`uronic_glycoside_head` (which emits
+    the ``-osiduronic acid`` *glycoside* head). Both are implemented as explicit
+    maps (NOT string surgery — the contributor guide root-cause; avoids the ``gluc`` ->
+    ``gluco`` edge cases). ``URONIC_ACID_NAMES`` keeps its base value
+    ``glucuronopyranose`` UNCHANGED so ``uronic_glycoside_head``'s
+    ``UREONIC_HEAD`` key still matches (Pitfall 5 coupling — D-10 must not
+    regress the Phase-182 glucuronide glycoside).
+
+    ``beta-D-glucopyranuronic acid`` is OPSIN-RT True (verified this session).
+    Galacto is forward-looking (Assumption A1: no corpus/gold row, RT
+    unverified) — kept in the map but carries no gold dependency.
+
+    Blue Book P-102.5.6.6.4.1 (@53714): a monosaccharide whose terminal
+    ``-CH2OH`` is oxidized to ``-COOH`` is named by changing the ``-ose`` of the
+    parent name to ``-uronic acid``.
+
+    Args:
+        anomer: Anomeric descriptor ("alpha", "beta", or "").
+        config: Configurational descriptor ("D", "L", or "").
+        base_name: Uronic sugar base (e.g. "glucuronopyranose").
+
+    Returns:
+        The free uronic-acid name, e.g. "beta-D-glucopyranuronic acid";
+        None for a non-uronic / unknown base (fail-closed, D-11).
+
+    Examples:
+        >>> uronic_free_acid_name("beta", "D", "glucuronopyranose")
+        'beta-D-glucopyranuronic acid'
+        >>> uronic_free_acid_name("alpha", "D", "galacturonopyranose")
+        'alpha-D-galactopyranuronic acid'
+        >>> uronic_free_acid_name("a", "b", "zzz") is None
+        True
+    """
+    URONIC_FREE_ACID = {
+        "glucuronopyranose": "glucopyranuronic acid",
+        "galacturonopyranose": "galactopyranuronic acid",
+    }
+    head = URONIC_FREE_ACID.get(base_name)
+    if head is None:
+        return None
+    if anomer and config:
+        return f"{anomer}-{config}-{head}"
+    return head
+
+
 # ============================================================================
 # Structure-derived sugar-skeleton recognizer (Phase 176, WSD-08)
 # ============================================================================
