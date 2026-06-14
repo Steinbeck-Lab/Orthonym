@@ -924,6 +924,24 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
             if sym == "N":
                 # ring C-OH replaced by C-N: amino at this ring carbon's locant.
+                # Only a BARE primary amine (-NH2) is the P-102.5.4 subtractive
+                # `amino` class.  An N-acyl / N-alkyl / charged nitrogen is a
+                # distinct (out-of-scope) regime: its decoration is invisible to
+                # the ring-CIP fingerprint, so classifying it as plain `amino`
+                # would silently DROP the substituent and ship a wrong name
+                # (CR-01).  Fail closed instead (the contributor guide fail-closed mandate):
+                # the structure cascade-continues to the catalog / decomposition.
+                # Bare -NH2 == the N's only heavy-atom neighbour is this ring
+                # carbon (heavy degree 1), neutral, and carries its two H.
+                heavy_nbrs = sum(
+                    1 for x in nbr.GetNeighbors() if x.GetAtomicNum() > 1
+                )
+                if (
+                    heavy_nbrs != 1
+                    or nbr.GetFormalCharge() != 0
+                    or nbr.GetTotalNumHs() < 2
+                ):
+                    return None  # N-acyl / N-alkyl / charged N -> out of scope
                 found["amino"].append(loc)
             elif sym == "C":
                 # exocyclic carbon: CH2OH (clean) / CH3 (deoxy) / COOH (uronic).
