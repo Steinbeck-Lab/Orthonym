@@ -52,8 +52,20 @@ class TestCarbanionIde:
 
     def test_propan_2_ide(self):
         """BlueBookV2 line 42517: ``propan-2-ide`` is the worked example; the
-        carbanion on the central carbon of propane takes locant 2."""
-        assert Orthonym().name("CC([CH-])C") == "propan-2-ide"
+        carbanion on the central carbon of propane takes locant 2.
+
+        SMILES CORRECTED in Plan 184-01 (root-cause, not band-aid): the Wave-0
+        scaffold used ``CC([CH-])C``, but that SMILES does NOT encode
+        propan-2-ide. ``CC([CH-])C`` canonicalizes (RDKit) to ``[CH-]C(C)C`` —
+        the ISObutyl divalent carbanion-radical (the ``[CH-]`` terminus carries a
+        formal -1 AND a radical electron), whose chemically-correct PIN is
+        ``2-methylpropan-1-ide`` and which the system fail-closes to ``unknown``
+        (RDKit reads it as a carbanion+radical hybrid). The genuine propan-2-ide
+        (isopropyl anion) is ``C[CH-]C`` — OPSIN-RT-confirmed (``-r``):
+        ``propan-2-ide`` -> ``C[CH-]C`` (RDKit-canonical match). The cited Blue
+        Book line 42517 worked example is exactly this isopropyl-anion structure.
+        """
+        assert Orthonym().name("C[CH-]C") == "propan-2-ide"
 
     def test_2_methylbutan_2_ide(self):
         """P-72.2.2.1: charge + methyl on the SAME carbon (D-09). The SMILES
@@ -73,16 +85,22 @@ class TestCarbanionIde:
         assert c_neighbours == 3
         assert Orthonym().name(smi) == "2-methylbutan-2-ide"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="A2 (184-CONTEXT D-09): OPSIN-RT-verify exact -ide-vs-ene "
-        "locant ordering in Plan 184-01; does not block Wave 0.",
-    )
     def test_but_3_en_2_ide(self):
-        """P-31.1.4: the suffix-type ``-ide`` centre is senior to the double
-        bond for the low locant. CC=C[CH-]C -> the carbanion at C2, double bond
-        at C3 -> but-3-en-2-ide."""
-        assert Orthonym().name("CC=C[CH-]C") == "but-3-en-2-ide"
+        """P-31.1.4: the suffix-type ``-ide`` centre is senior to the double bond
+        for the low locant, and the ``-en`` ending precedes the cumulative
+        ``-ide`` ending (Table 3.4). The carbanion at C2, double bond at C3 ->
+        ``but-3-en-2-ide``.
+
+        XFAIL FLIPPED + SMILES CORRECTED in Plan 184-01 (A2 resolved). The Wave-0
+        scaffold used ``CC=C[CH-]C``, but that is a FIVE-carbon chain (it names
+        the chemically-correct ``pent-3-en-2-ide``), not but-3-en-2-ide. The
+        genuine but-3-en-2-ide (a 4-carbon chain) is ``C[CH-]C=C`` —
+        OPSIN-RT-confirmed (``-r``): ``but-3-en-2-ide`` -> ``C[CH-]C=C``
+        (RDKit-canonical match). On the corrected SMILES the system produces
+        ``but-3-en-2-ide``: orient_chain criterion (a) gives the -ide centre
+        locant 2 over the C=C at 3, and the ending order is ``en`` before ``ide``.
+        """
+        assert Orthonym().name("C[CH-]C=C") == "but-3-en-2-ide"
 
     def test_methanide_subsumption_anchor(self):
         """D-09 subsumption equivalence anchor (NOT RED): [CH3-] -> ``methanide``

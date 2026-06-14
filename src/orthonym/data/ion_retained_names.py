@@ -36,7 +36,13 @@ RETAINED_ANIONS = {
     '[O-]c1ccccc1': 'phenoxide',  # Also called phenolate
 
     # Carbanions
-    '[CH3-]': 'methanide',
+    # D-09 (Plan 184-01): the '[CH3-]' -> 'methanide' entry was SUBSUMED by the
+    # systematic emit_parent_hydride_cumulative_suffix primitive (ions.py). The
+    # equivalence was proven byte-identical (the primitive emits 'methanide' for
+    # the single-carbon chain, locant omitted) AND route_charged is confirmed to
+    # reach the carbanion branch for [CH3-], so the primitive is now the single
+    # source of truth (no per-molecule retained band-aid). [c-]1ccccc1 (phenide)
+    # stays — it is a ring carbanion outside the acyclic parent-hydride path.
     '[c-]1ccccc1': 'phenide',  # Also called benzenide
 
     # Alkynide anions
