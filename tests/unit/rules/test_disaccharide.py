@@ -42,11 +42,18 @@ MALTOSE_SMILES = (
     "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)"
     "[C@H](O)[C@@H](O)[C@@H]1O"
 )
-# Sucrose (canonical from retained_names.py:350): no free hemiacetal (both
-# anomeric carbons in the glycosidic linkage) -> glycosyl glycoside.
+# Sucrose: no free hemiacetal (both anomeric carbons in the glycosidic linkage)
+# -> glycosyl glycoside. NOTE (Plan 183-02): the SMILES previously copied from
+# retained_names.py:350 is stereochemically INCORRECT sucrose (its fructose ring
+# is not D-fructofuranose: InChI .../m0 vs real sucrose .../m1) — it round-trips
+# to neither real sucrose nor "beta-D-fructofuranosyl alpha-D-glucopyranoside".
+# Corrected here to the structurally-correct sucrose (PubChem CID 5988), which the
+# assembler derives + OPSIN-round-trips to the expected systematic name. The buggy
+# retained_names.py entry is a separate (trivial-name-path) defect, logged for a
+# later phase.
 SUCROSE_SMILES = (
-    "OC[C@@H]1O[C@@](CO)(O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)"
-    "[C@@H](O)[C@H]1O"
+    "OC[C@H]1O[C@@](CO)(O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)"
+    "[C@@H](O)[C@@H]1O"
 )
 
 MALTOSE_EXPECTED = "alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
