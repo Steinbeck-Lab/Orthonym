@@ -429,7 +429,23 @@ def name_natural_product_with_substituents(
     for e in esters:
         ester_consumed_atoms.update(e["all_atoms"])
 
-    # 0b. Find epoxy bridges (O bridging two scaffold atoms, e.g. morphine 4,5-epoxy)
+    # 0a/0b/0c. Phase 182 (WSC-03, D-02/D-03): conjugate decorations — sulfate ester,
+    # mono-phosphate ester, glycosyl/uronyl. Each finder delegates fragment classification
+    # to conjugate_controller.classify_conjugate and returns ester-shaped dicts carrying a
+    # `word` key. Consuming these atoms here automatically dissolves the `androstan-3-olate`
+    # mis-assignment (D-05): once the conjugate-O linker is excluded, the OH/oxo finders no
+    # longer see it. Fires ONLY when a finder returns a non-empty list (D-09) — non-conjugate
+    # inputs reach an empty `conjugates` list and stay byte-identical.
+    conjugates = (
+        _find_sulfate_conjugates(mol, scaffold_info, numbering)
+        + _find_phosphate_conjugates(mol, scaffold_info, numbering)
+        + _find_glycosyl_conjugates(mol, scaffold_info, numbering)
+    )
+    conjugate_consumed_atoms = set()
+    for c in conjugates:
+        conjugate_consumed_atoms.update(c["all_atoms"])
+
+    # 0d. Find epoxy bridges (O bridging two scaffold atoms, e.g. morphine 4,5-epoxy)
     epoxy_bridges = _find_epoxy_bridges(mol, matched_set, numbering,
                                         exclude_atoms=ester_consumed_atoms)
     # Collect oxygen atoms consumed by epoxy bridges so they aren't counted as OH
@@ -444,9 +460,9 @@ def name_natural_product_with_substituents(
                     and n1.GetIdx() in numbering and n2.GetIdx() in numbering):
                 epoxy_consumed.add(atom.GetIdx())
 
-    all_exclude = ester_consumed_atoms | epoxy_consumed
+    all_exclude = ester_consumed_atoms | epoxy_consumed | conjugate_consumed_atoms
 
-    # 0c. Find methoxy groups (-OCH3) before hydroxyls (consumes O atoms)
+    # 0e. Find methoxy groups (-OCH3) before hydroxyls (consumes O atoms)
     methoxys = _find_methoxys(mol, scaffold_info, numbering,
                               exclude_atoms=all_exclude)
 
@@ -481,13 +497,90 @@ def name_natural_product_with_substituents(
     n_alkyls = _find_n_alkyl(mol, matched_set, numbering,
                              exclude_atoms=all_exclude)
 
-    # If no decorations found, return bare scaffold name
+    # Phase 182 (WSC-03, D-07): multi-conjugate seniority. The single-conjugate cohort is
+    # binding this phase; if >1 conjugate fragment is present (e.g. a disulfate) there is no
+    # confidently-nameable prefix form for the non-senior fragments yet, so honest-fail
+    # (return None → systematic pipeline) rather than guess. The completeness invariant below
+    # would in any case reject a name that drops the second fragment. Multi-conjugate prefix
+    # treatment (sulfooxy/phosphonooxy/glycosyloxy) is Phase 183/184.
+    if len(conjugates) > 1:
+        return None
+
+    # If no decorations found, return bare scaffold name. Phase 182 (D-09): also require
+    # `not conjugates` so a scaffold carrying ONLY a conjugate (and no other decoration)
+    # still enters assembly instead of short-circuiting to the bare scaffold name.
     if (not hydroxyls and not ketones and not methyls and not halogens
             and not unsaturation["ene"] and not unsaturation["yne"]
-            and not epoxy_bridges and not n_alkyls and not methoxys):
+            and not epoxy_bridges and not n_alkyls and not methoxys
+            and not conjugates):
         if modification_prefix:
             return modification_prefix + scaffold_name
         return scaffold_name
+
+    # Phase 182 (WSC-03, D-08): no-silent-drop completeness invariant. Runs ONLY when a
+    # conjugate fired (D-09 — non-conjugate inputs are entirely untouched), so it can never
+    # false-fail a name that does not go through the conjugate path. Assert every heavy atom
+    # in a scaffold-substituent subgraph is claimed by exactly one named feature; any
+    # unclaimed heavy atom → honest-fail (return None → systematic pipeline), NEVER emit a
+    # name omitting atoms. Asserted over `substituent_atoms` (the get_scaffold_substituents
+    # subgraphs), NEVER raw `non_scaffold_atoms` — the cholestane C20-C27 side chain folds
+    # into the stem and would otherwise trigger a false honest-fail (Pitfall 3).
+    if conjugates:
+        # WARNING-4 atom exposure: the OH/ketone/methyl/methoxy/halogen/n_alkyl finders return
+        # locants, not atom sets. Recompute each kind's consumed atoms locally from the SAME
+        # get_scaffold_substituents subgraphs, claiming a sub's atoms only when it structurally
+        # matches a decoration the corresponding finder actually reported. This is additive
+        # (the finders' returns are untouched) and reuses the already-excluded membership, so
+        # `claimed` can never disagree with `all_exclude`.
+        hydroxyl_atoms: set = set()
+        ketone_atoms: set = set()
+        methyl_atoms: set = set()
+        methoxy_atoms: set = set()
+        halogen_atoms: set = set()
+        n_alkyl_atoms: set = set()
+        _hydroxyl_locs = set(hydroxyls)
+        _ketone_locs = set(ketones)
+        _methyl_locs = set(methyls)
+        _methoxy_locs = set(methoxys)
+        _halogen_locs = {loc for loc, _ in halogens}
+        _n_alkyl_locs = {loc for loc, _ in n_alkyls}
+        _HALOGEN_Z = {9, 17, 35, 53}
+        all_subs = get_scaffold_substituents(mol, scaffold_info["matched_atoms"])
+        for sub in all_subs:
+            attach = sub["attachment_atom"]
+            loc = numbering.get(attach)
+            if loc is None:
+                continue
+            atoms = set(sub["substituent_atoms"])
+            first_idx = sub["first_atom"]
+            fa = mol.GetAtomWithIdx(first_idx)
+            single_atom = len(atoms) == 1
+            if single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() >= 1 \
+                    and loc in _hydroxyl_locs:
+                hydroxyl_atoms |= atoms
+            elif single_atom and fa.GetAtomicNum() == 8 and fa.GetTotalNumHs() == 0 \
+                    and loc in _ketone_locs:
+                ketone_atoms |= atoms
+            elif single_atom and fa.GetAtomicNum() == 6 and loc in _methyl_locs:
+                methyl_atoms |= atoms
+            elif single_atom and fa.GetAtomicNum() in _HALOGEN_Z and loc in _halogen_locs:
+                halogen_atoms |= atoms
+            elif fa.GetAtomicNum() == 8 and loc in _methoxy_locs:
+                methoxy_atoms |= atoms
+            elif fa.GetAtomicNum() == 6 and loc in _n_alkyl_locs \
+                    and mol.GetAtomWithIdx(attach).GetAtomicNum() == 7:
+                n_alkyl_atoms |= atoms
+
+        claimed = (ester_consumed_atoms | epoxy_consumed | conjugate_consumed_atoms
+                   | hydroxyl_atoms | ketone_atoms | methyl_atoms | methoxy_atoms
+                   | halogen_atoms | n_alkyl_atoms)
+        substituent_atoms = set()
+        for s in all_subs:
+            substituent_atoms |= set(s["substituent_atoms"])
+        heavy_unclaimed = {a for a in substituent_atoms - claimed
+                           if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+        if heavy_unclaimed:
+            return None  # honest-fail → systematic pipeline; NEVER emit a name omitting atoms
 
     # 4/5. Assemble the name. `ring_ab` non-empty ⇒ the steroid α/β path fired; we ship α/β
     # ONLY if it OPSIN-round-trips, else fall back to the whole-graph R/S name (Phase 181 D-08).
@@ -496,10 +589,17 @@ def name_natural_product_with_substituents(
     # ambiguous keep the existing R/S name that OPSIN does round-trip. Fail-OPEN when OPSIN is
     # absent (same posture as the SUB-03 validity gate) so the path is verifiable, not mandatory.
     def _assemble_steroid(sp, rab):
-        if esters:
+        # Phase 182 (WSC-03): a conjugate (sulfate / mono-phosphate / glycosyl) takes the
+        # senior `-yl` attachment exactly like an ester (D-07); pass conjugates as
+        # ester-shaped dicts carrying a `word` key into the proven `_assemble_np_ester_name`
+        # emitter (which already demotes scaffold OH/=O to hydroxy/oxo prefixes and renders
+        # α/β). For the binding single-conjugate cohort `esters` is empty, so `joined` is the
+        # single conjugate; mixed conjugate+ester is honest-failed upstream (D-07 / >1 guard).
+        joined = esters + conjugates
+        if joined:
             return _assemble_np_ester_name(
                 scaffold_stem, scaffold_name, hydroxyls, ketones,
-                unsaturation, esters, stereo_prefix=sp,
+                unsaturation, joined, stereo_prefix=sp,
                 methyls=methyls, halogens=halogens, ring_ab=rab,
             )
         return _assemble_np_name(
@@ -511,7 +611,22 @@ def name_natural_product_with_substituents(
 
     name_ab = _assemble_steroid(stereo_prefix, ring_ab)
     if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
-        return _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+        # Steroid α/β did not OPSIN-round-trip → fall back to the whole-graph R/S name
+        # (Phase 181 D-08). This single check covers the conjugate path too, since the
+        # conjugate name carries α/β when ring_ab is present.
+        fallback = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+        # Phase 182 (D-10): for a conjugate we must NEVER ship a name that does not RT —
+        # prior behaviour on these rows is already RT-False (the conjugate was dropped), so a
+        # non-RT R/S fallback is no better. If the R/S conjugate name also fails RT, honest-fail
+        # (None) to the systematic pipeline rather than ship a worse name. Fail-OPEN when OPSIN
+        # is absent (the gate above already returned True, so we never reach here).
+        if conjugates and not _alpha_beta_rt_ok(mol, fallback):
+            return None
+        return fallback
+    # Phase 182 (D-10): a conjugate with no α/β (ring_ab empty) skipped the gate above; still
+    # require the conjugate name to OPSIN-round-trip before shipping, else honest-fail.
+    if conjugates and not ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
+        return None
     return name_ab
 
 

@@ -478,6 +478,21 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if routed:
             return _validate_anion_name(mol, routed)
 
+        # Phase 182 (WSC-03, D-04/D-09/D-10): natural-product conjugate ANION. route_charged
+        # deliberately declines a sulfate/phosphate ESTER [O-] (charged_router.py:386-389:
+        # "out of scope -> neutral-form names it"), and the neutralize-recurse below would
+        # strip the charge BEFORE the NP path sees it, emitting the free-acid word
+        # ("hydrogen sulfate") which does NOT OPSIN-round-trip to the anion. To derive the
+        # correct anion word ("sulfate") per D-04 (classify the protonation state IN PLACE,
+        # never neutralize-then-rename), let the NP conjugate path see the CHARGED mol here.
+        # NARROW gate (D-09): only when an unclaimed sulfate/phosphate/glycosyl conjugate is
+        # present on a recognized NP scaffold; the NP path internally RT-gates the conjugate
+        # name (D-10), so a returned name has already round-tripped. Non-conjugate anions are
+        # untouched. The NP path returns None (honest-fail) for anything it cannot name.
+        np_conj = _name_np_conjugate_anion(mol)
+        if np_conj:
+            return _validate_anion_name(mol, np_conj)
+
         # Fall-through cascade (route_charged declined, e.g. metal/fragment).
         if anion_type in ('sulfonate', 'sulfinate', 'phosphonate'):
             result = _name_oxoacid_anion(mol, style)
@@ -618,6 +633,47 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
 
 
 # === NAME VALIDATION GUARDS ===
+
+def _name_np_conjugate_anion(mol) -> str:
+    """Name a natural-product conjugate ANION via the NP conjugate path (Phase 182, WSC-03).
+
+    Fires ONLY when the charged molecule is a recognized NP scaffold carrying an unclaimed
+    sulfate / mono-phosphate / glycosyl conjugate (D-09 narrow gate). Naming the CHARGED mol
+    lets the conjugate controller derive the anion word IN PLACE (D-04 — `sulfate`, not
+    `hydrogen sulfate`), and the NP path internally RT-gates the conjugate name (D-10). Returns
+    '' (no match / not a conjugate / NP path declined) so the caller falls through to the
+    legacy neutralize-recurse cascade unchanged.
+
+    This is the seam that keeps the original charge visible to the NP subsystem; the anion
+    pipeline otherwise neutralizes before the NP path runs, which would lose the anion word.
+    """
+    try:
+        from ..perception.natural_products import detect_natural_product
+        from .natural_products import (
+            _build_target_to_iupac,
+            _find_glycosyl_conjugates,
+            _find_phosphate_conjugates,
+            _find_sulfate_conjugates,
+            name_natural_product,
+        )
+        scaffold_info = detect_natural_product(mol)
+        if scaffold_info is None:
+            return ''
+        numbering = _build_target_to_iupac(scaffold_info)
+        if numbering is None:
+            return ''
+        has_conjugate = (
+            _find_sulfate_conjugates(mol, scaffold_info, numbering)
+            or _find_phosphate_conjugates(mol, scaffold_info, numbering)
+            or _find_glycosyl_conjugates(mol, scaffold_info, numbering)
+        )
+        if not has_conjugate:
+            return ''
+        name = name_natural_product(mol)
+        return name or ''
+    except (ValueError, RuntimeError, KeyError, IndexError, RecursionError):
+        return ''
+
 
 def _validate_anion_name(mol, result: str) -> str:
     """Validate an anion name and guard against misapplied suffixes.

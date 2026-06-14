@@ -254,4 +254,64 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
     side_map = {idx: loc for idx, loc in numbering.items() if loc not in ringset}
     side_rs: List[Tuple[int, str]] = collect_stereodescriptors(mol, side_map) if side_map else []
 
+    # Phase 182 (WSC-03): suppress side-chain stereocentres whose CIP matches the canonical
+    # stereoparent reference AND that bear no decoration — they are IMPLIED by the stem name
+    # (e.g. cholestane implies C-20 R; ChEBI omits it: `cholest-5-en-3beta-yl sulfate`). This
+    # mirrors the ring D-04c suppression for the acyclic side chain. A side-chain centre is
+    # CITED only when it (a) bears an exocyclic decoration/attachment outside the scaffold
+    # skeleton (e.g. the C-22 conjugate on ergostane, or a 20/22-OH on a triol → `(20R,22R)`)
+    # or (b) differs from the reference config. Reference unavailable → cite all (conservative,
+    # prior behaviour). Root-cause: compares against the natural parent, never a per-molecule
+    # hardcode.
+    if side_rs:
+        side_ref = _side_chain_reference_rs(
+            scaffold_info.get("scaffold_smiles"), set(side_map.values())
+        )
+        kept: List[Tuple[int, str]] = []
+        for loc, cip in side_rs:
+            idx = next((i for i, l in numbering.items() if l == loc), None)
+            decorated_side = False
+            if idx is not None:
+                atom = mol.GetAtomWithIdx(idx)
+                decorated_side = any(
+                    n.GetIdx() not in matched for n in atom.GetNeighbors()
+                )
+            ref_cip = side_ref.get(loc)
+            # Suppress only an UNDECORATED centre that matches the canonical reference.
+            if not decorated_side and ref_cip is not None and ref_cip == cip:
+                continue
+            kept.append((loc, cip))
+        side_rs = kept
+
     return {"ring_ab": ring_ab, "side_rs": side_rs}
+
+
+def _side_chain_reference_rs(scaffold_smiles, side_locants):
+    """Canonical side-chain R/S profile from the stereoparent scaffold SMILES.
+
+    The catalogued NATURAL_PRODUCT_SCAFFOLDS SMILES carry the natural @/@@ configuration, so
+    running the SAME CIP recipe over the reference mol yields the parent's natural descriptor
+    at each NON-ring (side-chain) locant. Read ONLY for the suppression diff (the emitted value
+    is always the target's own parity). Returns {locant: 'R'/'S'} or {} on any failure
+    (conservative: nothing suppressed).
+    """
+    from ..data.natural_products import get_scaffold_numbering
+    from ..perception.stereo import assign_stereochemistry
+    from .stereochemistry import collect_stereodescriptors
+
+    if not scaffold_smiles:
+        return {}
+    ref_mol = Chem.MolFromSmiles(scaffold_smiles)
+    if ref_mol is None:
+        return {}
+    numbering = get_scaffold_numbering(scaffold_smiles)  # {query_pos == atom idx: locant}
+    if not numbering:
+        return {}
+    try:
+        assign_stereochemistry(ref_mol)
+    except Exception:
+        return {}
+    side_map = {idx: loc for idx, loc in numbering.items() if loc in side_locants}
+    if not side_map:
+        return {}
+    return {loc: cip for loc, cip in collect_stereodescriptors(ref_mol, side_map)}

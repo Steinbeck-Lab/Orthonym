@@ -23,22 +23,29 @@ from orthonym import name_compound
 
 class TestAlphaBetaAssembly:
     def test_cholestane_3b_ol(self):
-        """Row 1: (20R)-5α-cholestan-3β-ol (ring α/β + acyclic side-chain (20R) R/S block, D-06)."""
+        """Row 1: 5α-cholestan-3β-ol (ring α/β; undecorated C-20 implied by cholestane).
+
+        Phase 182 (WSC-03) correction: the canonical cholestane stem IMPLIES the natural
+        C-20 R config (ChEBI convention — `cholest-5-en-3beta-yl sulfate` omits it), so an
+        UNDECORATED side-chain stereocentre that matches the stereoparent reference is
+        suppressed. Both `(20R)-…` and `…` round-trip; the suppressed form is the IUPAC/ChEBI
+        PIN. C-20 is still CITED when decorated (cf. test_cholestane_triol `(20R,22R)`).
+        """
         from orthonym.rules.steroid_stereo import collect_steroid_alpha_beta  # noqa: F401
         smiles = "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"
-        assert name_compound(smiles) == "(20R)-5alpha-cholestan-3beta-ol"
+        assert name_compound(smiles) == "5alpha-cholestan-3beta-ol"
 
     def test_cholestane_3a_ol(self):
-        """Row 2: (20R)-5α-cholestan-3α-ol."""
+        """Row 2: 5α-cholestan-3α-ol (Phase 182: undecorated C-20 suppressed)."""
         from orthonym.rules.steroid_stereo import collect_steroid_alpha_beta  # noqa: F401
         smiles = "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"
-        assert name_compound(smiles) == "(20R)-5alpha-cholestan-3alpha-ol"
+        assert name_compound(smiles) == "5alpha-cholestan-3alpha-ol"
 
     def test_5beta_case(self):
-        """Row 3: (20R)-5β-cholestan-3α-ol (the D-13 5β requirement)."""
+        """Row 3: 5β-cholestan-3α-ol (the D-13 5β requirement; Phase 182: C-20 suppressed)."""
         from orthonym.rules.steroid_stereo import collect_steroid_alpha_beta  # noqa: F401
         smiles = "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O"
-        assert name_compound(smiles) == "(20R)-5beta-cholestan-3alpha-ol"
+        assert name_compound(smiles) == "5beta-cholestan-3alpha-ol"
 
     def test_androstane_multi(self):
         """Row 4: 5α-androstane-3β,17β-diol (multi-stereo ring α/β; standard -diol suffix)."""
