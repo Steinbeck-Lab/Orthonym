@@ -1511,6 +1511,70 @@ def _find_ester_decorations(
     return sorted(esters, key=lambda e: e["locant"])
 
 
+# ---------------------------------------------------------------------------
+# Phase 182 (WSC-03): conjugate finders — sulfate / mono-phosphate / glycosyl.
+#
+# Each mirrors `_find_ester_decorations`: it walks `get_scaffold_substituents`,
+# skips substituents whose attachment is not in the numbering, requires the linker
+# atom to be an ester-type O (no H, so an -OH hydroxyl is never treated as a linker),
+# and delegates the fragment classification to the class-agnostic
+# `conjugate_controller.classify_conjugate` primitive (D-02). Detection is purely
+# structural — never molecule-specific (no CHEBI literals, no name lookups).
+#
+# Returns `[{locant, kind, word, all_atoms, linker_kind}]` where `all_atoms` is the
+# classifier's consumed-atom set (== `set(sub["substituent_atoms"])`), so the
+# conjugate-consumed atoms are excluded from the OH/oxo/methyl/halogen finders (the
+# same exclusion discipline as `ester_consumed_atoms`).
+# ---------------------------------------------------------------------------
+
+def _find_conjugates_of_kind(
+    mol, scaffold_info: Dict, numbering: Dict[int, int], kind: str
+) -> List[Dict]:
+    """Shared conjugate finder body; `kind` ∈ {"sulfate","phosphate","glycoside"}."""
+    from .conjugate_controller import classify_conjugate
+
+    out: List[Dict] = []
+    matched = set(scaffold_info["matched_atoms"])
+    for sub in get_scaffold_substituents(mol, scaffold_info["matched_atoms"]):
+        attach, first = sub["attachment_atom"], sub["first_atom"]
+        if attach not in numbering:
+            continue
+        fa = mol.GetAtomWithIdx(first)
+        if fa.GetAtomicNum() != 8 or fa.GetTotalNumHs() > 0:
+            continue  # linker O, no H (an ester-O, not an -OH)
+        info = classify_conjugate(mol, attach, first, matched)
+        if info and info["kind"] == kind:
+            out.append({"locant": numbering[attach], **info})
+    return sorted(out, key=lambda e: e["locant"])
+
+
+def _find_sulfate_conjugates(
+    mol, scaffold_info: Dict, numbering: Dict[int, int]
+) -> List[Dict]:
+    """Detect `scaffold-O-S(=O)(=O)-O[H/⁻]` sulfate-ester conjugates (RESEARCH Pattern 1)."""
+    return _find_conjugates_of_kind(mol, scaffold_info, numbering, "sulfate")
+
+
+def _find_phosphate_conjugates(
+    mol, scaffold_info: Dict, numbering: Dict[int, int]
+) -> List[Dict]:
+    """Detect `scaffold-O-P(=O)(O[H/⁻])(O[H/⁻])` mono-phosphate conjugates (RESEARCH Pattern 2).
+
+    The classifier returns None for di/tri-phosphate or any P-O-P bridge, so those
+    (out-of-scope, Phase 183/184) keep their legacy output.
+    """
+    return _find_conjugates_of_kind(mol, scaffold_info, numbering, "phosphate")
+
+
+def _find_glycosyl_conjugates(
+    mol, scaffold_info: Dict, numbering: Dict[int, int]
+) -> List[Dict]:
+    """Detect `scaffold-O-[anomeric C of a recognized sugar ring]` glycosyl/uronyl
+    conjugates (RESEARCH Pattern 3); the `word` is the glycoside head
+    (e.g. `beta-D-glucopyranosiduronic acid`)."""
+    return _find_conjugates_of_kind(mol, scaffold_info, numbering, "glycoside")
+
+
 def _count_acid_fragment_carbons(
     mol, carbonyl_idx: int, ester_oxy_idx: int, scaffold_atoms: set
 ) -> int:
@@ -1713,8 +1777,12 @@ def _assemble_np_ester_name(
         unsat_suffix = "an"
 
     # --- Build yl suffix and acylate word ---
+    # Phase 182 (WSC-03): conjugate dicts carry a `word` key (e.g. "sulfate",
+    # "beta-D-glucopyranosiduronic acid") and have NO "acylate". Prefer `word` so the
+    # single-conjugate functional-class join `{parent-yl} {word}` works without KeyError;
+    # real ester dicts still resolve via their `acylate` key.
     ester_locants = [e["locant"] for e in esters]
-    acylate_names = [e["acylate"] for e in esters]
+    acylate_names = [e.get("word") or e.get("acylate") for e in esters]
 
     if len(esters) == 1:
         # Single ester: stem-unsaturation-locant-yl acylate
