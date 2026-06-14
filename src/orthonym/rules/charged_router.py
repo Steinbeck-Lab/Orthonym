@@ -782,6 +782,23 @@ def route_charged(mol, style: str = 'pin') -> str:
         # thiolate/aminide) + the S/P oxoacid anions.
         if any(classify_anion(mol, a) == 'carboxylate' for a in sites['anions']):
             return ''
+        # WS-E.2 (P-72.2.2.1 / Table 3.4): a CARBANION has no neutral FG anchor
+        # (it neutralizes to a bare hydride 'hexane' — apply_ion_suffix_to_name finds
+        # no carbanion key and returns ''), so it cannot use the
+        # _principal_group_override seam. Name it directly via the index-preserving
+        # emitter on the ORIGINAL mol: the -ide centre gets the lowest locant
+        # (orient_chain), competing with unsaturation/substituents per P-31.1.4.
+        # CCC[CH-]CC -> hexan-3-ide. The centre index comes straight off
+        # sites['anions'][0]['atom_idx'] (same index space as mol) — do NOT
+        # canonicalize/neutralize before reading it (Pitfall 1).
+        _acls = {classify_anion(mol, a) for a in sites['anions']}
+        if _acls == {'carbanion'} and len(sites['anions']) == 1:
+            from .ions import emit_parent_hydride_cumulative_suffix
+            center_idx = sites['anions'][0]['atom_idx']
+            carbanion_name = emit_parent_hydride_cumulative_suffix(mol, center_idx, 'ide')
+            if carbanion_name:
+                return carbanion_name
+            return ''   # primitive declined (out of scope) -> legacy fallthrough
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
         # T3: remember the anion's acid FG so Step 6 can force it as principal if a
         # senior neutral acid (carboxylic) hijacks the re-entry's principal slot.

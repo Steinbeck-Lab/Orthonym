@@ -704,6 +704,14 @@ def _validate_anion_name(mol, result: str) -> str:
     if 'methylidene' in result:
         return ''
 
+    # D-10 (Table 3.4 / P-72.2.2.1): a carbanion '-ide' name is a valid anion
+    # ending. Explicitly accept it (it passes today via no rejecting guard, but a
+    # future guard must not silently suppress it). The single existing risk is the
+    # 'methylidene' radical-leak guard above — '-ide' (preceded by 'an-N-') is a
+    # distinct, valid suffix and must reach this return.
+    if result.endswith('ide') and 'methylidene' not in result:
+        return result
+
     return result
 
 
