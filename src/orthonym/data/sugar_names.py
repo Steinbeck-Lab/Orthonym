@@ -453,6 +453,53 @@ def sugar_to_glycoside_class_name(
     return stem
 
 
+def uronic_glycoside_head(
+    anomer: Optional[str], config: Optional[str], base_name: str
+) -> Optional[str]:
+    """Convert a uronic-acid sugar tuple to its functional-class glycoside head.
+
+    The catalog base for a uronic acid is ``glucuronopyranose`` (URONIC_ACID_NAMES
+    :137); but the IUPAC glycoside head form is NOT ``glucuronopyranoside`` — it is
+    ``glucopyranosiduronic acid`` (the ``-ose`` -> ``-oside`` swap applies to the
+    *parent* hexose stem, and the C6-carboxyl becomes the ``-uronic acid`` suffix).
+    ``sugar_to_glycoside_class_name`` would wrongly emit ``glucuronopyranoside``.
+
+    Implemented as an explicit map (NOT string surgery — avoids ``gluc`` -> ``gluco``
+    edge cases). ``beta-D-glucopyranosiduronic acid`` is OPSIN-RT verified (Phase 182,
+    against CHEBI:133504/133517). Galacto is forward-looking (Assumption A1: no corpus
+    row, RT unverified) — kept in the map but carries no gold dependency.
+
+    Blue Book P-102.5.6.6.4.2 (@53789): "change 'pyran' to 'pyranoside', elide final
+    'e', giving 'pyranosiduronic acid'." Example @53799: methyl
+    beta-D-glucopyranosiduronic acid.
+
+    Args:
+        anomer: Anomeric descriptor ("alpha", "beta", or "").
+        config: Configurational descriptor ("D", "L", or "").
+        base_name: Uronic sugar base (e.g. "glucuronopyranose").
+
+    Returns:
+        The uronic glycoside head, e.g. "beta-D-glucopyranosiduronic acid";
+        None for a non-uronic / unknown base.
+
+    Examples:
+        >>> uronic_glycoside_head("beta", "D", "glucuronopyranose")
+        'beta-D-glucopyranosiduronic acid'
+        >>> uronic_glycoside_head("alpha", "D", "xyz") is None
+        True
+    """
+    UREONIC_HEAD = {
+        "glucuronopyranose": "glucopyranosiduronic acid",
+        "galacturonopyranose": "galactopyranosiduronic acid",
+    }
+    head = UREONIC_HEAD.get(base_name)
+    if head is None:
+        return None
+    if anomer and config:
+        return f"{anomer}-{config}-{head}"
+    return head
+
+
 # ============================================================================
 # Structure-derived sugar-skeleton recognizer (Phase 176, WSD-08)
 # ============================================================================
