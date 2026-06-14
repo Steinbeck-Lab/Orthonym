@@ -303,3 +303,95 @@ class TestGlycosideBenchmarkCoverage:
         assert sugar_count >= 4, (
             f"Expected >= 4 glycosides with sugar names, got {sugar_count}/6"
         )
+
+
+# ============================================================================
+# Phase 183 (WSC-04): systematic monosaccharide + free uronic (D-10) +
+# P-102.7 disaccharide, end-to-end via the carbohydrate dispatch tier (D-03)
+# ============================================================================
+
+
+@pytest.mark.integration
+class TestSystematicCarbohydrateDispatch:
+    """The broadened CARBOHYDRATE_LOOKUP tier (priority 1000) now routes a
+    non-cataloged decorated single sugar ring to the systematic-mono engine, a
+    cataloged uronic free acid to the D-10 free-acid emitter, and >=2 linked
+    sugar rings to the P-102.7 disaccharide assembler -- all through the public
+    ``name_compound``. Cataloged sugars / simple glycosides / cataloged amino
+    sugars stay byte-identical (PROTECT)."""
+
+    def test_uronic_free_acid_d10(self):
+        """A free glucuronic acid emits the OPSIN-parseable free-acid form
+        ``beta-D-glucopyranuronic acid`` (D-10 / WSC-04 SC#1), NOT the
+        unparseable ``beta-D-glucuronopyranose`` (-> 'unknown')."""
+        name = name_compound(
+            "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        )
+        assert name == "beta-D-glucopyranuronic acid"
+        assert "glucuronopyranose" not in (name or "")
+        assert name != "unknown organic compound"
+
+    def test_six_deoxy_systematic_not_oxane(self):
+        """6-deoxy-glucose names systematically, NOT as a substituted oxane."""
+        name = name_compound(
+            "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        )
+        assert name == "6-deoxy-beta-D-glucopyranose"
+        assert "oxan" not in name.lower()
+
+    def test_amino_systematic_not_oxane(self):
+        """A non-cataloged amino sugar names systematically (P-102.5.4)."""
+        name = name_compound(
+            "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
+        )
+        assert name == "3-amino-3-deoxy-beta-D-glucopyranose"
+        assert "oxan" not in name.lower()
+
+    def test_maltose_glycosylglycose(self):
+        """Maltose -> P-102.7.1.2 glycosylglycose, ASCII (1->4) arrow,
+        unspecified reducing-end anomer (no alpha/beta on the parent, D-09)."""
+        name = name_compound(
+            "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)"
+            "[C@H](O)[C@@H](O)[C@@H]1O"
+        )
+        assert name == "alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
+
+    def test_sucrose_glycosyl_glycoside(self):
+        """Sucrose (no free hemiacetal) -> P-102.7.1.1 glycosyl glycoside."""
+        name = name_compound(
+            "O([C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO)"
+            "[C@@]1(CO)[C@@H](O)[C@H](O)[C@H](O1)CO"
+        )
+        assert name == "beta-D-fructofuranosyl alpha-D-glucopyranoside"
+
+    # --- PROTECT: byte-identical to the pre-183 behaviour ------------------
+
+    def test_protect_cataloged_glucose_byte_identical(self):
+        """A cataloged clean sugar stays on the lookup fast-path (D-05)."""
+        name = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+        assert name == "beta-D-glucopyranose"
+
+    def test_protect_simple_glycoside_byte_identical(self):
+        """A Phase-176 simple glycoside (methyl beta-D-glucopyranoside) is
+        NOT pulled into the disaccharide engine (Pitfall 4) and stays
+        byte-identical to its functional-class form."""
+        name = name_compound("CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O")
+        assert name == "methyl beta-D-glucopyranoside"
+
+    def test_protect_cataloged_amino_sugar_byte_identical(self):
+        """A cataloged amino sugar (beta-D-glucosamine) stays on the catalog
+        fast-path -- the uronic interception fires only on a uronic base."""
+        name = name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O")
+        assert name == "beta-D-glucosamine"
+
+    def test_protect_glucuronide_glycoside_byte_identical(self):
+        """The Phase-182 steroid glucuronide glycoside still emits the
+        ``-osiduronic acid`` head (D-10 coupling held: the free-acid emitter
+        does not regress ``uronic_glycoside_head``)."""
+        name = name_compound(
+            "C[C@]12CC[C@H](O[C@@H]3O[C@H](C(=O)O)[C@@H](O)[C@H](O)[C@H]3O)"
+            "C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12"
+        )
+        assert name == (
+            "17-oxo-5beta-androstan-3beta-yl beta-D-glucopyranosiduronic acid"
+        )
