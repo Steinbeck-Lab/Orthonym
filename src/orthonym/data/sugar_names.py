@@ -829,3 +829,352 @@ def recognize_sugar_skeleton(
     if fingerprint is None:
         return None
     return _SKELETON_FINGERPRINT_INDEX.get(fingerprint)
+
+
+# ============================================================================
+# Systematic monosaccharide engine (Phase 183, WSC-04, P-102.5)
+# ============================================================================
+#
+# name_monosaccharide_systematic is a sibling GENERALIZATION of
+# recognize_sugar_skeleton (D-01): where the clean-ring deriver fails closed on
+# a deoxy / amino / uronic ring, the systematic engine classifies the modified
+# positions structurally (D-04), PHYSICALLY idealizes the ring to its parent
+# aldose skeleton (RWMol edit + re-CIP, Pitfall 1 — the raw modified fingerprint
+# does NOT equal the clean parent, so idealization MUST be physical), recovers
+# (anomer, config, base) from the gate-proven _SKELETON_FINGERPRINT_INDEX, and
+# re-applies the modifications as detachable prefixes / the -uronic acid suffix
+# with STRUCTURALLY-derived locants — never string surgery on a derived base
+# (the contributor guide root-cause).  Fail-closed (D-11): any unrecognized modification,
+# out-of-scope ring, or unindexed (C7+) fingerprint returns None so the existing
+# pipeline (catalog / oxane / decomposition / acyclic) stays byte-identical.
+
+# Explicit clean-parent-base -> uronic-tagged-base map (Warning 2 / Pitfall 5).
+# The idealized fingerprint lookup recovers the CLEAN parent base
+# ("glucopyranose"), but uronic_free_acid_name's map keys on the uronic-tagged
+# base ("glucuronopyranose").  This is an EXPLICIT map, NEVER inline string
+# substitution (str.replace / re.sub) on a derived base name.  An out-of-map
+# skeleton has no verified uronic name -> the URONIC branch FAILS CLOSED.
+# galacto is forward-looking (Assumption A1, no gold dependency).
+_URONIC_STEM_MAP = {
+    "glucopyranose": "glucuronopyranose",
+    "galactopyranose": "galacturonopyranose",
+}
+
+
+def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
+    """Classify a single sugar ring's modified positions structurally (D-04).
+
+    Numbers the ring per IUPAC carbohydrate locants (anomeric C = C1; walk away
+    from the ring-O for C2..C5 on a pyranose / C2..C4 on a furanose; the
+    exocyclic CH2OH/COOH carbon = the next locant, C6 for a hexose) and
+    classifies each position against the idealized hydroxyl pattern:
+
+    * a ring carbon whose only exocyclic carbon is a bare terminal methyl
+      (no exocyclic O, degree 1) -> DEOXY at that exocyclic carbon's locant
+      (the 6-deoxy methyl tail, P-102.5.3);
+    * a ring carbon bearing an exocyclic nitrogen -> AMINO at the ring carbon's
+      locant, cited ``x-amino-x-deoxy`` (P-102.5.4 — the N replaces the C-OH);
+    * a ring carbon whose exocyclic carbon is oxidized to a carboxyl
+      (CH2OH -> COOH, an exocyclic carbon with two O neighbours incl. a double
+      bond) -> URONIC at that exocyclic carbon's locant (P-102.5.6.6).
+
+    Returns a dict ``{"deoxy": [locants], "amino": [locants], "uronic":
+    [locants]}`` of STRUCTURALLY-derived locants, or ``None`` if the ring carries
+    a modification this classifier does not recognize (fail-closed, D-11) — so
+    the engine never emits a partial / guessed sugar name.  A clean ring yields
+    all-empty lists (-> the engine returns None: a clean ring is
+    recognize_sugar_skeleton's / lookup_sugar's job).
+    """
+    ringset = set(ring)
+    adjacency = {
+        idx: [
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if n.GetIdx() in ringset
+        ]
+        for idx in ringset
+    }
+    # IUPAC ring-carbon numbering: start at the anomeric C (C1), step to the
+    # ring neighbour that is NOT the ring oxygen, then walk the ring.
+    non_oxygen_nbrs = [x for x in adjacency[anomeric_idx] if x != ring_oxygen]
+    if len(non_oxygen_nbrs) != 1:
+        return None
+    order = [anomeric_idx]
+    prev, cur = anomeric_idx, non_oxygen_nbrs[0]
+    while cur != anomeric_idx:
+        order.append(cur)
+        nxt = [x for x in adjacency[cur] if x != prev]
+        if not nxt:
+            break
+        prev, cur = cur, nxt[0]
+    ring_carbons = [i for i in order if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
+    # Map each ring carbon to its IUPAC locant (C1..Cn).
+    locant_of = {c: k + 1 for k, c in enumerate(ring_carbons)}
+    last_ring_locant = len(ring_carbons)  # C5 on a pyranose, C4 on a furanose
+
+    found = {"deoxy": [], "amino": [], "uronic": []}
+    for ring_c in ring_carbons:
+        loc = locant_of[ring_c]
+        atom = mol.GetAtomWithIdx(ring_c)
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ringset:
+                continue
+            sym = nbr.GetSymbol()
+            if sym == "O":
+                continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
+            if sym == "N":
+                # ring C-OH replaced by C-N: amino at this ring carbon's locant.
+                found["amino"].append(loc)
+            elif sym == "C":
+                # exocyclic carbon: CH2OH (clean) / CH3 (deoxy) / COOH (uronic).
+                o_neighbors = [
+                    x for x in nbr.GetNeighbors() if x.GetSymbol() == "O"
+                ]
+                has_double_o = any(
+                    b.GetBondTypeAsDouble() == 2.0 for b in nbr.GetBonds()
+                )
+                exo_locant = loc + 1  # the exocyclic carbon's locant (C6 on hexose)
+                if has_double_o and len(o_neighbors) >= 2:
+                    found["uronic"].append(exo_locant)  # CH2OH -> COOH
+                elif not o_neighbors and nbr.GetDegree() == 1:
+                    found["deoxy"].append(exo_locant)  # bare terminal CH3
+                elif len(o_neighbors) == 1 and not has_double_o:
+                    pass  # clean CH2OH exocyclic carbon (C6) — no modification
+                else:
+                    return None  # unrecognized exocyclic carbon (fail-closed)
+            else:
+                return None  # unrecognized heteroatom substituent (fail-closed)
+    # If a ring carbon is deoxy at its ring locant (an exocyclic O simply
+    # missing on a non-terminal carbon) it would surface as a clean carbon here;
+    # this engine handles the terminal 6-deoxy + amino + uronic classes only —
+    # additional deoxy positions are out of scope and would idealize-mismatch,
+    # caught downstream by the fingerprint lookup.  Record the last ring locant
+    # so the caller can sanity-check hexose vs pentose if needed.
+    found["_last_ring_locant"] = last_ring_locant
+    return found
+
+
+def _idealize_to_parent(mol):
+    """Physically restore a modified sugar ring to its parent aldose skeleton.
+
+    Builds a ``Chem.RWMol`` copy and edits it back to the clean hexose/pentose
+    OH/H/CH2OH skeleton (RESEARCH §1, all three edits VERIFIED to reproduce the
+    canonical SMILES of clean beta-D-glucopyranose):
+
+    * DEOXY  -> add an exocyclic O to the bare terminal ring-attached methyl C
+      (CH3 -> CH2OH);
+    * URONIC -> ``RemoveAtom`` the double-bonded O on the ring-attached COOH
+      carbon (COOH -> CH2OH);
+    * AMINO  -> ``SetAtomicNum(8)`` on the (single) ring/exocyclic nitrogen
+      (C-N -> C-OH).
+
+    Idealization MUST be physical, not analytic: the raw modified-sugar CIP
+    fingerprint does NOT match the clean parent (Pitfall 1 — e.g. the uronic C6
+    carboxyl re-ranks C5 R->S).  After the edit the molecule is sanitized and
+    re-CIP'd by the caller before fingerprinting.
+
+    Mirrors the in-tree RWMol-edit-then-sanitize analog
+    ``rules/lipids.py::_acid_fragment_name``.  Returns the idealized (NEW) mol,
+    or ``None`` on sanitize failure (T-183-04: never crash on a malformed ring).
+    The input mol is never mutated (pure — operates on an RWMol copy).
+    """
+    if mol is None:
+        return None
+    rw = Chem.RWMol(mol)
+    has_n = any(a.GetSymbol() == "N" for a in rw.GetAtoms())
+    has_carbonyl = any(
+        b.GetBondType() == Chem.BondType.DOUBLE
+        and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "O"}
+        for b in rw.GetBonds()
+    )
+    try:
+        if has_n:
+            # amino: ring/exocyclic N -> O (C-N -> C-OH).
+            for a in rw.GetAtoms():
+                if a.GetSymbol() == "N":
+                    a.SetAtomicNum(8)
+                    break
+        elif has_carbonyl:
+            # uronic: reduce the ring-attached COOH carbonyl (remove the =O atom).
+            cc = next(
+                a.GetIdx()
+                for a in rw.GetAtoms()
+                if a.GetSymbol() == "C"
+                and sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") == 2
+            )
+            dbl = next(
+                b.GetOtherAtom(rw.GetAtomWithIdx(cc)).GetIdx()
+                for b in rw.GetAtomWithIdx(cc).GetBonds()
+                if b.GetBondType() == Chem.BondType.DOUBLE
+            )
+            rw.RemoveAtom(dbl)
+        else:
+            # deoxy: add an exocyclic O on the bare terminal (degree-1) carbon.
+            methyl = next(
+                a.GetIdx()
+                for a in rw.GetAtoms()
+                if a.GetSymbol() == "C" and a.GetDegree() == 1
+            )
+            o = rw.AddAtom(Chem.Atom(8))
+            rw.AddBond(methyl, o, Chem.BondType.SINGLE)
+    except StopIteration:
+        return None  # the expected modification atom was not found -> fail-closed
+    m2 = rw.GetMol()
+    try:
+        Chem.SanitizeMol(m2)
+    except Exception:
+        try:
+            Chem.SanitizeMol(
+                m2,
+                sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
+                ^ Chem.SanitizeFlags.SANITIZE_KEKULIZE,
+            )
+        except Exception:
+            return None
+    return m2
+
+
+def name_monosaccharide_systematic(mol) -> Optional[str]:
+    """Systematic P-102.5 name for a non-cataloged deoxy/amino/uronic sugar ring.
+
+    A sibling GENERALIZATION of :func:`recognize_sugar_skeleton` (D-01): for a
+    single 5/6-membered sugar ring that the clean-ring deriver fails closed on
+    (because it carries a deoxy / amino / uronic modification), this engine
+
+    1. reuses the analog's gates (single ring; one ring-O; one anomeric C via
+       :func:`_locate_anomeric_carbon`) and derives the ring size ->
+       ``pyranose`` (6) / ``furanose`` (5) (P-102.3.4);
+    2. classifies the modified positions STRUCTURALLY with IUPAC-derived locants
+       (:func:`_classify_sugar_positions`, D-04);
+    3. PHYSICALLY idealizes the ring to its parent aldose skeleton
+       (:func:`_idealize_to_parent`, the three RESEARCH §1 edits), re-runs
+       ``rdCIPLabeler.AssignCIPLabels``, and recovers ``(anomer, config, base)``
+       from the gate-proven :data:`_SKELETON_FINGERPRINT_INDEX` (Pitfall 1 — the
+       raw modified fingerprint does NOT equal the clean parent);
+    4. assembles the name (D-04):
+
+       * URONIC (P-102.5.6.6): map the idealized clean ``base`` to the
+         uronic-tagged base via the explicit :data:`_URONIC_STEM_MAP`
+         (Warning 2 — NEVER inline ``str.replace``/``re.sub``), then emit
+         :func:`uronic_free_acid_name` -> ``beta-D-glucopyranuronic acid``;
+       * DEOXY / AMINO (P-102.5.3 / P-102.5.4): emit alphabetized detachable
+         prefixes with their derived locants ->
+         ``{prefixes}-{anomer}-{config}-{base}`` (e.g. ``6-deoxy-beta-D-
+         glucopyranose``, ``3-amino-3-deoxy-beta-D-glucopyranose``); ``amino``
+         alphabetizes before ``deoxy``.
+
+    Fail-closed (D-11): returns ``None`` for a non-sugar, a clean cataloged ring
+    (that is ``lookup_sugar``'s job, D-05), a C-glycoside / anhydro ring (no
+    clean idealized fingerprint), an out-of-map uronic skeleton, or a C7+ cyclic
+    sugar (no :data:`_SKELETON_FINGERPRINT_INDEX` entry, Assumption A3) — so the
+    existing pipeline stays byte-identical.  Descriptors are ASCII (``beta-D-``,
+    Pitfall 6).  The input mol is never mutated.
+
+    Args:
+        mol: RDKit Mol of a free monosaccharide (anomeric -OH present).
+
+    Returns:
+        The systematic P-102.5 name, or ``None`` when out of scope.
+
+    Examples:
+        >>> from rdkit import Chem
+        >>> m = Chem.MolFromSmiles("C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+        >>> name_monosaccharide_systematic(m)
+        '6-deoxy-beta-D-glucopyranose'
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    ring_oxygen = ring_oxygens[0]
+
+    anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None or anomeric_idx not in set(ring):
+        return None
+
+    ring_form = "pyranose" if len(set(ring)) == 6 else "furanose"
+
+    # (2) Classify the modified positions structurally (D-04).
+    modifications = _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx)
+    if modifications is None:
+        return None
+    deoxy_locants = sorted(modifications["deoxy"])
+    amino_locants = sorted(modifications["amino"])
+    uronic_locants = sorted(modifications["uronic"])
+    if not (deoxy_locants or amino_locants or uronic_locants):
+        # A clean ring is recognize_sugar_skeleton's / lookup_sugar's job.
+        return None
+
+    # (3) Physically idealize the ring to its parent skeleton and recover
+    # (anomer, config, base) from the proven fingerprint index (D-01).
+    idealized = _idealize_to_parent(mol)
+    if idealized is None:
+        return None
+    _ensure_cip(idealized)
+    ideal_ri = idealized.GetRingInfo()
+    if ideal_ri.NumRings() != 1:
+        return None
+    ideal_ring = ideal_ri.AtomRings()[0]
+    ideal_ring_oxygens = [
+        i for i in ideal_ring if idealized.GetAtomWithIdx(i).GetSymbol() == "O"
+    ]
+    if len(ideal_ring_oxygens) != 1:
+        return None
+    ideal_ring_oxygen = ideal_ring_oxygens[0]
+    ideal_anomeric = _locate_anomeric_carbon(idealized, ideal_ring, ideal_ring_oxygen)
+    if ideal_anomeric is None:
+        return None
+    fingerprint = _ring_cip_fingerprint(
+        idealized, ideal_ring, ideal_ring_oxygen, ideal_anomeric
+    )
+    if fingerprint is None:
+        return None
+    recovered = _SKELETON_FINGERPRINT_INDEX.get(fingerprint)
+    if recovered is None:
+        return None  # C7+ cyclic / unindexed fingerprint -> fail-closed (A3)
+    anomer, config, base = recovered
+    # The idealized base must carry the ring-form designator we derived; the
+    # fingerprint index keys all 8 D-hexoses + pentoses in pyranose/furanose.
+    if ring_form not in base:
+        return None
+
+    # (4) Assemble (D-04).
+    if uronic_locants:
+        # A uronic sugar is named purely by the -uronic acid suffix; it must not
+        # co-occur with deoxy/amino in this engine's scope (fail-closed if it does).
+        if deoxy_locants or amino_locants:
+            return None
+        uronic_base = _URONIC_STEM_MAP.get(base)
+        if uronic_base is None:
+            return None  # out-of-map skeleton has no verified uronic name (D-11)
+        return uronic_free_acid_name(anomer, config, uronic_base)
+
+    # DEOXY / AMINO: build alphabetized detachable prefixes WITH structural
+    # locants (never string surgery on the derived base).  P-102.5.4 cites an
+    # amino sugar as ``x-amino-x-deoxy`` (the N replaces a C-OH, so each amino
+    # locant is also a deoxy locant).
+    prefix_terms = []  # (alpha-sort-key, rendered-term)
+    all_deoxy = sorted(set(deoxy_locants) | set(amino_locants))
+    if amino_locants:
+        prefix_terms.append(
+            ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
+        )
+    if all_deoxy:
+        prefix_terms.append(
+            ("deoxy", f"{','.join(str(x) for x in all_deoxy)}-deoxy")
+        )
+    # Alphabetize the detachable prefixes (amino < deoxy).
+    prefix_terms.sort(key=lambda t: t[0])
+    prefix_str = "-".join(term for _, term in prefix_terms)
+
+    descriptor = f"{anomer}-{config}-" if anomer and config else ""
+    if prefix_str:
+        return f"{prefix_str}-{descriptor}{base}"
+    return f"{descriptor}{base}"
