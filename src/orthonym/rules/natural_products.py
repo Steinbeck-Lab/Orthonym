@@ -506,6 +506,16 @@ def name_natural_product_with_substituents(
     if len(conjugates) > 1:
         return None
 
+    # Phase 182 (WSC-03, D-07): a conjugate mixed with a real acyl ester (e.g. a steroid
+    # 17-acetate 3-sulfate) is NOT expressible as a single functional-class join — the
+    # `_assemble_np_ester_name` mixed-acid `else` branch keys on `ester["acylate"]`, which a
+    # conjugate dict (carrying `word`) does not have. There is no confidently-correct PIN for
+    # the mixed case yet (the non-senior fragment would need a sulfooxy/acyloxy prefix), so
+    # honest-fail (None → systematic pipeline) rather than emit a wrong/partial name or rely on
+    # a downstream KeyError. Mixed conjugate+ester is Phase 183/184 scope.
+    if conjugates and esters:
+        return None
+
     # If no decorations found, return bare scaffold name. Phase 182 (D-09): also require
     # `not conjugates` so a scaffold carrying ONLY a conjugate (and no other decoration)
     # still enters assembly instead of short-circuiting to the bare scaffold name.
