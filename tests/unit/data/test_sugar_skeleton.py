@@ -173,6 +173,90 @@ class TestSugarSkeletonCatalogReproduction:
 
 
 @pytest.mark.unit
+class TestSkeletonIdealization:
+    """Phase 183 (WSC-04, D-01): physical idealize-then-lookup reproduces the
+    clean parent skeleton for each modified-sugar class (deoxy / uronic / amino).
+
+    This is the floor the Wave-1 generalization must defend: the raw modified
+    fingerprint does NOT equal the clean parent (Pitfall 1 — the modification
+    re-ranks ring CIP), so idealization MUST be physical (edit the molecule, then
+    re-run rdCIPLabeler). Each idealization restores the EXACT canonical SMILES of
+    clean beta-D-glucopyranose, and the existing deriver recovers (beta, D,
+    glucopyranose) from it (RESEARCH §1).
+    """
+
+    # Verified modified-sugar SMILES (OPSIN-RT True this session); the clean parent.
+    _DEOXY = "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    _URONIC = "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    _AMINO = "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
+    _CLEAN = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+
+    @staticmethod
+    def _idealize(smiles):
+        """Physical idealization (RESEARCH §1): restore the parent skeleton.
+
+        deoxy -> add an exocyclic O on the bare terminal ring-attached CH3;
+        uronic -> remove the carbonyl =O so COOH -> CH2OH;
+        amino  -> SetAtomicNum(8) on the single nitrogen.
+        Returns the canonical SMILES of the idealized (NEW) molecule.
+        """
+        m = Chem.RWMol(Chem.MolFromSmiles(smiles))
+        has_n = any(a.GetSymbol() == "N" for a in m.GetAtoms())
+        has_carbonyl = any(
+            b.GetBondType() == Chem.BondType.DOUBLE
+            and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "O"}
+            for b in m.GetBonds()
+        )
+        if has_n:
+            for a in m.GetAtoms():
+                if a.GetSymbol() == "N":
+                    a.SetAtomicNum(8)
+                    break
+        elif has_carbonyl:
+            cc = next(
+                a.GetIdx()
+                for a in m.GetAtoms()
+                if a.GetSymbol() == "C"
+                and sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") == 2
+            )
+            dbl = next(
+                b.GetOtherAtom(m.GetAtomWithIdx(cc)).GetIdx()
+                for b in m.GetAtomWithIdx(cc).GetBonds()
+                if b.GetBondType() == Chem.BondType.DOUBLE
+            )
+            m.RemoveAtom(dbl)
+        else:
+            methyl = next(
+                a.GetIdx()
+                for a in m.GetAtoms()
+                if a.GetSymbol() == "C" and a.GetDegree() == 1
+            )
+            o = m.AddAtom(Chem.Atom(8))
+            m.AddBond(methyl, o, Chem.BondType.SINGLE)
+        Chem.SanitizeMol(m)
+        return Chem.MolToSmiles(m)
+
+    def test_idealization_reproduces_clean_parent(self):
+        """deoxy/uronic/amino each idealize to clean beta-D-glucopyranose (D-01)."""
+        clean = Chem.CanonSmiles(self._CLEAN)
+        for smi in (self._DEOXY, self._URONIC, self._AMINO):
+            assert self._idealize(smi) == clean, (
+                f"idealization of {smi} did not reproduce clean beta-D-glucopyranose"
+            )
+
+    def test_idealized_fingerprint_recovers_gluco(self):
+        """The idealized parent recovers (beta, D, glucopyranose) via the deriver."""
+        for smi in (self._DEOXY, self._URONIC, self._AMINO):
+            ideal = Chem.MolFromSmiles(self._idealize(smi))
+            recovered = recognize_sugar_skeleton(ideal, anomeric_idx=None) or lookup_sugar(
+                Chem.MolToSmiles(ideal)
+            )
+            assert recovered == ("beta", "D", "glucopyranose"), (
+                f"idealized {smi} recovered {recovered!r}, expected gluco"
+            )
+
+
+@pytest.mark.unit
 class TestGlycosideClassName:
     """D-07: -ose -> -oside with an ASCII alpha/beta-D/L- prefix."""
 

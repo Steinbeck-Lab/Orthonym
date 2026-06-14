@@ -1,0 +1,209 @@
+"""RED unit tests for the systematic monosaccharide engine (Phase 183, WSC-04).
+
+The systematic-mono engine (`data/sugar_names.name_monosaccharide_systematic`,
+D-01/D-04) is a *generalization* of the existing `recognize_sugar_skeleton`
+fingerprint deriver: for a non-cataloged single sugar ring (deoxy / amino /
+uronic) it PHYSICALLY idealizes the ring to its parent aldose/ketose skeleton
+(deoxy -> add the missing exocyclic O; uronic -> reduce COOH -> CH2OH; amino ->
+ring N -> O), re-runs `rdCIPLabeler.AssignCIPLabels`, looks the idealized
+fingerprint up in `_SKELETON_FINGERPRINT_INDEX` to recover (anomer, config,
+base), then re-applies the modifications as detachable prefixes / the uronic
+suffix with derived locants. It is fail-closed (D-11): any out-of-scope ring
+returns None -> existing pipeline.
+
+WAVE 0 CONTRACT (mirror tests/unit/rules/test_conjugate_controller.py): imports
+of the not-yet-built `name_monosaccharide_systematic` (and `AMINO_SUGAR_NAMES`
+for the Pitfall-3 non-catalog assertion) go INSIDE each test body, NOT at module
+level, so `pytest --collect-only` succeeds while the engine is RED at run time
+until Wave-1 (Plan 183-01) lands. `RDLogger.DisableLog("rdApp.*")` at module top.
+
+Root-cause-only (the contributor guide): every assertion is structural (physical
+idealization, fingerprint recovery, fail-closed None) — never string surgery on
+a derived base name.
+
+Verified this session (OPSIN-RT True, ASCII descriptors per Pitfall 6):
+  deoxy  : C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O   -> 6-deoxy-beta-D-glucopyranose
+  uronic : O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O -> beta-D-glucopyranuronic acid
+  amino  : N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O    -> 3-amino-3-deoxy-beta-D-glucopyranose
+           (idealizes to beta-D-glucopyranose; NOT in AMINO_SUGAR_NAMES -> Pitfall 3 OK)
+"""
+
+import pytest
+from rdkit import Chem
+from rdkit import RDLogger
+
+RDLogger.DisableLog("rdApp.*")
+
+
+# ---------------------------------------------------------------------------
+# Verified target SMILES (canonical, OPSIN-RT True this session)
+# ---------------------------------------------------------------------------
+# 6-deoxy-beta-D-glucopyranose (ring-CH3 instead of ring-CH2OH at C6).
+DEOXY_SMILES = "C[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+# beta-D-glucopyranuronic acid (C6 oxidized -CH2OH -> -COOH); free acid form (D-10).
+URONIC_SMILES = "O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+# 3-amino-3-deoxy-beta-D-glucopyranose: NON-cataloged amino sugar (Pitfall 3).
+# Built from clean beta-D-glucopyranose by replacing the C3 exocyclic O with N;
+# idealizing N->O provably returns the gluco parent. InChI-matched to OPSIN's
+# parse of "3-amino-3-deoxy-beta-D-glucopyranose" this session.
+AMINO_SMILES = "N[C@@H]1[C@@H](O)[C@H](O)O[C@H](CO)[C@H]1O"
+
+# Clean parent every idealization must reproduce (Pitfall 1 / RESEARCH §1).
+CLEAN_GLUCOPYRANOSE = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+
+# Open-chain aldoheptose (D-05 no-regression: the acyclic substitutive form
+# emits correctly today and MUST stay byte-identical; C7+ cyclic is honest-fail
+# per Assumption A3). HEAD output pinned below as the expected value.
+HEPTOSE_ACYCLIC_SMILES = "OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C=O"
+HEPTOSE_ACYCLIC_HEAD_NAME = "(2S,3S,4R,5S,6R)-2,3,4,5,6,7-hexahydroxyheptanal"
+
+
+def _idealize_to_parent_inline(smiles):
+    """Replicate the RESEARCH §1 physical idealization (Pitfall 1) inline.
+
+    deoxy : add an exocyclic O on the bare terminal ring-attached CH3.
+    uronic: RemoveAtom the carbonyl =O so COOH -> CH2OH.
+    amino : SetAtomicNum(8) on the (single) nitrogen.
+    Returns the canonical SMILES of the idealized molecule (a NEW mol so CIP
+    re-runs cleanly). This proves the physical-idealization requirement; the
+    Wave-1 helper (`_idealize_to_parent`) must reproduce this behaviour.
+    """
+    m = Chem.RWMol(Chem.MolFromSmiles(smiles))
+    has_n = any(a.GetSymbol() == "N" for a in m.GetAtoms())
+    has_carbonyl = any(
+        b.GetBondType() == Chem.BondType.DOUBLE
+        and {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()} == {"C", "O"}
+        for b in m.GetBonds()
+    )
+    if has_n:
+        for a in m.GetAtoms():
+            if a.GetSymbol() == "N":
+                a.SetAtomicNum(8)
+                break
+    elif has_carbonyl:
+        # uronic: reduce the ring-attached COOH carbonyl (remove the =O atom).
+        cc = next(
+            a.GetIdx()
+            for a in m.GetAtoms()
+            if a.GetSymbol() == "C"
+            and sum(1 for n in a.GetNeighbors() if n.GetSymbol() == "O") == 2
+        )
+        dbl = next(
+            b.GetOtherAtom(m.GetAtomWithIdx(cc)).GetIdx()
+            for b in m.GetAtomWithIdx(cc).GetBonds()
+            if b.GetBondType() == Chem.BondType.DOUBLE
+        )
+        m.RemoveAtom(dbl)
+    else:
+        # deoxy: add an exocyclic O on the bare terminal (degree-1) carbon.
+        methyl = next(
+            a.GetIdx()
+            for a in m.GetAtoms()
+            if a.GetSymbol() == "C" and a.GetDegree() == 1
+        )
+        o = m.AddAtom(Chem.Atom(8))
+        m.AddBond(methyl, o, Chem.BondType.SINGLE)
+    Chem.SanitizeMol(m)
+    return Chem.MolToSmiles(m)
+
+
+@pytest.mark.unit
+class TestSystematicMonosaccharide:
+    """WSC-04 systematic monosaccharide engine (deoxy / amino / uronic)."""
+
+    def test_deoxy_systematic(self):
+        """6-deoxy hexose names with a 'deoxy' detachable prefix, not an oxane."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        mol = Chem.MolFromSmiles(DEOXY_SMILES)
+        assert mol is not None
+        name = name_monosaccharide_systematic(mol)
+        assert name is not None, "deoxy sugar must name systematically, not None"
+        assert "6-deoxy" in name
+        assert "glucopyranose" in name
+        # Never the substituted-oxane mis-name (the live defect this fixes).
+        assert "oxane" not in name
+
+    def test_uronic_free_acid(self):
+        """Free uronic acid names as the OPSIN-parseable '...pyranuronic acid' (D-10)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        mol = Chem.MolFromSmiles(URONIC_SMILES)
+        assert mol is not None
+        name = name_monosaccharide_systematic(mol)
+        # The D-10 free-acid form, NOT 'glucuronopyranose' (OPSIN-unparseable).
+        assert name == "beta-D-glucopyranuronic acid"
+
+    def test_amino_systematic(self):
+        """A NON-cataloged amino-deoxy sugar names systematically (P-102.5.4, Pitfall 3)."""
+        from orthonym.data.sugar_names import (
+            AMINO_SUGAR_NAMES,
+            name_monosaccharide_systematic,
+        )
+
+        # Pitfall 3: the gold target MUST NOT be one of the cataloged amino
+        # sugars (those are PROTECT, not systematic targets).
+        canon = Chem.CanonSmiles(AMINO_SMILES)
+        catalog_keys = {Chem.CanonSmiles(k) for k in AMINO_SUGAR_NAMES}
+        assert canon not in catalog_keys, (
+            "amino TARGET must be non-cataloged (Pitfall 3); it is in AMINO_SUGAR_NAMES"
+        )
+
+        mol = Chem.MolFromSmiles(AMINO_SMILES)
+        assert mol is not None
+        name = name_monosaccharide_systematic(mol)
+        assert name is not None, "non-cataloged amino sugar must name systematically"
+        assert "amino" in name
+        assert "deoxy" in name
+        assert ("pyranose" in name) or ("furanose" in name)
+
+    def test_idealize_to_parent_recovers_clean_fingerprint(self):
+        """Physical idealization restores the clean parent skeleton (Pitfall 1).
+
+        For each modified-sugar class the idealized canonical SMILES MUST equal
+        clean beta-D-glucopyranose — proving idealization is physical (edit +
+        re-CIP), not an analytic 'modification-tolerant fingerprint' (which
+        FAILS because the modification re-ranks ring CIP). Where the engine
+        exposes a `_idealize_to_parent` helper it is preferred; otherwise the
+        inline replication asserts the same physical-idealization contract.
+        """
+        clean = Chem.CanonSmiles(CLEAN_GLUCOPYRANOSE)
+        try:
+            from orthonym.data.sugar_names import _idealize_to_parent  # type: ignore
+
+            def idealize(smi):
+                rw = _idealize_to_parent(Chem.MolFromSmiles(smi))
+                return Chem.MolToSmiles(rw) if rw is not None else None
+        except ImportError:
+            idealize = _idealize_to_parent_inline
+
+        for smi in (DEOXY_SMILES, URONIC_SMILES, AMINO_SMILES):
+            assert idealize(smi) == clean, (
+                f"idealization of {smi} did not reproduce clean beta-D-glucopyranose"
+            )
+
+    def test_heptose_acyclic_unchanged(self):
+        """C7+ acyclic aldose path is byte-identical (D-05 / Assumption A3 no-reg).
+
+        The open-chain substitutive form already emits correctly today; C7+
+        cyclic is honest-fail (no _SKELETON_FINGERPRINT_INDEX entry), so the
+        acyclic path MUST stay byte-identical. Pinned to the HEAD output.
+        """
+        from orthonym import name_compound
+
+        assert name_compound(HEPTOSE_ACYCLIC_SMILES) == HEPTOSE_ACYCLIC_HEAD_NAME
+
+    def test_systematic_mono_fail_closed(self):
+        """Fail-closed (D-11): None for a non-sugar and an out-of-scope ring."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        # Non-sugar (benzene) -> None.
+        benzene = Chem.MolFromSmiles("c1ccccc1")
+        assert name_monosaccharide_systematic(benzene) is None
+
+        # Out-of-scope ring: a C-glycoside (anomeric carbon bonded to a ring C,
+        # no anomeric exocyclic O) has no clean idealized fingerprint -> None.
+        c_glycoside = Chem.MolFromSmiles(
+            "OC[C@H]1O[C@@H](c2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O"
+        )
+        assert name_monosaccharide_systematic(c_glycoside) is None
