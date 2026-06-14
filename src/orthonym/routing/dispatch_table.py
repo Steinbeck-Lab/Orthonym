@@ -338,12 +338,39 @@ def _is_multiplicative(mol, smiles, canonical_smiles, features=None, **kwargs) -
 
 
 def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-2; mirrors namer.py:1051-1062 (audit § 1 row 10; § 2.10 purity proof)."""
+    """Tier-2; mirrors namer.py:1051-1062 (audit § 1 row 10; § 2.10 purity proof).
+
+    Phase 183 (D-03/D-13): the carbohydrate tier (priority 1000, above the
+    oxane/heterocycle handler) now fires for THREE recognized-sugar cases, gated
+    narrowly so it fires ONLY where a sugar is recognized:
+
+    1. cataloged sugars (``lookup_sugar`` is not None — unchanged fast-path);
+    2. a clean/decorated SINGLE sugar ring the systematic-mono engine can name
+       (``name_monosaccharide_systematic`` is not None — deoxy/amino/uronic, D-01);
+    3. >= 2 LINKED recognized sugar rings the disaccharide assembler can name
+       (``oligosaccharides.name_disaccharide`` via ``_classify_units`` is not None,
+       D-02).
+
+    Every cataloged sugar, Phase-176 simple glycoside, cataloged amino sugar, and
+    non-sugar molecule stays byte-identical: clauses 2/3 only ADD firing on
+    structures the catalog misses; the handler still falls through (None ->
+    cascade-continue) when no engine produces a name. ``classify_compound_class``
+    is the cheap pre-gate (sugar-ring SMARTS) that bounds the cost of the
+    structural recognizers.
+    """
     from orthonym.namer import classify_compound_class
     if classify_compound_class(mol, canonical_smiles) != 'carbohydrate':
         return False
-    from orthonym.data.sugar_names import lookup_sugar
-    return lookup_sugar(canonical_smiles) is not None
+    from orthonym.data.sugar_names import (
+        lookup_sugar,
+        name_monosaccharide_systematic,
+    )
+    if lookup_sugar(canonical_smiles) is not None:
+        return True
+    if name_monosaccharide_systematic(mol) is not None:
+        return True
+    from orthonym.rules.oligosaccharides import _classify_units
+    return _classify_units(mol) is not None
 
 
 def _is_lipid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -713,24 +740,68 @@ def _handle_multiplicative(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
                                 style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1052-1062 — direct lookup-then-join.
+    """Catalog-first carbohydrate cascade (Phase 183 D-03 + D-10).
 
-    The v18 cascade at namer.py:1051-1062 inlines the join; preserving that
-    verbatim here. ``lookup_sugar`` returns ``(anomer, config, base_name)``
-    or None; the predicate already gated on non-None so we hit the join path.
+    The v18 cascade at namer.py:1051-1062 inlined a plain lookup-then-join. This
+    handler keeps that fast-path FIRST (D-05) and extends it with two new
+    engines, behind the broadened predicate :func:`_is_carbohydrate_lookup`:
+
+    1. **Catalog (``lookup_sugar``) FIRST.** If it returns ``(anomer, config,
+       base_name)``:
+
+       * **D-10 uronic interception.** The free uronic acid SMILES is itself a
+         catalog key (``URONIC_ACID_NAMES`` -> ``ALL_SUGAR_NAMES``), so
+         ``lookup_sugar`` returns ``base_name == "glucuronopyranose"``. The plain
+         ``"-".join`` would emit the OPSIN-UNPARSEABLE ``beta-D-glucuronopyranose``
+         (the validity gate then suppresses it to ``unknown``). So when
+         ``"urono" in base_name`` we route to
+         :func:`~orthonym.data.sugar_names.uronic_free_acid_name`, which emits
+         the P-102.5.6.6.4 free-acid form ``beta-D-glucopyranuronic acid``.
+         A ``None`` from it cascade-continues (fail-closed, D-11).
+       * **Otherwise** the existing plain ``"-".join(parts)`` is UNCHANGED, so
+         every non-uronic cataloged sugar (incl. simple glycosides handled
+         elsewhere and the cataloged amino sugars) stays byte-identical.
+
+    2. **Systematic monosaccharide (D-01/D-04).** On a catalog miss, try
+       :func:`~orthonym.data.sugar_names.name_monosaccharide_systematic` so a
+       free deoxy/amino/uronic single sugar ring names systematically
+       (``6-deoxy-beta-D-glucopyranose``) rather than as a substituted oxane.
+
+    3. **Disaccharide / oligosaccharide (D-02).** On a further miss, try
+       :func:`~orthonym.rules.oligosaccharides.name_disaccharide` for the
+       P-102.7 glycosyl-glycoside / glycosylglycose form.
+
+    The first non-None wins; otherwise ``None`` (cascade-continue -> the existing
+    pipeline names it byte-identically). All imports are lazy/in-function.
     """
     from orthonym.data.sugar_names import lookup_sugar
     sugar_info = lookup_sugar(canonical_smiles)
-    if sugar_info is None:
-        return None  # defensive; predicate already gated on non-None
-    anomer, config, base_name = sugar_info
-    parts = []
-    if anomer:
-        parts.append(anomer)
-    if config:
-        parts.append(config)
-    parts.append(base_name)
-    return "-".join(parts)
+    if sugar_info is not None:
+        anomer, config, base_name = sugar_info
+        # D-10: a cataloged uronic base must emit the OPSIN-parseable free-acid
+        # form, not the unparseable "...uronopyranose" join.
+        if "urono" in base_name:
+            from orthonym.data.sugar_names import uronic_free_acid_name
+            free_acid = uronic_free_acid_name(anomer, config, base_name)
+            if free_acid is not None:
+                return free_acid
+            # uronic_free_acid_name fail-closed -> cascade-continue (D-11).
+            return None
+        parts = []
+        if anomer:
+            parts.append(anomer)
+        if config:
+            parts.append(config)
+        parts.append(base_name)
+        return "-".join(parts)
+
+    # Catalog miss -> systematic monosaccharide (D-01), then disaccharide (D-02).
+    from orthonym.data.sugar_names import name_monosaccharide_systematic
+    mono = name_monosaccharide_systematic(mol)
+    if mono is not None:
+        return mono
+    from orthonym.rules.oligosaccharides import name_disaccharide
+    return name_disaccharide(mol)
 
 
 def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
