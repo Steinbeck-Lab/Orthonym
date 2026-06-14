@@ -962,6 +962,205 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
     return ''
 
 
+# === CUMULATIVE PARENT-HYDRIDE SUFFIX (anion -ide / cation -ium / radical -yl) ==
+
+# P-72.2.2.1 (anion, loss of H+ -> -ide) / P-71 + Table 3.4 (radical, loss of
+# H. -> -yl/-ylidene/-ylidyne) / P-73.1.2 (cation -ium): the number of hydrogens
+# the centre gains (anion) or loses (radical/cation) to recover the SATURATED
+# neutral parent hydride. For an anion centre (e.g. [CH-]) the parent gains 1 H
+# back ([CH2]); for a monovalent radical it gains 1 H, divalent 2, trivalent 3;
+# for a cation it has 1 H too few, so the parent gains... no: a -ium centre is
+# protonated, so the parent loses 1 H. (BlueBookV2/BlueBookV2.md Table 3.4,
+# lines 17580-17608.)
+_CUMULATIVE_SUFFIX_H_DELTA = {
+    'ide': +1,        # P-72.2.2.1: anion gained an electron pair losing H+; parent re-adds 1 H
+    'yl': +1,         # P-71 / Table 3.4: monovalent radical; parent re-adds 1 H
+    'ylidene': +2,    # P-71: divalent radical; parent re-adds 2 H
+    'ylidyne': +3,    # P-71: trivalent radical; parent re-adds 3 H
+    'ium': -1,        # P-73.1.2: cation is protonated; parent removes 1 H
+}
+
+
+def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
+    """Name a parent hydride with a cumulative anionic / radical / cationic suffix
+    on a single carbon centre, with a FIRST-CLASS locant.
+
+    suffix in {'ide', 'ium', 'yl', 'ylidene', 'ylidyne'}.
+      'ide'      -> P-72.2.2.1 / Table 3.4 (anion, loss of H+)
+      'yl'/'ylidene'/'ylidyne' -> P-71 / Table 3.4 (radical, loss of H.)
+      'ium'      -> P-73.1.2 (cation; reserved for later reuse)
+
+    center_idx is the atom index OF THE CHARGED/RADICAL CARBON ON ``mol`` (the
+    index-preserving mol passed in — NOT a freshly canonicalized copy; canonical
+    SMILES reorders atoms, RESEARCH Pitfall 1). The centre gets the LOWEST locant
+    over the re-found chain, competing with unsaturation and substituents per
+    P-31.1.4 / P-14.4 (``orient_chain`` criterion (a), principal_group_atoms =
+    {center_idx}). This is a NEW P-72.2.2.1 numbering call ("locants identify
+    positions of the negative charges", BlueBookV2 lines 40876-40902), NOT a
+    reused -ol / FG anchor and NOT a hand-rolled carbon-counting scan.
+
+    Returns '' on any failure (caller falls through to legacy).
+    """
+    # --- 1. Defensive guards --------------------------------------------------
+    if mol is None or suffix not in _CUMULATIVE_SUFFIX_H_DELTA:
+        return ''
+    try:
+        center = mol.GetAtomWithIdx(center_idx)
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    # This primitive is the CARBON-centred parent-hydride path; heteroatom anions
+    # (alkoxide/thiolate/aminide) stay on their existing class paths.
+    if center.GetSymbol() != 'C':
+        return ''
+
+    # --- 2. Saturate the centre on an INDEX-PRESERVING copy (Pitfall 1) -------
+    # Work on an RWMol whose atom indices match ``mol`` exactly — do NOT round-trip
+    # through Chem.MolToSmiles/MolFromSmiles, which canonicalizes and reorders.
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(center_idx)
+        a.SetFormalCharge(0)
+        a.SetNumRadicalElectrons(0)
+        # Re-add (anion/radical: +delta) or remove (cation: -delta) the hydrogens
+        # the centre lost/gained relative to the saturated neutral parent hydride.
+        h_delta = _CUMULATIVE_SUFFIX_H_DELTA[suffix]
+        new_h = a.GetTotalNumHs() + h_delta
+        if new_h < 0:
+            return ''
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(new_h)
+        work_mol = work.GetMol()
+        Chem.SanitizeMol(work_mol)
+    except (RuntimeError, ValueError):
+        return ''
+
+    # --- 3. Find the principal chain on the saturated hydride -----------------
+    from ..perception.chains import find_principal_chain, get_substituents, classify_substituent
+    from ..perception.functional_groups import detect_functional_groups
+    try:
+        fgs = detect_functional_groups(work_mol)
+        # A bare parent hydride has NO principal characteristic group; the centre
+        # is located via the NEW P-72.2.2.1 numbering call below, not an FG.
+        chain = find_principal_chain(work_mol, fgs, principal_group=None)
+    except (RuntimeError, ValueError, KeyError):
+        return ''
+    if not chain or center_idx not in chain:
+        # Out of scope (e.g. centre is off the principal carbon chain, or a
+        # ring carbanion): caller falls through to legacy.
+        return ''
+
+    # --- 4. Orient the chain so the centre gets the lowest locant (P-72.2.2.1) -
+    from .locants import orient_chain, build_atom_to_locant
+    chain_set = set(chain)
+    double_bonds: List[tuple] = []
+    triple_bonds: List[tuple] = []
+    for i in range(len(chain) - 1):
+        bond = work_mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if bond is None:
+            continue
+        bt = bond.GetBondType()
+        if bt == Chem.BondType.DOUBLE:
+            double_bonds.append((chain[i], chain[i + 1]))
+        elif bt == Chem.BondType.TRIPLE:
+            triple_bonds.append((chain[i], chain[i + 1]))
+
+    # Substituent positions keyed by chain atom index drive orient_chain
+    # criterion (d) (lowest locants for substituents) as a tie-break.
+    subs_by_position = get_substituents(work_mol, chain)  # 1-based position -> [atoms]
+    substituent_positions: Dict[int, list] = {}
+    for position, sub_lists in subs_by_position.items():
+        substituent_positions[chain[position - 1]] = sub_lists
+
+    oriented = orient_chain(
+        chain, work_mol,
+        principal_group_atoms={center_idx},   # criterion (a): lowest locant for the -ide centre
+        double_bonds=double_bonds,
+        triple_bonds=triple_bonds,
+        substituent_positions=substituent_positions,
+    )
+    loc_map = build_atom_to_locant(oriented)
+    center_locant = loc_map[center_idx]
+    chain_len = len(oriented)
+
+    # --- 5. Assemble the name -------------------------------------------------
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+    try:
+        stem = get_chain_prefix(chain_len)
+    except ValueError:
+        return ''
+
+    # 5a. Substituent prefixes with their ORIENTED locants. Each substituent is
+    # named via the shared classify_substituent (alkyl/ring), grouped by name,
+    # given its chain-carbon locant, alphabetized (P-14.5.2) and multiplied
+    # (P-16.3.3) — the same machinery the neutral acyclic namer uses.
+    # subs_by_position keys are 1-based positions on the ORIGINAL ``chain`` order;
+    # map each back to its atom index, then to its oriented locant via loc_map.
+    parent_atoms = chain_set
+    name_to_locants: Dict[str, list] = {}
+    for position, sub_lists in subs_by_position.items():
+        chain_idx = chain[position - 1]
+        for sub_atoms in sub_lists:
+            info = classify_substituent(work_mol, sub_atoms, parent_atoms)
+            sub_name = info.get('name')
+            if not sub_name:
+                return ''  # unnameable substituent -> out of scope, fall through
+            name_to_locants.setdefault(sub_name, []).append(loc_map[chain_idx])
+
+    prefix_parts = []  # (sort_key, locant_min, text)
+    for sub_name, locants in name_to_locants.items():
+        locants_sorted = sorted(locants)
+        count = len(locants_sorted)
+        mult = get_multiplier_prefix(count, sub_name)
+        loc_str = ','.join(str(l) for l in locants_sorted)
+        from ..assembly.naming_utils import is_complex_substituent
+        if is_complex_substituent(sub_name) and count > 1:
+            body = f"{mult}({sub_name})"
+        else:
+            body = f"{mult}{sub_name}"
+        prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
+                             f"{loc_str}-{body}"))
+    prefix_parts.sort(key=lambda t: (t[0], t[1]))
+    # P-14.5.2: detachable prefixes join one another and the parent stem directly
+    # (the locant-hyphen is INTERNAL to each prefix block); '3-methyl' + 'butan-2-ide'
+    # -> '3-methylbutan-2-ide', NEVER '3-methyl-butan-2-ide'.
+    prefix_str = ''.join(p[2] for p in prefix_parts)
+
+    # 5b. Unsaturation endings (en/yn) come BEFORE the cumulative -ide/-yl ending
+    # (Table 3.4 cumulative-ending order; RESEARCH (d): but-3-en-2-ide, not
+    # 2-id-3-ene). Build the saturated/unsaturated parent stem 'hexan'/'but-3-en'.
+    unsat_endings = ''
+    if double_bonds or triple_bonds:
+        def _bond_locant(pair):
+            return min(loc_map[pair[0]], loc_map[pair[1]])
+        d_locs = sorted(_bond_locant(b) for b in double_bonds)
+        t_locs = sorted(_bond_locant(b) for b in triple_bonds)
+        if d_locs:
+            dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+            joiner = 'a' if dmult else ''
+            unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
+        if t_locs:
+            tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+            joiner = 'a' if tmult else ''
+            unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+
+    # 5c. Stem + 'an' + (unsaturation) + cumulative-suffix locant + suffix.
+    # Single-carbon special case (D-09 methanide): one-atom chain -> NO locant
+    # ('methane' -> 'methanide'). Otherwise the centre locant is first-class.
+    if chain_len == 1:
+        # methane -> methanide / methyl / methylidene ...
+        core = f"{stem}an{suffix}"
+    elif unsat_endings:
+        # 'but-3-en' already carries its own trailing locant on the unsaturation;
+        # append '-{center_locant}-{suffix}' (but-3-en-2-ide).
+        core = f"{stem}{unsat_endings}-{center_locant}-{suffix}"
+    else:
+        # 'hexane' -> 'hexan-{locant}-ide'; elide the trailing 'e' of 'ane'.
+        core = f"{stem}an-{center_locant}-{suffix}"
+
+    return f"{prefix_str}{core}"
+
+
 def _ionize_acid_name(neutral_name: str, total_charge: int,
                       allowed_suffixes: Optional[frozenset] = None) -> str:
     """Thin back-compat wrapper over ``apply_ion_suffix_to_name`` (169.6-02).
