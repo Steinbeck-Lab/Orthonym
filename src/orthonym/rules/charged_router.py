@@ -152,10 +152,58 @@ _ANION_ALLOWED_SUFFIXES = {
 # sulfonate suffix), not the carboxylic-principal 'propanoate' the neutral
 # seniority (P-41 carboxylic > sulfonic) yields for the di-acid skeleton.
 _ANION_PRINCIPAL_FG = {
-    'sulfonate': 'sulfonic_acid',
-    'sulfinate': 'sulfinic_acid',
-    'phosphonate': 'phosphonic_acid',
+    'carboxylate': 'carboxylic_acid',   # WS-E.3 (P-72.2): carboxylate is the senior anion acid class
+    'sulfonate': 'sulfonic_acid',       # 173.6 - byte-identical, do not change
+    'sulfinate': 'sulfinic_acid',       # 173.6 - byte-identical, do not change
+    'phosphonate': 'phosphonic_acid',   # 173.6 - byte-identical, do not change
 }
+
+# P-72.2 anion acid-class seniority (highest first) for the charge-first PCG pick.
+# Declarative single source of truth (the "class-keyed transform table" pattern):
+# the carboxylate > sulfonate > sulfinate > phosphonate order mirrors the P-72.2
+# anion-acid-class seniority used when several ionized acid centres coexist.
+_ANION_PCG_SENIORITY = ('carboxylate', 'sulfonate', 'sulfinate', 'phosphonate')
+
+
+def classify_charged_pcg(mol, sites) -> Optional[str]:
+    """Charge-first PCG classifier (WS-E.3, D-11/D-12). Runs on the ORIGINAL
+    (un-neutralized) mol. Returns the FG-name to FORCE as the principal
+    characteristic group (a detect_functional_groups KEY: 'carboxylic_acid',
+    'sulfonic_acid', 'sulfinic_acid', 'phosphonic_acid'), or None when the
+    charged class has NO neutral FG anchor (carbanion/alkoxide/thiolate/
+    aminide/phenolate -> handled by the WS-E.2 emit_parent_hydride_cumulative_
+    suffix primitive / the existing suffix seam, NOT this override) or when a
+    different route owns the molecule.
+
+    Ordering (D-12; P-72 anions / P-73 cations / P-74 zwitterion / P-33.3 radical):
+      1. radical present -> None (P-33.3 radical>anion>cation; the -yl primitive owns it)
+      2. mixed-sign (zwitterion) -> None (P-74 _route_zwitterion owns it)
+      3. anion(s): senior ionized acid class per P-72 -> its acid-FG key
+      4. cation(s) only -> None (the aminium / class-keyed cation transforms own it)
+    The forced FG MUST be a features.functional_groups key (namer.py:1821) or it
+    silently no-ops; for a class with no neutral FG anchor return None.
+    BlueBookV2.md:17580 (radical>anion>cation seniority)."""
+    # Rule 1 (P-33.3): a radical co-occurring outranks the ionic centre; the
+    # P-71 -yl/-ylidene primitive owns it, not this override.
+    from ..perception.ions import get_radical_sites
+    if get_radical_sites(mol):
+        return None
+    # Rule 2 (P-74): a mixed-sign zwitterion is owned by _route_zwitterion
+    # (anion-is-parent + azaniumyl prefix), never the charge-first override here.
+    if sites.get('cations') and sites.get('anions'):
+        return None
+    # Rule 3 (P-72): pick the senior ionized acid class present among the anions.
+    anions = sites.get('anions') or []
+    if anions:
+        acls = {classify_anion(mol, a) for a in anions}
+        for senior in _ANION_PCG_SENIORITY:
+            if senior in acls:
+                return _ANION_PRINCIPAL_FG[senior]
+        # No anion class has a neutral FG anchor (all carbanion/alkoxide/
+        # phenolate/thiolate/aminide) -> handled by the suffix primitive, not here.
+        return None
+    # Rule 4: cation-only (or charge-free) fragments are not this classifier's job.
+    return None
 
 # CATION class -> (cation_class arg for apply_ion_suffix_to_name, allowed_suffixes).
 # The class-keyed cation transforms (ylium/acylium/diazonium) are NOT plain suffix
