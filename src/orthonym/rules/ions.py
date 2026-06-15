@@ -458,6 +458,17 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     if retained_only:
         return None
 
+    # WS-E.3-dianion (D-13, P-12.2 / P-34.1.4): a BARE carbon-free inorganic
+    # oxoacid anion ([O-]S(=O)(=O)[O-], [O-]P(=O)([O-])[O-], [O-]C(=O)[O-]) is
+    # its preselected functional-parent anion word. Run BEFORE classify_anion,
+    # which mis-routes both sulfate [O-] to 'alkoxide' (ions.py:114 needs
+    # nb_has_carbon) -> _try_neutralize_and_name -> carbon-free 'unknown'.
+    # Carbon-free guard => cannot intercept a sulfate/phosphate ESTER or the
+    # NP-conjugate path (steroid sulfate, gold WSC-03).
+    inorganic = _name_inorganic_oxoacid_anion(mol)
+    if inorganic:
+        return _validate_anion_name(mol, inorganic)
+
     # Get anion sites
     sites = get_ion_sites(mol)
     anions = sites.get('anions', [])
@@ -1212,6 +1223,33 @@ def _ionize_acid_name(neutral_name: str, total_charge: int,
 # fused-ring-parent failure shape (D-10), NOT a legitimate parent — a real
 # parent always carries a stem (meth/eth/.../benzene/cyclo...) before ane/ene/yne.
 _DEGENERATE_OXOACID_PARENT_RE = re.compile(r'^(?:ane|ene|yne)(?:sulf|phosph|arso|boro|[0-9(-])')
+
+
+def _name_inorganic_oxoacid_anion(mol) -> str:
+    """WS-E.3-dianion (D-13): name a BARE (carbon-free) inorganic oxoacid anion as
+    its preselected functional-parent anion word (P-12.2 / P-34.1.4):
+    sulfate/sulfite/phosphate/hydrogenphosphate/nitrate/carbonate. There is no
+    carbon to name, so this is a DIRECT functional-parent lookup, NOT a
+    substitutive parent (BlueBookV2.md:2076 phosphoric acid; 35449 sulfuric acid).
+
+    CONSERVATIVE GUARD (D-13 risk): fires ONLY on a CARBON-FREE, non-metal fragment
+    matched by EXACT canonical SMILES in INORGANIC_ANIONS. A sulfate/phosphate
+    ESTER (R-O-SO3-, R-O-PO3-) has carbon -> declined here (and at
+    charged_router.py:382-389), so the steroid-sulfate NP-conjugate (gold WSC-03
+    'cholest-5-en-3beta-yl sulfate', '...yl hydrogen sulfate') is NEVER intercepted.
+    The mono-anion (OS(=O)(=O)[O-] -> 'hydrogensulfate') stays DISTINCT from the
+    dianion ('sulfate') because the table keys on protonation state
+    (BlueBookV2.md:7150). Returns '' if not a bare inorganic anion (caller falls
+    through to the existing cascade -- byte-identical contract).
+    """
+    if mol is None or _has_metal(mol):
+        return ''
+    # Carbon-free guard: any carbon -> organic anion / ester / conjugate,
+    # NOT a bare inorganic oxoacid anion. Decline so the existing paths handle it.
+    if any(atom.GetSymbol() == 'C' for atom in mol.GetAtoms()):
+        return ''
+    canonical = Chem.MolToSmiles(mol, canonical=True)
+    return get_anion_name(canonical) or ''
 
 
 def _name_oxoacid_anion(mol, style: str) -> str:
