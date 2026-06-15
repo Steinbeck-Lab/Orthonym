@@ -132,7 +132,10 @@ class OpsinOracle:
             return False
         try:
             result = subprocess.run(
-                ["java", "-jar", self._jar, "-osmi"],
+                # -r (--allowRadicals): add consistently with _invoke_opsin so the
+                # oracle accepts radical names; proven strictly additive over 11,668
+                # names (66 gains / 0 changes / 0 regressions; 184-RESEARCH §WS-E-RADICAL).
+                ["java", "-jar", self._jar, "-r", "-osmi"],
                 input=post_swap_subtree_str + "\n",
                 capture_output=True, text=True, timeout=10,
             )
@@ -163,7 +166,16 @@ class OpsinOracle:
         """
         try:
             result = subprocess.run(
-                ["java", "-jar", self._jar, "-osmi"],
+                # -r (--allowRadicals): the single source-of-truth subprocess call
+                # used by name_to_smiles AND parse_status. Adding -r lets the SUB-03
+                # validity gate (namer.py, via parse_status) ACCEPT radical names like
+                # 'pentan-3-yl' instead of suppressing them to 'unknown organic
+                # compound'. Proven strictly additive over 11,668 names (66 empty->
+                # parsed gains / 0 non-additive changes / 0 regressions;
+                # 184-RESEARCH §WS-E-RADICAL(a)) — byte-identical on all non-radical
+                # names. NOT a blanket gate bypass: OPSIN itself still validates the
+                # name (the heptanolate-class suppression hole stays closed).
+                ["java", "-jar", self._jar, "-r", "-osmi"],
                 input=name + "\n",
                 capture_output=True, text=True, timeout=10,
             )
