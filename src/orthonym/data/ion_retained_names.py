@@ -170,6 +170,14 @@ INORGANIC_ANIONS = {
     'O=[N+]([O-])[O-]': 'nitrate',
     'O=[N+][O-]': 'nitrite',
     'O=[SH](=O)[O-]': 'sulfate',  # Note: RDKit canonical form
+    # SO4(2-) bare dianion of sulfuric acid (P-12.2 / BlueBookV2.md:35449); the
+    # legacy 'O=[SH](=O)[O-]' key above was a -1 [SH] form that never matched the
+    # real fully-deprotonated dianion '[O-]S(=O)(=O)[O-]' (canonical O=S(=O)([O-])[O-]).
+    'O=S(=O)([O-])[O-]': 'sulfate',
+    # HSO4- mono-anion (P-12.2 / BlueBookV2.md:7150); MUST stay distinct from
+    # 'sulfate' (different protonation state). OPSIN round-trips 'hydrogensulfate'
+    # -> S(=O)(=O)(O)[O-] (the correct mono-anion).
+    'O=S(=O)([O-])O': 'hydrogensulfate',
     'O=S([O-])[O-]': 'sulfite',
     'O=P([O-])([O-])[O-]': 'phosphate',
     'O=P([O-])([O-])O': 'hydrogen phosphate',
@@ -178,6 +186,22 @@ INORGANIC_ANIONS = {
     'O=C([O-])O': 'hydrogen carbonate',
     '[O-][Cl+][O-]': 'chlorate',  # RDKit canonical form
 }
+
+
+def _canonicalize_anion_table(table):
+    # Re-key an anion lookup table by RDKit-canonical SMILES so a hand-written
+    # non-canonical key can never silently fail to match a canonicalized input
+    # (the WS-E.3 sulfate-key bug: 'O=[SH](=O)[O-]' never matched the bare -2
+    # dianion 'O=S(=O)([O-])[O-]'). Keys that fail to parse are kept verbatim.
+    out = {}
+    for smi, word in table.items():
+        m = Chem.MolFromSmiles(smi)
+        out[Chem.MolToSmiles(m) if m is not None else smi] = word
+    return out
+
+
+INORGANIC_ANIONS = _canonicalize_anion_table(INORGANIC_ANIONS)
+RETAINED_ANIONS = _canonicalize_anion_table(RETAINED_ANIONS)
 
 
 def get_anion_name(smiles: str) -> Optional[str]:
