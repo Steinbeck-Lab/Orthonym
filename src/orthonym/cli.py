@@ -107,44 +107,6 @@ def main(args: List[str] = None) -> int:
         help="Output format for --dump-tree (default: text)"
     )
 
-    # Phase 162 ML Fallback Gate (MLF-01 + CONTEXT D-08).
-    # --allow-ml-fallback: opt-in only; default OFF (MLF-01 non-negotiable).
-    #   Requires the [ml] optional extra (pip install orthonym[ml]).
-    # --ml-opsin-parse-required: gates the expensive P5 OPSIN-subprocess
-    #   pattern in the quality-gate predicate. Default ON for production
-    #   correctness; --no-ml-opsin-parse-required disables for the
-    #   MLF-04 dual-config raw-attach-rate measurement mode.
-    ml_group = parser.add_argument_group("ML Fallback (Phase 162)")
-    ml_group.add_argument(
-        "--allow-ml-fallback",
-        dest="allow_ml_fallback",
-        action="store_true",
-        default=False,
-        help=(
-            "Enable opt-in ML fallback (STOUT-pypi). Default OFF; "
-            "rule-based pipeline is the only path under default settings "
-            "(MLF-01). Requires the [ml] optional extra: "
-            "pip install orthonym[ml]. See 162-AUDIT-MLF.md § 1.2."
-        ),
-    )
-    ml_group.add_argument(
-        "--ml-opsin-parse-required",
-        action="store_true",
-        default=True,
-        help=(
-            "Quality-gate OPSIN-parse criterion (Phase 162 D-08). "
-            "Default True. Use --no-ml-opsin-parse-required to disable "
-            "(raw-attach-rate measurement mode; useful for MLF-04 "
-            "dual-config benchmark)."
-        ),
-    )
-    ml_group.add_argument(
-        "--no-ml-opsin-parse-required",
-        dest="ml_opsin_parse_required",
-        action="store_false",
-        help=argparse.SUPPRESS,
-    )
-
     # Phase 168 Triviality Controller (TRIV-01/02/03 + CONTEXT D-08).
     triv_group = parser.add_argument_group("Triviality Controller (Phase 168)")
     triv_group.add_argument(
@@ -252,20 +214,16 @@ def main(args: List[str] = None) -> int:
                 _print_tree_text(result)
             return 0
 
-        # Phase 162: thread parsed CLI flags to the Orthonym() constructor
-        # via name_compound's new kwargs. getattr defensive pattern preserves
-        # backwards compat for any direct callers that pre-date Phase 162.
-        ml_kwargs = {
-            "allow_ml_fallback": getattr(parsed, "allow_ml_fallback", False),
-            "opsin_parse_required": getattr(parsed, "ml_opsin_parse_required", True),
-            # Phase 168 D-08: thread the controller flag through name_compound.
+        # Phase 168 D-08: thread the triviality-controller flag through
+        # name_compound. getattr defensive pattern preserves backwards compat.
+        name_kwargs = {
             "enable_triviality_controller": getattr(
                 parsed, "enable_triviality_controller", False),
         }
 
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
-                                   include_confidence=True, **ml_kwargs)
+                                   include_confidence=True, **name_kwargs)
             print(f"Name:       {result['name']}")
             print(f"Confidence: {result['confidence']:.4f}")
             print(f"Handler:    {result['handler']}")
@@ -273,16 +231,13 @@ def main(args: List[str] = None) -> int:
                 print("Factors:")
                 for k, v in result['factors'].items():
                     print(f"  {k}: {v:.4f}")
-            if result.get('ml_fallback_used'):
-                print(f"ML fallback used: True")
-                print(f"ML model version: {result.get('ml_model_version', 'unknown')}")
         elif parsed.verbose:
-            name = name_compound(parsed.smiles, style=parsed.style, **ml_kwargs)
+            name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(f"SMILES: {parsed.smiles}")
             print(f"Style:  {parsed.style}")
             print(f"Name:   {name}")
         else:
-            name = name_compound(parsed.smiles, style=parsed.style, **ml_kwargs)
+            name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(name)
 
         return 0

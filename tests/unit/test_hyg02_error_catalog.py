@@ -175,7 +175,7 @@ def test_default_mode_never_raises_limit_on_canary_sample():
 
 
 def test_back_compat_metal_names_import():
-    # ml_fallback.quality_gate and data.cation_words import this from namer.
+    # data.cation_words imports these from namer (re-exported from errors).
     from orthonym.namer import _METAL_NAMES, _ORGANIC_ELEMENTS
     assert _METAL_NAMES["Au"] == "gold"
     assert "C" in _ORGANIC_ELEMENTS

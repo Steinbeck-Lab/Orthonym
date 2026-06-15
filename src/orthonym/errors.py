@@ -33,7 +33,7 @@ ATOM_LIMIT = 125
 
 # Elements Orthonym names as organic skeletons / substituents. Single source
 # of truth — re-exported from orthonym.namer for backward compatibility
-# (ml_fallback.quality_gate and data.cation_words import _METAL_NAMES there).
+# (data.cation_words imports _METAL_NAMES there).
 _ORGANIC_ELEMENTS = {
     'C', 'H', 'N', 'O', 'S', 'P', 'Se', 'F', 'Cl', 'Br', 'I', 'B', 'Si',
 }
@@ -56,6 +56,31 @@ _METAL_NAMES = {
     'Er': 'erbium', 'Tm': 'thulium', 'Lu': 'lutetium', 'Sc': 'scandium',
     'Y': 'yttrium',
 }
+
+
+def _build_descriptive_fallback_names() -> frozenset:
+    """Build the descriptive-fallback name set (the strings Orthonym emits
+    when an input is out of scope / unnameable).
+
+    The OPSIN validity gate (`namer._final_opsin_validity_gate`) skips
+    re-gating these — they are intentional descriptive fallbacks that do
+    not OPSIN-parse, so re-suppressing them is wasted work and must not
+    alter output. Relocated here (v21 ML retirement, ADR-21-01) from the
+    deleted `ml_fallback.quality_gate`; behaviour is byte-identical.
+    """
+    base = {
+        "unknown organic compound",
+        "compound with wildcard atoms (not supported)",
+        "inorganic compound (not supported)",
+    }
+    for metal_name in _METAL_NAMES.values():
+        base.add(f"{metal_name} compound (not supported)")
+    return frozenset(base)
+
+
+# Descriptive-fallback names the OPSIN validity gate must not re-gate
+# (byte-identity anchor for `namer._final_opsin_validity_gate`).
+_DESCRIPTIVE_FALLBACK_NAMES: frozenset = _build_descriptive_fallback_names()
 
 
 # Symbolic Orthonym codes -> (generic message, HERITAGE analog). The per-instance

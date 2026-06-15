@@ -120,7 +120,6 @@ class StoutClass(_StrEnumBase):
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
-    ML_FALLBACK = "ml_fallback"                   # Phase 162 telemetry tag (CONTEXT D-03; NOT a CFR dispatch entry — increment via _cfr_router._increment_stat at namer.py:1248 wrapper, no _register_dispatch call)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for

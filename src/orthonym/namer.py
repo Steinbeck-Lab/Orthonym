@@ -286,7 +286,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # Don't re-gate an already-descriptive fallback (it won't OPSIN-parse, and
     # re-suppressing is idempotent anyway) — skip the wasted OPSIN subprocess.
     try:
-        from .ml_fallback.quality_gate import _DESCRIPTIVE_FALLBACK_NAMES
+        from .errors import _DESCRIPTIVE_FALLBACK_NAMES
         if name in _DESCRIPTIVE_FALLBACK_NAMES:
             return name
     except Exception:
@@ -891,8 +891,6 @@ class Orthonym:
     def __init__(self, style: str = "pin", *,
                  _disable_grammar_validation: bool = False,
                  _disable_opsin_validity_gate: bool = False,
-                 allow_ml_fallback: bool = False,
-                 opsin_parse_required: bool = True,
                  enable_triviality_controller: bool = False,
                  enable_group_splitting: bool = False,
                  _principal_group_override: Optional[str] = None):
@@ -909,17 +907,6 @@ class Orthonym:
                 disabled (`self._grammar` is None). ON by default in
                 production; OFF only for unit tests inspecting raw
                 handler output.
-            allow_ml_fallback: Phase 162 MLF-01 opt-in flag. Default
-                False (rule-based pipeline only). When True, the
-                _name_impl wrapper (Plan-03 T01) consults
-                is_name_quality_inadequate() and may attach the STOUT
-                ML model when the rule-based pipeline emits a degraded
-                name. Requires the [ml] optional extra.
-            opsin_parse_required: Phase 162 D-08 quality-gate flag.
-                Default True (OPSIN-parse criterion ON for production
-                correctness). When False, the expensive P5 OPSIN
-                subprocess is bypassed (raw-attach-rate measurement
-                mode for the MLF-04 dual-config benchmark).
             enable_triviality_controller: Phase 168 D-08 opt-in flag.
                 Default False (Stage A SACRED byte-identical canary
                 invariant). When True, the triviality controller
@@ -942,14 +929,6 @@ class Orthonym:
         # anionic group is forced as the principal characteristic group per P-72/P-74.
         # None for every normal name() call -> byte-identical production behaviour.
         self._principal_group_override: Optional[str] = _principal_group_override
-        # Phase 162 ML Fallback Gate per MLF-01 + D-08 (kwargs stored;
-        # the wrapper at _name_impl():1248 lands in Plan-03 T01).
-        self._allow_ml_fallback: bool = allow_ml_fallback
-        self._opsin_parse_required: bool = opsin_parse_required
-        # Per-instance state: populated by Plan-03 T01 wrapper when
-        # MLFallbackInvoker fires. None at construction; reset to None
-        # at the start of every name_with_confidence call.
-        self._last_ml_result: Optional[Any] = None
         # Phase 156 D-17 + AP-19: per-instance counter dict, NEVER
         # module-global. Pre-seed all seven buckets so callers see a
         # complete histogram even before any name() invocation.
@@ -1290,22 +1269,12 @@ class Orthonym:
                   {'ratio': float, 'atom_coverage': float,
                    'fg_recognition': float, 'substituent_completeness': float}
               - 'handler' (str): Which handler produced the name
-              - 'ml_fallback_used' (bool): Phase 162 MLF-02 — True iff the
-                STOUT ML model was invoked for this call (False at Plan-02
-                ship since the wrapper at _name_impl():1248 has not landed)
-              - 'ml_model_version' (Optional[str]): Phase 162 MLF-05 —
-                64-char SHA-256 manifest hash of the STOUT artifact when
-                ML fired; None otherwise
 
         Raises:
             ValueError: If SMILES is invalid
         """
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
-        # Phase 162 MLF-02 + CONTEXT D-13 no-caching: reset per-call ML
-        # result slot so stale state cannot leak across name_with_confidence
-        # calls. Matches the clear_confidence() pattern.
-        self._last_ml_result = None
         start_naming_session()
         clear_confidence()
         try:
@@ -1348,17 +1317,6 @@ class Orthonym:
                 # Ensure name matches (the stored candidate should match
                 # what was returned)
                 metadata['name'] = name
-
-            # Phase 162 ML annotations per CONTEXT line 53 + MLF-02.
-            # Default: False / None when ML not invoked.
-            # Populated by _name_impl wrapper at Plan-03 T01 when
-            # MLFallbackInvoker fires (sets self._last_ml_result to an
-            # MLFallbackResult instance).
-            ml_used = self._last_ml_result is not None
-            metadata['ml_fallback_used'] = ml_used
-            metadata['ml_model_version'] = (
-                self._last_ml_result.model_version if ml_used else None
-            )
 
             # HYG-02 (Phase 173): informational limit annotation (additive — does
             # not change 'name'). None for in-scope inputs; otherwise the named
@@ -1675,70 +1633,8 @@ class Orthonym:
                             )
                             return decomp_name
 
-        # Phase 162 ML Fallback Gate wrapper per CONTEXT D-03 +
-        # 162-AUDIT-MLF.md § 2 (predicate spec) + § 5 (logging contract).
-        # Post-pipeline wrapper at _name_impl's final return statement —
-        # activates only when ALL rule-based paths are exhausted AND
-        # self._allow_ml_fallback is True AND is_name_quality_inadequate
-        # flags the output as degraded (per MLF-06).
-        if self._allow_ml_fallback:
-            # Lazy imports (CONTEXT D-09): ml_fallback only loaded when needed.
-            # StoutClass is imported at module-level (line 53) so we don't
-            # rebind it locally here; doing so would shadow the closure-scoped
-            # name used elsewhere in this function.
-            from .ml_fallback import (
-                is_name_quality_inadequate,
-                MLFallbackInvoker,
-            )
-            from .ml_fallback.invoker import MLFallbackResult
-            from .data.ml_model_pin import MLModelPinViolation
-
-            if is_name_quality_inadequate(
-                name, mol, canonical_smiles,
-                opsin_parse_required=self._opsin_parse_required,
-            ):
-                # Telemetry counter per RESEARCH § 9.4 — counts ATTEMPTS
-                # (not successes). Increment BEFORE the try/except so a
-                # SHA-pin or import error still registers as an attempt.
-                # ClassFirstRouter exposes the Counter directly (see
-                # dispatcher.py:92) — no public _increment_stat helper.
-                self._cfr_router._dispatch_stats[StoutClass.ML_FALLBACK] += 1
-                try:
-                    invoker = MLFallbackInvoker.get_instance()
-                    context_class = (
-                        result.class_id.value
-                        if result is not None and hasattr(result, "class_id")
-                        else None
-                    )
-                    ml_result = invoker.invoke(
-                        smiles, context_class=context_class,
-                    )
-                except MLModelPinViolation:
-                    # HARD-FAIL per CONTEXT D-10 tier 3 — reproducibility
-                    # non-negotiable; sentinel SHA or model drift both
-                    # surface here.
-                    raise
-                except RuntimeError:
-                    # D-10 tier 1: STOUT not installed (helpful pip hint
-                    # already in the RuntimeError). Soft-fail: emit a
-                    # placeholder MLFallbackResult so the wrapper records
-                    # the attempt + name_with_confidence sees a result.
-                    ml_result = MLFallbackResult(
-                        name=None,
-                        model_version="not_installed",
-                        opsin_parse_status="ml_inference_failed",
-                    )
-                self._last_ml_result = ml_result
-                if ml_result.name:
-                    return ml_result.name
-                # ML inference failed: fall through to the rule-based
-                # degraded name per D-10 tier 2 (preserves existing output
-                # rather than introducing a new None failure mode).
-                return name
-
-        # ML branch not taken — reset the per-call slot so
-        # name_with_confidence emits ml_fallback_used=False.
-        self._last_ml_result = None
+        # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no
+        # ML fallback. The rule-based pipeline output is the final name.
         return name
 
     def _perceive(self, mol, smiles: str, canonical_smiles: str) -> MolecularFeatures:
@@ -2469,8 +2365,6 @@ def name_with_tree(smiles: str, style: str = "pin"):
 def name_compound(smiles: str, style: str = "pin",
                    include_confidence: bool = False,
                    *,
-                   allow_ml_fallback: bool = False,
-                   opsin_parse_required: bool = True,
                    enable_triviality_controller: bool = False,
                    enable_group_splitting: bool = False,
                    raise_on_limit: bool = False):
@@ -2486,10 +2380,6 @@ def name_compound(smiles: str, style: str = "pin",
             - "cas": CAS-style naming
         include_confidence: If True, return dict with confidence metadata
             instead of plain str
-        allow_ml_fallback: Phase 162 MLF-01 opt-in flag (default False).
-            See Orthonym.__init__ docstring.
-        opsin_parse_required: Phase 162 D-08 quality-gate flag (default True).
-            See Orthonym.__init__ docstring.
 
     Returns:
         str: IUPAC systematic name (default)
@@ -2512,8 +2402,6 @@ def name_compound(smiles: str, style: str = "pin",
     """
     namer = Orthonym(
         style=style,
-        allow_ml_fallback=allow_ml_fallback,
-        opsin_parse_required=opsin_parse_required,
         enable_triviality_controller=enable_triviality_controller,
         enable_group_splitting=enable_group_splitting,
     )
@@ -2572,8 +2460,8 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
 
 # Metals/inorganic elements and the metal-name map now live in orthonym.errors
 # (single source of truth) and are re-exported via the module-top import so
-# ml_fallback.quality_gate and data.cation_words keep importing them from
-# orthonym.namer. _ORGANIC_ELEMENTS / _METAL_NAMES are bound at module top.
+# data.cation_words keeps importing them from orthonym.namer.
+# _ORGANIC_ELEMENTS / _METAL_NAMES are bound at module top.
 
 
 def _descriptive_fallback(smiles: str) -> str:
