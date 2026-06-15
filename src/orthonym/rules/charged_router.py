@@ -948,8 +948,32 @@ def route_charged(mol, style: str = 'pin') -> str:
 
     # --- Step 6: re-apply the class-correct ionic / radical suffix.
     if radical_suffix is not None:
-        # P-71: alkane 'ane' -> 'yl'/'ylidene'/'ylidyne'; elide a trailing 'e'
-        # otherwise. Structured (NOT carbon counting): operate on the parent name.
+        _radical_center_idx = radical_sites[0]['atom_idx']
+        # P-29.2 / Table 3.4: radicals are named as SUBSTITUENT GROUPS. A SIMPLE
+        # unbranched terminal radical keeps the contracted retained form WITHOUT a
+        # locant — the Blue Book lists 'CH3-CH2• ethyl (PIN)' (BlueBookV2.md:17597
+        # Table 3.4 example), not 'ethan-1-yl'; likewise 'methyl'/'propyl'. So the
+        # proven P-71.1.1 textual contraction (_apply_radical_suffix) IS the PIN for
+        # those. It is ALSO the correct path for the single-carbon -ylidene/-ylidyne
+        # (methylidene/methylidyne) the primitive would over-spell 'methanylidene'.
+        if _is_simple_terminal_radical(mol, _radical_center_idx):
+            return _apply_radical_suffix(neutral_name, radical_suffix)
+        # NON-terminal / branched / unsaturated radical: the centre needs a
+        # first-class locant (P-71 / P-31.1.4.3.4 lowest-locant for the free
+        # valence, competing with unsaturation/substituents per P-31/P-14.4) —
+        # exactly like the WS-E.2 carbanion -ide centre (BlueBookV2.md:17608
+        # 'ethan-2-id-1-yl (PIN)'). Route through the 184-01 primitive so
+        # CC[CH]CC -> 'pentan-3-yl', not the locant-less 'pentyl'.
+        # CRITICAL (Pitfall 1): pass the ORIGINAL mol + the centre index in the
+        # SAME index space — the primitive owns the atom-index-survival handling
+        # (it H-saturates / re-numbers internally); do NOT canonicalize mol first.
+        from .ions import emit_parent_hydride_cumulative_suffix
+        emitted = emit_parent_hydride_cumulative_suffix(
+            mol, _radical_center_idx, radical_suffix)
+        if emitted:
+            return emitted
+        # Fail-closed fallback: the primitive declined (out of its parent-hydride
+        # scope) -> keep the proven P-71.1.1 textual form rather than regress.
         return _apply_radical_suffix(neutral_name, radical_suffix)
 
     # (CARBOXYLATE anions are deferred to the proven path earlier; they never
@@ -992,6 +1016,46 @@ def route_charged(mol, style: str = 'pin') -> str:
                 cation_class=cation_class,
             )
     return ''
+
+
+def _is_simple_terminal_radical(mol, center_idx: int) -> bool:
+    """P-29.2 / P-71: TRUE iff the radical is a SIMPLE substituent-group shape
+    whose PIN is the contracted, locant-less ``-yl``/``-ylidene``/``-ylidyne`` form
+    (``methyl``/``ethyl``/``propyl``/``methylidene``), so it must keep the proven
+    ``_apply_radical_suffix`` textual contraction rather than the locant primitive.
+
+    The contracted form is correct ONLY for an UNBRANCHED, ACYCLIC, SATURATED,
+    ALL-CARBON chain whose free valence sits at a TERMINAL carbon (or a single
+    carbon). In that case the free-valence locant is 1 on the unique longest chain
+    and is omitted (Blue Book Table 3.4 lists ``CH3-CH2• ethyl (PIN)``).
+
+    A BRANCHED terminal radical (e.g. isobutyl ``(CH3)2CH-CH2•`` -> the PIN
+    ``2-methylpropan-1-yl`` carries the locant), a NON-terminal radical
+    (``CC[CH]CC`` -> ``pentan-3-yl``), or any unsaturated/heteroatom/ring shape
+    returns FALSE -> the locant primitive owns it.
+    """
+    try:
+        center = mol.GetAtomWithIdx(center_idx)
+    except (RuntimeError, IndexError, OverflowError):
+        return False
+    if center.GetSymbol() != 'C':
+        return False
+    # Whole-molecule must be an unbranched acyclic SATURATED all-carbon chain:
+    #   - no rings, no heteroatoms, no multiple bonds;
+    #   - every carbon has at most 2 carbon neighbours (a straight chain);
+    #   - the radical centre is a terminus (<= 1 carbon neighbour) or a lone C.
+    if mol.GetRingInfo().NumRings() > 0:
+        return False
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C':
+            return False
+        if sum(1 for nbr in atom.GetNeighbors() if nbr.GetSymbol() == 'C') > 2:
+            return False  # a branch point -> needs the locant form
+    for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.SINGLE:
+            return False  # unsaturation -> the centre competes for the locant
+    n_carbon_nbrs = sum(1 for nbr in center.GetNeighbors() if nbr.GetSymbol() == 'C')
+    return n_carbon_nbrs <= 1
 
 
 def _apply_radical_suffix(neutral_name: str, radical_suffix: str) -> str:
