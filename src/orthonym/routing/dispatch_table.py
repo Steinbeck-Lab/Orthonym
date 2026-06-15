@@ -98,6 +98,7 @@ class StoutClass(_StrEnumBase):
     ZWITTERION = "zwitterion"                 # row 3; namer.py:858-860; P-74
     ANION_RETAINED = "anion_retained"         # row 4; namer.py:861-871; P-72
     CATION_RETAINED = "cation_retained"       # row 5; namer.py:872-875; P-73
+    CATION_QUATERNARY = "cation_quaternary"   # Phase 184 WS-E.1 (P-73.1.2.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
     ANION_SMALL = "anion_small"               # row 6; namer.py:877-914; P-72.2.1
     POLY_ANION = "poly_anion"                 # row 7; namer.py:916-956; P-72.2.1
     MULTI_COMPONENT_NEUTRAL = "multi_component_neutral"  # row 8; namer.py:967-998
@@ -278,6 +279,32 @@ def _is_cation_retained(mol, smiles, canonical_smiles, features=None, *, _style:
         return False
     from orthonym.rules.ions import name_cation
     return name_cation(mol, style=_style, retained_only=True) is not None
+
+
+def _is_cation_quaternary(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Phase 184 WS-E.1 (P-73.1.2.1): narrow predicate for a STANDALONE quaternary
+    ammonium cation that should get the systematic ``-aminium`` PIN.
+
+    Fires ONLY for: exactly one cation site, NO anion sites (a mixed-sign
+    zwitterion is owned by ZWITTERION@300), a single fragment (a dot-disconnected
+    salt is out of scope), and the cation N satisfies the quaternary shape
+    (symbol N, formal charge +1, 0 H, degree >= 4, via ``classify_cation ==
+    'quaternary'``). Pure read-only (AP-21): does NOT mutate ``mol`` / ``features``.
+
+    Registered BELOW LIPID@250 / ZWITTERION@300 (so phosphatidylcholine + betaine
+    are reached first — RESEARCH Pitfall 3) and ABOVE CATION_RETAINED@500 (so it
+    beats the non-PIN ``tetramethylammonium`` / ``choline`` trivials).
+    """
+    from orthonym.perception.ions import detect_species_type, get_ion_sites
+    if detect_species_type(mol) != 'ion':
+        return False
+    if '.' in (canonical_smiles or ''):
+        return False  # multi-fragment salt -> out of scope (salts.py owns it)
+    sites = get_ion_sites(mol)
+    if len(sites['cations']) != 1 or sites['anions']:
+        return False
+    from orthonym.rules.ions import classify_cation
+    return classify_cation(mol, sites['cations'][0]) == 'quaternary'
 
 
 def _is_anion_small(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -540,6 +567,17 @@ def _handle_cation_retained(mol, smiles, canonical_smiles, features=None, *,
     """Mirrors namer.py:872-875."""
     from orthonym.rules.ions import name_cation
     return name_cation(mol, style=style, retained_only=True)
+
+
+def _handle_cation_quaternary(mol, smiles, canonical_smiles, features=None, *,
+                              style: str = "pin", **kwargs) -> Optional[str]:
+    """Phase 184 WS-E.1 thin shim: the parent decision + ``-aminium`` assembly is
+    owned by the ``route_charged`` chokepoint (which dispatches the 'quaternary'
+    cation kind to ``ions.name_quaternary_aminium`` and applies the mono-cation
+    OPSIN RT-gate backstop). Returns None on no-match so the dispatcher falls
+    through to CATION_RETAINED@500 (the legacy trivial)."""
+    from orthonym.rules.charged_router import route_charged
+    return route_charged(mol, style) or None
 
 
 def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
@@ -948,6 +986,13 @@ _register_dispatch(
     predicate=_is_anion_retained, handler=_handle_anion_retained,
     iupac_section="Blue Book P-72 retained anion names (acetate, benzoate, etc.)",
     description="Retained anion name lookup; routes to rules.ions.name_anion(retained_only=True)",
+    side_effect_inventory=(),
+)
+_register_dispatch(
+    class_id=StoutClass.CATION_QUATERNARY, priority=480, tier=1,
+    predicate=_is_cation_quaternary, handler=_handle_cation_quaternary,
+    iupac_section="Blue Book P-73.1.2.1 + Table 7.4 quaternary ammonium -> systematic -aminium PIN",
+    description="Standalone quaternary cation (single N+, 0 H, degree>=4, no anion, single fragment); routes to rules.charged_router.route_charged",
     side_effect_inventory=(),
 )
 _register_dispatch(

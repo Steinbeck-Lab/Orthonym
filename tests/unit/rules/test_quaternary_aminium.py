@@ -53,11 +53,6 @@ class TestQuaternaryAminium:
             "2-hydroxy-N,N,N-trimethylethanaminium",
         }
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="A1 (184-RESEARCH): OPSIN-RT-verify parent-chain + N-locant "
-        "alphabetization in Plan 184-02; does not block Wave 0.",
-    )
     def test_ethyldimethyl_quaternary(self):
         """P-73.1.2.1: N-substituent alphabetization (ethyl < methyl, di-
         ignored). CC[N+](C)(C)CC is N bonded to TWO ethyls + TWO methyls: parent

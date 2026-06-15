@@ -655,6 +655,62 @@ def _aminium_or_azaniumyl(neutral_name: str, n_cation_sites: int) -> str:
     return name_aminium_cation(neutral_name) or ''
 
 
+def _quaternary_rt_ok(name: str, mol) -> bool:
+    """Mono-cation OPSIN round-trip backstop for the quaternary-aminium name.
+
+    Phase 184 WS-E.1 (183 WR-01 precedent): parse the generated ``name`` back
+    through OPSIN and confirm it reconstructs the SAME structure as ``mol`` (strict
+    RDKit-canonical identity). A malformed quaternary name therefore fails CLOSED
+    (the caller returns '') rather than shipping a structurally-wrong name.
+
+    Fails OPEN (returns True) when the OPSIN jar is absent / the subprocess could
+    NOT run (timeout / OSError), mirroring the existing fail-open-on-jar-missing
+    convention so CI without OPSIN does not block. Uses the shared 10s-timeout
+    ``OpsinOracle._invoke_opsin`` (NO ``-r`` flag — that radical-allowing change is
+    Plan 04, not this gate). This is the targeted WR-01 backstop for the rare
+    quaternary class, NOT a new gate for all rows.
+    """
+    if not name:
+        return False
+    try:
+        from ..assembly.retained_substitution import OpsinOracle
+        # Resolve the OPSIN jar the same way the namer does (Phase 168/169
+        # precedent); if it cannot be found the oracle's _jar stays None and
+        # _invoke_opsin raises -> the outer except fails OPEN (jar-missing).
+        _jar = None
+        try:
+            import sys
+            from pathlib import Path
+            _scripts = str(Path(__file__).resolve().parent.parent.parent / "scripts")
+            if _scripts not in sys.path:
+                sys.path.insert(0, _scripts)
+            from validate_retained_names import find_opsin_jar
+            _jar = find_opsin_jar() or None
+        except ImportError:
+            _jar = None
+        oracle = OpsinOracle(opsin_jar=_jar)
+        if oracle._jar is None:
+            return True  # jar missing -> fail OPEN (CI without OPSIN must not block)
+        opsin_smi, ran = oracle._invoke_opsin(name)
+    except Exception:
+        # Oracle construction / invocation environment failure -> fail OPEN.
+        return True
+    if not ran:
+        # Subprocess could not run (timeout / OSError / jar missing) -> fail OPEN.
+        return True
+    if not opsin_smi:
+        # OPSIN ran and DEFINITIVELY rejected the name -> fail CLOSED.
+        return False
+    try:
+        opsin_canon = Chem.CanonSmiles(opsin_smi)
+        mol_canon = Chem.MolToSmiles(mol, canonical=True)
+        return opsin_canon == mol_canon
+    except Exception:
+        # Could not canonicalize the OPSIN structure -> fail CLOSED (the name did
+        # not parse back to a comparable structure).
+        return False
+
+
 @_reentry_guarded
 def route_charged(mol, style: str = 'pin') -> str:
     """THE single mandatory parent-selection chokepoint (CHOKE-01 / CHOKE-02).
@@ -764,6 +820,24 @@ def route_charged(mol, style: str = 'pin') -> str:
         if len(cclasses) != 1:
             return ''  # heterogeneous multi-cation -> legacy fallthrough
         ccls = next(iter(cclasses))
+        # WS-E.1 (P-73.1.2.1 + Table 7.4): a QUATERNARY ammonium N (0 H, degree
+        # >= 4) CANNOT take the _neutralize_fragment path — removing the lost
+        # proton leaves an over-valent neutral N and SanitizeMol raises -> ''
+        # (RESEARCH Pitfall 2) — and it is NOT an azaniumyl-prefix case (D-05;
+        # azaniumyl is zwitterion-only, P-74.1.3). Name it directly via the
+        # demote-N -> find_principal_chain -> '-aminium' emitter on the ORIGINAL
+        # mol. C[N+](C)(C)C -> N,N,N-trimethylmethanaminium.
+        if ccls == 'quaternary' and len(sites['cations']) == 1:
+            from .ions import name_quaternary_aminium
+            result = name_quaternary_aminium(mol, sites['cations'][0])
+            if not result:
+                return ''   # emitter declined (out of scope) -> legacy fallthrough
+            # Mono-cation OPSIN RT-gate backstop (183 WR-01 precedent): a malformed
+            # quaternary name fails CLOSED rather than shipping garbage. Fails OPEN
+            # only when the OPSIN jar is absent (CI without OPSIN must not block).
+            if not _quaternary_rt_ok(result, mol):
+                return ''
+            return result
         cation_class, allowed_suffixes = _CATION_SPEC.get(ccls, (None, None))
         # ylium / acylium are HYDRIDE-LOSS cations (P-73.2.2.1.1 / P-73.2.3.1):
         # neutralize by ADDING the lost hydride so the parent hydride is named.
