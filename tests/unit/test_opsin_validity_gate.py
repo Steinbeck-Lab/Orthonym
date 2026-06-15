@@ -120,6 +120,7 @@ class TestOpsinOracleParseStatus:
         class _Res:
             def __init__(self, out):
                 self.stdout = out
+                self.returncode = 0  # real CompletedProcess always has one
 
         def fake_run(*args, **kwargs):
             calls["n"] += 1
@@ -142,6 +143,7 @@ class TestOpsinOracleParseStatus:
         class _Res:
             def __init__(self, out):
                 self.stdout = out
+                self.returncode = 0  # real CompletedProcess always has one
 
         def fake_run(*args, **kwargs):
             calls["n"] += 1
@@ -151,3 +153,56 @@ class TestOpsinOracleParseStatus:
         assert oracle.parse_status("ethanol") == "parsed"
         assert oracle.parse_status("ethanol") == "parsed"
         assert calls["n"] == 1  # cached -> only ONE subprocess call
+
+
+@pytest.mark.unit
+class TestOpsinOracleNonZeroExit:
+    """ADR-21-01 close finding: a NON-ZERO OPSIN exit (JVM crash/OOM under
+    full-corpus load) must be classified 'unavailable' (transient, fail-OPEN),
+    NOT 'rejected' — else a valid name is suppressed to a descriptive fallback
+    on a transient subprocess failure. Completes the CR-01 hardening, which
+    previously caught only TimeoutExpired/OSError.
+    """
+
+    def _oracle(self):
+        from orthonym.assembly.retained_substitution import OpsinOracle
+        return OpsinOracle(opsin_jar="/nonexistent/opsin.jar")  # _jar non-None
+
+    def test_nonzero_exit_is_unavailable_not_rejected(self, monkeypatch):
+        import orthonym.assembly.retained_substitution as rs
+
+        class _Res:
+            returncode = 1          # JVM crash / OOM
+            stdout = ""             # empty — looks like a "rejection" to the old code
+            stderr = "Error: OutOfMemoryError"
+
+        monkeypatch.setattr(rs.subprocess, "run", lambda *a, **k: _Res())
+        oracle = self._oracle()
+        # Must be 'unavailable' (transient) so the gate fails OPEN — NOT 'rejected'.
+        assert oracle.parse_status("any-valid-name-here") == "unavailable"
+        # And it must NOT be cached (a transient failure must not poison later lookups).
+        assert "any-valid-name-here" not in oracle._parse_status_cache
+
+    def test_zero_exit_empty_stdout_is_rejected(self, monkeypatch):
+        import orthonym.assembly.retained_substitution as rs
+
+        class _Res:
+            returncode = 0          # OPSIN ran cleanly
+            stdout = ""             # ...and definitively rejected (no SMILES)
+            stderr = "name is unparsable"
+
+        monkeypatch.setattr(rs.subprocess, "run", lambda *a, **k: _Res())
+        oracle = self._oracle()
+        assert oracle.parse_status("gibberish-name") == "rejected"
+
+    def test_zero_exit_with_smiles_is_parsed(self, monkeypatch):
+        import orthonym.assembly.retained_substitution as rs
+
+        class _Res:
+            returncode = 0
+            stdout = "CCO\n"
+            stderr = ""
+
+        monkeypatch.setattr(rs.subprocess, "run", lambda *a, **k: _Res())
+        oracle = self._oracle()
+        assert oracle.parse_status("ethanol") == "parsed"

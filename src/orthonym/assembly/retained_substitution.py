@@ -182,6 +182,24 @@ class OpsinOracle:
         except (subprocess.TimeoutExpired, OSError) as exc:
             logger.debug("OpsinOracle OPSIN invocation unavailable for %r: %s", name, exc)
             return None, False
+        # A NON-ZERO exit means OPSIN itself errored (e.g. a JVM OOM / crash
+        # under full-corpus parallel load), NOT a definitive rejection. OPSIN
+        # exits 0 for BOTH a successful parse (SMILES on stdout) AND a clean
+        # rejection (empty stdout + an "unparsable" note on stderr) — so a
+        # non-zero exit is always a transient/environmental failure. Treat it as
+        # "unavailable" (ran=False) so the SUB-03 validity gate fails OPEN and
+        # never suppresses a valid name on a transient OPSIN crash. This
+        # completes the CR-01 hardening, which previously caught only
+        # TimeoutExpired/OSError and let a non-zero exit collapse to "rejected"
+        # — the cause of valid heavy aminium names being suppressed to
+        # "unknown organic compound" under load (v21 ADR-21-01 close finding).
+        if result.returncode != 0:
+            logger.debug(
+                "OpsinOracle OPSIN non-zero exit (%s) for %r — treating as "
+                "unavailable (transient), not a rejection",
+                result.returncode, name,
+            )
+            return None, False
         smi = result.stdout.strip()
         return (smi or None), True
 
