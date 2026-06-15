@@ -922,11 +922,14 @@ def route_charged(mol, style: str = 'pin') -> str:
                 return carbanion_name
             return ''   # primitive declined (out of scope) -> legacy fallthrough
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
-        # T3: remember the anion's acid FG so Step 6 can force it as principal if a
-        # senior neutral acid (carboxylic) hijacks the re-entry's principal slot.
-        _acls = {classify_anion(mol, a) for a in sites['anions']}
-        if len(_acls) == 1:
-            anion_override_fg = _ANION_PRINCIPAL_FG.get(next(iter(_acls)))
+        # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
+        # The actually-ionized senior acid class anchors the name (P-72); a neutral
+        # group of higher P-41 seniority is demoted to a prefix. Subsumes the old
+        # per-site _ANION_PRINCIPAL_FG.get(...) lookup (same dict + seniority order).
+        # The carbanion short-circuit above already returned; classify_charged_pcg
+        # returns None for carbanion/alkoxide-only anyway (== the old .get() == None),
+        # so the 173.6 sulfonate/sulfinate/phosphonate behavior is byte-identical.
+        anion_override_fg = classify_charged_pcg(mol, sites)
     else:
         return ''  # defensive: mixed handled by zwitterion guard already
 

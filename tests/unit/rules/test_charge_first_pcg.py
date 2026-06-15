@@ -28,8 +28,12 @@ Blue Book sources (BlueBookV2/BlueBookV2.md):
 """
 
 import pytest
+from rdkit import Chem
 
 from orthonym.namer import Orthonym
+from orthonym.rules.charged_router import classify_charged_pcg
+from orthonym.rules.ions import classify_anion
+from orthonym.perception.ions import get_ion_sites
 
 
 @pytest.mark.unit
@@ -76,3 +80,35 @@ class TestChargeFirstPcgProtect:
             "2-carboxyethanesulfonate",
             "2-carboxyethane-1-sulfonate",
         }
+
+
+@pytest.mark.unit
+class TestChargeFirstPcgSeniority:
+    """WS-E.3 (D-11/D-12) generalization invariant: when several ionized acid
+    classes coexist, classify_charged_pcg picks the senior one per the
+    _ANION_PCG_SENIORITY (P-72.2) order. Deterministic (no OPSIN RT needed)."""
+
+    def test_carbanion_returns_none(self):
+        """P-72.2.2.1: a carbanion has no neutral FG anchor (neutralizes to a
+        bare hydride) -> classify_charged_pcg returns None; the WS-E.2 suffix
+        primitive owns it, not the _principal_group_override seam."""
+        m = Chem.MolFromSmiles("CCC[CH-]CC")
+        assert classify_charged_pcg(m, get_ion_sites(m)) is None
+
+    def test_sulfonate_over_sulfinate(self):
+        """P-72.2: with both an ionized sulfonate and an ionized sulfinate on the
+        same skeleton, the senior class (sulfonate) anchors the name ->
+        classify_charged_pcg returns 'sulfonic_acid' (the senior acid-FG key)."""
+        m = Chem.MolFromSmiles("[O-]S(=O)(=O)CCS(=O)[O-]")
+        # Confirm the two anion sites are the two distinct classes we expect
+        # (the invariant must rest on real class detection, not a brittle SMILES).
+        classes = {classify_anion(m, a) for a in get_ion_sites(m)["anions"]}
+        assert classes == {"sulfonate", "sulfinate"}
+        assert classify_charged_pcg(m, get_ion_sites(m)) == "sulfonic_acid"
+
+    def test_single_sulfonate_byte_identical(self):
+        """P-72.7 (173.6 byte-identity): the sulfonate-coexisting-with-neutral-
+        COOH case still returns 'sulfonic_acid' (identical to the old
+        _ANION_PRINCIPAL_FG.get('sulfonate')) -> 2-carboxyethanesulfonate path."""
+        m = Chem.MolFromSmiles("O=C(O)CCS(=O)(=O)[O-]")
+        assert classify_charged_pcg(m, get_ion_sites(m)) == "sulfonic_acid"
