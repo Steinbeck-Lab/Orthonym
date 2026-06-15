@@ -127,12 +127,18 @@ class TestClassifyCation:
         assert cation_type == 'aminium'
 
     def test_aminium_quaternary(self):
-        """Tetramethylammonium should be classified as aminium."""
+        """Tetramethylammonium (a quaternary N: +1, 0 H, degree 4) classifies as
+        'quaternary' (Phase 184 WS-E.1 / D-04). The dedicated class routes it to
+        the systematic ``-aminium`` PIN (N,N,N-trimethylmethanaminium) via the
+        CATION_QUATERNARY dispatch — a quaternary N cannot take the protonated-amine
+        ('aminium') neutralize path (over-valent neutral N), so it is split out from
+        the generic 'aminium' class. The resulting PIN is asserted in
+        tests/unit/rules/test_quaternary_aminium.py."""
         mol = Chem.MolFromSmiles('C[N+](C)(C)C')
         sites = get_ion_sites(mol)
         assert len(sites['cations']) == 1
         cation_type = classify_cation(mol, sites['cations'][0])
-        assert cation_type == 'aminium'
+        assert cation_type == 'quaternary'
 
     def test_carbenium_methylium(self):
         """Methylium (CH3+) should be classified as ylium."""
