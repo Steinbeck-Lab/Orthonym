@@ -108,3 +108,28 @@ class TestCarbanionIde:
         the new primitive must reproduce it byte-identically. BlueBookV2 line
         41309: ``H3C- methanide (PIN)``."""
         assert Orthonym().name("[CH3-]") == "methanide"
+
+    @pytest.mark.parametrize("smiles", [
+        "[CH-]1CCCCC1",    # cyclohexanide (ring-member centre)
+        "[CH-]1CCCC1",     # cyclopentanide (ring-member centre)
+        "[CH-]CC1CCCCC1",  # exocyclic centre, ring otherwise absorbed into the chain
+        "[CH-]C1CCCCC1",   # exocyclic centre adjacent to a ring
+    ])
+    def test_ring_carbanion_not_linearized(self, smiles):
+        """CR-01 regression guard (Phase 184 deep code review).
+        ``emit_parent_hydride_cumulative_suffix`` is an ACYCLIC parent-hydride
+        primitive, but ``find_principal_chain`` linearizes a ring (it returns the
+        ring carbons as a "chain"). Without the ring guards a cyclic/ring-bearing
+        carbanion would be mis-named as a straight chain that round-trips to a
+        DIFFERENT molecule (cyclohexanide -> ``hexan-1-ide``; ``[CH-]CC1CCCCC1``
+        -> ``octan-1-yl``) — a structural error the parse-only validity gate
+        cannot catch. The two guards (``center.IsInRing()`` + all-chain-atoms-
+        acyclic) make the primitive decline these and fall through to legacy.
+        This asserts the linearized acyclic ``hexan-*``/``octan-*``/``pentan-1-ide``
+        names are NEVER produced for a ring substrate."""
+        name = Orthonym().name(smiles)
+        for forbidden in ("hexan-1-ide", "hexan-1-yl", "octan-1-ide",
+                          "octan-1-yl", "pentan-1-ide"):
+            assert forbidden not in name, (
+                f"ring substrate {smiles!r} linearized to {name!r} "
+                f"(contains forbidden acyclic fragment {forbidden!r})")

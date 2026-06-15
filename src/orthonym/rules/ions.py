@@ -1050,6 +1050,18 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     # (alkoxide/thiolate/aminide) stay on their existing class paths.
     if center.GetSymbol() != 'C':
         return ''
+    # RING-MEMBER centres are OUT of scope for this ACYCLIC parent-hydride
+    # primitive. find_principal_chain linearizes a ring (it returns the ring's
+    # carbons as a "chain"), so the `center_idx in chain` guard below would PASS
+    # for a cyclic carbanion/radical and the centre would be mis-named as an
+    # acyclic chain — e.g. cyclohexanide `[CH-]1CCCCC1` -> `hexan-1-ide`, a
+    # structurally DIFFERENT molecule that the parse-only validity gate cannot
+    # catch (the name is grammatically valid). Fall through to the legacy ring
+    # path. A carbanion/radical on an exocyclic chain attached to a ring is NOT a
+    # ring member, so `IsInRing()` is False there and that case still names here
+    # (the ring becomes a substituent).
+    if center.IsInRing():
+        return ''
 
     # --- 2. Saturate the centre on an INDEX-PRESERVING copy (Pitfall 1) -------
     # Work on an RWMol whose atom indices match ``mol`` exactly — do NOT round-trip
@@ -1085,6 +1097,16 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     if not chain or center_idx not in chain:
         # Out of scope (e.g. centre is off the principal carbon chain, or a
         # ring carbanion): caller falls through to legacy.
+        return ''
+    # ACYCLIC-ONLY: find_principal_chain can LINEARIZE a ring into the returned
+    # chain (it opens a ring rather than treating it as a substituent), so a
+    # ring-bearing molecule with an EXOCYCLIC centre would still be mis-named as a
+    # straight chain — e.g. `[CH-]CC1CCCCC1` -> `octan-1-yl` (the 6 ring carbons
+    # absorbed into an 8-carbon chain), a structurally DIFFERENT molecule. The
+    # early `center.IsInRing()` guard only catches a centre that is ITSELF a ring
+    # atom; this catches the ring-absorbed-into-chain case. If ANY chain atom is a
+    # ring member, this acyclic parent-hydride primitive is out of scope -> legacy.
+    if any(work_mol.GetAtomWithIdx(i).IsInRing() for i in chain):
         return ''
 
     # --- 4. Orient the chain so the centre gets the lowest locant (P-72.2.2.1) -
