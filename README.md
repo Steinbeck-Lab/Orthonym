@@ -76,31 +76,29 @@ orthonym --batch molecules.txt --output names.txt
 
 ## Accuracy
 
-Measured against the v18 multi-corpus benchmark (ChEBI 5,000 + PubChem 2,000 + OPSIN self-test 500 = 7,500 compounds), Orthonym v19.0 achieves:
-
-**default-OFF** (rule-based pipeline only; primary):
+Measured against the multi-corpus benchmark (ChEBI 5,000 + PubChem 2,000 + OPSIN self-test 500 = 7,500 compounds), Orthonym v21.0 achieves (deterministic rule-based pipeline; the ML fallback was retired this milestone — ADR-21-01):
 
 | Metric | Overall (7,500) | ChEBI 5,000 | PubChem 2,000 | OPSIN self-test 500 |
 |---|---:|---:|---:|---:|
-| Round-trip accuracy (absolute) | 27.12% | 26.02% | 13.65% | 92.00% |
-| Round-trip accuracy (ceiling-relative) | 31.84% | 31.62% | 15.40% | 92.00% |
-| Graded score (mean) | 2.7603/5.0 | 2.627/5.0 | 2.5537/5.0 | 4.9199/5.0 |
+| Round-trip accuracy (absolute) | 30.36% | 29.58% | 16.85% | 92.20% |
+| Round-trip accuracy (ceiling-relative) | 35.65% | 35.94% | 19.01% | 92.20% |
+| Graded score (mean) | 2.7749/5.0 | 2.6454/5.0 | 2.5618/5.0 | 4.9219/5.0 |
 
-**`--allow-ml-fallback=ON`** (opt-in ML augmentation per ADR-19-08; predicted byte-identical to default-OFF under R-02 sentinel ACTIVE per CONTEXT D-10; ml_fallback_used_count = 0): same headline (2,034 / 7,500 = 27.12% absolute / 31.84% ceiling-relative); ML attach-rate 0% pending Phase 162.1 amendment commit upon Zenodo republish.
+Orthonym v21.0 is **deterministic-rules-only**: the dormant ML fallback (default-OFF, never fired in any prior run) was removed entirely (ADR-21-01), proven byte-identical. There is no longer an `--allow-ml-fallback` option.
 
-**v18.0 → v19.0 delta**: +7 RT overall (Phase 160.1 substituent enumerator +2 + Phase 161 P-69 organometallics +5). All other v19 phases ship substrate-only or canary-only (no multi-corpus RT delta at ship).
+**v20.0 → v21.0 delta**: **+125 RT overall** (2152 → 2277), measured by per-row A/B flip vs the v20 baseline (137 gains / 12 losses): ChEBI +92, PubChem +32, OPSIN self-test +1. v21 shipped the WS-A parent chokepoint + name-tree production path (Phases 178/179), the WS-C lipid/steroid/carbohydrate/glycoside subsystems (176/180–183), the WS-E charge-first PCG subsystem (184), and the WS-B `centres` CIP plumbing (177).
 
 Ceiling-relative round-trip accounts for the fact that not all reference IUPAC names in ChEBI / PubChem round-trip back to their structures themselves; see []() and [Phase 147.1 strategic decisions]() for full methodology.
 
-Salt-class compounds (314 of 7,500) are reported separately because reference-quality issues dominate salt-class round-trip behavior; non-salt accuracy (27.75%) is reported alongside salt-included accuracy (27.12%). See []() for details.
+Salt-class compounds (314 of 7,500) are reported separately because reference-quality issues dominate salt-class round-trip behavior; non-salt accuracy (31.07%) is reported alongside salt-included accuracy (30.36%). See []() for details.
 
-Stereochemistry is handled via RDKit's `rdCIPLabeler.AssignCIPLabels()`, which implements CIP rules 1-2 fully and rules 3-5 partially. The Hanson 2018 CIP Validation Suite reports 182/290 PASS on the v19 codebase (RDKit 2025.09.3 + 2026.03.1; stable across RDKit versions); affected stereo-dense compounds are documented in [](). v19 ships ZERO new stereo substrate per ADR-19-07 / ADR-19-08 / ADR-19-09 ZERO mutation invariants.
+Stereochemistry is handled via RDKit's `rdCIPLabeler.AssignCIPLabels()`, which implements CIP rules 1-2 fully and rules 3-5 partially. The Hanson 2018 CIP Validation Suite reports 182/290 PASS on RDKit; v21 plumbed the `centres` CIP engine (281/290 on the same suite, a verified +46) as an opt-in, held default-OFF at validation to keep the RT measurement uncoupled. Affected stereo-dense compounds are documented in []().
 
-**Honest verdict**: v19.0 ships **PASS-WITH-CAVEATS**. Of the 8 V19 §4 minimum success thresholds, 2 are NOT MET on data: Overall RT (ceiling-relative) 31.84% vs ≥ 65% target (-33.16 pp gap); Overall RT (absolute) 27.12% vs ≥ 50% target (-22.88 pp gap). The remaining 6 thresholds PASS (graded total +0.0031 vs v18 baseline; OPSIN parse rate within determinism floor; canary +39 surplus over ≥ 1,354 floor; tests passing ≥ Phase 163 ship; HIGH-severity code review 0; test failures 0 NEW). The gap is at the score-extraction layer per `v19_final_report.md` §10 (substrate-clean-but-score-extraction-lag posture inherited from v18 §10 lesson); v20.0 architectural phase targets the remediation. NO V19 §4 minimum threshold has been relaxed per `the contributor guide` memory rule #4 ("no band-aids").
+**Honest verdict**: v21.0 ships **PASS-WITH-CAVEATS**. There is **no regression on any anti-regression anchor** (full-7500 RT 2277 ≥ 2152; ChEBI 1479 ≥ 1387; PubChem 337 ≥ 305; OPSIN self-test 461 ≥ 460; OPSIN parse 73.80% ≥ 73.04%; graded 2.7749 ≥ 2.702; PIN-strict gold protect 1/atropine; among-rings gold protect 0; 0 NEW test failures). The aspirational ceiling-relative RT gates — 35.65% vs ≥ 45% (honest) and ≥ 65% — are **reported as failed on data, not relaxed**: the binding constraint is unbuilt complex-class depth (multi-defect; the ≥31-heavy-atom class at ~13% RT), not missing Blue Book rules in the neutral spine. NO success threshold was relaxed per `the contributor guide` memory rule #4 ("no band-aids").
 
-**Historical context:** HERITAGE (Wisniewski, Beilstein Institute, *J. Chem. Inf. Comput. Sci.* 1990, 30, 324-332) achieved 61% expert-status agreement with human nomenclaturists on stereo-bypassed random samples — the first general-purpose structure→IUPAC-name system. v19.0 explicitly handles stereo throughout and reports full numbers; v19.0 31.84% ceiling-relative remains below the 1990 algorithmic-naming benchmark on the modern multi-corpus suite (with stereo). v20.0 ≥ 65% ceiling-relative target carries forward.
+**Historical context:** HERITAGE (Wisniewski, Beilstein Institute, *J. Chem. Inf. Comput. Sci.* 1990, 30, 324-332) achieved 61% expert-status agreement with human nomenclaturists on stereo-bypassed random samples — the first general-purpose structure→IUPAC-name system. v21.0 explicitly handles stereo throughout and reports full numbers; v21.0 35.65% ceiling-relative remains below the 1990 algorithmic-naming benchmark on the modern multi-corpus suite (with stereo).
 
-For the comprehensive measurement report (per-phase attribution, per-compound-class accuracy, handler performance, stereo analysis, OPSIN failure deep dive, theoretical-ceiling analysis, v20.0 roadmap), see [`v19_final_report.md`]() (862 LOC, 12 sections + 4 appendices).
+For the comprehensive measurement report (per-phase attribution, per-compound-class accuracy, handler performance, stereo analysis, OPSIN failure deep dive, theoretical-ceiling analysis, v22 roadmap), see [`V21.0-FINAL-REPORT.md`]() (12 sections + 4 appendices).
 
 ## Development
 
