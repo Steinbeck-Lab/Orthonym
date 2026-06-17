@@ -92,6 +92,10 @@ _COMPOUND_S_SUFFIXES_COMPLEX = (
     'sulfinyl', 'sulfonyl', 'sulfanyl',
     'seleninyl', 'selenonyl', 'selanyl',
     'tellurinyl', 'telluronyl', 'tellanyl',
+    # DD2 Fix B (Phase D, P-63.3.1(1)): (alkyl)disulfanyl is a compound
+    # substituent — '(methyldisulfanyl)methane'. Bare 'disulfanyl' (terminal
+    # -S-SH, no alkyl root) is simple and is not matched by the root loop.
+    'disulfanyl',
 )
 
 # Functional group prefixes that, when fused with alkyl roots, form compound
@@ -165,6 +169,13 @@ TERMINAL_FG_TYPES = frozenset({
 # (P-31.1.4, 1-phenylethan-1-one) and are likewise excluded.
 _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     "primary_amine", "secondary_amine", "tertiary_amine",
+    # DD2 (Phase D, P-56.1 / P-63.4): the peroxol family is a single monovalent
+    # chalcogen suffix on a terminal carbon — exactly like -amine — so on a
+    # monosubstituted ethane the two carbons are equivalent and the locant is
+    # omitted: 'ethaneperoxol' (P-56.1 verbatim), 'ethanedithioperoxol', not
+    # 'ethane-1-peroxol'. These route through _generate_suffix (no dedicated
+    # handler), so the elision must be declared here.
+    "hydroperoxide", "so_thioperoxol", "os_thioperoxol", "dithioperoxol",
 })
 
 
@@ -679,6 +690,11 @@ def is_complex_substituent(name: str) -> bool:
             for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
                 if remainder == s_suffix:
                     return True
+    # DD2 Fix B (Phase D, P-63.3.1(1)): (alkyl)peroxy is a compound substituent
+    # requiring enclosing marks — '(methylperoxy)ethane', '(ethylperoxy)benzene'.
+    # The simple 'peroxy' bridge and 'hydroperoxy' prefix are NOT compound.
+    if name_lower.endswith('peroxy') and name_lower not in ('peroxy', 'hydroperoxy'):
+        return True
     # Acyloxy compound prefixes per IUPAC P-16.3.3:
     # "acetyloxy", "benzoyloxy", "propanoyloxy" etc. are compound prefixes
     # (acyl + oxy) that require complex multipliers (bis/tris) and parenthesization.
@@ -1144,4 +1160,11 @@ def format_suffix_with_locants(
             # 'butanedioic acid', 'pentanedioic acid'
             full_suffix = suffix_multiplier + suffix
             return apply_vowel_elision(base + "e", full_suffix)
+        # DD2 (Phase D, P-56.2): a suffix led by an italic chalcogen-pair
+        # descriptor ('SO-thioperoxol' / 'OS-thioperoxol') needs a separating
+        # hyphen even with no numeric locant — 'methane-SO-thioperoxol', not
+        # 'methaneSO-thioperoxol'. Matched explicitly (not a bare isupper() test)
+        # so a future uppercase-led suffix cannot silently inherit this path.
+        if suffix.startswith(("SO-", "OS-")):
+            return f"{base}e-{suffix}"
         return apply_vowel_elision(base + "e", suffix)

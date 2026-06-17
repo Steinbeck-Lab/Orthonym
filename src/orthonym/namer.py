@@ -302,6 +302,18 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # phase's "0-regression by construction" guarantee.
     if _validity_gate_status(name) != "rejected":
         return name  # OPSIN parses it (or could not be consulted) -> ship as-is
+    # DD2 / BBR-GATE (Phase D): OPSIN's generation grammar does not recognise the
+    # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
+    # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:
+    # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). Like the stereo-grammar carve-out
+    # below, an OPSIN coverage gap on a valid IUPAC suffix must not gate Orthonym
+    # correctness — gold is name-exact-match, not RT. CR-03 guard: only un-suppress a
+    # WELL-FORMED thioperoxol name. The italic 'SO-'/'OS-' descriptor must be
+    # separator-led (hyphen/paren); a multiplied form glued straight onto the
+    # descriptor ('ethane-1,2-bisSO-thioperoxol') is a real formatting defect and
+    # stays suppressed to the honest fallback rather than shipping malformed.
+    if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
+        return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then the name is correct by construction

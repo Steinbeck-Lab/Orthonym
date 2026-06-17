@@ -401,6 +401,31 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.7 (DD2 Fix B, Phase D): peroxy / disulfanyl substituent ----
+    # A -O-O-R (peroxy) / -S-S-R (disulfanyl) substituent: the attach atom is a
+    # divalent chalcogen bonded to a second like chalcogen inside the fragment.
+    # Named (R)peroxy / (R)disulfanyl per P-63.3.1(1). Placed before the cache /
+    # recursive tiers, which otherwise mangle the -O-O-/-S-S- into a bogus
+    # 'peroxyl'/'dithioperoxyl' fragment. Reachable from EVERY caller (the chain
+    # GENERAL path, the benzene/ring-substituent path), so the substitutive
+    # peroxide/disulfide is named identically wherever it appears.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        _attach_atom = mol.GetAtomWithIdx(attach_idx)
+        _sym = _attach_atom.GetSymbol()
+        if _sym in ('O', 'S') and any(
+            n.GetSymbol() == _sym and n.GetIdx() in frag_atoms_set
+            for n in _attach_atom.GetNeighbors()
+        ):
+            _parent_atoms = set(range(mol.GetNumAtoms())) - frag_atoms_set
+            _frag_list = list(frag_atoms_set)
+            _chal = (
+                _name_peroxy_branch(mol, _frag_list, attach_idx, _parent_atoms)
+                if _sym == 'O'
+                else _name_disulfanyl_branch(mol, _frag_list, attach_idx, _parent_atoms)
+            )
+            if _chal:
+                return _stereo_route(_chal)
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))
@@ -1260,6 +1285,35 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     if attach_idx is None and frag_atoms:
         attach_idx = frag_atoms[0]
 
+    frag_set_for_chalcogen = set(frag_atoms)
+
+    # DD2 Fix B (Phase D, P-63.3.1(1)): peroxy branch -O-O-R -> (R)peroxy.
+    # Checked BEFORE the alkoxy branch because both attach through a divalent O;
+    # only the peroxide case has a second O on the far side of the attach O.
+    if attach_idx is not None:
+        attach_atom = mol.GetAtomWithIdx(attach_idx)
+        if attach_atom.GetSymbol() == 'O' and attach_atom.GetDegree() == 2 and any(
+            n.GetSymbol() == 'O' and n.GetIdx() in frag_set_for_chalcogen
+            and n.GetIdx() not in parent_atoms
+            for n in attach_atom.GetNeighbors()
+        ):
+            name = _name_peroxy_branch(mol, frag_atoms, attach_idx, parent_atoms)
+            if name:
+                return name
+
+    # DD2 Fix B (Phase D): disulfanyl branch -S-S-R -> (R)disulfanyl, before the
+    # thioether (sulfanyl) branch (both attach through a divalent S).
+    if attach_idx is not None:
+        attach_atom = mol.GetAtomWithIdx(attach_idx)
+        if attach_atom.GetSymbol() == 'S' and any(
+            n.GetSymbol() == 'S' and n.GetIdx() in frag_set_for_chalcogen
+            and n.GetIdx() not in parent_atoms
+            for n in attach_atom.GetNeighbors()
+        ):
+            name = _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms)
+            if name:
+                return name
+
     # Special case: O-attached branches (ether substituents)
     # -O-R -> "alkoxy" (e.g., methoxy, ethoxy, phenoxy)
     if attach_idx is not None:
@@ -1695,6 +1749,150 @@ def _name_sulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
         return f"{alkyl_name}sulfanyl"
     except (ValueError, KeyError):
         return None
+
+
+_CHALCOGEN_ATOMIC_NUMS = frozenset({8, 16, 34, 52})  # O, S, Se, Te
+
+
+def _is_divalent_chalcogen_atom(atom) -> bool:
+    """True iff *atom* is a neutral, non-aromatic divalent chalcogen with only
+    single bonds — the ``-O-``/``-S-`` ether-oxidation state of a peroxide /
+    disulfide / thioperoxol linkage.
+
+    CR-01 guard (Phase D code review): without this, a higher-oxidation-state S
+    (sulfinyl ``-S(=O)-`` / sulfonyl ``-S(=O)(=O)-`` / thiosulfonate) was claimed
+    as a disulfide and its ``=O`` atoms dropped, producing a parseable name for a
+    DIFFERENT molecule. Mirrors ``skeletal_replacement._dichalcogen_bond_set`` and
+    the ``benzene.py`` ring-substituent guard.
+    """
+    if atom.GetAtomicNum() not in _CHALCOGEN_ATOMIC_NUMS:
+        return False
+    if atom.GetFormalCharge() != 0 or atom.GetIsAromatic():
+        return False
+    from rdkit import Chem as _Chem
+    return all(b.GetBondType() == _Chem.BondType.SINGLE for b in atom.GetBonds())
+
+
+def _name_peroxy_or_disulfanyl_R(mol, r_start, boundary, frag_set):
+    """Name the R group of a -O-O-R / -S-S-R substituent as a substituent prefix.
+
+    Collects the R fragment (atoms in ``frag_set`` reachable from ``r_start``
+    without crossing the two-chalcogen ``boundary``) and delegates to the shared
+    ``name_substituent`` cascade so alkyl (methyl/ethyl), aryl (phenyl), and
+    branched R groups are all named via one root-cause path. Returns None if R
+    is empty.
+    """
+    visited = set()
+    stack = [r_start]
+    while stack:
+        idx = stack.pop()
+        if idx in visited or idx in boundary or idx not in frag_set:
+            continue
+        visited.add(idx)
+        for n in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = n.GetIdx()
+            if nidx not in visited and nidx not in boundary:
+                stack.append(nidx)
+    if not visited:
+        return None
+    r_name = name_substituent(mol, sorted(visited), r_start)
+    if not r_name:
+        return None
+    # WR-01 (Phase D code review): a COMPOUND R needs enclosing marks before the
+    # outer peroxy/disulfanyl suffix is appended, so '[(methylperoxy)methyl]peroxy'
+    # not the ambiguous '(methylperoxy)methylperoxy'. apply_enclosing_marks does the
+    # ()->[]->{} nesting; a simple/retained R (methyl, phenyl) is returned bare.
+    from .naming_utils import is_complex_substituent, apply_enclosing_marks
+    _needs_marks = (
+        is_complex_substituent(r_name)
+        or '(' in r_name or '[' in r_name  # embedded enclosing marks (nested peroxy/disulfanyl)
+    )
+    if _needs_marks and not (
+        r_name.startswith('(') and r_name.endswith(')')
+        and r_name.count('(') == 1
+    ):
+        r_name = apply_enclosing_marks(r_name, depth=-1)
+    return r_name
+
+
+def _name_peroxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """DD2 Fix B (Phase D, P-63.3.1(1)): name a peroxy branch -O-O-R -> (R)peroxy.
+
+    The substituent attaches to the parent through a divalent O whose other
+    bond is to a second O (the peroxide linkage). The far side R is named as a
+    substituent prefix and suffixed with ``peroxy``:
+      -O-O-CH3   -> methylperoxy
+      -O-O-C2H5  -> ethylperoxy
+
+    Returns None if the attach atom is not a peroxide O or R cannot be named.
+    """
+    frag_set = set(frag_atoms)
+    o1 = mol.GetAtomWithIdx(attach_idx)
+    if o1.GetSymbol() != 'O' or not _is_divalent_chalcogen_atom(o1):
+        return None
+    o2_idx = None
+    for nbr in o1.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+            continue
+        if nbr.GetSymbol() == 'O' and _is_divalent_chalcogen_atom(nbr):
+            o2_idx = nbr_idx
+            break
+    if o2_idx is None:
+        return None
+    o2 = mol.GetAtomWithIdx(o2_idx)
+    r_start = None
+    for nbr in o2.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx == attach_idx or nbr_idx not in frag_set:
+            continue
+        r_start = nbr_idx
+        break
+    if r_start is None:
+        return None
+    r_name = _name_peroxy_or_disulfanyl_R(mol, r_start, {attach_idx, o2_idx}, frag_set)
+    if not r_name:
+        return None
+    return f"{r_name}peroxy"
+
+
+def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """DD2 Fix B (Phase D, P-63.3.1(1) / P-35.2.2): name a disulfanyl branch
+    -S-S-R -> (R)disulfanyl; terminal -S-SH -> disulfanyl.
+
+    Mirrors ``_name_peroxy_branch`` for the S-S linkage:
+      -S-S-CH3 -> methyldisulfanyl
+      -S-SH    -> disulfanyl (terminal; the H-bearing S carries no R)
+    """
+    frag_set = set(frag_atoms)
+    s1 = mol.GetAtomWithIdx(attach_idx)
+    if s1.GetSymbol() != 'S' or not _is_divalent_chalcogen_atom(s1):
+        return None
+    s2_idx = None
+    for nbr in s1.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+            continue
+        if nbr.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(nbr):
+            s2_idx = nbr_idx
+            break
+    if s2_idx is None:
+        return None
+    s2 = mol.GetAtomWithIdx(s2_idx)
+    r_start = None
+    for nbr in s2.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx == attach_idx or nbr_idx not in frag_set:
+            continue
+        r_start = nbr_idx
+        break
+    if r_start is None:
+        # Terminal -S-SH: no R group -> bare disulfanyl (P-35.2.2).
+        return "disulfanyl"
+    r_name = _name_peroxy_or_disulfanyl_R(mol, r_start, {attach_idx, s2_idx}, frag_set)
+    if not r_name:
+        return None
+    return f"{r_name}disulfanyl"
 
 
 def _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms):

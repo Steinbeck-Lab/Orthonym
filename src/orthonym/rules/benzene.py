@@ -397,6 +397,36 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if suffix_fg:
             return suffix_fg
 
+    # DD2 Fix B (Phase D, P-63.3.1(1)): a peroxy (-O-O-R) / disulfanyl (-S-S-R) /
+    # thioperoxol (-S-O-R, -O-S-R) substituent on the ring. The attach atom is a
+    # divalent (all-single-bond, neutral) chalcogen bonded outside the ring to a
+    # second divalent chalcogen — the peroxide/disulfide linkage. Route through the
+    # shared substituent namer ((R)peroxy / (R)disulfanyl) instead of dropping it
+    # (peroxide -> 'benzene') or collapsing it to a bare sulfanyl (disulfide ->
+    # 'sulfanylbenzene'). The divalent-single-bond guard excludes sulfinyl/sulfonyl.
+    if symbol in ('O', 'S') and start_atom.GetFormalCharge() == 0 and all(
+        b.GetBondType() == Chem.BondType.SINGLE for b in start_atom.GetBonds()
+    ):
+        _partner = None
+        for nbr in start_atom.GetNeighbors():
+            if nbr.GetIdx() in ring_atoms:
+                continue
+            if (nbr.GetSymbol() in ('O', 'S') and nbr.GetFormalCharge() == 0 and all(
+                b.GetBondType() == Chem.BondType.SINGLE for b in nbr.GetBonds()
+            )):
+                _partner = nbr
+                break
+        if _partner is not None:
+            _sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+            from ..assembly.substituent_enumerator import name_substituent
+            from ..assembly.naming_utils import needs_brackets
+            _pname = name_substituent(mol, set(_sub_atoms), start_idx)
+            if _pname and _pname not in ("substituent", "sulfanyl", "hydroxy"):
+                if needs_brackets(_pname) and not (
+                    _pname.startswith('(') and _pname.endswith(')')):
+                    _pname = f'({_pname})'
+                return {'name': _pname, 'atoms': _sub_atoms, 'is_complex': True}
+
     # Nitrogen-based groups
     if symbol == 'N':
         return _identify_nitrogen_group(mol, start_idx, ring_atoms)

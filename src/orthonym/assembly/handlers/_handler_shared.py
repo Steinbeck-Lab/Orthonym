@@ -682,6 +682,15 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         if fg_name in ('alkene', 'alkyne'):
             continue
 
+        # DD2 Fix B (Phase D): peroxide / disulfide are DIVALENT chalcogen-chalcogen
+        # linkages. Their substitutive substituent form ((R)peroxy / (R)disulfanyl)
+        # is emitted by the substituent-branch namer, and the genuine divalent
+        # bridge ('disulfanediyl', 'peroxy') is built by the multiplicative handler.
+        # The monovalent FG-prefix loop must NOT also emit them, or the S-S/O-O is
+        # double-counted (e.g. CSSC -> '(methyldisulfanyl)disulfanediylmethane').
+        if fg_name in ('peroxide', 'disulfide'):
+            continue
+
         # Filter out FGs on ring atoms when chain is parent
         if ring_atom_set:
             filtered = []
