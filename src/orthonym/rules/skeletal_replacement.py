@@ -445,6 +445,67 @@ def _has_terminal_functional_group(
     return False
 
 
+# DD2 Fix A.1 (Phase D, P-63.3/P-63.4): chalcogens whose mutual single bond is a
+# peroxide / disulfide / thioperoxol linkage (-O-O-, -S-S-, -Se-Se-, -Te-Te-, and the
+# mixed -S-O- / -O-S- of the thioperoxol family). Such a bond is a characteristic
+# group (named substitutively or with the -peroxol/-thioperoxol suffix, P-63.3/P-63.4),
+# NEVER two adjacent skeletal `oxa`/`thia` replacement atoms — so skeletal replacement
+# must not walk it (e.g. CCCCOO -> wrong '2-oxahexane'; PIN 'butane-1-peroxol').
+_CHALCOGEN_ATOMIC_NUMS = frozenset({8, 16, 34, 52})  # O, S, Se, Te
+
+
+def _dichalcogen_bond_set(mol: Chem.Mol) -> set:
+    """Return the set of {a, b} index frozensets for every divalent
+    chalcogen-chalcogen single bond in *mol* (peroxide / disulfide / thioperoxol
+    linkages, P-63.3 / P-63.4).
+
+    A bond qualifies when BOTH endpoints are divalent chalcogens (O/S/Se/Te,
+    no double/triple/aromatic bond, neutral, the ``-X-`` ether-oxidation state)
+    joined by a single bond. This is a STRUCTURAL graph property derived from
+    the molecule itself (CONTEXT D-04 pattern), NOT a per-FG SMARTS blocklist —
+    so it precisely forbids only the O-O/S-S traversal (leaving an unrelated
+    C-O-C ether elsewhere in the chain walkable) and uniformly covers the Se/Te
+    analogues and the terminal ``-SSH``/``-OOH`` cases that the carbon-flanked
+    ``peroxide``/``disulfide`` SMARTS do not perceive.
+    """
+    bonds: set = set()
+
+    def _is_divalent_chalcogen(atom) -> bool:
+        if atom.GetAtomicNum() not in _CHALCOGEN_ATOMIC_NUMS:
+            return False
+        if atom.GetFormalCharge() != 0 or atom.GetIsAromatic():
+            return False
+        # All bonds on a peroxide/disulfide-type chalcogen are single bonds
+        # (excludes sulfinyl/sulfonyl/carbonyl-adjacent higher-valent S/Se).
+        for b in atom.GetBonds():
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return False
+        return True
+
+    def _chalcogen_neighbour_count(atom) -> int:
+        return sum(
+            1 for n in atom.GetNeighbors()
+            if n.GetAtomicNum() in _CHALCOGEN_ATOMIC_NUMS
+        )
+
+    for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        a = bond.GetBeginAtom()
+        b = bond.GetEndAtom()
+        if not (_is_divalent_chalcogen(a) and _is_divalent_chalcogen(b)):
+            continue
+        # Scope to a 2-chalcogen linkage (peroxide / disulfide / thioperoxol):
+        # each endpoint must have EXACTLY ONE chalcogen neighbour (the other). A
+        # 3+ chalcogen chain (-S-S-S-, polysulfide) has an interior chalcogen with
+        # two chalcogen neighbours; those remain skeletal ('trithia...') — DD2
+        # covers only the 2-chalcogen peroxide/disulfide/thioperoxol class, and
+        # over-vetoing polysulfides would strip their established skeletal names.
+        if _chalcogen_neighbour_count(a) == 1 and _chalcogen_neighbour_count(b) == 1:
+            bonds.add(frozenset((a.GetIdx(), b.GetIdx())))
+    return bonds
+
+
 def _find_replacement_chain(mol: Chem.Mol) -> Optional[List[int]]:
     """Find the longest chain backbone including heteroatoms.
 
@@ -463,10 +524,19 @@ def _find_replacement_chain(mol: Chem.Mol) -> Optional[List[int]]:
     if num_atoms < 3:
         return None
 
+    # DD2 Fix A.1: never traverse a peroxide/disulfide/thioperoxol
+    # chalcogen-chalcogen bond — it is a characteristic group, not a skeletal
+    # `oxa`/`thia` linkage. Omitting it from the adjacency stops the longest
+    # skeletal chain at the first chalcogen, leaving the group intact for the
+    # substitutive / -peroxol suffix path.
+    _veto_bonds = _dichalcogen_bond_set(mol)
+
     adj: Dict[int, List[int]] = defaultdict(list)
     for bond in mol.GetBonds():
         a1 = bond.GetBeginAtomIdx()
         a2 = bond.GetEndAtomIdx()
+        if _veto_bonds and frozenset((a1, a2)) in _veto_bonds:
+            continue
         adj[a1].append(a2)
         adj[a2].append(a1)
 
