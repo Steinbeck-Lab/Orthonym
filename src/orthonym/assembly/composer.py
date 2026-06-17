@@ -5418,7 +5418,16 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             is_monosubstituted=(is_simple_hydrocarbon and total_substituents == 1
                                 and sorted_locants == [1]),
         ) and total_substituents == 1:
-            formatted = name
+            # A complex/compound substituent still needs enclosing marks even when
+            # its locant is elided (P-16.3.3): '(methylperoxy)ethane',
+            # '(methyldisulfanyl)methane'. Mirrors the ring-prefix path. The bare
+            # name passes through apply_enclosing_marks (correct ()->[]->{} nesting
+            # + leading-stereo escalation; avoids the double-enclose hazard).
+            from ..assembly.naming_utils import apply_enclosing_marks, _has_stereo_prefix
+            if is_complex_substituent(name) or _has_stereo_prefix(name):
+                formatted = apply_enclosing_marks(name, depth=-1)
+            else:
+                formatted = name
             emit_locants = ()
         else:
             formatted = format_substituent_prefix(name, sorted_locants, count)
