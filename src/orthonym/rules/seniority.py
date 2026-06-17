@@ -139,6 +139,12 @@ SENIORITY_ORDER = [
     "selenol",
     "tellurol",        # BBR-PERC (169.7): Te analogue of -ol/-selenol (P-63.1.5)
     "hydroperoxide",   # P-41 Table 4.1 class 18 (peroxol -OOH); junior to class-17 hydroxy/thiol
+    # DD2 Fix C (Phase D): chalcogen hydroperoxol analogues (P-63.4.2 / P-33.2.2(3)),
+    # same class-18 tier as hydroperoxide, in the P-63.7 chalcogen sub-order
+    # -OOH (peroxol) > -SOH > -OSH > -SSH.
+    "so_thioperoxol",  # R-S-OH -> -SO-thioperoxol (replaces retired sulfenic acid)
+    "os_thioperoxol",  # R-O-SH -> -OS-thioperoxol
+    "dithioperoxol",   # R-S-SH -> dithioperoxol (suffix) / disulfanyl (prefix)
 
     # Hydroxylamines (BBR-PERC, 169.7: P-68.3 class 21; ranked just above amines)
     "hydroxylamine",
@@ -162,6 +168,7 @@ SENIORITY_ORDER = [
     "thiocyanate",  # P-65.5: prefix-only (pseudohalide)
     "diazo",           # P-61.5: prefix-only
     "disulfide",       # P-63.6.2: prefix-only
+    "peroxide",        # DD2 Fix B (Phase D): R-OO-R' substitutive (R)peroxy prefix (P-63.3.1(1))
     "hydrazine_fg",    # P-62.4: prefix-only
 
     # Sulfur oxidation states (functional class naming, lower seniority than amines)
@@ -194,6 +201,7 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     "thiocyanate",   # P-65.5
     "diazo",         # P-61.5
     "disulfide",     # P-63.6.2
+    "peroxide",      # DD2 Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
     "hydrazine_fg",  # P-62.4
 })
 
@@ -268,6 +276,13 @@ SUFFIX_FORMS = {
     "selenol": ("selenol", "selenol"),
     "tellurol": ("tellurol", "tellurol"),  # BBR-PERC (169.7): Te -ol analogue (P-63.1.5)
     "hydroperoxide": ("peroxol", "peroxol"),
+    # DD2 Fix C (Phase D, P-63.4.2 / P-33.2.2(3)): chalcogen peroxol analogues.
+    # The italic chalcogen-pair descriptor ('SO'/'OS') is carried in the suffix
+    # string; the emission layer inserts the carbon locant before it
+    # (methane-SO-thioperoxol; propane-1-SO-thioperoxol).
+    "so_thioperoxol": ("SO-thioperoxol", "SO-thioperoxol"),
+    "os_thioperoxol": ("OS-thioperoxol", "OS-thioperoxol"),
+    "dithioperoxol": ("dithioperoxol", "dithioperoxol"),
     # BBR-PERC (169.7): hydroxylamine + free oxoacids + Se/Te ethers are named via
     # their handler / functional-parent (P-67/P-68.3) / functional-class (P-63.6) paths,
     # NOT as a chain suffix — None per the SUFFIX_FORMS contract (like thioether).
@@ -316,9 +331,14 @@ SUFFIX_FORMS = {
     # Phase 109: 6 new FG classes
     "acid_iodide": ("oyl iodide", "carbonyl iodide"),  # IUPAC P-65.5.1
     "amidine": ("imidamide", "carboximidamide"),        # IUPAC P-66.4.1
-    "sulfenic_acid": ("sulfenic acid", "sulfenic acid"),  # IUPAC P-65.3.1.4
+    # DD2 Fix C (Phase D): R-S-OH is now perceived as `so_thioperoxol` and emitted
+    # as `-SO-thioperoxol` (P-56.2 PIN). `sulfenic_acid` is retired from the PIN path
+    # (perception suppresses it on overlap) — this legacy suffix is unreachable for
+    # R-S-OH and kept only as a defensive label.
+    "sulfenic_acid": ("sulfenic acid", "sulfenic acid"),  # IUPAC P-65.3.1.4 (retired PIN; see so_thioperoxol)
     "diazo": None,               # P-61.5: prefix-only
     "disulfide": None,           # P-63.6.2: prefix-only
+    "peroxide": None,            # DD2 Fix B (Phase D): prefix-only ((R)peroxy)
     "hydrazine_fg": None,        # P-62.4: prefix-only
 }
 
@@ -356,6 +376,12 @@ PREFIX_FORMS = {
     "selenol": "selanyl",
     "tellurol": "tellanyl",   # BBR-PERC (169.7): Te analogue of sulfanyl/selanyl (P-63.1.5)
     "hydroperoxide": "hydroperoxy",
+    # DD2 Fix C (Phase D): demoted-prefix forms of the chalcogen peroxol analogues
+    # (P-63.4 / P-63.3.1). -S-OH -> hydroxysulfanyl; -O-SH -> sulfanyloxy;
+    # -S-SH -> disulfanyl (terminal disulfide, P-35.2.2).
+    "so_thioperoxol": "hydroxysulfanyl",
+    "os_thioperoxol": "sulfanyloxy",
+    "dithioperoxol": "disulfanyl",
     # BBR-PERC (169.7): hydroxylamine + free oxoacids are functional parents
     # (P-67/P-68.3); not expressed as detachable prefixes (None, like thioether).
     "hydroxylamine": None,
@@ -454,7 +480,10 @@ PREFIX_FORMS = {
     "amidine": "amidino",              # IUPAC P-66.4.1
     "sulfenic_acid": "sulfeno",        # IUPAC P-65.3.1.4
     "diazo": "diazo",                  # P-61.5
-    "disulfide": "disulfanediyl",      # P-63.6.2
+    "disulfide": "disulfanediyl",      # P-63.6.2 (divalent bridge; substitutive (R)disulfanyl via get_disulfanyl_prefix)
+    # DD2 Fix B (Phase D): R-OO-R' substituent prefix is (R)peroxy, generated
+    # dynamically by substituent_prefix_forms.get_peroxy_prefix (None here, like ether/ester).
+    "peroxide": None,                  # P-63.3.1(1): (R)peroxy via get_peroxy_prefix
     "hydrazine_fg": "hydrazinyl",      # P-62.4
 }
 

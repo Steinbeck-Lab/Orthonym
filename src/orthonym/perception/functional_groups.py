@@ -162,7 +162,17 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === HYDROPEROXIDES ===
     "hydroperoxide": "[OX2H][OX2][#6]",
     "peroxide": "[#6][OX2][OX2][#6]",
-    
+    # === CHALCOGEN HYDROPEROXOL ANALOGUES (DD2 Fix C, Phase D: P-63.4.2 / P-33.2.2(3)) ===
+    # The -OOH (peroxol) sulfur/mixed analogues. Each is BOTH a suffix-capable
+    # principal group (-SO-/-OS-/dithioperoxol) and, when demoted, a substituent
+    # prefix (hydroxysulfanyl / sulfanyloxy / disulfanyl). The -S-OH key REPLACES
+    # the Blue-Book-retired `sulfenic_acid` PIN (P-56.2 verbatim, BlueBookV2
+    # line ~24326: `CH3-S-OH -> methane-SO-thioperoxol (PIN) (not methanesulfenic
+    # acid)`); the collision resolver below suppresses `sulfenic_acid` on its atoms.
+    "so_thioperoxol": "[#6][SX2][OX2H]",   # R-S-OH  -> -SO-thioperoxol (was retired sulfenic acid)
+    "os_thioperoxol": "[#6][OX2][SX2H]",   # R-O-SH  -> -OS-thioperoxol
+    "dithioperoxol": "[#6][SX2][SX2H]",    # R-S-SH  -> dithioperoxol (suffix) / disulfanyl (prefix)
+
     # === HYDROXYLAMINES (BBR-PERC/DEF-2, 169.7: P-68.3 class 21) ===
     # R-NH-OH / R2N-OH — the N bears an -OH and >=1 carbon. MUST be checked before
     # amines/alcohol (resolver suppresses those on its atoms). Excludes hydroxamic
@@ -442,6 +452,19 @@ def _resolve_fg_collisions(results):
         ('acid_iodide', ['aldehyde']),
         # DATA-05b: disulfide suppresses thioether if S atoms overlap
         ('disulfide', ['thioether']),
+        # DD2 Fix C (Phase D, P-63.4.2 / P-56.2): the chalcogen hydroperoxol
+        # analogues supersede the legacy/retired generics on their atoms.
+        # -S-OH (`so_thioperoxol`) REPLACES the Blue-Book-retired `sulfenic acid`
+        # PIN; it also pre-empts any `thiol`/`thioether` read on its divalent S.
+        ('so_thioperoxol', ['sulfenic_acid', 'thiol', 'thioether', 'alcohol',
+                            'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol']),
+        # -O-SH (`os_thioperoxol`): the S bears the H but is bonded to O, not C, so
+        # `thiol` would not match anyway; suppress any `ether`/`thioether` read.
+        ('os_thioperoxol', ['thiol', 'ether', 'thioether']),
+        # -S-SH (`dithioperoxol`): terminal disulfanyl. The H-bearing S is bonded
+        # to S (not C) so `thiol` cannot match; the inner S-S has only one C end so
+        # the carbon-flanked `disulfide` cannot match — suppress defensively anyway.
+        ('dithioperoxol', ['thiol', 'thioether', 'disulfide']),
         # DATA-05c: hydrazine suppresses primary_amine on its -NH2 nitrogen
         ('hydrazine_fg', ['primary_amine']),
         # DATA-05c: hydrazide is more specific than hydrazine_fg
