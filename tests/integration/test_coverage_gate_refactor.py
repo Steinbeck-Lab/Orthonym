@@ -146,7 +146,9 @@ CANARY_SPOT_CHECK = [
     ("Cn1c(=O)c2c(ncn2C)n(C)c1=O",
      "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
     ("O=C(O)c1ccccc1", "benzoic acid"),
-    ("CCN(CC)CC", "triethylamine"),
+    # v22 Phase B (DD1 Fix 4): triethylamine is general-nomenclature; PIN is the
+    # substitutive N,N-diethylethanamine (P-62.2.1.2).
+    ("CCN(CC)CC", "N,N-diethylethanamine"),
 ]
 
 

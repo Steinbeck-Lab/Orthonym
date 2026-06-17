@@ -97,8 +97,9 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
     "CC(C)=O": "acetone",
     "CCC(C)=O": "butan-2-one",
     # --- Simple amines ---
-    "CN": "methylamine",
-    "CCN": "ethylamine",
+    # methylamine/ethylamine are general-nomenclature (non-PIN) functional-class
+    # names (P-62.2.1.2); removed so fragments resolve to the substitutive PIN
+    # (methanamine/ethanamine) via the systematic path. DD1 Fix 4 / H5.
     "CCCN": "propan-1-amine",
     "CCCCN": "butan-1-amine",
     "NCCCCCN": "pentane-1,5-diamine",

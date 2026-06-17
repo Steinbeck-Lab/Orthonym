@@ -218,10 +218,14 @@ class TestRingNitrogenNotAmineGold:
 class TestRingNitrogenNotAmineProtect:
     """Acyclic amines and bare N-heterocycle parents must not move."""
 
+    # v22 Phase B (DD1 Fix 4 / H5): triethylamine/trimethylamine are
+    # general-nomenclature functional-class names; the PINs are the substitutive
+    # forms (P-62.2.1.2). The ethane amine-suffix locant is elided per P-14.3.4.4
+    # ('ethanamine' not 'ethan-1-amine'), matching 'ethanol'/'ethanethiol'.
     CASES = [
-        ("CCN(CC)CC", "triethylamine"),
-        ("CCNCC", "N-ethylethan-1-amine"),
-        ("CN(C)C", "trimethylamine"),
+        ("CCN(CC)CC", "N,N-diethylethanamine"),
+        ("CCNCC", "N-ethylethanamine"),
+        ("CN(C)C", "N,N-dimethylmethanamine"),
         ("C1CCCCC1N", "cyclohexan-1-amine"),
         ("CNC1CCCCC1", "N-methylcyclohexan-1-amine"),
         ("C1COCCN1", "morpholine"),

@@ -66,11 +66,14 @@ RETAINED_NAMES = {
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",
     
     # === AMINES ===
-    "CN": "methylamine",
-    "CCN": "ethylamine",
+    # P-62.2.1.2 / P-15.2: methylamine / ethylamine / trimethylamine /
+    # triethylamine are GENERAL-nomenclature functional-class names, NOT PINs.
+    # The PINs are the substitutive forms (methanamine, ethanamine,
+    # N,N-dimethylmethanamine, N,N-diethylethanamine), which the systematic
+    # path already produces once these retained entries are absent. Removed from
+    # the PIN-headline path (DD1 Fix 4 / H5). 'aniline' IS a retained PIN
+    # (P-62.2.1.1.1) and stays.
     "Nc1ccccc1": "aniline",
-    "CN(C)C": "trimethylamine",
-    "CCN(CC)CC": "triethylamine",
     
     # === PHENOLS ===
     "Oc1ccccc1": "phenol",

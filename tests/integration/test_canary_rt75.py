@@ -668,7 +668,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCN(CC)Cc1ccccc1",
-        "N-benzyl-N-ethylethan-1-amine",
+        "N-benzyl-N-ethylethanamine",
     ),
     (
         "NC(N)=[NH2+].O=C([O-])C(=O)O",

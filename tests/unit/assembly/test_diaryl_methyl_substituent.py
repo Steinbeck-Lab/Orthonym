@@ -235,4 +235,7 @@ class TestPrincipalAmineGuard:
 
     @pytest.mark.unit
     def test_principal_dimethylamine_unchanged(self):
-        assert name_compound("CN(C)CC") == "N,N-dimethylethan-1-amine"
+        # v22 Phase B (DD1 Fix 4): the ethane amine-suffix locant is elided per
+        # P-14.3.4.4 -> 'N,N-dimethylethanamine' (PubChem-confirmed), not the
+        # over-located 'N,N-dimethylethan-1-amine'.
+        assert name_compound("CN(C)CC") == "N,N-dimethylethanamine"

@@ -39,7 +39,9 @@ ROUNDTRIP_VERIFIED = [
     ("CCCCC/C=C\\CC/C=C/C=O", "(2E,6Z)-dodeca-2,6-dienal"),
     ("CCCCCCCCCCC/C=C/CC/C=C/C(=O)O", "(2E,6E)-octadeca-2,6-dienoic acid"),
     ("C[C@H](O)C(=O)CC(=O)C(=O)O", "(5S)-5-hydroxy-2,4-dioxohexanoic acid"),
-    ("CCN(CC)CC", "triethylamine"),
+    # v22 Phase B (DD1 Fix 4): PIN is N,N-diethylethanamine, not the
+    # general-nomenclature 'triethylamine'.
+    ("CCN(CC)CC", "N,N-diethylethanamine"),
     ("CCCCCCCCCCCC/C=C/C(=O)O", "(2E)-pentadec-2-enoic acid"),
     ("CCCCCCC#CCCCC(=O)O", "dodec-5-ynoic acid"),
     ("CC/C=C\\C/C=C\\C/C=C\\CC#CCCCCC(=O)O", "(9Z,12Z,15Z)-octadeca-9,12,15-trien-6-ynoic acid"),

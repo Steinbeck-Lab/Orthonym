@@ -422,8 +422,18 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         if fg_locants:
             fg_count = len(fg_locants)
 
-        # Terminal groups: locant is implicitly 1, do NOT include in name
-        if should_omit_locant_one(context="suffix", fg_type=fg_name):
+        # Terminal groups: locant is implicitly 1, do NOT include in name.
+        # Pass chain_length + is_monosubstituted so P-14.3.4 elision also covers
+        # methane (chain_length==1) and a single non-terminal suffix on ethane
+        # (chain_length==2) -> 'methanamine' / 'N,N-dimethylmethanamine' /
+        # 'ethanamine', not 'methan-1-amine' / 'ethan-1-amine'.
+        _suffix_chain_len = len(features.principal_chain)
+        if should_omit_locant_one(
+            context="suffix",
+            fg_type=fg_name,
+            chain_length=_suffix_chain_len,
+            is_monosubstituted=(fg_count == 1),
+        ):
             locants = ()
         else:
             # For non-terminal groups (alcohol, ketone), include locants

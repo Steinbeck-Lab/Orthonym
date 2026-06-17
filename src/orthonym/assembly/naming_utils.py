@@ -154,6 +154,18 @@ TERMINAL_FG_TYPES = frozenset({
 # ============================================================================
 
 
+# Monovalent-heteroatom suffix FG classes whose locant elides on a symmetric
+# 2-carbon (ethane) parent (P-14.3.4.4): -amine / -ol / -thiol / -selenol /
+# -tellurol. Carbonyl-type suffixes (-one/-al) are deliberately EXCLUDED — they
+# always cite the suffix locant in PINs (P-31.1.4).
+_ETHANE_SUFFIX_ELIDE_FGS = frozenset({
+    "primary_amine", "secondary_amine", "tertiary_amine",
+    "primary_alcohol", "secondary_alcohol", "tertiary_alcohol",
+    "alcohol", "phenol", "enol",
+    "thiol", "selenol", "tellurol",
+})
+
+
 def should_omit_locant_one(
     *,
     context: str,
@@ -193,6 +205,20 @@ def should_omit_locant_one(
     # Rule 3: Terminal groups: suffix locant-1 is implicit
     # Chain is numbered from the terminal group (acid, aldehyde, nitrile, etc.)
     if context == "suffix" and fg_type in TERMINAL_FG_TYPES:
+        return True
+
+    # Rule 3b: A single monovalent-heteroatom suffix (-amine/-ol/-thiol/-selenol/
+    # -tellurol) on a 2-carbon (ethane) parent. The two carbons of ethane are
+    # equivalent and the group sits on a terminal carbon, so the locant is always
+    # 1 and is omitted (P-14.3.4.4): 'ethanamine'/'ethanol'/'ethanethiol', not
+    # 'ethan-1-amine'. This is FG-class-gated on purpose: carbonyl-type suffixes
+    # (-one/-al) ALWAYS cite their locant in PINs (P-31.1.4 — '1-phenylethan-1-one',
+    # 'propan-2-one'), so a ketone on ethane must NOT elide. methane
+    # (chain_length==1) is covered unconditionally by Rule 1; multi-instance
+    # suffixes (ethane-1,2-diamine) keep locants (is_monosubstituted is False).
+    if (context == "suffix" and not is_ring
+            and chain_length == 2 and is_monosubstituted
+            and fg_type in _ETHANE_SUFFIX_ELIDE_FGS):
         return True
 
     # Rule 4: Monosubstituted rings. WSD-06: the ring callers now pass

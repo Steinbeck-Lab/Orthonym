@@ -37,7 +37,12 @@ class TestAliphaticNOxide:
     def test_trimethylamine_n_oxide(self):
         result = name_compound("C[N+](C)(C)[O-]")
         assert "N-oxide" in result, f"Expected 'N-oxide' in '{result}'"
-        assert "trimethylamine" in result, f"Expected 'trimethylamine' in '{result}'"
+        # v22 Phase B (DD1 Fix 4 / H5): trimethylamine is general-nomenclature;
+        # removing the retained PIN-headline entry makes the N-oxide use the
+        # substitutive amine PIN -> 'N,N-dimethylmethanamine N-oxide'.
+        assert "N,N-dimethylmethanamine" in result, (
+            f"Expected systematic amine PIN in '{result}'"
+        )
 
 
 class TestNOxideRouting:

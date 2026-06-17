@@ -177,7 +177,8 @@ class TestAmideCanaries:
 # ---------------------------------------------------------------------------
 
 ROUNDTRIP_CANARIES = [
-    ("CCN(CC)CC", "triethylamine"),
+    # v22 Phase B (DD1 Fix 4): PIN is the substitutive N,N-diethylethanamine.
+    ("CCN(CC)CC", "N,N-diethylethanamine"),
     ("CCCCCCCCCCCC/C=C/C(=O)O", "(2E)-pentadec-2-enoic acid"),
     ("CCCCCCC#CCCCC(=O)O", "dodec-5-ynoic acid"),
     ("CCCCCCCCCC/C=C/CCCCCCCCCC(=O)O", "(11E)-docos-11-enoic acid"),

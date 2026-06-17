@@ -262,8 +262,10 @@ class TestIntegrationWithNameCompound:
         """Regular compounds still work correctly."""
         # Simple acid
         assert name_compound("CC(=O)O") == "acetic acid"
-        # Simple amine
-        assert name_compound("CCN") == "ethylamine"
+        # Simple amine. v22 Phase B (DD1 Fix 4 / H5): 'ethylamine' is a
+        # general-nomenclature functional-class name; the PIN is the substitutive
+        # 'ethanamine' (P-62.2.1.2; ethane locant elided per P-14.3.4.4).
+        assert name_compound("CCN") == "ethanamine"
 
 
 class TestOPSINSimpleGroupAminoAcids:
