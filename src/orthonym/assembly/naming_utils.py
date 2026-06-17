@@ -154,15 +154,17 @@ TERMINAL_FG_TYPES = frozenset({
 # ============================================================================
 
 
-# Monovalent-heteroatom suffix FG classes whose locant elides on a symmetric
-# 2-carbon (ethane) parent (P-14.3.4.4): -amine / -ol / -thiol / -selenol /
-# -tellurol. Carbonyl-type suffixes (-one/-al) are deliberately EXCLUDED — they
-# always cite the suffix locant in PINs (P-31.1.4).
+# Amine-family suffix FG classes whose locant elides on a symmetric 2-carbon
+# (ethane) parent (P-14.3.4.4): 'ethanamine' not 'ethan-1-amine'. Scoped to the
+# amine family ON PURPOSE — it is the only suffix that routes through the general
+# _generate_suffix path AND needs this elision (DD1 Fix 4 masking pair). -ol /
+# -thiol have dedicated handlers that already elide the bare case ('ethanol',
+# 'ethanethiol'); including them here changed the SUBSTITUTED-alcohol locant
+# (2-phenylethan-1-ol -> 2-phenylethanol), a separate unsettled question outside
+# Phase B. Carbonyl-type suffixes (-one/-al) always cite the locant in PINs
+# (P-31.1.4, 1-phenylethan-1-one) and are likewise excluded.
 _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     "primary_amine", "secondary_amine", "tertiary_amine",
-    "primary_alcohol", "secondary_alcohol", "tertiary_alcohol",
-    "alcohol", "phenol", "enol",
-    "thiol", "selenol", "tellurol",
 })
 
 
