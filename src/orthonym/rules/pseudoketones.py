@@ -129,10 +129,8 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
     if not ring_atoms:
         return None
 
-    # The N-side fragment = the ring system PLUS any substituents on it (the whole
-    # connected component on the nitrogen side after cutting the N->carbonyl bond).
-    # name_ring_system_substituent names the COMPLETE fragment (so a ring methyl is
-    # captured -> '4-methylpiperidin-1-yl'); dropping it would be a wrong molecule.
+    # The N-side fragment = the whole connected component on the nitrogen side
+    # after cutting the N->carbonyl bond (ring system + any substituents on it).
     from collections import deque
 
     frag_seen = {carbonyl_c}
@@ -147,6 +145,18 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
         for nb in mol.GetAtomWithIdx(a).GetNeighbors():
             if nb.GetIdx() not in frag_seen:
                 queue.append(nb.GetIdx())
+
+    # Deterministic constitutional safety guard (no external tool): only emit when
+    # the N-side fragment is the BARE ring system (no exocyclic substituents on the
+    # ring). For an unsubstituted ring, name_ring_system_substituent reliably yields
+    # a constitutionally-correct N-yl name (piperidin-1-yl / pyrrolidin-1-yl /
+    # morpholin-4-yl). On a SUBSTITUTED symmetric ring it can drop the attachment
+    # locant (e.g. '1-methylpiperazinyl', which denotes a DIFFERENT molecule), so a
+    # decorated ring falls through to the legacy path rather than risk a wrong name.
+    # (Substituted-ring pseudoketones are a follow-on, gated on the ring-substituent
+    # namer gaining correct attachment numbering for symmetric N-heterocycles.)
+    if set(frag) != set(ring_atoms):
+        return None
 
     # Acyl parent chain: longest carbon chain that excludes the entire N-side
     # fragment (ring + its substituents); the carbonyl carbon (the ketone, locant
@@ -185,41 +195,7 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
     stem_part = joined[: len(joined) - len(ketone_suffix)]  # 'ethan' / 'ethane'
     parent = f"{stem_part}-1-{ketone_suffix}"  # 'ethan-1-one' / 'ethane-1-thione'
 
-    candidate = f"1-({ringyl}){parent}"
-
-    # Constitutional safety guard: name_ring_system_substituent is reliable for a
-    # clean ring system but can drop the attachment locant on a substituted
-    # symmetric ring (e.g. it emits '1-methylpiperazinyl', which OPSIN reads as a
-    # DIFFERENT molecule). Emit only when the assembled name parses back to the
-    # input constitution; otherwise fall through (never assert a wrong molecule).
-    if not _constitution_matches(candidate, mol):
-        return None
-    return candidate
-
-
-def _constitution_matches(name: str, mol) -> bool:
-    """True iff ``name`` parses (OPSIN) to the same constitution as ``mol``
-    (heavy-atom connectivity, stereo ignored). Conservative: any parse failure,
-    OPSIN-unavailability, or mismatch returns False so the caller falls through."""
-    try:
-        from rdkit import Chem
-
-        from ..validation.opsin_roundtrip import opsin_parse
-
-        parsed = opsin_parse(name)
-        if not isinstance(parsed, str) or not parsed:
-            return False
-        pmol = Chem.MolFromSmiles(parsed)
-        if pmol is None:
-            return False
-        want = Chem.MolToSmiles(mol, isomericSmiles=False)
-        got = Chem.MolToSmiles(pmol, isomericSmiles=False)
-        # canonical round-trip both sides to normalise aromaticity/kekulé form
-        want = Chem.MolToSmiles(Chem.MolFromSmiles(want))
-        got = Chem.MolToSmiles(Chem.MolFromSmiles(got))
-        return want == got
-    except Exception:
-        return False
+    return f"1-({ringyl}){parent}"
 
 
 __all__ = ["is_hidden_amide", "name_pseudoketone"]
