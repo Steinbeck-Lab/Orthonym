@@ -898,6 +898,44 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         return _emit_ion_with_tree(assemble_ion_name(features, features.mol, style))
 
     # =========================================================================
+    # DD1 Fix 3 (B3): PSEUDOKETONE for acyl-on-ring-N "hidden amides"
+    # (P-66.1.3 / P-64.3.2 / P-66.1.4.3). An acyl group on a ring-system N is a
+    # ketone (the C=O carbon is the principal group, the ring is an N-yl
+    # substituent), NOT an amide. The legacy amide path drops the C=O entirely
+    # (is_ring_attached_amide is False, no -carboxamide ring fire) -> bare
+    # 'piperidine'. Detect on the original graph and emit the pseudoketone.
+    # Returns None for ordinary acyclic amides, lactams, or decorated acyl chains.
+    # =========================================================================
+    from ..rules.pseudoketones import name_pseudoketone as _name_pseudoketone
+    _pk_name = _name_pseudoketone(features, style)
+    if _pk_name:
+        return _emit_ion_with_tree(_pk_name)
+
+    # =========================================================================
+    # DD1 Fix 2 (B2): ADDED-CARBON MULTI-SUFFIX PARENT (P-65.1.1.1 /
+    # P-66.1.1.1.1.2 / P-66.5.1.1.2). When >=3 carboxylic-acid / carboxamide /
+    # carbonitrile groups sit on a clean acyclic carbon skeleton they cannot all
+    # be chain-terminal suffixes, so the PIN is the parent hydride (carbonyl/
+    # nitrile carbons removed) + a multiplied 'carbo*' suffix. This MUST run
+    # before the legacy parent-selection/clamp path, which walks through the
+    # carbonyl/nitrile carbons and drops the third group. The namer returns None
+    # for any structure outside the clean-acyclic-parent class (decorated parent,
+    # ring-attached, n<3) so control falls through unchanged.
+    # =========================================================================
+    from ..rules.added_carbon_parent import (
+        requires_added_carbon_suffix as _req_added_carbon,
+        name_added_carbon_parent as _name_added_carbon,
+    )
+    if _req_added_carbon(
+        features.mol,
+        getattr(features, "principal_group", None),
+        getattr(features, "principal_group_atoms", None),
+    ):
+        _ac_name = _name_added_carbon(features, style)
+        if _ac_name:
+            return _emit_ion_with_tree(_ac_name)
+
+    # =========================================================================
     # PHASE 160 INNER DISPATCH (DECOMP-01 + CONTEXT D-08 + D-10)
     # =========================================================================
     # The inner-dispatch table at orthonym.assembly.inner_dispatch is
