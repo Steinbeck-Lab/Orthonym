@@ -48,6 +48,10 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     'carbonic_acid',     # P-65.2.1: functional parent (HO-C(=O)-OH)
     'selenoether',       # P-63.6: functional class / substitutive (alkyl)selanyl
     'telluroether',      # P-63.6: functional class / substitutive (alkyl)tellanyl
+    # DD2 (Phase D, P-63.3.1(1)): R-OO-R' substituent prefix is (R)peroxy, generated
+    # dynamically by substituent_prefix_forms.get_peroxy_prefix (exactly like ether/ester
+    # above — no static principal-group prefix form).
+    'peroxide',          # P-63.3.1(1): substitutive (R)peroxy via get_peroxy_prefix
 })
 
 

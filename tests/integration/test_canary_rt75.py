@@ -366,8 +366,11 @@ CANARY_COMPOUNDS = [
     ),
     # CLS-02: Disulfides
     (
+        # DD2 (Phase D, P-63.3.1(1)): dialkyl disulfide is a substitutive PIN,
+        # not the 'dithia' skeletal-replacement chain (the old '2,3-dithiabutane'
+        # consumed the S-S as two skeletal thia atoms — the catalog C3 defect).
         "CSSC",
-        "2,3-dithiabutane",
+        "(methyldisulfanyl)methane",
     ),
     (
         "CCSSSCC",

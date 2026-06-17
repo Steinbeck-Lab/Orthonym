@@ -81,12 +81,17 @@ class TestAcyclicDisulfideCanaries:
     """
 
     def test_dimethyl_disulfide(self):
-        """``CSSC`` -> ``2,3-dithiabutane``."""
-        assert name_compound("CSSC") == "2,3-dithiabutane"
+        """``CSSC`` -> ``(methyldisulfanyl)methane``.
+
+        DD2 (Phase D, P-63.3.1(1)): a dialkyl disulfide is a SUBSTITUTIVE PIN —
+        the senior R as parent + ``(R'disulfanyl)`` prefix — not the ``dithia``
+        skeletal-replacement chain (the old ``2,3-dithiabutane`` consumed the S-S
+        bond as two skeletal thia atoms, the catalog C3 defect)."""
+        assert name_compound("CSSC") == "(methyldisulfanyl)methane"
 
     def test_diethyl_disulfide(self):
-        """``CCSSCC`` -> ``3,4-dithiahexane``."""
-        assert name_compound("CCSSCC") == "3,4-dithiahexane"
+        """``CCSSCC`` -> ``(ethyldisulfanyl)ethane`` (substitutive PIN, P-63.3.1(1))."""
+        assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"
 
 
 @pytest.mark.unit

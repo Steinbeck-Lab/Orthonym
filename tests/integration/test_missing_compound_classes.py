@@ -131,13 +131,17 @@ class TestCLS02Disulfides:
 
     @pytest.mark.integration
     def test_dithiabutane(self):
-        """Simplest dialkyl disulfide: CSSC."""
-        assert name_compound("CSSC") == "2,3-dithiabutane"
+        """Simplest dialkyl disulfide: CSSC. DD2 (Phase D, P-63.3.1(1)): a dialkyl
+        disulfide is a substitutive PIN ((R)disulfanyl on the senior parent), NOT
+        a 'dithia' skeletal-replacement chain (the skeletal form consumed the S-S
+        as two skeletal thia atoms — the C3 defect)."""
+        assert name_compound("CSSC") == "(methyldisulfanyl)methane"
 
     @pytest.mark.integration
     def test_dithiahexane(self):
-        """Symmetric disulfide: CCSSCC."""
-        assert name_compound("CCSSCC") == "3,4-dithiahexane"
+        """Symmetric disulfide: CCSSCC. DD2 (Phase D, P-63.3.1(1)): substitutive
+        PIN, not the 'dithia' skeletal form."""
+        assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"
 
     @pytest.mark.integration
     def test_trithiaheptane(self):

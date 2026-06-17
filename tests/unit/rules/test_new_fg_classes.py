@@ -185,9 +185,13 @@ class TestSulfenicAcid:
     """Sulfenic acid: R-S-OH, between sulfinic and phosphonic acid in seniority."""
 
     def test_methanesulfenic_acid_detected(self):
-        """Methanesulfenic acid CSO should be detected as sulfenic_acid."""
+        """DD2 (Phase D, P-56.2): R-S-OH is now perceived as ``so_thioperoxol`` and
+        named ``methane-SO-thioperoxol`` (PIN), NOT the Blue-Book-retired
+        ``methanesulfenic acid``. ``so_thioperoxol`` suppresses ``sulfenic_acid``
+        on overlap (collision resolver)."""
         result = _detect("CSO")
-        assert "sulfenic_acid" in result
+        assert "so_thioperoxol" in result
+        assert "sulfenic_acid" not in result
 
     def test_sulfenic_not_thiol(self):
         """Methanesulfenic acid CSO should NOT be detected as thiol."""
