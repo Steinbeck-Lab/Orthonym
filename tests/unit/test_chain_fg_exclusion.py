@@ -8,10 +8,12 @@ Non-principal FG terminal carbons whose prefix form includes the carbon
 (e.g., carbamoyl = -C(=O)NH2) are excluded from chain enumeration.
 This prevents chain inflation and ensures correct round-trip naming.
 
-FG terminal carbons whose prefix does NOT include the carbon (e.g.,
-cyano = #N on chain C) are NOT excluded.
+A NON-PRINCIPAL nitrile is the 'cyano' prefix whose carbon belongs to the
+prefix (-C#N), NOT the parent chain, so it is EXCLUDED (v22 Phase B / DD1
+Fix 1, P-66.5.1.1.4). When the nitrile IS the principal group its carbon
+stays in the chain (the -nitrile suffix counts it).
 
-Ref: IUPAC 2013 P-66.1(c) (carbamoyl), P-66.6.3 (cyano).
+Ref: IUPAC 2013 P-66.1(c) (carbamoyl), P-66.5.1.1.4 (cyano-prefix exclusion).
 """
 
 import pytest
@@ -104,11 +106,15 @@ class TestChainFGBehavior:
             "Amide C excluded (carbamoyl prefix includes it)"
         )
 
-    def test_nitrile_amino_acid_includes_nitrile_carbon(self):
-        """N#CCCCC(N)C(=O)O -- amino acid with nitrile side chain.
+    def test_nitrile_amino_acid_excludes_nitrile_carbon(self):
+        """N#CCCCC(N)C(=O)O -- amino acid with a nitrile side chain.
 
-        The nitrile C IS in the chain because "cyano" prefix does NOT
-        include the C (it represents only the #N).
+        v22 Phase B (DD1 Fix 1, P-66.5.1.1.4): the carboxylic acid is the
+        principal group, so the nitrile is a non-principal 'cyano' PREFIX whose
+        carbon (-C#N) is EXCLUDED from the parent chain. The backbone is the
+        5-carbon pentanoic acid (-> 2-amino-5-cyanopentanoic acid), NOT a 6-carbon
+        chain. (Previously the nitrile C was wrongly counted, inflating the chain
+        and round-tripping to a different molecule.)
         """
         mol = Chem.MolFromSmiles("N#CCCCC(N)C(=O)O")
         fgs = detect_functional_groups(mol)
@@ -117,12 +123,12 @@ class TestChainFGBehavior:
         nitrile_matches = fgs.get("nitrile", [])
         assert nitrile_matches, "nitrile should be detected"
         nitrile_carbon = nitrile_matches[0][0]
-        assert nitrile_carbon in chain, (
-            f"Nitrile C (atom {nitrile_carbon}) IS a chain member "
-            f"(cyano prefix = just #N). Chain: {chain}"
+        assert nitrile_carbon not in chain, (
+            f"Non-principal nitrile C (atom {nitrile_carbon}) must be EXCLUDED "
+            f"(cyano prefix includes its carbon, P-66.5.1.1.4). Chain: {chain}"
         )
-        assert len(chain) == 6, (
-            f"Chain should be 6 carbons (includes nitrile C), got {len(chain)}"
+        assert len(chain) == 5, (
+            f"Chain should be 5 carbons (nitrile C excluded), got {len(chain)}"
         )
 
     def test_diacid_keeps_both_principal_fg_carbons(self):

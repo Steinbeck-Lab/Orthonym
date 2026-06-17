@@ -260,12 +260,19 @@ def _get_non_principal_terminal_carbons(
     - carbamoyl (-C(=O)NH2): prefix includes C
     - carboxy (-COOH): prefix includes C (when non-principal acid)
     - carbonochloridoyl (-C(=O)Cl): prefix includes C
+    - cyano (-C#N): the nitrile carbon belongs to the cyano prefix, NOT the parent
+      chain, whenever the nitrile is non-principal (a senior group is present).
+      Per P-66.5.1.1.4 the cyano carbon is excluded from the parent (e.g.
+      N#CCCC(=O)O -> 3-cyanopropanoic acid, not 4-cyanobutanoic acid). When the
+      nitrile IS the principal group its carbon stays in the chain via the
+      `fg_name == principal_group` skip below (-nitrile suffix counts that C).
 
     FGs where the prefix represents only the heteroatom attachment are NOT excluded:
-    - cyano (#N on chain C): nitrile C IS a chain member
-    - oxo (=O on chain C): aldehyde C IS a chain member
+    - oxo (=O on chain C): the aldehyde/keto carbon IS a chain member and is
+      expressed as 'oxo' in-chain (e.g. O=CCC(=O)O -> 3-oxopropanoic acid, the
+      PIN per P-66.6.1); it is NOT excised to a 'formyl' prefix on acyclic chains.
 
-    Per IUPAC 2013 P-66.1(c), P-65.1.1.1.
+    Per IUPAC 2013 P-66.1(c), P-65.1.1.1, P-66.5.1.1.4.
 
     Args:
         mol: RDKit Mol object
@@ -281,6 +288,10 @@ def _get_non_principal_terminal_carbons(
         'acid_chloride': 0,
         'acid_bromide': 0,
         'acid_fluoride': 0,
+        # P-66.5.1.1.4: a non-principal nitrile is the 'cyano' prefix whose carbon
+        # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
+        # Skipped automatically when nitrile IS the principal group (suffix path).
+        'nitrile': 0,
     }
 
     principal_carbons: Set[int] = set()

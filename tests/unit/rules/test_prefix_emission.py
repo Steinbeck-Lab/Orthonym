@@ -51,10 +51,19 @@ class TestCyanoPrefix:
     """Non-principal nitrile groups should emit 'cyano' prefix (regression guard)."""
 
     def test_cyano_propanoic_acid(self):
-        """N#CCC(=O)O -> 3-cyanopropanoic acid."""
+        """N#CCC(=O)O (cyanoacetic acid) -> cyano PREFIX on a 2-carbon acid parent.
+
+        v22 Phase B (DD1 Fix 1, P-66.5.1.1.4): the non-principal nitrile is a
+        'cyano' prefix whose carbon is EXCLUDED from the parent chain, so the
+        parent is the 2-carbon acid (ethanoic/acetic), NOT a 3-carbon 'propanoic'
+        chain (which would wrongly count the nitrile C). This SMILES is
+        cyanoacetic acid, not 3-cyanopropanoic acid.
+        """
         name = name_compound("N#CCC(=O)O")
         assert "cyano" in name, f"Expected 'cyano' in '{name}'"
-        assert "propanoic" in name, f"Expected 'propanoic' in '{name}'"
+        assert "propanoic" not in name, (
+            f"Nitrile C must NOT inflate the chain to 3C 'propanoic': '{name}'"
+        )
 
 
 class TestFormylPrefix:
