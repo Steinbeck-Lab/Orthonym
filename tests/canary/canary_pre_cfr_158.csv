@@ -1019,7 +1019,7 @@ name_stability,test_canary_name_stability_309,CCCCCC/C=C\CCCCCCCCCC(=O)OC(COC(=O
 name_stability,test_canary_name_stability_310,CC(=O)Nc1ccc(S(=O)(=O)NC(C)=O)cc1,N-acetyl-1-amino-4-sulfanylbenzene,C(C)(=O)NC1=CC=C(C=C1)S,False
 name_stability,test_canary_name_stability_311,Cc1ccc(NC2=CC(=O)c3sc(C)nc3C2=O)cc1,"2-anilino-5-(ethylsulfanyl)cyclohex-2-ene-1,4-dione",N(C1=CC=CC=C1)C=1C(CC(C(C1)=O)SCC)=O,False
 name_stability,test_canary_name_stability_312,CCCCCCCC/C=C\CCCC(COC[C@@H](O)COP(=O)(O)OC[C@H](N)C(=O)O)OC,(2S)-2-aminobishexyloxyhydroxypropanoic acid,N[C@@](C(=O)O)(C(OCCCCCC)OCCCCCC)O,False
-name_stability,test_canary_name_stability_313,COc1c(O)c(O)c2c(c1O)C(=O)c1coc(C)c1C2=O,"10,12,13-trihydroxy-11-methoxy-4-methyl-5-oxa-tricyclo[7.4.0.0(3,7)]tridecan-2,8-dione",OC1C2C(C3COC(C3C(C2C(C(C1OC)O)O)=O)C)=O,False
+name_stability,test_canary_name_stability_313,COc1c(O)c(O)c2c(c1O)C(=O)c1coc(C)c1C2=O,unknown organic compound,,False
 name_stability,test_canary_name_stability_314,COc1c(-c2cc(O)c(O)c(CC=C(C)C)c2)oc2cc(O)cc(O)c2c1=O,3-methyl-4-oxo-2-phenyl-2H-pyran,CC1C(OC=CC1=O)C1=CC=CC=C1,False
 name_stability,test_canary_name_stability_315,COc1cc2oc3c(c(=O)c2cc1O)C(=O)c1c(ccc2cc4c(c(O)c12)C(=O)N1C(C)(C4)OC(=O)C1(C)COC(=O)CC(C)C)C3=O,"7-hexyl-3,24-dihydroxy-23-methoxy-7,10-dimethyl-9,20-dioxa-6-aza-heptacyclo[15.12.0.0(2,14).0(4,12).0(6,10).0(19,28).0(21,26)]nonacosan-5,8,18,27,29-pentaone",C(CCCCC)C1(N2C(C3C(C4C5C(C6C(C7CC(C(CC7OC6C(C5CCC4CC3CC2(OC1=O)C)=O)OC)O)=O)=O)O)=O)C,False
 name_stability,test_canary_name_stability_316,CCCCCCC/C=C\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCCCC/C=C\CCCCCCCC,(2R)-1-((9Z)-heptadec-9-enoyloxy)-2-(oleoyloxy)propanamine,C(CCCCCCC\C=C/CCCCCCC)(=O)OC([C@@H](C)OC(CCCCCCC\C=C/CCCCCCCC)=O)N,False

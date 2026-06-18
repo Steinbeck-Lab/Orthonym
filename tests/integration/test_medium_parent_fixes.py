@@ -136,12 +136,25 @@ POLYCYCLIC_VB_FIXES = [
         "CN([C@H]2CCCNC2=O)C3=O)C[C@@H]1O",
         "tricyclo",
         id="prenylated-tetracyclic-vb",
+        marks=pytest.mark.xfail(
+            reason="v22 G0/DD7 S1: this is a benzo-fused ring system; the prior "
+            "von-Baeyer 'tricyclo[...]' name DROPPED the aromaticity (a wrong, "
+            "de-aromatised cage). G0 fails it closed; the correct bridged-fused "
+            "PIN is a Phase-G1 build.",
+            strict=False,
+        ),
     ),
     pytest.param(
         "O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4"
         "CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1",
         "tetracyclo",
         id="peptide-tetracyclic-vb",
+        marks=pytest.mark.xfail(
+            reason="v22 G0/DD7 S1: benzo-fused ring system; the prior von-Baeyer "
+            "'tetracyclo[...]' name dropped the aromaticity. G0 fails it closed "
+            "(or routes to a non-VB name); correct bridged-fused PIN is Phase-G1.",
+            strict=False,
+        ),
     ),
     pytest.param(
         "C=C1CC[C@@H](C/C=C2/CC[C@]3(OC2)O[C@@]2(O)"

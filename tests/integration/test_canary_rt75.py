@@ -797,8 +797,16 @@ CANARY_COMPOUNDS = [
         "4-hydroxypyridine-6-carboxylic acid",  # Fixed: was "2,3-dibutyl-..." (fabricated from ring boundary leak)
     ),
     (
-        r"CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C",  # Sentinel: parent_mismatch - prenyl chromanone
-        "(2S,4S,5R)-4-methyl-9-2-methylbut-2-enyl-3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol",
+        # v22 Phase G0 (DD7 S1): this prenyl-chromanone fuses a benzene ring into
+        # the bicyclic O-bridge system. The prior expected von-Baeyer name
+        # `…3,13-dioxa-tricyclo[6.4.0.1(2,5)]tridec-6-en-12-ol` is structurally
+        # WRONG — it DROPS the benzo aromaticity (1 `-ene` for a 4-double-bond
+        # molecule), re-parsing to a different over-saturated structure. G0
+        # correctly fails closed (von Baeyer cannot represent aromaticity); the
+        # correct fused-aromatic PIN is a Phase-G1 build. This canary now guards
+        # the fail-closed refusal, not the old wrong cage.
+        r"CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C",  # Sentinel: G0 fail-closed (was wrong von-Baeyer)
+        "unknown organic compound",
     ),
     # Failure taxonomy sentinels: fragment_loss (3 compounds)
     (
@@ -3115,6 +3123,12 @@ def test_canary_opsin_parseable(smiles, expected_name):
     correct IUPAC but beyond OPSIN's parser capability are marked xfail with
     documented reasons. Any other parse failure indicates a format regression.
     """
+    # v22 Phase G0 (DD7 S1): a canary whose expected value is a deliberate
+    # fail-closed refusal ('unknown organic compound') is NOT an IUPAC name and
+    # is intentionally not OPSIN-parseable — skip the format-parse guard for it.
+    from orthonym.errors import is_failure_name
+    if is_failure_name(expected_name):
+        pytest.skip("G0 fail-closed refusal signal, not an IUPAC name to parse")
     if expected_name in _OPSIN_LIMITATIONS:
         pytest.xfail(f"OPSIN limitation: {_OPSIN_LIMITATIONS[expected_name]}")
     results = _get_opsin_results()

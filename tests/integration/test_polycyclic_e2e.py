@@ -143,14 +143,29 @@ class TestBridgedFusedE2E:
     """Tests for FR-8 bridged fused nomenclature."""
 
     def test_methanonaphthalene(self):
-        """1,4-methanonaphthalene: bridged fused system."""
-        # Naphthalene with methano bridge across 1,4 positions
-        # This is a FR-8 bridged fused system
+        """1,4-methanonaphthalene: bridged fused AROMATIC system.
+
+        v22 Phase G0 (DD7 S1): this molecule (10 aromatic atoms) was previously
+        named as a von-Baeyer `tricyclo[…]` cage that DROPS the benzo
+        aromaticity — a structurally WRONG name (it re-parses to a different,
+        over-saturated molecule). The old assertion ACCEPTED that wrong 'cyclo'
+        name as "fused recognition". G0 now fails closed (von Baeyer cannot
+        represent aromaticity); the correct bridged-fused PIN
+        (1,4-dihydro-1,4-methanonaphthalene, P-25.4) is a Phase-G1 build.
+        Acceptable outcomes: a fail-closed refusal, OR a real fused-system
+        name (when G1 lands) — but NEVER the de-aromatised von-Baeyer cage.
+        """
+        from orthonym.errors import is_failure_name
         result = name_compound('C12=CC=CC3=C1C=CC=C3C2')
-        # May produce methanonaphthalene or systematic fused name
-        # Either way should recognize fused aromatic component
-        assert any(x in result.lower() for x in ['naphthalene', 'fused', 'cyclo', 'anthracene']), \
-            f"Expected fused system recognition, got: {result}"
+        if is_failure_name(result):
+            # G0 fail-closed: correct (refuses rather than de-aromatising).
+            return
+        # If a name IS produced (post-G1), it must recognise the fused aromatic
+        # parent and must NOT be a de-aromatised von-Baeyer cage.
+        assert any(x in result.lower() for x in ['naphthalene', 'fused', 'anthracene']), \
+            f"Expected fused-aromatic recognition (or G0 refusal), got: {result}"
+        assert 'cyclo[' not in result.lower(), \
+            f"von-Baeyer cage drops aromaticity (G0 must refuse this), got: {result}"
 
     def test_pure_naphthalene_not_affected(self):
         """Naphthalene: pure fused not affected by bridged-fused routing."""
