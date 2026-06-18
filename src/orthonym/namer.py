@@ -721,7 +721,20 @@ def _build_ring_info_for_parent_selection(features):
                         for a in ring_mol_atoms)):
             try:
                 substituents = get_benzene_substituents(mol, ring_atoms)
-                oriented = orient_benzene(mol, ring_atoms, substituents)
+                # E1/DD4 (P-14.4(c)): anchor the principal characteristic group
+                # (the ring atoms bearing a senior suffix group) to the lowest
+                # locant before detachable substituents. Derived from the
+                # is_suffix marker already set by get_benzene_substituents
+                # (acids/aldehydes/amides); phenols are anchored downstream by
+                # _renumber_relative_to, so an empty set here is a no-op.
+                pcg_positions = {
+                    atom_idx for atom_idx, subs in substituents.items()
+                    if any(s.get("is_suffix") for s in subs)
+                }
+                oriented = orient_benzene(
+                    mol, ring_atoms, substituents,
+                    principal_group_positions=pcg_positions or None,
+                )
                 atom_to_locant = {
                     atom_idx: i + 1
                     for i, atom_idx in enumerate(oriented)

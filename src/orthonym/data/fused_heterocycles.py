@@ -294,16 +294,23 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
 
     # Acridine: dibenzo[b,e]pyridine
-    # IUPAC peripheral numbering: 1-2-3-4-4a-10(N)-10a-5-8a-6-7-8-9-9a (14 positions)
-    # Canonical: c1ccc2nc3ccccc3cc2c1
-    # Empirically verified: N(idx 4)=10. Ring A: 2,1,0,13 -> 1,2,3,4
-    # Ring C: 9,8,7,6 -> 6,7,8,9. Fusion: 12(=4a),3(=10a),5(=9a),10(=8a)
+    # Canonical pattern: c1ccc2nc3ccccc3cc2c1
+    # v22 Phase E1 / DD4 DATA FIX: the previous map was internally INCONSISTENT —
+    # the two C2v-symmetric benzo rings were numbered 3-2-1 / 6-7-8-9, so the two
+    # automorphic substructure matches mapped the SAME substituted carbon to a
+    # non-orbit pair of locants ({3,7}); minimizing then gave acridin-3-amine
+    # where OPSIN's PIN is acridin-2-amine. Re-derived authoritatively against
+    # OPSIN (acridin-N-amine, N=1..9): the C2v orbits are pattern atoms
+    # {13,9}->{1,8}, {0,8}->{2,7}, {1,7}->{3,6}, {2,6}->{4,5}, 11->9 (meso CH),
+    # 4->10 (N). Ring A peripheral 13,0,1,2 -> 1,2,3,4; ring C 6,7,8,9 -> 5,6,7,8;
+    # fusion 3->4a, 5->10a, 10->8a, 12->9a. With the automorphism-min in
+    # match_fused_heterocycle_core, the amino-C ({0,8}->{2,7}) now resolves to 2.
     'c1ccc2nc3ccccc3cc2c1': {
         'name': 'acridine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {2: 1, 1: 2, 0: 3, 13: 4, 12: '4a', 3: '10a', 4: 10, 11: 5, 5: '9a', 10: '8a', 9: 6, 8: 7, 7: 8, 6: 9},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 10, 5: '10a', 6: 5, 7: 6, 8: 7, 9: 8, 10: '8a', 11: 9, 12: '9a', 13: 1},
     },
 
     # Phenazine: dibenzo[b,e]pyrazine
@@ -2092,10 +2099,19 @@ def match_fused_heterocycle_core(
                     beaten = True
                     break
             if not beaten:
-                skel_matches = mol.GetSubstructMatches(skel_rec.pattern)
+                # uniquify=False: a C2v/Cs-symmetric core's automorphic matches
+                # share one atom SET, which uniquify=True (default) would collapse
+                # to a single match — hiding the alternative numbering from the
+                # substituent-locant minimization (the acridine 2-vs-7 bug).
+                skel_matches = mol.GetSubstructMatches(skel_rec.pattern, uniquify=False)
                 if skel_matches:
+                    # E1/DD4: choose the automorphism minimizing substituent
+                    # locants (was matches[0] — non-deterministic for symmetric
+                    # cores like acridine; byte-identical for asymmetric ones).
+                    skel_iul = FUSED_HETEROCYCLE_DATA[skel_rec.smiles].get('iupac_locants') or {}
+                    best_skel = _select_lowest_locant_match(mol, skel_matches, skel_iul)
                     return _build_core_result(
-                        skel_rec.name, list(skel_matches[0]), skel_rec.smiles)
+                        skel_rec.name, list(best_skel), skel_rec.smiles)
 
     # ---- bucket-pruned scan (byte-identical to the old full scan) ----
     best_match: Optional[Tuple[str, List[int], int, str]] = None
@@ -2109,13 +2125,19 @@ def match_fused_heterocycle_core(
         if not _prefilter(rec):
             continue
         if mol.HasSubstructMatch(rec.pattern):
-            matches = mol.GetSubstructMatches(rec.pattern)
+            # uniquify=False so symmetry-equivalent automorphic matches are all
+            # available for the substituent-locant minimization (see fast-path).
+            matches = mol.GetSubstructMatches(rec.pattern, uniquify=False)
             if matches:
-                match = matches[0]  # Take first match
                 core_size = rec.parent_atoms
 
                 # Keep the largest matching core
                 if best_match is None or core_size > best_match[2]:
+                    # E1/DD4: choose the automorphism minimizing substituent
+                    # locants (was matches[0]). Byte-identical when only one
+                    # match (asymmetric core) or no substituent.
+                    rec_iul = FUSED_HETEROCYCLE_DATA[rec.smiles].get('iupac_locants') or {}
+                    match = _select_lowest_locant_match(mol, matches, rec_iul)
                     best_match = (rec.name, list(match), core_size, rec.smiles)
 
     if best_match is None:
@@ -2123,6 +2145,77 @@ def match_fused_heterocycle_core(
 
     name, match_atoms, _, core_smiles = best_match
     return _build_core_result(name, match_atoms, core_smiles)
+
+
+def _coerce_locant_for_compare(locant):
+    """Coerce a catalog locant ('4a', 3, ...) to the int / (int, str) form that
+    ``compare_locant_sets`` orders. Returns None for an unparseable value."""
+    import re as _re
+    if isinstance(locant, int):
+        return locant
+    m = _re.match(r'^(\d+)([a-z]*)$', str(locant))
+    if m is None:
+        return None
+    base, suffix = int(m.group(1)), m.group(2)
+    return (base, suffix) if suffix else base
+
+
+def _select_lowest_locant_match(mol, matches, iupac_locants):
+    """Pick the automorphic substructure match giving the substituent-bearing
+    core atoms the lowest locants (P-14.3.5 / P-14.4 / P-25.3.3.1.2(a)).
+
+    v22 Phase E1 / DD4. For an asymmetric core there is exactly one match, so
+    this returns ``matches[0]`` (byte-identical to the legacy first-match
+    behaviour). For a C2v/Cs-symmetric core (acridine, carbazole,
+    phenanthridine, ...) with a substituent, the multiple automorphic matches
+    map the substituted atom onto its symmetry orbit; choosing the match that
+    minimizes the substituent locant set yields the deterministic PIN
+    numbering instead of an input-order-dependent first match.
+
+    Bare (unsubstituted) symmetric cores tie on the empty substituent set and
+    return ``matches[0]`` — their output name carries no locants, so the choice
+    is immaterial and byte-identical.
+    """
+    matches = [list(m) for m in matches]
+    if not matches:                       # IN-04: self-defensive (callers guard too)
+        return []
+    if len(matches) <= 1:
+        return matches[0]
+    core_atoms = set(matches[0])
+    sub_atoms = {
+        idx for idx in core_atoms
+        if any(nb.GetIdx() not in core_atoms
+               for nb in mol.GetAtomWithIdx(idx).GetNeighbors())
+    }
+    if not sub_atoms or not iupac_locants:
+        return matches[0]
+
+    from ..rules.locants import compare_numbering
+
+    best, best_locs = None, None
+    for m in matches:
+        locs = []
+        scorable = True
+        for pattern_idx, mol_idx in enumerate(m):
+            if mol_idx in sub_atoms:
+                coerced = _coerce_locant_for_compare(iupac_locants.get(pattern_idx))
+                if coerced is None:
+                    # WR-02 fail-closed: a substituent atom whose catalog locant
+                    # is non-numeric (exocyclic '=O'/'N6'/... — latent today)
+                    # cannot be scored. Excluding the whole match is correct;
+                    # silently dropping the locant would shorten the set and let
+                    # "shorter set wins" pick a wrong numbering.
+                    scorable = False
+                    break
+                locs.append(coerced)
+        if not scorable:
+            continue
+        if best is None or compare_numbering(
+                {'substituents': locs}, {'substituents': best_locs}) < 0:
+            best, best_locs = m, locs
+    # If every match was unscorable, fall back to the first (byte-identical to
+    # the legacy first-match rather than crashing).
+    return best if best is not None else matches[0]
 
 
 def _build_core_result(

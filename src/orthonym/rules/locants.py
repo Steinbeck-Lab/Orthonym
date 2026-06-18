@@ -18,9 +18,52 @@ IUPAC 2013 chain orientation criteria (applied in order):
 Reference: IUPAC 2013 Blue Book, P-14.4, P-14.6, P-14.7
 """
 
+from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
+
+# ---------------------------------------------------------------------------
+# Element-seniority order for numbering tie-breaks (DD4 / v22 Phase E1).
+#
+# Single source of truth for the IUPAC 2013 element-seniority sequence used in
+# numbering decisions (P-15.4.1.2 / P-15.4.3.2.1 skeletal-replacement; P-44.3.3
+# senior-acyclic-heteroatom; P-25.3.3.1.2(b) fused-ring). Lower rank = SENIOR
+# (gets the lower locant when a positional set ties).
+#
+#   F < Cl < Br < I < At < O < S < Se < Te < Po < N < P < As < Sb < Bi
+#     < C < Si < Ge < Sn < Pb < B < Al < Ga < In < Tl
+#
+# Before E1 there were 3+ divergent heteroatom-seniority tables
+# (ring_substituents._HETEROATOM_SENIORITY, ring_selection._HETEROATOM_SENIORITY,
+# fusion_descriptors.HETERO_PRIORITY). This constant is the canonical numbering
+# table; the numbering consumer (ring_substituents._HETEROATOM_SENIORITY) is
+# derived from it. ring_selection's table is a genuinely-different P-18
+# ring-selection order (D-04 lock) and is intentionally left separate.
+# Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-15.4.1.2; DD4.
+# ---------------------------------------------------------------------------
+_ELEMENT_NUMBERING_ORDER: List[str] = [
+    'F', 'Cl', 'Br', 'I', 'At',
+    'O', 'S', 'Se', 'Te', 'Po',
+    'N', 'P', 'As', 'Sb', 'Bi',
+    'C', 'Si', 'Ge', 'Sn', 'Pb',
+    'B', 'Al', 'Ga', 'In', 'Tl',
+]
+ELEMENT_NUMBERING_SENIORITY: Dict[str, int] = {
+    sym: rank for rank, sym in enumerate(_ELEMENT_NUMBERING_ORDER)
+}
+# Unknown elements sort AFTER every listed element (least senior) but
+# deterministically among themselves (by symbol, applied by callers).
+_ELEMENT_SENIORITY_DEFAULT: int = len(_ELEMENT_NUMBERING_ORDER)
+
+
+def element_seniority_rank(symbol: str) -> int:
+    """Numbering-seniority rank of an element symbol (lower = senior).
+
+    Unlisted symbols return a sentinel rank past every listed element so they
+    sort last in a deterministic, total order. Source: P-15.4.1.2 (DD4).
+    """
+    return ELEMENT_NUMBERING_SENIORITY.get(symbol, _ELEMENT_SENIORITY_DEFAULT)
 
 # Phase 147 D-01/D-02: locant type system extension.
 # Locants may be plain ints (e.g. 4) or (int_base, str_suffix) tuples for
@@ -173,6 +216,108 @@ def compare_locant_sets(
         return 1
 
     return 0  # Identical
+
+
+def _compare_heteroatom_seniority(
+    a_pairs: List[Tuple[_Locant, str]],
+    b_pairs: List[Tuple[_Locant, str]],
+) -> int:
+    """Compare two heteroatom (locant, element) lists for numbering.
+
+    Implements the skeletal/replacement + fused-ring numbering rule:
+      1. lowest heteroatom locant SET, kind-agnostic (P-15.4.3.2.1 /
+         P-25.3.3.1.2(a)) — via ``compare_locant_sets`` on the positions;
+      2. on a positional tie, the lower locant goes to the element highest in
+         the element-seniority order (P-15.4.1.2 / P-25.3.3.1.2(b)) — compared
+         element-by-element from most senior to least.
+
+    Worked example (BlueBook P-15.4.1.2): ``2-oxa-4,6,8-trisilanonane`` — the
+    locant sets ``{2,4,6,8}`` tie, so O (senior to Si) takes locant 2.
+
+    Returns -1 if ``a`` is preferred, +1 if ``b``, 0 if genuinely equivalent.
+    """
+    a_locs = [loc for loc, _ in a_pairs]
+    b_locs = [loc for loc, _ in b_pairs]
+    positional = compare_locant_sets(a_locs, b_locs)
+    if positional != 0:
+        return positional
+
+    # Positional tie -> element-seniority tie-break.
+    a_by: Dict[str, List[_Locant]] = defaultdict(list)
+    b_by: Dict[str, List[_Locant]] = defaultdict(list)
+    for loc, sym in a_pairs:
+        a_by[sym].append(loc)
+    for loc, sym in b_pairs:
+        b_by[sym].append(loc)
+
+    # Iterate elements most-senior first; the first element whose locant set
+    # differs decides (the senior element wants the lowest locants).
+    elements = sorted(set(a_by) | set(b_by), key=lambda s: (element_seniority_rank(s), s))
+    for sym in elements:
+        result = compare_locant_sets(a_by.get(sym, []), b_by.get(sym, []))
+        if result != 0:
+            return result
+    return 0
+
+
+def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
+    """Fully-ordered deterministic numbering tie-break (P-14.3.5 + P-14.4 layers).
+
+    The single shared lowest-locant comparator routed through by all three
+    numbering engines (skeletal-replacement, fused-ring/PAH, benzene ring) so
+    that the same structure always yields the same numbering regardless of
+    input SMILES order. It NEVER falls through to input order: when every active
+    tier ties, the two numberings are genuinely equivalent (the molecule has
+    that symmetry) and either is correct & byte-identical.
+
+    Each candidate is a dict carrying only the tiers relevant to the call; a
+    missing key means that tier is unconstrained (ties). Tiers, applied in order:
+
+      'pcg'          principal-characteristic-group locant set     (P-14.4(c))
+      'heteroatoms'  list of (locant, element) — positional set    (P-15.4.3.2.1)
+                     then element-seniority lowest-locant           (P-15.4.1.2)
+      'substituents' detachable-prefix locant set                   (P-14.4(f))
+      'alpha'        sortable key giving the alphabetically-first    (P-14.4(g))
+                     prefix the lowest locant
+
+    Returns -1 if ``candidate_a`` is preferred, +1 if ``candidate_b``, 0 if
+    every active tier ties. ``compare_locant_sets`` is reused unchanged as the
+    positional primitive — this comparator is additive alongside it.
+    """
+    # Tier 1 — principal characteristic group (P-14.4(c)).
+    a_pcg, b_pcg = candidate_a.get('pcg'), candidate_b.get('pcg')
+    if a_pcg is not None or b_pcg is not None:
+        result = compare_locant_sets(a_pcg or [], b_pcg or [])
+        if result != 0:
+            return result
+
+    # Tier 2 — heteroatom set (positional, then element seniority).
+    a_het, b_het = candidate_a.get('heteroatoms'), candidate_b.get('heteroatoms')
+    if a_het is not None or b_het is not None:
+        result = _compare_heteroatom_seniority(a_het or [], b_het or [])
+        if result != 0:
+            return result
+
+    # Tier 3 — detachable-substituent set (P-14.4(f)).
+    a_sub, b_sub = candidate_a.get('substituents'), candidate_b.get('substituents')
+    if a_sub is not None or b_sub is not None:
+        result = compare_locant_sets(a_sub or [], b_sub or [])
+        if result != 0:
+            return result
+
+    # Tier 4 — alphabetically-first prefix lowest locant (P-14.4(g)).
+    a_alpha, b_alpha = candidate_a.get('alpha'), candidate_b.get('alpha')
+    if a_alpha is not None or b_alpha is not None:
+        if a_alpha is None:
+            return 1
+        if b_alpha is None:
+            return -1
+        if a_alpha < b_alpha:
+            return -1
+        if a_alpha > b_alpha:
+            return 1
+
+    return 0
 
 
 def orient_chain(

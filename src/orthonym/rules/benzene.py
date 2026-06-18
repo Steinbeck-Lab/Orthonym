@@ -1416,12 +1416,22 @@ def _detect_chain_functional_group(mol, chain_atoms: List[int]) -> Optional[str]
 def orient_benzene(
     mol,
     ring_atoms: Tuple[int, ...],
-    substituents: Dict[int, List[Dict]]
+    substituents: Dict[int, List[Dict]],
+    principal_group_positions: Optional[Set[int]] = None,
 ) -> List[int]:
     """
     Orient benzene ring to give lowest locants to substituents.
 
-    IUPAC 2013 Rules:
+    IUPAC 2013 Rules (applied in order):
+    0. (P-14.4(c)) Lowest locant to the principal characteristic group, BEFORE
+       detachable substituents — applied only when ``principal_group_positions``
+       is supplied (the ring atoms bearing the senior suffix group). v22 Phase
+       E1 / DD4: this is the PCG-anchor tier that the kind-agnostic numberer
+       previously lacked; it is routed through the shared ``compare_locant_sets``
+       primitive. When the argument is ``None`` the function is byte-identical to
+       its pre-E1 behaviour (every current caller that does not pass a PCG set is
+       unchanged; phenol/acid suffix paths still re-anchor via
+       ``_renumber_relative_to`` and now AGREE with this tier).
     1. For monosubstituted: substituent position is 1
     2. For polysubstituted: use first-point-of-difference for locants
     3. For identical substituents: minimize locant set
@@ -1431,6 +1441,9 @@ def orient_benzene(
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices in the benzene ring (ordered)
         substituents: Dict from get_benzene_substituents
+        principal_group_positions: Optional set of ring atom indices bearing the
+            principal characteristic group (P-14.4(c)). Default None = no PCG
+            tier (byte-identical legacy behaviour).
 
     Returns:
         List of ring atom indices reordered so position 1 is first
@@ -1472,6 +1485,23 @@ def orient_benzene(
                 pos1_sub_name = substituents[pos1_atom][0]['name']
 
             candidates.append((oriented, locants, pos1_sub_name))
+
+    # --- Criterion 0 (P-14.4(c)): principal characteristic group lowest locant ---
+    # Keep only the orientations giving the PCG its lowest locant set, BEFORE the
+    # substituent-set tier below. No-op (byte-identical) when no PCG is supplied.
+    if principal_group_positions:
+        pcg_set = set(principal_group_positions)
+
+        def _pcg_locants(oriented):
+            return sorted(i + 1 for i, a in enumerate(oriented) if a in pcg_set)
+
+        best_pcg = None
+        for oriented, _, _ in candidates:
+            pl = _pcg_locants(oriented)
+            if pl and (best_pcg is None or _compare_locant_sets(pl, best_pcg) < 0):
+                best_pcg = pl
+        if best_pcg is not None:
+            candidates = [c for c in candidates if _pcg_locants(c[0]) == best_pcg]
 
     # Find the best locant set
     best_locants = None

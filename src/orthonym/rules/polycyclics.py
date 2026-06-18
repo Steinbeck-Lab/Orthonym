@@ -189,14 +189,41 @@ def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
 
     match_atoms = list(matches[0])
 
-    # Build atom index -> IUPAC position mapping
-    # This requires understanding the SMARTS match order vs IUPAC numbering
-    # For naphthalene c1ccc2ccccc2c1:
-    #   SMARTS traverses: c1 c c c2 c c c c c2 c1
-    #   IUPAC positions:  1  2 3 4  5 6 7 8 4a 8a (where 4a=4.5 and 8a=8.5 are fusions)
-    # But the match order depends on which atom starts first in the SMILES
+    # Identify the substituent attachment atoms (core atoms bearing a non-core
+    # neighbour) so the numbering can be resolved by the automorphism that gives
+    # THEM the lowest locants (P-14.3.5). The subset whose substituent is a
+    # principal-characteristic-group suffix (carboxylic acid/aldehyde/amide/
+    # nitrile) is tracked separately so it can claim the lowest locant FIRST
+    # (P-14.4(c)) — the WR-01 PCG-anchor.
+    attach_atoms = set()
+    suffix_atoms = set()
+    for idx in core_atoms:
+        is_attach = False
+        is_pcg = False
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in core_atoms:
+                continue
+            is_attach = True
+            sub = _identify_pah_substituent(mol, nb.GetIdx(), core_atoms)
+            if sub and sub.get('is_suffix'):
+                is_pcg = True
+        if is_attach:
+            attach_atoms.add(idx)
+        if is_pcg:
+            suffix_atoms.add(idx)
 
-    atom_to_position = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
+    # v22 Phase E1 / DD4 (H1): use the authoritative stored ``iupac_numbering``
+    # with automorphism-minimization (covers naphthalene/anthracene/phenanthrene/
+    # pyrene/azulene). The naphthalene-only alpha/beta heuristic
+    # (``_map_pah_atoms_to_iupac``) is kept ONLY as the fallback for cataloged
+    # PAHs that still lack a populated ``iupac_numbering`` map (fluorene,
+    # acenaphthene, ...). A regression test asserts the populated PAHs never
+    # reach the heuristic.
+    atom_to_position = get_polycyclic_iupac_locants(
+        mol, pah_name, substituent_atoms=attach_atoms, pcg_atoms=suffix_atoms,
+    )
+    if atom_to_position is None:
+        atom_to_position = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
 
     substituents: Dict[int, List[Dict]] = defaultdict(list)
 
@@ -386,6 +413,8 @@ def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[
 def get_polycyclic_iupac_locants(
     mol,
     pah_name: str,
+    substituent_atoms: Optional[Set[int]] = None,
+    pcg_atoms: Optional[Set[int]] = None,
 ) -> Optional[Dict[int, Any]]:
     """Phase 147: return authoritative IUPAC locants for a cataloged PAH.
 
@@ -434,34 +463,72 @@ def get_polycyclic_iupac_locants(
     if canonical_mol is None:
         return None
 
-    match = mol.GetSubstructMatch(canonical_mol)
-    if not match or len(match) != canonical_mol.GetNumAtoms():
-        return None
-
     # Anchored regex: parse 'NN' or 'NNa' / 'NNb' style locants.
     # Two-digit base critical for pyrene's '10b' (must yield (10, 'b'),
     # NOT (1, '0b')).
     locant_re = re.compile(r'^(\d+)([a-z]*)$')
-    result: Dict[int, Any] = {}
-    for canonical_idx, locant in canonical_numbering.items():
-        if canonical_idx >= len(match):
-            continue
-        mol_idx = match[canonical_idx]
-        if isinstance(locant, int):
-            result[mol_idx] = locant
-        elif isinstance(locant, str):
-            m = locant_re.match(locant)
-            if m is None:
-                # Malformed locant — skip defensively (should never fire
-                # for the 4 known entries: naphthalene/anthracene/
-                # phenanthrene/pyrene).
-                continue
-            base = int(m.group(1))
-            suffix = m.group(2)
-            result[mol_idx] = (base, suffix) if suffix else base
-        # Any other type silently skipped (defensive).
 
-    return result
+    def _build_map(match) -> Dict[int, Any]:
+        result: Dict[int, Any] = {}
+        for canonical_idx, locant in canonical_numbering.items():
+            if canonical_idx >= len(match):
+                continue
+            mol_idx = match[canonical_idx]
+            if isinstance(locant, int):
+                result[mol_idx] = locant
+            elif isinstance(locant, str):
+                m = locant_re.match(locant)
+                if m is None:
+                    # Malformed locant — skip defensively (should never fire
+                    # for the populated entries).
+                    continue
+                base = int(m.group(1))
+                suffix = m.group(2)
+                result[mol_idx] = (base, suffix) if suffix else base
+            # Any other type silently skipped (defensive).
+        return result
+
+    # v22 Phase E1 / DD4 (H1): when the caller passes the substituent-bearing
+    # core atoms, enumerate ALL automorphic substructure matches of the fixed
+    # canonical numbering and choose the one giving the substituents the lowest
+    # locant set (P-25.3.3.1.2(a) + P-14.3.5). This replaces the
+    # naphthalene-only alpha/beta heuristic for cataloged PAHs and is what makes
+    # 2-methylanthracene / anthracen-2-amine / phenanthren-3-amine come out as
+    # the PIN instead of an input-order-dependent first match. When
+    # ``substituent_atoms`` is None the first match is used (byte-identical to
+    # the pre-E1 unsubstituted/parent-selection path).
+    if substituent_atoms:
+        from .locants import compare_numbering
+
+        matches = mol.GetSubstructMatches(canonical_mol, uniquify=False)
+        sub_set = set(substituent_atoms)
+        # P-14.4(c) (WR-01 fix): the principal-characteristic-group atoms (the
+        # suffix-bearing carbons) get the lowest locant BEFORE detachable prefix
+        # substituents — via compare_numbering's 'pcg' tier, ahead of the
+        # kind-agnostic substituent set. When pcg_atoms is None/empty the tier is
+        # inert and this reduces to the prior substituent-set minimization
+        # (byte-identical for prefix-only and single-suffix PAHs).
+        pcg_set = set(pcg_atoms or ())
+        n_canonical = canonical_mol.GetNumAtoms()
+        best_map: Optional[Dict[int, Any]] = None
+        best_locs: Optional[List[Any]] = None
+        best_pcg: Optional[List[Any]] = None
+        for match in matches:
+            if len(match) != n_canonical:
+                continue
+            mp = _build_map(match)
+            locs = [mp[a] for a in sub_set if a in mp]
+            pcg_locs = [mp[a] for a in pcg_set if a in mp]
+            if best_map is None or compare_numbering(
+                    {'pcg': pcg_locs, 'substituents': locs},
+                    {'pcg': best_pcg, 'substituents': best_locs}) < 0:
+                best_map, best_locs, best_pcg = mp, locs, pcg_locs
+        return best_map
+
+    match = mol.GetSubstructMatch(canonical_mol)
+    if not match or len(match) != canonical_mol.GetNumAtoms():
+        return None
+    return _build_map(match)
 
 
 def _build_peripheral_order(
@@ -876,7 +943,11 @@ def name_substituted_polycyclic(
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     assign_stereochemistry(mol)
 
-    # Build atom_to_locant from the PAH numbering
+    # Build atom_to_locant from the PAH numbering (used for stereodescriptor
+    # locants). E1/DD4: prefer the authoritative stored numbering with
+    # automorphism-min over substituent-bearing atoms (consistent with
+    # get_polycyclic_substituents); fall back to the SMARTS + naphthalene
+    # heuristic only when the PAH has no populated iupac_numbering.
     pah_data = POLYCYCLIC_DATA.get(pah_name, {})
     smarts = pah_data.get('smarts', '')
     pattern = Chem.MolFromSmarts(smarts) if smarts else None
@@ -885,7 +956,31 @@ def name_substituted_polycyclic(
         matches = mol.GetSubstructMatches(pattern)
         if matches:
             match_atoms = list(matches[0])
-            atom_to_locant = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
+            core_set = set(match_atoms)
+            # Mirror get_polycyclic_substituents EXACTLY (incl. the WR-01 PCG
+            # subset) so the stereodescriptor numbering cannot desync from the
+            # substituent numbering (WR-03).
+            attach_atoms = set()
+            suffix_atoms = set()
+            for idx in core_set:
+                is_attach = False
+                is_pcg = False
+                for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+                    if nb.GetIdx() in core_set:
+                        continue
+                    is_attach = True
+                    sub = _identify_pah_substituent(mol, nb.GetIdx(), core_set)
+                    if sub and sub.get('is_suffix'):
+                        is_pcg = True
+                if is_attach:
+                    attach_atoms.add(idx)
+                if is_pcg:
+                    suffix_atoms.add(idx)
+            atom_to_locant = get_polycyclic_iupac_locants(
+                mol, pah_name, substituent_atoms=attach_atoms, pcg_atoms=suffix_atoms,
+            )
+            if atom_to_locant is None:
+                atom_to_locant = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
 
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant) if atom_to_locant else []
     stereo_prefix = format_stereodescriptor_string(stereo_descriptors) if stereo_descriptors else ""

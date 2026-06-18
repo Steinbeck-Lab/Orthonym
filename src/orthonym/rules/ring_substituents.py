@@ -275,11 +275,25 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
 
 # Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:
 # F > Cl > Br > I > O > S > Se > Te > N > P > ...). Lower value = senior.
+#
+# v22 Phase E1 / DD4: DERIVED from the single source of truth
+# ``locants.ELEMENT_NUMBERING_SENIORITY`` (the full P-15.4.1.2 order) instead of
+# a hand-maintained 4th copy. Densely re-ranking that order restricted to the
+# elements that appear as ring heteroatoms reproduces the original
+# {F:0,...,B:17} mapping byte-identically (At/Po/C and the Al..Tl tail are not
+# ring-heteroatom-relevant here), so behaviour is unchanged — the divergence is
+# eliminated for the numbering consumer. A unit test pins the equality.
+from .locants import ELEMENT_NUMBERING_SENIORITY as _ELEMENT_NUMBERING_SENIORITY
+
 _HETEROATOM_SENIORITY: Dict[str, int] = {
-    'F': 0, 'Cl': 1, 'Br': 2, 'I': 3,
-    'O': 4, 'S': 5, 'Se': 6, 'Te': 7,
-    'N': 8, 'P': 9, 'As': 10, 'Sb': 11, 'Bi': 12,
-    'Si': 13, 'Ge': 14, 'Sn': 15, 'Pb': 16, 'B': 17,
+    sym: rank
+    for rank, sym in enumerate(
+        sorted(
+            ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te',
+             'N', 'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B'),
+            key=lambda x: _ELEMENT_NUMBERING_SENIORITY[x],
+        )
+    )
 }
 
 
@@ -1377,13 +1391,15 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
                                 if mol.GetAtomWithIdx(i).GetSymbol() != 'C'))
         best = min(het_locs(o) for o in candidates)
         candidates = [o for o in candidates if het_locs(o) == best]
-        # (1b) element seniority at the heteroatom positions: F,Cl,Br,I,O,S,
-        # Se,Te,N,P (P-22.2.3.1); lower rank = more senior = lower locant.
-        _SENIORITY = ['F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P']
+        # (1b) element seniority at the heteroatom positions (P-22.2.3.1);
+        # lower rank = more senior = lower locant. v22 E1 / DD4 (IN-01/02):
+        # routed through the single ELEMENT_NUMBERING_SENIORITY source of truth
+        # (order-consistent with the old inline F,Cl,Br,I,O,S,Se,Te,N,P list —
+        # behaviour-preserving) so the P-15.4.1.2 order has exactly one definition.
+        from .locants import element_seniority_rank as _element_seniority_rank
         def het_rank_seq(o):
             return tuple(
-                _SENIORITY.index(mol.GetAtomWithIdx(o[p]).GetSymbol())
-                if mol.GetAtomWithIdx(o[p]).GetSymbol() in _SENIORITY else 99
+                _element_seniority_rank(mol.GetAtomWithIdx(o[p]).GetSymbol())
                 for p in sorted(o)
                 if mol.GetAtomWithIdx(o[p]).GetSymbol() != 'C')
         best = min(het_rank_seq(o) for o in candidates)

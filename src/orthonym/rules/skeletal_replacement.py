@@ -677,8 +677,18 @@ def _orient_for_lowest_locants(
 ) -> List[int]:
     """Orient the backbone chain to give lowest locants to heteroatoms.
 
-    Tries both directions and picks the one where the heteroatom locant
-    set is numerically lower at the first point of difference.
+    Tries both directions and picks the one whose heteroatom numbering is
+    preferred by the shared ``compare_numbering`` comparator (DD4 / v22 E1):
+
+      1. lowest heteroatom locant SET, kind-agnostic (P-15.4.3.2.1); then
+      2. on a positional tie, the lowest locant to the element highest in the
+         element-seniority order (P-15.4.1.2) — e.g. ``COCSC`` (positions
+         ``{2,4}`` either way) gives O the locant 2 over S, so both ``COCSC``
+         and ``CSCOC`` deterministically yield ``2-oxa-4-thiapentane``.
+
+    The old code broke a positional tie by ``return forward`` (input-order
+    dependent — the H2 non-determinism bug); the element-seniority tier is now
+    a real total order, so genuine ties only occur for true symmetry.
 
     Args:
         backbone: List of atom indices forming the backbone.
@@ -687,25 +697,58 @@ def _orient_for_lowest_locants(
     Returns:
         Reoriented backbone list.
     """
+    from .locants import compare_numbering
+
     forward = backbone
     reverse = list(reversed(backbone))
 
-    forward_locants = _get_heteroatom_locants(forward, mol)
-    reverse_locants = _get_heteroatom_locants(reverse, mol)
+    forward_pairs = _get_heteroatom_pairs(forward, mol)
+    reverse_pairs = _get_heteroatom_pairs(reverse, mol)
 
-    # Compare locant sets at first point of difference
-    for f_loc, r_loc in zip(forward_locants, reverse_locants):
-        if f_loc < r_loc:
-            return forward
-        elif r_loc < f_loc:
-            return reverse
-
-    # If equal, return forward (arbitrary but deterministic)
+    decision = compare_numbering(
+        {'heteroatoms': forward_pairs},
+        {'heteroatoms': reverse_pairs},
+    )
+    if decision == 1:
+        return reverse
+    # decision <= 0: forward preferred OR a genuine symmetry tie (either
+    # orientation is correct and byte-identical) — return forward.
     return forward
 
 
+def _get_heteroatom_pairs(
+    backbone: List[int], mol: Chem.Mol
+) -> List[Tuple[int, str]]:
+    """Get ``(locant, element_symbol)`` pairs for embedded skeletal heteroatoms.
+
+    Position-AND-element (DD4): the element is needed for the element-seniority
+    numbering tie-break, which the previous positions-only helper discarded.
+
+    Args:
+        backbone: List of atom indices.
+        mol: RDKit molecule object.
+
+    Returns:
+        List of (1-based locant, element symbol) for embedded heteroatoms,
+        sorted by locant.
+    """
+    pairs: List[Tuple[int, str]] = []
+    for i, atom_idx in enumerate(backbone):
+        if i == 0 or i == len(backbone) - 1:
+            continue  # Skip terminal atoms
+        atom = mol.GetAtomWithIdx(atom_idx)
+        symbol = atom.GetSymbol()
+        if symbol in REPLACEMENT_TERMS:
+            pairs.append((i + 1, symbol))  # 1-based
+    return sorted(pairs)
+
+
 def _get_heteroatom_locants(backbone: List[int], mol: Chem.Mol) -> List[int]:
-    """Get sorted locants of embedded heteroatoms in a backbone.
+    """Get sorted positional locants of embedded heteroatoms in a backbone.
+
+    Retained as the positional-only primitive (kind-agnostic); the
+    element-aware ``_get_heteroatom_pairs`` is preferred for numbering
+    decisions.
 
     Args:
         backbone: List of atom indices.
@@ -714,14 +757,7 @@ def _get_heteroatom_locants(backbone: List[int], mol: Chem.Mol) -> List[int]:
     Returns:
         Sorted list of 1-based locants for embedded heteroatoms.
     """
-    locants = []
-    for i, atom_idx in enumerate(backbone):
-        if i == 0 or i == len(backbone) - 1:
-            continue  # Skip terminal atoms
-        atom = mol.GetAtomWithIdx(atom_idx)
-        if atom.GetSymbol() in REPLACEMENT_TERMS:
-            locants.append(i + 1)  # 1-based
-    return sorted(locants)
+    return [loc for loc, _ in _get_heteroatom_pairs(backbone, mol)]
 
 
 def _build_replacement_name(
