@@ -58,6 +58,38 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],  # Allowed positions
         'num_rings': 2,
     },
+    'azulene': {
+        # Retained fused-ring hydrocarbon (IUPAC 2013 P-25.1.1, Table 28.1):
+        # a 5-membered ring ortho-fused to a 7-membered ring, fully mancude
+        # (aromatic). Carbocyclic, so it is NOT caught by name_fused_heterocycle,
+        # and being aromatic it is NOT caught by _name_saturated_fused_carbocyclic
+        # either -- without this entry identify_polycyclic() returns None and the
+        # molecule falls through to the acyclic chain catch-all, which emits the
+        # malformed empty stem 'ane' (V-1 / theme T10).
+        'canonical_smiles': 'c1ccc2cccc-2cc1',
+        'smarts': 'c1ccc2cccc-2cc1',  # fusion bond is formally single (c-c)
+        'num_atoms': 10,
+        # IUPAC numbering for azulene: 1,2,3 on the 5-membered ring; 4,5,6,7,8 on
+        # the 7-membered ring; 3a / 8a the two fusion atoms. Maps canonical atom
+        # index (of 'c1ccc2cccc-2cc1') -> IUPAC position. Derived from the
+        # canonical topology: fusion atoms idx 3 (=3a) and idx 7 (=8a); the
+        # 5-ring non-fusion arc 3-[4-5-6]-7 carries C3,C2,C1; the 7-ring
+        # non-fusion arc 7-[8-9-0-1-2]-3 carries C8,C7,C6,C5,C4. (Azulene has a
+        # mirror plane through C2/C6, so this orientation's locant set is the
+        # unique lowest set regardless of the C3a/C8a labelling direction.)
+        # NOTE: this dict is consumed by get_polycyclic_iupac_locants (correct
+        # for bare azulene). The *substituent*-naming path
+        # (rules/polycyclics._map_pah_atoms_to_iupac) is hardcoded to
+        # naphthalene's symmetric 6-6 alpha/beta pattern and has no azulene
+        # branch, so SUBSTITUTED azulene locants are unproven/likely wrong here
+        # -- that is fused-ring numbering, owned by Phase E1/DD4, out of C-T10
+        # scope. Bare azulene (the V-1 gold) is correct.
+        'iupac_numbering': {
+            6: 1, 5: 2, 4: 3, 3: '3a', 2: 4, 1: 5, 0: 6, 9: 7, 8: 8, 7: '8a'
+        },
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
+        'num_rings': 2,
+    },
     'anthracene': {
         'canonical_smiles': 'c1ccc2cc3ccccc3cc2c1',
         'smarts': 'c1ccc2cc3ccccc3cc2c1',

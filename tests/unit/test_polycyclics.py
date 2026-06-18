@@ -305,3 +305,113 @@ class TestPolycyclicNamingFunction:
         name = name_substituted_polycyclic(mol, 'naphthalene', subs)
 
         assert name == 'naphthalene'
+
+
+class TestRetainedFusedStemAzulene:
+    """v22 Phase C-T10 (V-1, theme T10): the empty/malformed-stem bug.
+
+    Azulene is a retained fused-ring hydrocarbon (IUPAC 2013 P-25.1.1,
+    Table 28.1): a 5-membered ring ortho-fused to a 7-membered ring, fully
+    mancude (aromatic). It was *declared* in resolvers._NAMED_PAH_SYSTEMS but
+    had no entry in POLYCYCLIC_DATA, so identify_polycyclic() returned None and
+    the molecule fell through name_fused_heterocycle (None: carbocyclic) and
+    name_ortho_fused_bicyclic (None: aromatic, so _name_saturated_fused_
+    carbocyclic declines) to the acyclic chain catch-all, which emitted the
+    malformed empty stem 'ane'. Fixed at the data/lookup source.
+
+    These tests assert the OUTPUT (the produced name), not a classification
+    flag. They cover the *bare* retained-fused-PAH naming path for the class
+    (the gold V-1 azulene + the other bare retained PAHs), not just the one
+    gold molecule. (Substituted-azulene locants route through the
+    naphthalene-specific `_map_pah_atoms_to_iupac` mapper and are out of C-T10
+    scope — owned by E1/DD4 fused-ring numbering.)
+    """
+
+    AZULENE_SMILES = 'C1=CC=C2C=CC=CC=C12'
+    AZULENE_CANONICAL = 'c1ccc2cccc-2cc1'
+
+    def test_azulene_in_polycyclic_data(self):
+        """The data/lookup source now carries azulene (root-cause locus)."""
+        assert 'azulene' in POLYCYCLIC_DATA
+        entry = POLYCYCLIC_DATA['azulene']
+        assert entry['num_atoms'] == 10
+        assert entry['num_rings'] == 2
+
+    def test_azulene_declared_named_pah_now_in_data(self):
+        """Reconcile the specific azulene inconsistency: azulene was declared in
+        resolvers._NAMED_PAH_SYSTEMS but absent from POLYCYCLIC_DATA (the cause
+        of the empty-stem trap); it must now be present in both. (This checks
+        only the azulene reconciliation, NOT a universal _NAMED_PAH_SYSTEMS
+        invariant — fluoranthene is also declared but resolves via the fusion
+        path rather than POLYCYCLIC_DATA membership; see the class-invariant
+        test below for the no-empty-stem guarantee over the whole set.)"""
+        from orthonym.assembly.resolvers import _NAMED_PAH_SYSTEMS
+        assert 'azulene' in _NAMED_PAH_SYSTEMS
+        assert 'azulene' in POLYCYCLIC_DATA
+
+    def test_named_pah_systems_class_never_emits_empty_stem(self):
+        """C-T10 CLASS INVARIANT: no retained PAH declared in
+        resolvers._NAMED_PAH_SYSTEMS may collapse to the malformed empty stem
+        'ane' / 'unknown' (the V-1 bug class). azulene was the declared member
+        that did; this guards the whole declared set against recurrence,
+        regardless of which path (POLYCYCLIC_DATA lookup or fusion) names it.
+        Names present in POLYCYCLIC_DATA use their canonical SMILES; fluoranthene
+        is declared but resolves via the fusion path (verified)."""
+        from orthonym.assembly.resolvers import _NAMED_PAH_SYSTEMS
+        # representative bare-parent SMILES for the one declared name not in
+        # POLYCYCLIC_DATA (fluoranthene resolves via the fusion descriptor path).
+        extra = {'fluoranthene': 'c1ccc-2c(c1)-c1cccc3cccc-2c13'}
+        for nm in sorted(_NAMED_PAH_SYSTEMS):
+            smi = (POLYCYCLIC_DATA[nm]['canonical_smiles']
+                   if nm in POLYCYCLIC_DATA else extra.get(nm))
+            assert smi is not None, f"no representative SMILES for declared PAH {nm!r}"
+            out = name_compound(smi)
+            assert out and out != 'ane' and 'unknown' not in out, (nm, out)
+
+    def test_azulene_exact_canonical_lookup(self):
+        """Bare azulene resolves via the exact canonical-SMILES lookup."""
+        assert is_polycyclic_aromatic(self.AZULENE_CANONICAL) is True
+        result = get_polycyclic_by_smiles(self.AZULENE_CANONICAL)
+        assert result is not None and result['name'] == 'azulene'
+
+    def test_identify_polycyclic_azulene(self):
+        """identify_polycyclic resolves azulene (was None -> empty-stem bug)."""
+        mol = Chem.MolFromSmiles(self.AZULENE_SMILES)
+        assert identify_polycyclic(mol) == 'azulene'
+
+    def test_azulene_end_to_end_gold(self):
+        """V-1 gold: the whole-pipeline name is 'azulene', not 'ane'."""
+        assert name_compound(self.AZULENE_SMILES) == 'azulene'
+
+    def test_azulene_never_emits_malformed_stem(self):
+        """The malformed empty stem 'ane' / 'unknown' must never be produced."""
+        out = name_compound(self.AZULENE_SMILES)
+        assert out == 'azulene'
+        assert out != 'ane'
+        assert 'unknown' not in out
+
+    def test_azulene_input_order_deterministic(self):
+        """Same structure, different SMILES spellings -> same name (the
+        determinism gate this fix must hold)."""
+        import random
+        base = Chem.MolFromSmiles(self.AZULENE_SMILES)
+        names = set()
+        for seed in range(6):
+            idx = list(range(base.GetNumAtoms()))
+            random.Random(seed).shuffle(idx)
+            respelled = Chem.MolToSmiles(Chem.RenumberAtoms(base, idx),
+                                         canonical=False)
+            names.add(name_compound(respelled))
+        assert names == {'azulene'}, names
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ('c1ccc2ccccc2c1', 'naphthalene'),       # bicyclic 6-6
+        ('c1ccc2cc3ccccc3cc2c1', 'anthracene'),  # linear tricyclic
+        ('c1ccc2c(c1)ccc1ccccc12', 'phenanthrene'),  # angular tricyclic
+        ('C1=CC=C2C=CC=CC=C12', 'azulene'),       # bicyclic 5-7 (this fix)
+    ])
+    def test_retained_fused_carbocyclic_class(self, smiles, expected):
+        """The shared bare retained-fused-PAH naming path is intact for the
+        whole class (A8 rule-family coverage), including the new azulene
+        member — none collapse to an empty stem."""
+        assert name_compound(smiles) == expected
