@@ -51,6 +51,8 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from ..errors import OrthonymLimitError  # G0 fail-closed refusal (DD7 S1)
+
 
 # Forward-reference NamingResult by string so we can keep the import
 # lazy (avoid name_tree -> inner_dispatch cycle at import time).
@@ -368,6 +370,12 @@ def dispatch_inner(
         # preservation logic (handlers/ester_family.py D-16 guard).
         try:
             result = entry.handler(features, _mol, style=style)
+        except OrthonymLimitError:
+            # G0 fail-closed (DD7 S1): a deliberate ring-coverage refusal must
+            # propagate UN-WRAPPED to Orthonym.name (which converts it to
+            # 'unknown organic compound' / re-raises it under raise_on_limit),
+            # NOT be wrapped in RuntimeError by the generic handler below.
+            raise
         except (AttributeError, KeyError, IndexError, TypeError):
             # Re-raise un-wrapped per D-16. namer.name_compound's broad
             # except clause handles these as descriptive-fallback signals.

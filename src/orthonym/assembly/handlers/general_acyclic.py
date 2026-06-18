@@ -233,6 +233,18 @@ def name_general_acyclic(
     pool.add(assembled, "chain", features, tree=tree)
     best = pool.best()
 
+    # G0 fail-closed safety (DD7): general_acyclic is the @99999 catch-all, but
+    # the pool can still be empty when NO candidate could be built (e.g. an
+    # all-aromatic-ring + two-metal species like the P-69 gold
+    # c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1, which has no nameable
+    # acyclic parent). Per the ADR-19-04 handler contract ("return None on
+    # gate-fail, never raise"), return None to cascade rather than crash on
+    # ``best.name`` — that AttributeError was masked by name_compound's broad
+    # except but propagated raw (NoneType .name) through the direct .name() /
+    # raise_on_limit API.
+    if best is None:
+        return None
+
     return NamingResult(
         name=best.name, tree=best.tree, atom_to_locant_hint=None,
     )

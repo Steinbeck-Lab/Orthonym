@@ -1206,6 +1206,15 @@ class Orthonym:
                 wrong". Default False preserves the always-emit behaviour
                 byte-for-byte (no limit is ever substituted into the result).
 
+                G0 (DD7 S1) note / WR-04: a top-level ring refusal carries the
+                specific ``UNSUPPORTED_RING_SYSTEM`` code. When the refusal
+                originates inside a RECURSIVE (substituent/fragment) naming call,
+                that inner frame returns its ``.message`` and the top-level
+                re-derives a generic ``UNNAMEABLE``/``UNSUPPORTED_ELEMENT`` code
+                via the post-failure classifier — i.e. the specific ring code
+                can be lost for those (rare) nested cases. The molecule still
+                fails closed; only the code precision is reduced.
+
         Returns:
             IUPAC systematic name
 
@@ -1226,7 +1235,20 @@ class Orthonym:
                     if _scope is not None:
                         _scope.smiles = smiles
                         raise _scope
-            result = self._name_impl(smiles)
+            try:
+                result = self._name_impl(smiles)
+            except OrthonymLimitError as _limit:
+                # G0 fail-closed (DD7 S1): a ring subsystem refused to emit a
+                # structurally-wrong name (de-aromatised von-Baeyer cage /
+                # phantom ring-as-substituent). Default path -> the descriptive
+                # fallback string ('unknown organic compound'); opt-in path ->
+                # re-raise the named limit. This is the single catch point; the
+                # signal propagated un-wrapped from the assembly layer.
+                if _limit.smiles is None:
+                    _limit.smiles = smiles
+                if raise_on_limit and is_top_level_naming():
+                    raise
+                return _limit.message
             # Universal stereo backstop (Phase 140, STER-16)
             # Only apply at top level -- decomposition fragments handle stereo
             # through their own naming paths.
@@ -1290,7 +1312,20 @@ class Orthonym:
         start_naming_session()
         clear_confidence()
         try:
-            name = self._name_impl(smiles)
+            try:
+                name = self._name_impl(smiles)
+            except OrthonymLimitError as _limit:
+                # G0 fail-closed (DD7 S1): a ring subsystem refused. Surface the
+                # descriptive-fallback name + the named limit code (no crash).
+                if _limit.smiles is None:
+                    _limit.smiles = smiles
+                return {
+                    'name': _limit.message,
+                    'confidence': 0.0,
+                    'factors': {},
+                    'handler': 'fallback',
+                    'limit': _limit.as_dict(),
+                }
             # Universal stereo backstop (Phase 140, STER-16)
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
@@ -2466,6 +2501,13 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
     try:
         namer = Orthonym(style=style)
         return namer._name_impl(smiles, _skip_decomposition=True)
+    except OrthonymLimitError:
+        # G0 (DD7 S1, WR-03): a fragment-level fail-closed refusal is "no name",
+        # not a crash — propagate as None so the decomposition engine treats the
+        # fragment as out-of-scope and tries another strategy. Caught explicitly
+        # (before the broad except) so the intent is documented and a genuine
+        # fragment bug is not silently conflated with a legitimate refusal.
+        return None
     except Exception:
         return None
 

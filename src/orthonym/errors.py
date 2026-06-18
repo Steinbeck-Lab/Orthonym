@@ -106,6 +106,18 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'unknown organic compound',
         'heritage_ref': 'ERR-270/274',
     },
+    # G0 fail-closed safety (DD7 S1): a ring system Orthonym recognises as
+    # complex (polycomponent-fused, bridged-fused, or aromatic-in-a-von-Baeyer
+    # cage) but cannot yet name CORRECTLY. Raised mid-assembly to refuse rather
+    # than emit a structurally-wrong de-aromatised cage / phantom substituent.
+    # The message is the generic unnameable string (so the default always-emit
+    # path is unchanged and ``is_failure_name``/``is_unknown`` still fire); the
+    # CODE carries the "coverage gap, not garbage" signal. The correct PINs are
+    # Phase-G1+ bridged/polycomponent-fusion builds.
+    'UNSUPPORTED_RING_SYSTEM': {
+        'message': 'unknown organic compound',
+        'heritage_ref': 'ERR-274',
+    },
 }
 
 
@@ -145,6 +157,15 @@ def _make(code: str, message: Optional[str] = None,
         heritage_ref=entry['heritage_ref'],
         smiles=smiles,
     )
+
+
+def unsupported_ring_system(smiles: Optional[str] = None) -> OrthonymLimitError:
+    """Build the G0 fail-closed refusal for a complex ring system Orthonym
+    cannot yet name correctly (DD7 S1). Raised mid-assembly by the von-Baeyer /
+    bicyclo / polycomponent-fusion paths; caught once at ``Orthonym.name``
+    (default path returns ``.message`` = 'unknown organic compound';
+    ``raise_on_limit=True`` re-raises this error)."""
+    return _make('UNSUPPORTED_RING_SYSTEM', smiles=smiles)
 
 
 def is_failure_name(name: Optional[str]) -> bool:

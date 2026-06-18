@@ -119,6 +119,7 @@ from ..rules.polycyclic import (
     _detect_ring_functional_groups,
 )
 from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
+from ..errors import OrthonymLimitError  # G0 fail-closed refusal (DD7 S1)
 
 # Partial saturation imports for fused heterocycles
 from ..rules.partial_saturation import (
@@ -2617,6 +2618,38 @@ def _classify_complex_ring(mol) -> str:
     return 'simple'
 
 
+def _fused_core_covers_ring_system(mol, atom_to_locant) -> bool:
+    """G0 fail-closed safety (DD7 S1): does the matched fused-ring core cover
+    every atom of the fused ring system(s) it sits in?
+
+    ``name_fused_heterocycle`` can match a 2-component catalog core (e.g.
+    ``furo[3,2-b]pyridine``) as a SUBSTRUCTURE of a larger polycomponent fused
+    system (e.g. difuropyridine). The leftover FUSED ring atoms are then handed
+    to substituent discovery and mis-named as an acyclic prefix (the phantom
+    ``7-ethoxy``). Returning False here lets the caller refuse rather than emit
+    that structurally-wrong name.
+
+    ``atom_to_locant`` int keys are the named core atoms. A pendant ring joined
+    by a single (non-ring) bond is a SEPARATE fused ring system, so a legitimate
+    cyclic substituent (e.g. 2-phenylquinoline's phenyl) does NOT trip this:
+    only fused ring atoms left OUT of the matched core do. When ``atom_to_locant``
+    is empty (the exact-match catalog path, which fully names the system) the
+    check is a no-op (no core atoms -> nothing uncovered)."""
+    # IN-03 contract: keys for NAMED ring atoms in atom_to_locant are always int
+    # (RDKit atom indices); name_fused_heterocycle never emits non-int atom keys.
+    # The isinstance filter is defensive — if that contract ever breaks, the
+    # coverage check would under-count and miss a refusal, so keep it int-keyed.
+    core_atoms = {k for k in (atom_to_locant or {}) if isinstance(k, int)}
+    if not core_atoms:
+        return True
+    from ..perception.rings import get_ring_systems
+    for rs in get_ring_systems(mol):
+        rs = set(rs)
+        if (core_atoms & rs) and not rs.issubset(core_atoms):
+            return False
+    return True
+
+
 def _assemble_complex_ring_name(mol, features):
     """
     Assemble IUPAC name for a complex ring system.
@@ -2700,6 +2733,17 @@ def _assemble_complex_ring_name(mol, features):
             result = name_fused_heterocycle(mol)
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
+                # G0 fail-closed safety (DD7 S1): when the matched fused-ring
+                # core covers only PART of its fused ring system (a 3+-component
+                # system matched a 2-component sub-core, P-25.3.4), the leftover
+                # FUSED ring atoms get mis-named as an acyclic substituent (e.g.
+                # difuropyridine -> '7-ethoxyfuro[3,2-b]pyridine', the 2nd furan
+                # read as a phantom ethoxy). That is a structurally-WRONG name;
+                # refuse instead (polycomponent fusion is a Phase-G1 build).
+                if not _fused_core_covers_ring_system(mol, atom_to_locant):
+                    # IN-01: no smiles arg — Orthonym.name back-fills the input SMILES.
+                    from ..errors import unsupported_ring_system
+                    raise unsupported_ring_system()
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
             # Try ortho-fused bicyclic (carbocyclic fallback)
@@ -2715,6 +2759,13 @@ def _assemble_complex_ring_name(mol, features):
             # Not a complex ring - shouldn't reach here
             return None
 
+    except OrthonymLimitError:
+        # G0 fail-closed (DD7 S1): a deliberate refusal must NOT be swallowed by
+        # the graceful-degradation except below (which would let the molecule
+        # cascade to a fragment namer and emit a sub-ring name). Propagate it to
+        # Orthonym.name, which converts it to 'unknown organic compound'
+        # (default) or re-raises it (raise_on_limit=True).
+        raise
     except Exception as e:
         # Graceful degradation - log and return None
         logging.warning(f"Complex ring naming error: {e}")
@@ -3149,6 +3200,18 @@ def _assemble_complete_bicyclo_name(mol, features):
         if fallback_name:
             return (fallback_name, ring_atoms, {}, True)
         return None
+
+    # G0 fail-closed safety (DD7 S1): bicyclo[...] nomenclature, like von Baeyer,
+    # cannot represent aromaticity. Check the EXACT bicyclo cage atoms (WR-01:
+    # bicyclo_data['ring_atoms'], NOT the molecule's raw ring-atom union — a
+    # pendant aromatic ring is not part of the cage). If the cage carries an
+    # aromatic atom, naming it here would silently de-aromatise it into a WRONG
+    # saturated cage; refuse (raise the named limit, caught at Orthonym.name).
+    from ..rules.polycyclic import vonbaeyer_cage_has_aromaticity
+    if vonbaeyer_cage_has_aromaticity(mol, bicyclo_data.get('ring_atoms', ())):
+        # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
+        from ..errors import unsupported_ring_system
+        raise unsupported_ring_system()
 
     # If there's a retained name and no substituents or unsaturation, use it
     retained_name = bicyclo_data.get('retained_name')

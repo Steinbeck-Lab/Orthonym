@@ -1317,6 +1317,32 @@ def _get_largest_connected_ring_component(mol, ring_atoms: Set[int]) -> Set[int]
     return max(components, key=len)
 
 
+def vonbaeyer_cage_has_aromaticity(mol, cage_atoms) -> bool:
+    """G0 fail-closed safety (DD7 S1 — "fail closed, never hallucinate").
+
+    Von Baeyer (P-23) and bicyclo nomenclature describe SATURATED bridged ring
+    skeletons; unsaturation is expressible only as ``-ene``/``-yne`` with
+    locants, and aromaticity CANNOT be represented at all. Naming a cage that
+    contains aromatic ring atoms therefore silently DROPS the aromaticity and
+    emits a structurally WRONG (de-aromatised) cage — e.g. benzonorbornadiene
+    ``C1C2C=CC1c1ccccc12`` -> ``tricyclo[4.4.0.1(2,5)]undec-3-ene`` (the benzo
+    ring desaturated). The correct PIN is a bridged-fused name (P-25.4, e.g.
+    ``1,4-dihydro-1,4-methanonaphthalene``), a Phase-G1 build; until then the
+    caller must fail closed (raise the limit -> ``unknown organic compound`` /
+    ``OrthonymLimitError``) rather than emit the wrong saturated cage.
+
+    ``cage_atoms`` MUST be the EXACT atom set the namer numbers — the von-Baeyer
+    descriptor's ``numbering`` keys for ``name_polycyclic_complete``, or
+    ``get_complete_bicyclo_data()['ring_atoms']`` for the bicyclo path — NOT the
+    molecule's largest connected ring component. Keying off the actual cage
+    means a PENDANT aromatic ring joined by a single (non-ring) bond — e.g. a
+    naphthyl on norbornane, even when the naphthyl is LARGER than the cage — is
+    never part of the cage and so can never trip the guard (it is correctly
+    named as a substituent). (WR-01.)
+    """
+    return any(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in cage_atoms)
+
+
 # ============================================================================
 # Public API
 # ============================================================================
@@ -2357,6 +2383,19 @@ def name_polycyclic_complete(mol, features=None):
 
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
+
+    # G0 fail-closed safety (DD7 S1): von Baeyer cannot represent aromaticity.
+    # Check the EXACT cage atoms the descriptor numbers (WR-01: NOT the largest
+    # ring component — a pendant aromatic ring never enters desc.numbering). If
+    # the cage carries an aromatic atom, naming it here would silently
+    # de-aromatise it into a WRONG saturated cage; refuse instead (raise the
+    # named limit, caught at Orthonym.name). Raising (not returning None) is
+    # required so the molecule fails closed rather than cascading to a fragment
+    # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
+    if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
+        # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
+        from ..errors import unsupported_ring_system
+        raise unsupported_ring_system()
 
     # Use total_atoms from VB analysis (sum(bridge_lengths) + 2) rather than
     # len(ring_atoms), which may miss non-ring atoms in the VB framework.
