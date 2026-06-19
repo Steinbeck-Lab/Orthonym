@@ -57,6 +57,17 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     """
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
 
+    # A RING sulfur is never an acyclic functional-class sulfide ("R R' sulfide",
+    # P-63.6.2.1) — it is a skeletal heteroatom named by the ring system (thiophene,
+    # thiane, the epithio bridge of a bridged-fused parent, ...). Characterising its
+    # two ring branches as substituent groups LINEARISES the ring into a phantom
+    # chain (e.g. the S-bridged 1,4-epithio-1,4-dihydronaphthalene -> "didecyl
+    # sulfide" for some SMILES spellings — an order-dependent WRONG name). Decline so
+    # the ring/heterocycle path names it. (The thioether handler's ring_type guard is
+    # spelling-fragile; this chemical-logic guard is spelling-independent.)
+    if sulfur.IsInRing():
+        return None
+
     # Get carbon neighbors
     neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == 'C']
     if len(neighbors) != 2:

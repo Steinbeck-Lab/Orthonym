@@ -36,11 +36,15 @@ def _is_refused(smiles: str) -> bool:
 # --------------------------------------------------------------------------- #
 # Family 1 — von-Baeyer / bicyclo cage that would drop aromaticity            #
 # --------------------------------------------------------------------------- #
+# NOTE (v22 Phase G1, DD7 COV-01): the three single-bridge naphthalene systems
+# G0 refused (benzonorbornadiene / 1,4-epoxy- / 1,4-ethano-) are now named
+# CORRECTLY by the P-25.4 constructor (see tests/unit/test_g1_bridged_fused.py),
+# so they left the fail-closed family. The polyspiro spirobi-indane stays refused
+# (its spirobi[indane] PIN is a Phase-G4 build; is_spiro_system rejects
+# polycyclic-component spiro, so it still routes to von Baeyer and the aromaticity
+# veto fires).
 AROMATIC_IN_CAGE = [
-    "C1C2C=CC1c1ccccc12",        # benzonorbornadiene (gold DD7-S1-safety-1)
-    "C1=CC2OC1c1ccccc12",        # 1,4-epoxy-1,4-dihydronaphthalene (DD7-bridged-1)
-    "C1CC2CCC1c1ccccc12",        # 1,4-ethano-tetrahydronaphthalene (DD7-bridged-2)
-    "C1Cc2ccccc2C13Cc1ccccc1C3",  # spirobi-indane (DD7-spiro-1; routes to VB, benzo)
+    "C1Cc2ccccc2C13Cc1ccccc1C3",  # spirobi-indane (DD7-spiro-1; polyspiro -> G4)
 ]
 
 

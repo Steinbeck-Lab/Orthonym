@@ -2393,6 +2393,15 @@ def name_polycyclic_complete(mol, features=None):
     # required so the molecule fails closed rather than cascading to a fragment
     # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
     if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
+        # v22 Phase G1 (DD7 COV-01): a fused-aromatic core + bridge
+        # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
+        # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
+        # Try the P-25.4 constructor first; it returns a name only for the class
+        # it can name correctly, and None otherwise -> we then fail closed (G0).
+        from .bridged_fused import name_bridged_fused_pin
+        bridged = name_bridged_fused_pin(mol)
+        if bridged is not None:
+            return bridged
         # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
         from ..errors import unsupported_ring_system
         raise unsupported_ring_system()

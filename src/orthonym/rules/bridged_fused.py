@@ -20,6 +20,7 @@ Reference: IUPAC 2013 Blue Book, P-25.7 (Bridged Fused Ring Systems)
 
 from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict, deque
+from itertools import combinations
 from rdkit import Chem
 
 from .fused_rings import classify_fused_system, get_shared_atoms
@@ -735,6 +736,296 @@ def is_bridged_fused(mol) -> bool:
         True if molecule is a bridged fused system
     """
     return detect_bridged_fused(mol)
+
+
+# ============================================================================
+# Bridged-fused PIN constructor (v22 Phase G1, DD7 COV-01)
+# ============================================================================
+#
+# A bridged fused ring system (P-25.4.1.1) = a recognised fused parent (the
+# "main ring system", e.g. naphthalene) + one or more bridges across it.
+# The G0 fail-closed safety (DD7 S1) currently refuses these (von Baeyer would
+# drop the benzo aromaticity). This constructor names the dominant, well-defined
+# sub-class CORRECTLY and returns None (-> caller stays fail-closed) for anything
+# outside it, so we never emit a wrong bridged-fused name.
+#
+# Handled class (this phase):
+#   * a SINGLE divalent bridge (1-2 skeletal atoms; C or a single O/S/NH),
+#   * across a NAPHTHALENE residual (10 C, two ortho-fused 6-rings, one benzo),
+#   * with the parent ring system carrying NO substituents (bare ring systems).
+# Anything else (anthracene+ residual, multi-bridge, polyvalent/composite/cyclic
+# bridge, substituted, heteroaromatic parent) -> None -> G0 fail-closed (G1b/G2+).
+
+
+def name_bridged_fused_pin(mol):
+    """Name a bridged-fused ring system by the P-25.4 cascade (DD7 COV-01).
+
+    Returns the standard complex-ring tuple ``(name, ring_atoms, atom_to_locant,
+    substituents_included)`` for the handled class, else ``None`` (the caller then
+    falls through to G0 fail-closed). The name is assembled as:
+    bridge + hydro prefixes cited TOGETHER in alphanumerical order, ignoring
+    multiplying prefixes ('epoxy' < 'ethano' < 'hydro' < 'methano'), each with its
+    own locant set, then the parent (Blue Book P-25.4.3.4 / P-31.1.4.3.4):
+    '1,4-dihydro-1,4-methanonaphthalene', '1,4-epoxy-1,4-dihydronaphthalene',
+    '1,4-ethano-1,2,3,4-tetrahydronaphthalene'.
+    """
+    if mol is None:
+        return None
+
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings()]
+    # Need fused parent (>=2 rings) + at least one extra ring created by a bridge.
+    if len(rings) < 3:
+        return None
+    all_ring_atoms: Set[int] = set().union(*rings)
+
+    # Bare ring systems only: a substituent would be dropped (a wrong name), so
+    # fail closed if any heavy atom is outside the ring system. (Substituted
+    # bridged-fused is a documented G1 follow-on.)
+    heavy = {a.GetIdx() for a in mol.GetAtoms()}
+    if heavy != all_ring_atoms:
+        return None
+
+    aromatic = {i for i in all_ring_atoms if mol.GetAtomWithIdx(i).GetIsAromatic()}
+    if not aromatic:
+        return None  # the fused parent must be (at least partly) aromatic (benzo)
+
+    # Enumerate candidate bridges: connected subsets of NON-aromatic ring atoms
+    # whose excision leaves a clean naphthalene residual. "Clean" = the residual
+    # ring atoms plus the bridge atoms PARTITION every original ring atom (no
+    # leftover dangling atom mis-read as a phantom substituent — the size-1
+    # false positive on a 2-atom ethano bridge).
+    non_aromatic = sorted(all_ring_atoms - aromatic)
+    chosen = None
+    for k in (1, 2, 3):
+        for combo in combinations(non_aromatic, k):
+            bridge = set(combo)
+            if not _bridge_is_connected(mol, bridge):
+                continue
+            residual = _excise_to_naphthalene_residual(mol, bridge, all_ring_atoms)
+            if residual is not None:
+                chosen = (bridge, residual)
+                break
+        if chosen:
+            break
+    if chosen is None:
+        return None
+
+    bridge_atoms, (res_mol, orig_to_res, res_ring_atoms) = chosen
+
+    # Bridgeheads = original-mol neighbours of bridge atoms that are not bridge
+    # atoms themselves. A single divalent bridge has exactly two.
+    bridgeheads: Set[int] = set()
+    for b in bridge_atoms:
+        for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+            if nb.GetIdx() not in bridge_atoms:
+                bridgeheads.add(nb.GetIdx())
+    if len(bridgeheads) != 2:
+        return None
+    if any(bh not in orig_to_res for bh in bridgeheads):
+        return None
+
+    # Only simple SATURATED bivalent bridges are in scope (methano/ethano/propano,
+    # epoxy/epithio/epimino). An unsaturated bridge (etheno -CH=CH-, methylidene)
+    # would be mis-named 'ethano'/'methano' by the length-keyed prefix table, so
+    # fail closed if any bond incident to a bridge atom (within the bridge or to a
+    # bridgehead) is not single. This is the no-wrong-name guard.
+    bridge_and_heads = bridge_atoms | bridgeheads
+    for b in bridge_atoms:
+        for bond in mol.GetAtomWithIdx(b).GetBonds():
+            other = bond.GetOtherAtomIdx(b)
+            if other in bridge_and_heads and bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+
+    # Number the bridged ring of the naphthalene residual (1,2,3,4 around it,
+    # bridgeheads at the lowest locants), reusing the fixed naphthalene numbering.
+    bh_res = {orig_to_res[bh] for bh in bridgeheads}
+    numbering = _number_naphthalene_bridged_ring(res_mol, bh_res)
+    if numbering is None:
+        return None  # bridge not across a numberable (alpha) position pair
+
+    bridge_locants = sorted(numbering[orig_to_res[bh]] for bh in bridgeheads)
+
+    # Hydro prefix: the sp3 ring atoms of the residual (the saturated positions of
+    # the mancude parent), with their locants. Only the bridged ring saturates;
+    # the benzo ring stays aromatic.
+    hydro_locants = sorted(
+        loc for res_idx, loc in numbering.items()
+        if res_mol.GetAtomWithIdx(res_idx).GetHybridization() == Chem.HybridizationType.SP3
+    )
+
+    # Bridge prefix (methano/ethano/.../epoxy/epithio/epimino).
+    elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in bridge_atoms]
+    hetero = next((e for e in elements if e != 'C'), None)
+    bridge_prefix = get_bridge_prefix({
+        'length': len(bridge_atoms),
+        'element': hetero or 'C',
+        'heteroatom': hetero,
+    })
+    if not bridge_prefix:
+        return None
+
+    parent_name = 'naphthalene'
+
+    # Cite bridge + hydro prefixes together, alphanumerically (ignoring the hydro
+    # multiplying prefix), each with its locant set; the last prefix abuts parent.
+    entries = []  # (alpha_key, locant_string, prefix)
+    entries.append((bridge_prefix, _format_locants(bridge_locants), bridge_prefix))
+    if hydro_locants:
+        hydro_prefix = _hydro_prefix(len(hydro_locants))
+        if hydro_prefix is None:
+            return None
+        entries.append(('hydro', _format_locants(hydro_locants), hydro_prefix))
+    entries.sort(key=lambda e: e[0])
+
+    name = '-'.join(f"{loc}-{pref}" for _key, loc, pref in entries) + parent_name
+
+    atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}  # ring-membership map
+    return (name, set(all_ring_atoms), atom_to_locant, True)
+
+
+# Multiplying prefixes only matter for the hydro term, whose multiplier is always
+# a true multiplying prefix; the bridge prefix in the handled class never carries
+# one, so we key it as-is (avoids mis-stripping e.g. 'diazeno').
+def _format_locants(locants: List[int]) -> str:
+    return ','.join(str(x) for x in locants)
+
+
+_HYDRO_PREFIXES = {
+    2: 'dihydro', 4: 'tetrahydro', 6: 'hexahydro', 8: 'octahydro',
+    10: 'decahydro', 12: 'dodecahydro',
+}
+
+
+def _hydro_prefix(n_sp3: int) -> Optional[str]:
+    """Hydro prefix for *n_sp3* saturated ring positions (each adds one H)."""
+    return _HYDRO_PREFIXES.get(n_sp3)
+
+
+def _bridge_is_connected(mol, atoms: Set[int]) -> bool:
+    """True if *atoms* form a connected subgraph (a single bridge unit)."""
+    if not atoms:
+        return False
+    if len(atoms) == 1:
+        return True
+    seen = set()
+    stack = [next(iter(atoms))]
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if nb.GetIdx() in atoms and nb.GetIdx() not in seen:
+                stack.append(nb.GetIdx())
+    return seen == atoms
+
+
+def _excise_to_naphthalene_residual(mol, bridge_atoms: Set[int], all_ring_atoms: Set[int]):
+    """Excise *bridge_atoms*; if the residual ring system is a clean naphthalene
+    (two ortho-fused 6-rings, 10 carbons) whose atoms PARTITION the original ring
+    atoms with the bridge (no dangling leftover), return
+    ``(residual_mol, orig_to_res_index_map, residual_ring_atoms)``; else None.
+    """
+    rw = Chem.RWMol(mol)
+    for a in rw.GetAtoms():
+        a.SetIntProp('__bf_orig', a.GetIdx())
+    for idx in sorted(bridge_atoms, reverse=True):
+        rw.RemoveAtom(idx)
+    res = rw.GetMol()
+    try:
+        Chem.SanitizeMol(res)
+    except Exception:
+        return None
+
+    ri = res.GetRingInfo()
+    res_rings = [set(r) for r in ri.AtomRings()]
+    six = [r for r in res_rings if len(r) == 6]
+    res_ring_atoms = set().union(*res_rings) if res_rings else set()
+
+    is_naphthalene = (
+        len(res_rings) == 2
+        and len(six) == 2
+        and len(six[0] & six[1]) == 2
+        and len(res_ring_atoms) == 10
+        and all(res.GetAtomWithIdx(i).GetSymbol() == 'C' for i in res_ring_atoms)
+    )
+    if not is_naphthalene:
+        return None
+
+    orig_to_res = {
+        res.GetAtomWithIdx(i).GetIntProp('__bf_orig'): i
+        for i in range(res.GetNumAtoms())
+    }
+    res_ring_orig = {res.GetAtomWithIdx(i).GetIntProp('__bf_orig') for i in res_ring_atoms}
+    # Clean partition: every original ring atom is either in the residual ring
+    # system or in the bridge (no atom orphaned into a phantom substituent).
+    if res_ring_orig | bridge_atoms != all_ring_atoms:
+        return None
+
+    return (res, orig_to_res, res_ring_atoms)
+
+
+def _number_naphthalene_bridged_ring(res_mol, bridgeheads_res: Set[int]) -> Optional[Dict[int, int]]:
+    """Number the bridged (non-benzo) ring of a naphthalene residual 1..4 around
+    its four non-fusion atoms, choosing the direction that gives the bridgeheads
+    the lowest locant set (P-25.4.4). Returns ``{res_idx: locant}`` for those four
+    atoms, or None if the bridge is not across a numberable position pair.
+    """
+    ri = res_mol.GetRingInfo()
+    res_rings = [set(r) for r in ri.AtomRings() if len(r) == 6]
+    if len(res_rings) != 2:
+        return None
+    fusion = res_rings[0] & res_rings[1]
+    if len(fusion) != 2:
+        return None
+
+    # Bridged ring = the 6-ring containing both bridgeheads.
+    bridged_ring = next((r for r in res_rings if bridgeheads_res <= r), None)
+    if bridged_ring is None:
+        return None
+
+    non_fusion = list(bridged_ring - fusion)  # 4 atoms
+    if len(non_fusion) != 4:
+        return None
+
+    # The four non-fusion atoms form a path between the two fusion atoms (the
+    # ring minus its fusion edge). Endpoints are adjacent to a fusion atom.
+    nf_set = set(non_fusion)
+    endpoints = [
+        a for a in non_fusion
+        if any(nb.GetIdx() in fusion for nb in res_mol.GetAtomWithIdx(a).GetNeighbors())
+    ]
+    if len(endpoints) != 2:
+        return None
+
+    # Walk the path from one endpoint through non-fusion atoms.
+    path = [endpoints[0]]
+    prev = None
+    cur = endpoints[0]
+    while len(path) < 4:
+        nxt = None
+        for nb in res_mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j in nf_set and j != prev and j not in path:
+                nxt = j
+                break
+        if nxt is None:
+            return None
+        path.append(nxt)
+        prev, cur = cur, nxt
+
+    # Two candidate numberings (path and its reverse); choose lowest bridgehead set.
+    def numbering_for(order):
+        return {idx: i + 1 for i, idx in enumerate(order)}
+
+    cand = []
+    for order in (path, list(reversed(path))):
+        numb = numbering_for(order)
+        bh_set = tuple(sorted(numb[b] for b in bridgeheads_res))
+        cand.append((bh_set, numb))
+    cand.sort(key=lambda c: c[0])
+    return cand[0][1]
 
 
 def get_bridged_fused_info(mol) -> Optional[Dict[str, Any]]:
