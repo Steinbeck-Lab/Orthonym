@@ -395,6 +395,26 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     anion_idx = anions[0]['atom_idx']
     cation_atom = mol.GetAtomWithIdx(cation_idx)
 
+    # F-T6 (DD3, P-74.1.2): the cationic centre is a RING atom skeletal to the
+    # anion's parent ring (the ring N+ of a pyridinium carboxylate). It is kept on
+    # the parent as an -ium suffix and combined with the anion's -carboxylate into
+    # the cumulative '<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate' (cation
+    # cited before anion). Previously deferred (the line-413 skeletal check below
+    # returned ''), which let the legacy path neutralize it to 'nicotinic acid'
+    # (charge dropped). Attempt this BEFORE the protonated-amine defer (a
+    # protonated ring N has totalH>0 and would otherwise be deferred). Fail-closed
+    # ('' here) preserves every existing zwitterion (amino acid / betaine / ylide)
+    # path: a non-ring cation, or a non-carboxylate anion, declines and falls
+    # through to the established handling below. (The helper self-validates that
+    # the cation is a ring atom AND the carboxylate hangs off that same ring;
+    # _cation_is_skeletal_to_anion_parent is NOT a usable precondition here — it
+    # inspects the anion's DIRECT neighbour, the exocyclic carboxyl carbon, which
+    # is not a ring atom, so it returns False for exactly these molecules.)
+    from .ions import emit_zwitterion_ring_carboxylate
+    zwit = emit_zwitterion_ring_carboxylate(mol, cation_idx, anion_idx)
+    if zwit:
+        return zwit
+
     # SCOPE (D-06): GUARD 4's (azaniumyl) prefix is for a cation on a DIFFERENT
     # parent (P-74.1.3) — i.e. a QUATERNARY ammonium (0 H) that has NO neutral
     # free-amine form, the betaine class. A PROTONATED amine (NH3+/NH2+/NH+, >0
@@ -886,6 +906,23 @@ def route_charged(mol, style: str = 'pin') -> str:
             if not _quaternary_rt_ok(result, mol):
                 return ''
             return result
+        # F-T6 (DD3, P-73.1.1.2): a protonated / N-substituted RING-N cation is
+        # named by the ring-aware cumulative-suffix emitter (ring numbering +
+        # 'e' elision + cationic-centre locant), NOT the acyclic amine->aminium
+        # textual transform (which produced 'pyridineium'/'morpholineium' and,
+        # for the 0-H N-substituted aromatic case, an over-valent neutralize that
+        # crashed to ''). The emitter owns both the in-place (protonated) and the
+        # demote (N-substituted aromatic) sub-cases. On decline it returns ''
+        # and we fall through to the existing acyclic-amine path (byte-identical
+        # to HEAD for the ring shapes the emitter cannot number).
+        if ccls == 'aminium' and len(sites['cations']) == 1:
+            cat_idx = sites['cations'][0]['atom_idx']
+            if mol.GetAtomWithIdx(cat_idx).IsInRing():
+                from .ions import emit_parent_hydride_cumulative_suffix
+                ring_ium = emit_parent_hydride_cumulative_suffix(
+                    mol, cat_idx, 'ium')
+                if ring_ium:
+                    return ring_ium
         cation_class, allowed_suffixes = _CATION_SPEC.get(ccls, (None, None))
         # ylium / acylium are HYDRIDE-LOSS cations (P-73.2.2.1.1 / P-73.2.3.1):
         # neutralize by ADDING the lost hydride so the parent hydride is named.
@@ -917,10 +954,27 @@ def route_charged(mol, style: str = 'pin') -> str:
         if _acls == {'carbanion'} and len(sites['anions']) == 1:
             from .ions import emit_parent_hydride_cumulative_suffix
             center_idx = sites['anions'][0]['atom_idx']
+            # The emitter now dispatches a RING carbanion through its ring branch
+            # ([CH-]1CCCCC1 -> cyclohexan-1-ide), so ring carbanions are named
+            # here too instead of dropping their charge (DD3 Defect C).
             carbanion_name = emit_parent_hydride_cumulative_suffix(mol, center_idx, 'ide')
             if carbanion_name:
                 return carbanion_name
             return ''   # primitive declined (out of scope) -> legacy fallthrough
+        # F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion
+        # (P/As/Sb/Si/Ge) has no neutral FG anchor and no -ol/-thiol suffix the
+        # generic seam could catch, so neutralize->re-enter->suffix-map currently
+        # DROPS the charge (C[P-]C -> dimethylphosphane). Route it through the
+        # same index-preserving emitter (heteroatom branch): the parent hydride is
+        # named and the -anide ending added. C[P-]C -> dimethylphosphanide,
+        # C[Si-](C)C -> trimethylsilanide.
+        if _acls == {'heteroatom_hydride_anion'} and len(sites['anions']) == 1:
+            from .ions import emit_parent_hydride_cumulative_suffix
+            center_idx = sites['anions'][0]['atom_idx']
+            het_name = emit_parent_hydride_cumulative_suffix(mol, center_idx, 'ide')
+            if het_name:
+                return het_name
+            return ''   # primitive declined (un-nameable heterane) -> legacy
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
         # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
         # The actually-ionized senior acid class anchors the name (P-72); a neutral

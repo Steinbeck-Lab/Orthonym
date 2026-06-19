@@ -25,6 +25,24 @@ from ..data.ion_retained_names import get_anion_name, get_cation_name
 from ..perception.ions import get_ion_sites
 
 
+# F-T6 (DD3, P-72.2.2.1): skeletal heteroatom-hydride anions named with the
+# -anide ending on the parent hydride. element -> the neutral parent-hydride
+# stem the re-entered neutral name MUST end in (else fail-closed, so an
+# un-nameable heterane like 'methylmethylmethyl' for arsane never produces
+# garbage). Chalcogens (S/Se/Te) are EXCLUDED — they take -thiolate/-selenolate/
+# -tellurolate via the existing suffix map. B is EXCLUDED — its anion is -uide
+# (P-72.3, hydride addition), a separate staged family. N/O handled separately.
+_HETEROATOM_HYDRIDE_IDE_STEMS = {
+    'P': 'phosphane',
+    'As': 'arsane',
+    'Sb': 'stibane',
+    'Si': 'silane',
+    'Ge': 'germane',
+    'Sn': 'stannane',
+    'Pb': 'plumbane',
+}
+
+
 # === SUFFIX MAPPINGS ===
 
 ANION_SUFFIXES = {
@@ -140,6 +158,17 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     elif element == 'S':
         # Sulfur anion (thiolate)
         return 'thiolate'
+
+    # F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion (loss of H+
+    # from a parent hydride) — P, As, Sb (phosphane/arsane/stibane), Si, Ge
+    # (silane/germane). Named on the parent-hydride form with the -anide ending by
+    # the emit_parent_hydride_cumulative_suffix heteroatom branch. NOT the
+    # chalcogens (Se/Te ride the existing -ol/-selenol -> -olate/-selenolate
+    # suffix map, since selenol/tellurol end in "ol"); NOT B (its anion is the
+    # P-72.3 -uide hydride-addition family, staged); N -> 'aminide' and O ->
+    # alkoxide/phenolate are handled above.
+    elif element in _HETEROATOM_HYDRIDE_IDE_STEMS:
+        return 'heteroatom_hydride_anion'
 
     return 'unknown'
 
@@ -344,6 +373,16 @@ def name_aminium_cation(parent_name: str) -> str:
         # Handle alkane-based names
         return name[:-1] + 'ium'
     else:
+        # F-T6 (DD3, P-73.1.2 elision): both branches above elide the final 'e'
+        # before '-ium' (methanamine->methanaminium, methane->methylium-via-ane).
+        # The else branch must ALSO elide a trailing 'e' for the same reason —
+        # otherwise an aryl/retained amine parent ending in 'e' is mis-glued
+        # ('aniline' + 'ium' -> 'anilineium' instead of 'anilinium'). A name not
+        # ending in 'e' is unchanged (just append 'ium'). Ring-N parents are
+        # intercepted upstream in route_charged (the ring-aware -ium emitter), so
+        # this only sees acyclic amine principal-group parents here.
+        if name.endswith('e'):
+            return name[:-1] + 'ium'
         return name + 'ium'
 
 
@@ -1046,22 +1085,22 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         center = mol.GetAtomWithIdx(center_idx)
     except (RuntimeError, IndexError, OverflowError):
         return ''
-    # This primitive is the CARBON-centred parent-hydride path; heteroatom anions
-    # (alkoxide/thiolate/aminide) stay on their existing class paths.
-    if center.GetSymbol() != 'C':
-        return ''
-    # RING-MEMBER centres are OUT of scope for this ACYCLIC parent-hydride
-    # primitive. find_principal_chain linearizes a ring (it returns the ring's
-    # carbons as a "chain"), so the `center_idx in chain` guard below would PASS
-    # for a cyclic carbanion/radical and the centre would be mis-named as an
-    # acyclic chain — e.g. cyclohexanide `[CH-]1CCCCC1` -> `hexan-1-ide`, a
-    # structurally DIFFERENT molecule that the parse-only validity gate cannot
-    # catch (the name is grammatically valid). Fall through to the legacy ring
-    # path. A carbanion/radical on an exocyclic chain attached to a ring is NOT a
-    # ring member, so `IsInRing()` is False there and that case still names here
-    # (the ring becomes a substituent).
+
+    # --- 1b. Dispatch by centre type (F-T6 / DD3) -----------------------------
+    # The body below is the ORIGINAL acyclic-carbon parent-hydride path (carbanion
+    # -ide, radical -yl/-ylidene/-ylidyne) — kept byte-identical. Two generalized
+    # branches are split out so the charge is never dropped for the families the
+    # carbon-chain path cannot reach:
+    #   (a) RING-MEMBER centre (ring carbanion -ide / ring-N -ium): use the ring
+    #       numbering, not find_principal_chain (which would LINEARIZE the ring —
+    #       cyclohexanide `[CH-]1CCCCC1` -> `hexan-1-ide`, a different molecule).
+    #   (b) ACYCLIC non-carbon heteroatom centre (P/As/Sb/Si/Ge -ide): name the
+    #       parent hydride (phosphane/silane/...) and add the -anide ending.
+    # Each branch fail-closes ('' -> legacy), preserving the v18 no-crash contract.
     if center.IsInRing():
-        return ''
+        return _emit_ring_cumulative_suffix(mol, center_idx, suffix)
+    if center.GetSymbol() != 'C':
+        return _emit_heteroatom_cumulative_suffix(mol, center_idx, suffix)
 
     # --- 2. Saturate the centre on an INDEX-PRESERVING copy (Pitfall 1) -------
     # Work on an RWMol whose atom indices match ``mol`` exactly — do NOT round-trip
@@ -1219,6 +1258,434 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         core = f"{stem}an-{center_locant}-{suffix}"
 
     return f"{prefix_str}{core}"
+
+
+def _elide_terminal_e(name: str) -> str:
+    """P-72/P-73 elision: drop a single trailing 'e' before a vowel-initial
+    cumulative suffix ('pyridine' -> 'pyridin', 'cyclohexane' -> 'cyclohexan',
+    'dimethylphosphane' -> 'dimethylphosphan'). Names not ending in 'e' are
+    returned unchanged ('cyclopenta-2,4-dien' keeps its tail)."""
+    return name[:-1] if name.endswith('e') else name
+
+
+def _heteroatom_ide_name(neutral_name: str, symbol: str) -> str:
+    """Form the heteroatom-hydride -ide name from the re-entered NEUTRAL parent
+    hydride name (P-72.2.2.1). The neutral name MUST end in the element's parent-
+    hydride stem (phosphane/arsane/stibane/silane/germane/stannane/plumbane) — a
+    GUARD that fail-closes when the pipeline could not name the heterane (e.g.
+    methylarsane currently re-enters as the garbled 'methylmethylmethyl'); we then
+    return '' rather than emit 'methylmethylmethylide'. Mononuclear hydride centre
+    takes no locant ('dimethylphosphane' -> 'dimethylphosphanide')."""
+    stem = _HETEROATOM_HYDRIDE_IDE_STEMS.get(symbol)
+    if not stem or not neutral_name.endswith(stem):
+        return ''
+    return _elide_terminal_e(neutral_name) + 'ide'
+
+
+def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
+    """F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion (loss of
+    H+ from a parent hydride) — P/As/Sb/Si/Ge. The carbon chain-finder cannot
+    name a heterane parent, so we (1) neutralize the centre on an INDEX-PRESERVING
+    RWMol with the correct H-delta (+1 H to recover the saturated hydride — NOT
+    the buggy explicit-H add in charged_router._neutralize_fragment, which
+    over-protonates an explicit-H heteroatom), (2) re-enter the pipeline to name
+    the neutral hydride (dimethylphosphane, trimethylsilane), (3) append the
+    -anide ending with 'e' elision via the element-keyed _heteroatom_ide_name
+    guard. Returns '' on any decline (caller falls through to legacy)."""
+    if suffix != 'ide':
+        # Only the -ide (anion, loss of H+) heteroatom path lives here. Acyclic
+        # heteroatom radicals/cations keep their existing structured handlers.
+        return ''
+    center = mol.GetAtomWithIdx(center_idx)
+    symbol = center.GetSymbol()
+    if symbol not in _HETEROATOM_HYDRIDE_IDE_STEMS:
+        return ''
+    # H-delta +1: the parent hydride re-adds the H that was lost as H+.
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(center_idx)
+        a.SetFormalCharge(0)
+        a.SetNumRadicalElectrons(0)
+        new_h = a.GetTotalNumHs() + 1
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(new_h)
+        work_mol = work.GetMol()
+        Chem.SanitizeMol(work_mol)
+    except (RuntimeError, ValueError):
+        return ''
+    neutral_smi = Chem.MolToSmiles(work_mol)
+    if not neutral_smi:
+        return ''
+    try:
+        from ..namer import Orthonym
+        neutral_name = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True).name(neutral_smi)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not neutral_name or 'unknown' in neutral_name.lower():
+        return ''
+    return _heteroatom_ide_name(neutral_name, symbol)
+
+
+def _ring_iupac_locants(ring_mol):
+    """Reuse the namer's authoritative ring-locant supplier on an INDEX-PRESERVING
+    mol (heterocycle/benzene/PAH/fused). Returns the atom_idx -> locant dict (the
+    SAME numbering the neutral ring name uses, so a composed center locant matches
+    the parent name's locants) or None (e.g. a plain carbocyclic monocycle, whose
+    fallback the caller resolves by symmetry)."""
+    try:
+        from ..namer import compute_features, _build_ring_info_for_parent_selection
+        ri = _build_ring_info_for_parent_selection(compute_features(ring_mol))
+    except (RecursionError, ValueError, RuntimeError, KeyError):
+        return None
+    return (ri or {}).get('iupac_locants')
+
+
+def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
+    """F-T6 (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
+    P-72.2.2.1) or -ium (ring cation, P-73.1.1.2) suffix, with 'e' elision and a
+    first-class ring locant read from the neutral-ring numbering.
+
+    Two modes, by how the centre neutralizes:
+      * IN-PLACE (>=1 removable H for -ium, or the always-+1 for -ide): set the
+        centre charge to 0 and apply the H-delta on an index-preserving RWMol,
+        name the neutral ring, read center locant from the ring numbering.
+        `[CH-]1CCCCC1`->cyclohexan-1-ide, `c1cc[nH+]cc1`->pyridin-1-ium,
+        `O1CC[NH2+]CC1`->morpholin-4-ium, `c1c[nH]c[nH+]1`->imidazol-3-ium.
+      * DEMOTE (a 0-H ring cation, e.g. an N-substituted aromatic `C[n+]1ccccc1`):
+        the centre cannot be neutralized in place (over-valent), so the exocyclic
+        substituent(s) are severed, named as ring substituent prefix(es) at the
+        centre locant, and the neutral ring takes the -ium. -> 1-methylpyridin-1-ium.
+
+    Returns '' for any other suffix (a ring radical keeps its legacy textual form,
+    preserving byte-identity) or on any decline (legacy fall-through)."""
+    if suffix not in ('ide', 'ium'):
+        return ''
+    from ..perception.rings import get_ring_systems
+    ring_system = None
+    try:
+        for rs in get_ring_systems(mol, include_spiro=True):
+            if center_idx in rs:
+                ring_system = rs
+                break
+    except (RuntimeError, ValueError):
+        return ''
+    if ring_system is None:
+        return ''
+
+    center = mol.GetAtomWithIdx(center_idx)
+    h_delta = _CUMULATIVE_SUFFIX_H_DELTA[suffix]
+    target_h = center.GetTotalNumHs() + h_delta
+
+    if target_h >= 0:
+        # --- IN-PLACE neutralization ---------------------------------------
+        work = Chem.RWMol(mol)
+        try:
+            a = work.GetAtomWithIdx(center_idx)
+            a.SetFormalCharge(0)
+            a.SetNumRadicalElectrons(0)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(target_h)
+            ring_mol = work.GetMol()
+            Chem.SanitizeMol(ring_mol)
+        except (RuntimeError, ValueError):
+            return ''
+        try:
+            from ..namer import Orthonym
+            parent = Orthonym(
+                style='pin', _disable_opsin_validity_gate=True
+            ).name(Chem.MolToSmiles(ring_mol))
+        except (RecursionError, ValueError, RuntimeError):
+            return ''
+        if not parent or 'unknown' in parent.lower():
+            return ''
+        locants = _ring_iupac_locants(ring_mol)
+        if locants and center_idx in locants:
+            center_locant = locants[center_idx]
+        else:
+            # Carbocyclic monocycle (no heteroatom supplier): an unsubstituted
+            # single all-carbon ring is symmetric, so the centre is locant 1.
+            # Anything else (substituted / poly-ring) is out of scope -> legacy.
+            ring_atoms = [mol.GetAtomWithIdx(i) for i in ring_system]
+            try:
+                n_rings = len(get_ring_systems(mol))
+            except (RuntimeError, ValueError):
+                return ''
+            if n_rings == 1 and all(at.GetSymbol() == 'C' for at in ring_atoms) \
+                    and not _ring_has_off_ring_substituent(mol, ring_system):
+                center_locant = 1
+            else:
+                return ''
+        return f"{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
+
+    # --- DEMOTE (0-H ring cation: N-substituted aromatic) ------------------
+    if suffix != 'ium':
+        return ''
+    exo = [n.GetIdx() for n in center.GetNeighbors()
+           if n.GetIdx() not in ring_system]
+    if not exo:
+        return ''
+    from ..perception.chains import classify_substituent
+    sub_names = []
+    for e in exo:
+        sub_atoms = _collect_substituent_atoms(mol, center_idx, e, ring_system)
+        if sub_atoms is None:
+            return ''
+        info = classify_substituent(mol, sorted(sub_atoms), set(ring_system))
+        sub_name = info.get('name')
+        if not sub_name:
+            return ''
+        sub_names.append(sub_name)
+    # Scope (kept tight): exactly one exocyclic substituent, no OTHER ring
+    # substituents (after severing, the neutral ring must be unsubstituted).
+    if len(sub_names) != 1:
+        return ''
+    work = Chem.RWMol(mol)
+    try:
+        for e in exo:
+            work.RemoveBond(center_idx, e)
+        a = work.GetAtomWithIdx(center_idx)
+        a.SetFormalCharge(0)
+        a.SetNoImplicit(False)
+        severed = work.GetMol()
+        frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
+        frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
+    except (RuntimeError, ValueError):
+        return ''
+    ring_k = [k for k, ix in enumerate(frag_idxs) if center_idx in ix]
+    if not ring_k:
+        return ''
+    ring_frag = frag_mols[ring_k[0]]
+    ring_orig = frag_idxs[ring_k[0]]
+    center_frag_idx = list(ring_orig).index(center_idx)
+    # The neutral ring (after severing) must be unsubstituted for this scope.
+    if _ring_frag_has_substituent(ring_frag):
+        return ''
+    try:
+        from ..namer import Orthonym
+        parent = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True
+        ).name(Chem.MolToSmiles(ring_frag))
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not parent or 'unknown' in parent.lower():
+        return ''
+    locants = _ring_iupac_locants(ring_frag)
+    if not locants or center_frag_idx not in locants:
+        return ''
+    center_locant = locants[center_frag_idx]
+    # Substituent and -ium share the centre locant (P-73.1.1.2):
+    # '1-methyl' + 'pyridin-1-ium' -> '1-methylpyridin-1-ium'.
+    return (f"{center_locant}-{sub_names[0]}"
+            f"{_elide_terminal_e(parent)}-{center_locant}-{suffix}")
+
+
+def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):
+    """BFS the connected substituent component hanging off ``start_idx`` (a
+    neighbour of the ring centre), excluding the centre and ring atoms. Returns
+    the atom-index set, or None if it loops back into the ring (fused/bridged
+    attachment — out of scope)."""
+    seen = {center_idx}
+    stack = [start_idx]
+    sub = set()
+    while stack:
+        x = stack.pop()
+        if x in seen:
+            continue
+        seen.add(x)
+        sub.add(x)
+        for nb in mol.GetAtomWithIdx(x).GetNeighbors():
+            nbi = nb.GetIdx()
+            if nbi in ring_system and nbi != center_idx:
+                return None  # substituent re-enters the ring system
+            if nbi not in seen:
+                stack.append(nbi)
+    return sub
+
+
+def _ring_has_off_ring_substituent(mol, ring_system):
+    """True if any ring atom bears a non-H neighbour outside the ring system."""
+    rs = set(ring_system)
+    for idx in ring_system:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in rs and nb.GetSymbol() != 'H':
+                return True
+    return False
+
+
+def _ring_frag_has_substituent(ring_frag):
+    """True if the severed ring fragment carries any off-ring heavy substituent
+    (so the demote scope — an otherwise-unsubstituted neutral ring — does not
+    apply and we fail-closed)."""
+    ring_atoms = set()
+    for ring in ring_frag.GetRingInfo().AtomRings():
+        ring_atoms.update(ring)
+    for idx in ring_atoms:
+        for nb in ring_frag.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetSymbol() != 'H':
+                return True
+    return False
+
+
+def _carboxyl_ring_anchor(mol, anion_idx, ring_system):
+    """For a carboxylate O- attached (via its carboxyl carbon) to a ring atom of
+    ``ring_system``, return (carboxyl_C_idx, ring_attach_idx). Returns None if the
+    anion is not a carboxylate, or its carboxyl carbon is not bonded to exactly
+    one atom of this ring system."""
+    o = mol.GetAtomWithIdx(anion_idx)
+    carbons = [n for n in o.GetNeighbors() if n.GetSymbol() == 'C']
+    if len(carbons) != 1:
+        return None
+    cC = carbons[0]
+    has_double_o = any(
+        nn.GetSymbol() == 'O'
+        and mol.GetBondBetweenAtoms(cC.GetIdx(), nn.GetIdx()).GetBondType()
+        == Chem.BondType.DOUBLE
+        for nn in cC.GetNeighbors()
+    )
+    if not has_double_o:
+        return None
+    ring_attach = [n.GetIdx() for n in cC.GetNeighbors() if n.GetIdx() in ring_system]
+    if len(ring_attach) != 1:
+        return None
+    return cC.GetIdx(), ring_attach[0]
+
+
+def emit_zwitterion_ring_carboxylate(mol, cation_idx: int, anion_idx: int) -> str:
+    """F-T6 (DD3, P-74.1.2): a zwitterion whose cationic centre is a RING atom of
+    the same ring that bears a carboxylate anion -> the cumulative
+    ``<ring>-<cation-locant>-ium-<carboxyl-locant>-carboxylate`` suffix (cation
+    suffix cited before anion). `[O-]C(=O)c1ccc[nH+]c1` -> pyridin-1-ium-3-
+    carboxylate; `C[n+]1ccccc1C(=O)[O-]` -> 1-methylpyridin-1-ium-2-carboxylate.
+
+    The ring numbering (which fixes both the cation locant and the carboxyl
+    locant) is derived on the neutralized, carboxyl-bearing ring via the namer's
+    authoritative supplier; the bare ring stem is named with the carboxyl removed.
+    Returns '' on any decline (caller falls through to the legacy path)."""
+    from ..perception.rings import get_ring_systems
+    ring_system = None
+    try:
+        for rs in get_ring_systems(mol, include_spiro=True):
+            if cation_idx in rs:
+                ring_system = rs
+                break
+    except (RuntimeError, ValueError):
+        return ''
+    if ring_system is None or anion_idx in ring_system:
+        return ''
+    anchor = _carboxyl_ring_anchor(mol, anion_idx, ring_system)
+    if anchor is None:
+        return ''
+    carboxyl_c, ring_attach = anchor
+
+    cation = mol.GetAtomWithIdx(cation_idx)
+    cation_has_h = cation.GetTotalNumHs() > 0
+    sub_prefix = ''
+
+    if cation_has_h:
+        # IN-PLACE: protonated ring N. Neutralize cation (-1 H) and anion (->COOH).
+        work = Chem.RWMol(mol)
+        try:
+            ca = work.GetAtomWithIdx(cation_idx)
+            ca.SetFormalCharge(0)
+            ca.SetNoImplicit(True)
+            ca.SetNumExplicitHs(ca.GetTotalNumHs() - 1)
+            ao = work.GetAtomWithIdx(anion_idx)
+            ao.SetFormalCharge(0)
+            ao.SetNoImplicit(True)
+            ao.SetNumExplicitHs(ao.GetTotalNumHs() + 1)
+            neutral = work.GetMol()
+            Chem.SanitizeMol(neutral)
+        except (RuntimeError, ValueError):
+            return ''
+        locants = _ring_iupac_locants(neutral)
+        if not locants:
+            return ''
+        cation_locant = locants.get(cation_idx)
+        carboxyl_locant = locants.get(ring_attach)
+        stem = _name_bare_ring_after_removing(neutral, carboxyl_c)
+    else:
+        # DEMOTE: 0-H N-substituted aromatic ring cation. Sever exo substituent(s),
+        # neutralize cation in place, neutralize anion -> COOH; then work on the
+        # ring fragment that keeps the carboxyl substituent.
+        from ..perception.chains import classify_substituent
+        exo = [n.GetIdx() for n in cation.GetNeighbors()
+               if n.GetIdx() not in ring_system]
+        sub_names = []
+        for e in exo:
+            sub_atoms = _collect_substituent_atoms(mol, cation_idx, e, ring_system)
+            if sub_atoms is None:
+                return ''
+            info = classify_substituent(mol, sorted(sub_atoms), set(ring_system))
+            if not info.get('name'):
+                return ''
+            sub_names.append(info['name'])
+        if len(sub_names) != 1:
+            return ''
+        work = Chem.RWMol(mol)
+        try:
+            for e in exo:
+                work.RemoveBond(cation_idx, e)
+            ca = work.GetAtomWithIdx(cation_idx)
+            ca.SetFormalCharge(0)
+            ca.SetNoImplicit(False)
+            ao = work.GetAtomWithIdx(anion_idx)
+            ao.SetFormalCharge(0)
+            ao.SetNoImplicit(True)
+            ao.SetNumExplicitHs(ao.GetTotalNumHs() + 1)
+            severed = work.GetMol()
+            frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
+            frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
+        except (RuntimeError, ValueError):
+            return ''
+        ring_k = [k for k, ix in enumerate(frag_idxs) if cation_idx in ix]
+        if not ring_k:
+            return ''
+        ring_frag = frag_mols[ring_k[0]]
+        ring_orig = list(frag_idxs[ring_k[0]])
+        if carboxyl_c not in ring_orig or ring_attach not in ring_orig:
+            return ''
+        cation_locant_idx = ring_orig.index(cation_idx)
+        attach_frag_idx = ring_orig.index(ring_attach)
+        carboxyl_frag_idx = ring_orig.index(carboxyl_c)
+        locants = _ring_iupac_locants(ring_frag)
+        if not locants:
+            return ''
+        cation_locant = locants.get(cation_locant_idx)
+        carboxyl_locant = locants.get(attach_frag_idx)
+        stem = _name_bare_ring_after_removing(ring_frag, carboxyl_frag_idx)
+        if stem and cation_locant is not None:
+            sub_prefix = f"{cation_locant}-{sub_names[0]}"
+
+    if not stem or cation_locant is None or carboxyl_locant is None:
+        return ''
+    return (f"{sub_prefix}{_elide_terminal_e(stem)}"
+            f"-{cation_locant}-ium-{carboxyl_locant}-carboxylate")
+
+
+def _name_bare_ring_after_removing(ring_mol, carboxyl_c_idx):
+    """Name the bare ring stem of ``ring_mol`` after deleting the carboxyl group
+    (the carboxyl carbon + its bonded oxygens). Returns the ring parent name
+    ('pyridine') or '' on failure."""
+    work = Chem.RWMol(ring_mol)
+    to_remove = {carboxyl_c_idx}
+    for nb in ring_mol.GetAtomWithIdx(carboxyl_c_idx).GetNeighbors():
+        if nb.GetSymbol() == 'O':
+            to_remove.add(nb.GetIdx())
+    try:
+        for idx in sorted(to_remove, reverse=True):
+            work.RemoveAtom(idx)
+        bare = work.GetMol()
+        Chem.SanitizeMol(bare)
+        from ..namer import Orthonym
+        name = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True
+        ).name(Chem.MolToSmiles(bare))
+    except (RuntimeError, ValueError, RecursionError):
+        return ''
+    if not name or 'unknown' in name.lower():
+        return ''
+    return name
 
 
 def _ionize_acid_name(neutral_name: str, total_charge: int,

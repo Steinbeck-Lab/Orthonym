@@ -308,10 +308,27 @@ def orient_heterocycle_with_substituents(
         atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(ring_list, 1)}
         return ring_list, atom_to_locant
 
-    # Find highest-priority heteroatom for position 1
+    # Find highest-priority heteroatom for position 1. Among EQUAL-priority
+    # heteroatoms (e.g. the two N of imidazole / pyrazole / pyrimidine) the choice
+    # of which becomes position 1 MUST be both deterministic and IUPAC-correct.
+    # The prior key used ONLY element priority, so Python's stable sort left the
+    # tie broken by the heteroatoms' list order = ascending ATOM INDEX, which
+    # flips with the SMILES spelling -> nondeterministic numbering (imidazolium
+    # came out 'imidazol-1-ium' from one spelling and 'imidazol-3-ium' from
+    # another). Break the tie by, in order: (a) P-31.1.4.3.4 indicated hydrogen —
+    # a pyrrole-type ring atom bearing an H takes the lower locant (the NH of
+    # imidazole is position 1, so the other N is 3); (b) a CANONICAL atom rank
+    # (input-order INDEPENDENT) as the final deterministic discriminator. Rings
+    # with a UNIQUE senior heteroatom (pyridine/furan/…) have no tie, so their
+    # numbering is byte-identical.
+    _canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     sorted_heteroatoms = sorted(
         heteroatoms,
-        key=lambda x: get_heteroatom_priority(x[1])
+        key=lambda x: (
+            get_heteroatom_priority(x[1]),
+            0 if mol.GetAtomWithIdx(x[0]).GetTotalNumHs() >= 1 else 1,
+            _canon_rank[x[0]],
+        )
     )
     start_idx = sorted_heteroatoms[0][0]
     start_pos = ring_list.index(start_idx)

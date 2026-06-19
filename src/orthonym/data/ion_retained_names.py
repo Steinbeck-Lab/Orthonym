@@ -45,6 +45,14 @@ RETAINED_ANIONS = {
     # stays — it is a ring carbanion outside the acyclic parent-hydride path.
     '[c-]1ccccc1': 'phenide',  # Also called benzenide
 
+    # Azanide (NH2-) — the conjugate base of azane (NH3). F-T6 (DD3, P-72.2.2.2):
+    # the preselected name of the bare nitrogen-hydride anion. RETAINED_ANIONS is
+    # consulted before INORGANIC_ANIONS, so this shadows the legacy inorganic
+    # 'amide' (a deprecated name) — azanide is the IUPAC 2013 PIN and OPSIN
+    # round-trips it to [NH2-]. (Bare [NH2-] previously emitted 'amide', which the
+    # OPSIN validity gate suppressed to 'unknown organic compound'.)
+    '[NH2-]': 'azanide',
+
     # Alkynide anions
     '[C-]#C': 'ethynide',  # Terminal alkynide
 
