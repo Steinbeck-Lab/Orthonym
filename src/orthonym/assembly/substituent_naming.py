@@ -99,6 +99,26 @@ def _is_linear_alkyl(mol, sub_atoms: List[int]) -> bool:
     return True
 
 
+def _attach_is_chain_terminus(mol, sub_atoms: List[int], attach_idx) -> bool:
+    """True when the substituent's attachment atom is a chain TERMINUS.
+
+    A terminus has at most one carbon neighbour WITHIN the fragment, so the free
+    valence sits at locant 1 of an unbranched chain (the elided ``-yl`` form). An
+    internal attachment (2 in-fragment carbon neighbours) makes the free valence
+    an interior locant (``alkan-k-yl``), which the linear fast path cannot express
+    (DD5 RC-6 / SEN-04). Returns True when ``attach_idx`` is None so callers that
+    lack attachment context keep their prior fast-path behaviour.
+    """
+    if attach_idx is None:
+        return True
+    sub_set = set(sub_atoms)
+    c_nbrs = sum(
+        1 for nbr in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+        if nbr.GetIdx() in sub_set and nbr.GetSymbol() == 'C'
+    )
+    return c_nbrs <= 1
+
+
 # ============================================================================
 # Unsaturated Linear Chain Naming (IUPAC P-31.1.3)
 # ============================================================================
@@ -1067,47 +1087,43 @@ def _check_retained_substituent(
 # ============================================================================
 
 
-def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
-    """Derive ``(<alkan>, k)`` for a single-stereocentre acyclic-alkyl substituent.
+def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
+    """Name an acyclic, all-carbon, saturated substituent by its OWN principal
+    chain, numbered from the free valence (P-29.2 / P-46.1.8 / P-46.1.12).
 
-    GENERAL structure-derived located-descriptor rule (P-29.2 / P-31.1.4.3 /
-    P-91), replacing the former hardcoded ``sec-butyl -> butan-2-yl`` table.
+    GENERAL structure-derived rule (DD5 RC-6 / SEN-04), no name table and NOT
+    gated on a stereocentre. Returns ``(name, k)`` where ``name`` is the full
+    located prefix and ``k`` is the free-valence locant, or ``None`` when the
+    substituent is not an acyclic, all-carbon, saturated alkyl (caller then
+    falls through to the recursive path).
 
-    When the substituent is an ACYCLIC, all-carbon, SATURATED group whose single
-    stereocentre is its ATTACHMENT carbon, its PIN is ``<alkan>-<k>-yl`` where:
+    - The parent is the LONGEST carbon chain THROUGH the free-valence atom
+      (P-29.2: a substituent's principal chain includes the atom with the free
+      valence and is the longest such chain).
+    - The free valence gets the LOWEST locant ``k`` (P-46.1.8).
+    - The substituent's OWN substituents (off-chain branches) are numbered from
+      that same chain and cited as prefixes (P-46.1.12), via the shared
+      substituent namer.
 
-    - the parent of the substituent is its LONGEST carbon chain through the
-      attachment carbon (P-29.2: the principal chain of a substituent group
-      includes the atom with the free valence and is the longest such chain);
-    - ``k`` is the attachment carbon's locant under the numbering that gives the
-      free-valence (attachment) atom the LOWEST locant (P-31.1.4.3.4).
+    Forms (P-29.2 / P-29.6.2.3):
+      - free valence terminal (k == 1): ``<sub-prefixes><stem>yl`` with the
+        free-valence locant elided — e.g. ``3-methylbutyl``, ``4-methylpentyl``.
+        (A k==1 chain with NO branches is a plain unbranched alkyl handled by
+        the linear fast path; this deriver only reaches it defensively.)
+      - free valence internal (k >= 2): ``<sub-prefixes><stem>an-k-yl`` — e.g.
+        ``pentan-3-yl``, ``hexan-2-yl``, ``4-methylhexan-2-yl``.
 
-    Worked examples derived purely from structure (no name table):
-      - ``[C@@H](C)CC``  -> ("butan", 2)   => butan-2-yl
-      - ``[C@@H](C)CCC`` -> ("pentan", 2)  => pentan-2-yl
-
-    Returns ``(systematic_name, k)`` or ``None`` when the substituent is not a
-    single-stereocentre acyclic alkyl, or when the longest chain does not pass
-    through the attachment carbon (e.g. the stereocentre is not the attachment
-    atom). Per D-09 (missing beats wrong) the caller then emits no located form.
-
-    Args:
-        mol: RDKit Mol (CIP labels already assigned).
-        sub_atoms: Atom indices of the substituent fragment.
-        attach_idx: The substituent's attachment atom (bonded to the parent).
-
-    Returns:
-        ``(name, k)`` tuple, or None.
+    Replaces the former hardcoded ``sec-butyl -> butan-2-yl`` table and the
+    branch-blind longest-chain deriver (which dropped a substituent's own methyl,
+    e.g. ``3-methylbutyl`` was mis-named ``butyl``).
     """
     if attach_idx is None or not sub_atoms:
         return None
-
     sub_set = set(sub_atoms)
     if attach_idx not in sub_set:
         return None
 
-    # Acyclic, all-carbon, fully saturated within the fragment (no ring, no
-    # heteroatom, no C=C/C#C). A genuine secondary acyclic alkyl is sp3.
+    # Acyclic, all-carbon, fully saturated within the fragment.
     ring_info = mol.GetRingInfo()
     for idx in sub_set:
         atom = mol.GetAtomWithIdx(idx)
@@ -1121,61 +1137,130 @@ def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
                 if bond and bond.GetBondTypeAsDouble() != 1.0:
                     return None
 
-    # The attachment carbon must be the stereocentre (a secondary acyclic alkyl).
-    attach_atom = mol.GetAtomWithIdx(attach_idx)
-    if not attach_atom.HasProp('_CIPCode'):
-        return None
-
-    # Longest carbon chain WITHIN the fragment that passes through the attachment
-    # carbon. DFS the two longest arms out of the attachment atom and join them;
-    # the attachment carbon is an interior or terminal vertex of that chain.
+    # Longest carbon chain THROUGH the free valence: the two longest arms out of
+    # the attachment atom joined through it (the attachment is an interior or
+    # terminal vertex of that chain). Iterative (explicit-stack post-order) so a
+    # pathologically long chain cannot raise RecursionError (WR-03); result and
+    # tie behaviour are identical to the recursive form (first-of-ties kept).
     def _longest_arm(start, came_from):
-        # Longest simple path of carbons starting at `start`, not revisiting
-        # `came_from` or stepping outside the fragment.
-        best = [start]
-        stack_atom = mol.GetAtomWithIdx(start)
-        for nbr in stack_atom.GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx in sub_set and nidx != came_from:
-                arm = _longest_arm(nidx, start)
-                if len(arm) + 1 > len(best):
-                    best = [start] + arm
-        return best
+        best_child: Dict[int, List[int]] = {}
+        stack = [(start, came_from, False)]
+        while stack:
+            node, parent, processed = stack.pop()
+            if processed:
+                best = [node]
+                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if nidx in sub_set and nidx != parent:
+                        cand = [node] + best_child.get(nidx, [nidx])
+                        if len(cand) > len(best):
+                            best = cand
+                best_child[node] = best
+            else:
+                stack.append((node, parent, True))
+                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if nidx in sub_set and nidx != parent:
+                        stack.append((nidx, node, False))
+        return best_child[start]
 
-    # Arms emanating from the attachment carbon (excluding each other).
-    arm_lengths = []  # (length, path) for each neighbour-rooted arm
-    for nbr in attach_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx in sub_set:
-            arm = _longest_arm(nidx, attach_idx)
-            arm_lengths.append(arm)
-
-    arm_lengths.sort(key=len, reverse=True)
-    if len(arm_lengths) >= 2:
-        # Two longest arms joined through the attachment carbon.
-        left = list(reversed(arm_lengths[0]))
-        right = arm_lengths[1]
-        chain = left + [attach_idx] + right
-    elif len(arm_lengths) == 1:
-        chain = [attach_idx] + arm_lengths[0]
+    arms = []
+    for nbr in mol.GetAtomWithIdx(attach_idx).GetNeighbors():
+        if nbr.GetIdx() in sub_set:
+            arms.append(_longest_arm(nbr.GetIdx(), attach_idx))
+    arms.sort(key=len, reverse=True)
+    if len(arms) >= 2:
+        chain = list(reversed(arms[0])) + [attach_idx] + arms[1]
+    elif len(arms) == 1:
+        chain = [attach_idx] + arms[0]
     else:
         chain = [attach_idx]
-
     chain_len = len(chain)
     if chain_len < 2:
         return None
 
-    # Position of the attachment carbon in the chain (1-based), lowest-locant end.
-    pos_from_start = chain.index(attach_idx) + 1
-    pos_from_end = chain_len - chain.index(attach_idx)
-    k = min(pos_from_start, pos_from_end)
+    # Number so the free valence gets the LOWEST locant (P-46.1.8).
+    if (chain_len - chain.index(attach_idx)) < (chain.index(attach_idx) + 1):
+        chain = list(reversed(chain))
+    k = chain.index(attach_idx) + 1
+    chain_set_c = set(chain)
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+
+    # Off-chain branches -> the substituent's own substituents (P-46.1.12),
+    # named by the shared substituent namer and located on this chain.
+    from collections import defaultdict
+    from .substituent_enumerator import name_substituent
+    branch_groups: dict = defaultdict(list)
+    for chain_atom in chain:
+        for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in chain_set_c or nidx not in sub_set:
+                continue
+            # BFS the branch fragment within the substituent (excluding the chain).
+            frag = []
+            seen = set(chain_set_c)
+            stack = [nidx]
+            while stack:
+                cur = stack.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                frag.append(cur)
+                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                        stack.append(nn.GetIdx())
+            try:
+                bname = name_substituent(mol, frag, nidx)
+            except Exception as exc:  # noqa: BLE001
+                # Missing-beats-wrong: a branch we cannot name -> decline the
+                # whole located form (fall through to the recursive path). Logged
+                # at debug so a genuine namer bug here stays observable (IN-02).
+                logger.debug("located-alkyl branch naming failed: %s", exc)
+                return None
+            if not bname or bname == "substituent":
+                return None
+            branch_groups[bname].append(chain_pos[chain_atom])
 
     from ..data.chain_names import get_chain_prefix
+    if k == 1 and not branch_groups:
+        # Unbranched primary alkyl (normally handled upstream); plain name.
+        try:
+            return (get_alkyl_name(chain_len), 1)
+        except (ValueError, KeyError):
+            return None
     try:
         stem = get_chain_prefix(chain_len)
     except (ValueError, KeyError):
         return None
-    return (f"{stem}an-{k}-yl", k)
+
+    from .composer import _format_prefix_groups
+    prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
+
+    if k == 1:
+        try:
+            base = get_alkyl_name(chain_len)  # 'butyl', 'pentyl', ...
+        except (ValueError, KeyError):
+            base = f"{stem}yl"
+        return (f"{prefix}{base}", 1)
+    return (f"{prefix}{stem}an-{k}-yl", k)
+
+
+def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
+    """Stereo-path adapter for the located acyclic-alkyl deriver.
+
+    Thin wrapper kept for ``_add_substituent_stereo`` (which prepends the
+    ``({k}{cip})-`` descriptor only when the attachment atom IS the stereocentre,
+    i.e. ``s_idx == attach_idx``). The structure derivation — including the
+    substituent's OWN substituents and free-valence numbering — now lives in the
+    general, un-gated ``_located_acyclic_alkyl_name`` (DD5 RC-6 / SEN-04). The old
+    ``HasProp('_CIPCode')`` gate here is no longer needed: the caller's
+    ``s_idx == attach_idx`` check already restricts descriptor emission to the
+    stereocentre-at-attachment case.
+
+    Worked examples (BlueBook P-29.6.2.3): ``[C@@H](C)CC`` -> ("butan-2-yl", 2),
+    ``[C@@H](C)CCC`` -> ("pentan-2-yl", 2).
+    """
+    return _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx)
 
 
 def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
@@ -1334,8 +1419,14 @@ def name_substituent_fragment(
             if _chal:
                 return _add_substituent_stereo(mol, sub_atoms, _chal, attach_idx=attach_idx)
 
-    # Step 2: Fast path -- linear saturated alkyl (no branching, no unsaturation)
-    if _is_linear_alkyl(mol, sub_atoms):
+    # Step 2: Fast path -- linear saturated alkyl, attached at a chain TERMINUS.
+    # DD5 RC-6 / SEN-04: a linear chain attached at an INTERNAL carbon (e.g. the
+    # central C of pentan-3-yl, the 2-C of hexan-2-yl) is NOT a terminal alkyl —
+    # it must be numbered from the free valence (Step 2d). The free-valence-locant
+    # is only elided (the bare 'pentyl' form) when the attachment is terminal.
+    if _is_linear_alkyl(mol, sub_atoms) and _attach_is_chain_terminus(
+        mol, sub_atoms, attach_idx
+    ):
         carbon_count = sum(
             1 for i in sub_atoms
             if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
@@ -1362,6 +1453,21 @@ def name_substituent_fragment(
     halo_name = _name_saturated_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
     if halo_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
+
+    # Step 2d (DD5 RC-6 / SEN-04, P-29.2 / P-46): branched / secondary acyclic
+    # all-carbon alkyl substituent named by its OWN principal chain numbered from
+    # the free valence (hexan-2-yl, pentan-3-yl, 3-methylbutyl). MUST precede the
+    # recursive Step 3, which caps the free valence with H and renames the fragment
+    # as a free molecule — losing the attachment so a secondary attachment becomes
+    # a terminal alkyl (hexan-2-yl -> 'hexyl') and a branch is numbered from the
+    # wrong end (3-methylbutyl -> '2-methylbutyl', a DIFFERENT constitution).
+    # Returns None for anything not an acyclic all-carbon saturated alkyl -> falls
+    # through. Retained prefixes (isopropyl/sec-butyl/…) are already handled by
+    # Step 1, so they are not reached here.
+    located = _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx)
+    if located is not None:
+        located_name, _k = located
+        return _add_substituent_stereo(mol, sub_atoms, located_name, attach_idx=attach_idx)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)

@@ -445,29 +445,85 @@ def find_principal_chain(
                         count += 1
         return count
 
+    def _cascade_reverse(chain: List[int]) -> bool:
+        """True if the REVERSED chain gives lower locants by the orientation
+        cascade PCG -> multiple bonds -> double bonds -> substituents
+        (P-31.1.4 numbering order).
+
+        Used so the substituent-locant criterion (idx 9) is read in the SAME
+        orientation the higher-priority criteria fix, instead of independently
+        re-minimizing (the old ``max(fwd, rev)`` evaluated a fictional
+        orientation and mis-ranked chains tying on the higher criteria).
+        """
+        from ..rules.locants import compare_locant_sets
+        cset = set(chain)
+        rev = list(reversed(chain))
+
+        def _fg(ch):
+            return sorted(i + 1 for i, a in enumerate(ch) if a in fg_atoms)
+
+        def _mb(ch):
+            out = []
+            for i in range(len(ch) - 1):
+                b = mol.GetBondBetweenAtoms(ch[i], ch[i + 1])
+                if b and b.GetBondType() in (
+                    Chem.BondType.DOUBLE, Chem.BondType.TRIPLE
+                ):
+                    out.append(i + 1)
+            return sorted(out)
+
+        def _db(ch):
+            out = []
+            for i in range(len(ch) - 1):
+                b = mol.GetBondBetweenAtoms(ch[i], ch[i + 1])
+                if b and b.GetBondType() == Chem.BondType.DOUBLE:
+                    out.append(i + 1)
+            return sorted(out)
+
+        def _sub(ch):
+            out = []
+            for i, a in enumerate(ch):
+                for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                    ni = nbr.GetIdx()
+                    if ni not in cset and ni not in exclude and nbr.GetSymbol() != 'H':
+                        out.append(i + 1)
+                        break
+            return sorted(out)
+
+        for setf in (_fg, _mb, _db, _sub):
+            c = compare_locant_sets(setf(chain), setf(rev))
+            if c < 0:
+                return False
+            if c > 0:
+                return True
+        return False
+
     def _compute_sub_locant_score(chain: List[int]) -> tuple:
-        """Criterion 9: Lowest locants for substituents."""
+        """Criterion 9 (P-44.4 / P-45.2.2): lowest substituent locants, read in the
+        orientation fixed by the higher-priority criteria (PCG -> multiple bonds ->
+        double bonds), NOT independently minimized.
+
+        The old independent ``max(fwd, rev)`` evaluated a fictional orientation and
+        mis-ranked chains that tie on the higher criteria — e.g. for
+        ``C=CCC(C=C(C)C)C(C)=CC`` (both length-7, both 1,5-diene) it preferred the
+        ``{4,6}`` carving over the correct ``{4,5}`` (5-methyl-4-(2-methylprop-1-en-
+        1-yl)hepta-1,5-diene). For chains with no PCG/bonds the cascade falls
+        through to substituents, so a pure substituted alkane still orients to the
+        lowest substituent locants (byte-identical to the old behaviour).
+        """
         chain_set = set(chain)
+        ch = list(reversed(chain)) if _cascade_reverse(chain) else chain
         positions = []
-        for i, atom_idx in enumerate(chain):
+        for i, atom_idx in enumerate(ch):
             atom = mol.GetAtomWithIdx(atom_idx)
-            has_sub = False
             for nbr in atom.GetNeighbors():
                 nbr_idx = nbr.GetIdx()
-                if nbr_idx not in chain_set and nbr_idx not in exclude:
-                    if nbr.GetSymbol() != 'H':
-                        has_sub = True
-                        break
-            if has_sub:
-                positions.append(i)
+                if nbr_idx not in chain_set and nbr_idx not in exclude and nbr.GetSymbol() != 'H':
+                    positions.append(i)
+                    break
         if not positions:
             return ()
-        # Try both orientations
-        fwd = sorted(positions)
-        rev = sorted(len(chain) - 1 - p for p in positions)
-        fwd_score = tuple(-p for p in fwd)
-        rev_score = tuple(-p for p in rev)
-        return max(fwd_score, rev_score)
+        return tuple(-p for p in sorted(positions))
 
     def _compute_double_bond_locant_score(chain: List[int]) -> tuple:
         """Criterion 7.5 (P-44.1(h)): Lowest locants for double bonds only.
@@ -548,13 +604,64 @@ def find_principal_chain(
                 fg_locants_score, bond_locants_score, double_bond_locants_score,
                 sub_count, sub_locants_score)
     
-    # Find chain with highest score
-    best_chain = max(chains, key=chain_score)
-    
+    def _p45_alpha_key(chain: List[int]) -> tuple:
+        """DD5 RC-1 (P-45.2.3 / P-45.2.2 / P-45.5): deterministic candidate
+        comparator for chains that TIE on every chain_score term.
+
+        Replaces the arbitrary ``max()`` fall-through (which returned whichever
+        chain ``find_all_carbon_chains`` happened to enumerate first). The key is
+        ``(full_substituent_locant_set, locants_in_alphanumerical_citation_order)``,
+        both read in the chain's PCG-/substituent-lowest orientation, so the chain
+        whose prefixes get the lowest locants in order of citation wins (lower key
+        preferred): ``OCC(CCBr)CCCl`` -> ``2-(2-bromoethyl)-4-chlorobutan-1-ol``
+        (not ``4-bromo-2-(2-chloroethyl)…``). Substituent names are resolved by the
+        shared namer; the multiplier-free base name is the alpha sort key.
+        """
+        from ..assembly.naming_utils import alpha_sort_key
+        from ..assembly.substituent_enumerator import name_substituent
+
+        # WR-05: orient via the SAME full cascade `_compute_sub_locant_score` uses
+        # (PCG -> multiple-bonds -> double-bonds -> substituents), not just the PCG,
+        # so the citation-order tie-break is read in one consistent orientation; and
+        # use the chain-enumeration boundary `combined_exclude` (chain set + the
+        # non-principal FG terminal carbons removed from enumeration) so the named
+        # substituent fragment matches what the real enumerator sees.
+        oriented = list(reversed(chain)) if _cascade_reverse(chain) else chain
+        cset = set(oriented)
+        bfs_boundary = cset | combined_exclude
+        pos = {a: i + 1 for i, a in enumerate(oriented)}
+        entries = []  # (alpha_key, locant)
+        sub_locants = []
+        for chain_atom in oriented:
+            for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in cset or ni in combined_exclude or ni in fg_atoms:
+                    continue
+                if nbr.GetSymbol() == 'H':
+                    continue
+                frag = _bfs_substituent(mol, ni, bfs_boundary)
+                try:
+                    nm = name_substituent(mol, frag, ni)
+                except Exception:
+                    nm = "zzz"
+                entries.append((alpha_sort_key(nm or "zzz"), pos[chain_atom]))
+                sub_locants.append(pos[chain_atom])
+        entries.sort()
+        return (sorted(sub_locants), tuple(loc for _a, loc in entries))
+
+    # Find chain with highest score; break exact ties deterministically (P-45).
+    scored = [(chain_score(c), c) for c in chains]
+    best_score = max(s for s, _ in scored)
+    top = [c for s, c in scored if s == best_score]
+    if len(top) == 1:
+        best_chain = top[0]
+    else:
+        best_chain = min(top, key=_p45_alpha_key)
+
     # Determine numbering direction (lowest locants for principal group)
     if principal_group and fg_atoms:
         best_chain = _orient_chain_for_lowest_locants(best_chain, fg_atoms)
-    
+
     return best_chain
 
 

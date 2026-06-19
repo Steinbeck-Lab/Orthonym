@@ -426,6 +426,36 @@ def name_substituent(mol, frag_atoms, attach_idx):
             if _chal:
                 return _stereo_route(_chal)
 
+    # ---- Tier 1.8 (DD5 RC-6 / SEN-04): located acyclic alkyl ----
+    # A BRANCHED or INTERNALLY-attached acyclic all-carbon saturated alkyl
+    # substituent is named by its OWN principal chain numbered from the free
+    # valence (hexan-2-yl, pentan-3-yl, 3-methylbutyl) per P-29.2 / P-46. This
+    # MUST precede the fragment cache (Tier 2) and the linear fast path (Tier 3),
+    # both of which name the fragment as a FREE molecule and lose the attachment
+    # (-> 'hexyl', 'pentyl', '2-methylbutyl' — a wrong locant or constitution).
+    # Scoped to the cases where the located form DIFFERS from the plain alkyl
+    # (internal attachment OR a branch): a TERMINAL unbranched chain keeps the
+    # fast path byte-identical. Returns None for rings / heteroatoms / unsaturated
+    # -> falls through unchanged.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from .substituent_naming import (
+                _located_acyclic_alkyl_name,
+                _attach_is_chain_terminus,
+                _is_linear_alkyl,
+            )
+            _frag_list = list(frag_atoms_set)
+            _terminal_linear = (
+                _is_linear_alkyl(mol, _frag_list)
+                and _attach_is_chain_terminus(mol, _frag_list, attach_idx)
+            )
+            if not _terminal_linear:
+                _located = _located_acyclic_alkyl_name(mol, _frag_list, attach_idx)
+                if _located is not None:
+                    return _stereo_route(_located[0])
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))
@@ -445,9 +475,15 @@ def name_substituent(mol, frag_atoms, attach_idx):
     except Exception:
         pass  # Cache miss is fine, continue to next tier
 
-    # ---- Tier 3: Linear alkyl fast path ----
+    # ---- Tier 3: Linear alkyl fast path (attached at a chain TERMINUS) ----
+    # DD5 RC-6 / SEN-04: a linear chain attached at an INTERNAL carbon
+    # (pentan-3-yl, hexan-2-yl) is NOT a terminal alkyl — defer to Tier 4's
+    # located deriver so the free valence becomes the numbering basis.
     try:
-        if _is_linear_alkyl(mol, list(frag_atoms_set)):
+        from .substituent_naming import _attach_is_chain_terminus
+        if _is_linear_alkyl(mol, list(frag_atoms_set)) and _attach_is_chain_terminus(
+            mol, list(frag_atoms_set), attach_idx
+        ):
             carbon_count = sum(
                 1 for i in frag_atoms_set
                 if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
