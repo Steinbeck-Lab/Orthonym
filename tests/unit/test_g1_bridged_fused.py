@@ -94,6 +94,20 @@ STILL_REFUSED = [
     "c1cc2nc3ccoc3cc2o1",          # difuropyridine (polycomponent P-25.3.4 -> G1b)
     "c1cc2nc3ccsc3cc2o1",          # furo+thieno+pyridine (polycomponent -> G1b)
     "C1Cc2ccccc2C13Cc1ccccc1C3",   # spirobi-indane (polyspiro -> G4)
+    # CRITICAL-1 (code review): ortho-fused small rings share a BOND with naphthalene
+    # (fusion nomenclature, e.g. 1H-cyclopropa[b]naphthalene) — the bridgeheads are
+    # adjacent + aromatic, so they are NOT a P-25.4 bridge. Must NOT emit
+    # '2,3-methano-/ethano-/propanonaphthalene' (a non-PIN that even OPSIN re-parses
+    # to the same structure, so the RT gate can't catch it).
+    "c1ccc2cc3c(cc2c1)C3",         # cyclopropa[b]naphthalene
+    "c1ccc2cc3c(cc2c1)CC3",        # cyclobuta[b]naphthalene
+    "c1ccc2cc3c(cc2c1)CCC3",       # cyclopenta[b]naphthalene
+    # CRITICAL-2 (code review): a composite / multi-heteroatom bridge would DROP atoms
+    # via the length-blind heteroatom prefix (epidioxy -> 'epoxy' loses an O). Must
+    # fail closed until the composite-bridge grammar (P-25.4.1.5) is built.
+    "C1=CC2OOC1c1ccccc12",         # -O-O- (epidioxy bridge)
+    "C1=CC2COCC1c1ccccc12",        # -CH2-O-CH2- (composite bridge)
+    "C1=CC2CSCC1c1ccccc12",        # -CH2-S-CH2- (composite bridge)
 ]
 
 

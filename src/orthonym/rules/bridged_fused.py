@@ -790,31 +790,42 @@ def name_bridged_fused_pin(mol):
     if not aromatic:
         return None  # the fused parent must be (at least partly) aromatic (benzo)
 
-    # Enumerate candidate bridges: connected subsets of NON-aromatic ring atoms
-    # whose excision leaves a clean naphthalene residual. "Clean" = the residual
-    # ring atoms plus the bridge atoms PARTITION every original ring atom (no
-    # leftover dangling atom mis-read as a phantom substituent — the size-1
-    # false positive on a 2-atom ethano bridge).
+    # Enumerate ALL candidate bridge excisions: connected subsets of NON-aromatic
+    # ring atoms whose excision leaves a clean naphthalene residual ("clean" = the
+    # residual ring atoms plus the bridge atoms PARTITION every original ring atom,
+    # so no leftover dangling atom is mis-read as a phantom substituent — the size-1
+    # false positive on a 2-atom ethano bridge). Name each candidate and accept ONLY
+    # if every valid excision yields the SAME name; otherwise the choice would be
+    # SMILES-spelling dependent (atom-index order), so fail closed rather than risk
+    # an order-dependent wrong name.
     non_aromatic = sorted(all_ring_atoms - aromatic)
-    chosen = None
+    results = []
     for k in (1, 2, 3):
         for combo in combinations(non_aromatic, k):
             bridge = set(combo)
             if not _bridge_is_connected(mol, bridge):
                 continue
             residual = _excise_to_naphthalene_residual(mol, bridge, all_ring_atoms)
-            if residual is not None:
-                chosen = (bridge, residual)
-                break
-        if chosen:
-            break
-    if chosen is None:
-        return None
+            if residual is None:
+                continue
+            res = _name_bridged_fused_excision(mol, bridge, residual, all_ring_atoms)
+            if res is not None:
+                results.append(res)
 
-    bridge_atoms, (res_mol, orig_to_res, res_ring_atoms) = chosen
+    distinct = {r[0] for r in results}
+    if len(distinct) != 1:
+        return None  # 0 valid excisions, or an ambiguous (>1 distinct) name
+    return results[0]
 
-    # Bridgeheads = original-mol neighbours of bridge atoms that are not bridge
-    # atoms themselves. A single divalent bridge has exactly two.
+
+def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring_atoms: Set[int]):
+    """Build the P-25.4 name for one (bridge, naphthalene-residual) excision, or None
+    if the excision is not an in-scope, correctly-nameable bridged-fused system. Every
+    guard here is a no-wrong-name guard: a None return cascades to G0 fail-closed."""
+    res_mol, orig_to_res, _res_ring_atoms = residual
+
+    # Bridgeheads = original-mol neighbours of bridge atoms that are not themselves
+    # bridge atoms. A single divalent bridge has exactly two.
     bridgeheads: Set[int] = set()
     for b in bridge_atoms:
         for nb in mol.GetAtomWithIdx(b).GetNeighbors():
@@ -825,11 +836,30 @@ def name_bridged_fused_pin(mol):
     if any(bh not in orig_to_res for bh in bridgeheads):
         return None
 
-    # Only simple SATURATED bivalent bridges are in scope (methano/ethano/propano,
-    # epoxy/epithio/epimino). An unsaturated bridge (etheno -CH=CH-, methylidene)
-    # would be mis-named 'ethano'/'methano' by the length-keyed prefix table, so
-    # fail closed if any bond incident to a bridge atom (within the bridge or to a
-    # bridgehead) is not single. This is the no-wrong-name guard.
+    # A P-25.4 bridge spans NON-adjacent atoms whose attachment positions are
+    # SATURATED. If the two bridgeheads are directly bonded, or either remains
+    # aromatic, this is an ORTHO-FUSED ring (fusion nomenclature, e.g.
+    # cyclopropa[b]naphthalene), NOT a bridge — fail closed (a 2,3-methano "bridge"
+    # across the adjacent aromatic 2,3-bond is a non-PIN mis-description).
+    bh = list(bridgeheads)
+    if mol.GetBondBetweenAtoms(bh[0], bh[1]) is not None:
+        return None
+    if any(mol.GetAtomWithIdx(b).GetIsAromatic() for b in bridgeheads):
+        return None
+
+    # Bridge composition: only an all-carbon bridge (methano/ethano/propano) or a
+    # SINGLE-atom heteroatom bridge (epoxy/epithio/epimino) is named correctly here.
+    # A multi-atom or multi-heteroatom bridge (epidioxy -O-O-, composite -CH2-O-,
+    # -CH2-O-CH2-) needs the composite-bridge grammar (P-25.4.1.5); get_bridge_prefix's
+    # length-blind heteroatom shortcut would otherwise silently DROP atoms — fail closed.
+    elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in bridge_atoms]
+    n_hetero = sum(1 for e in elements if e != 'C')
+    if n_hetero > 1 or (n_hetero == 1 and len(bridge_atoms) != 1):
+        return None
+
+    # Unsaturated bridge (etheno -CH=CH-, methylidene) would be mis-named 'ethano'/
+    # 'methano' by the length-keyed prefix table — fail closed if any bond incident to
+    # a bridge atom (within the bridge or to a bridgehead) is not single.
     bridge_and_heads = bridge_atoms | bridgeheads
     for b in bridge_atoms:
         for bond in mol.GetAtomWithIdx(b).GetBonds():
@@ -839,23 +869,22 @@ def name_bridged_fused_pin(mol):
 
     # Number the bridged ring of the naphthalene residual (1,2,3,4 around it,
     # bridgeheads at the lowest locants), reusing the fixed naphthalene numbering.
-    bh_res = {orig_to_res[bh] for bh in bridgeheads}
+    bh_res = {orig_to_res[x] for x in bridgeheads}
     numbering = _number_naphthalene_bridged_ring(res_mol, bh_res)
     if numbering is None:
         return None  # bridge not across a numberable (alpha) position pair
 
-    bridge_locants = sorted(numbering[orig_to_res[bh]] for bh in bridgeheads)
+    bridge_locants = sorted(numbering[orig_to_res[x]] for x in bridgeheads)
 
-    # Hydro prefix: the sp3 ring atoms of the residual (the saturated positions of
-    # the mancude parent), with their locants. Only the bridged ring saturates;
-    # the benzo ring stays aromatic.
+    # Hydro prefix: the sp3 ring atoms of the residual (the saturated positions of the
+    # mancude parent), with their locants. Only the bridged ring saturates; the benzo
+    # ring stays aromatic.
     hydro_locants = sorted(
         loc for res_idx, loc in numbering.items()
         if res_mol.GetAtomWithIdx(res_idx).GetHybridization() == Chem.HybridizationType.SP3
     )
 
-    # Bridge prefix (methano/ethano/.../epoxy/epithio/epimino).
-    elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in bridge_atoms]
+    # Bridge prefix (methano/ethano/propano | epoxy/epithio/epimino).
     hetero = next((e for e in elements if e != 'C'), None)
     bridge_prefix = get_bridge_prefix({
         'length': len(bridge_atoms),
@@ -865,12 +894,9 @@ def name_bridged_fused_pin(mol):
     if not bridge_prefix:
         return None
 
-    parent_name = 'naphthalene'
-
     # Cite bridge + hydro prefixes together, alphanumerically (ignoring the hydro
-    # multiplying prefix), each with its locant set; the last prefix abuts parent.
-    entries = []  # (alpha_key, locant_string, prefix)
-    entries.append((bridge_prefix, _format_locants(bridge_locants), bridge_prefix))
+    # multiplying prefix), each with its locant set; the last prefix abuts the parent.
+    entries = [(bridge_prefix, _format_locants(bridge_locants), bridge_prefix)]
     if hydro_locants:
         hydro_prefix = _hydro_prefix(len(hydro_locants))
         if hydro_prefix is None:
@@ -878,9 +904,11 @@ def name_bridged_fused_pin(mol):
         entries.append(('hydro', _format_locants(hydro_locants), hydro_prefix))
     entries.sort(key=lambda e: e[0])
 
-    name = '-'.join(f"{loc}-{pref}" for _key, loc, pref in entries) + parent_name
+    name = '-'.join(f"{loc}-{pref}" for _key, loc, pref in entries) + 'naphthalene'
 
-    atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}  # ring-membership map
+    # atom_to_locant is a ring-MEMBERSHIP map only (not real IUPAC locants); harmless
+    # because substituents_included=True makes the caller skip substituent enrichment.
+    atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}
     return (name, set(all_ring_atoms), atom_to_locant, True)
 
 
