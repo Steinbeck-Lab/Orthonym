@@ -109,27 +109,40 @@ class TestCarbanionIde:
         41309: ``H3C- methanide (PIN)``."""
         assert Orthonym().name("[CH3-]") == "methanide"
 
+    @pytest.mark.parametrize("smiles,expected", [
+        ("[CH-]1CCCCC1", "cyclohexan-1-ide"),   # ring-member centre
+        ("[CH-]1CCCC1", "cyclopentan-1-ide"),   # ring-member centre
+    ])
+    def test_ring_member_carbanion_named_not_linearized(self, smiles, expected):
+        """F-T6 (DD3) UPDATE of the Phase-184 CR-01 guard. A RING-MEMBER carbanion
+        used to be DECLINED by the acyclic primitive (``center.IsInRing()`` bail)
+        and fall through to legacy, DROPPING the charge (``cyclohexane``). F-T6
+        added a ring branch to ``emit_parent_hydride_cumulative_suffix``
+        (``_emit_ring_cumulative_suffix``) that names it with the ring ``-ide`` and
+        the cationic/anionic-centre locant: ``cyclohexan-1-ide``. The CR-01 intent
+        — the ring is NEVER linearized to an ACYCLIC chain (``hexan-1-ide``) — still
+        holds: the emitter uses the ring numbering, not ``find_principal_chain``.
+        The name is the cyclic stem, so it must start with ``cyclo`` and must NOT be
+        the bare acyclic ``hexan-*``/``pentan-*`` linearization."""
+        name = Orthonym().name(smiles)
+        assert name == expected
+        assert name.startswith("cyclo")
+        assert not name.startswith(("hexan", "pentan", "octan", "heptan"))
+
     @pytest.mark.parametrize("smiles", [
-        "[CH-]1CCCCC1",    # cyclohexanide (ring-member centre)
-        "[CH-]1CCCC1",     # cyclopentanide (ring-member centre)
         "[CH-]CC1CCCCC1",  # exocyclic centre, ring otherwise absorbed into the chain
         "[CH-]C1CCCCC1",   # exocyclic centre adjacent to a ring
     ])
-    def test_ring_carbanion_not_linearized(self, smiles):
-        """CR-01 regression guard (Phase 184 deep code review).
-        ``emit_parent_hydride_cumulative_suffix`` is an ACYCLIC parent-hydride
-        primitive, but ``find_principal_chain`` linearizes a ring (it returns the
-        ring carbons as a "chain"). Without the ring guards a cyclic/ring-bearing
-        carbanion would be mis-named as a straight chain that round-trips to a
-        DIFFERENT molecule (cyclohexanide -> ``hexan-1-ide``; ``[CH-]CC1CCCCC1``
-        -> ``octan-1-yl``) — a structural error the parse-only validity gate
-        cannot catch. The two guards (``center.IsInRing()`` + all-chain-atoms-
-        acyclic) make the primitive decline these and fall through to legacy.
-        This asserts the linearized acyclic ``hexan-*``/``octan-*``/``pentan-1-ide``
-        names are NEVER produced for a ring substrate."""
+    def test_exocyclic_carbanion_not_linearized(self, smiles):
+        """CR-01 regression guard (Phase 184 deep code review), still active for an
+        EXOCYCLIC carbanion centre: the acyclic primitive must DECLINE when a ring
+        would be absorbed into the returned chain (``[CH-]CC1CCCCC1`` -> the bogus
+        acyclic ``octan-1-yl``), via the all-chain-atoms-acyclic guard, and fall
+        through to legacy. Asserts the linearized acyclic ``octan-*``/``heptan-*``
+        names are NEVER produced for a ring-bearing substrate."""
         name = Orthonym().name(smiles)
-        for forbidden in ("hexan-1-ide", "hexan-1-yl", "octan-1-ide",
-                          "octan-1-yl", "pentan-1-ide"):
+        for forbidden in ("octan-1-ide", "octan-1-yl", "heptan-1-ide",
+                          "heptan-1-yl"):
             assert forbidden not in name, (
                 f"ring substrate {smiles!r} linearized to {name!r} "
                 f"(contains forbidden acyclic fragment {forbidden!r})")

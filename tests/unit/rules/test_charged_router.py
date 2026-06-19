@@ -159,13 +159,15 @@ class TestDeferrals:
         """A dot-disconnected multi-fragment species -> '' (Plan 04)."""
         assert _rc("CC(=O)[O-].CC(=O)[O-]") == ""
 
-    def test_zwitterion_p74_1_2_skeletal_deferred(self):
-        """GUARD 4 (P-74.0): a P-74.1.2 zwitterion whose cation is SKELETAL to the
-        anion's parent ring (a pyridinium-2-carboxylate ring N+) is still deferred
-        to the legacy path (the cumulative ium+ate suffix is out of 169.6-04
-        scope) -> ''. (The P-74.1.3 separable-cation betaine is now IMPLEMENTED;
-        see test_zwitterion_salt.TestZwitterionGuard4.)"""
-        assert _rc("O=C([O-])c1cccc[n+]1C") == ""
+    def test_zwitterion_p74_1_2_skeletal_implemented(self):
+        """F-T6 (DD3, P-74.1.2): a zwitterion whose cation is SKELETAL to the
+        anion's parent ring (a pyridinium-2-carboxylate ring N+) is now named with
+        the cumulative ``<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate``
+        suffix via ``emit_zwitterion_ring_carboxylate`` (was deferred to '' in
+        169.6-04 scope). The N-methyl aromatic cation is demoted to a ring
+        substituent prefix. PIN-VERIFICATION §B confirms the cumulative-suffix PIN
+        (PubChem neutralizes the zwitterion)."""
+        assert _rc("O=C([O-])c1cccc[n+]1C") == "1-methylpyridin-1-ium-2-carboxylate"
 
     def test_neutral_internal_charge_not_routed(self):
         """A molecule whose only charge is an internal nitro/N-oxide bonding

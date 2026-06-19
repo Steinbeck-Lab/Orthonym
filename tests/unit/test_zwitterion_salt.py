@@ -96,11 +96,13 @@ class TestZwitterionGuard4:
         assert _rc("[NH3+]CC(=O)[O-]") == ""                 # glycine zwitterion
         assert _rc("CC(=O)CC([NH3+])C(=O)[O-]") == ""        # 2-amino-4-oxopentanoate
 
-    def test_p74_1_2_ring_cation_deferred(self):
-        """P-74.1.2: the cation N+ is SKELETAL to the anion's parent ring
-        (pyridinium-2-carboxylate) -> the cumulative ium+ate suffix is out of
-        scope this plan -> route_charged defers (returns '')."""
-        assert _rc("O=C([O-])c1cccc[n+]1C") == ""
+    def test_p74_1_2_ring_cation_implemented(self):
+        """F-T6 (DD3, P-74.1.2): the cation N+ is SKELETAL to the anion's parent
+        ring (pyridinium-2-carboxylate) -> the cumulative
+        ``<ring>-<N-locant>-ium-<carboxyl-locant>-carboxylate`` suffix is now built
+        by ``emit_zwitterion_ring_carboxylate`` (was deferred to '' this plan). The
+        N-methyl aromatic cation is demoted to a ring substituent prefix."""
+        assert _rc("O=C([O-])c1cccc[n+]1C") == "1-methylpyridin-1-ium-2-carboxylate"
 
     def test_ylide_amine_oxide_honest_fail(self):
         """P-74.2 dipolar / non-N onium cations are out of scope -> '' (honest-
