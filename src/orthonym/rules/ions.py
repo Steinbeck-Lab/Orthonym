@@ -53,6 +53,20 @@ _HETEROATOM_HYDRIDE_IDE_VALENCE = {
     'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
 }
 
+# F-T6 (DD3 Fix 5, P-72.3): the -uide (hydride-ADDITION) family. A Group-13
+# centre at one bond ABOVE its standard valence carrying the -1 charge is the
+# ate-complex / -uide anion (BH3 + H- -> boranuide BH4-; B(CH3)4- ->
+# tetramethylboranuide; B(C6H5)4- -> tetraphenylboranuide). element -> parent
+# anion stem (the '-uide' is appended after eliding 'e'). standard valence 3 ->
+# the -uide centre has degree + H == 4.
+_GROUP13_UIDE_STEMS = {
+    'B': 'borane',
+    'Al': 'alumane',
+    'Ga': 'gallane',
+    'In': 'indigane',
+    'Tl': 'thallane',
+}
+
 
 # === SUFFIX MAPPINGS ===
 
@@ -193,6 +207,14 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
                 == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]):
             return 'heteroatom_hydride_anion'
 
+    # F-T6 (DD3 Fix 5, P-72.3): a Group-13 centre ONE bond above its standard
+    # valence (degree + H == 4 for trivalent B/Al/…) carrying the -1 charge is the
+    # -uide hydride-addition anion (the ate-complex / borate): B(CH3)4- ->
+    # tetramethylboranuide, B(C6H5)4- -> tetraphenylboranuide.
+    elif element in _GROUP13_UIDE_STEMS:
+        if atom.GetDegree() + atom.GetTotalNumHs() == 4:
+            return 'group13_uide_anion'
+
     return 'unknown'
 
 
@@ -228,11 +250,20 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
     atom = mol.GetAtomWithIdx(atom_idx)
 
     if element == 'N':
-        # Check for diazonium (N2+ pattern: N connected to another N)
+        # Check for diazonium (P-73.2.2.3: the terminal -N2+ group, R-N+#N / R-N+=N).
+        # The diazo/diazonium linkage is ALWAYS a DOUBLE or TRIPLE N=N/N#N bond — NOT
+        # a single or AROMATIC N-N. The prior check fired for ANY N neighbour, so it
+        # mis-classified an adjacent-N AROMATIC ring cation (pyrazolium, pyridazinium,
+        # 1,2,3-triazolium) as 'diazonium' -> 'pyrazolediazonium'. Gate on bond order
+        # so those route to the ring-N '-ium' emitter (-> 1H-pyrazol-2-ium /
+        # pyridazin-1-ium) instead. Real diazonium (benzenediazonium c1ccccc1[N+]#N)
+        # keeps its triple-bonded N and is unaffected.
         for neighbor in atom.GetNeighbors():
             if neighbor.GetSymbol() == 'N':
-                # Diazonium: R-N+=N or R-N=N+
-                return 'diazonium'
+                bond = mol.GetBondBetweenAtoms(atom_idx, neighbor.GetIdx())
+                if bond is not None and bond.GetBondType() in (
+                        Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+                    return 'diazonium'
 
         # Phase 184 WS-E.1 (P-73.1.2.1): a QUATERNARY ammonium N (formal charge
         # +1, NO hydrogens to remove, degree >= 4) cannot be neutralized by the
@@ -1350,6 +1381,56 @@ def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str
     return _heteroatom_ide_name(neutral_name, symbol)
 
 
+def _emit_group13_uide(mol, center_idx: int) -> str:
+    """F-T6 (DD3 Fix 5, P-72.3): name a Group-13 -uide (hydride-addition) anion —
+    a centre ONE bond above its standard valence carrying the -1 charge (the
+    ate-complex / borate). Substituents on the centre are named as prefixes on the
+    '-uide' parent anion (boranuide = BH4-): B(CH3)4- -> tetramethylboranuide,
+    B(C6H5)4- -> tetraphenylboranuide, BF4- -> tetrafluoroboranuide. Explicit H on
+    the centre stay implicit on the parent (CH3-BH3- -> methylboranuide). Cannot
+    neutralize-then-re-enter (B(CH3)4 is an invalid neutral), so the substituents
+    are named directly. Returns '' on any decline (caller -> legacy)."""
+    center = mol.GetAtomWithIdx(center_idx)
+    stem = _GROUP13_UIDE_STEMS.get(center.GetSymbol())
+    if not stem:
+        return ''
+    from ..perception.chains import classify_substituent
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, alpha_sort_key, is_complex_substituent)
+    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+    parent_atoms = {center_idx}
+    name_to_count: Dict[str, int] = {}
+    for nb in center.GetNeighbors():
+        if nb.GetSymbol() == 'H':
+            continue
+        # A bare halogen ligand (BF4- -> tetrafluoroboranuide): classify_substituent
+        # only names carbon groups, so map a single-atom halogen to its prefix here.
+        if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
+            sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
+        else:
+            sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
+            if sub_atoms is None:
+                return ''
+            info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
+            sub_name = info.get('name')
+        if not sub_name:
+            return ''
+        name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
+    suffix = f"{_elide_terminal_e(stem)}uide"
+    if not name_to_count:
+        return suffix  # bare boranuide (BH4-)
+    parts = []
+    for sub_name, count in name_to_count.items():
+        mult = get_multiplier_prefix(count, sub_name)
+        if is_complex_substituent(sub_name) and count > 1:
+            body = f"{mult}({sub_name})"
+        else:
+            body = f"{mult}{sub_name}"
+        parts.append((alpha_sort_key(sub_name), body))
+    parts.sort(key=lambda t: t[0])
+    return f"{''.join(p[1] for p in parts)}{suffix}"
+
+
 def _ring_iupac_locants(ring_mol):
     """Reuse the namer's authoritative ring-locant supplier on an INDEX-PRESERVING
     mol (heterocycle/benzene/PAH/fused). Returns the atom_idx -> locant dict (the
@@ -1362,6 +1443,115 @@ def _ring_iupac_locants(ring_mol):
     except (RecursionError, ValueError, RuntimeError, KeyError):
         return None
     return (ri or {}).get('iupac_locants')
+
+
+def _indicated_hydrogen_prefix(indicated_h_locant, parent, ring_system, mol):
+    """Form the ``{n}H-`` indicated-hydrogen prefix for an azolium/azole ring -ium
+    (the neutral-ring namer drops it — 'imidazole' not '1H-imidazole' — so without
+    this `imidazol-3-ium` / `pyrazol-2-ium` would come out non-PIN). Returns '' when
+    there is no pyrrole-type indicated H, when the parent name ALREADY cites one
+    (avoid doubling), or when the ring bears an off-ring substituent (a substituted
+    azole's name composition with both an indicated H and substituent prefixes is
+    out of this emitter's scope — fall back to the no-prefix form rather than
+    mis-compose). -> 1H-imidazol-3-ium, 1H-pyrazol-2-ium."""
+    if indicated_h_locant is None:
+        return ''
+    if re.match(r'^\d+[Hh]-', parent):
+        return ''
+    if _ring_has_off_ring_substituent(mol, ring_system):
+        return ''
+    return f"{indicated_h_locant}H-"
+
+
+def _order_ring_cycle(mol, ring_system):
+    """Return the atoms of a SIMPLE single ring in cyclic connectivity order, or
+    None if ``ring_system`` is not a simple cycle (fused/bridged: an atom with !=2
+    ring-neighbours)."""
+    ring = set(ring_system)
+    adj = {}
+    for i in ring:
+        nbrs = [nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                if nb.GetIdx() in ring]
+        if len(nbrs) != 2:
+            return None
+        adj[i] = nbrs
+    start = min(ring)
+    order = [start]
+    prev, cur = None, start
+    while True:
+        nxt = adj[cur][0] if adj[cur][0] != prev else adj[cur][1]
+        if nxt == start:
+            break
+        order.append(nxt)
+        prev, cur = cur, nxt
+        if len(order) > len(ring):
+            return None
+    return order if len(order) == len(ring) else None
+
+
+def _charged_ring_locants(mol, ring_system, center_idx):
+    """Full single-ring IUPAC numbering for a charged ring centre, choosing the
+    orientation that gives lowest locants in P-31.1.4.3 / P-73.1.2 order:
+      (a) all heteroatoms as a set;
+      (b) the senior heteroatom (O > S > … > N > P …) — P-31.1.4.3.3;
+      (c) the indicated hydrogen (pyrrole-type aromatic ring atom bearing H) —
+          P-31.1.4.3.4;
+      (d) the charged centre (the principal characteristic group, the -ium/-ide) —
+          P-73.1.2.4 / P-31.1.4.3.4 — so a symmetric di-N azinium gets the cation
+          at the LOWEST locant (pyridazin-1-ium, not -2-ium);
+      (e) other substituents; with a canonical-rank final deterministic tiebreak.
+    Returns ``(atom_to_locant, indicated_h_locant)`` keyed by the SAME atom indices
+    as ``mol`` (index-preserving), or ``(None, None)`` for a fused/multi ring
+    (caller falls back to the general ``_ring_iupac_locants`` supplier). Subsumes
+    the carbocyclic-monocycle fallback (an all-carbon symmetric ring gives the
+    centre locant 1 via criterion (d))."""
+    cyclic = _order_ring_cycle(mol, ring_system)
+    if cyclic is None or center_idx not in cyclic:
+        return None, None
+    from ..data.hw_heteroatoms import get_heteroatom_priority
+    ring = set(ring_system)
+    n = len(cyclic)
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    def _sym(i):
+        return mol.GetAtomWithIdx(i).GetSymbol()
+
+    het_atoms = [i for i in cyclic if _sym(i) != 'C']
+    elements = sorted({_sym(i) for i in het_atoms}, key=get_heteroatom_priority)
+
+    def _is_indicated_h(i):
+        # The indicated/added hydrogen of an azole-type mancude ring is the
+        # pyrrole-type ring HETEROATOM that bears an H (the NH of imidazole /
+        # pyrazole / triazole). NOT an aromatic C-H (every pyridine/benzene CH has
+        # an H but cites no indicated hydrogen) and NOT a pyridine-type =N- (0 H).
+        a = mol.GetAtomWithIdx(i)
+        return (a.GetSymbol() != 'C' and a.GetIsAromatic()
+                and a.GetTotalNumHs() >= 1)
+
+    def _has_subst(i):
+        a = mol.GetAtomWithIdx(i)
+        return any(nb.GetIdx() not in ring and nb.GetSymbol() != 'H'
+                   for nb in a.GetNeighbors())
+
+    indicated_atoms = [i for i in cyclic if _is_indicated_h(i)]
+    subst_atoms = [i for i in cyclic if _has_subst(i)]
+    best = None
+    for start in range(n):
+        for direction in (1, -1):
+            order = [cyclic[(start + i * direction) % n] for i in range(n)]
+            loc = {idx: k + 1 for k, idx in enumerate(order)}
+            het_set = tuple(sorted(loc[i] for i in het_atoms))
+            senior = tuple(
+                tuple(sorted(loc[i] for i in het_atoms if _sym(i) == el))
+                for el in elements
+            )
+            indh = tuple(sorted(loc[i] for i in indicated_atoms))
+            subst = tuple(sorted(loc[i] for i in subst_atoms))
+            canonkey = tuple(canon[i] for i in order)
+            key = (het_set, senior, indh, loc[center_idx], subst, canonkey)
+            if best is None or key < best[0]:
+                best = (key, loc, indh[0] if indh else None)
+    return best[1], best[2]
 
 
 def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
@@ -1430,24 +1620,22 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             return ''
         if not parent or 'unknown' in parent.lower():
             return ''
-        locants = _ring_iupac_locants(ring_mol)
-        if locants and center_idx in locants:
-            center_locant = locants[center_idx]
-        else:
-            # Carbocyclic monocycle (no heteroatom supplier): an unsubstituted
-            # single all-carbon ring is symmetric, so the centre is locant 1.
-            # Anything else (substituted / poly-ring) is out of scope -> legacy.
-            ring_atoms = [mol.GetAtomWithIdx(i) for i in ring_system]
-            try:
-                n_rings = len(get_ring_systems(mol))
-            except (RuntimeError, ValueError):
-                return ''
-            if n_rings == 1 and all(at.GetSymbol() == 'C' for at in ring_atoms) \
-                    and not _ring_has_off_ring_substituent(mol, ring_system):
-                center_locant = 1
-            else:
-                return ''
-        return f"{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
+        # Single-ring IUPAC numbering with the charged centre + indicated hydrogen
+        # as low-locant criteria (subsumes the carbocyclic-monocycle fallback). Run
+        # on the NEUTRALIZED ring_mol (index-preserving) — the indicated-H detection
+        # reads H counts, and the original [nH+] still carries its proton (it would
+        # be mis-counted as a pyrrole-NH -> a bogus '1H-pyridin-1-ium').
+        locants, indicated_h = _charged_ring_locants(ring_mol, ring_system, center_idx)
+        if locants is None:
+            # Fused / multi-ring: fall back to the general supplier (no cation
+            # low-locant / indicated-H handling, but a valid name beats a charge drop).
+            locants = _ring_iupac_locants(ring_mol)
+            indicated_h = None
+        if not locants or center_idx not in locants:
+            return ''
+        center_locant = locants[center_idx]
+        prefix = _indicated_hydrogen_prefix(indicated_h, parent, ring_system, mol)
+        return f"{prefix}{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
 
     # --- DEMOTE (0-H ring cation: N-substituted aromatic) ------------------
     if suffix != 'ium':
@@ -1501,7 +1689,16 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         return ''
     if not parent or 'unknown' in parent.lower():
         return ''
-    locants = _ring_iupac_locants(ring_frag)
+    # Number the bare neutral ring frag with the charged centre as a low-locant
+    # criterion (cation-lowest, like the in-place branch). The frag is a bare
+    # single ring (guarded above), so derive its ring-atom set for the enumerator.
+    frag_rings = ring_frag.GetRingInfo().AtomRings()
+    locants = None
+    if len(frag_rings) == 1:
+        locants, _ = _charged_ring_locants(
+            ring_frag, set(frag_rings[0]), center_frag_idx)
+    if locants is None:
+        locants = _ring_iupac_locants(ring_frag)
     if not locants or center_frag_idx not in locants:
         return ''
     center_locant = locants[center_frag_idx]

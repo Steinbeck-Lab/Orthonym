@@ -508,20 +508,22 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
     """
     if mol is None:
         return False
-    # F-T6 (DD3, P-72.2.2.1): a single-anion ion centred on a Group-14
-    # metalloid/metal (silanide/germanide/stannanide — classify_anion ==
-    # 'heteroatom_hydride_anion') is a charged parent-hydride -ide anion owned by
-    # the ANION_SMALL -> route_charged -> heteroatom-hydride emitter path. The
-    # neutral P-69 organometallic handler (priority 50) would otherwise claim it
-    # FIRST and DROP the charge (`C[Si-](C)C` -> 'trimethylsilane' instead of
-    # 'trimethylsilanide'). Decline here so the charged path wins. PURE: only
-    # read-only perception/classification calls, no mutation (D-12/D-26 invariant).
+    # F-T6 (DD3): a single-anion ion centred on a Group-13/14 metalloid is a
+    # charged parent-hydride anion owned by the ANION_SMALL -> route_charged
+    # emitter path, NOT the neutral P-69 organometallic handler (priority 50) which
+    # would otherwise claim it FIRST and DROP the charge (`C[Si-](C)C` ->
+    # 'trimethylsilane' instead of 'trimethylsilanide'; `C[B-](C)(C)C` -> 'unknown'
+    # instead of 'tetramethylboranuide'). Decline here so the charged path wins:
+    #   - 'heteroatom_hydride_anion' (P/As/Sb/Si/Ge/Sn/Pb) -> the -ide path;
+    #   - 'group13_uide_anion'       (B/Al/… ate-complex)  -> the -uide path.
+    # PURE: only read-only perception/classification calls, no mutation (D-12/D-26).
     from orthonym.perception.ions import detect_species_type, get_ion_sites
     if detect_species_type(mol) == 'ion':
         _sites = get_ion_sites(mol)
         if len(_sites.get('anions', [])) == 1 and not _sites.get('cations'):
             from orthonym.rules.ions import classify_anion
-            if classify_anion(mol, _sites['anions'][0]) == 'heteroatom_hydride_anion':
+            if classify_anion(mol, _sites['anions'][0]) in (
+                    'heteroatom_hydride_anion', 'group13_uide_anion'):
                 return False
     from orthonym.perception.metals import detect_metal_complex
     return detect_metal_complex(mol) is not None

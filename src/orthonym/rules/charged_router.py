@@ -975,6 +975,15 @@ def route_charged(mol, style: str = 'pin') -> str:
             if het_name:
                 return het_name
             return ''   # primitive declined (un-nameable heterane) -> legacy
+        # F-T6 (DD3 Fix 5, P-72.3): a Group-13 -uide (hydride-addition) anion —
+        # the ate-complex / borate (B(CH3)4- / B(C6H5)4- / BF4-). Named by the
+        # substituted-'-uide'-parent emitter (cannot neutralize: B(CH3)4 is invalid).
+        if _acls == {'group13_uide_anion'} and len(sites['anions']) == 1:
+            from .ions import _emit_group13_uide
+            uide = _emit_group13_uide(mol, sites['anions'][0]['atom_idx'])
+            if uide:
+                return uide
+            return ''   # emitter declined -> legacy
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
         # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
         # The actually-ionized senior acid class anchors the name (P-72); a neutral
