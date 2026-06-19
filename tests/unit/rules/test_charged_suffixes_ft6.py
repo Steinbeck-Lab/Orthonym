@@ -173,6 +173,64 @@ def test_unnameable_heterane_never_emits_ide():
         assert not out.endswith("anide"), f"{smi} -> {out} (spurious heteroatom -ide)"
 
 
+# --- Follow-on fixes: adjacent-N azolium (diazonium mis-class), indicated H,
+#     >=3-heteroatom rings, and the -uide / borate family --------------------
+@pytest.mark.parametrize("smiles,expected", [
+    ("c1cc[nH+][nH]1", "1H-pyrazol-2-ium"),     # was 'pyrazolediazonium'
+    ("c1cc[nH+]nc1", "pyridazin-1-ium"),         # was 'pyridazinediazonium'; cation lowest locant
+    ("c1cc[nH+]cn1", "pyrimidin-1-ium"),
+    ("c1c[nH]c[nH+]1", "1H-imidazol-3-ium"),     # indicated H injected (was 'imidazol-3-ium')
+])
+def test_adjacent_n_azolium_not_diazonium(namer, smiles, expected):
+    """The diazonium check now requires a DOUBLE/TRIPLE N-N bond (P-73.2.2.3), so an
+    adjacent-N AROMATIC ring cation routes to the ring -ium emitter with the correct
+    indicated hydrogen and cation-lowest locant — NOT the bogus '…diazonium'."""
+    assert namer.name(smiles) == expected
+
+
+def test_real_diazonium_preserved(namer):
+    """A genuine terminal -N2+ diazonium (triple N#N) is unaffected by the gate."""
+    from rdkit import Chem
+    from orthonym.rules.ions import classify_cation
+    from orthonym.perception.ions import get_ion_sites
+    m = Chem.MolFromSmiles("c1ccccc1[N+]#N")
+    assert classify_cation(m, get_ion_sites(m)["cations"][0]) == "diazonium"
+
+
+@pytest.mark.parametrize("smiles", [
+    "c1c[nH+][nH]n1",   # 1,2,3-triazolium
+    "c1nc[nH+][nH]1",   # 1,2,4-triazolium
+])
+def test_triazolium_deterministic(namer, smiles):
+    """>=3 equal-priority heteroatom rings: the single-charged-ring enumerator does a
+    GLOBAL all-starts numbering, so the name is deterministic across SMILES spellings."""
+    from rdkit import Chem
+    mol = Chem.MolFromSmiles(smiles)
+    outs = {namer.name(Chem.MolToSmiles(mol, doRandom=True, canonical=False))
+            for _ in range(8)}
+    assert len(outs) == 1, f"nondeterministic: {outs}"
+    assert "diazonium" not in next(iter(outs))
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[B-](C)(C)C", "tetramethylboranuide"),          # P-72.3 -uide / borate
+    ("CC[B-](CC)(CC)CC", "tetraethylboranuide"),
+    ("[B-](F)(F)(F)F", "tetrafluoroboranuide"),
+])
+def test_group13_uide_borate(namer, smiles, expected):
+    """P-72.3 (DD3 Fix 5): a Group-13 centre one bond above its standard valence
+    bearing the -1 charge is the ate-complex / -uide (tetramethylboranuide,
+    tetrafluoroboranuide), named via the substituted-'-uide'-parent emitter."""
+    assert namer.name(smiles) == expected
+
+
+def test_overcoordinated_silicon_has_no_uide(namer):
+    """`C[Si-](C)(C)C` (4-coordinate Si, 0 H) is NOT silanuide (that name adds an H:
+    C[SiH-](C)(C)C). It has no clean PIN, so it stays the organometallic neutral name
+    rather than a wrong -uide."""
+    assert namer.name("C[Si-](C)(C)C") == "tetramethylsilane"
+
+
 def test_fg_substituted_ring_cation_fails_closed():
     """WR-01: the ring -ium emitter must NOT compose a malformed
     `<ring>-<locant>-ol-<locant>-ium` for a ring cation that also bears a
