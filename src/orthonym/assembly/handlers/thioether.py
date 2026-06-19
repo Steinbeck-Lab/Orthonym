@@ -46,7 +46,27 @@ def name_thioether(
     if not matches:
         return None
 
-    # SMARTS match gives (S, C, C) — sulfur is first.
+    # DD5 SEN-02 (P-41 cls 40 > 41/42): the functional-class `R R' sulfide` silently
+    # DROPS any co-substituent the substituent characteriser can't express — e.g. the
+    # ether of COCSC -> "dimethyl sulfide". DECLINE for such LOSSY cases so the
+    # substitutive carbon-parent path names it (COCSC -> methoxy(methylsulfanyl)methane,
+    # via the carbon-over-ether skeletal-replacement guard + the (R)sulfanyl producer).
+    #
+    # SCOPED (to keep this surgical and avoid the broad sulfide -> substitutive PIN
+    # migration, which is a separate follow-on with a large test/corpus surface):
+    #   - NEUTRAL only — a charged species (dithiocarbamate ammonium) would route to a
+    #     wrong partial substitutive name; keep the legacy path (byte-identical to HEAD);
+    #   - only when the molecule carries a non-C/H/S heteroatom (an ether O, etc.) that
+    #     the functional-class sulfide name would DROP. A pure C/H/S sulfide
+    #     (dimethyl sulfide, methyl phenyl sulfide) keeps its established functional-class
+    #     name — unchanged from HEAD.
+    _neutral = all(a.GetFormalCharge() == 0 for a in features.mol.GetAtoms())
+    _has_dropped_heteroatom = any(
+        a.GetSymbol() not in ('C', 'H', 'S') for a in features.mol.GetAtoms()
+    )
+    if _neutral and _has_dropped_heteroatom:
+        return None
+
     sulfur_idx = matches[0][0]
     name = name_sulfide(features.mol, sulfur_idx)
     if not name:

@@ -379,10 +379,33 @@ def find_principal_chain(
     fg_atoms = set()
     fg_matches: List[tuple] = []
     if principal_group and principal_group in functional_groups:
-        fg_matches = functional_groups[principal_group]
+        # DD5 RC-4 (P-44.1.1): count the principal characteristic group over its
+        # WHOLE equal-seniority class (e.g. primary + secondary OH = two hydroxy
+        # PCGs), so the chain bearing all of them wins on PCG count (the di-OH
+        # chain -> 3-(4-chlorobutyl)pentane-1,4-diol, not the longer 1-OH chain).
+        # Non-equalized groups fall back to the single subtype (byte-identical).
+        from ..rules.seniority import (
+            _SENIORITY_PARENT, _SENIORITY_CLASS_MEMBERS, _RC4_UNION_CLASSES,
+            _CLASS_CHARACTERISTIC_Z, _normalize_pcg_match,
+        )
+        _parent_class = _SENIORITY_PARENT.get(principal_group)
+        _members = _SENIORITY_CLASS_MEMBERS.get(_parent_class)
+        if _members is None or _parent_class not in _RC4_UNION_CLASSES:
+            fg_matches = functional_groups[principal_group]
+        else:
+            # Union over the equal-seniority class, normalized to the
+            # (heteroatom, bearing-carbon) shape so fg_count intersects the chain
+            # ONLY at the bearing carbon — the raw secondary-OH SMARTS includes
+            # FLANKING carbons that would otherwise falsely count the group for a
+            # longer chain that does not actually carry the OH.
+            _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
+            fg_matches = [
+                _normalize_pcg_match(mol, m, _het_z)
+                for sub in _members for m in functional_groups.get(sub, [])
+            ]
         for match in fg_matches:
             fg_atoms.update(match)
-    
+
     def count_bonds_in_chain(chain: List[int]) -> Tuple[int, int]:
         """Count double and triple bonds within the chain."""
         double_bonds = 0

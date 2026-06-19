@@ -5471,26 +5471,37 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         count = len(locants)
         sorted_locants = sorted(locants)
 
-        # Omit locant for monosubstituted hydrocarbons at position 1.
-        # The is_monosubstituted guard encodes the full original condition so
-        # that multi-substituent methane derivatives still go through
-        # format_substituent_prefix for bracket wrapping.
+        # Omit locant for monosubstituted hydrocarbons at position 1, OR for ANY
+        # substituent on a methane parent (chain_length == 1): methane has a single
+        # skeletal position, so every substituent is trivially at locant 1 and the
+        # locant is omitted even when MULTIPLE distinct substituents are present
+        # (DD5 SEN-02: methoxy(methylsulfanyl)methane, NOT 1-methoxy-1-(methyl-
+        # sulfanyl)methane; bis(methylsulfanyl)methane). Bracket wrapping for
+        # complex substituents is preserved in the omit branch below.
+        _prefix_chain_len = len(getattr(features, 'principal_chain', []))
         if should_omit_locant_one(
             context="prefix",
-            chain_length=len(getattr(features, 'principal_chain', [])),
+            chain_length=_prefix_chain_len,
             is_monosubstituted=(is_simple_hydrocarbon and total_substituents == 1
                                 and sorted_locants == [1]),
-        ) and total_substituents == 1:
+        ) and (total_substituents == 1 or _prefix_chain_len == 1):
             # A complex/compound substituent still needs enclosing marks even when
             # its locant is elided (P-16.3.3): '(methylperoxy)ethane',
             # '(methyldisulfanyl)methane'. Mirrors the ring-prefix path. The bare
             # name passes through apply_enclosing_marks (correct ()->[]->{} nesting
             # + leading-stereo escalation; avoids the double-enclose hazard).
-            from ..assembly.naming_utils import apply_enclosing_marks, _has_stereo_prefix
+            from ..assembly.naming_utils import (
+                apply_enclosing_marks, _has_stereo_prefix, get_multiplier_prefix,
+            )
+            # Preserve the multiplier when the (locant-elided) substituent occurs
+            # more than once — e.g. two methylsulfanyl groups on a methane parent
+            # -> bis(methylsulfanyl)methane (NOT a single dropped group). The locant
+            # is omitted (methane, position 1) but the COUNT must still be cited.
+            _mult = get_multiplier_prefix(count, name) if count > 1 else ""
             if is_complex_substituent(name) or _has_stereo_prefix(name):
-                formatted = apply_enclosing_marks(name, depth=-1)
+                formatted = _mult + apply_enclosing_marks(name, depth=-1)
             else:
-                formatted = name
+                formatted = _mult + name
             emit_locants = ()
         else:
             formatted = format_substituent_prefix(name, sorted_locants, count)

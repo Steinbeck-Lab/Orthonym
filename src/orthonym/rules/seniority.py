@@ -220,6 +220,59 @@ _SENIORITY_PARENT = {
     "aromatic_amine": "amine",
 }
 
+# DD5 RC-4 (P-44.1.1): reverse index class -> subtypes, in SENIORITY_ORDER order.
+# get_principal_group returns the UNION of match tuples over EVERY present subtype
+# of the chosen group's equal-seniority class, so the whole class is expressed in
+# ONE multiplied suffix (a primary + a secondary OH on the chain -> ...-1,n-diol,
+# not n-hydroxy-...-1-ol). Classes NOT in _SENIORITY_PARENT (acids, carbonyls, …)
+# are their own singleton class -> the union is byte-identical for them.
+_SENIORITY_CLASS_MEMBERS: Dict[str, List[str]] = {}
+for _sub in SENIORITY_ORDER:
+    _cls = _SENIORITY_PARENT.get(_sub)
+    if _cls is not None:
+        _SENIORITY_CLASS_MEMBERS.setdefault(_cls, []).append(_sub)
+del _sub, _cls
+
+# Characteristic heteroatom (atomic number) of each equalized PCG class, used to
+# normalize the union's heterogeneous subtype match tuples to the senior subtype's
+# (heteroatom, bearing-carbon) 2-tuple shape (RC-4).
+_CLASS_CHARACTERISTIC_Z: Dict[str, int] = {"alcohol": 8, "amine": 7}
+
+# DD5 RC-4 scope: classes for which get_principal_group unions across subtypes
+# (and chains/prefixes count/skip the class). SCOPED to alcohols: a mixed
+# primary+secondary OH chain is a diol (P-44.1.1). Amines are EXCLUDED — a mixed
+# primary+secondary amine carries N-substituents on the secondary N (N-methyl…)
+# that the general acyclic path does not express (it would mis-name the N-methyl
+# as a 'methylamino' prefix); that needs the amine-assembler N-substituent path,
+# a documented follow-on. Same-subtype amine diamines (NCC(N)C -> propane-1,2-
+# diamine) already work via the single-subtype count and are unaffected.
+_RC4_UNION_CLASSES = frozenset({"alcohol"})
+
+
+def _normalize_pcg_match(mol, match, het_z: Optional[int]) -> tuple:
+    """Normalize a PCG SMARTS match tuple to the canonical
+    ``(characteristic_heteroatom, bearing_carbon)`` 2-tuple.
+
+    Different alcohol/amine subtypes emit different-shaped SMARTS matches
+    (``(O, C)`` vs ``(O, C, C, C)``); the union in get_principal_group returns
+    them all under one ``pg_name``, so they must share ONE shape. Falls back to
+    the original tuple when the heteroatom / bearing carbon cannot be located.
+    """
+    if het_z is None:
+        return tuple(match)
+    match_set = set(match)
+    het = next(
+        (a for a in match if mol.GetAtomWithIdx(a).GetAtomicNum() == het_z), None
+    )
+    if het is None:
+        return tuple(match)
+    carbon = next(
+        (nb.GetIdx() for nb in mol.GetAtomWithIdx(het).GetNeighbors()
+         if nb.GetAtomicNum() == 6 and nb.GetIdx() in match_set),
+        None,
+    )
+    return (het, carbon) if carbon is not None else (het,)
+
 # Suffix forms for principal groups
 # Format: (chain_terminal_suffix, ring_attached_suffix), or None for functional-class-only
 SUFFIX_FORMS = {
@@ -519,7 +572,28 @@ def get_principal_group(
             # this function's contract: "the group that will be expressed as a suffix".
             if fg_name in _PREFIX_ONLY_PRINCIPAL:
                 continue
-            return fg_name, functional_groups[fg_name]
+            # DD5 RC-4 (P-44.1.1): the principal characteristic group is the WHOLE
+            # equal-seniority class. When fg_name maps to an equalized class
+            # (alcohol/amine), return the UNION of match tuples over every present
+            # subtype, normalized to the senior subtype's (heteroatom, bearing-C)
+            # shape, so downstream suffix counting (a primary + secondary OH ->
+            # pentane-1,4-diol) and chain selection see all instances. Non-equalized
+            # groups (acids, carbonyls, …) have no class entry -> unchanged.
+            parent_class = _SENIORITY_PARENT.get(fg_name)
+            members = _SENIORITY_CLASS_MEMBERS.get(parent_class)
+            if members is None or parent_class not in _RC4_UNION_CLASSES:
+                return fg_name, functional_groups[fg_name]
+            het_z = _CLASS_CHARACTERISTIC_Z.get(parent_class)
+            matches: List[tuple] = []
+            seen = set()
+            for subtype in members:
+                for match in functional_groups.get(subtype, []):
+                    norm = _normalize_pcg_match(mol, match, het_z)
+                    key = norm[0] if norm else tuple(match)
+                    if key not in seen:
+                        seen.add(key)
+                        matches.append(norm)
+            return fg_name, matches
 
     return None, []
 

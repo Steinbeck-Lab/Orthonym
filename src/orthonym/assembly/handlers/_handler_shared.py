@@ -672,8 +672,20 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     # (e.g. FCCCl -> '1-chloro-2-fluoroethane', not 'chloro-2-fluoroethane').
     fg_prefix_specs = []  # list of (prefix_text, fg_locants)
 
+    # DD5 RC-4 (P-44.1.1): subtypes of the principal group's equal-seniority class
+    # (e.g. secondary_alcohol when primary_alcohol is principal) are expressed
+    # TOGETHER in the multiplied suffix (diol/triol) by _generate_suffix via the
+    # get_principal_group class-union — they must NOT also leak here as a redundant
+    # hydroxy prefix. SCOPED to the same classes the union covers (_RC4_UNION_CLASSES,
+    # alcohols) so amine subtypes are untouched.
+    from ...rules.seniority import _SENIORITY_PARENT as _SEN_PARENT, _RC4_UNION_CLASSES
+    _principal_class = _SEN_PARENT.get(features.principal_group, features.principal_group)
+    _skip_same_class = _principal_class in _RC4_UNION_CLASSES
+
     for fg_name, matches in features.functional_groups.items():
         if fg_name == features.principal_group:
+            continue
+        if _skip_same_class and _SEN_PARENT.get(fg_name, fg_name) == _principal_class:
             continue
 
         # Unsaturation indicators are NOT functional groups (IUPAC P-31.1).
@@ -717,6 +729,18 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             for match in matches:
                 if not all(a in branch_atoms for a in match):
                     filtered_branch.append(match)
+                    continue
+                # DD5 RC-4 corollary: a HALOGEN entirely within a substituent
+                # branch is ALWAYS cited inside that substituent's name (the
+                # haloalkyl / located / recursive namers emit it as a mandatory
+                # detachable prefix), so it must NOT also leak as a standalone
+                # halo prefix — regardless of branch size. (The ≤3-carbon limit
+                # below is for COMPOUND FG substituents like 'hydroxymethyl'
+                # whose name only includes the FG on small branches.) Fixes the
+                # diol + halo-arm double-emit exposed by the new diol chain
+                # selection: 3-(4-chlorobutyl)pentane-1,4-diol, NOT
+                # chloro-3-(4-chlorobutyl)pentane-1,4-diol.
+                if fg_name in ('fluoro', 'chloro', 'bromo', 'iodo'):
                     continue
                 # Check if FG is on a small branch with carbons
                 # Search both chain substituents and ring substituents

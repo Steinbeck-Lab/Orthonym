@@ -296,6 +296,37 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
+    # DD5 SEN-02 / Fix C (P-41 Table 4.1 cls 40 > 41/42; P-15.4.3.2.2): a carbon
+    # skeleton is SENIOR to ether/sulfide. For a plain acyclic chain with EXACTLY
+    # TWO embedded heteroatoms, both divalent chalcogen ether/sulfide links
+    # (O/S/Se/Te), a carbon present to be the parent, and NO terminal-OH suffix
+    # integration, the substitutive carbon-parent name is the PIN
+    # (COCSC -> methoxy(methylsulfanyl)methane; glyme COCCOC -> 1,2-dimethoxyethane),
+    # NOT skeletal replacement.
+    #
+    # SCOPED to exactly-2 MIXED chalcogens (>= 2 DISTINCT elements), carbon-bearing:
+    #   - the carbon-over-ether/sulfide PIN is unambiguous for a MIXED chain
+    #     (COCSC O+S -> methoxy(methylsulfanyl)methane); a HOMOGENEOUS 2-heteroatom
+    #     chain (diether O+O -> 2,5-dioxahexane; dithioether S+S -> 2,4-dithiapentane)
+    #     keeps its established skeletal PIN (the broad diether/dithioether ->
+    #     substitutive migration is a separate, larger follow-on);
+    #   - 1 heteroatom keeps single-hetero-long-chain (4-thiaheptane);
+    #   - >= 3 keeps skeletal (2,5,8-trioxanonane / triglyme);
+    #   - a non-chalcogen replacement driver (N/P/Si/Ge/… -> 2-oxa-4-azapentane,
+    #     silyl cages) keeps skeletal;
+    #   - a carbon-less chain ([O-]SS[O-]) has no carbon parent -> keeps skeletal;
+    #   - terminal-OH polyether-ol (3,6,9-trioxadecan-1-ol, has_terminal_oh) exempt.
+    if not has_terminal_oh and len(embedded_heteroatoms) == 2:
+        _CHALCOGEN_LINK = {'O', 'S', 'Se', 'Te'}
+        _elements = {sym for _, sym in embedded_heteroatoms}
+        _has_carbon = any(
+            mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in backbone
+        )
+        if (_has_carbon and len(_elements) >= 2
+                and _elements <= _CHALCOGEN_LINK):
+            return None
+
+    # ----------------------------------------------------------------
     # Gate 5 (Phase 154.A D-03): strict IUPAC P-15.4.1.2 PIN trigger.
     # Replaces the legacy single-hetero chain-len < 6 reject with explicit
     # branch labels. Rationale string is for debug logging + 154-AUDIT-A.md
