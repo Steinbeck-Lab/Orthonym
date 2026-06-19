@@ -129,9 +129,14 @@ class TestCompareNumbering:
 # --------------------------------------------------------------------------- #
 class TestSkeletalReplacementSeniority:
     @pytest.mark.parametrize("smiles", ["COCSC", "CSCOC"])
-    def test_oxa_thia_senior_oxygen_low_locant(self, namer, smiles):
-        # O senior to S -> O takes locant 2 regardless of input order.
-        assert _name(namer, smiles) == "2-oxa-4-thiapentane"
+    def test_oxa_thia_carbon_over_ether_pin(self, namer, smiles):
+        # v22 Phase E2 (SEN-02): COCSC now routes to the carbon-parent PIN
+        # methoxy(methylsulfanyl)methane (P-41 cls 40 > 41/42), not the skeletal
+        # 2-oxa-4-thiapentane. E1 made it DETERMINISTIC (both SMILES orders give one
+        # name — still true); E2 made it the correct PIN. The O-senior-to-S element
+        # numbering tiebreak is still covered directly at the comparator level by
+        # test_heteroatom_element_seniority_on_positional_tie + the aza case below.
+        assert _name(namer, smiles) == "methoxy(methylsulfanyl)methane"
 
     @pytest.mark.parametrize("smiles", ["COCNC", "CNCOC"])
     def test_oxa_aza_senior_oxygen_low_locant(self, namer, smiles):

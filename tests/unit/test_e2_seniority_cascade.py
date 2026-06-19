@@ -194,18 +194,72 @@ def test_sen01_invariant_no_regression(namer, smiles, expected):
 # ---------------------------------------------------------------------------
 # SEN-02 / SEN-03 deferred — non-regression invariants
 # ---------------------------------------------------------------------------
+# SEN-03 (PCG-atom union, P-44.1.1) — alcohol class: mixed primary+secondary OH
+# is a diol/triol/pentaol, not N-hydroxy-...-ol.
+# ---------------------------------------------------------------------------
 
-SEN02_03_NONREGRESSION = [
-    # carbon-over-ether family: still PASS via E1-deterministic accept_also.
-    ("COCSC", "2-oxa-4-thiapentane"),
-    ("CSCOC", "2-oxa-4-thiapentane"),
-    # PCG-union mixed-OH: constitutionally-correct N-hydroxy-...-ol preserved.
-    ("OCC(O)C", "2-hydroxypropan-1-ol"),
-    ("OC(C)CC(C)O", "pentane-2,4-diol"),   # same-subtype diol path unaffected
+SEN03_DIOL = [
+    ("OCC(O)C", "propane-1,2-diol"),                 # primary + secondary OH
+    ("OCCC(O)C", "butane-1,3-diol"),
+    ("CC(C)(O)CCO", "3-methylbutane-1,3-diol"),      # tertiary + primary OH
+    ("OCCC(CCCCCl)C(O)C", "3-(4-chlorobutyl)pentane-1,4-diol"),  # gold (+ halo-branch)
+]
+
+# Invariants: same-subtype diols and single-OH unchanged; amine class excluded.
+SEN03_INVARIANT = [
     ("OCCO", "ethane-1,2-diol"),
+    ("OC(C)CC(C)O", "pentane-2,4-diol"),
+    ("OCC(O)CO", "glycerol"),
+    ("CCO", "ethanol"),
+    ("CC(C)O", "propan-2-ol"),
+    ("NCC(N)C", "propane-1,2-diamine"),   # same-subtype amine diamine unaffected
 ]
 
 
-@pytest.mark.parametrize("smiles,expected", SEN02_03_NONREGRESSION)
-def test_sen02_03_deferred_no_regression(namer, smiles, expected):
+@pytest.mark.parametrize("smiles,expected", SEN03_DIOL)
+def test_sen03_mixed_subtype_diol(namer, smiles, expected):
     assert namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", SEN03_INVARIANT)
+def test_sen03_invariant(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+# ---------------------------------------------------------------------------
+# SEN-02 (carbon-over-ether/sulfide, P-41 cls 40 > 41/42) — scoped to the mixed
+# ether+sulfide class (the broad sulfide/sulfoxide/diether -> substitutive PIN
+# migration is a documented follow-on, so simple sulfides/diethers/sulfoxides
+# keep their established names).
+# ---------------------------------------------------------------------------
+
+SEN02_CARBON_OVER_ETHER = [
+    ("COCSC", "methoxy(methylsulfanyl)methane"),     # headline gold (carbon parent)
+    ("CSCOC", "methoxy(methylsulfanyl)methane"),     # determinism pair
+]
+
+# Invariants: homogeneous diethers/dithioethers + simple sulfides/sulfoxides keep
+# their established (skeletal / functional-class) names — NOT migrated here.
+SEN02_INVARIANT = [
+    ("COCCOC", "2,5-dioxahexane"),       # homogeneous diether -> skeletal kept
+    ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
+    ("CSC", "dimethyl sulfide"),         # simple sulfide -> functional-class kept
+    ("CSCC", "ethyl methyl sulfide"),
+    ("CS(=O)C", "dimethyl sulfoxide"),   # sulfoxide -> functional-class kept (follow-on)
+    ("OCCOCCOCCOC", "3,6,9-trioxadecan-1-ol"),  # terminal-OH polyether -> skeletal kept
+]
+
+
+@pytest.mark.parametrize("smiles,expected", SEN02_CARBON_OVER_ETHER)
+def test_sen02_carbon_over_ether(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", SEN02_INVARIANT)
+def test_sen02_invariant(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+def test_sen02_carbon_over_ether_deterministic(namer):
+    # COCSC and CSCOC are the same molecule -> one PIN regardless of SMILES order.
+    assert namer.name("COCSC") == namer.name("CSCOC")
