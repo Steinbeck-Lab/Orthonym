@@ -73,10 +73,13 @@ class TestLargeSubstituentsOnComplexRings:
     """Large substituents (>12 HA) on complex rings should not be silently dropped."""
 
     def test_long_chain_on_cyclohexane(self):
-        """A 10-carbon chain on cyclohexane should be named."""
+        """A long secondary chain on cyclohexane is named (not dropped), numbered
+        from the free valence per DD5/SEN-04 (P-46.1.8)."""
         smi = "CCCCCCCCCC(C1CCCCC1)C"
         result = name_compound(smi)
-        # Should contain some indication of the ring and the chain
-        assert "cyclohexyl" in result or "decyl" in result or "methyl" in result, (
-            f"Expected substituent names in '{result}'"
+        # The C11 secondary chain is the substituent on the cyclohexane parent,
+        # numbered from the free valence -> undecan-2-yl (was the wrong-constitution
+        # decyl/methyl split before the SEN-04 located deriver).
+        assert "undecan-2-yl" in result and "cyclohexane" in result, (
+            f"Expected free-valence-numbered chain on the ring parent in '{result}'"
         )
