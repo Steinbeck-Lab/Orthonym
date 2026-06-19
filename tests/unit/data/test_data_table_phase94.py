@@ -82,13 +82,15 @@ class TestSimpleRetainedNames:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
+        # F-T9/DD6 RET-01: 'biphenyl'/'anisole' are general-only; the PIN headline is
+        # the systematic 1,1'-biphenyl / methoxybenzene. acetylene stays (hc_override).
+        ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
         ("C#C", "acetylene"),
-        ("COc1ccccc1", "anisole"),
+        ("COc1ccccc1", "methoxybenzene"),
         ("O=C1CCCCCN1", "caprolactam"),
     ], ids=["biphenyl-e2e", "acetylene-e2e", "anisole-e2e", "caprolactam-e2e"])
     def test_name_compound_e2e(self, smiles, expected):
-        """name_compound() should return the retained name."""
+        """name_compound() should return the PIN headline (retained PIN or systematic)."""
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 

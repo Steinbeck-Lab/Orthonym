@@ -448,5 +448,7 @@ class TestFullPipeline:
         assert len(results) == 1
         name = classify_and_name_fragment(mol, results[0], ring_set)
         assert name is not None
-        # Should be 'isopropyl' or 'propan-2-yl' or '1-methylethyl'
-        assert 'propyl' in name.lower() or 'methylethyl' in name.lower()
+        # F-T9/DD6 RET-02: the PIN is the located 'propan-2-yl' (not the deprecated
+        # 'isopropyl'/'1-methylethyl'). Accept the historical forms too for robustness.
+        assert ('propan-2-yl' in name.lower() or 'propyl' in name.lower()
+                or 'methylethyl' in name.lower())

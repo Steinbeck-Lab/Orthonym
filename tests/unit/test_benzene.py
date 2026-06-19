@@ -64,8 +64,9 @@ class TestBenzeneRetainedNames:
 
     @pytest.mark.unit
     def test_cumene(self):
-        """Isopropylbenzene should return retained name 'cumene'."""
-        assert name_compound("CC(C)c1ccccc1") == "cumene"
+        """F-T9/DD6 RET-01/RET-02: 'cumene' is general-only (P-22.1.3); the PIN is the
+        substitutive '(propan-2-yl)benzene' (enclosing marks per P-16.5.1.3)."""
+        assert name_compound("CC(C)c1ccccc1") == "(propan-2-yl)benzene"
 
 
 # =============================================================================

@@ -27,17 +27,17 @@ class TestBenzeneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylbenzene_cumene(self):
-        """Isopropylbenzene should be named 'cumene' (retained name)."""
+        """F-T9/DD6 RET-02: PIN is '(propan-2-yl)benzene' (cumene/isopropyl are general-only)."""
         result = name_compound("CC(C)c1ccccc1")
         assert result is not None
-        assert "cumene" in result.lower() or "isopropyl" in result.lower()
+        assert "propan-2-yl" in result.lower(), f"Expected propan-2-yl in {result}"
 
     @pytest.mark.integration
     def test_sec_butylbenzene(self):
-        """sec-butylbenzene has a branched substituent at the attachment point."""
+        """F-T9/DD6 RET-02: secondary attachment -> 'butan-2-yl' (sec-butyl deprecated)."""
         result = name_compound("CCC(C)c1ccccc1")
         assert result is not None
-        assert "sec-butyl" in result, f"Expected sec-butyl in {result}"
+        assert "butan-2-yl" in result, f"Expected butan-2-yl in {result}"
 
     @pytest.mark.integration
     def test_tert_butylbenzene(self):
@@ -48,17 +48,17 @@ class TestBenzeneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isobutylbenzene(self):
-        """isobutylbenzene has branch one carbon from attachment."""
+        """F-T9/DD6 RET-02: terminal-branched -> '2-methylpropyl' (isobutyl deprecated)."""
         result = name_compound("CC(C)Cc1ccccc1")
         assert result is not None
-        assert "isobutyl" in result, f"Expected isobutyl in {result}"
+        assert "2-methylpropyl" in result, f"Expected 2-methylpropyl in {result}"
 
     @pytest.mark.integration
     def test_neopentylbenzene(self):
-        """neopentylbenzene has C(CH3)3 two carbons from attachment."""
+        """F-T9/DD6 RET-02: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
         result = name_compound("CC(C)(C)Cc1ccccc1")
         assert result is not None
-        assert "neopentyl" in result, f"Expected neopentyl in {result}"
+        assert "2,2-dimethylpropyl" in result, f"Expected 2,2-dimethylpropyl in {result}"
 
     @pytest.mark.integration
     def test_methylbut2enyl_benzene(self):
@@ -74,10 +74,10 @@ class TestCycloalkaneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylcyclohexane(self):
-        """Isopropylcyclohexane should use the retained name."""
+        """F-T9/DD6 RET-02: -> 'propan-2-yl' (isopropyl deprecated)."""
         result = name_compound("CC(C)C1CCCCC1")
         assert result is not None
-        assert "isopropyl" in result, f"Expected isopropyl in {result}"
+        assert "propan-2-yl" in result, f"Expected propan-2-yl in {result}"
 
     @pytest.mark.integration
     def test_tert_butylcyclohexane(self):
@@ -88,24 +88,24 @@ class TestCycloalkaneRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isobutylcyclohexane(self):
-        """isobutylcyclohexane should use the retained name."""
+        """F-T9/DD6 RET-02: -> '2-methylpropyl' (isobutyl deprecated)."""
         result = name_compound("CC(C)CC1CCCCC1")
         assert result is not None
-        assert "isobutyl" in result, f"Expected isobutyl in {result}"
+        assert "2-methylpropyl" in result, f"Expected 2-methylpropyl in {result}"
 
     @pytest.mark.integration
     def test_neopentylcyclohexane(self):
-        """neopentylcyclohexane should use the retained name."""
+        """F-T9/DD6 RET-02: -> '2,2-dimethylpropyl' (neopentyl deprecated)."""
         result = name_compound("CC(C)(C)CC1CCCCC1")
         assert result is not None
-        assert "neopentyl" in result, f"Expected neopentyl in {result}"
+        assert "2,2-dimethylpropyl" in result, f"Expected 2,2-dimethylpropyl in {result}"
 
     @pytest.mark.integration
     def test_sec_butylcyclopentane(self):
-        """sec-butylcyclopentane should use the retained name."""
+        """F-T9/DD6 RET-02: -> 'butan-2-yl' (sec-butyl deprecated)."""
         result = name_compound("CCC(C)C1CCCC1")
         assert result is not None
-        assert "sec-butyl" in result, f"Expected sec-butyl in {result}"
+        assert "butan-2-yl" in result, f"Expected butan-2-yl in {result}"
 
 
 class TestFusedRingRetainedSubstituents:
@@ -135,11 +135,11 @@ class TestHeterocycleRetainedSubstituents:
 
     @pytest.mark.integration
     def test_isopropylpyridine(self):
-        """Isopropyl on pyridine should use retained name."""
+        """F-T9/DD6 RET-02: isopropyl on pyridine -> 'propan-2-yl'."""
         result = name_compound("CC(C)c1ccncc1")
         assert result is not None
-        # Should detect isopropyl branching
-        assert "propyl" in result or "isopropyl" in result
+        # Located PIN: propan-2-yl (isopropyl is general-only)
+        assert "propan-2-yl" in result, f"Expected propan-2-yl in {result}"
 
 
 # ============================================================================

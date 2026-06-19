@@ -49,11 +49,13 @@ SEN04_TERMINAL_PLAIN = [
     ("CCc1ccccc1", "ethylbenzene"),
 ]
 
-# INVARIANT: retained prefixes are intercepted upstream and must NOT change.
+# F-T9/DD6 RET-02 (supersedes the original E2 invariant): these deprecated retained
+# substituent prefixes are no longer emitted — they are de-headlined to the located /
+# systematic PIN. (cumene/isopropyl P-29.6.2.2; isobutyl/sec-butyl P-29.6.3.)
 SEN04_RETAINED = [
-    ("CC(C)c1ccccc1", "cumene"),
-    ("CC(C)Cc1ccccc1", "isobutylbenzene"),
-    ("CCC(C)c1ccccc1", "sec-butylbenzene"),
+    ("CC(C)c1ccccc1", "(propan-2-yl)benzene"),
+    ("CC(C)Cc1ccccc1", "(2-methylpropyl)benzene"),
+    ("CCC(C)c1ccccc1", "(butan-2-yl)benzene"),
 ]
 
 
@@ -73,7 +75,9 @@ def test_sen04_terminal_unbranched_unchanged(namer, smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", SEN04_RETAINED)
-def test_sen04_retained_prefixes_unchanged(namer, smiles, expected):
+def test_sen04_deprecated_prefixes_deheadlined_to_pin(namer, smiles, expected):
+    # F-T9/DD6 RET-02: the deprecated retained substituent prefixes are de-headlined
+    # to the located/systematic PIN (the E2 located producer is now the headline).
     assert namer.name(smiles) == expected
 
 

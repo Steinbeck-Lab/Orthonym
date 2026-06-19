@@ -43,13 +43,13 @@ class TestNameSubstituentRealMolecules:
         assert "ethyl" in result.lower()
 
     def test_isopropyl_on_benzene(self):
-        """Isopropyl on benzene -> 'isopropyl' or '1-methylethyl'."""
+        """F-T9/DD6 RET-02: isopropyl fragment -> located PIN 'propan-2-yl'."""
         mol = Chem.MolFromSmiles("CC(C)c1ccccc1")
         assert mol is not None
         # Fragment: atoms 0, 1, 2 (CC(C) chain), attach at atom 1
         result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
         assert result is not None
-        assert "propyl" in result.lower() or "methylethyl" in result.lower()
+        assert "propan-2-yl" in result.lower(), f"Expected propan-2-yl in {result}"
 
     def test_hydroxymethyl_fragment(self):
         """Hydroxymethyl fragment (CH2OH) -> produces a name."""

@@ -90,7 +90,7 @@ class TestEtherRegressionGuard:
     """Ensure currently-passing ether compounds remain correct."""
 
     @pytest.mark.parametrize("smiles,expected_substr", [
-        ("COc1ccccc1", "anisole"),         # retained name
+        ("COc1ccccc1", "methoxybenzene"),  # F-T9/DD6 RET-01: PIN (anisole is general-only)
         ("CCOc1ccccc1", "ethoxy"),         # simple ether prefix
         ("COc1ccc(C(=O)O)cc1", "methoxy"),  # methoxy on acid
     ])

@@ -358,7 +358,10 @@ class TestHCGateSafetyA1:
     emittable in ALL_RETAINED_NAMES. Green now and after Plan 02 (regression guard).
     """
 
-    GENUINE = ["benzaldehyde", "butanoic acid", "camphor", "biphenyl", "acetamide"]
+    # F-T9/DD6 RET-01: 'biphenyl' is NO LONGER genuine — it is general-only (PIN
+    # 1,1'-biphenyl) and is now correctly denied. Replaced with 'naphthalene', a true
+    # retained PIN that must stay non-denied + emittable.
+    GENUINE = ["benzaldehyde", "butanoic acid", "camphor", "naphthalene", "acetamide"]
 
     @pytest.mark.unit
     def test_genuine_names_not_denied(self):

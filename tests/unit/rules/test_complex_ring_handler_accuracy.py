@@ -24,10 +24,11 @@ from orthonym.namer import name_compound
     ("c1ccc2ccccc2c1", "naphthalene"),
     ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
     ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),
-    ("c1ccc(-c2ccccc2)cc1", "biphenyl"),
+    # F-T9/DD6 RET-01: 'biphenyl' is general-only; the PIN is 1,1'-biphenyl (P-28.2.1).
+    ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
 ])
 def test_polycyclic_retained_names(smiles, expected_name):
-    """Polycyclic aromatics produce correct retained names."""
+    """Polycyclic aromatics produce correct retained / systematic PIN names."""
     result = name_compound(smiles)
     assert result == expected_name, f"Expected '{expected_name}', got '{result}'"
 

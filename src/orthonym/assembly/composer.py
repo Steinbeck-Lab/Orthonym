@@ -1488,7 +1488,9 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     """Name an R group (substituent fragment) starting from start_idx.
 
     For simple alkyl chains: methyl, ethyl, propyl, butyl, ...
-    For branched alkyls: isopropyl, tert-butyl, sec-butyl, isobutyl
+    For branched alkyls: the located PIN (propan-2-yl, butan-2-yl,
+    2-methylpropyl) via the substituent chokepoint; tert-butyl is the only
+    retained branched prefix emitted directly (P-29.6.1). F-T9 / DD6 RET-02.
     For phenyl: phenyl
     For benzyl: benzyl (if CH2-phenyl)
 
@@ -1580,62 +1582,22 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     if carbon_count == 0:
         return None
 
-    # Check for branched alkyl patterns using the attachment point
-    # The start_idx is the atom directly connected to the FG
+    # RETAINED PREFERRED branched alkyl: only tert-butyl (P-29.6.1) is emitted
+    # directly. F-T9 / DD6 RET-02: isopropyl (P-29.6.2.2) and sec-butyl / isobutyl
+    # (P-29.6.3) are NO LONGER hardcoded here — like the parallel
+    # _check_retained_substituent, this functional-class R-group namer must
+    # headline the located/systematic PIN. Every other branched / secondary
+    # pure-carbon alkyl is routed to the substituent chokepoint below (which goes
+    # through _located_acyclic_alkyl_name: propan-2-yl, butan-2-yl, 2-methylpropyl).
     start_atom = mol.GetAtomWithIdx(start_idx)
     if start_atom.GetSymbol() == 'C':
-        # Count carbon neighbors within the fragment
         c_neighbors_in_frag = [
             nbr.GetIdx() for nbr in start_atom.GetNeighbors()
             if nbr.GetIdx() in frag_set and nbr.GetSymbol() == 'C'
         ]
-
-        if carbon_count == 3:
-            # 3 carbons: could be isopropyl (CH(CH3)2) or propyl (CH2CH2CH3)
-            if len(c_neighbors_in_frag) == 2:
-                # Branched at attachment point: isopropyl
-                return "isopropyl"
-
-        elif carbon_count == 4:
-            if len(c_neighbors_in_frag) == 3:
-                # 3 branches at attachment point: tert-butyl
-                return "tert-butyl"
-            elif len(c_neighbors_in_frag) == 2:
-                # Check for isobutyl (CH2-CH(CH3)2) vs sec-butyl (CH(CH3)(CH2CH3))
-                # sec-butyl: attachment carbon has 1 methyl + 1 ethyl branch
-                branch_sizes = []
-                for nb_idx in c_neighbors_in_frag:
-                    # Count carbons in this sub-branch
-                    sub_visited = {start_idx}
-                    sub_queue = deque([nb_idx])
-                    sub_count = 0
-                    while sub_queue:
-                        a = sub_queue.popleft()
-                        if a in sub_visited or a not in frag_set:
-                            continue
-                        sub_visited.add(a)
-                        if mol.GetAtomWithIdx(a).GetSymbol() == 'C':
-                            sub_count += 1
-                        for nn in mol.GetAtomWithIdx(a).GetNeighbors():
-                            if nn.GetIdx() not in sub_visited and nn.GetIdx() in frag_set:
-                                sub_queue.append(nn.GetIdx())
-                    branch_sizes.append(sub_count)
-
-                branch_sizes.sort()
-                if branch_sizes == [1, 2]:
-                    return "sec-butyl"
-            elif len(c_neighbors_in_frag) == 1:
-                # Linear attachment but could be isobutyl
-                # Check if there's branching further down
-                next_c = c_neighbors_in_frag[0]
-                next_atom = mol.GetAtomWithIdx(next_c)
-                next_c_nbrs = [
-                    nbr.GetIdx() for nbr in next_atom.GetNeighbors()
-                    if nbr.GetIdx() in frag_set and nbr.GetIdx() != start_idx
-                    and nbr.GetSymbol() == 'C'
-                ]
-                if len(next_c_nbrs) == 2:
-                    return "isobutyl"
+        if carbon_count == 4 and len(c_neighbors_in_frag) == 3:
+            # tert-butyl: C(CH3)3 -- 3 carbon branches at the attachment carbon.
+            return "tert-butyl"
 
     # Phase 139 gap closure: detect chain-FG oxygen/sulfur in fragment
     # BEFORE simple alkyl path.  Oxygen and sulfur on chains indicate
@@ -1680,6 +1642,31 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
         except Exception:
             pass
         # Fall through to simple alkyl if name_substituent failed
+
+    # F-T9 / DD6 RET-02: a BRANCHED or internally-attached PURE-CARBON alkyl
+    # R-group must go through the substituent chokepoint for its located PIN
+    # (propan-2-yl, butan-2-yl, 2-methylpropyl) BEFORE the linear default — the
+    # get_alkyl_name() fallback below would otherwise collapse it to the linear
+    # name (propyl/butyl), the exact defect RET-02 removes. A simple TERMINAL
+    # LINEAR alkyl keeps the fast get_alkyl_name() path (byte-identical), and the
+    # chokepoint declining still falls through to it as a last resort.
+    if not heteroatom_in_frag:
+        try:
+            from .substituent_naming import _is_linear_alkyl, _attach_is_chain_terminus
+            _terminal_linear = (
+                _is_linear_alkyl(mol, frag_atoms)
+                and _attach_is_chain_terminus(mol, frag_atoms, start_idx)
+            )
+        except Exception:
+            _terminal_linear = True  # conservative: keep the legacy linear path
+        if not _terminal_linear:
+            try:
+                from .substituent_enumerator import name_substituent as _ns_r
+                prefix = _ns_r(mol, set(frag_atoms), start_idx)
+                if prefix and prefix != "substituent":
+                    return prefix
+            except Exception:
+                pass
 
     # Default: linear alkyl name
     try:

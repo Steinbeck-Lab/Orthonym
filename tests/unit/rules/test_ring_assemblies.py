@@ -121,9 +121,10 @@ class TestNaming:
 
     @pytest.mark.unit
     def test_biphenyl_name(self):
-        """Biphenyl SMILES produces 'biphenyl' (retained name per P-31.1.2.4)."""
+        """Biphenyl SMILES produces the PIN '1,1'-biphenyl' (F-T9/DD6 RET-01: bare
+        'biphenyl' is general-only; the ring-assembly PIN is 1,1'-biphenyl, P-28.2.1)."""
         name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert name == "biphenyl"
+        assert name == "1,1'-biphenyl"
 
     @pytest.mark.unit
     def test_bipyridine_contains_bipyridine(self):
@@ -291,9 +292,10 @@ class TestHigherMultipliers:
 
     @pytest.mark.unit
     def test_regression_biphenyl(self):
-        """Regression: biphenyl detection and naming still works."""
+        """Regression: biphenyl detection + naming produces the PIN 1,1'-biphenyl
+        (F-T9/DD6 RET-01)."""
         name = name_compound("c1ccc(-c2ccccc2)cc1")
-        assert name == "biphenyl"
+        assert name == "1,1'-biphenyl"
 
     @pytest.mark.unit
     def test_regression_bipyridine(self):

@@ -79,9 +79,11 @@ class TestAlkenylNegative:
         assert "cyclohex" in result.lower()
 
     def test_isopropyl_still_retained(self):
-        """Saturated isopropyl must stay as retained name, not systematic."""
+        """Saturated isopropyl is named as the located alkyl 'propan-2-yl' (F-T9/DD6
+        RET-02), NOT as an alkenyl — the point of this test is that no spurious 'en'
+        unsaturation appears."""
         result = name_compound("CC(C)C1CCCCC1")
-        assert "isopropyl" in result.lower()
+        assert "propan-2-yl" in result.lower()
         assert "en" not in result.lower()
 
 

@@ -218,7 +218,9 @@ class TestNewEntries:
         # Verify via get_retained_name function
         ("O=C(O)c1cccc(C(=O)O)c1", "isophthalic acid"),
         ("O=c1ccc2ccccc2o1", "coumarin"),
-        ("NCCCCN", "putrescine"),
+        # F-T9/DD6 RET-01: 'putrescine' (NCCCCN) is general-only — denied from the
+        # gated headline path (PIN butane-1,4-diamine), so get_retained_name -> None.
+        # (It stays in the RAW retained_names.RETAINED_NAMES alias; see test_new_entry_exists.)
         ("Nc1ncnc2[nH]cnc12", "adenine"),
         ("c1ccc(Cc2ccccc2)cc1", "diphenylmethane"),
     ])

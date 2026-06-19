@@ -135,21 +135,35 @@ class TestType2bBranch:
 
 
 class TestType2cBranch:
-    """Type 2c (P-15.1.8.2.3): default-to-Type-3 when no locus override (anisole/hydroxylamine)."""
+    """Type 2c (P-15.1.8.2.3): default-to-Type-3 when no locus override (hydroxylamine).
+
+    F-T9 (DD6 RET-01): anisole was removed from the seed table — it is no longer a PIN
+    (the PIN is methoxybenzene, P-12.1), so the triviality controller must NOT swap
+    methoxybenzene -> anisole. The Type-2c bare/substituted dispatch is now exercised via
+    hydroxylamine, the remaining Type-2c entry; ``test_anisole_removed_from_seed`` locks the
+    F-T9 policy.
+    """
 
     @pytest.mark.unit
-    def test_anisole_bare_swap_allowed(self):
-        entry = _entry("COc1ccccc1")
+    def test_hydroxylamine_bare_swap_allowed(self):
+        entry = _entry("NO")
         assert entry.locus_override_rule_id is None
-        assert _type_2c_check(NameTreeNode(parent_stem="methoxybenzene"),
-                              Chem.MolFromSmiles("COc1ccccc1"), entry) is True
+        assert _type_2c_check(NameTreeNode(parent_stem="hydroxylamine"),
+                              Chem.MolFromSmiles("NO"), entry) is True
 
     @pytest.mark.unit
-    def test_anisole_refuses_swap_with_ring_substituent(self):
-        entry = _entry("COc1ccccc1")
-        child = NameTreeNode(parent_stem="methyl", locants=(2,))
-        node = NameTreeNode(parent_stem="methoxybenzene", prefixes=(child,))
-        assert _type_2c_check(node, Chem.MolFromSmiles("COc1ccccc1C"), entry) is False
+    def test_hydroxylamine_refuses_swap_with_substituent(self):
+        entry = _entry("NO")
+        child = NameTreeNode(parent_stem="methyl")
+        node = NameTreeNode(parent_stem="hydroxylamine", prefixes=(child,))
+        assert _type_2c_check(node, Chem.MolFromSmiles("CNO"), entry) is False
+
+    @pytest.mark.unit
+    def test_anisole_removed_from_seed(self):
+        # F-T9 / DD6 RET-01: 'anisole' is general-only (PIN methoxybenzene), denied in
+        # iupac_2013_pin_list.json. It must NOT be a triviality-controller swap target
+        # (the deny gate in load_seed_table would otherwise zero the whole table).
+        assert Chem.CanonSmiles("COc1ccccc1") not in SEED_TABLE
 
 
 class TestType3Branch:

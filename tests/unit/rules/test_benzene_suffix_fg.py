@@ -104,8 +104,8 @@ def test_benzene_dicarboxylic_and_dialdehyde_suffix(smiles, expected):
     ("Nc1ccccc1", "aniline"),
     # Nitrobenzene (retained name)
     ("[O-][N+](=O)c1ccccc1", "nitrobenzene"),
-    # Anisole (retained name, P-34.1.1.4 PIN; systematic: methoxybenzene)
-    ("COc1ccccc1", "anisole"),
+    # F-T9/DD6 RET-01: 'anisole' is general-only; the PIN is methoxybenzene (P-12.1).
+    ("COc1ccccc1", "methoxybenzene"),
     # Ethoxybenzene
     ("CCOc1ccccc1", "ethoxybenzene"),
     # Halogens

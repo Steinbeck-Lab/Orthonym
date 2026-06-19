@@ -5,10 +5,14 @@ any substituent (linear, branched, functionalized, or ring-containing) from
 its atom indices within a parent molecule.
 
 Architecture:
-  1. Fast path: linear alkyl substituents use get_alkyl_name() directly.
-  2. Retained names: isopropyl, tert-butyl, sec-butyl, isobutyl, phenyl.
-  3. Recursive path: extract fragment SMILES, name via name_fragment_recursively(),
-     convert parent name to prefix form via parent_to_prefix().
+  1. Fast path: linear terminal alkyl substituents use get_alkyl_name() directly.
+  2. Retained PREFERRED names: phenyl, benzyl, retained cycloalkyls, tert-butyl
+     (F-T9/DD6 RET-02: isopropyl/sec-butyl/isobutyl/neopentyl are NOT retained —
+     their located PINs come from _located_acyclic_alkyl_name in step 3/2d).
+  3. Located / recursive path: a branched or internally-attached acyclic alkyl is
+     named by its own principal chain numbered from the free valence
+     (_located_acyclic_alkyl_name: propan-2-yl, butan-2-yl, 2-methylpropyl);
+     other fragments extract SMILES and convert via parent_to_prefix().
 
 The function returns RAW prefix names WITHOUT enclosing marks (parentheses/brackets).
 The caller (format_substituent_prefix in naming_utils.py) handles wrapping based on
@@ -21,7 +25,6 @@ References:
 
 import re
 import logging
-from collections import deque
 from typing import List, Optional, Set
 
 from rdkit import Chem
@@ -908,10 +911,18 @@ def _check_retained_substituent(
     sub_atoms: List[int],
     attach_idx: int,
 ) -> Optional[str]:
-    """Check for common retained substituent names.
+    """Check for the RETAINED PREFERRED substituent names only.
 
-    Detects isopropyl, tert-butyl, sec-butyl, isobutyl, neopentyl,
-    and phenyl by analyzing the branching pattern at the attachment point.
+    Detects phenyl, benzyl, the retained cycloalkyls (cyclopropyl…cyclooctyl),
+    and tert-butyl by analyzing the branching pattern at the attachment point.
+
+    F-T9 / DD6 RET-02: the no-longer-recommended branched short-chain prefixes
+    (isopropyl P-29.6.2.2; sec-butyl / isobutyl / neopentyl P-29.6.3) are NOT
+    returned here. They are general-nomenclature-only forms whose PINs are the
+    located/systematic names (propan-2-yl, butan-2-yl, 2-methylpropyl,
+    2,2-dimethylpropyl), produced downstream by ``_located_acyclic_alkyl_name``
+    (Step 2d / Tier 1.8). tert-butyl STAYS — it IS a preferred prefix per
+    P-29.6.1 (Blue Book 16196 / 16286).
 
     Args:
         mol: RDKit Mol object.
@@ -1022,62 +1033,16 @@ def _check_retained_substituent(
         if nbr.GetIdx() in frag_set and nbr.GetSymbol() == 'C'
     ]
 
-    if carbon_count == 3:
-        # isopropyl: CH(CH3)2 -- 2 branches at attachment point
-        if len(c_neighbors_in_frag) == 2:
-            return "isopropyl"
-
-    elif carbon_count == 4:
-        if len(c_neighbors_in_frag) == 3:
-            # tert-butyl: C(CH3)3 -- 3 branches at attachment
-            return "tert-butyl"
-        elif len(c_neighbors_in_frag) == 2:
-            # Could be sec-butyl: CH(CH3)(CH2CH3)
-            # Check branch sizes
-            branch_sizes = []
-            for nb_idx in c_neighbors_in_frag:
-                sub_visited = {attach_idx}
-                sub_queue = deque([nb_idx])
-                sub_count = 0
-                while sub_queue:
-                    a = sub_queue.popleft()
-                    if a in sub_visited or a not in frag_set:
-                        continue
-                    sub_visited.add(a)
-                    if mol.GetAtomWithIdx(a).GetSymbol() == 'C':
-                        sub_count += 1
-                    for nn in mol.GetAtomWithIdx(a).GetNeighbors():
-                        if nn.GetIdx() not in sub_visited and nn.GetIdx() in frag_set:
-                            sub_queue.append(nn.GetIdx())
-                branch_sizes.append(sub_count)
-
-            branch_sizes.sort()
-            if branch_sizes == [1, 2]:
-                return "sec-butyl"
-        elif len(c_neighbors_in_frag) == 1:
-            # Check for isobutyl: CH2CH(CH3)2
-            next_c = c_neighbors_in_frag[0]
-            next_atom = mol.GetAtomWithIdx(next_c)
-            next_c_nbrs = [
-                nbr.GetIdx() for nbr in next_atom.GetNeighbors()
-                if nbr.GetIdx() in frag_set and nbr.GetIdx() != attach_idx
-                and nbr.GetSymbol() == 'C'
-            ]
-            if len(next_c_nbrs) == 2:
-                return "isobutyl"
-
-    elif carbon_count == 5:
-        # neopentyl: CH2C(CH3)3
-        if len(c_neighbors_in_frag) == 1:
-            next_c = c_neighbors_in_frag[0]
-            next_atom = mol.GetAtomWithIdx(next_c)
-            next_c_nbrs = [
-                nbr.GetIdx() for nbr in next_atom.GetNeighbors()
-                if nbr.GetIdx() in frag_set and nbr.GetIdx() != attach_idx
-                and nbr.GetSymbol() == 'C'
-            ]
-            if len(next_c_nbrs) == 3:
-                return "neopentyl"
+    # F-T9 / DD6 RET-02: only tert-butyl is a RETAINED PREFERRED prefix
+    # (P-29.6.1, Blue Book 16196 / 16286). isopropyl (P-29.6.2.2) and
+    # sec-butyl / isobutyl / neopentyl (P-29.6.3, no-longer-recommended) are
+    # deliberately NOT returned: their PINs are the located/systematic forms
+    # (propan-2-yl, butan-2-yl, 2-methylpropyl, 2,2-dimethylpropyl), built by
+    # the general structure-derived producer `_located_acyclic_alkyl_name`
+    # (Step 2d / Tier 1.8, shipped in E2/SEN-04) once this returns None.
+    if carbon_count == 4 and len(c_neighbors_in_frag) == 3:
+        # tert-butyl: C(CH3)3 -- 3 carbon branches at the attachment carbon.
+        return "tert-butyl"
 
     return None
 
@@ -1373,8 +1338,10 @@ def name_substituent_fragment(
 
     This is the centralized entry point for all substituent naming.
     It detects the complexity of the substituent and routes accordingly:
-    1. Retained names: isopropyl, tert-butyl, sec-butyl, isobutyl, phenyl.
-    2. Linear alkyl (fast path): get_alkyl_name() directly.
+    1. Retained PREFERRED names: phenyl, benzyl, retained cycloalkyls, tert-butyl.
+    2. Linear terminal alkyl (fast path): get_alkyl_name() directly.
+    2d. Located acyclic alkyl: branched/internal attachment -> _located_acyclic_alkyl_name
+        (propan-2-yl, butan-2-yl, 2-methylpropyl) — the F-T9/DD6 RET-02 PINs.
     3. Recursive naming: extract SMILES, name recursively, convert to prefix.
 
     Args:
@@ -1384,7 +1351,7 @@ def name_substituent_fragment(
         parent_chain: List of atom indices in the parent chain.
 
     Returns:
-        Raw prefix name (e.g., "methyl", "isopropyl", "2-methylpropyl")
+        Raw prefix name (e.g., "methyl", "propan-2-yl", "2-methylpropyl")
         WITHOUT enclosing marks. Returns None if naming fails.
     """
     if not sub_atoms:
@@ -1392,10 +1359,11 @@ def name_substituent_fragment(
 
     parent_set = set(parent_chain) if parent_chain else set()
 
-    # Step 1: Check retained substituent names FIRST (isopropyl, tert-butyl,
-    # sec-butyl, isobutyl, neopentyl, phenyl, benzyl). These depend on
-    # the attachment point context and must be checked before the linear
-    # alkyl fast path, which cannot distinguish e.g. propyl from isopropyl.
+    # Step 1: Check retained PREFERRED substituent names FIRST (phenyl, benzyl,
+    # retained cycloalkyls, tert-butyl). F-T9/DD6 RET-02: isopropyl/sec-butyl/
+    # isobutyl/neopentyl are NOT returned (their located PINs come from Step 2d).
+    # The retained check runs before the linear fast path, which cannot
+    # distinguish e.g. propyl from a branched 3-carbon attachment.
     retained = _check_retained_substituent(mol, sub_atoms, attach_idx)
     if retained:
         return _add_substituent_stereo(mol, sub_atoms, retained, attach_idx=attach_idx)

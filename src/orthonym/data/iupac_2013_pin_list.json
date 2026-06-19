@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 109,
+  "total_entries": 117,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},
@@ -20,7 +20,7 @@
     {"name": "indene", "smiles": "c1ccc2c(c1)CC=C2", "pin": true, "citation": "P-22.1.2", "note": "Retained PIN; 1H-indene is the standard PIN form"},
     {"name": "indane", "smiles": "c1ccc2c(c1)CCC2", "pin": false, "citation": "P-22.1.3", "note": "NOT PIN - PIN is 2,3-dihydro-1H-indene per P-22.1.3"},
     {"name": "mesitylene", "smiles": "Cc1cc(C)cc(C)c1", "pin": false, "citation": "P-22.1.3", "note": "NOT PIN - PIN is 1,3,5-trimethylbenzene per P-22.1.3"},
-    {"name": "cumene", "smiles": "CC(C)c1ccccc1", "pin": false, "hc_override": true, "citation": "P-22.1.3", "note": "NOT PIN - cumene/cymene not retained per P-22.1.3. HC retains 'cumene' as a retained-name surface form per CONTEXT D-11 (HC wins on conflict). REVIEW WR-05: hc_override=true documents the intentional semantic conflict; PIN-DENY filter applies only to OPSIN-side promotion, not to HC-curated entries."},
+    {"name": "cumene", "smiles": "CC(C)c1ccccc1", "pin": false, "citation": "P-22.1.3 / P-29.6.2.2", "note": "NOT PIN - cumene not retained per P-22.1.3; PIN is (propan-2-yl)benzene. F-T9/DD6 RET-01: hc_override REMOVED (reverses Phase 150 CONTEXT D-11) so cumene filters from BOTH the hand-curated dict and OPSIN promotion. The headline-must-be-PIN policy (T9) supersedes the D-11 retained-surface-form decision: the bare molecule must emit the substitutive PIN, not the deprecated retained name."},
     {"name": "cymene", "smiles": "Cc1ccc(C(C)C)cc1", "pin": false, "citation": "P-22.1.3", "note": "NOT PIN per P-22.1.3"},
     {"name": "prismane", "smiles": "C12C3C1C3C2", "pin": false, "citation": "P-23.7", "note": "DEPRECATED - replaced by tetracyclo[2.2.0.0(2,6).0(3,5)]hexane systematic name per P-23.7"},
     {"name": "furan", "smiles": "c1ccoc1", "pin": true, "citation": "P-22.2.1 Table 2.2", "note": "Mancude heterocycle PIN"},
@@ -112,6 +112,14 @@
     {"name": "styrene", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: retained name acceptable only in general nomenclature; the PIN is ethenylbenzene (BlueBookV2 line 2002, verbatim). Deny so PIN style emits the systematic name. OPSIN-RT-verified."},
     {"name": "styrol", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: OPSIN-imported synonym of styrene; not the PIN (ethenylbenzene). Deny alongside styrene/vinylbenzene so the systematic PIN emerges."},
     {"name": "vinylbenzene", "smiles": "C=Cc1ccccc1", "pin": false, "citation": "P-31.1.3.4", "note": "Phase 169.7 BBR-HYG: acceptable substitutive name in general nomenclature (BlueBookV2 line 2002) but NOT the PIN; the PIN is ethenylbenzene. Deny so PIN style emits ethenylbenzene."},
-    {"name": "carbon tetrachloride", "smiles": "ClC(Cl)(Cl)Cl", "pin": false, "citation": "P-21.1", "note": "Phase 169.7 BBR-HYG: traditional name, not the PIN; the PIN is tetrachloromethane (substitutive halide naming). Deny so PIN style emits the systematic name. OPSIN-RT-verified."}
+    {"name": "carbon tetrachloride", "smiles": "ClC(Cl)(Cl)Cl", "pin": false, "citation": "P-21.1", "note": "Phase 169.7 BBR-HYG: traditional name, not the PIN; the PIN is tetrachloromethane (substitutive halide naming). Deny so PIN style emits the systematic name. OPSIN-RT-verified."},
+    {"name": "methylamine", "smiles": "CN", "pin": false, "citation": "P-62.2.1.1 / P-66.6.3", "note": "F-T9/DD6 RET-01: general-nomenclature functional-class amine, NOT a PIN; the PIN is the substitutive methanamine (BB 17604). Phase B4 already removed the CN hand-curated entry; this policy row also denies any OPSIN-side promotion of 'methylamine'."},
+    {"name": "ethylamine", "smiles": "CCN", "pin": false, "citation": "P-62.2.1.1 / P-66.6.3", "note": "F-T9/DD6 RET-01: general-nomenclature functional-class amine, NOT a PIN; the PIN is ethanamine. Policy row (Phase B4 removed the HC entry); denies OPSIN-side promotion."},
+    {"name": "trimethylamine", "smiles": "CN(C)C", "pin": false, "citation": "P-15.2.2 / P-66.6.3", "note": "F-T9/DD6 RET-01: functional-class amine, NOT a PIN; the PIN is N,N-dimethylmethanamine (BB 5082). Policy row; denies OPSIN-side promotion."},
+    {"name": "triethylamine", "smiles": "CCN(CC)CC", "pin": false, "citation": "P-62.2.2.1", "note": "F-T9/DD6 RET-01: functional-class amine, NOT a PIN; the PIN is N,N-diethylethanamine (BB 7563). Policy row; denies OPSIN-side promotion."},
+    {"name": "putrescine", "smiles": "NCCCCN", "pin": false, "citation": "P-62.2.1", "note": "F-T9/DD6 RET-01: retained name acceptable in general nomenclature only; the PIN is butane-1,4-diamine. Deny so the RETAINED_NAME dispatch misses and the systematic diamine name is the headline."},
+    {"name": "cadaverine", "smiles": "NCCCCCN", "pin": false, "citation": "P-62.2.1", "note": "F-T9/DD6 RET-01: retained name acceptable in general nomenclature only; the PIN is pentane-1,5-diamine. Deny so the systematic diamine name is the headline."},
+    {"name": "anisole", "smiles": "COc1ccccc1", "pin": false, "citation": "P-12.1 / P-34.1.1.4", "note": "F-T9/DD6 RET-01: general-only retained name, NOT a PIN; the PIN is methoxybenzene (substitutive). Deny so the RETAINED_NAME dispatch misses and methoxybenzene is the headline."},
+    {"name": "biphenyl", "smiles": "c1ccc(-c2ccccc2)cc1", "pin": false, "citation": "P-12.1 / P-28.2.1", "note": "F-T9/DD6 RET-01: 'biphenyl' is general nomenclature; the PIN is the ring-assembly name 1,1'-biphenyl. Deny the bare 'biphenyl' so the systematic ring-assembly headline emerges. Distinct SMILES key from 4-phenylphenol (Oc1ccc(-c2ccccc2)cc1), which is NOT affected."}
   ]
 }

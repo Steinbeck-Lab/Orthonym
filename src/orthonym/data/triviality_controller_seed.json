@@ -597,19 +597,6 @@
       "opsin_rt_verified_at": "2026-05-29T07:29:13Z"
     },
     {
-      "canonical_smiles": "COc1ccccc1",
-      "retained_pin_name": "anisole",
-      "substitution_type": "type_2c",
-      "iupac_p_section": "P-34.1.2",
-      "locant_context": null,
-      "compulsory_prefix_smarts": null,
-      "principal_group_required": null,
-      "locus_override_rule_id": null,
-      "stereo_in_key": false,
-      "notes": "PIN methoxybenzene retained name; default to Type-3 unless locus override set",
-      "opsin_rt_verified_at": "2026-05-29T07:29:13Z"
-    },
-    {
       "canonical_smiles": "NO",
       "retained_pin_name": "hydroxylamine",
       "substitution_type": "type_2c",

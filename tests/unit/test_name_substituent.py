@@ -158,12 +158,13 @@ class TestTierOrdering:
     """Verify that the correct tier is selected in the cascade."""
 
     def test_retained_isopropyl(self):
-        """Isopropyl (branched 3C at center) -> 'isopropyl' via retained names (tier 1)."""
+        """Branched 3C at the centre -> 'propan-2-yl' (F-T9/DD6 RET-02: the PIN is the
+        located form; 'isopropyl' is P-29.6.2.2 general-only and no longer emitted)."""
         mol = _make_mol("CC(C)C")  # isobutane: C0-C1(-C2)-C3
         # Fragment = {0, 1, 2}, attached at C1 (bonded to parent C3)
         result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
         assert result is not None
-        assert "isopropyl" in result.lower()
+        assert "propan-2-yl" in result.lower()
 
     def test_cache_hit_returns_cache_result(self):
         """Fragment matching FRAGMENT_NAME_CACHE entry returns cached name (tier 2)."""
@@ -235,13 +236,13 @@ class TestAttachIdx:
         assert result == "propyl"
 
     def test_propyl_attached_at_middle(self):
-        """3-carbon fragment attached at middle -> 'isopropyl'."""
+        """3-carbon fragment attached at middle -> 'propan-2-yl' (F-T9/DD6 RET-02)."""
         mol = _make_mol("CC(C)C")  # 2-methylpropane
         # Fragment {0, 1, 2} with attach at atom 1 (the branching center)
         result = name_substituent(mol, {0, 1, 2}, attach_idx=1)
         assert result is not None
-        # Attached at center of 3 carbons -> isopropyl
-        assert "isopropyl" in result.lower()
+        # Attached at centre of 3 carbons -> propan-2-yl (located PIN, not 'isopropyl')
+        assert "propan-2-yl" in result.lower()
 
     def test_ethyl_always_ethyl(self):
         """2-carbon linear fragment -> 'ethyl' regardless of attach position."""

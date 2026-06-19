@@ -328,11 +328,13 @@ class TestExocyclicEndToEnd:
         )
 
     def test_e2e_isopropylidene_cyclohexane(self):
-        """End-to-end: =C(CH3)2 on a ring gives isopropylidene."""
-        # 4-isopropylidene-1-methylcyclohexane
+        """End-to-end: =C(CH3)2 on a ring gives propan-2-ylidene (F-T9/DD6 RET-02:
+        the PIN is the located 'propan-2-ylidene'; 'isopropylidene' is P-29.6.2.2
+        general-only)."""
+        # 1-methyl-4-(propan-2-ylidene)cyclohexane
         name = self._name('CC1CCC(=C(C)C)CC1')
-        assert 'isopropylidene' in name or 'propylidene' in name, (
-            f"Expected isopropylidene or propylidene: {name}"
+        assert 'propan-2-ylidene' in name, (
+            f"Expected propan-2-ylidene: {name}"
         )
 
 

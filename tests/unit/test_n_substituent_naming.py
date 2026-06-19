@@ -19,7 +19,7 @@ COMPLEX_N_SUBSTITUENT_CASES = [
     # (SMILES, expected_substring, description)
     ("CC(=O)NC1CCCC1", "cyclopentyl", "cyclopentyl ring substituent"),
     ("CC(=O)NC1CCCCC1", "cyclohexyl", "cyclohexyl ring substituent"),
-    ("CC(=O)NC(C)C", "isopropyl", "branched substituent (isopropyl retained name)"),
+    ("CC(=O)NC(C)C", "propan-2-yl", "branched substituent (F-T9 RET-02: PIN propan-2-yl, not isopropyl)"),
     ("CC(=O)NC(C)(C)C", "tert-butyl", "branched substituent (tert-butyl)"),
     ("CC(=O)Nc1ccncc1", "pyridin", "heterocyclic substituent"),
     # WS-A.2 re-baseline: the old expectation 'tolu' locked the WRONG form

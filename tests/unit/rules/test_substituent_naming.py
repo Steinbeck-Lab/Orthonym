@@ -200,13 +200,13 @@ class TestNameSubstituentFragment:
     # --- Retained branched names ---
 
     def test_isopropyl(self):
-        """CH(CH3)2 -> isopropyl."""
+        """CH(CH3)2 -> propan-2-yl (F-T9/DD6 RET-02: 'isopropyl' is P-29.6.2.2 general-only)."""
         # 2-methylpropane: CC(C)C
         mol = Chem.MolFromSmiles("CC(C)C")
         # Atom 1 is the branch point attached to some parent
         # sub_atoms = [1, 2, 3], attach_idx=1, parent=[0]
         result = name_substituent_fragment(mol, [1, 2, 3], attach_idx=1, parent_chain=[0])
-        assert result == "isopropyl"
+        assert result == "propan-2-yl"
 
     def test_tert_butyl(self):
         """C(CH3)3 -> tert-butyl."""
@@ -217,7 +217,7 @@ class TestNameSubstituentFragment:
         assert result == "tert-butyl"
 
     def test_sec_butyl(self):
-        """CH(CH3)(CH2CH3) -> sec-butyl."""
+        """CH(CH3)(CH2CH3) -> butan-2-yl (F-T9/DD6 RET-02: 'sec-butyl' is P-29.6.3 deprecated)."""
         # 2-methylbutane: CCC(C)C  -> atoms 0,1,2,3,4
         mol = Chem.MolFromSmiles("CCC(C)C")
         # Atom 2 is attachment point, sub_atoms = [2, 0, 1, 3] with parent=[4]
@@ -244,10 +244,10 @@ class TestNameSubstituentFragment:
         # branch sizes: [2] (chain 2->3) and [1] (just 4)
         # sorted = [1, 2] => sec-butyl
         result = name_substituent_fragment(mol_sb, [1, 2, 3, 4], attach_idx=1, parent_chain=[0])
-        assert result == "sec-butyl"
+        assert result == "butan-2-yl"
 
     def test_isobutyl(self):
-        """CH2CH(CH3)2 -> isobutyl."""
+        """CH2CH(CH3)2 -> 2-methylpropyl (F-T9/DD6 RET-02: 'isobutyl' is P-29.6.3 deprecated)."""
         # parent-CH2-CH(CH3)2 -> CC(C)CC
         # 0-1(-2)-3-4  where parent=[4], sub_atoms=[3,1,0,2], attach=3
         mol = Chem.MolFromSmiles("CC(C)CC")
@@ -256,7 +256,7 @@ class TestNameSubstituentFragment:
         # atom 3 has 1 C neighbor in frag: atom 1
         # atom 1 has 2 C neighbors in frag: atoms 0 and 2 (branch)
         result = name_substituent_fragment(mol, [0, 1, 2, 3], attach_idx=3, parent_chain=[4])
-        assert result == "isobutyl"
+        assert result == "2-methylpropyl"
 
     # --- Compound substituents (recursive naming) ---
 

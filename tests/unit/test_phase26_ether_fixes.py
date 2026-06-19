@@ -101,7 +101,7 @@ class TestAlkoxyNonRegression:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_name", [
-        ("COc1ccccc1", "anisole"),  # retained name (P-34.1.1.4 PIN)
+        ("COc1ccccc1", "methoxybenzene"),  # F-T9/DD6 RET-01: PIN (anisole is general-only)
         ("CCOc1ccccc1", "ethoxybenzene"),
         ("CCCOc1ccccc1", "propoxybenzene"),
     ])
