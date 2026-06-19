@@ -127,3 +127,61 @@ def test_charged_protect_families(namer, smiles, expected):
 ])
 def test_neutral_parents_unchanged(namer, smiles, expected):
     assert namer.name(smiles) == expected
+
+
+# --- Code-review hardening (CR-03 valence gate, CR-01/CR-02 fail-closed, WR-01) -
+@pytest.mark.parametrize("smiles,expected", [
+    # 4-coordinate (over-coordinated) Group-14 metalloid anion = the P-72.3 -uide
+    # family, NOT a parent-hydride -ide. The valence gate (degree+H+1 == valence)
+    # must EXCLUDE it so it stays on the neutral organometallic path and keeps its
+    # structure-preserving name — never charge-dropped to '' (the CR-03 regression).
+    ("C[Si-](C)(C)C", "tetramethylsilane"),
+    ("C[Sn-](C)(C)C", "tetramethylstannane"),
+])
+def test_overcoordinated_heteroatom_anion_not_regressed(namer, smiles, expected):
+    out = namer.name(smiles)
+    assert out == expected
+    assert not out.endswith("ide")          # not a spurious -ide
+    assert out and "unknown" not in out      # not charge-dropped to ''/unknown
+
+
+def test_valence_gate_excludes_invalid_arities():
+    """classify_anion must return 'heteroatom_hydride_anion' ONLY for a valid
+    parent-hydride -ide arity (degree + H + 1 == standard valence). A 3-coordinate
+    P anion (no P-H was lost) and a 4-coordinate Si anion (the -uide family) must
+    NOT be classified as the -ide class."""
+    from rdkit import Chem
+    from orthonym.rules.ions import classify_anion
+    from orthonym.perception.ions import get_ion_sites
+
+    def _acls(smi):
+        m = Chem.MolFromSmiles(smi)
+        return classify_anion(m, get_ion_sites(m)["anions"][0])
+
+    assert _acls("C[P-]C") == "heteroatom_hydride_anion"        # 2-coord P -> phosphanide
+    assert _acls("C[Si-](C)C") == "heteroatom_hydride_anion"    # 3-coord Si -> silanide
+    assert _acls("C[P-](C)C") != "heteroatom_hydride_anion"     # 3-coord P (invalid -ide arity)
+    assert _acls("C[Si-](C)(C)C") != "heteroatom_hydride_anion"  # 4-coord Si (-uide)
+
+
+def test_unnameable_heterane_never_emits_ide():
+    """An element whose neutral heterane the pipeline cannot name (As/Sb arsane/
+    stibane) must NEVER emit a garbage '-ide' — the heterane-stem guard fails
+    closed. The final name (legacy, charge-dropped) must not be a fake '*anide'."""
+    for smi in ["C[As-]C", "C[Sb-]C", "C[As-](C)C"]:
+        out = Orthonym().name(smi)
+        assert not out.endswith("anide"), f"{smi} -> {out} (spurious heteroatom -ide)"
+
+
+def test_fg_substituted_ring_cation_fails_closed():
+    """WR-01: the ring -ium emitter must NOT compose a malformed
+    `<ring>-<locant>-ol-<locant>-ium` for a ring cation that also bears a
+    principal-group FG (-ol/-al). It fails closed (the FG case is P-73.1.1/P-74
+    territory). Direct emitter check: returns '' rather than a malformed string."""
+    from rdkit import Chem
+    from orthonym.rules.ions import _emit_ring_cumulative_suffix
+    from orthonym.perception.ions import get_ion_sites
+    for smi in ["Oc1ccc[nH+]c1", "O=Cc1ccc[nH+]c1"]:
+        m = Chem.MolFromSmiles(smi)
+        ci = get_ion_sites(m)["cations"][0]["atom_idx"]
+        assert _emit_ring_cumulative_suffix(m, ci, "ium") == ""

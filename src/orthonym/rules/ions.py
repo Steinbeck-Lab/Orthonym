@@ -42,6 +42,17 @@ _HETEROATOM_HYDRIDE_IDE_STEMS = {
     'Pb': 'plumbane',
 }
 
+# Standard valence of each heteroatom-hydride-anion element, for the
+# classify_anion VALENCE GATE (code-review CR-03): a parent-hydride -ide anion
+# satisfies degree + H + 1 == valence (re-adding the lost H+ gives the
+# standard-valence neutral hydride). An over-coordinated centre (the P-72.3
+# -uide family) fails the gate and stays on the neutral organometallic/legacy
+# path instead of being charge-dropped to ''.
+_HETEROATOM_HYDRIDE_IDE_VALENCE = {
+    'P': 3, 'As': 3, 'Sb': 3,
+    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+}
+
 
 # === SUFFIX MAPPINGS ===
 
@@ -167,8 +178,20 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     # suffix map, since selenol/tellurol end in "ol"); NOT B (its anion is the
     # P-72.3 -uide hydride-addition family, staged); N -> 'aminide' and O ->
     # alkoxide/phenolate are handled above.
-    elif element in _HETEROATOM_HYDRIDE_IDE_STEMS:
-        return 'heteroatom_hydride_anion'
+    #
+    # VALENCE GATE (code-review CR-03): a parent-hydride -ide anion is formed by
+    # H+ LOSS, so re-adding one H must restore the element's STANDARD-valence
+    # neutral hydride: degree + H + 1 == valence. This EXCLUDES an over-coordinated
+    # centre — e.g. 4-coordinate (CH3)4Si- / (CH3)4Sn-, the P-72.3 -uide
+    # (hydride-ADDITION) family, which would over-valence on the +1 H and the
+    # emitter cannot name. Those must stay 'unknown' so the neutral organometallic
+    # / legacy path keeps naming them (tetramethylsilane), NOT get pulled out by
+    # the organometallic-decline into a charge-dropped '' regression. Also excludes
+    # a 3-coordinate P (not a clean phosphanide — no P-H was lost).
+    elif element in _HETEROATOM_HYDRIDE_IDE_VALENCE:
+        if (atom.GetDegree() + atom.GetTotalNumHs() + 1
+                == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]):
+            return 'heteroatom_hydride_anion'
 
     return 'unknown'
 
@@ -1390,6 +1413,14 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
             Chem.SanitizeMol(ring_mol)
         except (RuntimeError, ValueError):
             return ''
+        # Fail-closed (code-review WR-01) when the neutral ring carries a
+        # principal characteristic group (-ol / -al / -one / -oic acid / -amine
+        # / -nitrile …): the `<ring-stem>-<locant>-<suffix>` append is only
+        # well-formed for a BARE ring parent (stem + detachable PREFIXES); an FG
+        # suffix corrupts it (`pyridin-3-ol-1-ium`). Those are P-73.1.1/P-74
+        # territory -> legacy (on HEAD they are 'unknown' too, so no regression).
+        if _ring_bears_principal_group(ring_mol):
+            return ''
         try:
             from ..namer import Orthonym
             parent = Orthonym(
@@ -1511,6 +1542,26 @@ def _ring_has_off_ring_substituent(mol, ring_system):
             if nb.GetIdx() not in rs and nb.GetSymbol() != 'H':
                 return True
     return False
+
+
+def _ring_bears_principal_group(ring_mol):
+    """True if the neutral ring carries a principal characteristic group (a
+    suffix-taking FG: -ol / -al / -one / -oic acid / -amine / -nitrile / …).
+    Code-review WR-01: the ring -ium/-ide append `<ring-stem>-<locant>-<suffix>`
+    is well-formed ONLY for a BARE ring parent (ring stem + detachable
+    substituent PREFIXES); a principal-group SUFFIX corrupts the composition
+    (`pyridin-3-ol-1-ium`). Used to fail-closed so the legacy / P-73.1.1 / P-74
+    path handles those. On perception failure return False (don't block a clean
+    ring — a residual malformed FG-ring name is caught by the OPSIN gate anyway,
+    so the safe-against-regression default is to proceed)."""
+    try:
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        fgs = detect_functional_groups(ring_mol)
+        pg_name, _ = get_principal_group(ring_mol, fgs)
+        return pg_name is not None
+    except (RuntimeError, ValueError, KeyError, IndexError, TypeError):
+        return False
 
 
 def _ring_frag_has_substituent(ring_frag):
