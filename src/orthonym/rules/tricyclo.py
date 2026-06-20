@@ -848,13 +848,16 @@ def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
         if oh_count == 1:
             return f"{base_name}ol"
         else:
-            # Use proper multiplier: diol, triol, tetraol, pentaol, etc.
+            # Use proper multiplier: diol, triol, tetrol, pentol, etc.
+            # P-63.1.2 elides the multiplier-final 'a' before '-ol'
+            # (tetra+ol -> tetrol) via the shared naming_utils helper.
+            from ..assembly.naming_utils import _join_multiplied_suffix
             _OH_MULTIPLIERS = {
                 2: "di", 3: "tri", 4: "tetra", 5: "penta",
                 6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
             }
             mult = _OH_MULTIPLIERS.get(oh_count, f"{oh_count}")
-            return f"{base_name}{mult}ol"
+            return f"{base_name}{_join_multiplied_suffix(mult, 'ol')}"
     
     return base_name
 

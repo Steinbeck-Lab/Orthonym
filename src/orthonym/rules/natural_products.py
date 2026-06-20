@@ -1515,7 +1515,9 @@ def _assemble_np_name(
         locant_str = ",".join(_greek_locant(loc) for loc in hydroxyls)
         count = len(hydroxyls)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-        ol_suffix = f"-{locant_str}-{multiplier}ol"
+        # P-63.1.2: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
+        from ..assembly.naming_utils import _join_multiplied_suffix
+        ol_suffix = f"-{locant_str}-{_join_multiplied_suffix(multiplier, 'ol')}"
         # non-OH prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + -ol
         # e.g., "4-methylcholest-5-en-3-ol" or "5alpha-cholestan-3beta-ol"
         return f"{stereo_prefix}{_stemjoin(non_oh_prefix + modification_prefix, effective_stem)}{unsat_suffix}{ol_suffix}"

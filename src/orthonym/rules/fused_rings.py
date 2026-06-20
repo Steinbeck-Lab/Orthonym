@@ -1485,10 +1485,12 @@ def _assemble_fused_heterocycle_name(
             chosen_suffix = next(iter(suffix_groups))
             chosen_locants = suffix_groups[chosen_suffix]
 
+        from ..assembly.naming_utils import _join_multiplied_suffix
         count = len(chosen_locants)
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count)) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
-        suffix_part = f"-{locant_str}-{multiplier}{chosen_suffix}"
+        # P-63.1.2: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
+        suffix_part = f"-{locant_str}-{_join_multiplied_suffix(multiplier, chosen_suffix)}"
 
         # Remaining suffix groups become prefixes
         for suf_name, suf_locants in suffix_groups.items():
@@ -1616,8 +1618,10 @@ def _format_suffix(suffix_base: str, locants: List) -> str:
     if count == 1:
         return f"-{locant_str}-{suffix_base}"
     else:
+        from ..assembly.naming_utils import _join_multiplied_suffix
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"-{locant_str}-{multiplier}{suffix_base}"
+        # P-63.1.2: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
+        return f"-{locant_str}-{_join_multiplied_suffix(multiplier, suffix_base)}"
 
 
 def _apply_suffix_to_core(core_name: str, suffix: str) -> str:

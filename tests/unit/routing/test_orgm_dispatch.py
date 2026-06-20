@@ -135,6 +135,12 @@ class TestOrgmDispatch:
         for cls, entry in DISPATCH_TABLE.items():
             if cls == StoutClass.ORGANOMETALLIC:
                 continue
+            # v22 G2 COV-02: INORGANIC_ACID@40 deliberately fires BEFORE ORGM@50
+            # so a free inorganic oxoacid (e.g. silicic acid O[Si](O)(O)O) is
+            # named as an oxoacid, not claimed as a Si organometallic. It is the
+            # sole intentional exception to "ORGM is the global priority minimum".
+            if cls == StoutClass.INORGANIC_ACID:
+                continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "
                 f"CONTEXT D-02 violation."

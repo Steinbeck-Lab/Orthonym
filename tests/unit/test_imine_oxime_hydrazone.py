@@ -223,7 +223,7 @@ class TestSeniorityData:
             "isothiocyanate": "isothiocyanato",
             "urea": "carbamoylamino",
             "guanidine": "guanidino",
-            "boronic_acid": "dihydroxyboranyl",
+            "boronic_acid": "borono",  # v22 G2 COV-02 (P-68.1.4.2 preselected prefix)
             "hydrazone": "hydrazinylidene",
         }
         for fg, prefix in expected.items():

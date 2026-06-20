@@ -2624,13 +2624,17 @@ def _build_parent_with_unsaturation(
             parent_base = base_name
 
         # Append suffix: "decane-1-carboxylic acid"
+        # P-63.1.2: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol);
+        # _join_multiplied_suffix is a no-op for 'carb...'/one/amine suffixes.
+        from ..assembly.naming_utils import _join_multiplied_suffix
         count = len(suffix_locants)
         mult = fg_multipliers.get(count, str(count))
+        full_suffix = _join_multiplied_suffix(mult, suffix_text)
         if suffix_locants:
             locant_str = ','.join(str(loc) for loc in suffix_locants)
-            return f"{parent_base}-{locant_str}-{mult}{suffix_text}" if mult else f"{parent_base}-{locant_str}-{suffix_text}"
+            return f"{parent_base}-{locant_str}-{full_suffix}"
         else:
-            return f"{parent_base}-{mult}{suffix_text}" if mult else f"{parent_base}-{suffix_text}"
+            return f"{parent_base}-{full_suffix}"
 
     # For 'inline' type (one, ol, amine), replace the terminal 'e' or 'ane'
     # Examples: decane -> decan-2-one, decane -> decan-1-ol
@@ -2662,21 +2666,18 @@ def _build_parent_with_unsaturation(
     if len(double_bonds) > 1 or (double_bonds and triple_bonds):
         stem = stem + 'a'
 
-    # Build suffix part with locants
+    # Build suffix part with locants. P-63.1.2: elide multiplier-final 'a' before
+    # '-ol' (tetra+ol -> tetrol) via the shared helper (no-op for one/amine).
+    from ..assembly.naming_utils import _join_multiplied_suffix
     fg_count = len(suffix_locants)
     fg_mult = fg_multipliers.get(fg_count, str(fg_count))
+    fg_full = _join_multiplied_suffix(fg_mult, suffix_text)
 
     if suffix_locants:
         locant_str = ','.join(str(loc) for loc in suffix_locants)
-        if fg_mult:
-            suffix_part = f"-{locant_str}-{fg_mult}{suffix_text}"
-        else:
-            suffix_part = f"-{locant_str}-{suffix_text}"
+        suffix_part = f"-{locant_str}-{fg_full}"
     else:
-        if fg_mult:
-            suffix_part = f"-{fg_mult}{suffix_text}"
-        else:
-            suffix_part = f"-{suffix_text}"
+        suffix_part = f"-{fg_full}"
 
     # Vowel elision: check if suffix starts with a vowel
     # If so, drop trailing 'e' from unsaturation or 'an' stem

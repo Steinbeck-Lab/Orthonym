@@ -29,7 +29,7 @@ from typing import List, Optional, Set
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
-from .naming_utils import get_alkyl_name
+from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS
 from .fragment_naming import name_fragment_recursively
 
 logger = logging.getLogger(__name__)
@@ -604,10 +604,16 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # ---- Multi-FG alcohol: -diol, -triol ----
     # e.g., "propane-1,2-diol" -> "2,3-dihydroxypropyl"
     # e.g., "ethane-1,2-diol" -> "2-hydroxy-1-(hydroxymethyl)" ... complex
-    m_diol = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)ol$', name)
+    # P-63.1.2 elides the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol),
+    # so match BOTH spellings (tetra? = tetr|tetra) and derive the hydroxy
+    # multiplier from the locant COUNT — group(2) 'tetr' must NOT become the
+    # wrong 'tetrhydroxy'. (v22 G2 follow-on: keeps this converter in sync with
+    # the elision fix in naming_utils._join_multiplied_suffix.)
+    m_diol = re.search(r'[,-](\d+(?:,\d+)*)-(?:di|tri|tetra?)ol$', name)
     if m_diol:
         locants = m_diol.group(1)
-        multiplier = m_diol.group(2)
+        count = locants.count(',') + 1
+        multiplier = SIMPLE_MULTIPLIERS.get(count, '') if count > 1 else ''
         stem = name[:m_diol.start()]
         if stem.endswith('an'):
             stem = stem[:-2]

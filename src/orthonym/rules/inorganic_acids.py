@@ -34,7 +34,9 @@ _INORGANIC_OXOACIDS = {
     "O=S(O)O": "sulfurous acid",                # P-67.1.1    H2SO3
     "O=C(O)O": "carbonic acid",                 # P-65.2.1    H2CO3 (retained)
     "O[Si](O)(O)O": "silicic acid",             # P-68.2      Si(OH)4
-    "O=[N+]([O-])O": "nitric acid",             # P-67.1.1    HNO3
+    # (nitric acid HNO3 is intentionally NOT here — it already round-trips via the
+    #  RETAINED_NAME tier; zwitterion/salt predicates decline its charge-separated
+    #  form, so no early mis-route. Kept out to avoid a duplicate-table drift.)
     "O=P(O)(O)OP(=O)(O)O": "diphosphoric acid",  # P-67.2.1   (HO)2P(O)-O-P(O)(OH)2
     "O=S(=O)(O)OS(=O)(=O)O": "disulfuric acid",  # P-67.2.1   (HO)SO2-O-SO2(OH)
 }

@@ -55,6 +55,7 @@ from .naming_utils import (
     is_complex_substituent,
     should_omit_locant_one,
     _wrap_n_substituent,
+    _join_multiplied_suffix,
     SIMPLE_MULTIPLIERS,
     COMPLEX_MULTIPLIERS,
     TERMINAL_FG_TYPES,
@@ -3522,18 +3523,22 @@ def _build_bicyclo_principal_suffix(
     multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
     locant_str = ",".join(str(loc) for loc in locants)
 
+    # P-63.1.2: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol);
+    # _join_multiplied_suffix is a no-op for any other suffix ('carb...'/one/amine).
+    full_suffix = _join_multiplied_suffix(multiplier, suffix_text)
+
     if suffix_type == 'appended':
         # consonant-initial 'carb...' -> never elide the parent 'e'.
         if locants:
-            return f"-{locant_str}-{multiplier}{suffix_text}", False
-        return f"-{multiplier}{suffix_text}", False
+            return f"-{locant_str}-{full_suffix}", False
+        return f"-{full_suffix}", False
 
     # inline (one/ol/amine): elide the parent 'e' only before the bare,
     # vowel-initial suffix; the multiplied di*/tri* form is consonant-initial.
     if locants:
-        suffix_str = f"-{locant_str}-{multiplier}{suffix_text}"
+        suffix_str = f"-{locant_str}-{full_suffix}"
     else:
-        suffix_str = f"-{multiplier}{suffix_text}"
+        suffix_str = f"-{full_suffix}"
     return suffix_str, (not multiplier)
 
 
