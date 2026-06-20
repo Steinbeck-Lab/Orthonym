@@ -505,6 +505,19 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     if any(c >= 3 for c in membership.values()):
         return None
 
+    # Fully aromatic + neutral only. The descriptor carries no hydro /
+    # indicated-H / charge, so a saturated, partially-saturated, or charged
+    # cata-fused system would be MIS-NAMED — e.g. a perhydro difuropyridine
+    # would emit the aromatic 'difuro[3,2-b:2',3'-e]pyridine', silently dropping
+    # the saturation (`_identify_ring_name` is aromaticity-agnostic: it returns
+    # 'furan' for a saturated O-5-ring). The 2-component algorithmic path has the
+    # same aromaticity requirement. Fail closed otherwise.
+    for idx in ring_atom_set:
+        a = mol.GetAtomWithIdx(idx)
+        if (not a.GetIsAromatic() or a.GetFormalCharge() != 0
+                or a.GetNumRadicalElectrons() != 0):
+            return None
+
     # Each component must be a recognised monocycle.
     comps = [list(r) for r in atom_rings]
     from .fusion_descriptors import _identify_ring_name
