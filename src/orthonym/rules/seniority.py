@@ -314,8 +314,12 @@ SUFFIX_FORMS = {
     "thioketone": ("thione", "thione"),
     # Phase 163 Tier FRN-C: chalcogen-aldehyde/ketone SUFFIX_FORMS per AUDIT-FRN § 5 LOCK
     # PIN short form -selenal / -tellural (parallel to -thial per P-66.6.3)
-    "selenoaldehyde": ("selenal", "carboselenoaldehyde"),
-    "telluroaldehyde": ("tellural", "carbotelluroaldehyde"),
+    # v22 C-T2 (V-2): the added-carbon ("carbo*") forms are carboselenaldehyde /
+    # carbotelluraldehyde (Blue Book Table 28, BB ~line 18827/18829) — NOT the
+    # "carboseleno-/carbotelluro-aldehyde" (extra 'o') typo, which mirrored the
+    # acid/amide infix form by mistake. cf. the correct "carbothialdehyde" above.
+    "selenoaldehyde": ("selenal", "carboselenaldehyde"),
+    "telluroaldehyde": ("tellural", "carbotelluraldehyde"),
     # PIN suffix form -selone / -tellone (dialkyl-word form fails OPSIN per AUDIT § 5 LOCK + RESEARCH §7.2)
     "selenoketone": ("selone", "selone"),
     "telluroketone": ("tellone", "tellone"),

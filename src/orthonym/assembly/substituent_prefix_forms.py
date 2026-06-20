@@ -1160,6 +1160,21 @@ def _check_substituent_prefix_form(
             # the FG (CONTEXT D-04 strict scope).
             if match_set != frag_atoms_set:
                 continue
+            # v22 C-T2 (V-3): the ether (alkoxy) prefix form is an attach-via-O
+            # prefix (R-O-). It is only valid when the substituent actually
+            # attaches through the ether oxygen (match[0] for the O-ether SMARTS).
+            # When the fragment attaches via a CARBON (e.g. -CH2-O-CH3,
+            # methoxymethyl), the ether is internal to the chain and must be named
+            # (R-oxy)alkyl by the downstream chain handler — NOT collapsed to
+            # 'methoxy' (which drops the attachment carbon -> a different
+            # constitution). Fall through. Scoped to O-ethers only: the
+            # thioether/selenoether/telluroether SMARTS put a CARBON at match[0]
+            # (S/Se/Te at match[1]), so this match[0] test does not apply to them,
+            # and no carbon-attached chalcogen-ether handler exists yet (C-T2 is O).
+            if (fg_name in ("ether", "vinyl_ether", "aromatic_ether")
+                    and attach_idx is not None
+                    and len(match) >= 1 and attach_idx != match[0]):
+                continue
             prefix = get_substituent_prefix_form(
                 fg_name, mol, tuple(match), principal_chain=None
             )

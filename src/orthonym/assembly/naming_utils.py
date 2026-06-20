@@ -713,6 +713,18 @@ def is_complex_substituent(name: str) -> bool:
     # Acylamino compound substituents: "ethanoylamino", "propanoylamino" etc.
     if name.endswith('amino') and 'oyl' in name:
         return True
+    # (R-oxy)alkyl compound substituents per IUPAC P-16.3.3 / P-63.2.2.2 (v22
+    # C-T2 / V-3): an alkoxy/aryloxy unit ('<R>oxy') fused to a terminal alkyl-yl
+    # stem is a compound prefix taking enclosing marks — '(phenoxymethyl)benzene',
+    # '(methoxymethyl)benzene'. A bare terminal alkoxy ('methoxy', 'phenoxy')
+    # ends in 'oxy' and stays simple; 'hydroxy'/'carboxy' heads are NOT ethers.
+    for _oxy_stem in ('oxymethyl', 'oxyethyl', 'oxypropyl', 'oxybutyl',
+                      'oxypentyl', 'oxyhexyl'):
+        if name_lower.endswith(_oxy_stem):
+            _head = name_lower[:-len(_oxy_stem)]
+            if _head and not _head.endswith(('hydr', 'carb')):
+                return True
+            break
     return False
 
 

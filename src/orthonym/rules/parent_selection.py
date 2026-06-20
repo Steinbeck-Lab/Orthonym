@@ -721,14 +721,33 @@ def select_parent(
             reasoning="No chain provided - ring is parent"
         )
 
-    # Handle single carbon "chain" - this is just a substituent
+    # Handle single-carbon "chain". Normally a 1-carbon chain is just a
+    # substituent (a methyl), so the ring is the parent. EXCEPTION (P-44.1.1,
+    # v22 C-T2 / V-4): when that single carbon BEARS the principal characteristic
+    # group AND is not bonded to any ring atom, the ring cannot express the PCG
+    # as a ring suffix, so the 1-carbon parent (methanamide/formamide, methanal,
+    # formic acid, ...) must win. Without this an N-aryl formamide
+    # (H-C(=O)-NH-Ar) falls to the ring -> 'carbamoylbenzene' (= benzamide, a
+    # DIFFERENT constitution). The ring-neighbour test keeps benzaldehyde /
+    # benzamide / 1-formylpiperidine (PCG carbon bonded to a ring atom) on ring.
     if len(principal_chain) == 1:
-        return ParentSelectionResult(
-            parent_type='ring',
-            parent_atoms=list(sorted(all_ring_atoms)),
-            substituent_rings=[],
-            reasoning="Single carbon chain - ring is parent"
+        _single = principal_chain[0]
+        _single_ring_attached = any(
+            nbr.GetIdx() in all_ring_atoms
+            for nbr in mol.GetAtomWithIdx(_single).GetNeighbors()
         )
+        if (not principal_group or not principal_group_atoms
+                or _single_ring_attached
+                or is_principal_group_on_ring(
+                    mol, all_ring_atoms, principal_group_atoms, principal_group)):
+            return ParentSelectionResult(
+                parent_type='ring',
+                parent_atoms=list(sorted(all_ring_atoms)),
+                substituent_rings=[],
+                reasoning="Single carbon chain - ring is parent"
+            )
+        # else: PCG on a non-ring-attached single carbon -> fall through to the
+        # P-44.1 PG-location logic below (the chain becomes the parent).
 
     # P-31.1.3.4: Natural product backbones always use ring as parent
     np_info = detect_natural_product(mol)

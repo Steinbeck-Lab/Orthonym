@@ -1831,8 +1831,25 @@ class Orthonym:
                 exclude_atoms=all_ring_atoms
             )
 
-            # Only do parent selection if we found a meaningful chain (>= 2 carbons)
-            if potential_chain and len(potential_chain) >= 2:
+            # Only do parent selection if we found a meaningful chain (>= 2
+            # carbons) OR (v22 C-T2 / V-4, P-44.1.1) a 1-carbon chain whose
+            # principal-characteristic-group carbon is NOT ring-attached: the
+            # ring then cannot express the PCG as a ring suffix, so the 1-carbon
+            # parent (formamide / formic acid / methanal) must be parent-eligible
+            # (else an N-aryl formamide falls to the ring -> 'carbamoylbenzene').
+            # select_parent() applies the same ring-neighbour test, so a
+            # ring-attached single PCG carbon (benzaldehyde/benzamide) is
+            # unaffected.
+            _run_parent_selection = bool(potential_chain) and len(potential_chain) >= 2
+            if (potential_chain and len(potential_chain) == 1
+                    and features.principal_group and features.principal_group_atoms):
+                _single = potential_chain[0]
+                if not any(
+                    nbr.GetIdx() in all_ring_atoms
+                    for nbr in features.mol.GetAtomWithIdx(_single).GetNeighbors()
+                ):
+                    _run_parent_selection = True
+            if _run_parent_selection:
                 # Phase 147 D-03: delegate ring-type dispatch to helper.
                 # Replaces the prior inline fused-hetero-only block; new
                 # helper covers fused-hetero / PAH / benzene / simple-
@@ -2023,6 +2040,23 @@ class Orthonym:
                 from .rules.benzene import is_benzene_ring, get_benzene_substituents
                 if is_benzene_ring(features.mol, features.principal_ring):
                     features.is_benzene = True
+                    # v22 C-T2 (V-3): with >1 benzene ring and no principal
+                    # characteristic group (aralkyl/diaryl ethers, e.g. benzyl
+                    # phenyl ether), `atom_rings[0]` is SMILES-order-dependent, so
+                    # the parent flipped with the input spelling -> non-determinism
+                    # ('(phenoxymethyl)benzene' vs 'benzoxybenzene'). Pick the
+                    # parent ring deterministically (carbon-linked preference +
+                    # canonical rank). Single-benzene and PCG-bearing rings are
+                    # left to the existing principal-ring selection.
+                    from .rules.benzene import _select_benzene_parent_ring
+                    _benzene_rings = [
+                        r for r in features.mol.GetRingInfo().AtomRings()
+                        if is_benzene_ring(features.mol, r)
+                    ]
+                    if len(_benzene_rings) > 1 and not features.principal_group:
+                        _bz = _select_benzene_parent_ring(features.mol)
+                        if _bz is not None:
+                            features.principal_ring = _bz
                     features.benzene_ring = features.principal_ring
                     features.benzene_substituents = get_benzene_substituents(
                         features.mol, features.principal_ring

@@ -456,6 +456,26 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.9 (v22 C-T2 / V-3): ether-substituted carbon chain ----
+    # A saturated all-carbon chain bearing ether -O-R substituent(s), numbered
+    # from the free valence, named (R-oxy)alkyl per P-63.2.2.2 (phenoxymethyl,
+    # 2-phenoxyethyl, methoxymethyl). MUST precede the cache (Tier 2): the cache
+    # maps the capped fragment SMILES to a whole-molecule retained name
+    # (COc1ccccc1 -> 'anisole') which parent_to_prefix then mangles to 'anisolyl'
+    # — a DIFFERENT constitution (free valence on the ring). Reachable from every
+    # caller so the ether substituent is named identically wherever it appears.
+    # Returns None (fall through) for anything not this narrow class (fail-closed).
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from .substituent_naming import _name_ether_substituted_chain
+            _ether = _name_ether_substituted_chain(
+                mol, list(frag_atoms_set), attach_idx, set()
+            )
+            if _ether:
+                return _stereo_route(_ether)
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

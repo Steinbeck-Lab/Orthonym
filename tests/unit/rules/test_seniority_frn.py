@@ -58,8 +58,14 @@ class TestFRNSuffixForms:
         assert SUFFIX_FORMS['telluroamide'] == ('telluroamide', 'carbotelluroamide')
 
     def test_selenoaldehyde_suffix_selenal_short_form(self):
-        """AUDIT § 5.2 LOCK: PIN is -selenal short form (parallel to -thial)."""
-        assert SUFFIX_FORMS['selenoaldehyde'] == ('selenal', 'carboselenoaldehyde')
+        """AUDIT § 5.2 LOCK: PIN is -selenal short form (parallel to -thial).
+
+        v22 C-T2 (V-2): the added-carbon form is 'carboselenaldehyde' (Blue Book
+        Table 28, BB ~line 18827; parallel to the 'carbothialdehyde' above) — the
+        prior 'carboselenoaldehyde' (extra 'o') was a data typo mirroring the
+        acid/amide infix form. Assertion updated to the corrected value.
+        """
+        assert SUFFIX_FORMS['selenoaldehyde'] == ('selenal', 'carboselenaldehyde')
 
     def test_selenoketone_suffix_form_only(self):
         """AUDIT § 5.2 LOCK: PIN is -selone suffix (dialkyl-word form fails OPSIN)."""

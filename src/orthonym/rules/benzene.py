@@ -55,6 +55,13 @@ _SUFFIX_PRIORITY = [
     'carboxamide',
     'carbonitrile',
     'carbaldehyde',
+    # v22 C-T2 (V-2): chalcogen analogues of the aldehyde-on-ring suffix
+    # (P-66.6.3). Seniority O > S > Se > Te. Ring-attached -CH=S/Se/Te was
+    # silently dropped (the C read as a methyl -> 'methylbenzene'); these emit
+    # benzenecarbothialdehyde / benzenecarboselenaldehyde / benzenecarbotelluraldehyde.
+    'carbothialdehyde',
+    'carboselenaldehyde',
+    'carbotelluraldehyde',
     'ol',  # ASML-13: hydroxyl as suffix when principal group on benzene
 ]
 
@@ -78,6 +85,12 @@ _BENZENE_FG_SMARTS = {
     'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
     'tert_amide': Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]'),
     'aldehyde': Chem.MolFromSmarts('[CX3H1](=O)'),
+    # v22 C-T2 (V-2): chalcogen aldehydes (-CH=S / -CH=Se / -CH=Te). The H1
+    # requirement excludes 0-H carbons (chalcogen ketones/amides), so a
+    # selenobenzamide ring-C(=Se)NH2 is NOT matched here.
+    'thioaldehyde': Chem.MolFromSmarts('[CX3H1](=[SX1])'),
+    'selenoaldehyde': Chem.MolFromSmarts('[CX3H1](=[SeX1])'),
+    'telluroaldehyde': Chem.MolFromSmarts('[CX3H1](=[TeX1])'),
     'nitrile': Chem.MolFromSmarts('[CX2]#[NX1]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
@@ -268,6 +281,22 @@ def _identify_suffix_fg_on_benzene(
                     'name': 'carbaldehyde', 'suffix_name': 'carbaldehyde',
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
+
+        # v22 C-T2 (V-2): chalcogen aldehydes on the ring (-CH=S/Se/Te).
+        # P-66.6.3 added-carbon suffixes carbothialdehyde/carboselenaldehyde/
+        # carbotelluraldehyde. HEAD dropped the =chalcogen and read the carbon
+        # as a methyl (-> 'methylbenzene', a different molecule).
+        for _fg, _suffix in (
+            ('thioaldehyde', 'carbothialdehyde'),
+            ('selenoaldehyde', 'carboselenaldehyde'),
+            ('telluroaldehyde', 'carbotelluraldehyde'),
+        ):
+            for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS[_fg]):
+                if match[0] == start_idx:
+                    return {
+                        'name': _suffix, 'suffix_name': _suffix,
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
 
         # Nitrile: C#N
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['nitrile']):
@@ -1896,6 +1925,18 @@ def _assemble_benzene_with_suffix(
             atom_to_locant, oriented_ring
         )
 
+    # v22 C-T2 (V-2): single chalcogen aldehyde on benzene. No retained base
+    # exists (unlike benzaldehyde), so the systematic 'benzenecarbo*aldehyde'
+    # base is used, with the suffix renumbered to locant 1 when other
+    # substituents are present (e.g. 4-methylbenzene-1-carboselenaldehyde).
+    if chosen_suffix in (
+        'carbothialdehyde', 'carboselenaldehyde', 'carbotelluraldehyde'
+    ) and chosen_count == 1:
+        return _name_substituted_chalcogen_carbaldehyde(
+            remaining_prefix_groups, chosen_locants[0], chosen_suffix,
+            atom_to_locant, oriented_ring
+        )
+
     # General suffix assembly for multi-suffix or non-retained cases
     # Build suffix part: benzene-{locants}-{multiplier}{suffix}
     multiplier = get_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
@@ -2100,6 +2141,44 @@ def _name_substituted_benzaldehyde(
     prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
 
     return f"{prefix_part}benzaldehyde"
+
+
+def _name_substituted_chalcogen_carbaldehyde(
+    prefix_groups: Dict[str, List[int]],
+    suffix_locant: int,
+    suffix_name: str,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+) -> str:
+    """
+    Name a benzene bearing a single chalcogen aldehyde (-CH=S/Se/Te).
+
+    v22 C-T2 (V-2). Unlike benzaldehyde, the chalcogen analogues have no
+    retained base name (P-66.6.3), so the systematic 'benzenecarbo*aldehyde'
+    base is used:
+
+      - unsubstituted: ``benzenecarboselenaldehyde``
+      - substituted:   ``4-methylbenzene-1-carboselenaldehyde`` (the principal
+        group takes locant 1 and is cited because other prefixes are present,
+        P-14.3.4.2)
+
+    Args:
+        prefix_groups: Non-suffix substituent groups.
+        suffix_locant: Locant of the chalcogen-aldehyde carbon (original numbering).
+        suffix_name: 'carbothialdehyde' / 'carboselenaldehyde' / 'carbotelluraldehyde'.
+        atom_to_locant: Mapping from atom index to locant.
+        oriented_ring: The oriented ring.
+    """
+    if not prefix_groups:
+        return f"benzene{suffix_name}"
+
+    # Renumber relative to the chalcogen-aldehyde position (= position 1).
+    renumbered_groups = _renumber_relative_to(prefix_groups, suffix_locant)
+    prefix_part = _build_prefix_string_with_locants(
+        renumbered_groups, mono_needs_locant=True
+    )
+
+    return f"{prefix_part}benzene-1-{suffix_name}"
 
 
 def _renumber_relative_to(
@@ -2348,6 +2427,48 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
     return result
 
 
+def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
+    """Deterministically select the benzene ring to use as the parent.
+
+    v22 C-T2 (V-3): ``get_benzene_ring`` returns the FIRST benzene ring in SSSR
+    order, which is SMILES-atom-order-dependent. For a molecule with two benzene
+    rings connected by a bridge (an aralkyl ether, e.g. benzyl phenyl ether
+    ``c1ccccc1COc1ccccc1``) the choice of parent flipped with the input spelling
+    -> non-determinism (``(phenoxymethyl)benzene`` vs ``benzoxybenzene``).
+
+    Among the benzene rings, prefer one that is **carbon-linked** (a ring atom
+    has a non-ring carbon neighbour) over a purely heteroatom-linked ring, then
+    break ties by the lowest canonical-atom-rank tuple. The carbon-linked
+    preference keeps the bridging ether oxygen in the substituent prefix
+    (-> ``phenoxymethyl``, the BB-21618 form) and avoids the heteroatom-linked
+    parent path that mis-names ``-O-CH2-Ar``. Single-benzene molecules (the
+    overwhelming majority) are unaffected — the lone ring is returned.
+    """
+    benzene_rings = [r for r in mol.GetRingInfo().AtomRings()
+                     if is_benzene_ring(mol, r)]
+    if not benzene_rings:
+        return None
+    if len(benzene_rings) == 1:
+        return benzene_rings[0]
+
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    def _carbon_linked(ring: Tuple[int, ...]) -> bool:
+        ring_set = set(ring)
+        for a in ring:
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nbr.GetIdx() not in ring_set and nbr.GetSymbol() == 'C':
+                    return True
+        return False
+
+    def _key(ring: Tuple[int, ...]):
+        # carbon-linked first (0 < 1), then lowest canonical-rank tuple.
+        return (0 if _carbon_linked(ring) else 1,
+                tuple(sorted(ranks[a] for a in ring)))
+
+    return min(benzene_rings, key=_key)
+
+
 def name_benzene_derivative(mol) -> Optional[str]:
     """
     Generate name for a benzene derivative.
@@ -2360,8 +2481,9 @@ def name_benzene_derivative(mol) -> Optional[str]:
     Returns:
         IUPAC name string, or None if not a benzene derivative
     """
-    # Find benzene ring
-    ring_atoms = get_benzene_ring(mol)
+    # Find benzene ring (deterministic parent-ring choice when >1 benzene ring;
+    # v22 C-T2 / V-3 — see _select_benzene_parent_ring).
+    ring_atoms = _select_benzene_parent_ring(mol)
     if ring_atoms is None:
         return None
 

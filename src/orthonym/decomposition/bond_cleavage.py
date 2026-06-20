@@ -71,6 +71,23 @@ def _atoms_in_same_ring(mol, atom1: int, atom2: int) -> bool:
     return False
 
 
+def _is_benzylic_sp3_carbon(mol, c_idx: int) -> bool:
+    """True if ``c_idx`` is an acyclic sp3 carbon bonded to an aromatic ring atom.
+
+    v22 C-T2 (V-3). Such a carbon (a benzylic ``-CH2-``/``-CHR-`` linker) marks an
+    aralkyl ether (e.g. benzyl phenyl ether ``c1ccccc1COc1ccccc1``) that is named
+    SUBSTITUTIVELY as an (aryloxy/alkoxy)alkyl-substituted parent —
+    ``(phenoxymethyl)benzene`` — NOT by functional-class ether cleavage, which
+    mis-places the O on the ring (``phenoxytoluene``, a different constitution).
+    """
+    atom = mol.GetAtomWithIdx(c_idx)
+    if (atom.GetSymbol() != 'C' or atom.GetIsAromatic()
+            or atom.IsInRing()
+            or atom.GetHybridization() != Chem.HybridizationType.SP3):
+        return False
+    return any(n.GetIsAromatic() for n in atom.GetNeighbors())
+
+
 def _is_skeletal_ether(mol, o_idx: int) -> bool:
     """Check if an ether oxygen is part of a skeletal replacement chain.
 
@@ -554,6 +571,14 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             # Skeletal replacement guard: skip if the oxygen is part of a
             # chain with multiple heteroatoms (oxa-naming applies instead)
             if _is_skeletal_ether(mol, oxygen):
+                continue
+
+            # v22 C-T2 (V-3): aralkyl-ether guard. When an ether carbon is a
+            # benzylic sp3 linker (-CH2-/-CHR- on an aromatic ring), the molecule
+            # is named substitutively as (aryloxy/alkoxy)alkyl, not by ether
+            # cleavage which mis-places the O on the ring (phenoxytoluene).
+            if (_is_benzylic_sp3_carbon(mol, carbon1)
+                    or _is_benzylic_sp3_carbon(mol, carbon2)):
                 continue
 
             # Determine cleavage bond: bond between the larger-side carbon

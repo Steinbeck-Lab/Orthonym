@@ -29,7 +29,7 @@ from typing import List, Optional, Set
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
-from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS
+from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS, alpha_sort_key
 from .fragment_naming import name_fragment_recursively
 
 logger = logging.getLogger(__name__)
@@ -442,6 +442,182 @@ def _name_saturated_substituted_chain(
 
     stem = get_chain_prefix(len(backbone))
     return f"{'-'.join(part_strings)}{stem}yl"
+
+
+def _name_ether_substituted_chain(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Name a saturated all-carbon chain substituent bearing ether ``-O-R``
+    group(s), numbered from the attachment point (free valence = locant 1,
+    P-29.2 / P-46; the ether expressed as an (R-oxy) prefix, P-63.2.2.2).
+
+    v22 C-T2 (V-3, V1 constitutional-fidelity theme). Fixes the defect where the
+    recursive path (Step 3-4) caps the fragment to a FREE molecule whose retained
+    name is then naively ``-yl``-ed, losing the attachment locus:
+    ``-CH2-O-C6H5`` -> capped ``anisole`` -> ``anisolyl`` (a DIFFERENT
+    constitution — implies the free valence is on the ring). Here the backbone
+    carbon bearing each ether is numbered from the free valence and each ``-O-R``
+    is named via :func:`get_alkoxy_prefix`:
+
+      - ``-CH2-O-C6H5``   -> ``phenoxymethyl``
+      - ``-CH2-O-CH3``    -> ``methoxymethyl``
+      - ``-CH2CH2-O-C6H5``-> ``2-phenoxyethyl``
+
+    Returns ``None`` (fall through to the richer recursive path — fail-closed)
+    for anything that is not a LINEAR all-carbon backbone with a TERMINAL
+    (primary) attachment whose only heteroatoms are neutral, divalent, acyclic
+    ether oxygens, each bridging exactly one backbone carbon to a nameable R
+    group (no other functional groups, no branches, no unsaturation, no rings on
+    the backbone).
+    """
+    if not sub_atoms:
+        return None
+    sub_set = set(sub_atoms)
+    ring_info = mol.GetRingInfo()
+
+    attach_atom = mol.GetAtomWithIdx(attach_idx)
+    if attach_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(attach_idx) > 0:
+        return None  # attach via heteroatom / ring -> not this handler
+
+    # Identify ether oxygens: neutral, divalent, acyclic, both neighbours in the
+    # fragment, both bonds single. Anything else (charged O, =O, -OH, ring O,
+    # peroxide -O-O-) disqualifies the whole fragment (fail-closed).
+    ether_os: List[int] = []
+    for idx in sub_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        if sym == 'C':
+            continue
+        if sym != 'O':
+            return None  # any non-C, non-O heteroatom -> richer case
+        if (atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0
+                or atom.GetDegree() != 2 or ring_info.NumAtomRings(idx) > 0):
+            return None
+        nbrs = [n.GetIdx() for n in atom.GetNeighbors()]
+        if not all(n in sub_set for n in nbrs):
+            return None
+        if any(mol.GetBondBetweenAtoms(idx, n).GetBondType()
+               != Chem.BondType.SINGLE for n in nbrs):
+            return None
+        ether_os.append(idx)
+    if not ether_os:
+        return None  # plain alkyl is the fast path; need >=1 ether here
+    ether_set = set(ether_os)
+
+    # Backbone = carbons reachable from the attachment WITHOUT crossing an ether
+    # oxygen. Must be all-carbon, acyclic, saturated (single C-C bonds only).
+    backbone: List[int] = []
+    seen = {attach_idx}
+    stack = [attach_idx]
+    while stack:
+        cur = stack.pop()
+        cur_atom = mol.GetAtomWithIdx(cur)
+        if cur_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(cur) > 0:
+            return None
+        backbone.append(cur)
+        for nbr in cur_atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in ether_set or ni not in sub_set or ni in seen:
+                continue
+            if nbr.GetSymbol() != 'C':
+                return None  # non-C, non-ether neighbour on the backbone
+            bond = mol.GetBondBetweenAtoms(cur, ni)
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None  # unsaturated backbone -> fall through
+            seen.add(ni)
+            stack.append(ni)
+    backbone_set = set(backbone)
+
+    # Linear backbone, attachment at a terminal (primary) carbon.
+    for idx in backbone:
+        c_nbrs = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                     if n.GetIdx() in backbone_set)
+        if c_nbrs > 2:
+            return None  # branched backbone -> fall through
+    attach_c_nbrs = sum(1 for n in attach_atom.GetNeighbors()
+                        if n.GetIdx() in backbone_set)
+    if attach_c_nbrs > 1:
+        return None  # secondary/internal attachment -> fall through
+
+    # Every fragment atom must be backbone, an ether O, or reachable only through
+    # an ether O (i.e. part of an R group). Map each ether O to the backbone
+    # carbon it decorates + its R-side neighbour.
+    accounted = backbone_set | ether_set
+    ether_links: List[tuple] = []  # (backbone_carbon, ether_O, r_side_atom)
+    for o_idx in ether_os:
+        nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(o_idx).GetNeighbors()]
+        bb_side = [n for n in nbrs if n in backbone_set]
+        r_side = [n for n in nbrs if n not in backbone_set]
+        if len(bb_side) != 1 or len(r_side) != 1:
+            return None  # O not bridging backbone -> R (e.g. R-O-R' both off backbone)
+        ether_links.append((bb_side[0], o_idx, r_side[0]))
+        # Walk the R group, marking atoms accounted-for.
+        r_stack = [r_side[0]]
+        r_seen = {o_idx}
+        while r_stack:
+            ra = r_stack.pop()
+            if ra in r_seen:
+                continue
+            r_seen.add(ra)
+            accounted.add(ra)
+            for n in mol.GetAtomWithIdx(ra).GetNeighbors():
+                if n.GetIdx() in sub_set and n.GetIdx() not in r_seen:
+                    r_stack.append(n.GetIdx())
+    if accounted != sub_set:
+        return None  # unaccounted atoms -> richer case, fall through
+
+    # Number the backbone from the attachment terminal (attach = locant 1).
+    ordered = [attach_idx]
+    visited = {attach_idx}
+    current = attach_idx
+    while len(ordered) < len(backbone):
+        nxt = None
+        for n in mol.GetAtomWithIdx(current).GetNeighbors():
+            ni = n.GetIdx()
+            if ni in backbone_set and ni not in visited:
+                nxt = ni
+                break
+        if nxt is None:
+            break
+        ordered.append(nxt)
+        visited.add(nxt)
+        current = nxt
+    if len(ordered) != len(backbone):
+        return None  # disconnected backbone -> fall through
+    pos = {idx: i + 1 for i, idx in enumerate(ordered)}
+
+    # Name each ether as an (R-oxy) prefix at its backbone-carbon locant.
+    from collections import defaultdict
+    from ..data.chain_names import get_chain_prefix
+    from .substituent_prefix_forms import get_alkoxy_prefix
+    groups: dict = defaultdict(list)
+    for bb_c, o_idx, r_side in ether_links:
+        oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
+        if not oxy or oxy == "alkoxy":
+            return None  # un-nameable R -> fall through (fail-closed)
+        groups[oxy].append(pos[bb_c])
+
+    _MULT = {1: "", 2: "bis", 3: "tris", 4: "tetrakis"}
+    cite_locants = len(backbone) > 1  # methyl: single position -> elide locant
+    part_strings = []
+    # Alphanumerical order by the (compound) oxy prefix name (P-14.5.2).
+    for prefix in sorted(groups.keys(), key=alpha_sort_key):
+        locs = sorted(groups[prefix])
+        mult = _MULT.get(len(locs), f"{len(locs)}")
+        # Compound oxy prefixes (phenoxy, benzyloxy, methoxy) are enclosed when
+        # multiplied; single occurrence is cited bare.
+        body = f"({prefix})" if len(locs) > 1 else prefix
+        if cite_locants:
+            loc_str = ",".join(str(loc) for loc in locs)
+            part_strings.append(f"{loc_str}-{mult}{body}")
+        else:
+            part_strings.append(f"{mult}{body}")
+
+    stem = get_chain_prefix(len(backbone))
+    return f"{''.join(part_strings) if not cite_locants else '-'.join(part_strings)}{stem}yl"
 
 
 # ============================================================================
@@ -1427,6 +1603,15 @@ def name_substituent_fragment(
     halo_name = _name_saturated_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
     if halo_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
+
+    # Step 2c-ether (v22 C-T2 / V-3, P-63.2.2.2): saturated all-carbon chain
+    # bearing ether -O-R substituent(s), numbered from the attachment. MUST
+    # precede the recursive path, which caps the fragment to a free molecule and
+    # mis-names a retained ether as '<molecule>yl' (-CH2-O-C6H5 -> 'anisolyl', a
+    # different constitution). Returns None for anything else -> falls through.
+    ether_name = _name_ether_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
+    if ether_name is not None:
+        return _add_substituent_stereo(mol, sub_atoms, ether_name, attach_idx=attach_idx)
 
     # Step 2d (DD5 RC-6 / SEN-04, P-29.2 / P-46): branched / secondary acyclic
     # all-carbon alkyl substituent named by its OWN principal chain numbered from
