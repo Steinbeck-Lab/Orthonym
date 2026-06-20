@@ -373,3 +373,119 @@ class TestFusedRingAssemblyUnits:
         info = detect_ring_assembly(mol, rs)
         assert info is not None, "Should detect biquinoline as 2-ring assembly"
         assert info["count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# G3 / COV-03: P-28.2.1 enclosing marks (von Baeyer confusion)
+# ---------------------------------------------------------------------------
+
+class TestP28EnclosingMarks:
+    """IUPAC P-28.2.1: 'bi' + parent hydride name *enclosed in parentheses, if
+    necessary*. Parentheses are used to avoid confusion with von Baeyer names,
+    so cycloalkane / von-Baeyer components are enclosed (``1,1'-bi(cyclopropane)``)
+    while mancude rings (phenyl / pyridine / furan / naphthalene) are NOT
+    (``1,1'-biphenyl``, ``2,2'-bipyridine``). All PINs OPSIN-RT-verified.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C1CC1C1CC1", "1,1'-bi(cyclopropane)"),
+        ("C1CCC1C1CCC1", "1,1'-bi(cyclobutane)"),
+        ("C1CCCC1C1CCCC1", "1,1'-bi(cyclopentane)"),
+        ("C1CCCCC1C1CCCCC1", "1,1'-bi(cyclohexane)"),
+    ])
+    def test_cycloalkane_assembly_enclosing_marks(self, smiles, expected):
+        """Cycloalkane ring assemblies get enclosing marks (P-28.2.1)."""
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,present,absent", [
+        ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl", "("),    # benzene -> no parens
+        ("c1ccc(-c2ccccn2)nc1", "2,2'-bipyridine", "("),  # pyridine -> no parens
+        ("c1ccoc1-c1ccoc1", "bifuran", "bi("),            # furan -> no parens
+        ("c1ccc2ccccc2c1-c1ccc2ccccc2c1", "binaphthalene", "bi("),  # naphthalene
+    ])
+    def test_mancude_assembly_no_enclosing_marks(self, smiles, present, absent):
+        """Mancude ring assemblies must NOT be parenthesized (no von Baeyer clash)."""
+        name = name_compound(smiles)
+        assert present in name, f"expected {present!r} in {name!r}"
+        assert absent not in name, f"unexpected {absent!r} in {name!r}"
+
+
+# ---------------------------------------------------------------------------
+# G3 / COV-03: P-28.2.2 double-bond junction (ylidene)
+# ---------------------------------------------------------------------------
+
+class TestP28DoubleBondJunction:
+    """IUPAC P-28.2.2: two identical cyclic systems linked by a *double bond*
+    are named with the ylidene substituent form, enclosed in parentheses:
+    ``1,1'-bi(cyclopentylidene)``. All PINs OPSIN-RT-verified.
+    """
+
+    @pytest.mark.unit
+    def test_double_bond_detector_accepts_identical_carbocycles(self):
+        """detect_ring_assembly now recognises a double-bond junction between
+        identical saturated carbocycles (P-28.2.2)."""
+        mol = Chem.MolFromSmiles("C1CCCC1=C1CCCC1")
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is not None
+        assert info["count"] == 2
+        assert info["ring_type"] == "carbocyclic"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C1CCCC1=C1CCCC1", "1,1'-bi(cyclopentylidene)"),
+        ("C1CCCCC1=C1CCCCC1", "1,1'-bi(cyclohexylidene)"),
+        ("C1CCC1=C1CCC1", "1,1'-bi(cyclobutylidene)"),
+    ])
+    def test_cycloalkane_ylidene_assembly(self, smiles, expected):
+        """Double-bond cycloalkane assemblies name as bi(...ylidene) (P-28.2.2)."""
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.unit
+    def test_multiring_saturated_dimer_not_claimed(self):
+        """CR-01: a double-bond dimer of a MULTI-ring saturated carbocycle
+        (norbornane) is NOT claimed by detect_ring_assembly — the monocyclic
+        ylidene namer cannot name it, so it must fall through to the prior path
+        rather than trigger the namer.py early-return into a fail-closed dead end.
+        """
+        mol = Chem.MolFromSmiles("C1CC2CCC1C2=C1CC2CCC1C2")
+        assert detect_ring_assembly(mol, get_ring_systems(mol)) is None
+
+    @pytest.mark.unit
+    def test_double_bond_junction_deterministic(self):
+        """Same structure from a different SMILES writing gives the same PIN."""
+        a = name_compound("C1CCCC1=C1CCCC1")
+        b = name_compound("C1(=C2CCCC2)CCCC1")
+        assert a == b == "1,1'-bi(cyclopentylidene)"
+
+
+# ---------------------------------------------------------------------------
+# G3 / COV-03: P-28.2.1 + P-28.3.1 citation-order locant determinism
+# ---------------------------------------------------------------------------
+
+class TestP28CitationOrderDeterminism:
+    """IUPAC P-28.2.1 ("lowest possible locants ... for the positions of
+    attachment") + P-28.3.1 erratum (8 Oct 2025, "lowest locant set, then order
+    of citation"): for a 2-component assembly of identical rings, the unprimed
+    (first-cited) ring must carry the lower attachment locant. The name must be
+    invariant to SMILES atom order (2,3'-bifuran, never 3,2'-bifuran).
+    BB P-28.2.1 worked example: '2,3'-bifuran (PIN)'.
+    """
+
+    @pytest.mark.unit
+    def test_bifuran_is_2_3prime(self):
+        assert name_compound("c1ccoc1-c1ccoc1") == "2,3'-bifuran"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles", [
+        "c1ccoc1-c1ccoc1",
+        "c1oc(cc1)-c1ccoc1",
+        "c1(cocc1)-c1occc1",
+        "c1cc(-c2ccoc2)oc1",
+    ])
+    def test_bifuran_deterministic_across_respellings(self, smiles):
+        """Every SMILES spelling of bifuran yields the lowest-locant PIN
+        (the unprimed ring takes locant 2, not 3)."""
+        assert name_compound(smiles) == "2,3'-bifuran"

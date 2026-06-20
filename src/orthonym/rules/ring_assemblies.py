@@ -68,6 +68,78 @@ ASSEMBLY_MULTIPLIERS = {
 }
 
 
+# IUPAC P-28.2.1: the multiplied parent-hydride name of a ring assembly is
+# enclosed in parentheses "to avoid confusion with von Baeyer names". This is
+# required for cycloalkane / cycloalkene monocycles (cyclopropane, cyclohexene,
+# cyclopentylidene) and von Baeyer polycyclics (bicyclo[2.2.1]heptane,
+# spiro[...]). Mancude rings (phenyl, pyridine, furan, naphthalene, indole) are
+# NOT enclosed: 1,1'-biphenyl, 2,2'-bipyridine, 2,3'-bifuran, 1,2'-binaphthalene.
+# Worked examples P-28.2.1; all PINs OPSIN-RT-verified (v22 G3 / COV-03).
+_VON_BAEYER_NAME_RE = re.compile(
+    r"^cyclo[a-z]+(?:ane|ene|yne|adiene|atriene|ylidene)$"
+)
+
+
+def _needs_von_baeyer_parens(name: str) -> bool:
+    """True if a ring-assembly component name must be parenthesized (P-28.2.1).
+
+    Triggers for cycloalkane / cycloalkene / ylidene monocycles and von Baeyer
+    polycyclics (bicyclo[..]/tricyclo[..]/spiro[..]); mancude ring names (which
+    never start with a 'cyclo' hydrocarbon stem) are left bare.
+    """
+    if not name:
+        return False
+    # von Baeyer descriptor: "...cyclo[<digit>..." or "spiro[<digit>...".
+    if re.search(r"cyclo\[\d", name) or name.startswith("spiro["):
+        return True
+    # Monocyclic cycloalkane / cycloalkene / ylidene hydrocarbon stem.
+    return bool(_VON_BAEYER_NAME_RE.match(name))
+
+
+def _enclose_component(name: str) -> str:
+    """Enclose a ring-assembly component name in parentheses when P-28.2.1
+    requires it (von Baeyer disambiguation); otherwise return it unchanged."""
+    return f"({name})" if _needs_von_baeyer_parens(name) else name
+
+
+def _to_ylidene(name: str) -> Optional[str]:
+    """Convert a saturated carbocycle parent-hydride name to its ylidene
+    substituent-group name for a P-28.2.2 double-bond junction
+    (cyclopentane -> cyclopentylidene). Returns None if ``name`` is not a clean
+    'cyclo...ane' hydrocarbon ring, so the caller fails closed (no wrong names)."""
+    if name and name.startswith("cyclo") and name.endswith("ane"):
+        return name[:-3] + "ylidene"
+    return None
+
+
+def _is_saturated_carbocycle(mol, system_atoms: Set[int]) -> bool:
+    """True if a ring system is a SINGLE all-carbon, non-aromatic ring with no
+    internal ring double bond -- the monocyclic cycloalkane class nameable as a
+    P-28.2.2 ylidene assembly (matching ``_to_ylidene``'s 'cyclo...ane'
+    capability). Multi-ring saturated carbocycles (norbornane, decalin) are
+    EXCLUDED so detect_ring_assembly does not claim a double-bond junction it
+    cannot name -- otherwise namer.py early-returns on the assembly and the
+    namer's None falls through to a fail-closed 'unknown'. A10: claim only what
+    we can name; everything else keeps its prior (von Baeyer / substituent) path."""
+    ri = mol.GetRingInfo()
+    rings_in_system = [r for r in ri.AtomRings() if set(r) <= system_atoms]
+    if len(rings_in_system) != 1:
+        return False
+    for i in system_atoms:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != "C" or a.GetIsAromatic():
+            return False
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (
+            a1 in system_atoms
+            and a2 in system_atoms
+            and bond.GetBondType() == rdchem.BondType.DOUBLE
+        ):
+            return False
+    return True
+
+
 def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
     """
     Compute a ring system signature for identity comparison.
@@ -100,16 +172,19 @@ def _find_inter_system_bonds(
     mol, ring_systems: List[Set[int]]
 ) -> List[Tuple[int, int, int, int]]:
     """
-    Find all single bonds connecting different ring systems.
+    Find all bonds connecting different ring systems.
 
     Returns list of (atom_idx_A, atom_idx_B, system_idx_A, system_idx_B).
-    Only SINGLE and AROMATIC bond types are accepted (biphenyl's inter-ring
-    bond may be typed as either depending on Kekulization).
+    SINGLE and AROMATIC bonds are the single-bond junction (P-28.2.1; biphenyl's
+    inter-ring bond may be typed as either depending on Kekulization). DOUBLE
+    bonds are accepted for the P-28.2.2 double-bond junction (bi(...ylidene));
+    detect_ring_assembly gates which double-bond junctions are actually claimed.
     """
     connections = []
     acceptable_types = {
         rdchem.BondType.SINGLE,
         rdchem.BondType.AROMATIC,
+        rdchem.BondType.DOUBLE,
     }
 
     # Build atom -> set of system indices (an atom can be in multiple systems
@@ -358,6 +433,22 @@ def detect_ring_assembly(
     if len(set(signatures)) != 1:
         return None
 
+    # IUPAC P-28.2.2: a junction may be a DOUBLE bond (bi(...ylidene)).
+    # _find_inter_system_bonds now also returns double-bond junctions; restrict
+    # the ones this detector CLAIMS to the saturated-carbocycle class that the
+    # ylidene namer can build. Other double-bond junctions return None here so
+    # the molecule keeps its prior (substituent-based) naming instead of
+    # early-returning in namer.py to a fail-closed dead end (A10, no wrong names).
+    double_bond_junction = any(
+        (bond := mol.GetBondBetweenAtoms(a1, a2)) is not None
+        and bond.GetBondType() == rdchem.BondType.DOUBLE
+        for a1, a2, _, _ in connections
+    )
+    if double_bond_junction and not all(
+        _is_saturated_carbocycle(mol, sys_atoms) for sys_atoms in ring_systems
+    ):
+        return None
+
     # Additional guard: reject if there are non-ring atoms in the molecule
     # other than substituents (i.e., linker atoms between rings).
     # For true ring assemblies, the inter-ring bond is direct (no linker).
@@ -393,6 +484,7 @@ def detect_ring_assembly(
         'connections': connections,
         'count': len(ring_systems),
         'ring_type': ring_type,
+        'double_bond_junction': double_bond_junction,
     }
 
 
@@ -1190,6 +1282,10 @@ def name_ring_assembly(
             return per_system[sys_idx][atom_idx]
         return _get_connection_locant(mol, atom_idx, sys_atoms)
 
+    # Substituents on the assembly, computed once and reused below (the ylidene
+    # branch, the P-28.3.1 citation-order tiebreak, and the prefix builder).
+    substituent_list = _get_substituent_info(mol, ring_systems, connections)
+
     # Sort connections by system indices to ensure consistent ordering.
     # For bi- assemblies: one connection -> "X,X'"
     # For ter- assemblies: two connections -> "X,X':X',X''"
@@ -1205,9 +1301,34 @@ def name_ring_assembly(
         loc2 = _lookup_locant(per_system_locants, s2, a2, ring_systems[s2])
         prime1 = _format_prime(s1)
         prime2 = _format_prime(s2)
+        # IUPAC P-28.2.1 + P-28.3.1 (8 Oct 2025 erratum): "lowest locants ...
+        # then order of citation" — the unprimed (first-cited) ring takes the
+        # lower attachment locant. For a 2-component assembly of identical rings
+        # with no distinguishing substituent, get_ring_systems order is
+        # atom-index (SMILES-spelling) dependent, so without this tiebreak the
+        # asymmetric case is order-dependent (2,3'-bifuran vs 3,2'-bifuran).
+        # Relabeling the unprimed ring is valid only when no substituent
+        # differentiates the two identical rings.
+        if count == 2 and not substituent_list and loc2 < loc1:
+            loc1, loc2 = loc2, loc1
         connection_parts.append(f"{loc1}{prime1},{loc2}{prime2}")
 
     connection_str = ":".join(connection_parts)
+
+    # IUPAC P-28.2.2: a double-bond junction is named with the ylidene
+    # substituent-group form (method 2), enclosed in parentheses to avoid
+    # confusion with von Baeyer names: 1,1'-bi(cyclopentylidene). The detector
+    # restricts entry to saturated carbocycles; convert cyclopentane ->
+    # cyclopentylidene here. Fail closed (return None -> prior naming) if the
+    # component is not a clean cyclo...ane ring or carries substituents, since
+    # substituted ylidene assemblies are outside the built class (no wrong names).
+    if assembly_info.get("double_bond_junction"):
+        ylidene = _to_ylidene(ring_name)
+        if ylidene is None:
+            return None
+        if substituent_list:
+            return None
+        return f"{connection_str}-{multiplier}{_enclose_component(ylidene)}"
 
     # Phase 155.B D-09: indicated-H placement subset for ring assemblies.
     # If ring_name carries an indicated-H prefix like "1H-indole", emit the
@@ -1232,10 +1353,10 @@ def name_ring_assembly(
             f"{indicated_h_replicated}{connection_str}-{multiplier}{ring_stem}"
         )
     else:
-        base_name = f"{connection_str}-{multiplier}{ring_name}"
-
-    # Find substituents
-    substituent_list = _get_substituent_info(mol, ring_systems, connections)
+        # IUPAC P-28.2.1: enclose the component in parentheses when needed to
+        # avoid confusion with von Baeyer names (cycloalkanes / spiro / bicyclo);
+        # mancude rings (phenyl/pyridine/furan/...) stay bare.
+        base_name = f"{connection_str}-{multiplier}{_enclose_component(ring_name)}"
 
     if not substituent_list:
         return base_name
