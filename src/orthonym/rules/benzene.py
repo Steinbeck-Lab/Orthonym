@@ -1847,12 +1847,15 @@ def _assemble_benzene_with_suffix(
                 atom_to_locant, oriented_ring
             )
         else:
-            # Multiple OH on benzene: benzenediol, benzenetriol
-            # Use systematic naming with multiplied -ol suffix.
-            from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+            # Multiple OH on benzene: benzene-1,2-diol, benzene-1,2,3,4,5,6-hexol.
+            # Use systematic naming with multiplied -ol suffix; P-63.1.2 elides
+            # the multiplier-final 'a' before '-ol' (hexa+ol → hexol).
+            from ..assembly.naming_utils import (
+                SIMPLE_MULTIPLIERS, _join_multiplied_suffix,
+            )
             mult = SIMPLE_MULTIPLIERS.get(len(ol_locants), str(len(ol_locants)))
             loc_str = ','.join(str(l) for l in sorted(ol_locants))
-            suffix_part = f"benzene-{loc_str}-{mult}ol"
+            suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'ol')}"
             if remaining_prefix_groups:
                 prefix_part = _build_prefix_string_with_locants(
                     remaining_prefix_groups, mono_needs_locant=True

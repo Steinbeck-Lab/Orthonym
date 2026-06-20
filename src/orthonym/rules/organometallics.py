@@ -141,6 +141,44 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
     return None
 
 
+# v22 G2 COV-02 (P-68.2): a bare -OH/-NH2/-SH bonded DIRECTLY to a Group-14
+# parent-hydride centre (Si/Ge/Sn/Pb) is a principal characteristic group, named
+# with a substitutive suffix on the hydride stem (silanol/silanamine/silanethiol)
+# — NOT a ligand. element-Z + H-count -> the suffix word.
+_GROUP14_PRINCIPAL_SUFFIX: Dict[Tuple[int, int], str] = {
+    (8, 1): 'ol',      # -OH  (hydroxy)
+    (7, 2): 'amine',   # -NH2 (primary amine)
+    (16, 1): 'thiol',  # -SH  (sulfanyl)
+}
+
+# v22 G2 COV-02: the substitutive -ol/-amine/-thiol suffix mode is Group-14 ONLY
+# (Si/Ge/Sn/Pb). Boron is ALSO a 'hydride_parent' naming system but its hydroxy
+# acid is named with the boronic/borinic-acid characteristic group (P-68.1/P-68.3,
+# e.g. phenylboronic acid), NOT 'phenylboranediol' — so B must be EXCLUDED from
+# the principal-group diversion and left to cascade to the boronic-acid handler.
+_GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
+
+
+def _principal_suffix_for_ligand(mol: Any, lg: Any) -> Optional[str]:
+    """Return the substitutive suffix ('ol'/'amine'/'thiol') if ``lg`` is a bare
+    neutral -OH/-NH2/-SH single-atom ligand, else ``None`` (fail-closed).
+
+    Strictly single-atom O/N/S with exactly one heavy neighbour (the metal) and
+    the canonical H-count, so ethers (Si-O-C, fragment has 2 atoms), secondary
+    amines (Si-NH-C), metal-oxo (=O, 0 H), and siloxides (charged) all decline.
+    """
+    idxs = lg.ligand_atom_indices
+    if len(idxs) != 1:
+        return None
+    atom = mol.GetAtomWithIdx(idxs[0])
+    if atom.GetFormalCharge() != 0:
+        return None
+    heavy_deg = sum(1 for nbr in atom.GetNeighbors() if nbr.GetAtomicNum() != 1)
+    if heavy_deg != 1:
+        return None
+    return _GROUP14_PRINCIPAL_SUFFIX.get((atom.GetAtomicNum(), atom.GetTotalNumHs()))
+
+
 # === ORGM_LIGAND_ORDER (Salzer 1999 §5.2 alphabetic with multiplicatives ignored) ===
 # This is NOT the carbon-organic seniority of P-43 — that stays UNTOUCHED
 # in src/orthonym/rules/seniority.py per CONTEXT D-06.
@@ -408,15 +446,23 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             return None
         naming_system = metal_name_info['naming_system']
 
-        # Partition into organic ligands and halide ligands
-        halide_ligs = [
-            lg for lg in ligand_groups
-            if lg.ligand_smarts_key in _HALIDE_LIGAND_TO_HALIDE_WORD
-        ]
-        organic_ligs = [
-            lg for lg in ligand_groups
-            if lg.ligand_smarts_key not in _HALIDE_LIGAND_TO_HALIDE_WORD
-        ]
+        # Partition into halide, (Group-14 only) principal-group, and organic
+        # ligands. v22 G2 COV-02: a bare -OH/-NH2/-SH directly on a Si/Ge/Sn/Pb
+        # centre is a principal characteristic group, not a ligand — divert it so
+        # Branch A can emit it as a substitutive suffix (-> trimethylsilanol).
+        # The diversion is Group-14-scoped so the metal-direct branch keeps its
+        # exact prior behaviour (such ligands stay organic -> None -> cascade).
+        is_group14 = metal_symbol in _GROUP14_SUFFIX_ELEMENTS
+        halide_ligs: List[Any] = []
+        pg_ligs: List[Any] = []
+        organic_ligs: List[Any] = []
+        for lg in ligand_groups:
+            if lg.ligand_smarts_key in _HALIDE_LIGAND_TO_HALIDE_WORD:
+                halide_ligs.append(lg)
+            elif is_group14 and _principal_suffix_for_ligand(mol, lg) is not None:
+                pg_ligs.append(lg)
+            else:
+                organic_ligs.append(lg)
 
         # Identify organic ligand names from atom indices
         organic_names: List[Optional[str]] = [
@@ -441,7 +487,6 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 _multiplicative_prefix(count) + name
                 for count, name in sorted_groups
             )
-            full_name = f"{ligand_prefix}{parent_name}"
             ligand_tree_nodes = [
                 NameTreeNode(
                     parent_stem=name,
@@ -450,6 +495,30 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 )
                 for count, name in sorted_groups
             ]
+
+            if pg_ligs:
+                # v22 G2 COV-02 (P-68.2): emit the bare -OH/-NH2/-SH on the
+                # Group-14 centre as a substitutive suffix on the hydride stem
+                # (trimethylsilanol, dimethylsilanediol, trimethylsilanamine,
+                # trimethylsilanethiol). Every principal group must be the same
+                # kind — a mixed -OH/-NH2 centre is ambiguous, so fail closed.
+                suffix_kinds = {
+                    _principal_suffix_for_ligand(mol, lg) for lg in pg_ligs
+                }
+                if len(suffix_kinds) != 1:
+                    return None
+                from ..assembly.naming_utils import (
+                    apply_vowel_elision, _join_multiplied_suffix,
+                )
+                suffix = suffix_kinds.pop()
+                mult = _multiplicative_prefix(len(pg_ligs))  # '', 'di', 'tri'
+                full_suffix = _join_multiplied_suffix(mult, suffix)
+                parent_with_suffix = apply_vowel_elision(parent_name, full_suffix)
+                full_name = f"{ligand_prefix}{parent_with_suffix}"
+                # No Stock notation (hydride-parent system implicit +4)
+                return (full_name, parent_name, ligand_tree_nodes)
+
+            full_name = f"{ligand_prefix}{parent_name}"
             # No Stock notation (hydride-parent system implicit +4)
             return (full_name, parent_name, ligand_tree_nodes)
 

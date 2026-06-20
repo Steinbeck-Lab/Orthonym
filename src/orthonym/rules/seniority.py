@@ -454,7 +454,7 @@ PREFIX_FORMS = {
     "urea": "carbamoylamino",
     "guanidine": "guanidino",
     "carbamate": None,                  # functional class only
-    "boronic_acid": "dihydroxyboranyl",
+    "boronic_acid": "borono",           # P-68.1.4.2: -B(OH)2 preselected prefix (not 'dihydroxyboranyl')
     "n_oxide_aromatic": None,           # functional class only
     "n_oxide_aliphatic": None,          # functional class only
     "primary_sulfonamide": "sulfamoyl",

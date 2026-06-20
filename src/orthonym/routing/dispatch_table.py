@@ -118,6 +118,7 @@ class StoutClass(_StrEnumBase):
     GENERAL = "general"                       # row 18; namer.py:1124-1131; CFR-02 D-08
 
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
+    INORGANIC_ACID = "inorganic_acid"             # v22 G2 COV-02 (P-67/P-65.2.1; priority 40, before ORGANOMETALLIC@50)
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -930,6 +931,26 @@ def _handle_general(mol, smiles, canonical_smiles, features=None, *,
     return None
 
 
+def _is_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v22 G2 COV-02; priority 40 (before ORGANOMETALLIC@50 so silicic acid is
+    not claimed as a Si organometallic).
+
+    PURE: exact full-molecule canonical-SMILES match only (zero false positives;
+    charged conjugate bases / esters / derivatives never match). No mutation.
+    """
+    if mol is None:
+        return False
+    from orthonym.rules.inorganic_acids import name_inorganic_acid
+    return name_inorganic_acid(mol) is not None
+
+
+def _handle_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the retained free-inorganic-oxoacid PIN (P-67/P-65.2.1), else None
+    (cascade-continuation per CONTEXT D-02)."""
+    from orthonym.rules.inorganic_acids import name_inorganic_acid
+    return name_inorganic_acid(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -950,6 +971,21 @@ def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
 # sibling-phase insertions. The cascade order mirrors namer.py:852-1131
 # byte-identical.
 # ---------------------------------------------------------------------------
+
+# --- v22 G2 COV-02: INORGANIC_ACID at priority 40 (intercepts BEFORE ---
+# ORGANOMETALLIC@50 so silicic acid O[Si](O)(O)O is named, not claimed as a Si
+# organometallic; and before GENERAL so free phosphoric/sulfuric/carbonic acids
+# stop returning 'trihydrophosphate'/'unknown'/'methane'). Exact canonical-SMILES
+# match -> zero false positives; cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.INORGANIC_ACID, priority=40, tier=1,
+    predicate=_is_inorganic_acid, handler=_handle_inorganic_acid,
+    iupac_section="Blue Book P-67 / P-65.2.1 / P-68.2",
+    description="Free mononuclear/simple-polynuclear inorganic oxoacid with a "
+                "retained/preselected PIN (phosphoric/sulfuric/carbonic/silicic/"
+                "nitric/diphosphoric/disulfuric acid); exact canonical-SMILES lookup",
+)
+
 
 # --- Phase 161: ORGANOMETALLIC at priority 50 (intercepts BEFORE SALT@100) ---
 # Per CONTEXT D-02: ferrocene/ruthenocene/all sandwich complexes are

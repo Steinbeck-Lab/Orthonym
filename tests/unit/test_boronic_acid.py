@@ -42,9 +42,14 @@ class TestBoronicAcidNaming:
         assert features.principal_group == "boronic_acid"
 
     def test_boronic_acid_prefix_form_in_seniority(self):
-        """Boronic acid prefix 'dihydroxyboranyl' is registered."""
+        """Boronic acid prefix is 'borono' (v22 G2 COV-02; P-68.1.4.2).
+
+        -B(OH)2 has the *preselected* prefix 'borono' (Blue Book P-68.1.4.2 /
+        P-67.1.4.2 retained); 'dihydroxyboranyl' is the non-PIN systematic
+        alternative. Updated from the pre-G2 'dihydroxyboranyl' assertion.
+        """
         from orthonym.rules.seniority import PREFIX_FORMS
-        assert PREFIX_FORMS.get("boronic_acid") == "dihydroxyboranyl"
+        assert PREFIX_FORMS.get("boronic_acid") == "borono"
 
     def test_boronic_acid_suffix_form_in_seniority(self):
         """Boronic acid suffix forms are registered."""

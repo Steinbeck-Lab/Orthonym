@@ -1075,6 +1075,25 @@ def apply_vowel_elision(parent_stem: str, suffix: str) -> str:
     return parent_stem + suffix
 
 
+def _join_multiplied_suffix(suffix_multiplier: str, suffix: str) -> str:
+    """Join a numerical multiplier to a characteristic-group suffix with the
+    IUPAC P-63.1.2 / P-16.3.3 vowel elision applied.
+
+    The final letter 'a' of a multiplying prefix ('tetra', 'penta', 'hexa', …)
+    is elided before the suffix '-ol' (tetra+ol → tetrol, hexa+ol → hexol;
+    Blue Book P-63.1.2: ``benzenehexol``, ``cyclohexane-1,2,3,4-tetrol``).
+
+    The elision is SCOPED to '-ol' specifically: ketone/aldehyde/amine suffixes
+    do NOT take it (``butane-1,2,3,4-tetraone`` keeps its 'a' — verified against
+    OPSIN), and 'di'/'tri' carry no terminal 'a', so 'diol'/'triol' are
+    unaffected. Keeping the scope tight avoids emitting wrong forms like the
+    non-existent '-tetrone'.
+    """
+    if suffix == "ol" and suffix_multiplier.endswith("a"):
+        return suffix_multiplier[:-1] + suffix
+    return suffix_multiplier + suffix
+
+
 # ============================================================================
 # Suffix with Locants Formatting (PIN Infix Style)
 # ============================================================================
@@ -1121,8 +1140,9 @@ def format_suffix_with_locants(
         # Format locants as comma-separated
         locant_str = ",".join(str(loc) for loc in suffix_locants)
 
-        # Build the suffix part: multiplier + suffix (e.g., 'diol', 'ol')
-        full_suffix = suffix_multiplier + suffix
+        # Build the suffix part: multiplier + suffix (e.g., 'diol', 'tetrol').
+        # P-63.1.2 elides multiplier-final 'a' before '-ol' (tetra+ol → tetrol).
+        full_suffix = _join_multiplied_suffix(suffix_multiplier, suffix)
 
         # When there's a multiplier (e.g., 'di'), the base keeps terminal 'e'
         # because 'diol' starts with 'd' (consonant), so no elision.
@@ -1158,7 +1178,7 @@ def format_suffix_with_locants(
         if suffix_multiplier:
             # Multiple terminal groups without locants (e.g., diacids):
             # 'butanedioic acid', 'pentanedioic acid'
-            full_suffix = suffix_multiplier + suffix
+            full_suffix = _join_multiplied_suffix(suffix_multiplier, suffix)
             return apply_vowel_elision(base + "e", full_suffix)
         # DD2 (Phase D, P-56.2): a suffix led by an italic chalcogen-pair
         # descriptor ('SO-thioperoxol' / 'OS-thioperoxol') needs a separating

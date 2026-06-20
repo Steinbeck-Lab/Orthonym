@@ -346,6 +346,19 @@ RETAINED_NAMES = {
     "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "deoxyadenosine",
     "Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "deoxyguanosine",
     "Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1": "deoxycytidine",
+    # v22 G2 COV-02: nucleotide retained names re-admitted on the hand-curated
+    # side (the adenylic JSON deny entries carry hc_override). These are
+    # correct-but-NON-PIN names (the PIN is the full systematic
+    # adenosine/inosine 5'-(dihydrogen phosphate)); re-admitting them stops the
+    # egregious atom-dropping mis-name AMP→'6-aminopyrimidine' /
+    # IMP→'6-oxo-1,3-diazine'. A10 honest-fail-on-data: a correct retained name
+    # beats a wrong systematic one when no PIN is computable. The inosinic KETO
+    # tautomer is added explicitly (OPSIN normalises the name to the enol form,
+    # which already promotes via the OPSIN import). OPSIN-RT verified.
+    "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O": "5'-adenylic acid",
+    "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1OP(=O)(O)O": "2'-adenylic acid",
+    "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](OP(=O)(O)O)[C@H]1O": "3'-adenylic acid",
+    "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O": "5'-inosinic acid",
 
     # === DISACCHARIDES (Phase 94) ===
     # NOTE: OPSIN cannot parse most disaccharide names -- InChI validation used
