@@ -255,6 +255,301 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     return name
 
 
+# ============================================================================
+# Polycomponent ortho-fusion constructor (P-25.3.4) — v22 Phase G1b (DD7 COV-01)
+# ============================================================================
+#
+# Builds systematic fusion PINs for the cata-fused single-base monocyclic-
+# component "star" sub-class: a single most-senior base ring (P-25.3.2 / FR-2.3)
+# with >=2 attached monocyclic components, each ortho-fused to the base by exactly
+# one bond, no interior (peri) atom, unsubstituted, no carbocyclic attached
+# component. This replaces the `len(atom_rings) != 2 -> return None` decision-only
+# gate for the structures it can name CORRECTLY (e.g. difuro[3,2-b:2',3'-e]pyridine,
+# furo[3,2-b]thieno[2,3-e]pyridine); everything outside the sub-class fails closed
+# (returns None -> existing path / G0 fail-closed veto). It does NOT handle
+# multiparent bases ("difuran"), ortho-peri (interior atom), second-order attached
+# components, bridged-AND-fused, or carbocyclic children (those are deferred, A10).
+#
+# Source: IUPAC 2013 Blue Book P-25.3.1.3 (descriptor construction),
+#         P-25.3.2 (base component), https://iupac.qmul.ac.uk/fusedring/FR23.html
+
+# Carbocyclic attached components (benzo/cyclopenta...) are refused: nearly all
+# 3-ring benzo-fused systems are RETAINED (acridine/carbazole/dibenzofuran) and
+# named upstream; emitting a systematic dibenzo[...] here would be a non-PIN.
+_PCF_CARBOCYCLIC = {
+    'benzene', 'cyclopentadiene', 'cyclopentene',
+    'cycloheptadiene', 'cycloheptene', 'cyclohexene',
+}
+_PCF_MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+# Heteroatom seniority for the base's isolated IUPAC numbering (senior -> low
+# locant): O > S > Se > Te > N > P > As > B (Hantzsch-Widman element order).
+_PCF_HET_NUM_SENIORITY = {
+    'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4, 'P': 5, 'As': 6, 'Sb': 7, 'B': 8,
+}
+
+
+def _pcf_ring_cycle(mol, ring_atoms: List[int]) -> Optional[List[int]]:
+    """Return the ring atoms in cyclic adjacency order, or None if not a simple
+    monocycle (a fused/interior atom has !=2 in-ring neighbours)."""
+    ring_set = set(ring_atoms)
+    adj = {}
+    for idx in ring_atoms:
+        nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if n.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return None
+        adj[idx] = nbrs
+    start = ring_atoms[0]
+    order = [start]
+    prev, curr = start, adj[start][0]
+    while curr != start:
+        order.append(curr)
+        nxt = [n for n in adj[curr] if n != prev]
+        if not nxt:
+            return None
+        prev, curr = curr, nxt[0]
+    return order if len(order) == len(ring_atoms) else None
+
+
+def _pcf_base_numberings(mol, base_ring: List[int]) -> List[List[int]]:
+    """Candidate isolated IUPAC numberings of the base monocycle: all
+    rotations + reflections that achieve the most-senior-heteroatom locant key
+    (heteroatoms at lowest locants, senior element first). For pyridine/furan
+    this is the 2 directions with the heteroatom at position 1; for benzene all
+    12 orderings. The descriptor-minimising one is chosen by the caller."""
+    cyc = _pcf_ring_cycle(mol, base_ring)
+    if cyc is None:
+        return []
+    n = len(cyc)
+    orderings = []
+    for start in range(n):
+        for direction in (1, -1):
+            orderings.append([cyc[(start + direction * i) % n] for i in range(n)])
+
+    def het_key(order):
+        items = []
+        for i, a in enumerate(order):
+            sym = mol.GetAtomWithIdx(a).GetSymbol()
+            if sym != 'C':
+                items.append((i + 1, _PCF_HET_NUM_SENIORITY.get(sym, 9)))
+        return tuple(sorted(items))
+
+    best = min((het_key(o) for o in orderings), default=())
+    uniq, seen = [], set()
+    for o in orderings:
+        if het_key(o) == best and tuple(o) not in seen:
+            seen.add(tuple(o))
+            uniq.append(o)
+    return uniq
+
+
+def _pcf_edge_descriptor(border: List[int], child_order: List[int],
+                         shared: Set[int]) -> Optional[Tuple[str, Tuple[int, int]]]:
+    """For a fixed base numbering `border`, return (edge_letter, (child_lo,
+    child_hi)) for the shared ortho edge. Child locants are cited in the
+    base-lettering direction (child locant of the lower-position base atom
+    first). Mirrors fusion_descriptors.generate_fusion_descriptor lower/higher
+    + wraparound logic."""
+    n = len(border)
+    a, b = list(shared)
+    try:
+        pa, pb = border.index(a), border.index(b)
+    except ValueError:
+        return None
+    if pa < pb:
+        if pb - pa == 1:
+            lower, higher, edge = a, b, pa
+        elif pb - pa == n - 1:
+            lower, higher, edge = b, a, pb
+        else:
+            return None
+    else:
+        if pa - pb == 1:
+            lower, higher, edge = b, a, pb
+        elif pa - pb == n - 1:
+            lower, higher, edge = a, b, pa
+        else:
+            return None
+    if edge >= 26:
+        return None
+    letter = chr(ord('a') + edge)
+    try:
+        clo = child_order.index(lower) + 1
+        chi = child_order.index(higher) + 1
+    except ValueError:
+        return None
+    return letter, (clo, chi)
+
+
+def _pcf_assemble(per, base_name: str) -> str:
+    """Assemble the fusion name from per-attachment (component_name, letter,
+    locs). Identical components are multiplied (difuro) and their descriptors
+    combined in one bracket (colon-separated, primed on repeats); distinct
+    components are cited as separate prefixes in alphanumerical order."""
+    from .fusion_descriptors import get_fusion_prefix
+    groups = defaultdict(list)
+    for (nm, letter, locs) in per:
+        groups[nm].append((letter, locs))
+
+    tokens = []  # (sort_key, token)
+    for nm, items in groups.items():
+        items.sort(key=lambda x: x[0])  # by edge letter
+        prefix = get_fusion_prefix(nm)
+        mult = _PCF_MULTIPLIERS.get(len(items), '')
+        any_locs = any(locs is not None for (_, locs) in items)
+        parts = []
+        for k, (letter, locs) in enumerate(items):
+            prime = "'" * k
+            if locs is None:
+                parts.append(letter)
+            else:
+                lo, hi = locs
+                parts.append(f"{lo}{prime},{hi}{prime}-{letter}")
+        sep = ":" if any_locs else ","
+        tokens.append((prefix, f"{mult}{prefix}[{sep.join(parts)}]"))
+
+    tokens.sort(key=lambda t: t[0])  # alphanumerical citation order
+    return "".join(t[1] for t in tokens) + base_name
+
+
+def _pcf_name_with_base(mol, comps: List[List[int]], names: List[str],
+                        base_idx: int) -> Optional[str]:
+    """Try to name the system with comps[base_idx] as the single base ring.
+    Returns the fusion name, or None if the star topology is not satisfied."""
+    from .fusion_descriptors import _get_iupac_ring_order_for_fusion
+
+    base_ring = comps[base_idx]
+    base_name = names[base_idx]
+    base_set = set(base_ring)
+
+    attachments = []  # (comp_idx, name, shared_set)
+    for i, c in enumerate(comps):
+        if i == base_idx:
+            continue
+        shared = base_set & set(c)
+        if len(shared) != 2:
+            return None  # not first-order star (peri / multiparent / disjoint)
+        s = list(shared)
+        if mol.GetBondBetweenAtoms(s[0], s[1]) is None:
+            return None  # shared atoms not a bond -> not an ortho edge
+        if names[i] in _PCF_CARBOCYCLIC:
+            return None  # carbocyclic child -> defer (retained dibenzo systems)
+        attachments.append((i, names[i], shared))
+
+    if not attachments:
+        return None
+
+    borders = _pcf_base_numberings(mol, base_ring)
+    if not borders:
+        return None
+
+    best = None  # (key, name)
+    for border in borders:
+        per = []
+        ok = True
+        for (ci, nm, shared) in attachments:
+            child_order = _get_iupac_ring_order_for_fusion(
+                mol, comps[ci], shared, is_child=True)
+            res = _pcf_edge_descriptor(border, child_order, shared)
+            if res is None:
+                ok = False
+                break
+            letter, locs = res
+            per.append((nm, letter, locs))
+        if not ok:
+            continue
+        # Lowest letter set; tiebreak by letters in alphanumerical citation
+        # order (so the first-cited component gets the lowest letter), then by
+        # child locants in citation order. P-25.3.3 / P-25.3.1.3.
+        from .fusion_descriptors import get_fusion_prefix
+        by_cite = sorted(per, key=lambda p: (get_fusion_prefix(p[0]), p[1]))
+        key = (tuple(sorted(p[1] for p in per)),
+               tuple(p[1] for p in by_cite),
+               tuple(p[2] for p in by_cite))
+        name = _pcf_assemble(per, base_name)
+        if best is None or key < best[0]:
+            best = (key, name)
+
+    return best[1] if best else None
+
+
+def _try_polycomponent_fusion_name(mol) -> Optional[str]:
+    """Systematic fusion name for a cata-fused single-base monocyclic-component
+    star system (P-25.3.4 restricted sub-class). Returns the PIN, or None when
+    the molecule is outside the handled sub-class (fail closed; the caller then
+    keeps its existing behaviour). MUST be invoked AFTER retained-name checks —
+    it does not recognise retained systems and would emit a systematic name for
+    them (acridine etc.); carbocyclic children are additionally refused.
+
+    Source: IUPAC 2013 Blue Book P-25.3.1.3, P-25.3.2; FR-2.3.
+    """
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+    if len(atom_rings) < 3:
+        return None  # >=3 components only; 2-component handled by existing path
+
+    # Unsubstituted: every heavy atom is a ring atom (substituted/funct. systems
+    # need final-system peripheral numbering -> deferred, fail closed).
+    ring_atom_set = set()
+    for r in atom_rings:
+        ring_atom_set.update(r)
+    for atom in mol.GetAtoms():
+        if atom.GetIdx() not in ring_atom_set and atom.GetAtomicNum() != 1:
+            return None
+
+    # Cata-fused only: no atom shared by >=3 rings (no interior/peri atom).
+    membership = defaultdict(int)
+    for r in atom_rings:
+        for idx in r:
+            membership[idx] += 1
+    if any(c >= 3 for c in membership.values()):
+        return None
+
+    # Each component must be a recognised monocycle.
+    comps = [list(r) for r in atom_rings]
+    from .fusion_descriptors import _identify_ring_name
+    names = [_identify_ring_name(mol, c) for c in comps]
+    if any(not nm for nm in names):
+        return None
+
+    # FR-2.3(a): base is among the most-senior components. Try EACH most-senior
+    # component as base; only the one(s) satisfying the single-base star topology
+    # yield a name. Return iff the produced names are unique (deterministic; the
+    # central ring of a linear-symmetric system is the only valid base, and
+    # symmetric duplicates collapse to one name). Multiparent (two senior rings,
+    # both terminal -> no valid base) collapses to no name -> None.
+    from .fused_ring_selection import _rank
+    ranks = [_rank(mol, set(c)) for c in comps]
+    min_rank = min(ranks)
+    base_candidates = [i for i, r in enumerate(ranks) if r == min_rank]
+
+    produced = set()
+    for bidx in base_candidates:
+        nm = _pcf_name_with_base(mol, comps, names, bidx)
+        if nm:
+            produced.add(nm)
+    if len(produced) == 1:
+        return next(iter(produced))
+    return None
+
+
+def _core_covers_ring_system(mol, atom_mapping) -> bool:
+    """Does the matched fused-ring core cover every atom of the fused ring
+    system(s) it sits in? Mirrors composer._fused_core_covers_ring_system (kept
+    local to avoid the composer->fused_rings circular import). int keys in
+    atom_mapping are the named core atoms; a pendant ring joined by a single
+    (non-ring) bond is a SEPARATE ring system so a legit cyclic substituent does
+    not trip this. Empty mapping (exact-match path) -> True (no-op)."""
+    core_atoms = {k for k in (atom_mapping or {}) if isinstance(k, int)}
+    if not core_atoms:
+        return True
+    for rs in get_ring_systems(mol):
+        rs = set(rs)
+        if (core_atoms & rs) and not rs.issubset(core_atoms):
+            return False
+    return True
+
+
 def _build_algorithmic_locant_map(
     mol,
     parent_ring: List[int],
@@ -528,9 +823,26 @@ def name_fused_heterocycle(mol):
         algorithmic_name = _try_algorithmic_fusion_name(mol)
         if algorithmic_name:
             return (algorithmic_name, ring_atoms, {}, True)
+        # v22 G1b (P-25.3.4): polycomponent ortho-fusion constructor for 3+-
+        # component cata-fused monocyclic-component systems with no catalog core.
+        poly = _try_polycomponent_fusion_name(mol)
+        if poly:
+            return (poly, ring_atoms, {}, True)
         return None
 
     core_name, atom_mapping, _core_smiles = core_result
+
+    # v22 G1b (P-25.3.4): a 2-component catalog core (e.g. furo[3,2-b]pyridine)
+    # can match as a SUBSTRUCTURE of a larger polycomponent fused system (e.g.
+    # difuropyridine); its leftover fused ring would be mis-named as a phantom
+    # acyclic substituent (the G0 '7-ethoxyfuro[3,2-b]pyridine' defect). When the
+    # matched core does NOT cover the whole fused ring system, try the
+    # polycomponent constructor first; None -> the downstream G0 coverage veto
+    # still fails closed on the phantom name.
+    if not _core_covers_ring_system(mol, atom_mapping):
+        poly = _try_polycomponent_fusion_name(mol)
+        if poly:
+            return (poly, ring_atoms, {}, True)
 
     # NOTE: General indicated hydrogen (_compute_general_indicated_h) is
     # implemented but NOT wired here. Dictionary-matched fused systems handle

@@ -79,15 +79,35 @@ def test_aromatic_in_cage_is_deterministic(smiles):
 
 
 # --------------------------------------------------------------------------- #
-# Family 2 — polycomponent fused: matched core covers only PART of the system #
+# Family 2 — polycomponent fused: matched core covers only PART of the system. #
+# G0 (2026-06-18) made these fail closed to kill the phantom 'ethoxy'. v22      #
+# Phase G1b (2026-06-20) SUPERSEDES the outcome for the *unsubstituted* parents:#
+# the polycomponent ortho-fusion constructor now names them CORRECTLY. The G0   #
+# coverage veto remains the backstop for partial-core systems G1b cannot name   #
+# (SUBSTITUTED variants — G1b refuses substituted -> still fail closed).        #
 # --------------------------------------------------------------------------- #
-PARTIAL_FUSED_CORE = [
-    "c1cc2nc3ccoc3cc2o1",   # difuro[3,2-b:2',3'-e]pyridine (gold DD7-S1-safety-2)
-    "c1cc2nc3ccsc3cc2o1",   # furo+thieno+pyridine (DD7-fusion-2)
+PARTIAL_FUSED_CORE_NAMED = [
+    ("c1cc2nc3ccoc3cc2o1", "difuro[3,2-b:2',3'-e]pyridine"),     # gold DD7-S1-safety-2
+    ("c1cc2nc3ccsc3cc2o1", "furo[3,2-b]thieno[2,3-e]pyridine"),  # DD7-fusion-2
+]
+
+# Partial-core systems G1b still CANNOT name (substituted) -> the G0 veto fires.
+PARTIAL_FUSED_CORE_STILL_CLOSED = [
+    "Cc1cc2nc3ccoc3cc2o1",   # methyl-difuropyridine (substituted -> G1b refuses)
+    "Clc1cc2nc3ccoc3cc2o1",  # chloro-difuropyridine
 ]
 
 
-@pytest.mark.parametrize("smiles", PARTIAL_FUSED_CORE)
+@pytest.mark.parametrize("smiles,expected", PARTIAL_FUSED_CORE_NAMED)
+def test_partial_fused_core_now_named_by_g1b(smiles, expected):
+    # v22 G1b supersedes the G0 fail-closed for the unsubstituted parent: the
+    # polycomponent constructor names it correctly (and still emits no phantom).
+    out = name_compound(smiles)
+    assert out == expected, f"{smiles} -> {out!r}, expected {expected!r}"
+    assert "ethoxy" not in out.lower()  # no phantom-substituent regression
+
+
+@pytest.mark.parametrize("smiles", PARTIAL_FUSED_CORE_STILL_CLOSED)
 def test_partial_fused_core_fails_closed(smiles):
     out = name_compound(smiles)
     assert is_failure_name(out), f"{smiles} must refuse, got {out!r}"
@@ -95,7 +115,7 @@ def test_partial_fused_core_fails_closed(smiles):
     assert "ethoxy" not in out.lower()
 
 
-@pytest.mark.parametrize("smiles", PARTIAL_FUSED_CORE)
+@pytest.mark.parametrize("smiles", PARTIAL_FUSED_CORE_STILL_CLOSED)
 def test_partial_fused_core_raises_named_limit(smiles):
     with pytest.raises(OrthonymLimitError) as ei:
         Orthonym().name(smiles, raise_on_limit=True)

@@ -91,8 +91,10 @@ def test_protect_unchanged(smiles, expected):
 # Fail-closed boundary: out-of-class systems MUST stay refused (no wrong name) #
 # --------------------------------------------------------------------------- #
 STILL_REFUSED = [
-    "c1cc2nc3ccoc3cc2o1",          # difuropyridine (polycomponent P-25.3.4 -> G1b)
-    "c1cc2nc3ccsc3cc2o1",          # furo+thieno+pyridine (polycomponent -> G1b)
+    # NOTE: difuropyridine + furo+thieno+pyridine were here as polycomponent
+    # out-of-class examples; v22 Phase G1b (2026-06-20) now NAMES them correctly
+    # (difuro[3,2-b:2',3'-e]pyridine etc.) via the polycomponent ortho-fusion
+    # constructor, so they moved out of this fail-closed list.
     "C1Cc2ccccc2C13Cc1ccccc1C3",   # spirobi-indane (polyspiro -> G4)
     # CRITICAL-1 (code review): ortho-fused small rings share a BOND with naphthalene
     # (fusion nomenclature, e.g. 1H-cyclopropa[b]naphthalene) — the bridgeheads are
