@@ -766,3 +766,189 @@ def is_tetrahydronaphthalene(mol: Chem.Mol, fused_ring_atoms: Set[int]) -> bool:
 
     # Tetrahydronaphthalene: 4 sp3 + 6 aromatic
     return sp3_count == 4 and aromatic_count == 6
+
+
+# =============================================================================
+# Hydrogenated fused carbocycles with residual ring double bonds (V-5 / V2 theme)
+# =============================================================================
+
+# Number of ring atoms -> mancude parent that has a populated ``iupac_numbering``
+# map in POLYCYCLIC_DATA. Only parents whose numbering (incl. the lettered fusion
+# locants 4a/8a/...) is stored can be numbered correctly; everything else fails
+# closed (no wrong locants). 10 = naphthalene covers the common V-5 class.
+_HYDRO_FUSED_PARENT_BY_SIZE: Dict[int, str] = {
+    10: 'naphthalene',
+}
+
+
+def _locant_key(loc: Union[int, str, Tuple[int, str]]) -> Tuple[int, str]:
+    """Sortable key for a locant that may be an int, a ``(int, str)`` tuple, or a
+    string like ``'4a'`` — so that ``4 < 4a < 5`` and integers/tuples mix cleanly."""
+    if isinstance(loc, tuple):
+        return (int(loc[0]), str(loc[1]))
+    if isinstance(loc, int):
+        return (loc, '')
+    if isinstance(loc, str):
+        i = 0
+        while i < len(loc) and loc[i].isdigit():
+            i += 1
+        if i == 0:
+            return (999, loc)
+        return (int(loc[:i]), loc[i:])
+    return (999, str(loc))
+
+
+def _locant_display(loc: Union[int, str, Tuple[int, str]]) -> str:
+    """Render a locant (int / ``(int, str)`` tuple / ``'4a'`` string) as the
+    string used in a name (``4a``, ``8a``, ``1`` ...)."""
+    if isinstance(loc, tuple):
+        return f"{loc[0]}{loc[1]}"
+    return str(loc)
+
+
+def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
+    """Name a *partially* saturated fused bicyclic carbocycle (naphthalene-type).
+
+    This covers the V-5 / V2-theme defect: a fused carbocycle that is the
+    hydrogenated form of a mancude parent (e.g. naphthalene) but still retains
+    one or more *isolated* (non-aromatic) ring C=C double bonds. The legacy
+    ``_name_saturated_fused_carbocyclic`` blindly emits the fully-saturated
+    (``decahydro``) name for any non-aromatic two-ring carbocycle, dropping the
+    residual double bond and naming a different molecule.
+
+    Algorithm (IUPAC 2013 P-31.1.4):
+      1. Require a two-ring, all-carbon, non-aromatic system with >= 1 residual
+         ring double bond (fully-saturated systems are handled as ``perhydro``
+         elsewhere -> return None here).
+      2. Identify the mancude parent by ring-atom count; require a populated
+         ``iupac_numbering`` map (with lettered fusion locants).
+      3. Enumerate every automorphic numbering of the parent skeleton onto the
+         molecule (bond-order-agnostic substructure match), and pick the one
+         giving the LOWEST locant set to the ``hydro`` prefixes (the sp3 ring
+         atoms), then to the residual double bonds (P-31.1.4.3.4).
+      4. Emit ``<locants>-<count>hydro<parent>`` (e.g.
+         ``1,2,3,4,4a,5,6,8a-octahydronaphthalene``).
+
+    Fails closed (returns None) for any system it cannot number correctly so it
+    never emits a wrong name.
+
+    Args:
+        mol: RDKit molecule (a two-ring carbocyclic, non-aromatic fused system).
+
+    Returns:
+        The hydro-prefixed parent name, or None if not handled (fail closed).
+    """
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+
+    if mol is None:
+        return None
+
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+    if len(atom_rings) != 2:
+        return None
+
+    ring_atoms: Set[int] = set()
+    for ring in atom_rings:
+        ring_atoms.update(ring)
+
+    # Carbocyclic only; no aromatic ring atoms (the aromatic-bearing partial
+    # case is handled by the polycyclics PAH path).
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None
+        if atom.GetIsAromatic():
+            return None
+
+    # Residual ring double bonds (non-aromatic C=C with both atoms in the ring).
+    ring_double_bonds: List[Tuple[int, int]] = []
+    for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
+            continue
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in ring_atoms and b in ring_atoms:
+            ring_double_bonds.append((a, b))
+
+    # No residual double bond -> fully saturated; perhydro is handled elsewhere.
+    if not ring_double_bonds:
+        return None
+
+    # The sp3 (saturated / "hydro") ring atoms.
+    sp3_atoms = {
+        idx for idx in ring_atoms
+        if mol.GetAtomWithIdx(idx).GetHybridization() == Chem.HybridizationType.SP3
+    }
+    sp2_atoms = ring_atoms - sp3_atoms
+
+    # Every sp2 ring atom must be accounted for by a ring double bond (no
+    # exocyclic unsaturation such as an exocyclic =CH2 or =O on the ring) — else
+    # the hydro count would be wrong. Fail closed otherwise.
+    if len(sp2_atoms) != 2 * len(ring_double_bonds):
+        return None
+
+    parent = _HYDRO_FUSED_PARENT_BY_SIZE.get(len(ring_atoms))
+    if parent is None:
+        return None
+    entry = POLYCYCLIC_DATA.get(parent)
+    if entry is None:
+        return None
+    numbering = entry.get('iupac_numbering') or {}
+    canonical_smiles = entry.get('canonical_smiles')
+    if not numbering or not canonical_smiles:
+        return None
+
+    canonical_mol = Chem.MolFromSmiles(canonical_smiles)
+    if canonical_mol is None:
+        return None
+
+    # Bond-order-agnostic query: the stored parent SMILES is aromatic, but the
+    # molecule is (partly) saturated, so match on connectivity only while keeping
+    # the canonical atom order so ``numbering`` (keyed by canonical index) applies.
+    params = Chem.AdjustQueryParameters.NoAdjustments()
+    params.makeBondsGeneric = True
+    params.aromatizeIfPossible = False
+    params.adjustDegree = False
+    query = Chem.AdjustQueryProperties(canonical_mol, params)
+
+    matches = mol.GetSubstructMatches(query, uniquify=False)
+    if not matches:
+        return None
+
+    n_hydro = len(sp3_atoms)
+    prefix = SATURATION_PREFIXES.get(n_hydro)
+    if prefix is None:
+        return None
+
+    n_canonical = canonical_mol.GetNumAtoms()
+
+    # Choose the numbering minimizing (hydro-locant set, then residual-double-bond
+    # locant set) per P-31.1.4.3.4 (lowest locants to hydro prefixes + ene).
+    best_key = None
+    best_map: Optional[Dict[int, Any]] = None
+    for match in matches:
+        if len(match) != n_canonical:
+            continue
+        atom_to_locant = {
+            match[c_idx]: loc
+            for c_idx, loc in numbering.items()
+            if c_idx < len(match)
+        }
+        if len(atom_to_locant) != len(ring_atoms):
+            continue
+        hydro_locs = sorted((_locant_key(atom_to_locant[a]) for a in sp3_atoms))
+        ene_locs = sorted(
+            min(_locant_key(atom_to_locant[i]), _locant_key(atom_to_locant[j]))
+            for i, j in ring_double_bonds
+        )
+        key = (hydro_locs, ene_locs)
+        if best_key is None or key < best_key:
+            best_key = key
+            best_map = atom_to_locant
+
+    if best_map is None:
+        return None
+
+    hydro_display = sorted((best_map[a] for a in sp3_atoms), key=_locant_key)
+    locant_str = ','.join(_locant_display(loc) for loc in hydro_display)
+    return f"{locant_str}-{prefix}{parent}"

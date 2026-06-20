@@ -2154,6 +2154,20 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
         if mol.GetAtomWithIdx(idx).GetSymbol() != 'C':
             return None
 
+    # V-5 / V2 theme (P-31.1.4): if the system retains an isolated (non-aromatic)
+    # ring C=C, it is only PARTIALLY saturated — emitting the fully-saturated
+    # (decahydro) name here drops the double bond and names a different molecule.
+    # Delegate to the partial-saturation namer (correct hydro count + 4a/8a-aware
+    # lowest locant set), which fails closed (None) for systems it cannot number.
+    has_ring_double = any(
+        b.GetBondType() == Chem.BondType.DOUBLE and not b.GetIsAromatic()
+        and b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
+        for b in mol.GetBonds()
+    )
+    if has_ring_double:
+        from .partial_saturation import name_hydrogenated_fused_carbocycle
+        return name_hydrogenated_fused_carbocycle(mol)
+
     # Get ring sizes (sorted smallest first for lookup)
     size1 = len(atom_rings[0])
     size2 = len(atom_rings[1])

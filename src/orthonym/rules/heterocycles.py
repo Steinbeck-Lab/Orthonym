@@ -641,12 +641,20 @@ def name_heterocycle(mol, ring_atoms) -> str:
 
     ring_size = info['ring_size']
 
-    # For rings > 10: use replacement nomenclature (cycloXXXane parent)
+    # For rings > 10: use replacement nomenclature (cycloXXXane parent).
+    # V-6 / P-31.1.4: enumerate the actual ring double bonds (kekulising a
+    # conjugated macrocycle RDKit reads as aromatic) so a polyene is named with
+    # ALL its bonds + locants instead of a single bare 'ene'.
     if ring_size > 10:
+        macro_het, double_locants = _orient_macrocycle_for_replacement(mol, ring_atoms)
+        if macro_het is None:
+            # Could not enumerate -> fall back to the heteroatom-only orientation.
+            macro_het, double_locants = heteroatom_locants, None
         return _build_replacement_name(
-            heteroatom_locants,
+            macro_het,
             ring_size,
-            info['is_saturated']
+            info['is_saturated'],
+            double_locants=double_locants,
         )
 
     hw_name = build_hw_name(
@@ -671,10 +679,110 @@ def name_heterocycle(mol, ring_atoms) -> str:
     return hw_name
 
 
+def _macrocycle_ordered_ring(mol, ring_set: Set[int]) -> Optional[List[int]]:
+    """Return the ring atom indices in connected (cycle) order, or None if the
+    atoms do not form a single simple cycle."""
+    start = min(ring_set)
+    order = [start]
+    prev = None
+    cur = start
+    while len(order) < len(ring_set):
+        nxt = None
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in ring_set and ni != prev and ni not in order:
+                nxt = ni
+                break
+        if nxt is None:
+            return None
+        order.append(nxt)
+        prev = cur
+        cur = nxt
+    # Confirm ring closure (last atom adjacent to the start).
+    if start not in {nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()}:
+        return None
+    return order
+
+
+def _macrocycle_db_locant(p: int, q: int, ring_size: int) -> int:
+    """Locant cited for a ring double bond between adjacent positions p, q:
+    the lower locant, except the ring-closure (1, N) bond which is cited as N."""
+    if {p, q} == {1, ring_size}:
+        return ring_size
+    return min(p, q)
+
+
+def _orient_macrocycle_for_replacement(
+    mol, ring_atoms
+) -> Tuple[Optional[List[Tuple[int, str]]], Optional[List[int]]]:
+    """Number a >10-membered heteromonocycle for replacement ("a") nomenclature.
+
+    Returns ``(heteroatom_locants, double_bond_locants)`` where the numbering
+    minimises, in order (IUPAC 2013 P-31.1.4.3): the heteroatom locant set, then
+    the heteroatoms by element seniority, then the ring double-bond locant set.
+
+    The ring is *kekulised* first so a fully-conjugated macrocycle that RDKit
+    perceives as aromatic (e.g. the V-6 azacyclotrideca-hexaene) yields its
+    localised double bonds instead of zero (the bug that made the old path emit
+    a single bare ``ene``). Returns ``(None, None)`` if the ring cannot be
+    ordered/kekulised, so the caller can fall back safely.
+    """
+    ring_set = set(ring_atoms)
+    ring_size = len(ring_set)
+    het = [a for a in ring_set if mol.GetAtomWithIdx(a).GetSymbol() != 'C']
+    if not het:
+        return None, None
+
+    kmol = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kmol, clearAromaticFlags=True)
+    except Exception:
+        return None, None
+
+    order = _macrocycle_ordered_ring(kmol, ring_set)
+    if order is None or len(order) != ring_size:
+        return None, None
+
+    ring_double_bonds: List[Tuple[int, int]] = []
+    for bond in kmol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.DOUBLE:
+            continue
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            ring_double_bonds.append((i, j))
+
+    best = None
+    for start in range(ring_size):
+        for direction in (1, -1):
+            seq = [order[(start + k * direction) % ring_size] for k in range(ring_size)]
+            loc = {a: idx + 1 for idx, a in enumerate(seq)}
+            het_set = sorted(loc[a] for a in het)
+            seniority = sorted(
+                (HETEROATOM_PRIORITY.get(kmol.GetAtomWithIdx(a).GetSymbol(), 999), loc[a])
+                for a in het
+            )
+            dbl = sorted(
+                _macrocycle_db_locant(loc[i], loc[j], ring_size)
+                for i, j in ring_double_bonds
+            )
+            key = (het_set, seniority, dbl)
+            if best is None or key < best[0]:
+                best = (key, loc, dbl)
+
+    loc = best[1]
+    dbl = best[2]
+    heteroatom_locants = sorted(
+        ((loc[a], kmol.GetAtomWithIdx(a).GetSymbol()) for a in het),
+        key=lambda t: t[0],
+    )
+    return heteroatom_locants, dbl
+
+
 def _build_replacement_name(
     heteroatoms: List[Tuple[int, str]],
     ring_size: int,
-    is_saturated: bool
+    is_saturated: bool,
+    double_locants: Optional[List[int]] = None,
 ) -> str:
     """
     Build replacement ("a") nomenclature name for macrocyclic heterocycles.
@@ -688,9 +796,16 @@ def _build_replacement_name(
         heteroatoms: List of (locant, element) tuples
         ring_size: Number of atoms in the ring (> 10)
         is_saturated: True if fully saturated
+        double_locants: Sorted ring double-bond locants (V-6 / P-31.1.4 polyene
+            enumeration). When supplied (incl. an empty list for a saturated
+            ring), the unsaturation suffix is built from the ACTUAL double bonds
+            (``cyclotrideca-2,4,6,8,10,12-hexaene``) instead of the old bare
+            ``ene`` that dropped every bond but one. When None, the legacy
+            saturated/``ene`` behaviour is used (caller could not enumerate).
 
     Returns:
-        IUPAC replacement name (e.g., '1,4,7,10-tetraoxacyclododecane')
+        IUPAC replacement name (e.g., '1,4,7,10-tetraoxacyclododecane',
+        '1-azacyclotrideca-2,4,6,8,10,12-hexaene')
     """
     from ..data.chain_names import get_chain_prefix
 
@@ -730,15 +845,24 @@ def _build_replacement_name(
 
     replacement_prefix = '-'.join(prefix_parts)
 
-    # Build parent ring name
+    # Build parent ring name. 'cyclo' starts with a consonant so the replacement
+    # prefix never needs terminal-'a' elision against it.
     chain_prefix = get_chain_prefix(ring_size)
+
+    if double_locants is not None:
+        # V-6 / P-31.1.4: enumerate ALL ring double bonds with their locants
+        # (e.g. 'a-2,4,6,8,10,12-hexaen' + 'e'), reusing the shared infix builder
+        # so the conventions (euphonic 'a', multipliers, hyphenation) match the
+        # carbocyclic path exactly. Empty list -> 'an' -> '...ane' (saturated).
+        from ..assembly.composition_primitives import _build_unsaturation_infix
+        infix = _build_unsaturation_infix(sorted(double_locants), [])
+        return f"{replacement_prefix}cyclo{chain_prefix}{infix}e"
+
+    # Legacy fallback (double bonds could not be enumerated): keep prior behaviour.
     if is_saturated:
         parent = f"cyclo{chain_prefix}ane"
     else:
         parent = f"cyclo{chain_prefix}ene"
-
-    # Apply 'a' elision: drop terminal 'a' before 'cyclo' (which starts with 'c')
-    # No elision needed since 'cyclo' starts with consonant
 
     return f"{replacement_prefix}{parent}"
 
