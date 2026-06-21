@@ -44,8 +44,9 @@ SATURATION_PREFIXES = [
 # prefix "sulfanediyl"; the legacy "thio" is deprecated (Blue Book P-63.2.5).
 # The two-identical-ring monosulfide PIN is the *multiplicative* name, e.g.
 # c1ccccc1Sc1ccccc1 -> "1,1'-sulfanediyldibenzene" (Blue Book P-63.3, line 27826:
-# "1,1'-sulfanediyldibenzene (PIN) (not 1,1'-thiodibenzene)"), parallel to
-# "1,1'-oxydibenzene" (PIN, line 23921) and "1,1'-peroxydibenzene" (PIN).
+# "1,1'-sulfanediyldibenzene (PIN) (not 1,1'-thiodibenzene)"), parallel to the
+# "1,1'-oxydibenzene" PIN (line 23921); the -O-O- / -S-S- analogues are likewise
+# multiplicative PINs (see the two-atom bridge table below for their cites).
 _SINGLE_ATOM_BRIDGES: Dict[str, str] = {
     "O": "oxy",
     "S": "sulfanediyl",
