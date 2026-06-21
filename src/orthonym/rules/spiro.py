@@ -32,7 +32,13 @@ from rdkit import Chem
 from ..perception.rings import get_spiro_atoms
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
 # Phase 151-04 WR-01: shared IUPAC P-25.3.1.3 heteroatom priority (halogen-aware).
-from ..data.hw_heteroatoms import get_heteroatom_priority
+# v22 G4: get_hw_prefix (clean 'a'-prefix table; get_heteroatom_prefix has typos
+# like Te->'tea') + sort_heteroatoms_by_priority for skeletal-replacement order.
+from ..data.hw_heteroatoms import (
+    get_heteroatom_priority,
+    get_hw_prefix,
+    sort_heteroatoms_by_priority,
+)
 # Phase 151-02 D-11/D-20: locant comparator reuse — no parallel comparator
 # permitted in this module. Imported at the top so the source-grep lock in
 # tests/unit/rules/test_mixed_spiro_fused.py and test_spiro_numbering.py
@@ -57,6 +63,43 @@ _POLYSPIRO_PREFIXES = [
     'tetraspiro', # 4
     'pentaspiro', # 5
 ]
+
+# IUPAC standard bonding numbers for skeletal-replacement ('a') atoms
+# (P-31.1.4.2.4, Table 2.8). A ring heteroatom whose ACTUAL bonding number
+# differs from its standard value carries the lambda convention (P-31.1.4.2):
+# e.g. a tetravalent ring sulfur -> "lambda4" cited after its locant
+# (4lambda4-thiaspiro[3.5]nonane). Elements absent from this table are
+# treated as standard (no lambda) — fail-closed, never a spurious lambda.
+_STANDARD_BONDING_NUMBER = {
+    'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
+    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
+    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
+    'F': 1, 'Cl': 1, 'Br': 1, 'I': 1,
+}
+
+
+def _nonstandard_bonding_number(mol, atom_idx: int) -> Optional[int]:
+    """Return the lambda bonding number (P-31.1.4.2) for a ring skeletal atom
+    whose valence is non-standard, or None when the valence is standard.
+
+    The bonding number is the total count of skeletal/H bonds (RDKit
+    ``GetTotalValence``). It is emitted as ``lambda<n>`` immediately after the
+    atom's locant in the 'a'-replacement prefix, e.g. a tetravalent ring
+    sulfur at locant 4 -> ``4lambda4-thia`` (P-24.2.4.1 spiro example
+    ``4lambda4-thiaspiro[3.5]nonane``).
+
+    Fail-closed: only neutral atoms present in ``_STANDARD_BONDING_NUMBER``
+    can carry a lambda; charged/exotic atoms return None (no spurious lambda).
+    """
+    atom = mol.GetAtomWithIdx(atom_idx)
+    if atom.GetFormalCharge() != 0:
+        return None
+    standard = _STANDARD_BONDING_NUMBER.get(atom.GetSymbol())
+    if standard is None:
+        return None
+    bonding_number = atom.GetTotalValence()
+    return bonding_number if bonding_number != standard else None
 
 
 def is_spiro_system(mol) -> bool:
@@ -535,57 +578,112 @@ def _get_polyspiro_numbering(
     return {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
 
 
+def _spiro_ring_traversals(
+    mol, ring: List[int], spiro_center: int
+) -> List[List[int]]:
+    """Enumerate each directional ordering of a ring's NON-spiro atoms.
+
+    Each ordering starts at a spiro-centre neighbour and walks away from the
+    centre around the ring. A simple ring yields two orderings (one per spiro
+    neighbour, i.e. the two numbering directions); each has ``len(ring) - 1``
+    atoms (the spiro centre itself is excluded). Used to enumerate the
+    candidate IUPAC spiro numberings so the lowest-locant rule can choose
+    among them deterministically.
+    """
+    ring_set = set(ring)
+    spiro_neighbors = [
+        n.GetIdx() for n in mol.GetAtomWithIdx(spiro_center).GetNeighbors()
+        if n.GetIdx() in ring_set
+    ]
+    traversals: List[List[int]] = []
+    for start in spiro_neighbors:
+        ordered = [start]
+        visited = {spiro_center, start}
+        current = start
+        while len(ordered) < len(ring) - 1:
+            nxt = None
+            for nbr in mol.GetAtomWithIdx(current).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in ring_set and ni not in visited:
+                    nxt = ni
+                    break
+            if nxt is None:
+                break
+            ordered.append(nxt)
+            visited.add(nxt)
+            current = nxt
+        if len(ordered) == len(ring) - 1:
+            traversals.append(ordered)
+    return traversals
+
+
 def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
     """
-    Generate IUPAC numbering for atoms in a spiro system.
+    Generate IUPAC numbering for a monospiro system.
 
-    IUPAC P-31.3.1.2 rules for spiro numbering:
-    1. Start at atom adjacent to spiro center in the SMALLER ring
-    2. Number around the smaller ring
-    3. The spiro center gets the next number
-    4. Continue around the larger ring
+    IUPAC P-24.2.1 / P-31.3.1.2: numbering starts at an atom adjacent to the
+    spiro centre in the SMALLER ring, proceeds around that ring, through the
+    spiro centre, then around the larger ring.
 
-    Args:
-        mol: RDKit Mol object
-        spiro_center: Atom index of the spiro center
+    Among the directional choices (which spiro-neighbour starts each ring, and
+    — when the two rings are the same size — which ring is numbered first), the
+    chosen numbering gives the LOWEST locants to the heteroatoms considered
+    together, then to the most senior heteroatom (P-31.1.4.3.4 / P-24.2.4.1).
+    A spelling-independent canonical-rank tiebreak makes the result fully
+    deterministic for symmetric systems (e.g. spiro[5.5] acetals). This both
+    fixes the latent SMILES-order dependence in heteroatom locants (a tetra-
+    valent ``1-oxaspiro[4.5]decane`` was flipping to ``4-oxaspiro[4.5]decane``)
+    and yields the correct lowest-locant PIN.
 
-    Returns:
-        Dictionary mapping atom index to IUPAC locant (1-indexed)
+    Returns a dict mapping atom index to IUPAC locant (1-indexed), or {} when
+    the spiro centre is not in exactly two rings.
     """
     ri = mol.GetRingInfo()
-    rings_containing = [ring for ring in ri.AtomRings() if spiro_center in ring]
-
+    rings_containing = [list(r) for r in ri.AtomRings() if spiro_center in r]
     if len(rings_containing) != 2:
         return {}
+    r1, r2 = rings_containing
 
-    ring1 = list(rings_containing[0])
-    ring2 = list(rings_containing[1])
-
-    if len(ring1) <= len(ring2):
-        smaller_ring = ring1
-        larger_ring = ring2
+    # Smaller ring numbered first; equal-sized rings -> either may be first, so
+    # enumerate both and let the lowest-locant rule decide.
+    if len(r1) < len(r2):
+        size_pairs = [(r1, r2)]
+    elif len(r2) < len(r1):
+        size_pairs = [(r2, r1)]
     else:
-        smaller_ring = ring2
-        larger_ring = ring1
+        size_pairs = [(r1, r2), (r2, r1)]
 
-    spiro_pos_small = smaller_ring.index(spiro_center)
-    spiro_pos_large = larger_ring.index(spiro_center)
+    candidates: List[Dict[int, int]] = []
+    for smaller, larger in size_pairs:
+        for small_seq in _spiro_ring_traversals(mol, smaller, spiro_center):
+            for large_seq in _spiro_ring_traversals(mol, larger, spiro_center):
+                sequence = small_seq + [spiro_center] + large_seq
+                candidates.append(
+                    {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
+                )
+    if not candidates:
+        return {}
 
-    reordered_small = (
-        smaller_ring[spiro_pos_small + 1:]
-        + smaller_ring[:spiro_pos_small + 1]
-    )
-    reordered_large = (
-        larger_ring[spiro_pos_large + 1:]
-        + larger_ring[:spiro_pos_large]
-    )
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
 
-    sequence = reordered_small[:-1]
-    sequence.append(spiro_center)
-    sequence.extend(reordered_large)
+    def _key(mapping: Dict[int, int]):
+        heteros = [
+            (a, loc) for a, loc in mapping.items()
+            if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+        ]
+        # (1) lowest locants for ALL heteroatoms together (P-31.1.4.3.4)
+        het_locs = sorted(loc for _a, loc in heteros)
+        # (2) then lowest locants to the most senior heteroatom (O > S > ...)
+        het_by_seniority = sorted(
+            (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc)
+            for a, loc in heteros
+        )
+        # (3) deterministic, spelling-independent tiebreak for symmetric rings
+        seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
+        canon_seq = tuple(canon[a] for a in seq)
+        return (het_locs, het_by_seniority, canon_seq)
 
-    atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
-    return atom_to_locant
+    return min(candidates, key=_key)
 
 
 def _get_ring_adjacent_to_spiro(
@@ -791,6 +889,8 @@ def _build_hetero_prefix(
     if not numbering:
         return None
 
+    from ..assembly.naming_utils import get_multiplier_prefix
+
     heteroatom_info = []
     for atom_idx in ring_atoms:
         atom = mol.GetAtomWithIdx(atom_idx)
@@ -798,28 +898,36 @@ def _build_hetero_prefix(
         if symbol != 'C':
             locant = numbering.get(atom_idx)
             if locant is not None:
-                heteroatom_info.append((locant, symbol))
+                heteroatom_info.append((locant, symbol, atom_idx))
 
     if not heteroatom_info:
         return None
 
-    # IUPAC priority order: O > S > Se > N > P > Si > B
-    priority_order = ['O', 'S', 'Se', 'N', 'P', 'Si', 'B']
+    # Group each element's (locant, lambda) records. The lambda bonding
+    # number (P-31.1.4.2) is None for standard-valence atoms.
+    by_element: Dict[str, List[Tuple[int, Optional[int]]]] = {}
+    for locant, symbol, atom_idx in heteroatom_info:
+        lam = _nonstandard_bonding_number(mol, atom_idx)
+        by_element.setdefault(symbol, []).append((locant, lam))
 
-    by_element: Dict[str, List[int]] = {}
-    for locant, symbol in heteroatom_info:
-        by_element.setdefault(symbol, []).append(locant)
-
-    mult_names = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+    # Cite elements in skeletal-replacement seniority order
+    # (P-25.3.1.3 / hw_heteroatoms: O > S > Se > Te > N > P > ... > Si > B),
+    # replacing the old hard-coded list (which omitted Te/Ge/As/Sb).
     prefix_parts = []
-    for element in priority_order:
-        if element in by_element:
-            locants = sorted(by_element[element])
-            prefix_name = get_heteroatom_prefix(element)
-            count = len(locants)
-            mult = mult_names.get(count, f'{count}-')
-            locant_str = ','.join(str(loc) for loc in locants)
-            prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
+    for element in sort_heteroatoms_by_priority(list(by_element.keys())):
+        entries = sorted(by_element[element])  # by locant, then lambda
+        prefix_name = get_hw_prefix(element) or get_heteroatom_prefix(element)
+        count = len(entries)
+        # Shared multiplying-prefix generator (di/tri/.../hexa/hepta/octa...)
+        # — replaces the old penta-capped dict that emitted the malformed
+        # "6-oxa" instead of "hexaoxa" (DD7 spiro multiplier bug).
+        mult = get_multiplier_prefix(count, prefix_name)
+        locant_tokens = [
+            (f"{loc}lambda{lam}" if lam is not None else str(loc))
+            for loc, lam in entries
+        ]
+        locant_str = ','.join(locant_tokens)
+        prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
 
     if not prefix_parts:
         return None
@@ -1507,6 +1615,38 @@ def _walk_side_ring_locants(
     return best[1]
 
 
+def _component_alpha_key(name: str) -> str:
+    """Alphanumerical sort key for a spiro ring-component name (P-24.5.1 /
+    P-14.5). Compare by the ring-component name itself, ignoring a leading
+    indicated-hydrogen descriptor — e.g. ``1H-indene`` -> ``indene`` so that
+    ``cyclopentane`` (c) sorts before ``indene`` (i), per the P-24.5.1 Note
+    ("the first ring to be cited is determined by alphabetical order and not
+    by seniority of the rings or ring systems")."""
+    import re
+    s = name.strip().lower()
+    s = re.sub(r'^\d+h-', '', s)  # drop a leading '1h-'/'3h-' indicated H
+    return s
+
+
+def _strip_consumed_indicated_h(component_name: str, spiro_locant) -> str:
+    """Drop a leading indicated-hydrogen descriptor (``1H-``) from a spiro
+    ring-component name when the spiro atom sits at that locant.
+
+    A mancude component such as ``1H-indene`` carries indicated hydrogen to
+    place its single sp3 centre. When the quaternary spiro atom occupies that
+    centre, the indicated hydrogen is no longer needed in the complete
+    structure (P-24.3.2 / P-24.5.1), e.g. spiro at indene C1 -> ``indene``,
+    giving ``spiro[cyclopentane-1,1'-indene]`` (NOT ``...1H-indene]``).
+
+    Conservative: only strips when the indicated-H locant equals the spiro
+    attachment locant; otherwise the name is returned unchanged (fail-safe)."""
+    import re
+    m = re.match(r'^(\d+)H-(.+)$', component_name)
+    if m and str(spiro_locant) == m.group(1):
+        return m.group(2)
+    return component_name
+
+
 def name_mixed_spiro_fused(
     mol,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
@@ -1578,29 +1718,43 @@ def name_mixed_spiro_fused(
     if f_loc is None or s_loc is None:
         return None
 
-    # Step 5: assemble the HERITAGE §4 nested form.
-    #   spiro[<fused>-<f_loc>,<s_loc>'-<side>]
-    name = f"spiro[{fused_name}-{f_loc},{s_loc}'-{side_name}]"
+    # Step 5: assemble the P-24.5.1 nested form.
+    #   spiro[<comp1>-<l1>,<l2>'-<comp2>]
+    # P-24.5.1 (+ its Note): the two ring components are cited in
+    # ALPHANUMERICAL order of the component name — NOT fused-component-first
+    # and NOT by ring seniority. The first-cited component is unprimed, the
+    # second primed. Indicated hydrogen at the spiro locant is dropped
+    # (consumed by the quaternary spiro junction; P-24.3.2).
+    fused_key = _component_alpha_key(fused_name)
+    side_key = _component_alpha_key(side_name)
+    fused_primed = fused_key > side_key  # fused cited SECOND iff it sorts later
+    if not fused_primed:
+        first_name, first_loc, second_name, second_loc = (
+            fused_name, f_loc, side_name, s_loc,
+        )
+    else:
+        first_name, first_loc, second_name, second_loc = (
+            side_name, s_loc, fused_name, f_loc,
+        )
+    first_name = _strip_consumed_indicated_h(first_name, first_loc)
+    second_name = _strip_consumed_indicated_h(second_name, second_loc)
+    name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
 
-    # Build the combined atom_to_locant map for the cascade-step-6 supplier.
-    # Convention: fused-side atoms keep their integer locants; side-ring
-    # atoms get tuple (locant, "'") to mark them as primed.
+    # Build the combined atom_to_locant map for the cascade-step-6 supplier,
+    # primed-consistent with the cited order: the SECOND-cited (primed)
+    # component's atoms get the tuple (locant, "'") marker; the first-cited
+    # (unprimed) component keeps plain integer locants. The spiro centre lives
+    # in both partitions — keep its unprimed (first-cited) locant.
+    unprimed_map = side_atom_to_locant if fused_primed else fused_atom_to_locant
+    primed_map = fused_atom_to_locant if fused_primed else side_atom_to_locant
     combined_locants: Dict[int, _Locant] = {}
-    for atom_idx, locant in fused_atom_to_locant.items():
+    for atom_idx, locant in unprimed_map.items():
         combined_locants[atom_idx] = locant
-    for atom_idx, locant in side_atom_to_locant.items():
+    for atom_idx, locant in primed_map.items():
         if atom_idx == spiro_center:
-            # Spiro centre exists in BOTH partitions; prefer the fused
-            # component's locant (the unprimed one) as the canonical key
-            # — but record the primed form too via the tuple suffix
-            # convention (the cascade-step-6 gate accepts int|tuple per
-            # locants.py:_Locant). The fused-side numeric is already set;
-            # leave it intact.
             continue
-        # Tuple form (locant, "'") marks the side-ring atoms in the
-        # combined map. _build_ring_pos coerces ints to (n, '') tuples
-        # when ANY tuple is present in the dict, so this is internally
-        # consistent.
+        # _build_ring_pos coerces ints to (n, '') tuples when ANY tuple is
+        # present in the dict, so this primed marking is internally consistent.
         combined_locants[atom_idx] = (locant, "'")
 
     # Coverage invariant: combined map covers ALL ring atoms.
