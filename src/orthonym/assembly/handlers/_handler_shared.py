@@ -851,6 +851,41 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     return prefixes
 
 
+def _is_unsubstituted_monocyclic_cycloalkene(mol) -> bool:
+    """True for an unsubstituted all-carbon monocyclic ring with ONE double bond.
+
+    STER-01 (Phase H, P-93.5.1.4.1): this is exactly the Blue Book ``cyclooctene``
+    / ``cyclononene`` class whose single cyclic double bond carries NO locant in
+    the parent name ("cyclooctene", not "cyclooct-1-ene"). Used to decide whether
+    the lone E/Z stereodescriptor's locant is likewise elided (``(E)-cyclooctene``).
+
+    Deliberately NARROW so it can never misfire:
+      * exactly one ring (NumRings == 1) -- fused/bridged systems keep locants;
+      * every atom is carbon AND every atom is in the ring (no substituent and no
+        heteroatom) -- a substituent or suffix (e.g. cyclooct-2-en-1-ol) can push
+        the double bond off locant 1 and the parent name then CITES the locant, so
+        those must keep "(2E)-"; restricting to the bare hydrocarbon avoids that
+        entirely;
+      * exactly one double bond, in the ring, and no triple bond -- a di-ene
+        (cyclodeca-1,3-diene) keeps "(1Z,3E)" via the len(descriptors)>1 guard at
+        the call site, and this is belt-and-suspenders.
+    """
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return False
+    ring = ri.AtomRings()[0]
+    if mol.GetNumAtoms() != len(ring):
+        return False  # substituent atoms present -> not the bare cycloalkene
+    if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in range(mol.GetNumAtoms())):
+        return False  # heteroatom -> would carry a suffix locant
+    double_bonds = [b for b in mol.GetBonds() if b.GetBondTypeAsDouble() == 2.0]
+    if len(double_bonds) != 1 or not double_bonds[0].IsInRing():
+        return False
+    if any(b.GetBondTypeAsDouble() == 3.0 for b in mol.GetBonds()):
+        return False
+    return True
+
+
 def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional[Dict[int, int]] = None) -> Optional["NameFragment"]:
     """
     Generate stereodescriptor prefix using correct IUPAC locants.
@@ -932,6 +967,23 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
         and descriptors[0][0] == next(iter(atom_to_locant.values()))
     ):
         # Strip the locant: emit the bare descriptor "(R)-".
+        cip = descriptors[0][1]
+        return NameFragment(text=f"({cip})-", fragment_type="stereo")
+
+    # STER-01 (Phase H, P-93.5.1.4.1): single cyclic double bond on an
+    # UNSUBSTITUTED monocyclic cycloalkene. The parent name elides the
+    # unsaturation locant ("cyclooctene", not "cyclooct-1-ene"), so the lone
+    # E/Z stereodescriptor's locant is elided too -> the Blue Book PINs
+    # "(E)-cyclooctene" / "(E)-cyclononene". Guarded by
+    # _is_unsubstituted_monocyclic_cycloalkene to the exact BB class so it can
+    # never touch a substituted/heteroatom ring (keeps "(2E)-cyclooct-2-en-1-ol")
+    # or a multi-element block (cyclodeca-1,3-diene keeps "(1Z,3E)" via len==1).
+    # The prior "(1Z)-cyclooctene" was over-specified (OPSIN-parseable, not wrong).
+    if (
+        len(descriptors) == 1
+        and descriptors[0][1] in ('E', 'Z')
+        and _is_unsubstituted_monocyclic_cycloalkene(mol)
+    ):
         cip = descriptors[0][1]
         return NameFragment(text=f"({cip})-", fragment_type="stereo")
 

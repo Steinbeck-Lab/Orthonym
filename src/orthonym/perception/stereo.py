@@ -15,14 +15,19 @@ logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
-# WSB-03 (Phase 177, D-13): opt-in centres CIP engine. Read once at import time
-# (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER). Default OFF ->
-# the CIP path is byte-identical to HEAD (rdCIPLabeler only). When ON, centres
-# is the source-of-truth IF its jar + a Java runtime are present; otherwise the
-# code falls through to rdCIPLabeler UNCHANGED (never hard-fail a name on a
-# missing JVM).
+# WSB-03 (Phase 177, D-13): centres CIP engine. Read once at import time
+# (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
+#
+# STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
+# scores 281/290 on the Hanson 2018 CIP Validation Suite vs
+# rdCIPLabeler's 235/290 -- a net +46 CORRECT labels with **0 per-compound
+# regressions** (centres is a strict superset of RDKit on the suite; the gain
+# is exotic CIP rule cases RDKit mis-ranks). When centres is unavailable (jar
+# or Java absent) the code falls through to rdCIPLabeler UNCHANGED -- a missing
+# JVM never hard-fails a name (D-13). Set ORTHONYM_USE_CENTRES_CIP=0/off to
+# force the legacy RDKit-only path.
 _USE_CENTRES_CIP = os.environ.get(
-    "ORTHONYM_USE_CENTRES_CIP", ""
+    "ORTHONYM_USE_CENTRES_CIP", "on"
 ).strip().lower() in ("1", "true", "yes", "on")
 
 

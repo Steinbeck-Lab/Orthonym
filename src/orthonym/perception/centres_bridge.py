@@ -242,6 +242,30 @@ def apply_centres_labels(mol, label_map: Dict[int, str]) -> None:
             bond.SetProp("_CIPCode", da)
 
 
+def _smiles_output_order(mol) -> Optional[List[int]]:
+    """Return RDKit's atom output order for the last ``MolToSmiles(mol)`` call.
+
+    ``Chem.MolToSmiles`` writes atoms in CANONICAL rank order (not the mol's own
+    atom-index order) and records the mapping as the ``_smilesAtomOutputOrder``
+    computed property: ``order[pos]`` is the ORIGINAL atom index written at
+    output SMILES position ``pos``. centres parses the SMILES STRING, so its
+    1-based labels are keyed to those output positions, not to ``mol``'s atom
+    indices -- this list is what lets us map them back (STER-02 / Phase H).
+
+    Returns the parsed order, or None when the property is absent/malformed
+    (caller then declines the centres path -- a missing label beats a wrong one).
+    """
+    try:
+        raw = mol.GetProp("_smilesAtomOutputOrder")
+    except KeyError:
+        return None
+    try:
+        order = [int(x) for x in raw.strip().strip("[]").split(",") if x.strip() != ""]
+    except ValueError:
+        return None
+    return order or None
+
+
 def centres_label_mol(mol) -> bool:
     """Label a single RDKit mol with centres (gated single-mol convenience).
 
@@ -249,19 +273,47 @@ def centres_label_mol(mol) -> bool:
     and applies the returned labels onto ``mol``'s atoms/bonds via
     ``apply_centres_labels``.
 
+    CRITICAL (STER-02 / Phase H): centres labels are 1-based atom indices keyed
+    to the CANONICAL SMILES string emitted by ``Chem.MolToSmiles``, whose atom
+    output order generally DIFFERS from ``mol``'s own atom indices. Applying the
+    labels directly by ``idx-1`` (the pre-Phase-H behaviour) lands descriptors on
+    the WRONG atoms whenever canonicalisation reorders (e.g. 4-hydroxyproline,
+    tartaric acid) -- a wrong/malformed descriptor, which Phase H forbids. We
+    remap each centres position through ``_smilesAtomOutputOrder`` back to the
+    original atom index before applying. The validation harness
+    (``score_suite_centres``) is unaffected: it sends the suite's ORIGINAL SMILES
+    and never round-trips through canonicalisation.
+
     Returns:
         True if centres produced a label map and it was applied (the engine
-        was available); False if the engine was unavailable (jar/Java absent)
-        -- the caller must then fall back to RDKit (D-13). Note that an
-        AVAILABLE engine returning an empty map (an achiral molecule) still
-        returns True: centres ran, there simply were no descriptors.
+        was available); False when the caller must fall back to RDKit (D-13).
+        False has TWO causes: (1) the engine was unavailable (jar/Java absent),
+        or (2) the engine ran but the `_smilesAtomOutputOrder` remap could not
+        be read while there were labels to place — declining beats misplacing
+        them. An AVAILABLE engine returning an empty map (an achiral molecule)
+        still returns True: centres ran, there simply were no descriptors.
     """
     try:
         smi = Chem.MolToSmiles(mol)
     except (ValueError, RuntimeError):
         return False
+    # Must read the output order from the SAME MolToSmiles call above.
+    order = _smiles_output_order(mol)
     batch = centres_label_batch([smi])
     if batch is None:
         return False
-    apply_centres_labels(mol, batch.get(smi, {}))
+    raw_labels = batch.get(smi, {})  # {canonical_1based_pos: descriptor}
+    if order is None:
+        # No output-order map available (should not happen for a real
+        # MolToSmiles). If there are labels to place we cannot safely remap
+        # them, so decline -> the caller falls back to RDKit (D-09: a missing
+        # descriptor beats a wrong one). If there are none, centres ran cleanly.
+        return not raw_labels
+    # Remap canonical SMILES positions -> mol's own 1-based atom indices.
+    remapped: Dict[int, str] = {}
+    for pos1, desc in raw_labels.items():
+        pos0 = pos1 - 1
+        if 0 <= pos0 < len(order):
+            remapped[order[pos0] + 1] = desc
+    apply_centres_labels(mol, remapped)
     return True
