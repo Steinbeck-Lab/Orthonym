@@ -19,6 +19,7 @@ from rdkit import Chem
 from rdkit.Chem import RWMol
 
 from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+from ..data.chain_names import get_chain_prefix
 
 
 # ---------------------------------------------------------------------------
@@ -39,9 +40,15 @@ SATURATION_PREFIXES = [
 # ---------------------------------------------------------------------------
 
 # Single-atom bridge names
+# IUPAC P-15.3.1.2.1.1: the divalent -S- multiplicative group is the preselected
+# prefix "sulfanediyl"; the legacy "thio" is deprecated (Blue Book P-63.2.5).
+# The two-identical-ring monosulfide PIN is the *multiplicative* name, e.g.
+# c1ccccc1Sc1ccccc1 -> "1,1'-sulfanediyldibenzene" (Blue Book P-63.3, line 27826:
+# "1,1'-sulfanediyldibenzene (PIN) (not 1,1'-thiodibenzene)"), parallel to
+# "1,1'-oxydibenzene" (PIN, line 23921) and "1,1'-peroxydibenzene" (PIN).
 _SINGLE_ATOM_BRIDGES: Dict[str, str] = {
     "O": "oxy",
-    "S": "thio",
+    "S": "sulfanediyl",
     "NH": "imino",
     "CH2": "methylene",
 }
@@ -213,6 +220,246 @@ def _is_pure_single_bond_assembly(mol) -> bool:
     return has_single_bond_inter_system and not has_bridge_atom
 
 
+# ---------------------------------------------------------------------------
+# Central-arene + acyclic identical arms  (P-15.3.1.1 (a)+(d) / P-15.3.1.3)
+# ---------------------------------------------------------------------------
+# A benzene ring bearing >=2 identical acyclic carboxylic-acid arms is a
+# multiplicative case where the ARM is the parent functional compound (acetic
+# acid, P-15.3.1.1(d)) and the benzene is the central di-/poly-valent group:
+#     OC(=O)Cc1cc(CC(=O)O)cc(CC(=O)O)c1
+#       -> 2,2',2''-(benzene-1,3,5-triyl)triacetic acid   (PIN, BB line 6757)
+#     OC(=O)Cc1ccc(CC(=O)O)cc1
+#       -> 2,2'-(1,4-phenylene)diacetic acid              (PIN, cf. BB line 25171)
+# Without this path, parent selection takes ONE acid arm and the symmetric
+# others are DROPPED (a constitutional undercount, defect V-8).
+#
+# Scope (fail closed otherwise -- never a wrong name):
+#   * exactly one ring system, a bare benzene (6 aromatic carbons);
+#   * every exocyclic ring substituent is an UNBRANCHED aliphatic carboxylic
+#     acid -(CH2)k-COOH with k>=1 (the >=1 CH2 spacer is what distinguishes the
+#     multiplicative acetic-acid arm from a ring-attached -COOH / -CONH2, which
+#     stays the carbo* added-carbon suffix: benzene-1,3,5-tricarboxamide,
+#     benzene-1,2-dicarboxylic acid);
+#   * all arms identical; >=2 of them; no other substituents anywhere.
+
+# yl-multiplier for a poly-valent benzene central group (n>=3; n==2 is phenylene)
+_BENZENE_YL_MULTIPLIER = {3: "triyl", 4: "tetrayl", 5: "pentayl", 6: "hexayl"}
+
+
+def _lowest_locant_set(ring_cyclic: List[int], attach_set: set) -> List[int]:
+    """Lowest locant set for the attachment ring atoms, over the 12 dihedral
+    numberings of a 6-ring.  Order-independent (deterministic) result."""
+    n = len(ring_cyclic)
+    best: Optional[List[int]] = None
+    for start in range(n):
+        for direction in (1, -1):
+            locant_of = {
+                ring_cyclic[(start + direction * i) % n]: i + 1 for i in range(n)
+            }
+            locs = sorted(locant_of[a] for a in attach_set)
+            if best is None or locs < best:
+                best = locs
+    return best or []
+
+
+def _central_arene_substituent_name(
+    ring_cyclic: List[int], attach_set: set
+) -> Optional[str]:
+    """Name the central benzene group: divalent -> "1,x-phenylene" (P-29.6.1
+    preferred prefix), tri-/poly-valent -> "benzene-<locants>-triyl" etc."""
+    locs = _lowest_locant_set(ring_cyclic, attach_set)
+    if not locs:
+        return None
+    loc_str = ",".join(str(loc) for loc in locs)
+    n = len(attach_set)
+    if n == 2:
+        return f"{loc_str}-phenylene"
+    yl = _BENZENE_YL_MULTIPLIER.get(n)
+    if yl is None:
+        return None
+    return f"benzene-{loc_str}-{yl}"
+
+
+def _arm_acid_parent(mol, attach_carbon_idx: int, ring_atoms: set):
+    """Verify the exocyclic arm rooted at ``attach_carbon_idx`` is a clean
+    UNBRANCHED aliphatic carboxylic acid ``-(CH2)k-COOH`` (k>=1) and return
+    ``(parent_acid_name, attach_locant, arm_atom_set)`` or ``None``.
+
+    The central group attaches at the terminal chain carbon, whose locant is the
+    carbon count (COOH carbon = C1).  The 2-carbon acid uses the retained PIN
+    "acetic acid" (BB line 2010); longer chains use "<stem>anoic acid".
+    """
+    # 1. arm = connected component of non-ring HEAVY atoms reached from attach C.
+    arm_atoms = set()
+    stack = [attach_carbon_idx]
+    while stack:
+        a = stack.pop()
+        if a in arm_atoms:
+            continue
+        arm_atoms.add(a)
+        for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in ring_atoms or ni in arm_atoms or nbr.GetAtomicNum() <= 1:
+                continue
+            stack.append(ni)
+
+    arm_carbons = [a for a in arm_atoms if mol.GetAtomWithIdx(a).GetSymbol() == "C"]
+    # Only carbons + carboxyl oxygens allowed (no other heteroatoms).
+    for a in arm_atoms:
+        if mol.GetAtomWithIdx(a).GetSymbol() not in ("C", "O"):
+            return None
+    if len(arm_carbons) < 2:
+        return None  # need the CH2 spacer + the COOH carbon (k>=1)
+
+    # 2. exactly one carboxylic-acid carbon (C(=O)-OH, one carbon neighbour).
+    carboxyl_c = None
+    for c in arm_carbons:
+        catom = mol.GetAtomWithIdx(c)
+        o_double = o_hydroxyl = c_in_arm = 0
+        ok = True
+        for nbr in catom.GetNeighbors():
+            ni, sym = nbr.GetIdx(), nbr.GetSymbol()
+            if sym == "H" or nbr.GetAtomicNum() <= 1:
+                continue
+            if sym == "O":
+                bond = mol.GetBondBetweenAtoms(c, ni)
+                if bond.GetBondType() == Chem.BondType.DOUBLE:
+                    o_double += 1
+                elif (
+                    bond.GetBondType() == Chem.BondType.SINGLE
+                    and nbr.GetTotalNumHs() == 1
+                    and nbr.GetDegree() == 1
+                ):
+                    o_hydroxyl += 1
+                else:
+                    ok = False
+            elif sym == "C" and ni in arm_atoms:
+                c_in_arm += 1
+            else:
+                ok = False
+        if ok and o_double == 1 and o_hydroxyl == 1 and c_in_arm == 1:
+            if carboxyl_c is not None:
+                return None  # >1 COOH in the arm -> not our clean class
+            carboxyl_c = c
+    if carboxyl_c is None:
+        return None
+
+    # 3. the chain carbons (incl. the attach carbon) are sp3, unbranched, with no
+    #    heteroatom/unsaturation/branch substituents; only the attach carbon may
+    #    touch the ring (exactly once).
+    arm_carbon_set = set(arm_carbons)
+    for c in arm_carbons:
+        if c == carboxyl_c:
+            continue
+        catom = mol.GetAtomWithIdx(c)
+        if catom.GetIsAromatic() or catom.IsInRing():
+            return None
+        for nbr in catom.GetNeighbors():
+            ni, sym = nbr.GetIdx(), nbr.GetSymbol()
+            if nbr.GetAtomicNum() <= 1:
+                continue
+            if ni in ring_atoms:
+                if c != attach_carbon_idx:
+                    return None  # only the attach carbon touches the ring
+                continue
+            if sym != "C" or ni not in arm_carbon_set:
+                return None  # heteroatom / non-chain substituent
+            if mol.GetBondBetweenAtoms(c, ni).GetBondType() != Chem.BondType.SINGLE:
+                return None  # unsaturated chain
+
+    # 4. unbranched-path check: every arm carbon has <=2 arm-carbon neighbours and
+    #    the two degree-1 ends are exactly {carboxyl carbon, attach carbon}.
+    deg = {}
+    for c in arm_carbons:
+        deg[c] = sum(
+            1 for nbr in mol.GetAtomWithIdx(c).GetNeighbors()
+            if nbr.GetIdx() in arm_carbon_set
+        )
+    if any(d > 2 for d in deg.values()):
+        return None
+    ends = {c for c, d in deg.items() if d == 1}
+    if ends != {carboxyl_c, attach_carbon_idx}:
+        return None
+
+    carbon_count = len(arm_carbons)
+    attach_locant = carbon_count  # terminal carbon; COOH carbon is C1
+    if carbon_count == 2:
+        parent_name = "acetic acid"
+    else:
+        parent_name = f"{get_chain_prefix(carbon_count)}anoic acid"
+    return parent_name, attach_locant, frozenset(arm_atoms)
+
+
+def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
+    """Multiplicative naming for a bare benzene bearing >=2 identical acyclic
+    carboxylic-acid arms (defect V-8).  Returns the PIN or ``None`` (fail closed).
+    """
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumRings() != 1:
+        return None
+    from ..perception.rings import get_ring_systems
+
+    systems = get_ring_systems(mol)
+    if len(systems) != 1 or len(systems[0]) != 6:
+        return None
+    ring_atoms = set(systems[0])
+    for a in ring_atoms:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetSymbol() != "C" or not atom.GetIsAromatic():
+            return None
+    ring_cyclic = list(ring_info.AtomRings()[0])
+    if set(ring_cyclic) != ring_atoms:
+        return None
+
+    # exocyclic attachments: ring atom -> its single exocyclic heavy neighbour
+    attachments = {}
+    for ra in ring_atoms:
+        exo = [
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(ra).GetNeighbors()
+            if n.GetIdx() not in ring_atoms and n.GetAtomicNum() > 1
+        ]
+        if not exo:
+            continue
+        if len(exo) > 1:
+            return None
+        attachments[ra] = exo[0]
+    if len(attachments) < 2:
+        return None
+
+    parents = []
+    all_arm_atoms = set()
+    for ra, ac in attachments.items():
+        if mol.GetAtomWithIdx(ac).GetSymbol() != "C":
+            return None  # arm must attach to the ring via a carbon
+        res = _arm_acid_parent(mol, ac, ring_atoms)
+        if res is None:
+            return None
+        parent_name, attach_locant, arm_atoms = res
+        parents.append((parent_name, attach_locant))
+        all_arm_atoms |= set(arm_atoms)
+
+    if len(set(parents)) != 1:
+        return None  # arms not identical -> multiplicative requires identical units
+    parent_name, attach_locant = parents[0]
+
+    # the whole molecule must be exactly ring + arms (no stray heavy atoms)
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    if (ring_atoms | all_arm_atoms) != heavy:
+        return None
+
+    n = len(attachments)
+    multiplier = SIMPLE_MULTIPLIERS.get(n)
+    if multiplier is None:
+        return None
+    central = _central_arene_substituent_name(ring_cyclic, set(attachments.keys()))
+    if central is None:
+        return None
+
+    arm_locants = ",".join(f"{attach_locant}{chr(39) * i}" for i in range(n))
+    return f"{arm_locants}-({central}){multiplier}{parent_name}"
+
+
 def name_multiplicative(mol) -> Optional[str]:
     """Detect and name multiplicative nomenclature cases.
 
@@ -224,6 +471,13 @@ def name_multiplicative(mol) -> Optional[str]:
     """
     if mol is None:
         return None
+
+    # Central-arene + acyclic identical-acid arms (P-15.3.1.1(d); defect V-8).
+    # Runs before the >=2-ring-system bridge logic because here the benzene is a
+    # SINGLE ring acting as the central multiplicative group, not a parent.
+    result = _try_central_arene_acyclic_arms(mol)
+    if result is not None:
+        return result
 
     # Quick reject: need at least 2 ring systems
     ring_info = mol.GetRingInfo()

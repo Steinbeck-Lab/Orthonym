@@ -320,13 +320,17 @@ class TestBridgeTables:
         "symbol,expected_name",
         [
             ("O", "oxy"),
-            ("S", "thio"),
+            # v22 F-T5 / MULT-01: the -S- multiplicative bridge is the modern
+            # preselected prefix "sulfanediyl" (P-15.3.1.2.1.1); legacy "thio"
+            # is deprecated. PIN "1,1'-sulfanediyldibenzene" (BB line 27826).
+            ("S", "sulfanediyl"),
             ("NH", "imino"),
             ("CH2", "methylene"),
         ],
     )
     def test_single_atom_bridges_baseline(self, symbol, expected_name):
-        """Pre-existing single-atom bridges preserved after Plan 154-02."""
+        """Pre-existing single-atom bridges preserved after Plan 154-02
+        (S modernized thio->sulfanediyl in v22 F-T5)."""
         from orthonym.rules.multiplicative import _SINGLE_ATOM_BRIDGES
 
         assert _SINGLE_ATOM_BRIDGES.get(symbol) == expected_name
