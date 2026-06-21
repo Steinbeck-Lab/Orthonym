@@ -445,3 +445,100 @@ class TestNoBandAids:
         assert "band-aid" not in src.lower() and "bandaid" not in src.lower(), (
             "D-13: 'band-aid' keyword found in multiplicative.py."
         )
+
+
+# ---------------------------------------------------------------------------
+# v22 F-T5 — MULT-01 central-arene multiplicative (V-8) + thio->sulfanediyl (V-17)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCentralAreneMultiplicative:
+    """v22 F-T5: a bare benzene + >=2 identical -(CH2)k-COOH arms is a P-15.3
+    multiplicative case (the arm is the parent acid, the benzene the central
+    group). Must keep ALL arms; fail closed (None) outside the handled class."""
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            # V-8: trivalent central -> "benzene-1,3,5-triyl"
+            ("OC(=O)Cc1cc(CC(=O)O)cc(CC(=O)O)c1",
+             "2,2',2''-(benzene-1,3,5-triyl)triacetic acid"),
+            # divalent central -> "1,x-phenylene" (preferred prefix, P-29.6.1)
+            ("OC(=O)Cc1ccc(CC(=O)O)cc1", "2,2'-(1,4-phenylene)diacetic acid"),
+            ("OC(=O)Cc1cccc(CC(=O)O)c1", "2,2'-(1,3-phenylene)diacetic acid"),
+            ("OC(=O)Cc1ccccc1CC(=O)O", "2,2'-(1,2-phenylene)diacetic acid"),
+            # longer identical arm -> propanoic acid, attach locant 3
+            ("OC(=O)CCc1ccc(CCC(=O)O)cc1",
+             "3,3'-(1,4-phenylene)dipropanoic acid"),
+        ],
+    )
+    def test_central_arene_acid_arms_keep_all(self, smiles, expected):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
+
+    @pytest.mark.parametrize(
+        "smiles,why",
+        [
+            ("OC(=O)Cc1ccccc1", "single arm (needs >=2 identical)"),
+            ("OC(=O)c1ccc(C(=O)O)cc1", "terephthalic: -COOH on ring, k=0 (carbo suffix)"),
+            ("OC(=O)c1ccccc1C(=O)O", "phthalic: k=0"),
+            ("NC(=O)c1cc(C(N)=O)cc(C(N)=O)c1", "amide arms (k=0, not -COOH)"),
+            ("OCc1cc(CO)cc(CO)c1", "hydroxymethyl arms (not a carboxylic acid)"),
+            ("COC(=O)Cc1ccc(CC(=O)OC)cc1", "methyl-ester arms (not free -COOH)"),
+            ("[O-]C(=O)Cc1ccc(CC(=O)[O-])cc1", "carboxylate (anion, not -COOH)"),
+            ("Cc1cc(CC(=O)O)cc(CC(=O)O)c1", "extra methyl substituent on ring"),
+            ("OC(=O)Cc1cc(CCC(=O)O)cc(CC(=O)O)c1", "non-identical arm lengths"),
+            ("OC(=O)CC(C)c1ccc(C(C)CC(=O)O)cc1", "branched arm"),
+            ("OC(=O)Cc1ccc(CC(=O)O)nc1", "pyridine central (not benzene)"),
+            ("OC(=O)Cc1ccc2cc(CC(=O)O)ccc2c1", "naphthalene central (>6 ring atoms)"),
+            ("OC(=O)CCCC(=O)O", "acyclic diacid (no ring)"),
+        ],
+    )
+    def test_fail_closed_returns_none(self, smiles, why):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"bad test SMILES: {smiles}"
+        assert name_multiplicative(mol) is None, (
+            f"expected fail-closed None for {smiles} ({why})"
+        )
+
+    def test_central_arene_is_order_independent(self):
+        """Symmetric multiplicative molecules are a determinism trap: the name
+        must not depend on RDKit atom ordering (lowest-locant over all 12
+        dihedral numberings)."""
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        mol = Chem.MolFromSmiles("OC(=O)Cc1cc(CC(=O)O)cc(CC(=O)O)c1")
+        names = {
+            name_multiplicative(
+                Chem.MolFromSmiles(
+                    Chem.MolToSmiles(mol, canonical=False, rootedAtAtom=i)
+                )
+            )
+            for i in range(mol.GetNumAtoms())
+        }
+        assert names == {"2,2',2''-(benzene-1,3,5-triyl)triacetic acid"}
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            # V-17: -S- bridge uses the modern preselected prefix (BB line 27826)
+            ("c1ccccc1Sc1ccccc1", "1,1'-sulfanediyldibenzene"),
+            ("Nc1ccc(Sc2ccc(N)cc2)cc1", "4,4'-sulfanediyldianiline"),
+            # unchanged O / O-O / S-S analogues (all PINs)
+            ("c1ccccc1Oc1ccccc1", "1,1'-oxydibenzene"),
+            ("c1ccccc1OOc1ccccc1", "1,1'-peroxydibenzene"),
+            ("c1ccccc1SSc1ccccc1", "1,1'-disulfanediyldibenzene"),
+        ],
+    )
+    def test_two_ring_bridge_modern_prefix(self, smiles, expected):
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
