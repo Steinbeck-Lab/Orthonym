@@ -126,10 +126,22 @@ class TestSpecificNewEntries:
         assert FUSED_HETEROCYCLE_DATA[smi]["name"] == "9H-xanthene"
 
     def test_cinnoline_present(self):
-        """Cinnoline (pre-existing) should still be present."""
-        smi = Chem.CanonSmiles("c1ccc2cnncc2c1")
+        """Cinnoline = 1,2-diazanaphthalene (adjacent N-N).
+
+        audit fix 2026-06-22: this test previously asserted c1ccc2cnncc2c1 ->
+        'cinnoline', encoding the cinnoline/phthalazine name-swap bug. OPSIN
+        (authoritative name->structure) confirms cinnoline is c1ccc2nnccc2c1
+        (N at 1,2); phthalazine is c1ccc2cnncc2c1 (N at 2,3).
+        """
+        smi = Chem.CanonSmiles("c1ccc2nnccc2c1")
         assert smi in FUSED_HETEROCYCLE_DATA
         assert FUSED_HETEROCYCLE_DATA[smi]["name"] == "cinnoline"
+
+    def test_phthalazine_present(self):
+        """Phthalazine = 2,3-diazanaphthalene (c1ccc2cnncc2c1 per OPSIN)."""
+        smi = Chem.CanonSmiles("c1ccc2cnncc2c1")
+        assert smi in FUSED_HETEROCYCLE_DATA
+        assert FUSED_HETEROCYCLE_DATA[smi]["name"] == "phthalazine"
 
     def test_pteridine_present(self):
         """Pteridine (pre-existing) should still be present."""

@@ -101,6 +101,7 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2c(c1)CCOC2': 'isochromane',
     'c1ccc2c(c1)CCS2': '2,3-dihydro-1-benzothiophene',
     'c1ccc2c(c1)CNC2': 'isoindoline',
+    'c1ccc2c(c1)COc1ccccc1-2': '6H-benzo[c]chromene',  # audit fix 2026-06-22: restored entry
     'c1ccc2c(c1)Cc1ccccc1O2': '9H-xanthene',
     'c1ccc2c(c1)Cc1ccccc1S2': '9H-thioxanthene',
     'c1ccc2c(c1)NCCN2': '1,2,3,4-tetrahydroquinazoline',
@@ -129,14 +130,14 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2cc3occc3cc2c1': 'naphtho[2,3-b]furan',
     'c1ccc2cc3sccc3cc2c1': 'naphtho[2,3-b]thiophene',
     'c1ccc2cnccc2c1': 'isoquinoline',
-    'c1ccc2cnncc2c1': 'cinnoline',
+    'c1ccc2cnncc2c1': 'phthalazine',  # audit fix 2026-06-22: was swapped with cinnoline
     'c1ccc2cocc2c1': 'isobenzofuran',
     'c1ccc2nc3ccccc3cc2c1': 'acridine',
     'c1ccc2nc3ccccc3nc2c1': 'phenazine',
     'c1ccc2ncccc2c1': 'quinoline',
     'c1ccc2nccnc2c1': 'quinoxaline',
     'c1ccc2ncncc2c1': 'quinazoline',
-    'c1ccc2nnccc2c1': 'phthalazine',
+    'c1ccc2nnccc2c1': 'cinnoline',  # audit fix 2026-06-22: was swapped with phthalazine
     'c1ccc2nocc2c1': '1,2-benzisoxazole',
     'c1ccc2nonc2c1': '2,1,3-benzoxadiazole',
     'c1ccc2nscc2c1': '1,2-benzisothiazole',

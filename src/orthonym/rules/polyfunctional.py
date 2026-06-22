@@ -90,6 +90,38 @@ PARENT_CLASS_MAP = {
 }
 
 
+def _drop_union_class_subtypes(
+    non_principal: Dict[str, List[tuple]], principal_group: Optional[str]
+) -> Dict[str, List[tuple]]:
+    """Remove non-principal FGs already absorbed into the principal multiplied suffix.
+
+    DD5 RC-4 / SEN-03 parity (audit fix 2026-06-22): ``get_principal_group`` unions
+    every present subtype of the principal group's equal-seniority *union* class
+    (alcohols, ``_RC4_UNION_CLASSES``) into ``principal_group_atoms``, so a mixed
+    primary+secondary OH chain is expressed as ONE multiplied suffix
+    (``…-1,3-diol``). Such same-class subtypes therefore must NOT also leak into
+    the non-principal prefix loop — doing so double-listed the secondary OH as both
+    a ``hydroxy`` prefix and a ``-ol`` suffix locant, producing OPSIN-invalid names
+    like ``2-amino-3-hydroxyoctadecane-1,3-diol`` (sphinganine) / geminal forms.
+
+    This mirrors the identical skip in
+    ``assembly/handlers/_handler_shared._generate_prefixes`` (the general-acyclic
+    path); ``polyfunctional`` is the parallel multi-FG handler and needs the same
+    guard. Scoped to ``_RC4_UNION_CLASSES`` (alcohols only) via the shared
+    ``_SENIORITY_PARENT`` map, so amine/other subtypes are untouched.
+    """
+    if not principal_group:
+        return non_principal
+    from .seniority import _SENIORITY_PARENT, _RC4_UNION_CLASSES
+    pclass = _SENIORITY_PARENT.get(principal_group, principal_group)
+    if pclass not in _RC4_UNION_CLASSES:
+        return non_principal
+    return {
+        k: v for k, v in non_principal.items()
+        if _SENIORITY_PARENT.get(k, k) != pclass
+    }
+
+
 def detect_polyfunctional(mol, functional_groups: Dict[str, List[tuple]]) -> bool:
     """
     Determine if a molecule has multiple distinct functional groups.
@@ -553,6 +585,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     mol = features.mol
     principal_group = features.principal_group
     non_principal = getattr(features, 'non_principal_groups', {})
+    # audit fix 2026-06-22: drop same-union-class subtypes already in the
+    # multiplied suffix (parity with the chain path; ring polyols too).
+    non_principal = _drop_union_class_subtypes(non_principal, principal_group)
 
     if not principal_group:
         return None
@@ -838,6 +873,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     atom_to_locant = features.atom_to_locant
     principal_group = features.principal_group
     non_principal = getattr(features, 'non_principal_groups', {})
+    # audit fix 2026-06-22: drop same-union-class subtypes already in the
+    # multiplied suffix (prevents the 'n-hydroxy…-1,n-diol' double-listing).
+    non_principal = _drop_union_class_subtypes(non_principal, principal_group)
 
     if not principal_chain or not atom_to_locant:
         # --- Phase 86-02: Ring-as-parent polyfunctional path ---

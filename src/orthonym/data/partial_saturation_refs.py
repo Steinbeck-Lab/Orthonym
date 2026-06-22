@@ -50,14 +50,17 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
         'description': 'benzo[e]pyrazine',
     },
 
+    # audit fix 2026-06-22: smiles were swapped (cinnoline carried phthalazine's
+    # SMILES and vice-versa). OPSIN: cinnoline = c1ccc2nnccc2c1 (1,2-diaza),
+    # phthalazine = c1ccc2cnncc2c1 (2,3-diaza).
     'cinnoline': {
-        'smiles': 'c1ccc2cnncc2c1',
+        'smiles': 'c1ccc2nnccc2c1',
         'ring_atoms': 10,
         'description': 'benzo[c]pyridazine',
     },
 
     'phthalazine': {
-        'smiles': 'c1ccc2nnccc2c1',
+        'smiles': 'c1ccc2cnncc2c1',
         'ring_atoms': 10,
         'description': 'benzo[d]pyridazine',
     },

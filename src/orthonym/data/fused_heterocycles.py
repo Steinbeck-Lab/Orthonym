@@ -203,20 +203,27 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5},
     },
 
-    # Cinnoline: benzo[c]pyridazine
+    # Phthalazine: benzo[d]pyridazine (N at canonical idx 5,6 -> locants 2,3).
+    # NOTE (audit fix 2026-06-22): this key's name was swapped with cinnoline's
+    # below. OPSIN confirms c1ccc2cnncc2c1 IS phthalazine (2,3-diazanaphthalene);
+    # the iupac_locants already place the two N at positions 2,3, so only the
+    # 'name' (and this comment) needed correcting.
     # Canonical atom order: c1(0)-c(1)-c(2)-c2(3)-c(4)-n(5)-n(6)-c(7)-c2(8)-c1(9)
     'c1ccc2cnncc2c1': {
-        'name': 'cinnoline',
+        'name': 'phthalazine',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-membered',
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5},
     },
 
-    # Phthalazine: benzo[d]pyridazine
+    # Cinnoline: benzo[c]pyridazine (N at canonical idx 4,5 -> locants 1,2).
+    # NOTE (audit fix 2026-06-22): name corrected from the swapped 'phthalazine'.
+    # OPSIN confirms c1ccc2nnccc2c1 IS cinnoline (1,2-diazanaphthalene); the
+    # iupac_locants already place the two N at positions 1,2.
     # Canonical atom order: c1(0)-c(1)-c(2)-c2(3)-n(4)-n(5)-c(6)-c(7)-c2(8)-c1(9)
     'c1ccc2nnccc2c1': {
-        'name': 'phthalazine',
+        'name': 'cinnoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-membered',
         'parent_atoms': 10,
@@ -362,6 +369,25 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
         'iupac_locants': {2: 1, 1: 2, 0: 3, 5: 4, 4: '4a', 3: '9a', 6: 9, 7: '4b', 12: '8a', 8: 5, 9: 6, 10: 7, 11: 8, 13: 10},
+    },
+
+    # 6H-Benzo[c]chromene: dibenzo[b,d]pyran (angular [b,d] fusion — O5 and the
+    # sp3 CH2 at position 6 are ADJACENT in the central pyran ring, unlike the
+    # linear [b,e] xanthene above where they are para).
+    # audit fix 2026-06-22: this retained tricyclic regressed to 'unknown' at
+    # v22 HEAD (the entry was lost; the von-Baeyer G0 aromaticity veto then
+    # fail-closed-raises before any namer fires). v21 named it by dict lookup;
+    # this restores that via the same mechanism (lookup precedes von Baeyer).
+    # IUPAC numbering empirically derived via OPSIN substituent placement:
+    # periphery 1-4 (idx12,11,10,9), O5 (idx7), CH2 6 (idx6), 7-10 (idx5,0,1,2);
+    # fusion 4a(idx8, C4|O5), 6a(idx4, C6|C7), 10a(idx3, C10|10b), 10b(idx13).
+    # Canonical: c1ccc2c(c1)COc1ccccc1-2
+    'c1ccc2c(c1)COc1ccccc1-2': {
+        'name': '6H-benzo[c]chromene',
+        'tautomer_locant': 6,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 14,
+        'iupac_locants': {12: 1, 11: 2, 10: 3, 9: 4, 8: '4a', 7: 5, 6: 6, 4: '6a', 5: 7, 0: 8, 1: 9, 2: 10, 3: '10a', 13: '10b'},
     },
 
     # Thianthrene: dibenzo[b,e][1,4]dithiine

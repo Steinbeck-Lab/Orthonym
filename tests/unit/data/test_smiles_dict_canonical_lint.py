@@ -129,8 +129,10 @@ _KEEP_NAME_STRUCTURE_MISMATCH = frozenset({
     "c1cc2sccc2cn1", "c1cc2sccc2s1", "c1ccc2c(c1)NCCN2",
     "c1ccc2c(c1)ccc1[nH]ccc12", "c1ccc2c(c1)ccc1occc12",
     "c1ccc2c(c1)ccc1sccc12", "c1ccc2c(c1)oc1cccnc12", "c1ccc2c[nH]cc2c1",
-    "c1ccc2cc3cnccc3cc2c1", "c1ccc2cc3ncccc3cc2c1", "c1ccc2cnncc2c1",
-    "c1ccc2nnccc2c1", "c1ccc2nocc2c1", "c1ccc2nscc2c1", "c1ccc2oncc2c1",
+    "c1ccc2cc3cnccc3cc2c1", "c1ccc2cc3ncccc3cc2c1",
+    # cinnoline/phthalazine REMOVED 2026-06-22: name-swap fixed, now key-correct
+    # (ratchet shrinks). c1ccc2nnccc2c1=cinnoline, c1ccc2cnncc2c1=phthalazine.
+    "c1ccc2nocc2c1", "c1ccc2nscc2c1", "c1ccc2oncc2c1",
     "c1ccn2ncnc2c1", "c1cnc2[nH]cnc2c1", "c1cnc2cc[nH]c2c1",
     "c1cnc2cnccc2c1", "c1cnc2cnncc2c1", "c1cnc2nccn2c1", "c1cnc2ncoc2c1",
     "c1cnc2ncsc2c1", "c1cnc2nncn2c1", "c1cnc2nocc2c1", "c1cnc2ocnc2c1",
