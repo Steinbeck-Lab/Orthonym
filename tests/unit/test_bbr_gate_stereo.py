@@ -52,8 +52,16 @@ def gate_enabled_real_policy(monkeypatch):
     import orthonym.namer as namer
 
     monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    # Isolate the parseability + stereo-carve-out POLICY under test from the SELF-01
+    # constitutional layer (a separate gate, exercised by test_self_consistency_gate.py).
+    monkeypatch.setattr(namer, "_SC_MODE", "off", raising=False)
     monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True, raising=False)
     monkeypatch.setattr(namer, "_validity_gate_status", _simulated_opsin_status, raising=False)
+    # SELF-01 reorder: the gate consults name_to_smiles first. Mirror the simulated
+    # verdict — None when OPSIN rejects (the stereo-block names), a SMILES otherwise.
+    monkeypatch.setattr(
+        namer, "_validity_gate_name_to_smiles",
+        lambda n: None if _simulated_opsin_status(n) == "rejected" else "CCO", raising=False)
     yield
 
 
@@ -87,6 +95,7 @@ def test_constitutional_fail_still_suppressed(monkeypatch):
     monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True, raising=False)
     # A malformed constitutional name with NO leading stereo block: strip_stereo is a
     # no-op, so the where-it-fails carve-out cannot rescue it -> suppressed.
+    monkeypatch.setattr(namer, "_validity_gate_name_to_smiles", lambda n: None, raising=False)  # OPSIN rejects
     monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected", raising=False)
     out = namer._final_opsin_validity_gate("2-methylhept9ol", "CCCCCCCC")
     assert out != "2-methylhept9ol"  # suppressed to the descriptive fallback

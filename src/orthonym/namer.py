@@ -236,6 +236,27 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
 _VG_ENV = os.environ.get("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "").strip().lower()
 _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 
+# SELF-01 (v23 Phase 0): the constitutional self-consistency gate. After the
+# parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
+# the name to a CONSTITUTIONALLY DIFFERENT molecule than the input, the name is
+# wrong (names a different compound) and is suppressed to the honest fallback.
+#   * "warn" — log + count would-suppressions WITHOUT changing output (the mandatory
+#              warn-only validation phase: 0 protect-row false-positives before flip).
+#   * "on"   — suppress on a verified constitutional mismatch (the accuracy-first state).
+#   * "off"  — disabled.
+# Comparison is STEREO-INSENSITIVE and TAUTOMER-/AROMATICITY-TOLERANT (standard
+# InChIKey skeleton block, ADR-18-07): a stereo-only or mobile-H-tautomer difference
+# must NEVER suppress a constitutionally-correct name. Fail-OPEN on every inconclusive
+# outcome (OPSIN can't be consulted, either structure unparseable by RDKit).
+# Flipped "warn" -> "on" 2026-06-22 after warn-only validation: the constitutional gate
+# would-suppress 0/79 protect-set rows (zero false-positives), while correctly flagging
+# the wrong-molecule TARGET cases (C[Ti](Cl)(Cl)Cl->"methane", [O-]C(=O)CN->"acetate", ...).
+# Accuracy-first: a name for a different molecule is suppressed to the honest fallback.
+_SC_DEFAULT = "on"
+_SC_MODE = os.environ.get("ORTHONYM_SELF_CONSISTENCY_GATE", _SC_DEFAULT).strip().lower()
+if _SC_MODE not in ("off", "warn", "on"):
+    _SC_MODE = _SC_DEFAULT
+
 # Module-level singleton so the OPSIN parse cache is shared across all name()
 # calls in a process (lazy-init on first use).
 _VALIDITY_ORACLE = None
@@ -271,6 +292,73 @@ def _validity_gate_status(name: str) -> str:
     return _VALIDITY_ORACLE.parse_status(name)
 
 
+def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
+    """OPSIN canonical SMILES for ``name`` via the shared singleton oracle (cached),
+    or None if OPSIN rejected it / could not be consulted. Used by the SELF-01
+    constitutional self-consistency gate to re-perceive the emitted name."""
+    global _VALIDITY_ORACLE
+    if _VALIDITY_ORACLE is None:
+        from .assembly.retained_substitution import OpsinOracle
+        from .validation.opsin_roundtrip import _find_opsin_jar
+        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
+    return _VALIDITY_ORACLE.name_to_smiles(name)
+
+
+def _self_consistency_skeleton(smiles: str) -> Optional[str]:
+    """Constitutional skeleton key = the first (skeleton) block of the standard
+    InChIKey. It encodes formula + connectivity + mobile-H-normalized H layer, and
+    EXCLUDES stereochemistry (the /t,/b layers live in the second block). So it is
+    stereo-insensitive and tautomer-tolerant by construction (ADR-18-07). Returns
+    None if RDKit cannot parse/hash the SMILES (-> the caller fails OPEN)."""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        from rdkit.Chem import inchi
+        ik = inchi.MolToInchiKey(mol)
+        return ik.split("-")[0] if ik else None
+    except Exception:
+        return None
+
+
+def _self_consistency_verdict(input_smiles: str, opsin_smiles: str) -> str:
+    """``"ok"`` | ``"mismatch"`` | ``"inconclusive"`` — does the OPSIN re-perception of
+    the emitted name encode the SAME constitution as the input structure?"""
+    a = _self_consistency_skeleton(input_smiles)
+    b = _self_consistency_skeleton(opsin_smiles)
+    if a is None or b is None:
+        return "inconclusive"
+    return "ok" if a == b else "mismatch"
+
+
+def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: str,
+                               stats: Optional[Dict[str, int]]) -> str:
+    """SELF-01: OPSIN already PARSED ``name``; verify it parses to the SAME molecule.
+
+    Suppresses (mode "on") only on a VERIFIED constitutional mismatch — never on a
+    stereo-only / tautomer difference, never when the comparison is inconclusive
+    (fail-OPEN). In mode "warn" it logs + counts the would-suppression but ships the
+    name unchanged (behaviour-neutral); in mode "off" it is a no-op."""
+    if _SC_MODE == "off" or not smiles:
+        return name
+    verdict = _self_consistency_verdict(smiles, opsin_smiles)
+    if verdict != "mismatch":
+        return name  # "ok" ships; "inconclusive" fails OPEN
+    if stats is not None:
+        stats["self_consistency_mismatch"] = stats.get("self_consistency_mismatch", 0) + 1
+    if _SC_MODE == "warn":
+        logger.warning(
+            "SELF-01 would-suppress (warn-only): %r names a constitutionally DIFFERENT "
+            "molecule (input=%s opsin=%s)", name[:80], smiles, opsin_smiles)
+        return name
+    # mode "on": suppress to the honest descriptive fallback.
+    if stats is not None:
+        stats["self_consistency_suppressed"] = stats.get("self_consistency_suppressed", 0) + 1
+    logger.warning("SELF-01 suppressed (different molecule): %r (opsin=%s)",
+                   name[:80], opsin_smiles)
+    return _descriptive_fallback(smiles)
+
+
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                                stats: Optional[Dict[str, int]] = None) -> str:
     """SUB-03 real-OPSIN validity gate (D-11/D-12/D-13).
@@ -300,8 +388,18 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # turn a valid, round-trip-passing name into a descriptive fallback. The old
     # `parse-or-None` check conflated 'rejected' with 'unavailable', breaking the
     # phase's "0-regression by construction" guarantee.
+    #
+    # SELF-01 (v23 Phase 0): re-perceive the name via OPSIN. A non-None canonical
+    # SMILES means OPSIN PARSED it -> run the constitutional self-consistency check
+    # (suppress if the name encodes a DIFFERENT molecule). None means rejected or
+    # unavailable; only then consult parse_status to distinguish them (fail-OPEN on
+    # unavailable). Using name_to_smiles as the primary probe also avoids a second
+    # OPSIN subprocess on the common parsed path.
+    opsin_smiles = _validity_gate_name_to_smiles(name)
+    if opsin_smiles is not None:
+        return _self_consistency_decision(name, smiles, opsin_smiles, stats)
     if _validity_gate_status(name) != "rejected":
-        return name  # OPSIN parses it (or could not be consulted) -> ship as-is
+        return name  # unavailable -> fail-OPEN (transient; never suppress)
     # DD2 / BBR-GATE (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:

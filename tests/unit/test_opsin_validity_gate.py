@@ -46,14 +46,17 @@ class TestOpsinValidityGate:
         monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False)
 
     def test_parseable_name_passes_through_unchanged(self, monkeypatch):
-        """A name OPSIN can parse ('parsed') is returned verbatim."""
+        """A name OPSIN can parse ('parsed') and that round-trips to the SAME molecule
+        is returned verbatim. (SELF-01 reorder: the gate consults name_to_smiles first.)"""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
+        monkeypatch.setattr(namer, "_validity_gate_name_to_smiles", lambda n: "CCO")
         monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "parsed")
         assert _final_opsin_validity_gate("ethanol", "CCO") == "ethanol"
 
     def test_malformed_name_falls_back_to_descriptive_string(self, monkeypatch):
         """A DEFINITIVELY rejected name -> the _descriptive_fallback STRING (not None)."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
+        monkeypatch.setattr(namer, "_validity_gate_name_to_smiles", lambda n: None)  # OPSIN rejects
         monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "rejected")
         smiles = "CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2"  # camphor
         out = _final_opsin_validity_gate("4,7,7-trimethylanediol", smiles)
@@ -72,6 +75,9 @@ class TestOpsinValidityGate:
         JAR present) must FAIL OPEN and ship the name, NEVER suppress it. The old
         parse-or-None check suppressed here, turning an RT=1 name into RT=0."""
         monkeypatch.setattr(namer, "_validity_gate_jar_present", lambda: True)
+        # name_to_smiles returns None on a transient failure too; the status probe
+        # then distinguishes 'unavailable' -> fail OPEN (SELF-01 reorder).
+        monkeypatch.setattr(namer, "_validity_gate_name_to_smiles", lambda n: None)
         monkeypatch.setattr(namer, "_validity_gate_status", lambda n: "unavailable")
         # A perfectly valid name that simply timed out must survive unchanged.
         assert _final_opsin_validity_gate("ethanol", "CCO") == "ethanol"
