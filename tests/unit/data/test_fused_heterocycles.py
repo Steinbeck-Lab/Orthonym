@@ -100,21 +100,27 @@ class TestTautomerLocants:
 
     @pytest.mark.unit
     def test_2h_isoindole_has_locant_2(self):
-        """2H-isoindole has indicated hydrogen at position 2."""
-        mol = Chem.MolFromSmiles('C1=Nc2ccccc2C1')
+        """2H-isoindole (the aromatic isoindole tautomer) has indicated H at position 2.
+
+        DATA-01: the aromatic isoindole key 'c1ccc2c[nH]cc2c1' was mislabeled
+        '1H-isoindole'; the aromatic tautomer is 2H-isoindole (OPSIN-verified).
+        """
+        mol = Chem.MolFromSmiles('c1ccc2c[nH]cc2c1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
         assert result[0] == '2H-isoindole'
         assert result[1] == 2
 
     @pytest.mark.unit
-    def test_1h_isoindole_has_locant_1(self):
-        """1H-isoindole (aromatic tautomer) has indicated hydrogen at position 1."""
-        mol = Chem.MolFromSmiles('c1ccc2c[nH]cc2c1')
+    def test_3h_indole_has_locant_3(self):
+        """DATA-01: the key 'C1=Nc2ccccc2C1' was mislabeled '2H-isoindole'; it is
+        actually 3H-indole (indolenine) — N adjacent to a ring-fusion carbon
+        (benzo[b]pyrrole skeleton), OPSIN-verified."""
+        mol = Chem.MolFromSmiles('C1=Nc2ccccc2C1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == '1H-isoindole'
-        assert result[1] == 1
+        assert result[0] == '3H-indole'
+        assert result[1] == 3
 
     @pytest.mark.unit
     def test_9h_carbazole_has_locant_9(self):
@@ -456,19 +462,22 @@ class TestBenzoFusedOxazolesAndThiazoles:
 
     @pytest.mark.unit
     def test_benzisoxazole(self):
-        """Benzisoxazole should be correctly identified."""
+        """DATA-01: key 'c1ccc2nocc2c1' (N-O-C 5-ring, anthranil skeleton) was
+        mislabeled '1,2-benzisoxazole'; it is 2,1-benzisoxazole (OPSIN-verified).
+        The 1,2-benzisoxazole structure is the swap partner 'c1ccc2oncc2c1'."""
         mol = Chem.MolFromSmiles('c1ccc2nocc2c1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == '1,2-benzisoxazole'
+        assert result[0] == '2,1-benzisoxazole'
 
     @pytest.mark.unit
     def test_benzisothiazole(self):
-        """Benzisothiazole should be correctly identified."""
+        """DATA-01: key 'c1ccc2nscc2c1' (N-S-C 5-ring) was mislabeled
+        '1,2-benzisothiazole'; it is 2,1-benzothiazole (OPSIN-verified)."""
         mol = Chem.MolFromSmiles('c1ccc2nscc2c1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == '1,2-benzisothiazole'
+        assert result[0] == '2,1-benzothiazole'
 
 
 class TestSaturatedVariants:

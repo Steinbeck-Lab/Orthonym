@@ -903,10 +903,12 @@ class TestHeritageBPrecedence:
         ("c1ccc2[nH]ncc2c1", 1, "1H-indazole (1H)"),
         ("c1ccc2[nH]cnc2c1", 1, "1H-benzimidazole (1H)"),
         # 2H subclass
-        ("C1=Nc2ccccc2C1", 2, "2H-isoindole (2H)"),
         ("C1=Cc2ccccc2OC1", 2, "2H-chromene (2H)"),
-        # 3H subclass
-        ("c1cc2nc[nH]cc-2n1", 3, "3H-imidazo[4,5-c]pyridine (3H)"),
+        # 3H subclass (DATA-01: both were mislabeled — C1=Nc2ccccc2C1 is 3H-indole,
+        # not 2H-isoindole; c1cc2nc[nH]cc-2n1 is 3H-pyrrolo[3,2-d]pyrimidine, not
+        # 3H-imidazo[4,5-c]pyridine. Both still carry the 3H indicated-H.)
+        ("C1=Nc2ccccc2C1", 3, "3H-indole (3H)"),
+        ("c1cc2nc[nH]cc-2n1", 3, "3H-pyrrolo[3,2-d]pyrimidine (3H)"),
         # 9H subclass
         ("c1ccc2c(c1)[nH]c1ccccc12", 9, "9H-carbazole (9H)"),
         ("c1ccc2c(c1)Cc1ccccc1O2", 9, "9H-xanthene (9H)"),

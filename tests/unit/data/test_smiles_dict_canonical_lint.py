@@ -110,34 +110,20 @@ import json as _json
 _EXPECTED_CANON_PATH = _Path(__file__).parent / "fused_heterocycle_expected_canon.json"
 
 _KEEP_NAME_STRUCTURE_MISMATCH = frozenset({
-    # --- KEEP-tautomer: intentional Phase-142 tautomer entries ---
+    # --- KEEP-tautomer: intentional Phase-142 purine tautomer entries. Standard
+    #     InChI normalizes the mobile ring N-H, so OPSIN emits a different (but
+    #     equivalent) tautomer's canonical SMILES for the trivial name — same
+    #     molecule, NOT a mislabel. After the v23 DATA-01 fused-heterocycle
+    #     data-integrity sweep (46 mislabeled entries corrected + heptalene key
+    #     fixed), these five are the ONLY remaining name<->structure mismatches.
+    #     The earlier KEEP-deferred block (the 43 isomer mislabels) and the
+    #     heptalene KEEP-aromaticity entry are now FIXED and removed (ratchet
+    #     shrinks). ---
     "Nc1ncnc2[nH]cnc12",            # adenine
     "Nc1nc(=O)c2[nH]cnc2[nH]1",     # guanine (tautomer)
     "Nc1nc2[nH]cnc2c(=O)[nH]1",     # guanine (tautomer)
     "O=c1[nH]cnc2[nH]cnc12",        # hypoxanthine
     "O=c1[nH]c(=O)c2nc[nH]c2[nH]1", # xanthine
-    # --- KEEP-aromaticity: RDKit-vs-OPSIN kekulization (same molecule) ---
-    "C1=CC=C2C=CC=CC=C2C=1",        # heptalene
-    # --- KEEP-deferred: fused-ring isomer name<->structure mismatches; a tracked
-    #     follow-on (per-entry OPSIN verification + iupac_locant audit) beyond the
-    #     Phase-175 WSD-03 reachable-defect scope. NOT fixed here to avoid an
-    #     unvalidated mass data rewrite; the ratchet pins them so none is ADDED. ---
-    "C1=Cc2ccccc2SC1", "C1=NCc2ccccc2C1", "C1=Nc2ccccc2C1",
-    "c1cc2[nH]ccc2cn1", "c1cc2[nH]ncc2cn1", "c1cc2cc[nH]c2cn1",
-    "c1cc2ccncc2cn1", "c1cc2ccncn2c1", "c1cc2ccsc2nn1", "c1cc2ccsc2s1",
-    "c1cc2nc[nH]cc-2n1", "c1cc2nccnc2cn1", "c1cc2ncncc2cn1", "c1cc2occc2cn1",
-    "c1cc2sccc2cn1", "c1cc2sccc2s1", "c1ccc2c(c1)NCCN2",
-    "c1ccc2c(c1)ccc1[nH]ccc12", "c1ccc2c(c1)ccc1occc12",
-    "c1ccc2c(c1)ccc1sccc12", "c1ccc2c(c1)oc1cccnc12", "c1ccc2c[nH]cc2c1",
-    "c1ccc2cc3cnccc3cc2c1", "c1ccc2cc3ncccc3cc2c1",
-    # cinnoline/phthalazine REMOVED 2026-06-22: name-swap fixed, now key-correct
-    # (ratchet shrinks). c1ccc2nnccc2c1=cinnoline, c1ccc2cnncc2c1=phthalazine.
-    "c1ccc2nocc2c1", "c1ccc2nscc2c1", "c1ccc2oncc2c1",
-    "c1ccn2ncnc2c1", "c1cnc2[nH]cnc2c1", "c1cnc2cc[nH]c2c1",
-    "c1cnc2cnccc2c1", "c1cnc2cnncc2c1", "c1cnc2nccn2c1", "c1cnc2ncoc2c1",
-    "c1cnc2ncsc2c1", "c1cnc2nncn2c1", "c1cnc2nocc2c1", "c1cnc2ocnc2c1",
-    "c1cnc2scnc2n1", "c1cnn2cccc2c1", "c1cnn2ccnc2c1", "c1ncc2[nH]ccc2n1",
-    "c1ncc2ncncc2n1",
 })
 
 

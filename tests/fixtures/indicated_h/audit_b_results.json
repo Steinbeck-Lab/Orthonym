@@ -6,28 +6,25 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2c[nH]cc2c1",
-    "name": "1H-isoindole",
-    "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 1,
-    "expected_locant": 1,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
-  },
-  {
-    "smiles": "C1=Nc2ccccc2C1",
     "name": "2H-isoindole",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 2,
     "expected_locant": 2,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "C1=Nc2ccccc2C1",
+    "name": "3H-indole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2[nH]ncc2c1",
@@ -36,8 +33,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2[nH]cnc2c1",
@@ -46,8 +42,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2[nH]nnc2c1",
@@ -56,8 +51,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2occc2c1",
@@ -66,8 +60,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2sccc2c1",
@@ -76,8 +69,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2ocnc2c1",
@@ -86,18 +78,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2nocc2c1",
-    "name": "1,2-benzisoxazole",
+    "name": "2,1-benzisoxazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2scnc2c1",
@@ -106,18 +96,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2nscc2c1",
-    "name": "1,2-benzisothiazole",
+    "name": "2,1-benzothiazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2ncccc2c1",
@@ -126,8 +114,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-membered"
   },
   {
     "smiles": "c1ccc2cnccc2c1",
@@ -136,8 +123,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-membered"
   },
   {
     "smiles": "c1ccc2ncncc2c1",
@@ -146,8 +132,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-membered"
   },
   {
     "smiles": "c1ccc2nccnc2c1",
@@ -156,48 +141,43 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-membered"
   },
   {
     "smiles": "c1ccc2cnncc2c1",
-    "name": "cinnoline",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1ccc2nnccc2c1",
     "name": "phthalazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-membered"
+  },
+  {
+    "smiles": "c1ccc2nnccc2c1",
+    "name": "cinnoline",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-membered"
   },
   {
     "smiles": "c1cnc2ccncc2c1",
-    "name": "1,5-naphthyridine",
+    "name": "1,6-naphthyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphthyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphthyridine"
   },
   {
     "smiles": "c1cc2ccncc2cn1",
-    "name": "pyrido[3,2-b]pyridine",
+    "name": "2,7-naphthyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphthyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphthyridine"
   },
   {
     "smiles": "c1cnc2nccnc2c1",
@@ -206,18 +186,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyridopyrazine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyridopyrazine"
   },
   {
     "smiles": "c1cnc2cnccc2c1",
-    "name": "2,7-naphthyridine",
+    "name": "1,7-naphthyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphthyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphthyridine"
   },
   {
     "smiles": "c1ccc2c(c1)[nH]c1ccccc12",
@@ -226,8 +204,7 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2nc3ccccc3cc2c1",
@@ -236,8 +213,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2nc3ccccc3nc2c1",
@@ -246,8 +222,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)Nc1ccccc1O2",
@@ -256,8 +231,7 @@
     "tautomer_locant_catalog": 10,
     "expected_locant": 10,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)Nc1ccccc1S2",
@@ -266,8 +240,7 @@
     "tautomer_locant_catalog": 10,
     "expected_locant": 10,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)Cc1ccccc1O2",
@@ -276,8 +249,16 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)COc1ccccc1-2",
+    "name": "6H-benzo[c]chromene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 6,
+    "expected_locant": 6,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)Sc1ccccc1S2",
@@ -286,8 +267,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccn2cccc2c1",
@@ -296,8 +276,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccn2ccnc2c1",
@@ -306,8 +285,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccn2cncc2c1",
@@ -316,28 +294,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cnc2[nH]cnc2c1",
-    "name": "1H-imidazo[4,5-c]pyridine",
-    "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 1,
-    "expected_locant": 1,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "imidazopyridine",
-    "heritage_b_tiebreak": "no-tiebreak"
-  },
-  {
-    "smiles": "c1cc2nc[nH]cc-2n1",
-    "name": "3H-imidazo[4,5-c]pyridine",
+    "name": "3H-imidazo[4,5-b]pyridine",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 3,
     "expected_locant": 3,
     "opsin_rt_inchi_match": true,
-    "ring_system": "imidazopyridine",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "imidazopyridine"
+  },
+  {
+    "smiles": "c1cc2nc[nH]cc-2n1",
+    "name": "3H-pyrrolo[3,2-d]pyrimidine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "imidazopyridine"
   },
   {
     "smiles": "c1cnc2[nH]ccc2c1",
@@ -346,18 +321,16 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "azaindole",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "azaindole"
   },
   {
     "smiles": "c1cc2cc[nH]c2cn1",
-    "name": "1H-pyrrolo[3,2-b]pyridine",
+    "name": "1H-pyrrolo[2,3-c]pyridine",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "azaindole",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "azaindole"
   },
   {
     "smiles": "O=c1ccc2ccccc2o1",
@@ -366,8 +339,7 @@
     "tautomer_locant_catalog": 2,
     "expected_locant": 2,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-membered-lactone",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzo-6-membered-lactone"
   },
   {
     "smiles": "c1ccc2c(c1)CCO2",
@@ -376,8 +348,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered-saturated"
   },
   {
     "smiles": "C1=Cc2ccccc2OC1",
@@ -386,8 +357,7 @@
     "tautomer_locant_catalog": 2,
     "expected_locant": 2,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzopyran",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzopyran"
   },
   {
     "smiles": "C1=COc2ccccc2C1",
@@ -396,8 +366,7 @@
     "tautomer_locant_catalog": 4,
     "expected_locant": 4,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzopyran",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzopyran"
   },
   {
     "smiles": "c1ncc2nc[nH]c2n1",
@@ -406,8 +375,7 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "purine"
   },
   {
     "smiles": "c1cnc2ncncc2n1",
@@ -416,8 +384,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pteridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pteridine"
   },
   {
     "smiles": "Nc1ncnc2nc[nH]c12",
@@ -426,8 +393,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "Nc1ncnc2[nH]cnc12",
@@ -436,8 +402,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "O=c1[nH]cnc2nc[nH]c12",
@@ -446,8 +411,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "O=c1[nH]cnc2[nH]cnc12",
@@ -456,8 +420,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "Nc1nc2[nH]cnc2c(=O)[nH]1",
@@ -466,8 +429,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "Nc1nc(=O)c2[nH]cnc2[nH]1",
@@ -476,8 +438,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "c1cnc2ccnn2c1",
@@ -486,8 +447,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cnc2sccc2c1",
@@ -496,8 +456,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyridine"
   },
   {
     "smiles": "c1ccc2c(c1)CCN2",
@@ -506,8 +465,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CNC2",
@@ -516,8 +474,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CCCN2",
@@ -526,8 +483,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CCNC2",
@@ -536,8 +492,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CCCO2",
@@ -546,8 +501,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CCOC2",
@@ -556,8 +510,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2nsnc2c1",
@@ -566,8 +519,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2nonc2c1",
@@ -576,38 +528,34 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2c(c1)ccc1occc12",
-    "name": "naphtho[1,2-b]furan",
+    "name": "naphtho[2,1-b]furan",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1ccc2c(c1)ccc1sccc12",
-    "name": "naphtho[1,2-b]thiophene",
+    "name": "naphtho[2,1-b]thiophene",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1ccc2c(c1)ccc1[nH]ccc12",
-    "name": "1H-naphtho[1,2-b]pyrrole",
+    "name": "3H-benzo[e]indole",
     "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 1,
-    "expected_locant": 1,
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1ccc2cc3occc3cc2c1",
@@ -616,8 +564,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1ccc2cc3sccc3cc2c1",
@@ -626,8 +573,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1ccc2cc3[nH]ccc3cc2c1",
@@ -636,8 +582,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphtho-fused",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "naphtho-fused"
   },
   {
     "smiles": "c1cnc2ncncc2c1",
@@ -646,38 +591,34 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyridopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyridopyrimidine"
   },
   {
     "smiles": "c1cnc2cccnc2c1",
-    "name": "pyrido[3,4-b]pyridine",
+    "name": "1,5-naphthyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "naphthyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "naphthyridine"
   },
   {
     "smiles": "c1cnc2ccnnc2c1",
-    "name": "pyrido[3,4-b]pyridazine",
-    "classification": "OPSIN-UNPARSEABLE",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": false,
-    "ring_system": "pyridopyridazine",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1cnc2nccn2c1",
-    "name": "imidazo[1,2-b]pyridazine",
+    "name": "pyrido[3,2-c]pyridazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyridopyridazine"
+  },
+  {
+    "smiles": "c1cnc2nccn2c1",
+    "name": "imidazo[1,2-a]pyrimidine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ncc2[nH]cnc2n1",
@@ -686,8 +627,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine-related",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "purine-related"
   },
   {
     "smiles": "c1cnc2ccsc2c1",
@@ -696,28 +636,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyridine"
   },
   {
     "smiles": "c1cnc2ncsc2c1",
-    "name": "thieno[2,3-d]pyrimidine",
+    "name": "thiazolo[4,5-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyrimidine"
   },
   {
     "smiles": "c1cnc2cc[nH]c2c1",
-    "name": "1H-pyrrolo[3,2-c]pyridine",
+    "name": "1H-pyrrolo[3,2-b]pyridine",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "azaindole",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "azaindole"
   },
   {
     "smiles": "c1cnc2ccoc2c1",
@@ -726,8 +663,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "furopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "furopyridine"
   },
   {
     "smiles": "c1cnc2occc2c1",
@@ -736,28 +672,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "furopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "furopyridine"
   },
   {
     "smiles": "c1cnc2ocnc2c1",
-    "name": "oxazolo[4,5-b]pyridine",
+    "name": "oxazolo[5,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "oxazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "oxazolopyridine"
   },
   {
     "smiles": "c1cnc2nncn2c1",
-    "name": "[1,2,4]triazolo[1,5-a]pyridine",
+    "name": "[1,2,4]triazolo[4,3-a]pyrimidine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
-    "opsin_rt_inchi_match": false,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccc2c(c1)cnc1ccccc12",
@@ -766,8 +699,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)[nH]c1cnccc12",
@@ -776,8 +708,7 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "O=c1c2ccccc2[nH]c2ccccc12",
@@ -786,8 +717,7 @@
     "tautomer_locant_catalog": 10,
     "expected_locant": 10,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)oc1ccccc12",
@@ -796,8 +726,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)sc1ccccc12",
@@ -806,8 +735,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)ccc1ncccc12",
@@ -816,28 +744,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2cc3ncccc3cc2c1",
-    "name": "benzo[h]quinoline",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1ccc2cc3cnccc3cc2c1",
     "name": "benzo[g]quinoline",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
+  },
+  {
+    "smiles": "c1ccc2cc3cnccc3cc2c1",
+    "name": "benzo[g]isoquinoline",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "O=C1c2ccccc2-c2ccccc21",
@@ -846,8 +771,7 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "O=c1[nH]c2ccccc2c2ccccc12",
@@ -856,8 +780,7 @@
     "tautomer_locant_catalog": 5,
     "expected_locant": 5,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "C1=CCN2C=CC=CC2=C1",
@@ -866,8 +789,7 @@
     "tautomer_locant_catalog": 4,
     "expected_locant": 4,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "C1CCN2CCCCC2C1",
@@ -876,8 +798,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "C1=Cn2cccc2C1",
@@ -886,8 +807,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "O=c1c2ccccc2oc2ccccc12",
@@ -896,8 +816,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "O=c1c2ccccc2sc2ccccc12",
@@ -906,8 +825,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1cnc2c(c1)ccc1cccnc12",
@@ -916,8 +834,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "C1=Nc2cccc3cccc(c23)N1",
@@ -926,8 +843,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)Cc1ccccc1S2",
@@ -936,8 +852,7 @@
     "tautomer_locant_catalog": 9,
     "expected_locant": 9,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2cocc2c1",
@@ -946,18 +861,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2oncc2c1",
-    "name": "2,1-benzisoxazole",
+    "name": "1,2-benzisoxazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "c1ccc2[se]cnc2c1",
@@ -966,8 +879,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-membered",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-membered"
   },
   {
     "smiles": "C1=Cc2ccccc2C1",
@@ -976,8 +888,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bicyclic-carbocyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "bicyclic-carbocyclic"
   },
   {
     "smiles": "c1ccc2c(c1)CCC2",
@@ -986,8 +897,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bicyclic-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bicyclic-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)-c1ccccc1-2",
@@ -996,8 +906,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "non-benzenoid",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "non-benzenoid"
   },
   {
     "smiles": "C1=Cc2cccc3cccc1c23",
@@ -1006,8 +915,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic-carbocyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic-carbocyclic"
   },
   {
     "smiles": "C1=Cc2cccc3cccc(c23)C1",
@@ -1016,8 +924,7 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic-carbocyclic",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "tricyclic-carbocyclic"
   },
   {
     "smiles": "c1cc2ccc3cccc4ccc(c1)c2c34",
@@ -1026,8 +933,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tetracyclic-carbocyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tetracyclic-carbocyclic"
   },
   {
     "smiles": "c1ccc2c(c1)ccc1c3ccccc3ccc21",
@@ -1036,8 +942,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tetracyclic-carbocyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tetracyclic-carbocyclic"
   },
   {
     "smiles": "c1ccc2c(c1)c1ccccc1c1ccccc21",
@@ -1046,8 +951,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tetracyclic-carbocyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tetracyclic-carbocyclic"
   },
   {
     "smiles": "c1ccc2cc3cc4ccccc4cc3cc2c1",
@@ -1056,8 +960,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tetracyclic-carbocyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tetracyclic-carbocyclic"
   },
   {
     "smiles": "C1=Cc2cc3c(cc2=C1)C=CC=3",
@@ -1066,8 +969,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "non-benzenoid",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "non-benzenoid"
   },
   {
     "smiles": "C1=Cc2c3c(ccc2=C1)=CC=C3",
@@ -1076,18 +978,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "non-benzenoid",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "non-benzenoid"
   },
   {
-    "smiles": "C1=CC=C2C=CC=CC=C2C=1",
+    "smiles": "C1=CC=C2C=CC=CC=C2C=C1",
     "name": "heptalene",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
-    "opsin_rt_inchi_match": false,
-    "ring_system": "non-benzenoid",
-    "heritage_b_tiebreak": "not-applicable"
+    "opsin_rt_inchi_match": true,
+    "ring_system": "non-benzenoid"
   },
   {
     "smiles": "c1cnc2[nH]ncc2c1",
@@ -1096,18 +996,16 @@
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrazolopyridine",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "pyrazolopyridine"
   },
   {
     "smiles": "c1cnc2ncoc2c1",
-    "name": "oxazolo[5,4-b]pyridine",
+    "name": "oxazolo[4,5-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "oxazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "oxazolopyridine"
   },
   {
     "smiles": "c1cnc2scnc2c1",
@@ -1116,8 +1014,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thiazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thiazolopyridine"
   },
   {
     "smiles": "c1cnc2oncc2c1",
@@ -1126,28 +1023,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "isoxazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "isoxazolopyridine"
   },
   {
     "smiles": "c1cnc2scnc2n1",
-    "name": "thieno[3,2-d]pyrimidine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": false,
-    "ring_system": "thienopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1cnc2cnncc2c1",
-    "name": "pyrido[2,3-c]pyridazine",
+    "name": "thiazolo[4,5-b]pyrazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyridopyridazine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyrimidine"
+  },
+  {
+    "smiles": "c1cnc2cnncc2c1",
+    "name": "pyrido[2,3-d]pyridazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "pyridopyridazine"
   },
   {
     "smiles": "c1cnc2nccnc2n1",
@@ -1156,28 +1050,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrazinopyrazine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyrazinopyrazine"
   },
   {
     "smiles": "c1cc2ncncc2cn1",
-    "name": "pyrido[3,2-d]pyrimidine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "pyridopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1cc2nccnc2cn1",
     "name": "pyrido[4,3-d]pyrimidine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyridopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyridopyrimidine"
+  },
+  {
+    "smiles": "c1cc2nccnc2cn1",
+    "name": "pyrido[3,4-b]pyrazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "pyridopyrimidine"
   },
   {
     "smiles": "c1cc2ccsc2cn1",
@@ -1186,48 +1077,43 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyridine"
   },
   {
     "smiles": "c1cc2sccc2cn1",
-    "name": "thieno[3,4-b]pyridine",
+    "name": "thieno[3,2-c]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyridine"
   },
   {
     "smiles": "c1cc2occc2cn1",
-    "name": "furo[2,3-c]pyridine",
+    "name": "furo[3,2-c]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "furopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "furopyridine"
   },
   {
     "smiles": "c1cc2[nH]ccc2cn1",
-    "name": "1H-pyrrolo[2,3-c]pyridine",
+    "name": "1H-pyrrolo[3,2-c]pyridine",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "azaindole",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "azaindole"
   },
   {
     "smiles": "c1cnn2cccc2c1",
-    "name": "pyrazolo[1,5-a]pyridine",
+    "name": "pyrrolo[1,2-b]pyridazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccn2nnnc2c1",
@@ -1236,18 +1122,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccn2ncnc2c1",
-    "name": "[1,2,4]triazolo[4,3-a]pyridine",
+    "name": "[1,2,4]triazolo[1,5-a]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cn2ccsc2n1",
@@ -1256,18 +1140,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cc2ccncn2c1",
-    "name": "pyrrolo[1,2-a]pyrimidine",
+    "name": "pyrrolo[1,2-c]pyrimidine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cc2cnccn2c1",
@@ -1276,8 +1158,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "C1CC2CCCN2C1",
@@ -1286,8 +1167,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "C1CCN2CCCC2C1",
@@ -1296,8 +1176,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1ccc2c(c1)Oc1ccccc1S2",
@@ -1306,38 +1185,34 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1ccc2c(c1)oc1cccnc12",
-    "name": "furo[3,2-b]quinoline",
+    "name": "benzofuro[3,2-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "tricyclic",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "tricyclic"
   },
   {
     "smiles": "c1cc2sccc2s1",
-    "name": "thieno[2,3-b]thiophene",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "thienothiophene",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1cc2ccsc2s1",
     "name": "thieno[3,2-b]thiophene",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienothiophene",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienothiophene"
+  },
+  {
+    "smiles": "c1cc2ccsc2s1",
+    "name": "thieno[2,3-b]thiophene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "thienothiophene"
   },
   {
     "smiles": "O=c1[nH]c(=O)c2nc[nH]c2[nH]1",
@@ -1346,8 +1221,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "O=c1[nH]c(=O)c2[nH]cnc2[nH]1",
@@ -1356,48 +1230,43 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "purine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "purine"
   },
   {
     "smiles": "O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1",
-    "name": "alloxazine",
-    "classification": "OPSIN-UNPARSEABLE",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": false,
-    "ring_system": "pteridine-related",
-    "heritage_b_tiebreak": "not-applicable"
-  },
-  {
-    "smiles": "c1ncc2ncncc2n1",
-    "name": "pyrimido[4,5-d]pyrimidine",
+    "name": "benzo[g]pteridine-2,4(1H,3H)-dione",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrimidopyrimidine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pteridine-related"
+  },
+  {
+    "smiles": "c1ncc2ncncc2n1",
+    "name": "pyrimido[5,4-d]pyrimidine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "pyrimidopyrimidine"
   },
   {
     "smiles": "c1ncc2[nH]ccc2n1",
-    "name": "1H-pyrrolo[2,3-b]pyrazine",
+    "name": "5H-pyrrolo[3,2-d]pyrimidine",
     "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 1,
-    "expected_locant": 1,
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrrolopyrazine",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "pyrrolopyrazine"
   },
   {
     "smiles": "C1=Cc2ccccc2SC1",
-    "name": "2H-isothiochromene",
-    "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 2,
-    "expected_locant": 2,
+    "name": "thiochromene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzothiopyran",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "benzothiopyran"
   },
   {
     "smiles": "c1ccc2c(c1)CCCS2",
@@ -1406,8 +1275,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)OCCO2",
@@ -1416,8 +1284,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)CCS2",
@@ -1426,28 +1293,25 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-saturated"
   },
   {
     "smiles": "c1ccc2c(c1)NCCN2",
-    "name": "1,2,3,4-tetrahydroquinazoline",
+    "name": "1,2,3,4-tetrahydroquinoxaline",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "C1=NCc2ccccc2C1",
-    "name": "3,4-dihydroisoquinoline",
+    "name": "1,4-dihydroisoquinoline",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-6-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-6-saturated"
   },
   {
     "smiles": "c1cnc2c(c1)CCN2",
@@ -1456,38 +1320,34 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "benzo-5-saturated",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "benzo-5-saturated"
   },
   {
     "smiles": "c1cnn2ccnc2c1",
-    "name": "pyrazolo[1,5-a]pyrazine",
+    "name": "imidazo[1,2-b]pyridazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "bridgehead",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "bridgehead"
   },
   {
     "smiles": "c1cc2[nH]ncc2cn1",
-    "name": "1H-pyrazolo[3,4-c]pyridine",
+    "name": "1H-pyrazolo[4,3-c]pyridine",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrazolopyridine",
-    "heritage_b_tiebreak": "no-tiebreak"
+    "ring_system": "pyrazolopyridine"
   },
   {
     "smiles": "c1cc2ccsc2nn1",
-    "name": "thieno[2,3-d]pyridazine",
+    "name": "thieno[2,3-c]pyridazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thienopyridazine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thienopyridazine"
   },
   {
     "smiles": "c1cc2ncoc2cn1",
@@ -1496,8 +1356,7 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "oxazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "oxazolopyridine"
   },
   {
     "smiles": "c1cc2ncsc2cn1",
@@ -1506,18 +1365,16 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "thiazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "thiazolopyridine"
   },
   {
     "smiles": "c1cnc2nocc2c1",
-    "name": "isoxazolo[4,5-b]pyridine",
+    "name": "isoxazolo[3,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "isoxazolopyridine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "isoxazolopyridine"
   },
   {
     "smiles": "c1cc2nccnc2nn1",
@@ -1526,7 +1383,6 @@
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
-    "ring_system": "pyrazinopyridazine",
-    "heritage_b_tiebreak": "not-applicable"
+    "ring_system": "pyrazinopyridazine"
   }
 ]
