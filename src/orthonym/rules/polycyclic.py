@@ -2402,6 +2402,25 @@ def name_polycyclic_complete(mol, features=None):
         bridged = name_bridged_fused_pin(mol)
         if bridged is not None:
             return bridged
+        # v23 IH-01 (Phase 2): a partially-saturated PAH (e.g. 9,10-dihydro-
+        # anthracene) reaches this von-Baeyer path because its cage still
+        # carries the intact aromatic ring(s); von Baeyer would de-aromatise
+        # it into a WRONG saturated cage. The carbocyclic partial-saturation
+        # constructor names it correctly (hydro prefix on the mancude parent,
+        # automorphism-min numbering) and fails closed otherwise — try it
+        # before refusing, exactly as the bridged-fused delegation above.
+        from .partial_saturation import detect_carbocyclic_partial_saturation
+        _sat_ring_atoms = set()
+        for _r in ri.AtomRings():
+            _sat_ring_atoms.update(_r)
+        _sat = detect_carbocyclic_partial_saturation(mol, _sat_ring_atoms)
+        if _sat is not None:
+            from .polycyclics import _assemble_partially_saturated_carbocycle_name
+            _sat_name = _assemble_partially_saturated_carbocycle_name(mol, _sat)
+            if _sat_name:
+                # substituents_included=False -> the complex-ring caller enriches
+                # any ring substituents via the stored atom_to_locant.
+                return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], False)
         # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
         from ..errors import unsupported_ring_system
         raise unsupported_ring_system()

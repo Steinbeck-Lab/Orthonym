@@ -423,6 +423,111 @@ def get_ring_saturation_level(
 # =============================================================================
 
 
+def _carbocyclic_mancude_parents_by_size(n_ring_atoms: int) -> List[str]:
+    """All-carbon mancude parents in ``POLYCYCLIC_DATA`` that carry a populated
+    ``iupac_numbering`` and are a *pure* ring system of exactly ``n_ring_atoms``
+    atoms.
+
+    Returning every same-size candidate (e.g. naphthalene AND azulene at 10;
+    anthracene AND phenanthrene at 14) is safe: the bond-order-agnostic
+    automorphism match in :func:`_match_mancude_parent_numbering` only succeeds
+    for the parent whose *connectivity* matches, so a mismatched same-size
+    parent is silently skipped (fail-closed — never a wrong parent guess).
+    """
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+
+    out: List[str] = []
+    for name, entry in POLYCYCLIC_DATA.items():
+        numbering = entry.get('iupac_numbering')
+        csmiles = entry.get('canonical_smiles')
+        if not numbering or not csmiles:
+            continue
+        cmol = Chem.MolFromSmiles(csmiles)
+        if cmol is None or cmol.GetNumAtoms() != n_ring_atoms:
+            continue
+        if any(a.GetSymbol() != 'C' for a in cmol.GetAtoms()):
+            continue
+        out.append(name)
+    return out
+
+
+def _match_mancude_parent_numbering(
+    mol: Chem.Mol,
+    ring_atoms: Set[int],
+    sp3_atoms: Set[int],
+    ring_double_bonds: List[Tuple[int, int]],
+    candidate_parents: List[str],
+) -> Optional[Tuple[str, Dict[int, Any]]]:
+    """Number a (partly) saturated fused carbocycle by its mancude parent.
+
+    For each candidate parent, do a bond-order-agnostic automorphism match of
+    the stored aromatic parent skeleton onto ``mol`` and read off the parent's
+    fixed ``iupac_numbering`` (incl. the lettered fusion locants 4a/8a/...).
+    Among ALL matching numberings (across all candidates) pick the one giving
+    the LOWEST locant set to the hydro positions (the sp3 ring atoms), then to
+    the residual ring double bonds — IUPAC 2013 P-31.1.4.3.4.
+
+    Returns ``(parent_name, {atom_idx: locant})`` for the winning numbering, or
+    ``None`` if no candidate's skeleton matches the ring system exactly (fail
+    closed — never emit a wrong parent/locant).
+
+    This is the shared primitive behind both the aromatic-bearing partial-PAH
+    path (:func:`detect_carbocyclic_partial_saturation`) and the all-saturated
+    residual-ene path (:func:`name_hydrogenated_fused_carbocycle`); it replaces
+    the old naive sp3-walk that mis-numbered non-adjacent hydro positions (e.g.
+    1,4-dihydronaphthalene → wrong "1,2-").
+    """
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+
+    ring_atom_set = set(ring_atoms)
+    best_key = None
+    best: Optional[Tuple[str, Dict[int, Any]]] = None
+
+    for parent in candidate_parents:
+        entry = POLYCYCLIC_DATA.get(parent)
+        if not entry:
+            continue
+        numbering = entry.get('iupac_numbering') or {}
+        csmiles = entry.get('canonical_smiles')
+        if not numbering or not csmiles:
+            continue
+        cmol = Chem.MolFromSmiles(csmiles)
+        if cmol is None:
+            continue
+        n_canonical = cmol.GetNumAtoms()
+        if n_canonical != len(ring_atom_set):
+            continue
+
+        params = Chem.AdjustQueryParameters.NoAdjustments()
+        params.makeBondsGeneric = True
+        params.aromatizeIfPossible = False
+        params.adjustDegree = False
+        query = Chem.AdjustQueryProperties(cmol, params)
+
+        for match in mol.GetSubstructMatches(query, uniquify=False):
+            if len(match) != n_canonical:
+                continue
+            atom_to_locant = {
+                match[c_idx]: loc
+                for c_idx, loc in numbering.items()
+                if c_idx < len(match)
+            }
+            # The match must cover EXACTLY the ring system (not some other subset).
+            if set(atom_to_locant) != ring_atom_set:
+                continue
+            hydro_locs = sorted(_locant_key(atom_to_locant[a]) for a in sp3_atoms)
+            ene_locs = sorted(
+                min(_locant_key(atom_to_locant[i]), _locant_key(atom_to_locant[j]))
+                for i, j in ring_double_bonds
+            )
+            key = (hydro_locs, ene_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best = (parent, atom_to_locant)
+
+    return best
+
+
 def detect_carbocyclic_partial_saturation(
     mol: Chem.Mol,
     fused_ring_atoms: Set[int]
@@ -474,8 +579,6 @@ def detect_carbocyclic_partial_saturation(
         >>> result['parent_name']
         'naphthalene'
     """
-    from ..data.partial_saturation_refs import get_reference_smiles
-
     if mol is None or not fused_ring_atoms:
         return None
 
@@ -539,42 +642,42 @@ def detect_carbocyclic_partial_saturation(
         if not is_fused:
             return None
 
-    # Identify parent based on ring system characteristics
-    parent_name = None
-    parent_smiles = None
-    parent_aromatic_count = 0
+    # Residual non-aromatic ring C=C double bonds — needed both to choose the
+    # lowest-locant numbering (P-31.1.4.3.4) and to recognise full saturation.
+    ring_double_bonds: List[Tuple[int, int]] = []
+    for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
+            continue
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in fused_ring_atoms and b in fused_ring_atoms:
+            ring_double_bonds.append((a, b))
 
-    # Naphthalene-type: 10 ring atoms total
-    if total_ring_atoms == 10:
-        parent_name = 'naphthalene'
-        parent_smiles = get_reference_smiles('naphthalene')
-        parent_aromatic_count = 10
-
-    # Anthracene/phenanthrene-type: 14 ring atoms total
-    elif total_ring_atoms == 14:
-        # Could be anthracene or phenanthrene - use anthracene as default
-        parent_name = 'anthracene'
-        parent_smiles = get_reference_smiles('anthracene')
-        parent_aromatic_count = 14
-
-    else:
-        # Unknown fused system size
+    # Identify the mancude parent AND its IUPAC numbering by a bond-order-agnostic
+    # automorphism match (P-31.1.4): the all-carbon parent skeleton whose
+    # connectivity matches this ring system, numbered to give the lowest locants
+    # first to the hydro (sp3) positions, then to any residual ring double bond.
+    # Fail closed if no all-carbon parent of this exact ring size matches — never
+    # guess the parent by ring-atom count (the old size->name guess mislabelled
+    # phenanthrene as anthracene) and never number by a naive sp3 walk (the old
+    # _build_naphthalene_type_locants mis-numbered non-adjacent hydro positions,
+    # e.g. 1,4-dihydronaphthalene -> wrong "1,2-").
+    sp3_set = set(sp3_indices)
+    candidates = _carbocyclic_mancude_parents_by_size(total_ring_atoms)
+    matched = _match_mancude_parent_numbering(
+        mol, fused_ring_atoms, sp3_set, ring_double_bonds, candidates,
+    )
+    if matched is None:
         return None
+    parent_name, atom_to_locant = matched
 
-    if parent_smiles is None:
-        return None
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+    parent_smiles = POLYCYCLIC_DATA[parent_name].get('canonical_smiles')
 
-    # Calculate hydrogen count
-    # In fused aromatic systems, each aromatic C has 1 H.
-    # When a C goes from sp2 (aromatic) to sp3 (saturated), it gains 1 H.
-    # So hydrogen_count = sp3_count (not sp3_count * 2).
-    # Example: tetrahydronaphthalene has 4 sp3 C = 4 extra H = tetrahydro
+    # In a mancude carbocycle every ring atom is sp2; each sp3 ring atom is one
+    # added hydrogen, so hydrogen_count == sp3_count.
     hydrogen_count = sp3_count
+    is_perhydro = (sp3_count == total_ring_atoms)
 
-    # Check for perhydro (fully saturated)
-    is_perhydro = sp3_count >= parent_aromatic_count
-
-    # Determine prefix
     if is_perhydro:
         prefix = 'perhydro'
     else:
@@ -582,10 +685,6 @@ def detect_carbocyclic_partial_saturation(
 
     if prefix is None:
         return None
-
-    # Build atom-to-locant mapping for the fused system
-    # For naphthalene-type systems, use standard IUPAC numbering
-    atom_to_locant = _build_naphthalene_type_locants(mol, fused_ring_atoms, sp3_indices)
 
     return {
         'parent_name': parent_name,
@@ -952,3 +1051,177 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     hydro_display = sorted((best_map[a] for a in sp3_atoms), key=_locant_key)
     locant_str = ','.join(_locant_display(loc) for loc in hydro_display)
     return f"{locant_str}-{prefix}{parent}"
+
+
+# =============================================================================
+# Added indicated hydrogen + ring-ketone suffix (P-31.1.4.2.4 / P-58.2)
+# =============================================================================
+
+
+def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
+    """Ring carbons bearing a single exocyclic ketone-type =O."""
+    out: List[int] = []
+    for idx in ring_set:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            o = bond.GetOtherAtom(atom)
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and o.GetSymbol() == 'O'
+                    and o.GetIdx() not in ring_set
+                    and o.GetDegree() == 1):
+                out.append(idx)
+                break
+    return out
+
+
+def name_ring_ketone_with_added_indicated_h(mol: Chem.Mol) -> Optional[str]:
+    """Name an unsubstituted ring ketone on a mancude ring using the added
+    indicated hydrogen form ``<parent>-<loc>(<n>H)-one`` (IUPAC P-31.1.4.2.4).
+
+    Examples:
+        ``O=c1cccc[nH]1``        -> ``pyridin-2(1H)-one``
+        ``O=C1CC=Cc2ccccc21``    -> ``naphthalen-1(2H)-one``
+
+    The carbonyl carbon takes the ``-one`` suffix; the single ring atom that
+    carries an *extra* hydrogen relative to the mancude parent (an N-H, or a
+    -CH2-) is the added indicated hydrogen. Numbering gives the lowest locants
+    to the heteroatom set, then the suffix, then the added-IH (P-31.1.4.3.4).
+
+    Tightly scoped + fail-closed (returns None -> the molecule keeps its prior
+    name / SELF-01 net; never a wrong name):
+      * exactly ONE ring ketone (a single ``-one``; di-ones deferred);
+      * exactly ONE added-indicated-hydrogen atom (the simple ``(nH)`` form;
+        dihydro+ketone such as a tetralone, with several saturated ring atoms,
+        is deferred — that overlaps the fused-base-selection bug);
+      * NO other substituents (only the ring + the one carbonyl O), so it can
+        never silently drop a substituent;
+      * monocyclic heterocycle (mancude parent must aromatize, no leading
+        indicated-H parent) OR carbocyclic PAH (matches a stored mancude PAH).
+    Fused heterocyclic ring ketones are deferred (a follow-on).
+    """
+    if mol is None:
+        return None
+    ring_lists = mol.GetRingInfo().AtomRings()
+    if not ring_lists:
+        return None
+    ring_set: Set[int] = set()
+    for r in ring_lists:
+        ring_set.update(r)
+
+    carbonyls = _ring_carbonyl_carbons(mol, ring_set)
+    if len(carbonyls) != 1:
+        return None
+    carbonyl_c = carbonyls[0]
+
+    # Only the ring + the single carbonyl O may be present (no other substituents).
+    if mol.GetNumHeavyAtoms() != len(ring_set) + 1:
+        return None
+
+    # ---- Monocyclic heterocycle (e.g. 2-pyridone -> pyridin-2(1H)-one) ----
+    if len(ring_lists) == 1:
+        ring = ring_lists[0]
+        if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring):
+            return None  # carbocyclic monocycle (cyclohexanone etc.) — not here
+        # lazy imports avoid an import cycle with heterocycles.py
+        from .heterocycles import (
+            _mancude_monocycle_parent, name_heterocycle,
+            get_heteroatom_priority, _macrocycle_ordered_ring,
+        )
+        parent, old_to_new = _mancude_monocycle_parent(mol, ring)
+        if parent is None:
+            return None
+        parent_ring = parent.GetRingInfo().AtomRings()
+        if len(parent_ring) != 1:
+            return None
+        parent_name = name_heterocycle(parent, parent_ring[0])
+        if not parent_name or parent_name[:1].isdigit():
+            return None  # defer mancude parents that already carry indicated H
+        # added indicated H = ring atom with MORE hydrogens than in the parent
+        added = {
+            i for i in ring
+            if mol.GetAtomWithIdx(i).GetTotalNumHs()
+            > parent.GetAtomWithIdx(old_to_new[i]).GetTotalNumHs()
+        }
+        if len(added) != 1:
+            return None
+        ordered = _macrocycle_ordered_ring(mol, ring_set)
+        n = len(ring)
+        if ordered is None or len(ordered) != n:
+            return None
+        het = {i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+        best_key = None
+        best_map: Optional[Dict[int, int]] = None
+        for start in range(n):
+            for direction in (1, -1):
+                seq = [ordered[(start + k * direction) % n] for k in range(n)]
+                loc = {a: idx + 1 for idx, a in enumerate(seq)}
+                key = (
+                    tuple(sorted(loc[a] for a in het)),
+                    tuple(sorted(
+                        (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
+                        for a in het
+                    )),
+                    loc[carbonyl_c],
+                    tuple(sorted(loc[a] for a in added)),
+                )
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best_map = loc
+        if best_map is None:
+            return None
+        ih = ','.join(f"{best_map[a]}H" for a in sorted(added, key=lambda x: best_map[x]))
+        return f"{_elide_terminal_e(parent_name)}-{best_map[carbonyl_c]}({ih})-one"
+
+    # ---- Carbocyclic PAH (e.g. naphthalen-1(2H)-one) ----
+    if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
+        from ..data.polycyclic_data import POLYCYCLIC_DATA
+        n = len(ring_set)
+        best_key = None
+        best_name = None
+        for parent in _carbocyclic_mancude_parents_by_size(n):
+            entry = POLYCYCLIC_DATA[parent]
+            numbering = entry['iupac_numbering']
+            cmol = Chem.MolFromSmiles(entry['canonical_smiles'])
+            if cmol is None or cmol.GetNumAtoms() != n:
+                continue
+            params = Chem.AdjustQueryParameters.NoAdjustments()
+            params.makeBondsGeneric = True
+            params.aromatizeIfPossible = False
+            params.adjustDegree = False
+            query = Chem.AdjustQueryProperties(cmol, params)
+            for match in mol.GetSubstructMatches(query, uniquify=False):
+                a2l = {match[c]: loc for c, loc in numbering.items() if c < len(match)}
+                if set(a2l) != ring_set:
+                    continue
+                parent_h = {
+                    match[c]: cmol.GetAtomWithIdx(c).GetTotalNumHs()
+                    for c in numbering if c < len(match)
+                }
+                added = {
+                    i for i in ring_set
+                    if i != carbonyl_c
+                    and mol.GetAtomWithIdx(i).GetTotalNumHs() > parent_h.get(i, 0)
+                }
+                if len(added) != 1:
+                    continue
+                key = (
+                    _locant_key(a2l[carbonyl_c]),
+                    tuple(sorted(_locant_key(a2l[a]) for a in added)),
+                )
+                if best_key is None or key < best_key:
+                    best_key = key
+                    ih = ','.join(
+                        f"{a2l[a]}H" for a in sorted(added, key=lambda x: _locant_key(a2l[x]))
+                    )
+                    best_name = f"{_elide_terminal_e(parent)}-{a2l[carbonyl_c]}({ih})-one"
+        return best_name
+
+    return None
+
+
+def _elide_terminal_e(stem: str) -> str:
+    """Elide a terminal 'e' before an '-one' suffix (P-16.3.3): naphthalene ->
+    naphthalen, pyridine -> pyridin."""
+    return stem[:-1] if stem.endswith('e') else stem

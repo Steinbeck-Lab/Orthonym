@@ -279,7 +279,7 @@ class TestSubstitutedHeterocycleRegression:
         """Test that adding substituent support doesn't break unsubstituted naming."""
         # 5-membered
         assert name_compound("c1ccoc1") == "furan"
-        assert name_compound("c1cc[nH]c1") == "pyrrole"
+        assert name_compound("c1cc[nH]c1") == "1H-pyrrole"  # v23 IH-01: leading indicated-H
         assert name_compound("c1ccsc1") == "thiophene"
         assert name_compound("C1CCOC1") == "oxolane"
         assert name_compound("C1CCNC1") == "pyrrolidine"

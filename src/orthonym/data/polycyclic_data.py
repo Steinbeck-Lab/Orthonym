@@ -94,15 +94,16 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2cc3ccccc3cc2c1',
         'smarts': 'c1ccc2cc3ccccc3cc2c1',
         'num_atoms': 14,
-        # IUPAC numbering for anthracene (linear tricyclic)
-        # Empirically derived from RDKit canonical SMILES 'c1ccc2cc3ccccc3cc2c1':
-        # Rings: [0,13,12,3,2,1], [4,5,10,11,12,3], [6,7,8,9,10,5]
-        # Fusion: idx 3(=4a), 5(=8a), 10(=9a), 12(=10a)
-        # Peripheral path: 13->0->1->2->[3]->4->[5]->6->7->8->9->[10]->11->[12]
-        # IUPAC: 1->2->3->4->[4a]->5->[8a]->6->7->8->9->[9a]->10->[10a]
+        # IUPAC numbering for anthracene (linear tricyclic). AUTHORITATIVE:
+        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `anthracene -o extendedsmi`
+        # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
+        # was INVALID — it placed a *meso* carbon (central-ring atoms 4 & 11) at
+        # locant 5 instead of the correct 9/10, so 9-substituted/9,10-dihydro
+        # anthracenes were mis-numbered (e.g. 9-methyl -> wrong "5-methyl").
+        # Meso (central-ring CH) atoms 4 -> 9, 11 -> 10.
         'iupac_numbering': {
-            13: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: '8a',
-            6: 6, 7: 7, 8: 8, 9: 9, 10: '9a', 11: 10, 12: '10a'
+            2: 1, 1: 2, 0: 3, 13: 4, 9: 5, 8: 6, 7: 7, 6: 8, 4: 9, 11: 10,
+            3: '9a', 5: '8a', 10: '10a', 12: '4a',
         },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 3,
@@ -130,16 +131,15 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'smarts': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'num_atoms': 16,
-        # IUPAC numbering for pyrene (peri-condensed tetracyclic)
-        # Empirically derived from RDKit canonical SMILES 'c1cc2ccc3cccc4ccc(c1)c2c34':
-        # Rings: [0,13,12,14,2,1], [3,4,5,15,14,2], [6,7,8,9,15,5], [10,11,12,14,15,9]
-        # Fusion: idx 2(=3a), 5(=5a), 9(=8a), 12(=10b)
-        # Peri: idx 14(=3b, in R0/R1/R3), idx 15(=10a, in R1/R2/R3)
-        # IUPAC: 1->2->3->[3a]->4->5->[5a]->6->7->8->[8a]->9->10->[10b]->[3b]->[10a]
+        # IUPAC numbering for pyrene (peri-condensed tetracyclic). AUTHORITATIVE:
+        # re-derived 2026-06-22 (v23 IH-01) from OPSIN `pyrene -o extendedsmi`
+        # ($_AV: locants) mapped onto this canonical SMILES. The prior numbering
+        # was INVALID (interior/fusion locants '3b'/'10a' instead of the correct
+        # peri carbons 10a/10b/10c), so substituted pyrenes were mis-numbered.
+        # Interior carbons: 14 -> 10b, 15 -> 10c.
         'iupac_numbering': {
-            13: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: '5a',
-            6: 6, 7: 7, 8: 8, 9: '8a', 10: 9, 11: 10, 12: '10b',
-            14: '3b', 15: '10a'
+            1: 1, 0: 2, 13: 3, 11: 4, 10: 5, 8: 6, 7: 7, 6: 8, 4: 9, 3: 10,
+            12: '3a', 9: '5a', 5: '8a', 2: '10a', 14: '10b', 15: '10c',
         },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 4,

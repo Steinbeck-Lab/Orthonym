@@ -89,12 +89,19 @@ def test_phenanthrene_4b_locant():
 
 
 def test_pyrene_six_fusion_atoms_and_10b_two_digit():
-    """pyrene: 16 keys; fusion set includes (10,'b') two-digit-base regression.
+    """pyrene: 16 keys; fusion set is the six interior/peri carbons
+    3a, 5a, 8a, 10a, 10b, 10c (includes (10,'b') two-digit-base regression).
 
     Critical: '10b' MUST parse to (10, 'b'), NOT (1, '0b').
 
+    v23 IH-01 (2026-06-22): the stored pyrene ``iupac_numbering`` was corrected
+    to the OPSIN-authoritative numbering (``pyrene -o extendedsmi``). The prior
+    fusion set wrongly contained ``(3,'b')`` and omitted ``(10,'c')`` — pyrene's
+    peri carbons are 10a/10b/10c, there is no 3b. This test had pinned the
+    invalid numbering.
+
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01.
+    Source: Phase 147 D-01; v23 IH-01 numbering correction.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')
@@ -105,7 +112,7 @@ def test_pyrene_six_fusion_atoms_and_10b_two_digit():
         v for v in result.values() if isinstance(v, tuple)
     )
     assert fusion_tuples == [
-        (3, 'a'), (3, 'b'), (5, 'a'), (8, 'a'), (10, 'a'), (10, 'b'),
+        (3, 'a'), (5, 'a'), (8, 'a'), (10, 'a'), (10, 'b'), (10, 'c'),
     ]
 
 

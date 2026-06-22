@@ -86,11 +86,15 @@ RETAINED_NAMES = {
     # === 5-MEMBERED AROMATIC HETEROCYCLES ===
     "c1ccoc1": "furan",
     "c1ccsc1": "thiophene",
-    "c1cc[nH]c1": "pyrrole",
-    "c1c[nH]cn1": "imidazole",
-    "c1cnc[nH]1": "imidazole",
-    "c1cn[nH]c1": "pyrazole",   # Canonical SMILES for pyrazole
-    "c1cc[nH]n1": "pyrazole",   # Alternate input form
+    # Azoles carry a leading indicated hydrogen in the PIN (P-25.7.1.3): the
+    # NH is the indicated-H position, cited as 1H-. Each SMILES key fixes a
+    # specific tautomer, so the indicated-H locant is determined per key
+    # (all OPSIN-2.9.0 round-trip verified, v23 IH-01).
+    "c1cc[nH]c1": "1H-pyrrole",
+    "c1c[nH]cn1": "1H-imidazole",
+    "c1cnc[nH]1": "1H-imidazole",
+    "c1cn[nH]c1": "1H-pyrazole",   # Canonical SMILES for pyrazole
+    "c1cc[nH]n1": "1H-pyrazole",   # Alternate input form
     "c1cocn1": "oxazole",       # Canonical SMILES for oxazole
     "c1cnco1": "oxazole",       # Alternate input form
     "c1cnoc1": "isoxazole",     # Canonical SMILES for isoxazole
@@ -99,7 +103,7 @@ RETAINED_NAMES = {
     "c1cncs1": "thiazole",      # Alternate input form
     "c1cnsc1": "isothiazole",   # Canonical SMILES for isothiazole
     "c1ccsn1": "isothiazole",   # Alternate input form
-    "c1nnn[nH]1": "tetrazole",
+    "c1nnn[nH]1": "1H-tetrazole",  # this tautomer = 1H- (OPSIN-RT verified)
     
     # === 6-MEMBERED AROMATIC HETEROCYCLES ===
     "c1ccncc1": "pyridine",

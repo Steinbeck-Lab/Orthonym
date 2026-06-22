@@ -47,10 +47,10 @@ HETEROCYCLE_ACCURACY_CASES = [
 
     # --- Basic monocyclic heterocycles (regression checks) ---
     ("c1ccncc1", "pyridine"),
-    ("c1cc[nH]c1", "pyrrole"),
+    ("c1cc[nH]c1", "1H-pyrrole"),  # v23 IH-01: leading indicated-H
     ("c1ccoc1", "furan"),
     ("c1ccsc1", "thiophene"),
-    ("c1c[nH]cn1", "imidazole"),
+    ("c1c[nH]cn1", "1H-imidazole"),  # v23 IH-01: leading indicated-H
     ("c1cncnc1", "pyrimidine"),
     ("c1cnccn1", "pyrazine"),
 

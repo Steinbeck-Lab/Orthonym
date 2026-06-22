@@ -128,6 +128,24 @@ def name_tier_a_ring(
         _ring_is_whole_molecule_for_complex,
     )
 
+    # v23 IH-01 (Phase 2): an unsubstituted ring ketone on a mancude ring is the
+    # added-indicated-hydrogen form (pyridin-2(1H)-one / naphthalen-1(2H)-one).
+    # The default paths drop the C=O (carbocyclic) or name it as a '2-oxo'
+    # prefix (heterocyclic). This recognizer is tightly scoped + fail-closed
+    # (returns None for everything else), so it preempts only the cases it names
+    # correctly and never touches the pool for any other molecule.
+    from ...rules.partial_saturation import name_ring_ketone_with_added_indicated_h
+    _kih_name = name_ring_ketone_with_added_indicated_h(features.mol)
+    if _kih_name:
+        return NamingResult(
+            name=_kih_name,
+            tree=NameTreeNode(
+                parent_stem=_kih_name, class_id="tier_a_ring",
+                iupac_section_cite="P-31.1.4.2.4", fragment_legacy=_kih_name,
+            ),
+            atom_to_locant_hint=None,
+        )
+
     # =========================================================================
     # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool
     # =========================================================================

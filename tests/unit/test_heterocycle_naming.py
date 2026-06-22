@@ -132,14 +132,15 @@ class TestFiveMemberedAromaticHeterocycles:
     @pytest.mark.parametrize("smiles,expected", [
         # Single heteroatom
         ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "pyrrole"),
+        # v23 IH-01: N-H azoles carry the leading indicated hydrogen in the PIN.
+        ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
         # Two heteroatoms - 1,3 arrangement
-        ("c1c[nH]cn1", "imidazole"),  # N at 1,3
+        ("c1c[nH]cn1", "1H-imidazole"),  # N at 1,3
         ("c1cnco1", "oxazole"),       # O at 1, N at 3
         ("c1cncs1", "thiazole"),      # S at 1, N at 3
         # Two heteroatoms - 1,2 arrangement
-        ("c1cc[nH]n1", "pyrazole"),   # N at 1,2
+        ("c1cc[nH]n1", "1H-pyrazole"),   # N at 1,2
         ("c1ccno1", "isoxazole"),     # O at 1, N at 2
         ("c1ccsn1", "isothiazole"),   # S at 1, N at 2
     ])
@@ -439,8 +440,9 @@ class TestMultipleSameHeteroatoms:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # Tetrazole - 4 nitrogens in 5-membered aromatic ring
-        ("c1nnn[nH]1", "tetrazole"),
+        # Tetrazole - 4 nitrogens in 5-membered aromatic ring.
+        # v23 IH-01: this tautomer is the 1H- form (OPSIN-RT verified).
+        ("c1nnn[nH]1", "1H-tetrazole"),
     ])
     def test_multiple_nitrogen_aromatics(self, smiles, expected):
         """Test aromatic heterocycles with multiple nitrogens."""
@@ -494,7 +496,7 @@ class TestEdgeCases:
             "c1cnc[nH]1",  # Different starting position
         ]
         for smiles in smiles_variants:
-            assert name_compound(smiles) == "imidazole"
+            assert name_compound(smiles) == "1H-imidazole"  # v23 IH-01: leading indicated-H
 
 
 # =============================================================================
@@ -518,14 +520,14 @@ class TestPipelineIntegration:
         ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
         ("C1CCSC1", "tetrahydrothiophene"),
-        # 5-membered aromatic
+        # 5-membered aromatic (v23 IH-01: N-H azoles carry leading 1H-)
         ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "pyrrole"),
+        ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
-        ("c1c[nH]cn1", "imidazole"),
+        ("c1c[nH]cn1", "1H-imidazole"),
         ("c1cnco1", "oxazole"),
         ("c1cncs1", "thiazole"),
-        ("c1cc[nH]n1", "pyrazole"),
+        ("c1cc[nH]n1", "1H-pyrazole"),
         ("c1ccno1", "isoxazole"),
         ("c1ccsn1", "isothiazole"),
         # 6-membered saturated

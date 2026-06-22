@@ -598,6 +598,153 @@ def build_hw_name(
     return prefix + stem
 
 
+def _mancude_monocycle_parent(mol, ring_atoms):
+    """Build the mancude (maximum-non-cumulative-double-bond) parent of a
+    monocyclic ring by forcing every ring atom + bond aromatic and re-sanitizing.
+
+    Returns ``(parent_mol, old_to_new_idx)`` where ``parent_mol`` is the ring-only
+    aromatic parent and ``old_to_new_idx`` maps each input ring atom index to its
+    index in ``parent_mol``. Returns ``(None, None)`` if the ring cannot aromatize
+    (the parent is then not a mancude aromatic ring, so the hydro naming declines).
+    """
+    ring = set(ring_atoms)
+    em = Chem.RWMol()
+    old_to_new = {}
+    for idx in sorted(ring):
+        old_to_new[idx] = em.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring and j in ring:
+            em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
+            em.GetAtomWithIdx(old_to_new[i]).SetIsAromatic(True)
+            em.GetAtomWithIdx(old_to_new[j]).SetIsAromatic(True)
+    parent = em.GetMol()
+    try:
+        Chem.SanitizeMol(parent)
+    except Exception:
+        return None, None
+    if not all(a.GetIsAromatic() for a in parent.GetAtoms()):
+        return None, None
+    return parent, old_to_new
+
+
+def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
+    """Name a partially-saturated monocyclic mancude heterocycle (IUPAC P-31.1.4).
+
+    Example: ``C1C=CC=CN1`` -> ``1,2-dihydropyridine`` (the systematic HW path
+    would otherwise drop the hydrogenation and emit the mancude parent
+    ``pyridine``). Works by (1) building the mancude aromatic parent and naming
+    it, (2) finding the ring atoms that carry a ring double bond in the mancude
+    parent but have LOST it in the molecule (the hydro positions — detected by
+    bond topology, NOT hybridization, so a conjugated enamine N still counts),
+    (3) numbering the ring with the heteroatom set lowest then the hydro set
+    lowest (P-31.1.4.3.4), and (4) emitting ``<locants>-<prefix>hydro<parent>``.
+
+    Scope (fail closed otherwise — never a wrong name, SELF-01-safe):
+      * the mancude parent must aromatize and carry NO leading indicated
+        hydrogen (parents like ``1H-pyrrole`` / ``2H-pyran`` whose hydro form
+        interleaves added-indicated-H are deferred to a follow-on);
+      * the molecule must retain >= 1 ring unsaturation (a fully saturated ring
+        is named by its retained / HW saturated stem, not as a hydro prefix);
+      * the hydro count must be a standard di/tetra/hexa... value.
+    """
+    from .partial_saturation import SATURATION_PREFIXES
+
+    ring_set = set(ring_atoms)
+    n = len(ring_set)
+    if n < 4:
+        return None
+
+    # Ring atoms still unsaturated in the MOLECULE (ring double bond or aromatic)
+    # — these are NOT hydro positions.
+    mol_unsat: Set[int] = set()
+    for bond in mol.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                mol_unsat.add(i)
+                mol_unsat.add(j)
+    for i in ring_set:
+        if mol.GetAtomWithIdx(i).GetIsAromatic():
+            mol_unsat.add(i)
+    if not mol_unsat:
+        # Fully saturated -> retained / HW saturated stem handles it.
+        return None
+    # A fully-aromatic (mancude) ring has NO hydro positions. Bail now: the
+    # mancude parent of an aromatic ring is itself, so naming it (below) would
+    # re-enter name_heterocycle -> here -> infinite recursion for an aromatic
+    # ring that lacks a retained name (e.g. a HW-named azine).
+    if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return None
+
+    parent, old_to_new = _mancude_monocycle_parent(mol, ring_atoms)
+    if parent is None:
+        return None
+    parent_ring = parent.GetRingInfo().AtomRings()
+    if len(parent_ring) != 1:
+        return None
+
+    # Atoms that hold a ring double bond in the mancude parent (kekulised).
+    kp = Chem.Mol(parent)
+    try:
+        Chem.Kekulize(kp, clearAromaticFlags=True)
+    except Exception:
+        return None
+    parent_db_atoms: Set[int] = set()
+    for bond in kp.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            parent_db_atoms.add(bond.GetBeginAtomIdx())
+            parent_db_atoms.add(bond.GetEndAtomIdx())
+
+    # Hydro positions = ring atoms in a mancude-parent ring double bond that have
+    # lost it (saturated) in the molecule.
+    hydro = {
+        i for i in ring_set
+        if old_to_new[i] in parent_db_atoms and i not in mol_unsat
+    }
+    if not hydro:
+        return None
+    prefix = SATURATION_PREFIXES.get(len(hydro))
+    if prefix is None:
+        return None
+
+    # Name the mancude parent — DEFERRED until after the hydro check so a fully
+    # mancude ring (hydro == {}) never reaches this recursive name_heterocycle
+    # call. Defer parents carrying a leading indicated hydrogen (1H-pyrrole,
+    # 2H-pyran ...): their hydro form interleaves added-indicated-H (follow-on).
+    parent_name = name_heterocycle(parent, parent_ring[0])
+    if not parent_name or parent_name[:1].isdigit():
+        return None
+
+    # Number the ring: lowest locants to the heteroatom set, then heteroatom
+    # seniority, then the hydro set (P-31.1.4.3.4). Enumerate all 2N numberings.
+    ordered = _macrocycle_ordered_ring(mol, ring_set)
+    if ordered is None or len(ordered) != n:
+        return None
+    het = {i for i in ordered if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+    best_key = None
+    best_map: Optional[Dict[int, int]] = None
+    for start in range(n):
+        for direction in (1, -1):
+            seq = [ordered[(start + k * direction) % n] for k in range(n)]
+            loc = {a: idx + 1 for idx, a in enumerate(seq)}
+            het_locs = tuple(sorted(loc[a] for a in het))
+            seniority = tuple(sorted(
+                (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
+                for a in het
+            ))
+            hydro_locs = tuple(sorted(loc[a] for a in hydro))
+            key = (het_locs, seniority, hydro_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_map = loc
+    if best_map is None:
+        return None
+
+    locant_str = ','.join(str(loc) for loc in sorted(best_map[a] for a in hydro))
+    return f"{locant_str}-{prefix}{parent_name}"
+
+
 def name_heterocycle(mol, ring_atoms) -> str:
     """
     Generate IUPAC name for a heterocyclic ring.
@@ -631,6 +778,14 @@ def name_heterocycle(mol, ring_atoms) -> str:
     retained = get_retained_name(ring_smiles)
     if retained:
         return retained
+
+    # Partially-saturated mancude monocyclic heterocycle (e.g. 1,2-dihydro-
+    # pyridine): the systematic HW path below drops the hydrogenation and emits
+    # the mancude parent ('pyridine'). Detect + name the hydro form first
+    # (P-31.1.4); fails closed for anything it cannot number correctly.
+    partial = name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms)
+    if partial:
+        return partial
 
     # Fall back to systematic naming
     info = classify_heterocycle(mol, ring_atoms)
