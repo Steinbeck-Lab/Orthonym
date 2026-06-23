@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 117,
+  "total_entries": 120,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},
@@ -120,6 +120,9 @@
     {"name": "putrescine", "smiles": "NCCCCN", "pin": false, "citation": "P-62.2.1", "note": "F-T9/DD6 RET-01: retained name acceptable in general nomenclature only; the PIN is butane-1,4-diamine. Deny so the RETAINED_NAME dispatch misses and the systematic diamine name is the headline."},
     {"name": "cadaverine", "smiles": "NCCCCCN", "pin": false, "citation": "P-62.2.1", "note": "F-T9/DD6 RET-01: retained name acceptable in general nomenclature only; the PIN is pentane-1,5-diamine. Deny so the systematic diamine name is the headline."},
     {"name": "anisole", "smiles": "COc1ccccc1", "pin": false, "citation": "P-12.1 / P-34.1.1.4", "note": "F-T9/DD6 RET-01: general-only retained name, NOT a PIN; the PIN is methoxybenzene (substitutive). Deny so the RETAINED_NAME dispatch misses and methoxybenzene is the headline."},
-    {"name": "biphenyl", "smiles": "c1ccc(-c2ccccc2)cc1", "pin": false, "citation": "P-12.1 / P-28.2.1", "note": "F-T9/DD6 RET-01: 'biphenyl' is general nomenclature; the PIN is the ring-assembly name 1,1'-biphenyl. Deny the bare 'biphenyl' so the systematic ring-assembly headline emerges. Distinct SMILES key from 4-phenylphenol (Oc1ccc(-c2ccccc2)cc1), which is NOT affected."}
+    {"name": "biphenyl", "smiles": "c1ccc(-c2ccccc2)cc1", "pin": false, "citation": "P-12.1 / P-28.2.1", "note": "F-T9/DD6 RET-01: 'biphenyl' is general nomenclature; the PIN is the ring-assembly name 1,1'-biphenyl. Deny the bare 'biphenyl' so the systematic ring-assembly headline emerges. Distinct SMILES key from 4-phenylphenol (Oc1ccc(-c2ccccc2)cc1), which is NOT affected."},
+    {"name": "naphtho-1,4-quinone", "smiles": "O=C1C=CC(=O)c2ccccc21", "pin": false, "citation": "P-66.6.3 / P-64.2.2.2.2", "note": "v23 IH-01b: no retained quinone name is a PIN (P-64.2.2.2.2). PIN is the systematic dione naphthalene-1,4-dione (BlueBook 28322: 'naphthalene-1,4-dione (PIN) (not naphthoquinone)'). Deny so the cyclic-oxo engine emits the dione."},
+    {"name": "anthra-9,10-quinone", "smiles": "O=C1c2ccccc2C(=O)c2ccccc21", "pin": false, "citation": "P-66.6.3 / P-64.2.2.2.2", "note": "v23 IH-01b: PIN is anthracene-9,10-dione (BlueBook 28324: 'anthracene-9,10-dione (PIN) (not anthraquinone)'). Deny for the systematic dione."},
+    {"name": "anthra-1,4-quinone", "smiles": "O=C1C=CC(=O)c2cc3ccccc3cc21", "pin": false, "citation": "P-66.6.3 / P-64.2.2.2.2", "note": "v23 IH-01b: no retained quinone name is a PIN (P-64.2.2.2.2). PIN is the systematic dione anthracene-1,4-dione. Deny for the systematic dione."}
   ]
 }

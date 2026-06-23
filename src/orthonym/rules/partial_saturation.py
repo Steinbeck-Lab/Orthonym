@@ -1059,7 +1059,9 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
 
 
 def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
-    """Ring carbons bearing a single exocyclic ketone-type =O."""
+    """Ring carbons bearing an exocyclic ketone-type =O (suitable for an -one /
+    -dione suffix). Covers ketone, lactam, and lactone carbonyls on mancude
+    rings — all named with the -one suffix per P-64.2.2.2."""
     out: List[int] = []
     for idx in ring_set:
         atom = mol.GetAtomWithIdx(idx)
@@ -1076,152 +1078,268 @@ def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
     return out
 
 
-def name_ring_ketone_with_added_indicated_h(mol: Chem.Mol) -> Optional[str]:
-    """Name an unsubstituted ring ketone on a mancude ring using the added
-    indicated hydrogen form ``<parent>-<loc>(<n>H)-one`` (IUPAC P-31.1.4.2.4).
+def _elide_terminal_e(stem: str) -> str:
+    """Elide a terminal 'e' before a vowel-initial suffix (P-16.3.3): naphthalene
+    -> naphthalen (before -one); kept before -dione/-trione (consonant)."""
+    return stem[:-1] if stem.endswith('e') else stem
 
-    Examples:
-        ``O=c1cccc[nH]1``        -> ``pyridin-2(1H)-one``
-        ``O=C1CC=Cc2ccccc21``    -> ``naphthalen-1(2H)-one``
 
-    The carbonyl carbon takes the ``-one`` suffix; the single ring atom that
-    carries an *extra* hydrogen relative to the mancude parent (an N-H, or a
-    -CH2-) is the added indicated hydrogen. Numbering gives the lowest locants
-    to the heteroatom set, then the suffix, then the added-IH (P-31.1.4.3.4).
+def _max_oxo_matching(adj, nodes, locant):
+    """Max-cardinality matching over ``nodes`` (ring sub-graph ``adj``); among
+    maximum matchings, minimise the sorted unmatched-locant tuple. Returns
+    ``(matched_set, unmatched_set)``. The matched atoms pair into reduced ring
+    double bonds (hydro); the unmatched atoms are the indicated-H positions."""
+    from functools import lru_cache
+    nodes = frozenset(nodes)
 
-    Tightly scoped + fail-closed (returns None -> the molecule keeps its prior
-    name / SELF-01 net; never a wrong name):
-      * exactly ONE ring ketone (a single ``-one``; di-ones deferred);
-      * exactly ONE added-indicated-hydrogen atom (the simple ``(nH)`` form;
-        dihydro+ketone such as a tetralone, with several saturated ring atoms,
-        is deferred — that overlaps the fused-base-selection bug);
-      * NO other substituents (only the ring + the one carbonyl O), so it can
-        never silently drop a substituent;
-      * monocyclic heterocycle (mancude parent must aromatize, no leading
-        indicated-H parent) OR carbocyclic PAH (matches a stored mancude PAH).
-    Fused heterocyclic ring ketones are deferred (a follow-on).
+    @lru_cache(maxsize=None)
+    def rec(avail):
+        if not avail:
+            return (0, (), frozenset())
+        a = min(avail)
+        rest = avail - {a}
+        best = rec(rest)
+        best = (best[0], tuple(sorted(best[1] + (_locant_key(locant[a]),))), best[2])
+        for b in adj[a]:
+            if b in rest:
+                s, uk, mset = rec(rest - {b})
+                cand = (s + 1, uk, mset | {a, b})
+                if (cand[0] > best[0]) or (cand[0] == best[0] and cand[1] < best[1]):
+                    best = cand
+        return best
+
+    _, _, matched = rec(nodes)
+    return set(matched), set(nodes) - set(matched)
+
+
+def _mancude_ring_parent(mol, ring_atoms):
+    """Aromatic mancude parent of the whole ring system (drop every exocyclic
+    bond, force all ring atoms+bonds aromatic, re-sanitise). Returns
+    ``(parent_mol, old_to_new)`` or ``(None, None)`` if it cannot aromatize."""
+    ring = set(ring_atoms)
+    em = Chem.RWMol()
+    old_to_new = {}
+    for idx in sorted(ring):
+        old_to_new[idx] = em.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring and j in ring:
+            em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
+            em.GetAtomWithIdx(old_to_new[i]).SetIsAromatic(True)
+            em.GetAtomWithIdx(old_to_new[j]).SetIsAromatic(True)
+    parent = em.GetMol()
+    try:
+        Chem.SanitizeMol(parent)
+    except Exception:
+        return None, None
+    if not all(a.GetIsAromatic() for a in parent.GetAtoms()):
+        return None, None
+    return parent, old_to_new
+
+
+def _resolve_oxo_parent(mol, ring_atoms):
+    """Resolve the mancude parent of a ring-ketone's ring system.
+
+    Returns ``(parent_name, [(locant_map, parentH_map), ...])`` or ``(None, None)``.
+    ``locant_map``: mol-atom -> IUPAC locant; ``parentH_map``: mol-atom -> the H
+    count of the corresponding mancude-parent atom. parentH is paired PER
+    candidate numbering because for an intrinsic-indicated-H parent (1H-indene,
+    9H-fluorene) the indicated-H carbon's H count (2) is alignment-dependent —
+    the carbonyl must align with that >CH2 (P-64.2.2.2.2).
     """
-    if mol is None:
-        return None
-    ring_lists = mol.GetRingInfo().AtomRings()
-    if not ring_lists:
-        return None
-    ring_set: Set[int] = set()
-    for r in ring_lists:
-        ring_set.update(r)
+    from .heterocycles import (
+        name_heterocycle, _macrocycle_ordered_ring, get_heteroatom_priority,
+    )
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+    from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
-    carbonyls = _ring_carbonyl_carbons(mol, ring_set)
-    if len(carbonyls) != 1:
-        return None
-    carbonyl_c = carbonyls[0]
+    ring_set = set(ring_atoms)
+    n = len(ring_set)
+    rings = mol.GetRingInfo().AtomRings()
 
-    # Only the ring + the single carbonyl O may be present (no other substituents).
-    if mol.GetNumHeavyAtoms() != len(ring_set) + 1:
-        return None
-
-    # ---- Monocyclic heterocycle (e.g. 2-pyridone -> pyridin-2(1H)-one) ----
-    if len(ring_lists) == 1:
-        ring = ring_lists[0]
-        if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring):
-            return None  # carbocyclic monocycle (cyclohexanone etc.) — not here
-        # lazy imports avoid an import cycle with heterocycles.py
-        from .heterocycles import (
-            _mancude_monocycle_parent, name_heterocycle,
-            get_heteroatom_priority, _macrocycle_ordered_ring,
-        )
-        parent, old_to_new = _mancude_monocycle_parent(mol, ring)
+    # --- monocyclic: build the mancude (aromatic) parent + free numbering ---
+    if len(rings) == 1:
+        if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
+            return None, None  # carbocyclic monocycle -> cycloalkanone path
+        parent, old_to_new = _mancude_ring_parent(mol, ring_set)
         if parent is None:
-            return None
-        parent_ring = parent.GetRingInfo().AtomRings()
-        if len(parent_ring) != 1:
-            return None
-        parent_name = name_heterocycle(parent, parent_ring[0])
-        if not parent_name or parent_name[:1].isdigit():
-            return None  # defer mancude parents that already carry indicated H
-        # added indicated H = ring atom with MORE hydrogens than in the parent
-        added = {
-            i for i in ring
-            if mol.GetAtomWithIdx(i).GetTotalNumHs()
-            > parent.GetAtomWithIdx(old_to_new[i]).GetTotalNumHs()
-        }
-        if len(added) != 1:
-            return None
+            return None, None
+        pr = parent.GetRingInfo().AtomRings()
+        if len(pr) != 1:
+            return None, None
+        pname = name_heterocycle(parent, pr[0])
+        if not pname:
+            return None, None
+        parentH = {a: parent.GetAtomWithIdx(old_to_new[a]).GetTotalNumHs() for a in ring_set}
         ordered = _macrocycle_ordered_ring(mol, ring_set)
-        n = len(ring)
         if ordered is None or len(ordered) != n:
-            return None
-        het = {i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
-        best_key = None
-        best_map: Optional[Dict[int, int]] = None
+            return None, None
+        het = {i for i in ring_set if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+        nums = []
         for start in range(n):
             for direction in (1, -1):
                 seq = [ordered[(start + k * direction) % n] for k in range(n)]
-                loc = {a: idx + 1 for idx, a in enumerate(seq)}
-                key = (
-                    tuple(sorted(loc[a] for a in het)),
-                    tuple(sorted(
-                        (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
-                        for a in het
-                    )),
-                    loc[carbonyl_c],
-                    tuple(sorted(loc[a] for a in added)),
-                )
-                if best_key is None or key < best_key:
-                    best_key = key
-                    best_map = loc
-        if best_map is None:
-            return None
-        ih = ','.join(f"{best_map[a]}H" for a in sorted(added, key=lambda x: best_map[x]))
-        return f"{_elide_terminal_e(parent_name)}-{best_map[carbonyl_c]}({ih})-one"
+                nums.append({a: idx + 1 for idx, a in enumerate(seq)})
 
-    # ---- Carbocyclic PAH (e.g. naphthalen-1(2H)-one) ----
-    if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
-        from ..data.polycyclic_data import POLYCYCLIC_DATA
-        n = len(ring_set)
-        best_key = None
-        best_name = None
-        for parent in _carbocyclic_mancude_parents_by_size(n):
-            entry = POLYCYCLIC_DATA[parent]
-            numbering = entry['iupac_numbering']
-            cmol = Chem.MolFromSmiles(entry['canonical_smiles'])
-            if cmol is None or cmol.GetNumAtoms() != n:
+        def _hk(loc):
+            return (tuple(sorted(loc[a] for a in het)),
+                    tuple(sorted((get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a]) for a in het)))
+        if het:
+            best_h = min(_hk(l) for l in nums)
+            nums = [l for l in nums if _hk(l) == best_h]
+        return pname, [(l, parentH) for l in nums]
+
+    # --- fused: bond-generic skeleton match vs PAH then fused-heterocycle data ---
+    cands = []
+    for nm, e in POLYCYCLIC_DATA.items():
+        if e.get('iupac_numbering') and e.get('canonical_smiles'):
+            cands.append((nm, e['canonical_smiles'], e['iupac_numbering']))
+    for cs, e in FUSED_HETEROCYCLE_DATA.items():
+        if e.get('iupac_locants'):
+            cands.append((e['name'], cs, e['iupac_locants']))
+    for nm, cs, numbering in cands:
+        cmol = Chem.MolFromSmiles(cs)
+        if cmol is None or cmol.GetNumAtoms() != n:
+            continue
+        params = Chem.AdjustQueryParameters.NoAdjustments()
+        params.makeBondsGeneric = True
+        params.aromatizeIfPossible = False
+        params.adjustDegree = False
+        q = Chem.AdjustQueryProperties(cmol, params)
+        pairs = []
+        for match in mol.GetSubstructMatches(q, uniquify=False):
+            a2l = {match[c]: loc for c, loc in numbering.items() if c < len(match)}
+            if set(a2l) != ring_set:
                 continue
-            params = Chem.AdjustQueryParameters.NoAdjustments()
-            params.makeBondsGeneric = True
-            params.aromatizeIfPossible = False
-            params.adjustDegree = False
-            query = Chem.AdjustQueryProperties(cmol, params)
-            for match in mol.GetSubstructMatches(query, uniquify=False):
-                a2l = {match[c]: loc for c, loc in numbering.items() if c < len(match)}
-                if set(a2l) != ring_set:
-                    continue
-                parent_h = {
-                    match[c]: cmol.GetAtomWithIdx(c).GetTotalNumHs()
-                    for c in numbering if c < len(match)
-                }
-                added = {
-                    i for i in ring_set
-                    if i != carbonyl_c
-                    and mol.GetAtomWithIdx(i).GetTotalNumHs() > parent_h.get(i, 0)
-                }
-                if len(added) != 1:
-                    continue
-                key = (
-                    _locant_key(a2l[carbonyl_c]),
-                    tuple(sorted(_locant_key(a2l[a]) for a in added)),
-                )
-                if best_key is None or key < best_key:
-                    best_key = key
-                    ih = ','.join(
-                        f"{a2l[a]}H" for a in sorted(added, key=lambda x: _locant_key(a2l[x]))
-                    )
-                    best_name = f"{_elide_terminal_e(parent)}-{a2l[carbonyl_c]}({ih})-one"
-        return best_name
-
-    return None
+            if not all(mol.GetAtomWithIdx(match[c]).GetAtomicNum() == cmol.GetAtomWithIdx(c).GetAtomicNum()
+                       for c in numbering if c < len(match)):
+                continue
+            pH = {match[c]: cmol.GetAtomWithIdx(c).GetTotalNumHs() for c in numbering if c < len(match)}
+            pairs.append((a2l, pH))
+        if pairs:
+            return nm, pairs
+    return None, None
 
 
-def _elide_terminal_e(stem: str) -> str:
-    """Elide a terminal 'e' before an '-one' suffix (P-16.3.3): naphthalene ->
-    naphthalen, pyridine -> pyridin."""
-    return stem[:-1] if stem.endswith('e') else stem
+def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
+    """Name an UNSUBSTITUTED cyclic ketone / dione on a mancude ring system,
+    emitting the preferred IUPAC name with added indicated hydrogen and/or hydro
+    prefixes (IUPAC P-31.1.4 / P-58.2 / P-64.2.2.2 / P-14.7.2).
+
+    Worked examples (all OPSIN-2.9.0 round-trip + Blue-Book verified):
+        ``O=c1cccc[nH]1``              -> ``pyridin-2(1H)-one``
+        ``O=c1ccc2ccccc2[nH]1``        -> ``quinolin-2(1H)-one``
+        ``O=c1c2ccccc2[nH]c2ccccc12``  -> ``acridin-9(10H)-one``
+        ``O=C1CC=Cc2ccccc21``          -> ``naphthalen-1(2H)-one``
+        ``O=C1CCCc2ccccc21``           -> ``3,4-dihydronaphthalen-1(2H)-one``
+        ``O=C1C=CC(=O)c2ccccc21``      -> ``naphthalene-1,4-dione``     (no added-H, P-58.2.2.3)
+        ``O=c1[nH]c(=O)c2ccccc2[nH]1`` -> ``quinazoline-2,4(1H,3H)-dione``
+        ``O=C1C=Cc2ccccc21``           -> ``1H-inden-1-one``           (intrinsic-IH parent)
+        ``O=C1CCc2ccccc21``            -> ``2,3-dihydro-1H-inden-1-one``
+
+    Method: identify the mancude parent + numbering; the carbonyl C(s) take the
+    -one/-dione suffix; ring atoms carrying an EXTRA hydrogen vs the mancude
+    parent (an N-H or a >CH2) split, by a maximum matching of the ring graph,
+    into hydro positions (matched pairs = reduced ring C=C) and added-indicated-H
+    positions (unmatched, cited as ``(nH)`` after the suffix locant). Lowest
+    locants go to the suffix, then added-IH, then hydro (P-58.2.2.2 / P-31.1).
+
+    Tightly fail-closed (returns None — never a wrong name):
+      * >= 1 ring carbonyl; UNSUBSTITUTED (ring + carbonyl O's only);
+      * the ring must retain residual unsaturation (an aromatic ring atom OR a
+        non-carbonyl ring C=C) — a fully-saturated ring carbonyl is a saturated
+        lactam/lactone/ketone named on the saturated parent (piperidin-2-one,
+        oxolan-2-one), NOT here;
+      * the whole molecule has no retained PIN name (so uracil / maleimide are
+        left to their retained entries);
+      * the mancude parent must resolve (aromatic monocycle, or a stored PAH /
+        fused-heterocycle skeleton).
+    """
+    from ..data.retained_names import get_retained_name
+
+    rings = mol.GetRingInfo().AtomRings()
+    if not rings:
+        return None
+    ring_set: Set[int] = set()
+    for r in rings:
+        ring_set.update(r)
+
+    carbonyls = set(_ring_carbonyl_carbons(mol, ring_set))
+    if not carbonyls:
+        return None
+    if mol.GetNumHeavyAtoms() != len(ring_set) + len(carbonyls):
+        return None  # unsubstituted only
+    if get_retained_name(Chem.MolToSmiles(mol)):
+        return None  # a retained PIN (uracil, maleimide) owns the name
+
+    # Residual unsaturation required (else fully-saturated lactam/lactone/ketone).
+    has_residual = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set)
+    if not has_residual:
+        for bond in mol.GetBonds():
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                if (i in ring_set and j in ring_set
+                        and i not in carbonyls and j not in carbonyls):
+                    has_residual = True
+                    break
+    if not has_residual:
+        return None
+
+    parent_name, pairs = _resolve_oxo_parent(mol, ring_set)
+    if not parent_name:
+        return None
+
+    best = None
+    for loc, parentH in pairs:
+        # SAT = non-carbonyl ring C/N with MORE H than the mancude parent at this
+        # alignment (added-IH or hydro). Per-pair: an intrinsic-IH parent's IH
+        # carbon's H count depends on the alignment.
+        sat = {i for i in ring_set
+               if i not in carbonyls
+               and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N')
+               and mol.GetAtomWithIdx(i).GetTotalNumHs() > parentH.get(i, 0)}
+        adj = {i: set() for i in sat}
+        for bond in mol.GetBonds():
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in sat and j in sat:
+                adj[i].add(j)
+                adj[j].add(i)
+        matched, unmatched = _max_oxo_matching(adj, sat, loc)
+        added_ih, hydro = unmatched, matched
+        key = (sorted(_locant_key(loc[c]) for c in carbonyls),
+               sorted(_locant_key(loc[a]) for a in added_ih),
+               sorted(_locant_key(loc[a]) for a in hydro))
+        if best is None or key < best[0]:
+            best = (key, loc, added_ih, hydro)
+    if best is None:
+        return None
+    _, loc, added_ih, hydro = best
+
+    carb_sorted = sorted(carbonyls, key=lambda c: _locant_key(loc[c]))
+    carb_str = ','.join(_locant_display(loc[c]) for c in carb_sorted)
+    suffix = {1: 'one', 2: 'dione', 3: 'trione', 4: 'tetrone'}.get(len(carbonyls))
+    if suffix is None:
+        return None
+    if added_ih:
+        ih_sorted = sorted(added_ih, key=lambda a: _locant_key(loc[a]))
+        ih_str = '(' + ','.join(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
+    else:
+        ih_str = ''
+    # P-16.3.3: elide terminal 'e' only before the vowel-initial '-one' suffix.
+    elide = parent_name.endswith('e') and len(carbonyls) == 1
+    stem = parent_name[:-1] if elide else parent_name
+    name = f"{stem}-{carb_str}{ih_str}-{suffix}"
+    if hydro:
+        prefix = SATURATION_PREFIXES.get(len(hydro))
+        if prefix is None:
+            return None
+        hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
+        sep = '-' if name[:1].isdigit() else ''  # hyphen before a digit-initial parent (1H-inden...)
+        name = f"{','.join(_locant_display(loc[a]) for a in hy_sorted)}-{prefix}{sep}{name}"
+    return name
+
+
+# Back-compat alias: the original (narrower) Phase-2 entry point, now backed by
+# the general cyclic-oxo engine.
+def name_ring_ketone_with_added_indicated_h(mol: Chem.Mol) -> Optional[str]:
+    return name_cyclic_oxo_compound(mol)
