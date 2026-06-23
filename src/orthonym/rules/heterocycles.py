@@ -607,25 +607,46 @@ def _mancude_monocycle_parent(mol, ring_atoms):
     index in ``parent_mol``. Returns ``(None, None)`` if the ring cannot aromatize
     (the parent is then not a mancude aromatic ring, so the hydro naming declines).
     """
+    from itertools import combinations
     ring = set(ring_atoms)
-    em = Chem.RWMol()
-    old_to_new = {}
-    for idx in sorted(ring):
-        old_to_new[idx] = em.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
-    for bond in mol.GetBonds():
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        if i in ring and j in ring:
-            em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
-            em.GetAtomWithIdx(old_to_new[i]).SetIsAromatic(True)
-            em.GetAtomWithIdx(old_to_new[j]).SetIsAromatic(True)
-    parent = em.GetMol()
-    try:
-        Chem.SanitizeMol(parent)
-    except Exception:
-        return None, None
-    if not all(a.GetIsAromatic() for a in parent.GetAtoms()):
-        return None, None
-    return parent, old_to_new
+    # A ring N may be pyridine-type (=N-, no H) or pyrrole-type (-NH-). RDKit
+    # treats a bare aromatic N as pyridine-type, which aromatizes a 6-membered
+    # azine (pyridine) but NOT a 5-membered azole (needs the pyrrole-type N-H
+    # for the 6-pi count). Try the MOLECULE's actual N-H positions FIRST (so the
+    # mancude parent's indicated-H aligns with the molecule's N-H — critical for
+    # the 2-N azoles, e.g. 4,5-dihydro-1H-imidazole), then all-pyridine-type
+    # (azines, where the N-H N is itself a hydro position, e.g. dihydropyridine),
+    # then other combinations as a fallback.
+    ring_n = [i for i in sorted(ring) if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+    mol_nh = frozenset(i for i in ring_n if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1)
+    nh_options = [mol_nh, frozenset()]
+    for r in range(1, len(ring_n) + 1):
+        nh_options.extend(frozenset(c) for c in combinations(ring_n, r))
+    seen = set()
+    nh_options = [o for o in nh_options if not (o in seen or seen.add(o))]
+    for nh_set in nh_options:
+        em = Chem.RWMol()
+        old_to_new = {}
+        for idx in sorted(ring):
+            atom = Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum())
+            if idx in nh_set:
+                atom.SetNumExplicitHs(1)
+                atom.SetNoImplicit(True)
+            old_to_new[idx] = em.AddAtom(atom)
+        for bond in mol.GetBonds():
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring and j in ring:
+                em.AddBond(old_to_new[i], old_to_new[j], Chem.BondType.AROMATIC)
+                em.GetAtomWithIdx(old_to_new[i]).SetIsAromatic(True)
+                em.GetAtomWithIdx(old_to_new[j]).SetIsAromatic(True)
+        parent = em.GetMol()
+        try:
+            Chem.SanitizeMol(parent)
+        except Exception:
+            continue
+        if all(a.GetIsAromatic() for a in parent.GetAtoms()):
+            return parent, old_to_new
+    return None, None
 
 
 def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
@@ -710,10 +731,13 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
 
     # Name the mancude parent — DEFERRED until after the hydro check so a fully
     # mancude ring (hydro == {}) never reaches this recursive name_heterocycle
-    # call. Defer parents carrying a leading indicated hydrogen (1H-pyrrole,
-    # 2H-pyran ...): their hydro form interleaves added-indicated-H (follow-on).
+    # call (the all-aromatic guard above also blocks re-entry). An intrinsic
+    # indicated-H parent (1H-pyrrole, 1H-imidazole, ...) is KEPT: the hydro
+    # positions are the saturated C's; the indicated-H N is never in a parent
+    # ring double bond so it is never counted as hydro (P-31.1.4 + the parent's
+    # own nH-) -> e.g. 2,3-dihydro-1H-pyrrole.
     parent_name = name_heterocycle(parent, parent_ring[0])
-    if not parent_name or parent_name[:1].isdigit():
+    if not parent_name:
         return None
 
     # Number the ring: lowest locants to the heteroatom set, then heteroatom
@@ -722,6 +746,14 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
     if ordered is None or len(ordered) != n:
         return None
     het = {i for i in ordered if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+    # The indicated-H atom(s) of the kept parent (the N-H carrying the parent's
+    # nH-, when present) must take the LOWEST locant (P-31.1.4.3) — this fixes
+    # the 1H position for 2-N azoles (1H-pyrazole N1 = the N-H, not the =N-),
+    # ranked before the hydro set.
+    indicated_nh = ({i for i in het
+                     if mol.GetAtomWithIdx(i).GetSymbol() == 'N'
+                     and mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1}
+                    if parent_name[:1].isdigit() else set())
     best_key = None
     best_map: Optional[Dict[int, int]] = None
     for start in range(n):
@@ -733,8 +765,9 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
                 (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
                 for a in het
             ))
+            ih_locs = tuple(sorted(loc[a] for a in indicated_nh))
             hydro_locs = tuple(sorted(loc[a] for a in hydro))
-            key = (het_locs, seniority, hydro_locs)
+            key = (het_locs, seniority, ih_locs, hydro_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best_map = loc
@@ -742,7 +775,9 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
         return None
 
     locant_str = ','.join(str(loc) for loc in sorted(best_map[a] for a in hydro))
-    return f"{locant_str}-{prefix}{parent_name}"
+    # Hyphen before a digit-initial (intrinsic-IH) parent: 2,3-dihydro-1H-pyrrole.
+    sep = '-' if parent_name[:1].isdigit() else ''
+    return f"{locant_str}-{prefix}{sep}{parent_name}"
 
 
 def name_heterocycle(mol, ring_atoms) -> str:

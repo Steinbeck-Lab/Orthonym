@@ -300,7 +300,28 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
         matches = mol.GetSubstructMatches(pattern, uniquify=True)
         for match in matches:
             results[fg_name].append(match)
-    
+
+    # A ring-internal C=N-N is the backbone of an azoline/azole ring (e.g.
+    # 4,5-dihydro-1H-pyrazole), NOT a hydrazone principal group (a hydrazone is
+    # the acyclic R2C=N-NH2). Drop hydrazone matches whose C=N AND N-N bonds are
+    # BOTH ring bonds, so the ring namer (not the hydrazone PCG path) handles
+    # them. Acyclic hydrazones keep their match; aromatic azoles never match the
+    # explicit-'=' SMARTS. (P-31.1.4 ring features vs P-66.6 hydrazone PCG.)
+    if results.get("hydrazone"):
+        kept = []
+        for match in results["hydrazone"]:
+            c_idx, n1_idx, n2_idx = match[0], match[1], match[2]
+            b_cn = mol.GetBondBetweenAtoms(c_idx, n1_idx)
+            b_nn = mol.GetBondBetweenAtoms(n1_idx, n2_idx)
+            ring_internal = (b_cn is not None and b_cn.IsInRing()
+                             and b_nn is not None and b_nn.IsInRing())
+            if not ring_internal:
+                kept.append(match)
+        if kept:
+            results["hydrazone"] = kept
+        else:
+            del results["hydrazone"]
+
     # Post-processing: remove generic FG matches that overlap with more-specific FGs
     results = _resolve_fg_collisions(results)
 
