@@ -1137,15 +1137,66 @@ def _mancude_ring_parent(mol, ring_atoms):
     return parent, old_to_new
 
 
-def _resolve_oxo_parent(mol, ring_atoms):
-    """Resolve the mancude parent of a ring-ketone's ring system.
+# Single-chalcogen pyran family: 2H-/4H-pyran and chalcogen analogues are PINs
+# (BB Table 2.2, lines 2164/8141). These mancude parents do NOT aromatize, so
+# they are built here rather than via _mancude_ring_parent.
+_CHALCOGEN_PYRAN_BASE = {'O': 'pyran', 'S': 'thiopyran',
+                         'Se': 'selenopyran', 'Te': 'telluropyran'}
 
-    Returns ``(parent_name, [(locant_map, parentH_map), ...])`` or ``(None, None)``.
-    ``locant_map``: mol-atom -> IUPAC locant; ``parentH_map``: mol-atom -> the H
-    count of the corresponding mancude-parent atom. parentH is paired PER
-    candidate numbering because for an intrinsic-indicated-H parent (1H-indene,
-    9H-fluorene) the indicated-H carbon's H count (2) is alignment-dependent —
-    the carbonyl must align with that >CH2 (P-64.2.2.2.2).
+
+def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
+    """Intrinsic-indicated-H mancude parent candidates for a NON-aromatizing
+    6-membered monocycle bearing exactly one chalcogen (O/S/Se/Te) — the pyran
+    family. A ring ketone on such a parent is named by DIRECT substitution of
+    the indicated-H >CH2 (P-64.2.2.2.2): ``4H-pyran-4-one`` / ``2H-pyran-2-one``
+    and chalcogen analogues. The only mancude (max non-cumulative double bond)
+    indicated-H positions of a 6-ring with the heteroatom at locant 1 are 2 and
+    4 (positions 3/5 cannot carry two noncumulative double bonds; 6 ≡ 2), so two
+    parent isomers per direction are offered. Returns
+    ``[(name, [(loc, {})], ih_locants), ...]``; the carbonyl-at-indicated-H
+    constraint in :func:`name_cyclic_oxo_compound` selects the correct isomer
+    and ring direction. Returns ``[]`` (fail-closed) for any other ring.
+    """
+    from .heterocycles import _macrocycle_ordered_ring
+    if len(ring_set) != 6:
+        return []
+    het = [i for i in ring_set
+           if mol.GetAtomWithIdx(i).GetSymbol() in _CHALCOGEN_PYRAN_BASE]
+    if len(het) != 1:
+        return []
+    x = het[0]
+    if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_set if i != x):
+        return []
+    base = _CHALCOGEN_PYRAN_BASE[mol.GetAtomWithIdx(x).GetSymbol()]
+    ordered = _macrocycle_ordered_ring(mol, ring_set)
+    if ordered is None or len(ordered) != 6:
+        return []
+    n = 6
+    out = []
+    for start in range(n):
+        if ordered[start] != x:
+            continue
+        for direction in (1, -1):
+            seq = [ordered[(start + k * direction) % n] for k in range(n)]
+            loc = {a: idx + 1 for idx, a in enumerate(seq)}  # heteroatom -> 1
+            for ih in (2, 4):  # the only valid mancude indicated-H positions
+                out.append((f"{ih}H-{base}", [(loc, {})], frozenset({ih})))
+    return out
+
+
+def _resolve_oxo_parent(mol, ring_atoms):
+    """Resolve the mancude parent(s) of a ring-ketone's ring system.
+
+    Returns a list of ``(parent_name, [(locant_map, parentH_map), ...], ih_locants)``
+    candidates (empty list if none resolve). ``locant_map``: mol-atom -> IUPAC
+    locant. ``ih_locants``: the set of locants carrying INTRINSIC indicated
+    hydrogen in this parent (a >CH2 in the otherwise mancude system, e.g. {2} for
+    2H-chromene, {4} for 4H-chromene, {2}/{4} for the pyran isomers); empty for a
+    fully-mancude parent (naphthalene, pyridine). For an intrinsic-IH parent the
+    carbonyl must sit AT one of ``ih_locants`` — the ketone is the direct
+    substitution of that >CH2 (P-64.2.2.2.2) — which disambiguates the parent
+    isomer (4H-chromen-4-one, not 2H-chromen-3-one). ``parentH_map`` is retained
+    for shape compatibility (currently unused downstream).
     """
     from .heterocycles import (
         name_heterocycle, _macrocycle_ordered_ring, get_heteroatom_priority,
@@ -1160,20 +1211,21 @@ def _resolve_oxo_parent(mol, ring_atoms):
     # --- monocyclic: build the mancude (aromatic) parent + free numbering ---
     if len(rings) == 1:
         if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
-            return None, None  # carbocyclic monocycle -> cycloalkanone path
+            return []  # carbocyclic monocycle -> cycloalkanone path
         parent, old_to_new = _mancude_ring_parent(mol, ring_set)
         if parent is None:
-            return None, None
+            # non-aromatizing mancude monocycle (pyran-type intrinsic-IH parent)
+            return _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set)
         pr = parent.GetRingInfo().AtomRings()
         if len(pr) != 1:
-            return None, None
+            return []
         pname = name_heterocycle(parent, pr[0])
         if not pname:
-            return None, None
+            return []
         parentH = {a: parent.GetAtomWithIdx(old_to_new[a]).GetTotalNumHs() for a in ring_set}
         ordered = _macrocycle_ordered_ring(mol, ring_set)
         if ordered is None or len(ordered) != n:
-            return None, None
+            return []
         het = {i for i in ring_set if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
         nums = []
         for start in range(n):
@@ -1187,7 +1239,8 @@ def _resolve_oxo_parent(mol, ring_atoms):
         if het:
             best_h = min(_hk(l) for l in nums)
             nums = [l for l in nums if _hk(l) == best_h]
-        return pname, [(l, parentH) for l in nums]
+        # An aromatic mancude monocycle has no intrinsic indicated hydrogen.
+        return [(pname, [(l, parentH) for l in nums], frozenset())]
 
     # --- fused: bond-generic skeleton match vs PAH then fused-heterocycle data ---
     cands = []
@@ -1197,10 +1250,34 @@ def _resolve_oxo_parent(mol, ring_atoms):
     for cs, e in FUSED_HETEROCYCLE_DATA.items():
         if e.get('iupac_locants'):
             cands.append((e['name'], cs, e['iupac_locants']))
+    out = []
     for nm, cs, numbering in cands:
         cmol = Chem.MolFromSmiles(cs)
         if cmol is None or cmol.GetNumAtoms() != n:
             continue
+        # Intrinsic indicated-H locants of THIS parent: ring carbons that are NOT
+        # in a ring double bond of the kekulised parent (the >CH2 of the mancude
+        # system). Independent of the match; computed once per candidate.
+        ih_locants = set()
+        kek = Chem.Mol(cmol)
+        try:
+            Chem.Kekulize(kek, clearAromaticFlags=True)
+            cring = set().union(*[set(r) for r in cmol.GetRingInfo().AtomRings()]) \
+                if cmol.GetRingInfo().AtomRings() else set()
+            in_ring_db = set()
+            for bond in kek.GetBonds():
+                if bond.GetBondType() == Chem.BondType.DOUBLE:
+                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    if i in cring and j in cring:
+                        in_ring_db.add(i)
+                        in_ring_db.add(j)
+            for c, loc in numbering.items():
+                if (c < cmol.GetNumAtoms() and isinstance(loc, int)
+                        and cmol.GetAtomWithIdx(c).GetSymbol() == 'C'
+                        and c not in in_ring_db):
+                    ih_locants.add(loc)
+        except Exception:
+            ih_locants = set()
         params = Chem.AdjustQueryParameters.NoAdjustments()
         params.makeBondsGeneric = True
         params.aromatizeIfPossible = False
@@ -1217,8 +1294,8 @@ def _resolve_oxo_parent(mol, ring_atoms):
             pH = {match[c]: cmol.GetAtomWithIdx(c).GetTotalNumHs() for c in numbering if c < len(match)}
             pairs.append((a2l, pH))
         if pairs:
-            return nm, pairs
-    return None, None
+            out.append((nm, pairs, frozenset(ih_locants)))
+    return out
 
 
 def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
@@ -1307,8 +1384,8 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not has_residual:
         return None
 
-    parent_name, pairs = _resolve_oxo_parent(mol, ring_set)
-    if not parent_name:
+    candidates = _resolve_oxo_parent(mol, ring_set)
+    if not candidates:
         return None
 
     # SAT = the ring atoms that are SATURATED relative to the mancude parent
@@ -1340,23 +1417,33 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             adj[j].add(i)
 
     best = None
-    for loc, parentH in pairs:
-        matched, unmatched = _max_oxo_matching(adj, sat, loc)
-        added_ih, hydro = unmatched, matched
-        # Substituent locants are the LAST numbering criterion (P-14.4: after the
-        # suffix, added-IH and hydro).
-        sub_ring = {i for i in ring_set
-                    if any(nb.GetIdx() in substituent_atoms
-                           for nb in mol.GetAtomWithIdx(i).GetNeighbors())}
-        key = (sorted(_locant_key(loc[c]) for c in carbonyls),
-               sorted(_locant_key(loc[a]) for a in added_ih),
-               sorted(_locant_key(loc[a]) for a in hydro),
-               sorted(_locant_key(loc[a]) for a in sub_ring))
-        if best is None or key < best[0]:
-            best = (key, loc, added_ih, hydro)
+    for parent_name, pairs, ih_locants in candidates:
+        for loc, parentH in pairs:
+            # Intrinsic-IH parent (1H-indene, 2H-/4H-chromene, the 2H-/4H-pyran
+            # isomers): the ketone is the DIRECT substitution of the parent's
+            # >CH2, so a carbonyl MUST sit at one of its indicated-H locants
+            # (P-64.2.2.2.2). This disambiguates 4H-chromen-4-one from
+            # 2H-chromen-3-one and selects the 2H-/4H-pyran isomer + ring
+            # direction. No constraint for a fully mancude parent (ih_locants
+            # empty) — its added-IH comes from the maximum matching below.
+            if ih_locants and not any(loc[c] in ih_locants for c in carbonyls):
+                continue
+            matched, unmatched = _max_oxo_matching(adj, sat, loc)
+            added_ih, hydro = unmatched, matched
+            # Substituent locants are the LAST numbering criterion (P-14.4: after
+            # the suffix, added-IH and hydro).
+            sub_ring = {i for i in ring_set
+                        if any(nb.GetIdx() in substituent_atoms
+                               for nb in mol.GetAtomWithIdx(i).GetNeighbors())}
+            key = (sorted(_locant_key(loc[c]) for c in carbonyls),
+                   sorted(_locant_key(loc[a]) for a in added_ih),
+                   sorted(_locant_key(loc[a]) for a in hydro),
+                   sorted(_locant_key(loc[a]) for a in sub_ring))
+            if best is None or key < best[0]:
+                best = (key, loc, added_ih, hydro, parent_name)
     if best is None:
         return None
-    _, loc, added_ih, hydro = best
+    _, loc, added_ih, hydro, parent_name = best
 
     carb_sorted = sorted(carbonyls, key=lambda c: _locant_key(loc[c]))
     carb_str = ','.join(_locant_display(loc[c]) for c in carb_sorted)
