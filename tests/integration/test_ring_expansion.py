@@ -71,8 +71,10 @@ class TestFusedHeterocycleNaming:
         assert not _has_vb_notation(name)
 
     def test_acridone(self):
+        # v23 cyclic-oxo engine: PIN is acridin-9(10H)-one (acridine is the retained
+        # PIN ring parent; P-64.2.2.2.2 added-IH ketone). 'acridone' is a non-PIN trivial.
         name = name_compound("O=c1c2ccccc2[nH]c2ccccc12")
-        assert "acridon" in name.lower()
+        assert name == "acridin-9(10H)-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_4h_quinolizine(self):
@@ -129,8 +131,10 @@ class TestFlavonoidNaming:
         assert not _has_vb_notation(name)
 
     def test_chromone(self):
+        # v23 IH-01f: PIN is 4H-1-benzopyran-4-one (1-benzopyran is the PIN ring parent
+        # per P-19(d); P-64.2.2.2.2 ketone = substitution of the 4H >CH2).
         name = name_compound("O=c1ccoc2ccccc12")
-        assert "chromone" in name.lower() or "chromen" in name.lower()
+        assert name == "4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
 

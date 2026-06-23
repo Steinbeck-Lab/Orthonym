@@ -195,8 +195,12 @@ class TestFlavonoidEntries:
         assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'chromanone'
 
     def test_chromone(self):
+        # v23 IH-01f: chromone de-headlined (removed from NATURAL_PRODUCT_DERIVATIVES)
+        # so the cyclic-oxo engine emits the PIN 4H-1-benzopyran-4-one (P-19(d) / P-64.2.2.2.2).
         can = _canonical('O=c1ccoc2ccccc12')
-        assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'chromone'
+        assert NATURAL_PRODUCT_DERIVATIVES.get(can) is None
+        from orthonym import name_compound
+        assert name_compound('O=c1ccoc2ccccc12') == '4H-1-benzopyran-4-one'
 
 
 class TestTerpenoidNPEntries:

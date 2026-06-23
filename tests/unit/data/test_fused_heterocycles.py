@@ -731,7 +731,8 @@ class TestChromeneVariants:
         mol = Chem.MolFromSmiles('O=c1ccc2ccccc2o1')
         canonical = Chem.MolToSmiles(mol)
         assert canonical in FUSED_HETEROCYCLE_DATA, f"Coumarin ({canonical}) not in data"
-        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == 'coumarin'
+        # v23 IH-01f: de-headlined to the PIN (1-benzopyran is the PIN ring parent, P-19(d))
+        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == '2H-1-benzopyran-2-one'
 
     @pytest.mark.unit
     def test_coumarin_systematic_name(self):
@@ -739,16 +740,15 @@ class TestChromeneVariants:
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         coumarin_data = FUSED_HETEROCYCLE_DATA['O=c1ccc2ccccc2o1']
-        assert coumarin_data['systematic'] == '2H-chromen-2-one'
+        assert coumarin_data['systematic'] == '2H-1-benzopyran-2-one'
         assert coumarin_data['tautomer_locant'] == 2
 
     @pytest.mark.unit
     def test_coumarin_e2e(self):
-        """O=c1ccc2ccccc2o1 should return coumarin or chromen-2-one."""
+        """O=c1ccc2ccccc2o1 should return the PIN 2H-1-benzopyran-2-one (v23 IH-01f)."""
         from orthonym import name_compound
         result = name_compound('O=c1ccc2ccccc2o1')
-        result_lower = result.lower()
-        assert 'coumarin' in result_lower or 'chromen' in result_lower, f"Got {result}"
+        assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
     @pytest.mark.unit
     def test_dihydrobenzofuran_in_data(self):
@@ -794,12 +794,12 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_2h_chromene_exists(self):
-        """2H-chromene should be in data."""
+        """The 2H-chromene ring is named by its PIN 2H-1-benzopyran (v23 IH-01f, P-19(d))."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
-        # 2H-chromene canonical SMILES
+        # 2H-chromene canonical SMILES key; PIN ring parent name is 2H-1-benzopyran
         assert 'C1=Cc2ccccc2OC1' in FUSED_HETEROCYCLE_DATA
-        assert FUSED_HETEROCYCLE_DATA['C1=Cc2ccccc2OC1']['name'] == '2H-chromene'
+        assert FUSED_HETEROCYCLE_DATA['C1=Cc2ccccc2OC1']['name'] == '2H-1-benzopyran'
 
     @pytest.mark.unit
     def test_coumarin_ring_system_type(self):
@@ -1154,10 +1154,12 @@ class TestPhase101EndToEndNaming:
 
     @pytest.mark.unit
     def test_thioxanthone_e2e(self):
-        """Thioxanthone SMILES should produce 'thioxanthone'."""
+        """Thioxanthone SMILES produces the PIN 9H-thioxanthen-9-one (v23 cyclic-oxo
+        engine; thioxanthene is the PIN ring parent per BB line 11638, 'thioxanthone'
+        is a non-PIN trivial name)."""
         from orthonym import name_compound
         result = name_compound('O=c1c2ccccc2sc2ccccc12')
-        assert result == 'thioxanthone'
+        assert result == '9H-thioxanthen-9-one'
 
     @pytest.mark.unit
     def test_phenanthroline_e2e(self):

@@ -2962,7 +2962,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=c1cc(-c2ccccc2)c2cc(O)c(O)cc2o1",  # aromatic,heterocycle,fused-ring,medium
-        "6,7-dihydroxy-4-phenylcoumarin",
+        # v23 IH-01f: coumarin -> PIN 2H-1-benzopyran-2-one (P-19(d)); OPSIN-RT verified
+        "6,7-dihydroxy-4-phenyl-2H-1-benzopyran-2-one",
     ),
     (
         "CC(CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(=O)O",  # fused-ring,medium,steroid

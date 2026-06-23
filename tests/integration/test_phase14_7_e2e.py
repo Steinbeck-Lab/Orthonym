@@ -179,10 +179,11 @@ class TestExistingCompoundsPreserved:
 
     @pytest.mark.integration
     def test_coumarin(self):
-        """Coumarin should use retained name."""
+        """v23 IH-01f: coumarin de-headlined to the PIN 2H-1-benzopyran-2-one
+        (1-benzopyran is the PIN ring parent per P-19(d)); 'coumarin' is not a PIN."""
         result = name_compound("O=c1ccc2ccccc2o1")
-        assert result == "coumarin" or "coumarin" in result.lower(), (
-            f"Expected 'coumarin', got '{result}'"
+        assert result == "2H-1-benzopyran-2-one", (
+            f"Expected '2H-1-benzopyran-2-one', got '{result}'"
         )
 
     @pytest.mark.integration

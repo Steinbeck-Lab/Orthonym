@@ -513,7 +513,9 @@ class TestNoRegressionExistingNP:
         assert name_compound("O=C1CCOc2ccccc21") == "chromanone"
 
     def test_chromone(self):
-        assert name_compound("O=c1ccoc2ccccc12") == "chromone"
+        # v23 IH-01f: chromone de-headlined to the PIN (1-benzopyran is the PIN ring
+        # parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the 4H >CH2).
+        assert name_compound("O=c1ccoc2ccccc12") == "4H-1-benzopyran-4-one"
 
     def test_pinane(self):
         assert name_compound("CC1CCC2CC1C2(C)C") == "pinane"

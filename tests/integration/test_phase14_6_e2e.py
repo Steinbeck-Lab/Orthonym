@@ -120,10 +120,10 @@ class TestBug4ChromeneCoumarin:
     """BUG-4: Chromene/benzopyran naming failure."""
 
     def test_coumarin(self):
-        """Critical success criteria #4 from CONTEXT.md"""
+        """v23 IH-01f: PIN is 2H-1-benzopyran-2-one (1-benzopyran is the PIN ring
+        parent per P-19(d); coumarin/chromene are general-nomenclature only)."""
         result = name_compound('O=c1ccc2ccccc2o1')
-        result_lower = result.lower()
-        assert 'coumarin' in result_lower or 'chromen' in result_lower, f"Got {result}"
+        assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
     def test_dihydrobenzofuran(self):
         result = name_compound('C1Cc2ccccc2O1')
@@ -216,10 +216,9 @@ class TestAllSuccessCriteria:
         )
 
     def test_success_criteria_4_coumarin(self):
-        """SC-4: coumarin or chromen-2-one names correctly."""
+        """SC-4: coumarin names as the PIN 2H-1-benzopyran-2-one (v23 IH-01f, P-19(d))."""
         result = name_compound('O=c1ccc2ccccc2o1')
-        result_lower = result.lower()
-        assert 'coumarin' in result_lower or 'chromen' in result_lower
+        assert result == '2H-1-benzopyran-2-one', f"Got {result}"
 
 
 class TestAdditionalCoverage:

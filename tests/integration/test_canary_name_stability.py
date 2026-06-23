@@ -2628,7 +2628,8 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "COc1cc(O)cc2cc(CO)c(=O)oc12",  # aromatic,heterocycle,fused-ring,medium
-        "6-hydroxy-3-hydroxymethyl-8-methoxycoumarin",
+        # v23 IH-01f: coumarin -> PIN 2H-1-benzopyran-2-one (P-19(d)); OPSIN-RT verified
+        "6-hydroxy-3-hydroxymethyl-8-methoxy-2H-1-benzopyran-2-one",
     ),
     (
         "C[C@H](N[C@@H](CCc1ccccc1)C(=O)O)C(=O)N1CCC[C@H]1C(=O)O",  # aromatic,heterocycle,polyfunctional,medium

@@ -324,14 +324,15 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '7a', 7: 7, 8: 6},
     },
-    # coumarin
+    # coumarin -> PIN 2H-1-benzopyran-2-one (P-19(d) line 1736: '1-benzopyran' is
+    # the PIN ring parent, not 'chromene'; '2H-1-benzopyran-2-one' OPSIN-RT-verified)
     'O=c1ccc2ccccc2o1': {
-        'name': 'coumarin',
+        'name': '2H-1-benzopyran-2-one',
         'tautomer_locant': 2,
         'ring_system': 'benzo-6-membered-lactone',
         'parent_atoms': 11,
         'iupac_locants': {0: '=O', 1: 2, 2: 3, 3: 4, 4: '4a', 5: 5, 6: 6, 7: 7, 8: 8, 9: '8a', 10: 1},
-        'systematic': '2H-chromen-2-one',
+        'systematic': '2H-1-benzopyran-2-one',
     },
     # 2,3-dihydro-1-benzofuran
     'c1ccc2c(c1)CCO2': {
@@ -342,17 +343,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
         'systematic': '2,3-dihydro-1-benzofuran',
     },
-    # 2H-chromene
+    # 2H-chromene -> PIN 2H-1-benzopyran (P-19(d) line 1736; line 24647 '2H-1-benzopyran (PIN)';
+    # line 19453 '2H-1-benzopyran (PIN)  2H-chromene'). Same ring system => iupac_locants unchanged.
     'C1=Cc2ccccc2OC1': {
-        'name': '2H-chromene',
+        'name': '2H-1-benzopyran',
         'tautomer_locant': 2,
         'ring_system': 'benzopyran',
         'parent_atoms': 10,
         'iupac_locants': {0: 4, 1: 3, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
-    # 4H-chromene
+    # 4H-chromene -> PIN 4H-1-benzopyran
     'C1=COc2ccccc2C1': {
-        'name': '4H-chromene',
+        'name': '4H-1-benzopyran',
         'tautomer_locant': 4,
         'ring_system': 'benzopyran',
         'parent_atoms': 10,

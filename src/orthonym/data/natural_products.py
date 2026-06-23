@@ -265,8 +265,9 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "isoflavone",
     "O=C1CCOc2ccccc21":
         "chromanone",
-    "O=c1ccoc2ccccc12":
-        "chromone",
+    # chromone de-headlined (v23 IH-01f): PIN is 4H-1-benzopyran-4-one (1-benzopyran is
+    # the PIN ring parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the >CH2) ->
+    # emitted by the cyclic-oxo engine. Also pin:false in iupac_2013_pin_list.json.
 
     # ---- Ergostane derivatives with non-standard ring perception ----
     "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C":
