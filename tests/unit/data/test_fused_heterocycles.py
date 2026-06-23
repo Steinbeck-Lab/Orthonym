@@ -510,7 +510,8 @@ class TestSaturatedVariants:
 
     @pytest.mark.unit
     def test_chromane(self):
-        """Chromane should be identified."""
+        """Chromane should be identified. (PIN 3,4-dihydro-2H-1-benzopyran deferred to IH-01h —
+        its chromanone derivative needs the P-64.2.2.2.2 hydro-locant fix first.)"""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCO2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
@@ -772,7 +773,7 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_chromane_already_exists(self):
-        """Chromane (3,4-dihydro-2H-chromene) should already be in data."""
+        """Chromane should already be in data (PIN rename deferred to IH-01h)."""
         from rdkit import Chem
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
@@ -1147,10 +1148,11 @@ class TestPhase101EndToEndNaming:
 
     @pytest.mark.unit
     def test_xanthone_e2e(self):
-        """Xanthone SMILES should produce 'xanthone'."""
+        """v23 IH-01g: xanthone -> PIN 9H-xanthen-9-one (xanthene is the PIN ring parent,
+        BB line 11634; 'xanthone' is a non-PIN trivial). Emitted by the cyclic-oxo engine."""
         from orthonym import name_compound
         result = name_compound('O=c1c2ccccc2oc2ccccc12')
-        assert result == 'xanthone'
+        assert result == '9H-xanthen-9-one'
 
     @pytest.mark.unit
     def test_thioxanthone_e2e(self):

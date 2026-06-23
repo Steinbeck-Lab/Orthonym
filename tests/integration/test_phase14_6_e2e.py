@@ -131,7 +131,8 @@ class TestBug4ChromeneCoumarin:
         assert 'benzofuran' in result_lower or 'dihydro' in result_lower, f"Got {result}"
 
     def test_chromane(self):
-        """Chromane (3,4-dihydro-2H-chromene) should be named correctly."""
+        """Chromane (3,4-dihydro-2H-chromene) should be named correctly.
+        (PIN 3,4-dihydro-2H-1-benzopyran deferred to IH-01h — chromanone hydro-locant fix.)"""
         result = name_compound('c1ccc2OCCCc2c1')
         result_lower = result.lower()
         assert 'chromane' in result_lower or 'chromen' in result_lower, f"Got {result}"

@@ -305,7 +305,7 @@ class TestStereo:
         assert name_compound("C=CC/C=C/CCC(=O)OC") == "methyl (4E)-octa-4,7-dienoate"
 
     def test_028_dihydroxy_methylisochromane(self):
-        """#28: isochromane with corrected locants."""
+        """#28: isochromane with corrected locants. (PIN benzopyran rename deferred to IH-01h.)"""
         name = name_compound("C[C@@H]1Cc2cc(O)cc(O)c2CO1")
         assert "isochromane" in name
         assert "dihydroxy" in name
@@ -327,13 +327,13 @@ class TestStereo:
         assert "amino" in name or "glyc" in name or "amide" in name or name is not None
 
     def test_046_propylisochromane(self):
-        """#46: isochromane with corrected locants."""
+        """#46: isochromane with corrected locants. (PIN benzopyran rename deferred to IH-01h.)"""
         name = name_compound("CCC[C@@H]1OCc2c(O)cccc2[C@H]1O")
         assert "isochromane" in name
         assert "propyl" in name
 
     def test_050_methoxyisochromanone(self):
-        """#50: COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O - isochromanone."""
+        """#50: COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O - isochromanone. (PIN rename deferred to IH-01h.)"""
         name = name_compound("COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O")
         assert "isochroman" in name
         assert "methoxy" in name

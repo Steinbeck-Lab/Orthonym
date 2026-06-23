@@ -252,9 +252,10 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a', 13: 10},
     },
-    # 6H-benzo[c]chromene
+    # 6H-benzo[c]chromene -> PIN 6H-dibenzo[b,d]pyran (BB line 13463 '6H-dibenzo[b,d]pyran (PIN)
+    # ... not ... 6H-benzo[c]chromene'). Same ring system + numbering (OPSIN extendedsmi verified) -> rename only.
     'c1ccc2c(c1)COc1ccccc1-2': {
-        'name': '6H-benzo[c]chromene',
+        'name': '6H-dibenzo[b,d]pyran',
         'tautomer_locant': 6,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
@@ -478,7 +479,11 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
-    # chromane
+    # chromane: PIN is 3,4-dihydro-2H-1-benzopyran (BB line 17004), but the rename is DEFERRED
+    # to IH-01h — its 4-oxo derivative (chromanone) is named "parent + oxo" by the fused-substituted
+    # path, which inherits chromane's 3,4-dihydro-2H instead of re-deriving the lowest-locant
+    # 2,3-dihydro-4H (P-64.2.2.2.2). Until that path applies the carbonyl-at-IH rule, keep 'chromane'
+    # (valid general nomenclature) so chromanones do not regress to a non-PIN hydro form.
     'c1ccc2c(c1)CCCO2': {
         'name': 'chromane',
         'tautomer_locant': None,
@@ -486,13 +491,23 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
-    # isochromane
+    # isochromane: PIN is 3,4-dihydro-1H-2-benzopyran (BB line 17016) — DEFERRED to IH-01h
+    # (same isochromanone 4-oxo hydro-locant issue as chromane).
     'c1ccc2c(c1)CCOC2': {
         'name': 'isochromane',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
+    },
+    # isochromene -> PIN 1H-2-benzopyran (P-19(d); BB line 11682 'the PIN is 1H-2-benzopyran').
+    # New catalog entry (was named only via the OPSIN-import alias); locants from OPSIN extendedsmi (O at 2).
+    'C1=Cc2ccccc2CO1': {
+        'name': '1H-2-benzopyran',
+        'tautomer_locant': 1,
+        'ring_system': 'benzopyran',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
     # 2,1,3-benzothiadiazole
     'c1ccc2nsnc2c1': {
@@ -1166,15 +1181,16 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
     },
-    # thiochromene
+    # thiochromene -> PIN 2H-1-benzothiopyran (P-19(d); BB line 11664 'the PIN is 2H-1-benzothiopyran')
     'C1=Cc2ccccc2SC1': {
-        'name': 'thiochromene',
-        'tautomer_locant': None,
+        'name': '2H-1-benzothiopyran',
+        'tautomer_locant': 2,
         'ring_system': 'benzothiopyran',
         'parent_atoms': 10,
         'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
-    # thiochromane
+    # thiochromane: PIN is 3,4-dihydro-2H-1-benzothiopyran (BB line 17006) — DEFERRED to IH-01h
+    # (same thiochromanone 4-oxo hydro-locant issue as chromane).
     'c1ccc2c(c1)CCCS2': {
         'name': 'thiochromane',
         'tautomer_locant': None,
