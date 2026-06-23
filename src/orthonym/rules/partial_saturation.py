@@ -1267,8 +1267,30 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     carbonyls = set(_ring_carbonyl_carbons(mol, ring_set))
     if not carbonyls:
         return None
-    if mol.GetNumHeavyAtoms() != len(ring_set) + len(carbonyls):
-        return None  # unsubstituted only
+    # The carbonyl O's belong to the suffix, not to substituents.
+    carbonyl_oxygens: Set[int] = set()
+    for c in carbonyls:
+        ca = mol.GetAtomWithIdx(c)
+        for bond in ca.GetBonds():
+            o = bond.GetOtherAtom(ca)
+            if (bond.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == 'O'
+                    and o.GetIdx() not in ring_set and o.GetDegree() == 1):
+                carbonyl_oxygens.add(o.GetIdx())
+    substituent_atoms = {a.GetIdx() for a in mol.GetAtoms()
+                         if a.GetIdx() not in ring_set and a.GetIdx() not in carbonyl_oxygens}
+    substituted = bool(substituent_atoms)
+    if substituted:
+        # Substituted ring-ketones are SCOPED to a MONOCYCLIC ring whose
+        # substituents are hydrocarbon/halogen only: then the ring ketone is
+        # unambiguously the principal group (no heteroatom substituent can be
+        # senior to or rival the ketone), and the existing heterocycle
+        # substituent assembler can render the prefixes against this numbering.
+        # Fused-substituted + heteroatom-substituent ring-ketones fail closed.
+        if len(rings) != 1:
+            return None
+        _ALKYL_HALO = {'C', 'F', 'Cl', 'Br', 'I'}
+        if any(mol.GetAtomWithIdx(a).GetSymbol() not in _ALKYL_HALO for a in substituent_atoms):
+            return None
     if get_retained_name(Chem.MolToSmiles(mol)):
         return None  # a retained PIN (uracil, maleimide) owns the name
 
@@ -1289,26 +1311,47 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not parent_name:
         return None
 
+    # SAT = the ring atoms that are SATURATED relative to the mancude parent
+    # (added-IH + hydro), detected STRUCTURALLY: non-carbonyl ring C/N that are
+    # NOT in a ring double bond in the KEKULISED molecule. Structural (not H-count)
+    # so a SUBSTITUTED indicated-H position still counts (1-methylpyridin-2(1H)-one
+    # keeps its (1H); the parent O/S never enters — only C/N can be a hydro/IH
+    # position). Independent of numbering, so computed once.
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    mol_ring_db: Set[int] = set()
+    for bond in kek.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                mol_ring_db.add(i)
+                mol_ring_db.add(j)
+    sat = {i for i in ring_set
+           if i not in carbonyls and i not in mol_ring_db
+           and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N')}
+    adj = {i: set() for i in sat}
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in sat and j in sat:
+            adj[i].add(j)
+            adj[j].add(i)
+
     best = None
     for loc, parentH in pairs:
-        # SAT = non-carbonyl ring C/N with MORE H than the mancude parent at this
-        # alignment (added-IH or hydro). Per-pair: an intrinsic-IH parent's IH
-        # carbon's H count depends on the alignment.
-        sat = {i for i in ring_set
-               if i not in carbonyls
-               and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N')
-               and mol.GetAtomWithIdx(i).GetTotalNumHs() > parentH.get(i, 0)}
-        adj = {i: set() for i in sat}
-        for bond in mol.GetBonds():
-            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-            if i in sat and j in sat:
-                adj[i].add(j)
-                adj[j].add(i)
         matched, unmatched = _max_oxo_matching(adj, sat, loc)
         added_ih, hydro = unmatched, matched
+        # Substituent locants are the LAST numbering criterion (P-14.4: after the
+        # suffix, added-IH and hydro).
+        sub_ring = {i for i in ring_set
+                    if any(nb.GetIdx() in substituent_atoms
+                           for nb in mol.GetAtomWithIdx(i).GetNeighbors())}
         key = (sorted(_locant_key(loc[c]) for c in carbonyls),
                sorted(_locant_key(loc[a]) for a in added_ih),
-               sorted(_locant_key(loc[a]) for a in hydro))
+               sorted(_locant_key(loc[a]) for a in hydro),
+               sorted(_locant_key(loc[a]) for a in sub_ring))
         if best is None or key < best[0]:
             best = (key, loc, added_ih, hydro)
     if best is None:
@@ -1336,6 +1379,27 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         hy_sorted = sorted(hydro, key=lambda a: _locant_key(loc[a]))
         sep = '-' if name[:1].isdigit() else ''  # hyphen before a digit-initial parent (1H-inden...)
         name = f"{','.join(_locant_display(loc[a]) for a in hy_sorted)}-{prefix}{sep}{name}"
+
+    # Substituents (monocyclic, hydrocarbon/halogen): render them as alphabetized
+    # prefixes against THIS numbering, with the carbonyl 'oxo' excluded (it is the
+    # -one/-dione suffix), reusing the heterocycle substituent assembler. The
+    # base `name` (parent + added-IH + suffix, possibly hydro-prefixed) is passed
+    # as the parent so prefixes are prepended -> e.g. 5-methylpyridin-2(1H)-one.
+    if substituted:
+        from .heterocycles import (
+            get_heterocycle_substituents, name_substituted_heterocycle,
+        )
+        oriented = [a for a, _ in sorted(loc.items(), key=lambda kv: _locant_key(kv[1]))]
+        subs = get_heterocycle_substituents(mol, list(ring_set), oriented, loc)
+        filtered = {}
+        for locant, slist in subs.items():
+            keep = [s for s in slist
+                    if s.get('hetero_name') != 'oxo'
+                    and not any(a in carbonyl_oxygens for a in s.get('atoms', []))]
+            if keep:
+                filtered[locant] = keep
+        if filtered:
+            name = name_substituted_heterocycle(mol, list(ring_set), name, filtered, loc)
     return name
 
 
