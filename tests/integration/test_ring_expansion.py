@@ -126,8 +126,10 @@ class TestFlavonoidNaming:
         assert not _has_vb_notation(name)
 
     def test_chromanone(self):
+        # v23 IH-01h: PIN is 2,3-dihydro-4H-1-benzopyran-4-one (cyclic-oxo engine;
+        # the 4-one substitutes the 4H >CH2, P-64.2.2.2.2). 'chromanone' is non-PIN.
         name = name_compound("O=C1CCOc2ccccc21")
-        assert "chromanone" in name.lower() or "chroman" in name.lower()
+        assert name == "2,3-dihydro-4H-1-benzopyran-4-one", f"Got {name}"
         assert not _has_vb_notation(name)
 
     def test_chromone(self):

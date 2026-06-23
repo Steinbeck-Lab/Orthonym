@@ -1078,6 +1078,39 @@ def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
     return out
 
 
+def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
+    """Return the atoms of the single FUSED ring system that contains a seed atom.
+
+    Rings are merged into one system when they share an edge (>=2 atoms = ortho-
+    or peri-fusion); rings connected only by a single bond (a pendant phenyl) or a
+    spiro atom (1 shared atom) are SEPARATE systems. This isolates the parent
+    ring system of a ring ketone from pendant ring substituents (the phenyl of a
+    3-phenylchroman-4-one). Returns the merged atom set whose system contains any
+    ``seed_atoms`` atom, or an empty set if none match.
+    """
+    ring_sets = [set(r) for r in rings]
+    parent = list(range(len(rings)))
+
+    def _find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(len(rings)):
+        for j in range(i + 1, len(rings)):
+            if len(ring_sets[i] & ring_sets[j]) >= 2:  # shared edge = fused
+                parent[_find(i)] = _find(j)
+
+    systems: Dict[int, Set[int]] = {}
+    for i in range(len(rings)):
+        systems.setdefault(_find(i), set()).update(ring_sets[i])
+    for atoms in systems.values():
+        if atoms & seed_atoms:
+            return atoms
+    return set()
+
+
 def _elide_terminal_e(stem: str) -> str:
     """Elide a terminal 'e' before a vowel-initial suffix (P-16.3.3): naphthalene
     -> naphthalen (before -one); kept before -dione/-trione (consonant)."""
@@ -1243,13 +1276,23 @@ def _resolve_oxo_parent(mol, ring_atoms):
         return [(pname, [(l, parentH) for l in nums], frozenset())]
 
     # --- fused: bond-generic skeleton match vs PAH then fused-heterocycle data ---
+    # Only MANCUDE parents are valid oxo-parents: the ketone substitutes an
+    # indicated-H >CH2 and the added-IH/hydro is computed RELATIVE to the mancude
+    # ring. A SATURATED catalog entry (chromane, thiochromane, 2,3-dihydro-1-
+    # benzofuran, ...) is NOT a mancude parent — matching it would make a fused
+    # saturated ketone (chroman-4-one) inherit the saturated parent's hydro
+    # pattern instead of re-deriving the lowest-locant form (P-64.2.2.2.2). Skip
+    # any entry flagged saturated by its name ('hydro') or ring_system.
     cands = []
     for nm, e in POLYCYCLIC_DATA.items():
         if e.get('iupac_numbering') and e.get('canonical_smiles'):
             cands.append((nm, e['canonical_smiles'], e['iupac_numbering']))
     for cs, e in FUSED_HETEROCYCLE_DATA.items():
-        if e.get('iupac_locants'):
-            cands.append((e['name'], cs, e['iupac_locants']))
+        if not e.get('iupac_locants'):
+            continue
+        if 'hydro' in e['name'].lower() or 'saturated' in e.get('ring_system', '').lower():
+            continue  # saturated/partially-hydro entry — not a mancude oxo-parent
+        cands.append((e['name'], cs, e['iupac_locants']))
     out = []
     for nm, cs, numbering in cands:
         cmol = Chem.MolFromSmiles(cs)
@@ -1337,9 +1380,21 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     rings = mol.GetRingInfo().AtomRings()
     if not rings:
         return None
-    ring_set: Set[int] = set()
+    all_ring_atoms: Set[int] = set()
     for r in rings:
-        ring_set.update(r)
+        all_ring_atoms.update(r)
+
+    # The parent ring system is the FUSED ring system bearing the ring carbonyl —
+    # NOT every ring in the molecule. A pendant ring (a phenyl on a chromanone,
+    # connected by a single bond, sharing 0-1 atoms) is a SUBSTITUENT, not part of
+    # the parent, so it must be excluded from ring_set (else _resolve_oxo_parent
+    # can't match the parent skeleton, and the carbonyl/substituent split breaks).
+    all_carbonyls = set(_ring_carbonyl_carbons(mol, all_ring_atoms))
+    if not all_carbonyls:
+        return None
+    ring_set: Set[int] = _fused_ring_system_atoms(rings, all_carbonyls)
+    if not ring_set:
+        return None
 
     carbonyls = set(_ring_carbonyl_carbons(mol, ring_set))
     if not carbonyls:
@@ -1357,17 +1412,40 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
                          if a.GetIdx() not in ring_set and a.GetIdx() not in carbonyl_oxygens}
     substituted = bool(substituent_atoms)
     if substituted:
-        # Substituted ring-ketones are SCOPED to a MONOCYCLIC ring whose
-        # substituents are hydrocarbon/halogen only: then the ring ketone is
-        # unambiguously the principal group (no heteroatom substituent can be
-        # senior to or rival the ketone), and the existing heterocycle
-        # substituent assembler can render the prefixes against this numbering.
-        # Fused-substituted + heteroatom-substituent ring-ketones fail closed.
-        if len(rings) != 1:
+        # Substituted ring-ketones (monocyclic OR fused): the engine fires only
+        # when the ring ketone(s) IS the principal characteristic group, verified
+        # via the authoritative seniority machinery (get_principal_group) — NOT a
+        # heuristic, since this recognizer PREEMPTS the normal dispatch. Then every
+        # substituent is a junior prefix and the heterocycle substituent assembler
+        # renders them against this numbering. A pendant ring (the phenyl of a
+        # 3-phenylchroman-4-one) is already excluded from ring_set, so it appears as
+        # a substituent. Fail closed when the ketone is not the PCG (a senior
+        # aldehyde/acid/ester/amide/nitrile substituent) OR when any substituent
+        # bears its own acyl/imine/nitrile/thiocarbonyl carbon (a rival the
+        # same-class PCG check would not separate).
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        # The principal characteristic group must sit on the PARENT ring system —
+        # i.e. the ring carbonyl(s) named by the -one suffix (ketone, OR a lactam /
+        # lactone ring C=O, all of which P-64.2.2.2 names as -one). If the PCG's
+        # atoms touch a SUBSTITUENT, a senior group lives there (a substituent acid /
+        # aldehyde / sulfonic acid) and the ring -one is not the principal group ->
+        # fail closed. (Checking PCG-location, not name, keeps lactam pyridinones /
+        # lactone chromen-2-ones in scope while excluding senior substituents.)
+        _pcg_name, _pcg_atoms = get_principal_group(mol, detect_functional_groups(mol))
+        _pcg_idx = {i for tup in (_pcg_atoms or []) for i in tup}
+        if _pcg_idx & substituent_atoms:
             return None
-        _ALKYL_HALO = {'C', 'F', 'Cl', 'Br', 'I'}
-        if any(mol.GetAtomWithIdx(a).GetSymbol() not in _ALKYL_HALO for a in substituent_atoms):
-            return None
+        # Belt-and-braces for an EQUAL-class rival the PCG union may not localise: a
+        # substituent bearing its own acyl / imine / nitrile / thiocarbonyl carbon.
+        for a in substituent_atoms:
+            at = mol.GetAtomWithIdx(a)
+            if at.GetSymbol() != 'C':
+                continue
+            for b in at.GetBonds():
+                if (b.GetBondTypeAsDouble() in (2.0, 3.0)
+                        and b.GetOtherAtom(at).GetSymbol() in ('O', 'N', 'S', 'Se', 'Te')):
+                    return None  # substituent acyl / imine / nitrile / thiocarbonyl
     if get_retained_name(Chem.MolToSmiles(mol)):
         return None  # a retained PIN (uracil, maleimide) owns the name
 

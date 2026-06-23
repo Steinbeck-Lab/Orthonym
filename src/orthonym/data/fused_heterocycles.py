@@ -479,22 +479,19 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
-    # chromane: PIN is 3,4-dihydro-2H-1-benzopyran (BB line 17004), but the rename is DEFERRED
-    # to IH-01h — its 4-oxo derivative (chromanone) is named "parent + oxo" by the fused-substituted
-    # path, which inherits chromane's 3,4-dihydro-2H instead of re-deriving the lowest-locant
-    # 2,3-dihydro-4H (P-64.2.2.2.2). Until that path applies the carbonyl-at-IH rule, keep 'chromane'
-    # (valid general nomenclature) so chromanones do not regress to a non-PIN hydro form.
+    # chromane -> PIN 3,4-dihydro-2H-1-benzopyran (BB line 17004). The IH-01h cyclic-oxo
+    # engine now names chromanone derivatives correctly (carbonyl-at-IH mancude parent,
+    # P-64.2.2.2.2), so the rename is safe.
     'c1ccc2c(c1)CCCO2': {
-        'name': 'chromane',
+        'name': '3,4-dihydro-2H-1-benzopyran',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1},
     },
-    # isochromane: PIN is 3,4-dihydro-1H-2-benzopyran (BB line 17016) — DEFERRED to IH-01h
-    # (same isochromanone 4-oxo hydro-locant issue as chromane).
+    # isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (BB line 17016)
     'c1ccc2c(c1)CCOC2': {
-        'name': 'isochromane',
+        'name': '3,4-dihydro-1H-2-benzopyran',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,
@@ -1189,10 +1186,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
-    # thiochromane: PIN is 3,4-dihydro-2H-1-benzothiopyran (BB line 17006) — DEFERRED to IH-01h
-    # (same thiochromanone 4-oxo hydro-locant issue as chromane).
+    # 4H-1-benzothiopyran (4H isomer) — the mancude oxo-parent for thiochroman-4-one
+    # (carbonyl at the 4H indicated position, P-64.2.2.2.2). Locants from OPSIN extendedsmi (S@1).
+    'C1=CSc2ccccc2C1': {
+        'name': '4H-1-benzothiopyran',
+        'tautomer_locant': 4,
+        'ring_system': 'benzothiopyran',
+        'parent_atoms': 10,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '8a', 4: 8, 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4},
+    },
+    # thiochromane -> PIN 3,4-dihydro-2H-1-benzothiopyran (BB line 17006)
     'c1ccc2c(c1)CCCS2': {
-        'name': 'thiochromane',
+        'name': '3,4-dihydro-2H-1-benzothiopyran',
         'tautomer_locant': None,
         'ring_system': 'benzo-6-saturated',
         'parent_atoms': 10,

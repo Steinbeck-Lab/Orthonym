@@ -228,9 +228,11 @@ class TestPartialSaturation:
 
     @pytest.mark.parametrize("smiles,expected_stem", [
         ("c1ccc2c(c1)CCN2", "indolin"),
-        ("c1ccc2c(c1)CCCO2", "chroman"),
+        # v23 IH-01h: chromane/isochromane PINs are the 1-/2-benzopyran forms (P-54.4.3.2);
+        # the substituent prefix stem follows (OPSIN-RT: 3,4-dihydro-2H-1-benzopyran-6-yl parses).
+        ("c1ccc2c(c1)CCCO2", "3,4-dihydro-2H-1-benzopyran"),
         ("c1ccc2c(c1)CCCN2", "1,2,3,4-tetrahydroquinolin"),
-        ("c1ccc2c(c1)CCOC2", "isochroman"),
+        ("c1ccc2c(c1)CCOC2", "3,4-dihydro-1H-2-benzopyran"),
         ("c1ccc2c(c1)CNC2", "isoindolin"),
     ])
     def test_partial_saturation_stems(self, smiles, expected_stem):

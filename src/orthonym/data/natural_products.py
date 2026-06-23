@@ -263,8 +263,9 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "flavanone",
     "O=c1c(-c2ccccc2)coc2ccccc12":
         "isoflavone",
-    "O=C1CCOc2ccccc21":
-        "chromanone",
+    # chromanone de-headlined (v23 IH-01h): PIN is 2,3-dihydro-4H-1-benzopyran-4-one
+    # (P-64.2.2.2.2: the 4-one substitutes the 4H >CH2; chroman-4-one is the chromane-stem
+    # acceptable name) -> emitted by the cyclic-oxo engine. Also pin:false in the PIN list.
     # chromone de-headlined (v23 IH-01f): PIN is 4H-1-benzopyran-4-one (1-benzopyran is
     # the PIN ring parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the >CH2) ->
     # emitted by the cyclic-oxo engine. Also pin:false in iupac_2013_pin_list.json.

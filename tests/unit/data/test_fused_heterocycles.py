@@ -510,12 +510,11 @@ class TestSaturatedVariants:
 
     @pytest.mark.unit
     def test_chromane(self):
-        """Chromane should be identified. (PIN 3,4-dihydro-2H-1-benzopyran deferred to IH-01h —
-        its chromanone derivative needs the P-64.2.2.2.2 hydro-locant fix first.)"""
+        """Chromane ring named by its PIN 3,4-dihydro-2H-1-benzopyran (v23 IH-01h, P-54.4.3.2)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCO2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'chromane'
+        assert result[0] == '3,4-dihydro-2H-1-benzopyran'
 
 
 class TestIUPACLocantMappings:
@@ -773,14 +772,14 @@ class TestChromeneVariants:
 
     @pytest.mark.unit
     def test_chromane_already_exists(self):
-        """Chromane should already be in data (PIN rename deferred to IH-01h)."""
+        """Chromane ring in data, named by its PIN 3,4-dihydro-2H-1-benzopyran (v23 IH-01h)."""
         from rdkit import Chem
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCO2')
         canonical = Chem.MolToSmiles(mol)
         assert canonical in FUSED_HETEROCYCLE_DATA, f"Chromane ({canonical}) not in data"
-        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == 'chromane'
+        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == '3,4-dihydro-2H-1-benzopyran'
 
     @pytest.mark.unit
     def test_isochromane_already_exists(self):
@@ -791,7 +790,7 @@ class TestChromeneVariants:
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCOC2')
         canonical = Chem.MolToSmiles(mol)
         assert canonical in FUSED_HETEROCYCLE_DATA, f"Isochromane ({canonical}) not in data"
-        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == 'isochromane'
+        assert FUSED_HETEROCYCLE_DATA[canonical]['name'] == '3,4-dihydro-1H-2-benzopyran'
 
     @pytest.mark.unit
     def test_2h_chromene_exists(self):

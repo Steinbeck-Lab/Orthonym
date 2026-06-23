@@ -215,8 +215,8 @@ class TestMissingSubstituent:
         assert name is not None and len(name) > 3
 
     def test_057_dimethylchromanone(self):
-        """#57: CC1(C)CC(=O)c2c(O)cc(O)cc2O1 -> 5,7-dihydroxy-2,2-dimethylchroman-4-one [RT]."""
-        assert name_compound("CC1(C)CC(=O)c2c(O)cc(O)cc2O1") == "5,7-dihydroxy-2,2-dimethylchroman-4-one"
+        """#57: chromanone -> PIN 2,3-dihydro-4H-1-benzopyran-4-one (v23 IH-01h, P-64.2.2.2.2) [RT]."""
+        assert name_compound("CC1(C)CC(=O)c2c(O)cc(O)cc2O1") == "5,7-dihydroxy-2,2-dimethyl-2,3-dihydro-4H-1-benzopyran-4-one"
 
     def test_060_hydroxybiphenyl_diacid_2(self):
         """#60: dihydroxybiphenyldicarboxylic acid."""
@@ -305,9 +305,9 @@ class TestStereo:
         assert name_compound("C=CC/C=C/CCC(=O)OC") == "methyl (4E)-octa-4,7-dienoate"
 
     def test_028_dihydroxy_methylisochromane(self):
-        """#28: isochromane with corrected locants. (PIN benzopyran rename deferred to IH-01h.)"""
+        """#28: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (v23 IH-01h, P-54.4.3.2)."""
         name = name_compound("C[C@@H]1Cc2cc(O)cc(O)c2CO1")
-        assert "isochromane" in name
+        assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "dihydroxy" in name
         assert "3-methyl" in name  # corrected from 1-methyl
 
@@ -327,15 +327,15 @@ class TestStereo:
         assert "amino" in name or "glyc" in name or "amide" in name or name is not None
 
     def test_046_propylisochromane(self):
-        """#46: isochromane with corrected locants. (PIN benzopyran rename deferred to IH-01h.)"""
+        """#46: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (v23 IH-01h, P-54.4.3.2)."""
         name = name_compound("CCC[C@@H]1OCc2c(O)cccc2[C@H]1O")
-        assert "isochromane" in name
+        assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "propyl" in name
 
     def test_050_methoxyisochromanone(self):
-        """#50: COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O - isochromanone. (PIN rename deferred to IH-01h.)"""
+        """#50: isochroman-4-one -> PIN 3,4-dihydro-1H-2-benzopyran-4-one (v23 IH-01h, P-64.2.2.2.2)."""
         name = name_compound("COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O")
-        assert "isochroman" in name
+        assert "3,4-dihydro-1H-2-benzopyran" in name
         assert "methoxy" in name
 
     def test_055_butanoyloxycyclohexadiene(self):
