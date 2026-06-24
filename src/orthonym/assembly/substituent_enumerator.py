@@ -476,6 +476,29 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.95 (Phase 4 SUBST-01): ring-system substituent chokepoint ----
+    # A ring-bearing fragment is named by the trustworthy ring engine
+    # (get_ring_substituent_name + _compound_ring_on_chain_substituent) BEFORE the
+    # Tier-2 cache, which would otherwise (a) drop ene/yne locants
+    # ('cyclohexenyl' for cyclohex-1-en-1-yl via parent_to_prefix), or (b) name a
+    # ring-on-chain as a different molecule ('methylcyclohexyl' for
+    # cyclohexylmethyl). allow_enumerator_fallback=False makes the chokepoint
+    # return None on a decline instead of re-entering this cascade (recursion
+    # guard); we then fall through to the existing tiers unchanged.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            _ri = mol.GetRingInfo()
+            if any(_ri.NumAtomRings(a) > 0 for a in frag_atoms_set):
+                from ..rules.ring_substituents import name_ring_system_substituent
+                _ring_nm = name_ring_system_substituent(
+                    mol, sorted(frag_atoms_set), attach_idx,
+                    allow_enumerator_fallback=False,
+                )
+                if _ring_nm:
+                    return _stereo_route(_ring_nm)
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

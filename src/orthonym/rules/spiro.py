@@ -617,7 +617,9 @@ def _spiro_ring_traversals(
     return traversals
 
 
-def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
+def get_spiro_numbering(
+    mol, spiro_center: int, suffix_ring_atoms: Optional[Set[int]] = None
+) -> Dict[int, int]:
     """
     Generate IUPAC numbering for a monospiro system.
 
@@ -628,12 +630,16 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
     Among the directional choices (which spiro-neighbour starts each ring, and
     — when the two rings are the same size — which ring is numbered first), the
     chosen numbering gives the LOWEST locants to the heteroatoms considered
-    together, then to the most senior heteroatom (P-31.1.4.3.4 / P-24.2.4.1).
+    together, then to the most senior heteroatom (P-31.1.4.3.4 / P-24.2.4.1),
+    then — Phase 4 SUBST-01, mirroring ``get_bicyclo_numbering`` — to the
+    ``suffix_ring_atoms`` (the free valence of a spiro SUBSTITUENT, P-31.1.4.3.4).
     A spelling-independent canonical-rank tiebreak makes the result fully
     deterministic for symmetric systems (e.g. spiro[5.5] acetals). This both
     fixes the latent SMILES-order dependence in heteroatom locants (a tetra-
     valent ``1-oxaspiro[4.5]decane`` was flipping to ``4-oxaspiro[4.5]decane``)
-    and yields the correct lowest-locant PIN.
+    and yields the correct lowest-locant PIN. Without the suffix tier, a
+    symmetric carbocyclic spiro substituent flipped between equivalent locants
+    (spiro[5.5]undecan-3-yl vs -9-yl) by SMILES order.
 
     Returns a dict mapping atom index to IUPAC locant (1-indexed), or {} when
     the spiro centre is not in exactly two rings.
@@ -665,6 +671,7 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
         return {}
 
     canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    suffix_set = set(suffix_ring_atoms or ())
 
     def _key(mapping: Dict[int, int]):
         heteros = [
@@ -678,10 +685,14 @@ def get_spiro_numbering(mol, spiro_center: int) -> Dict[int, int]:
             (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc)
             for a, loc in heteros
         )
-        # (3) deterministic, spelling-independent tiebreak for symmetric rings
+        # (3) Phase 4 SUBST-01: lowest locants to the free-valence / suffix atoms
+        # (after heteroatoms) so a symmetric spiro SUBSTITUENT is minimal AND
+        # deterministic (spiro[5.5]undecan-3-yl, never -9-yl).
+        suffix_locs = sorted(loc for a, loc in mapping.items() if a in suffix_set)
+        # (4) deterministic, spelling-independent tiebreak for symmetric rings
         seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
         canon_seq = tuple(canon[a] for a in seq)
-        return (het_locs, het_by_seniority, canon_seq)
+        return (het_locs, het_by_seniority, suffix_locs, canon_seq)
 
     return min(candidates, key=_key)
 

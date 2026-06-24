@@ -1569,6 +1569,29 @@ def name_substituent_fragment(
             if _chal:
                 return _add_substituent_stereo(mol, sub_atoms, _chal, attach_idx=attach_idx)
 
+    # Step 1c (Phase 4 SUBST-01): ring-bearing fragment -> the trustworthy ring
+    # chokepoint, BEFORE the recursive / cache paths which drop ene/yne locants
+    # ('cyclohexenyl' for cyclohex-1-en-1-yl) or name a ring-on-chain as a
+    # different molecule ('methylcyclohexyl' for cyclohexylmethyl) or guess a
+    # monocycle for a polycyclic (cycloheptyl for norbornane). The benzene /
+    # ring-parent assemblers route their substituents here, so this is the locus
+    # that fixes them. allow_enumerator_fallback=False = recursion guard (the
+    # chokepoint's own fallback is the enumerator's name_substituent, which calls
+    # back here at Tier 4).
+    if attach_idx is not None:
+        try:
+            _ri = mol.GetRingInfo()
+            if any(_ri.NumAtomRings(a) > 0 for a in sub_atoms):
+                from ..rules.ring_substituents import name_ring_system_substituent
+                _ring_nm = name_ring_system_substituent(
+                    mol, sorted(sub_atoms), attach_idx,
+                    allow_enumerator_fallback=False,
+                )
+                if _ring_nm:
+                    return _ring_nm
+        except Exception:
+            pass
+
     # Step 2: Fast path -- linear saturated alkyl, attached at a chain TERMINUS.
     # DD5 RC-6 / SEN-04: a linear chain attached at an INTERNAL carbon (e.g. the
     # central C of pentan-3-yl, the 2-C of hexan-2-yl) is NOT a terminal alkyl —

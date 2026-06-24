@@ -129,6 +129,19 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
     ring_size = len(ring_atoms)
     ring_set = set(ring_atoms)
 
+    # --- Single-ring guard (Phase 4 SUBST-01) -------------------------------
+    # identify_ring_system describes ONE ring by its size + heteroatom set. If
+    # the atom set spans more than one ring (a fused/bridged/spiro polycyclic
+    # system) the size-based branches below would mislabel it as a monocycle of
+    # that atom count (norbornane[7]->'cycloheptane', decalin/tetralin[10]->
+    # 'cyclodecane') — a DIFFERENT molecule. Decline so the caller routes the
+    # polycyclic fragment to the dedicated von-Baeyer / spiro / partial-hydro
+    # namers instead of guessing a monocycle.
+    _atom_rings = mol.GetRingInfo().AtomRings()
+    _contained = [r for r in _atom_rings if set(r) <= ring_set]
+    if len(_contained) != 1:
+        return None
+
     # Check aromaticity of all ring atoms
     is_aromatic = all(
         mol.GetAtomWithIdx(idx).GetIsAromatic()
@@ -183,6 +196,8 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
                 return 'cyclohexane'
             elif heteroatoms == ['O']:
                 return 'oxane'
+            elif heteroatoms == ['S']:
+                return 'thiane'
             elif heteroatoms == ['N']:
                 return 'piperidine'
             elif heteroatoms == ['N', 'O']:
@@ -211,6 +226,8 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
                 return 'cyclopentane'
             elif heteroatoms == ['O']:
                 return 'oxolane'
+            elif heteroatoms == ['S']:
+                return 'thiolane'
             elif heteroatoms == ['N']:
                 return 'pyrrolidine'
 
@@ -271,6 +288,13 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'morpholine': 'morpholin',
     'piperidine': 'piperidin',
     'piperazine': 'piperazin',
+    # Phase 4 SUBST-01 (d): saturated O/S monocycles take the same free-valence
+    # numbering (heteroatom = locant 1): oxan-2-yl, oxolan-3-yl, thian-2-yl,
+    # thiolan-3-yl. Extends the path beyond the N-rings above.
+    'oxane': 'oxan',
+    'oxolane': 'oxolan',
+    'thiane': 'thian',
+    'thiolane': 'thiolan',
 }
 
 # Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:
@@ -459,10 +483,298 @@ def pin_heteroaryl_substituent_name(
     return f"{prefix}{stem}-{attach_locant}-yl"
 
 
+# Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra...).
+_UNSAT_MULT: Dict[int, str] = {
+    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
+}
+
+
+def _fmt_locant(loc) -> str:
+    """Render a numbering value (int or lettered fusion locant like '4a')."""
+    return str(loc)
+
+
+def _build_ene_yne_infix(stem: str, ene: List[int], yne: List[int]) -> Optional[str]:
+    """Assemble ``<stem>[a]-<locs>-[mult]en[-<locs>-[mult]yn]`` WITHOUT the
+    trailing 'e', so the caller appends ``-<loc>-yl``.
+
+    ``cyclohex`` + ene=[1]      -> ``cyclohex-1-en``
+    ``cyclohex`` + ene=[1,3]    -> ``cyclohexa-1,3-dien``   (euphonic 'a' before di)
+    Per IUPAC 2013 P-31.1.4: the parent-hydride stem keeps its 'a' before a
+    multiplied unsaturation suffix (hexa-1,3-diene) but elides it before a single
+    'ene' (hex-1-ene).
+    """
+    if not ene and not yne:
+        return None
+    has_mult = len(ene) >= 2 or len(yne) >= 2
+    out = stem + ('a' if has_mult else '')
+    if ene:
+        m = _UNSAT_MULT.get(len(ene), '') if len(ene) > 1 else ''
+        out += '-' + ','.join(str(x) for x in ene) + '-' + m + 'en'
+    if yne:
+        m = _UNSAT_MULT.get(len(yne), '') if len(yne) > 1 else ''
+        out += '-' + ','.join(str(x) for x in yne) + '-' + m + 'yn'
+    return out
+
+
+def _unsaturated_carbocyclic_substituent(
+    mol, ring_atoms: Tuple[int, ...], attachment_atom: int
+) -> Optional[str]:
+    """P-31.1.4.3.4 substituent name for a monocyclic, all-carbon, non-aromatic
+    ring carrying >=1 skeletal multiple bond and no other decoration:
+    ``cyclohex-1-en-1-yl``, ``cyclohex-2-en-1-yl``, ``cyclohexa-2,4-dien-1-yl``.
+
+    The free valence takes locant 1 (lowest for a carbocyclic monocyclic
+    substituent, P-29.2); the ring is numbered in the direction giving the lowest
+    locants to the skeletal multiple bonds. Returns None (fail-closed) for
+    anything outside this narrow class — heteroatoms, charge, fused/spiro atoms,
+    saturated rings, or any extra exocyclic decoration.
+    """
+    from .cycloalkanes import ring_double_bond_locant
+    ring_set = set(ring_atoms)
+    n = len(ring_set)
+    if attachment_atom not in ring_set or n < 3:
+        return None
+    ri = mol.GetRingInfo()
+    adj: Dict[int, List[int]] = {}
+    for i in ring_atoms:
+        a = mol.GetAtomWithIdx(i)
+        if (a.GetSymbol() != 'C' or a.GetIsAromatic()
+                or a.GetFormalCharge() != 0):
+            return None
+        if ri.NumAtomRings(i) != 1:
+            return None  # fused / spiro atom -> not a simple monocycle
+        nbrs = [x.GetIdx() for x in a.GetNeighbors() if x.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return None
+        adj[i] = nbrs
+    # No exocyclic heavy decoration except the single parent bond.
+    for i in ring_atoms:
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            if nbr.GetIdx() in ring_set or nbr.GetAtomicNum() <= 1:
+                continue
+            if i == attachment_atom:
+                continue
+            return None
+    multibonds: List[Tuple[int, int, int]] = []
+    for i in ring_atoms:
+        for j in adj[i]:
+            if i < j:
+                order = mol.GetBondBetweenAtoms(i, j).GetBondTypeAsDouble()
+                if order >= 2.0:
+                    multibonds.append((i, j, int(order)))
+    if not multibonds:
+        return None  # saturated -> not this path
+    order0 = [attachment_atom, adj[attachment_atom][0]]
+    while len(order0) < n:
+        prev, cur = order0[-2], order0[-1]
+        nxt = [x for x in adj[cur] if x != prev]
+        if not nxt:
+            return None
+        order0.append(nxt[0])
+    if len(order0) != n:
+        return None
+    candidates = [order0, [order0[0]] + order0[:0:-1]]
+    best: Optional[Tuple[list, List[int], List[int]]] = None
+    for seq in candidates:
+        pos = {atom: idx + 1 for idx, atom in enumerate(seq)}
+        ene: List[int] = []
+        yne: List[int] = []
+        for a, b, o in multibonds:
+            loc = ring_double_bond_locant(pos[a] - 1, pos[b] - 1, n)
+            (ene if o == 2 else yne).append(loc)
+        key = sorted(ene) + sorted(yne)
+        if best is None or key < best[0]:
+            best = (key, sorted(ene), sorted(yne))
+    _, ene, yne = best
+    stem = 'cyclo' + _get_chain_prefix(n)
+    infix = _build_ene_yne_infix(stem, ene, yne)
+    if infix is None:
+        return None
+    return f'{infix}-1-yl'
+
+
+def _extract_ring_submol(mol, ring_atoms, attachment_atom):
+    """Return ``(submol, attach_idx_in_submol)`` for the ring system as a
+    standalone molecule, the broken parent bond at the attachment atom left as an
+    implicit hydrogen (so the fragment is a valid neutral ring the parent namers
+    can perceive). Returns ``(None, None)`` on failure."""
+    from rdkit import Chem
+    keep = set(ring_atoms)
+    if attachment_atom not in keep:
+        return None, None
+    try:
+        rw = Chem.RWMol(mol)
+        rw.GetAtomWithIdx(attachment_atom).SetAtomMapNum(990017)
+        for idx in sorted((a.GetIdx() for a in mol.GetAtoms()
+                           if a.GetIdx() not in keep), reverse=True):
+            rw.RemoveAtom(idx)
+        sub = rw.GetMol()
+        Chem.SanitizeMol(sub)
+    except Exception:
+        return None, None
+    attach_sub = None
+    for a in sub.GetAtoms():
+        if a.GetAtomMapNum() == 990017:
+            attach_sub = a.GetIdx()
+            a.SetAtomMapNum(0)
+            break
+    if attach_sub is None:
+        return None, None
+    return sub, attach_sub
+
+
+def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
+    """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
+    ring system, reusing the bicyclo parent namer (P-23) with the free valence
+    treated as the lowest-locant feature (P-31.1.4.3.4). Carbocyclic only;
+    heteroatom von-Baeyer stems are out of this phase's scope -> None."""
+    from . import bicyclo
+    try:
+        if not bicyclo.is_bicyclo_system(sub):
+            return None
+        if any(a.GetSymbol() != 'C' for a in sub.GetAtoms()):
+            return None
+        desc = bicyclo.generate_bicyclo_descriptor(sub)
+        if not desc:
+            return None
+        numbering = bicyclo.get_bicyclo_numbering(
+            sub, suffix_ring_atoms={attach_sub})
+        if not numbering or attach_sub not in numbering:
+            return None
+        loc = numbering[attach_sub]
+        stem = bicyclo._get_alkane_name(sub.GetNumAtoms())  # 'heptane'
+        parent = desc + stem  # 'bicyclo[2.2.1]heptane'
+        if parent.endswith('e'):
+            parent = parent[:-1]
+        return f'{parent}-{loc}-yl'
+    except Exception:
+        return None
+
+
+def _spiro_substituent_name(sub, attach_sub) -> Optional[str]:
+    """``spiro[4.5]decan-<loc>-yl`` for a detached carbocyclic monospiro ring
+    system, reusing the spiro parent namer (P-24). Carbocyclic only -> None
+    otherwise."""
+    from . import spiro
+    try:
+        if not spiro.is_spiro_system(sub):
+            return None
+        if any(a.GetSymbol() != 'C' for a in sub.GetAtoms()):
+            return None
+        desc = spiro.generate_spiro_descriptor(sub)
+        if not desc:
+            return None
+        ri = sub.GetRingInfo()
+        centers = [a.GetIdx() for a in sub.GetAtoms()
+                   if ri.NumAtomRings(a.GetIdx()) >= 2]
+        if len(centers) != 1:
+            return None  # only monospiro in scope
+        numbering = spiro.get_spiro_numbering(
+            sub, centers[0], suffix_ring_atoms={attach_sub})
+        if not numbering or attach_sub not in numbering:
+            return None
+        loc = numbering[attach_sub]
+        stem = _get_chain_prefix(sub.GetNumAtoms()) + 'ane'  # 'decane'
+        parent = desc + stem
+        if parent.endswith('e'):
+            parent = parent[:-1]
+        return f'{parent}-{loc}-yl'
+    except Exception:
+        return None
+
+
+def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
+    """``5,6,7,8-tetrahydronaphthalen-1-yl`` etc. for a detached partially
+    saturated fused carbocycle, reusing the partial-saturation parent perception
+    but numbered with the FREE VALENCE first (P-31.1.4.3.4): low locant to the
+    attachment, then to the hydro positions, then to any residual ring double
+    bond. Returns None (fail-closed) for perhydro systems (handled elsewhere) and
+    anything the mancude parent skeleton cannot number."""
+    from rdkit import Chem
+    from . import partial_saturation as ps
+    from .partial_saturation import _locant_key
+    from ..data.polycyclic_data import POLYCYCLIC_DATA
+    try:
+        ring_atoms = set(range(sub.GetNumAtoms()))
+        det = ps.detect_carbocyclic_partial_saturation(sub, ring_atoms)
+        if not det or det.get('is_perhydro'):
+            return None
+        parent = det['parent_name']
+        prefix = det['prefix']
+        sp3 = set(det['saturated_indices'])
+        entry = POLYCYCLIC_DATA.get(parent)
+        numbering = entry.get('iupac_numbering') if entry else None
+        csmiles = entry.get('canonical_smiles') if entry else None
+        if not numbering or not csmiles:
+            return None
+        cmol = Chem.MolFromSmiles(csmiles)
+        if cmol is None:
+            return None
+        params = Chem.AdjustQueryParameters.NoAdjustments()
+        params.makeBondsGeneric = True
+        params.aromatizeIfPossible = False
+        params.adjustDegree = False
+        query = Chem.AdjustQueryProperties(cmol, params)
+        ring_db: List[Tuple[int, int]] = []
+        for b in sub.GetBonds():
+            if b.GetBondType() == Chem.BondType.DOUBLE and not b.GetIsAromatic():
+                a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+                if a1 in ring_atoms and a2 in ring_atoms:
+                    ring_db.append((a1, a2))
+        best = None
+        for match in sub.GetSubstructMatches(query, uniquify=False):
+            a2l = {match[c]: loc for c, loc in numbering.items() if c < len(match)}
+            if set(a2l) != ring_atoms or attach_sub not in a2l:
+                continue
+            attach_loc = _locant_key(a2l[attach_sub])
+            hydro = sorted(_locant_key(a2l[a]) for a in sp3)
+            ene = sorted(min(_locant_key(a2l[i]), _locant_key(a2l[j]))
+                         for i, j in ring_db)
+            key = (attach_loc, hydro, ene)
+            if best is None or key < best[0]:
+                best = (key, a2l)
+        if best is None:
+            return None
+        a2l = best[1]
+        stem = parent[:-1] if parent.endswith('e') else parent  # naphthalen
+        hydro_locs = sorted((a2l[a] for a in sp3), key=_locant_key)
+        hydro_str = ','.join(_fmt_locant(x) for x in hydro_locs)
+        return f'{hydro_str}-{prefix}{stem}-{_fmt_locant(a2l[attach_sub])}-yl'
+    except Exception:
+        return None
+
+
+def _polycyclic_substituent_name(
+    mol, ring_atoms: Tuple[int, ...], attachment_atom: Optional[int]
+) -> Optional[str]:
+    """Name a MULTI-RING substituent (von-Baeyer, spiro, or partially hydro fused
+    carbocycle) by routing the detached ring system through the existing parent
+    namers with free-valence numbering. Returns the ``...-<loc>-yl`` name, or None
+    (fail-closed) for any polycyclic the routed namers cannot number — never a
+    monocycle size-guess (the old ``cyclo{N}yl`` corruption)."""
+    if attachment_atom is None or attachment_atom not in set(ring_atoms):
+        return None
+    sub, attach_sub = _extract_ring_submol(mol, ring_atoms, attachment_atom)
+    if sub is None:
+        return None
+    for namer in (_vonbaeyer_substituent_name,
+                  _spiro_substituent_name,
+                  _fused_hydro_substituent_name):
+        try:
+            name = namer(sub, attach_sub)
+        except Exception:
+            name = None
+        if name:
+            return name
+    return None
+
+
 def name_ring_system_substituent(
     mol,
     frag_atoms,
     attach_idx: int,
+    allow_enumerator_fallback: bool = True,
 ) -> Optional[str]:
     """Name a RING-CONTAINING substituent fragment (WS-A task 9 chokepoint).
 
@@ -514,7 +826,11 @@ def name_ring_system_substituent(
         name = _compound_ring_on_chain_substituent(
             mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info
         )
-    if not name:
+    if not name and allow_enumerator_fallback:
+        # Recursion guard: the public ``name_substituent`` cascade routes
+        # ring-bearing fragments back here (Tier 1.95). When called from there,
+        # the caller passes allow_enumerator_fallback=False so a decline returns
+        # None instead of re-entering the cascade (no infinite loop).
         from ..assembly.substituent_enumerator import name_substituent
         name = name_substituent(mol, frag_atoms, attach_idx)
     if name and name != 'substituent' and ' ' not in name:
@@ -588,16 +904,23 @@ def _compound_ring_on_chain_substituent(
     if not alkyl:
         return None
     loc = ring_attach_positions[0]
+    # P-16.3.3: enclose the ring-yl in marks only when it is itself complex
+    # (carries locants/parens, e.g. '(naphthalen-2-yl)methyl'); a simple ring-yl
+    # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained
+    # 'benzyl' elsewhere). The old unconditional parens produced the non-PIN
+    # '(cyclohexyl)methyl'.
+    from ..assembly.naming_utils import is_complex_substituent
+    inner = f'({ring_name})' if is_complex_substituent(ring_name) else ring_name
     if len(path) == 1:
-        return f'({ring_name})methyl'
-    return f'{loc}-({ring_name}){alkyl}'
+        return f'{inner}methyl'
+    return f'{loc}-{inner}{alkyl}'
 
 
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
     attachment_point: Optional[int] = None
-) -> str:
+) -> Optional[str]:
     """
     Get the substituent name for a ring when it becomes a substituent on a chain.
 
@@ -610,7 +933,9 @@ def get_ring_substituent_name(
                          Used for position-specific names (e.g., 2-pyridyl vs 4-pyridyl).
 
     Returns:
-        Substituent name string (e.g., 'phenyl', 'cyclohexyl', '2-pyridyl')
+        Substituent name string (e.g., 'phenyl', 'cyclohexyl', '2-pyridyl'), or
+        None when the ring system cannot be named by a provable rule (Phase 4
+        SUBST-01: fail-closed — never a monocycle size-guess for a polycyclic).
     """
     # Identify the ring system
     ring_name = identify_ring_system(mol, ring_atoms)
@@ -652,10 +977,29 @@ def get_ring_substituent_name(
                         return f'{stem}-{attach_locant}-yl'
                 return f'{stem}-yl'
 
-        # Unknown ring - generate generic cycloXyl name
-        ring_size = len(ring_atoms)
-        prefix = _get_chain_prefix(ring_size)
-        return f'cyclo{prefix}yl'
+        # Phase 4 SUBST-01: multi-ring substituent with no retained name —
+        # route the detached system through the von-Baeyer / spiro / partial-hydro
+        # parent namers with free-valence numbering (bicyclo[2.2.1]heptan-2-yl,
+        # 5,6,7,8-tetrahydronaphthalen-1-yl, spiro[4.5]decan-2-yl).
+        poly = _polycyclic_substituent_name(mol, ring_atoms, attachment_point)
+        if poly:
+            return poly
+
+        # Fail-closed: an unidentifiable ring system (the old generic
+        # ``cyclo{N}yl`` size-guess named a DIFFERENT molecule — norbornane as
+        # cycloheptyl, tetralin as cyclodecyl). Decline so the caller emits a
+        # locant-less form or an honest ``unknown`` rather than a wrong name.
+        return None
+
+    # Phase 4 SUBST-01 (a): a monocyclic, all-carbon, non-aromatic ring carrying
+    # a skeletal multiple bond keeps its ene/yne locants as a substituent
+    # (cyclohex-1-en-1-yl) — identify_ring_system reports the saturated stem
+    # ('cyclohexane'), dropping the unsaturation. Free-valence-first numbering.
+    if attachment_point is not None:
+        _unsat = _unsaturated_carbocyclic_substituent(
+            mol, ring_atoms, attachment_point)
+        if _unsat is not None:
+            return _unsat
 
     # IUPAC P-31.1.4.3.4: a monocyclic heteroaryl substituent takes
     # free-valence numbering (pyridin-3-yl, 1H-imidazol-5-yl, furan-2-yl, ...),

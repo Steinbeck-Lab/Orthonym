@@ -4882,15 +4882,22 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         if len(ring_atom_set) > len(ring_atoms):
             _full_ring = tuple(sorted(ring_atom_set))
             _full_name = get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom)
-            # Accept the full-system name only if it produced a retained name
-            # (not a generic cyclo-name)
-            if not _full_name.startswith('cyclo') or _full_name in ('cyclohexyl', 'cyclopentyl', 'cyclopropyl', 'cyclobutyl', 'cycloheptyl', 'cyclooctyl'):
+            # Accept the full-system name only if it produced a retained / routed
+            # name (not a generic cyclo-name). Phase 4 SUBST-01: get_ring_substituent_name
+            # may now return None (fail-closed for an unnameable polycyclic) — fall
+            # back to the SSSR ring in that case too.
+            if _full_name and (not _full_name.startswith('cyclo') or _full_name in ('cyclohexyl', 'cyclopentyl', 'cyclopropyl', 'cyclobutyl', 'cycloheptyl', 'cyclooctyl')):
                 base_name = _full_name
             else:
-                # Full system produced generic cyclo-name; use original SSSR ring
+                # Full system produced generic cyclo-name / None; use SSSR ring
                 base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
         else:
             base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
+        # Phase 4 SUBST-01: a None base_name (unnameable ring) must not reach the
+        # string assembly below — emit the honest fallback marker so the molecule
+        # surfaces as unknown rather than crashing / dropping the ring.
+        if base_name is None:
+            base_name = 'unknown'
 
         # Detect substituents on the ring itself
         sub_name = _build_substituted_ring_name(

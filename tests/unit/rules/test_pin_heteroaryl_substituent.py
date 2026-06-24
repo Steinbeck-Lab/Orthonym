@@ -113,8 +113,15 @@ def test_guard_extra_ring_substituent():
 
 
 def test_guard_saturated_ring():
-    mol, ring, attach = _ring_and_attach("CC1CCNCC1")  # methyl-piperidine
+    # pin_heteroaryl_substituent_name claims heteroarenes and saturated
+    # HETEROcyclic monocycles (piperidin-4-yl, oxan-2-yl — WS-A task 9 / Phase 4
+    # SUBST-01d), but NOT a saturated carbocycle: those are named by the
+    # cycloalkyl path, so the heteroaryl primitive must decline them.
+    mol, ring, attach = _ring_and_attach("CC1CCCCC1")  # methyl-cyclohexane
     assert pin_heteroaryl_substituent_name(mol, ring, attach) is None
+    # A saturated heteromonocycle IS now claimed (free-valence numbering).
+    mol2, ring2, attach2 = _ring_and_attach("CC1CCNCC1")  # methyl-piperidine
+    assert pin_heteroaryl_substituent_name(mol2, ring2, attach2) == "piperidin-4-yl"
 
 
 def test_guard_attachment_not_in_ring():

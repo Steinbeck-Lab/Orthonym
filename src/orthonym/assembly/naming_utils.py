@@ -50,6 +50,16 @@ _ALKYLAMINO_RE = re.compile(
     r'(?:amino|imino)$'
 )
 
+# Phase 4 SUBST-01: a substituted substituent whose carrier is itself a '-yl'
+# group bearing a terminal alkyl-yl tail ('cyclohexylmethyl', 'cyclopentylethyl',
+# 'piperidinylmethyl') is a compound prefix requiring enclosing marks
+# ('(cyclohexylmethyl)benzene', P-16.3.3). The internal 'yl' before the terminal
+# alkyl marks the compound boundary; simple alkyls ('methyl') lack it, and FG
+# heads ('hydroxymethyl') do not end the head in 'yl'.
+_RINGYL_ALKYL_RE = re.compile(
+    r'yl(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl)$'
+)
+
 _COMPOUND_OXY_PREFIXES = frozenset((
     'sulfooxy', 'sulfonyloxy', 'phosphonooxy', 'phosphonatoxy', 'carbonyloxy',
 ))
@@ -725,6 +735,10 @@ def is_complex_substituent(name: str) -> bool:
             if _head and not _head.endswith(('hydr', 'carb')):
                 return True
             break
+    # Phase 4 SUBST-01: compound (ring/substituent)-yl + alkyl-yl
+    # ('cyclohexylmethyl', 'piperidinylmethyl') — enclosing marks per P-16.3.3.
+    if _RINGYL_ALKYL_RE.search(name_lower):
+        return True
     return False
 
 
