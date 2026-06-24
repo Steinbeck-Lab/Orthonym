@@ -121,6 +121,7 @@ class StoutClass(_StrEnumBase):
     INORGANIC_ACID = "inorganic_acid"             # v22 G2 COV-02 (P-67/P-65.2.1; priority 40, before ORGANOMETALLIC@50)
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
+    MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6 (P-68 / P-31.1.4.2 λ-convention; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
@@ -964,6 +965,27 @@ def _handle_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwarg
     return name_inorganic_acid(mol)
 
 
+def _is_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 6 (P-68 / P-31.1.4.2); priority 45 (after INORGANIC_ACID@40 so
+    an oxoacid is never claimed here, before ORGANOMETALLIC@50).
+
+    PURE graph classifier: an all-halogen mononuclear hydride with a
+    non-standard-valence hub (SF6/SF4/PF5/PCl5/IF5/IF3 -> the λ-convention).
+    Fail-closed; no mutation.
+    """
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride
+    return name_mononuclear_hydride(mol) is not None
+
+
+def _handle_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the λ-convention mononuclear-hydride PIN (P-68 / P-31.1.4.2), else
+    None (cascade-continuation per CONTEXT D-02)."""
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride
+    return name_mononuclear_hydride(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -997,6 +1019,24 @@ _register_dispatch(
     description="Free mononuclear/simple-polynuclear inorganic oxoacid with a "
                 "retained/preselected PIN (phosphoric/sulfuric/carbonic/silicic/"
                 "nitric/diphosphoric/disulfuric acid); exact canonical-SMILES lookup",
+)
+
+
+# --- v23 Phase 6: MONONUCLEAR_HYDRIDE at priority 45 (intercepts BETWEEN ---
+# INORGANIC_ACID@40 and ORGANOMETALLIC@50). All-halogen mononuclear hydride
+# with a non-standard-valence hub -> the λ-convention (P-68 / P-31.1.4.2):
+# SF6 -> hexafluoro-lambda6-sulfane, PCl5 -> pentachloro-lambda5-phosphane,
+# IF5 -> pentafluoro-lambda5-iodane (all 'unknown' before this phase). Graph
+# classifier, λ REQUIRED -> never steals a standard-valence element hydride
+# (PCl3/SF2/SiF4 = Phase 7/8); cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.MONONUCLEAR_HYDRIDE, priority=45, tier=1,
+    predicate=_is_mononuclear_hydride, handler=_handle_mononuclear_hydride,
+    iupac_section="Blue Book P-68 / P-31.1.4.2 (λ-convention)",
+    description="All-halogen mononuclear hydride (chalcogen/P/iodine hub) with a "
+                "non-standard-valence hub carrying the λ-convention "
+                "(hexafluoro-lambda6-sulfane / pentachloro-lambda5-phosphane / "
+                "pentafluoro-lambda5-iodane); graph classifier, fail-closed",
 )
 
 

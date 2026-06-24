@@ -135,11 +135,13 @@ class TestOrgmDispatch:
         for cls, entry in DISPATCH_TABLE.items():
             if cls == StoutClass.ORGANOMETALLIC:
                 continue
-            # v22 G2 COV-02: INORGANIC_ACID@40 deliberately fires BEFORE ORGM@50
-            # so a free inorganic oxoacid (e.g. silicic acid O[Si](O)(O)O) is
-            # named as an oxoacid, not claimed as a Si organometallic. It is the
-            # sole intentional exception to "ORGM is the global priority minimum".
-            if cls == StoutClass.INORGANIC_ACID:
+            # v22 G2 COV-02 + v23 Phase 6: INORGANIC_ACID@40 and
+            # MONONUCLEAR_HYDRIDE@45 deliberately fire BEFORE ORGM@50 so a free
+            # inorganic oxoacid (e.g. silicic acid O[Si](O)(O)O) or an
+            # all-halogen mononuclear hydride (SF6, PCl5) is named as such, not
+            # claimed as a Si/element organometallic. These are the intentional
+            # exceptions to "ORGM is the global priority minimum".
+            if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

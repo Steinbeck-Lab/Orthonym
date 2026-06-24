@@ -25,6 +25,10 @@ from rdkit import Chem
 
 from ..data.chain_names import get_chain_prefix
 from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+# Phase 6 (v23): shared P-21.2.4 / P-31.1.4.2 λ-convention. A non-standard-valence
+# embedded chain heteroatom cites its bonding number after the locant
+# (``...lambda<n>...``); standard valences emit the bare locant (byte-identical).
+from .lambda_convention import nonstandard_bonding_number, format_lambda_token
 
 
 # ============================================================================
@@ -352,14 +356,21 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     else:
         backbone = _orient_for_lowest_locants(backbone, mol)
 
-    # Rebuild heteroatom positions after reorientation
+    # Rebuild heteroatom positions after reorientation. A non-standard-valence
+    # embedded heteroatom carries the λ-convention (P-21.2.4); standard valences
+    # (every ordinary oxa/aza/thia chain) record no λ -> byte-identical output.
     heteroatom_positions = []
+    lambda_by_locant: Dict[int, int] = {}
     for i, atom_idx in enumerate(backbone):
         atom = mol.GetAtomWithIdx(atom_idx)
         symbol = atom.GetSymbol()
         if symbol in REPLACEMENT_TERMS and i > 0 and i < len(backbone) - 1:
             # Locants are 1-based
-            heteroatom_positions.append((i + 1, symbol))
+            locant = i + 1
+            heteroatom_positions.append((locant, symbol))
+            lam = nonstandard_bonding_number(mol, atom_idx)
+            if lam is not None:
+                lambda_by_locant[locant] = lam
 
     if not heteroatom_positions:
         return None
@@ -375,7 +386,10 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # ----------------------------------------------------------------
     # Build the replacement name
     # ----------------------------------------------------------------
-    return _build_replacement_name(len(backbone), heteroatom_positions, suffix=suffix)
+    return _build_replacement_name(
+        len(backbone), heteroatom_positions, suffix=suffix,
+        lambda_by_locant=lambda_by_locant,
+    )
 
 
 def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
@@ -795,6 +809,7 @@ def _build_replacement_name(
     chain_length: int,
     heteroatom_positions: List[Tuple[int, str]],
     suffix: Optional[Tuple[str, int]] = None,
+    lambda_by_locant: Optional[Dict[int, int]] = None,
 ) -> str:
     """Build the skeletal replacement name from chain length and heteroatom info.
 
@@ -807,10 +822,15 @@ def _build_replacement_name(
         heteroatom_positions: List of (locant, element_symbol) tuples.
         suffix: Optional (suffix_name, locant) tuple for terminal FG,
                 e.g., ('ol', 1) for terminal alcohol.
+        lambda_by_locant: Optional {locant: bonding_number} for embedded
+                heteroatoms whose valence is non-standard (P-21.2.4 / P-31.1.4.2).
+                The λ is cited after the locant (``2lambda4-thia...``); absent /
+                standard locants emit the bare number (byte-identical default).
 
     Returns:
         Complete replacement name string.
     """
+    lambda_by_locant = lambda_by_locant or {}
     # Get the chain prefix (hex, oct, non, etc.)
     chain_prefix = get_chain_prefix(chain_length)
 
@@ -833,7 +853,9 @@ def _build_replacement_name(
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = ','.join(str(loc) for loc in locants)
+        locant_str = ','.join(
+            format_lambda_token(loc, lambda_by_locant.get(loc)) for loc in locants
+        )
         count = len(locants)
 
         if count == 1:

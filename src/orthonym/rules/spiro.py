@@ -45,6 +45,16 @@ from ..data.hw_heteroatoms import (
 # can verify the invariant without inspecting individual function bodies.
 from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
 
+# Phase 6 (v23): the P-31.1.4.2 / Table-2.8 lambda-convention logic was promoted
+# to the shared rules/lambda_convention.py so spiro, acyclic skeletal-replacement
+# and the mononuclear-hydride namers share one fail-closed implementation. The
+# private aliases preserve the spiro public surface (test_spiro_g4.py imports
+# spiro._nonstandard_bonding_number) with byte-identical behaviour.
+from ..rules.lambda_convention import (  # noqa: F401 — re-export for test compat
+    STANDARD_BONDING_NUMBER as _STANDARD_BONDING_NUMBER,
+    nonstandard_bonding_number as _nonstandard_bonding_number,
+)
+
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 
@@ -63,44 +73,6 @@ _POLYSPIRO_PREFIXES = [
     'tetraspiro', # 4
     'pentaspiro', # 5
 ]
-
-# IUPAC standard bonding numbers for skeletal-replacement ('a') atoms
-# (P-31.1.4.2.4, Table 2.8). A ring heteroatom whose ACTUAL bonding number
-# differs from its standard value carries the lambda convention (P-31.1.4.2):
-# e.g. a tetravalent ring sulfur -> "lambda4" cited after its locant
-# (4lambda4-thiaspiro[3.5]nonane). Elements absent from this table are
-# treated as standard (no lambda) — fail-closed, never a spurious lambda.
-_STANDARD_BONDING_NUMBER = {
-    'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
-    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
-    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
-    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
-    'F': 1, 'Cl': 1, 'Br': 1, 'I': 1,
-}
-
-
-def _nonstandard_bonding_number(mol, atom_idx: int) -> Optional[int]:
-    """Return the lambda bonding number (P-31.1.4.2) for a ring skeletal atom
-    whose valence is non-standard, or None when the valence is standard.
-
-    The bonding number is the total count of skeletal/H bonds (RDKit
-    ``GetTotalValence``). It is emitted as ``lambda<n>`` immediately after the
-    atom's locant in the 'a'-replacement prefix, e.g. a tetravalent ring
-    sulfur at locant 4 -> ``4lambda4-thia`` (P-24.2.4.1 spiro example
-    ``4lambda4-thiaspiro[3.5]nonane``).
-
-    Fail-closed: only neutral atoms present in ``_STANDARD_BONDING_NUMBER``
-    can carry a lambda; charged/exotic atoms return None (no spurious lambda).
-    """
-    atom = mol.GetAtomWithIdx(atom_idx)
-    if atom.GetFormalCharge() != 0:
-        return None
-    standard = _STANDARD_BONDING_NUMBER.get(atom.GetSymbol())
-    if standard is None:
-        return None
-    bonding_number = atom.GetTotalValence()
-    return bonding_number if bonding_number != standard else None
-
 
 def is_spiro_system(mol) -> bool:
     """
