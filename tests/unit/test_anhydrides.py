@@ -1,8 +1,8 @@
 """Tests for anhydride naming (19-02).
 
 Tests functional class naming for anhydrides following IUPAC conventions:
-- Symmetric acyclic: ethanoic anhydride
-- Mixed/asymmetric: ethanoic propanoic anhydride (alphabetical)
+- Symmetric acyclic: acetic anhydride (retained acid name, PIN per P-65.1.1.1)
+- Mixed/asymmetric: acetic propanoic anhydride (alphabetical)
 - Cyclic (from diacids): butanedioic anhydride
 - Consumed-atom filtering: anhydride atoms removed from ester FG detection
 """
@@ -14,9 +14,9 @@ class TestSymmetricAnhydrides:
     """Test symmetric acyclic anhydride naming."""
 
     def test_ethanoic_anhydride(self):
-        """Ethanoic anhydride (acetic anhydride) - simplest symmetric."""
+        """Acetic anhydride - simplest symmetric (retained acid PIN P-65.1.1.1)."""
         result = name_compound("CC(=O)OC(=O)C")
-        assert result == "ethanoic anhydride"
+        assert result == "acetic anhydride"
 
     def test_propanoic_anhydride(self):
         """Propanoic anhydride - C3 symmetric."""
@@ -29,18 +29,18 @@ class TestSymmetricAnhydrides:
         assert result == "butanoic anhydride"
 
     def test_methanoic_anhydride(self):
-        """Methanoic anhydride (formic anhydride) - C1 symmetric."""
+        """Formic anhydride - C1 symmetric (retained acid PIN P-65.1.1.1)."""
         result = name_compound("O=COC=O")
-        assert result == "methanoic anhydride"
+        assert result == "formic anhydride"
 
 
 class TestMixedAnhydrides:
     """Test mixed/asymmetric acyclic anhydride naming."""
 
     def test_ethanoic_propanoic_anhydride(self):
-        """Ethanoic propanoic anhydride - alphabetical order."""
+        """Acetic propanoic anhydride - alphabetical order (acetic retained)."""
         result = name_compound("CC(=O)OC(=O)CC")
-        assert result == "ethanoic propanoic anhydride"
+        assert result == "acetic propanoic anhydride"
 
     def test_butanoic_propanoic_anhydride(self):
         """Butanoic propanoic anhydride - mixed C4+C3."""

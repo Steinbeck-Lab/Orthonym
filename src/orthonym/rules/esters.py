@@ -1742,6 +1742,220 @@ def _find_backbone_carbons(mol, c1: int, c2: int, ester_oxygens: set) -> Optiona
     return None
 
 
+# ---------------------------------------------------------------------------
+# Ring dicarboxylic-acid diester (P-65.6.3.2 / P-66.6.3)
+# ---------------------------------------------------------------------------
+# When BOTH ester carbonyls are bonded to a ring, the parent is the ring
+# di-carboxylic acid (benzene-1,3-dicarboxylic acid), NOT an acyclic -dioate
+# chain.  The legacy backbone BFS (_find_backbone_carbons) walks THROUGH the
+# ring carbons and linearises the ring, so dimethyl isophthalate became
+# "dimethyl pentanedioate" — a constitutionally different molecule.
+
+_diacid_namer_singleton = None
+
+
+def _diacid_namer():
+    """Lazily-cached namer for intermediate (di)acid fragments.
+
+    Grammar + OPSIN validity gate are disabled: the di-acid name is an
+    INTERMEDIATE that gets transformed into the ester ("...dicarboxylate"),
+    not a final emitted name, so it must not be gated (mirrors the
+    fragment-intermediate contract at namer.py:1044).
+    """
+    global _diacid_namer_singleton
+    if _diacid_namer_singleton is None:
+        from ..namer import Orthonym
+        _diacid_namer_singleton = Orthonym(
+            _disable_grammar_validation=True,
+            _disable_opsin_validity_gate=True,
+        )
+    return _diacid_namer_singleton
+
+
+def _build_diacid_from_diester(mol, ester_matches):
+    """Return the di-acid Mol obtained by stripping both ester alkyl groups.
+
+    For each ester (carbonyl_c, =O, ester_o, alkyl_c) the ester_o--alkyl_c bond
+    is broken and the entire alkyl fragment removed; the ester oxygen keeps its
+    bond to the carbonyl carbon and sanitises to -C(=O)OH.  Returns None on
+    failure.
+    """
+    rw = Chem.RWMol(mol)
+    to_remove = set()
+    for m in ester_matches:
+        ester_o, alkyl_c = m[2], m[3]
+        stack = [alkyl_c]
+        seen = {ester_o}
+        while stack:
+            a = stack.pop()
+            if a in seen:
+                continue
+            seen.add(a)
+            to_remove.add(a)
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nbr.GetIdx() not in seen:
+                    stack.append(nbr.GetIdx())
+        bond = rw.GetBondBetweenAtoms(ester_o, alkyl_c)
+        if bond is not None:
+            rw.RemoveBond(ester_o, alkyl_c)
+    for idx in sorted(to_remove, reverse=True):
+        rw.RemoveAtom(idx)
+    try:
+        diacid = rw.GetMol()
+        Chem.SanitizeMol(diacid)
+    except Exception:
+        return None
+    return diacid
+
+
+def _both_ester_carbonyls_on_ring(mol, ester_matches) -> bool:
+    """True iff every ester carbonyl carbon is bonded to a ring atom and all
+    those ring atoms belong to one connected ring system (so the parent is a
+    single ring di/poly-carboxylic acid, not two separate ring acids)."""
+    ring_neighbors = []
+    for m in ester_matches:
+        carbonyl_c = m[0]
+        ring_nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+                     if n.IsInRing()]
+        if not ring_nbrs:
+            return False
+        ring_neighbors.append(ring_nbrs[0])
+    # All anchoring ring atoms in the same ring system (share a fused component).
+    ri = mol.GetRingInfo()
+    components = []
+    for ring in ri.AtomRings():
+        rset = set(ring)
+        merged = False
+        for comp in components:
+            if comp & rset:
+                comp |= rset
+                merged = True
+        if not merged:
+            components.append(set(rset))
+    # second pass to merge transitively-fused rings
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(components)):
+            for j in range(i + 1, len(components)):
+                if components[i] & components[j]:
+                    components[i] |= components[j]
+                    components[j] = set()
+                    changed = True
+        components = [c for c in components if c]
+    for comp in components:
+        if all(a in comp for a in ring_neighbors):
+            return True
+    return False
+
+
+def _acid_name_to_ate(acid_name: str) -> Optional[str]:
+    """Convert an acid name to its ester anion stem (P-65.6.3.2):
+    '...ic acid' -> '...ate' (dicarboxylic acid -> dicarboxylate; dioic ->
+    dioate).  Returns None when the input is not an '-ic acid' form."""
+    if acid_name and acid_name.endswith("ic acid"):
+        return acid_name[: -len("ic acid")] + "ate"
+    return None
+
+
+def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
+    """Name a ring di-carboxylic-acid diester as 'dialkyl <ring>-x,y-dicarboxylate'.
+
+    Builds the di-acid, names it via the GENERAL pipeline (bypassing the
+    retained-name dispatch so the SYSTEMATIC PIN benzene-1,3-dicarboxylic acid
+    is used, not the non-PIN retained 'isophthalic acid'), then converts the
+    '-ic acid' suffix to '-ate' and prefixes the alkyl group(s).  Fail-closed.
+    """
+    if len(ester_matches) != 2:
+        return None
+    if not _both_ester_carbonyls_on_ring(mol, ester_matches):
+        return None
+
+    alkyl_names = []
+    for m in ester_matches:
+        _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, m)
+        if not alkyl_atoms:
+            return None
+        alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+        if not alkyl_name:
+            return None
+        alkyl_names.append(alkyl_name)
+
+    diacid = _build_diacid_from_diester(mol, ester_matches)
+    if diacid is None:
+        return None
+
+    from ..namer import compute_features
+    from ..assembly.composer import assemble_name
+    try:
+        diacid_smiles = Chem.MolToSmiles(diacid)
+        feats = compute_features(diacid, diacid_smiles)
+        _diacid_namer()._classify(feats)
+        acid_name = assemble_name(feats, style="pin")
+    except Exception:
+        return None
+
+    ate = _acid_name_to_ate(acid_name)
+    # Guard: only accept a well-formed ring-acid PIN (must carry the
+    # 'carboxyl' suffix root); reject garbled/empty stems.
+    if ate is None or "carboxyl" not in ate:
+        return None
+
+    if alkyl_names[0] == alkyl_names[1]:
+        return f"di{alkyl_names[0]} {ate}"
+    first, second = sorted(alkyl_names)
+    return f"{first} {second} {ate}"
+
+
+def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]:
+    """Name a polyfunctional compound whose most-senior group is a SINGLE ester.
+
+    The ester stays the principal group (suffix '-oate'); every junior group
+    (acyl halide -> oxo+halo, ketone/aldehyde -> oxo, nitrile -> cyano, -OH ->
+    hydroxy, ...) is a prefix on the acid-side chain (IUPAC P-65.6.3 + P-41:
+    esters outrank acyl halides/amides/nitriles/aldehydes/ketones/alcohols).
+
+    Strategy (mirrors the diester ring path): build the ACID analog (ester ->
+    free -COOH), name it via the GENERAL pipeline (which already emits those
+    junior groups as prefixes), then convert '-ic acid' -> '-ate' and prepend
+    the alkyl group as a separate word.  The junior groups must lie on the ACID
+    side; the removed alkyl side must be a plain hydrocarbon.  Fail-closed.
+    """
+    _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_match)
+    if not alkyl_atoms:
+        return None
+    # The removed alkyl side must carry no other functional atoms (else the
+    # acid analog would silently drop them -> a different molecule).
+    for a in alkyl_atoms:
+        if mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H'):
+            return None
+    alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+    if not alkyl_name:
+        return None
+
+    acid_mol = _build_diacid_from_diester(mol, [ester_match])
+    if acid_mol is None:
+        return None
+
+    from ..namer import compute_features
+    from ..assembly.composer import assemble_name
+    try:
+        acid_smiles = Chem.MolToSmiles(acid_mol)
+        feats = compute_features(acid_mol, acid_smiles)
+        _diacid_namer()._classify(feats)
+        acid_name = assemble_name(feats, style="pin")
+    except Exception:
+        return None
+
+    ate = _acid_name_to_ate(acid_name)
+    if ate is None:
+        return None
+    # Reject garbled stems (empty / bare-suffix artefacts).
+    if len(ate) < 4 or ate.startswith("ano"):
+        return None
+    return f"{alkyl_name} {ate}"
+
+
 def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     """
     Name a dicarboxylic acid diester compound.
@@ -1758,6 +1972,12 @@ def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     """
     if len(ester_matches) != 2:
         return None
+
+    # Ring-attached diester (P-65.6.3.2): both carbonyls bonded to a ring ->
+    # the parent is the ring di-carboxylic acid, not an acyclic -dioate.
+    ring_name = _name_ring_dicarboxylic_diester(mol, ester_matches)
+    if ring_name is not None:
+        return ring_name
 
     # Collect ester oxygens
     ester_oxygens = set()

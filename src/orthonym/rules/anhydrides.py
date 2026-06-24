@@ -317,9 +317,21 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str
             is_branched = True
             break
 
-    if not is_branched and not non_c_non_carbonyl_o:
-        # Simple linear chain: use existing fast path (no substituents to discover)
-        return _build_acid_name(len(chain_carbons))
+    # Ring acyl (benzoyl -> "benzoic", cyclohexanecarbonyl ->
+    # "cyclohexanecarboxylic") or a simple acyclic chain (1C -> "formic",
+    # 2C -> "acetic", fatty/unsaturated, else systematic) is named by the
+    # canonical retained-aware acid namer.  Per IUPAC P-65.1.1.1 these
+    # retained acid names ARE the PINs cited in the anhydride functional-class
+    # name (acetic anhydride, benzoic anhydride), so the systematic-only
+    # _build_acid_name path produced the wrong stem (ethanoic; heptanoic for a
+    # linearised benzene ring).  Branched or heteroatom-substituted *acyclic*
+    # acids still need the substituent-prefix path below.
+    from .esters import acid_is_ring_acid, get_acid_fragment_name
+    frag_list = list(frag_atoms)
+    if acid_is_ring_acid(mol, frag_list) or (
+        not is_branched and not non_c_non_carbonyl_o
+    ):
+        return get_acid_fragment_name(mol, frag_list)
 
     # Branched or has heteroatom substituents: use _integrate_universal_prefixes()
     # per D-01 to discover and name substituents on the acyl chain.

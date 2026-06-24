@@ -5893,23 +5893,34 @@ def _check_for_acyloxy(mol, sub_atoms: List[int], principal_chain: List[int]) ->
                 if has_nitrogen_on_carbonyl:
                     return None
 
-                # Count carbons in acyl chain via C-C bonds only
-                exclude = chain_set | {idx}
-                if carbonyl_o is not None:
-                    exclude.add(carbonyl_o)
-                acyl_carbons = _count_carbon_chain(mol, nbr_idx, exclude)
-                if acyl_carbons == 0:
-                    acyl_carbons = 1
-
-                # Build acyloxy name: bare prefixanoyloxy (no parens)
-                # Callers use format_substituent_prefix() for IUPAC parens
-                # Check trivial acid name first, then fall back to systematic
-                from ..data.chain_names import get_acid_stem
-                from ..rules.esters import get_acyloxy_prefix as _get_acyloxy
+                # R5 convergence: name the acyl fragment with the ring-aware
+                # acid namer instead of _count_carbon_chain, which linearises a
+                # ring acyl (benzoyl -> phantom "heptanoyl", the heptanoyloxy
+                # bug).  Collect the whole acyl fragment R-C(=O)- by BFS from the
+                # carbonyl C, excluding the ester oxygen (the bond to the parent
+                # chain); get_acid_fragment_name then returns "benzoic" for a
+                # benzoyl ring acyl (same primitive esters.name_ester_as_prefix
+                # uses).  Returns the BARE prefix (callers add parens).
+                acyl_atoms = set()
+                _stack = [nbr_idx]
+                _seen = {idx}
+                while _stack:
+                    _a = _stack.pop()
+                    if _a in _seen:
+                        continue
+                    _seen.add(_a)
+                    acyl_atoms.add(_a)
+                    for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if _nb.GetIdx() not in _seen:
+                            _stack.append(_nb.GetIdx())
+                from ..rules.esters import (
+                    get_acid_fragment_name,
+                    get_acyloxy_prefix as _get_acyloxy,
+                )
                 try:
-                    acid_stem = get_acid_stem(acyl_carbons)
-                    acyloxy = _get_acyloxy(acid_stem)
-                    return acyloxy
+                    acid_name = get_acid_fragment_name(mol, list(acyl_atoms))
+                    if acid_name:
+                        return _get_acyloxy(acid_name)
                 except (ValueError, KeyError):
                     pass
 

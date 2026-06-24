@@ -926,10 +926,28 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                             return ring_name
         return None
 
-    # --- EL-02: Ester demotion in polyfunctional context ---
-    # When ester is the principal group in a polyfunctional compound, it should
-    # NOT use "-oate" suffix. Instead, demote esters to acyloxy prefixes and
-    # re-select the next-highest seniority group as the principal group.
+    # --- Ester is the most-senior group (P-41: esters outrank acyl halides,
+    # amides, nitriles, aldehydes, ketones, alcohols) ---
+    # When get_principal_group selected the ester, the ester IS the most senior
+    # group present, so it STAYS the principal characteristic group (suffix
+    # '-oate') and the junior groups become prefixes (oxo/halo/cyano/hydroxy).
+    # Name it as "alkyl <acid-with-prefixes>oate" via the acid-analog builder.
+    # (The legacy EL-02 fallback below DEMOTED the ester and promoted a LESS
+    # senior group to PCG -- a different, wrong molecule; kept only as a
+    # fail-closed fallback for cases the acid-analog path declines.)
+    if principal_group == "ester":
+        _ester_matches_all = features.functional_groups.get("ester", [])
+        if len(_ester_matches_all) == 1:
+            from ..rules.esters import name_polyfunctional_ester_via_acid
+            _ester_pin = name_polyfunctional_ester_via_acid(
+                mol, _ester_matches_all[0]
+            )
+            if _ester_pin:
+                return _ester_pin
+
+    # --- EL-02 (fallback): Ester demotion in polyfunctional context ---
+    # Legacy path, reached only when the acid-analog naming above declined
+    # (e.g. >1 ester, or a junior group on the removed alkyl side).
     ester_acyloxy_prefixes = []
     _esters_demoted = False
     if principal_group == "ester":
@@ -1093,6 +1111,36 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 )
                 continue
             matches = _amine_kept
+
+        # Non-principal acyl halide on a CHAIN parent (P-65.5.4): the
+        # acyl-halide carbon is a chain member, expressed as 'oxo' (=O) +
+        # 'halo' (X), NOT the 'carbonochloridoyl' prefix.  Blue Book worked
+        # examples: "4-chloro-4-oxobutanoic acid" (PIN, line 5108),
+        # "3-chloro-3-oxopropanoic acid" (PIN, line 31531).  The
+        # 'carbonochloridoyl' prefix is the PIN only on a RING parent (the
+        # carbon cannot join the ring, e.g. "2-carbonochloridoylbenzoic acid",
+        # line 31533) — handled elsewhere; here we fall through to it only when
+        # the acyl-halide carbon is NOT a member of the principal chain.
+        _ACYL_HALIDE_HALO = {
+            'acid_fluoride': 'fluoro', 'acid_chloride': 'chloro',
+            'acid_bromide': 'bromo', 'acid_iodide': 'iodo',
+        }
+        if fg_name in _ACYL_HALIDE_HALO and chain_set:
+            _ah_locs = []
+            for _m in matches:
+                _c = _m[0]  # acyl-halide carbonyl carbon (SMARTS index 0)
+                if _c in chain_set:
+                    _loc = atom_to_locant.get(_c)
+                    if _loc is not None:
+                        _ah_locs.append(_loc)
+            if _ah_locs and len(_ah_locs) == len(matches):
+                _ah_locs.sort()
+                _n = len(_ah_locs)
+                all_prefixes.append(format_fg_prefix('oxo', _ah_locs, _n))
+                all_prefixes.append(
+                    format_fg_prefix(_ACYL_HALIDE_HALO[fg_name], _ah_locs, _n)
+                )
+                continue
 
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(

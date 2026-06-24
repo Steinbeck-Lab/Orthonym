@@ -282,12 +282,18 @@ def _get_non_principal_terminal_carbons(
     Returns:
         Set of atom indices for non-principal FG terminal carbons
     """
+    # NOTE: acid_chloride/bromide/fluoride are deliberately NOT in this set.
+    # On a CHAIN parent a non-principal acyl halide keeps its carbon IN the
+    # chain, expressed as 'oxo' (=O) + 'halo' (X): Blue Book P-65.5.4 worked
+    # examples — "methyl 4-chloro-4-oxobutanoate" (PIN, line 5108),
+    # "3-chloro-3-oxopropanoic acid" (PIN, line 31531) — NOT the longer-prefix
+    # "...carbonochloridoyl...".  (The 'carbonochloridoyl'/'chlorocarbonyl'
+    # prefix IS the PIN only on a RING parent, e.g. "2-carbonochloridoyl-
+    # benzoic acid" line 31533, where the carbon cannot be a ring member; that
+    # path does not use chain enumeration so it is unaffected.)
     _TERMINAL_C_FGS = {
         'carboxylic_acid': 0,
         'primary_amide': 0,
-        'acid_chloride': 0,
-        'acid_bromide': 0,
-        'acid_fluoride': 0,
         # P-66.5.1.1.4: a non-principal nitrile is the 'cyano' prefix whose carbon
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).

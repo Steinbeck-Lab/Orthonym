@@ -18,8 +18,9 @@ class TestAnhydrideSubstituents:
         assert "anhydride" in result
 
     def test_simple_ethanoic_anhydride_unchanged(self):
+        # Retained acid name is the PIN (P-65.1.1.1): acetic, not ethanoic.
         result = name_compound("CC(=O)OC(=O)C")
-        assert "ethanoic anhydride" == result
+        assert "acetic anhydride" == result
 
     def test_simple_butanoic_anhydride_unchanged(self):
         # CCCC(=O)OC(=O)CCC = symmetric butanoic anhydride (4C each side)

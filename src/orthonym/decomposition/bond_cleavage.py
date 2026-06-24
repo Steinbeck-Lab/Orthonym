@@ -423,6 +423,21 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if _atoms_in_same_ring(mol, carbonyl_c, ester_o):
                 continue
 
+            # Anhydride guard: when the "alkyl" carbon is itself a carbonyl
+            # carbon the linkage is C(=O)-O-C(=O), i.e. an acid anhydride, not
+            # an ester.  Anhydrides are a distinct functional class named by the
+            # dedicated handler (rules.anhydrides, P-65.7); cleaving the bridge
+            # O into two acid fragments yields a constitutionally different
+            # multi-component name (benzoic anhydride -> "benzoic acid
+            # benzoate" = two molecules).  Skip both orientations of the match.
+            _alkyl = mol.GetAtomWithIdx(alkyl_c)
+            if _alkyl.GetSymbol() == 'C' and any(
+                b.GetBondTypeAsDouble() == 2.0
+                and b.GetOtherAtom(_alkyl).GetSymbol() == 'O'
+                for b in _alkyl.GetBonds()
+            ):
+                continue
+
             # Get the bond between carbonyl C and ester O
             bond = mol.GetBondBetweenAtoms(carbonyl_c, ester_o)
             if bond and bond.GetIdx() not in seen_bond_indices:
