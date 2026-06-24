@@ -135,13 +135,16 @@ class TestOrgmDispatch:
         for cls, entry in DISPATCH_TABLE.items():
             if cls == StoutClass.ORGANOMETALLIC:
                 continue
-            # v22 G2 COV-02 + v23 Phase 6: INORGANIC_ACID@40 and
-            # MONONUCLEAR_HYDRIDE@45 deliberately fire BEFORE ORGM@50 so a free
-            # inorganic oxoacid (e.g. silicic acid O[Si](O)(O)O) or an
-            # all-halogen mononuclear hydride (SF6, PCl5) is named as such, not
-            # claimed as a Si/element organometallic. These are the intentional
-            # exceptions to "ORGM is the global priority minimum".
-            if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE):
+            # v22 G2 COV-02 + v23 Phase 6/7: a small set of parent-hydride /
+            # inorganic recognizers deliberately fire BEFORE ORGM@50 so a free
+            # inorganic oxoacid (silicic acid O[Si](O)(O)O), a mononuclear hydride
+            # (SF6, trimethylarsane), a chalcogen chain (trisulfane) or a polyazane
+            # (hydrazine) is named substitutively, not claimed as an element
+            # organometallic. These are the intentional exceptions to "ORGM is the
+            # global priority minimum" (INORGANIC_ACID@40, MONONUCLEAR_HYDRIDE@45,
+            # CHALCOGEN_CHAIN@46, POLYAZANE@47 — all < 50, all mutually decline).
+            if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
+                       StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

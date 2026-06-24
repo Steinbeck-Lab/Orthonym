@@ -121,7 +121,9 @@ class StoutClass(_StrEnumBase):
     INORGANIC_ACID = "inorganic_acid"             # v22 G2 COV-02 (P-67/P-65.2.1; priority 40, before ORGANOMETALLIC@50)
     ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
     LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
-    MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6 (P-68 / P-31.1.4.2 λ-convention; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
+    MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6/7 (P-68 / P-31.1.4.2 λ-convention + Group-15 As/Sb/Bi; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
+    CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
+    POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
@@ -527,6 +529,19 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
             if classify_anion(mol, _sites['anions'][0]) in (
                     'heteroatom_hydride_anion', 'group13_uide_anion'):
                 return False
+    # v23 Phase 7 (7a): a neutral mononuclear Group-15 (As/Sb/Bi) parent hydride
+    # — trimethylarsane / triphenylarsane / arsane / trichloroarsane — is named
+    # SUBSTITUTIVELY (P-68.3), NOT by P-69 organometallic nomenclature. The
+    # MONONUCLEAR_HYDRIDE handler@45 already intercepts these before ORGM@50, but
+    # decline here too so the classification is semantically honest and the
+    # gate-OFF path is correct (ORGM otherwise mis-opens C[As](C)C to the carbon
+    # chain '(methylmethyl)methane'). The hydride namer fail-closes on anything
+    # that is not a clean parent hydride (=O / ring / charge / dot-disconnect), so
+    # a genuine As/Sb/Bi coordination complex is unaffected. Cheap pure RDKit
+    # graph walk (no OPSIN); mirrors the single-anion decline above.
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride
+    if name_mononuclear_hydride(mol) is not None:
+        return False
     from orthonym.perception.metals import detect_metal_complex
     return detect_metal_complex(mol) is not None
 
@@ -966,12 +981,14 @@ def _handle_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwarg
 
 
 def _is_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """v23 Phase 6 (P-68 / P-31.1.4.2); priority 45 (after INORGANIC_ACID@40 so
-    an oxoacid is never claimed here, before ORGANOMETALLIC@50).
+    """v23 Phase 6/7 (P-68 / P-21.1 / P-31.1.4.2); priority 45 (after
+    INORGANIC_ACID@40 so an oxoacid is never claimed here, before ORGANOMETALLIC@50
+    so a Group-15 As/Sb/Bi parent hydride is named substitutively, not as ORGM).
 
-    PURE graph classifier: an all-halogen mononuclear hydride with a
-    non-standard-valence hub (SF6/SF4/PF5/PCl5/IF5/IF3 -> the λ-convention).
-    Fail-closed; no mutation.
+    PURE graph classifier (Phase 7 generalised Phase 6): a mononuclear parent
+    hydride — all-halogen hub (SF6/PF5 -> λ; PCl3/SF2/AsCl3 -> no λ) OR an
+    organyl/bare Group-15 As/Sb/Bi hub (trimethylarsane / triphenylarsane /
+    arsane). Fail-closed; no mutation.
     """
     if mol is None:
         return False
@@ -984,6 +1001,36 @@ def _handle_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **
     None (cascade-continuation per CONTEXT D-02)."""
     from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride
     return name_mononuclear_hydride(mol)
+
+
+def _is_chalcogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 7 (P-21.2.2); priority 46. A homogeneous O/S/Se/Te chain parent
+    hydride (trisulfane/trioxidane). PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.polychalcogen import name_chalcogen_chain
+    return name_chalcogen_chain(mol) is not None
+
+
+def _handle_chalcogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the chalcogen-chain PIN (P-21.2.2), else None (cascade-continuation)."""
+    from orthonym.rules.polychalcogen import name_chalcogen_chain
+    return name_chalcogen_chain(mol)
+
+
+def _is_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 7 (P-68.3.1.1/.3); priority 47. A polyazane-family parent hydride
+    (hydrazine/diazene/triazane/azo). PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.polyazane import name_polyazane
+    return name_polyazane(mol) is not None
+
+
+def _handle_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the polyazane-family PIN (P-68.3.1.1/.3), else None (cascade-continuation)."""
+    from orthonym.rules.polyazane import name_polyazane
+    return name_polyazane(mol)
 
 
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
@@ -1022,21 +1069,54 @@ _register_dispatch(
 )
 
 
-# --- v23 Phase 6: MONONUCLEAR_HYDRIDE at priority 45 (intercepts BETWEEN ---
-# INORGANIC_ACID@40 and ORGANOMETALLIC@50). All-halogen mononuclear hydride
-# with a non-standard-valence hub -> the λ-convention (P-68 / P-31.1.4.2):
-# SF6 -> hexafluoro-lambda6-sulfane, PCl5 -> pentachloro-lambda5-phosphane,
-# IF5 -> pentafluoro-lambda5-iodane (all 'unknown' before this phase). Graph
-# classifier, λ REQUIRED -> never steals a standard-valence element hydride
-# (PCl3/SF2/SiF4 = Phase 7/8); cascade-continuation on None per D-02. ---
+# --- v23 Phase 6/7: MONONUCLEAR_HYDRIDE at priority 45 (intercepts BETWEEN ---
+# INORGANIC_ACID@40 and ORGANOMETALLIC@50). A mononuclear parent hydride (P-68 /
+# P-21.1 / P-31.1.4.2): an all-halogen hub on any of S/Se/Te/P/As/Sb/Bi/I (SF6 ->
+# hexafluoro-lambda6-sulfane, PF5 -> pentafluoro-λ5; standard valence PCl3 ->
+# trichlorophosphane, SF2 -> difluorosulfane, AsCl3 -> trichloroarsane), OR an
+# organyl/bare Group-15 As/Sb/Bi hub (C[As](C)C -> trimethylarsane, [AsH3] ->
+# arsane) — all 'unknown' / ORGM-mangled before these phases. Graph classifier,
+# fail-closed; cascade-continuation on None per D-02. Phase 7 dropped Phase 6's
+# "λ REQUIRED" gate and added the As/Sb/Bi stems + the organyl regime. ---
 _register_dispatch(
     class_id=StoutClass.MONONUCLEAR_HYDRIDE, priority=45, tier=1,
     predicate=_is_mononuclear_hydride, handler=_handle_mononuclear_hydride,
-    iupac_section="Blue Book P-68 / P-31.1.4.2 (λ-convention)",
-    description="All-halogen mononuclear hydride (chalcogen/P/iodine hub) with a "
-                "non-standard-valence hub carrying the λ-convention "
-                "(hexafluoro-lambda6-sulfane / pentachloro-lambda5-phosphane / "
-                "pentafluoro-lambda5-iodane); graph classifier, fail-closed",
+    iupac_section="Blue Book P-68 / P-21.1 / P-31.1.4.2 (λ-convention)",
+    description="Mononuclear parent hydride: all-halogen hub "
+                "(S/Se/Te/P/As/Sb/Bi/I) with optional λ-convention "
+                "(hexafluoro-lambda6-sulfane / trichlorophosphane / trichloroarsane) "
+                "or an organyl/bare Group-15 As/Sb/Bi hub (trimethylarsane / arsane); "
+                "graph classifier, fail-closed",
+)
+
+
+# --- v23 Phase 7: CHALCOGEN_CHAIN at priority 46 (after MONONUCLEAR_HYDRIDE@45). ---
+# A homogeneous O/S/Se/Te chain parent hydride (P-21.2.2): SS -> disulfane,
+# OOO -> trioxidane, SSSS -> tetrasulfane, CSSS -> 1-methyltrisulfane (all
+# 'unknown' before this phase). Carbon substitution admitted only for >=3
+# chalcogens (avoids the sulfide/disulfide functional classes). Graph classifier,
+# fail-closed; cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.CHALCOGEN_CHAIN, priority=46, tier=1,
+    predicate=_is_chalcogen_chain, handler=_handle_chalcogen_chain,
+    iupac_section="Blue Book P-21.2.2 / P-68.3",
+    description="Homogeneous chalcogen-chain parent hydride (disulfane / trioxidane "
+                "/ tetrasulfane / 1-methyltrisulfane); graph classifier, fail-closed",
+)
+
+
+# --- v23 Phase 7: POLYAZANE at priority 47 (after CHALCOGEN_CHAIN@46). ---
+# The polyazane parent-hydride family (P-68.3.1.1 / P-68.3.1.3): NN -> hydrazine,
+# N=N -> diazene, NNN -> triazane, N=NN -> triaz-1-ene, CN=NC -> 1,2-dimethyldiazene,
+# PhN=NPh -> 1,2-diphenyldiazene (all 'unknown' before this phase). Graph classifier
+# over N-N bonds; fail-closed on amines/diamines/hydroxylamine/hydrazones/azides;
+# cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.POLYAZANE, priority=47, tier=1,
+    predicate=_is_polyazane, handler=_handle_polyazane,
+    iupac_section="Blue Book P-68.3.1.1 / P-68.3.1.3 / P-21.2.2",
+    description="Polyazane-family parent hydride (hydrazine / diazene / triazane / "
+                "triaz-1-ene / 1,2-diphenyldiazene); graph classifier, fail-closed",
 )
 
 

@@ -1956,6 +1956,42 @@ def _try_name_urea(features: Any) -> Optional[str]:
         if nbr.GetSymbol() == 'O':
             urea_core.add(nbr.GetIdx())
 
+    # v23 Phase 7 (7d): halogen-only N-substituted urea. _name_r_group below
+    # returns None for a lone halogen, so a halogenated urea would otherwise DROP
+    # the halogens and mis-name as "urea" (structure loss — gate-suppressed). Cite
+    # the halogens with the Blue Book locant-omission rule (P-66.1.6.1.1 /
+    # P-14.3.4.2): omit locants only when UNAMBIGUOUS — a single substituent
+    # ("fluorourea") or all four positions identically substituted
+    # ("tetrafluorourea", BB P-66.1.6.1). Ambiguous partial patterns (N,N'- vs
+    # N,N-difluoro, mixed halogens) fall through to the carbon path (declined ->
+    # gate-suppressed; their N,N' locants need the carbon-handler rework, deferred).
+    _HALO_UREA = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+    def _n_halogen_subs(n_idx):
+        """Halogen symbols on this urea N, or None if it bears any non-halogen
+        (carbon) heavy substituent."""
+        halos = []
+        for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            if nbr.GetIdx() == c_idx or nbr.GetAtomicNum() <= 1:
+                continue
+            sym = nbr.GetSymbol()
+            if sym not in _HALO_UREA or nbr.GetDegree() != 1:
+                return None
+            halos.append(sym)
+        return halos
+
+    _h1 = _n_halogen_subs(n1_idx)
+    _h2 = _n_halogen_subs(n2_idx)
+    if _h1 is not None and _h2 is not None and (_h1 or _h2):
+        _all = _h1 + _h2
+        if len(set(_all)) == 1:                       # one halogen species only
+            _hp = _HALO_UREA[_all[0]]
+            if len(_all) == 1:                        # mono -> no locant
+                return f"{_hp}urea"
+            if len(_h1) == 2 and len(_h2) == 2:       # all four positions -> no locant
+                return f"tetra{_hp}urea"
+        # else: ambiguous partial / mixed-halogen pattern -> fall through.
+
     # Collect substituents on N1
     n1_subs = []
     n1_atom = mol.GetAtomWithIdx(n1_idx)

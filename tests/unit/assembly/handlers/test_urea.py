@@ -110,3 +110,44 @@ class TestNameUrea:
         except Exception:
             pytest.skip("representative SMILES exercises a non-handler error path")
         assert n1 == n2
+
+
+class TestHalogenSubstitutedUrea:
+    """v23 Phase 7 (7d): halogen N-substituent citation (P-66.1.6.1.1).
+
+    The carbon R-group namer dropped lone halogens -> a halogenated urea was
+    mis-named 'urea' (structure loss). The new halogen-only branch cites them
+    with the Blue Book locant-omission rule. The autouse conftest disables the
+    OPSIN validity gate, so name() returns the raw handler output here.
+    """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("O=C(N(F)F)N(F)F", "tetrafluorourea"),       # BB P-66.1.6.1 PIN
+        ("O=C(N(Cl)Cl)N(Cl)Cl", "tetrachlorourea"),
+        ("O=C(NF)N", "fluorourea"),                    # mono -> no locant
+        ("O=C(NCl)N", "chlorourea"),
+    ])
+    def test_unambiguous_halogen_urea(self, smiles, expected):
+        assert Orthonym().name(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("NC(=O)N", "urea"),                            # unsubstituted unchanged
+        ("O=C(NC)NC", "N,N'-dimethylurea"),             # carbon path unchanged
+    ])
+    def test_carbon_path_unchanged(self, smiles, expected):
+        assert Orthonym().name(smiles) == expected
+
+    @pytest.mark.parametrize("smiles", [
+        "O=C(NF)NF",        # N,N'-difluoro (ambiguous: needs N,N' locants)
+        "O=C(N(F)F)N",      # N,N-difluoro (ambiguous: needs N,N locants)
+    ])
+    def test_ambiguous_partial_falls_through(self, smiles):
+        """The scoped halogen branch claims ONLY the unambiguous mono/tetra cases.
+
+        Ambiguous partial patterns fall through to the pre-existing carbon path,
+        which drops the halogens to bare 'urea' — a structure-loss that the
+        production SELF-01 self-consistency gate suppresses to 'unknown' (the gate
+        is disabled in the unit suite, so the raw fall-through 'urea' is visible
+        here). Citing these with N,N'/N,N locants is a documented Phase-7 deferral
+        (needs the carbon-handler locant-omission rework)."""
+        assert Orthonym().name(smiles) == "urea"  # pre-existing raw fall-through
