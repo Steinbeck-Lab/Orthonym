@@ -34,7 +34,12 @@ STANDARD_AMINO_ACIDS: Dict[str, str] = {
     "NC(C(=O)O)CO": "serine",                 # Ser - alternate canonical
 
     # Sulfur-containing
-    "CSCC(N)C(=O)O": "methionine",            # Met
+    # v23 Phase 5 data fix: the key was CSCC(N)C(=O)O — that is C4
+    # (CH3-S-CH2-CH(NH2)-COOH) = S-methylcysteine, NOT methionine. True
+    # methionine is C5 (CH3-S-CH2-CH2-CH(NH2)-COOH); a C4 input was therefore
+    # named 'methionine' (a DIFFERENT molecule). Re-keyed to the correct C5
+    # structure; the C4 S-methylcysteine moved to NON_STANDARD_AMINO_ACIDS.
+    "CSCCC(N)C(=O)O": "methionine",           # Met (C5; OPSIN-RT verified)
     "NC(CS)C(=O)O": "cysteine",               # Cys
 
     # Acidic and amides
@@ -66,6 +71,11 @@ STANDARD_AMINO_ACIDS: Dict[str, str] = {
 
 # Non-standard amino acids with trivial names
 NON_STANDARD_AMINO_ACIDS: Dict[str, str] = {
+    # v23 Phase 5: C4 CH3-S-CH2-CH(NH2)-COOH = S-methylcysteine (the S-methyl
+    # derivative of cysteine), moved here from the STANDARD methionine slot it
+    # had wrongly occupied. Name per Blue Book line 54569 (S-methyl-L-cysteine);
+    # OPSIN parses 'S-methylcysteine' to this exact structure (RT verified).
+    "CSCC(N)C(=O)O": "S-methylcysteine",
     "NCCCC(N)C(=O)O": "ornithine",            # Orn - not proteinogenic
     "NC(CCCN)C(=O)O": "ornithine",            # Orn - alternate
     "NCCC(N)C(=O)O": "2,4-diaminobutanoic acid",  # Dab

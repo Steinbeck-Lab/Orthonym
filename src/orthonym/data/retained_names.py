@@ -27,6 +27,11 @@ RETAINED_NAMES = {
     # NOTE: xylene isomers are NOT retained names in IUPAC 2013 PIN
     # Use systematic: 1,2-dimethylbenzene, 1,3-dimethylbenzene, 1,4-dimethylbenzene
     "c1ccc2ccccc2c1": "naphthalene",
+    # v23 Phase 5: pentalene (PIN per Blue Book line 11459; bicyclo[3.3.0] fully
+    # mancude non-benzenoid). HEAD dropped one ring -> 'cyclopenta-1,3-diene'
+    # (SELF-01-suppressed to 'unknown'); the retained name keeps both rings.
+    # OPSIN-RT verified ('pentalene' -> same molecule).
+    "C1=CC2=CC=CC2=C1": "pentalene",
     "c1cc2ccc3cccc4ccc(c1)c2c34": "pyrene",
     "c1ccc2cc3ccccc3cc2c1": "anthracene",
     "c1ccc2c(c1)ccc1ccccc12": "phenanthrene",
@@ -363,6 +368,14 @@ RETAINED_NAMES = {
     "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1OP(=O)(O)O": "2'-adenylic acid",
     "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](OP(=O)(O)O)[C@H]1O": "3'-adenylic acid",
     "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O": "5'-inosinic acid",
+    # v23 Phase 5: inosine (the hypoxanthine nucleoside) was MISSING (adenosine/
+    # guanosine/cytidine/uridine all present) -> 'unknown'. Added via the KETO
+    # tautomer canonical (mirrors hypoxanthine and 5'-inosinic acid above): RDKit
+    # canonicalises a keto input to this form, while OPSIN normalises the name
+    # 'inosine' to the 6-hydroxy ENOL — same skeleton InChIKey (UGQMRVRMYYASKQ),
+    # so the self-consistency gate accepts it (tautomer-tolerant). Correct-but-
+    # NON-PIN retained name (PIN is systematic); OPSIN-RT (skeleton) verified.
+    "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O": "inosine",
 
     # === DISACCHARIDES (Phase 94) ===
     # NOTE: OPSIN cannot parse most disaccharide names -- InChI validation used

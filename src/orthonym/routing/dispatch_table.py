@@ -842,6 +842,19 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
                 return free_acid
             # uronic_free_acid_name fail-closed -> cascade-continue (D-11).
             return None
+        # F-CATALOG-JOIN (v23 Phase 5): a prefix-bearing catalog base (the N-acetyl
+        # amino sugars store base_name="2-(acetylamino)-2-deoxy-glucopyranose",
+        # which already carries detachable prefixes) needs the configurational
+        # descriptor inserted immediately BEFORE the stereoparent stem, AFTER the
+        # prefixes. The naive "-".join([anomer, config, base_name]) produced the
+        # OPSIN-unparseable "beta-D-2-(acetylamino)-2-deoxy-glucopyranose", which the
+        # validity gate suppressed to 'unknown' (GlcNAc / GalNAc). Bare-stem bases
+        # (no hyphen) and prefix-bearing names without an anomer/config (d-/l-
+        # glyceraldehyde) keep the existing join unchanged. OPSIN-RT verified.
+        if (anomer or config) and "-" in base_name:
+            prefix_block, stem = base_name.rsplit("-", 1)
+            descriptor = "-".join(p for p in (anomer, config) if p)
+            return f"{prefix_block}-{descriptor}-{stem}"
         parts = []
         if anomer:
             parts.append(anomer)

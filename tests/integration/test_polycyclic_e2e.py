@@ -46,9 +46,12 @@ class TestVonBaeyerE2E:
             f"Expected -ene or norbornene, got: {result}"
 
     def test_cubane_retained_name(self):
-        """Cubane: retained name per IUPAC P-31.1.2.1."""
-        # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane, retained name preferred
-        result = name_compound('C12C3C4C1C5C3C4C25')
+        """Cubane: retained name AND PIN per IUPAC P-23.2.5.1 (Blue Book 9881)."""
+        # Cubane = pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane, retained name preferred.
+        # v23 Phase 5: the prior SMILES C12C3C4C1C5C3C4C25 was the WRONG (CH)8 cage
+        # isomer (InChIKey BOLISNSTKUABPW); the true cubane canonical is below
+        # (TXWRERCHRDBNLG), matching what OPSIN emits for 'cubane'.
+        result = name_compound('C12C3C4C1C1C2C3C41')
         assert result == 'cubane', f"Expected cubane, got: {result}"
 
 
@@ -503,9 +506,10 @@ class TestOPSINCompatibleVBFormat:
         """Cubane: retained name is OPSIN-compatible.
 
         Cubane now returns retained name; VB descriptor format tested via
-        generate_polycyclic_name.
+        generate_polycyclic_name. v23 Phase 5: SMILES corrected from the wrong
+        (CH)8 cage isomer to the true cubane canonical (TXWRERCHRDBNLG).
         """
-        result = name_compound('C12C3C4C1C5C3C4C25')
+        result = name_compound('C12C3C4C1C1C2C3C41')
         assert result == 'cubane', f"Expected retained name 'cubane', got: {result}"
         # Must NOT contain old LaTeX-style notation
         assert '^{' not in result, \

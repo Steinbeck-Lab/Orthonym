@@ -427,6 +427,19 @@ def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) ->
         return True
 
 
+def _count_sugar_rings(mol) -> int:
+    """Count 5-/6-membered rings with exactly one ring oxygen (a pyranose/furanose
+    ring proxy). A disaccharide has 2; a trisaccharide+ has 3+. Used to fail closed
+    on >=3-unit saccharides, which the binary assembler mis-parses (v23 Phase 5)."""
+    n = 0
+    for ring in mol.GetRingInfo().AtomRings():
+        if len(ring) in (5, 6) and sum(
+            1 for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"
+        ) == 1:
+            n += 1
+    return n
+
+
 # --------------------------------------------------------------------------- #
 # Public entry point (D-02)
 # --------------------------------------------------------------------------- #
@@ -440,6 +453,20 @@ def name_disaccharide(mol) -> Optional[str]:
     (branched / non-linear / C-glycoside / polymeric / unrecognized unit / dropped
     atom / RT-fail) so the molecule cascade-continues.
     """
+    # v23 Phase 5: trisaccharide+ are out of scope (deferred to v24). The binary
+    # assembler only validates the disaccharide (gold + RT gate), and its
+    # unit-parser can mis-read a 3rd sugar ring as a glycosyloxy substituent rather
+    # than a separate unit — bypassing the len(units)!=2 guard below and emitting a
+    # MALFORMED hybrid. Fail closed here on >=3 sugar rings so this assembler never
+    # ships a trisaccharide name. (Disaccharides have exactly 2 sugar rings, so this
+    # is a no-op for them — sucrose/maltose/etc. are unaffected.) NOTE: raffinose's
+    # OWN production output is already 'unknown' — its malformed name comes from a
+    # DIFFERENT path (the heterocycle handler's sugar-substituent naming), which the
+    # SUB-03 validity gate suppresses; that path over-claiming pure oligosaccharides
+    # is a separate pre-existing issue (shared substituent layer, v24 carbohydrate
+    # scope), not addressed by hardening THIS assembler.
+    if _count_sugar_rings(mol) >= 3:
+        return None
     info = _classify_units(mol)
     if info is None:
         return None

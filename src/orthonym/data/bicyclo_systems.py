@@ -56,8 +56,14 @@ BICYCLO_RETAINED_NAMES: Dict[str, str] = {
     # === Adamantane: tricyclo[3.3.1.1(3,7)]decane retained name per IUPAC P-31.1.2.1 ===
     "C1C2CC3CC1CC(C2)C3": "adamantane",
 
-    # === Cubane: pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane retained name per IUPAC P-31.1.2.1 ===
-    "C12C3C4C1C1C3C2C41": "cubane",
+    # === Cubane: pentacyclo[4.2.0.0(2,5).0(3,8).0(4,7)]octane; retained name AND PIN
+    # per IUPAC P-23.2.5.1 / Blue Book line 9881 ("adamantane and cubane ... as
+    # preferred IUPAC names"). v23 Phase 5: rekeyed from the stale C12C3C4C1C1C3C2C41
+    # (InChIKey BOLISNSTKUABPW -- a DIFFERENT (CH)8 cage isomer, NOT cubane) to the true
+    # cubane canonical SMILES (InChIKey TXWRERCHRDBNLG, what OPSIN emits for both "cubane"
+    # and the systematic pentacyclo name). The old key mislabelled the wrong isomer as
+    # cubane and left true cubane named systematically. OPSIN-RT verified. ===
+    "C12C3C4C1C1C2C3C41": "cubane",
 }
 
 

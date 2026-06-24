@@ -184,13 +184,17 @@ class TestCubaneAdded:
 
     @pytest.mark.unit
     def test_cubane_in_bicyclo_retained_names(self):
-        """Cubane canonical SMILES should be a key in BICYCLO_RETAINED_NAMES."""
-        assert "C12C3C4C1C1C3C2C41" in BICYCLO_RETAINED_NAMES
+        """Cubane canonical SMILES should be a key in BICYCLO_RETAINED_NAMES.
+
+        v23 Phase 5: rekeyed from the stale C12C3C4C1C1C3C2C41 (InChIKey
+        BOLISNSTKUABPW, a DIFFERENT (CH)8 cage, NOT cubane) to the true cubane
+        canonical (InChIKey TXWRERCHRDBNLG)."""
+        assert "C12C3C4C1C1C2C3C41" in BICYCLO_RETAINED_NAMES
 
     @pytest.mark.unit
     def test_cubane_value_correct(self):
-        """BICYCLO_RETAINED_NAMES should map cubane SMILES to 'cubane'."""
-        assert BICYCLO_RETAINED_NAMES.get("C12C3C4C1C1C3C2C41") == "cubane"
+        """BICYCLO_RETAINED_NAMES should map the true cubane SMILES to 'cubane'."""
+        assert BICYCLO_RETAINED_NAMES.get("C12C3C4C1C1C2C3C41") == "cubane"
 
 
 # ============================================================================

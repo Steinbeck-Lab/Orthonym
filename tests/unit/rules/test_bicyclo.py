@@ -551,10 +551,13 @@ class TestSUB02NegativeCanary:
     def test_negative_adamantane_unchanged(self):
         assert name_compound("C1C2CC3CC1CC(C2)C3") == "adamantane"
 
-    def test_negative_cubane_unchanged(self):
-        # D-08 no-op proof: the VonBaeyerAnalyzer path is already correct.
-        assert name_compound("C12C3C4C1C5C2C3C45") == \
-            "pentacyclo[3.1.1.1(2,6).0(3,7).0(4,8)]octane"
+    def test_negative_cubane_retained(self):
+        # v23 Phase 5: cubane is a retained name AND a PIN (Blue Book line 9881 /
+        # P-23.2.5.1). The bicyclo_systems catalog key was previously the WRONG
+        # (CH)8 cage isomer (InChIKey BOLISNSTKUABPW), so true cubane missed its
+        # retained name and got the systematic von-Baeyer name. After the rekey to
+        # the true cubane canonical (TXWRERCHRDBNLG) it correctly emits 'cubane'.
+        assert name_compound("C12C3C4C1C5C2C3C45") == "cubane"
 
     def test_negative_bridged_tricyclic_unchanged(self):
         # D-08 no-op proof: a bridged tricyclic already named via the correct

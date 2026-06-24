@@ -856,6 +856,19 @@ def name_fused_heterocycle(mol):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
+        # v23 Phase 5 note: when poly is None here the matched catalog core is
+        # fused to leftover ring atoms it cannot name. The fall-through below
+        # generates a phantom substituent name (the '7-ethoxyfuro[3,2-b]pyridine'
+        # ring-as-acyclic class defect), which is suppressed downstream by the G0
+        # coverage veto + the self-consistency gate (verified: such systems emit
+        # 'unknown' in production). An explicit `return None` here was evaluated
+        # and REJECTED — it routes the molecule to the monocyclic benzene handler,
+        # which drops the heterocyclic rings and emits the WORSE 'benzene' in the
+        # gate-off diagnostic layer (production is 'unknown' either way). The
+        # phantom-then-veto path keeps the molecule in the fused-naming lane and
+        # yields a cleaner 'unknown'. Truly fail-closing at the source needs the
+        # benzene/monocyclic handlers to decline fused-to-heteroaromatic systems
+        # (a dispatch-level change, Phase 13 polycomponent-fusion scope).
 
     # NOTE: General indicated hydrogen (_compute_general_indicated_h) is
     # implemented but NOT wired here. Dictionary-matched fused systems handle

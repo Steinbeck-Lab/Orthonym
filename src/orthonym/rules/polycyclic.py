@@ -1474,12 +1474,30 @@ def is_polycyclic_system(mol) -> bool:
 # ============================================================================
 
 # Heteroatom priority based on Hantzsch-Widman seniority
+# Skeletal-replacement ("a") prefixes for von Baeyer / ring systems, in IUPAC
+# 2013 Table 2.8 / P-31.1.4.3.4 seniority order (the order heteroatoms are cited
+# and the order they receive lowest locants): F>Cl>Br>I>O>S>Se>Te>N>P>As>Sb>Bi>
+# Si>Ge>Sn>Pb>B. The integer is a relative sort key only (used at call sites to
+# order multi-element prefixes); the strings are the replacement stems and are
+# OPSIN-round-trip verified (e.g. heptasilabicyclo[2.2.1]heptane,
+# heptagermabicyclo[2.2.1]heptane). Group-14/15 + B added in v23 Phase 5 so an
+# all-heteroatom von Baeyer system is named via its hydride-replacement stem
+# instead of silently dropping the heteroatoms (structure-loss safety).
 HETEROATOM_PREFIXES = {
     'O': ('oxa', 1),
     'S': ('thia', 2),
     'Se': ('selena', 3),
-    'N': ('aza', 4),
-    'P': ('phospha', 5),
+    'Te': ('tellura', 4),
+    'N': ('aza', 5),
+    'P': ('phospha', 6),
+    'As': ('arsa', 7),
+    'Sb': ('stiba', 8),
+    'Bi': ('bisma', 9),
+    'Si': ('sila', 10),
+    'Ge': ('germa', 11),
+    'Sn': ('stanna', 12),
+    'Pb': ('plumba', 13),
+    'B': ('bora', 14),
 }
 
 
