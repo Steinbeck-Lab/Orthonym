@@ -365,6 +365,15 @@ def orient_heterocycle_with_substituents(
         cmp = _compare_locant_sets(cw_pg, ccw_pg)
     if cmp == 0:
         cmp = _compare_locant_sets(cw_sub, ccw_sub)
+    if cmp == 0:
+        # Genuine tie (symmetric ring, or every ring position substituted so the
+        # locant sets coincide). Break it on a CANONICAL atom rank so the choice
+        # is independent of the input SMILES atom order — otherwise the direction
+        # is decided by atom order and the numbering is non-deterministic across
+        # equivalent SMILES (CARB-01). Mirrors the heteroatom-selection tie-break.
+        cw_rank = [_canon_rank[a] for a in cw]
+        ccw_rank = [_canon_rank[a] for a in ccw]
+        cmp = -1 if cw_rank <= ccw_rank else 1
 
     # cmp <= 0 keeps cw (preserves the prior tie-goes-to-cw behaviour).
     oriented = cw if cmp <= 0 else ccw
@@ -1175,7 +1184,23 @@ def get_heterocycle_substituents(
                 # Check for functional groups that have no carbons
                 hetero_sub_name = _identify_hetero_substituent(mol, sub_atoms, ring_set)
                 if hetero_sub_name is None:
-                    continue  # Truly empty (just implicit H)
+                    # An unrecognised no-carbon exocyclic group (e.g. the oxygen
+                    # of an -O-SO3H sulfate or -O-PO(OH)2 phosphate ester). BFS
+                    # only walks heavy atoms, so this is NEVER just implicit H —
+                    # silently dropping it corrupts the structure (F-OXANE-DROP).
+                    # Record it as unnameable so the assembler declines the whole
+                    # heterocycle candidate rather than emit a group-dropping
+                    # name. Fail-closed per accuracy-first.
+                    substituents.setdefault(locant, []).append({
+                        'atoms': sub_atoms,
+                        'is_on_nitrogen': is_nitrogen,
+                        'carbon_count': 0,
+                        'connecting_atom': ring_atom_idx,
+                        'is_ring': False,
+                        'ring_name': None,
+                        'unnameable': True,
+                    })
+                    continue
 
             # Check for suffix-type functional groups (-COOH, -CHO, -CONH2, -CN)
             # These should be expressed as suffixes, not prefix substituents
@@ -1388,9 +1413,14 @@ def name_substituted_heterocycle(
     substituents: Dict[int, List[Dict]],
     atom_to_locant: Dict[int, int],
     principal_group: Optional[str] = None
-) -> str:
+) -> Optional[str]:
     """
     Assemble complete name for a substituted heterocycle.
+
+    Returns None (the heterocycle candidate declines) when an exocyclic
+    substituent cannot be named correctly and completely — naming it partially
+    would silently drop atoms (F-OXANE-DROP / structure loss). Callers treat a
+    None return as a fail-closed decline.
 
     N-substituted groups use N-locant format (N-methyl, N,N-dimethyl).
     C-substituted groups use numeric locants (2-methyl, 3-ethyl).
@@ -1442,6 +1472,12 @@ def name_substituted_heterocycle(
 
     for locant, sub_list in substituents.items():
         for sub_info in sub_list:
+            if sub_info.get('unnameable'):
+                # An exocyclic group we cannot name correctly and completely
+                # (e.g. the oxygen of a sulfate/phosphate ester). Decline the
+                # whole heterocycle candidate rather than silently drop the
+                # group (F-OXANE-DROP / structure loss). Fail-closed.
+                return None
             if sub_info.get('is_suffix'):
                 sname = sub_info['suffix_name']
                 if sname not in suffix_fg:
@@ -1471,29 +1507,47 @@ def name_substituted_heterocycle(
                 # Non-carbon functional substituent (amino, hydroxy, etc.)
                 sub_name = sub_info['hetero_name']
             else:
-                # Get alkyl name from carbon count, with recursive naming for branched subs
+                # Name the substituent fragment. A multi-atom substituent —
+                # whether pure C/H (branched alkyl) OR carbon-anchored with
+                # heteroatoms (hydroxymethyl, methoxymethyl, aminomethyl) — is
+                # named by the recursive fragment namer. Naming a heteroatom-
+                # bearing substituent from its carbon count alone silently drops
+                # the heteroatoms (F-OXANE-DROP, structure loss), so the
+                # carbon-count fallback below is reserved for pure C/H fragments.
                 carbon_count = sub_info['carbon_count']
                 sub_atoms = sub_info.get('atoms', [])
                 sub_name = None
-                # Pure C/H substituents: try recursive naming first (handles branching)
-                if sub_atoms and len(sub_atoms) > 1:
-                    all_c_h = all(
-                        mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
-                        for i in sub_atoms
+                all_c_h = bool(sub_atoms) and all(
+                    mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H')
+                    for i in sub_atoms
+                )
+                # The fragment namer is reliable only when the substituent is
+                # anchored to the ring through a CARBON; an O-/N-/S-anchored
+                # substituent (e.g. alkoxy) is mis-named by it, so such a
+                # fragment fails closed below instead.
+                attach_is_carbon = bool(sub_atoms) and (
+                    mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol() == 'C'
+                )
+                if sub_atoms and len(sub_atoms) > 1 and (all_c_h or attach_is_carbon):
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    attach_idx = sub_atoms[0]
+                    ring_set_local = set(ring_atoms) if ring_atoms else set()
+                    sub_name = name_substituent_fragment(
+                        mol, sub_atoms, attach_idx, list(ring_set_local)
                     )
-                    if all_c_h:
-                        from ..assembly.substituent_naming import name_substituent_fragment
-                        attach_idx = sub_atoms[0]
-                        ring_set_local = set(ring_atoms) if ring_atoms else set()
-                        sub_name = name_substituent_fragment(
-                            mol, sub_atoms, attach_idx, list(ring_set_local)
-                        )
                 if sub_name is None:
+                    if not all_c_h:
+                        # A heteroatom-bearing substituent the fragment namer
+                        # could not name correctly and completely -> decline the
+                        # whole heterocycle candidate rather than emit a
+                        # heteroatom-dropping alkyl name (F-OXANE-DROP).
+                        # Fail-closed per accuracy-first.
+                        return None
                     try:
                         sub_name = get_alkyl_name(carbon_count)
                     except ValueError:
-                        # Carbon count too large for simple alkyl name;
-                        # try recursive naming as fallback (including heteroatom subs)
+                        # Carbon count too large for the simple alkyl table;
+                        # try recursive naming as a last resort (pure C/H here).
                         if sub_atoms and len(sub_atoms) > 1:
                             from ..assembly.substituent_naming import name_substituent_fragment
                             attach_idx = sub_atoms[0]
@@ -1682,7 +1736,9 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     locant_str = ",".join(str(loc) for loc in locants)
     # Wrap compound names in enclosing marks to prevent locant ambiguity
     display_name = name
-    from ..assembly.naming_utils import is_complex_substituent, _has_stereo_prefix
+    from ..assembly.naming_utils import (
+        is_complex_substituent, needs_brackets, _has_stereo_prefix,
+    )
 
     def _fully_enclosed(n: str) -> bool:
         # True only when ONE outer pair of parens spans the whole name —
@@ -1704,7 +1760,13 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
         # Name has CIP stereo prefix like "(R)-sec-butyl":
         # use square brackets per IUPAC P-16.3.3
         display_name = f'[{name}]'
-    elif not _fully_enclosed(name) and is_complex_substituent(name):
+    elif not _fully_enclosed(name) and (
+            is_complex_substituent(name) or needs_brackets(name)):
+        # is_complex_substituent governs the di-/bis- multiplier choice;
+        # needs_brackets is the broader P-14.5.2 enclosing test that also
+        # flags compound FG-on-alkyl prefixes (hydroxymethyl, aminomethyl)
+        # which take a SIMPLE multiplier but STILL require parentheses
+        # (the benzene path's '1,3,5-tri(hydroxymethyl)benzene' convention).
         if '(' in name:
             # P-16.3.3 nesting: a name already containing parentheses is
             # enclosed in the next mark up ([(naphthalen-2-yl)methyl]).

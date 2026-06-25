@@ -2187,23 +2187,38 @@ class Orthonym:
                     # the cycloalkene branch: a ring C whose FG-match heteroatom is
                     # exocyclic (C=O ketone, C-OH alcohol/phenol, C-NH2 amine, ...).
                     pg_ring_atoms = set()
-                    if (features.principal_group
-                            and features.principal_group in features.functional_groups):
-                        for match in features.functional_groups[features.principal_group]:
-                            match_set = set(match)
-                            for atom_idx in match:
-                                if atom_idx not in ring_set:
-                                    continue
-                                atom = features.mol.GetAtomWithIdx(atom_idx)
-                                if atom.GetSymbol() != 'C':
-                                    continue
-                                for nbr in atom.GetNeighbors():
-                                    nbr_idx = nbr.GetIdx()
-                                    if (nbr_idx not in ring_set
-                                            and nbr_idx in match_set
-                                            and nbr.GetSymbol() != 'C'):
-                                        pg_ring_atoms.add(atom_idx)
-                                        break
+                    if features.principal_group:
+                        from .rules.seniority import get_prefix as _pg_get_prefix
+                        _pg_prefix = _pg_get_prefix(features.principal_group)
+                        # The principal characteristic group is a CLASS, not a
+                        # single FG label. A ring bearing an exocyclic primary
+                        # alcohol (-CH2OH) plus secondary ring alcohols (ring -OH)
+                        # has principal_group == primary_alcohol, but the RING
+                        # carbons that carry the -ol SUFFIX are the secondary ones
+                        # (the assembly already unions them via the shared 'hydroxy'
+                        # prefix). Collect every same-prefix FG class so orient
+                        # gives the suffix-bearing ring carbons the lowest locants
+                        # (P-14.4(c)) DETERMINISTICALLY (SEN-03 alcohol-class union);
+                        # without this the suffix-locant tie is broken by SMILES
+                        # atom order -> non-deterministic numbering (CARB-01).
+                        for _fg, _matches in features.functional_groups.items():
+                            if _pg_prefix is None or _pg_get_prefix(_fg) != _pg_prefix:
+                                continue
+                            for match in _matches:
+                                match_set = set(match)
+                                for atom_idx in match:
+                                    if atom_idx not in ring_set:
+                                        continue
+                                    atom = features.mol.GetAtomWithIdx(atom_idx)
+                                    if atom.GetSymbol() != 'C':
+                                        continue
+                                    for nbr in atom.GetNeighbors():
+                                        nbr_idx = nbr.GetIdx()
+                                        if (nbr_idx not in ring_set
+                                                and nbr_idx in match_set
+                                                and nbr.GetSymbol() != 'C'):
+                                            pg_ring_atoms.add(atom_idx)
+                                            break
 
                     # Orient considering heteroatoms, the principal group, then
                     # other substituents for lowest locants (P-14.4 order).
