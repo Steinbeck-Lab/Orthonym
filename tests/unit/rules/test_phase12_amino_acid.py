@@ -1,0 +1,77 @@
+"""v23 Phase 12 — amino-acid structure-loss fixes (Tier-2 final).
+
+Covers the three genuine root-cause wins (all OPSIN-RT verified during the phase):
+  - F-THIOETHER-DROP  : _name_amino_acid_systematic dropped a C-S-C thioether
+                        (counted the S-alkyl carbon as backbone). Now bails to
+                        the polyfunctional pipeline via the _EXTRA_FG_SMARTS list.
+  - branched-AA       : the carbon-count namer collapsed a branched side chain
+                        into a too-long straight chain. Now bails on any chain
+                        carbon with >2 carbon neighbours.
+  - glycinate anion   : _name_carboxylate_systematic dropped the amino group
+                        ('acetate') because the retained name 'glycine' has no
+                        convertible '-oic acid' suffix. Now named via
+                        _amino_acid_carboxylate (P-103.2.4.2) + the fallback
+                        fail-closes when substituents would be dropped.
+
+The PIN gate () does NOT run the unit suite, so these lock in
+the behaviour at the unit level. The conftest autouse fixture keeps the OPSIN
+validity gate OFF here; all three fixes act BEFORE that gate, so the names below
+are the raw production output.
+"""
+
+import pytest
+
+from orthonym.namer import name_compound
+
+
+class TestThioetherDrop:
+    """F-THIOETHER-DROP: the thioether must NOT be dropped (BB P-103 audit F1)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CCSCC(N)C(=O)O", "2-amino-3-(ethylsulfanyl)propanoic acid"),   # S-ethylcysteine
+        ("CSCCCC(N)C(=O)O", "2-amino-5-(methylsulfanyl)pentanoic acid"),  # homomethionine
+        ("CSC[C@H](N)C(=O)O", "(2R)-2-amino-3-(methylsulfanyl)propanoic acid"),  # S-methyl-L-cys
+    ])
+    def test_thioether_retained(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CSCC[C@@H](N)C(=O)O", "D-methionine"),  # catalog C5 methionine (P5) — unaffected
+        ("CSCC(N)C(=O)O", "S-methylcysteine"),    # catalog S-methylcysteine (P5) — unaffected
+        ("NC(CS)C(=O)O", "cysteine"),             # catalog cysteine — unaffected
+    ])
+    def test_catalog_amino_acids_unaffected(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+
+class TestBranchedAminoAcid:
+    """P-103.2.3: a branched side chain must not collapse into a straight chain."""
+
+    def test_branched_side_chain(self):
+        # CC[C@H](C)[C@@H](N)C(=O)O = a 3-methylpentanoic alpha-amino acid.
+        # HEAD collapsed it to the OPSIN-unparseable '(2R,3S)-2-aminohexanoic acid'.
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == \
+            "(2R,3S)-2-amino-3-methylpentanoic acid"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CCCC[C@H](N)C(=O)O", "(2S)-2-aminohexanoic acid"),  # straight chain — unaffected
+        ("CCC[C@H](N)C(=O)O", "(2S)-2-aminopentanoic acid"),  # norvaline — unaffected
+    ])
+    def test_straight_chain_unaffected(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+
+class TestGlycinateAnion:
+    """P-103.2.4.2 (audit F4): the amino group must not be dropped ('acetate')."""
+
+    def test_glycinate(self):
+        assert name_compound("[O-]C(=O)CN") == "glycinate"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CC(=O)[O-]", "acetate"),                       # no amino — unaffected
+        ("[O-]C(=O)c1ccccc1", "benzoate"),               # aromatic carboxylate — unaffected
+        ("[O-]C(=O)CCCC", "pentanoate"),                 # simple chain — unaffected
+        ("[O-]C(=O)CCC(=O)[O-]", "succinate"),           # dicarboxylate — unaffected
+    ])
+    def test_carboxylate_regressions(self, smiles, expected):
+        assert name_compound(smiles) == expected

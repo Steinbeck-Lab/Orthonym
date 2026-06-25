@@ -38,6 +38,15 @@ PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
 _EXTRA_FG_SMARTS = [
     '[OX2H1;!$([OX2H1]C=O)]',  # Hydroxy OH (not in COOH)
     '[SX2H1]',                   # Thiol SH
+    # v23 Phase 12 (F-THIOETHER-DROP, BB P-103 audit F1): a thioether -S- (both
+    # neighbours carbon) is NOT a chain atom — the carbon-count systematic namer
+    # would count the S-alkyl carbon(s) as backbone and silently DROP the sulfur
+    # (methionine homologues / S-alkyl-cysteines named as plain '2-aminoalkanoic
+    # acid' = a different molecule). Bail to the polyfunctional pipeline, which
+    # emits the (alkylsulfanyl) prefix (2-amino-3-(ethylsulfanyl)propanoic acid).
+    # Disulfides (S has an S neighbour) and ring S (rings already bail above) are
+    # excluded by the two-carbon-neighbour requirement.
+    '[SX2]([#6])[#6]',           # Thioether C-S-C
     '[F,Cl,Br,I]',               # Halogen
     '[N+](=O)[O-]',              # Nitro
     '[CX3;!$([CX3](=O)[OX2H1]);!$([CX3](=O)[NX3])](=O)',  # Ketone C=O (excludes acid and amide C=O)
@@ -263,6 +272,20 @@ def _name_amino_acid_systematic(mol) -> str:
     # multi-FG chains correctly with proper prefix ordering and locants.
     if _has_extra_functional_groups(mol):
         return None
+
+    # v23 Phase 12 (P-103.2.3 branched systematic AA, BB audit): the carbon-count
+    # stem below assumes a SINGLE unbranched chain (it names every carbon as
+    # backbone -> '2-amino{stem}anoic acid'). A branched side chain (a carbon with
+    # >2 carbon neighbours, e.g. CC[C@H](C)[C@@H](N)C(=O)O = a 3-methylpentanoic
+    # α-amino acid) collapses into a too-long straight chain ('2-aminohexanoic
+    # acid' — a DIFFERENT, OPSIN-unparseable molecule that then leaks past the
+    # parse-fail-open self-consistency gate). Bail to the polyfunctional pipeline,
+    # which selects the parent chain + 3-methyl prefix correctly
+    # (2-amino-3-methylpentanoic acid). Straight-chain homologues (Abu/norvaline/
+    # norleucine) have no carbon with >2 carbon neighbours and are unaffected.
+    if any(sum(1 for nbr in atom.GetNeighbors() if nbr.GetSymbol() == 'C') > 2
+           for atom in mol.GetAtoms() if atom.GetSymbol() == 'C'):
+        return None  # branched side chain -> general pipeline
 
     # Count carbons in the backbone (acid chain) -- safe for acyclic molecules
     carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')

@@ -2330,6 +2330,60 @@ def _compare_locant_lists(a: list, b: list) -> int:
     return compare_locant_sets(a, b)
 
 
+def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
+    """Name the carboxylate of an amino acid whose neutral form has a RETAINED
+    name lacking a convertible '-oic acid' suffix (e.g. glycine -> glycinate).
+
+    v23 Phase 12 (F4, BB P-103 audit): a deprotonated amino acid such as glycine
+    (``[O-]C(=O)CN``) neutralizes to ``glycine`` — a retained name carrying NO
+    '-oic acid' suffix — so the neutralize->name->convert path above returns ''
+    and the carbon-count fallback below LINEARIZES the chain, dropping the amino
+    substituent (-> 'acetate', a different molecule). P-103.2.4.2 forms the anion
+    by replacing the retained amino-acid name's final 'e' (or '-ic acid') with
+    '-ate' (glycine -> glycinate; all 20 verified OPSIN-RT). Chiral amino acids
+    never reach here (their fragment name is the systematic '...-oic acid', which
+    the acid path already converts to '...-oate'); this catches the achiral /
+    unspecified-stereo retained-name case. Returns '' for anything that is not a
+    single-carboxylate recognized amino acid, so the caller fail-closes.
+    """
+    # Single carboxylate only — di-acid amino acids (aspartate/glutamate) are
+    # the multi-anion path's responsibility.
+    carboxylate_sites = [a for a in get_ion_sites(mol)['anions']
+                         if classify_anion(mol, a) == 'carboxylate']
+    if len(carboxylate_sites) != 1:
+        return ''
+    # Neutralize this carboxylate to its parent acid SMILES.
+    try:
+        rw = Chem.RWMol(mol)
+        o_atom = rw.GetAtomWithIdx(anion_site['atom_idx'])
+        if o_atom.GetFormalCharge() >= 0:
+            return ''
+        o_atom.SetFormalCharge(0)
+        o_atom.SetNumExplicitHs(o_atom.GetNumExplicitHs() + 1)
+        Chem.SanitizeMol(rw)
+        neutral_smi = Chem.MolToSmiles(rw, canonical=True)
+    except Exception:
+        return ''
+    nmol = Chem.MolFromSmiles(neutral_smi)
+    if nmol is None:
+        return ''
+    from ..data.amino_acids import get_amino_acid_name
+    aa = get_amino_acid_name(neutral_smi, mol=nmol, with_descriptor=True)
+    if not aa:
+        return ''
+    # P-103.2.4.2 retained-name -> anion, preserving any leading D-/L- descriptor.
+    prefix, stem = '', aa
+    for d in ('DL-', 'D-', 'L-'):
+        if stem.startswith(d):
+            prefix, stem = d, stem[len(d):]
+            break
+    if stem.endswith('ic acid'):
+        return prefix + stem[:-len('ic acid')] + 'ate'
+    if stem.endswith('e'):
+        return prefix + stem[:-1] + 'ate'
+    return ''
+
+
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     """Generate systematic name for carboxylate anion.
 
@@ -2352,8 +2406,26 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
         if oate_name:
             return oate_name
 
-    # Fallback: simple chain naming (no substituent detection)
+    # v23 Phase 12 (F4): the carboxylate of an amino acid whose neutral form has
+    # a retained name (glycine) — the acid path returns '' (no '-oic acid'), and
+    # the carbon-count fallback below would DROP the amino group ('acetate').
+    aa_anion = _amino_acid_carboxylate(mol, anion_site)
+    if aa_anion:
+        return aa_anion
+
+    # Fallback: simple chain naming (no substituent detection). FAIL-CLOSED
+    # (v23 Phase 12, F4 root cause): this carbon-count namer drops every
+    # non-carbon, non-carboxylate substituent (it is the source of the
+    # structure-destroying 'acetate' for glycinate). Only use it when the linear
+    # carbon chain actually covers the whole molecule; otherwise return '' so the
+    # caller fail-closes (the self-consistency gate then suppresses to unknown)
+    # rather than emitting a name for a different molecule.
     chain, double_bond_locs = _find_carboxylate_chain(mol, anion_site)
+    n_heavy = mol.GetNumHeavyAtoms()
+    # carboxylate carbon + 2 O's are the head group; the chain already includes
+    # the carboxyl carbon. All remaining heavy atoms must be chain carbons.
+    if chain is not None and (len(chain) + 2) != n_heavy:
+        return ''   # substituents/heteroatoms would be dropped -> fail closed
     carbon_count = len(chain) if chain else sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'C')
 
     if carbon_count == 1:
