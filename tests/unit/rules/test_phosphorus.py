@@ -101,31 +101,43 @@ class TestPhosphineOxideNaming:
 
 
 class TestPhosphonicAcidNaming:
-    """Tests for phosphonic acid naming."""
+    """Tests for phosphonic acid naming.
 
-    def test_methanephosphonic_acid(self):
-        """CP(=O)(O)O -> methanephosphonic acid"""
+    v23 Phase 9: phosphonic acid is named in substituent-prefix mode (the IUPAC
+    PIN, P-67.1.1.2) — ``methylphosphonic acid``, NOT the explicitly-rejected
+    parent-hydride-stem form ``methanephosphonic acid``. ``name_phosphonic_acid``
+    now takes only ``(mol, phosphonic_atoms)`` and derives the organyl prefix
+    itself (the old ``parent_name`` argument is gone)."""
+
+    def test_methylphosphonic_acid(self):
+        """CP(=O)(O)O -> methylphosphonic acid (PIN, was 'methanephosphonic')"""
         mol = Chem.MolFromSmiles("CP(=O)(O)O")
-        result = name_phosphonic_acid(mol, (1, 2, 3, 4), "methane")
-        assert result == "methanephosphonic acid"
+        result = name_phosphonic_acid(mol, (1, 2, 3, 4))
+        assert result == "methylphosphonic acid"
 
-    def test_ethanephosphonic_acid(self):
-        """CCP(=O)(O)O -> ethanephosphonic acid"""
+    def test_ethylphosphonic_acid(self):
+        """CCP(=O)(O)O -> ethylphosphonic acid (PIN, was 'ethanephosphonic')"""
         mol = Chem.MolFromSmiles("CCP(=O)(O)O")
-        result = name_phosphonic_acid(mol, (2, 3, 4, 5), "ethane")
-        assert result == "ethanephosphonic acid"
+        result = name_phosphonic_acid(mol, (2, 3, 4, 5))
+        assert result == "ethylphosphonic acid"
 
     def test_phenylphosphonic_acid(self):
-        """c1ccccc1P(=O)(O)O -> phenylphosphonic acid (note: phenyl not benzene)"""
+        """c1ccccc1P(=O)(O)O -> phenylphosphonic acid"""
         mol = Chem.MolFromSmiles("c1ccccc1P(=O)(O)O")
-        result = name_phosphonic_acid(mol, (6, 7, 8, 9), "phenyl")
+        result = name_phosphonic_acid(mol, (6, 7, 8, 9))
         assert result == "phenylphosphonic acid"
 
-    def test_propanephosphonic_acid(self):
-        """CCCP(=O)(O)O -> propanephosphonic acid"""
+    def test_propylphosphonic_acid(self):
+        """CCCP(=O)(O)O -> propylphosphonic acid (PIN, was 'propanephosphonic')"""
         mol = Chem.MolFromSmiles("CCCP(=O)(O)O")
-        result = name_phosphonic_acid(mol, (3, 4, 5, 6), "propane")
-        assert result == "propanephosphonic acid"
+        result = name_phosphonic_acid(mol, (3, 4, 5, 6))
+        assert result == "propylphosphonic acid"
+
+    def test_complex_organyl_fails_closed(self):
+        """A heteroatom-bearing organyl is not a clean simple substituent -> None
+        (caller defers to the generic path; no wrong substituent-prefix name)."""
+        mol = Chem.MolFromSmiles("OCCP(=O)(O)O")  # (2-hydroxyethyl)phosphonic acid
+        assert name_phosphonic_acid(mol, (3, 4, 5, 6)) is None
 
 
 class TestPhosphinicAcidNaming:

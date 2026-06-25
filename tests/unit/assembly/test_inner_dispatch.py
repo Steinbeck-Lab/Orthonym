@@ -1023,14 +1023,15 @@ class TestPhase160_2_Registrations:
         from orthonym.assembly.handlers.general_acyclic import name_general_acyclic
         assert INNER_DISPATCH_TABLE["general_acyclic"].handler is name_general_acyclic
 
-    def test_inner_dispatch_table_size_37(self):
+    def test_inner_dispatch_table_size_38(self):
         from orthonym.assembly.inner_dispatch import INNER_DISPATCH_TABLE
         # 33 through Phase 160.2 (general_acyclic@99999) + imidate@2900
         # (Phase 163 AUDIT-FRN § 7) + chalcogen_ester@2950 (Phase 163.1 closure)
         # + hydroxylamine@5250 (Phase 169.7 BBR-PERC — substituted-hydroxylamine
         # handler, P-68.3.1.2.1) [35 → 36] + nitrite_ester@2960 (WSD-05 / Phase 175,
-        # P-67) [36 → 37].
-        assert len(INNER_DISPATCH_TABLE) == 37
+        # P-67) [36 → 37] + phosphonic_acid@2350 (v23 Phase 9, P-67.1.1.2
+        # substituent-prefix PIN) [37 → 38].
+        assert len(INNER_DISPATCH_TABLE) == 38
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1058,10 +1059,11 @@ class TestPhase160_2_Registrations:
         # Eagerly populated tuple per WR-06 + RESEARCH §5; size matches
         # INNER_DISPATCH_TABLE which Phase 163 grew 33 → 34 (imidate@2900,
         # AUDIT-FRN § 7), Phase 163.1 grew 34 → 35 (chalcogen_ester@2950),
-        # Phase 169.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC), and WSD-05 /
-        # Phase 175 grew 36 → 37 (nitrite_ester@2960, P-67).
+        # Phase 169.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC), WSD-05 /
+        # Phase 175 grew 36 → 37 (nitrite_ester@2960, P-67), and v23 Phase 9
+        # grew 37 → 38 (phosphonic_acid@2350, P-67.1.1.2).
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 37
+        assert len(_SORTED_ENTRIES_CACHE) == 38
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)

@@ -744,6 +744,25 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- v23 Phase 9: phosphonic_acid (P-67.1.1.2 substituent-prefix PIN). Parallel
+#     to phosphinic_acid; @2350 so it intercepts an organyl phosphonic acid
+#     (principal_group == 'phosphonic_acid') BEFORE the generic suffix assembler
+#     emits the rejected 'ethanephosphonic' parent-hydride-stem form. Fail-closed
+#     (None -> cascade-continuation) for a complex organyl.
+from .handlers.phosphonic_acid import (  # noqa: E402
+    _is_phosphonic_acid, name_phosphonic_acid,
+)
+
+_register_inner(
+    handler_id="phosphonic_acid",
+    priority=2350,
+    predicate=_is_phosphonic_acid,
+    handler=name_phosphonic_acid,
+    iupac_section="P-67.1.1.2",
+    description="Phosphonic acid functional class naming (substituent-prefix PIN, direct-return)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-21: phosphinic_acid (Tier-1.5 SHIM; audit § 1 + § 2.25;
 #     direct-return; pool.add() + _inject_stereo_if_missing).
 from .handlers.phosphinic_acid import (  # noqa: E402

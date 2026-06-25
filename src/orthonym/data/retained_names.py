@@ -206,9 +206,10 @@ RETAINED_NAMES = {
     "CP(C)(C)=O": "trimethylphosphane oxide",
     "CCP(=O)(CC)CC": "triethylphosphane oxide",
     "O=P(c1ccccc1)(c1ccccc1)c1ccccc1": "triphenylphosphane oxide",
-    # Phosphonic acids
-    "CP(=O)(O)O": "methanephosphonic acid",
-    "CCP(=O)(O)O": "ethanephosphonic acid",
+    # Phosphonic acids (v23 Phase 9: substituent-prefix PIN P-67.1.1.2 — the
+    # 'methane'/'ethane' parent-hydride-stem forms are explicitly rejected)
+    "CP(=O)(O)O": "methylphosphonic acid",
+    "CCP(=O)(O)O": "ethylphosphonic acid",
     "O=P(O)(O)c1ccccc1": "phenylphosphonic acid",
     # Phosphinic acids
     "CP(C)(=O)O": "dimethylphosphinic acid",

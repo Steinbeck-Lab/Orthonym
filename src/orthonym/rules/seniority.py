@@ -64,6 +64,14 @@ SENIORITY_ORDER = [
     "sulfonic_acid",
     "sulfinic_acid",
     "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
+    # v23 Phase 9 (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
+    # sulfonic/sulfinic. Standalone naming is rank-independent; this relative
+    # position only governs polyfunctional Se/Te-vs-S ties (S>Se>Te, -onic>-inic;
+    # near-zero corpus) — additive, so the byte-positions of the rows above hold.
+    "selenonic_acid",
+    "seleninic_acid",
+    "telluronic_acid",
+    "tellurinic_acid",
     "phosphonic_acid",
     "phosphinic_acid",
     "boronic_acid",    # P-68.3 boron acid
@@ -290,6 +298,12 @@ SUFFIX_FORMS = {
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
+    # v23 Phase 9 (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
+    # ethaneselenonic acid), parallel to sulfonic.
+    "selenonic_acid": ("selenonic acid", "selenonic acid"),
+    "seleninic_acid": ("seleninic acid", "seleninic acid"),
+    "telluronic_acid": ("telluronic acid", "telluronic acid"),
+    "tellurinic_acid": ("tellurinic acid", "tellurinic acid"),
     "phosphonic_acid": ("phosphonic acid", "phosphonic acid"),
     "phosphinic_acid": ("phosphinic acid", "phosphinic acid"),
     "anhydride": ("oic anhydride", "carboxylic anhydride"),
@@ -417,6 +431,11 @@ PREFIX_FORMS = {
     "carbamic_acid": "carbamoyloxy",  # When not principal group
     "sulfonic_acid": "sulfo",
     "sulfinic_acid": "sulfino",
+    # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
+    "selenonic_acid": "selenono",
+    "seleninic_acid": "selenino",
+    "telluronic_acid": "tellurono",
+    "tellurinic_acid": "tellurino",
     "aldehyde": "oxo",  # or "formyl" for terminal
     "ketone": "oxo",
     "thioketone": "sulfanylidene",  # P-63.1.5: =S as non-principal prefix

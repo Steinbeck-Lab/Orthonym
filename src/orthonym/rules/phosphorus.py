@@ -267,20 +267,40 @@ def name_phosphine_oxide(mol, phosphine_oxide_atoms: Tuple[int, ...]) -> Optiona
     return f"{prefix}phosphane oxide"
 
 
-def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...], parent_name: str) -> str:
-    """
-    Name a phosphonic acid with -phosphonic acid suffix.
+def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...]) -> Optional[str]:
+    """Name an organyl phosphonic acid in substituent-prefix mode (IUPAC PIN).
 
-    Args:
-        mol: RDKit Mol object
-        phosphonic_atoms: Atom indices from SMARTS match
-        parent_name: Parent chain/ring name (e.g., "methane", "ethane", "benzene")
+    R-P(=O)(OH)2 -> ``methylphosphonic acid`` / ``ethylphosphonic acid`` /
+    ``phenylphosphonic acid`` (P-67.1.1.2). Phosphonic acid is a functional
+    *parent* (HP(=O)(OH)2) whose central-atom H is substituted by the organyl
+    group; the PIN is therefore ``{R-yl}phosphonic acid`` — NOT the
+    parent-hydride-stem form ``{R-ane}phosphonic acid`` (``ethanephosphonic``),
+    which the generic suffix assembler would otherwise emit (it correctly serves
+    the genuine *suffix* acids like ``ethanesulfonic``).
 
-    Returns:
-        Name like "methanephosphonic acid", "ethanephosphonic acid"
+    Mirrors :func:`name_phosphinic_acid`. Returns ``None`` (fail-closed) when the
+    single organyl substituent is not a clean simple alkyl / aryl — the caller
+    then defers to the generic path (no regression for complex parents).
     """
-    # Phosphonic acid always attached at chain/ring end, no locant needed for simple cases
-    return f"{parent_name}phosphonic acid"
+    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
+
+    phosphorus_idx = None
+    for idx in phosphonic_atoms:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'P':
+            phosphorus_idx = idx
+            break
+    if phosphorus_idx is None:
+        return None
+
+    phosphorus = mol.GetAtomWithIdx(phosphorus_idx)
+    carbons = [n for n in phosphorus.GetNeighbors() if n.GetSymbol() == 'C']
+    if len(carbons) != 1:                       # phosphonic acid has exactly one C-P bond
+        return None
+
+    prefix = pure_organyl_prefix_name(mol, carbons[0].GetIdx(), phosphorus_idx)
+    if prefix is None:
+        return None                             # complex organyl -> defer (fail-closed)
+    return f"{prefix}phosphonic acid"
 
 
 def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str]:

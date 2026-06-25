@@ -1,4 +1,4 @@
-"""Free inorganic oxoacids (P-67 / P-65.2.1) — retained / preselected PINs.
+"""Inorganic oxoacids + functional-class derivatives (P-67 / P-65.2.1) — PINs.
 
 Orthonym has no functional-parent subsystem for the mononuclear and simple
 polynuclear inorganic oxoacids: free ``phosphoric``/``sulfuric``/… either return
@@ -8,22 +8,38 @@ polynuclear inorganic oxoacids: free ``phosphoric``/``sulfuric``/… either retu
 acid; P-68.1.4.1 boric/boronic/borinic acid; P-67.2.1 di-acids), so there is no
 constitutional algorithm to run — the correct PIN is a table lookup.
 
-This module is an EXACT canonical-SMILES recognizer: it returns the retained PIN
-only for the precise structures in ``_INORGANIC_OXOACIDS`` and ``None`` for
-everything else (fail-closed). Because the match is on the full-molecule RDKit
-canonical SMILES, there are zero false positives — a charged conjugate base, an
-ester, or any substituted derivative simply will not match and cascades onward.
+This module is an EXACT canonical-SMILES recognizer: it returns the PIN only for
+the precise structures tabled here and ``None`` for everything else (fail-closed).
+Because the match is on the full-molecule RDKit canonical SMILES, there are zero
+false positives — a charged conjugate base, an ester, or any substituted
+derivative simply will not match and cascades onward.
 
-DEFERRED (A10 honest-fail-on-data, NOT in this build): organyl-substituted
-oxoacids (``CCP(=O)(O)O`` → ethylphosphonic acid), acyl-halide word-forms
-(phosphoryl/sulfuryl), and end-to-end polyacid / di-/triphosphate-*ester*
-numbering. Those need a functional-replacement engine; emitting them here would
-risk wrong names, so the conjugate-controller P-O-P out-of-scope gate is left in
-place and only the FREE acids are tabled (free di-acids included as exact rows).
+Three tables, all consulted by :func:`name_inorganic_acid`:
+  * ``_INORGANIC_OXOACIDS`` — the FREE acids (P-67.1.1 / P-65.2.1 / P-68).
+  * ``_INORGANIC_ACID_DERIVATIVES`` — v23 Phase 9: acid-halide acyl-word forms
+    (``phosphoryl trichloride``, ``sulfuryl dichloride``, P-67.1.2.5.1) and the
+    amide functional-class names (``phosphoric triamide``, ``sulfuric diamide``,
+    ``sulfamic acid``, P-67.1.2.6.1). The acyl-halide names are spelled by the
+    shared FRN engine (``rules.functional_replacement``).
+  * ``_CARBONIC_FRN`` — v23 Phase 9: the carbonic/carbamic functional-replacement
+    acids (P-65.2.1.2/.3) — ``carbonoperoxoic`` / ``carbonodithioic`` /
+    ``carbonotrithioic`` / ``carbonimidic`` / ``carbamimidic`` / ``dicarbonic`` /
+    ``tricarbonic`` — names built by the SAME FRN engine.
+
+DEFERRED (Phase 19, name-exact gold — OPSIN rejects the word-form so they cannot
+be round-trip-validated): the italic O/S/Se tautomer-locant acid words
+(``carbonothioic S-acid``, ``carbamothioic O-acid``, ``phosphorothioic O,O-acid``).
+Also out of scope: end-to-end di-/triphosphate-*ester* numbering.
 """
 from typing import Optional
 
 from rdkit import Chem
+
+from .functional_replacement import (
+    build_acyl_halide_name,
+    build_frn_acid_name,
+    build_polyacid_name,
+)
 
 # Keyed by RDKit ``Chem.MolToSmiles`` canonical SMILES of the neutral, fully
 # protonated acid. Every name has been confirmed to round-trip through OPSIN to
@@ -69,9 +85,46 @@ _INORGANIC_OXOACIDS = {
     "BO": "borinic acid",                        # P-68.1.4.1  H2B(OH)  (H3BO,  parent)
 }
 
+# --- v23 Phase 9: acid-halide + amide functional-class derivatives ---
+# Acid halides of phosphoric/sulfuric (identical replaceable -OH groups) use the
+# acyl-group word (P-67.1.2.5.1); amides replace all -OH by -NH2 (P-67.1.2.6.1).
+# These intercept @40 BEFORE the OPSIN-imported retained tier (RETAINED_NAME@1300)
+# which would otherwise emit the non-PIN 'phosphorous(v) oxychloride' /
+# 'phosphoramide' / 'sulfamide'. Keys are RDKit canonical SMILES of the neutral
+# molecule; every name is OPSIN-RT-confirmed.
+_INORGANIC_ACID_DERIVATIVES = {
+    "O=P(Cl)(Cl)Cl": build_acyl_halide_name("phosphoryl", "chloride", 3),       # POCl3
+    "O=P(F)(F)F": build_acyl_halide_name("phosphoryl", "fluoride", 3),          # POF3
+    "O=P(Br)(Br)Br": build_acyl_halide_name("phosphoryl", "bromide", 3),        # POBr3
+    "S=P(Cl)(Cl)Cl": build_acyl_halide_name("phosphorothioyl", "chloride", 3),  # PSCl3 (FRN thio)
+    "O=S(=O)(Cl)Cl": build_acyl_halide_name("sulfuryl", "chloride", 2),         # SO2Cl2
+    "O=S(=O)(F)F": build_acyl_halide_name("sulfuryl", "fluoride", 2),           # SO2F2
+    "NP(N)(N)=O": "phosphoric triamide",   # P-67.1.2.6.1 PIN ('phosphoramide' = non-PIN alt)
+    "NS(N)(=O)=O": "sulfuric diamide",     # P-67.1.2.6.1 PIN ('sulfamide' = general name)
+    "NS(=O)(=O)O": "sulfamic acid",        # P-67.1.2.4.1.1 H2N-SO2-OH (contraction of sulfuramidic)
+}
+
+# --- v23 Phase 9: carbonic/carbamic functional-replacement acids ---
+# Plain (non-italic-locant) forms that OPSIN round-trips; names built by the
+# shared FRN engine. The single-chalcogen tautomer forms needing italic S-/O-
+# acid locants (carbonothioic S-acid) are DEFERRED to Phase 19 (no OPSIN RT).
+_CARBONIC_FRN = {
+    "O=C(O)OO": build_frn_acid_name("carbon", "peroxo", 1),          # carbonoperoxoic acid
+    "O=C(S)S": build_frn_acid_name("carbon", "thio", 2),             # carbonodithioic acid  (HS-CO-SH)
+    "S=C(S)S": build_frn_acid_name("carbon", "thio", 3),             # carbonotrithioic acid (HS-CS-SH)
+    "N=C(O)O": build_frn_acid_name("carbon", "imido", 1),            # carbonimidic acid     (HO-C(=NH)-OH)
+    "N=C(N)O": build_frn_acid_name("carbam", "imido", 1),            # carbamimidic acid     (H2N-C(=NH)-OH)
+    "O=C(O)OC(=O)O": build_polyacid_name("carbonic acid", 2),        # dicarbonic acid
+    "O=C(O)OC(=O)OC(=O)O": build_polyacid_name("carbonic acid", 3),  # tricarbonic acid
+}
+
+# Merged lookup (no key overlap across the three tables — distinct structures).
+_ALL_INORGANIC = {**_INORGANIC_OXOACIDS, **_INORGANIC_ACID_DERIVATIVES, **_CARBONIC_FRN}
+
 
 def name_inorganic_acid(mol) -> Optional[str]:
-    """Return the retained PIN for a free inorganic oxoacid, else ``None``.
+    """Return the PIN for a free inorganic oxoacid or its tabled functional-class
+    derivative (acid halide / amide / carbonic-FRN acid), else ``None``.
 
     Pure: no mol mutation, no global state. Recomputes the RDKit canonical
     SMILES so the key matches regardless of how the input was written.
@@ -82,4 +135,4 @@ def name_inorganic_acid(mol) -> Optional[str]:
         canonical = Chem.MolToSmiles(mol)
     except Exception:
         return None
-    return _INORGANIC_OXOACIDS.get(canonical)
+    return _ALL_INORGANIC.get(canonical)

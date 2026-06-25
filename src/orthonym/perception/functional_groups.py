@@ -50,6 +50,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     "sulfonic_acid": "[SX4;$([SX4][#6])](=O)(=O)[OX2H1]",
     "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
+    # v23 Phase 9 (P-65.3 / Table 6.2): selenium & tellurium analogues of the
+    # sulfonic/sulfinic suffix acids, C-attached (parallel [#6] guard) so the
+    # free chalcogen oxoacids are not mis-claimed -> ethaneselenonic acid etc.
+    "selenonic_acid": "[SeX4;$([SeX4][#6])](=O)(=O)[OX2H1]",  # R-Se(=O)2-OH
+    "seleninic_acid": "[SeX3;$([SeX3][#6])](=O)[OX2H1]",      # R-Se(=O)-OH
+    "telluronic_acid": "[TeX4;$([TeX4][#6])](=O)(=O)[OX2H1]", # R-Te(=O)2-OH
+    "tellurinic_acid": "[TeX3;$([TeX3][#6])](=O)[OX2H1]",     # R-Te(=O)-OH
     "phosphonic_acid": "[PX4;$([PX4][#6])](=O)([OX2H1])[OX2H1]",
     # Phosphinic acid: R2P(=O)(OH) - two C attached to P
     "phosphinic_acid": "[PX4](=O)([OX2H1])([#6])[#6]",
