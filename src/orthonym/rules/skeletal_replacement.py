@@ -276,6 +276,24 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             return None
 
     # ----------------------------------------------------------------
+    # Gate 3b (v23 Phase 8, P-68.2.1.1; E2-owned terminal-atom gate): a TERMINAL
+    # Group-14 backbone atom (Si/Ge/Sn/Pb) is NOT a skeletal-replacement chain
+    # atom. Gate 5 only marks INTERIOR atoms (0 < i < len-1) as embedded
+    # replacements, so a terminal Si/Ge/Sn/Pb is silently counted as a CARBON of
+    # the alkane stem — structure loss: trisiloxane [SiH3]O[SiH2]O[SiH3] ->
+    # '2,4-dioxa-3-silapentane' (RTs to dimethoxysilane, a DIFFERENT molecule). A
+    # terminal Group-14 atom belongs to a silyl substituent or makes the molecule a
+    # homonuclear parent hydride (siloxane), neither of which is built here, so we
+    # fail-closed rather than walk it into the stem. (Coordinated with the Phase-7
+    # chalcogen-suffix path; this single gate owns the terminal-atom rule.)
+    _GROUP14_SKELETAL = {'Si', 'Ge', 'Sn', 'Pb'}
+    if backbone and (
+        mol.GetAtomWithIdx(backbone[0]).GetSymbol() in _GROUP14_SKELETAL
+        or mol.GetAtomWithIdx(backbone[-1]).GetSymbol() in _GROUP14_SKELETAL
+    ):
+        return None
+
+    # ----------------------------------------------------------------
     # Gate 4: All heavy atoms must be on the backbone (no substituents)
     # Branched molecules with substituents off the replacement chain
     # are not handled. Only unbranched replacement chains.

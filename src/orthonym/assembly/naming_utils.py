@@ -739,6 +739,15 @@ def is_complex_substituent(name: str) -> bool:
     # ('cyclohexylmethyl', 'piperidinylmethyl') — enclosing marks per P-16.3.3.
     if _RINGYL_ALKYL_RE.search(name_lower):
         return True
+    # v23 Phase 8 (P-16.3.3): a Group-14 silyl/germyl substituent carrying its OWN
+    # prefixes ('trihydroxysilyl', 'hydroxydimethylsilyl', 'aminodimethylsilyl') is
+    # a compound prefix taking enclosing marks. The bare 'silyl'/'germyl' stems
+    # stay simple; 'trimethylsilyl'/'triethylsilyl' are already caught by the
+    # alkyl-multiplier regex above. (These prefixed silyl names are all new in v23
+    # Phase 8, so this rule adds no regression to pre-existing substituents.)
+    if (name_lower.endswith(('silyl', 'germyl'))
+            and name_lower not in ('silyl', 'germyl')):
+        return True
     return False
 
 
@@ -1107,15 +1116,19 @@ def _join_multiplied_suffix(suffix_multiplier: str, suffix: str) -> str:
 
     The final letter 'a' of a multiplying prefix ('tetra', 'penta', 'hexa', …)
     is elided before the suffix '-ol' (tetra+ol → tetrol, hexa+ol → hexol;
-    Blue Book P-63.1.2: ``benzenehexol``, ``cyclohexane-1,2,3,4-tetrol``).
+    Blue Book P-63.1.2: ``benzenehexol``, ``cyclohexane-1,2,3,4-tetrol``) and
+    before the suffix '-amine' (tetra+amine → tetramine; **Blue Book P-62.2.4.1.2
+    states this verbatim**: "The terminal letter 'a' of a numerical prefix is
+    elided before the suffix amine, i.e., 'tetramine', not 'tetraamine'",
+    e.g. ``[1,1'-biphenyl]-3,3',4,4'-tetramine``, ``silanetetramine``).
 
-    The elision is SCOPED to '-ol' specifically: ketone/aldehyde/amine suffixes
-    do NOT take it (``butane-1,2,3,4-tetraone`` keeps its 'a' — verified against
-    OPSIN), and 'di'/'tri' carry no terminal 'a', so 'diol'/'triol' are
-    unaffected. Keeping the scope tight avoids emitting wrong forms like the
-    non-existent '-tetrone'.
+    The elision is SCOPED to '-ol' and '-amine' specifically: the ketone/aldehyde
+    suffixes do NOT take it (``butane-1,2,3,4-tetraone`` keeps its 'a' — verified
+    against OPSIN), and 'di'/'tri' carry no terminal 'a', so 'diol'/'triol'/
+    'diamine'/'triamine' are unaffected. Keeping the scope tight avoids emitting
+    wrong forms like the non-existent '-tetrone'.
     """
-    if suffix == "ol" and suffix_multiplier.endswith("a"):
+    if suffix in ("ol", "amine") and suffix_multiplier.endswith("a"):
         return suffix_multiplier[:-1] + suffix
     return suffix_multiplier + suffix
 

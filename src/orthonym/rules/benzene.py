@@ -397,6 +397,42 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[in
     return alkyl_names
 
 
+def _identify_boron_group(
+    mol, start_idx: int, ring_atoms: Set[int]
+) -> Optional[Dict]:
+    """Identify a ``-B(OH)2`` boronic-acid substituent on a ring as the
+    preselected ``borono`` prefix (P-68.1.4.2).
+
+    Graph classifier (NOT SMARTS broadening, per feedback_smarts_and_seniority):
+    a neutral three-coordinate boron bonded to exactly one ring atom and two
+    TERMINAL hydroxy oxygens (-OH), nothing else. The multivalent boranediyl /
+    dimethylboranyl forms (P-68.1.5.2.3) are out of scope and fail closed to
+    None (the borono ring-propagation here is the Phase-8 target). Returns the
+    prefix dict, or None.
+    """
+    b = mol.GetAtomWithIdx(start_idx)
+    if b.GetSymbol() != 'B' or b.GetFormalCharge() != 0 or b.GetDegree() != 3:
+        return None
+    ring_nbrs = 0
+    oh_nbrs = 0
+    for nbr in b.GetNeighbors():
+        if nbr.GetIdx() in ring_atoms:
+            ring_nbrs += 1
+            continue
+        bond = mol.GetBondBetweenAtoms(start_idx, nbr.GetIdx())
+        if (nbr.GetSymbol() == 'O' and nbr.GetFormalCharge() == 0
+                and nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 1
+                and bond is not None
+                and bond.GetBondType() == Chem.BondType.SINGLE):
+            oh_nbrs += 1
+        else:
+            return None  # any other neighbour (alkyl/=O/chalcogen) -> not borono
+    if ring_nbrs == 1 and oh_nbrs == 2:
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        return {'name': 'borono', 'atoms': sub_atoms}
+    return None
+
+
 def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
@@ -467,6 +503,30 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     # Sulfur-based groups (non-suffix fallback)
     if symbol == 'S':
         return _identify_sulfur_group(mol, start_idx, ring_atoms)
+
+    # Boron-based groups: the borono prefix -B(OH)2 (P-68.1.4.2 preselected
+    # substituent prefix). HEAD dropped the whole boron unit on ring parents
+    # (4-boronobenzoic acid -> 'benzoic acid', a different molecule) because no
+    # 'B' branch existed here — only the acyclic chain path emitted borono.
+    if symbol == 'B':
+        boron_result = _identify_boron_group(mol, start_idx, ring_atoms)
+        if boron_result:
+            return boron_result
+
+    # Group-14 silyl/germyl substituents (P-68.2.2): -SiH3 -> silyl, -Si(OH)3 ->
+    # trihydroxysilyl, -Si(CH3)3 -> trimethylsilyl. HEAD had no 'Si'/'Ge' branch
+    # here, so the whole silyl/germyl unit was dropped on ring parents
+    # (4-silylbenzoic acid -> 'benzoic acid', a different molecule). Routes through
+    # the shared _name_group14_substituent (fail-closed; multivalent / complex
+    # centres -> None -> fall through unchanged).
+    if symbol in ('Si', 'Ge'):
+        from ..assembly.substituent_naming import _name_group14_substituent
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        g14 = _name_group14_substituent(mol, sub_atoms, start_idx)
+        if g14:
+            # Enclosing marks are added downstream by the benzene assembler via
+            # is_complex_substituent (silyl-with-prefixes is now complex).
+            return {'name': g14, 'atoms': sub_atoms}
 
     # Phosphorus-based groups: generate phosphanyl prefix (IUPAC P-68)
     if symbol == 'P':

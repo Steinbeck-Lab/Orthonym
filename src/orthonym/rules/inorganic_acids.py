@@ -5,8 +5,8 @@ polynuclear inorganic oxoacids: free ``phosphoric``/``sulfuric``/… either retu
 ``unknown`` or mis-name (``OP(=O)(O)O`` → ``trihydrophosphate``; ``OC(=O)O`` →
 ``methane``). The Blue Book gives these *retained / preselected* names directly
 (P-67.1.1 phosphoric acid, sulfuric acid; P-65.2.1 carbonic acid; P-68.2 silicic
-acid; P-67.2.1 di-acids), so there is no constitutional algorithm to run — the
-correct PIN is a table lookup.
+acid; P-68.1.4.1 boric/boronic/borinic acid; P-67.2.1 di-acids), so there is no
+constitutional algorithm to run — the correct PIN is a table lookup.
 
 This module is an EXACT canonical-SMILES recognizer: it returns the retained PIN
 only for the precise structures in ``_INORGANIC_OXOACIDS`` and ``None`` for
@@ -56,6 +56,17 @@ _INORGANIC_OXOACIDS = {
     "[O-][I+]O": "iodous acid",                   # P-67.1.1.1  I(O)(OH)
     "[O-][I+2]([O-])O": "iodic acid",            # P-67.1.1.1  I(O)2(OH)
     "[O-][I+3]([O-])([O-])O": "periodic acid",   # P-67.1.1.1  I(O)3(OH) (metaperiodic)
+    # --- v23 Phase 8: the three preselected/retained boron parent acids
+    #     (P-68.1.4.1 / P-67.1.1.1). These are the UNSUBSTITUTED parents; the
+    #     carbon-bearing R-boronic acids (CB(O)O -> methylboronic acid) carry a
+    #     carbon and so never match these exact carbon-free keys — they continue
+    #     to the dedicated boronic_acid handler. Boron is kept OUT of the Group-14
+    #     substitutive-suffix path (organometallics._GROUP14_SUFFIX_ELEMENTS) — a
+    #     boron hydroxy acid is named here, never 'boranetriol' (the v22 G2 lesson).
+    #     Every name OPSIN-RT-confirmed. ---
+    "OB(O)O": "boric acid",                      # P-68.1.4.1  B(OH)3   (H3BO3)
+    "OBO": "boronic acid",                       # P-68.1.4.1  HB(OH)2  (H3BO2, parent)
+    "BO": "borinic acid",                        # P-68.1.4.1  H2B(OH)  (H3BO,  parent)
 }
 
 

@@ -618,3 +618,29 @@ class TestC11PlusAlkylRootCoverage:
     def test_alpha_sort_key_dioxo_returns_oxo(self):
         """'di' is stripped: dioxo -> oxo."""
         assert alpha_sort_key("dioxo") == "oxo"
+
+
+@pytest.mark.unit
+class TestPhase8MultipliedSuffixAndSilyl:
+    """v23 Phase 8: amine-suffix elision (BB P-62.2.4.1.2: 'tetramine', not
+    'tetraamine') + silyl/germyl-with-prefix complexity (P-16.3.3)."""
+
+    def test_join_multiplied_suffix_amine_elision(self):
+        from orthonym.assembly.naming_utils import _join_multiplied_suffix
+        # tetra/penta/hexa final 'a' elides before 'amine'; di/tri unaffected.
+        assert _join_multiplied_suffix("tetra", "amine") == "tetramine"
+        assert _join_multiplied_suffix("penta", "amine") == "pentamine"
+        assert _join_multiplied_suffix("di", "amine") == "diamine"
+        assert _join_multiplied_suffix("tri", "amine") == "triamine"
+        # -ol elision preserved; -one keeps its 'a'.
+        assert _join_multiplied_suffix("tetra", "ol") == "tetrol"
+        assert _join_multiplied_suffix("tetra", "one") == "tetraone"
+
+    def test_is_complex_silyl_with_prefixes(self):
+        # silyl/germyl carrying their own prefixes are compound -> enclosing marks.
+        assert is_complex_substituent("trihydroxysilyl") is True
+        assert is_complex_substituent("hydroxydimethylsilyl") is True
+        assert is_complex_substituent("trimethylsilyl") is True
+        # bare stems stay simple.
+        assert is_complex_substituent("silyl") is False
+        assert is_complex_substituent("germyl") is False

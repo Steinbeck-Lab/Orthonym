@@ -468,3 +468,32 @@ class TestCyclicReplacement:
         assert result is None, (
             f"gate 1 should reject ring size <7: smiles={smiles}, got {result!r}"
         )
+
+
+@pytest.mark.unit
+class TestTerminalGroup14Gate:
+    """v23 Phase 8 (P-68.2.1.1, E2-owned terminal-atom gate): a TERMINAL Group-14
+    backbone atom (Si/Ge/Sn/Pb) is NOT a skeletal-replacement chain atom — it
+    would be silently counted as a carbon of the alkane stem (structure loss).
+    Fail-closed; INTERIOR Group-14 atoms and ether/replacement chains are
+    UNAFFECTED."""
+
+    @pytest.mark.parametrize("smiles", [
+        "[SiH3]O[SiH2]O[SiH3]",   # trisiloxane: was '2,4-dioxa-3-silapentane' (=> dimethoxysilane)
+        "[SiH3]O[SiH3]",          # disiloxane
+        "[GeH3]O[GeH3]",          # digermoxane (terminal Ge)
+    ])
+    def test_terminal_group14_fail_closed(self, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) is None
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # INTERIOR Group-14 stays a skeletal replacement (terminal atoms are C).
+        ("C[SiH2]CC[SiH2]CC[SiH2]CC[SiH2]C", "2,5,8,11-tetrasiladodecane"),
+        # plain ether/dithioether chains untouched.
+        ("COCCOC", "2,5-dioxahexane"),
+        ("COCCOCCOC", "2,5,8-trioxanonane"),
+    ])
+    def test_interior_and_ether_unaffected(self, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        assert try_skeletal_replacement_name(mol) == expected

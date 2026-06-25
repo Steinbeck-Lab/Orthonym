@@ -10,6 +10,8 @@ optionally bearing the λ-convention when the hub valence is non-standard::
     FI(F)(F)(F)F      -> pentafluoro-lambda5-iodane      (IF5, λ5)
     ClP(Cl)Cl         -> trichlorophosphane              (PCl3, standard valence)
     FS(F)             -> difluorosulfane                 (SF2, standard valence)
+    F[Si](F)(F)F      -> tetrafluorosilane               (SiF4, Group-14, std valence)
+    Cl[Ge](Cl)(Cl)Cl  -> tetrachlorogermane              (GeCl4, Group-14)
     Cl[As](Cl)Cl      -> trichloroarsane                 (AsCl3, Group-15)
     C[As](C)C         -> trimethylarsane                 (organyl As, Group-15)
     c1ccccc1[As]...   -> triphenylarsane
@@ -31,7 +33,9 @@ SCOPE (fail-closed, accuracy-first):
         phenyl/naphthyl organyl, named via the mononuclear-parent-hydride
         enclosing-mark rule (P-16.5.1.3). Covers trimethylarsane / triphenylarsane
         and the bare arsane/stibane/bismuthane.
-  * P / S / Se / Te / I take only the all-halogen regime here. Carbon-substituted
+  * P / S / Se / Te / I / Si / Ge take only the all-halogen regime here.
+    Carbon-substituted Si/Ge (tetramethylsilane) stay with the P-69 organometallic
+    hydride-parent namer; carbon-substituted
     P (trimethylphosphane) stays with ``rules.phosphorus.name_phosphine`` (no
     double-claim); carbon-substituted chalcogens are sulfides/sulfanes named
     elsewhere; the organyl regime is reserved for the Group-15 metals As/Sb/Bi,
@@ -67,6 +71,14 @@ _HUB_STEMS = {
     'Sb': 'stibane',
     'Bi': 'bismuthane',
     'I': 'iodane',
+    # v23 Phase 8: Group-14 Si/Ge for the ALL-HALOGEN regime only (P-68.2.1.1 +
+    # P-67.1.2.5.2: "halides of silicic acid are substitutive names") — SiF4 ->
+    # tetrafluorosilane, GeCl4 -> tetrachlorogermane. Kept OUT of _ORGANYL_HUBS so
+    # the carbon-substituted forms (tetramethylsilane) stay with the P-69
+    # organometallic hydride-parent namer; only the all-halogen tetrahalides are
+    # claimed here (a mixed methyltrifluorosilane fails both guards -> cascades).
+    'Si': 'silane',
+    'Ge': 'germane',
 }
 
 # Hubs that additionally accept ORGANYL / bare substituents (no pre-existing

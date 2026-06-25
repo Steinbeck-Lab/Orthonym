@@ -1569,6 +1569,21 @@ def name_substituent_fragment(
             if _chal:
                 return _add_substituent_stereo(mol, sub_atoms, _chal, attach_idx=attach_idx)
 
+    # Step 1d (v23 Phase 8, P-68.2.2): Group-14 (Si/Ge) substituent ->
+    # (prefixes)silyl / (prefixes)germyl. Without this, Step 4's recursive path
+    # names a bare -SiH3 as the free molecule ('unknown organic compound') + 'yl'
+    # = 'unknown organic compoundyl' (then dropped on a senior carbon parent,
+    # losing the silyl), and an -Si(OH)3 as the parent-hydride -ol suffix
+    # ('silanetriol') + 'yl' = 'silanetriolyl' (OH wrongly kept as a suffix).
+    # Returns the correct silyl/germyl prefix, or None (fall through) for a
+    # multivalent / complex centre — byte-identical for the simple-organyl forms
+    # (trimethylsilyl) the recursive path already produces. (Same two-namer wiring
+    # as the Phase-4 SUBST-01 lesson: name_substituent AND this function.)
+    if _attach.GetSymbol() in ('Si', 'Ge'):
+        _g14 = _name_group14_substituent(mol, sub_atoms, attach_idx)
+        if _g14:
+            return _g14
+
     # Step 1c (Phase 4 SUBST-01): ring-bearing fragment -> the trustworthy ring
     # chokepoint, BEFORE the recursive / cache paths which drop ene/yne locants
     # ('cyclohexenyl' for cyclohex-1-en-1-yl) or name a ring-on-chain as a
@@ -1827,6 +1842,86 @@ def _collect_branch_atoms(mol, start_idx: int, block_idx: int) -> List[int]:
             if nn.GetIdx() not in visited:
                 stack.append(nn.GetIdx())
     return frag
+
+
+# v23 Phase 8 (P-68.2.2): Group-14 substituent groups -XH3 named by method (2)
+# of P-29.2 -> silyl / germyl, with the substituents on the X centre cited as
+# prefixes (trimethylsilyl, trihydroxysilyl). Scoped to Si/Ge (the Phase-8 scope;
+# Sn/Pb stannyl/plumbyl deferred).
+_GROUP14_SUBSTITUENT_STEM = {'Si': 'silyl', 'Ge': 'germyl'}
+# Terminal (X-bonded only) neutral heteroatom neighbour -> its substituent prefix.
+_GROUP14_TERMINAL_HETERO_PREFIX = {
+    ('O', 1): 'hydroxy',
+    ('S', 1): 'sulfanyl',
+    ('Se', 1): 'selanyl',
+    ('Te', 1): 'tellanyl',
+    ('N', 2): 'amino',
+}
+_GROUP14_HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+
+def _group14_neighbour_prefix(mol, idx, exclude_idx, frag_set) -> Optional[str]:
+    """Prefix name for ONE neighbour atom of a Group-14 substituent centre, or
+    None (fail-closed) for anything not a simple terminal hetero / halide / pure
+    organyl."""
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetFormalCharge() != 0:
+        return None
+    sym = atom.GetSymbol()
+    heavy_in_frag = [nb for nb in atom.GetNeighbors()
+                     if nb.GetIdx() in frag_set and nb.GetSymbol() != 'H']
+    # A TERMINAL hetero/halide neighbour (the Group-14 centre is its sole heavy
+    # neighbour) is cited as hydroxy / sulfanyl / amino / fluoro / ... A
+    # NON-terminal -O-R (silyl ether / silicic ester) is NOT this class -> None.
+    if len(heavy_in_frag) == 1 and heavy_in_frag[0].GetIdx() == exclude_idx:
+        if sym in _GROUP14_HALO_PREFIX:
+            return _GROUP14_HALO_PREFIX[sym]
+        hp = _GROUP14_TERMINAL_HETERO_PREFIX.get((sym, atom.GetTotalNumHs()))
+        if hp is not None:
+            return hp
+    # Pure unbranched-alkyl / phenyl-naphthyl organyl (reuse the Phase-7 guard).
+    from ..rules.substituent_purity import pure_organyl_prefix_name
+    return pure_organyl_prefix_name(mol, idx, exclude_idx)
+
+
+def _name_group14_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
+    """Name a MONOVALENT Group-14 (Si/Ge) substituent as ``(prefixes)silyl`` /
+    ``(prefixes)germyl`` (P-68.2.2 / P-29.2 method 2), else None (fail-closed).
+
+    Fixes (the substituent cascade otherwise drops or mis-suffixes these):
+      -SiH3      -> silyl            (HEAD: 'substituent', dropped on a senior C)
+      -Si(OH)3   -> trihydroxysilyl  (HEAD: 'silanetriolyl', OH kept as a -ol suffix)
+      -Si(CH3)3  -> trimethylsilyl   (already worked via Tier-4; kept byte-identical)
+
+    Fail-closed for: a non-Si/Ge attach atom, a charged/radical/ring centre, a
+    MULTIVALENT free valence (silanediyl bridge), or any neighbour that is not H /
+    terminal -OH,-SH,-SeH,-TeH,-NH2,-halide / pure organyl (a silyl ether / silicic
+    ester Si-O-C fails the terminal check -> None -> handled elsewhere).
+    """
+    frag_set = set(frag_atoms)
+    a = mol.GetAtomWithIdx(attach_idx)
+    stem = _GROUP14_SUBSTITUENT_STEM.get(a.GetSymbol())
+    if stem is None:
+        return None
+    if (a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0
+            or a.IsInRing()):
+        return None
+    # Monovalent: exactly one bond leaves the fragment (to the parent). A
+    # silanediyl / silanetriyl bridge (>=2 external bonds) is out of scope.
+    external = [n for n in a.GetNeighbors() if n.GetIdx() not in frag_set]
+    if len(external) != 1:
+        return None
+    prefixes: List[str] = []
+    for n in a.GetNeighbors():
+        if n.GetIdx() not in frag_set:
+            continue  # the parent attachment
+        p = _group14_neighbour_prefix(mol, n.GetIdx(), attach_idx, frag_set)
+        if p is None:
+            return None
+        prefixes.append(p)
+    if not prefixes:
+        return stem  # bare -SiH3 -> 'silyl'
+    return _compose_n_substituent_prefix(prefixes) + stem
 
 
 def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:

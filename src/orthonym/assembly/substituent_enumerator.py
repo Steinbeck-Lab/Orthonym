@@ -476,6 +476,25 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.92 (v23 Phase 8, P-68.2.2): Group-14 silyl/germyl substituent --
+    # A monovalent Si/Ge substituent is named (prefixes)silyl / (prefixes)germyl,
+    # with the substituents on the Si/Ge centre cited as prefixes. MUST precede the
+    # Tier-2 cache and Tier-4 recursive namer, which drop a bare -SiH3 ('substituent')
+    # or keep an -OH as a parent-hydride -ol suffix (-Si(OH)3 -> 'silanetriolyl').
+    # Gated on the attach atom being Si/Ge (rare -> contained blast radius);
+    # fail-closed (None -> fall through unchanged) for every other case.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        if mol.GetAtomWithIdx(attach_idx).GetSymbol() in ('Si', 'Ge'):
+            try:
+                from .substituent_naming import _name_group14_substituent
+                _g14 = _name_group14_substituent(
+                    mol, list(frag_atoms_set), attach_idx
+                )
+                if _g14:
+                    return _stereo_route(_g14)
+            except Exception:
+                pass
+
     # ---- Tier 1.95 (Phase 4 SUBST-01): ring-system substituent chokepoint ----
     # A ring-bearing fragment is named by the trustworthy ring engine
     # (get_ring_substituent_name + _compound_ring_on_chain_substituent) BEFORE the
