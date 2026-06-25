@@ -47,7 +47,7 @@ COc1cc(O)c2c(=O)c(OC)c(-c3ccc(OC)c(O)c3)oc2c1,3-methoxyphenol,DECOMPOSITION_PRE_
 CCCCCCCCCCCCCCCC(=O)OC[C@H](CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)OC(=O)CCCCCCCCCCCCCCC,"(beta-D-galactopyranosyloxy)(2S)-1,2-bis(palmitoyloxy)propan-3-ol",DECOMPOSITION_PRE_GENERAL,Tier 3,canary_post_160.2.csv,test_canary_name_stability_0248
 [Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,decamethylferrocene,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-10
 CC[Li],ethyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-20
-[Li]C=C,ethyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-12
+[Li]C=C,ethenyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-12
 [Ni].C=CC.C=CC,bis(η³-prop-2-en-1-yl)nickel,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T4-06
 [Li][CH3],methyllithium,ORGANOMETALLIC,ORGM-T2,canary_organometallics.csv,ORG-T3-01
 CCC(=O)c1ccc(OC)cc1OC,"1-(2,4-dimethoxyphenyl)propan-1-one",GENERAL,Tier 1,canary_post_160.2.csv,test_canary_rt75_0673

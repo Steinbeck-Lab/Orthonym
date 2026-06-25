@@ -1,9 +1,10 @@
 """Phase 161 integration canary: ORGM 53-fixture per-tier validation.
 
-ORGM-04 acceptance: 49/53 Tier-A on the in-Phase-161-scope subset
-(53 total minus 4 Phase-161.1-deferred fixtures: T4-07, T4-12, T4-15, T4-22).
+ORGM-04 acceptance: 50/53 Tier-A on the in-Phase-161-scope subset
+(53 total minus 3 Phase-161.1-deferred fixtures: T4-07, T4-15, T4-22).
+v23 Phase 10 resolved T4-12 (ethenyllithium); it is now in-scope/passing.
 
-Per CONTEXT D-09 + project memory rule #4 (no band-aids): the 4 deferred
+Per CONTEXT D-09 + project memory rule #4 (no band-aids): the 3 deferred
 fixtures remain in the canary and produce HONEST FAILING tests per
 honest-fail-on-data. They are NOT @pytest.mark.xfail-masked — VERIFICATION.md
 § 3 documents each disposition.
@@ -41,9 +42,13 @@ def _load_orgm_canary():
 ORGM_CANARY = _load_orgm_canary()
 _ORGM_IDS = [row['id'] for row in ORGM_CANARY]
 
-# Phase-161.1 backlog (4 fixtures): honest failures documented in 161-VERIFICATION.md § 3
+# Phase-161.1 backlog (3 fixtures): honest failures documented in 161-VERIFICATION.md § 3
 # These fixtures remain in the canary; the tests fail; the failures are scope-deferred per CONTEXT D-01.
-_PHASE_161_1_BACKLOG = frozenset({'ORG-T4-07', 'ORG-T4-12', 'ORG-T4-15', 'ORG-T4-22'})
+# v23 Phase 10 RESOLVED ORG-T4-12 ([Li]C=C): the σ-unsaturated ligand recogniser now
+# emits 'ethenyl' (root-cause fix in _ligand_name_from_atoms). Its CSV expected_name_pin
+# was also corrected from the mislabeled 'vinyllithium' to the true PIN 'ethenyllithium'
+# (P-31.1.4.3.4 — vinyl is retained, general-nomenclature only).
+_PHASE_161_1_BACKLOG = frozenset({'ORG-T4-07', 'ORG-T4-15', 'ORG-T4-22'})
 
 
 @pytest.mark.integration
@@ -152,11 +157,15 @@ def test_tier4_eta_bonded(row):
 
 @pytest.mark.integration
 def test_canary_in_scope_count():
-    """Audit invariant: exactly 49 in-scope fixtures + 4 Phase-161.1 backlog = 53 total."""
+    """Audit invariant: exactly 50 in-scope fixtures + 3 Phase-161.1 backlog = 53 total.
+
+    v23 Phase 10 moved ORG-T4-12 (ethenyllithium) from backlog → in-scope
+    (the σ-unsaturated ligand recogniser fix resolved it): 49→50 in-scope, 4→3 backlog.
+    """
     in_scope = [r for r in ORGM_CANARY if r['id'] not in _PHASE_161_1_BACKLOG]
     backlog = [r for r in ORGM_CANARY if r['id'] in _PHASE_161_1_BACKLOG]
-    assert len(in_scope) == 49, f"Expected 49 in-scope; got {len(in_scope)}"
-    assert len(backlog) == 4, f"Expected 4 backlog; got {len(backlog)}"
+    assert len(in_scope) == 50, f"Expected 50 in-scope; got {len(in_scope)}"
+    assert len(backlog) == 3, f"Expected 3 backlog; got {len(backlog)}"
     assert len(ORGM_CANARY) == 53
 
 

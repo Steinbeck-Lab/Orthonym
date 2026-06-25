@@ -38,7 +38,7 @@ ORG-T4-08,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Mn].C1=CC=CC=CC=1,[C-]#[O+].[C-]#[O+].[
 ORG-T4-09,[Fe].C1=CC=CC=CC=C1,[Fe].C1=CC=CC=CC=C1,(η⁸-cyclooctatetraene)iron,(η⁸-cyclooctatetraene)iron(0),tier4,bis_cot,8,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
 ORG-T4-10,[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,[Fe+2].CC1=C(C)C(C)=C(C)[C-]1C.CC1=C(C)C(C)=C(C)[C-]1C,decamethylferrocene,bis(η⁵-pentamethylcyclopentadienyl)iron(II),tier4,metallocene_substituted,5,parse_ok,parse_unsupported,rt_ok,Salzer §5.4
 ORG-T4-11,C[SiH3],C[SiH3],methylsilane,methylsilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
-ORG-T4-12,[Li]C=C,[Li]C=C,vinyllithium,ethenyllithium,tier4,sigma_alkali_unsat,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T4-12,[Li]C=C,[Li]C=C,ethenyllithium,ethenyllithium,tier4,sigma_alkali_unsat,1,parse_ok,parse_ok,rt_ok,P-69.3
 ORG-T4-13,C[Si](C)(C)c1ccccc1,C[Si](C)(C)c1ccccc1,trimethylphenylsilane,trimethylphenylsilane,tier4,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2 (PIN amended Plan-04: IUPAC P-29.2 alphabetic order ignores multiplicative prefix tri-; methyl(m) < phenyl(p); methyl FIRST.)
 ORG-T4-14,CCCC[Li],CCCC[Li],butyllithium,butyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3 (PIN/SYS amended Plan-04: SMILES CCCC[Li] canonicalizes to [Li][CH2]CCC = n-butyl-Li primary; sec-butyl-Li SMILES is CCC([Li])C = [Li][CH](C)CC. Audit Plan-01 misidentified.)
 ORG-T4-15,CC(C)(C)[Li],CC(C)(C)[Li],tert-butyllithium,tert-butyllithium,tier4,sigma_alkali,1,parse_ok,parse_ok,rt_ok,P-69.3

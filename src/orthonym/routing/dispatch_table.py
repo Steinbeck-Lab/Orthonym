@@ -124,6 +124,7 @@ class StoutClass(_StrEnumBase):
     MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6/7 (P-68 / P-31.1.4.2 λ-convention + Group-15 As/Sb/Bi; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
     CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
+    DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
@@ -1033,6 +1034,21 @@ def _handle_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) ->
     return name_polyazane(mol)
 
 
+def _is_dinuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 10 (P-69.5.3); priority 48. A two-atom Group-14/Group-15 catenated
+    parent hydride (germylstibane). PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_dinuclear_hydride
+    return name_dinuclear_hydride(mol) is not None
+
+
+def _handle_dinuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the di-nuclear catenated-hydride PIN (P-69.5.3), else None (cascade-continuation)."""
+    from orthonym.rules.mononuclear_hydrides import name_dinuclear_hydride
+    return name_dinuclear_hydride(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -1117,6 +1133,25 @@ _register_dispatch(
     iupac_section="Blue Book P-68.3.1.1 / P-68.3.1.3 / P-21.2.2",
     description="Polyazane-family parent hydride (hydrazine / diazene / triazane / "
                 "triaz-1-ene / 1,2-diphenyldiazene); graph classifier, fail-closed",
+)
+
+
+# --- v23 Phase 10: DINUCLEAR_HYDRIDE at priority 48 (after POLYAZANE@47, before ---
+# ORGANOMETALLIC@50). A two-atom Group-14/Group-15 catenated parent hydride
+# (P-69.5.3 two-class-2-metal substitutive): [GeH3][SbH2] -> germylstibane,
+# [SiH3][AsH2] -> silylarsane, [PbH3][BiH2] -> plumbylbismuthane (Group-15 is the
+# P-41-senior parent; Group-14 is the -yl substituent). All 'X compound (not
+# supported)' before this phase (detect_metal_complex returns None for the
+# multimetal single fragment, so ORGM@50 never engages). Graph classifier,
+# fail-closed (exactly one Group-14 + one Group-15 hub, H-saturated, single bond);
+# cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.DINUCLEAR_HYDRIDE, priority=48, tier=1,
+    predicate=_is_dinuclear_hydride, handler=_handle_dinuclear_hydride,
+    iupac_section="Blue Book P-69.5.3 / P-68 / P-41",
+    description="Di-nuclear Group-14/Group-15 catenated parent hydride "
+                "(germylstibane / silylarsane / plumbylbismuthane); graph "
+                "classifier, fail-closed",
 )
 
 

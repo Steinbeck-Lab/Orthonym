@@ -1,5 +1,10 @@
 """Mononuclear parent-hydride namer (P-68 / P-21.1 / P-31.1.4.2 λ-convention).
 
+(v23 Phase 10 adds a sibling ``name_dinuclear_hydride`` for the two-atom
+Group-14/Group-15 catenated hydride ``germylstibane`` family — P-69.5.3 — at
+the bottom of this module; it reuses the structural guards but is a distinct
+entry point with its own dispatch slot.)
+
 Names a single non-carbon "hub" atom — a Group-15 pnictogen (P/As/Sb/Bi), a
 chalcogen (S/Se/Te) or iodine — as a *substitutive parent hydride* (P-68.3),
 optionally bearing the λ-convention when the hub valence is non-standard::
@@ -91,6 +96,18 @@ _ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi'})
 # multiplying prefix di/tri/... does NOT count for ordering).
 _HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
 _HALOGENS = frozenset(_HALO_PREFIX)
+
+
+# === v23 Phase 10 (P-69.5.3): di-nuclear Group-14 / Group-15 catenated hydride ===
+# A Group-14 atom bonded to a senior Group-15 parent hydride. Per P-41 the
+# Group-15 element outranks Group-14, so it is the PARENT hydride and the
+# Group-14 element is the -yl substituent prefix:
+#   [GeH3][SbH2] -> germylstibane    [SiH3][AsH2] -> silylarsane
+# Only As/Sb/Bi parents (P stays with rules.phosphorus.name_phosphine — no
+# double-claim; N is not a metal in this family). Only the Group-14 substituent
+# prefixes silyl/germyl/stannyl/plumbyl.
+_GROUP14_SUBST_YL = {'Si': 'silyl', 'Ge': 'germyl', 'Sn': 'stannyl', 'Pb': 'plumbyl'}
+_GROUP15_HYDRIDE_PARENT = {'As': 'arsane', 'Sb': 'stibane', 'Bi': 'bismuthane'}
 
 
 def _find_unique_hub(mol):
@@ -216,4 +233,71 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     return None
 
 
-__all__ = ["name_mononuclear_hydride"]
+def name_dinuclear_hydride(mol) -> Optional[str]:
+    """Return the substitutive PIN for a two-atom Group-14/Group-15 catenated
+    parent hydride (P-69.5.3 two-class-2-metal substitutive), else ``None``
+    (fail-closed cascade-continuation).
+
+    A single bond joins EXACTLY one Group-14 atom (Si/Ge/Sn/Pb) and one
+    Group-15 atom (As/Sb/Bi), each otherwise saturated with hydrogen (no
+    carbon, no halide, no other heavy atom). Per P-41 the Group-15 element is
+    senior, so it is the PARENT hydride (arsane/stibane/bismuthane) and the
+    Group-14 element is the substituent prefix (silyl/germyl/stannyl/plumbyl)::
+
+        [GeH3][SbH2] -> germylstibane       (Sb senior -> stibane parent)
+        [SiH3][AsH2] -> silylarsane
+        [PbH3][BiH2] -> plumbylbismuthane
+
+    Every emitted name round-trips through OPSIN 2.9.0 to the input structure.
+
+    SCOPE (fail-closed, accuracy-first): exactly one Group-14 + one Group-15
+    hub, single-bonded, H-saturated, neutral, non-radical, single fragment,
+    neither hub in a ring. Homo-dinuclear (Si-Si disilane, Sb-Bi), substituted
+    (hexamethyldisilane), >2 hubs, any carbon/halide/stray heteroatom, P/N
+    parents, ions and rings each fail a guard and cascade onward — zero false
+    positives. (P is excluded so phosphane stays with name_phosphine.)
+
+    Pure: no mol mutation, no global state.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # Every heavy atom must be one of the two hub elements (a carbon, halide or
+    # stray heteroatom -> not a bare catenated hydride -> fail-closed).
+    g14 = []
+    g15 = []
+    for atom in mol.GetAtoms():
+        sym = atom.GetSymbol()
+        if sym == 'H':
+            continue
+        if sym in _GROUP14_SUBST_YL:
+            g14.append(atom)
+        elif sym in _GROUP15_HYDRIDE_PARENT:
+            g15.append(atom)
+        else:
+            return None
+    if len(g14) != 1 or len(g15) != 1:
+        return None
+    sub_atom, parent_atom = g14[0], g15[0]
+
+    # A metallacycle (ring-member hub) is a different class (P-69.4) — decline.
+    if sub_atom.IsInRing() or parent_atom.IsInRing():
+        return None
+
+    # The two hubs are joined by the catenation bond, which must be single
+    # (a double bond would be a -ylidene / -diyl, out of scope). With exactly
+    # two heavy atoms in one fragment, this bond is their only connection.
+    bond = mol.GetBondBetweenAtoms(sub_atom.GetIdx(), parent_atom.GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+
+    return (f"{_GROUP14_SUBST_YL[sub_atom.GetSymbol()]}"
+            f"{_GROUP15_HYDRIDE_PARENT[parent_atom.GetSymbol()]}")
+
+
+__all__ = ["name_mononuclear_hydride", "name_dinuclear_hydride"]

@@ -114,6 +114,20 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
     if n_atoms == 6 and aromatic_count == 6:
         return 'phenyl'
 
+    # Ethenyl (CH2=CH-): a clean 2-carbon σ-ligand joined by a C=C double
+    # bond. P-31.1.4.3.4 — 'ethenyl' is the PIN substituent prefix ('vinyl'
+    # is retained, general-nomenclature only; both OPSIN-RT). This case was
+    # listed in the docstring but the body never implemented it, so C=C[M]
+    # silently collapsed to 'ethyl' — a structure-loss bug that dropped the
+    # double bond (→ a different molecule, SELF-01-suppressed in production).
+    # Scope is the clean 2-carbon terminal vinyl ONLY; any larger / branched /
+    # internal unsaturated ligand stays None (fail-closed) — not yet
+    # confidently nameable.
+    if n_atoms == 2 and aromatic_count == 0:
+        bond = mol.GetBondBetweenAtoms(atom_indices[0], atom_indices[1])
+        if bond is not None and bond.GetBondTypeAsDouble() == 2.0:
+            return 'ethenyl'
+
     # Alkyl groups: all sp³ carbons in a linear chain
     if aromatic_count == 0:
         # Check linearity: degree 1 carbons at the ends, degree 2 in middle
