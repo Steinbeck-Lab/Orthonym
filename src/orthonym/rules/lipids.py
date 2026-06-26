@@ -264,6 +264,66 @@ def _bis_enclose(inner: str, mult: str) -> str:
     return f"{mult}({inner})"
 
 
+# Multiplier word for free acidic -OH on the functional-class phosphate ester.
+_HYDROGEN_WORD = {1: "hydrogen", 2: "dihydrogen"}
+
+
+def _collect_head_skeleton(mol, head_c, head_o_idx) -> list:
+    """BFS the head-group skeleton from ``head_c``, blocked at the phospho-ester
+    oxygen (so the phosphate is excluded). Returns the atom-index list naming the
+    head substituent (P-107.3.3)."""
+    from collections import deque
+    seen = {head_o_idx, head_c}
+    out = [head_c]
+    dq = deque([head_c])
+    while dq:
+        cur = dq.popleft()
+        for n in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = n.GetIdx()
+            if ni in seen:
+                continue
+            seen.add(ni)
+            out.append(ni)
+            dq.append(ni)
+    return out
+
+
+def _count_free_phosphate_oh(mol, p_idx) -> int:
+    """Count free acidic -OH oxygens on the phosphorus (single-bonded, degree 1,
+    >=1 H) — the 'hydrogen'/'dihydrogen' multiplier for the phosphate ester."""
+    n = 0
+    p = mol.GetAtomWithIdx(p_idx)
+    for nb in p.GetNeighbors():
+        if nb.GetAtomicNum() != 8:
+            continue
+        b = mol.GetBondBetweenAtoms(p_idx, nb.GetIdx())
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        if nb.GetDegree() == 1 and nb.GetTotalNumHs() >= 1:
+            n += 1
+    return n
+
+
+def _name_phospho_head_substituent(mol, head_o_idx) -> Optional[str]:
+    """Name a neutral organic phospho head group (e.g. serine) as a substituent
+    prefix FROM STRUCTURE, via the (structure-loss-free) substituent namer. The
+    head carbon is the carbon neighbour of the phospho-ester oxygen; the skeleton
+    is collected blocked at that oxygen. Fail-closed: returns None on a degenerate
+    / unnameable result so the caller defers to the substitutive glyceride form."""
+    from ..assembly.substituent_enumerator import name_substituent
+    head_o = mol.GetAtomWithIdx(head_o_idx)
+    head_c = next((n.GetIdx() for n in head_o.GetNeighbors()
+                   if n.GetAtomicNum() == 6), None)
+    if head_c is None:
+        return None
+    skeleton = _collect_head_skeleton(mol, head_c, head_o_idx)
+    name = name_substituent(mol, skeleton, head_c)
+    if (not name or name in ("substituent", "unknown organic compound")
+            or "unknown" in name):
+        return None
+    return name
+
+
 def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     central = _central_carbon(mol, match.core_atoms)
     loc_to_atom = {v: k for k, v in match.position_locants.items()}
@@ -292,6 +352,25 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
             if glyceryl is None:
                 return None
             return f"{glyceryl} dihydrogen phosphate"
+        # v23 SL: a neutral organic head (serine -> phosphatidylserine, P-107.3.3)
+        # named FROM STRUCTURE via the structure-loss-free substituent namer ->
+        # functional-class hydrogen-phosphate diester '<glyceryl> <head> hydrogen
+        # phosphate'. inositol (stereo-entangled ring head), ethanolamine/glycerol
+        # (substitutive form) keep their existing paths. Fail-closed: declines to
+        # the substitutive glyceride form when the head is not cleanly nameable.
+        if head_desc not in ("choline", "ethanolamine", "glycerol", "inositol"):
+            head_o_idx = atom_site[phospho_atom][4]
+            p_idx = atom_site[phospho_atom][1]
+            head_name = (
+                _name_phospho_head_substituent(mol, head_o_idx)
+                if head_o_idx is not None else None
+            )
+            hword = _HYDROGEN_WORD.get(_count_free_phosphate_oh(mol, p_idx))
+            if head_name is not None and hword is not None:
+                glyceryl = _diacyl_glyceryl(
+                    mol, match, central, phospho_atom, acyl_atoms, atom_site)
+                if glyceryl is not None:
+                    return f"{glyceryl} {head_name} {hword} phosphate"
         return _assemble_glyceride(mol, match, style)  # neutral substitutive form (or None if unrecognized)
 
     glyceryl = _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site)

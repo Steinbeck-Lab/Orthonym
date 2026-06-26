@@ -518,6 +518,26 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # ---- Tier 1.96 (v23 SL): polyfunctional acyclic substituent ----
+    # A saturated acyclic carbon chain bearing >=2 simple detachable prefixes
+    # (carboxy/amino/hydroxy/oxo/halogen) is named from STRUCTURE, numbered from
+    # the free valence. MUST precede the Tier-2 cache, which maps the H-capped
+    # fragment to a whole-molecule retained name (serine-O -CH2CH(NH2)COOH caps
+    # to 'alanine' -> 'alaninyl', a different constitution), and the Tier-4
+    # recursive path, which lets parent_to_prefix DROP the secondary prefixes
+    # ('(R)-2-carboxyethyl', amino lost). Fail-closed (None -> fall through) for
+    # rings / branched / unsaturated / amides / esters / ethers / single-FG.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from .substituent_naming import _name_polyfunctional_acyclic_substituent
+            _poly = _name_polyfunctional_acyclic_substituent(
+                mol, list(frag_atoms_set), attach_idx, set()
+            )
+            if _poly:
+                return _stereo_route(_poly)
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

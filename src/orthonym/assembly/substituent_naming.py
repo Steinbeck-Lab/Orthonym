@@ -444,6 +444,283 @@ def _name_saturated_substituted_chain(
     return f"{'-'.join(part_strings)}{stem}yl"
 
 
+# Single-atom detachable prefixes this namer enumerates from STRUCTURE, keyed
+# by (element, role). Carboxy is multi-atom (handled separately: its carbon is
+# NOT a backbone carbon — P-65.1.1 expresses -COOH on a substituent as the
+# detachable prefix "carboxy", excluding the acid carbon from the parent chain).
+_POLYFUNC_OXO_PREFIX = "oxo"
+_POLYFUNC_HYDROXY_PREFIX = "hydroxy"
+_POLYFUNC_AMINO_PREFIX = "amino"
+_POLYFUNC_CARBOXY_PREFIX = "carboxy"
+
+
+def _name_polyfunctional_acyclic_substituent(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Name an acyclic SATURATED carbon-chain substituent bearing >=2 simple
+    detachable functional-group prefixes (carboxy / amino / hydroxy / oxo /
+    halogen), numbered from the free valence (P-29.2 / P-31.1.4.3.4: the free
+    valence is locant 1; every characteristic group on a substituent is cited
+    as a detachable prefix per P-29.3.2 / P-65.1.1).
+
+    ROOT-CAUSE fix for the polyfunctional structure-loss bug: the recursive
+    Tier-4 path names the H-capped fragment as a FREE molecule
+    ('(2R)-2-aminopropanoic acid') and ``parent_to_prefix`` then rebuilds the
+    stem from the carbon COUNT alone — DROPPING every secondary prefix
+    (-> '(R)-2-carboxyethyl', the amino lost) — while the Tier-2 cache maps the
+    capped fragment to a whole-molecule retained name ('alanine' -> 'alaninyl',
+    a different constitution: the free valence is on a former methyl). Both lose
+    structure. Here every group on the chain is enumerated directly FROM
+    STRUCTURE, so nothing is dropped and the locants are attachment-correct.
+
+    Fail-closed: returns None (caller falls through unchanged) for rings,
+    unsaturated or branched backbones, non-primary (internal) attachment,
+    secondary/tertiary amines, amides / esters / ethers / thioethers / nitriles
+    (existing tiers own those), charged atoms, or any unrecognised atom. Scoped
+    to >=2 functional-group prefixes — the documented polyfunctional-loss class;
+    single-FG forms keep their existing (byte-identical) tiers.
+
+    Worked example (IUPAC P-65.1.1 / serine phosphoester head, ChEBI PS):
+        ``-CH2-CH(NH2)-COOH`` -> "2-amino-2-carboxyethyl"
+    """
+    if not sub_atoms or attach_idx is None:
+        return None
+    sub_set = set(sub_atoms)
+    if attach_idx not in sub_set:
+        return None
+    ring_info = mol.GetRingInfo()
+    if any(ring_info.NumAtomRings(i) > 0 for i in sub_set):
+        return None  # ring fragment -> the ring engine owns it
+
+    consumed: Set[int] = set()      # atoms absorbed by a carboxy group
+    # backbone_carbon_idx -> list of prefix strings sitting on that carbon
+    prefix_on: dict = {}
+
+    def _add_prefix(carbon_idx: int, prefix: str) -> None:
+        prefix_on.setdefault(carbon_idx, []).append(prefix)
+
+    # ---- Pass 1: carboxy (-C(=O)OH / -C(=O)O-). The carboxy carbon and its two
+    # oxygens are consumed; the prefix is recorded on the carboxy carbon's single
+    # carbon neighbour (a backbone carbon). ----
+    for idx in sub_set:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != 'C' or a.GetFormalCharge() != 0:
+            continue
+        dbl_o = []
+        oh_o = []
+        c_nbr = []
+        clean = True
+        for b in a.GetBonds():
+            nb = b.GetOtherAtom(a)
+            ni = nb.GetIdx()
+            if ni not in sub_set:
+                # only the free-valence bond (at the attachment atom) may leave
+                # the fragment; a carboxy carbon is never the attachment here
+                clean = clean and (idx == attach_idx)
+                continue
+            bt = b.GetBondType()
+            if nb.GetSymbol() == 'O' and bt == Chem.BondType.DOUBLE:
+                dbl_o.append(ni)
+            elif nb.GetSymbol() == 'O' and bt == Chem.BondType.SINGLE:
+                oh_o.append(nb)
+            elif nb.GetSymbol() == 'C' and bt == Chem.BondType.SINGLE:
+                c_nbr.append(ni)
+            else:
+                clean = False
+        if not clean:
+            continue
+        if len(dbl_o) == 1 and len(oh_o) == 1 and len(c_nbr) == 1:
+            o_single = oh_o[0]
+            if (o_single.GetDegree() == 1
+                    and (o_single.GetTotalNumHs() >= 1
+                         or o_single.GetFormalCharge() < 0)):
+                consumed.add(idx)
+                consumed.add(dbl_o[0])
+                consumed.add(o_single.GetIdx())
+                _add_prefix(c_nbr[0], _POLYFUNC_CARBOXY_PREFIX)
+
+    # Backbone = every carbon not consumed by a carboxy group.
+    backbone = [
+        i for i in sub_set
+        if mol.GetAtomWithIdx(i).GetSymbol() == 'C' and i not in consumed
+    ]
+    backbone_set = set(backbone)
+    if not backbone:
+        return None
+    if attach_idx not in backbone_set:
+        return None  # attachment is inside a carboxy/prefix group -> decline
+
+    # Carboxy must attach to a backbone carbon (else the fragment is malformed).
+    for c_idx in list(prefix_on):
+        if c_idx not in backbone_set:
+            return None
+
+    # ---- Pass 2: every remaining (non-consumed) atom must be a recognised
+    # single-atom prefix on a backbone carbon; backbone carbons must be saturated
+    # and bond only to backbone carbons / recognised prefix atoms. ----
+    fg_count = sum(len(v) for v in prefix_on.values())  # carboxy groups so far
+    for idx in sub_set:
+        if idx in consumed:
+            continue
+        a = mol.GetAtomWithIdx(idx)
+        sym = a.GetSymbol()
+        if a.GetFormalCharge() != 0:
+            return None
+        if idx in backbone_set:
+            # Validate this backbone carbon's bonds.
+            for b in a.GetBonds():
+                nb = b.GetOtherAtom(a)
+                ni = nb.GetIdx()
+                bt = b.GetBondType()
+                if ni not in sub_set:
+                    if idx != attach_idx:
+                        return None      # only the free valence leaves the frag
+                    continue
+                if ni in consumed:
+                    continue             # bond into the carboxy group (the C=O–OH)
+                if bt == Chem.BondType.SINGLE:
+                    continue             # to backbone C or to a prefix heteroatom
+                if (bt == Chem.BondType.DOUBLE and nb.GetSymbol() == 'O'
+                        and ni not in backbone_set):
+                    continue             # ketone/aldehyde C=O (oxo) — handled below
+                return None              # C=C / C#C / C#N / C=N etc. -> decline
+            continue
+        # Non-backbone, non-consumed heavy atom -> must be a simple prefix.
+        if a.GetIsotope():
+            return None
+        # find its single backbone-carbon neighbour
+        heavy_nbrs = [n for n in a.GetNeighbors()]
+        c_host = [n.GetIdx() for n in heavy_nbrs
+                  if n.GetIdx() in backbone_set]
+        in_frag_nbrs = [n.GetIdx() for n in heavy_nbrs if n.GetIdx() in sub_set]
+        if sym == 'O':
+            # hydroxy (-OH, single bond, terminal) or oxo (=O on a backbone C)
+            if len(in_frag_nbrs) != 1 or len(c_host) != 1:
+                return None
+            bond = mol.GetBondBetweenAtoms(idx, c_host[0])
+            if bond.GetBondType() == Chem.BondType.SINGLE:
+                if a.GetTotalNumHs() < 1:
+                    return None          # alkoxide / ether-like -> decline
+                _add_prefix(c_host[0], _POLYFUNC_HYDROXY_PREFIX)
+                fg_count += 1
+            elif bond.GetBondType() == Chem.BondType.DOUBLE:
+                if a.GetTotalNumHs() != 0:
+                    return None
+                _add_prefix(c_host[0], _POLYFUNC_OXO_PREFIX)
+                fg_count += 1
+            else:
+                return None
+        elif sym == 'N':
+            # primary amine -NH2 only (neutral, terminal, single bond, 2 H);
+            # the host carbon must NOT be a carbonyl (that is an amide).
+            if len(in_frag_nbrs) != 1 or len(c_host) != 1:
+                return None
+            if a.GetTotalNumHs() != 2:
+                return None
+            bond = mol.GetBondBetweenAtoms(idx, c_host[0])
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            host = mol.GetAtomWithIdx(c_host[0])
+            if any(bb.GetBondType() == Chem.BondType.DOUBLE
+                   and bb.GetOtherAtom(host).GetSymbol() == 'O'
+                   for bb in host.GetBonds()):
+                return None              # -C(=O)NH2 amide -> decline (carbamoyl)
+            _add_prefix(c_host[0], _POLYFUNC_AMINO_PREFIX)
+            fg_count += 1
+        elif sym in _HALOGEN_PREFIX:
+            if len(in_frag_nbrs) != 1 or len(c_host) != 1:
+                return None
+            bond = mol.GetBondBetweenAtoms(idx, c_host[0])
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            _add_prefix(c_host[0], _HALOGEN_PREFIX[sym])
+            fg_count += 1
+        else:
+            return None                  # S / P / B / etc. -> decline
+
+    # A single carbon bearing BOTH oxo and hydroxy is a carboxyl carbon (-C(=O)OH)
+    # that Pass-1 did not consume as 'carboxy' (e.g. its only non-O neighbour is the
+    # non-carbon parent — a carbamic acid C-N). Never emit 'hydroxyoxomethyl' for a
+    # carboxylic acid: fail-closed so another tier names it (P-65.1.1).
+    for _prefixes in prefix_on.values():
+        if _POLYFUNC_OXO_PREFIX in _prefixes and _POLYFUNC_HYDROXY_PREFIX in _prefixes:
+            return None
+
+    if fg_count < 2:
+        return None  # scoped to the polyfunctional class (single-FG = other tiers)
+
+    # ---- Backbone must be a single linear chain attached at a terminus. ----
+    for idx in backbone:
+        n_bb = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                   if n.GetIdx() in backbone_set)
+        if n_bb > 2:
+            return None  # branched backbone -> follow-on (located polyfunctional)
+    n_attach_bb = sum(1 for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                      if n.GetIdx() in backbone_set)
+    if n_attach_bb > 1:
+        return None  # internal/secondary attachment -> follow-on
+
+    # Trace the chain from the attachment terminus (attach = locant 1).
+    ordered = [attach_idx]
+    visited = {attach_idx}
+    current = attach_idx
+    while len(ordered) < len(backbone):
+        nxt = None
+        for n in mol.GetAtomWithIdx(current).GetNeighbors():
+            ni = n.GetIdx()
+            if ni in backbone_set and ni not in visited:
+                nxt = ni
+                break
+        if nxt is None:
+            break
+        ordered.append(nxt)
+        visited.add(nxt)
+        current = nxt
+    if len(ordered) != len(backbone):
+        return None  # disconnected backbone -> decline
+
+    pos = {idx: i + 1 for i, idx in enumerate(ordered)}  # attach = 1
+    single_position = (len(backbone) == 1)
+
+    from collections import defaultdict
+    from ..data.chain_names import get_chain_prefix
+    groups: dict = defaultdict(list)  # prefix -> sorted locant list
+    for c_idx, prefixes in prefix_on.items():
+        for pfx in prefixes:
+            groups[pfx].append(pos[c_idx])
+
+    _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra",
+             5: "penta", 6: "hexa"}
+    parts = []
+    for prefix in sorted(groups.keys(), key=alpha_sort_key):
+        locs = sorted(groups[prefix])
+        mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+        if single_position:
+            parts.append(f"{mult}{prefix}")           # methyl: locant elided
+        else:
+            loc_str = ",".join(str(loc) for loc in locs)
+            parts.append(f"{loc_str}-{mult}{prefix}")
+
+    stem = get_chain_prefix(len(backbone))
+    # Join consecutive prefix parts; a leading digit after a non-digit needs a
+    # hyphen ("...amino-2-carboxy..."), handled by the locant prefix itself.
+    return f"{''.join(_joined_prefix_parts(parts))}{stem}yl"
+
+
+def _joined_prefix_parts(parts: List[str]) -> List[str]:
+    """Join alphabetised prefix parts inserting a hyphen between a letter and a
+    following locant digit (e.g. 'amino' + '2-carboxy' -> 'amino-2-carboxy')."""
+    out = []
+    for i, p in enumerate(parts):
+        if i > 0 and out and out[-1][-1].isalpha() and p[:1].isdigit():
+            out.append("-")
+        out.append(p)
+    return out
+
+
 def _name_ether_substituted_chain(
     mol,
     sub_atoms: List[int],
@@ -1641,6 +1918,18 @@ def name_substituent_fragment(
     halo_name = _name_saturated_substituted_chain(mol, sub_atoms, attach_idx, parent_set)
     if halo_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
+
+    # Step 2c-poly (v23 SL — polyfunctional structure-loss): a saturated acyclic
+    # carbon chain bearing >=2 simple detachable prefixes (carboxy/amino/hydroxy/
+    # oxo/halogen), numbered from the free valence. MUST precede the recursive
+    # path, which caps the fragment to a free molecule and lets parent_to_prefix
+    # DROP the secondary prefixes (serine-O -CH2CH(NH2)COOH -> '(R)-2-carboxyethyl',
+    # amino lost). Fail-closed for rings / branched / unsaturated / amides / ethers.
+    poly_name = _name_polyfunctional_acyclic_substituent(
+        mol, sub_atoms, attach_idx, parent_set
+    )
+    if poly_name is not None:
+        return _add_substituent_stereo(mol, sub_atoms, poly_name, attach_idx=attach_idx)
 
     # Step 2c-ether (v22 C-T2 / V-3, P-63.2.2.2): saturated all-carbon chain
     # bearing ether -O-R substituent(s), numbered from the attachment. MUST
