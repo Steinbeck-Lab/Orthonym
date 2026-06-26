@@ -94,6 +94,23 @@ NATURAL_PRODUCT_SCAFFOLDS = {
 # Key = pre-canonicalized SMILES, value = retained/trivial name.
 
 NATURAL_PRODUCT_DERIVATIVES = {
+    # ---- v23 Phase 14: NP parent-hydride catalog growth (P-101.2.7 Table 10.1) ----
+    # Bare stereoparents recognised by exact canonical SMILES (the audit p100-101
+    # F8/F10 coverage reservoir).  All OPSIN-RT.  The exact lookup runs BEFORE
+    # scaffold decoration, so the spiroketal steroids below intercept the prior
+    # (valid-but-non-retained) '16,22-epoxycholestane' / wrong-stereo names.
+    #   tetrapyrroles / corrinoid (Table 10.1d) — were 'unknown':
+    "C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[nH]5)C=C4)[nH]3": "porphyrin",
+    "C1=C2CCC(=N2)C=C2CCC(N2)C2CCC(=N2)C=C2CCC1=N2": "corrin",
+    "C1=CC(=CC2=NC(=CC3=NC(=Cc4ccc[nH]4)C=C3)C=C2)N=C1": "21H-biline",
+    #   steroid stereoparents (Table 10.1b) — spirostan/furostan were non-retained
+    #   epoxy-names; gorgostane leaked an OPSIN-unparseable name; poriferastane was
+    #   mis-named 'stigmastane' (C-24 epimer, a stereo error SELF-01 cannot catch):
+    "CC1CC[C@@]2(OC1)O[C@H]1C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]1[C@@H]2C": "spirostan",
+    "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C": "furostan",
+    "CC(C)[C@@H](C)[C@@]1(C)C[C@@H]1[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": "gorgostane",
+    "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C": "poriferastane",
+
     # ---- Steroid derivatives ----
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C":
         "cholesterol",

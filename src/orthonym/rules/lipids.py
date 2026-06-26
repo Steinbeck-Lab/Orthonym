@@ -283,16 +283,34 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     # "phosphate" yields the anionic/zwitterion form (matches PC, not neutral PE).
     head_alkyl = _HEAD_GROUP_ALKYL.get(head_desc)
     if head_alkyl is None:
+        # v23 Phase 14: a FREE phosphatidic acid (no head group beyond the
+        # phosphate) is named as the functional-class phosphate monoester
+        # '<2,3-bis(acyloxy)propyl> dihydrogen phosphate' (P-107.3.1). The
+        # detector tags the bare -OPO(OH)2 site head_desc='phosphate'.
+        if head_desc == "phosphate":
+            glyceryl = _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site)
+            if glyceryl is None:
+                return None
+            return f"{glyceryl} dihydrogen phosphate"
         return _assemble_glyceride(mol, match, style)  # neutral substitutive form (or None if unrecognized)
 
-    # Glyceryl propyl: local C1 = phospho-attached carbon, C2 = central, C3 = other terminal.
+    glyceryl = _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site)
+    if glyceryl is None:
+        return None
+    # P-68 functional-class diester: [<glyceryl>] <head-alkyl> phosphate (glyceryl bracketed first)
+    return f"[{glyceryl}] {head_alkyl} phosphate"
+
+
+def _diacyl_glyceryl(mol, match, central, phospho_atom, acyl_atoms, atom_site) -> Optional[str]:
+    """Build the diacyl glyceryl substituent '(2R)-2,3-bis(acyloxy)propyl' for a
+    phospholipid: local C1 = the phospho-attached carbon, C2 = central, C3 = the
+    other terminal; the two acyls become (acyloxy) prefixes at locals 2,3."""
     other_terminal = [a for a in match.core_atoms if a not in (central, phospho_atom)]
     if len(other_terminal) != 1:
         return None
     other_terminal = other_terminal[0]
     local = {phospho_atom: 1, central: 2, other_terminal: 3}
 
-    # (acyloxy) prefixes at the two acyl positions (local locants 2 and 3)
     acyloxy_by_loc = {}
     for a in acyl_atoms:
         ax = _acyloxy_for_site(mol, atom_site[a])
@@ -315,9 +333,7 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     descriptors = collect_stereodescriptors(mol, {central: 2}, include_near_parent_ez=False)
     if descriptors:
         glyceryl = format_stereodescriptor_string(descriptors) + glyceryl
-
-    # P-68 functional-class diester: [<glyceryl>] <head-alkyl> phosphate (glyceryl bracketed first)
-    return f"[{glyceryl}] {head_alkyl} phosphate"
+    return glyceryl
 
 
 # --------------------------------------------------------------------------- #

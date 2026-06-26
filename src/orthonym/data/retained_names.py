@@ -353,9 +353,13 @@ RETAINED_NAMES = {
     "Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1": "cytidine",
     "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O": "thymidine",
     "O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1": "uridine",
-    "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "deoxyadenosine",
-    "Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "deoxyguanosine",
-    "Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1": "deoxycytidine",
+    # v23 Phase 14: 2'-deoxynucleoside PINs (the prime is REQUIRED — 'deoxyadenosine'
+    # is ambiguous; '2'-deoxyadenosine' is the PIN, P-105.2.1 / carbohydrate P-102.5).
+    # All four OPSIN-RT; 2'-deoxyuridine was MISSING. Old bare 'deoxy…' keys renamed.
+    "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "2'-deoxyadenosine",
+    "Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "2'-deoxyguanosine",
+    "Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1": "2'-deoxycytidine",
+    "O=c1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1": "2'-deoxyuridine",
     # v22 G2 COV-02: nucleotide retained names re-admitted on the hand-curated
     # side (the adenylic JSON deny entries carry hc_override). These are
     # correct-but-NON-PIN names (the PIN is the full systematic

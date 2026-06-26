@@ -105,9 +105,11 @@ NUCLEOSIDE_ENTRIES = [
     ("Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1", "cytidine"),
     ("Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O", "thymidine"),
     ("O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1", "uridine"),
-    ("Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1", "deoxyadenosine"),
-    ("Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "deoxyguanosine"),
-    ("Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1", "deoxycytidine"),
+    # v23 Phase 14: renamed to the 2'-deoxy PIN (the prime is required).
+    ("Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1", "2'-deoxyadenosine"),
+    ("Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "2'-deoxyguanosine"),
+    ("Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1", "2'-deoxycytidine"),
+    ("O=c1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "2'-deoxyuridine"),
 ]
 
 

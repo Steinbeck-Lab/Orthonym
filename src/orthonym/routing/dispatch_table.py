@@ -126,6 +126,7 @@ class StoutClass(_StrEnumBase):
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
+    NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
@@ -958,6 +959,23 @@ def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,
     return None
 
 
+def _is_nucleoside(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 14 — decorated nucleoside / nucleotide recogniser (P-105.2/P-106).
+    Fires only for a furanose-N-glycoside bearing a recognised sugar decoration
+    (5'-phosphate chain or O-acyl ester) whose bare nucleoside is a retained
+    name; bare nucleosides + the retained adenylic/inosinic monophosphates are
+    NOT claimed here (they hit RETAINED_NAME@1300 first). Fail-closed."""
+    from orthonym.rules.nucleosides import name_nucleoside
+    return name_nucleoside(mol) is not None
+
+
+def _handle_nucleoside(mol, smiles, canonical_smiles, features=None, *,
+                       style: str = "pin", **kwargs) -> Optional[str]:
+    """v23 Phase 14 — decorated nucleoside/nucleotide PIN (P-105.2/P-106)."""
+    from orthonym.rules.nucleosides import name_nucleoside
+    return name_nucleoside(mol)
+
+
 def _handle_decomposition_pre_general(mol, smiles, canonical_smiles, features=None, *,
                                        style: str = "pin",
                                        _skip_decomposition: bool = False,
@@ -1345,6 +1363,21 @@ _register_dispatch(
     description="Inositol cyclitol retained PIN (myo-/scyllo-/cis-/epi-/neo-/allo-/"
                 "muco-/D-chiro-/L-chiro-inositol); name-exact (OPSIN-unparseable), "
                 "hard-gated InChIKey lookup, fail-closed; routes to rules.inositols.name_inositol",
+    side_effect_inventory=(),
+)
+
+# --- v23 Phase 14: NUCLEOSIDE/NUCLEOTIDE decoration at priority 1800 ---
+# After RETAINED_NAME@1300 (so bare nucleosides + the retained adenylic/inosinic
+# monophosphates keep their catalog names) and INOSITOL@1700, before
+# DECOMPOSITION_PRE_GENERAL@99000 (which would otherwise mis-decompose ATP/ADP
+# into 'adenosine diphosphoric acid'). strip-and-recognise engine; OPSIN-RT;
+# fail-closed (declines any molecule it cannot fully account for).
+_register_dispatch(
+    class_id=StoutClass.NUCLEOSIDE, priority=1800, tier=2,
+    predicate=_is_nucleoside, handler=_handle_nucleoside,
+    iupac_section="Blue Book P-105.2 / P-106 (nucleoside/nucleotide decoration)",
+    description="Decorated nucleoside/nucleotide (5'-mono/di/tri-phosphate + O-acyl "
+                "ester); strip-and-recognise; routes to rules.nucleosides.name_nucleoside",
     side_effect_inventory=(),
 )
 
