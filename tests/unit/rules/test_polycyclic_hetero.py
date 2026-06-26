@@ -467,3 +467,45 @@ class TestVBIntegration:
         assert name is not None
         assert 'oxa' in name
         assert 'tricyclo' in name
+
+
+# ============================================================================
+# v23 Phase 13: lambda-convention (P-31.1.4.2 / P-23.6.1) in the VB 'a'-prefix
+# ============================================================================
+
+class TestVonBaeyerLambdaConvention:
+    """A non-standard-valence ring heteroatom in a von-Baeyer system must carry
+    the lambda convention in its 'a'-prefix (e.g. tetravalent S -> 3lambda4-thia),
+    via the shared rules.lambda_convention infra. Standard-valence heteroatoms
+    must be byte-identical (no spurious lambda)."""
+
+    def _prefix(self, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        ring_atoms = set()
+        for r in mol.GetRingInfo().AtomRings():
+            ring_atoms.update(r)
+        analyzer = VonBaeyerAnalyzer()
+        desc = analyzer.analyze(mol, ring_atoms)
+        return get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
+
+    @pytest.mark.unit
+    def test_tetravalent_sulfur_emits_lambda4(self):
+        # S(IV) bridge in bicyclo[3.2.1]octane -> 3lambda4-thia (was 3-thia,
+        # which denotes S(II) -> a different molecule the gate suppressed).
+        prefix = self._prefix("C12C[SH2]CC(CC1)C2")
+        assert "lambda4" in prefix and "thia" in prefix
+
+    @pytest.mark.unit
+    def test_standard_valence_oxygen_no_lambda(self):
+        # O(II) is standard -> no lambda (byte-identical to pre-Phase-13).
+        prefix = self._prefix("C12COCC(CC1)C2")
+        assert "lambda" not in prefix and "oxa" in prefix
+
+    @pytest.mark.unit
+    def test_full_name_round_trippable_pin(self):
+        from orthonym.namer import name_compound
+        # Gate-off in the unit suite (conftest), so the raw name is emitted;
+        # it carries the stray VB 'a'-prefix hyphen (OPSIN-RT-tolerant).
+        name = name_compound("C12C[SH2]CC(CC1)C2")
+        assert "3lambda4" in name and "thia" in name and "bicyclo[3.2.1]octane" in name

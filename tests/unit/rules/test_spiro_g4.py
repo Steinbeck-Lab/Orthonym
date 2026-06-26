@@ -130,27 +130,32 @@ class TestSpiroFusedAlphanumerical:
 
 
 @pytest.mark.unit
-class TestSpirobiFailClosedA10:
-    """A10 honest-deferral: the spirobi polycyclic-component class (DD7-spiro-1)
-    is NOT built — it must stay FAIL-CLOSED ('unknown'), never a wrong name.
-    Guards against a future change silently emitting a structurally-wrong
-    spirobi/von-Baeyer name."""
+class TestSpirobiBuiltP24_3:
+    """v23 Phase 13: the spirobi polycyclic-component class (P-24.3.1) is now
+    BUILT (`name_spirobi`). Two identical polycyclic components at one spiro
+    atom -> ``<lo>,<hi>'-spirobi[component]``, RT-verified. (Previously this
+    class was A10 honest-deferral / fail-closed; the build supersedes it.)"""
 
-    def test_spirobi_indane_is_fail_closed(self):
-        name = name_compound("C1Cc2ccccc2C13Cc1ccccc1C3")
-        assert name is not None and "unknown" in name.lower(), name
+    def test_spirobi_indene_named(self):
+        # 1H-indene mancude component; spiro at C1 of both -> 1,1'.
+        assert name_compound("C1=Cc2ccccc2C13C=Cc1ccccc13") == "1,1'-spirobi[indene]"
 
-    def test_spirobi_not_claimed_by_spiro_handlers(self):
-        from orthonym.rules.spiro import is_mixed_spiro_fused, is_spiro_system
+    def test_spirobi_indane_named(self):
+        # Spiro is benzylic (locant 1) in one indane, the middle carbon
+        # (locant 2) in the other -> 1,2' (NOT 1,1'); RT-verified PIN.
+        assert name_compound("C1Cc2ccccc2C13Cc1ccccc1C3") == "1,2'-spirobi[indane]"
+
+    def test_spirobi_claimed_by_new_detector_only(self):
+        from orthonym.rules.spiro import (
+            is_mixed_spiro_fused, is_spiro_system, is_spirobi,
+        )
         mol = Chem.MolFromSmiles("C1Cc2ccccc2C13Cc1ccccc1C3")
-        # Both-sides-fused polycyclic spiro: the DETECTORS must NOT claim it
-        # (is_spiro_system requires n_rings == n_spiro + 1; this is 4 rings /
-        # 1 spiro). That keeps the wrong-name spiro handlers off the dispatch
-        # path (name_spiro_system would otherwise emit a bogus spiro[4.4]nonane
-        # from the spiro atom's two 5-rings, dropping both benzenes) and routes
-        # the molecule to the G0 fail-closed backstop instead.
+        # The legacy detectors still decline (is_spiro_system requires
+        # n_rings == n_spiro + 1; this is 4 rings / 1 spiro; mixed-spiro-fused
+        # requires a single side ring). The NEW P-24.3 detector claims it.
         assert is_spiro_system(mol) is False
         assert is_mixed_spiro_fused(mol) is False
+        assert is_spirobi(mol) is True
 
 
 @pytest.mark.unit

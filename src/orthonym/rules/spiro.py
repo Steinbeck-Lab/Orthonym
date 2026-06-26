@@ -1750,6 +1750,200 @@ def name_mixed_spiro_fused(
     return (name, all_ring_atoms, combined_locants, False)
 
 
+def _partition_rings_at_spiro(
+    mol, spiro_center: int, all_rings: List[List[int]],
+) -> Optional[Tuple[Set[int], Set[int]]]:
+    """Partition ring INDICES into the two fused components meeting at a single
+    spiro atom (P-24.3 / P-24.5). Each component is the set of rings reachable
+    from one of the spiro atom's two rings via fused edges (>=2 shared atoms),
+    never crossing the spiro atom. Returns (comp_a_ring_idxs, comp_b_ring_idxs)
+    or None when the topology is not a clean two-sided split (e.g. the two rings
+    at the spiro atom belong to one fused component, or a ring is left over)."""
+    rings_at = [r for r in all_rings if spiro_center in r]
+    if len(rings_at) != 2:
+        return None
+    n = len(all_rings)
+    fused_adj: Dict[int, List[int]] = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            if len(set(all_rings[i]) & set(all_rings[j])) >= 2:
+                fused_adj[i].append(j)
+                fused_adj[j].append(i)
+
+    def _component(start: int) -> Set[int]:
+        seen = {start}
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            for nbr in fused_adj[cur]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    stack.append(nbr)
+        return seen
+
+    idx_a = all_rings.index(rings_at[0])
+    idx_b = all_rings.index(rings_at[1])
+    comp_a = _component(idx_a)
+    comp_b = _component(idx_b)
+    if comp_a & comp_b:
+        # The two rings at the spiro atom are themselves fused into one
+        # component — not a spiro-separable system (it is fused/bridged).
+        return None
+    if comp_a | comp_b != set(range(n)):
+        return None  # a ring is unaccounted for — not a clean monospiro split
+    return comp_a, comp_b
+
+
+def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: int):
+    """Lowest locant the spiro atom may take given the component's symmetry
+    (P-24.3.3). ``extracted`` is the (frag_mol, orig_to_frag) tuple from
+    ``_extract_subfragment``; atoms sharing the spiro atom's CanonicalRankAtoms
+    class are symmetry-equivalent (a valid alternative numbering), so the spiro
+    atom's deterministic locant is the minimum locant over that orbit."""
+    frag, orig_to_frag = extracted
+    if spiro_center not in orig_to_frag:
+        return loc_map.get(spiro_center)
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    try:
+        ranks = list(Chem.CanonicalRankAtoms(frag, breakTies=False))
+    except Exception:
+        return loc_map.get(spiro_center)
+    target_rank = ranks[orig_to_frag[spiro_center]]
+    candidate_locants = []
+    for frag_idx, rank in enumerate(ranks):
+        if rank != target_rank:
+            continue
+        orig = frag_to_orig.get(frag_idx)
+        if orig is not None and orig in loc_map:
+            candidate_locants.append(loc_map[orig])
+    if not candidate_locants:
+        return loc_map.get(spiro_center)
+    return min(candidate_locants)
+
+
+def is_spirobi(mol) -> bool:
+    """P-24.3.1: monospiro ring system with two IDENTICAL (polycyclic)
+    components joined at one spiro atom (e.g. 1,1'-spirobi[indene]).
+
+    These have ``n_rings > n_spiro + 1`` (each component is itself polycyclic),
+    so ``is_spiro_system`` rejects them and they are NOT mixed-spiro-fused
+    (which requires one side to be a single ring). Fail-closed: exactly one
+    spiro atom, both fused components polycyclic and graph-isomorphic, and the
+    whole system unsubstituted (substituted spirobi numbering is a follow-on).
+    """
+    if mol is None:
+        return False
+    return _name_spirobi_core(mol) is not None
+
+
+def _name_spirobi_core(mol):
+    """Shared core for is_spirobi / name_spirobi. Returns
+    (name, all_ring_atoms, combined_locants) or None (fail-closed)."""
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 1:
+        return None
+    spiro_center = next(iter(spiro_atoms))
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+    # Pure monospiro (2 rings) is name_spiro_system's job, not spirobi.
+    if len(all_rings) <= 2:
+        return None
+    part = _partition_rings_at_spiro(mol, spiro_center, all_rings)
+    if part is None:
+        return None
+    comp_a_idx, comp_b_idx = part
+    # spirobi requires BOTH components polycyclic (>=2 rings each); a 1-ring
+    # side is mixed-spiro-fused (P-24.5) or pure spiro.
+    if len(comp_a_idx) < 2 or len(comp_b_idx) < 2:
+        return None
+
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms.update(r)
+    # Fail-closed on substituted spirobi: every heavy atom must be a ring atom
+    # (substituted-spirobi prime/locant selection is a documented follow-on).
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+
+    rings_a = [all_rings[i] for i in comp_a_idx]
+    rings_b = [all_rings[i] for i in comp_b_idx]
+    atoms_a: Set[int] = set()
+    for r in rings_a:
+        atoms_a.update(r)
+    atoms_b: Set[int] = set()
+    for r in rings_b:
+        atoms_b.update(r)
+
+    # Components must be graph-isomorphic (canonical SMILES of the capped
+    # fragments equal). If not, it is a DIFFERENT-component spiro (P-24.5), not
+    # spirobi — decline here.
+    ext_a = _extract_subfragment(mol, atoms_a)
+    ext_b = _extract_subfragment(mol, atoms_b)
+    if ext_a is None or ext_b is None:
+        return None
+    if Chem.MolToSmiles(ext_a[0]) != Chem.MolToSmiles(ext_b[0]):
+        return None
+
+    named_a = _name_fused_component(mol, rings_a)
+    named_b = _name_fused_component(mol, rings_b)
+    if named_a is None or named_b is None:
+        return None
+    name_a, loc_map_a = named_a
+    name_b, loc_map_b = named_b
+    if name_a != name_b:
+        return None  # isomorphic skeleton but the namers disagree -> decline
+    # P-24.3.3 lowest locant at the spiro atom, computed DETERMINISTICALLY: a
+    # symmetric component (e.g. indane positions 1 and 3 are mirror-equivalent)
+    # lets the catalog substructure-match place the spiro atom at either of two
+    # equivalent locants depending on SMILES atom order — so pick the minimum
+    # over the spiro atom's symmetry orbit (atoms with equal CanonicalRankAtoms
+    # in the component fragment), not whichever match RDKit returned first.
+    loc_a = _canonical_spiro_locant(ext_a, loc_map_a, spiro_center)
+    loc_b = _canonical_spiro_locant(ext_b, loc_map_b, spiro_center)
+    if loc_a is None or loc_b is None:
+        return None
+
+    # P-24.3.3: the lower number at the spiro atom is unprimed.
+    if loc_a <= loc_b:
+        lo, hi = loc_a, loc_b
+        unprimed_map, primed_map = loc_map_a, loc_map_b
+    else:
+        lo, hi = loc_b, loc_a
+        unprimed_map, primed_map = loc_map_b, loc_map_a
+
+    # P-24.3.2 / P-24.5.1: indicated hydrogen of the individual component is not
+    # cited when the spiro atom occupies that locant.
+    component_name = _strip_consumed_indicated_h(name_a, lo)
+    name = f"{lo},{hi}'-spirobi[{component_name}]"
+
+    combined_locants: Dict[int, _Locant] = {}
+    for atom_idx, locant in unprimed_map.items():
+        combined_locants[atom_idx] = locant
+    for atom_idx, locant in primed_map.items():
+        if atom_idx == spiro_center:
+            continue
+        combined_locants[atom_idx] = (locant, "'")
+
+    if not (set(combined_locants.keys()) >= all_ring_atoms):
+        return None  # coverage invariant (Pitfall 7)
+    return name, all_ring_atoms, combined_locants
+
+
+def name_spirobi(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.3.1 ``spirobi`` name for two identical polycyclic
+    components at one spiro atom (``1,1'-spirobi[indene]``). Return shape
+    matches ``name_mixed_spiro_fused`` (name, ring_atoms, atom_to_locant,
+    substituents_included=False). Fail-closed (see ``_name_spirobi_core``)."""
+    core = _name_spirobi_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
 def get_mixed_spiro_fused_iupac_locants(
     mol,
 ) -> Optional[Dict[int, _Locant]]:

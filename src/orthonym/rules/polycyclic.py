@@ -1501,6 +1501,36 @@ HETEROATOM_PREFIXES = {
 }
 
 
+def _vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
+    """λ bonding number (P-31.1.4.2) for a von-Baeyer ring 'a'-prefix atom, or
+    None. Refines the shared ``nonstandard_bonding_number`` with the SKELETAL-
+    DEGREE rule that governs ring replacement nomenclature: when OPSIN parses an
+    'a'-replacement name it assigns each skeletal atom the LOWEST valid valence
+    >= its skeletal degree. So a high-degree (bridgehead) heteroatom whose actual
+    valence EQUALS that connectivity-forced value needs NO λ — OPSIN infers it,
+    and an explicit λ there is redundant AND OPSIN-rejected (e.g. the bridgehead
+    Te in heptatellurabicyclo[2.2.1]heptane has degree 3 and valence 4 = the
+    lowest Te valence >= 3, so it must NOT carry λ4). λ IS cited only when the
+    valence EXCEEDS the connectivity-forced value (the heteroatom carries extra
+    hydrogen), e.g. a degree-2 ring S(IV): OPSIN would default it to S(II)
+    without the λ4 — a different molecule. This is intentionally LOCAL to the VB
+    'a'-prefix path; the shared ``nonstandard_bonding_number`` stays standard-
+    valence-relative for the parent-hydride/chain namers (SF6 -> lambda6-sulfane
+    needs λ even though its degree forces valence 6)."""
+    from .lambda_convention import nonstandard_bonding_number
+    lam = nonstandard_bonding_number(mol, atom_idx)
+    if lam is None:
+        return None
+    from rdkit.Chem import GetPeriodicTable
+    atom = mol.GetAtomWithIdx(atom_idx)
+    valences = [v for v in GetPeriodicTable().GetValenceList(atom.GetAtomicNum()) if v > 0]
+    degree = atom.GetDegree()
+    forced = min((v for v in valences if v >= degree), default=None)
+    if forced is not None and lam == forced:
+        return None  # connectivity-forced valence; OPSIN infers it (no spurious λ)
+    return lam
+
+
 def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms: Set[int]) -> str:
     """
     Generate 'a' replacement nomenclature prefix for ring heteroatoms.
@@ -1520,8 +1550,14 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         This is a placeholder for Plan 16-02 implementation. Currently returns
         empty string.
     """
-    # Group heteroatoms by element type
-    heteroatoms: Dict[str, List[int]] = {}
+    # Group heteroatoms by element type. Each entry is (locant, lambda) where
+    # lambda is the non-standard bonding number (P-31.1.4.2) or None — e.g. a
+    # tetravalent ring sulfur at locant 3 -> (3, 4) -> "3lambda4-thia". Uses the
+    # degree-aware _vb_lambda_for_atom (NOT the raw shared check) so a
+    # connectivity-forced bridgehead valence is not over-cited (see that helper).
+    from .lambda_convention import format_lambda_token
+
+    heteroatoms: Dict[str, List[tuple]] = {}
 
     for atom_idx in ring_atoms:
         atom = mol.GetAtomWithIdx(atom_idx)
@@ -1529,9 +1565,10 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         if symbol != 'C' and symbol in HETEROATOM_PREFIXES:
             if atom_idx in numbering:
                 locant = numbering[atom_idx]
+                lam = _vb_lambda_for_atom(mol, atom_idx)
                 if symbol not in heteroatoms:
                     heteroatoms[symbol] = []
-                heteroatoms[symbol].append(locant)
+                heteroatoms[symbol].append((locant, lam))
 
     if not heteroatoms:
         return ""
@@ -1544,11 +1581,11 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
 
     parts = []
     for element in sorted_elements:
-        locants = sorted(heteroatoms[element])
+        entries = sorted(heteroatoms[element])  # by locant (lambda follows it)
         prefix_name = HETEROATOM_PREFIXES[element][0]
 
-        locant_str = ','.join(str(loc) for loc in locants)
-        count = len(locants)
+        locant_str = ','.join(format_lambda_token(loc, lam) for loc, lam in entries)
+        count = len(entries)
 
         if count > 1:
             mult = SIMPLE_MULTIPLIERS.get(count, str(count))
