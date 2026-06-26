@@ -76,6 +76,12 @@ NON_STANDARD_AMINO_ACIDS: Dict[str, str] = {
     # had wrongly occupied. Name per Blue Book line 54569 (S-methyl-L-cysteine);
     # OPSIN parses 'S-methylcysteine' to this exact structure (RT verified).
     "CSCC(N)C(=O)O": "S-methylcysteine",
+    # v23 Phase 12 follow-on (audit F2): cystine is the disulfide dimer of two
+    # cysteines. The natural L-cystine (2R,2'R) is already in the OPSIN-import
+    # catalog (-> 'cystine'); the D-enantiomer (2S,2'S) was unrecognised. Keyed by
+    # exact stereo SMILES (OPSIN parses 'D-cystine'; RT-verified). meso-cystine
+    # (2R,2'S) has no simple retained name and stays fail-closed (unknown).
+    "N[C@H](CSSC[C@@H](N)C(=O)O)C(=O)O": "D-cystine",
     "NCCCC(N)C(=O)O": "ornithine",            # Orn - not proteinogenic
     "NC(CCCN)C(=O)O": "ornithine",            # Orn - alternate
     "NCCC(N)C(=O)O": "2,4-diaminobutanoic acid",  # Dab

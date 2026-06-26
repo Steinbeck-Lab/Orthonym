@@ -412,6 +412,19 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # stays suppressed to the honest fallback rather than shipping malformed.
     if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
         return name
+    # v23 Phase 12 follow-on (P-104.2.1): the inositol retained names
+    # (myo-/scyllo-/cis-/epi-/neo-/allo-/muco-/D-chiro-/L-chiro-inositol) are the
+    # PIN but are OPSIN-UNPARSEABLE (no generation-grammar support — verified
+    # name_to_smiles -> None for every one), exactly the thioperoxol situation
+    # above. They are produced ONLY by the hard-gated InChIKey recogniser
+    # (rules.inositols.name_inositol) — correct by construction — and validated
+    # name-exact, so OPSIN's coverage gap must not suppress them.
+    try:
+        from .rules.inositols import INOSITOL_NAMES
+        if name in INOSITOL_NAMES:
+            return name
+    except Exception:
+        pass
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then the name is correct by construction

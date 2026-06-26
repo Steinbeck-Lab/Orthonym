@@ -1501,6 +1501,16 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             _POLY_GUARD_FG_TYPES = {
                 'primary_amide', 'carboxylic_acid',
                 'acid_chloride', 'acid_bromide', 'acid_fluoride',
+                # v23 Phase 12 follow-on (F3 ureido): a urea substituent
+                # -NH-C(=O)-NH2 is emitted as the 'carbamoylamino' FG prefix by
+                # the FG loop above (its carbon is in the prefix). Without this
+                # guard the SAME branch is ALSO named by _check_for_acylamino
+                # below, which counts the ureido C(=O) as a 1-carbon acyl ->
+                # the spurious 'methanoylamino', doubling the prefix on one
+                # carbon ('5-carbamoylamino-5-(methanoylamino)' = a different,
+                # OPSIN-unparseable molecule). The urea match [NX3][CX3](=O)[NX3]
+                # covers the whole branch, so the subset test skips it here.
+                'urea',
             }
             _sub_set = set(sub_atoms)
             _skip_fg_branch = False

@@ -460,6 +460,16 @@ def needs_brackets(name: str) -> bool:
     if '-' in name:
         return True
 
+    # v23 Phase 12 follow-on: acyl-substituted amino prefixes (-oylamino) are
+    # compound substituents (a substituted amino) and take enclosing marks per
+    # P-16.3.3 — carbamoylamino (the urea FG prefix), ethanoylamino,
+    # benzoylamino, sulfamoylamino, etc. The '-oyl' acyl ending distinguishes
+    # them from simple alkylamino (methylamino ends in 'ylamino', not
+    # 'oylamino'). Already-bracketed forms returned False above, so this only
+    # promotes the unbracketed urea prefix to '(carbamoylamino)'.
+    if name.lower().endswith('oylamino'):
+        return True
+
     # Functional group prefixes fused with alkyl names are compound substituents.
     # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
     # But NOT: methoxy, ethoxy (these are simple ether prefixes, single concept)

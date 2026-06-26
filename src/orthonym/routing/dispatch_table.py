@@ -125,6 +125,7 @@ class StoutClass(_StrEnumBase):
     CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
+    INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
@@ -466,6 +467,16 @@ def _is_cyclophane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
     """Tier-2; predicate IS handler (audit § 1 row 16; § 2.16 purity proof)."""
     from orthonym.rules.phane import name_cyclophane
     return name_cyclophane(mol) is not None
+
+
+def _is_inositol(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v23 Phase 12 follow-on; hard-gated cyclitol recognizer (P-104.2.1). Fires
+    for the seven meso inositols (named) AND the chiral chiro pair (refused — see
+    _handle_inositol); both are detected order-stably from the cyclohexanehexol
+    skeleton + stereo layer. The undefined-stereo hexol does NOT match (keeps the
+    systematic name)."""
+    from orthonym.rules.inositols import name_inositol, is_chiral_inositol
+    return name_inositol(mol) is not None or is_chiral_inositol(mol)
 
 
 def _is_decomposition_pre_general(mol, smiles, canonical_smiles, features=None, *,
@@ -931,6 +942,22 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
     return name_cyclophane(mol)
 
 
+def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,
+                     style: str = "pin", **kwargs) -> Optional[str]:
+    """v23 Phase 12 follow-on: retained inositol PIN (P-104.2.1) for the seven
+    meso inositols; the chiral chiro pair is REFUSED to a deterministic
+    descriptive fallback (RDKit perceives its absolute config non-deterministically,
+    so a systematic CIP name would flip the enantiomer by atom order)."""
+    from orthonym.rules.inositols import name_inositol, is_chiral_inositol
+    nm = name_inositol(mol)
+    if nm is not None:
+        return nm
+    if is_chiral_inositol(mol):
+        from orthonym.namer import _descriptive_fallback
+        return _descriptive_fallback(smiles)
+    return None
+
+
 def _handle_decomposition_pre_general(mol, smiles, canonical_smiles, features=None, *,
                                        style: str = "pin",
                                        _skip_decomposition: bool = False,
@@ -1299,6 +1326,25 @@ _register_dispatch(
     predicate=_is_cyclophane, handler=_handle_cyclophane,
     iupac_section="Blue Book P-26.4 phane nomenclature",
     description="Cyclophane topology; routes to rules.phane.name_cyclophane",
+    side_effect_inventory=(),
+)
+
+# --- v23 Phase 12 follow-on: INOSITOL at priority 1700 (after CYCLOPHANE@1600, ---
+# before DECOMPOSITION_PRE_GENERAL@99000 / GENERAL@99999). The nine inositol
+# (cyclohexane-1,2,3,4,5,6-hexol) retained names are the PIN (P-104.2.1) and are
+# OPSIN-UNPARSEABLE, so this is a NAME-EXACT recogniser. Hard-gated InChIKey
+# lookup over the cyclohexanehexol skeleton -> fail-closed (only one of the nine
+# fully-stereodefined inositols matches; an undefined-stereo or substituted hexol
+# keeps the systematic name). Placed at 1700 because the dense 100-1600 region has
+# no free hundreds-slot; it sits ABOVE the retained/skeletal/cyclophane block but
+# still intercepts before the systematic cyclohexanehexol naming in GENERAL.
+_register_dispatch(
+    class_id=StoutClass.INOSITOL, priority=1700, tier=2,
+    predicate=_is_inositol, handler=_handle_inositol,
+    iupac_section="Blue Book P-104.2.1 (cyclitols / inositol retained names)",
+    description="Inositol cyclitol retained PIN (myo-/scyllo-/cis-/epi-/neo-/allo-/"
+                "muco-/D-chiro-/L-chiro-inositol); name-exact (OPSIN-unparseable), "
+                "hard-gated InChIKey lookup, fail-closed; routes to rules.inositols.name_inositol",
     side_effect_inventory=(),
 )
 
