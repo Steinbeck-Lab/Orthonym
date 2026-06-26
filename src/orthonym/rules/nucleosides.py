@@ -42,6 +42,143 @@ _PHOSPHATE_STEM = {1: "phosphate", 2: "diphosphate", 3: "triphosphate", 4: "tetr
 _ACYL_NAME = {1: "formate", 2: "acetate", 3: "propanoate", 4: "butanoate"}
 _PRIME_MULT = {2: "di", 3: "tri", 4: "tetra"}
 
+# ---------------------------------------------------------------------------
+# Base-ring numbering + tautomer-robust base classification (P-105.2.1 ring
+# substitution).  The base TYPE is read off the EXOCYCLIC heteroatom markers
+# (N=amino/imino, O=oxo/hydroxy) at each ring locant — this is robust to the
+# amino<->imino / keto<->enol tautomer (and the m7G charge) that ring-N
+# alkylation forces.  Carbon groups on a ring atom (or on an exocyclic amino N)
+# are SUBSTITUENTS, cited by base locant.
+# ---------------------------------------------------------------------------
+_PURINE_SMARTS = Chem.MolFromSmarts("[#7:1]1~[#6:2]~[#7:3]~[#6:4]2~[#7:9]~[#6:8]~[#7:7]~[#6:5]2~[#6:6]~1")
+_PYRIMIDINE_SMARTS = Chem.MolFromSmarts("[#7:1]1~[#6:2]~[#7:3]~[#6:4]~[#6:5]~[#6:6]~1")
+_ALKYL_NAME = {1: "methyl", 2: "ethyl", 3: "propyl", 4: "butyl"}
+_BASE_SIG = {                                     # {(ring-locant, exo-element)} -> base type
+    frozenset([(6, "N")]): "adenine",
+    frozenset([(2, "N"), (6, "O")]): "guanine",
+    frozenset([(6, "O")]): "hypoxanthine",
+    frozenset([(2, "O"), (6, "O")]): "xanthine",
+    frozenset([(2, "O"), (4, "O")]): "uracil",
+    frozenset([(2, "O"), (4, "N")]): "cytosine",
+}
+_NUCLEOSIDE_STEM = {                              # (base, sugar) -> bare nucleoside name
+    ("adenine", "ribo"): "adenosine", ("adenine", "deoxy"): "2'-deoxyadenosine",
+    ("guanine", "ribo"): "guanosine", ("guanine", "deoxy"): "2'-deoxyguanosine",
+    ("hypoxanthine", "ribo"): "inosine", ("hypoxanthine", "deoxy"): "2'-deoxyinosine",
+    ("xanthine", "ribo"): "xanthosine",
+    ("uracil", "ribo"): "uridine", ("uracil", "deoxy"): "2'-deoxyuridine",
+    ("cytosine", "ribo"): "cytidine", ("cytosine", "deoxy"): "2'-deoxycytidine",
+}
+
+
+def _base_numbering(mol: Chem.Mol, base_n: int) -> Optional[Dict[int, int]]:
+    """{atom idx -> IUPAC base locant}, anchored so the glycosidic N is 9 (purine)
+    or 1 (pyrimidine).  None if the base is neither purine nor pyrimidine."""
+    # uniquify=False: the pyrimidine ring is symmetric between N1 and N3 (both flank
+    # C2), so the default uniquify drops one of the two anchorings non-deterministically
+    # by atom order.  Enumerate all and pick the one anchoring the glycosidic N at its
+    # canonical locant (9 purine / 1 pyrimidine) — deterministic.
+    for patt, glyc in ((_PURINE_SMARTS, 9), (_PYRIMIDINE_SMARTS, 1)):
+        for match in mol.GetSubstructMatches(patt, uniquify=False):
+            loc = {m: patt.GetAtomWithIdx(q).GetAtomMapNum() for q, m in enumerate(match)}
+            if loc.get(base_n) == glyc:
+                return loc
+    return None
+
+
+def _frag_from(mol: Chem.Mol, start: int, blocked: set) -> set:
+    seen, stack = set(), [start]
+    while stack:
+        a = stack.pop()
+        if a in seen or a in blocked:
+            continue
+        seen.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() not in blocked:
+                stack.append(nb.GetIdx())
+    return seen
+
+
+def _classify_base(mol: Chem.Mol, core: _Core):
+    """Return (bare_nucleoside_name, [(locant_str, alkyl_word)], strip_atoms) or None.
+
+    Reads the base TYPE from exocyclic N/O markers (tautomer/charge robust) and the
+    sugar type (ribo vs 2'-deoxy) from C2'.  Carbon groups on a ring atom or on an
+    exocyclic amino N become substituents (locant = ``L`` or ``N<L>``).  Fail-closed
+    on any non-alkyl base group it cannot name."""
+    num = _base_numbering(mol, core.base_n)
+    if num is None:
+        return None
+    base_ring = set(num)
+    sugar_side = _frag_from(mol, core.anomeric, {core.base_n})
+    markers: Dict[int, set] = {}
+    subs: List[Tuple[str, str]] = []
+    strip: set = set()
+    exo_het: Dict[int, str] = {}   # exocyclic N/O idx -> "N<loc>"/"O<loc>"
+    for aidx, loc in num.items():
+        for nb in mol.GetAtomWithIdx(aidx).GetNeighbors():
+            b = nb.GetIdx()
+            if b in base_ring or b in sugar_side:
+                continue
+            sym = nb.GetSymbol()
+            if sym in ("N", "O"):
+                markers.setdefault(loc, set()).add(sym)
+                exo_het[b] = f"{sym}{loc}"
+            elif sym == "C":
+                frag = _frag_from(mol, b, {aidx})
+                if frag & base_ring or frag & sugar_side or \
+                        not all(mol.GetAtomWithIdx(x).GetSymbol() == "C" for x in frag):
+                    return None
+                word = _ALKYL_NAME.get(len(frag))
+                if word is None:
+                    return None
+                subs.append((str(loc), word))
+                strip |= frag
+            else:
+                return None  # exocyclic halogen/other on the base -> out of scope (fail-closed)
+    # substituents on an exocyclic amino N (e.g. N6-methyl on the 6-amino N)
+    for nidx, nloc in exo_het.items():
+        for nb in mol.GetAtomWithIdx(nidx).GetNeighbors():
+            b = nb.GetIdx()
+            if b in base_ring or b in sugar_side or nb.GetSymbol() != "C":
+                continue
+            frag = _frag_from(mol, b, {nidx})
+            if frag & base_ring or frag & sugar_side or \
+                    not all(mol.GetAtomWithIdx(x).GetSymbol() == "C" for x in frag):
+                return None
+            word = _ALKYL_NAME.get(len(frag))
+            if word is None:
+                return None
+            subs.append((nloc, word))
+            strip |= frag
+    base = _BASE_SIG.get(frozenset((loc, e) for loc, es in markers.items() for e in es))
+    if base is None:
+        return None
+    c2 = core.idx_for("2'")
+    c2_has_o = any(nb.GetSymbol() == "O" and nb.GetIdx() not in core.ring_atoms
+                   for nb in mol.GetAtomWithIdx(c2).GetNeighbors())
+    bare = _NUCLEOSIDE_STEM.get((base, "ribo" if c2_has_o else "deoxy"))
+    if bare is None:
+        return None
+    return bare, subs, strip
+
+
+def _assemble_base_substituents(bare: str, subs: List[Tuple[str, str]]) -> Optional[str]:
+    """Assemble ``<locant>-<alkyl><nucleoside>`` (P-105.2.1).  Single substituent, or
+    several identical-word substituents with a multiplier; mixed words -> None."""
+    if not subs:
+        return None
+    words = {w for _, w in subs}
+    if len(words) == 1:
+        word = next(iter(words))
+        locs = sorted(subs, key=lambda t: (len(t[0]), t[0]))
+        loc_str = ",".join(l for l, _ in locs)
+        if len(subs) == 1:
+            return f"{loc_str}-{word}{bare}"
+        mult = _PRIME_MULT.get(len(subs))
+        return f"{loc_str}-{mult}{word}{bare}" if mult else None
+    return None  # mixed substituent words -> alphanumeric ordering not built yet
+
 
 def _canon(smi: str) -> Optional[str]:
     try:
@@ -285,6 +422,19 @@ def _lookup_bare(bare: Chem.Mol) -> Optional[str]:
     return get_retained_name(smi) if smi else None
 
 
+def _name_base_substituted(mol: Chem.Mol, core: _Core) -> Optional[str]:
+    """Name a base-substituted nucleoside (P-105.2.1) e.g. 1-methyladenosine,
+    N6-methyladenosine, 5-methyluridine.  None if the base is unsubstituted (->
+    retained-name path) or carries a group the classifier cannot name."""
+    res = _classify_base(mol, core)
+    if res is None:
+        return None
+    bare, subs, _strip_atoms = res
+    if not subs:
+        return None  # bare nucleoside -> retained-name path
+    return _assemble_base_substituents(bare, subs)
+
+
 def name_nucleoside(mol: Chem.Mol) -> Optional[str]:
     """Name a decorated nucleoside / nucleotide, or return ``None`` (fail-closed)."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
@@ -313,7 +463,8 @@ def name_nucleoside(mol: Chem.Mol) -> Optional[str]:
             del_atoms |= to_del
 
     if not decorations:
-        return None  # bare nucleoside -> retained-name path
+        # no sugar decoration -> maybe a base-substituted nucleoside (P-105.2.1)
+        return _name_base_substituted(mol, core)
     kinds = {d[0] for d in decorations.values()}
     if len(kinds) > 1:
         return None  # mixed phosphate+acyl -> no combined grammar

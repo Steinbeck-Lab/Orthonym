@@ -425,6 +425,19 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return name
     except Exception:
         pass
+    # v23 Phase 14 (P-101.2.7 Table 10.1 a/c): the terpene/alkaloid stereoparent
+    # retained names (abietane/kaurane/.../yohimban/sparteine/...) are the recommended
+    # semisystematic parent names but are OPSIN-UNPARSEABLE (verified name_to_smiles ->
+    # None for each), exactly the inositol/thioperoxol situation.  They are produced ONLY
+    # by the exact-canonical-SMILES NATURAL_PRODUCT_DERIVATIVES lookup (correct by
+    # construction; structures ChEBI/Wikidata cross-verified), validated name-exact, so
+    # OPSIN's coverage gap must not suppress them.
+    try:
+        from .data.natural_products import NAME_EXACT_NP_PARENTS
+        if name in NAME_EXACT_NP_PARENTS:
+            return name
+    except Exception:
+        pass
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then the name is correct by construction

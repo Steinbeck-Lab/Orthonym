@@ -111,6 +111,48 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC(C)[C@@H](C)[C@@]1(C)C[C@@H]1[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": "gorgostane",
     "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C": "poriferastane",
 
+    # ---- v23 Phase 14 CONTINUATION: name-exact terpene/alkaloid stereoparent catalog ----
+    # (P-101.2.7 Table 10.1 a/c).  OPSIN cannot parse these parent-hydride names AND
+    # PubChem name-lookup resolves none, so they are NAME-EXACT (no RT oracle): each
+    # structure was sourced from ChEBI and cross-confirmed against Wikidata + PubChem
+    # (byte-identical InChIKey incl. the stereo layer), and verified permutation-stable
+    # (deterministic canonical SMILES).  The name-exact ones are whitelisted in
+    # namer._final_opsin_validity_gate via NAME_EXACT_NP_PARENTS (the thioperoxol/inositol
+    # template).  Recognition is exact-canonical-SMILES (correct by construction).
+    #   diterpenes / triterpenes / sesquiterpenes:
+    "CC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1": "abietane",
+    "C[C@@H]1C[C@]23CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]2CC[C@H]1C3": "kaurane",
+    "C[C@@H]1CCC[C@@]2(C)CC[C@H]3[C@H](C)CC[C@@H](C[C@H]12)C3(C)C": "taxane",
+    "CC(C)[C@@H]1CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]12": "lupane",
+    "CC1(C)CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1": "oleanane",
+    "C[C@@H]1[C@H]2[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]4(C)[C@]3(C)CC[C@@]2(C)CC[C@H]1C": "ursane",
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]3CC[C@]12C": "lanostane",
+    "CC(C)[C@H]1CC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]4(C)[C@]3(C)CC[C@@H]12": "hopane",
+    "CC1(C)CCC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]4(C)[C@]3(C)CC[C@@H]12": "gammacerane",
+    "CC(C)[C@@H]1CC[C@@]2(C)CCC[C@@H](C)[C@@H]2C1": "eudesmane",
+    "CC(C)[C@@H]1CC[C@H](C)[C@@H]2CC[C@H](C)C[C@H]21": "cadinane",
+    "CC(C)[C@@H]1CC[C@H](C)[C@@H]2CC[C@H](C)[C@@H]2C1": "guaiane",
+    "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1": "germacrane",
+    "CC[C@]1(C)CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1": "pimarane",
+    "C1CC[C@H]2C[C@]34CC[C@H](CCC3C2C1)C4": "gibbane",
+    "CC1(C)CCC[C@]2(C)[C@@H]1CC[C@@]13CC[C@@](C)(CC[C@H]12)C3": "beyerane",
+    "C[C@@H]1C[C@@]23CC[C@@H]1C[C@@H]2[C@@]1(C)CCCC(C)(C)[C@@H]1CC3": "atisane",
+    "CC[C@@H](C)CC[C@H]1[C@@H](C)CC[C@H]2C(C)(C)CCC[C@]12C": "labdane",
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@]12C": "dammarane",
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CCC4[C@@H](CCCC4(C)C)[C@]3(C)CC[C@]12C": "cucurbitane",
+    #   prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
+    "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": "prostane",
+    "CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC": "thromboxane",
+    #   alkaloid stereoparents (Table 10.1a):
+    "c1ccc2c3c([nH]c2c1)[C@@H]1C[C@@H]2CCCC[C@H]2CN1CC3": "yohimban",
+    "C1CCN2C[C@@H]3C[C@@H](CN4CCCC[C@@H]34)[C@H]2C1": "sparteine",
+    "CC[C@H]1C[C@@H]2C[C@H]3c4[nH]c5ccccc5c4CCN(C2)[C@@H]13": "ibogamine",
+    "CC[C@@]12CCCN3CC[C@]4(c5ccccc5N[C@@H]4CC1)[C@H]32": "aspidospermidine",
+    "CC[C@]12CCCN3CCc4c(n(c5ccccc45)CC1)[C@@H]32": "vincane",
+    "C/C=C1/CN2[C@H]3C[C@@H]1[C@@H](C)[C@@H]2Cc1c3[nH]c2ccccc12": "sarpagan",
+    "C1=C2CN3CC[C@]45c6ccccc6N6CC[C@H](OC1)[C@@H]([C@H]64)[C@H]2C[C@H]35": "strychnidine",
+    "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6": "hetisane",
+
     # ---- Steroid derivatives ----
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C":
         "cholesterol",
@@ -300,6 +342,19 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC1CCC(C(C)C)CC1":
         "menthane",
 }
+
+
+# v23 Phase 14 CONTINUATION: the terpene/alkaloid stereoparent retained names that
+# OPSIN cannot parse (verified name_to_smiles -> None for each).  Whitelisted in
+# namer._final_opsin_validity_gate so the name-exact PIN ships (the thioperoxol/inositol
+# template).  prostane/thromboxane/aconitane are EXCLUDED — those names DO OPSIN-RT and
+# pass the gate normally.  Recognition stays exact-canonical-SMILES (fail-closed).
+NAME_EXACT_NP_PARENTS = frozenset({
+    "abietane", "kaurane", "taxane", "lupane", "oleanane", "ursane", "lanostane", "hopane",
+    "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
+    "beyerane", "atisane", "labdane", "dammarane", "cucurbitane", "yohimban", "sparteine",
+    "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisane",
+})
 
 
 # ---------------------------------------------------------------------------

@@ -121,3 +121,45 @@ def test_free_phosphatidic_acid():
 ])
 def test_lipid_regression(smiles, expected):
     assert name_compound(smiles) == expected
+
+
+# --------------------------------------------------------------------------- #
+# CONTINUATION C2 — base-substituted nucleosides (P-105.2.1), tautomer-robust
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("smiles,expected", [
+    ("Cn1cnc2c(ncn2[C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c1=N", "1-methyladenosine"),
+    ("Cn1c(N)nc2c(ncn2[C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c1=O", "1-methylguanosine"),
+    ("Cc1cn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]c1=O", "5-methyluridine"),
+    ("CNc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O", "N6-methyladenosine"),
+    ("Cc1cn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)nc1N", "5-methylcytidine"),
+    ("C[n+]1cn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c2nc(N)[nH]c(=O)c21", "7-methylguanosine"),
+])
+def test_base_substituted_nucleosides(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+def test_5_methylcytidine_deterministic():
+    # the pyrimidine ring is symmetric N1/N3; _base_numbering must use uniquify=False
+    # so the glycosidic-N anchoring is stable across atom orders (else NONDET).
+    m = Chem.MolFromSmiles("Cc1cn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)nc1N")
+    outs = {name_compound(Chem.MolToSmiles(m, doRandom=True)) for _ in range(15)}
+    assert outs == {"5-methylcytidine"}
+
+
+# --------------------------------------------------------------------------- #
+# CONTINUATION C1 — name-exact NP stereoparent catalog (P-101.2.7 Table 10.1)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1", "abietane"),
+    ("C[C@@H]1C[C@]23CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]2CC[C@H]1C3", "kaurane"),
+    ("CC(C)[C@@H]1CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]12", "lupane"),
+    ("CC1(C)CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1", "oleanane"),
+    ("CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]3CC[C@]12C", "lanostane"),
+    ("c1ccc2c3c([nH]c2c1)[C@@H]1C[C@@H]2CCCC[C@H]2CN1CC3", "yohimban"),
+    ("C1CCN2C[C@@H]3C[C@@H](CN4CCCC[C@@H]34)[C@H]2C1", "sparteine"),
+    ("C1=C2CN3CC[C@]45c6ccccc6N6CC[C@H](OC1)[C@@H]([C@H]64)[C@H]2C[C@H]35", "strychnidine"),
+    ("CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC", "prostane"),
+    ("CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC", "thromboxane"),
+])
+def test_np_stereoparents(smiles, expected):
+    assert name_compound(smiles) == expected
