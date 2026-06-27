@@ -3,7 +3,7 @@
 
 Covers:
   * centres-ON: with the jar present + Java available, the CIP validation
-    suite scores 281/290 via the centres engine.
+    suite scores 279/290 via the centres engine (1.5; was 281 on 1.2.1).
   * graceful RDKit fallback: when _find_centres_jar() returns None (monkeypatch)
     OR Java is absent, centres_label_batch returns None so the caller falls
     back to RDKit -- a missing JVM never hard-fails (D-13).
@@ -41,13 +41,18 @@ def _engine_available() -> bool:
 
 @pytest.mark.integration
 def test_find_centres_jar_at_project_root():
-    """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.2.1.jar."""
+    """The vendored jar resolves at PROJECT_ROOT as centres-cli-1.5.jar.
+
+    CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
+    develop @ d4b3cf0). _find_centres_jar() now globs centres-cli-*.jar and
+    picks the highest version, so this asserts the highest vendored jar.
+    """
     jar = _find_centres_jar()
     assert jar is not None, "centres jar not vendored at project root"
-    assert Path(jar).name == "centres-cli-1.2.1.jar"
+    assert Path(jar).name == "centres-cli-1.5.jar"
     assert Path(jar).parent == PROJECT_ROOT
     # Vendored unmodified -> exact byte size (T-177-03 provenance).
-    assert Path(jar).stat().st_size == 2291742
+    assert Path(jar).stat().st_size == 2421241
 
 
 @pytest.mark.integration
@@ -201,8 +206,13 @@ def test_centres_live_mol_apply_double_bond():
 
 
 @pytest.mark.integration
-def test_centres_engine_scores_281_on_suite():
-    """centres-ON scores 281/290 on the CIP validation suite (D-17 gate).
+def test_centres_engine_scores_279_on_suite():
+    """centres-ON scores 279/290 on the CIP validation suite (D-17 gate).
+
+    CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (develop @ d4b3cf0).
+    R/S/E/Z labels byte-identical to 1.2.1; the -2 vs 1.2.1 (281 -> 279) is two
+    exotic cyclic-cumulene axial M/P labels Orthonym does not consume. See
+    test_cip_validation.test_centres_engine_279.
 
     Single batched JVM invocation (D-12) via the shared validation-suite
     scorer.
@@ -215,6 +225,6 @@ def test_centres_engine_scores_281_on_suite():
     )
     cip_data = load_cip_data()
     centres_pass = score_suite_centres(cip_data)
-    assert centres_pass == 281, (
-        f"centres CIP-suite pass count drifted: expected 281, got {centres_pass}"
+    assert centres_pass == 279, (
+        f"centres CIP-suite pass count drifted: expected 279, got {centres_pass}"
     )

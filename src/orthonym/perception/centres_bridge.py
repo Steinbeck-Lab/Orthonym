@@ -34,6 +34,7 @@ JVM never hard-fails a name (D-13).
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -50,22 +51,43 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
-def _find_centres_jar(version: str = "1.2.1") -> Optional[str]:
+def _centres_jar_version_key(path: Path):
+    """Sort key for a vendored ``centres-cli-<version>.jar`` filename.
+
+    Parses the leading dotted-numeric version so newer jars sort higher::
+
+        centres-cli-1.2.1.jar       -> (1, 2, 1)
+        centres-cli-1.5.jar         -> (1, 5)
+        centres-cli-1.5-SNAPSHOT.jar-> (1, 5)
+
+    An unparseable name sorts lowest (``(-1,)``)."""
+    m = re.match(r"centres-cli-(\d+(?:\.\d+)*)", path.name)
+    if not m:
+        return (-1,)
+    return tuple(int(p) for p in m.group(1).split("."))
+
+
+def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
     """Find the vendored centres CLI jar at the project root.
 
     Parallel to ``opsin_roundtrip._find_opsin_jar``.
 
     Args:
-        version: centres version string (default "1.2.1").
+        version: if given, resolve that exact ``centres-cli-<version>.jar``.
+            If None (the default), GLOB ``centres-cli-*.jar`` and return the
+            HIGHEST version present — so a freshly-vendored newer engine jar is
+            picked up with no code change (the centres-engine update path).
 
     Returns:
         Absolute path to the jar, or None if it is not present.
     """
-    jar_name = f"centres-cli-{version}.jar"
-    jar_path = PROJECT_ROOT / jar_name
-    if jar_path.exists():
-        return str(jar_path)
-    return None
+    if version is not None:
+        jar_path = PROJECT_ROOT / f"centres-cli-{version}.jar"
+        return str(jar_path) if jar_path.exists() else None
+    candidates = sorted(
+        PROJECT_ROOT.glob("centres-cli-*.jar"), key=_centres_jar_version_key
+    )
+    return str(candidates[-1]) if candidates else None
 
 
 def _java_available() -> bool:

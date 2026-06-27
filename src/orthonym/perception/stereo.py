@@ -19,13 +19,19 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
 # STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
-# scores 281/290 on the Hanson 2018 CIP Validation Suite vs
-# rdCIPLabeler's 235/290 -- a net +46 CORRECT labels with **0 per-compound
-# regressions** (centres is a strict superset of RDKit on the suite; the gain
-# is exotic CIP rule cases RDKit mis-ranks). When centres is unavailable (jar
-# or Java absent) the code falls through to rdCIPLabeler UNCHANGED -- a missing
-# JVM never hard-fails a name (D-13). Set ORTHONYM_USE_CENTRES_CIP=0/off to
-# force the legacy RDKit-only path.
+# scores 279/290 on the Hanson 2018 CIP Validation Suite vs
+# rdCIPLabeler's 235/290 -- a net +44 CORRECT labels with **0 per-compound
+# regressions vs RDKit** (centres remains a strict superset of RDKit on the
+# suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is
+# unavailable (jar or Java absent) the code falls through to rdCIPLabeler
+# UNCHANGED -- a missing JVM never hard-fails a name (D-13). Set
+# ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
+#
+# CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
+# develop @ d4b3cf0). All R/S/E/Z labels are byte-identical to 1.2.1; the only
+# delta is 2 exotic CYCLIC-CUMULENE axial M/P labels (suite 281->279), which
+# Orthonym does NOT consume (allene/axial CIP is computed independently in
+# detect_axial_chirality + _manual_allene_cip), so naming is unaffected.
 _USE_CENTRES_CIP = os.environ.get(
     "ORTHONYM_USE_CENTRES_CIP", "on"
 ).strip().lower() in ("1", "true", "yes", "on")

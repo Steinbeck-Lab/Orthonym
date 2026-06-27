@@ -191,7 +191,8 @@ def score_suite(cip_data: List[Dict], label_fn) -> int:
 
     label_fn(mol) -> {1-based-atom-idx: descriptor}. Skips invalid SMILES and
     compounds with no expected labels (consistent with the documented gate
-    numbers: min-keyed RDKit 182, fair-keyed RDKit 235, centres 281).
+    numbers: min-keyed RDKit 182, fair-keyed RDKit 235, centres 279
+    [centres 1.5; was 281 on 1.2.1 — see test_centres_engine_279]).
     """
     pass_count = 0
     for entry in cip_data:
@@ -486,8 +487,19 @@ class TestCIPValidationSuite:
             f"Fair both-endpoint RDKit baseline drifted: expected 235, got {fair_keyed}"
         )
 
-    def test_centres_engine_281(self, cip_data):
-        """centres ON scores 281/290 -- the genuine +46 over fair-keyed RDKit (D-17).
+    def test_centres_engine_279(self, cip_data):
+        """centres ON scores 279/290 -- the genuine +44 over fair-keyed RDKit.
+
+        CIP-UPDATE (2026-06-27): the vendored engine was refreshed
+        1.2.1 -> 1.5 (SiMolecule/centres develop @ d4b3cf0). Every R/S/E/Z
+        label is byte-identical to 1.2.1; the only delta vs 1.2.1 is 2 exotic
+        CYCLIC-CUMULENE axial M/P labels (VS078 macrocyclic bis-allene, VS287
+        bicyclic allene), so the suite score moved 281 -> 279. Orthonym does
+        NOT consume centres' cumulene/allene M/P (it computes axial CIP
+        independently in perception.stereo.detect_axial_chirality +
+        _manual_allene_cip), so production naming is unaffected. centres
+        remains a strict superset of RDKit on the suite (no regression vs the
+        fair-keyed RDKit baseline of 235).
 
         Uses a SINGLE batched JVM invocation (D-12). Skips cleanly when Java /
         the centres jar is absent (graceful fallback is exercised by
@@ -497,9 +509,10 @@ class TestCIPValidationSuite:
         if centres_pass is None:
             pytest.skip("centres jar or Java runtime not available")
         print(f"\ncentres engine pass count: {centres_pass}/290")
-        assert centres_pass == 281, (
-            f"centres CIP-suite pass count drifted: expected 281, got {centres_pass}. "
-            f"(fair-keyed RDKit baseline is 235; the +46 engine gain is 281-235.)"
+        assert centres_pass == 279, (
+            f"centres CIP-suite pass count drifted: expected 279, got {centres_pass}. "
+            f"(fair-keyed RDKit baseline is 235; the +44 engine gain is 279-235. "
+            f"centres 1.5 vs 1.2.1: -2 cyclic-cumulene M/P, R/S/E/Z identical.)"
         )
 
     def test_stereo_type_coverage(self, cip_data):

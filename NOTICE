@@ -6,26 +6,37 @@ artifacts vendored into this repository and invoked at runtime via
 subprocess (no source linkage, no relicensing burden).
 
 
-centres-cli-1.2.1.jar
----------------------
+centres-cli-1.5.jar
+-------------------
 - Component:  centres (CIP — Cahn-Ingold-Prelog stereo descriptor labeller)
 - Project:    SiMolecule / centres  (reference implementation of the
               Hanson et al. 2018 CIP algorithm; CDK backend)
-- Version:    1.2.1
+- Version:    1.5 (built from the `develop` branch @ commit d4b3cf0, pom
+              version 1.5-SNAPSHOT; CDK 2.12). Refreshed 2026-06-27 from the
+              previously vendored 1.2.1.
 - Main-Class: com.simolecule.centres.LabelCip
-- Size:       2,291,742 bytes (vendored UNMODIFIED, byte-identical to the
-              verified copy at )
-- License:    LGPL-3.0 (GNU Lesser General Public License, version 3)
+- Size:       2,421,241 bytes (vendored UNMODIFIED; shaded fat-jar produced by
+              `mvn -pl cdk -am package -DskipTests`).
+- License:    BSD-2-Clause (per the upstream LICENSE file and every source
+              header; Copyright (c) 2020, John Mayfield). NOTE: the upstream
+              Maven pom <licenses> block inconsistently lists LGPL-3.0, but the
+              authoritative LICENSE file + source headers are BSD-2-Clause.
 - Usage:      Invoked out-of-process as an unmodified standalone jar via a
-              subprocess (`java -jar centres-cli-1.2.1.jar -i smi <file>`)
+              subprocess (`java -jar centres-cli-1.5.jar -i smi <file>`)
               by src/orthonym/perception/centres_bridge.py. Orthonym does
-              NOT link against, statically embed, or modify the jar. Use of an
-              unmodified LGPL-3.0 jar over a subprocess interface imposes no
-              relicensing obligation on Orthonym (same posture as the bundled
-              OPSIN jar below).
-- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default OFF).
+              NOT link against, statically embed, or modify the jar.
+              `centres_bridge._find_centres_jar()` globs `centres-cli-*.jar`
+              and selects the highest version, so a future engine update needs
+              only a new jar dropped in (no code change).
+- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default ON).
               When the jar or a Java runtime is absent, Orthonym falls back to
               RDKit's rdCIPLabeler and never hard-fails a name on a missing JVM.
+- Suite:      centres 1.5 scores 279/290 on the Hanson 2018 CIP Validation
+              Suite (vs 281 on 1.2.1 and 235 for RDKit's rdCIPLabeler). The −2
+              vs 1.2.1 is two exotic cyclic-cumulene axial (M/P) labels (VS078,
+              VS287); all R/S/E/Z labels are byte-identical to 1.2.1, and
+              Orthonym computes allene/axial CIP independently, so naming is
+              unaffected. See tests/integration/test_cip_validation.py.
 - Source:     https://github.com/SiMolecule/centres
 
 
