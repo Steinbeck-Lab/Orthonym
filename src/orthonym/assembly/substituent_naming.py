@@ -460,31 +460,43 @@ def _name_polyfunctional_acyclic_substituent(
     attach_idx: int,
     parent_set: Set[int],
 ) -> Optional[str]:
-    """Name an acyclic SATURATED carbon-chain substituent bearing >=2 simple
+    """Name an acyclic SATURATED carbon-chain substituent bearing >=1 simple
     detachable functional-group prefixes (carboxy / amino / hydroxy / oxo /
     halogen), numbered from the free valence (P-29.2 / P-31.1.4.3.4: the free
     valence is locant 1; every characteristic group on a substituent is cited
     as a detachable prefix per P-29.3.2 / P-65.1.1).
 
-    ROOT-CAUSE fix for the polyfunctional structure-loss bug: the recursive
-    Tier-4 path names the H-capped fragment as a FREE molecule
-    ('(2R)-2-aminopropanoic acid') and ``parent_to_prefix`` then rebuilds the
-    stem from the carbon COUNT alone — DROPPING every secondary prefix
-    (-> '(R)-2-carboxyethyl', the amino lost) — while the Tier-2 cache maps the
-    capped fragment to a whole-molecule retained name ('alanine' -> 'alaninyl',
-    a different constitution: the free valence is on a former methyl). Both lose
-    structure. Here every group on the chain is enumerated directly FROM
-    STRUCTURE, so nothing is dropped and the locants are attachment-correct.
+    ROOT-CAUSE fix for the substituent structure-loss / locant-drop bug: the
+    recursive Tier-4 path names the H-capped fragment as a FREE molecule
+    ('(2R)-2-aminopropanoic acid' / 'propan-1-ol' / 'acetic acid') and
+    ``parent_to_prefix`` then (a) rebuilds the stem from the carbon COUNT alone,
+    DROPPING every secondary prefix (-> '(R)-2-carboxyethyl', the amino lost),
+    (b) inherits the parent's LOWEST-LOCANT numbering instead of re-numbering
+    from the free valence (-CH2CH2CH2OH -> 'propan-1-ol' -> '1-hydroxypropyl',
+    a WRONG locant — the hydroxy is 3 C from the attachment), or (c) maps a
+    1-carbon acid to its retained acyl name (-CH2COOH -> 'acetic acid' ->
+    'acetyl', a DIFFERENT MOLECULE) — while the Tier-2 cache maps the capped
+    fragment to a whole-molecule retained name ('alanine' -> 'alaninyl'). All
+    lose structure or mis-locate. Here every group on the chain is enumerated
+    directly FROM STRUCTURE, numbered from the free valence, so nothing is
+    dropped and the locants are attachment-correct.
 
     Fail-closed: returns None (caller falls through unchanged) for rings,
     unsaturated or branched backbones, non-primary (internal) attachment,
     secondary/tertiary amines, amides / esters / ethers / thioethers / nitriles
-    (existing tiers own those), charged atoms, or any unrecognised atom. Scoped
-    to >=2 functional-group prefixes — the documented polyfunctional-loss class;
-    single-FG forms keep their existing (byte-identical) tiers.
+    (existing tiers own those), charged atoms, any unrecognised atom (S / P / B
+    / ...), or a single oxo on the free-valence carbon (= an acyl group, named
+    acetyl / propanoyl by the retained/acyl tier). Single-FG forms that were
+    already correct elsewhere stay byte-identical: a 1-carbon backbone elides the
+    locant ('hydroxymethyl' / 'aminomethyl' / 'carboxymethyl'), and pure-halogen
+    chains are handled upstream by the halogen path (Step 2c) before this runs.
 
-    Worked example (IUPAC P-65.1.1 / serine phosphoester head, ChEBI PS):
-        ``-CH2-CH(NH2)-COOH`` -> "2-amino-2-carboxyethyl"
+    Worked examples:
+        ``-CH2-CH(NH2)-COOH`` -> "2-amino-2-carboxyethyl"  (P-65.1.1, ChEBI PS)
+        ``-CH2-CH2-OH``       -> "2-hydroxyethyl"           (locant restored)
+        ``-CH2-CH2-CH2-OH``   -> "3-hydroxypropyl"          (locant corrected)
+        ``-CH2-COOH``         -> "carboxymethyl"            (was 'acetyl')
+        ``-CH2-C(=O)-CH3``    -> "2-oxopropyl"              (oxo, not on attach)
     """
     if not sub_atoms or attach_idx is None:
         return None
@@ -649,8 +661,18 @@ def _name_polyfunctional_acyclic_substituent(
         if _POLYFUNC_OXO_PREFIX in _prefixes and _POLYFUNC_HYDROXY_PREFIX in _prefixes:
             return None
 
-    if fg_count < 2:
-        return None  # scoped to the polyfunctional class (single-FG = other tiers)
+    if fg_count < 1:
+        return None  # no detachable group -> plain alkyl, the fast/located tiers own it
+
+    # An oxo on the FREE-VALENCE (attachment) carbon makes the fragment an ACYL
+    # group (-C(=O)-R): its PIN is the acyl prefix (acetyl / propanoyl / formyl,
+    # P-66.6.3 / P-65.3.1), NOT '1-oxoalkyl'. The single-FG path (fg_count == 1)
+    # would otherwise mis-name a bare acyl substituent, so fail-closed and let the
+    # retained / acyl tier own it. (The >=2-FG behaviour shipped in a8dd06ff is
+    # left untouched: an acyl bearing a second detachable group is a rare edge that
+    # those golds do not exercise -> follow-on.)
+    if fg_count == 1 and _POLYFUNC_OXO_PREFIX in prefix_on.get(attach_idx, []):
+        return None
 
     # ---- Backbone must be a single linear chain attached at a terminus. ----
     for idx in backbone:
@@ -1919,12 +1941,15 @@ def name_substituent_fragment(
     if halo_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, halo_name, attach_idx=attach_idx)
 
-    # Step 2c-poly (v23 SL — polyfunctional structure-loss): a saturated acyclic
-    # carbon chain bearing >=2 simple detachable prefixes (carboxy/amino/hydroxy/
-    # oxo/halogen), numbered from the free valence. MUST precede the recursive
-    # path, which caps the fragment to a free molecule and lets parent_to_prefix
-    # DROP the secondary prefixes (serine-O -CH2CH(NH2)COOH -> '(R)-2-carboxyethyl',
-    # amino lost). Fail-closed for rings / branched / unsaturated / amides / ethers.
+    # Step 2c-poly (v23 SL — substituent structure-loss / locant-drop): a saturated
+    # acyclic carbon chain bearing >=1 simple detachable prefixes (carboxy/amino/
+    # hydroxy/oxo/halogen), numbered from the free valence. MUST precede the
+    # recursive path, which caps the fragment to a free molecule and lets
+    # parent_to_prefix DROP the secondary prefixes (serine-O -CH2CH(NH2)COOH ->
+    # '(R)-2-carboxyethyl', amino lost), inherit the parent's lowest-locant
+    # numbering (-CH2CH2CH2OH -> '1-hydroxypropyl', wrong end), or map a 1-carbon
+    # acid to its retained acyl (-CH2COOH -> 'acetyl'). Fail-closed for rings /
+    # branched / unsaturated / amides / ethers / bare-acyl (oxo on the attach C).
     poly_name = _name_polyfunctional_acyclic_substituent(
         mol, sub_atoms, attach_idx, parent_set
     )

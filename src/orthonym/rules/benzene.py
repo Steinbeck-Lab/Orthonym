@@ -1378,14 +1378,16 @@ _FG_SUB_PREFIX = {
         3: "3-oxopropyl",        # -(CH2)2CHO
     },
     'alcohol': {
-        # NOTE (Phase 172): the locant-drop here (hydroxyethyl vs 2-hydroxyethyl) is a
-        # real DEF-4-family defect, but alcohol is NOT a moving-base-atom FG (no central
-        # carbon migrates) and the sibling parent_to_prefix alcohol branch drops the
-        # locant too -- fixing only this copy creates an inconsistency. Deferred to a
-        # uniform DEF-4 alcohol-locant pass (out of Phase-172 MBA scope). Left as-is.
-        1: "hydroxymethyl",      # -CH2OH
-        2: "hydroxyethyl",       # -CH2CH2OH
-        3: "hydroxypropyl",      # -(CH2)2CH2OH
+        # The hydroxy is numbered from the free valence (P-29.2: the attachment is
+        # locant 1, so -OH on the far carbon of an N-carbon chain is locant N). The
+        # 1-carbon form elides the locant (hydroxymethyl). v23 single-FG-substituent
+        # fix: this map mirrors the structure-based namer (_name_polyfunctional_
+        # acyclic_substituent, now single-FG) — the Phase-172 NOTE deferred the
+        # locant because the sibling parent_to_prefix path dropped it too; that path
+        # is now fixed (Tier 1.96 / Step 2c-poly), so both are consistently located.
+        1: "hydroxymethyl",      # -CH2OH        (1-carbon: locant elided)
+        2: "2-hydroxyethyl",     # -CH2CH2OH
+        3: "3-hydroxypropyl",    # -(CH2)2CH2OH
     },
 }
 
@@ -1410,17 +1412,22 @@ def _name_functionalized_chain_substituent(carbon_count: int, functional_group: 
     if functional_group == 'carboxylic_acid' and carbon_count > 0:
         if carbon_count == 1:
             return "carboxy"
-        # For longer chains: (N-1)-carboxyalkyl
-        alkyl = _CHAIN_SUB_STEMS.get(carbon_count - 1)
+        # The carboxy carbon (P-65.1.1) is NOT a backbone carbon, so the backbone is
+        # (N-1) carbons; the carboxy sits on the carbon farthest from the attachment
+        # = backbone locant (N-1) (P-29.2, numbered from the free valence).
+        backbone = carbon_count - 1
+        alkyl = _CHAIN_SUB_STEMS.get(backbone)
         if alkyl:
-            return f"carboxy{alkyl}"
+            return f"{backbone}-carboxy{alkyl}" if backbone > 1 else f"carboxy{alkyl}"
 
     if functional_group == 'alcohol' and carbon_count > 0:
-        # NOTE (Phase 172): alcohol locant-drop left as-is (out of MBA scope; see the
-        # _FG_SUB_PREFIX['alcohol'] note). Uniform DEF-4 alcohol fix deferred.
+        # Hydroxy on the far carbon, numbered from the free valence (P-29.2): locant
+        # = carbon_count; the 1-carbon form elides it (hydroxymethyl). v23 single-FG
+        # fix — consistent with the structure-based namer (the Phase-172 deferral is
+        # resolved now that parent_to_prefix / Tier 1.96 are also located).
         alkyl = _CHAIN_SUB_STEMS.get(carbon_count)
         if alkyl:
-            return f"hydroxy{alkyl}"
+            return f"{carbon_count}-hydroxy{alkyl}" if carbon_count > 1 else f"hydroxy{alkyl}"
 
     if functional_group == 'aldehyde' and carbon_count > 0:
         if carbon_count == 1:

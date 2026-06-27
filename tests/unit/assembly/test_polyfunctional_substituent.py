@@ -66,14 +66,77 @@ class TestPolyfunctionalSubstituentNamed:
         assert _name_frag("CCC(Cl)O") == "2-chloro-2-hydroxyethyl"
 
 
-class TestPolyfunctionalSubstituentFailClosed:
-    """Fail-closed: single-FG and non-clean classes keep their existing tiers."""
+class TestSingleFGSubstituent:
+    """v23 single-FG extension: ONE detachable prefix, numbered from the free
+    valence so the locant is attachment-correct (P-29.2). 1-carbon backbones
+    elide the locant; >=2-carbon backbones carry it."""
 
-    def test_single_hydroxy_unchanged(self):
-        # 1 FG (<2) -> namer declines; existing 'hydroxymethyl' kept
+    def test_2_hydroxyethyl(self):
+        # -CH2CH2OH : was 'hydroxyethyl' (locant dropped)
+        assert _name_frag("CCCO") == "2-hydroxyethyl"
+
+    def test_3_hydroxypropyl(self):
+        # -CH2CH2CH2OH : was '1-hydroxypropyl' (numbered from the WRONG end)
+        assert _name_frag("CCCCO") == "3-hydroxypropyl"
+
+    def test_2_aminoethyl(self):
+        assert _name_frag("CCCN") == "2-aminoethyl"
+
+    def test_3_aminopropyl(self):
+        assert _name_frag("CCCCN") == "3-aminopropyl"
+
+    def test_carboxymethyl(self):
+        # -CH2COOH : was 'acetyl' (a DIFFERENT molecule -C(=O)CH3)
+        assert _name_frag("CCC(=O)O") == "carboxymethyl"
+
+    def test_2_carboxyethyl(self):
+        assert _name_frag("CCCC(=O)O") == "2-carboxyethyl"
+
+    def test_2_oxopropyl(self):
+        # -CH2C(=O)CH3 : oxo on C2 (not the attachment) -> '2-oxopropyl'
+        assert _name_frag("CCC(=O)C") == "2-oxopropyl"
+
+    def test_hydroxymethyl_one_carbon_byte_identical(self):
         assert _name_frag("CCO") == "hydroxymethyl"
 
-    def test_single_amino_unchanged(self):
+    def test_acyl_oxo_on_attachment_declined(self):
+        # -C(=O)CH3 : the oxo sits on the free-valence carbon = an acyl group;
+        # the structure namer DECLINES (acetyl/propanoyl is named elsewhere), so
+        # it must never emit '1-oxoethyl'.
+        from orthonym.assembly.substituent_naming import (
+            _name_polyfunctional_acyclic_substituent as f,
+        )
+        mol = Chem.MolFromSmiles("CC(=O)C")  # parent-C0, attach=1 (carbonyl C)
+        assert f(mol, [1, 2, 3], 1, set()) is None
+
+
+class TestSingleFGRingParent:
+    """The ring-parent path (benzene._name_functionalized_chain_substituent)
+    must give the SAME located single-FG names as the structure-based namer."""
+
+    def test_benzoic_2_hydroxyethyl(self):
+        assert name_compound("OC(=O)c1ccc(CCO)cc1") == "4-(2-hydroxyethyl)benzoic acid"
+
+    def test_benzoic_3_hydroxypropyl(self):
+        assert name_compound("OC(=O)c1ccc(CCCO)cc1") == "4-(3-hydroxypropyl)benzoic acid"
+
+    def test_benzoic_carboxymethyl_unchanged(self):
+        assert name_compound("OC(=O)c1ccc(CC(=O)O)cc1") == "4-(carboxymethyl)benzoic acid"
+
+    def test_benzoic_formyl_preserved(self):
+        # -CHO directly on the ring stays 'formyl' (1-carbon map entry intact)
+        assert name_compound("OC(=O)c1ccc(C=O)cc1") == "4-formylbenzoic acid"
+
+
+class TestPolyfunctionalSubstituentFailClosed:
+    """Fail-closed: non-clean classes (ring/ether/amide) keep their existing tiers."""
+
+    def test_single_hydroxy_one_carbon_elided(self):
+        # 1-carbon backbone -> locant elided -> 'hydroxymethyl' (byte-identical
+        # to the pre-single-FG behaviour).
+        assert _name_frag("CCO") == "hydroxymethyl"
+
+    def test_single_amino_one_carbon_elided(self):
         assert _name_frag("CCN") == "aminomethyl"
 
     def test_ether_declined(self):
