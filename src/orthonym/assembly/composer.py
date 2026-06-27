@@ -2505,6 +2505,12 @@ def _is_complex_ring_system(mol) -> bool:
     if is_spiro_system(mol):
         return True
 
+    # P-24.5 spiro-of-von-Baeyer (Phase 13B(c)): monospiro with >=1 cage
+    # component (mirrors the _classify_complex_ring dispatch order).
+    from ..rules.spiro import is_spiro_vonbaeyer
+    if is_spiro_vonbaeyer(mol):
+        return True
+
     # Check polycyclic-bridged (tricyclo+ pure bridged systems)
     if is_polycyclic_system(mol):
         return True
@@ -2570,6 +2576,15 @@ def _classify_complex_ring(mol) -> str:
     # whole two-component spiro system, so the spirobi branch never fires.
     from ..rules.spiro import is_spirobi as _is_spirobi_classify
     _input_is_spirobi = _is_spirobi_classify(mol)
+    # P-24.5 spiro-of-von-Baeyer / spiro-PAH (Phase 13B): SAME hazard. When a
+    # spiro component is a fused HETEROCYCLE (e.g. spiro[fluorene-9,9'-xanthene])
+    # the catalog matches the xanthene sub-core; worse, get_ring_systems splits
+    # the by-atom spiro junction into two systems and the shared spiro atom makes
+    # the core atoms intersect BOTH, tricking the dominant-system heuristic into
+    # returning 'ortho-fused' for the whole molecule -> the spiro-vonbaeyer
+    # branch never fires. Computed once here, reused at the dispatch branch below.
+    from ..rules.spiro import is_spiro_vonbaeyer as _is_spiro_vb_classify
+    _input_is_spiro_vb = _is_spiro_vb_classify(mol)
 
     # Check known fused heterocycles BEFORE polycyclic-bridged check.
     # Prevents tricyclic fused heterocycles (xanthene, phenothiazine,
@@ -2583,7 +2598,7 @@ def _classify_complex_ring(mol) -> str:
     # is the largest ring system (nucleotide cofactors: adenine + ribose),
     # use only the core's ring system atom count.
     from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
-    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi) else match_fused_heterocycle_core(mol)
+    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi or _input_is_spiro_vb) else match_fused_heterocycle_core(mol)
     if core_match is not None:
         core_smiles = core_match[2]
         core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
@@ -2644,6 +2659,19 @@ def _classify_complex_ring(mol) -> str:
     # so complex polycyclic molecules with incidental spiro atoms are excluded.
     if is_spiro_system(mol):
         return 'spiro'
+
+    # P-24.5 spiro-of-von-Baeyer / spiro-PAH (Phase 13B(c)/(b)): a monospiro
+    # system with >=1 von Baeyer cage OR carbo-PAH (fluorene) component (e.g.
+    # spiro[bicyclo[2.2.1]heptane-2,1'-cyclohexane], 2,2'-spirobi[bicyclo[2.2.1]
+    # heptane], 9,9'-spirobi[fluorene], spiro[fluorene-9,9'-xanthene]). The
+    # cage-bridge / C9 spiro atom sits in >2 SSSR rings (or the components only
+    # share the spiro atom), so is_spiro_system / is_spirobi / is_mixed_spiro_
+    # fused all decline (they key off get_spiro_atoms) and the system would
+    # otherwise mis-route to polycyclic-bridged / ortho-fused -> 'unknown'.
+    # Must precede the polycyclic-bridged check. Reuses the flag computed for
+    # the catalog-skip above. Fail-closed.
+    if _input_is_spiro_vb:
+        return 'spiro-vonbaeyer'
 
     # Check polycyclic-bridged (tricyclo+ bridged systems) BEFORE fused
     # This is critical: is_polycyclic_system correctly distinguishes
@@ -2765,6 +2793,19 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Spirobi naming failed for molecule")
+            return None
+
+        elif ring_type == 'spiro-vonbaeyer':
+            # P-24.5 (Phase 13B(c)): monospiro with >=1 von Baeyer cage
+            # component, named by the component-name method
+            # (spiro[bicyclo[2.2.1]heptane-2,1'-cyclohexane]) or the spirobi
+            # form for two identical cages (2,2'-spirobi[bicyclo[2.2.1]heptane]).
+            from ..rules.spiro import name_spiro_vonbaeyer
+            result = name_spiro_vonbaeyer(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Spiro-von-Baeyer naming failed for molecule")
             return None
 
         elif ring_type == 'mixed-spiro-fused':

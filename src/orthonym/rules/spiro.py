@@ -1944,6 +1944,375 @@ def name_spirobi(
     return (name, all_ring_atoms, combined_locants, False)
 
 
+# ============================================================================
+# P-24.5 — spiro systems with at least one von Baeyer (bridged) ring component
+# (Phase 13B(c) — spiro-of-von-Baeyer). The existing spirobi / mixed-spiro-fused
+# paths rely on ``get_spiro_atoms`` (atom in EXACTLY 2 SSSR rings) + the
+# catalog/ortho-fused ``_name_fused_component``; a von Baeyer cage shares its
+# spiro atom across >2 SSSR rings (cage-bridge spiro) and is named by its
+# ``bicyclo[...]`` descriptor, so neither path fires and the whole system
+# mis-routes to the pure-VB polycyclic-bridged branch (VonBaeyerAnalyzer
+# invariant-fails -> unknown). This adds a dedicated, fail-closed P-24.5 path.
+# ============================================================================
+
+
+def _ring_atom_graph(mol) -> Tuple[Set[int], Dict[int, Set[int]]]:
+    """Ring-atom set + adjacency limited to ring-ring bonds."""
+    ring_atoms: Set[int] = set()
+    for r in mol.GetRingInfo().AtomRings():
+        ring_atoms.update(r)
+    adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_atoms and j in ring_atoms:
+            adj[i].add(j)
+            adj[j].add(i)
+    return ring_atoms, adj
+
+
+def _ring_components_excluding(
+    adj: Dict[int, Set[int]], exclude: int,
+) -> List[Set[int]]:
+    """Connected components of the ring-atom graph with ``exclude`` removed."""
+    seen: Set[int] = {exclude}
+    comps: List[Set[int]] = []
+    for start in adj:
+        if start in seen:
+            continue
+        stack = [start]
+        comp: Set[int] = {start}
+        seen.add(start)
+        while stack:
+            cur = stack.pop()
+            for nbr in adj[cur]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    comp.add(nbr)
+                    stack.append(nbr)
+        comps.append(comp)
+    return comps
+
+
+def find_monospiro_separation_atom(
+    mol,
+) -> Optional[Tuple[int, List[Set[int]]]]:
+    """The unique ring atom whose removal splits the ring-atom graph into exactly
+    two components (a monospiro junction), ROBUST to a spiro atom that sits in
+    >2 SSSR rings (a von-Baeyer cage-bridge spiro, where ``get_spiro_atoms``
+    returns nothing). A spiro atom has exactly four ring bonds (two into each
+    component) and is a cut vertex of the ring-atom graph; a VB bridgehead is
+    NOT a cut vertex (the other bridges keep the cage connected) and an
+    ortho-fusion junction atom has three ring bonds, not four. Returns
+    ``(spiro_atom, [component_a_atoms, component_b_atoms])`` or None when there
+    is not exactly one such clean two-way split (polyspiro / fused / bridged)."""
+    ring_atoms, adj = _ring_atom_graph(mol)
+    candidates: List[Tuple[int, List[Set[int]]]] = []
+    for atom in ring_atoms:
+        if len(adj[atom]) != 4:
+            continue
+        comps = _ring_components_excluding(adj, atom)
+        if len(comps) == 2 and all(adj[atom] & c for c in comps):
+            candidates.append((atom, comps))
+    if len(candidates) != 1:
+        return None
+    return candidates[0]
+
+
+def _name_carbocyclic_monocycle_component(
+    mol, component_atoms: Set[int], spiro_center: int,
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a single SATURATED CARBOCYCLIC ring component of a spiro system,
+    numbering it with locant 1 at the spiro atom (the P-24.5 side-ring
+    convention). Returns ``(cyclo<N>ane, {orig_idx: locant})`` or None for a
+    heteroatom ring or an unsaturated ring (deferred follow-on -> fail-closed)."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    rings = frag.GetRingInfo().AtomRings()
+    if len(rings) != 1:
+        return None
+    ring = list(rings[0])
+    for fi in ring:  # carbocyclic only
+        if frag.GetAtomWithIdx(fi).GetAtomicNum() != 6:
+            return None
+    ring_set = set(ring)
+    for bond in frag.GetBonds():  # saturated only
+        if (bond.GetBeginAtomIdx() in ring_set
+                and bond.GetEndAtomIdx() in ring_set
+                and bond.GetBondType() != Chem.BondType.SINGLE):
+            return None
+    fadj: Dict[int, List[int]] = {a: [] for a in ring}
+    for bond in frag.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            fadj[i].append(j)
+            fadj[j].append(i)
+    start = orig_to_frag[spiro_center]
+    # Walk the ring from the spiro atom (locant 1 at spiro). Deterministic:
+    # an unsubstituted monocycle is symmetric about the spiro atom, so either
+    # walk direction yields the same name; iterate sorted neighbours for a
+    # stable map.
+    for first in sorted(fadj[start]):
+        path = [start, first]
+        visited = {start, first}
+        cur = first
+        while len(path) < len(ring):
+            nxt = next((nb for nb in fadj[cur] if nb not in visited), None)
+            if nxt is None:
+                break
+            path.append(nxt)
+            visited.add(nxt)
+            cur = nxt
+        if len(path) == len(ring):
+            a2l = {frag_to_orig[a]: i + 1 for i, a in enumerate(path)}
+            return f"cyclo{_get_chain_prefix(len(ring))}ane", a2l
+    return None
+
+
+def _name_vonbaeyer_spiro_component(
+    mol, component_atoms: Set[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a von-Baeyer (bicyclic cage) component by its SYSTEMATIC
+    ``bicyclo[...]alkane`` descriptor — NOT a retained name: the component-name
+    spiro PIN cites the von Baeyer name (P-24.5), e.g. ``bicyclo[2.2.1]heptane``
+    not ``norbornane`` (and the alphanumerical citation order depends on it).
+    Returns ``(name, {orig_idx: locant})`` or None (non-bicyclo cage, tricyclo+,
+    or heteroatom cage -> follow-on, fail-closed)."""
+    from .bicyclo import (
+        is_bicyclo_system, generate_bicyclo_descriptor,
+        get_bicyclo_numbering, _get_alkane_name,
+    )
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    if not is_bicyclo_system(frag):
+        return None
+    descriptor = generate_bicyclo_descriptor(frag)
+    if not descriptor:
+        return None
+    numbering = get_bicyclo_numbering(frag)
+    if not numbering:
+        return None
+    ring_atom_idxs = [a.GetIdx() for a in frag.GetAtoms() if a.IsInRing()]
+    if any(frag.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in ring_atom_idxs):
+        return None  # heteroatom cage -> follow-on (oxa/aza VB spiro component)
+    name = descriptor + _get_alkane_name(len(ring_atom_idxs))
+    a2l = {
+        frag_to_orig[fi]: loc
+        for fi, loc in numbering.items()
+        if fi in frag_to_orig
+    }
+    return name, a2l
+
+
+# --- Carbocyclic-PAH numbered templates (Phase 13B(b)) ----------------------
+# A fused CARBOCYCLIC ring system (fluorene, ...) is not in the heterocycle
+# catalog and is not an ortho-fused BICYCLIC, so ``_name_fused_component``
+# declines it. Its IUPAC peripheral numbering is a fixed table; store it as a
+# numbered template (locants from OPSIN ``-o extendedsmi`` $_AV:) and map a
+# component's atoms onto it by substructure match. Fail-closed beyond the
+# registered templates (a general carbo-PAH numbering engine is out of scope).
+
+
+def _carbopah_loc_base(loc) -> int:
+    """Base integer of a (possibly letter-suffixed) locant: '9a' -> 9."""
+    return int("".join(c for c in str(loc) if c.isdigit()))
+
+
+# (display_name, template SMILES [atom order == OPSIN locant order], locants).
+_CARBO_PAH_TEMPLATE_SPECS = [
+    # fluorene  |$_AV:1;2;3;4;4a;4b;5;6;7;8;8a;9;9a$|  (C9 = the sp3 spiro centre)
+    ("9H-fluorene", "C1=CC=CC=2C3=CC=CC=C3CC12",
+     [1, 2, 3, 4, "4a", "4b", 5, 6, 7, 8, "8a", 9, "9a"]),
+]
+
+
+def _build_carbo_pah_templates():
+    out = []
+    for name, smi, locants in _CARBO_PAH_TEMPLATE_SPECS:
+        tmpl = Chem.MolFromSmiles(smi)
+        if tmpl is not None:
+            out.append((name, tmpl, locants, Chem.CanonSmiles(smi)))
+    return out
+
+
+_CARBO_PAH_TEMPLATES = _build_carbo_pah_templates()
+
+
+def _name_carbopah_spiro_component(
+    mol, component_atoms: Set[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a fused CARBOCYCLIC PAH component (e.g. fluorene) by matching it to
+    a numbered template. Returns ``(name, {orig_idx: base_int_locant})`` or None
+    (not a registered carbo-PAH skeleton -> fail-closed)."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    frag_canon = Chem.MolToSmiles(frag)
+    for name, tmpl, locants, tmpl_canon in _CARBO_PAH_TEMPLATES:
+        if frag_canon != tmpl_canon:
+            continue
+        match = frag.GetSubstructMatch(tmpl)  # match[i] = frag atom for template i
+        if not match or len(match) != tmpl.GetNumAtoms():
+            continue
+        a2l: Dict[int, int] = {}
+        for ti, frag_atom in enumerate(match):
+            orig = frag_to_orig.get(frag_atom)
+            if orig is not None:
+                a2l[orig] = _carbopah_loc_base(locants[ti])
+        return name, a2l
+    return None
+
+
+def _component_rings(mol, component_atoms: Set[int]) -> List[List[int]]:
+    """Rings of ``mol`` fully contained in ``component_atoms`` (the list-of-rings
+    interface that ``_name_fused_component`` expects)."""
+    return [
+        list(r) for r in mol.GetRingInfo().AtomRings()
+        if set(r) <= component_atoms
+    ]
+
+
+def _name_spiro_component(
+    mol, component_atoms: Set[int], spiro_center: int,
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Dispatch one spiro component to the right namer, in order: a single
+    saturated carbocyclic ring; a von Baeyer cage (systematic bicyclo); a fused
+    heterocycle (catalog, e.g. xanthene); a fused carbocyclic PAH (template,
+    e.g. fluorene). Returns ``(name, {orig_idx: locant})`` or None (fail-closed
+    when none of these name the component)."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    if extracted[0].GetRingInfo().NumRings() == 1:
+        return _name_carbocyclic_monocycle_component(
+            mol, component_atoms, spiro_center
+        )
+    vb = _name_vonbaeyer_spiro_component(mol, component_atoms)
+    if vb is not None:
+        return vb
+    fused = _name_fused_component(mol, _component_rings(mol, component_atoms))
+    if fused is not None:
+        return fused
+    return _name_carbopah_spiro_component(mol, component_atoms)
+
+
+def _name_spiro_vonbaeyer_core(mol):
+    """Shared core for is_spiro_vonbaeyer / name_spiro_vonbaeyer. Returns
+    ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed)."""
+    found = find_monospiro_separation_atom(mol)
+    if found is None:
+        return None
+    spiro_center, (comp_a, comp_b) = found
+    all_ring_atoms: Set[int] = comp_a | comp_b | {spiro_center}
+    # Unsubstituted only — substituted spiro-VB locant selection is a follow-on.
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+    atoms_a = comp_a | {spiro_center}
+    atoms_b = comp_b | {spiro_center}
+    ext_a = _extract_subfragment(mol, atoms_a)
+    ext_b = _extract_subfragment(mol, atoms_b)
+    if ext_a is None or ext_b is None:
+        return None
+    from .bicyclo import is_bicyclo_system
+    # At least one component must be a von Baeyer cage OR a registered carbo-PAH
+    # (fluorene); otherwise this is plain spiro / spirobi / mixed-spiro-fused —
+    # the existing branches own those and are checked FIRST in the composer
+    # dispatch, so this path only sees what they declined. Keeping a positive
+    # gate (rather than relying solely on dispatch order) bounds the blast
+    # radius: a fused-heterocycle-only spiro stays fail-closed here (follow-on).
+    a_vb = is_bicyclo_system(ext_a[0])
+    b_vb = is_bicyclo_system(ext_b[0])
+    if not (
+        a_vb or b_vb
+        or _name_carbopah_spiro_component(mol, atoms_a) is not None
+        or _name_carbopah_spiro_component(mol, atoms_b) is not None
+    ):
+        return None
+    named_a = _name_spiro_component(mol, atoms_a, spiro_center)
+    named_b = _name_spiro_component(mol, atoms_b, spiro_center)
+    if named_a is None or named_b is None:
+        return None
+    name_a, locmap_a = named_a
+    name_b, locmap_b = named_b
+    # P-24.3.3 lowest spiro locant per component, deterministic over the spiro
+    # atom's symmetry orbit (CanonicalRankAtoms) — the spirobi tie-break reused.
+    loc_a = _canonical_spiro_locant(ext_a, locmap_a, spiro_center)
+    loc_b = _canonical_spiro_locant(ext_b, locmap_b, spiro_center)
+    if loc_a is None or loc_b is None:
+        return None
+
+    identical = (
+        name_a == name_b
+        and Chem.MolToSmiles(ext_a[0]) == Chem.MolToSmiles(ext_b[0])
+    )
+    if identical:
+        # P-24.3.1 spirobi multiplicative form for two identical components.
+        if loc_a <= loc_b:
+            lo, hi = loc_a, loc_b
+            unprimed_map, primed_map = locmap_a, locmap_b
+        else:
+            lo, hi = loc_b, loc_a
+            unprimed_map, primed_map = locmap_b, locmap_a
+        component = _strip_consumed_indicated_h(name_a, lo)
+        name = f"{lo},{hi}'-spirobi[{component}]"
+    else:
+        # P-24.5.1 component-name spiro: cite components in ALPHANUMERICAL order
+        # of the component name (NOT ring seniority); first cited is unprimed.
+        if _component_alpha_key(name_a) <= _component_alpha_key(name_b):
+            first_name, first_loc = name_a, loc_a
+            second_name, second_loc = name_b, loc_b
+            unprimed_map, primed_map = locmap_a, locmap_b
+        else:
+            first_name, first_loc = name_b, loc_b
+            second_name, second_loc = name_a, loc_a
+            unprimed_map, primed_map = locmap_b, locmap_a
+        first_name = _strip_consumed_indicated_h(first_name, first_loc)
+        second_name = _strip_consumed_indicated_h(second_name, second_loc)
+        name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
+
+    combined_locants: Dict[int, _Locant] = {}
+    for atom_idx, locant in unprimed_map.items():
+        combined_locants[atom_idx] = locant
+    for atom_idx, locant in primed_map.items():
+        if atom_idx == spiro_center:
+            continue
+        combined_locants[atom_idx] = (locant, "'")
+    if not (set(combined_locants.keys()) >= all_ring_atoms):
+        return None  # coverage invariant (Pitfall 7)
+    return name, all_ring_atoms, combined_locants
+
+
+def is_spiro_vonbaeyer(mol) -> bool:
+    """P-24.5: monospiro system with >=1 von Baeyer (bridged) ring component
+    (e.g. ``spiro[bicyclo[2.2.1]heptane-2,1'-cyclohexane]``,
+    ``2,2'-spirobi[bicyclo[2.2.1]heptane]``). Fail-closed (see
+    ``_name_spiro_vonbaeyer_core``)."""
+    if mol is None:
+        return False
+    return _name_spiro_vonbaeyer_core(mol) is not None
+
+
+def name_spiro_vonbaeyer(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.5 component-name spiro PIN for a monospiro system with at
+    least one von Baeyer cage component. Return shape matches ``name_spirobi``
+    (name, ring_atoms, atom_to_locant, substituents_included=False)."""
+    core = _name_spiro_vonbaeyer_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
 def get_mixed_spiro_fused_iupac_locants(
     mol,
 ) -> Optional[Dict[int, _Locant]]:

@@ -159,6 +159,129 @@ class TestSpirobiBuiltP24_3:
 
 
 @pytest.mark.unit
+class TestSpiroVonBaeyerP24_5:
+    """v23 Phase 13B(c): monospiro systems with >=1 von Baeyer (bridged) cage
+    component (P-24.5 component-name form, or P-24.3.1 spirobi for two identical
+    cages). Built by ``name_spiro_vonbaeyer`` via a robust atom-based
+    separation-atom finder that handles a cage-bridge spiro atom sitting in >2
+    SSSR rings (where ``get_spiro_atoms`` fails). The von Baeyer component is
+    cited by its SYSTEMATIC ``bicyclo[...]`` name, not a retained name."""
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            # VB cage + monocycle (component-name form, alphanumerical order b<c).
+            ("C1CCC2(CC1)CC1CCC2C1",
+             "spiro[bicyclo[2.2.1]heptane-2,1'-cyclohexane]"),
+            ("C1CCC2(CC1)CC1CCC2CC1",
+             "spiro[bicyclo[2.2.2]octane-2,1'-cyclohexane]"),
+            ("C1CCC2(C1)CC1CCC2C1",
+             "spiro[bicyclo[2.2.1]heptane-2,1'-cyclopentane]"),
+            # Spiro at the 1-atom bridge (cage position 7, in BOTH cage SSSR rings).
+            ("C1CCC2(CC1)C1CCC2CC1",
+             "spiro[bicyclo[2.2.1]heptane-7,1'-cyclohexane]"),
+            # Two identical cages -> spirobi (P-24.3.1).
+            ("C1CC2CC1CC21CC2CCC1C2", "2,2'-spirobi[bicyclo[2.2.1]heptane]"),
+            ("C1CC2CCC1CC21CC2CCC1CC2", "2,2'-spirobi[bicyclo[2.2.2]octane]"),
+        ],
+    )
+    def test_spiro_vonbaeyer_named(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    def test_systematic_not_retained_component_name(self):
+        # The cage MUST be cited systematically (bicyclo[2.2.1]heptane), never
+        # the retained 'norbornane' — that also fixes the citation order (b<c).
+        out = name_compound("C1CCC2(CC1)CC1CCC2C1")
+        assert "bicyclo[2.2.1]heptane" in out
+        assert "norbornane" not in out
+
+    def test_claimed_by_new_detector_only(self):
+        from orthonym.rules.spiro import (
+            is_mixed_spiro_fused, is_spiro_system, is_spirobi,
+            is_spiro_vonbaeyer,
+        )
+        # bicyclo[2.2.2]octane spiro cyclohexane: the cage-position-2 spiro atom
+        # is in both cage SSSR rings, so all legacy detectors decline.
+        mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1CCC2CC1")
+        assert is_spiro_system(mol) is False
+        assert is_mixed_spiro_fused(mol) is False
+        assert is_spirobi(mol) is False
+        assert is_spiro_vonbaeyer(mol) is True
+
+    @pytest.mark.parametrize(
+        "smiles",
+        [
+            "C1C2CC3CC1CC(C2)C3",      # adamantane (pure cage)
+            "C1CC2CCC1C2",             # norbornane (pure bicyclo)
+            "C1CCC2(CC1)CCCC2",        # spiro[4.5]decane (two monocycles)
+            "C1CCC2CCCCC2C1",          # decalin (fused bicyclic)
+            "C1CCC2(CC1)CC1(CCCCC1)C2",  # dispiro[5.1.5.1]tetradecane (polyspiro)
+        ],
+    )
+    def test_fail_closed_declines(self, smiles):
+        from orthonym.rules.spiro import is_spiro_vonbaeyer
+        mol = Chem.MolFromSmiles(smiles)
+        assert is_spiro_vonbaeyer(mol) is False
+
+    def test_determinism_across_spellings(self):
+        # The spiro locant + citation order must be SMILES-order-independent.
+        mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1CCC2C1")
+        names = set()
+        for root in range(mol.GetNumAtoms()):
+            spelling = Chem.MolToSmiles(mol, rootedAtAtom=root, canonical=False)
+            rm = Chem.MolFromSmiles(spelling)
+            if rm is not None:
+                names.add(name_compound(Chem.MolToSmiles(rm)))
+        assert names == {"spiro[bicyclo[2.2.1]heptane-2,1'-cyclohexane]"}, names
+
+
+@pytest.mark.unit
+class TestSpiroPAHFluoreneP24_5:
+    """v23 Phase 13B(b): spiro systems with a fused CARBOCYCLIC-PAH component
+    (fluorene), named via a numbered template. Headlined by 9,9'-spirobifluorene
+    (the spiro-OLED core). The fluorene component is cited by its retained PAH
+    name with the indicated H consumed by the C9 spiro atom."""
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            ("c1ccc2c(c1)-c1ccccc1C21c2ccccc2-c2ccccc21",
+             "9,9'-spirobi[fluorene]"),
+            ("c1ccc2c(c1)-c1ccccc1C21CCCCC1",
+             "spiro[cyclohexane-1,9'-fluorene]"),
+            ("c1ccc2c(c1)-c1ccccc1C21CCCC1",
+             "spiro[cyclopentane-1,9'-fluorene]"),
+            # fluorene (carbo-PAH) + xanthene (fused heterocycle) co-component.
+            ("c1ccc2c(c1)Oc1ccccc1C21c2ccccc2-c2ccccc21",
+             "spiro[fluorene-9,9'-xanthene]"),
+        ],
+    )
+    def test_spiro_pah_named(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    def test_catalog_skip_guard_is_precise(self):
+        # The _input_is_spiro_vb catalog-skip guard must NOT steal genuine fused
+        # heterocycles that merely contain a catalog sub-core. Oxanthrene
+        # (dibenzo-p-dioxin) has no spiro atom -> stays on the catalog path.
+        assert name_compound("O1c2ccccc2Oc2ccccc21") == "oxanthrene"
+        # Bare xanthene / fluorene keep their catalog names.
+        assert name_compound("c1ccc2c(c1)Cc1ccccc1O2") == "9H-xanthene"
+        assert name_compound("c1ccc2c(c1)Cc3ccccc3-2") == "fluorene"
+
+    def test_spirobifluorene_determinism(self):
+        mol = Chem.MolFromSmiles(
+            "c1ccc2c(c1)-c1ccccc1C21c2ccccc2-c2ccccc21"
+        )
+        names = set()
+        for root in range(0, mol.GetNumAtoms(), 3):
+            spelling = Chem.MolToSmiles(mol, rootedAtAtom=root, canonical=False)
+            rm = Chem.MolFromSmiles(spelling)
+            if rm is not None:
+                names.add(name_compound(Chem.MolToSmiles(rm)))
+        assert names == {"9,9'-spirobi[fluorene]"}, names
+
+
+@pytest.mark.unit
 class TestSpiroNumberingDeterminism:
     """The G4 get_spiro_numbering rewrite must give SMILES-order-independent,
     LOWEST-locant heteroatom numbering — closing the pre-existing A9 trap where
