@@ -97,13 +97,20 @@ class TestVBNotationFormat:
     """
 
     def test_tricyclo_descriptor_format(self):
-        """tricyclo descriptors should use parenthesized locants for secondary bridges."""
+        """tricyclo descriptors use PIN superscript locants for secondary bridges.
+
+        13B(d): secondary-bridge attachment locants are now cited in the PIN
+        superscript form ``<len>^<lo>,<hi>`` (P-23.2.5.1 / P-23.2.6.1.2), e.g.
+        ``tricyclo[6.3.0.0^2,6]``, replacing the older ``0(2,6)`` parenthesis
+        form. OPSIN parses both, so this is a typography upgrade only.
+        """
         smiles = "COCC1=C2[C@@H]3CC(C)(C)C[C@@H]3C[C@@]2(O)CC1=O"
         name = name_compound(smiles)
         assert "tricyclo[" in name, f"Expected tricyclo descriptor: {name}"
-        # Should have secondary bridge with parenthesized locants
-        assert "(" in name.split("tricyclo[")[1].split("]")[0], (
-            f"Expected parenthesized locants in tricyclo descriptor: {name}"
+        descriptor_body = name.split("tricyclo[")[1].split("]")[0]
+        # Secondary bridge cited with a superscript caret locant pair.
+        assert "^" in descriptor_body, (
+            f"Expected superscript locants in tricyclo descriptor: {name}"
         )
 
 

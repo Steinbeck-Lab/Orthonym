@@ -442,8 +442,11 @@ class TestWSD01VonBaeyerFGSuffix:
     @pytest.mark.unit
     def test_tricyclo_amine_suffix(self):
         # RING-09: amine on adamantane cage, was dropped entirely.
+        # 13B(d): secondary-bridge locants now in PIN superscript form (1^3,7).
         assert name_compound('NC1C2CC3CC(C2)CC1C3') in {
-            'tricyclo[3.3.1.1(3,7)]decan-2-amine', 'adamantan-2-amine'}
+            'tricyclo[3.3.1.1^3,7]decan-2-amine',
+            'tricyclo[3.3.1.1(3,7)]decan-2-amine',
+            'adamantan-2-amine'}
 
     @pytest.mark.unit
     def test_bicyclo_alcohol_is_suffix(self):

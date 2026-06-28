@@ -306,7 +306,11 @@ class TestZeroLengthBridges:
     def test_cubane_has_correct_bridge_count(self):
         """Cubane must have exactly 6 bridge lengths (ring_count + 1 = 5 + 1 = 6).
 
-        Three of the 6 bridge lengths should be zero (zero-length secondary bridges).
+        13B(d): with the P-23.2.1 main-ring fix the main ring is now the maximal
+        (8-membered) cycle, so the main bridge is 0 atoms and FOUR of the six
+        bridge lengths are zero (descriptor pentacyclo[3.3.0.0^2,6.0^3,7.0^4,8]),
+        up from three under the previous (non-maximal main-ring) decomposition.
+        Both round-trip to the same C8 cage.
         """
         mol = Chem.MolFromSmiles("C12C3C4C1C5C3C4C25")
         ring_atoms = _get_ring_atoms(mol)
@@ -319,18 +323,20 @@ class TestZeroLengthBridges:
             f"Expected 6 bridge lengths for cubane (pentacyclo), got {len(desc.bridge_lengths)}"
         )
 
-        # Exactly 3 zero-length bridges
+        # Maximal main ring => 0-atom main bridge => four zero-length bridges.
         zero_count = sum(1 for bl in desc.bridge_lengths if bl == 0)
-        assert zero_count == 3, (
-            f"Expected 3 zero-length bridges for cubane, got {zero_count}"
+        assert zero_count == 4, (
+            f"Expected 4 zero-length bridges for cubane, got {zero_count}"
         )
 
     @pytest.mark.unit
     def test_cubane_descriptor_format(self):
-        """Cubane descriptor must contain 'pentacyclo[' and zero-length bridge entries.
+        """Cubane descriptor must contain 'pentacyclo[' and zero-length bridges.
 
-        The OPSIN-compatible format uses inline superscript locants:
-        0locant_low,locant_high (e.g., 02,6 for zero-length bridge between 2 and 6).
+        13B(d): PIN superscript typography for secondary bridges
+        (``0^low,high`` per P-23.2.5.1) and a 0-atom main bridge from the
+        maximal main ring => three zero-length SECONDARY-bridge entries plus the
+        zero main bridge.
         """
         mol = Chem.MolFromSmiles("C12C3C4C1C5C3C4C25")
         ring_atoms = _get_ring_atoms(mol)
@@ -343,14 +349,13 @@ class TestZeroLengthBridges:
             f"Expected pentacyclo prefix, got: {desc.descriptor_string}"
         )
 
-        # Must contain zero-length bridge entries with parenthesized locants
-        # OPSIN-compatible format: 0(locant_low,locant_high)
+        # Secondary zero-length bridges use the PIN superscript form: 0^lo,hi
         import re
-        zero_bridge_pattern = r"0\(\d+,\d+\)"
+        zero_bridge_pattern = r"0\^\d+,\d+"
         matches = re.findall(zero_bridge_pattern, desc.descriptor_string)
         assert len(matches) == 3, (
-            f"Expected 3 zero-length bridge entries in descriptor, found {len(matches)}: "
-            f"{desc.descriptor_string}"
+            f"Expected 3 superscript zero-length secondary-bridge entries, "
+            f"found {len(matches)}: {desc.descriptor_string}"
         )
 
     @pytest.mark.unit
@@ -371,17 +376,18 @@ class TestZeroLengthBridges:
 
     @pytest.mark.unit
     def test_adamantane_unchanged(self):
-        """Adamantane must still produce tricyclo[3.3.1.1(3,7)]decane.
+        """Adamantane must still produce tricyclo[3.3.1.1^3,7]decane.
 
         Regression guard: zero-length bridge detection must not alter systems
         that already had correct secondary bridge detection via unassigned atoms.
+        13B(d): secondary-bridge locants now in PIN superscript form (``1^3,7``).
         """
         mol = Chem.MolFromSmiles("C1C2CC3CC1CC(C2)C3")
 
         name = generate_polycyclic_name(mol)
         assert name is not None
-        assert "tricyclo[3.3.1.1(3,7)]" in name, (
-            f"Expected tricyclo[3.3.1.1(3,7)] in adamantane name, got: {name}"
+        assert "tricyclo[3.3.1.1^3,7]" in name, (
+            f"Expected tricyclo[3.3.1.1^3,7] in adamantane name, got: {name}"
         )
         assert name.endswith("decane"), (
             f"Expected name to end with 'decane', got: {name}"

@@ -289,12 +289,12 @@ class TestDescriptorFormatting:
 
     @pytest.mark.unit
     def test_adamantane_descriptor(self, adamantane, analyzer):
-        """Adamantane descriptor: tricyclo[3.3.1.1(3,7)]."""
+        """Adamantane descriptor: tricyclo[3.3.1.1^3,7] (PIN superscript form)."""
         ring_atoms = _get_ring_atoms(adamantane)
         desc = analyzer.analyze(adamantane, ring_atoms)
-        # Parenthesized locants for secondary bridges (OPSIN-compatible)
-        assert desc.descriptor_string == "tricyclo[3.3.1.1(3,7)]", (
-            f"Expected 'tricyclo[3.3.1.1(3,7)]', got '{desc.descriptor_string}'"
+        # 13B(d): PIN superscript locants for secondary bridges (P-23.2.5.1).
+        assert desc.descriptor_string == "tricyclo[3.3.1.1^3,7]", (
+            f"Expected 'tricyclo[3.3.1.1^3,7]', got '{desc.descriptor_string}'"
         )
 
     @pytest.mark.unit
@@ -375,10 +375,15 @@ class TestFullNameGeneration:
 
     @pytest.mark.unit
     def test_adamantane_full_name(self, adamantane):
-        """Adamantane -> tricyclo[3.3.1.1(3,7)]decane."""
+        """Adamantane -> tricyclo[3.3.1.1^3,7]decane.
+
+        13B(d): secondary-bridge locants now use the PIN superscript typography
+        (``1^3,7``) per P-23.2.5.1 / P-23.2.6.1.2; was the older ``1(3,7)``
+        parenthesis form. OPSIN round-trips both.
+        """
         name = generate_polycyclic_name(adamantane)
-        assert name == "tricyclo[3.3.1.1(3,7)]decane", (
-            f"Expected 'tricyclo[3.3.1.1(3,7)]decane', got '{name}'"
+        assert name == "tricyclo[3.3.1.1^3,7]decane", (
+            f"Expected 'tricyclo[3.3.1.1^3,7]decane', got '{name}'"
         )
 
     @pytest.mark.unit

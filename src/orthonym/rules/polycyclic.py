@@ -234,9 +234,87 @@ class VonBaeyerAnalyzer:
     Verification: sum(bridge_lengths) + 2 = total_skeletal_atoms
     """
 
+    @staticmethod
+    def _canonical_atom_order(mol) -> Optional[List[int]]:
+        """A fully spelling-invariant atom order: the order in which RDKit
+        emits atoms in the canonical SMILES.
+
+        ``CanonicalRankAtoms(breakTies=True)`` is NOT invariant across input
+        orderings for symmetric molecules (its tie-break depends on the start
+        atom), which left symmetric cages (homocubane, nortricyclene)
+        non-deterministic. The canonical-SMILES output order is invariant
+        (verified across random spellings), so renumbering by it gives a
+        molecule whose atom indices are identical for every spelling.
+
+        Returns ``order`` such that ``order[new_idx] = old_idx``, or None if the
+        order cannot be obtained.
+        """
+        try:
+            # MolToSmiles records the canonical output order on ``mol`` as the
+            # private string property "_smilesAtomOutputOrder" (e.g.
+            # "[2,3,4,5,1,0,6]"); GetPropsAsDict does not surface it, so read it
+            # explicitly via GetProp.
+            Chem.MolToSmiles(mol)
+            if not mol.HasProp("_smilesAtomOutputOrder"):
+                return None
+            raw = mol.GetProp("_smilesAtomOutputOrder").strip()
+            order = [int(x) for x in raw.strip("[]").split(",") if x != ""]
+            n = mol.GetNumAtoms()
+            if len(order) == n and sorted(order) == list(range(n)):
+                return order
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _descriptor_is_valid(result: "PolycyclicDescriptor",
+                             ring_atoms: Set[int]) -> bool:
+        """Well-formed iff bridge lengths are all non-negative, the
+        P-23.2.6.1.1 invariant holds (sum + 2 == ring atoms), and every ring
+        atom received a locant. Malformed descriptors are OPSIN-unparseable.
+        """
+        if result is None:
+            return False
+        if any(l < 0 for l in result.bridge_lengths):
+            return False
+        if sum(result.bridge_lengths) + 2 != result.total_atoms:
+            return False
+        return set(result.numbering.keys()) >= set(ring_atoms)
+
+    @staticmethod
+    def _is_unsubstituted_ring_system(mol, ring_atoms: Set[int]) -> bool:
+        """True iff no ring atom carries an exocyclic heavy-atom substituent.
+
+        Only such 'pure cages' (prismane, cubane, nortricyclene, ...) are
+        renumbered for determinism: their name is just the descriptor + parent,
+        so re-numbering the core can only permute the secondary-bridge
+        superscript locants -- which OPSIN round-trips either way -- and can
+        never misplace a substituent. Substituted/heteroatom-bearing cages skip
+        the renumber so their downstream locants are untouched (renumbering
+        them was shown to break round-trips).
+        """
+        for idx in ring_atoms:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() != "C":
+                return False
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() not in ring_atoms and nbr.GetAtomicNum() > 1:
+                    return False
+        return True
+
     def analyze(self, mol, ring_atoms: Set[int]) -> PolycyclicDescriptor:
         """
         Main entry point: analyze a polycyclic system and produce its descriptor.
+
+        Determinism (WS-D): for an UNSUBSTITUTED cage the cascade is run on a
+        copy renumbered into a total RDKit canonical-rank order (identical for
+        every SMILES spelling), making the descriptor spelling-independent; the
+        numbering is then mapped back to the caller's atom indices. If the
+        canonical run yields a malformed descriptor it falls back to the
+        original order, so the result is never worse than the un-renumbered
+        path. SUBSTITUTED / heteroatom cages are NOT renumbered (that shifts
+        substituent locants and breaks round-trips); they still tie-break on
+        canonical ranks inside ``_find_main_ring``.
 
         Args:
             mol: RDKit Mol object
@@ -245,10 +323,56 @@ class VonBaeyerAnalyzer:
         Returns:
             PolycyclicDescriptor with all VB information
         """
+        if self._is_unsubstituted_ring_system(mol, ring_atoms):
+            order = self._canonical_atom_order(mol)
+            if order is not None:
+                old_to_new = {old: new for new, old in enumerate(order)}
+                new_to_old = {new: old for new, old in enumerate(order)}
+                try:
+                    canon_mol = Chem.RenumberAtoms(mol, order)
+                    canon_ring = {old_to_new[i] for i in ring_atoms}
+                    # Pure cage: no substituents to misplace, so we may also
+                    # search the main-bridgehead/direction choices for the PIN
+                    # (lowest secondary-bridge superscript locant set,
+                    # P-23.2.6.2.4/.5).
+                    canon_result = self._analyze_impl(
+                        canon_mol, canon_ring, optimize_orientation=True
+                    )
+                except Exception:
+                    canon_result = None
+                if self._descriptor_is_valid(canon_result, canon_ring):
+                    canon_result.numbering = {
+                        new_to_old[k]: v
+                        for k, v in canon_result.numbering.items()
+                        if k in new_to_old
+                    }
+                    for bridge in canon_result.bridge_info_list:
+                        bridge.atoms = [new_to_old.get(a, a) for a in bridge.atoms]
+                        bridge.start_bh = new_to_old.get(bridge.start_bh, bridge.start_bh)
+                        bridge.end_bh = new_to_old.get(bridge.end_bh, bridge.end_bh)
+                    return canon_result
+
+        return self._analyze_impl(mol, ring_atoms)
+
+    def _analyze_impl(self, mol, ring_atoms: Set[int],
+                      optimize_orientation: bool = False) -> PolycyclicDescriptor:
+        """Von Baeyer cascade (VB-1..VB-7) on the given atom ordering.
+
+        When ``optimize_orientation`` is set (pure-cage path only) the main
+        bridgehead chosen as locant 1 and the traversal direction are selected
+        to give the lowest secondary-bridge superscript locant set
+        (P-23.2.6.2.4/.5). This is RT-safe only without substituents, hence the
+        caller gate; it is what turns nortricyclene 0^3,5 into the PIN 0^2,6.
+        """
         ring_count = self._get_ring_count(mol, ring_atoms)
         bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
         main_ring, bh_pair = self._find_main_ring(mol, ring_atoms, bridgeheads)
         main_bridge = self._find_main_bridge(mol, ring_atoms, main_ring, bh_pair)
+
+        if optimize_orientation:
+            main_ring, bh_pair = self._select_pin_orientation(
+                mol, ring_atoms, main_ring, main_bridge, bh_pair
+            )
         secondary_bridges = self._find_secondary_bridges(
             mol, ring_atoms, main_ring, main_bridge, bh_pair
         )
@@ -492,78 +616,97 @@ class VonBaeyerAnalyzer:
             atom = mol.GetAtomWithIdx(idx)
             adj[idx] = set(n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in ring_atoms)
 
+        # Spelling-invariant tie-break key: RDKit canonical atom ranks are
+        # identical for every SMILES spelling of the same molecule. breakTies=
+        # True forces a TOTAL order so that even symmetry-equivalent atoms in a
+        # cage (homocubane etc.) get a stable, reproducible ordering -- without
+        # it the path-enumeration (GetNeighbors) order would break rank ties
+        # non-deterministically. This makes the main-ring selection fully
+        # order-independent (WS-D determinism).
+        try:
+            _ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+        except Exception:
+            _ranks = list(range(mol.GetNumAtoms()))
+
+        def _rank_key(atom_indices):
+            return tuple(sorted(_ranks[i] for i in atom_indices))
+
         best_ring = None
         best_bh_pair = None
-        best_score = (-1, -1, -1)  # (balance, ring_size, -main_bridge_len)
+        # Score tuple, compared with ">" (higher wins). Faithful to the
+        # P-23.2.1 -> P-23.2.4 -> P-23.2.6.2.1 cascade:
+        #   (ring_size,            # P-23.2.1: main ring includes max skeletal atoms
+        #    main_bridge_len,      # P-23.2.4: main bridge as large as possible
+        #    balance,              # P-23.2.6.2.1: main ring divided as symmetrically as possible
+        #    tie_key)              # deterministic canon-rank tie-break (lowest ranks win)
+        best_score = None
+
+        def _consider(ring, bh1, bh2, branch1_len, branch2_len, main_bridge_len):
+            nonlocal best_score, best_ring, best_bh_pair
+            balance = min(branch1_len, branch2_len)
+            tie_key = tuple(-r for r in _rank_key(ring))
+            score = (len(ring), main_bridge_len, balance, tie_key)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_ring = ring
+                best_bh_pair = (bh1, bh2)
+
+        def _best_disjoint_pair(allowed, exclude_direct):
+            """Largest, then most symmetric, pair of interior-disjoint bh1->bh2
+            paths through ``allowed``. ``exclude_direct`` drops the trivial
+            direct edge so a 0-atom main bridge keeps the rest as the main ring.
+            Deterministic: ties broken by the lowest canon-rank tuple.
+            """
+            all_paths = _find_all_simple_paths(mol, bh1, bh2, allowed)
+            if exclude_direct:
+                all_paths = [p for p in all_paths if len(p) >= 3]
+            if len(all_paths) < 2:
+                return None
+            best_local = None
+            best_pair = None
+            for i, p1 in enumerate(all_paths):
+                p1_interior = set(p1[1:-1])
+                for p2 in all_paths[i + 1:]:
+                    p2_interior = set(p2[1:-1])
+                    if p1_interior & p2_interior:
+                        continue
+                    ring_size = len(p1) + len(p2) - 2  # shared endpoints
+                    balance = min(len(p1) - 2, len(p2) - 2)
+                    key = (ring_size, balance,
+                           tuple(-r for r in _rank_key(set(p1) | set(p2))))
+                    if best_local is None or key > best_local:
+                        best_local = key
+                        best_pair = (p1, p2)
+            return best_pair
 
         for bh1, bh2 in combinations(sorted(bridgeheads), 2):
-            # Find common neighbors (potential main bridge atoms)
+            # Find common neighbors (potential 1-atom main bridge atoms)
             common_neighbors = adj.get(bh1, set()) & adj.get(bh2, set())
 
-            # Also consider direct connection (0-atom bridge)
+            # Also consider direct connection (0-atom main bridge)
             has_direct_bond = bh2 in adj.get(bh1, set())
 
-            # Case 1: Direct bond between bridgeheads (0-atom main bridge)
+            # Case 1: Direct bond between bridgeheads (0-atom main bridge).
+            # The main ring is the largest pair of interior-disjoint paths that
+            # do NOT use the direct edge; the direct bond is the main bridge.
+            # (Previously this greedily grabbed a single longest path, which on
+            # a dense cage consumed every atom and left no second branch -- so a
+            # 0-atom-bridge main ring was never even generated, e.g. prismane.)
             if has_direct_bond:
-                # Main ring via other atoms
-                remaining = ring_atoms - {bh1, bh2}
-                # But we need to avoid the direct bond, so find paths excluding it
-                path1 = self._find_path_avoiding_direct(mol, bh1, bh2, remaining | {bh1, bh2})
-                if path1 and len(path1) >= 3:
-                    path1_interior = set(path1[1:-1])
-                    remaining2 = remaining - path1_interior
-                    path2 = self._find_path_avoiding_direct(mol, bh2, bh1, remaining2 | {bh1, bh2})
-                    if path2 and len(path2) >= 2:
-                        ring = path1 + path2[1:-1]
-                        branch1_len = len(path1) - 2
-                        branch2_len = len(path2) - 2
-                        balance = min(branch1_len, branch2_len)
-                        score = (balance, len(ring), 0)  # 0-atom bridge
-                        if score > best_score:
-                            best_score = score
-                            best_ring = ring
-                            best_bh_pair = (bh1, bh2)
+                pair = _best_disjoint_pair(ring_atoms, exclude_direct=True)
+                if pair:
+                    p1, p2 = pair
+                    ring = p1 + p2[1:-1][::-1]
+                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 0)
 
-            # Case 2: Main bridge via a common neighbor
-            for bridge_atom in common_neighbors:
-                # Main ring via OTHER atoms (excluding the bridge atom)
-                remaining = ring_atoms - {bridge_atom}
-
-                # Find ALL paths between bridgeheads and select best disjoint pair
-                all_paths = _find_all_simple_paths(mol, bh1, bh2, remaining)
-                if len(all_paths) < 2:
-                    continue
-
-                # Find best pair of disjoint paths (most balanced)
-                best_pair_score = -1
-                best_path1 = None
-                best_path2 = None
-
-                for i, p1 in enumerate(all_paths):
-                    p1_interior = set(p1[1:-1])
-                    for p2 in all_paths[i + 1:]:
-                        p2_interior = set(p2[1:-1])
-                        # Check if paths are interior-disjoint
-                        if not (p1_interior & p2_interior):
-                            balance = min(len(p1) - 2, len(p2) - 2)
-                            ring_size = len(p1) + len(p2) - 2  # -2 for shared endpoints
-                            pair_score = (balance, ring_size)
-                            if pair_score > (best_pair_score, 0):
-                                best_pair_score = balance
-                                best_path1 = p1
-                                best_path2 = p2
-
-                if best_path1 and best_path2:
-                    ring = best_path1 + best_path2[1:-1][::-1]
-                    branch1_len = len(best_path1) - 2
-                    branch2_len = len(best_path2) - 2
-                    balance = min(branch1_len, branch2_len)
-                    score = (balance, len(ring), -1)  # 1-atom bridge
-
-                    if score > best_score:
-                        best_score = score
-                        best_ring = ring
-                        best_bh_pair = (bh1, bh2)
+            # Case 2: 1-atom main bridge via a common neighbor.
+            for bridge_atom in sorted(common_neighbors):
+                pair = _best_disjoint_pair(ring_atoms - {bridge_atom},
+                                           exclude_direct=False)
+                if pair:
+                    p1, p2 = pair
+                    ring = p1 + p2[1:-1][::-1]
+                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 1)
 
         # Fallback: use largest ring method (for bicyclo or unusual cases)
         if best_ring is None:
@@ -690,8 +833,108 @@ class VonBaeyerAnalyzer:
             # Reverse: the backward path is longer, so we want it first
             # Reverse the ring (keep bh1 at start)
             ring = [ring[0]] + ring[1:][::-1]
+        elif forward_len == backward_len:
+            # Symmetric main ring (equal branches): the traversal direction is a
+            # genuine tie. Break it deterministically by choosing the rotation
+            # whose post-bridgehead atom sequence is lexicographically smaller.
+            # On the canonically-renumbered molecule the atom index IS the
+            # canonical rank, so this yields a spelling-independent (and
+            # lowest-locant) orientation -- fixing the symmetric-cage flip
+            # (e.g. homocubane) without touching the decomposition.
+            reflected = [ring[0]] + ring[1:][::-1]
+            if reflected[1:] < ring[1:]:
+                ring = reflected
 
         return ring
+
+    def _select_pin_orientation(
+        self, mol, ring_atoms: Set[int], main_ring: List[int],
+        main_bridge: Optional[BridgeInfo], bh_pair: Tuple[int, int]
+    ) -> List[int]:
+        """Re-orient the main ring to the PIN numbering (RT-safe, pure cages).
+
+        Holds the decomposition (which atoms are main-ring / main-bridge /
+        secondary) FIXED and only varies which main bridgehead becomes locant 1
+        and the traversal direction, then keeps the orientation whose secondary
+        bridges get the lowest superscript locants as an ascending set
+        (P-23.2.6.2.4), then the lowest citation sequence (P-23.2.6.2.5), with a
+        deterministic atom-index backstop. Both main bridgeheads stay the main
+        bridgeheads, so the main bridge is unchanged and the cage is unchanged
+        -- only the numbering moves.
+        """
+        bh1, bh2 = bh_pair
+        ring_set = set(main_ring)
+        if bh1 not in ring_set or bh2 not in ring_set or bh1 == bh2:
+            return main_ring
+        n = len(main_ring)
+        BIG = 10 ** 6
+
+        candidates = []
+        seen = set()
+        for start, partner in ((bh1, bh2), (bh2, bh1)):
+            s_idx = main_ring.index(start)
+            rot = main_ring[s_idx:] + main_ring[:s_idx]
+            p_idx = rot.index(partner)
+            forward_len = p_idx - 1
+            backward_len = n - p_idx - 1
+            reflected = [rot[0]] + rot[1:][::-1]
+            # Keep the longer branch first (VB-7); admit both directions on a tie.
+            options = []
+            if forward_len > backward_len:
+                options = [rot]
+            elif backward_len > forward_len:
+                options = [reflected]
+            else:
+                options = [rot, reflected]
+            for opt in options:
+                key = tuple(opt)
+                if key not in seen:
+                    seen.add(key)
+                    candidates.append((opt, (start, partner)))
+
+        main_bridge_len = len(main_bridge.atoms) if main_bridge else 0
+
+        best_key = None
+        best_ring = main_ring
+        best_bhp = bh_pair
+        for cand_ring, cand_bhp in candidates:
+            cb1, cb2 = cand_bhp
+            # Primary branch lengths for this orientation (mirror _analyze_impl).
+            # cb1 is at index 0 in cand_ring by construction.
+            try:
+                b2_pos = cand_ring.index(cb2)
+            except ValueError:
+                continue
+            branch1_len = b2_pos - 1
+            branch2_len = len(cand_ring) - b2_pos - 1
+            # Reject malformed primaries (degenerate / adjacent bridgeheads).
+            if branch1_len < 0 or branch2_len < 0:
+                continue
+            sec = self._find_secondary_bridges(
+                mol, ring_atoms, cand_ring, main_bridge, cand_bhp
+            )
+            sec, numbering = self._order_and_number_secondary_bridges(
+                mol, sec, cand_ring, main_bridge, cand_bhp
+            )
+            if set(numbering.keys()) < set(ring_atoms):
+                continue  # incomplete numbering -> not a usable orientation
+            pairs = []
+            for b in sec:
+                l1 = numbering.get(b.start_bh)
+                l2 = numbering.get(b.end_bh)
+                if not l1 or not l2:
+                    pairs.append((BIG, BIG))
+                else:
+                    pairs.append((min(l1, l2), max(l1, l2)))
+            flat_set = tuple(sorted(x for pr in pairs for x in pr))       # P-23.2.6.2.4
+            citation = tuple(x for pr in pairs for x in pr)               # P-23.2.6.2.5
+            idx_backstop = tuple(cand_ring)
+            key = (flat_set, citation, idx_backstop)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_ring = cand_ring
+                best_bhp = cand_bhp
+        return best_ring, best_bhp
 
     # ========================================================================
     # VB-5: Main Bridge
@@ -837,8 +1080,10 @@ class VonBaeyerAnalyzer:
             remaining_unassigned = set(unassigned)
 
             while remaining_unassigned:
-                # BFS from an unassigned atom to find its connected component
-                start = next(iter(remaining_unassigned))
+                # BFS from an unassigned atom to find its connected component.
+                # Seed at the LOWEST atom index (not set-iteration order) so the
+                # component discovery is order-independent (WS-D determinism).
+                start = min(remaining_unassigned)
                 component = set()
                 queue = deque([start])
                 while queue:
@@ -955,6 +1200,14 @@ class VonBaeyerAnalyzer:
                     if edge not in accounted_edges:
                         zero_length_candidates.append(edge)
                         accounted_edges.add(edge)  # Don't double count
+
+            # Determinism (WS-D): RDKit GetBonds() iteration order is NOT
+            # canonical even after RenumberAtoms, and on over-determined cages
+            # (cubane, prismane, homocubane) there are more unaccounted ring
+            # bonds than zero-length bridges needed, so the [:needed_more] slice
+            # would otherwise pick a different subset per spelling. Sort by
+            # (low, high) atom index so the chosen subset is order-independent.
+            zero_length_candidates.sort(key=lambda e: (e[0], e[1]))
 
             # Add zero-length bridges for unaccounted ring bonds
             for a_idx, b_idx in zero_length_candidates[:needed_more]:
@@ -1248,9 +1501,20 @@ class VonBaeyerAnalyzer:
                 continue
             locant_low = min(loc1, loc2)
             locant_high = max(loc1, loc2)
-            parts.append(f"{bridge.length}({locant_low},{locant_high})")
+            parts.append(self._format_secondary_locants(
+                bridge.length, locant_low, locant_high))
 
         return f"{prefix}[{'.'.join(parts)}]"
+
+    @staticmethod
+    def _format_secondary_locants(length: int, locant_low: int, locant_high: int) -> str:
+        """Format one secondary-bridge term in PIN superscript typography.
+
+        ``length^low,high`` e.g. ``0^2,6`` (P-23.2.5.1 / P-23.2.6.1.2). OPSIN
+        parses both this caret form and the older ``length(low,high)``
+        parenthesis form, so the change is typography only -- not round-trip.
+        """
+        return f"{length}^{locant_low},{locant_high}"
 
 
 # ============================================================================
