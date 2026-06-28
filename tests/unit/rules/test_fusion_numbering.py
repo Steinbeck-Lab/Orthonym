@@ -116,6 +116,59 @@ class TestSystematicNumbering:
 
 
 @pytest.mark.unit
+class TestAngularBranchedNumbering:
+    """Angular / branched cata-fused PAH match OPSIN up to automorphism.
+
+    These are the cases the start-atom (P-25.3.3.1.1) and contiguous-row
+    (P-25.3.2.3.3a) fixes added — the engine previously mis-numbered every one
+    (fusion-carbon locants one position too low).  Compared up to the molecule's
+    own automorphism because symmetric systems (D3h triphenylene) have several
+    equivalent atom assignments with the same locant set.
+    """
+
+    # SMILES + OPSIN ($_AV) atom-ordered locants for a fresh parse.
+    _CASES = {
+        "triphenylene": (
+            "C1=CC=CC=2C3=CC=CC=C3C3=CC=CC=C3C12",
+            ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "8b",
+             "9", "10", "11", "12", "12a", "12b"],
+        ),
+        "benz[a]anthracene": (
+            "C1=CC=CC=2C1=C1C=C3C=CC=CC3=CC1=CC2",
+            ["1", "2", "3", "4", "4a", "12b", "12a", "12", "11a", "11", "10",
+             "9", "8", "7a", "7", "6a", "6", "5"],
+        ),
+        "picene": (
+            "C1=CC=CC2=CC=C3C4=CC=C5C=CC=CC5=C4C=CC3=C21",
+            ["1", "2", "3", "4", "4a", "5", "6", "6a", "6b", "7", "8", "8a",
+             "9", "10", "11", "12", "12a", "12b", "13", "14", "14a", "14b"],
+        ),
+        "benzo[c]chrysene": (
+            "C1=C2C=CC3=C4C5=C(C=CC4=CC=C3C2=CC=C1)C=CC=C5",
+            ["1", "14a", "14", "13", "12c", "12b", "12a", "8a", "8", "7", "6a",
+             "6", "5", "4b", "4a", "4", "3", "2", "9", "10", "11", "12"],
+        ),
+        "dibenz[a,c]anthracene": (
+            "C1=CC=CC2=C1C1=CC3=CC=CC=C3C=C1C1=C2C=CC=C1",
+            ["1", "2", "3", "4", "4a", "14b", "14a", "14", "13a", "13", "12",
+             "11", "10", "9a", "9", "8b", "8a", "4b", "5", "6", "7", "8"],
+        ),
+    }
+
+    @pytest.mark.parametrize("name", list(_CASES))
+    def test_matches_opsin_up_to_automorphism(self, name):
+        smi, locs = self._CASES[name]
+        m = Chem.MolFromSmiles(smi)
+        target = {i: _norm(l) for i, l in enumerate(locs)}
+        computed = compute_fused_numbering(m, _ring_atoms(m))
+        assert computed is not None, f"{name}: engine returned None"
+        computed = {k: _norm(v) for k, v in computed.items()}
+        assert _automorph_equal(m, target, computed), (
+            f"{name}: {computed} not automorph-equal to OPSIN {target}"
+        )
+
+
+@pytest.mark.unit
 class TestFailClosed:
     def test_pyrene_peri_fused_returns_none(self):
         m = Chem.MolFromSmiles("c1cc2ccc3cccc4ccc(c1)c2c34")
@@ -133,6 +186,20 @@ class TestFailClosed:
         m = Chem.MolFromSmiles("c1ccccc1")
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
+    @pytest.mark.parametrize("name,smi", [
+        # Helicenes are a Blue-Book special class (P-25.3.3.1.1 note) and cannot
+        # embed planar -> the overcrowding/planarity gate declines them.
+        ("pentahelicene", "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC=CC5=C4C3=C12"),
+        ("hexahelicene",
+         "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC6=CC=CC=C6C5=C4C3=C12"),
+    ])
+    def test_helicene_returns_none(self, name, smi):
+        m = Chem.MolFromSmiles(smi)
+        assert m is not None, f"{name}: bad SMILES"
+        assert compute_fused_numbering(m, _ring_atoms(m)) is None, (
+            f"{name}: should fail-close (non-planar special class)"
+        )
+
 
 @pytest.mark.unit
 class TestDeterminism:
@@ -142,6 +209,11 @@ class TestDeterminism:
         "phenanthrene": "c1ccc2c(c1)ccc1ccccc12",
         "tetracene": "c1ccc2cc3cc4ccccc4cc3cc2c1",
         "chrysene": "c1ccc2c(c1)ccc1c3ccccc3ccc21",
+        # angular / branched (the fixed cases) must also be spelling-stable
+        "triphenylene": "c1ccc2c(c1)c1ccccc1c1ccccc21",
+        "benz[a]anthracene": "c1ccc2cc3c(ccc4ccccc43)cc2c1",
+        "picene": "c1ccc2c(c1)ccc1c2ccc2c1ccc1ccccc12",
+        "benzo[c]chrysene": "C1=C2C=CC3=C4C5=C(C=CC4=CC=C3C2=CC=C1)C=CC=C5",
     }
 
     @pytest.mark.parametrize("name", list(_CASES))

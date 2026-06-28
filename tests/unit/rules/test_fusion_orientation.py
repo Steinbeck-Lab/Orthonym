@@ -82,14 +82,27 @@ class TestEmbedding:
                 assert (x + y) % 2 == 0, name
 
     def test_pyrene_peri_fused_orientation_none(self):
-        # Pyrene is peri-fused: the classification gate rejects it, so the
-        # public entry point ``best_orientations`` must return None (the raw
-        # ``embed_atoms_on_hex_lattice`` is intentionally NOT gated — it is only
-        # ever reached after the cata-fused check passes).
+        # Pyrene is peri-fused: the classification (cata-fused) gate rejects it,
+        # so the public entry point ``best_orientations`` returns None.
         m = Chem.MolFromSmiles("c1cc2ccc3cccc4ccc(c1)c2c34")
         info = classify_ring_system(m, _ring_atoms(m))
         assert not info["cata_fused"]
         assert best_orientations(m, _ring_atoms(m)) is None
+
+    def test_helicene_embedding_rejected_overcrowded(self):
+        # A [5]+ helicene cannot embed planar; the overcrowding/planarity gate in
+        # ``embed_atoms_on_hex_lattice`` returns None (non-bonded atoms crammed
+        # below 3*d^2 = 12).  [6]+ overlaps atoms outright; [5] crams to bond
+        # distance.  Both decline -> best_orientations is None.
+        for smi in (
+            "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC=CC5=C4C3=C12",  # pentahelicene
+            "C1=CC=CC2=CC=C3C=CC4=CC=C5C=CC6=CC=CC=C6C5=C4C3=C12",  # hexahelicene
+        ):
+            m = Chem.MolFromSmiles(smi)
+            info = classify_ring_system(m, _ring_atoms(m))
+            assert info["cata_fused"], "helicene is cata-fused"
+            assert embed_atoms_on_hex_lattice(info["graph"], m) is None
+            assert best_orientations(m, _ring_atoms(m)) is None
 
 
 @pytest.mark.unit
@@ -120,6 +133,24 @@ class TestOrientationScoring:
         best = best_orientations(m, _ring_atoms(m))
         assert best
         assert score_orientation(info["graph"], best[0])[0] == -2
+
+    def test_triphenylene_row_is_contiguous_not_spurious(self):
+        # Branched D3h system: the main row is only 2 ortho-fused rings joined by
+        # a vertical bond.  A naive "all rings at one y" count would wrongly find
+        # 3 (a same-y ring is disconnected); the contiguous-run fix keeps it 2.
+        m = Chem.MolFromSmiles("c1ccc2c(c1)c1ccccc1c1ccccc21")
+        info = classify_ring_system(m, _ring_atoms(m))
+        best = best_orientations(m, _ring_atoms(m))
+        assert best
+        assert score_orientation(info["graph"], best[0])[0] == -2
+
+    def test_benzanthracene_three_in_a_row(self):
+        # benz[a]anthracene has a genuine 3-ring (anthracene-like) horizontal row.
+        m = Chem.MolFromSmiles("c1ccc2cc3c(ccc4ccccc43)cc2c1")
+        info = classify_ring_system(m, _ring_atoms(m))
+        best = best_orientations(m, _ring_atoms(m))
+        assert best
+        assert score_orientation(info["graph"], best[0])[0] == -3
 
 
 @pytest.mark.unit

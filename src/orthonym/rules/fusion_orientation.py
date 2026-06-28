@@ -277,6 +277,30 @@ def embed_atoms_on_hex_lattice(
         all_atoms |= node['atoms']  # type: ignore[operator]
     if set(atom_coord) != all_atoms:
         return None
+
+    # Planarity / overcrowding gate (P-25.3.3.1.1 note; helicenes are a special
+    # class — line 11479 "the series begins with six rings", line 12529 terminal-
+    # ring orientation — and cannot be embedded planar).  On this hex lattice the
+    # ONLY squared inter-atomic distances (in the ``3*d^2 = 3*dx^2 + dy^2`` integer
+    # form) are 4 for a bond/overlap and >=12 otherwise — nothing between.  So two
+    # NON-bonded atoms closer than 12 means the embedding folds onto itself: a [6]+
+    # helicene overlaps atoms (3d^2 = 0) and a [5]helicene crams non-bonded atoms
+    # to bond distance (3d^2 = 4).  Decline (fail-closed); the system needs the
+    # special helicene rule, out of this engine's planar cata-fused scope.  All
+    # genuine planar PAH — including the [4]helicene (benzo[c]phenanthrene) cove —
+    # have a minimum non-bonded 3d^2 of exactly 12, so they are unaffected.
+    items = list(atom_coord.items())
+    for i in range(len(items)):
+        ai, (xi, yi) = items[i]
+        for j in range(i + 1, len(items)):
+            aj, (xj, yj) = items[j]
+            if mol.GetBondBetweenAtoms(ai, aj) is not None:
+                continue
+            dx = xi - xj
+            dy = yi - yj
+            if 3 * dx * dx + dy * dy < 12:
+                return None
+
     return atom_coord
 
 
@@ -492,32 +516,41 @@ def score_orientation(
     and we only test signs/equalities.
     """
     centers6 = _ring_centers_from_atoms(graph, coords)  # 6 * true_center
-    # ---- (a) busiest horizontal row ----
-    # Group ring centers by their y (6*true_y); the largest group is the main row
-    # candidate.  Ties on size are resolved later by (b)-(d); here we take the
-    # max count and FIX the row as the one with the most rings, breaking ties by
-    # the LOWEST y (deterministic) — but since we ultimately return the score
-    # tuple and keep all tied orientations, choosing the max-count row and, on a
-    # tie in count, the row that yields the best (b)-(d) is what matters.  We
-    # pick the row maximising count, tie-break by the row that places the most
-    # rings in the upper-right (handled implicitly by enumerating candidate rows
-    # below).
+    # ---- (a) busiest horizontal row (P-25.3.2.3.3(a)) ----
+    # The main row is the longest run of *ortho-fused rings joined by VERTICAL
+    # common bonds*, NOT merely rings sharing a y-coordinate.  On this pointy-top
+    # hex lattice two rings share a vertical edge iff their centers have the same
+    # 6*true_y and their 6*true_x differ by exactly 12 (Delta true_x = 2; see the
+    # embedding docstring).  So the row count is the longest CONTIGUOUS run of
+    # same-y ring centers spaced 12 apart; same-y rings separated by a gap do NOT
+    # form one row.  (Counting all same-y rings made angular systems such as
+    # benzo[c]chrysene mis-score a spurious longer row and pick a wrong
+    # orientation.)  Each maximal run is a candidate main row; we keep all that
+    # achieve the maximum length and let (b)-(d) discriminate below.
     from collections import defaultdict
-    by_row: Dict[int, List[Tuple[int, int]]] = defaultdict(list)
+    by_row: Dict[int, List[int]] = defaultdict(list)
     for c in centers6:
-        by_row[c[1]].append(c)
-    max_row = max(len(v) for v in by_row.values())
-
-    # Candidate main rows: those achieving the maximum ring count.
-    candidate_rows = sorted(y for y, v in by_row.items() if len(v) == max_row)
+        by_row[c[1]].append(c[0])  # row_y -> list of 6*true_x centers
+    candidate_runs: List[Tuple[int, List[int]]] = []  # (row_y, xs_in_run)
+    for row_y in sorted(by_row):
+        xs_sorted = sorted(by_row[row_y])
+        run = [xs_sorted[0]]
+        for x in xs_sorted[1:]:
+            if x - run[-1] == 12:
+                run.append(x)
+            else:
+                candidate_runs.append((row_y, run))
+                run = [x]
+        candidate_runs.append((row_y, run))
+    max_row = max(len(xs) for _, xs in candidate_runs)
 
     best_sub: Optional[Tuple[int, int, int]] = None
-    for row_y in candidate_rows:
+    for row_y, xs in candidate_runs:
+        if len(xs) != max_row:
+            continue
         # Quadrant origin per P-25.3.2.3.3(b): central common bond if even #
-        # rings in the row, central ring center if odd.  Working in 6*true
-        # coordinates: the row's ring x-centers (6*true_x), sorted.
-        row_centers = sorted(by_row[row_y], key=lambda c: c[0])
-        xs = [c[0] for c in row_centers]
+        # rings in the row, central ring center if odd.  ``xs`` are the run's
+        # 6*true_x centers, ascending.
         n_row = len(xs)
         if n_row % 2 == 1:
             origin_x6 = xs[n_row // 2]

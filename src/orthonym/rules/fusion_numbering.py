@@ -256,31 +256,44 @@ def _candidate_starts(
 ) -> List[Tuple[int, int]]:
     """Enumerate (start_atom, direction) candidates per P-25.3.3.1.1.
 
-    P-25.3.3.1.1: "Numbering starts from the non-fused atom most counterclockwise
-    in the [uppermost-rightmost] ring and proceeds in a clockwise direction."
+    P-25.3.3.1.1: "Numbering starts from the non-fused atom MOST COUNTERCLOCKWISE
+    in the [uppermost, then rightmost] ring and proceeds in a CLOCKWISE direction."
 
-    Geometric realisation (empirically validated against OPSIN numbering for
-    naphthalene / tetracene / chrysene): the most-counterclockwise non-fusion
-    atom of the start ring, when numbering will then go clockwise, is the
-    UPPERMOST non-fusion atom of that ring — i.e. the atom reached first when
-    sweeping clockwise from twelve o'clock.  On a y-tie (two equally-high
-    atoms) both are returned as candidates and the P-25.3.3.1.2 lowest-locant
-    cascade in ``compute_fused_numbering`` discriminates; the leftmost (more
-    counterclockwise) is offered first for a deterministic default.
+    Exact geometric realisation (validated against OPSIN ``-o extendedsmi``
+    numbering for every all-6 cata-fused PAH — linear acenes, angular polyaphenes,
+    branched triphenylene, the chrysene / anthracene-fused families): the
+    most-counterclockwise non-fusion atom is the non-fusion atom of the start ring
+    at the COUNTERCLOCKWISE END of its peripheral non-fusion arc, i.e. the one
+    whose counterclockwise peripheral neighbour is a fusion atom.  Walking
+    CLOCKWISE from there enters the start ring's non-fusion arc first, giving it
+    the lowest numbers.  (The earlier "uppermost non-fusion atom" proxy only
+    coincided with this for linear acenes and was wrong for every angular or
+    branched system — it minimised fusion-carbon locants one position too early.)
+
+    For a terminal or angular start ring the non-fusion atoms form a single
+    contiguous arc, so there is exactly ONE such atom — deterministic, no cascade
+    needed.  A start ring with two separate non-fusion arcs (a linear-middle ring
+    selected as uppermost-rightmost) yields more than one candidate; all are
+    returned and the P-25.3.3.1.2 lowest-locant cascade in
+    ``compute_fused_numbering`` discriminates (with the canonical-rank tie-break
+    making symmetric alternatives deterministic).  If the start ring has no
+    non-fusion atom at all, no candidate is returned (fail-closed; the rarer
+    "advance to the next ring clockwise" case is outside this engine's scope).
 
     Returns ``(start_atom, clockwise_direction)`` pairs.
     """
     clockwise_dir = _clockwise_direction(coords, periphery)
-    start_nonfusion = [a for a in start_ring_atoms if a not in fusion_atoms]
-    if not start_nonfusion:
-        return []
-    max_y = max(coords[a][1] for a in start_nonfusion)
-    # Topmost non-fusion atoms; leftmost first (most counterclockwise at top).
-    top_atoms = sorted(
-        (a for a in start_nonfusion if coords[a][1] == max_y),
-        key=lambda a: (coords[a][0], a),
-    )
-    return [(a, clockwise_dir) for a in top_atoms]
+    n = len(periphery)
+    pos = {a: i for i, a in enumerate(periphery)}
+    # The counterclockwise end of a non-fusion arc: a non-fusion start-ring atom
+    # whose counterclockwise peripheral neighbour (index step -clockwise_dir) is a
+    # fusion atom.
+    candidates = [
+        a for a in start_ring_atoms
+        if a not in fusion_atoms
+        and periphery[(pos[a] - clockwise_dir) % n] in fusion_atoms
+    ]
+    return [(a, clockwise_dir) for a in sorted(candidates)]
 
 
 def _assign_from_start(
