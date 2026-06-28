@@ -1,0 +1,467 @@
+"""Deterministic peripheral numbering of fused polycyclic ring systems.
+
+Given an oriented integer hex-lattice embedding (from ``fusion_orientation``),
+this module assigns IUPAC locants to the peripheral skeletal atoms following
+P-25.3.3.1: start from the uppermost ring (tie -> furthest right), begin at the
+most-counterclockwise non-fusion atom, and walk CLOCKWISE assigning integers to
+non-fusion atoms (and fusion heteroatoms), giving each fusion carbon the number
+of the preceding non-fusion atom modified by a Roman letter ('a', 'b', ...).
+
+The lowest-locant cascade P-25.3.3.1.2 is then applied across all surviving
+(orientation, start) candidates using the shared comparison primitives in
+``rules/locants.py`` (``compare_locant_sets`` / ``_compare_heteroatom_seniority``
+via ``compare_numbering``) — the comparison logic is NEVER reimplemented here.
+
+Fixed-numbering exceptions (P-25.1.1 / P-31.1.4.3.4)
+----------------------------------------------------
+``anthracene`` and ``phenanthrene`` are retained names with FIXED, traditional
+numbering ("special numbering" — Blue Book P-25.1.1 entries (11) and (12); also
+P-31.1.4.3.4: "in purine, anthracene, and phenanthrene, this numbering must be
+used").  Their traditional numbers do NOT follow the systematic P-25.3.3
+peripheral walk (anthracene numbers its meso carbons 9,10 last; phenanthrene
+uses 4a,4b/8a,10a fusion labels).  A correct engine must encode these two
+exceptions, so ``compute_fused_numbering`` recognises their exact ring graph and
+returns the fixed numbering mapped onto the input atoms.  Every other all-6
+cata-fused carbocyclic system (naphthalene, tetracene, pentacene, chrysene,
+triphenylene, ...) is numbered systematically by the peripheral walk.
+
+Stage 1 scope
+-------------
+``compute_fused_numbering`` returns a map ONLY for all-six-membered, ortho-
+(cata-)fused, carbocyclic ring systems with no interior (peri-fusion) atom.
+Otherwise it returns ``None`` and the caller falls back to its existing path.
+
+Locant shape: ``int`` for ordinary atoms, ``(int, 'a')`` tuples for fusion
+carbons — the existing ``rules.locants._Locant`` type, so downstream consumers
+(``compare_locant_sets``, the cascade) are unchanged.
+
+Source: IUPAC 2013 Blue Book P-25.3.3 (BlueBookV2/BlueBookV2.md ~line 12501);
+        P-25.1.1 / P-31.1.4.3.4 (anthracene/phenanthrene fixed numbering).
+"""
+
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Set, Tuple
+
+from rdkit import Chem
+
+from .fusion_orientation import (
+    best_orientations,
+    classify_ring_system,
+)
+from .locants import _Locant, compare_locant_sets, compare_numbering
+
+
+# ---------------------------------------------------------------------------
+# Fixed-numbering retained ring systems (P-25.1.1 / P-31.1.4.3.4).
+#
+# anthracene and phenanthrene have traditional "special" numbering that the
+# systematic P-25.3.3 peripheral walk does NOT reproduce.  Each reference is a
+# SMILES whose atoms are listed in molecule order with their FIXED IUPAC locant
+# (string form), taken verbatim from OPSIN's extended-SMILES ``$_AV`` output
+# (``opsin -o extendedsmi``) — the authoritative source already used to populate
+# data/polycyclic_data.py.  The recognizer maps these onto an input ring system
+# by substructure isomorphism.
+# ---------------------------------------------------------------------------
+_FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    (
+        'anthracene',
+        'C1=CC=CC2=CC3=CC=CC=C3C=C12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
+    (
+        'phenanthrene',
+        'C1=CC=CC=2C3=CC=CC=C3C=CC12',
+        ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9',
+         '10', '10a'),
+    ),
+)
+
+
+def _parse_locant(text: str) -> _Locant:
+    """'4a' -> (4, 'a'); '4' -> 4 (matching the ``_Locant`` int|tuple shape)."""
+    import re as _re
+    m = _re.match(r'^(\d+)([a-z]*)$', text)
+    if m is None:  # pragma: no cover - reference strings are well-formed
+        raise ValueError(f'bad locant {text!r}')
+    base = int(m.group(1))
+    suffix = m.group(2)
+    return (base, suffix) if suffix else base
+
+
+def _try_fixed_numbering(
+    mol: Chem.Mol,
+    ring_atoms: Set[int],
+) -> Optional[Dict[int, _Locant]]:
+    """Return the fixed traditional numbering if the ring system is a known
+    special case (anthracene / phenanthrene); otherwise ``None``.
+
+    Uses an exact substructure (graph) match restricted to ``ring_atoms`` so a
+    decorated anthracene still resolves to anthracene's fixed numbering.  The
+    match must cover ALL and ONLY the ring atoms (a same-size bijection) so a
+    larger fused system (e.g. tetracene) does not spuriously match the
+    anthracene fragment.
+    """
+    for _name, smi, locant_strs in _FIXED_NUMBERING_SYSTEMS:
+        ref = Chem.MolFromSmiles(smi)
+        if ref is None or ref.GetNumAtoms() != len(ring_atoms):
+            continue
+        ref_locants = [_parse_locant(s) for s in locant_strs]
+        # uniquify=False so symmetric automorphisms are all available; any one
+        # of them yields an equivalent (byte-identical after relabelling) map —
+        # we take the first whose image is exactly the ring-atom set.
+        for match in mol.GetSubstructMatches(ref, uniquify=False):
+            if set(match) == ring_atoms:
+                return {match[i]: ref_locants[i] for i in range(len(match))}
+    return None
+
+
+def _fusion_atoms(graph: Dict[int, Dict[str, object]]) -> Set[int]:
+    """Atoms shared by 2+ rings (fusion atoms) in the ring-fusion graph."""
+    membership: Dict[int, int] = {}
+    for node in graph.values():
+        for a in node['atoms']:  # type: ignore[union-attr]
+            membership[a] = membership.get(a, 0) + 1
+    return {a for a, c in membership.items() if c >= 2}
+
+
+def _peripheral_cycle(
+    mol: Chem.Mol,
+    ring_atoms: Set[int],
+) -> Optional[List[int]]:
+    """Return the peripheral cycle of the fused system in connectivity order.
+
+    The periphery of a cata-fused system is the unique cycle formed by every
+    ring bond that bounds exactly ONE ring face (an exterior bond).  Interior
+    (fusion) bonds bound two faces and are excluded.  For a cata-fused (no
+    interior atom) system every skeletal atom lies on this cycle.
+
+    Returns the atoms in cyclic order, or ``None`` if a single closed periphery
+    cannot be formed (e.g. a peri-fused system slipped through).
+    """
+    ri = mol.GetRingInfo()
+    # Count, for each ring bond, how many SSSR rings contain it.
+    bond_face_count: Dict[Tuple[int, int], int] = {}
+    for ring in ri.AtomRings():
+        if not (set(ring) <= ring_atoms):
+            continue
+        n = len(ring)
+        for i in range(n):
+            a, b = ring[i], ring[(i + 1) % n]
+            if mol.GetBondBetweenAtoms(a, b) is None:
+                continue
+            key = (a, b) if a < b else (b, a)
+            bond_face_count[key] = bond_face_count.get(key, 0) + 1
+
+    # Peripheral bonds bound exactly one face.
+    peripheral_adj: Dict[int, List[int]] = {a: [] for a in ring_atoms}
+    for (a, b), c in bond_face_count.items():
+        if c == 1:
+            peripheral_adj[a].append(b)
+            peripheral_adj[b].append(a)
+
+    # In a cata-fused system every atom must have exactly two peripheral
+    # neighbours (the periphery is a single simple cycle through all atoms).
+    if any(len(peripheral_adj[a]) != 2 for a in ring_atoms):
+        return None
+
+    # Walk the single cycle deterministically from the lowest atom index.
+    start = min(ring_atoms)
+    order = [start]
+    prev = None
+    cur = start
+    while True:
+        nbrs = peripheral_adj[cur]
+        nxt = None
+        for cand in sorted(nbrs):
+            if cand != prev:
+                nxt = cand
+                break
+        if nxt is None:
+            return None
+        if nxt == start:
+            break
+        order.append(nxt)
+        prev, cur = cur, nxt
+        if len(order) > len(ring_atoms):
+            return None
+    if len(order) != len(ring_atoms):
+        return None
+    return order
+
+
+def _signed_area2(coords: List[Tuple[int, int]]) -> int:
+    """Twice the signed area of a closed polygon (shoelace), in lattice units.
+
+    Positive = counterclockwise in the lattice coordinate frame where +y is up.
+    (The constant sqrt(3)/... real-y factor only scales the magnitude; the SIGN
+    is preserved, which is all we use.)
+    """
+    n = len(coords)
+    s = 0
+    for i in range(n):
+        x1, y1 = coords[i]
+        x2, y2 = coords[(i + 1) % n]
+        s += x1 * y2 - x2 * y1
+    return s
+
+
+def _start_ring_key(
+    graph: Dict[int, Dict[str, object]],
+    coords: Dict[int, Tuple[int, int]],
+) -> int:
+    """Pick the start ring per P-25.3.3.1.1: uppermost, tie -> furthest right.
+
+    Ring vertical position uses 6*true_y (= sum of atom y over the 6 atoms);
+    horizontal uses 6*true_x.  Deterministic final tie-break by node key (the
+    ring's minimum atom index) — only reached for genuinely coincident centers,
+    which cannot happen for distinct rings, so it is a safety net.
+    """
+    best_key: Optional[int] = None
+    best_metric: Optional[Tuple[int, int, int]] = None
+    for key in sorted(graph):
+        atoms = graph[key]['atoms']  # type: ignore[index]
+        sy = sum(coords[a][1] for a in atoms)
+        sx = sum(coords[a][0] for a in atoms)
+        # Uppermost = max sy; tie -> furthest right = max sx.  Use negatives so
+        # min() picks the winner; final tie-break by key (ascending).
+        metric = (-sy, -sx, key)
+        if best_metric is None or metric < best_metric:
+            best_metric = metric
+            best_key = key
+    assert best_key is not None
+    return best_key
+
+
+def _clockwise_direction(
+    coords: Dict[int, Tuple[int, int]],
+    periphery: List[int],
+) -> int:
+    """Return +1 or -1: the ``periphery``-index step that walks CLOCKWISE.
+
+    In the +y-up lattice frame a counterclockwise polygon has positive signed
+    area, so the clockwise traversal is the -index direction (and vice-versa).
+    """
+    area2 = _signed_area2([coords[a] for a in periphery])
+    return -1 if area2 > 0 else 1
+
+
+def _candidate_starts(
+    mol: Chem.Mol,
+    coords: Dict[int, Tuple[int, int]],
+    periphery: List[int],
+    start_ring_atoms: Set[int],
+    fusion_atoms: Set[int],
+) -> List[Tuple[int, int]]:
+    """Enumerate (start_atom, direction) candidates per P-25.3.3.1.1.
+
+    P-25.3.3.1.1: "Numbering starts from the non-fused atom most counterclockwise
+    in the [uppermost-rightmost] ring and proceeds in a clockwise direction."
+
+    Geometric realisation (empirically validated against OPSIN numbering for
+    naphthalene / tetracene / chrysene): the most-counterclockwise non-fusion
+    atom of the start ring, when numbering will then go clockwise, is the
+    UPPERMOST non-fusion atom of that ring — i.e. the atom reached first when
+    sweeping clockwise from twelve o'clock.  On a y-tie (two equally-high
+    atoms) both are returned as candidates and the P-25.3.3.1.2 lowest-locant
+    cascade in ``compute_fused_numbering`` discriminates; the leftmost (more
+    counterclockwise) is offered first for a deterministic default.
+
+    Returns ``(start_atom, clockwise_direction)`` pairs.
+    """
+    clockwise_dir = _clockwise_direction(coords, periphery)
+    start_nonfusion = [a for a in start_ring_atoms if a not in fusion_atoms]
+    if not start_nonfusion:
+        return []
+    max_y = max(coords[a][1] for a in start_nonfusion)
+    # Topmost non-fusion atoms; leftmost first (most counterclockwise at top).
+    top_atoms = sorted(
+        (a for a in start_nonfusion if coords[a][1] == max_y),
+        key=lambda a: (coords[a][0], a),
+    )
+    return [(a, clockwise_dir) for a in top_atoms]
+
+
+def _assign_from_start(
+    mol: Chem.Mol,
+    periphery: List[int],
+    start_atom: int,
+    direction: int,
+    fusion_atoms: Set[int],
+) -> Dict[int, _Locant]:
+    """Assign locants walking the periphery clockwise from ``start_atom``.
+
+    P-25.3.3.1.1: assign integers to non-fusion atoms AND fusion heteroatoms;
+    each fusion CARBON is given the number of the immediately preceding
+    non-fusion (numbered) atom, modified by 'a'/'b'/'c'/...  (Stage 1 is
+    carbocyclic, so fusion heteroatoms do not occur, but the heteroatom branch
+    is written for forward-compatibility and is harmless here.)
+    """
+    n = len(periphery)
+    pos = {a: i for i, a in enumerate(periphery)}
+    start_i = pos[start_atom]
+
+    locants: Dict[int, _Locant] = {}
+    counter = 0          # last assigned integer locant
+    letter_ord = 0       # next Roman-letter suffix index for fusion carbons
+    last_int: Optional[int] = None
+
+    for step in range(n):
+        atom_idx = periphery[(start_i + step * direction) % n]
+        atom = mol.GetAtomWithIdx(atom_idx)
+        is_fusion = atom_idx in fusion_atoms
+        is_carbon = atom.GetAtomicNum() == 6
+        if is_fusion and is_carbon:
+            # Fusion carbon -> previous int + letter.
+            if last_int is None:
+                # A fusion carbon cannot legally be the first atom (start atom is
+                # always a non-fusion atom); guard defensively.
+                return {}
+            suffix = chr(ord('a') + letter_ord)
+            locants[atom_idx] = (last_int, suffix)
+            letter_ord += 1
+        else:
+            # Non-fusion atom OR fusion heteroatom -> next integer.
+            counter += 1
+            locants[atom_idx] = counter
+            last_int = counter
+            letter_ord = 0
+    return locants
+
+
+def _heteroatom_pairs(
+    mol: Chem.Mol,
+    locants: Dict[int, _Locant],
+) -> List[Tuple[_Locant, str]]:
+    """(locant, element) pairs for ring heteroatoms (for the cascade tier)."""
+    pairs: List[Tuple[_Locant, str]] = []
+    for idx, loc in locants.items():
+        sym = mol.GetAtomWithIdx(idx).GetSymbol()
+        if sym != 'C':
+            pairs.append((loc, sym))
+    return pairs
+
+
+def _fusion_letters(locants: Dict[int, _Locant]) -> List[_Locant]:
+    """The fusion-carbon locant tuples (e.g. (4,'a'),(8,'a')) for tier (c)."""
+    return [loc for loc in locants.values() if isinstance(loc, tuple)]
+
+
+def compute_fused_numbering(
+    mol: Chem.Mol,
+    ring_system_atoms,
+) -> Optional[Dict[int, _Locant]]:
+    """Deterministic IUPAC fused-ring numbering for an all-6 cata-fused PAH.
+
+    Returns ``{atom_idx -> locant}`` (``int`` or ``(int, 'a')`` tuple) when the
+    ring system is all-six-membered, ortho-(cata-)fused, carbocyclic, and has no
+    interior (peri-fusion) atom.  Returns ``None`` otherwise (the caller then
+    keeps its existing numbering path — fail-closed, never a regression).
+
+    The numbering is selected by the IUPAC P-25.3.3 cascade over every
+    (surviving-orientation, start-atom) candidate, compared via the shared
+    ``rules.locants`` primitives so the choice is fully deterministic and
+    coordinate-free.
+
+    Args:
+        mol: RDKit Mol.
+        ring_system_atoms: iterable of atom indices forming the fused ring
+            system (the ring atoms of the parent — substituents excluded).
+
+    Source: IUPAC 2013 Blue Book P-25.3.3.1 / P-25.3.3.1.2.
+    """
+    ring_atoms = set(ring_system_atoms)
+    if len(ring_atoms) < 6:
+        return None
+
+    info = classify_ring_system(mol, ring_atoms)
+    if not (info['all_six'] and info['carbocyclic']
+            and info['cata_fused'] and info['connected']):
+        return None
+    graph = info['graph']  # type: ignore[assignment]
+
+    # This is a FUSION engine: require at least two ortho-fused rings.  A lone
+    # ring (e.g. benzene) is not a fused system and is handled elsewhere.
+    if len(graph) < 2:
+        return None
+
+    # P-25.1.1 / P-31.1.4.3.4 fixed-numbering exceptions (anthracene,
+    # phenanthrene) — their traditional numbering is NOT the systematic walk.
+    fixed = _try_fixed_numbering(mol, ring_atoms)
+    if fixed is not None:
+        return fixed
+
+    periphery = _peripheral_cycle(mol, ring_atoms)
+    if periphery is None or len(periphery) != len(ring_atoms):
+        return None
+
+    fusion_atoms = _fusion_atoms(graph)  # type: ignore[arg-type]
+
+    orientations = best_orientations(mol, ring_atoms)
+    if not orientations:
+        return None
+
+    # Canonical atom ranks (SMILES-order-INDEPENDENT) for the final symmetry
+    # tie-break.  Two numberings tying through the whole P-25.3.3.1.2 cascade are
+    # genuinely equivalent (a molecular automorphism relates them); to return ONE
+    # deterministic representative regardless of input SMILES order we then
+    # prefer the candidate whose locant->canonical-rank assignment is
+    # lexicographically smallest.  This is a graph-canonical decision, never a
+    # set/dict iteration-order one.
+    canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+
+    def _canon_signature(cand: Dict[int, _Locant]) -> Tuple:
+        # Order atoms by their assigned locant, emit the atom's canonical rank.
+        items = sorted(
+            cand.items(),
+            key=lambda kv: (kv[1][0], kv[1][1]) if isinstance(kv[1], tuple)
+            else (kv[1], ''),
+        )
+        return tuple(canon_rank[a] for a, _ in items)
+
+    # Enumerate every (orientation, start) candidate numbering, then select the
+    # IUPAC-preferred one via the shared lowest-locant cascade.
+    best_map: Optional[Dict[int, _Locant]] = None
+    best_het: Optional[List[Tuple[_Locant, str]]] = None
+    best_fus: Optional[List[_Locant]] = None
+    best_sig: Optional[Tuple] = None
+    for coords in orientations:
+        start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
+        start_ring_atoms = set(graph[start_ring]['atoms'])  # type: ignore[index]
+        for start_atom, direction in _candidate_starts(
+            mol, coords, periphery, start_ring_atoms, fusion_atoms,
+        ):
+            cand = _assign_from_start(
+                mol, periphery, start_atom, direction, fusion_atoms,
+            )
+            if not cand:
+                continue
+            # Cascade comparison terms:
+            #   P-25.3.3.1.2(a)/(b): heteroatom set then element seniority
+            #     (carbocyclic Stage 1 -> empty, inert);
+            #   P-25.3.3.1.2(c): low locants to fusion carbons.
+            het = _heteroatom_pairs(mol, cand)
+            fus = _fusion_letters(cand)
+            if best_map is None:
+                best_map, best_het, best_fus = cand, het, fus
+                best_sig = _canon_signature(cand)
+                continue
+            # Tier (a)+(b): heteroatoms (via the shared comparator).
+            cmp = compare_numbering(
+                {'heteroatoms': het}, {'heteroatoms': best_het},
+            )
+            if cmp == 0:
+                # Tier (c): low locants to fusion carbons (the (int,'a') set).
+                cmp = compare_locant_sets(fus, best_fus)
+            if cmp == 0:
+                # Genuine symmetry tie -> canonical-rank representative.
+                sig = _canon_signature(cand)
+                if sig < best_sig:  # type: ignore[operator]
+                    best_map, best_het, best_fus, best_sig = cand, het, fus, sig
+                continue
+            if cmp < 0:
+                best_map, best_het, best_fus = cand, het, fus
+                best_sig = _canon_signature(cand)
+
+    return best_map
