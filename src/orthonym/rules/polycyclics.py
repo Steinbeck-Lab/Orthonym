@@ -410,6 +410,35 @@ def _map_pah_atoms_to_iupac(mol, pah_name: str, match_atoms: List[int]) -> Dict[
     return best_mapping if best_mapping else {atom_idx: i + 1 for i, atom_idx in enumerate(peripheral_atoms)}
 
 
+def _engine_canonical_numbering(canonical_mol) -> Dict[int, Any]:
+    """Deterministic IUPAC numbering of a bare PAH skeleton via the S1 engine.
+
+    Used by ``get_polycyclic_iupac_locants`` to supply a numbering for cataloged
+    PAH entries whose ``iupac_numbering`` was never tabulated (tetracene,
+    chrysene, triphenylene, benz[a]anthracene, ...).  Returns the numbering keyed
+    by the canonical-mol atom index, in the SAME storage form as the tabulated
+    maps (plain ``int`` for peripheral atoms, ``'4a'`` strings for fusion
+    carbons) so the existing automorphism-minimization downstream is reused
+    unchanged.
+
+    Returns ``{}`` when the fusion-numbering engine declines (peri-fused,
+    helicene, non-all-six, or heterocyclic systems) — the caller then falls back
+    to its existing path, so this is strictly fail-closed (never a regression).
+
+    Source: IUPAC 2013 P-25.3.2.3.3 / P-25.3.3.1 (rules/fusion_numbering.py).
+    """
+    from .fusion_numbering import compute_fused_numbering
+
+    ring_atoms = {a.GetIdx() for a in canonical_mol.GetAtoms() if a.IsInRing()}
+    engine = compute_fused_numbering(canonical_mol, ring_atoms)
+    if engine is None:
+        return {}
+    out: Dict[int, Any] = {}
+    for idx, locant in engine.items():
+        out[idx] = f"{locant[0]}{locant[1]}" if isinstance(locant, tuple) else locant
+    return out
+
+
 def get_polycyclic_iupac_locants(
     mol,
     pah_name: str,
@@ -452,9 +481,6 @@ def get_polycyclic_iupac_locants(
     entry = POLYCYCLIC_DATA.get(pah_name)
     if entry is None:
         return None
-    canonical_numbering = entry.get('iupac_numbering') or {}
-    if not canonical_numbering:
-        return None
 
     canonical_smiles = entry.get('canonical_smiles')
     if not canonical_smiles:
@@ -462,6 +488,20 @@ def get_polycyclic_iupac_locants(
     canonical_mol = Chem.MolFromSmiles(canonical_smiles)
     if canonical_mol is None:
         return None
+
+    canonical_numbering = entry.get('iupac_numbering') or {}
+    if not canonical_numbering:
+        # v23 13B(a) S1: a real PAH entry whose IUPAC numbering was never
+        # tabulated (tetracene, chrysene, triphenylene, benz[a]anthracene,
+        # picene, pentacene, ...).  Derive it deterministically from the bare
+        # skeleton with the fusion-numbering engine; the SAME automorphism-
+        # minimization below then assigns the lowest substituent locants.
+        # Fail-closed: the engine returns {} for peri-fused / helicene /
+        # non-all-six systems, so we return None and the caller keeps its
+        # existing fallback (no regression).
+        canonical_numbering = _engine_canonical_numbering(canonical_mol)
+        if not canonical_numbering:
+            return None
 
     # Anchored regex: parse 'NN' or 'NNa' / 'NNb' style locants.
     # Two-digit base critical for pyrene's '10b' (must yield (10, 'b'),

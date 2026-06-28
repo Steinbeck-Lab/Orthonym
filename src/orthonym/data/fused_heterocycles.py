@@ -1639,7 +1639,53 @@ def get_fused_heterocycle_name(mol: Chem.Mol) -> Optional[Tuple[str, Optional[in
     return None
 
 
+def _match_covers_ring_systems(mol, atom_mapping) -> bool:
+    """Does the matched catalog core cover every atom of the fused ring
+    system(s) it sits in?
+
+    Mirrors ``rules.fused_rings._core_covers_ring_system`` (kept local to avoid a
+    data->rules import); ``get_ring_systems`` is imported lazily (perception does
+    not import data, so there is no cycle).  ``int`` keys in ``atom_mapping`` are
+    the matched core atoms; a pendant ring joined by a single (non-ring) bond is a
+    SEPARATE ring system, so a legitimate cyclic substituent does not trip this.
+
+    This is the guard that stops a SMALLER catalog pattern from matching a LARGER
+    fused ring system as a substructure (e.g. the 4-ring naphthacene pattern
+    matching inside 5-ring pentacene, or chrysene inside picene) — a structure-
+    loss hallucination that otherwise yields a wrong parent name.  v23 13B(a).
+    """
+    core_atoms = {k for k in (atom_mapping or {}) if isinstance(k, int)}
+    if not core_atoms:
+        return True
+    from ..perception.rings import get_ring_systems
+    for rs in get_ring_systems(mol):
+        rs = set(rs)
+        if (core_atoms & rs) and not rs.issubset(core_atoms):
+            return False
+    return True
+
+
 def match_fused_heterocycle_core(
+    mol: Chem.Mol
+) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
+    """Match a molecule against the cataloged fused ring-system cores.
+
+    Thin coverage-guarded wrapper over ``_match_fused_heterocycle_core_impl``: a
+    catalog match is accepted ONLY if it covers the whole fused ring system it
+    touches (P-25.3 — a base/retained ring system name must span the entire fused
+    system, not a sub-part).  Without this, a larger non-cataloged PAH whose
+    skeleton contains a cataloged subset (pentacene contains naphthacene, picene
+    contains chrysene) spuriously matched the smaller entry.  v23 13B(a) S1.
+    """
+    result = _match_fused_heterocycle_core_impl(mol)
+    if result is None:
+        return None
+    if not _match_covers_ring_systems(mol, result[1]):
+        return None
+    return result
+
+
+def _match_fused_heterocycle_core_impl(
     mol: Chem.Mol
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
     """

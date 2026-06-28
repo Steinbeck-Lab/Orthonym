@@ -231,6 +231,19 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         'num_rings': 5,
     },
+    'picene': {
+        # Angular 5-ring cata-fused PAH (fancene). v23 13B(a) S1: numbering is
+        # supplied by the deterministic fusion-numbering engine (iupac_numbering
+        # left empty); recognition added here so identify_polycyclic resolves it
+        # (it contains a chrysene substructure, so it must be checked before
+        # chrysene — the largest-first scan handles that).
+        'canonical_smiles': 'c1ccc2c(c1)ccc1c2ccc2c3ccccc3ccc21',
+        'smarts': 'c1ccc2c(c1)ccc1c2ccc2c3ccccc3ccc21',
+        'num_atoms': 22,
+        'iupac_numbering': {},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'num_rings': 5,
+    },
     'perylene': {
         # Peri-condensed PAH (two naphthalene units joined peri)
         'canonical_smiles': 'c1ccc2cccc3cc4c(c1)cc1cccc4c1c23',
