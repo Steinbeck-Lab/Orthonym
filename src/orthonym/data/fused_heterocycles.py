@@ -234,7 +234,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 10, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 5},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a', 5: 1, 6: 10, 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a', 13: 5},
     },
     # 10H-phenothiazine
     'c1ccc2c(c1)Nc1ccccc1S2': {
@@ -242,7 +242,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 10,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 10, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 5},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '10a', 5: 1, 6: 10, 7: '9a', 8: 9, 9: 8, 10: 7, 11: 6, 12: '5a', 13: 5},
     },
     # 9H-xanthene
     'c1ccc2c(c1)Cc1ccccc1O2': {
@@ -250,7 +250,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a', 13: 10},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '9a', 5: 1, 6: 9, 7: '8a', 8: 8, 9: 7, 10: 6, 11: 5, 12: '10a', 13: 10},
     },
     # 6H-benzo[c]chromene -> PIN 6H-dibenzo[b,d]pyran (BB line 13463 '6H-dibenzo[b,d]pyran (PIN)
     # ... not ... 6H-benzo[c]chromene'). Same ring system + numbering (OPSIN extendedsmi verified) -> rename only.
@@ -351,7 +351,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 2,
         'ring_system': 'benzopyran',
         'parent_atoms': 10,
-        'iupac_locants': {0: 4, 1: 3, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
+        'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
     # 4H-chromene -> PIN 4H-1-benzopyran
     'C1=COc2ccccc2C1': {
@@ -375,7 +375,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'pteridine',
         'parent_atoms': 10,
-        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5},
     },
     # adenine
     'Nc1ncnc2nc[nH]c12': {
@@ -576,7 +576,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'pyridopyrimidine',
         'parent_atoms': 10,
-        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5},
     },
     # 1,5-naphthyridine
     'c1cnc2cccnc2c1': {
@@ -713,7 +713,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: 5, 8: '10b', 9: 1, 10: 2, 11: 3, 12: 4, 13: '4a'},
+        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10b'},
     },
     # benzo[g]quinoline
     'c1ccc2cc3ncccc3cc2c1': {
@@ -763,7 +763,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 10,
-        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: 8, 8: '8a', 9: 1},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9, 8: '9a', 9: 1},
     },
     # pyrrolizine
     'C1=Cn2cccc2C1': {
@@ -813,7 +813,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a', 13: 10},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '9a', 5: 1, 6: 9, 7: '8a', 8: 8, 9: 7, 10: 6, 11: 5, 12: '10a', 13: 10},
     },
     # isobenzofuran
     'c1ccc2cocc2c1': {
@@ -1297,7 +1297,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'pyrazinopyridazine',
         'parent_atoms': 10,
-        'iupac_locants': {0: 2, 1: 3, 2: '4a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '8a', 8: 8, 9: 1},
+        'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
 }
 

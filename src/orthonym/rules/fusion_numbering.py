@@ -76,6 +76,38 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
         ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9',
          '10', '10a'),
     ),
+    # ----- anthracene-type heterocycles with retained "special numbering" -----
+    # Blue Book Table 2.8 lists acridine (entry 4, "special numbering") and the
+    # xanthene chalcogen family (entry 22: xanthene/thioxanthene/selenoxanthene/
+    # telluroxanthene, all "special numbering"; PIN of each is the 9H-isomer).
+    # Like anthracene/phenanthrene their two central-ring meso atoms take the
+    # HIGHEST locants 9 and 10, which the systematic P-25.3.3 peripheral walk
+    # does NOT reproduce (the walk numbers a meso atom mid-sequence).  Reference
+    # SMILES + locants are OPSIN ``-o extendedsmi $_AV`` output (authoritative).
+    (
+        'acridine',
+        'C1=CC=CC2=NC3=CC=CC=C3C=C12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
+    (
+        '9H-xanthene',
+        'C1=CC=CC=2OC3=CC=CC=C3CC12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
+    (
+        '9H-thioxanthene',
+        'C1=CC=CC=2SC3=CC=CC=C3CC12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
+    (
+        '9H-selenoxanthene',
+        'C1=CC=CC=2[Se]C3=CC=CC=C3CC12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
 )
 
 
@@ -388,9 +420,15 @@ def compute_fused_numbering(
     if len(ring_atoms) < 6:
         return None
 
+    # v23 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
+    # phenazine/pteridine/... families).  The hex-lattice embedding and the
+    # peripheral walk are element-agnostic; the heteroatom-lowest-locant cascade
+    # (P-25.3.3.1.2(a)/(b)) is applied below.  Carbocyclic systems are unchanged
+    # (the relaxed gate is a superset).  We still require all-six-membered,
+    # ortho-(cata-)fused, connected — non-6 rings (S2b) and peri-fusion (S4) are
+    # outside this engine's geometry and fail closed.
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['all_six'] and info['carbocyclic']
-            and info['cata_fused'] and info['connected']):
+    if not (info['all_six'] and info['cata_fused'] and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
 

@@ -605,9 +605,12 @@ def best_orientations(
     carbocyclic, or the lattice embedding is inconsistent).  Otherwise returns a
     non-empty list of atom-coordinate maps, all sharing the optimal score.
     """
+    # v23 13B(a) S2a: heteroatom rings admitted (the embedding is element-
+    # agnostic).  Still require all-six + cata-fused + connected; non-6 (S2b) and
+    # peri-fusion (S4) fall through to ``embed_atoms_on_hex_lattice`` returning
+    # None / the planarity gate, i.e. fail closed.
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['all_six'] and info['carbocyclic']
-            and info['cata_fused'] and info['connected']):
+    if not (info['all_six'] and info['cata_fused'] and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
     base = embed_atoms_on_hex_lattice(graph, mol)  # type: ignore[arg-type]

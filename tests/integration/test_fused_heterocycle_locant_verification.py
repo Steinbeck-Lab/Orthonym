@@ -236,12 +236,16 @@ class TestLocantDataIntegrity:
     def test_xanthene_locant_values(self):
         """Xanthene locant set must contain expected IUPAC positions.
 
-        Xanthene (9H-xanthene) IUPAC numbering:
-        1,2,3,4,4a,4b,5,6,7,8,8a,9,9a,10 = 14 positions
+        9H-xanthene has anthracene-type "special numbering" (Blue Book Table 2.8):
+        the two meso atoms (O and the 9H carbon) take the highest locants 10 and 9,
+        with fusion carbons 4a/8a/9a/10a — NOT a spurious '4b'.  Positions:
+        1,2,3,4,4a,5,6,7,8,8a,9,9a,10,10a = 14.  (v23 13B(a) S2a corrected the
+        DATA-01-flagged wrong stored numbering; re-derived from the deterministic
+        fusion engine, OPSIN-verified.)
         """
         data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)Cc1ccccc1O2']
         locant_values = set(data['iupac_locants'].values())
-        expected = {1, 2, 3, 4, '4a', '4b', 5, 6, 7, 8, '8a', 9, '9a', 10}
+        expected = {1, 2, 3, 4, '4a', 5, 6, 7, 8, '8a', 9, '9a', 10, '10a'}
         assert locant_values == expected, (
             f"Xanthene locant values mismatch.\n"
             f"  Expected: {expected}\n"

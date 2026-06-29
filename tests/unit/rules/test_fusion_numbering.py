@@ -178,8 +178,10 @@ class TestFailClosed:
         m = Chem.MolFromSmiles("c1ccc2cccc-2cc1")
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
-    def test_quinoline_heterocycle_returns_none(self):
-        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+    def test_indole_non_all_six_returns_none(self):
+        # v23 13B(a) S2a admits all-SIX heterocycles, but a system containing a
+        # 5- (or 7-) membered ring still fails closed (mixed-ring geometry = S2b).
+        m = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")  # indole = (5,6)
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
     def test_benzene_single_ring_returns_none(self):
@@ -199,6 +201,44 @@ class TestFailClosed:
         assert compute_fused_numbering(m, _ring_atoms(m)) is None, (
             f"{name}: should fail-close (non-planar special class)"
         )
+
+
+@pytest.mark.unit
+class TestHeterocycleNumbering:
+    """v23 13B(a) S2a — all-6 fused HETEROCYCLES are numbered via the relaxed
+    gate + heteroatom-lowest-locant cascade (P-25.3.3.1.2) and the Table-2.8
+    anthracene-type "special numbering" fixed maps.  Locants verified against
+    OPSIN ``-o extendedsmi``."""
+
+    @pytest.mark.parametrize("smi,sym,expected", [
+        ("c1ccc2ncccc2c1", "N", 1),    # quinoline    — N is position 1
+        ("c1ccc2cnccc2c1", "N", 2),    # isoquinoline — N is position 2
+        ("c1ccc2nc3ccccc3cc2c1", "N", 10),    # acridine  — meso N is 10
+        ("c1ccc2c(c1)Cc1ccccc1O2", "O", 10),  # 9H-xanthene — meso O is 10
+        ("c1ccc2c(c1)Cc1ccccc1S2", "S", 10),  # 9H-thioxanthene — meso S is 10
+    ])
+    def test_single_heteroatom_locant(self, smi, sym, expected):
+        m = Chem.MolFromSmiles(smi)
+        nb = compute_fused_numbering(m, _ring_atoms(m))
+        assert nb is not None, f"{smi}: engine declined a valid all-6 heterocycle"
+        het = [nb[a.GetIdx()] for a in m.GetAtoms() if a.GetSymbol() == sym]
+        assert het == [expected], f"{smi}: {sym} locants {het} != [{expected}]"
+
+    def test_pteridine_nitrogen_set_is_1_3_5_8(self):
+        # The DATA-01 follow-on bug: stored had N-set {2,4,5,8}; correct is
+        # {1,3,5,8} (Blue Book Table 2.8 entry 7).
+        m = Chem.MolFromSmiles("c1cnc2ncncc2n1")
+        nb = compute_fused_numbering(m, _ring_atoms(m))
+        nset = sorted(nb[a.GetIdx()] for a in m.GetAtoms() if a.GetSymbol() == "N")
+        assert nset == [1, 3, 5, 8], f"pteridine N-set {nset} != [1,3,5,8]"
+
+    def test_acridine_meso_positions_are_9_and_10(self):
+        # anthracene-type fixed numbering: the two central-ring meso atoms take
+        # the highest locants 9 and 10 (the systematic walk would not).
+        m = Chem.MolFromSmiles("c1ccc2nc3ccccc3cc2c1")
+        nb = compute_fused_numbering(m, _ring_atoms(m))
+        ints = sorted(v for v in nb.values() if isinstance(v, int))
+        assert ints == list(range(1, 11))  # 1..10, both meso atoms numbered last
 
 
 @pytest.mark.unit
