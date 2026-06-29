@@ -210,7 +210,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '9a', 5: 1, 6: 9, 7: '8a', 8: 8, 9: 7, 10: 6, 11: 5, 12: '4b'},
     },
     # acridine
     'c1ccc2nc3ccccc3cc2c1': {
@@ -275,7 +275,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
     # imidazo[1,2-a]pyridine
     'c1ccn2ccnc2c1': {
@@ -283,7 +283,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
     # imidazo[1,5-a]pyridine
     'c1ccn2cncc2c1': {
@@ -291,7 +291,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
     # 3H-imidazo[4,5-b]pyridine
     'c1cnc2[nH]cnc2c1': {
@@ -341,7 +341,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered-saturated',
         'parent_atoms': 9,
-        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 3, 7: 2, 8: 1},
         'systematic': '2,3-dihydro-1-benzofuran',
     },
     # 2H-chromene -> PIN 2H-1-benzopyran (P-19(d) line 1736; line 24647 '2H-1-benzopyran (PIN)';
@@ -437,7 +437,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 3, 5: 2, 6: 1, 7: '3a', 8: 4},
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: 8, 8: 7},
     },
     # thieno[2,3-b]pyridine
     'c1cnc2sccc2c1': {
@@ -453,7 +453,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 3, 6: 2, 7: 1, 8: 4},
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 3, 7: 2, 8: 1},
     },
     # isoindoline
     'c1ccc2c(c1)CNC2': {
@@ -552,7 +552,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
         'parent_atoms': 13,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 9, 5: '9a', 6: 1, 7: 2, 8: 3, 9: '3a', 10: 4, 11: '4a', 12: 5},
     },
     # naphtho[2,3-b]thiophene
     'c1ccc2cc3sccc3cc2c1': {
@@ -560,7 +560,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'naphtho-fused',
         'parent_atoms': 13,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 9, 5: '9a', 6: 1, 7: 2, 8: 3, 9: '3a', 10: 4, 11: '4a', 12: 5},
     },
     # 1H-naphtho[2,3-b]pyrrole
     'c1ccc2cc3[nH]ccc3cc2c1': {
@@ -568,7 +568,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 1,
         'ring_system': 'naphtho-fused',
         'parent_atoms': 13,
-        'iupac_locants': {0: 7, 1: 8, 2: 9, 3: '9a', 4: '4a', 5: 5, 6: 4, 7: 3, 8: 2, 9: 1, 10: '3a', 11: '9b', 12: 6},
+        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 9, 5: '9a', 6: 1, 7: 2, 8: 3, 9: '3a', 10: 4, 11: '4a', 12: 5},
     },
     # pyrido[2,3-d]pyrimidine
     'c1cnc2ncncc2c1': {
@@ -616,7 +616,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'thienopyridine',
         'parent_atoms': 9,
-        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: '7a', 8: 7},
     },
     # thiazolo[4,5-b]pyridine
     'c1cnc2ncsc2c1': {
@@ -640,7 +640,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'furopyridine',
         'parent_atoms': 9,
-        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: '7a', 8: 1},
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: '7a', 8: 7},
     },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
@@ -680,7 +680,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 9,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: '4b', 4: '8a', 5: 8, 6: 9, 7: '9a', 8: 1, 9: 2, 10: 3, 11: 4, 12: '4a'},
     },
     # acridone
     'O=c1c2ccccc2[nH]c2ccccc12': {
@@ -957,7 +957,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'thiazolopyridine',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: '7a', 8: 7},
     },
     # isoxazolo[5,4-b]pyridine
     'c1cnc2oncc2c1': {
@@ -1053,7 +1053,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 5},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
     # [1,2,4]triazolo[1,5-a]pyridine
     'c1ccn2ncnc2c1': {
@@ -1085,7 +1085,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a'},
+        'iupac_locants': {0: 7, 1: 8, 2: '8a', 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 8: 6},
     },
     # pyrrolizidine
     'C1CC2CCCN2C1': {
@@ -1093,7 +1093,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
-        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 5, 4: 6, 5: 7, 6: '7a', 7: 1},
+        'iupac_locants': {0: 2, 1: 1, 2: '7a', 3: 7, 4: 6, 5: 5, 6: 4, 7: 3},
     },
     # indolizidine
     'C1CCN2CCCC2C1': {
@@ -1101,7 +1101,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 9,
-        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: 6, 6: 7, 7: '8a', 8: 1},
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: '8a', 8: 8},
     },
     # phenoxathiin
     'c1ccc2c(c1)Oc1ccccc1S2': {
@@ -1217,7 +1217,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
-        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: 7, 7: '7a', 8: 1},
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: '3a', 5: 4, 6: 3, 7: 2, 8: 1},
     },
     # 1,2,3,4-tetrahydroquinoxaline
     'c1ccc2c(c1)NCCN2': {
@@ -1273,7 +1273,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'oxazolopyridine',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '7a', 7: 7, 8: 6},
+        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 1, 4: 2, 5: 3, 6: '3a', 7: 4, 8: 5},
     },
     # thiazolo[5,4-c]pyridine
     'c1cc2ncsc2cn1': {
@@ -1281,7 +1281,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'thiazolopyridine',
         'parent_atoms': 9,
-        'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '7a', 7: 7, 8: 6},
+        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 1, 4: 2, 5: 3, 6: '3a', 7: 4, 8: 5},
     },
     # isoxazolo[3,4-b]pyridine
     'c1cnc2nocc2c1': {

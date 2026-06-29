@@ -208,12 +208,18 @@ class TestLocantCorrectness:
         assert locant_values == expected
 
     def test_indolizine_locants(self):
-        """Indolizine: 9 atoms, bridgehead N-system."""
+        """Indolizine: 9 atoms, bridgehead N-system (Blue Book Table 2.8 #20).
+
+        Numbering 1,2,3,4,5,6,7,8,8a: the bridgehead N is position 4 and the
+        bridgehead carbon is 8a — there is NO '3a' (that was the DATA-01-flagged
+        wrong stored numbering, N at 8a). v23 13B(a) 5/7-ring data fix re-derived
+        these from OPSIN -o extendedsmi, substituted-RT verified.
+        """
         data = FUSED_HETEROCYCLE_DATA['c1ccn2cccc2c1']
         assert data['name'] == 'indolizine'
         locants = data['iupac_locants']
         locant_values = set(locants.values())
-        expected = {1, 2, 3, '3a', 5, 6, 7, 8, '8a'}
+        expected = {1, 2, 3, 4, 5, 6, 7, 8, '8a'}
         assert locant_values == expected
 
 
