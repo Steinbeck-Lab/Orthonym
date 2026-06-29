@@ -127,15 +127,29 @@ def test_unknown_name_returns_none():
     assert get_polycyclic_iupac_locants(mol, 'nonexistent_pah') is None
 
 
-def test_unpopulated_pah_returns_none():
-    """fluorene's iupac_numbering is empty -> returns None (Phase 151 audit).
+def test_fluorene_numbered_via_engine_fixed():
+    """v23 13B(a) S2b: fluorene (empty stored iupac_numbering) is now derived by
+    the mixed-ring fusion engine via its special-numbering fixed map (CH2 at 9).
+    Was a fail-closed None pre-S2b (Phase 151 audit).
 
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25
-    Source: Phase 147 D-01; Phase 151 ring-class completion (deferred).
+    Source: IUPAC P-25.1.1 retained PAH special numbering; rules/fusion_numbering.
     """
     from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
     mol = Chem.MolFromSmiles('c1ccc2c(c1)Cc1ccccc1-2')
-    assert get_polycyclic_iupac_locants(mol, 'fluorene') is None
+    locants = get_polycyclic_iupac_locants(mol, 'fluorene')
+    assert locants is not None
+    c9 = [a.GetIdx() for a in mol.GetAtoms()
+          if a.GetSymbol() == 'C' and not a.GetIsAromatic()]
+    assert len(c9) == 1 and locants.get(c9[0]) == 9
+
+
+def test_peri_pah_still_returns_none():
+    """A peri-fused PAH with empty numbering still fails closed (engine declines
+    peri-fusion -> S4)."""
+    from orthonym.rules.polycyclics import get_polycyclic_iupac_locants
+    mol = Chem.MolFromSmiles('C1Cc2cccc3cccc1c23')  # acenaphthene (peri)
+    assert mol is not None
+    assert get_polycyclic_iupac_locants(mol, 'acenaphthene') is None
 
 
 def test_two_digit_base_locant_parses_correctly():

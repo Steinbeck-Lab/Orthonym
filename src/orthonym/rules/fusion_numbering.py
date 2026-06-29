@@ -108,6 +108,37 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
         ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
          '9', '9a'),
     ),
+    # ----- (5,6)/(5,6,6) heterocycles with retained "special numbering" -----
+    # Blue Book Table 2.8: purine (entry 16, "special numbering" — also listed
+    # with anthracene/phenanthrene at P-14.4 (a) as fixed) and carbazole (entry
+    # 6, "special numbering"); both number all skeletal atoms without the
+    # systematic peripheral walk's choice (purine: fusion C at 4,5 not 4a/9a;
+    # carbazole: NH at 9, fusion 4a/4b/8a/9a).  beta-carboline (the retained
+    # name for 9H-pyrido[3,4-b]indole) uses carbazole's exact numbering pattern.
+    # SMILES + locants are OPSIN ``-o extendedsmi $_AV`` (authoritative).
+    (
+        '7H-purine',
+        'N1=CN=C2NC=NC2=C1',
+        ('1', '2', '3', '4', '9', '8', '7', '5', '6'),
+    ),
+    (
+        '9H-carbazole',
+        'C1=CC=CC=2C3=CC=CC=C3NC12',
+        ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
+    ),
+    (
+        '9H-beta-carboline',
+        'C1=NC=CC=2C3=CC=CC=C3NC12',
+        ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
+    ),
+    # 9H-fluorene — the carbocyclic carbazole-shape (CH2 at 9, no heteroatom to
+    # drive the lowest-locant cascade) is a retained PAH with the SAME special
+    # numbering; the systematic walk/scorer mis-selects it (P-25.1.1 retained).
+    (
+        '9H-fluorene',
+        'C1=CC=CC=2C3=CC=CC=C3CC12',
+        ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
+    ),
 )
 
 
@@ -393,6 +424,30 @@ def _fusion_letters(locants: Dict[int, _Locant]) -> List[_Locant]:
     return [loc for loc in locants.values() if isinstance(loc, tuple)]
 
 
+def _indicated_h_locants(
+    mol: Chem.Mol,
+    locants: Dict[int, _Locant],
+) -> List[_Locant]:
+    """Locants of indicated-hydrogen atoms, for the P-14.4(b) cascade tier.
+
+    Restricted to AROMATIC heteroatoms bearing H (NH-type — 1H-indole,
+    1H-benzimidazole): these are the genuine indicated-H of a mancude ring
+    system.  A fully saturated ring (``-idine``, e.g. pyrrolizidine — every
+    ring atom is an sp3 CH/CH2) has NO indicated hydrogen, and dihydro/sp3
+    saturation is a HYDRO feature (a separate, lower cascade tier), so sp3 ring
+    atoms are deliberately NOT counted here.  sp3 indicated-H mancude parents
+    that the systematic walk cannot reproduce (9H-xanthene, purine, carbazole)
+    are handled by ``_FIXED_NUMBERING_SYSTEMS`` instead.
+    """
+    out: List[_Locant] = []
+    for idx, loc in locants.items():
+        atom = mol.GetAtomWithIdx(idx)
+        if (atom.GetTotalNumHs() >= 1 and atom.GetIsAromatic()
+                and atom.GetAtomicNum() != 6):
+            out.append(loc)
+    return out
+
+
 def compute_fused_numbering(
     mol: Chem.Mol,
     ring_system_atoms,
@@ -421,14 +476,16 @@ def compute_fused_numbering(
         return None
 
     # v23 13B(a) S2a: heteroatoms in the rings are admitted (quinoline/acridine/
-    # phenazine/pteridine/... families).  The hex-lattice embedding and the
-    # peripheral walk are element-agnostic; the heteroatom-lowest-locant cascade
-    # (P-25.3.3.1.2(a)/(b)) is applied below.  Carbocyclic systems are unchanged
-    # (the relaxed gate is a superset).  We still require all-six-membered,
-    # ortho-(cata-)fused, connected — non-6 rings (S2b) and peri-fusion (S4) are
-    # outside this engine's geometry and fail closed.
+    # phenazine/pteridine/... families).  S2b: mixed 5/6-membered rings are
+    # admitted too (indole/benzofuran/carbazole/...).  The embedding (hex for
+    # all-6, regular-polygon for mixed) + peripheral walk are element- and
+    # size-agnostic; the heteroatom- then indicated-H-lowest-locant cascade
+    # (P-25.3.3.1.2 / P-14.4) is applied below.  We require ortho-(cata-)fused +
+    # connected; ``best_orientations`` fail-closes on non-embeddable systems
+    # (7-/8-membered rings = S2b.3, peri-fusion = S4), so this is a superset gate
+    # that never regresses the all-6 path.
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['all_six'] and info['cata_fused'] and info['connected']):
+    if not (info['cata_fused'] and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
 
@@ -476,6 +533,7 @@ def compute_fused_numbering(
     best_map: Optional[Dict[int, _Locant]] = None
     best_het: Optional[List[Tuple[_Locant, str]]] = None
     best_fus: Optional[List[_Locant]] = None
+    best_ih: Optional[List[_Locant]] = None
     best_sig: Optional[Tuple] = None
     for coords in orientations:
         start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
@@ -489,13 +547,14 @@ def compute_fused_numbering(
             if not cand:
                 continue
             # Cascade comparison terms:
-            #   P-25.3.3.1.2(a)/(b): heteroatom set then element seniority
-            #     (carbocyclic Stage 1 -> empty, inert);
-            #   P-25.3.3.1.2(c): low locants to fusion carbons.
+            #   P-25.3.3.1.2(a)/(b): heteroatom set then element seniority;
+            #   P-25.3.3.1.2(c): low locants to fusion carbons;
+            #   P-14.4(b): low locants to indicated hydrogen (1H-indole etc.).
             het = _heteroatom_pairs(mol, cand)
             fus = _fusion_letters(cand)
+            ih = _indicated_h_locants(mol, cand)
             if best_map is None:
-                best_map, best_het, best_fus = cand, het, fus
+                best_map, best_het, best_fus, best_ih = cand, het, fus, ih
                 best_sig = _canon_signature(cand)
                 continue
             # Tier (a)+(b): heteroatoms (via the shared comparator).
@@ -506,13 +565,17 @@ def compute_fused_numbering(
                 # Tier (c): low locants to fusion carbons (the (int,'a') set).
                 cmp = compare_locant_sets(fus, best_fus)
             if cmp == 0:
+                # Tier (b, P-14.4): low locants to indicated hydrogen.
+                cmp = compare_locant_sets(ih, best_ih)
+            if cmp == 0:
                 # Genuine symmetry tie -> canonical-rank representative.
                 sig = _canon_signature(cand)
                 if sig < best_sig:  # type: ignore[operator]
-                    best_map, best_het, best_fus, best_sig = cand, het, fus, sig
+                    best_map, best_het, best_fus, best_ih, best_sig = (
+                        cand, het, fus, ih, sig)
                 continue
             if cmp < 0:
-                best_map, best_het, best_fus = cand, het, fus
+                best_map, best_het, best_fus, best_ih = cand, het, fus, ih
                 best_sig = _canon_signature(cand)
 
     return best_map

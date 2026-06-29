@@ -45,6 +45,7 @@ Source: IUPAC 2013 Blue Book P-25.3.2.3.3 (BlueBookV2/BlueBookV2.md ~line 12079)
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
@@ -595,31 +596,249 @@ def score_orientation(
     return (-max_row, ur4, ll4, neg_above2)
 
 
+# ---------------------------------------------------------------------------
+# S2b: general mixed-ring (5/6/7) embedding + scale-invariant scoring
+#
+# The integer hex lattice tiles only regular hexagons; 5- and 7-membered rings
+# have irrational regular-polygon vertices, so the all-6 path cannot embed them.
+# For mixed-ring cata-fused systems we build a REAL-coordinate regular-polygon
+# embedding (deterministic: canonical BFS seed, fixed arithmetic, rounded to a
+# fine integer grid so all stored coords are integers).  Orientation is then
+# enumerated by the 12 D6 REAL rotations (60-deg multiples + mirror) — NOT the
+# hex ``_transform`` (which assumes hex-lattice y-scaling).  Scoring is a
+# scale-/size-invariant reimplementation of P-25.3.2.3.3 (a)-(d): rows are
+# chains of rings joined by VERTICAL common bonds, quadrant counts use exact
+# integer cross-multiplication of the true ring centres (sum_x/n, sum_y/n).
+#
+# Source: IUPAC 2013 P-25.3.2.3.1 (permitted shapes) / P-25.3.2.3.3.
+# ---------------------------------------------------------------------------
+
+# Edge length on the fine integer grid (rounding error < 0.5/_GEN_SCALE).
+_GEN_SCALE = 1000
+
+
+def _regular_polygon_on_edge(cur_center, pa, pb, ring_order, coord):
+    """Place a regular n-gon whose edge ``pa``-``pb`` is shared, on the side
+    AWAY from ``cur_center``.  ``ring_order`` is the ring's cyclic atom order
+    starting (pa, pb, ...); fills ``coord`` for the new atoms (rounded ints)."""
+    n = len(ring_order)
+    ax, ay = coord[pa]
+    bx, by = coord[pb]
+    ex, ey = bx - ax, by - ay
+    L = math.hypot(ex, ey)
+    cx, cy = cur_center
+    mx, my = (ax + bx) / 2.0, (ay + by) / 2.0
+    cross = ex * (my - cy) - ey * (mx - cx)  # which side is "away"
+    turn = (2 * math.pi / n) * (1 if cross > 0 else -1)
+    ang = math.atan2(ey, ex)
+    px, py = float(bx), float(by)
+    verts = [(float(ax), float(ay)), (float(bx), float(by))]
+    d = ang
+    for _ in range(n - 2):
+        d += turn
+        px += L * math.cos(d)
+        py += L * math.sin(d)
+        verts.append((px, py))
+    for atom, (vx, vy) in zip(ring_order, verts):
+        if atom not in coord:
+            coord[atom] = (int(round(vx)), int(round(vy)))
+
+
+def embed_general(
+    graph: Dict[int, Dict[str, object]],
+    mol: Chem.Mol,
+) -> Optional[Dict[int, Tuple[int, int]]]:
+    """Real-coordinate regular-polygon embedding for a mixed-ring cata-fused
+    system (rounded to the integer grid).  Deterministic: seed = lowest node
+    key, BFS in sorted neighbour order.  Returns ``None`` if inconsistent /
+    non-injective (e.g. peri-fusion that slipped through)."""
+    if not graph:
+        return None
+    seed = min(graph)
+    seed_atoms = graph[seed]['sorted_atoms']  # type: ignore[index]
+    order = _ordered_ring_walk(mol, set(seed_atoms))
+    if order is None:
+        return None
+    n = len(order)
+    R = _GEN_SCALE / (2 * math.sin(math.pi / n))
+    coord: Dict[int, Tuple[int, int]] = {}
+    for i, a in enumerate(order):
+        ang = math.pi / 2 - i * (2 * math.pi / n)  # first atom top, clockwise
+        coord[a] = (int(round(R * math.cos(ang))), int(round(R * math.sin(ang))))
+    from collections import deque
+    ring_center = {seed: (0, 0)}
+    queue: deque[int] = deque([seed])
+    placed = {seed}
+    while queue:
+        cur = queue.popleft()
+        for nb in sorted(graph[cur]['neighbours']):  # type: ignore[index]
+            if nb in placed:
+                continue
+            edge = graph[cur]['neighbours'][nb]  # type: ignore[index]
+            a, b = tuple(edge)
+            if a not in coord or b not in coord:
+                return None
+            ro = (_ring_order_from_edge(mol, graph[nb]['atoms'], a, b)  # type: ignore[index]
+                  or _ring_order_from_edge(mol, graph[nb]['atoms'], b, a))  # type: ignore[index]
+            if ro is None:
+                return None
+            _regular_polygon_on_edge(ring_center[cur], ro[0], ro[1], ro, coord)
+            atoms = graph[nb]['atoms']  # type: ignore[index]
+            ring_center[nb] = (sum(coord[x][0] for x in atoms) // len(atoms),
+                               sum(coord[x][1] for x in atoms) // len(atoms))
+            placed.add(nb)
+            queue.append(nb)
+    all_atoms: Set[int] = set()
+    for node in graph.values():
+        all_atoms |= node['atoms']  # type: ignore[operator]
+    if set(coord) != all_atoms:
+        return None
+    # Injectivity (no atom overlap) — peri/over-crowded systems fail closed.
+    if len(set(coord.values())) != len(coord):
+        return None
+    return coord
+
+
+def all_orientations_general(
+    coords: Dict[int, Tuple[int, int]],
+) -> List[Dict[int, Tuple[int, int]]]:
+    """12 D6 orientations via REAL 2D rotation (k*60 deg + mirror), rounded to
+    int — correct for the real-coordinate ``embed_general`` output."""
+    out: List[Dict[int, Tuple[int, int]]] = []
+    for mirror in (False, True):
+        for k in range(6):
+            a = math.radians(60 * k)
+            c, s = math.cos(a), math.sin(a)
+            out.append({
+                at: (int(round((-x if mirror else x) * c - y * s)),
+                     int(round((-x if mirror else x) * s + y * c)))
+                for at, (x, y) in coords.items()
+            })
+    return out
+
+
+def score_orientation_general(
+    graph: Dict[int, Dict[str, object]],
+    coords: Dict[int, Tuple[int, int]],
+) -> Tuple[int, ...]:
+    """Scale-/size-invariant P-25.3.2.3.3 (a)-(d) score (smaller is better).
+    Rows = chains of rings joined by VERTICAL common bonds (shared-edge atoms
+    with equal x); quadrant counts via exact integer cross-multiplication of the
+    true ring centres (sum_x/n, sum_y/n)."""
+    cen = {nd: (sum(coords[a][0] for a in graph[nd]['atoms']),  # type: ignore[index]
+                sum(coords[a][1] for a in graph[nd]['atoms']),  # type: ignore[index]
+                len(graph[nd]['atoms']))  # type: ignore[index]
+           for nd in graph}
+    nodes = sorted(graph)
+    vadj: Dict[int, set] = {nd: set() for nd in nodes}
+    for nd in nodes:
+        for nb, edge in graph[nd]['neighbours'].items():  # type: ignore[index]
+            a, b = tuple(edge)
+            if coords[a][0] == coords[b][0]:  # vertical shared bond
+                vadj[nd].add(nb)
+                vadj.setdefault(nb, set()).add(nd)
+    seen: set = set()
+    rows: List[List[int]] = []
+    for nd in nodes:
+        if nd in seen:
+            continue
+        comp = []
+        st = [nd]
+        while st:
+            c = st.pop()
+            if c in seen:
+                continue
+            seen.add(c)
+            comp.append(c)
+            st.extend(vadj[c] - seen)
+        rows.append(comp)
+    max_row = max(len(r) for r in rows)
+
+    def xsign(c, ox):
+        return c[0] * ox[1] - ox[0] * c[2]
+
+    def ysign(c, oy):
+        return c[1] * oy[1] - oy[0] * c[2]
+
+    best: Optional[Tuple[int, int, int]] = None
+    for row in rows:
+        if len(row) != max_row:
+            continue
+        xs = sorted(row, key=lambda nd: cen[nd][0] / cen[nd][2])
+        nr = len(xs)
+        if nr % 2 == 1:
+            cc = cen[xs[nr // 2]]
+            ox = (cc[0], cc[2])
+        else:
+            c1 = cen[xs[nr // 2 - 1]]
+            c2 = cen[xs[nr // 2]]
+            ox = (c1[0] * c2[2] + c2[0] * c1[2], 2 * c1[2] * c2[2])
+        rc = cen[row[0]]
+        oy = (rc[1], rc[2])
+        ur4 = ll4 = above2 = 0
+        for nd in nodes:
+            c = cen[nd]
+            xs_ = xsign(c, ox)
+            ys_ = ysign(c, oy)
+            onv = (xs_ == 0)
+            onh = (ys_ == 0)
+            ur4 += (2 if xs_ > 0 else (1 if onv else 0)) * (2 if ys_ > 0 else (1 if onh else 0))
+            ll4 += (2 if xs_ < 0 else (1 if onv else 0)) * (2 if ys_ < 0 else (1 if onh else 0))
+            above2 += (2 if ys_ > 0 else (1 if onh else 0))
+        sub = (-ur4, ll4, -above2)
+        if best is None or sub < best:
+            best = sub
+    assert best is not None
+    return (-max_row, best[0], best[1], best[2])
+
+
 def best_orientations(
     mol: Chem.Mol,
     ring_atoms: Set[int],
 ) -> Optional[List[Dict[int, Tuple[int, int]]]]:
-    """Return ALL D6 orientations tying for best by P-25.3.2.3.3 (a)-(d).
+    """Return ALL orientations tying for best by P-25.3.2.3.3 (a)-(d).
 
-    Returns ``None`` if the system is not embeddable (e.g. not all-6 cata-fused
-    carbocyclic, or the lattice embedding is inconsistent).  Otherwise returns a
-    non-empty list of atom-coordinate maps, all sharing the optimal score.
+    Returns ``None`` if the system is not embeddable.  Otherwise a non-empty
+    list of atom-coordinate maps.  Dispatches by ring sizes:
+
+    * all-six-membered  -> the shipped integer HEX lattice + ``score_orientation``
+      (unchanged — S1/S2a path);
+    * mixed (contains a 5- or 7-... ring), cata-fused, connected, no ring > 6
+      -> the S2b ``embed_general`` + REAL-rotation orientations.  For a BICYCLIC
+      system the orientation criteria do not discriminate a unique drawing, so
+      ALL orientations are returned and the lowest-locant numbering cascade picks
+      (heteroatom-driven); for >=3 rings the scale-invariant
+      ``score_orientation_general`` selects the preferred orientation.
     """
-    # v23 13B(a) S2a: heteroatom rings admitted (the embedding is element-
-    # agnostic).  Still require all-six + cata-fused + connected; non-6 (S2b) and
-    # peri-fusion (S4) fall through to ``embed_atoms_on_hex_lattice`` returning
-    # None / the planarity gate, i.e. fail closed.
     info = classify_ring_system(mol, ring_atoms)
-    if not (info['all_six'] and info['cata_fused'] and info['connected']):
+    if not (info['cata_fused'] and info['connected']):
         return None
     graph = info['graph']  # type: ignore[assignment]
-    base = embed_atoms_on_hex_lattice(graph, mol)  # type: ignore[arg-type]
+
+    if info['all_six']:
+        base = embed_atoms_on_hex_lattice(graph, mol)  # type: ignore[arg-type]
+        if base is None:
+            return None
+        layouts = all_orientations(base)
+        scored0: List[Tuple[Tuple[int, ...], int, Dict[int, Tuple[int, int]]]] = []
+        for i, layout in enumerate(layouts):
+            scored0.append((score_orientation(graph, layout), i, layout))  # type: ignore[arg-type]
+        best_score0 = min(s for s, _, _ in scored0)
+        return [layout for s, _, layout in scored0 if s == best_score0]
+
+    # --- S2b mixed-ring path ---
+    rings = info['rings']  # type: ignore[assignment]
+    if any(len(r) > 6 for r in rings):  # 7-/8-membered: not yet validated -> S2b.3
+        return None
+    base = embed_general(graph, mol)  # type: ignore[arg-type]
     if base is None:
         return None
-
-    layouts = all_orientations(base)
+    layouts = all_orientations_general(base)
+    if len(graph) <= 2:
+        # bicyclic: orientation does not discriminate; cascade picks over ALL.
+        return layouts
     scored: List[Tuple[Tuple[int, ...], int, Dict[int, Tuple[int, int]]]] = []
     for i, layout in enumerate(layouts):
-        scored.append((score_orientation(graph, layout), i, layout))  # type: ignore[arg-type]
+        scored.append((score_orientation_general(graph, layout), i, layout))  # type: ignore[arg-type]
     best_score = min(s for s, _, _ in scored)
     return [layout for s, _, layout in scored if s == best_score]

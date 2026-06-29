@@ -47,12 +47,18 @@ class TestEngineWiringIntoConsumer:
         assert any(isinstance(v, int) for v in locants.values())
         assert any(isinstance(v, tuple) for v in locants.values())
 
-    def test_fluorene_engine_declines_returns_none(self):
-        # fluorene has an sp3 C9 + a 5-membered ring -> not all-6 cata-fused;
-        # the engine declines, so the consumer returns None (caller falls back).
+    def test_fluorene_numbered_via_fixed_special_numbering(self):
+        # v23 13B(a) S2b: fluorene (5,6,6, sp3 C9) is now numbered by the engine
+        # via _FIXED_NUMBERING_SYSTEMS (the carbazole-shape special numbering,
+        # CH2 at position 9). Was a fail-closed None pre-S2b.
         entry = POLYCYCLIC_DATA["fluorene"]
         mol = Chem.MolFromSmiles(entry["canonical_smiles"])
-        assert get_polycyclic_iupac_locants(mol, "fluorene") is None
+        locants = get_polycyclic_iupac_locants(mol, "fluorene")
+        assert locants is not None, "fluorene should now be numbered (S2b fixed)"
+        c9 = [a.GetIdx() for a in mol.GetAtoms()
+              if a.GetSymbol() == "C" and not a.GetIsAromatic()]
+        assert len(c9) == 1
+        assert locants.get(c9[0]) == 9, f"fluorene C9 locant = {locants.get(c9[0])}"
 
 
 @pytest.mark.unit

@@ -178,10 +178,12 @@ class TestFailClosed:
         m = Chem.MolFromSmiles("c1ccc2cccc-2cc1")
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
-    def test_indole_non_all_six_returns_none(self):
-        # v23 13B(a) S2a admits all-SIX heterocycles, but a system containing a
-        # 5- (or 7-) membered ring still fails closed (mixed-ring geometry = S2b).
-        m = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")  # indole = (5,6)
+    def test_seven_membered_ring_returns_none(self):
+        # v23 13B(a) S2b admits 5/6-membered mixed rings (indole etc.), but a
+        # system containing a 7- (or 8-) membered ring still fails closed
+        # (mixed >6-ring geometry = S2b.3).
+        m = Chem.MolFromSmiles("C1=CC=CC2=CC=CC=CC2=C1")  # heptalene (7,7)
+        assert m is not None
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
     def test_benzene_single_ring_returns_none(self):
@@ -223,6 +225,32 @@ class TestHeterocycleNumbering:
         assert nb is not None, f"{smi}: engine declined a valid all-6 heterocycle"
         het = [nb[a.GetIdx()] for a in m.GetAtoms() if a.GetSymbol() == sym]
         assert het == [expected], f"{smi}: {sym} locants {het} != [{expected}]"
+
+    @pytest.mark.parametrize("smi,sym,expected", [
+        ("c1ccc2[nH]ccc2c1", "N", 1),       # 1H-indole       — NH is 1
+        ("c1ccc2occc2c1", "O", 1),          # 1-benzofuran    — O is 1
+        ("c1ccc2[nH]cnc2c1", "N", [1, 3]),  # 1H-benzimidazole — NH=1, N=3
+        ("c1ccn2cccc2c1", "N", 4),          # indolizine      — bridgehead N is 4
+    ])
+    def test_56_bicyclic_heteroatom(self, smi, sym, expected):
+        # v23 13B(a) S2b — (5,6) bicyclic mixed-ring numbering via the general
+        # regular-polygon embedding + cascade (incl. indicated-H tier).
+        m = Chem.MolFromSmiles(smi)
+        nb = compute_fused_numbering(m, _ring_atoms(m))
+        assert nb is not None, f"{smi}: engine declined a valid (5,6) heterocycle"
+        het = sorted(nb[a.GetIdx()] for a in m.GetAtoms() if a.GetSymbol() == sym)
+        exp = sorted(expected) if isinstance(expected, list) else [expected]
+        assert het == exp, f"{smi}: {sym} locants {het} != {exp}"
+
+    def test_carbazole_nh_is_9_special_numbering(self):
+        # 9H-carbazole (Blue Book Table 2.8 entry 6, "special numbering"): NH=9,
+        # fusion 4a/4b/8a/9a — via _FIXED_NUMBERING_SYSTEMS (the systematic
+        # walk/scorer mis-selects this carbazole-shape, NH not lowest-locant).
+        m = Chem.MolFromSmiles("c1ccc2c(c1)[nH]c1ccccc12")
+        nb = compute_fused_numbering(m, _ring_atoms(m))
+        assert nb is not None
+        nloc = [nb[a.GetIdx()] for a in m.GetAtoms() if a.GetSymbol() == "N"]
+        assert nloc == [9], f"carbazole NH locant {nloc} != [9]"
 
     def test_pteridine_nitrogen_set_is_1_3_5_8(self):
         # The DATA-01 follow-on bug: stored had N-set {2,4,5,8}; correct is
