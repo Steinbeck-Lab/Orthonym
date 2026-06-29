@@ -815,13 +815,26 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 14,
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '9a', 5: 1, 6: 9, 7: '8a', 8: 8, 9: 7, 10: 6, 11: 5, 12: '10a', 13: 10},
     },
-    # isobenzofuran
+    # 2-benzofuran (PIN; isobenzofuran/benzo[c]furan are non-PIN synonyms —
+    # Blue Book P-25 line 11829: "2-benzofuran (PIN) isobenzofuran benzo[c]furan";
+    # cf. its dione = phthalic anhydride = 2-benzofuran-1,3-dione, BB line 32494)
     'c1ccc2cocc2c1': {
-        'name': 'isobenzofuran',
+        'name': '2-benzofuran',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 1,3-dihydro-2-benzofuran (phthalan) — the 1,3-dihydro form of 2-benzofuran
+    # (parallel to the cataloged 2,3-dihydro-1-benzofuran). PIN per BB P-25;
+    # iupac_locants OPSIN-derived (O at 2, CH2 at 1 and 3).
+    'c1ccc2c(c1)COC2': {
+        'name': '1,3-dihydro-2-benzofuran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered-saturated',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: '7a', 5: 7, 6: 1, 7: 2, 8: 3},
+        'systematic': '1,3-dihydro-2-benzofuran',
     },
     # 1,2-benzisoxazole
     'c1ccc2oncc2c1': {

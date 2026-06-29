@@ -6852,7 +6852,7 @@ OPSIN_ARYL_GROUPS: Dict[str, dict] = {
         'is_pin': False,
     },
     'c1ccc2cocc2c1': {
-        'names': ['isobenzofuran'],
+        'names': ['2-benzofuran'],  # PIN (Blue Book P-25 line 11829); isobenzofuran/benzo[c]furan non-PIN
         'smiles': 'c1ccc2cocc2c1',
         'labels': '1/2/3/3a/4/5/6/7/7a',
         'type': 'ring',

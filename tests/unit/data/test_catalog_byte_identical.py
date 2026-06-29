@@ -133,7 +133,8 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2cc3sccc3cc2c1': 'naphtho[2,3-b]thiophene',
     'c1ccc2cnccc2c1': 'isoquinoline',
     'c1ccc2cnncc2c1': 'phthalazine',
-    'c1ccc2cocc2c1': 'isobenzofuran',
+    'c1ccc2cocc2c1': '2-benzofuran',  # v23: isobenzofuran->2-benzofuran PIN (BB 11829)
+    'c1ccc2c(c1)COC2': '1,3-dihydro-2-benzofuran',  # v23: phthalan catalog add
     'c1ccc2nc3ccccc3cc2c1': 'acridine',
     'c1ccc2nc3ccccc3nc2c1': 'phenazine',
     'c1ccc2ncccc2c1': 'quinoline',
