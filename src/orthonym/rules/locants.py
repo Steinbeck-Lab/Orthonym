@@ -538,7 +538,24 @@ def _pick_locant_atom(
                 candidates.append(atom_idx)
 
     if not candidates:
-        # No carbon on chain -- fall back to any atom on chain
+        # No carbon *inside the match* lies on the chain. This is the case for
+        # SMARTS that deliberately exclude the attachment carbon from the match
+        # arity and assert it only via a recursive environment -- e.g. the
+        # sulfinic / sulfonic oxoacid patterns
+        #   '[SX3;$([SX3][#6])](=O)[OX2H1]' / '[SX4;$([SX4][#6])](=O)(=O)[OX2H1]'
+        # match only (S, O, O[, O]); the chain carbon that BEARS the group is a
+        # NEIGHBOR of a match atom, not a member of the match (the recursive
+        # $(...) keeps the inorganic-oxoacid distinction). Walk the match atoms'
+        # neighbors and return the chain carbon that bears the group so its
+        # suffix locant is cited (P-14.3.4 / P-65.3.1: 'butane-2-sulfinic acid',
+        # 'butane-2-sulfonic acid' -- not the locant-dropped 'butanesulfinic acid'
+        # that mis-names a secondary-carbon attachment as a primary one).
+        for atom_idx in match_tuple:
+            for nbr in mol.GetAtomWithIdx(atom_idx).GetNeighbors():
+                nbr_idx = nbr.GetIdx()
+                if nbr_idx in chain_set and nbr.GetAtomicNum() == 6:
+                    return nbr_idx
+        # Last resort: any match atom on the chain (legacy behavior).
         for atom_idx in match_tuple:
             if atom_idx in chain_set:
                 return atom_idx

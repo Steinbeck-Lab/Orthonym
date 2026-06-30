@@ -216,7 +216,10 @@ class TestNewEntries:
 
     @pytest.mark.parametrize("smiles,expected_name", [
         # Verify via get_retained_name function
-        ("O=C(O)c1cccc(C(=O)O)c1", "isophthalic acid"),
+        # v23 D-FOLLOWON item 2: 'isophthalic acid' (O=C(O)c1cccc(C(=O)O)c1) de-headlined
+        # (pin:false) — PIN is the systematic ring di-acid benzene-1,3-dicarboxylic acid
+        # (P-65.1.1), so get_retained_name -> None (stays in the RAW retained_names alias;
+        # see test_new_entry_exists line 149). Parallel to coumarin/putrescine below.
         # v23 IH-01f: 'coumarin' (O=c1ccc2ccccc2o1) de-headlined (pin:false) — PIN is
         # 2H-1-benzopyran-2-one (P-19(d)), so get_retained_name -> None (stays in the
         # RAW retained_names alias; see test_new_entry_exists). Parallel to putrescine.

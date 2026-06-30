@@ -689,8 +689,9 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
     saturated fused carbocycle, reusing the partial-saturation parent perception
     but numbered with the FREE VALENCE first (P-31.1.4.3.4): low locant to the
     attachment, then to the hydro positions, then to any residual ring double
-    bond. Returns None (fail-closed) for perhydro systems (handled elsewhere) and
-    anything the mancude parent skeleton cannot number."""
+    bond. Also names the FULLY-saturated (perhydro) case with the count-form
+    prefix (``decahydronaphthalen-2-yl``; D-FOLLOWON item 3). Returns None
+    (fail-closed) for anything the mancude parent skeleton cannot number."""
     from rdkit import Chem
     from . import partial_saturation as ps
     from .partial_saturation import _locant_key
@@ -698,8 +699,9 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
     try:
         ring_atoms = set(range(sub.GetNumAtoms()))
         det = ps.detect_carbocyclic_partial_saturation(sub, ring_atoms)
-        if not det or det.get('is_perhydro'):
+        if not det:
             return None
+        is_perhydro = bool(det.get('is_perhydro'))
         parent = det['parent_name']
         prefix = det['prefix']
         sp3 = set(det['saturated_indices'])
@@ -738,6 +740,16 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
             return None
         a2l = best[1]
         stem = parent[:-1] if parent.endswith('e') else parent  # naphthalen
+        if is_perhydro:
+            # Fully-saturated fused carbocycle: cite the COUNT-form prefix
+            # (P-31.1.4.3.4 / the explicit-hydrogen convention this project uses
+            # for the PARENT, e.g. 'decahydronaphthalene'), with NO per-position
+            # hydro locants, then the free-valence locant ->
+            # 'decahydronaphthalen-2-yl'. Fail-closed if the count is non-standard.
+            count_prefix = ps.get_saturation_prefix(det.get('hydrogen_count', len(sp3)))
+            if not count_prefix:
+                return None
+            return f'{count_prefix}{stem}-{_fmt_locant(a2l[attach_sub])}-yl'
         hydro_locs = sorted((a2l[a] for a in sp3), key=_locant_key)
         hydro_str = ','.join(_fmt_locant(x) for x in hydro_locs)
         return f'{hydro_str}-{prefix}{stem}-{_fmt_locant(a2l[attach_sub])}-yl'
@@ -975,7 +987,17 @@ def get_ring_substituent_name(
                     )
                     if attach_locant is not None:
                         return f'{stem}-{attach_locant}-yl'
-                return f'{stem}-yl'
+                    # Position matters but the retained-stem numberer cannot place
+                    # it -- e.g. a saturated/hydro retained ring such as
+                    # 'decahydronaphthalene' (_get_polycyclic_attachment_locant
+                    # only numbers mancude PAH stems). Do NOT emit the locant-less
+                    # '{stem}-yl': it mis-names a non-symmetric attachment and
+                    # fails OPSIN-RT (SELF-01 then suppresses it to unknown).
+                    # Fall through to _polycyclic_substituent_name below, which
+                    # numbers the free valence via the mancude parent
+                    # (D-FOLLOWON item 3 -> 'decahydronaphthalen-2-yl').
+                else:
+                    return f'{stem}-yl'
 
         # Phase 4 SUBST-01: multi-ring substituent with no retained name —
         # route the detached system through the von-Baeyer / spiro / partial-hydro

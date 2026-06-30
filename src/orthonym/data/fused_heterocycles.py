@@ -692,20 +692,27 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'is_retained_name': True,
     },
     # dibenzofuran
+    # D-FOLLOWON item 4 (DATA-01 remnant): stored grid put the O bridge (idx 6) at
+    # locant 9 and the second benzo ring (idx 8-11) at 5-8; OPSIN's authoritative
+    # numbering (`-o extendedsmi` $_AV:) puts O at 5, the second benzo ring at 6-9,
+    # and fusion atoms at 9b/5a/9a. The O/S anchor fixes the C2v axis, so the old
+    # grid was NOT a valid automorphic labeling -> di-substituents spanning both
+    # rings (2,8-dimethyl) emerged shifted (2,7) and SELF-01-suppressed. Re-derived
+    # from OPSIN extendedsmi (independently reproduced).
     'c1ccc2c(c1)oc1ccccc12': {
         'name': 'dibenzofuran',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9b', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a'},
     },
-    # dibenzothiophene
+    # dibenzothiophene  (same skeleton, S substitutes for O at idx 6 -> identical grid)
     'c1ccc2c(c1)sc1ccccc12': {
         'name': 'dibenzothiophene',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: '4a', 5: 4, 6: 9, 7: '4b', 8: 5, 9: 6, 10: 7, 11: 8, 12: '8a'},
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9b', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a'},
     },
     # benzo[f]quinoline
     'c1ccc2c(c1)ccc1ncccc12': {
@@ -1834,6 +1841,78 @@ def _coerce_locant_for_compare(locant):
     return (base, suffix) if suffix else base
 
 
+def _loc_to_float(coerced) -> float:
+    """Normalize a coerced locant (int, or (base, suffix) tuple from
+    _coerce_locant_for_compare) to a single sortable float so the P-14.4(g)
+    alpha-tiebreak tuple is uniformly comparable across automorphic matches."""
+    if isinstance(coerced, tuple):
+        base, suffix = coerced
+        return float(base) + (ord(suffix[0]) - 96) * 0.01 if suffix else float(base)
+    return float(coerced)
+
+
+def _match_substituent_alpha_key(mol, match, core_atoms, sub_atoms, iupac_locants):
+    """P-14.4(g) / P-14.5.2 alpha tiebreak key for one automorphic match.
+
+    For each substituent-bearing core atom, name its exocyclic substituent
+    fragment and pair the name with the atom's locant in THIS match's
+    orientation; return ``(alpha_sort_key(name), locant)`` pairs sorted by name
+    and flattened. Lexicographic comparison of two matches' keys then gives the
+    alphabetically-first substituent the lowest locant -- the deterministic PIN
+    choice when the substituent LOCANT SET ties between mirror orientations
+    (e.g. 4-bromo-6-methyldibenzofuran, NOT 6-bromo-4-methyl). Mirrors
+    rules.locants._p45_alpha_key. Fail-soft: an unnameable fragment falls back to
+    a carbon-count / element-symbol proxy (which still orders halo<alkyl etc.)."""
+    from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name
+
+    entries = []
+    for pattern_idx, mol_idx in enumerate(match):
+        if mol_idx not in sub_atoms:
+            continue
+        coerced = _coerce_locant_for_compare(iupac_locants.get(pattern_idx))
+        if coerced is None:
+            continue
+        # Gather the exocyclic substituent fragment hanging off this core atom.
+        frag, seen, stack = [], set(core_atoms), [
+            nb.GetIdx() for nb in mol.GetAtomWithIdx(mol_idx).GetNeighbors()
+            if nb.GetIdx() not in core_atoms
+        ]
+        while stack:
+            a = stack.pop()
+            if a in seen:
+                continue
+            seen.add(a)
+            frag.append(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nb.GetIdx() not in seen:
+                    stack.append(nb.GetIdx())
+        name = None
+        if frag and any(mol.GetAtomWithIdx(a).IsInRing() for a in frag):
+            try:
+                attach = next(
+                    (a for a in frag
+                     if any(nbr.GetIdx() == mol_idx
+                            for nbr in mol.GetAtomWithIdx(a).GetNeighbors())),
+                    None,
+                )
+                if attach is not None:
+                    from ..assembly.substituent_enumerator import name_substituent
+                    name = name_substituent(mol, list(frag), attach)
+            except Exception:
+                name = None
+        if not name:
+            ccount = sum(1 for a in frag if mol.GetAtomWithIdx(a).GetSymbol() == 'C')
+            if ccount > 0:
+                name = get_alkyl_name(ccount)
+            elif frag:
+                name = mol.GetAtomWithIdx(frag[0]).GetSymbol().lower()
+            else:
+                name = 'zzz'
+        entries.append((alpha_sort_key(name or 'zzz'), _loc_to_float(coerced)))
+    entries.sort()
+    return tuple(item for pair in entries for item in pair)
+
+
 def _select_lowest_locant_match(mol, matches, iupac_locants):
     """Pick the automorphic substructure match giving the substituent-bearing
     core atoms the lowest locants (P-14.3.5 / P-14.4 / P-25.3.3.1.2(a)).
@@ -1866,7 +1945,7 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
 
     from ..rules.locants import compare_numbering
 
-    best, best_locs = None, None
+    best, best_cand = None, None
     for m in matches:
         locs = []
         scorable = True
@@ -1884,9 +1963,15 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
                 locs.append(coerced)
         if not scorable:
             continue
-        if best is None or compare_numbering(
-                {'substituents': locs}, {'substituents': best_locs}) < 0:
-            best, best_locs = m, locs
+        # P-14.4(f) lowest substituent-locant SET, then P-14.4(g)/P-14.5.2 lowest
+        # locant to the alphabetically-first substituent (the alpha tier breaks a
+        # mirror-orientation tie deterministically AND PIN-correctly, e.g.
+        # 4-bromo-6-methyldibenzofuran rather than the input-order-dependent
+        # 6-bromo-4-methyl).
+        cand = {'substituents': locs,
+                'alpha': _match_substituent_alpha_key(mol, m, core_atoms, sub_atoms, iupac_locants)}
+        if best is None or compare_numbering(cand, best_cand) < 0:
+            best, best_cand = m, cand
     # If every match was unscorable, fall back to the first (byte-identical to
     # the legacy first-match rather than crashing).
     return best if best is not None else matches[0]

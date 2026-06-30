@@ -186,6 +186,16 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # 'ethane-1-peroxol'. These route through _generate_suffix (no dedicated
     # handler), so the elision must be declared here.
     "hydroperoxide", "so_thioperoxol", "os_thioperoxol", "dithioperoxol",
+    # D-FOLLOWON item 1 (P-14.3.4.4 / P-65.3.1): the S/Se/Te oxoacid suffixes
+    # (-sulfinic/-sulfonic/-selenonic/-seleninic/-telluronic/-tellurinic acid)
+    # attach to a chain carbon whose locant is now computed (the _pick_locant_atom
+    # neighbor-walk fix). On the symmetric 2-carbon (ethane) parent the two carbons
+    # are equivalent and the suffix sits on a terminal carbon, so the locant is
+    # omitted: 'ethanesulfinic acid' / 'ethaneselenonic acid' (PIN), NOT
+    # 'ethane-1-sulfinic acid'. methane (chain_length==1) is already elided by
+    # Rule 1; a chain of 3+ carbons (butane-2-sulfinic acid) keeps its locant.
+    "sulfinic_acid", "sulfonic_acid",
+    "selenonic_acid", "seleninic_acid", "telluronic_acid", "tellurinic_acid",
 })
 
 
