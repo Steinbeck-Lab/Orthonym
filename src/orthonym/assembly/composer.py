@@ -5486,6 +5486,31 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             for idx in sub_info.frag_atoms
         )
+        # D-FOLLOWON item 9 (P-68.2.2): a CARBON-FREE silyl/germyl chain substituent
+        # (-SiH3, -GeH3, -Si(OH)3) would be dropped by Guard 3 (has_carbon False),
+        # and the FG-prefix loop cannot emit silyl/germyl (they are substituent
+        # prefixes, not functional groups) -> the whole group was lost (the acid
+        # collapsed to its de-silylated form, SELF-01-suppressed to unknown). Name it
+        # via the shared group-14 namer (the SAME one the benzene RING path uses,
+        # Phase 8c) and append it as a prefix. Gated on NOT has_carbon so the
+        # carbon-bearing-silyl path (trimethylsilyl etc.) stays byte-identical via
+        # classify_and_name_fragment below; fail-closed (None) for any non-Si/Ge,
+        # charged, ring, or multivalent centre -> falls through unchanged.
+        if not has_carbon:
+            _g14_attach = next(
+                (fi for fi in sub_info.frag_atoms
+                 if any(nb.GetIdx() in chain_set
+                        for nb in mol.GetAtomWithIdx(fi).GetNeighbors())),
+                None,
+            )
+            if (_g14_attach is not None
+                    and mol.GetAtomWithIdx(_g14_attach).GetSymbol() in ('Si', 'Ge')):
+                from ..assembly.substituent_naming import _name_group14_substituent
+                _g14 = _name_group14_substituent(
+                    mol, list(sub_info.frag_atoms), _g14_attach)
+                if _g14:
+                    substituent_groups[_g14].append(sub_info.locant)
+                    continue
         if not has_carbon:
             logger.debug(
                 "DROP-01 substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",

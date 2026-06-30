@@ -1094,6 +1094,45 @@ def _count_pg_on_chain(
     return count
 
 
+def _ring_system_substituent_alpha_key(mol, system) -> tuple:
+    """P-45.5 / P-14.5.2 alphanumeric tiebreak key for a candidate ring-system
+    parent: the sorted tuple of ``alpha_sort_key`` of every substituent borne by
+    the ring system. Lexicographically-lower = the ring system whose substituent
+    citation is alphanumerically first (the deterministic PIN choice when two ring
+    systems tie through all earlier P-44/P-45 criteria). Built robustly (any naming
+    failure -> a neutral 'zzz' placeholder) so it never perturbs the reachable
+    non-tie cases, where the (score, -pg_attachments) sort resolves before this key
+    is consulted. D-FOLLOWON item 12 — replaces the bare RDKit-ring-enumeration
+    index as the tie discriminator (the index is retained as the final, totality
+    tiebreak)."""
+    try:
+        from ..assembly.naming_utils import alpha_sort_key
+        from ..assembly.substituent_enumerator import name_substituent
+    except Exception:
+        return ()
+    keys = []
+    sysset = set(system)
+    for a in system:
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() in sysset:
+                continue
+            frag, seen, stack = [], set(sysset), [nb.GetIdx()]
+            while stack:
+                x = stack.pop()
+                if x in seen:
+                    continue
+                seen.add(x)
+                frag.append(x)
+                stack.extend(n.GetIdx() for n in mol.GetAtomWithIdx(x).GetNeighbors()
+                             if n.GetIdx() not in seen)
+            try:
+                nm = name_substituent(mol, frag, nb.GetIdx())
+            except Exception:
+                nm = None
+            keys.append(alpha_sort_key(nm) if nm else "zzz")
+    return tuple(sorted(keys))
+
+
 def _select_best_ring_system(
     mol,
     ring_systems: List[set],
@@ -1157,6 +1196,23 @@ def _select_best_ring_system(
 
     scored.sort()
     best_idx = scored[0][2]
+
+    # P-45.5 / P-14.5.2 tiebreak (D-FOLLOWON item 12): when 2+ ring systems tie on
+    # the P-44.2 score AND the pg-attachment count, the winner is the one cited
+    # alphanumerically first (lowest substituent alpha key), with the input index
+    # kept as the final totality tiebreak — NOT the raw RDKit ring-enumeration
+    # index alone (which is SMILES-order-dependent). Computed only for the tied
+    # group, so the reachable non-tie cases are byte-identical. (Defensive today:
+    # no nameable molecule reaches a true ring-vs-equal-ring tie — the diaryl
+    # scaffolds that would fail upstream first — so this is inert on the corpus but
+    # makes the parent choice a deterministic graph criterion.)
+    top_score, top_pg = scored[0][0], scored[0][1]
+    tied = [s for s in scored if s[0] == top_score and s[1] == top_pg]
+    if len(tied) > 1:
+        best_idx = min(
+            tied,
+            key=lambda s: (_ring_system_substituent_alpha_key(mol, ring_systems[s[2]]), s[2]),
+        )[2]
 
     best_system = ring_systems[best_idx]
     other_systems = [ring_systems[i] for i in range(len(ring_systems)) if i != best_idx]

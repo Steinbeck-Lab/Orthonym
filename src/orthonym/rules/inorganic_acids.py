@@ -122,9 +122,78 @@ _CARBONIC_FRN = {
 _ALL_INORGANIC = {**_INORGANIC_OXOACIDS, **_INORGANIC_ACID_DERIVATIVES, **_CARBONIC_FRN}
 
 
+def name_silicate_ester(mol) -> Optional[str]:
+    """Tetraalkyl silicate ester PIN (P-68.2.4 / BB 35978): a NEUTRAL silicon
+    bearing exactly four ``-O-R`` groups (a fully-esterified silicic acid) ->
+    ``{multiplier}{R} silicate`` (``tetramethyl silicate``,
+    ``tetrakis(propan-2-yl) silicate``), or space-separated alphabetical citation
+    for mixed R (``ethyl methyl ... silicate``). The functional-class ester word
+    is the PIN, NOT the substitutive ``tetra(R)oxysilane``.
+
+    Fail-closed (returns ``None``) for ANY Si that is not exactly Si(OR)4: a free
+    Si-OH (partial ester / silicic acid -> stays the free-acid table row or the
+    substitutive silanetriol path), an Si-C bond (genuine organosilicon ->
+    P-69 / mononuclear-hydride), a charge, or a non-carbon-rooted O substituent.
+    """
+    if mol is None:
+        return None
+    si_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "Si"]
+    if len(si_atoms) != 1:
+        return None
+    si = si_atoms[0]
+    if si.GetFormalCharge() != 0 or si.GetDegree() != 4:
+        return None
+    si_idx = si.GetIdx()
+    o_idxs = {nb.GetIdx() for nb in si.GetNeighbors()}
+    if len(o_idxs) != 4:
+        return None
+
+    from ..assembly.substituent_enumerator import name_substituent
+
+    r_names = []
+    for o in si.GetNeighbors():
+        # Each must be a neutral, H-free, divalent bridging O bonded to Si + one C.
+        if (o.GetSymbol() != "O" or o.GetFormalCharge() != 0
+                or o.GetTotalNumHs() != 0 or o.GetDegree() != 2):
+            return None
+        others = [nb for nb in o.GetNeighbors() if nb.GetIdx() != si_idx]
+        if len(others) != 1 or others[0].GetSymbol() != "C":
+            return None
+        c = others[0]
+        # BFS the R fragment (everything beyond the four Si-O bonds).
+        frag, seen, stack = [], {si_idx, *o_idxs}, [c.GetIdx()]
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            frag.append(x)
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
+                         if nb.GetIdx() not in seen)
+        nm = name_substituent(mol, frag, c.GetIdx())
+        if not nm:
+            return None
+        r_names.append(nm)
+    if len(r_names) != 4:
+        return None
+
+    from collections import Counter
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, is_complex_substituent, alpha_sort_key,
+    )
+    counts = Counter(r_names)
+    parts = []
+    for nm in sorted(counts, key=alpha_sort_key):
+        c = counts[nm]
+        enclosed = f"({nm})" if is_complex_substituent(nm) else nm
+        parts.append(enclosed if c == 1 else f"{get_multiplier_prefix(c, nm)}{enclosed}")
+    return " ".join(parts) + " silicate"
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
-    derivative (acid halide / amide / carbonic-FRN acid), else ``None``.
+    derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
+    ester (P-68.2.4), else ``None``.
 
     Pure: no mol mutation, no global state. Recomputes the RDKit canonical
     SMILES so the key matches regardless of how the input was written.
@@ -135,4 +204,10 @@ def name_inorganic_acid(mol) -> Optional[str]:
         canonical = Chem.MolToSmiles(mol)
     except Exception:
         return None
-    return _ALL_INORGANIC.get(canonical)
+    tabled = _ALL_INORGANIC.get(canonical)
+    if tabled is not None:
+        return tabled
+    # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
+    # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
+    # hub and linearizes the silyl-ester ligands into nonsense).
+    return name_silicate_ester(mol)
