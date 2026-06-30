@@ -553,6 +553,8 @@ TERMINAL_GROUPS = {
     "selenoaldehyde",      # Always at chain end (locant 1)
     "telluroaldehyde",     # Always at chain end (locant 1)
     "carbamic_acid",    # Retained name, terminal (locant 1)
+    # D-FOLLOWON item 8 (P-66.4.1): amidine/imidamide characteristic C is terminal.
+    "amidine",          # Always at chain end (locant 1)
 }
 
 # Token list for DROP-04 validation: ring+heteroatom branch names must contain
@@ -2029,8 +2031,21 @@ def _try_name_urea(features: Any) -> Optional[str]:
         # Only N2 substituted -> assign N2 as "N"
         first_subs, second_subs = n2_subs, n1_subs
     else:
-        # Both substituted -> N1 as "N", N2 as "N'"
-        first_subs, second_subs = n1_subs, n2_subs
+        # Both Ns substituted: choose which N is UNPRIMED ("N") by IUPAC
+        # P-66.1.6.1.1 + P-14.3.5 (lowest set of locants), then alphanumerical-
+        # first (P-14.5.2). The N bearing MORE substituents takes the unprimed
+        # 'N' ({N,N,N'} < {N,N',N'}); on an equal count, the N whose substituent
+        # set is alphanumerically first takes 'N'. The single sort key
+        # (-len, sorted(subs)) captures both (more subs -> smaller; ties broken
+        # by the alphabetically-first substituent set). This ALSO removes the
+        # SMILES-atom-order dependence (the SMARTS [N]C(=O)[N] match order was
+        # the old, nondeterministic basis) -- a determinism fix as well as a PIN fix.
+        key1 = (-len(n1_subs), sorted(n1_subs))
+        key2 = (-len(n2_subs), sorted(n2_subs))
+        if key1 <= key2:
+            first_subs, second_subs = n1_subs, n2_subs
+        else:
+            first_subs, second_subs = n2_subs, n1_subs
 
     tagged_subs = []  # list of (locant, sub_name) pairs
     for s in first_subs:

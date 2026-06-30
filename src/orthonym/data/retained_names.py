@@ -411,11 +411,15 @@ RETAINED_NAMES = {
     "Nc1ccc(C(=O)O)cc1": "4-aminobenzoic acid",
     "COc1cc(C(=O)O)ccc1O": "vanillic acid",
 
-    # === ANHYDRIDES (Phase 109 expansion) ===
-    # Note: acetic/succinic anhydride omitted -- existing tests expect
-    # systematic names (ethanoic anhydride, butanedioic anhydride)
-    "O=C1C=CC(=O)O1": "maleic anhydride",
-    "O=C1OC(=O)c2ccccc21": "phthalic anhydride",
+    # === CYCLIC ANHYDRIDES -> heterocyclic-pseudoketone (dione) PINs ===
+    # D-FOLLOWON item 6 (P-65.7.7.1 method 1): the PIN for a cyclic anhydride is
+    # the heterocyclic dione, NOT the functional-class '{diacid} anhydride'.
+    # Retargeted from the non-PIN retained names 'maleic anhydride'/'phthalic
+    # anhydride' (general nomenclature only). The anhydride handler (@1200) emits
+    # these via get_retained_name; succinic/glutaric (no retained entry) take the
+    # saturated-oxa-dione path (oxolane-2,5-dione / oxane-2,6-dione).
+    "O=C1C=CC(=O)O1": "furan-2,5-dione",
+    "O=C1OC(=O)c2ccccc21": "2-benzofuran-1,3-dione",
 
     # === HETEROCYCLE DERIVATIVES (Phase 109 expansion) ===
     "O=c1ccc2ccccc2o1": "coumarin",       # 2H-chromen-2-one

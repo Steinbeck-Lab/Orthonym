@@ -93,6 +93,16 @@ def name_anhydride(features) -> Optional[str]:
             break
 
     if is_cyclic:
+        # PIN (P-65.7.7.1 method 1): the heterocyclic-pseudoketone dione
+        # (oxolane-2,5-dione, furan-2,5-dione, 2-benzofuran-1,3-dione, ...).
+        # Produced from WITHIN this priority-1200 handler so the lactone@1300
+        # handler (which also matches a cyclic anhydride) cannot grab + mis-name it.
+        dione = _name_cyclic_anhydride_dione(mol, c1_idx, c2_idx, bridge_o, ring_set)
+        if dione:
+            return dione
+        # Fallback: general-nomenclature '{diacid} anhydride' (non-PIN, NOT the
+        # wrong molecule for a simple all-carbon ring) for anything the dione namer
+        # declines.
         return _name_cyclic_anhydride(total_chain_length)
 
     # Acyclic anhydride: name each acyl fragment as its corresponding acid.
@@ -379,8 +389,9 @@ def _build_acid_name(chain_length: int) -> str:
 def _name_cyclic_anhydride(num_carbons: int) -> str:
     """Name a cyclic anhydride from a dicarboxylic acid.
 
-    Cyclic anhydrides are named as "{diacid name} anhydride".
-    The diacid name is based on the number of carbons.
+    P-65.7.7.1 METHOD (2) ('{diacid} anhydride') — NOT the PIN (method 1 = the
+    heterocyclic-pseudoketone dione). Retained only as the last-resort general-
+    nomenclature fallback for a cyclic anhydride the dione namer declines.
 
     Args:
         num_carbons: Number of carbon atoms in the ring (both carbonyl carbons + chain).
@@ -390,6 +401,135 @@ def _name_cyclic_anhydride(num_carbons: int) -> str:
     """
     prefix = get_chain_prefix(num_carbons)
     return f"{prefix}anedioic anhydride"
+
+
+# Saturated monocyclic oxa-heterocycle stems (the anhydride bridge O is the ring
+# heteroatom at locant 1). D-FOLLOWON item 6 (P-65.7.7.1 method 1).
+_SATURATED_OXA_STEMS = {
+    3: "oxirane", 4: "oxetane", 5: "oxolane", 6: "oxane",
+    7: "oxepane", 8: "oxocane", 9: "oxonane", 10: "oxecane",
+}
+
+
+def _name_cyclic_anhydride_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Optional[str]:
+    """Heterocyclic-pseudoketone (dione) PIN for a cyclic anhydride (P-65.7.7.1
+    method 1, the PREFERRED form): succinic -> oxolane-2,5-dione, glutaric ->
+    oxane-2,6-dione, maleic -> furan-2,5-dione, phthalic -> 2-benzofuran-1,3-dione,
+    methylsuccinic -> 3-methyloxolane-2,5-dione. Returns None (fail-closed) for
+    anything it cannot name, so name_anhydride falls back to the general
+    '{diacid} anhydride'."""
+    from ..data.retained_names import get_retained_name
+
+    # (a) Mancude / fused anhydrides whose dione PIN is a retained-table entry
+    # (maleic -> furan-2,5-dione, phthalic -> 2-benzofuran-1,3-dione). The catalog
+    # value IS the PIN dione (retargeted), so emit it directly. (The cyclic-oxo
+    # engine produces the same strings; using the table avoids its retained
+    # self-gate and keeps this handler the priority-1200 gatekeeper.)
+    rn = get_retained_name(Chem.MolToSmiles(mol))
+    if rn and rn.endswith("dione"):
+        return rn
+
+    # (b) Saturated monocyclic oxa-heterocycle dione (succinic/glutaric/...).
+    return _name_saturated_oxa_dione(mol, c1, c2, bridge_o, ring)
+
+
+def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Optional[str]:
+    """Name a FULLY-SATURATED monocyclic oxa-heterocycle dione (the anhydride O at
+    locant 1; the two ring carbonyls flank it at 2 and n). Substituents become
+    prefixes with lowest locants. Fail-closed for fused / mancude / non-oxa /
+    >oxecane rings."""
+    ring = list(ring)
+    n = len(ring)
+    stem = _SATURATED_OXA_STEMS.get(n)
+    if stem is None:
+        return None
+    ring_set = set(ring)
+    # Monocyclic, all atoms in exactly this ring, ring = {one O (bridge) + carbons}.
+    ri = mol.GetRingInfo()
+    for a in ring:
+        if ri.NumAtomRings(a) != 1:
+            return None  # fused / bridged -> not this path
+        at = mol.GetAtomWithIdx(a)
+        if a == bridge_o:
+            if at.GetSymbol() != "O":
+                return None
+        elif at.GetSymbol() != "C":
+            return None
+    # No in-ring unsaturation (mancude/aromatic handled by the retained-dione branch).
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            if b.GetIsAromatic() or b.GetBondType() == Chem.BondType.DOUBLE:
+                return None
+
+    def ring_nbrs(a):
+        return [nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                if nb.GetIdx() in ring_set]
+
+    o_nbrs = ring_nbrs(bridge_o)
+    if len(o_nbrs) != 2 or set(o_nbrs) != {c1, c2}:
+        return None  # carbonyls must flank the bridge O (true for an anhydride)
+
+    from ..assembly.substituent_enumerator import name_substituent
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+
+    best = None
+    for start in o_nbrs:
+        loc = {bridge_o: 1}
+        prev, cur, k = bridge_o, start, 2
+        while cur is not None and cur not in loc:
+            loc[cur] = k
+            k += 1
+            nxt = [x for x in ring_nbrs(cur) if x != prev and x not in loc]
+            prev, cur = cur, (nxt[0] if nxt else None)
+        if len(loc) != n:
+            continue
+        subs = []  # (locant, name)
+        ok = True
+        for a in ring:
+            if a in (bridge_o, c1, c2):
+                continue
+            attach = next((nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                           if nb.GetIdx() not in ring_set), None)
+            if attach is None:
+                continue
+            frag, seen, stack = [], set(ring_set), [attach]
+            while stack:
+                x = stack.pop()
+                if x in seen:
+                    continue
+                seen.add(x)
+                frag.append(x)
+                stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
+                             if nb.GetIdx() not in seen)
+            nm = name_substituent(mol, frag, attach)
+            if not nm:
+                ok = False
+                break
+            subs.append((loc[a], nm))
+        if not ok:
+            continue
+        key = sorted(l for l, _ in subs)
+        if best is None or key < best[0]:
+            best = (key, loc, subs)
+    if best is None:
+        return None
+    _, loc, subs = best
+    cl = sorted([loc[c1], loc[c2]])
+
+    # Assemble the substituent prefix (group by name, multiply, alphabetize).
+    groups = {}
+    for locant, nm in subs:
+        groups.setdefault(nm, []).append(locant)
+    parts = []
+    for nm in sorted(groups, key=alpha_sort_key):
+        locs = sorted(groups[nm])
+        mult = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
+        parts.append(f"{','.join(str(x) for x in locs)}-{mult}{nm}")
+    # The substituent prefix attaches DIRECTLY to the parent stem (no separating
+    # hyphen): '3-methyloxolane-2,5-dione', not '3-methyl-oxolane-2,5-dione'.
+    prefix = "-".join(parts)
+    return f"{prefix}{stem}-{cl[0]},{cl[1]}-dione"
 
 
 def get_anhydride_consumed_atoms(functional_groups: dict) -> set:

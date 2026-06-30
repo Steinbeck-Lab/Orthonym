@@ -27,6 +27,8 @@ class TestAnhydrideSubstituents:
         result = name_compound("CCCC(=O)OC(=O)CCC")
         assert "butanoic anhydride" == result
 
-    def test_cyclic_butanedioic_anhydride_unchanged(self):
+    def test_cyclic_succinic_anhydride_is_dione_pin(self):
+        # v23 D-FOLLOWON item 6 (P-65.7.7.1 method 1): succinic anhydride's PIN is
+        # the heterocyclic-pseudoketone dione, not 'butanedioic anhydride'.
         result = name_compound("O=C1CCC(=O)O1")
-        assert "butanedioic anhydride" == result
+        assert "oxolane-2,5-dione" == result

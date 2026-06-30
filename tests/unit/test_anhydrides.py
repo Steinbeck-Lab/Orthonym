@@ -52,21 +52,25 @@ class TestCyclicAnhydrides:
     """Test cyclic anhydride naming (from dicarboxylic acids)."""
 
     def test_butanedioic_anhydride(self):
-        """Butanedioic anhydride (succinic anhydride) - 5-membered ring."""
+        """Succinic anhydride - 5-membered ring. v23 D-FOLLOWON item 6: PIN is the
+        heterocyclic-pseudoketone dione (P-65.7.7.1 method 1), not the non-PIN
+        functional-class 'butanedioic anhydride'."""
         result = name_compound("O=C1CCC(=O)O1")
-        assert result == "butanedioic anhydride"
+        assert result == "oxolane-2,5-dione"
 
     def test_pentanedioic_anhydride(self):
-        """Pentanedioic anhydride (glutaric anhydride) - 6-membered ring."""
+        """Glutaric anhydride - 6-membered ring. PIN = oxane-2,6-dione (item 6)."""
         result = name_compound("O=C1CCCC(=O)O1")
-        assert result == "pentanedioic anhydride"
+        assert result == "oxane-2,6-dione"
 
     def test_cyclic_anhydride_not_lactone(self):
-        """Cyclic anhydrides should NOT be named as lactones."""
-        # O=C1CCC(=O)O1 has two C=O in ring - it's an anhydride, not a lactone
+        """Cyclic anhydrides must NOT be mis-named as a (mono)lactone by the
+        lactone handler — the dione names BOTH ring carbonyls."""
+        # O=C1CCC(=O)O1 has two C=O in the ring -> oxolane-2,5-dione (a dione),
+        # NOT the single-carbonyl lactone oxolan-2-one.
         result = name_compound("O=C1CCC(=O)O1")
-        assert "anhydride" in result
-        assert "one" not in result  # Not oxolan-2-one
+        assert result == "oxolane-2,5-dione"
+        assert "-2-one" not in result  # not the mono-lactone oxolan-2-one
 
 
 class TestConsumedAtomFilteringAnhydride:

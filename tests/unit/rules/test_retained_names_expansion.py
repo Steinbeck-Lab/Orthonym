@@ -150,9 +150,11 @@ class TestNewEntries:
         ("Nc1ccc(C(=O)O)cc1", "4-aminobenzoic acid"),
         ("Nc1ccccc1C(=O)O", "anthranilic acid"),
         ("COc1cc(C(=O)O)ccc1O", "vanillic acid"),
-        # Anhydrides
-        ("O=C1C=CC(=O)O1", "maleic anhydride"),
-        ("O=C1OC(=O)c2ccccc21", "phthalic anhydride"),
+        # Cyclic anhydrides -> heterocyclic-pseudoketone dione PINs (v23 D-FOLLOWON
+        # item 6, P-65.7.7.1 method 1): retargeted from the non-PIN 'maleic/phthalic
+        # anhydride' to the preferred dione names.
+        ("O=C1C=CC(=O)O1", "furan-2,5-dione"),
+        ("O=C1OC(=O)c2ccccc21", "2-benzofuran-1,3-dione"),
         # Heterocycle derivatives
         ("O=c1ccc2ccccc2o1", "coumarin"),
         ("O=c1ccoc2ccccc12", "chromone"),

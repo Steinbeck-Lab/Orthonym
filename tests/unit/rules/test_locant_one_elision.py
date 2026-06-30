@@ -222,7 +222,8 @@ class TestTerminalFGTypes:
             telluroic_Te_acid, telluroic_O_acid, ditelluroic_acid
           - chalcogen amides (3): thioamide, selenoamide, telluroamide
           - chalcogen aldehydes (3): thioaldehyde, selenoaldehyde, telluroaldehyde
-        Total: 13 + 12 = 25 entries.
+        v23 D-FOLLOWON item 8 added 'amidine' (P-66.4.1: imidamide C is terminal).
+        Total: 13 + 12 + 1 = 26 entries.
         """
         expected = {
             "carboxylic_acid", "aldehyde", "nitrile",
@@ -237,6 +238,8 @@ class TestTerminalFGTypes:
             "thioamide", "selenoamide", "telluroamide",
             # Phase 163 FRN-C chalcogen aldehydes
             "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
+            # v23 D-FOLLOWON item 8: amidine (imidamide / carboximidamide)
+            "amidine",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -245,5 +248,6 @@ class TestTerminalFGTypes:
         assert isinstance(TERMINAL_FG_TYPES, frozenset)
 
     def test_terminal_count_after_phase_163(self):
-        """TERMINAL_FG_TYPES must contain exactly 25 entries post-Phase 163 (13 baseline + 12 chalcogen)."""
-        assert len(TERMINAL_FG_TYPES) == 25
+        """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
+        (v23 D-FOLLOWON item 8) = 26 entries."""
+        assert len(TERMINAL_FG_TYPES) == 26

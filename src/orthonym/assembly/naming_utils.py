@@ -160,6 +160,11 @@ TERMINAL_FG_TYPES = frozenset({
     # "propanetellural"; suffix is "-thial"/"-selenal"/"-tellural" per seniority.py SUFFIX_FORMS,
     # but FG identifier is the long form. Always terminal — never carries locant-1.)
     "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
+    # D-FOLLOWON item 8 (P-66.4.1): the amidine (imidamide / carboximidamide)
+    # characteristic carbon is ALWAYS chain-terminal (C1), exactly like
+    # nitrile / amide / aldehyde — so its suffix locant-1 is implicit and elided:
+    # 'propanimidamide' not 'propan-1-imidamide'.
+    "amidine",
 })
 
 

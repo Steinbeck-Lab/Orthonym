@@ -50,6 +50,13 @@ SUBSTITUENT_PREFIXES = {
 _SUFFIX_PRIORITY = [
     'carboxylic acid',
     'sulfonic acid',
+    # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
+    # acid and sulfonic acid (P-41 acid seniority C-acids > S > Se/Te/P oxoacids) so
+    # a co-occurring -COOH stays principal and these demote to their prefixes.
+    'sulfinic acid',
+    'phosphonic acid',
+    'selenonic acid',
+    'telluronic acid',
     'sulfonamide',
     'carbonyl chloride',
     'carboxamide',
@@ -69,6 +76,11 @@ _SUFFIX_PRIORITY = [
 _SUFFIX_TO_PREFIX = {
     'carboxylic acid': 'carboxy',
     'sulfonic acid': 'sulfo',
+    # D-FOLLOWON item 5 (prefix forms; seniority.py FG_PREFIXES already has these).
+    'sulfinic acid': 'sulfino',
+    'phosphonic acid': 'phosphono',
+    'selenonic acid': 'selenono',
+    'telluronic acid': 'tellurono',
     'sulfonamide': 'sulfamoyl',
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
@@ -96,6 +108,15 @@ _BENZENE_FG_SMARTS = {
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
     'sulfonic': Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]'),
+    # D-FOLLOWON item 5 (P-67.1.1.2 / P-65.3): the P/Se/Te ring oxoacids + ring
+    # sulfinic acid as demotable suffix FGs (mirrors the sulfonic/borono ring path;
+    # the Phase-9a fix was the acyclic CHAIN path only). The attach atom is at
+    # match[0] (guarded == start_idx downstream). Each pattern matches ONLY the
+    # true oxoacid (an -OH present), never a phosphine / sulfoxide / oxoacid ester.
+    'sulfinic': Chem.MolFromSmarts('[SX3](=O)[OX2H1]'),
+    'phosphonic': Chem.MolFromSmarts('[PX4](=O)([OX2H1])[OX2H1]'),
+    'selenonic': Chem.MolFromSmarts('[SeX4](=O)(=O)[OX2H1]'),
+    'telluronic': Chem.MolFromSmarts('[TeX4](=O)(=O)[OX2H1]'),
 }
 
 
@@ -340,6 +361,34 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
+        # Sulfinic acid: S(=O)(OH) -- demotes to 'sulfino' (D-FOLLOWON item 5,
+        # the ring analogue of the chain sulfinic-locant item 1).
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfinic']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfinic acid', 'suffix_name': 'sulfinic acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
+    # Phosphorus / selenium / tellurium ring oxoacids (D-FOLLOWON item 5,
+    # P-67.1.1.2 / P-65.3). Demote to phosphono / selenono / tellurono when a
+    # senior carboxylic acid is the principal group; emit benzenephosphonic /
+    # benzeneselenonic / benzenetelluronic acid as the bare principal suffix.
+    if symbol in ('P', 'Se', 'Te'):
+        for _sym, _fg, _suffix in (
+            ('P', 'phosphonic', 'phosphonic acid'),
+            ('Se', 'selenonic', 'selenonic acid'),
+            ('Te', 'telluronic', 'telluronic acid'),
+        ):
+            if symbol != _sym:
+                continue
+            for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS[_fg]):
+                if match[0] == start_idx:
+                    return {
+                        'name': _suffix, 'suffix_name': _suffix,
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
     return None
 
 
@@ -455,8 +504,11 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
             'atoms': [start_idx]
         }
 
-    # For C and S atoms, check suffix FGs first
-    if symbol in ('C', 'S'):
+    # For C, S, and the P/Se/Te oxoacid hubs, check suffix FGs first. P/Se/Te
+    # added by D-FOLLOWON item 5 so a ring phosphonic/selenonic/telluronic acid is
+    # recognized BEFORE the phosphanyl P branch / Se-Te fall-through-None below
+    # (genuine phosphines etc. don't match the oxoacid SMARTS -> still fall through).
+    if symbol in ('C', 'S', 'P', 'Se', 'Te'):
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
         suffix_fg = _identify_suffix_fg_on_benzene(mol, start_idx, sub_atoms, ring_atoms)
         if suffix_fg:
