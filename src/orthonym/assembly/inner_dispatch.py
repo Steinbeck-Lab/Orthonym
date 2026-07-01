@@ -973,6 +973,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- R8c (P-66.1.1.3.2 / P-65.1.3.4): hydroxamic_acid handler.
+#     Hydroxamic acid (-C(=O)-NH-OH) is an amide with N-hydroxy substituent.
+#     PIN = 'N-hydroxy<stem>amide', not the retained 'hydroxamic acid' suffix.
+#     Priority 5210 — fires after amide@5200 (different principal_group mutex)
+#     and before amine@5300.  Handler is fail-safe: returns None on failure so
+#     general_acyclic@99999 continues as backstop.
+from .handlers.hydroxamic_acid import _is_hydroxamic_acid, name_hydroxamic_acid  # noqa: E402
+
+_register_inner(
+    handler_id="hydroxamic_acid",
+    priority=5210,
+    predicate=_is_hydroxamic_acid,
+    handler=name_hydroxamic_acid,
+    iupac_section="P-66.1.1.3.2",
+    description="Hydroxamic acid -> N-hydroxy<stem>amide PIN (R8c; P-66.1.1.3.2 / P-65.1.3.4)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
 #     mutex; audit § 1 + § 3). Predicate:
 #       principal_group in {secondary_amine, tertiary_amine}

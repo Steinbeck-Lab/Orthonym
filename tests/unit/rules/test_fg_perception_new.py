@@ -178,9 +178,12 @@ class TestSeniorityEntries:
         assert "hydroxamic_acid" in SENIORITY_ORDER
 
     def test_hydroxamic_acid_suffix_form(self):
+        # R8c (P-66.1.1.3.2 / P-65.1.3.4): hydroxamic acid is named via the
+        # amide handler as 'N-hydroxy<stem>amide', NOT the retained 'hydroxamic
+        # acid' suffix.  SUFFIX_FORMS entry is None (handler-emitted, no
+        # substitutive suffix) — same contract as thioether, sulfoxide, etc.
         assert "hydroxamic_acid" in SUFFIX_FORMS
-        chain, ring = SUFFIX_FORMS["hydroxamic_acid"]
-        assert "hydroxamic" in chain
+        assert SUFFIX_FORMS["hydroxamic_acid"] is None
 
     def test_hydroxamic_acid_prefix_form(self):
         assert "hydroxamic_acid" in PREFIX_FORMS

@@ -372,7 +372,10 @@ SUFFIX_FORMS = {
     "oxime": ("oxime", "oxime"),           # functional class suffix
     "hydrazone": ("hydrazone", "hydrazone"),  # functional class suffix
     "boronic_acid": ("boronic acid", "boronic acid"),  # retained acid form
-    "hydroxamic_acid": ("hydroxamic acid", "hydroxamic acid"),  # IUPAC P-65.3.3
+    # R8c (P-66.1.1.3.2 / P-65.1.3.4): hydroxamic acid is an amide with N-hydroxy;
+    # PIN is 'N-hydroxy<stem>amide', not the retained 'hydroxamic acid' suffix.
+    # Suffix path suppressed (None) — composer dispatches via _assemble_hydroxamic_name().
+    "hydroxamic_acid": None,
     # --- Phase 93-01: close SENIORITY_ORDER suffix gaps ---
     # FGs with real suffix forms
     # P-66.3.1.1: acyclic hydrazide suffix is stem + 'hydrazide' (no '-o-' infix);

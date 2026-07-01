@@ -39,3 +39,17 @@ def test_r8b_amidine_prefix_carbamimidoyl():
     assert name_compound("N=C(N)c1ccc(C(=O)O)cc1", style="pin") == "4-carbamimidoylbenzoic acid"
     # REGRESSION GUARD: saturated-ring amidine suffix must remain correct
     assert name_compound("N=C(N)C1CCCCC1", style="pin") == "cyclohexanecarboximidamide"
+
+
+# ---------------------------------------------------------------------------
+# R8c — hydroxamic acid -> N-hydroxy...amide PIN (P-66.1.1.3.2 / P-65.1.3.4)
+# ---------------------------------------------------------------------------
+
+def test_r8c_hydroxamic_acid_pin():
+    """P-66.1.1.3.2 / P-65.1.3.4: -C(=O)-NH-OH is an amide with an N-hydroxy
+    substituent; the PIN is 'N-hydroxy<stem>amide', not the retained
+    'hydroxamic acid' string.
+    """
+    assert name_compound("CC(=O)NO", style="pin") == "N-hydroxyacetamide"
+    assert name_compound("CCC(=O)NO", style="pin") == "N-hydroxypropanamide"
+    assert name_compound("O=C(NO)C1CCCCC1", style="pin") == "N-hydroxycyclohexanecarboxamide"
