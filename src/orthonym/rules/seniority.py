@@ -375,7 +375,12 @@ SUFFIX_FORMS = {
     "hydroxamic_acid": ("hydroxamic acid", "hydroxamic acid"),  # IUPAC P-65.3.3
     # --- Phase 93-01: close SENIORITY_ORDER suffix gaps ---
     # FGs with real suffix forms
-    "hydrazide": ("ohydrazide", "carbohydrazide"),  # IUPAC P-66.3
+    # P-66.3.1.1: acyclic hydrazide suffix is stem + 'hydrazide' (no '-o-' infix);
+    # 'pentanoic acid' -> 'pentanehydrazide' (h is consonant, no vowel elision).
+    # Ring form is 'carbohydrazide' (appended-carbon nomenclature, e.g. cyclopentane-
+    # carbohydrazide). The characteristic C is always terminal (chain-end), so
+    # locant-1 is implicit and elided (see TERMINAL_FG_TYPES in naming_utils.py).
+    "hydrazide": ("hydrazide", "carbohydrazide"),  # IUPAC P-66.3
     "imide": ("imide", "dicarboximide"),  # IUPAC P-66.2
     # FGs with functional class naming only (no substitutive suffix)
     "thioester": None,           # IUPAC P-65.3.1: functional class naming (S-alkyl alkanethioate)

@@ -165,6 +165,10 @@ TERMINAL_FG_TYPES = frozenset({
     # nitrile / amide / aldehyde — so its suffix locant-1 is implicit and elided:
     # 'propanimidamide' not 'propan-1-imidamide'.
     "amidine",
+    # R8a (P-66.3.1.1): the hydrazide characteristic carbon is ALWAYS chain-terminal
+    # (C1), exactly like amide / nitrile / aldehyde — so its suffix locant-1 is
+    # implicit and elided: 'pentanehydrazide' not 'pentane-1-hydrazide'.
+    "hydrazide",
 })
 
 

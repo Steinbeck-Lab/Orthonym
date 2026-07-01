@@ -168,6 +168,14 @@ RETAINED_NAMES = {
     "CC(=O)N": "acetamide",
     "CC(N)=O": "acetamide",  # canonical form of CC(=O)N
 
+    # === HYDRAZIDES (P-66.3.1.1: retained acyl-stem + hydrazide) ===
+    # C1: formic acid -> formohydrazide (H-C(=O)-NH-NH2)
+    "NNC=O": "formohydrazide",
+    # C2: acetic acid -> acetohydrazide (CH3-C(=O)-NH-NH2)
+    "CC(=O)NN": "acetohydrazide",
+    # Aromatic: benzoic acid -> benzohydrazide (C6H5-C(=O)-NH-NH2)
+    "NNC(=O)c1ccccc1": "benzohydrazide",
+
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",

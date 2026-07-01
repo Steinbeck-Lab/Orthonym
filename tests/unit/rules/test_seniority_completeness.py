@@ -118,8 +118,15 @@ class TestGetSuffixReturnsCorrectValues:
     """get_suffix() returns correct tuple values for FGs with real suffixes."""
 
     def test_hydrazide_chain_suffix(self):
-        """Hydrazide chain suffix is 'ohydrazide' (IUPAC P-66.3)."""
-        assert get_suffix("hydrazide") == "ohydrazide"
+        """Hydrazide chain suffix is 'hydrazide' (IUPAC P-66.3.1.1 PIN).
+
+        P-66.3.1.1: the suffix is formed by replacing the '-ic acid' ending
+        with '-hydrazide' — giving 'pentane-hydrazide' (h is consonant, no
+        vowel elision of stem-final 'e'), not 'pentano-hydrazide'.
+        The old value 'ohydrazide' was wrong per the Blue Book PIN and produced
+        'pentan-1-ohydrazide' instead of the correct 'pentanehydrazide'.
+        """
+        assert get_suffix("hydrazide") == "hydrazide"
 
     def test_hydrazide_ring_suffix(self):
         """Hydrazide ring suffix is 'carbohydrazide' (IUPAC P-66.3)."""

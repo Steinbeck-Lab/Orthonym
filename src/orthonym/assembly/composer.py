@@ -555,6 +555,8 @@ TERMINAL_GROUPS = {
     "carbamic_acid",    # Retained name, terminal (locant 1)
     # D-FOLLOWON item 8 (P-66.4.1): amidine/imidamide characteristic C is terminal.
     "amidine",          # Always at chain end (locant 1)
+    # R8a (P-66.3.1.1): hydrazide characteristic C is always chain-terminal.
+    "hydrazide",        # Always at chain end (locant 1)
 }
 
 # Token list for DROP-04 validation: ring+heteroatom branch names must contain
