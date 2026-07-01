@@ -52,14 +52,13 @@ RETAINED_NAMES = {
     "CC(=O)O": "acetic acid",
     "CCC(=O)O": "propanoic acid",  # propionic acid is also accepted
     "CCCC(=O)O": "butanoic acid",  # butyric acid is also accepted
-    "O=C(O)C(=O)O": "oxalic acid",      # canonical key (was OC(=O)C(O)=O)
-    "O=C(O)C(O)C(O)C(=O)O": "tartaric acid",  # P-65.1.1.1 retained; canonical key
-    "O=C(O)CC(=O)O": "malonic acid",         # canonical key (was OC(=O)CC(=O)O)
-    "O=C(O)CCC(=O)O": "succinic acid",       # canonical key (was OC(=O)CCC(=O)O)
-    "O=C(O)CCCC(=O)O": "glutaric acid",      # canonical key (was OC(=O)CCCC(=O)O)
-    "O=C(O)CCCCC(=O)O": "adipic acid",       # canonical key (was OC(=O)CCCCC(=O)O)
-    "O=C(O)c1ccccc1": "benzoic acid",        # Canonical SMILES (was OC(=O)c1ccccc1)
-    "O=C(O)CC(O)(CC(=O)O)C(=O)O": "citric acid",  # canonical key (was OC(=O)CC(O)(CC(=O)O)C(=O)O)
+    "OC(=O)C(O)=O": "oxalic acid",
+    "OC(=O)CC(=O)O": "malonic acid",
+    "OC(=O)CCC(=O)O": "succinic acid",
+    "OC(=O)CCCC(=O)O": "glutaric acid",
+    "OC(=O)CCCCC(=O)O": "adipic acid",
+    "O=C(O)c1ccccc1": "benzoic acid",  # Canonical SMILES (was OC(=O)c1ccccc1)
+    "OC(=O)CC(O)(CC(=O)O)C(=O)O": "citric acid",
     
     # === ALDEHYDES ===
     "C=O": "formaldehyde",
