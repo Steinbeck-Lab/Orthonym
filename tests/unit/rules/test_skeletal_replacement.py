@@ -210,14 +210,19 @@ class TestDioxaChains:
     """Test replacement naming for chains with embedded oxygen atoms."""
 
     def test_dioxahexane(self):
-        """COCCOC -> 2,5-dioxahexane"""
+        """R4 / P-12.1 / P-63.2.4: COCCOC has 2 embedded O-ethers, no terminal -ol.
+        The substitutive PIN is '1,2-dimethoxyethane', so try_skeletal_replacement_name
+        returns None (hands off to the substitutive namer).  Updated from the old
+        '2,5-dioxahexane' assertion which was pre-R4 behaviour."""
         mol = Chem.MolFromSmiles('COCCOC')
-        assert try_skeletal_replacement_name(mol) == '2,5-dioxahexane'
+        assert try_skeletal_replacement_name(mol) is None
 
     def test_dioxaoctane(self):
-        """CCOCCOCC -> 3,6-dioxaoctane"""
+        """R4 / P-12.1 / P-63.2.4: CCOCCOCC has 2 embedded O-ethers, no terminal -ol.
+        The substitutive PIN is '1,2-diethoxyethane', so try_skeletal_replacement_name
+        returns None.  Updated from the old '3,6-dioxaoctane' assertion (pre-R4)."""
         mol = Chem.MolFromSmiles('CCOCCOCC')
-        assert try_skeletal_replacement_name(mol) == '3,6-dioxaoctane'
+        assert try_skeletal_replacement_name(mol) is None
 
     def test_trioxanonane(self):
         """COCCOCCOC -> 2,5,8-trioxanonane"""
@@ -382,8 +387,10 @@ class TestEndToEnd:
     """Test skeletal replacement via the full name_compound pipeline."""
 
     def test_dioxahexane_e2e(self):
-        """name_compound('COCCOC') -> '2,5-dioxahexane'"""
-        assert name_compound('COCCOC') == '2,5-dioxahexane'
+        """R4 / P-12.1 / P-63.2.4: COCCOC (2 embedded O-ethers, no -ol suffix) is
+        named substitutively as '1,2-dimethoxyethane', NOT skeletal '2,5-dioxahexane'.
+        Updated from pre-R4 assertion."""
+        assert name_compound('COCCOC') == '1,2-dimethoxyethane'
 
     def test_azahexane_e2e(self):
         """P-62.2.2: CCNCCC → substitutive 'N-ethylpropan-1-amine', not '3-azahexane'.
@@ -391,8 +398,10 @@ class TestEndToEnd:
         assert name_compound('CCNCCC') == 'N-ethylpropan-1-amine'
 
     def test_dioxaoctane_e2e(self):
-        """name_compound('CCOCCOCC') -> '3,6-dioxaoctane'"""
-        assert name_compound('CCOCCOCC') == '3,6-dioxaoctane'
+        """R4 / P-12.1 / P-63.2.4: CCOCCOCC (2 embedded O-ethers, no -ol suffix) is
+        named substitutively as '1,2-diethoxyethane', NOT skeletal '3,6-dioxaoctane'.
+        Updated from pre-R4 assertion."""
+        assert name_compound('CCOCCOCC') == '1,2-diethoxyethane'
 
     def test_trioxanonane_e2e(self):
         """name_compound('COCCOCCOC') -> '2,5,8-trioxanonane'"""
@@ -501,8 +510,9 @@ class TestTerminalGroup14Gate:
     @pytest.mark.parametrize("smiles,expected", [
         # INTERIOR Group-14 stays a skeletal replacement (terminal atoms are C).
         ("C[SiH2]CC[SiH2]CC[SiH2]CC[SiH2]C", "2,5,8,11-tetrasiladodecane"),
-        # plain ether/dithioether chains untouched.
-        ("COCCOC", "2,5-dioxahexane"),
+        # R4 / P-63.2.4: 2-O diether without terminal -ol -> substitutive (None from skeletal).
+        # COCCOC -> None (substitutive gives '1,2-dimethoxyethane').  Updated pre-R4 '2,5-dioxahexane'.
+        # 3-O triether stays skeletal (>= 3 O falls through R4 gate).
         ("COCCOCCOC", "2,5,8-trioxanonane"),
     ])
     def test_interior_and_ether_unaffected(self, smiles, expected):

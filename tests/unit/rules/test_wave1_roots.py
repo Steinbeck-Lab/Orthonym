@@ -82,3 +82,23 @@ def test_r3_amine_not_aza_replacement():
     # REGRESSION GUARDS — these must stay correct:
     assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"     # ether replacement OK
     assert name_compound("NNN", style="pin") == "triazane"                       # polyazane OK (N–N bonded)
+
+
+# ---------------------------------------------------------------------------
+# R4 — simple O-ether chains go substitutive, not skeletal oxa-replacement
+#       (Blue Book P-12.1 / P-63.2.4)
+# ---------------------------------------------------------------------------
+
+def test_r4_simple_ethers_substitutive():
+    """P-12.1 / P-63.2.4: single/dual embedded-O ethers with no principal
+    characteristic group suffix are named substitutively (alkoxy prefix),
+    NOT by skeletal 'oxa' replacement.
+    - 1-ethoxypropane: single embedded O in 6-atom chain (was 3-oxahexane).
+    - 1,2-dimethoxyethane: 2 homogeneous O, no -ol suffix (was 2,5-dioxahexane).
+    REGRESSION GUARD: 3,6-dioxaoctan-1-ol carries a principal characteristic
+    group (-ol) that anchors the replacement parent -> must stay skeletal.
+    """
+    assert name_compound("CCOCCC", style="pin") == "1-ethoxypropane"      # was 3-oxahexane
+    assert name_compound("COCCOC", style="pin") == "1,2-dimethoxyethane"  # was 2,5-dioxahexane
+    # REGRESSION GUARD: genuine replacement chain (terminal -ol) must NOT change:
+    assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"

@@ -66,5 +66,8 @@ def test_diazomethane_prefix_not_dropped(namer):
 
 @pytest.mark.unit
 def test_genuine_skeletal_replacement_unaffected(namer):
-    # a real oxa chain (no prefix-only FG) must STILL skeletal-replace
-    assert namer.name("CCOCCOCC") == "3,6-dioxaoctane"
+    # a real oxa chain (no prefix-only FG) must STILL skeletal-replace.
+    # R4 / P-63.2.4: CCOCCOCC has exactly 2 embedded O-ethers with no terminal
+    # -ol suffix; the substitutive PIN is '1,2-diethoxyethane' (not skeletal).
+    # Updated from pre-R4 '3,6-dioxaoctane'.  A 3-O chain still keeps skeletal:
+    assert namer.name("COCCOCCOC") == "2,5,8-trioxanonane"

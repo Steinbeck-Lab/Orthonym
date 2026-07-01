@@ -242,10 +242,12 @@ SEN02_CARBON_OVER_ETHER = [
     ("CSCOC", "methoxy(methylsulfanyl)methane"),     # determinism pair
 ]
 
-# Invariants: homogeneous diethers/dithioethers + simple sulfides/sulfoxides keep
+# Invariants: homogeneous dithioethers + simple sulfides/sulfoxides keep
 # their established (skeletal / functional-class) names — NOT migrated here.
+# NOTE: COCCOC (homogeneous 2-O diether) was previously listed here as
+# "2,5-dioxahexane" but R4 (P-12.1/P-63.2.4) now routes it substitutive ->
+# '1,2-dimethoxyethane'.  Removed from this invariant set.
 SEN02_INVARIANT = [
-    ("COCCOC", "2,5-dioxahexane"),       # homogeneous diether -> skeletal kept
     ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
     ("CSC", "dimethyl sulfide"),         # simple sulfide -> functional-class kept
     ("CSCC", "ethyl methyl sulfide"),

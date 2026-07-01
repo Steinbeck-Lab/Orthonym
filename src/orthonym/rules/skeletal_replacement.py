@@ -6,9 +6,10 @@ embedded in a carbon chain backbone are named using replacement terms
 (oxa, aza, thia, etc.) rather than substitutive prefixes (methoxy, amino, etc.).
 
 Examples:
-    COCCOC  -> 2,5-dioxahexane   (not 1,2-dimethoxyethane)
-    CCNCCC  -> 3-azahexane        (not N-ethylpropan-1-amine)
-    CCOCCOCC -> 3,6-dioxaoctane   (not butoxyethane)
+    COCCOCCOC -> 2,5,8-trioxanonane   (3 O: skeletal replacement)
+    CCNCCC  -> 3-azahexane             (N: amine gate blocks; substitutive N-ethylpropan-1-amine)
+    COCCOC  -> None (2 O, no -ol: R4 routes substitutive -> 1,2-dimethoxyethane)
+    OCCOCCOCC -> 3,6-dioxaoctan-1-ol   (2 O with terminal -ol: skeletal + suffix)
 
 Scope: Chain-only (acyclic). Rings <= 10 atoms are handled by
 Hantzsch-Widman naming in the heterocycles module.
@@ -367,6 +368,33 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
+    # R4 / P-12.1 / P-63.2.4: simple O-ether chains are named substitutively
+    # (alkoxy prefix), NOT by skeletal 'oxa' replacement.
+    #
+    # A single embedded O (no terminal-OH suffix) is always a plain ether ->
+    # the substitutive namer produces '1-ethoxypropane', '1-ethoxybutane', etc.
+    # (The chain-length threshold for "single-hetero-long-chain" in
+    # _qualifies_for_pin_skeletal_replacement is a legacy P-15.4 gate for
+    # non-O heteroatoms; O-ethers are explicitly substitutive per P-63.2.4.)
+    #
+    # Similarly, exactly 2 embedded O-ethers with no terminal-OH -> substitutive
+    # ('1,2-dimethoxyethane', '1,2-diethoxyethane').  A 2-O chain that DOES
+    # carry a principal characteristic group (terminal -ol) keeps replacement
+    # ('3,6-dioxaoctan-1-ol') because the suffix anchors the replacement parent.
+    #
+    # Non-O single heteroatom (thia, aza, sila, ...) and >= 3 O-ethers keep
+    # the existing skeletal-replacement path.
+    if not has_terminal_oh:
+        _emb_elements = [sym for _, sym in embedded_heteroatoms]
+        _emb_O_count = _emb_elements.count('O')
+        _all_O = (_emb_O_count == len(_emb_elements))
+        _has_carbon = any(
+            mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in backbone
+        )
+        if _has_carbon and _all_O and _emb_O_count in (1, 2):
+            return None
+
+    # ----------------------------------------------------------------
     # DD5 SEN-02 / Fix C (P-41 Table 4.1 cls 40 > 41/42; P-15.4.3.2.2): a carbon
     # skeleton is SENIOR to ether/sulfide. For a plain acyclic chain with EXACTLY
     # TWO embedded heteroatoms, both divalent chalcogen ether/sulfide links
@@ -377,16 +405,14 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     #
     # SCOPED to exactly-2 MIXED chalcogens (>= 2 DISTINCT elements), carbon-bearing:
     #   - the carbon-over-ether/sulfide PIN is unambiguous for a MIXED chain
-    #     (COCSC O+S -> methoxy(methylsulfanyl)methane); a HOMOGENEOUS 2-heteroatom
-    #     chain (diether O+O -> 2,5-dioxahexane; dithioether S+S -> 2,4-dithiapentane)
-    #     keeps its established skeletal PIN (the broad diether/dithioether ->
-    #     substitutive migration is a separate, larger follow-on);
+    #     (COCSC O+S -> methoxy(methylsulfanyl)methane);
     #   - 1 heteroatom keeps single-hetero-long-chain (4-thiaheptane);
     #   - >= 3 keeps skeletal (2,5,8-trioxanonane / triglyme);
-    #   - a non-chalcogen replacement driver (N/P/Si/Ge/… -> 2-oxa-4-azapentane,
+    #   - a non-chalcogen replacement driver (N/P/Si/Ge/... -> 2-oxa-4-azapentane,
     #     silyl cages) keeps skeletal;
     #   - a carbon-less chain ([O-]SS[O-]) has no carbon parent -> keeps skeletal;
     #   - terminal-OH polyether-ol (3,6,9-trioxadecan-1-ol, has_terminal_oh) exempt.
+    #   - homogeneous 1-O or 2-O chain (ether/diether) handled by R4 block above.
     if not has_terminal_oh and len(embedded_heteroatoms) == 2:
         _CHALCOGEN_LINK = {'O', 'S', 'Se', 'Te'}
         _elements = {sym for _, sym in embedded_heteroatoms}
