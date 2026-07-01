@@ -239,14 +239,19 @@ class TestAzaChains:
     """Test replacement naming for chains with embedded nitrogen atoms."""
 
     def test_azahexane(self):
-        """CCNCCC -> 3-azahexane (single N, chain >= 5)"""
+        """P-62.2.2: acyclic amine N bonded only to C → substitutive preferred.
+        CCNCCC: the amine gate (Gate 2c) returns None so skeletal replacement
+        does NOT produce '3-azahexane'; the substitutive handler gives
+        'N-ethylpropan-1-amine' instead (tested in TestEndToEnd.test_azahexane_e2e)."""
         mol = Chem.MolFromSmiles('CCNCCC')
-        assert try_skeletal_replacement_name(mol) == '3-azahexane'
+        assert try_skeletal_replacement_name(mol) is None
 
     def test_diazaheptane(self):
-        """CNCCNCC -> 2,5-diazaheptane"""
+        """P-62.2.2: acyclic N–C–N chain still blocked by amine gate (Gate 2c).
+        CNCCNCC: both N atoms are bonded only to C → Gate 2c fires → None.
+        The substitutive multi-amine form is not yet implemented (fail-closed)."""
         mol = Chem.MolFromSmiles('CNCCNCC')
-        assert try_skeletal_replacement_name(mol) == '2,5-diazaheptane'
+        assert try_skeletal_replacement_name(mol) is None
 
     def test_single_n_5atom_not_replacement(self):
         """CCNCC -> None (single N, chain = 5, below threshold of 6)"""
@@ -277,9 +282,12 @@ class TestMixedHeteroatomChains:
     """Test replacement naming for chains with different heteroatom types."""
 
     def test_oxa_aza_octane(self):
-        """COCCNCCC -> 2-oxa-5-azaoctane (ascending locant order)"""
+        """P-62.2.2: mixed oxa+aza chain — amine gate (Gate 2c) blocks skeletal replacement.
+        COCCNCCC: the N is bonded only to C atoms → Gate 2c fires → None.
+        The skeletal '2-oxa-5-azaoctane' is NOT the PIN; a substitutive
+        mixed-heteroatom form is not yet assembled (fail-closed → None)."""
         mol = Chem.MolFromSmiles('COCCNCCC')
-        assert try_skeletal_replacement_name(mol) == '2-oxa-5-azaoctane'
+        assert try_skeletal_replacement_name(mol) is None
 
 
 # ============================================================================
@@ -378,8 +386,9 @@ class TestEndToEnd:
         assert name_compound('COCCOC') == '2,5-dioxahexane'
 
     def test_azahexane_e2e(self):
-        """name_compound('CCNCCC') -> '3-azahexane'"""
-        assert name_compound('CCNCCC') == '3-azahexane'
+        """P-62.2.2: CCNCCC → substitutive 'N-ethylpropan-1-amine', not '3-azahexane'.
+        Amine Gate 2c blocks skeletal replacement; substitutive handler produces the PIN."""
+        assert name_compound('CCNCCC') == 'N-ethylpropan-1-amine'
 
     def test_dioxaoctane_e2e(self):
         """name_compound('CCOCCOCC') -> '3,6-dioxaoctane'"""
@@ -390,8 +399,10 @@ class TestEndToEnd:
         assert name_compound('COCCOCCOC') == '2,5,8-trioxanonane'
 
     def test_mixed_oxa_aza_e2e(self):
-        """name_compound('COCCNCCC') -> '2-oxa-5-azaoctane'"""
-        assert name_compound('COCCNCCC') == '2-oxa-5-azaoctane'
+        """P-62.2.2: COCCNCCC — amine Gate 2c blocks skeletal '2-oxa-5-azaoctane'.
+        Substitutive handler names the amine substitutively:
+        'N-2-methoxyethylmethoxypropan-1-amine' (methoxy substituents on propan-1-amine)."""
+        assert name_compound('COCCNCCC') == 'N-2-methoxyethylmethoxypropan-1-amine'
 
     def test_coc_not_replacement(self):
         """COC should NOT produce a replacement name."""

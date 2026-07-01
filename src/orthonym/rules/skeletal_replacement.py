@@ -155,6 +155,15 @@ _PRIORITY_FG_SMARTS = [
     '[NX2]=[CX2]=[SX1]',  # Isothiocyanate (N=C=S)
 ]
 
+# P-62.2.2: trivalent N bonded only to carbons → substitutive naming preferred
+# over skeletal ("aza") replacement for ACYCLIC carbon-chain amines.
+# Applied only in the acyclic path (Gate 2c); cyclic large-ring aza-replacement
+# is governed by P-22.1.3 and must not be blocked here.
+# The !$([NX3]~[!#6]) exclusion ensures N–N bonds (polyazane) and N–O/N–S bonds
+# (hydroxylamine, sulfonamide) are NOT blocked; aromatic N (!a) also excluded.
+_ACYCLIC_AMINE_SMARTS = '[NX3;!a;!$([NX3]~[!#6])]'
+_ACYCLIC_AMINE_PATTERN = Chem.MolFromSmarts(_ACYCLIC_AMINE_SMARTS)
+
 # Pre-compile the SMARTS patterns
 _PRIORITY_FG_PATTERNS = []
 for sma in _PRIORITY_FG_SMARTS:
@@ -245,6 +254,22 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     for pat in _PRIORITY_FG_PATTERNS:
         if mol.HasSubstructMatch(pat):
             return None
+
+    # ----------------------------------------------------------------
+    # Gate 2c (P-62.2.2): acyclic carbon-chain amines use substitutive naming.
+    # If the molecule contains a trivalent N bonded ONLY to carbons (secondary
+    # or tertiary amine on an all-carbon backbone), skeletal ("aza") replacement
+    # is NOT the PIN — the substitutive handler produces N-alkyl-alkan-1-amine.
+    # Applies to the ACYCLIC path only (cyclic large-ring aza-replacement is
+    # governed by P-22.1.3 and is checked separately above via
+    # _try_cyclic_replacement_name, which is never reached by this gate).
+    # N–N bonds (polyazane: NNN → triazane), N–O (hydroxylamine), N–S
+    # (sulfonamide) and aromatic N are NOT blocked (they carry !$([NX3]~[!#6])
+    # and !a guards in the pattern).
+    # ----------------------------------------------------------------
+    if (_ACYCLIC_AMINE_PATTERN is not None
+            and mol.HasSubstructMatch(_ACYCLIC_AMINE_PATTERN)):
+        return None
 
     # ----------------------------------------------------------------
     # Gate 2b (BBR-PERC/DEF-3, Phase 169.7): no prefix-only characteristic-group

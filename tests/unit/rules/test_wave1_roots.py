@@ -68,3 +68,17 @@ def test_r5_medium_rings_use_hantzsch_widman():
     # REGRESSION GUARD: multi-heteroatom / unsaturated 7-rings stay on replacement (NOT forced to HW)
     assert name_compound("O1CCOCCC1", style="pin") == "1,4-dioxacycloheptane"
     assert name_compound("O1CCCCC=C1", style="pin") == "1-oxacyclohept-2-ene"
+
+
+# ---------------------------------------------------------------------------
+# R3 — amines go substitutive, not aza-replacement (P-62.2.2)
+# ---------------------------------------------------------------------------
+
+def test_r3_amine_not_aza_replacement():
+    """P-62.2.2: trivalent N bonded only to C uses substitutive naming (N-propylpropan-1-amine),
+    NOT skeletal replacement (4-azaheptane). Polyazane (N–N chain) and ether replacement
+    must not be affected."""
+    assert name_compound("CCCNCCC", style="pin") == "N-propylpropan-1-amine"   # was 4-azaheptane
+    # REGRESSION GUARDS — these must stay correct:
+    assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"     # ether replacement OK
+    assert name_compound("NNN", style="pin") == "triazane"                       # polyazane OK (N–N bonded)
