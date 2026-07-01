@@ -13,6 +13,32 @@ from .retained_names import get_retained_name as _hand_curated_get
 
 logger = logging.getLogger(__name__)
 
+# Task 1.5 / R1 — P-65.1.1.1 retained-name key canonicalization.
+# Build a canon-key helper once at load; used below when constructing the
+# merged lookup so every entry is keyed by RDKit canonical SMILES regardless
+# of what the source dict stored.  Keys that RDKit cannot parse (e.g. OPSIN
+# radical-prefix forms or composite "||" keys) are kept as-is — they will
+# still miss on canonical lookups, but that was already the case and changing
+# them is out of scope here.
+try:
+    from rdkit import Chem as _Chem
+
+    def _canon_key(smi: str) -> str:
+        """Return the RDKit canonical SMILES for *smi*, or *smi* unchanged."""
+        if "||" in smi:
+            return smi  # composite key, do not canonicalize
+        try:
+            mol = _Chem.MolFromSmiles(smi)
+            if mol is not None:
+                return _Chem.MolToSmiles(mol)
+        except Exception:
+            pass
+        return smi
+
+except ImportError:
+    def _canon_key(smi: str) -> str:  # type: ignore[misc]
+        return smi
+
 # Try to import OPSIN data (may not exist if import script hasn't run)
 try:
     from .opsin_imports import OPSIN_RETAINED_NAMES as _OPSIN_NAMES_RAW
@@ -224,8 +250,10 @@ _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
 
 
 # Phase 150 D-02: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
+# Task 1.5 / R1: keys are canonicalized via _canon_key so that any drifted
+# stored SMILES still resolves correctly at lookup time.
 _OPSIN_NAMES: Dict[str, str] = {
-    smi: name for smi, name in _OPSIN_NAMES_RAW.items()
+    _canon_key(smi): name for smi, name in _OPSIN_NAMES_RAW.items()
     if _is_promotable(smi, name)
 }
 
@@ -246,8 +274,10 @@ if _stem_count > 0:
 # genuine names whose canonical SMILES are absent from the OPSIN round-trip cache
 # (Signal 3). _OPSIN_NAMES already applied _is_promotable (deny included); this
 # extends the same explicit-DENY enforcement to the hand-curated side.
+# Task 1.5 / R1: canonicalize every stored SMILES key so drifted entries
+# (like the OC(=O)C(O)=O -> O=C(O)C(=O)O family) resolve on lookup.
 _HAND_CURATED_GATED: Dict[str, str] = {
-    smi: name for smi, name in _HAND_CURATED_NAMES.items()
+    _canon_key(smi): name for smi, name in _HAND_CURATED_NAMES.items()
     if name.lower().strip() not in _PIN_DENY_HC
 }
 ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}
