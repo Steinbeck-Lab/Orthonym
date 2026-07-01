@@ -89,7 +89,7 @@ _HETEROATOM_SENIORITY = {
 # Tuple position i represents the count of element _HETEROATOM_VARIETY_ORDER[i].
 # Negated counts so min() selects ring with MORE of senior element.
 _HETEROATOM_VARIETY_ORDER = [
-    'N', 'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te',
+    'F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N',
     'P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga'
 ]
 

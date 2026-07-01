@@ -100,31 +100,39 @@ class TestP18bSeniorityLock157:
             )
 
     def test_heteroatom_variety_order_locked_157(self) -> None:
-        """_HETEROATOM_VARIETY_ORDER is consistent with _HETEROATOM_SENIORITY (P-18(b) FR-2.3 (e))."""
+        """_HETEROATOM_VARIETY_ORDER uses P-44.2.1.8 criterion (g) order (F>Cl>Br>I>O>S>Se>Te>N>...).
+
+        NOTE: VARIETY_ORDER (P-44.2.1.8 criterion g) is intentionally different from
+        _HETEROATOM_SENIORITY (P-18(b) criterion f where N is most senior).
+        They serve different Blue Book criteria. See P-44.2.1.8 fix (Wave 1 R9).
+        """
         from orthonym.rules.ring_selection import (
             _HETEROATOM_SENIORITY, _HETEROATOM_VARIETY_ORDER,
         )
 
         # The variety order must contain exactly the same 20 elements as the
-        # seniority dict --- it's the FR-2.3 (e) "greater heteroatom variety"
+        # seniority dict --- it's the P-44.2.1(g) "greater heteroatom variety"
         # tuple-position mapping per ring_selection.py:88-94.
         assert len(_HETEROATOM_VARIETY_ORDER) == 20, (
-            f"P-18(b) regression: VARIETY_ORDER size "
+            f"P-44.2.1.8 regression: VARIETY_ORDER size "
             f"{len(_HETEROATOM_VARIETY_ORDER)} != 20. AUDIT REQUIRED."
         )
         assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys()), (
-            f"P-18(b) regression: VARIETY_ORDER element set differs from "
+            f"P-44.2.1.8 regression: VARIETY_ORDER element set differs from "
             f"SENIORITY keys. AUDIT REQUIRED."
         )
-        # Descending-seniority order: VARIETY_ORDER[i] > VARIETY_ORDER[i+1]:
-        for i in range(len(_HETEROATOM_VARIETY_ORDER) - 1):
-            curr = _HETEROATOM_VARIETY_ORDER[i]
-            nxt = _HETEROATOM_VARIETY_ORDER[i + 1]
-            assert _HETEROATOM_SENIORITY[curr] > _HETEROATOM_SENIORITY[nxt], (
-                f"P-18(b) regression: VARIETY_ORDER position {i}: {curr} "
-                f"({_HETEROATOM_SENIORITY[curr]}) is not more senior than "
-                f"{nxt} ({_HETEROATOM_SENIORITY[nxt]}). AUDIT REQUIRED."
-            )
+        # P-44.2.1.8 criterion (g): variety order is F>Cl>Br>I>O>S>Se>Te>N>P>...
+        # (halogens first, then chalcogens, then N — different from P-18(b) where N is first).
+        assert _HETEROATOM_VARIETY_ORDER[0] == 'F', (
+            f"P-44.2.1.8 regression: VARIETY_ORDER[0] must be 'F' (not "
+            f"'{_HETEROATOM_VARIETY_ORDER[0]}'). AUDIT REQUIRED."
+        )
+        n_pos = _HETEROATOM_VARIETY_ORDER.index('N')
+        te_pos = _HETEROATOM_VARIETY_ORDER.index('Te')
+        assert n_pos == te_pos + 1, (
+            f"P-44.2.1.8 regression: 'N' must immediately follow 'Te' in VARIETY_ORDER "
+            f"(N at {n_pos}, Te at {te_pos}). AUDIT REQUIRED."
+        )
 
 
 class TestEZThresholdLock157:

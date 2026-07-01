@@ -80,18 +80,29 @@ class TestErrataHeteroatomSeniority:
         assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys())
 
     def test_variety_order_in_seniority_order(self):
-        """_HETEROATOM_VARIETY_ORDER must be sorted by descending seniority."""
+        """_HETEROATOM_VARIETY_ORDER uses P-44.2.1.8 criterion (g) order, NOT P-18(b).
+
+        P-44.2.1.8 criterion (g): F>Cl>Br>I>O>S>Se>Te>N>P>... (halogens first).
+        This differs from _HETEROATOM_SENIORITY (P-18(b), N most senior).
+        They serve different selection criteria. See Wave 1 R9 fix.
+        """
         from orthonym.rules.ring_selection import (
             _HETEROATOM_SENIORITY, _HETEROATOM_VARIETY_ORDER
         )
 
-        for i in range(len(_HETEROATOM_VARIETY_ORDER) - 1):
-            curr = _HETEROATOM_VARIETY_ORDER[i]
-            next_ = _HETEROATOM_VARIETY_ORDER[i + 1]
-            assert _HETEROATOM_SENIORITY[curr] > _HETEROATOM_SENIORITY[next_], (
-                f"Position {i}: {curr} ({_HETEROATOM_SENIORITY[curr]}) must be more "
-                f"senior than {next_} ({_HETEROATOM_SENIORITY[next_]})"
-            )
+        # Must contain the same 20 elements (set equality only, not same order).
+        assert set(_HETEROATOM_VARIETY_ORDER) == set(_HETEROATOM_SENIORITY.keys()), (
+            "VARIETY_ORDER element set must match SENIORITY keys"
+        )
+        # P-44.2.1.8: first element is F, N comes after Te.
+        assert _HETEROATOM_VARIETY_ORDER[0] == 'F', (
+            f"P-44.2.1.8: VARIETY_ORDER[0] must be 'F', got '{_HETEROATOM_VARIETY_ORDER[0]}'"
+        )
+        n_pos = _HETEROATOM_VARIETY_ORDER.index('N')
+        te_pos = _HETEROATOM_VARIETY_ORDER.index('Te')
+        assert n_pos == te_pos + 1, (
+            f"P-44.2.1.8: 'N' must immediately follow 'Te' (N={n_pos}, Te={te_pos})"
+        )
 
 
 class TestErrataHWPriority:
