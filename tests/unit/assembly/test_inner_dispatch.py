@@ -1030,8 +1030,9 @@ class TestPhase160_2_Registrations:
         # + hydroxylamine@5250 (Phase 169.7 BBR-PERC — substituted-hydroxylamine
         # handler, P-68.3.1.2.1) [35 → 36] + nitrite_ester@2960 (WSD-05 / Phase 175,
         # P-67) [36 → 37] + phosphonic_acid@2350 (v23 Phase 9, P-67.1.1.2
-        # substituent-prefix PIN) [37 → 38].
-        assert len(INNER_DISPATCH_TABLE) == 38
+        # substituent-prefix PIN) [37 → 38] + hydroxamic_acid@5210 (Wave 1 R8c,
+        # P-66.1.1.3.2 — hydroxamic acid -> N-hydroxy...amide) [38 → 39].
+        assert len(INNER_DISPATCH_TABLE) == 39
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1060,10 +1061,11 @@ class TestPhase160_2_Registrations:
         # INNER_DISPATCH_TABLE which Phase 163 grew 33 → 34 (imidate@2900,
         # AUDIT-FRN § 7), Phase 163.1 grew 34 → 35 (chalcogen_ester@2950),
         # Phase 169.7 grew 35 → 36 (hydroxylamine@5250, BBR-PERC), WSD-05 /
-        # Phase 175 grew 36 → 37 (nitrite_ester@2960, P-67), and v23 Phase 9
-        # grew 37 → 38 (phosphonic_acid@2350, P-67.1.1.2).
+        # Phase 175 grew 36 → 37 (nitrite_ester@2960, P-67), v23 Phase 9
+        # grew 37 → 38 (phosphonic_acid@2350, P-67.1.1.2), and Wave 1 R8c
+        # grew 38 → 39 (hydroxamic_acid@5210, P-66.1.1.3.2).
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 38
+        assert len(_SORTED_ENTRIES_CACHE) == 39
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)

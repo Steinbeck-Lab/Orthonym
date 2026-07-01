@@ -240,6 +240,9 @@ class TestTerminalFGTypes:
             "thioaldehyde", "selenoaldehyde", "telluroaldehyde",
             # v23 D-FOLLOWON item 8: amidine (imidamide / carboximidamide)
             "amidine",
+            # Wave 1 R8a (P-66.3.1.1): hydrazide is a terminal group (locant-1
+            # elided, e.g. pentanehydrazide) — added with the hydrazide-suffix fix.
+            "hydrazide",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -249,5 +252,5 @@ class TestTerminalFGTypes:
 
     def test_terminal_count_after_phase_163(self):
         """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
-        (v23 D-FOLLOWON item 8) = 26 entries."""
-        assert len(TERMINAL_FG_TYPES) == 26
+        (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) = 27 entries."""
+        assert len(TERMINAL_FG_TYPES) == 27
