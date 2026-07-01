@@ -515,6 +515,35 @@ def name_substituent(mol, frag_atoms, attach_idx):
                 )
                 if _ring_nm:
                     return _stereo_route(_ring_nm)
+                # P-32.2.2 CONSTITUTION GUARD (Tier 1.95 / recursive-path gate):
+                # Parallel guard to substituent_naming.py Step 1c.  When the ring-
+                # system namer declines a fused multi-ring fragment in the
+                # fused-heterocycle catalog under a tautomer_locant name (e.g.
+                # '1H-indene') AND the fragment has non-aromatic partial unsaturation
+                # (endocyclic C=C that is not aromatic), the Tier-2 cache and Tier-4
+                # recursive namer would independently produce the same wrong-
+                # constitution name.  Return None (sentinel) so the Tier-4 recursive
+                # path is bypassed and the caller emits 'unknown' instead.
+                _rings_in_frag = [r for r in _ri.AtomRings() if set(r) <= frag_atoms_set]
+                if len(_rings_in_frag) > 1:
+                    from rdkit import Chem as _Chem_enum
+                    _frag_smi = _Chem_enum.MolFragmentToSmiles(
+                        mol, sorted(frag_atoms_set), canonical=True
+                    )
+                    if _frag_smi:
+                        try:
+                            from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+                            _fhe = FUSED_HETEROCYCLE_DATA.get(_frag_smi)
+                            if _fhe and _fhe.get('tautomer_locant') is not None:
+                                _fmol = _Chem_enum.MolFromSmiles(_frag_smi)
+                                if _fmol is not None and any(
+                                    b.GetBondTypeAsDouble() == 2.0
+                                    and not b.GetIsAromatic()
+                                    for b in _fmol.GetBonds()
+                                ):
+                                    return None
+                        except ImportError:
+                            pass
         except Exception:
             pass
 

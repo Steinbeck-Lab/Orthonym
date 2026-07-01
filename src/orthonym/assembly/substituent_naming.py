@@ -1903,6 +1903,39 @@ def name_substituent_fragment(
                 )
                 if _ring_nm:
                     return _ring_nm
+                # P-32.2.2 CONSTITUTION GUARD (Step 1c / recursive-path gate):
+                # When the ring-system namer declines a multi-ring fragment that is
+                # in the fused-heterocycle catalog under a tautomer_locant name
+                # (e.g. '1H-indene') AND has non-aromatic partial unsaturation
+                # (endocyclic C=C that is not aromatic), the recursive naming path
+                # (Step 3-5 below) would fall back to naming the fragment as a
+                # free molecule ('1H-indene') and converting it via parent_to_prefix
+                # ('1H-indenyl') — which is a WRONG-CONSTITUTION name for the
+                # actual ring system.  Return None here so the caller emits an
+                # honest 'unknown' rather than a confident wrong name.
+                # Only activated for fused (multi-ring) systems with the
+                # tautomer_locant guard (fully-aromatic or fully-saturated fused
+                # systems are safe and do not reach this guard).
+                _rings_in_frag = [r for r in _ri.AtomRings() if set(r) <= set(sub_atoms)]
+                if len(_rings_in_frag) > 1:
+                    from rdkit import Chem as _Chem_sub
+                    _frag_smi = _Chem_sub.MolFragmentToSmiles(
+                        mol, sorted(set(sub_atoms)), canonical=True
+                    )
+                    if _frag_smi:
+                        try:
+                            from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+                            _fhe = FUSED_HETEROCYCLE_DATA.get(_frag_smi)
+                            if _fhe and _fhe.get('tautomer_locant') is not None:
+                                _fmol = _Chem_sub.MolFromSmiles(_frag_smi)
+                                if _fmol is not None and any(
+                                    b.GetBondTypeAsDouble() == 2.0
+                                    and not b.GetIsAromatic()
+                                    for b in _fmol.GetBonds()
+                                ):
+                                    return None
+                        except ImportError:
+                            pass
         except Exception:
             pass
 

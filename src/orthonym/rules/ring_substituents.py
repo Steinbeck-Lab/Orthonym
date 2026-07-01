@@ -971,6 +971,32 @@ def get_ring_substituent_name(
                 _fh_entry = FUSED_HETEROCYCLE_DATA.get(frag_smi)
                 if _fh_entry and _fh_entry.get('name'):
                     retained = _fh_entry['name']
+                    # P-32.2.2 CONSTITUTION GUARD: fused-heterocycle entries that
+                    # carry a 'tautomer_locant' (indicated hydrogen, e.g. '1H-indene')
+                    # describe partially-saturated ring systems.  Naming these as
+                    # substituents requires the hydro-substituent assembly engine
+                    # (Wave 5), which is not yet built.  Without it, the retained
+                    # stem is emitted for the WRONG ring constitution (e.g.
+                    # 1H-inden-3-yl applied to a mixed 5/6-ring system whose
+                    # correct PIN is 3,4-dihydronaphthalen-1-yl).  Fail-closed
+                    # here: clear the retained name so execution falls through to
+                    # _polycyclic_substituent_name, which returns None when the
+                    # dihydro-substituent engine is absent — emitting an honest
+                    # 'unknown' rather than a wrong-constitution name.
+                    # Only fire when the fragment has non-aromatic partial
+                    # unsaturation (endocyclic C=C that is NOT aromatic), which
+                    # distinguishes 1H-indene (has one) from fully-saturated or
+                    # fully-aromatic retained systems that are safe to use.
+                    if _fh_entry.get('tautomer_locant') is not None:
+                        _frag_mol = Chem.MolFromSmiles(frag_smi)
+                        if _frag_mol is not None:
+                            _has_partial_unsat = any(
+                                b.GetBondTypeAsDouble() == 2.0
+                                and not b.GetIsAromatic()
+                                for b in _frag_mol.GetBonds()
+                            )
+                            if _has_partial_unsat:
+                                retained = None
             except ImportError:
                 pass
             if retained:

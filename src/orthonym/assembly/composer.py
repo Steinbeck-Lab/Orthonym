@@ -4964,15 +4964,41 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                         if cpx is not None:
                             ring_sub_groups[cpx].append(locant)
                             continue
-                    # Unsubstituted fused het: simple prefix
-                    prefix = get_fused_heterocycle_prefix(
-                        core_smiles, attach_ring_idx, atom_mapping
-                    )
-                    if prefix is not None:
-                        # Fused het prefixes always need parentheses
-                        # (they contain locants and hyphens per IUPAC P-16.3.3)
-                        ring_sub_groups[f'({prefix})'].append(locant)
-                        continue
+                    # P-32.2.2 CONSTITUTION GUARD (Phase 78 / composer path):
+                    # Fused-het entries that carry a 'tautomer_locant' AND have
+                    # non-aromatic partial unsaturation (endocyclic C=C that is not
+                    # aromatic, e.g. '1H-indene') require the Wave-5 hydro-substituent
+                    # engine to produce the correct PIN.  Without it, the static
+                    # prefix table emits the wrong-constitution 'inden-3-yl' for a
+                    # ring system that is actually 3,4-dihydronaphthalen-1-yl.
+                    # Skip the Phase-78 fused-het prefix and fall through to the
+                    # get_ring_substituent_name path below (which already returns
+                    # None for these systems), producing an honest 'unknown'.
+                    _skip_fused_het_prefix = False
+                    try:
+                        from rdkit import Chem as _Chem_guard
+                        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+                        _fhe2 = FUSED_HETEROCYCLE_DATA.get(core_smiles)
+                        if _fhe2 and _fhe2.get('tautomer_locant') is not None:
+                            _fmol2 = _Chem_guard.MolFromSmiles(core_smiles)
+                            if _fmol2 is not None and any(
+                                b.GetBondTypeAsDouble() == 2.0
+                                and not b.GetIsAromatic()
+                                for b in _fmol2.GetBonds()
+                            ):
+                                _skip_fused_het_prefix = True
+                    except ImportError:
+                        pass
+                    if not _skip_fused_het_prefix:
+                        # Unsubstituted fused het: simple prefix
+                        prefix = get_fused_heterocycle_prefix(
+                            core_smiles, attach_ring_idx, atom_mapping
+                        )
+                        if prefix is not None:
+                            # Fused het prefixes always need parentheses
+                            # (they contain locants and hyphens per IUPAC P-16.3.3)
+                            ring_sub_groups[f'({prefix})'].append(locant)
+                            continue
         # --- End Phase 78 fused het detection ---
 
         # Find ring attachment atom for position-specific naming
