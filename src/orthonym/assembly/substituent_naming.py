@@ -1208,6 +1208,25 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
             return f"{shortened}-carboxy{short_stem}yl"
         return "carboxy"
 
+    # ---- Amidine: -carboximidamide / -imidamide ---- (IUPAC P-66.4.1.3.1)
+    # MUST precede the general -amide regex which would wrongly match "-imidamide"
+    # and return "carbamoyl" (amide prefix) for an amidine group.
+    # e.g., "methanimidamide" -> "carbamimidoyl" (terminal C1; chain_length-1 = 0)
+    # e.g., "propanimidamide" -> "carbamimidoyl" with chain stem for longer chains
+    if name.endswith('carboximidamide'):
+        stem = name[:-15]  # remove "carboximidamide"
+        if stem:
+            return f"carbamimidoyl{stem}yl"
+        return "carbamimidoyl"
+    m_imidamide = re.search(r'(?:an)?imidamide$', name)
+    if m_imidamide:
+        shortened = chain_length - 1
+        if shortened >= 1:
+            from ..data.chain_names import get_chain_prefix
+            short_stem = get_chain_prefix(shortened)
+            return f"{shortened}-carbamimidoyl{short_stem}yl"
+        return "carbamimidoyl"
+
     # ---- Amide: -carboxamide (most specific first) ---- (IUPAC P-66.1.1.4)
     # e.g., "benzcarboxamide" -> "carbamoyl" prefix
     if name.endswith('carboxamide'):

@@ -558,7 +558,7 @@ PREFIX_FORMS = {
     "telluroester": None,
     # Phase 109: 6 new FG classes
     "acid_iodide": "iodocarbonyl",     # IUPAC P-65.5.1.4
-    "amidine": "amidino",              # IUPAC P-66.4.1
+    "amidine": "carbamimidoyl",         # IUPAC P-66.4.1.3.1 (was "amidino" — wrong per BB P-66.4.1.3.1)
     "sulfenic_acid": "sulfeno",        # IUPAC P-65.3.1.4
     "diazo": "diazo",                  # P-61.5
     "disulfide": "disulfanediyl",      # P-63.6.2 (divalent bridge; substitutive (R)disulfanyl via get_disulfanyl_prefix)

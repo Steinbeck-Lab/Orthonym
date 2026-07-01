@@ -24,7 +24,7 @@ def _detect(smiles):
 # DATA-03: Amidine (IUPAC P-66.4.1)
 # ---------------------------------------------------------------------------
 class TestAmidine:
-    """Amidine: R-C(=NH)-NH2, suffix -imidamide/-carboximidamide, prefix amidino."""
+    """Amidine: R-C(=NH)-NH2, suffix -imidamide/-carboximidamide, prefix carbamimidoyl (P-66.4.1.3.1)."""
 
     def test_acetamidine_detected(self):
         """Acetamidine CC(=N)N should be detected as amidine."""
@@ -55,8 +55,8 @@ class TestAmidine:
         assert SUFFIX_FORMS["amidine"] == ("imidamide", "carboximidamide")
 
     def test_amidine_prefix_form(self):
-        """Amidine prefix: amidino."""
-        assert PREFIX_FORMS["amidine"] == "amidino"
+        """Amidine prefix: carbamimidoyl (IUPAC P-66.4.1.3.1; 'amidino' was wrong)."""
+        assert PREFIX_FORMS["amidine"] == "carbamimidoyl"
 
 
 # ---------------------------------------------------------------------------

@@ -1006,6 +1006,9 @@ def get_substituent_prefix_form(
         return PREFIX_FORMS.get("isocyanate")  # "isocyanato"
     if fg_name == "isothiocyanate":
         return PREFIX_FORMS.get("isothiocyanate")  # "isothiocyanato"
+    # R8b (P-66.4.1.3.1): amidine as non-principal substituent → "carbamimidoyl"
+    if fg_name == "amidine":
+        return PREFIX_FORMS.get("amidine")  # "carbamimidoyl"
 
     # --- Phase 163 FRN attachment slot ---
     # Phase 163 FRN attachment: thio/seleno/telluro/imino chalcogen replacement
@@ -1035,6 +1038,7 @@ _PREFIX_FORM_FG_NAMES = (
     "selenoether", "telluroether",  # BBR-PERC (169.7)
     "carbamate", "urea",
     "isocyanate", "isothiocyanate",
+    "amidine",  # R8b (P-66.4.1.3.1): carbamimidoyl prefix
 )
 
 _PREFIX_FORM_PATTERNS: dict = {}  # Lazily populated on first call

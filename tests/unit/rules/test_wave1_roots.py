@@ -25,3 +25,17 @@ def test_r8a_hydrazide_pins():
     assert name_compound("CC(=O)NN", style="pin") == "acetohydrazide"
     assert name_compound("O=CNN", style="pin") == "formohydrazide"
     assert name_compound("O=C(NN)c1ccccc1", style="pin") == "benzohydrazide"
+
+
+# ---------------------------------------------------------------------------
+# R8b — amidine prefix carbamimidoyl (P-66.4.1.3.1)
+# ---------------------------------------------------------------------------
+
+def test_r8b_amidine_prefix_carbamimidoyl():
+    """P-66.4.1.3.1: amidine as non-principal substituent uses prefix 'carbamimidoyl'.
+    When COOH is the principal group and C(=NH)NH2 is a ring substituent,
+    the amidine must be named as 'carbamimidoyl', not 'carbamoyl' (amide prefix).
+    """
+    assert name_compound("N=C(N)c1ccc(C(=O)O)cc1", style="pin") == "4-carbamimidoylbenzoic acid"
+    # REGRESSION GUARD: saturated-ring amidine suffix must remain correct
+    assert name_compound("N=C(N)C1CCCCC1", style="pin") == "cyclohexanecarboximidamide"
