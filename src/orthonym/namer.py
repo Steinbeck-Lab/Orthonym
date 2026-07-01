@@ -321,14 +321,48 @@ def _self_consistency_skeleton(smiles: str) -> Optional[str]:
         return None
 
 
+def _self_consistency_net_charge(smiles: str) -> Optional[int]:
+    """Net formal charge of ``smiles`` (None if unparseable). The InChIKey skeleton
+    block used by _self_consistency_skeleton EXCLUDES the charge/protonation layer
+    (/q,/p), so a name that silently drops or adds a charge (e.g. hydroperoxide
+    anion [O-]O -> neutral 'dioxidane' OO) shares the skeleton and would pass. Net
+    charge is a genuine constitutional difference and must be checked separately."""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        return sum(a.GetFormalCharge() for a in mol.GetAtoms())
+    except Exception:
+        return None
+
+
 def _self_consistency_verdict(input_smiles: str, opsin_smiles: str) -> str:
     """``"ok"`` | ``"mismatch"`` | ``"inconclusive"`` — does the OPSIN re-perception of
-    the emitted name encode the SAME constitution as the input structure?"""
+    the emitted name encode the SAME constitution as the input structure?
+
+    Constitution = InChIKey skeleton block (formula + connectivity + mobile-H;
+    stereo- and charge-insensitive) PLUS net formal charge (the skeleton block
+    excludes the charge layer, so a charge-dropping name would otherwise pass)."""
     a = _self_consistency_skeleton(input_smiles)
     b = _self_consistency_skeleton(opsin_smiles)
     if a is None or b is None:
         return "inconclusive"
-    return "ok" if a == b else "mismatch"
+    if a != b:
+        return "mismatch"
+    # Skeleton matches — guard against a name that fails to preserve a CHARGED
+    # input's net charge (the skeleton block excludes the charge layer).
+    ca = _self_consistency_net_charge(input_smiles)
+    cb = _self_consistency_net_charge(opsin_smiles)
+    if ca is None or cb is None:
+        return "ok"  # cannot compare charge -> trust the skeleton (fail-OPEN on charge)
+    # Only a genuinely CHARGED input whose charge the name drops/changes is a leak
+    # (e.g. [O-]O, -1, named 'dioxidane', 0). A NEUTRAL input is exempt: acid/ester
+    # names are protonation-ambiguous in OPSIN (e.g. 'methyl phosphate' round-trips
+    # to the -2 phosphate dianion) — that is not a wrong-molecule error, and firing
+    # on it wrongly suppresses correct names.
+    if ca != 0 and ca != cb:
+        return "mismatch"
+    return "ok"
 
 
 def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: str,
