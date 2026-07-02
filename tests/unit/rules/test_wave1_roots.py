@@ -55,6 +55,37 @@ def test_r8c_hydroxamic_acid_pin():
     assert name_compound("O=C(NO)C1CCCCC1", style="pin") == "N-hydroxycyclohexanecarboxamide"
 
 
+def test_r8c_ring_benzene_hydroxamic():
+    """C3: ring-attached hydroxamic acid on benzene -> N-hydroxybenzamide.
+    OPSIN-verified: O=C(NO)c1ccccc1 round-trips correctly.
+    """
+    assert name_compound("O=C(NO)c1ccccc1", style="pin") == "N-hydroxybenzamide"
+    # Substituted benzene hydroxamic: 2-hydroxy on ring
+    assert name_compound("O=C(NO)c1ccccc1O", style="pin") == "N-hydroxy-2-hydroxybenzamide"
+
+
+def test_r8c_ring_pyridine_hydroxamic():
+    """C3: ring-attached hydroxamic acid on pyridine rings -> N-hydroxypyridine-X-carboxamide.
+    OPSIN-verified: all four isomers.
+    """
+    assert name_compound("O=C(NO)c1ccncc1", style="pin") == "N-hydroxypyridine-4-carboxamide"
+    assert name_compound("O=C(NO)c1cccnc1", style="pin") == "N-hydroxypyridine-3-carboxamide"
+    assert name_compound("O=C(NO)c1ccccn1", style="pin") == "N-hydroxypyridine-2-carboxamide"
+
+
+def test_r8c_ring_pyrimidine_hydroxamic():
+    """C3: ring-attached hydroxamic acid on pyrimidine -> N-hydroxypyrimidine-5-carboxamide.
+    OPSIN-verified.
+    """
+    assert name_compound("O=C(NO)c1cncnc1", style="pin") == "N-hydroxypyrimidine-5-carboxamide"
+
+
+def test_r8c_ring_guard_plain_benzamide():
+    """Guard: plain benzamide and N-methylbenzamide must be UNCHANGED after C3 fix."""
+    assert name_compound("O=C(N)c1ccccc1", style="pin") == "benzamide"
+    assert name_compound("O=C(NC)c1ccccc1", style="pin") == "N-methylbenzamide"
+
+
 def test_r5_medium_rings_use_hantzsch_widman():
     """P-22.2.2.1: saturated heterocyclic rings of size 7-10 use Hantzsch-Widman
     (oxepane/oxocane/oxonane/oxecane), not '1-oxacyclo...ane' skeletal replacement.

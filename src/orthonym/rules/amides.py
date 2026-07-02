@@ -692,6 +692,7 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
                             break
 
         ring_size = 6  # Default
+        is_aromatic_benzene = False
         if carbonyl_carbon_idx is not None:
             carbonyl = mol.GetAtomWithIdx(carbonyl_carbon_idx)
             for neighbor in carbonyl.GetNeighbors():
@@ -700,12 +701,20 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
                     for ring in ring_info.AtomRings():
                         if neighbor.GetIdx() in ring:
                             ring_size = len(ring)
+                            if ring_size == 6:
+                                ring_atoms = [mol.GetAtomWithIdx(i) for i in ring]
+                                if (all(a.GetIsAromatic() for a in ring_atoms)
+                                        and all(a.GetSymbol() == 'C' for a in ring_atoms)):
+                                    is_aromatic_benzene = True
                             break
                     break
 
-        parent_name = get_amide_parent_name(
-            ring_size, is_ring=True, suffix_form=suffix_form,
-        )
+        if is_aromatic_benzene:
+            parent_name = "benzamide"
+        else:
+            parent_name = get_amide_parent_name(
+                ring_size, is_ring=True, suffix_form=suffix_form,
+            )
 
         # Check for N-substitution
         amide_type = get_amide_type(mol, amide_atoms)

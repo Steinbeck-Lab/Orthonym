@@ -1264,6 +1264,8 @@ def get_heterocycle_substituents(
                 if suffix_info:
                     sub_info['is_suffix'] = True
                     sub_info['suffix_name'] = suffix_info['suffix_name']
+                    if suffix_info.get('n_hydroxy'):
+                        sub_info['n_hydroxy'] = True
 
             if locant not in substituents:
                 substituents[locant] = []
@@ -1299,6 +1301,14 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
         for match in mol.GetSubstructMatches(ald_pat):
             if match[0] == start_idx:
                 return {'suffix_name': 'carbaldehyde'}
+
+    # Check for hydroxamic acid: C(=O)(NH-OH) — before primary amide because
+    # N has H1 bonded to O, not H2, so the primary amide pattern would not match.
+    hydroxamic_pat = Chem.MolFromSmarts('[CX3](=O)[NX3;H1][OX2H]')
+    if hydroxamic_pat:
+        for match in mol.GetSubstructMatches(hydroxamic_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carboxamide', 'n_hydroxy': True}
 
     # Check for primary amide: C(=O)(NH2)
     amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
@@ -1471,6 +1481,7 @@ def name_substituted_heterocycle(
 
     # Separate suffix-type FGs from prefix substituents
     suffix_fg: Dict[str, List[int]] = {}  # suffix_name -> [locants]
+    suffix_n_hydroxy: set = set()  # suffix_names whose FG was a hydroxamic acid
     prefix_substituents: Dict[int, List[Dict]] = {}
 
     for locant, sub_list in substituents.items():
@@ -1486,6 +1497,8 @@ def name_substituted_heterocycle(
                 if sname not in suffix_fg:
                     suffix_fg[sname] = []
                 suffix_fg[sname].append(locant)
+                if sub_info.get('n_hydroxy'):
+                    suffix_n_hydroxy.add(sname)
             else:
                 if locant not in prefix_substituents:
                     prefix_substituents[locant] = []
@@ -1661,6 +1674,11 @@ def name_substituted_heterocycle(
         if combined and combined[-1] == 'e' and suffix_token[:1].lower() in 'aeiouy':
             combined = combined[:-1]
         combined = f"{combined}-{locant_str}-{suffix_token}"
+
+        # Hydroxamic acid suffix: prepend N-hydroxy to the assembled name
+        # (P-65.1.3.4: N-hydroxy is an N-substituent on the amide parent).
+        if chosen_suffix == 'carboxamide' and chosen_suffix in suffix_n_hydroxy:
+            combined = f"N-hydroxy{combined}"
 
         # Remaining suffix FGs become prefixes (carboxy, formyl, etc.)
         _SUFFIX_TO_PREFIX = {

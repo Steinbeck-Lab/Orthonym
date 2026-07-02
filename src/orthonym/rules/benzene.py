@@ -93,6 +93,7 @@ _SUFFIX_TO_PREFIX = {
 # Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
 _BENZENE_FG_SMARTS = {
     'acid': Chem.MolFromSmarts('[CX3](=O)[OX2H1]'),
+    'hydroxamic': Chem.MolFromSmarts('[CX3](=O)[NX3;H1][OX2H]'),
     'amide': Chem.MolFromSmarts('[CX3](=O)[NX3H2]'),
     'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
     'tert_amide': Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]'),
@@ -265,6 +266,18 @@ def _identify_suffix_fg_on_benzene(
                 return {
                     'name': 'carboxylic acid', 'suffix_name': 'carboxylic acid',
                     'is_suffix': True, 'atoms': sub_atoms,
+                }
+
+        # Hydroxamic acid: C(=O)(NH-OH) — checked BEFORE primary/secondary amide
+        # because N has H1 bonded to O (not H2 or NHC), so neither 'amide' nor
+        # 'sec_amide' SMARTS would match.  n_substituents=['hydroxy'] propagates
+        # through the existing _name_substituted_benzamide machinery unchanged.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['hydroxamic']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carboxamide', 'suffix_name': 'carboxamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                    'n_substituents': ['hydroxy'],
                 }
 
         # Primary amide: C(=O)(NH2)
