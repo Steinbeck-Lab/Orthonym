@@ -18,7 +18,9 @@ class TestStyleParameter:
         """Default style 'pin' should return retained names when available."""
         assert name_compound("c1ccccc1") == "benzene"
         assert name_compound("CCO") == "ethanol"
-        assert name_compound("C=CCO") == "allyl alcohol"
+        # Wave-1 1.10: "allyl alcohol" is general-only (P-63.2.3) — demoted
+        # from the default headline; the PIN is the systematic name.
+        assert name_compound("C=CCO") == "prop-2-en-1-ol"
         # Phase 167 HYG-03: "ethylene glycol" was a deprecated (non-PIN) name and
         # is now corrected to ethane-1,2-diol; use a genuine retained PIN instead.
         assert name_compound("Cc1ccccc1") == "toluene"
@@ -45,7 +47,7 @@ class TestStyleParameter:
     @pytest.mark.unit
     def test_pin_style_explicit(self):
         """Explicit style='pin' should behave like default."""
-        assert name_compound("C=CCO", style="pin") == "allyl alcohol"
+        assert name_compound("C=CCO", style="pin") == "prop-2-en-1-ol"
 
     @pytest.mark.unit
     def test_backward_compatibility(self):

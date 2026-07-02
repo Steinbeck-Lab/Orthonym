@@ -213,7 +213,7 @@ SEN03_DIOL = [
 SEN03_INVARIANT = [
     ("OCCO", "ethane-1,2-diol"),
     ("OC(C)CC(C)O", "pentane-2,4-diol"),
-    ("OCC(O)CO", "glycerol"),
+    ("OCC(O)CO", "propane-1,2,3-triol"),  # Wave-1 1.10: glycerol demoted (general-only)
     ("CCO", "ethanol"),
     ("CC(C)O", "propan-2-ol"),
     ("NCC(N)C", "propane-1,2-diamine"),   # same-subtype amine diamine unaffected
