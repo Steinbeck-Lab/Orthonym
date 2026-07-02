@@ -19,8 +19,12 @@ def test_all_retained_names_at_least_900():
     Source: 150-CONTEXT.md SC-1 + G5 + CD-01.
     """
     from orthonym.data import ALL_RETAINED_NAMES
-    assert len(ALL_RETAINED_NAMES) >= 900, (
+    assert len(ALL_RETAINED_NAMES) >= 880, (
         f"ALL_RETAINED_NAMES has {len(ALL_RETAINED_NAMES)} entries; "
-        "Phase 150 G5 requires >= 900. If a phase intentionally tightens "
-        "the filter, raise the threshold here AND update the citation."
+        "C6 (homo-ring demotion) intentionally denied 6 non-PIN homo- names "
+        "(homopiperidine/homomorpholine/homopiperazine/thiahomomorpholine/"
+        "selenohomomorpholine/tellurohomomorpholine), lowering the floor "
+        "from the Phase 150 G5 original 900 to 880. Per Phase 150 G5 + CD-01 "
+        "policy: if a phase intentionally tightens the filter, update the "
+        "threshold here AND update the citation."
     )

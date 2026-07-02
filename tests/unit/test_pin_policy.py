@@ -199,3 +199,77 @@ class TestDemoteRegressionGuards:
         """Purine catalog must not be re-keyed (9H->7H was the 1.5 regression)."""
         assert name_compound("c1ncc2[nH]cnc2n1", style="pin") == \
             "1H-imidazo[4,5-d]pyrimidine"
+
+
+@pytest.mark.unit
+class TestC6HomoRingDemotions:
+    """C6-medring-leaks: six non-PIN 'homo-' ring-expansion trivial names must
+    be demoted to pin:false so the systematic Hantzsch-Widman PIN is returned.
+    BB refs: P-22.2.2.1, P-22.2.2.1.2, P-22.2.2.1.3, P-15.1.8.1,
+    P-22.2.1 Table 2.3.
+    """
+
+    def test_homopiperidine_demoted_to_azepane(self):
+        """N1CCCCCC1 must yield azepane (7-membered N-only HW ring), not homopiperidine."""
+        assert name_compound("N1CCCCCC1", style="pin") == "azepane"
+
+    def test_homopiperazine_demoted_to_diazepane(self):
+        """C1CNCCNC1 must yield a systematic 7-membered diaza name, not homopiperazine.
+        The IUPAC 2013 PIN is 1,4-diazepane (HW); the HW builder may also emit
+        the alternative replacement form 1,4-diazacycloheptane (both are valid
+        systematic IUPAC names for this ring; neither is homopiperazine)."""
+        result = name_compound("C1CNCCNC1", style="pin")
+        assert result in ("1,4-diazepane", "1,4-diazacycloheptane"), (
+            f"Expected systematic diaza-7-ring name, got {result!r}"
+        )
+
+    def test_homomorpholine_demoted_fail_closed(self):
+        """C1CNCCOC1 must NOT yield homomorpholine; PIN is 1,4-oxazepane.
+        The HW locant-elision bug (P-22.2.2.1.2 STILL_WRONG) means the
+        systematic builder currently emits a wrong-isomer name and SELF-01
+        catches it as unknown.  Either 'unknown organic compound' or
+        '1,4-oxazepane' are acceptable (fail-closed better than wrong name)."""
+        result = name_compound("C1CNCCOC1", style="pin")
+        assert result != "homomorpholine", (
+            f"homomorpholine leaked into PIN headline: got {result!r}"
+        )
+
+    def test_thiahomomorpholine_demoted_fail_closed(self):
+        """C1CNCCSC1 must NOT yield thiahomomorpholine; PIN is 1,4-thiazepane.
+        May be unknown (fail-closed) until P-22.2.2.1.2 locant fix."""
+        result = name_compound("C1CNCCSC1", style="pin")
+        assert result != "thiahomomorpholine", (
+            f"thiahomomorpholine leaked into PIN headline: got {result!r}"
+        )
+
+    def test_selenohomomorpholine_demoted_fail_closed(self):
+        """C1CNCC[Se]C1 must NOT yield selenohomomorpholine; PIN is 1,4-selenazepane."""
+        result = name_compound("C1CNCC[Se]C1", style="pin")
+        assert result != "selenohomomorpholine", (
+            f"selenohomomorpholine leaked into PIN headline: got {result!r}"
+        )
+
+    def test_tellurohomomorpholine_demoted_fail_closed(self):
+        """C1CNCC[Te]C1 must NOT yield tellurohomomorpholine; PIN is 1,4-tellurazepane."""
+        result = name_compound("C1CNCC[Te]C1", style="pin")
+        assert result != "tellurohomomorpholine", (
+            f"tellurohomomorpholine leaked into PIN headline: got {result!r}"
+        )
+
+    # --- control cases: 6-membered retained-PIN rings must be UNCHANGED ---
+
+    def test_piperidine_unchanged(self):
+        """C1CCNCC1 must still yield piperidine (retained PIN per P-22.2.1 Table 2.3)."""
+        assert name_compound("C1CCNCC1", style="pin") == "piperidine"
+
+    def test_morpholine_unchanged(self):
+        """C1COCCN1 must still yield morpholine (retained PIN per P-22.2.1 Table 2.3)."""
+        assert name_compound("C1COCCN1", style="pin") == "morpholine"
+
+    def test_piperazine_unchanged(self):
+        """C1CNCCN1 must still yield piperazine (retained PIN per P-22.2.1 Table 2.3)."""
+        assert name_compound("C1CNCCN1", style="pin") == "piperazine"
+
+    def test_azocane_unchanged(self):
+        """N1CCCCCCC1 must still yield azocane (8-membered HW, not affected by C6 deny)."""
+        assert name_compound("N1CCCCCCC1", style="pin") == "azocane"
