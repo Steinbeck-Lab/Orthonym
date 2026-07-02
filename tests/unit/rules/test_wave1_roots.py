@@ -56,8 +56,13 @@ def test_r8c_hydroxamic_acid_pin():
 
 
 def test_r5_medium_rings_use_hantzsch_widman():
-    """P-22.2.3: saturated single-heteroatom rings of size 7-10 use Hantzsch-Widman
-    (oxepane/oxocane/oxonane/oxecane), not '1-oxacyclo...ane' skeletal replacement."""
+    """P-22.2.2.1: saturated heterocyclic rings of size 7-10 use Hantzsch-Widman
+    (oxepane/oxocane/oxonane/oxecane), not '1-oxacyclo...ane' skeletal replacement.
+
+    C6b (completes 1.7) extends this to SATURATED MULTI-heteroatom medium rings:
+    they too take the HW PIN (1,4-dioxepane), not the replacement form. Only
+    UNSATURATED single-rings and rings > 10 keep skeletal replacement.
+    """
     assert name_compound("O1CCCCCC1", style="pin") == "oxepane"    # 7
     assert name_compound("O1CCCCCCC1", style="pin") == "oxocane"   # 8
     assert name_compound("O1CCCCCCCC1", style="pin") == "oxonane"  # 9
@@ -65,8 +70,9 @@ def test_r5_medium_rings_use_hantzsch_widman():
     assert name_compound("S1CCCCCC1", style="pin") == "thiepane"   # S analogue
     # REGRESSION GUARD: 11+ rings stay skeletal-replacement
     assert "oxacycloundecane" in name_compound("O1CCCCCCCCCC1", style="pin")
-    # REGRESSION GUARD: multi-heteroatom / unsaturated 7-rings stay on replacement (NOT forced to HW)
-    assert name_compound("O1CCOCCC1", style="pin") == "1,4-dioxacycloheptane"
+    # C6b: saturated 2-heteroatom 7-ring now takes the HW PIN (was replacement).
+    assert name_compound("O1CCOCCC1", style="pin") == "1,4-dioxepane"
+    # REGRESSION GUARD: UNSATURATED 7-rings stay on replacement (NOT forced to HW).
     assert name_compound("O1CCCCC=C1", style="pin") == "1-oxacyclohept-2-ene"
 
 

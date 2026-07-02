@@ -218,29 +218,28 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
                 break
         if not all_rings_large_hetero:
             return None
-        # P-22.2.3: saturated single-heteroatom rings of size 7-10 use
-        # Hantzsch-Widman (oxepane/oxocane/oxonane/oxecane, etc.), NOT
-        # cyclic skeletal replacement. Route them back to HW by returning
-        # None here so the heterocycle handler takes over.
-        # Multi-heteroatom rings AND unsaturated single-heteroatom 7-10
-        # rings keep cyclic replacement (P-22.1.3).
+        # P-22.2.2.1: saturated heterocyclic rings of size 3-10 use
+        # Hantzsch-Widman naming (oxepane/azepane, and mixed-heteroatom PINs
+        # such as 1,4-oxazepane / 1,4-diazepane / 1,4-thiazepane), NOT cyclic
+        # skeletal ("aza"/"oxa") replacement. Route ALL saturated 7-10 single-
+        # ring heterocycles back to the HW namer here (return None) regardless
+        # of how many heteroatoms they carry — the HW builder emits the correct
+        # collected-locant PIN. Only UNSATURATED single-rings (mancude/partial)
+        # and rings > 10 keep cyclic replacement (P-22.1.3); those fall through.
         if len(ring_info.AtomRings()) == 1:
             _ring = ring_info.AtomRings()[0]
             _rsize = len(_ring)
             if 7 <= _rsize <= 10:
-                _hetero_count = sum(
-                    1 for idx in _ring
-                    if mol.GetAtomWithIdx(idx).GetSymbol() in REPLACEMENT_TERMS
+                # Check saturation: any double/triple ring bond?
+                _all_single = all(
+                    mol.GetBondBetweenAtoms(_ring[i], _ring[(i + 1) % _rsize])
+                    .GetBondTypeAsDouble() == 1.0
+                    for i in range(_rsize)
                 )
-                if _hetero_count == 1:
-                    # Check saturation: any double/triple bond in ring?
-                    _all_single = all(
-                        mol.GetBondBetweenAtoms(_ring[i], _ring[(i + 1) % _rsize])
-                        .GetBondTypeAsDouble() == 1.0
-                        for i in range(_rsize)
-                    )
-                    if _all_single:
-                        return None  # HW namer owns this: oxepane/oxocane/etc.
+                if _all_single:
+                    # HW namer owns saturated 7-10 rings: oxepane, azepane,
+                    # 1,4-oxazepane, 1,4-diazepane, 1,4-thiazepane, ...
+                    return None
         # For large heterocyclic rings (>= 11, or unsaturated/multi-heteroatom
         # 7-10-rings), try cyclic replacement naming per IUPAC P-22.1.3.
         # Keep the "no priority FGs" gate.

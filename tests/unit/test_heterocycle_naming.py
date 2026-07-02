@@ -358,12 +358,11 @@ class TestHWSystematicNaming:
     @pytest.mark.unit
     def test_hw_name_multiple_different_heteroatoms(self):
         """Test HW naming with multiple different heteroatoms."""
-        # O has higher priority than N, so oxa comes first
-        # Morpholine-like: O at 1, N at 4
+        # O has higher priority than N, so oxa comes first. N present -> -inane
+        # stem (P-22.2.2.1.2). Locants are collected once at the front (C6b).
+        # Morpholine-like connectivity but the HW form: O at 1, N at 4.
         result = build_hw_name([(1, 'O'), (4, 'N')], 6, True, False)
-        # Should be something like oxazinane (if not a retained name)
-        assert result.startswith("oxa")
-        assert "az" in result  # Contains aza prefix
+        assert result == "1,4-oxazinane"
 
     @pytest.mark.unit
     def test_hw_prefix_priority_order(self):
@@ -636,3 +635,75 @@ class TestNameHeterocycleFunction:
         mol = Chem.MolFromSmiles("C1COCCN1")
         ring = mol.GetRingInfo().AtomRings()[0]
         assert name_heterocycle(mol, ring) == "morpholine"
+
+
+# =============================================================================
+# C6b: Hantzsch-Widman PINs for 2-heteroatom medium rings (task 1.7 completion)
+# Blue Book P-22.2.2.1 — mixed-heteroatom saturated 3-10 rings get HW names,
+# NOT skeletal replacement. Locants are MANDATORY and load-bearing (bare
+# "oxazepane" round-trips to the 1,2-isomer, a different molecule).
+# =============================================================================
+
+class TestC6bMediumRingHWNames:
+    """2-heteroatom medium-ring HW PINs (C6b, completes 1.7)."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # 7-membered, O/S/Se/Te/N + N  -> {1,4} set
+        ("C1CNCCOC1", "1,4-oxazepane"),
+        ("C1CNCCNC1", "1,4-diazepane"),
+        ("C1CNCCSC1", "1,4-thiazepane"),
+        ("C1CNCC[Se]C1", "1,4-selenazepane"),
+        ("C1CNCC[Te]C1", "1,4-tellurazepane"),
+        # 5-membered O,N -> {1,3}, N-present -> -olidine stem
+        ("C1NCCO1", "1,3-oxazolidine"),
+    ])
+    def test_acceptance_targets(self, smiles, expected):
+        """Full pipeline: OPSIN-verified HW PINs for 2-heteroatom medium rings."""
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,expected", [
+        # Retained names MUST be untouched.
+        ("C1COCCN1", "morpholine"),
+        ("C1CNCCN1", "piperazine"),
+        ("C1NCCS1", "thiazolidine"),
+        ("C1CNCN1", "imidazolidine"),
+        ("C1CCNCC1", "piperidine"),
+        ("C1CCOCC1", "oxane"),
+        # Single-heteroatom HW MUST be untouched.
+        ("O1CCCCCC1", "oxepane"),
+        ("N1CCCCCC1", "azepane"),
+        # 6-membered 2-heteroatom that already names correctly.
+        ("O1CCOCC1", "1,4-dioxane"),
+    ])
+    def test_guards_unchanged(self, smiles, expected):
+        """Guard cases: retained names + single-het HW + correct 6-rings."""
+        assert name_compound(smiles) == expected
+
+
+class TestC6bBuildHWNameLocants:
+    """build_hw_name unit tests: mixed heteroatoms keep locants + correct stem."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("heteroatoms,ring_size,expected", [
+        # 7-membered mixed -> locants retained
+        ([(1, 'O'), (4, 'N')], 7, "1,4-oxazepane"),
+        ([(1, 'S'), (4, 'N')], 7, "1,4-thiazepane"),
+        ([(1, 'Se'), (4, 'N')], 7, "1,4-selenazepane"),
+        ([(1, 'Te'), (4, 'N')], 7, "1,4-tellurazepane"),
+        ([(1, 'N'), (4, 'N')], 7, "1,4-diazepane"),
+        # 5-membered O,N -> N-present stem -olidine + locants
+        ([(1, 'O'), (3, 'N')], 5, "1,3-oxazolidine"),
+        # 6-membered O,N -> N-present stem -inane + locants
+        ([(1, 'O'), (4, 'N')], 6, "1,4-oxazinane"),
+        # 6-membered O,S (NO nitrogen) -> -ane stem
+        ([(1, 'O'), (4, 'S')], 6, "1,4-oxathiane"),
+        # 5-membered O,S (NO nitrogen) -> -olane stem
+        ([(1, 'O'), (3, 'S')], 5, "1,3-oxathiolane"),
+        # 5-membered O,O (NO nitrogen) -> -olane (regression)
+        ([(1, 'O'), (3, 'O')], 5, "1,3-dioxolane"),
+    ])
+    def test_mixed_heteroatom_locants_and_stem(self, heteroatoms, ring_size, expected):
+        result = build_hw_name(heteroatoms, ring_size, True, False)
+        assert result == expected

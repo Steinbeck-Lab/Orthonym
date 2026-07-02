@@ -178,12 +178,15 @@ class TestUnsaturatedCyclicReplacement:
         assert 'diene' in result
 
     def test_saturated_still_works(self):
-        """Regression: saturated dioxacyclononane unchanged."""
-        mol = Chem.MolFromSmiles('C1COCCOCCC1')
-        result = try_skeletal_replacement_name(mol)
-        assert result is not None
-        assert 'ane' in result
-        assert 'ene' not in result
+        """C6b: a saturated 2-heteroatom 9-ring now takes the Hantzsch-Widman
+        PIN (1,4-dioxonane, P-22.2.2.1), so skeletal replacement DECLINES.
+        Unsaturated medium heterorings (below) still keep skeletal replacement.
+        """
+        from orthonym import name_compound
+        mol = Chem.MolFromSmiles('C1COCCOCCC1')  # saturated dioxa 9-ring
+        # Skeletal replacement declines; HW handler owns it.
+        assert try_skeletal_replacement_name(mol) is None
+        assert name_compound('C1COCCOCCC1') == '1,4-dioxonane'
 
     def test_aromatic_6member_not_replacement(self):
         """Aromatic rings should NOT get replacement naming (6-member < 7)."""
@@ -450,13 +453,14 @@ class TestCyclicReplacement:
     """
 
     @pytest.mark.parametrize("smiles,expected_name,ring_size", [
-        # Audit-verified Blue Book + corpus examples per 154-AUDIT-A.md §6
-        # Blue Book fixtures (BB_4, BB_7)
-        ("O1CCOCCOCC1", "1,4,7-trioxacyclononane", 9),
+        # Audit-verified Blue Book + corpus examples per 154-AUDIT-A.md §6.
+        # C6b: rings of size 7-10 (incl. 9-membered) now take the Hantzsch-Widman
+        # PIN (P-22.2.2.1), so ONLY rings > 10 remain on cyclic skeletal
+        # replacement here. The former 9-membered rows (1,4,7-trioxacyclononane /
+        # 1,4,7-triazacyclononane) moved to test_hw_owns_medium_rings below.
         ("O1CCOCCOCCOCC1", "1,4,7,10-tetraoxacyclododecane", 12),
         # Corpus fixtures (audit §6 rows 3-6)
         ("C1CNCCNCCCNCCNC1", "1,4,8,11-tetraazacyclotetradecane", 14),
-        ("C1CNCCNCCN1", "1,4,7-triazacyclononane", 9),
         ("C1COCCOCCNCCOCCOCCN1",
          "1,10-diaza-4,7,13,16-tetraoxacyclooctadecane", 18),
         ("C1COCCOCCOCCOCCOCCO1",
@@ -470,6 +474,22 @@ class TestCyclicReplacement:
             f"ring_size={ring_size}, smiles={smiles}, "
             f"expected={expected_name!r}, got={result!r}"
         )
+
+    @pytest.mark.parametrize("smiles,hw_name", [
+        # C6b (P-22.2.2.1): saturated 7-10-membered heterocycles take the HW PIN,
+        # NOT cyclic skeletal replacement. try_skeletal_replacement_name must
+        # DECLINE (return None) so the HW handler owns them. Both HW names below
+        # are OPSIN round-trip verified.
+        ("O1CCOCCOCC1", "1,4,7-trioxonane"),   # was 1,4,7-trioxacyclononane
+        ("C1CNCCNCCN1", "1,4,7-triazonane"),   # was 1,4,7-triazacyclononane
+    ])
+    def test_hw_owns_medium_rings(self, smiles, hw_name):
+        from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+        from orthonym import name_compound
+        mol = Chem.MolFromSmiles(smiles)
+        # Skeletal replacement declines; HW handler produces the PIN.
+        assert try_skeletal_replacement_name(mol) is None
+        assert name_compound(smiles) == hw_name
 
     @pytest.mark.parametrize("smiles", [
         # 4-6-member heterocycles MUST route to Hantzsch-Widman, NOT

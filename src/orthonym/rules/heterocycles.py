@@ -551,28 +551,39 @@ def build_hw_name(
             element_locants[elem] = []
         element_locants[elem].append(locant)
 
-    # Build prefix parts, ordered by IUPAC priority
-    prefix_parts = []
+    # Order elements by IUPAC (Hantzsch-Widman) seniority: F > Cl > Br > I >
+    # O > S > Se > Te > N > P ... (P-22.2.2.1 / Table 2.8). Prefixes are cited
+    # in this order.
     elements_by_priority = sorted(
         element_locants.keys(),
         key=lambda e: HETEROATOM_PRIORITY.get(e, 999)
     )
 
+    # Collect the FULL heteroatom locant set (P-22.2.2.1.3): for a HW name with
+    # more than one heteroatom, ALL locants are cited ONCE at the front as a
+    # single ascending set (e.g. 1,4-oxazepane, 1,3,5-oxadiazinane), NOT
+    # distributed per prefix. A single heteroatom carries no locant (oxolane,
+    # azepane). This is the fix that keeps mixed-element medium rings from
+    # dropping their locants (bare 'oxazepane' is the 1,2-isomer — a different
+    # molecule).
+    all_locants = sorted(loc for locs in element_locants.values() for loc in locs)
+    total_het = len(all_locants)
+    locant_prefix = ""
+    if total_het > 1:
+        locant_prefix = ','.join(str(loc) for loc in all_locants) + '-'
+
+    # Build the element prefix chain in seniority order, each element carrying
+    # only its di/tri/... multiplier (locants already collected above).
+    prefix_parts = []
     for elem in elements_by_priority:
         hw_prefix = get_hw_prefix(elem)
         if not hw_prefix:
             continue
-
-        locants = sorted(element_locants[elem])
-        count = len(locants)
-
+        count = len(element_locants[elem])
         if count > 1:
-            # Multiple same heteroatoms: add locants and multiplier
-            locant_str = ','.join(str(loc) for loc in locants)
             multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-            prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
+            prefix_parts.append(f"{multiplier}{hw_prefix}")
         else:
-            # Single heteroatom: just the prefix
             prefix_parts.append(hw_prefix)
 
     # Join prefix parts with 'a' elision between them:
@@ -592,11 +603,20 @@ def build_hw_name(
     # Aromatic = unsaturated for HW naming purposes
     saturated_for_stem = is_saturated and not is_aromatic
 
-    # Get the dominant heteroatom (highest priority) for stem selection
+    # Stem selection (P-22.2.2.1.2, Table 2.3): the saturated 3-6-ring stem
+    # takes its N-containing form (-iridine/-etidine/-olidine/-inane) whenever
+    # NITROGEN is present ANYWHERE in the ring — not merely when the senior
+    # heteroatom is N. So 1,3-oxazolidine (O senior, N present) uses -olidine
+    # and 1,4-oxazinane uses -inane, while N-free rings (1,3-oxathiolane,
+    # 1,4-oxathiane) keep -olane/-ane. get_hw_stem selects the N-form when its
+    # `heteroatom` arg is 'N', so pass 'N' iff any ring heteroatom is nitrogen;
+    # otherwise pass the senior element (which drives the 6-ring O/S -ane form).
+    has_nitrogen = 'N' in element_locants
     dominant_elem = elements_by_priority[0] if elements_by_priority else 'O'
+    stem_heteroatom = 'N' if has_nitrogen else dominant_elem
 
-    # Get stem based on ring size, saturation, and dominant heteroatom
-    stem = get_hw_stem(ring_size, saturated_for_stem, dominant_elem)
+    # Get stem based on ring size, saturation, and stem-driving heteroatom
+    stem = get_hw_stem(ring_size, saturated_for_stem, stem_heteroatom)
     if not stem:
         stem = ""
 
@@ -604,7 +624,7 @@ def build_hw_name(
     if prefix.endswith('a') and stem and stem[0] in 'aeiou':
         prefix = prefix[:-1]
 
-    return prefix + stem
+    return locant_prefix + prefix + stem
 
 
 def _mancude_monocycle_parent(mol, ring_atoms):
