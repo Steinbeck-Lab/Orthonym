@@ -256,6 +256,61 @@ ALL_RETAINED_NAMES: Dict[str, str] = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}
 RETAINED_NAMES = ALL_RETAINED_NAMES
 
 
+# Task 1.9 (PIN-policy --trivial fallback): the general-only retained names —
+# exactly the entries the PIN deny gate EXCLUDES from ALL_RETAINED_NAMES. The
+# default (PIN) pipeline never consults this dict (fail-closed); the opt-in
+# ``Orthonym(trivial_fallback=True)`` / CLI ``--trivial`` path falls back to it
+# by canonical SMILES ONLY when the systematic pipeline produced no derivable
+# PIN. Two contributing sources, mirroring the two deny surfaces:
+#   (a) hand-curated entries filtered out by ``_PIN_DENY_HC`` (e.g. glycerol,
+#       allyl alcohol, chloroform, catechol, nicotinic acid), and
+#   (b) OPSIN-import candidates blocked SOLELY by ``_PIN_DENY`` membership —
+#       i.e. names that WOULD have promoted (S1 or S2, and S3 in non-provisional
+#       mode) but for the explicit deny (e.g. dihydroxalate, dihydrotartrate,
+#       glyoxal, phosgene). Candidates that fail promotion for OTHER reasons
+#       (stem heuristic, absent round-trip) are NOT re-admitted here.
+# Hand-curated wins key collisions (same precedence as ALL_RETAINED_NAMES).
+def _opsin_blocked_solely_by_deny(smiles: str, name: str) -> bool:
+    """True iff the OPSIN candidate would have promoted but for the deny gate.
+
+    Reconstructs ``_is_promotable`` WITHOUT its ``_PIN_DENY`` short-circuit:
+    the candidate must satisfy the real promotion rule ((S1 OR S2) AND S3, or
+    (S1 OR S2) in provisional mode) AND be explicitly denied. This excludes
+    candidates that fail promotion for any reason other than the deny.
+    """
+    name_lower = name.lower().strip()
+    if name_lower not in _PIN_DENY:
+        return False
+    s1 = _is_complete_name(name)
+    s2 = name_lower in _PIN_ALLOW
+    if _PROVISIONAL_MODE:
+        return s1 or s2
+    s3 = smiles in _ROUNDTRIP_PASS
+    return (s1 or s2) and s3
+
+
+_GENERAL_OPSIN: Dict[str, str] = {
+    smi: name for smi, name in _OPSIN_NAMES_RAW.items()
+    if _opsin_blocked_solely_by_deny(smi, name)
+}
+_GENERAL_HAND_CURATED: Dict[str, str] = {
+    smi: name for smi, name in _HAND_CURATED_NAMES.items()
+    if name.lower().strip() in _PIN_DENY_HC
+}
+GENERAL_RETAINED_NAMES: Dict[str, str] = {
+    **_GENERAL_OPSIN, **_GENERAL_HAND_CURATED
+}
+
+
+def get_general_retained_name(canonical_smiles: str) -> Optional[str]:
+    """Look up a general-only (PIN-denied) retained name by canonical SMILES.
+
+    Returns None when no such name exists. Consulted ONLY by the ``--trivial``
+    fallback path (Task 1.9); the default PIN pipeline never calls this.
+    """
+    return GENERAL_RETAINED_NAMES.get(canonical_smiles)
+
+
 def get_retained_name(canonical_smiles: str) -> Optional[str]:
     """Look up retained name from merged dictionary."""
     return ALL_RETAINED_NAMES.get(canonical_smiles)
@@ -290,4 +345,5 @@ if _conflict_count > 0:
     )
 
 __all__ = ["RETAINED_NAMES", "ALL_RETAINED_NAMES", "get_retained_name",
-           "has_retained_name", "register_retained_name"]
+           "has_retained_name", "register_retained_name",
+           "GENERAL_RETAINED_NAMES", "get_general_retained_name"]

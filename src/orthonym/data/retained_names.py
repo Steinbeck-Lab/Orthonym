@@ -52,7 +52,15 @@ RETAINED_NAMES = {
     "CC(=O)O": "acetic acid",
     "CCC(=O)O": "propanoic acid",  # propionic acid is also accepted
     "CCCC(=O)O": "butanoic acid",  # butyric acid is also accepted
-    "OC(=O)C(O)=O": "oxalic acid",
+    # Task 1.10 (PIN-policy): canonicalized key fix. The old non-canonical
+    # key OC(=O)C(O)=O never matched (every input canonicalizes to
+    # O=C(O)C(=O)O), so the canonical SMILES resolved to the OPSIN-import
+    # 'dihydroxalate' instead. Re-key to canonical + deny 'dihydroxalate' in
+    # iupac_2013_pin_list.json so this retained PIN (P-65.1.1.1) wins the merge.
+    "O=C(O)C(=O)O": "oxalic acid",
+    # Task 1.10 (PIN-policy): oxamic acid is a retained PIN (P-65.1.1.1) with no
+    # prior key (systematic engine emits '1-carbamoylmethanoic acid' otherwise).
+    "NC(=O)C(=O)O": "oxamic acid",
     "OC(=O)CC(=O)O": "malonic acid",
     "OC(=O)CCC(=O)O": "succinic acid",
     "OC(=O)CCCC(=O)O": "glutaric acid",
@@ -180,6 +188,11 @@ RETAINED_NAMES = {
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",
     "ClC(Cl)(Cl)Cl": "carbon tetrachloride",
+    # Task 1.10 (PIN-policy): carbonyl dichloride IS the P-65.5.5.1 PIN for
+    # phosgene (functional-class name the substitutive engine cannot derive;
+    # it goes to unknown otherwise). Canonical key of ClC(=O)Cl. The trivial
+    # 'phosgene' (OPSIN import) is denied in iupac_2013_pin_list.json.
+    "O=C(Cl)Cl": "carbonyl dichloride",
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",

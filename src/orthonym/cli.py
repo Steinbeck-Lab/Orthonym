@@ -124,6 +124,23 @@ def main(args: List[str] = None) -> int:
         ),
     )
 
+    # Task 1.9 (PIN-policy): --trivial fallback flag. Default OFF (PIN fails
+    # closed). When set, a general-only (PIN-denied) retained name is returned
+    # ONLY when the default pipeline could not derive a PIN — a fallback, never
+    # a downgrade of a derivable PIN.
+    parser.add_argument(
+        "--trivial",
+        dest="trivial_fallback",
+        action="store_true",
+        default=False,
+        help=(
+            "Fall back to a general-only (non-PIN) retained trivial name when "
+            "the default PIN pipeline cannot derive a preferred IUPAC name. "
+            "Never downgrades a derivable PIN (e.g. glycerol SMILES still "
+            "yields propane-1,2,3-triol). Default OFF (PIN fails closed)."
+        ),
+    )
+
     parsed = parser.parse_args(args)
     
     # Batch processing mode
@@ -216,9 +233,11 @@ def main(args: List[str] = None) -> int:
 
         # Phase 168 D-08: thread the triviality-controller flag through
         # name_compound. getattr defensive pattern preserves backwards compat.
+        # Task 1.9: also thread the --trivial fallback flag.
         name_kwargs = {
             "enable_triviality_controller": getattr(
                 parsed, "enable_triviality_controller", False),
+            "trivial_fallback": getattr(parsed, "trivial_fallback", False),
         }
 
         if parsed.confidence:

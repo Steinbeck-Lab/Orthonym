@@ -1076,6 +1076,7 @@ class Orthonym:
                  _disable_opsin_validity_gate: bool = False,
                  enable_triviality_controller: bool = False,
                  enable_group_splitting: bool = False,
+                 trivial_fallback: bool = False,
                  _principal_group_override: Optional[str] = None):
         """
         Initialize namer.
@@ -1099,8 +1100,20 @@ class Orthonym:
                 OpsinOracle is instantiated for the TRIV-03 T2 RT-safety
                 gate. Env override:
                 ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on.
+            trivial_fallback: PIN-policy fallback flag (CLI ``--trivial``).
+                Default False (PIN fails closed). When True, a general-only
+                (PIN-denied) retained name is returned ONLY when the default
+                pipeline could not derive a PIN — a FALLBACK, never a
+                downgrade of a derivable PIN. Per the PIN-policy contract
+                (context resolution 3) this ALSO implies
+                ``enable_triviality_controller=True`` (one user intent:
+                "allow non-PIN trivial output").
         """
         self.style = style
+        # Task 1.9 (PIN-policy): fallback-only opt-in. When True the name path
+        # substitutes a general-only retained name for the "unknown organic
+        # compound" failure signal; it never overrides a derived PIN.
+        self._trivial_fallback: bool = trivial_fallback
         # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
@@ -1145,7 +1158,11 @@ class Orthonym:
 
         # Phase 168 D-08: triviality-controller opt-in (default OFF = Stage A SACRED
         # byte-identical canary invariant). Env override via ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER.
-        self._enable_triviality_controller: bool = enable_triviality_controller or _DEFAULT_TRIV
+        # Task 1.9 (context resolution 3): trivial_fallback=True implies the
+        # triviality controller (one user intent: "allow non-PIN trivial output").
+        self._enable_triviality_controller: bool = (
+            enable_triviality_controller or _DEFAULT_TRIV or trivial_fallback
+        )
         # WARNING #9 fix (CRITICAL for TRIV-03 runtime per CONTEXT D-07): instantiate the OpsinOracle
         # when the flag is ON so the T2 RT-safety gate can run. Without it, OpsinOracle.rt_safe
         # degrades to the permissive always-True fallback and TRIV-03 runtime enforcement is silently
@@ -1419,7 +1436,9 @@ class Orthonym:
                     _limit.smiles = smiles
                 if raise_on_limit and is_top_level_naming():
                     raise
-                return _limit.message
+                # Task 1.9: PIN fails closed; --trivial falls back to a
+                # general-only retained name when no PIN could be derived.
+                return self._apply_trivial_fallback(_limit.message, smiles)
             # Universal stereo backstop (Phase 140, STER-16)
             # Only apply at top level -- decomposition fragments handle stereo
             # through their own naming paths.
@@ -1459,9 +1478,38 @@ class Orthonym:
                 _probe = Chem.MolFromSmiles(smiles)
                 if _probe is not None:
                     raise classify_failure_limit(_probe, smiles=smiles)
-            return result
+            # Task 1.9: PIN fails closed; --trivial falls back to a general-only
+            # retained name when the systematic pipeline derived no PIN.
+            return self._apply_trivial_fallback(result, smiles)
         finally:
             end_naming_session()
+
+    def _apply_trivial_fallback(self, result: str, smiles: str) -> str:
+        """Task 1.9 (PIN-policy --trivial fallback).
+
+        Returns ``result`` unchanged unless ALL of these hold:
+          - ``self._trivial_fallback`` is set (opt-in), AND
+          - naming produced only the failure signal (``is_failure_name``), AND
+          - a general-only (PIN-denied) retained name exists for the molecule.
+        In that single case the general-only trivial name is returned. This is
+        a fallback for an underivable PIN, never a downgrade of a derived PIN
+        (a real name is never a failure name, so this can never fire on one).
+        Applied only at the top level so recursive fragment calls are unaffected.
+        """
+        if not self._trivial_fallback:
+            return result
+        from .assembly.fragment_naming import is_top_level_naming
+        if not is_top_level_naming():
+            return result
+        if not is_failure_name(result):
+            return result
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return result
+        from .data import get_general_retained_name
+        canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
+        trivial = get_general_retained_name(canonical_smiles)
+        return trivial if trivial else result
 
     def name_with_confidence(self, smiles: str) -> dict:
         """Generate IUPAC name with confidence metadata.
@@ -2634,6 +2682,7 @@ def name_compound(smiles: str, style: str = "pin",
                    *,
                    enable_triviality_controller: bool = False,
                    enable_group_splitting: bool = False,
+                   trivial_fallback: bool = False,
                    raise_on_limit: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
@@ -2661,8 +2710,8 @@ def name_compound(smiles: str, style: str = "pin",
         >>> name_compound("c1ccccc1")
         'benzene'
         >>> name_compound("C=CCO")
-        'allyl alcohol'
-        >>> name_compound("C=CCO", style="systematic")
+        'prop-2-en-1-ol'
+        >>> name_compound("C=CCO", trivial_fallback=True)
         'prop-2-en-1-ol'
         >>> name_compound("CCO", include_confidence=True)
         {'name': 'ethanol', 'confidence': 1.0, ...}
@@ -2671,6 +2720,7 @@ def name_compound(smiles: str, style: str = "pin",
         style=style,
         enable_triviality_controller=enable_triviality_controller,
         enable_group_splitting=enable_group_splitting,
+        trivial_fallback=trivial_fallback,
     )
 
     if include_confidence:
