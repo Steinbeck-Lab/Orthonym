@@ -68,3 +68,4 @@ tmp_byte_identical_full/
 # OPSIN codebase (vendored at repo root for code reference per the contributor guide;
 # not part of Orthonym source. ~ 14 MB, 8 entries — keep local but untracked.)
 opsin/
+gate_verdict.json
