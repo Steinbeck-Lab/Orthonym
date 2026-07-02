@@ -146,7 +146,8 @@ def main(args: List[str] = None) -> int:
     # Batch processing mode
     if parsed.batch:
         return _process_batch(parsed.batch, parsed.output, parsed.style,
-                              parsed.verbose, parsed.confidence)
+                              parsed.verbose, parsed.confidence,
+                              getattr(parsed, 'trivial_fallback', False))
 
     # Single SMILES mode
     if not parsed.smiles:
@@ -270,7 +271,8 @@ def main(args: List[str] = None) -> int:
 
 
 def _process_batch(input_file: str, output_file: str, style: str,
-                    verbose: bool, confidence: bool = False) -> int:
+                    verbose: bool, confidence: bool = False,
+                    trivial_fallback: bool = False) -> int:
     """Process multiple SMILES from a file."""
     try:
         with open(input_file, 'r') as f:
@@ -289,13 +291,15 @@ def _process_batch(input_file: str, output_file: str, style: str,
         try:
             if confidence:
                 result = name_compound(smiles, style=style,
-                                       include_confidence=True)
+                                       include_confidence=True,
+                                       trivial_fallback=trivial_fallback)
                 results.append(
                     f"{smiles}\t{result['name']}\t"
                     f"{result['confidence']:.4f}\t{result['handler']}"
                 )
             else:
-                nm = name_compound(smiles, style=style)
+                nm = name_compound(smiles, style=style,
+                                   trivial_fallback=trivial_fallback)
                 results.append(f"{smiles}\t{nm}")
         except Exception as e:
             results.append(f"{smiles}\tERROR: {e}")

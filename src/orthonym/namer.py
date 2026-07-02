@@ -1538,8 +1538,10 @@ class Orthonym:
                 # descriptive-fallback name + the named limit code (no crash).
                 if _limit.smiles is None:
                     _limit.smiles = smiles
+                # Task 1.9 (C8): apply trivial fallback here, mirroring name().
+                _fallback_name = self._apply_trivial_fallback(_limit.message, smiles)
                 return {
-                    'name': _limit.message,
+                    'name': _fallback_name,
                     'confidence': 0.0,
                     'factors': {},
                     'handler': 'fallback',
@@ -1596,6 +1598,11 @@ class Orthonym:
                 if _lim is not None:
                     _limit = _lim.as_dict()
             metadata['limit'] = _limit
+
+            # Task 1.9 (C8): apply trivial fallback, mirroring name() line 1483.
+            # _apply_trivial_fallback is a no-op when trivial_fallback=False,
+            # when called recursively, or when a real PIN was derived — safe.
+            metadata['name'] = self._apply_trivial_fallback(metadata['name'], smiles)
 
             return metadata
         finally:
