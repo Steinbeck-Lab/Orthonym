@@ -1601,6 +1601,41 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
     if has_heteroatom or has_ring or carbon_count == 0:
         return None
 
+    # P-63.2.3.2 + P-14.5.2: branched alkyl groups must use (alkan-n-yl)oxy form
+    # with enclosing marks, NOT the retained n-alkyl names (propoxy, butoxy, etc.).
+    # A secondary or tertiary alkyl group attaches to O via a non-terminal carbon:
+    # the attachment carbon (alkyl_start) has >= 2 carbon neighbours within the
+    # fragment. Straight-chain alkyls always attach via a terminal carbon (1 C
+    # neighbour in the fragment). This correctly distinguishes isopropyl (2 C-nbrs
+    # at attach) from n-propyl (1 C-nbr at attach), without false positives for the
+    # middle carbon of n-propyl (which has 2 C-nbrs but is NOT the attachment point).
+    # The call to name_substituent_fragment is safe here because alkyl_sub_atoms
+    # excludes attach_idx (the ether O), so the recursed fragment has no O and
+    # _name_alkoxy_branch's O-check will not trigger inside that call.
+    frag_carbons = {idx for idx in visited if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'}
+    attach_c_nbrs_in_frag = [
+        n.GetIdx() for n in mol.GetAtomWithIdx(alkyl_start).GetNeighbors()
+        if n.GetIdx() in frag_carbons
+    ]
+    is_branched = len(attach_c_nbrs_in_frag) >= 2
+
+    if is_branched:
+        # Build the alkyl sub-fragment (all fragment atoms except the ether O)
+        alkyl_sub_atoms = [a for a in frag_atoms if a != attach_idx]
+        alkyl_name = name_substituent_fragment(
+            mol, alkyl_sub_atoms, alkyl_start, list(parent_atoms) + [attach_idx]
+        )
+        if alkyl_name and alkyl_name.endswith("yl"):
+            # P-14.5.2: the oxy suffix is appended to the alkyl name, then the
+            # whole compound substituent name is wrapped in enclosing marks.
+            # Correct: (propan-2-yloxy), NOT (propan-2-yl)oxy.
+            return f"({alkyl_name[:-2]}yloxy)"
+        # name_substituent_fragment failed — fall through to ALKOXY_NAMES approximation
+
+    # TODO: _check_for_alkoxy (composer.py) and get_alkoxy_prefix
+    # (substituent_prefix_forms.py) share the same ALKOXY_NAMES table and have the
+    # same branching bug; fix them too if those paths are ever extended to pure-ether
+    # whole-molecule naming.
     ALKOXY_NAMES = {
         1: "methoxy", 2: "ethoxy", 3: "propoxy", 4: "butoxy",
         5: "pentyloxy", 6: "hexyloxy", 7: "heptyloxy", 8: "octyloxy",

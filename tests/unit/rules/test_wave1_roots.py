@@ -108,3 +108,43 @@ def test_r4_simple_ethers_substitutive():
     assert name_compound("COCCOC", style="pin") == "1,2-dimethoxyethane"  # was 2,5-dioxahexane
     # REGRESSION GUARD: genuine replacement chain (terminal -ol) must NOT change:
     assert name_compound("OCCOCCOCC", style="pin") == "3,6-dioxaoctan-1-ol"
+
+
+# ---------------------------------------------------------------------------
+# C5 — branched alkoxy substituents (P-63.2.3.2 / P-14.5.2)
+# ---------------------------------------------------------------------------
+
+def test_c5_branched_alkoxy_substitutive():
+    """P-63.2.3.2 + P-14.5.2: branched alkoxy groups (isopropyl, sec-butyl, etc.)
+    must use (alkan-n-yl)oxy form with enclosing marks, not the retained
+    n-alkyl names (propoxy/butoxy).  The decomposition path lacks per-atom
+    locant info and must be vetoed for pure-alkyl ethers where both sides
+    have >= 3 heavy atoms — these must be routed to the GENERAL substitutive path.
+
+    OPSIN-verified expected names:
+      CC(C)OCC         -> 2-ethoxypropane          (isopropyl side < 3C still GENERAL)
+      CCC(C)OC         -> 2-methoxybutane           (sec-butyl side < 3C still GENERAL)
+      C(C)(C)(C)OC     -> 2-methoxy-2-methylpropane (t-butyl side < 3C still GENERAL)
+      CC(C)OC(C)C      -> 2-(propan-2-yloxy)propane  (both sides branched 3C — NEW FIX)
+      CC(C)OCCC        -> 1-(propan-2-yloxy)propane  (isopropyl vs propyl  — NEW FIX)
+      CCCCOC(C)C       -> 1-(propan-2-yloxy)butane   (butyl vs isopropyl   — NEW FIX)
+
+    Linear controls (must stay correct — these pass through GENERAL path already):
+      CCCOCCC          -> 1-propoxypropane
+      CCC(C)OCCC       -> 2-propoxybutane
+      CCCCOCCCC        -> 1-butoxybutane
+    """
+    # ALREADY PASSING (isopropyl/sec-butyl/t-butyl with methoxy/ethoxy — one side < 3C):
+    assert name_compound("CC(C)OCC", style="pin") == "2-ethoxypropane"
+    assert name_compound("CCC(C)OC", style="pin") == "2-methoxybutane"
+    assert name_compound("C(C)(C)(C)OC", style="pin") == "2-methoxy-2-methylpropane"
+
+    # C5 NEW FIXES — both sides >= 3 heavy atoms, one/both branched:
+    assert name_compound("CC(C)OC(C)C", style="pin") == "2-(propan-2-yloxy)propane"
+    assert name_compound("CC(C)OCCC", style="pin") == "1-(propan-2-yloxy)propane"
+    assert name_compound("CCCCOC(C)C", style="pin") == "1-(propan-2-yloxy)butane"
+
+    # LINEAR CONTROLS — must still pass:
+    assert name_compound("CCCOCCC", style="pin") == "1-propoxypropane"
+    assert name_compound("CCC(C)OCCC", style="pin") == "2-propoxybutane"
+    assert name_compound("CCCCOCCCC", style="pin") == "1-butoxybutane"
