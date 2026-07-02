@@ -169,36 +169,36 @@ def number_heterocycle_ring(
         # No heteroatoms - not a true heterocycle, return as-is
         return ring_list
 
-    # Find highest-priority heteroatom for position 1
-    sorted_heteroatoms = sorted(
-        heteroatoms,
-        key=lambda x: get_heteroatom_priority(x[1])
-    )
-    start_idx = sorted_heteroatoms[0][0]  # Atom index of highest priority
-
-    # Find position of start atom in ring list
-    start_pos = ring_list.index(start_idx)
+    # P-31.1.4.3.3: find the highest-priority element (lowest priority number).
+    best_prio = min(get_heteroatom_priority(sym) for _, sym in heteroatoms)
+    best_starts = [(idx, sym) for idx, sym in heteroatoms
+                   if get_heteroatom_priority(sym) == best_prio]
 
     # If only one heteroatom, direction doesn't matter
     if len(heteroatoms) == 1:
-        # Rotate so start atom is first, arbitrary direction
+        start_pos = ring_list.index(best_starts[0][0])
         return _rotate_ring(ring_list, start_pos, 1)
 
-    # Multiple heteroatoms - try both directions and pick lowest locants
-    cw = _rotate_ring(ring_list, start_pos, 1)   # Clockwise
-    ccw = _rotate_ring(ring_list, start_pos, -1)  # Counterclockwise
-
-    # Get locants for OTHER heteroatoms (not position 1) in each direction
-    cw_locants = _get_other_heteroatom_locants(cw, heteroatoms, start_idx)
-    ccw_locants = _get_other_heteroatom_locants(ccw, heteroatoms, start_idx)
-
-    # Compare using first-point-of-difference
-    comparison = _compare_locant_sets(cw_locants, ccw_locants)
-
-    if comparison <= 0:
-        return cw
-    else:
-        return ccw
+    # Try ALL equal-priority start atoms in both directions; pick the
+    # (start, direction) that gives the lexicographically minimum sorted
+    # all-heteroatom locant set (P-31.1.4.3.3 lowest-locant criterion).
+    # Use canonical rank as a tiebreaker to ensure determinism.
+    _canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    best_oriented = None
+    best_key = None
+    for start_idx, _ in best_starts:
+        start_pos = ring_list.index(start_idx)
+        for direction in (1, -1):
+            oriented = _rotate_ring(ring_list, start_pos, direction)
+            other_locs = _get_other_heteroatom_locants(oriented, heteroatoms, start_idx)
+            all_locs = sorted([1] + other_locs)
+            # Tiebreaker: canonical rank sequence of the oriented ring
+            canon_key = [_canon_rank[a] for a in oriented]
+            key = (all_locs, canon_key)
+            if best_key is None or key < best_key:
+                best_oriented = oriented
+                best_key = key
+    return best_oriented
 
 
 def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
@@ -308,19 +308,17 @@ def orient_heterocycle_with_substituents(
         atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(ring_list, 1)}
         return ring_list, atom_to_locant
 
-    # Find highest-priority heteroatom for position 1. Among EQUAL-priority
-    # heteroatoms (e.g. the two N of imidazole / pyrazole / pyrimidine) the choice
-    # of which becomes position 1 MUST be both deterministic and IUPAC-correct.
-    # The prior key used ONLY element priority, so Python's stable sort left the
-    # tie broken by the heteroatoms' list order = ascending ATOM INDEX, which
-    # flips with the SMILES spelling -> nondeterministic numbering (imidazolium
-    # came out 'imidazol-1-ium' from one spelling and 'imidazol-3-ium' from
-    # another). Break the tie by, in order: (a) P-31.1.4.3.4 indicated hydrogen —
-    # a pyrrole-type ring atom bearing an H takes the lower locant (the NH of
-    # imidazole is position 1, so the other N is 3); (b) a CANONICAL atom rank
-    # (input-order INDEPENDENT) as the final deterministic discriminator. Rings
-    # with a UNIQUE senior heteroatom (pyridine/furan/…) have no tie, so their
-    # numbering is byte-identical.
+    # Find the best (priority, H_count) tier from sorted heteroatoms.
+    # P-31.1.4.3.4: heteroatom bearing indicated H (pyrrole-type) takes
+    # the lower locant; (a) element priority, (b) H_count (lower=better),
+    # (c) canonical rank for deterministic tiebreaking.
+    # For rings where all heteroatoms are equal-priority AND equal-H_count
+    # (e.g. three sp2 N in 1,2,4-triazine) the old code fixed a single
+    # start atom, producing wrong locants when that atom wasn't the optimal
+    # choice.  The new code collects ALL atoms sharing the best
+    # (priority, h_count) tier and tries every one as position-1 candidate,
+    # picking the (start, direction) pair that yields the globally minimum
+    # tiered (hetero > pg > sub) locant comparison.
     _canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     sorted_heteroatoms = sorted(
         heteroatoms,
@@ -330,53 +328,38 @@ def orient_heterocycle_with_substituents(
             _canon_rank[x[0]],
         )
     )
-    start_idx = sorted_heteroatoms[0][0]
-    start_pos = ring_list.index(start_idx)
+    best_prio = get_heteroatom_priority(sorted_heteroatoms[0][1])
+    best_hcount = 0 if mol.GetAtomWithIdx(sorted_heteroatoms[0][0]).GetTotalNumHs() >= 1 else 1
+    # Collect all atoms that share the best (priority, h_count) tier
+    start_candidates = [
+        idx for idx, sym in heteroatoms
+        if get_heteroatom_priority(sym) == best_prio
+        and (0 if mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1 else 1) == best_hcount
+    ]
 
-    # Try both directions
-    cw = _rotate_ring(ring_list, start_pos, 1)
-    ccw = _rotate_ring(ring_list, start_pos, -1)
-
-    # Build position lookups
-    cw_map = {atom_idx: pos for pos, atom_idx in enumerate(cw, 1)}
-    ccw_map = {atom_idx: pos for pos, atom_idx in enumerate(ccw, 1)}
-
-    # Compare by heteroatom locants first (excluding position 1)
-    cw_hetero_locants = sorted([cw_map[idx] for idx, _ in heteroatoms if idx != start_idx])
-    ccw_hetero_locants = sorted([ccw_map[idx] for idx, _ in heteroatoms if idx != start_idx])
-
-    # Tiered lowest-locant comparison in P-14.4 order:
-    #   (1) other heteroatoms  ->  (2) principal group (suffix)  ->  (3) substituents
-    # First point of difference wins (compare_locant_sets), exactly mirroring the
-    # carbocyclic orient_cycloalkene Path A (pg before generic substituents).
     pg_set = principal_group_atoms or set()
 
-    def _direction_key(loc_map):
+    def _candidate_key(start_idx, direction):
+        """Return the tiered comparison key for a given (start, direction)."""
+        s_pos = ring_list.index(start_idx)
+        oriented_r = _rotate_ring(ring_list, s_pos, direction)
+        loc_map = {atom_idx: pos for pos, atom_idx in enumerate(oriented_r, 1)}
         hetero = sorted(loc_map[idx] for idx, _ in heteroatoms if idx != start_idx)
         pg = sorted(loc_map[idx] for idx in pg_set if idx in loc_map)
         sub = sorted(loc_map[idx] for idx in substituent_positions if idx in loc_map)
-        return hetero, pg, sub
+        canon = [_canon_rank[a] for a in oriented_r]
+        return (hetero, pg, sub, canon), oriented_r
 
-    cw_h, cw_pg, cw_sub = _direction_key(cw_map)
-    ccw_h, ccw_pg, ccw_sub = _direction_key(ccw_map)
+    best_key = None
+    best_oriented = None
+    for start_idx in start_candidates:
+        for direction in (1, -1):
+            key, oriented_r = _candidate_key(start_idx, direction)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_oriented = oriented_r
 
-    cmp = _compare_locant_sets(cw_h, ccw_h)
-    if cmp == 0:
-        cmp = _compare_locant_sets(cw_pg, ccw_pg)
-    if cmp == 0:
-        cmp = _compare_locant_sets(cw_sub, ccw_sub)
-    if cmp == 0:
-        # Genuine tie (symmetric ring, or every ring position substituted so the
-        # locant sets coincide). Break it on a CANONICAL atom rank so the choice
-        # is independent of the input SMILES atom order — otherwise the direction
-        # is decided by atom order and the numbering is non-deterministic across
-        # equivalent SMILES (CARB-01). Mirrors the heteroatom-selection tie-break.
-        cw_rank = [_canon_rank[a] for a in cw]
-        ccw_rank = [_canon_rank[a] for a in ccw]
-        cmp = -1 if cw_rank <= ccw_rank else 1
-
-    # cmp <= 0 keeps cw (preserves the prior tie-goes-to-cw behaviour).
-    oriented = cw if cmp <= 0 else ccw
+    oriented = best_oriented
 
     atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(oriented, 1)}
     return oriented, atom_to_locant
@@ -1704,6 +1687,27 @@ def name_substituted_heterocycle(
     return combined
 
 
+def _fully_enclosed(n: str) -> bool:
+    """
+    Return True only when a SINGLE outer pair of parentheses spans the whole
+    name — '(pyridin-2-yl)' -> True; '(naphthalen-2-yl)methyl' -> False
+    (the paren closes before 'methyl', so enclosure is NOT complete).
+
+    Used by both _format_n_substituent and _format_c_substituent.
+    """
+    if not (n.startswith('(') and n.endswith(')')):
+        return False
+    depth = 0
+    for i, ch in enumerate(n):
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0:
+                return i == len(n) - 1
+    return False
+
+
 def _format_n_substituent(name: str, count: int, locants=None) -> str:
     """
     Format an N-substituent prefix.
@@ -1715,7 +1719,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
     names get the same P-16.3.3 enclosure as C-substituents.
     """
     from ..assembly.naming_utils import (
-        _wrap_n_substituent, is_complex_substituent,
+        _wrap_n_substituent, is_complex_substituent, needs_brackets,
     )
     if locants:
         from ..assembly.naming_utils import _has_stereo_prefix
@@ -1725,7 +1729,12 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
             # brackets: '1-[(S)-sec-butyl]...' (the naive startswith('(')
             # check skipped enclosure and emitted '1-(S)-sec-butyl...').
             display = f'[{name}]'
-        elif is_complex_substituent(name) and not name.startswith('('):
+        elif not _fully_enclosed(name) and (
+                is_complex_substituent(name) or needs_brackets(name)):
+            # P-16.3.3: a name that is NOT fully enclosed by one outer pair of
+            # parentheses — e.g. '(pyrimidin-5-yl)methyl' where the paren closes
+            # before 'methyl' — still needs enclosure. Use [] when the name
+            # already contains '(' (nesting rule), else use ().
             display = f'[{name}]' if '(' in name else f'({name})'
         locant_str = ",".join(str(loc) for loc in sorted(locants))
         if count == 1:
@@ -1760,21 +1769,7 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
         is_complex_substituent, needs_brackets, _has_stereo_prefix,
     )
 
-    def _fully_enclosed(n: str) -> bool:
-        # True only when ONE outer pair of parens spans the whole name —
-        # '(pyridin-2-yl)' yes; '(naphthalen-2-yl)methyl' NO (the marks
-        # close before 'methyl', so the name still needs enclosure).
-        if not (n.startswith('(') and n.endswith(')')):
-            return False
-        depth = 0
-        for i, ch in enumerate(n):
-            if ch == '(':
-                depth += 1
-            elif ch == ')':
-                depth -= 1
-                if depth == 0:
-                    return i == len(n) - 1
-        return False
+    # _fully_enclosed is defined at module level (shared with _format_n_substituent)
 
     if _has_stereo_prefix(name):
         # Name has CIP stereo prefix like "(R)-sec-butyl":

@@ -457,7 +457,9 @@ class TestTriazines:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1nncnn1", "1,2,4-triazine"),
+        # C7 fix: correct canonical SMILES for 1,2,4-triazine is c1cnncn1 (3 N, one N-N bond)
+        # The old key c1nncnn1 had 4 N atoms (tetrazine) — wrong SMILES.
+        ("c1cnncn1", "1,2,4-triazine"),
         ("c1ncncn1", "1,3,5-triazine"),
     ])
     def test_triazine_retained_names(self, smiles, expected):

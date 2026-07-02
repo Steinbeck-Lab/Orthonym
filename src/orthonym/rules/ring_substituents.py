@@ -190,6 +190,24 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
                     else:  # min_sep == 2 = meta = pyrimidine
                         return 'pyrimidine'
                 return 'pyrimidine'  # fallback
+            elif heteroatoms == ['N', 'N', 'N']:
+                # Distinguish triazine isomers by counting adjacent N-N bonds:
+                #   0 adjacent pairs -> 1,3,5-triazine (sym-triazine)
+                #   1 adjacent pair  -> 1,2,4-triazine (as-triazine PIN)
+                #   2 adjacent pairs -> 1,2,3-triazine (v-triazine)
+                n_indices = [idx for idx in ring_atoms
+                             if mol.GetAtomWithIdx(idx).GetSymbol() == 'N']
+                adj_count = sum(
+                    1 for i in range(len(n_indices))
+                    for j in range(i + 1, len(n_indices))
+                    if mol.GetBondBetweenAtoms(n_indices[i], n_indices[j]) is not None
+                )
+                if adj_count == 0:
+                    return '1,3,5-triazine'
+                elif adj_count == 1:
+                    return '1,2,4-triazine'
+                else:
+                    return '1,2,3-triazine'
         else:
             # Saturated 6-membered
             if not heteroatoms:
@@ -295,6 +313,10 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'oxolane': 'oxolan',
     'thiane': 'thian',
     'thiolane': 'thiolan',
+    # P-31.1.4.2: triazine PIN stems
+    '1,2,4-triazine': '1,2,4-triazin',
+    '1,2,3-triazine': '1,2,3-triazin',
+    '1,3,5-triazine': '1,3,5-triazin',
 }
 
 # Element seniority for assigning low locants to heteroatoms (IUPAC Table 28:

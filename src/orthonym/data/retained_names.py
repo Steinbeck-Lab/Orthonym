@@ -123,7 +123,7 @@ RETAINED_NAMES = {
     "c1ccnnc1": "pyridazine",
     "c1cncnc1": "pyrimidine",
     "c1cnccn1": "pyrazine",
-    "c1nncnn1": "1,2,4-triazine",
+    "c1cnncn1": "1,2,4-triazine",
     "c1ncncn1": "1,3,5-triazine",
     
     # === FUSED HETEROCYCLES ===
