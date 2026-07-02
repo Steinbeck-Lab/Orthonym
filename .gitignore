@@ -68,4 +68,7 @@ tmp_byte_identical_full/
 # OPSIN codebase (vendored at repo root for code reference per the contributor guide;
 # not part of Orthonym source. ~ 14 MB, 8 entries — keep local but untracked.)
 opsin/
+
+# Gate run artifacts ( + v22_gate.py completion sentinel)
 gate_verdict.json
+gate_run.log
