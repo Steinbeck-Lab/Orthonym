@@ -58,8 +58,16 @@ _SUFFIX_PRIORITY = [
     'selenonic acid',
     'telluronic acid',
     'sulfonamide',
+    # C1 (P-65.3.1): sulfonohydrazide ranks with the sulfonamide family, above
+    # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
+    # the S parent; here it is the sole principal group in the target set).
+    'sulfonohydrazide',
     'carbonyl chloride',
     'carboxamide',
+    # C1 (P-66.3.1.1): ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
+    # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
+    # carboxamide so a co-occurring amide would stay principal.
+    'carbohydrazide',
     'carbonitrile',
     'carbaldehyde',
     # v22 C-T2 (V-2): chalcogen analogues of the aldehyde-on-ring suffix
@@ -82,8 +90,10 @@ _SUFFIX_TO_PREFIX = {
     'selenonic acid': 'selenono',
     'telluronic acid': 'tellurono',
     'sulfonamide': 'sulfamoyl',
+    'sulfonohydrazide': 'hydrazinesulfonyl',  # C1 (P-65.3.1)
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
+    'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
     'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
@@ -97,6 +107,10 @@ _BENZENE_FG_SMARTS = {
     'amide': Chem.MolFromSmarts('[CX3](=O)[NX3H2]'),
     'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
     'tert_amide': Chem.MolFromSmarts('[CX3](=O)[NX3]([#6])[#6]'),
+    # C1 (P-66.3.1.1): ring-attached hydrazide -C(=O)-NH-NH2. The amide N is
+    # bonded to N (not H2 / not [#6]), so none of the amide SMARTS above match it;
+    # check this pattern BEFORE the amide patterns for cleanliness.
+    'hydrazide': Chem.MolFromSmarts('[CX3](=O)[NX3][NX3]'),
     'aldehyde': Chem.MolFromSmarts('[CX3H1](=O)'),
     # v22 C-T2 (V-2): chalcogen aldehydes (-CH=S / -CH=Se / -CH=Te). The H1
     # requirement excludes 0-H carbons (chalcogen ketones/amides), so a
@@ -108,6 +122,10 @@ _BENZENE_FG_SMARTS = {
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
+    # C1 (P-65.3.1): ring-attached sulfonohydrazide -SO2-NH-NH2. The N is
+    # [NX3H1] bonded to N (not H2), so the sulfonamide SMARTS above never matches
+    # it; check this pattern first for cleanliness.
+    'sulfonohydrazide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3][NX3]'),
     'sulfonic': Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]'),
     # D-FOLLOWON item 5 (P-67.1.1.2 / P-65.3): the P/Se/Te ring oxoacids + ring
     # sulfinic acid as demotable suffix FGs (mirrors the sulfonic/borono ring path;
@@ -280,6 +298,17 @@ def _identify_suffix_fg_on_benzene(
                     'n_substituents': ['hydroxy'],
                 }
 
+        # C1 (P-66.3.1.1): ring-attached hydrazide C(=O)-NH-NH2 -> '-carbohydrazide'.
+        # Checked BEFORE the amide patterns: the hydrazide N is bonded to another
+        # N so the amide SMARTS never match it, but the explicit ordering keeps
+        # the intent clear. Emits e.g. 'benzene-1,4-dicarbohydrazide'.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['hydrazide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carbohydrazide', 'suffix_name': 'carbohydrazide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
         # Primary amide: C(=O)(NH2)
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['amide']):
             if match[0] == start_idx:
@@ -358,6 +387,16 @@ def _identify_suffix_fg_on_benzene(
 
     # Sulfur-based suffix FGs
     if symbol == 'S':
+        # C1 (P-65.3.1): ring-attached sulfonohydrazide S(=O)(=O)-NH-NH2 ->
+        # '-sulfonohydrazide'. Checked BEFORE sulfonamide (the N-N form is more
+        # specific; the sulfonamide SMARTS requires [NX3H2] so it never matches).
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonohydrazide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfonohydrazide', 'suffix_name': 'sulfonohydrazide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
         # Sulfonamide: S(=O)(=O)(NH2)
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonamide']):
             if match[0] == start_idx:
@@ -2048,6 +2087,23 @@ def _assemble_benzene_with_suffix(
             remaining_prefix_groups, chosen_locants[0],
             atom_to_locant, oriented_ring
         )
+
+    # C1 (P-65.3.1 / P-66.3.1.1): single sulfonohydrazide / carbohydrazide on
+    # benzene. Renumber relative to the group (position 1) and cite the locant of
+    # any other substituent, mirroring the benzenesulfonamide path:
+    # 'benzenesulfonohydrazide', '4-methylbenzenesulfonohydrazide',
+    # 'benzenecarbohydrazide'. (Multi-instance falls through to the general
+    # 'benzene-1,4-dicarbohydrazide' path below.)
+    if chosen_suffix in ('sulfonohydrazide', 'carbohydrazide') and chosen_count == 1:
+        if not remaining_prefix_groups:
+            return f"benzene{chosen_suffix}"
+        renumbered_groups = _renumber_relative_to(
+            remaining_prefix_groups, chosen_locants[0]
+        )
+        prefix_part = _build_prefix_string_with_locants(
+            renumbered_groups, mono_needs_locant=True
+        )
+        return f"{prefix_part}benzene{chosen_suffix}"
 
     # Single carbaldehyde: delegate to benzaldehyde retained name path
     # "benzaldehyde" is an IUPAC retained name (P-66.6.3.1.1)

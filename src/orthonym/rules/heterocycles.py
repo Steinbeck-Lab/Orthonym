@@ -1310,6 +1310,16 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
             if match[0] == start_idx:
                 return {'suffix_name': 'carboxamide', 'n_hydroxy': True}
 
+    # C1 (P-66.3.1.1): ring-attached hydrazide C(=O)-NH-NH2 -> '-carbohydrazide'.
+    # Checked BEFORE the amide pattern: the hydrazide N is bonded to another N so
+    # the amide SMARTS never matches it (pyridine-4-carbohydrazide,
+    # furan-2-carbohydrazide).
+    hydrazide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3][NX3]')
+    if hydrazide_pat:
+        for match in mol.GetSubstructMatches(hydrazide_pat):
+            if match[0] == start_idx:
+                return {'suffix_name': 'carbohydrazide'}
+
     # Check for primary amide: C(=O)(NH2)
     amide_pat = Chem.MolFromSmarts('[CX3](=O)[NX3H2]')
     if amide_pat:
@@ -1645,7 +1655,8 @@ def name_substituted_heterocycle(
         # to the fixed carb* priority list.
         pg_ring_suffix = _get_ring_suffix(principal_group, is_ring=True) if principal_group else None
         _SUFFIX_PRIORITY = [
-            'carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde',
+            'carboxylic acid', 'carboxamide', 'carbohydrazide',
+            'carbonitrile', 'carbaldehyde',
         ]
         chosen_suffix = None
         chosen_locants = []
@@ -1685,6 +1696,7 @@ def name_substituted_heterocycle(
             'carboxylic acid': 'carboxy',
             'carbaldehyde': 'formyl',
             'carboxamide': 'carbamoyl',
+            'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
             'carbonitrile': 'cyano',
         }
         for suf_name, suf_locants in suffix_fg.items():

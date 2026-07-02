@@ -452,8 +452,18 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             # indicate multiple groups, so count them accordingly.
             _MULT_MAP = {'di': 2, 'tri': 3, 'tetra': 4, 'penta': 5}
             amide_refs = 0
+            # C1 fix (P-66.3.1.1): find_cleavable_bonds labels each hydrazide
+            # C(=O)-N bond as type 'amide', so a dihydrazide has
+            # distinct_amide_carbonyls==2. The name token 'hydrazide' contains
+            # no amide/amido token, so without counting it the complete GENERAL
+            # name ('butanedihydrazide') was falsely rejected as under-naming.
+            # Count the hydrazide suffix tokens too. Longest-first so
+            # 'carbohydrazide' is not partial-matched as 'hydrazide'. Additive:
+            # this can only RAISE amide_refs (make the gate more lenient), never
+            # newly reject a name that passed before.
             for m in re.finditer(
-                r'(di|tri|tetra|penta)?(amino|amido|amide|acetamid|formamid)',
+                r'(di|tri|tetra|penta)?'
+                r'(carbohydrazide|hydrazide|hydrazid|amino|amido|amide|acetamid|formamid)',
                 name, re.IGNORECASE,
             ):
                 prefix = m.group(1)

@@ -110,6 +110,8 @@ SENIORITY_ORDER = [
     "primary_sulfonamide",
     "secondary_sulfonamide",
     "tertiary_sulfonamide",
+    # C1 (P-65.3.1): sulfono N-analogue; ranks with the sulfonamide family
+    "sulfonohydrazide",
     "hydrazide",
     "hydroxamic_acid",  # IUPAC P-65.3.3: between hydrazides and imides
     "imide",
@@ -321,6 +323,10 @@ SUFFIX_FORMS = {
     "primary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "secondary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "tertiary_sulfonamide": ("sulfonamide", "sulfonamide"),
+    # C1 (P-65.3.1): sulfono N-analogue -- parent stem + 'sulfonohydrazide'
+    # ('methane' + 'sulfonohydrazide' = 'methanesulfonohydrazide'), exactly like
+    # methanesulfonamide. Both simple and ring form are the same word.
+    "sulfonohydrazide": ("sulfonohydrazide", "sulfonohydrazide"),
     "nitrile": ("nitrile", "carbonitrile"),
     "aldehyde": ("al", "carbaldehyde"),
     "ketone": ("one", "one"),
@@ -491,6 +497,9 @@ PREFIX_FORMS = {
     "primary_sulfonamide": "sulfamoyl",
     "secondary_sulfonamide": "sulfamoyl",
     "tertiary_sulfonamide": "sulfamoyl",
+    # C1 (P-65.3.1): -SO2-NH-NH2 as a substituent prefix (defensive; target
+    # compounds are mono-functional so it is normally the principal suffix).
+    "sulfonohydrazide": "hydrazinesulfonyl",
     "nitrile": "cyano",
     "isocyanide": "isocyano",
     # Amides as non-principal group prefix (IUPAC P-66.1.1.4 method 2)

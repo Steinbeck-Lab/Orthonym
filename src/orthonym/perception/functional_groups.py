@@ -109,7 +109,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     "primary_sulfonamide": "[SX4](=O)(=O)[NX3H2]",
     "secondary_sulfonamide": "[SX4](=O)(=O)[NX3H1][#6]",
     "tertiary_sulfonamide": "[SX4](=O)(=O)[NX3]([#6])[#6]",
-    
+    # C1 fix (P-65.3.1): R-SO2-NH-NH2 is a sulfonohydrazide, the N-analogue of
+    # sulfonic acid. The carbonyl-based hydrazide SMARTS above never matches a
+    # sulfonyl S; mirror primary_sulfonamide but with the second N.
+    "sulfonohydrazide": "[SX4](=O)(=O)[NX3][NX3]",
+
     # === CARBAMATES (must check before esters -- N-C(=O)-O is more specific) ===
     "carbamate": "[NX3][CX3](=O)[OX2][#6]",
 
@@ -497,6 +501,13 @@ def _resolve_fg_collisions(results):
         ('hydrazine_fg', ['primary_amine']),
         # DATA-05c: hydrazide is more specific than hydrazine_fg
         ('hydrazide', ['hydrazine_fg']),
+        # C1 fix (P-65.3.1): sulfonohydrazide (R-SO2-NH-NH2) is the most specific
+        # read on its N-N atoms -- suppress the generic hydrazine and any
+        # sulfonamide/hydrazide read that shares those atoms. (The carbonyl-based
+        # hydrazide SMARTS cannot match a sulfonyl anyway; suppress defensively.)
+        ('sulfonohydrazide', ['hydrazine_fg', 'primary_sulfonamide',
+                              'secondary_sulfonamide', 'tertiary_sulfonamide',
+                              'hydrazide']),
         # PERC-05: specific alcohol subtypes suppress generic "alcohol" on same atoms
         ('primary_alcohol', ['alcohol']),
         ('secondary_alcohol', ['alcohol']),
