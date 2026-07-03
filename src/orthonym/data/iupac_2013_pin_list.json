@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "generated_at": "2026-04-29T07:45:00Z",
   "source": "150-RESEARCH.md section 6 (sub-tables 6.1 carbocyclic, 6.2 mancude heterocycle, 6.3 saturated heterocycle, 6.4 von Baeyer, 6.5 deprecated) + carry-forward from _OPSIN_NON_PIN_EXCLUSIONS per CONTEXT CD-02. Citations point to the QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook).",
-  "total_entries": 145,
+  "total_entries": 146,
   "entries": [
     {"name": "benzene", "smiles": "c1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN for the simplest aromatic carbocycle"},
     {"name": "toluene", "smiles": "Cc1ccccc1", "pin": true, "citation": "P-22.1.3", "note": "PIN; methylbenzene also acceptable but toluene is the retained PIN"},
@@ -22,6 +22,7 @@
     {"name": "mesitylene", "smiles": "Cc1cc(C)cc(C)c1", "pin": false, "citation": "P-22.1.3", "note": "NOT PIN - PIN is 1,3,5-trimethylbenzene per P-22.1.3"},
     {"name": "cumene", "smiles": "CC(C)c1ccccc1", "pin": false, "citation": "P-22.1.3 / P-29.6.2.2", "note": "NOT PIN - cumene not retained per P-22.1.3; PIN is (propan-2-yl)benzene. F-T9/DD6 RET-01: hc_override REMOVED (reverses Phase 150 CONTEXT D-11) so cumene filters from BOTH the hand-curated dict and OPSIN promotion. The headline-must-be-PIN policy (T9) supersedes the D-11 retained-surface-form decision: the bare molecule must emit the substitutive PIN, not the deprecated retained name."},
     {"name": "cymene", "smiles": "Cc1ccc(C(C)C)cc1", "pin": false, "citation": "P-22.1.3", "note": "NOT PIN per P-22.1.3"},
+    {"name": "diphenylamine", "smiles": "c1ccc(Nc2ccccc2)cc1", "pin": false, "citation": "P-62.2.2 / P-62.2.1.1.1", "note": "NOT PIN - diphenylamine is a general/traditional name; PIN is N-phenylaniline (substitutive on the retained aniline parent). C4: no hc_override so it filters from BOTH the hand-curated dict and OPSIN promotion, forcing the substitutive PIN. Available under --trivial via GENERAL_RETAINED_NAMES."},
     {"name": "prismane", "smiles": "C12C3C1C3C2", "pin": false, "citation": "P-23.7", "note": "DEPRECATED - replaced by tetracyclo[2.2.0.0(2,6).0(3,5)]hexane systematic name per P-23.7"},
     {"name": "furan", "smiles": "c1ccoc1", "pin": true, "citation": "P-22.2.1 Table 2.2", "note": "Mancude heterocycle PIN"},
     {"name": "thiophene", "smiles": "c1ccsc1", "pin": true, "citation": "P-22.2.1 Table 2.2", "note": "Mancude heterocycle PIN"},

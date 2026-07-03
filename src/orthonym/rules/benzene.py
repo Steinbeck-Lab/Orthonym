@@ -82,6 +82,12 @@ _SUFFIX_PRIORITY = [
     'carboselenaldehyde',
     'carbotelluraldehyde',
     'ol',  # ASML-13: hydroxyl as suffix when principal group on benzene
+    # C4 (P-41 / P-62.2.1.1.1): amine is JUNIOR to alcohol and all C/S/Se/Te/P
+    # acids, amides, nitriles, aldehydes, ketones. It MUST be the LAST entry so
+    # it only becomes the ring parent suffix ('aniline') when nothing more
+    # senior is present; any co-present senior group keeps the amine demoted to
+    # the 'amino'/(N-alkylamino) prefix (4-aminophenol, 4-aminobenzoic acid).
+    'amine',
 ]
 
 # Prefix forms for suffix FGs when they are NOT the principal group
@@ -102,6 +108,7 @@ _SUFFIX_TO_PREFIX = {
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
     'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
+    'amine': 'amino',  # C4: demoted amine -> 'amino' prefix when a senior group wins
 }
 
 
@@ -843,7 +850,16 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
 
     # Simple amino (-NH2)
     if h_count == 2 and len(neighbors) == 0:
-        return {'name': 'amino', 'atoms': [n_idx]}
+        # C4: carry an amine_candidate payload so name_substituted_benzene can
+        # promote this to the retained 'aniline' SUFFIX when the amine is the
+        # molecule-level principal group. The existing 'amino' prefix name is
+        # kept untouched so the NON-promoted (senior-group-present) path is
+        # byte-identical (4-aminophenol / 4-aminobenzoic acid).
+        return {
+            'name': 'amino',
+            'atoms': [n_idx],
+            'amine_candidate': {'suffix_name': 'amine', 'n_substituents': []},
+        }
 
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
     # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
@@ -866,11 +882,20 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                         'name': 'anilino',
                         'atoms': [n_idx] + alkyl_atoms,
                         'is_complex': False,
+                        # C4: -NHPh promotes to 'N-phenylaniline' when the amine
+                        # is the principal group; else stays the 'anilino' prefix.
+                        'amine_candidate': {
+                            'suffix_name': 'amine', 'n_substituents': ['phenyl'],
+                        },
                     }
                 return {
                     'name': f'(N-{alkyl_name}amino)',
                     'atoms': [n_idx] + alkyl_atoms,
                     'is_complex': True,
+                    # C4: -NHR promotes to 'N-<alkyl>aniline' when principal.
+                    'amine_candidate': {
+                        'suffix_name': 'amine', 'n_substituents': [alkyl_name],
+                    },
                 }
 
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
@@ -908,6 +933,11 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'name': prefix_name,
                     'atoms': all_sub_atoms,
                     'is_complex': True,
+                    # C4: -NR2 promotes to 'N,N-<...>aniline' when principal.
+                    'amine_candidate': {
+                        'suffix_name': 'amine',
+                        'n_substituents': list(alkyl_names_list),
+                    },
                 }
 
     # Nitroso (-NO)
@@ -1867,6 +1897,9 @@ def name_substituted_benzene(
     prefix_groups: Dict[str, List[int]] = defaultdict(list)
     # Track N-substituents for amides keyed by suffix_name
     n_substituents_map: Dict[str, List[str]] = {}
+    # C4: track amine prefixes that CAN be promoted to the aniline suffix.
+    # Maps locant -> {'prefix_name': <existing prefix>, 'n_substituents': [...]}.
+    amine_candidates: Dict[int, Dict] = {}
 
     for atom_idx in oriented_ring:
         if atom_idx not in substituents:
@@ -1881,6 +1914,15 @@ def name_substituted_benzene(
                     n_substituents_map[sub_info['suffix_name']] = sub_info['n_substituents']
             else:
                 prefix_groups[sub_info['name']].append(locant)
+                # C4: record a promotable amine (payload set by
+                # _identify_nitrogen_group). The prefix name is kept in
+                # prefix_groups so nothing changes unless it is promoted below.
+                cand = sub_info.get('amine_candidate')
+                if cand is not None:
+                    amine_candidates[locant] = {
+                        'prefix_name': sub_info['name'],
+                        'n_substituents': cand.get('n_substituents', []),
+                    }
 
     # Sort locants within each group
     for name in suffix_groups:
@@ -1910,6 +1952,32 @@ def name_substituted_benzene(
         suffix_groups['ol'] = prefix_groups.pop('hydroxy')
     # When suffix_groups is non-empty (acid, aldehyde, etc.), hydroxyl stays
     # as prefix "hydroxy" -- correct per IUPAC seniority rules.
+
+    # --- C4 (P-62.2.1.1.1 / P-41): reclassify an amine as the '-amine'
+    # (aniline) SUFFIX when it IS the molecule-level principal group. ---
+    # This runs AFTER the hydroxy->ol promotion and checks `not suffix_groups`,
+    # so any senior group (acid/aldehyde/nitrile/ol/etc.) keeps the amine as
+    # its 'amino'/(N-alkylamino)/anilino PREFIX -> 4-aminophenol,
+    # 4-aminobenzoic acid, 4-(N-methylamino)benzoic acid stay unchanged.
+    # Symmetric to the hydroxy->ol block above (amine sits last in seniority).
+    if amine_candidates and not suffix_groups and not has_competing_fg:
+        amine_locants = sorted(amine_candidates.keys())
+        # Remove each promoted amine from its prefix group (by locant), so the
+        # amine no longer appears as a substituent prefix.
+        for loc in amine_locants:
+            pname = amine_candidates[loc]['prefix_name']
+            if pname in prefix_groups and loc in prefix_groups[pname]:
+                prefix_groups[pname].remove(loc)
+                if not prefix_groups[pname]:
+                    del prefix_groups[pname]
+        suffix_groups['amine'] = amine_locants
+        # N-substituents only carried for the single-amine (aniline) path; the
+        # systematic multi-amine (benzene-...-diamine) path in the assembler
+        # does not take N-substituents in the target set.
+        if len(amine_locants) == 1:
+            n_subs = amine_candidates[amine_locants[0]]['n_substituents']
+            if n_subs:
+                n_substituents_map['amine'] = n_subs
 
     # If suffix groups exist, use suffix naming path
     if suffix_groups:
@@ -2099,6 +2167,34 @@ def _assemble_benzene_with_suffix(
                 return f"{prefix_part}{suffix_part}"
             return suffix_part
 
+    # C4 (P-62.2.1.1.1): amine suffix -- 'aniline' retained name for benzene.
+    # Mirrors the hydroxy->phenol path above (amine sits last in seniority).
+    if chosen_suffix == 'amine':
+        amine_locants = chosen_locants
+        if len(amine_locants) == 1:
+            # Single amine on benzene: 'aniline' retained parent + N-substituents.
+            n_subs = n_substituents_map.get('amine', [])
+            return _name_substituted_aniline(
+                remaining_prefix_groups, amine_locants[0],
+                atom_to_locant, oriented_ring, n_subs
+            )
+        else:
+            # Multiple amines: systematic benzene-<locants>-<mult>amine
+            # (e.g. benzene-1,2,4-triamine). N-substituents are not carried on
+            # this systematic path in the target set.
+            from ..assembly.naming_utils import (
+                SIMPLE_MULTIPLIERS, _join_multiplied_suffix,
+            )
+            mult = SIMPLE_MULTIPLIERS.get(len(amine_locants), str(len(amine_locants)))
+            loc_str = ','.join(str(l) for l in sorted(amine_locants))
+            suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
+            if remaining_prefix_groups:
+                prefix_part = _build_prefix_string_with_locants(
+                    remaining_prefix_groups, mono_needs_locant=True
+                )
+                return f"{prefix_part}{suffix_part}"
+            return suffix_part
+
     # Check for special "benzoic acid" retained base name:
     # Single carboxylic acid -> "benzoic acid" base (P-65.1.2.1)
     if chosen_suffix == 'carboxylic acid' and chosen_count == 1:
@@ -2260,6 +2356,71 @@ def _name_substituted_phenol(
     prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
 
     return f"{prefix_part}phenol"
+
+
+def _name_substituted_aniline(
+    prefix_groups: Dict[str, List[int]],
+    amine_locant: int,
+    atom_to_locant: Dict[int, int],
+    oriented_ring: List[int],
+    n_substituents: List[str],
+) -> str:
+    """Name substituted aniline derivatives (C4, P-62.2.1.1.1).
+
+    Uses 'aniline' as the retained base name. Position 1 is the amine-bearing
+    carbon. Ring substituents get locants relative to it; N-substituents are
+    cited with italic-N locants and are alphabetized TOGETHER with the ring
+    substituents (P-14.5.2 detachable-prefix ordering — the N-locant is not a
+    numeral, so ordering is by the substituent base name).
+
+    Models _name_substituted_phenol (ring prefixes + renumbering) plus the
+    N-substituent prefix builder of _name_substituted_benzamide.
+
+    Args:
+        prefix_groups: Non-amine ring substituent groups.
+        amine_locant: Locant of the amine in original ring numbering.
+        atom_to_locant: Mapping from atom index to locant.
+        oriented_ring: The oriented ring.
+        n_substituents: List of N-substituent names (e.g. ['methyl'],
+            ['phenyl'], ['ethyl', 'ethyl']).
+
+    Returns:
+        IUPAC name like 'aniline', 'N-methylaniline', '4-methylaniline',
+        'N,N-dimethylaniline', '4-fluoro-N-methylaniline'.
+    """
+    from ..assembly.naming_utils import _wrap_n_substituent
+
+    # Build the individual N-substituent prefix strings (with N/N,N locants).
+    n_prefix_entries: List[Tuple[str, str]] = []  # (alpha_key, rendered)
+    if n_substituents:
+        if len(n_substituents) == 2 and n_substituents[0] == n_substituents[1]:
+            mp = get_multiplier_prefix(2, n_substituents[0])
+            rendered = f"N,N-{mp}{_wrap_n_substituent(n_substituents[0])}"
+            n_prefix_entries.append((alpha_sort_key(n_substituents[0]), rendered))
+        else:
+            for name in n_substituents:
+                rendered = f"N-{_wrap_n_substituent(name)}"
+                n_prefix_entries.append((alpha_sort_key(name), rendered))
+
+    # Renumber ring substituents relative to the amine position (= position 1).
+    renumbered_groups = _renumber_relative_to(prefix_groups, amine_locant)
+
+    # Build the individual ring-substituent prefix strings.
+    ring_prefix_entries: List[Tuple[str, str]] = []  # (alpha_key, rendered)
+    for name in renumbered_groups:
+        locants = sorted(renumbered_groups[name])
+        rendered = format_substituent_prefix(name, locants, len(locants))
+        ring_prefix_entries.append((alpha_sort_key(name), rendered))
+
+    if not n_prefix_entries and not ring_prefix_entries:
+        return "aniline"
+
+    # Alphabetize N- and ring-substituents together (P-14.5.2).
+    all_entries = n_prefix_entries + ring_prefix_entries
+    all_entries.sort(key=lambda e: e[0])
+    prefix_part = "-".join(rendered for _key, rendered in all_entries)
+
+    return f"{prefix_part}aniline"
 
 
 def _build_amidine_n_prefix(n_substituents) -> str:

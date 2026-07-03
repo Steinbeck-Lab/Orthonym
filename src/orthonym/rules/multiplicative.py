@@ -728,6 +728,20 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         if canon_a != canon_b:
             continue
 
+        # C4 (P-62.2.2 / P-14.5): substitutive-PIN decline for the NITROGEN
+        # (NH -> 'imino') single-atom bridge only. When the amine N links two
+        # IDENTICAL SIMPLE CARBOCYCLES (plain benzene rings, no principal
+        # characteristic group), the PIN is the substitutive aniline form
+        # ('N-phenylaniline'), NOT the multiplicative '1,1'-iminodibenzene'.
+        # This mirrors the guard already applied at the 3-unit sibling
+        # _try_multi_atom_bridges (triphenylamine). Scoped strictly to N: the
+        # O/S/CH2 bridges (diphenyl ether/sulfide/methylene) keep their
+        # multiplicative PINs. Fragments bearing a senior PCG (e.g. the
+        # 4,4'-iminodibenzoic acid CO2H rings) make the guard False, so their
+        # imino multiplicative name is retained.
+        if bridge_type == 'NH' and _all_fragments_are_simple_carbocycles(mol, idx):
+            continue
+
         # Name the parent structure
         parent_name = _name_parent(canon_a)
         if parent_name is None:

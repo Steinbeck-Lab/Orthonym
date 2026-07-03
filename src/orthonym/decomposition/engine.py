@@ -516,6 +516,17 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                     bond_idx = bond_info.get("bond_idx")
                     if bond_idx is None:
                         continue
+                    # C4 (P-62.2.2): an amine bridge between two ring systems is
+                    # named SUBSTITUTIVELY (aniline parent + N-aryl prefix, e.g.
+                    # diphenylamine -> 'N-phenylaniline'), NOT by decomposition.
+                    # The substitutive name is legitimately compact (ratio ~1.15
+                    # for N-phenylaniline / 13 HA), so the char-ratio proxy below
+                    # would wrongly reject it and trigger a garbled cleavage
+                    # ('phenylphenol'). The amine bridge is not a decomposition
+                    # linkage (unlike ester/amide/ether); skip the ring-drop
+                    # rejection for it. Scoped strictly to amine bond types.
+                    if bond_info.get("type") in ("sec_amine", "tert_amine"):
+                        continue
                     bond_obj = mol.GetBondWithIdx(bond_idx)
                     a1 = bond_obj.GetBeginAtomIdx()
                     a2 = bond_obj.GetEndAtomIdx()

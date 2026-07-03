@@ -1175,6 +1175,60 @@ def get_heterocycle_substituents(
                 if _is_acyl:
                     continue
 
+            # C4 (P-62.2.2 / P-62.2.1.1.1): an N-substituted exocyclic amine on a
+            # ring CARBON, when the amine is the molecule-level principal group,
+            # is the ring-amine SUFFIX with the N-substituents cited as italic-N
+            # prefixes (pyridin-4-amine -> N-methylpyridin-4-amine /
+            # N-phenylpyridin-4-amine). Bare -NH2 already routes via the
+            # carbon_count==0 -> _identify_hetero_substituent -> is_principal_suffix
+            # path below; this block adds the -NHR / -NR2 forms (h_count 1/0 with
+            # carbon neighbours) that the carbon_count==0 gate would otherwise miss
+            # (they were mis-collected as an alkyl fragment -> 'N-methylanamine').
+            # Scoped strictly to: pg is amine, exocyclic N on a ring carbon, N is a
+            # neutral secondary/tertiary amine whose only non-ring neighbours are
+            # carbons (no =O/nitro/nitroso, no extra heteroatoms). Fail-closed: if
+            # any N-substituent cannot be named, skip this block and let the
+            # general path (which fails closed) handle it.
+            _amine_n = mol.GetAtomWithIdx(nbr_idx)
+            if (pg_ring_suffix == 'amine'
+                    and not is_nitrogen                       # ring atom is a carbon
+                    and _amine_n.GetSymbol() == 'N'
+                    and _amine_n.GetFormalCharge() == 0
+                    and _amine_n.GetTotalNumHs() < 2):        # -NHR or -NR2 (not -NH2)
+                _n_nonring = [
+                    nb for nb in _amine_n.GetNeighbors()
+                    if nb.GetIdx() not in ring_set
+                ]
+                # Genuine amine: every non-ring neighbour is a carbon (excludes
+                # nitroso -N=O, azo, hydrazino, N-oxide, etc.).
+                if _n_nonring and all(nb.GetSymbol() == 'C' for nb in _n_nonring):
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    _n_sub_names = []
+                    _ok = True
+                    for _cn in _n_nonring:
+                        _cn_atoms = _bfs_substituent(mol, _cn.GetIdx(), ring_set | {nbr_idx})
+                        _nm = name_substituent_fragment(
+                            mol, _cn_atoms, _cn.GetIdx(), list(ring_set | {nbr_idx})
+                        )
+                        if _nm is None:
+                            _ok = False
+                            break
+                        _n_sub_names.append(_nm)
+                    if _ok and _n_sub_names:
+                        _n_sub_names.sort()
+                        substituents.setdefault(locant, []).append({
+                            'atoms': sub_atoms,
+                            'is_on_nitrogen': False,
+                            'carbon_count': 0,
+                            'connecting_atom': ring_atom_idx,
+                            'is_ring': False,
+                            'ring_name': None,
+                            'is_suffix': True,
+                            'suffix_name': 'amine',
+                            'amine_n_substituents': _n_sub_names,
+                        })
+                        continue
+
             # Count carbon atoms for alkyl naming
             carbon_count = sum(
                 1 for idx in sub_atoms
@@ -1472,6 +1526,7 @@ def name_substituted_heterocycle(
         get_alkyl_name,
         alpha_sort_key,
         get_multiplier_prefix,
+        _wrap_n_substituent,  # C4: italic-N substituent wrapping for amine suffix
     )
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     from ..perception.stereo import assign_stereochemistry
@@ -1492,6 +1547,9 @@ def name_substituted_heterocycle(
     # Separate suffix-type FGs from prefix substituents
     suffix_fg: Dict[str, List[int]] = {}  # suffix_name -> [locants]
     suffix_n_hydroxy: set = set()  # suffix_names whose FG was a hydroxamic acid
+    # C4: N-substituents carried on the amine ring-suffix (pyridin-4-amine ->
+    # N-methyl/N-phenyl). Keyed by suffix_name; single-instance only in scope.
+    suffix_n_substituents: Dict[str, List[str]] = {}
     prefix_substituents: Dict[int, List[Dict]] = {}
 
     for locant, sub_list in substituents.items():
@@ -1509,6 +1567,8 @@ def name_substituted_heterocycle(
                 suffix_fg[sname].append(locant)
                 if sub_info.get('n_hydroxy'):
                     suffix_n_hydroxy.add(sname)
+                if sub_info.get('amine_n_substituents'):
+                    suffix_n_substituents[sname] = sub_info['amine_n_substituents']
             else:
                 if locant not in prefix_substituents:
                     prefix_substituents[locant] = []
@@ -1685,6 +1745,30 @@ def name_substituted_heterocycle(
         if combined and combined[-1] == 'e' and suffix_token[:1].lower() in 'aeiouy':
             combined = combined[:-1]
         combined = f"{combined}-{locant_str}-{suffix_token}"
+
+        # C4 (P-62.2.1.1.1): prepend the amine N-substituent prefixes
+        # (N-methyl / N-phenyl / N,N-dimethyl) to the ring-amine suffix name.
+        # Emitted only for the amine suffix; other suffixes are unaffected.
+        if chosen_suffix == 'amine' and chosen_suffix in suffix_n_substituents:
+            _n_subs = suffix_n_substituents[chosen_suffix]
+            _n_prefix = ""
+            if len(_n_subs) == 1:
+                _n_prefix = f"N-{_wrap_n_substituent(_n_subs[0])}"
+            elif len(_n_subs) == 2 and _n_subs[0] == _n_subs[1]:
+                _mp = get_multiplier_prefix(2, _n_subs[0])
+                _n_prefix = f"N,N-{_mp}{_wrap_n_substituent(_n_subs[0])}"
+            else:
+                _n_prefix = "-".join(
+                    f"N-{_wrap_n_substituent(_n)}" for _n in _n_subs
+                )
+            if _n_prefix:
+                # A hyphen is needed when the existing name already begins with a
+                # ring-locant prefix (e.g. '4-fluoropyridin...'); otherwise the
+                # N-prefix attaches directly (N-methylpyridin-4-amine).
+                if combined and combined[0].isdigit():
+                    combined = f"{_n_prefix}-{combined}"
+                else:
+                    combined = f"{_n_prefix}{combined}"
 
         # Hydroxamic acid suffix: prepend N-hydroxy to the assembled name
         # (P-65.1.3.4: N-hydroxy is an N-substituent on the amide parent).

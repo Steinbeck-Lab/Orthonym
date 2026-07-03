@@ -2218,9 +2218,23 @@ class Orthonym:
                     # that ring stays parent regardless of P-44.2 ring seniority.
                     from .rules.parent_selection import is_principal_group_on_ring
                     pg_on_default = False
+                    pg_on_senior = False
                     if features.principal_group_atoms:
                         pg_on_default = is_principal_group_on_ring(
                             features.mol, default_system,
+                            features.principal_group_atoms,
+                            features.principal_group,
+                        )
+                        # C4 (P-44.1 + P-44.2): a BRIDGING characteristic group
+                        # (e.g. a secondary amine N bonded to a carbon of EACH
+                        # ring — diaryl/aryl-heteroaryl amines) satisfies P-44.1
+                        # for BOTH ring systems. When it also sits on the SENIOR
+                        # ring, P-44.1 no longer disqualifies the senior ring, so
+                        # the P-44.2 seniority tiebreak decides -> the senior ring
+                        # is the parent (pyridine over benzene ->
+                        # N-phenylpyridin-4-amine, not (aminopyridinyl)benzene).
+                        pg_on_senior = is_principal_group_on_ring(
+                            features.mol, senior_set,
                             features.principal_group_atoms,
                             features.principal_group,
                         )
@@ -2232,7 +2246,7 @@ class Orthonym:
                     # 171 P-1 trial). Among-ring seniority does not decide a chain
                     # parent — keep the default ring. (See test_among_rings_gold.py
                     # TestPhase171StereoGuard.)
-                    if (not pg_on_default
+                    if ((not pg_on_default or pg_on_senior)
                             and not features.chain_is_parent
                             and senior_set != default_system):
                         best_ring = atom_rings[0]
