@@ -375,10 +375,19 @@ def _identify_suffix_fg_on_benzene(
             )
             if is_guanidino:
                 continue
-            return {
+            # D1 (P-66.4.1.2 / P-66.4.1.3.1): detect N/N'-substituents so the
+            # already-wired _build_amidine_n_prefix (ring-suffix path) and the
+            # demotion path can cite them. Fail-closed: on any non-nameable
+            # N-substituent the detector returns None -> emit the bare suffix and
+            # let SELF-01 keep it honest (never a wrong name).
+            n_subs = _detect_amidine_n_substituents(mol, start_idx, ring_atoms)
+            result = {
                 'name': 'carboximidamide', 'suffix_name': 'carboximidamide',
                 'is_suffix': True, 'atoms': sub_atoms,
             }
+            if n_subs:
+                result['n_substituents'] = n_subs
+            return result
 
         # Aldehyde: C(=O)H
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['aldehyde']):
@@ -2149,6 +2158,18 @@ def _assemble_benzene_with_suffix(
             continue
         # Convert to prefix form
         prefix_form = _SUFFIX_TO_PREFIX.get(sfx_name, sfx_name)
+        # D1 (P-66.4.1.3.1): a demoted N-/N'-substituted amidine must carry its
+        # italic-N locants onto the carbamimidoyl prefix, e.g.
+        # 4-(N-methylcarbamimidoyl)benzoic acid. n_substituents_map is keyed by
+        # the SUFFIX name ('carboximidamide') and holds (nlocant, name) tuples;
+        # prepend the N/N' prefix to the base 'carbamimidoyl'. The resulting
+        # hyphenated name is 'complex', so format_substituent_prefix wraps it in
+        # parentheses. Bare carbamimidoyl (no N-subs) keeps the plain prefix.
+        if sfx_name == 'carboximidamide':
+            n_subs = n_substituents_map.get('carboximidamide', [])
+            n_prefix = _build_amidine_n_prefix(n_subs)
+            if n_prefix:
+                prefix_form = f"{n_prefix}{prefix_form}"
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
 
@@ -2544,23 +2565,106 @@ def _name_substituted_benzenediamine(
     return f"{prefix_part}{suffix_part}"
 
 
+def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
+    """D1 (P-66.4.1.2 / P-66.4.1.3.1): detect N/N'-substituents on an amidine C.
+
+    Given the amidine carbon ``c_idx`` and the set of ``parent_atoms`` (the ring
+    or chain atoms that carry the amidine, excluded so they are never walked into
+    a substituent), return a list of ``(nlocant, name)`` tuples where:
+
+      * ``nlocant == 'N'``   -> the amino (SINGLE-bonded, -NH-) nitrogen, and
+      * ``nlocant == "N'"``  -> the imino (DOUBLE-bonded, =N-) nitrogen,
+
+    per OPSIN amidine suffixRule labels /N1 (single) and /N2 (double). Each
+    substituent is named through the existing ``name_substituent_fragment``
+    pipeline (pure alkyl/nameable fragments only).
+
+    Fail-closed: returns ``None`` if any N-substituent is NOT a nameable pure
+    fragment (so the caller keeps the bare form and SELF-01 stays honest). An
+    unsubstituted amidine returns ``[]`` (empty list).
+    """
+    from ..assembly.substituent_naming import name_substituent_fragment
+    c_atom = mol.GetAtomWithIdx(c_idx)
+    entries = []
+    for nbr in c_atom.GetNeighbors():
+        if nbr.GetSymbol() != 'N':
+            continue
+        n_idx = nbr.GetIdx()
+        bond = mol.GetBondBetweenAtoms(c_idx, n_idx)
+        # Determine the italic-N locant strictly from the C-N bond order.
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            nlocant = "N'"          # imino / =N nitrogen
+        elif bond.GetBondType() == Chem.BondType.SINGLE:
+            nlocant = "N"           # amino / -NH- nitrogen
+        else:
+            return None             # aromatic/other -> not a plain amidine; fail closed
+        # Walk this nitrogen's non-carbon-parent substituents (skip H implicitly).
+        for sub in nbr.GetNeighbors():
+            sub_idx = sub.GetIdx()
+            if sub_idx == c_idx or sub_idx in parent_atoms:
+                continue
+            if sub.GetSymbol() != 'C':
+                # A non-carbon substituent on the amidine N (e.g. N-N, N-O) is not
+                # a plain N-alkyl/aryl amidine -> fail closed.
+                return None
+            alkyl_atoms, carbon_count = _collect_pure_alkyl(
+                mol, sub_idx, set(parent_atoms) | {c_idx, n_idx}
+            )
+            if alkyl_atoms is None or carbon_count == 0:
+                return None
+            rec_name = name_substituent_fragment(
+                mol, alkyl_atoms, sub_idx, list(set(parent_atoms) | {c_idx, n_idx})
+            )
+            if not rec_name:
+                return None
+            entries.append((nlocant, rec_name))
+    return entries
+
+
 def _build_amidine_n_prefix(n_substituents) -> str:
     """Build the N/N'-locant prefix for an amidine (carboximidamide) suffix.
 
-    C2 (P-66.4.1.2.3): amidine N-substituent locants are N (the amino,
+    C2/D1 (P-66.4.1.2.3): amidine N-substituent locants are N (the amino,
     single-bonded nitrogen) and N' (the imino, =N nitrogen). Entries are
-    (nlocant, name) tuples where nlocant is 'N' or "N'". Emits e.g.
-    "N-methyl" / "N'-methyl" / "N-methyl-N'-ethyl" (no trailing hyphen, so it can
-    be concatenated directly before the ring base as the amide path does).
+    (nlocant, name) tuples where nlocant is 'N' or "N'". Identical substituent
+    names are collapsed onto a shared multiplier (P-14.3.2 / P-16.3.3):
+      [('N','methyl')]                  -> "N-methyl"
+      [("N'",'methyl')]                 -> "N'-methyl"
+      [('N','methyl'),("N'",'methyl')]  -> "N,N'-dimethyl"
+      [('N','methyl'),('N','methyl')]   -> "N,N-dimethyl"
+      [('N','ethyl'),("N'",'methyl')]   -> "N'-methyl-N-ethyl"  (alpha order)
+    No trailing hyphen, so it can be concatenated directly before the base name.
     Empty list -> "" (plain amidine, both nitrogens unsubstituted).
     """
     from ..assembly.naming_utils import _wrap_n_substituent
     if not n_substituents:
         return ""
-    # Sort by locant so N precedes N' (deterministic citation order).
-    ordered = sorted(n_substituents, key=lambda e: (e[0].count("'"), e[0]))
-    parts = [f"{nloc}-{_wrap_n_substituent(name)}" for nloc, name in ordered]
-    return "-".join(parts)
+
+    # Group locants by substituent name so identical substituents share a
+    # multiplier (N,N'-dimethyl) rather than being cited twice (N-methyl-N'-methyl).
+    by_name: Dict[str, List[str]] = defaultdict(list)
+    for nloc, name in n_substituents:
+        by_name[name].append(nloc)
+
+    def _loc_sort(nloc: str):
+        # 'N' (unprimed) before "N'" (primed) at first point of difference.
+        return (nloc.count("'"), nloc)
+
+    segments = []  # (alpha_key, rendered)
+    for name, nlocs in by_name.items():
+        nlocs_sorted = sorted(nlocs, key=_loc_sort)
+        loc_str = ",".join(nlocs_sorted)
+        count = len(nlocs_sorted)
+        if count > 1:
+            mp = get_multiplier_prefix(count, name)
+            rendered = f"{loc_str}-{mp}{_wrap_n_substituent(name)}"
+        else:
+            rendered = f"{loc_str}-{_wrap_n_substituent(name)}"
+        segments.append((alpha_sort_key(name), _loc_sort(nlocs_sorted[0]), rendered))
+
+    # Order distinct substituents by first-cited locant, then alphabetically.
+    segments.sort(key=lambda s: (s[1], s[0]))
+    return "-".join(rendered for _k, _l, rendered in segments)
 
 
 def _name_substituted_benzamide(

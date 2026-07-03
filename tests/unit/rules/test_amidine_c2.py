@@ -58,13 +58,11 @@ class TestBenzeneCarboximidamideSuffix:
 # ---------------------------------------------------------------------------
 # FIX (c) — N-substituted amidine (N/N'-aware carbamimidoyl prefix)
 # ---------------------------------------------------------------------------
-# DEFERRED (C2): sub-fix (c) is the known-hard N-substituted-amidine subsystem
-# (broadened SMARTS overlapping guanidine + N/N' locant assignment that can flip
-# the molecule). Per the C2 spec, (a)+(b) shipped as the safe high-value core and
-# (c) is deferred rather than shipped fragile. Current behavior fails CLOSED to
-# 'unknown organic compound' (never a wrong name — SELF-01-safe). These xfail
-# tests document the target and will flip to pass when the N/N' subsystem lands.
-@pytest.mark.xfail(reason="C2 sub-fix (c) N-substituted amidine deferred (fail-closed to unknown; SELF-01-safe)", strict=False)
+# SHIPPED (D1): sub-fix (c) — the N-substituted-amidine subsystem — landed in D1
+# (broadened SMARTS with the guanidine guard held + N/N' locant assignment pinned
+# by C-N bond order, OPSIN round-trip verified per tautomer). Full coverage lives
+# in tests/unit/rules/test_nsubst_amidine_d1.py; these two anchor cases stay here
+# to document the C2->D1 continuity.
 class TestNSubstitutedAmidine:
     def test_4_N_methylcarbamimidoyl_benzoic_acid(self):
         # CNC(=N)- : methyl on the single-bonded (amino) N = N-methyl

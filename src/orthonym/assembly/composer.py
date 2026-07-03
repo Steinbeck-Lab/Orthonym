@@ -982,6 +982,25 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # control falls through to the inline cascade below — Plan-03-01..03-04
     # remove those inline cascades, and general_acyclic@99999 (Plan-03-03)
     # becomes the catch-all that guarantees a non-None result.
+    # D1 (P-66.4.1.2 / P-66.4.1.3.1): acyclic N-/N'-substituted amidine. Must run
+    # BEFORE dispatch_inner because the general_acyclic catch-all otherwise
+    # mis-expresses the amino nitrogen as a '(methylamino)' chain prefix
+    # (OPSIN-unparseable -> SELF-01 -> unknown). _assemble_amidine_name is
+    # fail-closed: it returns None for unsubstituted amidines (general path names
+    # those correctly), for ring-attached amidines (benzene/cyclohexane ring
+    # namers own those), and for anything it cannot name cleanly, so this branch
+    # NEVER produces a wrong name — it only upgrades unknown -> correct.
+    if (features.principal_group == 'amidine'
+            and features.principal_chain
+            and not getattr(features, 'is_cyclic', False)):
+        _pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
+        if _pg_count == 1:
+            _amidine_name = _assemble_amidine_name(features, style)
+            if _amidine_name:
+                pool = get_current_pool()
+                pool.add(_amidine_name, "amidine", features)
+                return pool.best().name
+
     from .inner_dispatch import dispatch_inner
     _inner_result = dispatch_inner(features, mol=features.mol, style=style)
     if _inner_result is not None:
@@ -3805,6 +3824,119 @@ def _amide_acyl_parent_locants(mol, amide_atoms) -> Optional[Dict[int, int]]:
                 dist[ni] = dist[cur] + 1
                 q.append(ni)
     return dist
+
+
+def _find_amidine_carbon(mol, pg_atoms):
+    """D1: locate the amidine central carbon from the principal_group_atoms.
+
+    The classifier may re-order the raw SMARTS match tuple, so identify the
+    amidine C structurally: the sp2 carbon in the pg_atoms set that has exactly
+    one DOUBLE-bonded N and at least one SINGLE-bonded N neighbour, and no other
+    heteroatom double bond (excludes guanidine's 3-N carbon defensively — a
+    guanidine C has two single-bonded N besides the =N, so it is still an
+    amidine-shaped C, but guanidine never reaches this path because perception
+    suppresses the amidine read on it).
+    """
+    from rdkit import Chem
+    candidate_atoms = set()
+    for grp in pg_atoms:
+        candidate_atoms.update(grp)
+    for idx in candidate_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        double_n = 0
+        single_n = 0
+        for nbr in atom.GetNeighbors():
+            if nbr.GetSymbol() != 'N':
+                continue
+            bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                double_n += 1
+            elif bond.GetBondType() == Chem.BondType.SINGLE:
+                single_n += 1
+        if double_n == 1 and single_n >= 1:
+            return idx
+    return None
+
+
+def _assemble_amidine_name(features: Any, style: str):
+    """D1 (P-66.4.1 / P-66.4.1.2 / P-66.4.1.3.1): assemble an acyclic amidine
+    name with N/N'-substituent locants (e.g. N-methylethanimidamide,
+    N,N'-dimethylethanimidamide).
+
+    Mirrors the unsaturated-amide pattern: build the bare imidamide base from the
+    chain parent + '-imidamide' suffix, then prepend the italic-N/N' prefix.
+
+    Fail-closed: returns None (caller falls through to the general path, whose
+    output SELF-01 then keeps honest) whenever
+      * the amidine carbon or its N/N'-substituents cannot be resolved cleanly,
+      * a substituent nitrogen carries a non-nameable fragment, or
+      * the chain carries an extra substituent beyond the amidine group itself
+        (so a wrong 'dropped-substituent' name is never emitted).
+    """
+    from ..rules.benzene import _detect_amidine_n_substituents, _build_amidine_n_prefix
+
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms:
+        return None
+
+    c_idx = _find_amidine_carbon(mol, pg_atoms)
+    if c_idx is None:
+        return None
+
+    # The chain (parent) atoms carry the amidine; exclude them so the detector
+    # walks only the true N-substituents.
+    parent_atoms = set(features.principal_chain or [])
+    parent_atoms.add(c_idx)
+    n_subs = _detect_amidine_n_substituents(mol, c_idx, parent_atoms)
+    if n_subs is None:
+        return None
+    if not n_subs:
+        # Unsubstituted amidine -> the existing general path already produces the
+        # correct bare '-imidamide' (e.g. ethanimidamide); nothing to add here.
+        return None
+
+    # Collect the amidine group's atoms (C + both N + all N-substituent carbons)
+    # so we can verify the chain has NO extra (genuine) substituent. If it does,
+    # fall through rather than risk dropping it.
+    c_atom = mol.GetAtomWithIdx(c_idx)
+    amidine_n_idxs = [nbr.GetIdx() for nbr in c_atom.GetNeighbors()
+                      if nbr.GetSymbol() == 'N']
+    amidine_group_atoms = set(amidine_n_idxs) | {c_idx}
+    from ..rules.benzene import _collect_pure_alkyl
+    for n_idx in amidine_n_idxs:
+        for sub in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            if sub.GetIdx() == c_idx or sub.GetIdx() in parent_atoms:
+                continue
+            alkyl_atoms, _ = _collect_pure_alkyl(
+                mol, sub.GetIdx(), set(parent_atoms) | {c_idx, n_idx}
+            )
+            if alkyl_atoms:
+                amidine_group_atoms.update(alkyl_atoms)
+
+    # Any chain substituent branch not fully inside the amidine group is a
+    # genuine extra substituent -> fail closed.
+    if features.substituents:
+        for _pos, sub_list in features.substituents.items():
+            for sub_atoms in sub_list:
+                if not set(sub_atoms).issubset(amidine_group_atoms):
+                    return None
+
+    # Build the bare imidamide base from parent + suffix.
+    parent = _generate_chain_parent(features)
+    suffix = _generate_suffix(features)
+    if parent is None or suffix is None:
+        return None
+    base_name = _assemble_fragments([parent, suffix], style)
+    if not base_name or 'imidamide' not in base_name:
+        return None
+
+    n_prefix = _build_amidine_n_prefix(n_subs)
+    if not n_prefix:
+        return None
+    return f"{n_prefix}{base_name}"
 
 
 def _assemble_amide_name(features: Any, style: str) -> str:

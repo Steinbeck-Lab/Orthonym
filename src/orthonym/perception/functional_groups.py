@@ -123,8 +123,16 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
     "guanidine": "[NX3][CX3](=[NX2])[NX3]",
 
-    # === AMIDINE (IUPAC P-66.4.1: C(=NH)NH2, less specific than guanidine) ===
-    "amidine": "[CX3](=[NX2H])[NX3H2]",  # DATA-03
+    # === AMIDINE (IUPAC P-66.4.1: C(=N)N, less specific than guanidine) ===
+    # D1: broadened from [CX3](=[NX2H])[NX3H2] (both N unsubstituted) to
+    # [CX3](=[NX2])[NX3] so N-/N'-substituted amidines are classified too. This
+    # matches the benzene handler's proven SMARTS (benzene.py). The broadened
+    # pattern also matches the guanidine central C; the atom-overlap
+    # guanidine-suppresses-amidine rule below removes those matches. Match-tuple
+    # order stays (amidine_C, imino_N, amino_N) -> chains.py _TERMINAL_C_FGS
+    # ['amidine']=0 remains correct. =[NX2] (not =O) still excludes urea; the N
+    # (not O) neighbour still excludes imidates (COC(=N)C).
+    "amidine": "[CX3](=[NX2])[NX3]",  # DATA-03 / D1
 
     # === ISOCYANATES/ISOTHIOCYANATES (cumulated double bonds) ===
     "isocyanate": "[#6][NX2]=[CX2]=[OX1]",
