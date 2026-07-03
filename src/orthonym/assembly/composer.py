@@ -4014,53 +4014,33 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     return final_name
 
 
-def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
+def _walk_amine_n_substituents(
+    mol: Any, n_idx: int, chain_set: set, stop_set: Optional[set] = None
+) -> list:
+    """Walk the N-substituent fragments off one amine nitrogen and return
+    their prefix names (e.g. ['methyl'], ['ethyl'], ['phenyl'], ['methyl','methyl']).
+
+    Extracted verbatim from the original single-N body of _assemble_amine_name
+    so both the single-N and the multi-N (di/poly-amine) paths share one
+    implementation. `chain_set` gates only the ENTRY neighbour (a carbon on the
+    principal chain/ring is not the start of an N-substituent), exactly as the
+    original code did — traversal then follows freely (a benzyl walks through
+    the ring even when the ring is the parent). `stop_set` (multi-N path only,
+    D2 spec risk 3) HARD-BLOCKS traversal at the OTHER principal amine
+    nitrogens so one N's branch is never re-attributed to another; the chain
+    carbons between amines are already excluded by chain_set at entry.
     """
-    Assemble name for secondary/tertiary amines with N-alkyl prefixes.
-
-    For secondary amines: N-alkyl + parent amine (N-ethylethanamine)
-    For tertiary amines: N,N-dialkyl + parent amine (N,N-dimethylethanamine)
-
-    Returns None if unable to assemble (falls through to general naming).
-    """
-    mol = features.mol
-    pg_atoms = features.principal_group_atoms
-    if not pg_atoms:
-        return None
-
-    match = pg_atoms[0]
-    # Find nitrogen atom in the match
-    n_idx = None
-    for idx in match:
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'N':
-            n_idx = idx
-            break
-    if n_idx is None:
-        return None
-
-    nitrogen = mol.GetAtomWithIdx(n_idx)
-
-    # WS-A task 9 (P-66.6.1): a RING nitrogen is a skeletal heteroatom of a
-    # ring parent hydride, never an amine. Walking its "substituents" from
-    # here CUT the ring open ('N,N-dibutyl...' from morpholine). The amine
-    # SMARTS now excludes ring N (perception keystone); this emitter-level
-    # gate is defense-in-depth for any legacy caller.
-    if nitrogen.IsInRing():
-        return None
-
-    chain_set = set(features.principal_chain) if features.principal_chain else set()
-    # WS-A task 9: when a RING is the parent, its atoms must not be
-    # re-enumerated as N-substituents (the parent cyclohexane was emitted
-    # AGAIN as 'N-cyclohexyl').
-    if getattr(features, 'principal_ring', None):
-        chain_set |= set(features.principal_ring)
-
-    # Find N-substituents: carbon neighbors of N that are NOT on the principal chain
     from collections import deque
-    n_subs = []
+    if stop_set is None:
+        stop_set = set()
+    nitrogen = mol.GetAtomWithIdx(n_idx)
+    n_subs: list = []
+    # Find N-substituents: carbon neighbors of N that are NOT on the principal chain
     for nbr in nitrogen.GetNeighbors():
         nbr_idx = nbr.GetIdx()
         if nbr_idx in chain_set:
+            continue
+        if nbr_idx in stop_set:
             continue
         if nbr.GetSymbol() == 'H':
             continue
@@ -4070,13 +4050,14 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         frag = []
         while queue:
             a = queue.popleft()
-            if a in visited or a == n_idx:
+            if a in visited or a == n_idx or a in stop_set:
                 continue
             visited.add(a)
             frag.append(a)
             for nn in mol.GetAtomWithIdx(a).GetNeighbors():
-                if nn.GetIdx() not in visited and nn.GetIdx() != n_idx:
-                    queue.append(nn.GetIdx())
+                nn_i = nn.GetIdx()
+                if nn_i not in visited and nn_i != n_idx and nn_i not in stop_set:
+                    queue.append(nn_i)
         if frag:
             cc = sum(1 for i in frag if mol.GetAtomWithIdx(i).GetSymbol() == 'C')
             ring_info = mol.GetRingInfo()
@@ -4214,7 +4195,70 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                                 "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
                                 cc,
                             )
+    return n_subs
 
+
+def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
+    """
+    Assemble name for secondary/tertiary amines with N-alkyl prefixes.
+
+    For secondary amines: N-alkyl + parent amine (N-ethylethanamine)
+    For tertiary amines: N,N-dialkyl + parent amine (N,N-dimethylethanamine)
+
+    Returns None if unable to assemble (falls through to general naming).
+    """
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms:
+        return None
+
+    match = pg_atoms[0]
+    # Find nitrogen atom in the match
+    n_idx = None
+    for idx in match:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'N':
+            n_idx = idx
+            break
+    if n_idx is None:
+        return None
+
+    nitrogen = mol.GetAtomWithIdx(n_idx)
+
+    # WS-A task 9 (P-66.6.1): a RING nitrogen is a skeletal heteroatom of a
+    # ring parent hydride, never an amine. Walking its "substituents" from
+    # here CUT the ring open ('N,N-dibutyl...' from morpholine). The amine
+    # SMARTS now excludes ring N (perception keystone); this emitter-level
+    # gate is defense-in-depth for any legacy caller.
+    if nitrogen.IsInRing():
+        return None
+
+    chain_set = set(features.principal_chain) if features.principal_chain else set()
+    # WS-A task 9: when a RING is the parent, its atoms must not be
+    # re-enumerated as N-substituents (the parent cyclohexane was emitted
+    # AGAIN as 'N-cyclohexyl').
+    if getattr(features, 'principal_ring', None):
+        chain_set |= set(features.principal_ring)
+
+    # D2 (P-62.2.2 / P-16.3.3): collect ALL principal amine nitrogens, not just
+    # pg_atoms[0]. When >=2 non-ring principal N are present, this is an acyclic
+    # di/poly-amine; a single-N walk would drop every substituent except the
+    # first nitrogen's (a WRONG structure SELF-01 then suppresses to 'unknown').
+    # Dispatch to the multi-N handler, which cites N-substituents with PRIMED
+    # italic-N locants (N, N', N''). One-nitrogen amines fall through unchanged.
+    principal_n = []
+    for m in pg_atoms:
+        for idx in m:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetSymbol() == 'N' and not a.IsInRing():
+                if idx not in principal_n:
+                    principal_n.append(idx)
+                break
+    if len(principal_n) >= 2:
+        return _assemble_polyamine_name(features, style, principal_n, chain_set)
+
+    # Find N-substituents off this single nitrogen (byte-identical to the
+    # original single-N walk; the multi-N branch below reuses the same helper).
+    n_subs = _walk_amine_n_substituents(mol, n_idx, chain_set)
     if not n_subs:
         return None  # No N-substituents found, use general path
 
@@ -4289,6 +4333,138 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         c_prefix_str = "-".join(c_prefix_parts)
         return f"{c_prefix_str}-{n_prefix}{base_name}"
     return f"{n_prefix}{base_name}"
+
+
+def _assemble_polyamine_name(
+    features: Any, style: str, principal_n: list, chain_set: set
+) -> Optional[str]:
+    """Assemble an acyclic di/poly-amine (>=2 principal amine N) with PRIMED
+    italic-N locant prefixes (N, N', N''), the acyclic analog of
+    _name_substituted_benzenediamine (benzene.py) (D2, P-62.2.2 / P-16.3.3).
+
+    Each principal nitrogen is walked for its N-substituents (reusing
+    _walk_amine_n_substituents), excluding the principal chain, principal ring,
+    AND every OTHER principal amine nitrogen and their chain carbons, so a chain
+    carbon between two amines is never named as an N-substituent and one N's
+    branch is never re-attributed to another nitrogen (spec risk 3).
+
+    Numbering (P-31.1.4): nitrogens are ordered by their amine-carbon chain
+    locant ascending; the lowest-locant SUBSTITUTED nitrogen is cited with a
+    bare 'N', each subsequent substituted nitrogen with 'N'', 'N''', ...
+    Identical substituents across nitrogens are grouped into one multiplied
+    prefix with the combined locant set (e.g. N,N,N',N'-tetramethyl). N- and
+    C-substituent prefixes alphabetize together (P-14.5.2).
+    """
+    mol = features.mol
+    atom_to_locant = getattr(features, 'atom_to_locant', {}) or {}
+
+    def amine_carbon_locant(n_idx: int) -> Any:
+        """Lowest chain-carbon locant among this N's chain neighbours."""
+        locs = []
+        for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            li = atom_to_locant.get(nbr.GetIdx())
+            if li is not None:
+                locs.append(li)
+        return min(locs) if locs else float('inf')
+
+    principal_n_set = set(principal_n)
+    # Order the nitrogens by their amine-carbon locant (P-31.1.4). Tie-break on
+    # the atom index for determinism.
+    ordered_n = sorted(principal_n, key=lambda ni: (amine_carbon_locant(ni), ni))
+
+    # Walk each nitrogen's substituents, excluding the parent chain/ring AND all
+    # OTHER principal nitrogens (and their chain carbons) so branches are never
+    # cross-attributed (spec risk 3).
+    from collections import Counter
+    per_n_subs = []  # list of (n_idx, Counter(sub_name -> count))
+    for n_idx in ordered_n:
+        # chain_set gates the entry neighbour (parent chain/ring + inter-amine
+        # chain carbons are all in the principal chain -> never an N-substituent).
+        # stop_set hard-blocks traversal at every OTHER principal nitrogen so a
+        # branch is never re-attributed across nitrogens (spec risk 3).
+        stop_set = principal_n_set - {n_idx}
+        subs = _walk_amine_n_substituents(mol, n_idx, chain_set, stop_set)
+        per_n_subs.append((n_idx, Counter(subs)))
+
+    # Assign primed italic-N tags: only SUBSTITUTED nitrogens receive a tag, in
+    # amine-carbon-locant order (lowest -> bare 'N', then N', N'', ...).
+    n_tag_by_idx = {}
+    tag_count = 0
+    for n_idx, counter in per_n_subs:
+        if not counter:
+            continue
+        n_tag_by_idx[n_idx] = "N" + ("'" * tag_count)
+        tag_count += 1
+
+    if not n_tag_by_idx:
+        return None  # no N-substituents on any nitrogen -> primary-diamine path
+
+    # Group identical substituents across nitrogens into one multiplied prefix
+    # with the combined locant set (P-16.3.3: N,N,N',N'-tetramethyl). Preserve
+    # the tag order (N < N' < N'') within each locant string.
+    sub_tags = {}  # sub_name -> ordered list of italic-N tags (one per occurrence)
+    for n_idx, counter in per_n_subs:
+        tag = n_tag_by_idx.get(n_idx)
+        if tag is None:
+            continue
+        for name in sorted(counter.keys()):
+            sub_tags.setdefault(name, []).extend([tag] * counter[name])
+
+    def tag_sort_key(t: str):
+        return (t.count("'"), t)
+
+    n_prefix_entries = []  # (alpha_key, rendered)
+    for name, tags in sub_tags.items():
+        tags_sorted = sorted(tags, key=tag_sort_key)
+        count = len(tags_sorted)
+        loc_str = ",".join(tags_sorted)
+        if count == 1:
+            rendered = f"{loc_str}-{_wrap_n_substituent(name)}"
+        else:
+            mult = get_multiplier_prefix(count, name)
+            rendered = f"{loc_str}-{mult}{_wrap_n_substituent(name)}"
+        n_prefix_entries.append((alpha_sort_key(name), rendered))
+
+    # Base name: parent + '-diamine' suffix (+ stereo). Already correct — built
+    # from ALL principal nitrogens by _generate_suffix/_generate_chain_parent.
+    fragments = []
+    if features.principal_chain:
+        parent = _generate_chain_parent(features)
+    elif features.ring_systems:
+        parent = _generate_ring_parent(features)
+    else:
+        return None
+    fragments.append(parent)
+
+    if features.principal_group:
+        suffix = _generate_suffix(features)
+        if suffix:
+            fragments.append(suffix)
+
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        stereo = _generate_stereodescriptors(features)
+        if stereo:
+            fragments.append(stereo)
+
+    base_name = _assemble_fragments(fragments, style)
+    if not base_name:
+        return None
+
+    # C-substituent prefixes (halogens, hydroxy, chain-alkyls, ...) as their own
+    # entries, mirroring the single-N path; alphabetized WITH the N-prefixes.
+    c_prefix_entries = []  # (alpha_key, rendered)
+    for p in _generate_prefixes(features):
+        if p.locants and not str(p.text)[:1].isdigit():
+            _loc = ",".join(str(_l) for _l in p.locants)
+            rendered = f"{_loc}-{p.text}"
+        else:
+            rendered = p.text
+        c_prefix_entries.append((alpha_sort_key(p.text), rendered))
+
+    all_entries = n_prefix_entries + c_prefix_entries
+    all_entries.sort(key=lambda e: e[0])
+    prefix_part = "-".join(rendered for _k, rendered in all_entries)
+    return f"{prefix_part}{base_name}"
 
 
 def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
