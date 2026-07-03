@@ -110,3 +110,95 @@ class TestNamePhosphine:
         except Exception:
             pytest.skip("representative SMILES exercises a non-handler error path")
         assert n1 == n2
+
+
+# ---------------------------------------------------------------------------
+# D4: Tier-A ring mutex — P-22.2.2.1 / P-68.3.1.2
+# ---------------------------------------------------------------------------
+
+class TestD4RingMutex:
+    """D4: phosphine handler must decline ring-P molecules (Tier-A mutex).
+
+    Ring-P (is_cyclic=True, chain_is_parent=False) must fall through to
+    tier_a_ring@4500 → _assemble_heterocycle_name → build_hw_name which
+    produces the correct Hantzsch-Widman PIN.  Mirrors the amine handler's
+    guard (amine.py lines 55-58).
+
+    IUPAC refs: P-22.2.2.1 (HW names for saturated monocyclic heterocycles),
+    P-68.3.1.2 (substitutive phosphine names apply ONLY to acyclic compounds).
+    """
+
+    # --- Acceptance cases: ring-P → HW PIN (all were 'unknown' before D4) ---
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C1CNCCPC1",  "1,4-azaphosphepane"),   # 7-ring N+P, N@1 (Table 2.8)
+        ("C1CCPCC1",   "phosphinane"),           # 6-ring P only
+        ("C1CCPCCO1",  "1,4-oxaphosphepane"),    # 7-ring O+P, O@1
+        ("C1CCPC1",    "phospholane"),           # 5-ring P only
+        ("C1CP1",      "phosphirane"),           # 3-ring P only
+        ("C1CCP1",     "phosphetane"),           # 4-ring P only
+        ("C1CCPCCC1",  "phosphepane"),           # 7-ring P only
+    ])
+    def test_ring_phosphorus_hw_name(self, smiles, expected):
+        """Ring-P compounds must be named by HW rules (not substitutive)."""
+        namer = Orthonym()
+        result = namer.name(smiles)
+        assert result == expected, (
+            f"SMILES {smiles!r}: expected {expected!r}, got {result!r}"
+        )
+
+    # --- Guard cases: acyclic phosphines must be unchanged ---
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CPC",      "dimethylphosphane"),
+        ("CP(C)C",   "trimethylphosphane"),
+        ("CCP",      "ethylphosphane"),
+    ])
+    def test_acyclic_phosphine_unaffected(self, smiles, expected):
+        """Acyclic phosphines (is_cyclic=False) must be unchanged by D4."""
+        namer = Orthonym()
+        result = namer.name(smiles)
+        assert result == expected, (
+            f"SMILES {smiles!r}: expected {expected!r}, got {result!r}"
+        )
+
+    # --- Guard cases: N/O-only heterocycles must be unchanged ---
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C1CCNCC1",  "piperidine"),
+        ("O1CCCCCC1", "oxepane"),
+        ("C1CNCCOC1", "1,4-oxazepane"),
+    ])
+    def test_n_o_heterocycles_unaffected(self, smiles, expected):
+        """N/O-only rings (no P principal_group) must be unchanged by D4."""
+        namer = Orthonym()
+        result = namer.name(smiles)
+        assert result == expected, (
+            f"SMILES {smiles!r}: expected {expected!r}, got {result!r}"
+        )
+
+    # --- Predicate-level: ring mutex fires when is_cyclic=True, chain_is_parent=False ---
+
+    def test_predicate_declines_ring_without_chain_parent(self):
+        """_is_phosphine returns False when is_cyclic=True and chain_is_parent=False."""
+        class RingFeatures:
+            principal_group = "secondary_phosphine"
+            is_cyclic = True
+            chain_is_parent = False
+        assert _is_phosphine(RingFeatures()) is False
+
+    def test_predicate_accepts_ring_with_chain_parent(self):
+        """_is_phosphine returns True when is_cyclic=True and chain_is_parent=True."""
+        class ChainParentFeatures:
+            principal_group = "secondary_phosphine"
+            is_cyclic = True
+            chain_is_parent = True
+        assert _is_phosphine(ChainParentFeatures()) is True
+
+    def test_predicate_accepts_acyclic(self):
+        """_is_phosphine returns True for acyclic secondary phosphine."""
+        class AcyclicFeatures:
+            principal_group = "secondary_phosphine"
+            is_cyclic = False
+            chain_is_parent = False
+        assert _is_phosphine(AcyclicFeatures()) is True

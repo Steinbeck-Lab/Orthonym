@@ -27,8 +27,19 @@ _PHOSPHINE_GROUPS = (
 
 
 def _is_phosphine(features: Any) -> bool:
-    """Mirrors composer.py:1016 (principal_group in the three phosphine variants)."""
-    return getattr(features, 'principal_group', None) in _PHOSPHINE_GROUPS
+    """Mirrors composer.py:1016 (principal_group in the three phosphine variants).
+
+    Tier-A ring mutex (D4 / P-22.2.2.1): if the molecule is cyclic and the
+    chain is NOT the parent, decline so tier_a_ring@4500 handles it via the
+    Hantzsch-Widman builder.  Mirrors amine.py lines 55-58 exactly.
+    """
+    if getattr(features, 'principal_group', None) not in _PHOSPHINE_GROUPS:
+        return False
+    is_cyclic = getattr(features, 'is_cyclic', False)
+    chain_is_parent = getattr(features, 'chain_is_parent', False)
+    if is_cyclic and not chain_is_parent:
+        return False
+    return True
 
 
 def name_phosphine(
