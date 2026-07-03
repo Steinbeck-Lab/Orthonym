@@ -1315,8 +1315,21 @@ def _resolve_oxo_parent(mol, ring_atoms):
                         in_ring_db.add(i)
                         in_ring_db.add(j)
             for c, loc in numbering.items():
+                # A mancude parent's intrinsic indicated-hydrogen positions are ring
+                # atoms attached only by single ring bonds (not in a ring double
+                # bond) that carry hydrogen. These sit on CARBON (1H-indene,
+                # 2H-/4H-chromene) OR on NITROGEN (9H-purine, 1H-indole,
+                # 1H-benzimidazole, 9H-carbazole, ...). Nitrogen was previously
+                # excluded, so an N-indicated-H parent reported NO intrinsic IH; the
+                # carbonyl-at-IH validity check below was then bypassed and the
+                # catalog's baked-in tautomer label (e.g. "9H-") was emitted without
+                # verifying it fits the target — over-saturating the ring (the
+                # caffeine "9H-purine-2,6(1H,3H,7H)-dione" bug, caught only by the
+                # SELF-01 backstop). Detecting N here restores the check for the
+                # whole N-indicated-H parent class.
                 if (c < cmol.GetNumAtoms() and isinstance(loc, int)
-                        and cmol.GetAtomWithIdx(c).GetSymbol() == 'C'
+                        and cmol.GetAtomWithIdx(c).GetSymbol() in ('C', 'N')
+                        and cmol.GetAtomWithIdx(c).GetTotalNumHs() > 0
                         and c not in in_ring_db):
                     ih_locants.add(loc)
         except Exception:
