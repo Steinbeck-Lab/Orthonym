@@ -298,6 +298,14 @@ def _get_non_principal_terminal_carbons(
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).
         'nitrile': 0,
+        # C2 (P-66.4.1.3.1): a non-principal amidine is the 'carbamimidoyl' prefix
+        # whose carbon (the -C(=NH)NH2 C) is excluded from the parent chain — the
+        # direct analog of cyano/carbamoyl. SMARTS '[CX3](=[NX2H])[NX3H2]' /
+        # '[CX3](=[NX2])[NX3]' both give match index 0 = the amidine C. Skipped
+        # automatically when amidine IS the principal group (the 'if fg_name ==
+        # principal_group: continue' guard keeps the C in the chain for the
+        # -imidamide suffix, e.g. ethanimidamide/propanimidamide).
+        'amidine': 0,
     }
 
     principal_carbons: Set[int] = set()

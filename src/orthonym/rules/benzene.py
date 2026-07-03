@@ -68,6 +68,10 @@ _SUFFIX_PRIORITY = [
     # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
     # carboxamide so a co-occurring amide would stay principal.
     'carbohydrazide',
+    # C2 (P-66.4.1 / P-14.5.2 seniority): amidine ranks below amide and above
+    # nitrile, so '-carboximidamide' sits between 'carboxamide' and
+    # 'carbonitrile'. A co-occurring amide/acid therefore stays principal.
+    'carboximidamide',
     'carbonitrile',
     'carbaldehyde',
     # v22 C-T2 (V-2): chalcogen analogues of the aldehyde-on-ring suffix
@@ -94,6 +98,7 @@ _SUFFIX_TO_PREFIX = {
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
     'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
+    'carboximidamide': 'carbamimidoyl',  # C2 (P-66.4.1.3.1)
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
     'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
@@ -119,6 +124,12 @@ _BENZENE_FG_SMARTS = {
     'selenoaldehyde': Chem.MolFromSmarts('[CX3H1](=[SeX1])'),
     'telluroaldehyde': Chem.MolFromSmarts('[CX3H1](=[TeX1])'),
     'nitrile': Chem.MolFromSmarts('[CX2]#[NX1]'),
+    # C2 (P-66.4.1): ring-attached amidine -C(=N)N -> '-carboximidamide' suffix.
+    # =[NX2] (not =O) restricts it to true amidines so C(=O)N (amide) never
+    # matches; matched AFTER the amide/hydrazide blocks in the detector so amide
+    # wins on seniority. The C(=N)N guanidine/urea attach via N (start_idx would
+    # be N, not this C), so the C-branch is never reached for them.
+    'amidine': Chem.MolFromSmarts('[CX3](=[NX2])[NX3]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
@@ -336,6 +347,31 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                     'n_substituents': n_subs,
                 }
+
+        # C2 (P-66.4.1): ring-attached amidine -C(=N)N -> '-carboximidamide'.
+        # Placed AFTER all amide/hydrazide blocks so a C(=O)N group is claimed as
+        # the (senior) amide and never falls here; the =[NX2] in the SMARTS also
+        # excludes C=O structurally. Defensive guanidine skip: a guanidino C
+        # (N-C(=N)-N) attaches to the ring via N, so its C is never start_idx, but
+        # guard anyway. N-substituted amidines route through the N-aware
+        # substituent path (FIX c) when amidine is NOT the principal group; as a
+        # ring SUFFIX the plain -carboximidamide base is emitted here and any
+        # N/N'-substituents are carried on 'n_substituents'.
+        _guanidine_patt = Chem.MolFromSmarts('[NX3][CX3](=[NX2])[NX3]')
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['amidine']):
+            if match[0] != start_idx:
+                continue
+            # Skip if this C is a guanidine carbon (both flanking atoms are N).
+            is_guanidino = any(
+                gm[1] == start_idx
+                for gm in mol.GetSubstructMatches(_guanidine_patt)
+            )
+            if is_guanidino:
+                continue
+            return {
+                'name': 'carboximidamide', 'suffix_name': 'carboximidamide',
+                'is_suffix': True, 'atoms': sub_atoms,
+            }
 
         # Aldehyde: C(=O)H
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['aldehyde']):
@@ -2105,6 +2141,24 @@ def _assemble_benzene_with_suffix(
         )
         return f"{prefix_part}benzene{chosen_suffix}"
 
+    # C2 (P-66.4.1): single amidine on benzene -> '-carboximidamide' suffix.
+    # Bare -> 'benzenecarboximidamide' (no locant). With other substituents the
+    # PIN carries an explicit '-1-' on the group (unlike the carbohydrazide path
+    # above): '4-methylbenzene-1-carboximidamide' (OPSIN-verified). Multi-instance
+    # (-> 'benzene-1,4-dicarboximidamide') falls through to the general assembler.
+    if chosen_suffix == 'carboximidamide' and chosen_count == 1:
+        n_subs = n_substituents_map.get('carboximidamide', [])
+        n_prefix = _build_amidine_n_prefix(n_subs)
+        if not remaining_prefix_groups:
+            return f"{n_prefix}benzenecarboximidamide"
+        renumbered_groups = _renumber_relative_to(
+            remaining_prefix_groups, chosen_locants[0]
+        )
+        prefix_part = _build_prefix_string_with_locants(
+            renumbered_groups, mono_needs_locant=True
+        )
+        return f"{prefix_part}{n_prefix}benzene-1-carboximidamide"
+
     # Single carbaldehyde: delegate to benzaldehyde retained name path
     # "benzaldehyde" is an IUPAC retained name (P-66.6.3.1.1)
     if chosen_suffix == 'carbaldehyde' and chosen_count == 1:
@@ -2206,6 +2260,25 @@ def _name_substituted_phenol(
     prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
 
     return f"{prefix_part}phenol"
+
+
+def _build_amidine_n_prefix(n_substituents) -> str:
+    """Build the N/N'-locant prefix for an amidine (carboximidamide) suffix.
+
+    C2 (P-66.4.1.2.3): amidine N-substituent locants are N (the amino,
+    single-bonded nitrogen) and N' (the imino, =N nitrogen). Entries are
+    (nlocant, name) tuples where nlocant is 'N' or "N'". Emits e.g.
+    "N-methyl" / "N'-methyl" / "N-methyl-N'-ethyl" (no trailing hyphen, so it can
+    be concatenated directly before the ring base as the amide path does).
+    Empty list -> "" (plain amidine, both nitrogens unsubstituted).
+    """
+    from ..assembly.naming_utils import _wrap_n_substituent
+    if not n_substituents:
+        return ""
+    # Sort by locant so N precedes N' (deterministic citation order).
+    ordered = sorted(n_substituents, key=lambda e: (e[0].count("'"), e[0]))
+    parts = [f"{nloc}-{_wrap_n_substituent(name)}" for nloc, name in ordered]
+    return "-".join(parts)
 
 
 def _name_substituted_benzamide(
