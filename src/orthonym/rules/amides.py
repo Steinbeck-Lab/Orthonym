@@ -739,3 +739,128 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
             return f"{n_prefix}{parent_name}"
 
     return parent_name
+
+
+def name_chain_diamide(
+    mol, all_amide_matches: List[tuple], chain: List[int],
+    atom_to_locant: Dict[int, int],
+) -> Optional[str]:
+    """Name an acyclic chain diamide with optional N-substituents (D3).
+
+    Handles the mixed primary + N-substituted (and symmetric primary /
+    symmetric secondary) acyclic diamide class per BB P-66.1.1.1.1
+    (parent = ``{stem}anediamide``) and P-66.1.1.3.1.1 (N-substituents cited
+    as ``N{locant}`` prefixes where the locant is the chain-carbon locant of
+    the amide carbonyl; identical substituents on both ends give the
+    ``N1,N4-di...`` form).
+
+    Fail-closed: returns ``None`` (so the caller falls through to the existing
+    polyfunctional / general_acyclic path unchanged) whenever any precondition
+    is not met, or any N-substituent cannot be named.
+
+    Args:
+        mol: RDKit Mol object.
+        all_amide_matches: list of amide SMARTS match tuples (primary and/or
+            secondary), carbonyl carbon at tuple index 0.
+        chain: the principal chain atom-index list (the diamide backbone).
+        atom_to_locant: mapping from chain atom index -> locant.
+
+    Returns:
+        The PIN name string, or ``None`` (fail-closed).
+    """
+    # TIGHT predicate: exactly two amide groups.
+    if not all_amide_matches or len(all_amide_matches) != 2:
+        return None
+    chain_len = len(chain)
+    if chain_len < 2:
+        return None
+
+    end_locants = {1, chain_len}
+
+    # Both carbonyl carbons (tuple index 0) must sit at chain-END locants.
+    # Collect (locant, match) so the amide identity travels with its position.
+    positioned = []
+    for match in all_amide_matches:
+        carbonyl_c = match[0]
+        locant = atom_to_locant.get(carbonyl_c)
+        if locant is None or locant not in end_locants:
+            return None
+        positioned.append((locant, match))
+
+    # Guard against both amides mapping to the same chain end (degenerate).
+    if {loc for loc, _ in positioned} != end_locants:
+        return None
+
+    # Extract N-substituents at each end: (locant, [names]).
+    per_end = []  # list of (locant, [sub_name, ...])
+    for locant, match in positioned:
+        subs = get_n_substituents(mol, match)
+        names = []
+        for sub in subs:
+            name = sub.get("name")
+            if not name:
+                return None  # un-nameable N-substituent -> fail-closed
+            names.append(name)
+        per_end.append((locant, names))
+
+    # Orientation (P-14.5.1): choose forward vs reversed numbering so the
+    # N-substituents get the lowest locant set. The chain carries two
+    # numbering directions; the amide carbonyls are fixed at {1, chain_len}.
+    # For each candidate orientation compute the N-locant assigned to each
+    # substituted end and pick the lower sorted locant set.
+    def _n_locants_for(reverse: bool):
+        out = []
+        for locant, names in per_end:
+            eff = (chain_len + 1 - locant) if reverse else locant
+            for _ in names:
+                out.append(eff)
+        return sorted(out)
+
+    fwd = _n_locants_for(False)
+    rev = _n_locants_for(True)
+    reverse = rev < fwd
+
+    # Build (effective_locant, name) pairs across both ends.
+    placed = []  # (eff_locant, name)
+    for locant, names in per_end:
+        eff = (chain_len + 1 - locant) if reverse else locant
+        for name in names:
+            placed.append((eff, name))
+
+    # Parent name: {stem}anediamide (P-66.1.1.1.1). chain_len==2 -> ethanediamide.
+    stem = _get_chain_prefix(chain_len)
+    if not stem:
+        return None
+    parent_name = f"{stem}anediamide"
+
+    if not placed:
+        # Symmetric unsubstituted diamide (e.g. butanediamide) — plain parent.
+        return parent_name
+
+    # Group by substituent name, collecting its N-locants (P-66.1.1.3.1.1).
+    groups: Dict[str, List[int]] = defaultdict(list)
+    for eff_locant, name in placed:
+        groups[name].append(eff_locant)
+
+    # Build prefix parts, alphabetised by substituent name (P-14.5.2).
+    parts = []  # (sort_key, prefix_string)
+    for name in groups:
+        locants = sorted(groups[name])
+        is_complex = is_complex_substituent(name)
+        from ..assembly.naming_utils import _wrap_n_substituent
+        if is_complex:
+            display_name = _wrap_n_substituent(name) if '(' in name else f"({name})"
+        else:
+            display_name = _wrap_n_substituent(name)
+        n_locant_str = ",".join(f"N{loc}" for loc in locants)
+        if len(locants) == 1:
+            prefix = f"{n_locant_str}-{display_name}"
+        else:
+            multiplier = get_multiplier_prefix(len(locants), name)
+            prefix = f"{n_locant_str}-{multiplier}{display_name}"
+        parts.append((alpha_sort_key(name), prefix))
+
+    parts.sort(key=lambda p: p[0])
+    n_prefix_string = "-".join(p[1] for p in parts)
+
+    return f"{n_prefix_string}{parent_name}"

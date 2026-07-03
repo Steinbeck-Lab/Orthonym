@@ -1051,6 +1051,30 @@ _register_inner(
 )
 
 
+# --- D3: chain_diamide (acyclic diamide with optional N-substituents).
+#     Priority 1490 places it between ring_ester(1450) and ester_family(1500),
+#     intercepting mixed primary + N-substituted acyclic diamides BEFORE the
+#     polyfunctional / ester_family path double-counts the terminal secondary
+#     amide (SELF-01 -> 'unknown') or DROP-03 sweeps the N-alkyl carbons.
+#     TIGHT predicate (exactly 2 chain-end amides) so mono-amides, diacids,
+#     esters, and triamides fall through unchanged. oxamide (2-C diamide) is
+#     caught upstream at dispatch and never reaches here.
+from .handlers.diamide import _is_chain_diamide, name_chain_diamide_handler  # noqa: E402
+
+_register_inner(
+    handler_id="chain_diamide",
+    priority=1490,
+    predicate=_is_chain_diamide,
+    handler=name_chain_diamide_handler,
+    iupac_section="P-66.1.1.1.1 / P-66.1.1.3.1.1",
+    description=(
+        "Chain diamide with optional N-substituents (N1-methyl / N1,N4-dimethyl "
+        "forms per BB P-66.1.1.3.1.1)."
+    ),
+    side_effect_inventory=(),
+)
+
+
 # --- Plan-07 commit 07-01: ester_family composite (closes 3 of 8 deferred
 #     handlers: polyfunctional, multi_ester, ester). Per CONTEXT D-28 +
 #     ADR-19-02 §3.1 Option A composite-handler resolution path. Priority
