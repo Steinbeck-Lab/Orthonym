@@ -47,10 +47,20 @@ class TestAnilinoPrefix:
 
     @pytest.mark.unit
     def test_anilino_prefix_on_chain(self):
-        """Compound with -NHPh on an acyclic chain produces 'anilino' not 'phenylamino'."""
-        # 4-aminodiphenylamine: benzene with NH2 and NHPh
+        """Nc1ccc(Nc2ccccc2)cc1 is the PIN N-phenylbenzene-1,4-diamine.
+
+        SUPERSEDED (C4b, 2026-07-03): this test previously required the OLD
+        non-PIN general name '...anilinobenzene' for this molecule. Under the
+        C4/C4b aromatic-diamine fix both amino N's are the principal group, so
+        the PIN is the benzene-1,4-diamine parent with the aryl group cited as
+        an italic-N prefix -> 'N-phenylbenzene-1,4-diamine' (OPSIN round-trip
+        verified). No 'anilino' fragment appears; that is correct PIN behaviour,
+        not a regression. 'phenylamino' must still never appear.
+        """
         name = name_compound("Nc1ccc(Nc2ccccc2)cc1")
-        assert "anilino" in name, f"Expected 'anilino' in '{name}'"
+        assert name == "N-phenylbenzene-1,4-diamine", (
+            f"Expected PIN 'N-phenylbenzene-1,4-diamine', got '{name}'"
+        )
         assert "phenylamino" not in name, f"'phenylamino' should not appear in '{name}'"
 
     @pytest.mark.unit
@@ -65,9 +75,16 @@ class TestAnilinoPrefix:
 
     @pytest.mark.unit
     def test_anilino_no_outer_brackets(self):
-        """anilino should NOT have outer parentheses (OPSIN simple substituent)."""
-        name = name_compound("Nc1ccc(Nc2ccccc2)cc1")
-        # Should be "...anilinobenzene" not "...(anilino)benzene"
+        """anilino should NOT have outer parentheses (OPSIN simple substituent).
+
+        Uses 4-anilinobenzoic acid: the senior CO2H keeps the -NHPh amine
+        demoted to the 'anilino' PREFIX (P-62.2.2 seniority), so this still
+        exercises the anilino-prefix path. (The bare NH2/NHPh diamine now names
+        as the PIN N-phenylbenzene-1,4-diamine — see test_anilino_prefix_on_chain.)
+        """
+        name = name_compound("OC(=O)c1ccc(Nc2ccccc2)cc1")
+        assert "anilino" in name, f"Expected 'anilino' prefix in '{name}'"
+        # Should be "...anilinobenzoic acid" not "...(anilino)benzoic acid"
         assert "(anilino)" not in name, (
             f"'(anilino)' with brackets found in '{name}' -- anilino is a simple substituent"
         )
@@ -76,8 +93,7 @@ class TestAnilinoPrefix:
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")
     def test_anilino_opsin_parses(self):
         """OPSIN should parse names containing 'anilino'."""
-        # Simple test: 4-anilinobenzene-1-amine
-        name = name_compound("Nc1ccc(Nc2ccccc2)cc1")
+        name = name_compound("OC(=O)c1ccc(Nc2ccccc2)cc1")
         if "anilino" in name:
             assert opsin_parses(name), f"OPSIN failed to parse '{name}'"
 

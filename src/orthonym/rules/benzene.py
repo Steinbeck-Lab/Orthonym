@@ -1971,13 +1971,24 @@ def name_substituted_benzene(
                 if not prefix_groups[pname]:
                     del prefix_groups[pname]
         suffix_groups['amine'] = amine_locants
-        # N-substituents only carried for the single-amine (aniline) path; the
-        # systematic multi-amine (benzene-...-diamine) path in the assembler
-        # does not take N-substituents in the target set.
         if len(amine_locants) == 1:
+            # Single amine (aniline) path: N-substituents keyed under 'amine'.
             n_subs = amine_candidates[amine_locants[0]]['n_substituents']
             if n_subs:
                 n_substituents_map['amine'] = n_subs
+        else:
+            # C4b: multi-amine (benzene-x,y-diamine) path. Carry the FULL
+            # per-locant N-substituent map so the assembler can build the
+            # 'N-...benzene-x,y-diamine' PIN instead of dropping the
+            # N-substituent (which produced a WRONG structure -> SELF-01
+            # suppressed the whole molecule to 'unknown').
+            by_locant = {
+                loc: amine_candidates[loc]['n_substituents']
+                for loc in amine_locants
+                if amine_candidates[loc]['n_substituents']
+            }
+            if by_locant:
+                n_substituents_map['__amine_by_locant__'] = by_locant
 
     # If suffix groups exist, use suffix naming path
     if suffix_groups:
@@ -2179,21 +2190,16 @@ def _assemble_benzene_with_suffix(
                 atom_to_locant, oriented_ring, n_subs
             )
         else:
-            # Multiple amines: systematic benzene-<locants>-<mult>amine
-            # (e.g. benzene-1,2,4-triamine). N-substituents are not carried on
-            # this systematic path in the target set.
-            from ..assembly.naming_utils import (
-                SIMPLE_MULTIPLIERS, _join_multiplied_suffix,
+            # Multiple amines -> 'benzene-<locants>-<mult>amine' parent.
+            # C4b: when one/more of the amine nitrogens carry N-substituents
+            # (e.g. Nc1ccc(NC)cc1 -> N-methylbenzene-1,4-diamine), those must
+            # be cited as italic-N locant prefixes on the diamine parent.
+            # Previously they were DROPPED, yielding a wrong structure that
+            # SELF-01 then suppressed to 'unknown'.
+            n_by_locant = n_substituents_map.get('__amine_by_locant__', {})
+            return _name_substituted_benzenediamine(
+                remaining_prefix_groups, amine_locants, n_by_locant,
             )
-            mult = SIMPLE_MULTIPLIERS.get(len(amine_locants), str(len(amine_locants)))
-            loc_str = ','.join(str(l) for l in sorted(amine_locants))
-            suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
-            if remaining_prefix_groups:
-                prefix_part = _build_prefix_string_with_locants(
-                    remaining_prefix_groups, mono_needs_locant=True
-                )
-                return f"{prefix_part}{suffix_part}"
-            return suffix_part
 
     # Check for special "benzoic acid" retained base name:
     # Single carboxylic acid -> "benzoic acid" base (P-65.1.2.1)
@@ -2421,6 +2427,121 @@ def _name_substituted_aniline(
     prefix_part = "-".join(rendered for _key, rendered in all_entries)
 
     return f"{prefix_part}aniline"
+
+
+def _name_substituted_benzenediamine(
+    prefix_groups: Dict[str, List[int]],
+    amine_locants: List[int],
+    n_by_locant: Dict[int, List[str]],
+) -> str:
+    """Name a benzene poly-amine (>=2 -NH2/-NHR/-NR2) as the
+    'benzene-<locants>-<mult>amine' PIN, citing N-substituents on any
+    N-substituted nitrogen as italic-N prefixes (C4b, P-62.2.2 / P-31.1.4).
+
+    C4 promoted every amine to the diamine suffix but silently dropped the
+    N-substituent, producing e.g. 'benzene-1,4-diamine' for
+    N-methylbenzene-1,4-diamine — a WRONG structure that SELF-01 then
+    suppressed to 'unknown'. This restores the correct PIN for the class.
+
+    Numbering (all inputs are in the current oriented-ring locant space,
+    1..6, cyclic): the ring is renumbered over all 12 symmetry operations
+    (6 rotations x 2 directions). Selection criteria, in order (P-31.1.4):
+      1. lowest locant set for the amino (parent-suffix) positions,
+      2. lowest locants for the N-substituted nitrogens (so a single
+         N-substituted amine lands on position 1 -> cited as plain 'N-'),
+      3. lowest locants for the detachable ring-substituent prefixes,
+      4. numeric tie-break.
+
+    N-substituent citation: the lowest-locant substituted nitrogen is cited
+    with a bare 'N' (or 'N,N-' for a disubstituted single nitrogen); any
+    additional substituted nitrogen is cited with its numeric ring locant
+    ('N<locant>-', OPSIN-valid, P-14.3.2). Ring and N prefixes are
+    alphabetized together (P-14.5.2).
+
+    Args:
+        prefix_groups: Non-amine ring substituent groups (current locants).
+        amine_locants: Current locants of the amino-bearing ring carbons.
+        n_by_locant: current-locant -> list of N-substituent names, ONLY for
+            nitrogens that carry substituents (bare -NH2 omitted).
+
+    Returns:
+        IUPAC name, e.g. 'N-methylbenzene-1,4-diamine',
+        'N,N-dimethylbenzene-1,4-diamine', 'N-phenylbenzene-1,2-diamine'.
+    """
+    from ..assembly.naming_utils import (
+        SIMPLE_MULTIPLIERS, _join_multiplied_suffix, _wrap_n_substituent,
+    )
+
+    amine_set = set(amine_locants)
+
+    def renumber(start_pos: int, direction: int, old: int) -> int:
+        # old current locant (1..6) -> new locant under this symmetry op.
+        return ((direction * ((old - 1) - start_pos)) % 6) + 1
+
+    best = None  # (amine_key, n_key, ring_key, tiebreak, payload)
+    for start_pos in range(6):
+        for direction in (1, -1):
+            # New amine locants.
+            new_amines = sorted(renumber(start_pos, direction, a)
+                                for a in amine_locants)
+            # New locants of the N-substituted nitrogens.
+            new_n_locs = sorted(renumber(start_pos, direction, loc)
+                                for loc in n_by_locant)
+            # New ring-substituent locants.
+            new_ring: Dict[str, List[int]] = defaultdict(list)
+            for name, locs in prefix_groups.items():
+                for loc in locs:
+                    new_ring[name].append(renumber(start_pos, direction, loc))
+            ring_key = tuple(sorted(
+                loc for locs in new_ring.values() for loc in locs
+            ))
+            # Map new-N-locant -> substituent names (for citation).
+            new_n_map = {
+                renumber(start_pos, direction, loc): names
+                for loc, names in n_by_locant.items()
+            }
+            tiebreak = (tuple(new_amines), tuple(new_n_locs), ring_key)
+            key = (tuple(new_amines), tuple(new_n_locs), ring_key, tiebreak)
+            if best is None or key < best[0]:
+                best = (key, new_amines, new_ring, new_n_map)
+
+    _key, new_amines, new_ring, new_n_map = best
+
+    # --- N-substituent prefix entries (alpha_key, rendered) ---
+    n_prefix_entries: List[Tuple[str, str]] = []
+    lowest_sub_n = min(new_n_map) if new_n_map else None
+    for n_loc in sorted(new_n_map):
+        names = new_n_map[n_loc]
+        # The lowest-locant substituted N is cited with a bare 'N'; any
+        # further substituted N uses its numeric ring locant.
+        n_tag = "N" if n_loc == lowest_sub_n else f"N{n_loc}"
+        if len(names) == 2 and names[0] == names[1]:
+            mp = get_multiplier_prefix(2, names[0])
+            rendered = f"{n_tag},{n_tag}-{mp}{_wrap_n_substituent(names[0])}"
+            n_prefix_entries.append((alpha_sort_key(names[0]), rendered))
+        else:
+            for nm in names:
+                rendered = f"{n_tag}-{_wrap_n_substituent(nm)}"
+                n_prefix_entries.append((alpha_sort_key(nm), rendered))
+
+    # --- Ring-substituent prefix entries ---
+    ring_prefix_entries: List[Tuple[str, str]] = []
+    for name in new_ring:
+        locants = sorted(new_ring[name])
+        rendered = format_substituent_prefix(name, locants, len(locants))
+        ring_prefix_entries.append((alpha_sort_key(name), rendered))
+
+    # --- Parent suffix: benzene-<locants>-<mult>amine ---
+    mult = SIMPLE_MULTIPLIERS.get(len(new_amines), str(len(new_amines)))
+    loc_str = ",".join(str(l) for l in sorted(new_amines))
+    suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
+
+    all_entries = n_prefix_entries + ring_prefix_entries
+    if not all_entries:
+        return suffix_part
+    all_entries.sort(key=lambda e: e[0])
+    prefix_part = "-".join(rendered for _k, rendered in all_entries)
+    return f"{prefix_part}{suffix_part}"
 
 
 def _build_amidine_n_prefix(n_substituents) -> str:

@@ -96,3 +96,36 @@ def test_c4_guard_amine_prefix_when_senior_group_present():
     is on the ring — the amine is only promoted to the aniline suffix when it
     is the molecule-level principal group. OPSIN-verified fallback PIN."""
     assert _pin("CNc1ccc(C(=O)O)cc1") == "4-(N-methylamino)benzoic acid"
+
+
+# ---------------------------------------------------------------------------
+# C4b regression fix — N-substituted aromatic DIAMINES (P-62.2.2)
+#
+# A benzene ring bearing a free primary -NH2 AND a second, N-substituted
+# amino group. Both amino N's are the principal group -> 'benzene-x,y-diamine'
+# parent; the N-substituent(s) on one nitrogen are cited as italic-N locant
+# prefixes on that nitrogen (which takes ring position 1 so it reads plain
+# N-/N,N-). C4 promoted BOTH amines to the diamine suffix but DROPPED the
+# N-substituent -> emitted 'benzene-1,4-diamine' (wrong structure) which
+# SELF-01 then suppressed to 'unknown'. All PINs OPSIN round-trip verified.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("Nc1ccc(Nc2ccccc2)cc1", "N-phenylbenzene-1,4-diamine"),
+    ("Nc1ccccc1Nc1ccccc1", "N-phenylbenzene-1,2-diamine"),
+    ("CNc1ccc(N)cc1", "N-methylbenzene-1,4-diamine"),
+    ("Nc1ccc(NC)cc1", "N-methylbenzene-1,4-diamine"),
+    ("Nc1ccc(N(C)C)cc1", "N,N-dimethylbenzene-1,4-diamine"),
+    ("CNc1ccccc1N", "N-methylbenzene-1,2-diamine"),
+])
+def test_c4b_n_substituted_aromatic_diamine(smiles, expected):
+    assert _pin(smiles) == expected
+
+
+def test_c4b_pure_primary_diamine_unchanged():
+    """The pure primary diamine (both -NH2, no N-substituent) must stay a valid
+    diamine name and NOT regress to unknown. Its exact spelling is env-dependent
+    (prod SELF-01 path yields '1,4-phenylenediamine'; the RT-free unit path
+    yields 'benzene-1,4-diamine') — both are OPSIN-valid PINs/synonyms for the
+    same molecule; the C4b fix must not touch it."""
+    assert _pin("Nc1ccc(N)cc1") in {"benzene-1,4-diamine", "1,4-phenylenediamine"}
