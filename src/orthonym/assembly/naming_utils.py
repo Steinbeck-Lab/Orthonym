@@ -218,6 +218,14 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # (N-methylethanesulfonamide). A 3+ carbon chain keeps its locant
     # (propane-1-sulfonamide). Sulfinamide (no FG defined yet) deferred.
     "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
+    # Wave2 T1b (P-63.1.5 / P-14.3.4.4): selenol/tellurol are monovalent-chalcogen
+    # suffixes exactly like -ol/-thiol, so the locant elides on the symmetric 2-carbon
+    # (ethane) parent -> 'ethaneselenol'/'ethanetellurol' (PIN, OPSIN-RT), not
+    # 'ethane-1-selenol'. Unlike -ol/-thiol (which have dedicated handlers that already
+    # elide), selenol/tellurol route through the generic SUFFIX_FORMS path and so must
+    # be declared here (Rule 3b's docstring already anticipates them). propan-1-selenol
+    # (3-carbon) and substituted 2-X-ethaneselenol (is_monosubstituted False) keep the locant.
+    "selenol", "tellurol",
 })
 
 
