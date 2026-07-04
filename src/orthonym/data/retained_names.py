@@ -155,7 +155,7 @@ RETAINED_NAMES = {
     "C1CSC1": "thietane",
     "C1CCOC1": "oxolane",
     "C1CCNC1": "pyrrolidine",
-    "C1CCSC1": "tetrahydrothiophene",
+    "C1CCSC1": "thiolane",
     "C1CCOCC1": "oxane",
     "C1CCNCC1": "piperidine",
     "C1CCSCC1": "thiane",

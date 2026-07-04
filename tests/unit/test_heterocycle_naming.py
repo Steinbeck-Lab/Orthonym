@@ -92,8 +92,8 @@ class TestFiveMemberedSaturatedHeterocycles:
         ("C1CCOC1", "oxolane"),
         # Nitrogen - pyrrolidine
         ("C1CCNC1", "pyrrolidine"),
-        # Sulfur - tetrahydrothiophene (thiolane)
-        ("C1CCSC1", "tetrahydrothiophene"),
+        # Sulfur - Wave2 T1d: HW name 'thiolane' is the PIN (mirrors oxolane; P-63.5)
+        ("C1CCSC1", "thiolane"),
     ])
     def test_retained_names(self, smiles, expected):
         """Test retained names for common 5-membered saturated heterocycles."""
@@ -520,7 +520,7 @@ class TestPipelineIntegration:
         # 5-membered saturated
         ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
-        ("C1CCSC1", "tetrahydrothiophene"),
+        ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
         # 5-membered aromatic (v23 IH-01: N-H azoles carry leading 1H-)
         ("c1ccoc1", "furan"),
         ("c1cc[nH]c1", "1H-pyrrole"),

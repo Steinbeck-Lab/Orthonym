@@ -113,7 +113,7 @@ class TestKetonePGLocationProtect:
     neighbors of the PG-location change)."""
 
     CASES = [
-        ("CC(=O)c1ccccc1", "acetophenone"),  # retained name shields it
+        ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),  # Wave2 T1d: acetophenone de-headlined to the PIN
         ("CC(=O)C1CCCCC1", "1-cyclohexylethan-1-one"),
         ("O=C(CC)c1ccccc1", "1-phenylpropan-1-one"),
         ("O=C1CCCCC1", "cyclohexan-1-one"),

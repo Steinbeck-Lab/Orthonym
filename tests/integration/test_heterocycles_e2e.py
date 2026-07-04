@@ -40,7 +40,7 @@ class TestHETERO02:
     @pytest.mark.parametrize("smiles,expected", [
         ("C1CCOC1", "oxolane"),
         ("C1CCNC1", "pyrrolidine"),
-        ("C1CCSC1", "tetrahydrothiophene"),
+        ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
     ])
     def test_5_membered_saturated(self, smiles, expected):
         """Test 5-membered saturated heterocycles use retained names."""
@@ -58,16 +58,17 @@ class TestHETERO03:
     @pytest.mark.parametrize("smiles,expected", [
         # Single heteroatom
         ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "pyrrole"),
+        ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 T1d hygiene: IH-01 1H- azole PIN
         ("c1ccsc1", "thiophene"),
-        # Two heteroatoms - 1,3 arrangement
-        ("c1c[nH]cn1", "imidazole"),
-        ("c1cnco1", "oxazole"),
-        ("c1cncs1", "thiazole"),
+        # Two heteroatoms - 1,3 arrangement (Wave2 T1d hygiene: PINs — IH-01 1H- azoles
+        # + batch-A HW-locant oxa/thia-azoles; this integration file lagged the gate)
+        ("c1c[nH]cn1", "1H-imidazole"),
+        ("c1cnco1", "1,3-oxazole"),
+        ("c1cncs1", "1,3-thiazole"),
         # Two heteroatoms - 1,2 arrangement
-        ("c1cc[nH]n1", "pyrazole"),
-        ("c1ccno1", "isoxazole"),
-        ("c1ccsn1", "isothiazole"),
+        ("c1cc[nH]n1", "1H-pyrazole"),
+        ("c1ccno1", "1,2-oxazole"),
+        ("c1ccsn1", "1,2-thiazole"),
     ])
     def test_5_membered_aromatic(self, smiles, expected):
         """Test 5-membered aromatic heterocycles use retained names."""
@@ -261,13 +262,13 @@ class TestPhase3Regression:
             # 5-membered saturated
             ("C1CCOC1", "oxolane"),
             ("C1CCNC1", "pyrrolidine"),
-            ("C1CCSC1", "tetrahydrothiophene"),
+            ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
             # 5-membered aromatic
             ("c1ccoc1", "furan"),
-            ("c1cc[nH]c1", "pyrrole"),
+            ("c1cc[nH]c1", "1H-pyrrole"),  # Wave2 T1d hygiene: IH-01 1H- azole PINs
             ("c1ccsc1", "thiophene"),
-            ("c1c[nH]cn1", "imidazole"),
-            ("c1cc[nH]n1", "pyrazole"),
+            ("c1c[nH]cn1", "1H-imidazole"),
+            ("c1cc[nH]n1", "1H-pyrazole"),
             # 6-membered saturated
             ("C1CCOCC1", "oxane"),
             ("C1CCNCC1", "piperidine"),

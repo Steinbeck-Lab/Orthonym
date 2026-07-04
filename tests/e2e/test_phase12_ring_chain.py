@@ -220,9 +220,10 @@ class TestEdgeCases:
         assert result == 'phenylacetaldehyde' or result == '2-phenylethanal', f'Got: {result}'
 
     def test_acetophenone_ring_is_parent(self):
-        """Acetophenone: ketone directly on ring."""
+        """Acetophenone: ketone directly on ring. Wave2 T1d: PIN is the
+        substitutive 1-phenylethan-1-one (acetophenone de-headlined, P-64.2.1.2)."""
         result = name_compound('c1ccc(C(=O)C)cc1')
-        assert result == 'acetophenone', f'Got: {result}'
+        assert result == '1-phenylethan-1-one', f'Got: {result}'
 
     def test_2_phenylethanol(self):
         """2-Phenylethan-1-ol (short chain with alcohol)."""

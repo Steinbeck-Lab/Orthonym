@@ -58,8 +58,8 @@ RETAINED_BASE_REGRESSION_CASES = [
     ("OC(=O)c1ccc(Cl)c(Cl)c1", "3,4-dichlorobenzoic acid"),
     # Aniline retained base
     ("Nc1ccccc1", "aniline"),
-    # Acetophenone retained base
-    ("CC(=O)c1ccccc1", "acetophenone"),
+    # Acetophenone: Wave2 T1d de-headlined to the substitutive PIN (P-64.2.1.2)
+    ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),
     ("CC(=O)c1ccc(O)cc1", "4-hydroxyacetophenone"),
 ]
 
