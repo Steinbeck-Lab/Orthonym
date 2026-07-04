@@ -50,14 +50,14 @@ SATURATION_PREFIXES = [
 _SINGLE_ATOM_BRIDGES: Dict[str, str] = {
     "O": "oxy",
     "S": "sulfanediyl",
-    "NH": "imino",
+    "NH": "azanediyl",
     "CH2": "methylene",
 }
 
 # Two-atom bridge patterns
 _TWO_ATOM_BRIDGES = [
     # (element1, element2, h_count1, h_count2, bridge_name)
-    ("C", "C", 2, 2, "ethylene"),     # CH2-CH2
+    ("C", "C", 2, 2, "ethane-1,2-diyl"),  # CH2-CH2 (P-29.3.2.2 PIN; 'ethylene' is general-nomenclature only)
     ("C", "C", 1, 1, "vinylene"),     # CH=CH (rare)
     # Phase 154.B D-09 audit-driven adds (154-AUDIT-B.md §3 ranks 1-2):
     ("O", "O", 0, 0, "peroxy"),       # O-O; IUPAC P-29; OPSIN multiRadicalSubstituents.xml line 53; 154-AUDIT-B.md §3 #1
@@ -1441,6 +1441,13 @@ def _assemble_multiplicative_name(
     # Build primed locant string: e.g., "4,4'" for 2 units, "4,4',4''" for 3
     locant_str = _build_primed_locant_str(locant, unit_count)
 
+    # Enclosure (P-16.3.3 / P-29.6.2): a BRIDGE name that itself carries locants
+    # (e.g. "ethane-1,2-diyl") is parenthesised so its boundary with the primed
+    # locant set and the multiplier is unambiguous -> "4,4'-(ethane-1,2-diyl)di...".
+    # Locant-free bridges ("oxy", "sulfanediyl", "azanediyl", "methylene",
+    # "peroxy", "disulfanediyl") have no digit and stay bare.
+    bridge_token = f"({bridge_name})" if any(ch.isdigit() for ch in bridge_name) else bridge_name
+
     # Enclosure (P-15.3.1.2 / P-16.3.3): a parent name carrying locants (e.g.
     # "ethan-1-ol", "propan-1-ol") is parenthesised so the parent boundary is
     # unambiguous -> "...di(ethan-1-ol)".  The multiplier stays di/tri (NOT
@@ -1448,14 +1455,14 @@ def _assemble_multiplicative_name(
     # parents).  Locant-free parents ("aniline", "acetic acid", "benzoic acid")
     # are unaffected (no digit -> no parentheses).
     if any(ch.isdigit() for ch in parent_name):
-        return f"{locant_str}-{bridge_name}{multiplier}({parent_name})"
+        return f"{locant_str}-{bridge_token}{multiplier}({parent_name})"
 
     # Handle names with spaces (e.g., "benzoic acid" -> "tribenzoic acid")
     if " " in parent_name:
         parts = parent_name.split(" ", 1)
         base = parts[0]  # "benzoic"
         suffix = parts[1]  # "acid"
-        return f"{locant_str}-{bridge_name}{multiplier}{base} {suffix}"
+        return f"{locant_str}-{bridge_token}{multiplier}{base} {suffix}"
     else:
         # Simple name: "aniline" -> "dianiline"
-        return f"{locant_str}-{bridge_name}{multiplier}{parent_name}"
+        return f"{locant_str}-{bridge_token}{multiplier}{parent_name}"

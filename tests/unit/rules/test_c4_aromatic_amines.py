@@ -85,10 +85,11 @@ def test_c4_guard_methylenedibenzene_stays_multiplicative():
 
 
 def test_c4_guard_iminodibenzoic_acid_stays_multiplicative():
-    """4,4'-iminodibenzoic acid: fragments carry a senior PCG (CO2H) so the
-    _all_fragments_are_simple_carbocycles guard is False -> the imino
-    multiplicative bridge is retained (NOT reclassified to an aniline)."""
-    assert _pin("OC(=O)c1ccc(Nc2ccc(C(=O)O)cc2)cc1") == "4,4'-iminodibenzoic acid"
+    """4,4'-azanediyldibenzoic acid: fragments carry a senior PCG (CO2H) so the
+    _all_fragments_are_simple_carbocycles guard is False -> the -NH- (azanediyl)
+    multiplicative bridge is retained (NOT reclassified to an aniline).
+    Wave2 P-35.2.2: the divalent -NH- bridge PIN is 'azanediyl' (was 'imino')."""
+    assert _pin("OC(=O)c1ccc(Nc2ccc(C(=O)O)cc2)cc1") == "4,4'-azanediyldibenzoic acid"
 
 
 def test_c4_guard_amine_prefix_when_senior_group_present():

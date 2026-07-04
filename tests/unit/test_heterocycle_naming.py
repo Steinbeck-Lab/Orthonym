@@ -137,12 +137,12 @@ class TestFiveMemberedAromaticHeterocycles:
         ("c1ccsc1", "thiophene"),
         # Two heteroatoms - 1,3 arrangement
         ("c1c[nH]cn1", "1H-imidazole"),  # N at 1,3
-        ("c1cnco1", "oxazole"),       # O at 1, N at 3
-        ("c1cncs1", "thiazole"),      # S at 1, N at 3
+        ("c1cnco1", "1,3-oxazole"),   # Wave2 P-52.2.2.2 HW-locant PIN (was 'oxazole')
+        ("c1cncs1", "1,3-thiazole"),  # PIN (was 'thiazole')
         # Two heteroatoms - 1,2 arrangement
         ("c1cc[nH]n1", "1H-pyrazole"),   # N at 1,2
-        ("c1ccno1", "isoxazole"),     # O at 1, N at 2
-        ("c1ccsn1", "isothiazole"),   # S at 1, N at 2
+        ("c1ccno1", "1,2-oxazole"),   # PIN (was 'isoxazole')
+        ("c1ccsn1", "1,2-thiazole"),  # PIN (was 'isothiazole')
     ])
     def test_retained_names(self, smiles, expected):
         """Test retained names for common 5-membered aromatic heterocycles."""
@@ -526,11 +526,11 @@ class TestPipelineIntegration:
         ("c1cc[nH]c1", "1H-pyrrole"),
         ("c1ccsc1", "thiophene"),
         ("c1c[nH]cn1", "1H-imidazole"),
-        ("c1cnco1", "oxazole"),
-        ("c1cncs1", "thiazole"),
+        ("c1cnco1", "1,3-oxazole"),   # Wave2 P-52.2.2.2 PIN
+        ("c1cncs1", "1,3-thiazole"),
         ("c1cc[nH]n1", "1H-pyrazole"),
-        ("c1ccno1", "isoxazole"),
-        ("c1ccsn1", "isothiazole"),
+        ("c1ccno1", "1,2-oxazole"),
+        ("c1ccsn1", "1,2-thiazole"),
         # 6-membered saturated
         ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),

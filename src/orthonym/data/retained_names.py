@@ -108,14 +108,14 @@ RETAINED_NAMES = {
     "c1cnc[nH]1": "1H-imidazole",
     "c1cn[nH]c1": "1H-pyrazole",   # Canonical SMILES for pyrazole
     "c1cc[nH]n1": "1H-pyrazole",   # Alternate input form
-    "c1cocn1": "oxazole",       # Canonical SMILES for oxazole
-    "c1cnco1": "oxazole",       # Alternate input form
-    "c1cnoc1": "isoxazole",     # Canonical SMILES for isoxazole
-    "c1ccno1": "isoxazole",     # Alternate input form
-    "c1cscn1": "thiazole",      # Canonical SMILES for thiazole
-    "c1cncs1": "thiazole",      # Alternate input form
-    "c1cnsc1": "isothiazole",   # Canonical SMILES for isothiazole
-    "c1ccsn1": "isothiazole",   # Alternate input form
+    "c1cocn1": "1,3-oxazole",   # HW-locant PIN (P-52.2.2.2 / P-22.2.1); 'oxazole' is general-only
+    "c1cnco1": "1,3-oxazole",   # Alternate input form
+    "c1cnoc1": "1,2-oxazole",   # PIN (was 'isoxazole')
+    "c1ccno1": "1,2-oxazole",   # Alternate input form
+    "c1cscn1": "1,3-thiazole",  # PIN (was 'thiazole')
+    "c1cncs1": "1,3-thiazole",  # Alternate input form
+    "c1cnsc1": "1,2-thiazole",  # PIN (was 'isothiazole')
+    "c1ccsn1": "1,2-thiazole",  # Alternate input form
     "c1nnn[nH]1": "1H-tetrazole",  # this tautomer = 1H- (OPSIN-RT verified)
     
     # === 6-MEMBERED AROMATIC HETEROCYCLES ===

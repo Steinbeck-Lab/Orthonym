@@ -324,7 +324,9 @@ class TestBridgeTables:
             # preselected prefix "sulfanediyl" (P-15.3.1.2.1.1); legacy "thio"
             # is deprecated. PIN "1,1'-sulfanediyldibenzene" (BB line 27826).
             ("S", "sulfanediyl"),
-            ("NH", "imino"),
+            # Wave2 P-35.2.2: divalent -NH- bridge PIN is "azanediyl"; "imino"
+            # is deprecated for -NH- (mirrors the thio->sulfanediyl heal).
+            ("NH", "azanediyl"),
             ("CH2", "methylene"),
         ],
     )
@@ -338,7 +340,7 @@ class TestBridgeTables:
     @pytest.mark.parametrize(
         "atom_a,atom_b,h_a,h_b,expected_name",
         [
-            ("C", "C", 2, 2, "ethylene"),
+            ("C", "C", 2, 2, "ethane-1,2-diyl"),  # Wave2 P-29.3.2.2 PIN (was 'ethylene')
             ("C", "C", 1, 1, "vinylene"),
             ("O", "O", 0, 0, "peroxy"),  # D-09 add (154-AUDIT-B.md §3 #1)
             ("S", "S", 0, 0, "disulfanediyl"),  # D-09 add (154-AUDIT-B.md §3 #2)
