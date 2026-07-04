@@ -207,3 +207,62 @@ class TestSystematicMonosaccharide:
             "OC[C@H]1O[C@@H](c2ccccc2)[C@H](O)[C@@H](O)[C@@H]1O"
         )
         assert name_monosaccharide_systematic(c_glycoside) is None
+
+
+@pytest.mark.unit
+class TestCARB03ModifiedMonosaccharides:
+    """v23 CARB-03: uronic-acid family completion (P-102.5.6.6), halogeno-deoxy
+    (P-102.5.3), and the anomer-unspecified D/L descriptor fix. All targets were
+    OPSIN-round-trip verified; imports go inside each test body (module contract).
+    """
+
+    def test_uronic_family_beyond_gluco_galacto(self):
+        """All 8 aldohexose uronic acids name (was gluco/galacto only)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        cases = {
+            # ido (L-iduronic, heparin/dermatan) — not in the old 2-stem map
+            "O=C(O)[C@@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O":
+                "alpha-L-idopyranuronic acid",
+            # manno (D-mannuronic, alginate)
+            "O=C(O)[C@H]1O[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O":
+                "beta-D-mannopyranuronic acid",
+            # gulo (L-guluronic, alginate)
+            "O=C(O)[C@@H]1O[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O":
+                "beta-L-gulopyranuronic acid",
+        }
+        for smi, expected in cases.items():
+            mol = Chem.MolFromSmiles(smi)
+            assert mol is not None, smi
+            assert name_monosaccharide_systematic(mol) == expected
+
+    def test_gluco_galacto_uronic_unchanged(self):
+        """The pre-existing uronic entries stay byte-identical (no regression)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        gluc = Chem.MolFromSmiles("O=C(O)[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+        assert name_monosaccharide_systematic(gluc) == "beta-D-glucopyranuronic acid"
+
+    def test_halogeno_deoxy(self):
+        """A ring C-OH replaced by a halogen names x-deoxy-x-halogeno (P-102.5.3)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        # 2-deoxy-2-fluoro-D-galactopyranose (anomer unspecified; keeps D).
+        fluoro = Chem.MolFromSmiles("OC[C@H]1OC(O)[C@H](F)[C@@H](O)[C@H]1O")
+        assert name_monosaccharide_systematic(fluoro) == \
+            "2-deoxy-2-fluoro-D-galactopyranose"
+
+    def test_anomer_unspecified_keeps_config(self):
+        """D/L is emitted even when the anomeric configuration is undefined."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        # 6-deoxy-D-glucopyranose with an unspecified anomeric centre: keep the D.
+        deoxy = Chem.MolFromSmiles("OC1O[C@H](C)[C@@H](O)[C@H](O)[C@H]1O")
+        name = name_monosaccharide_systematic(deoxy)
+        assert name == "6-deoxy-D-glucopyranose", name
+
+    def test_halo_fail_closed_on_non_ring_carbon_halogen(self):
+        """A non-sugar molecule with a halogen still fails closed (None)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        assert name_monosaccharide_systematic(Chem.MolFromSmiles("CCCl")) is None

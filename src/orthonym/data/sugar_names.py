@@ -781,14 +781,24 @@ def uronic_free_acid_name(
         True
     """
     URONIC_FREE_ACID = {
+        "alluronopyranose": "allopyranuronic acid",
+        "altruronopyranose": "altropyranuronic acid",
         "glucuronopyranose": "glucopyranuronic acid",
+        "mannuronopyranose": "mannopyranuronic acid",
+        "guluronopyranose": "gulopyranuronic acid",
+        "iduronopyranose": "idopyranuronic acid",
         "galacturonopyranose": "galactopyranuronic acid",
+        "taluronopyranose": "talopyranuronic acid",
     }
     head = URONIC_FREE_ACID.get(base_name)
     if head is None:
         return None
     if anomer and config:
         return f"{anomer}-{config}-{head}"
+    if config:
+        # Anomeric configuration undefined but the parent config (D/L) is known:
+        # "D-glucopyranuronic acid" is the correct name, not the D-dropped form.
+        return f"{config}-{head}"
     return head
 
 
@@ -1096,10 +1106,22 @@ def recognize_sugar_skeleton(
 # base ("glucuronopyranose").  This is an EXPLICIT map, NEVER inline string
 # substitution (str.replace / re.sub) on a derived base name.  An out-of-map
 # skeleton has no verified uronic name -> the URONIC branch FAILS CLOSED.
-# galacto is forward-looking (Assumption A1, no gold dependency).
+# v23 CARB-03: completed to all 8 aldohexose uronic acids (P-102.5.6.6). Every
+# free-acid name is OPSIN-round-trip verified; the idealize->recover chain was
+# confirmed to recover the correct clean parent hexose for each (the fingerprint
+# index carries all 8 D/L hexopyranoses since CARB-02), so the two maps are the
+# only gate. Pentoses are excluded: an aldopentopyranose has no exocyclic
+# terminal CH2OH to oxidize (its "C5" is the ring CH2), so there is no
+# analogous pyranuronic acid.
 _URONIC_STEM_MAP = {
+    "allopyranose": "alluronopyranose",
+    "altropyranose": "altruronopyranose",
     "glucopyranose": "glucuronopyranose",
+    "mannopyranose": "mannuronopyranose",
+    "gulopyranose": "guluronopyranose",
+    "idopyranose": "iduronopyranose",
     "galactopyranose": "galacturonopyranose",
+    "talopyranose": "taluronopyranose",
 }
 
 
@@ -1154,7 +1176,7 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
     locant_of = {c: k + 1 for k, c in enumerate(ring_carbons)}
     last_ring_locant = len(ring_carbons)  # C5 on a pyranose, C4 on a furanose
 
-    found = {"deoxy": [], "amino": [], "uronic": []}
+    found = {"deoxy": [], "amino": [], "uronic": [], "halo": []}
     for ring_c in ring_carbons:
         loc = locant_of[ring_c]
         atom = mol.GetAtomWithIdx(ring_c)
@@ -1164,6 +1186,18 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
             sym = nbr.GetSymbol()
             if sym == "O":
                 continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
+            if sym in ("F", "Cl", "Br", "I"):
+                # ring C-OH replaced by C-halogen: a deoxy-halo sugar (e.g.
+                # 2-deoxy-2-fluoro-D-galactopyranose, P-102.5.3 + halogeno prefix).
+                # Only a terminal monovalent halogen substituting the ring C-OH
+                # is in scope; the halogen idealizes back to -OH (halogen -> O),
+                # so the position is BOTH deoxy and halo.  A halogen that is not a
+                # simple ring-carbon substituent (degree != 1) is out of scope ->
+                # fail closed (never a wrong / partial name).
+                if nbr.GetDegree() != 1:
+                    return None
+                found["halo"].append((loc, sym))
+                continue
             if sym == "N":
                 # ring C-OH replaced by C-N: amino at this ring carbon's locant.
                 # Only a BARE primary amine (-NH2) is the P-102.5.4 subtractive
@@ -1257,6 +1291,14 @@ def _idealize_to_parent(mol):
     # predicates (degree, neighbour symbols, double bonds) are evaluated against
     # the original molecule and are not perturbed by an earlier edit.
     nitrogen_idxs = [a.GetIdx() for a in rw.GetAtoms() if a.GetSymbol() == "N"]
+    # Halo (deoxy-halogeno): each monovalent halogen substituting a ring C-OH is
+    # restored to -OH (halogen -> O -> -OH after sanitize), mirroring the amino
+    # N -> O edit.  classify has already gated these to degree-1 ring-carbon
+    # substituents, so a plain SetAtomicNum(8) is valence-safe.
+    halogen_idxs = [
+        a.GetIdx() for a in rw.GetAtoms()
+        if a.GetSymbol() in ("F", "Cl", "Br", "I")
+    ]
     # Uronic carboxyl carbons: a carbon with two O neighbours and a C=O bond;
     # record the double-bonded O to remove (COOH -> CH2OH).
     carbonyl_o_idxs = []
@@ -1280,6 +1322,9 @@ def _idealize_to_parent(mol):
     try:
         # AMINO: every (bare) nitrogen -> O.  No index shift.
         for idx in nitrogen_idxs:
+            rw.GetAtomWithIdx(idx).SetAtomicNum(8)
+        # HALO: every ring-carbon halogen -> O (-> -OH).  No index shift.
+        for idx in halogen_idxs:
             rw.GetAtomWithIdx(idx).SetAtomicNum(8)
         # DEOXY: add the exocyclic O on each bare terminal carbon.  Additions
         # append new indices and never shift existing ones, so do them before
@@ -1416,7 +1461,8 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     deoxy_locants = sorted(modifications["deoxy"])
     amino_locants = sorted(modifications["amino"])
     uronic_locants = sorted(modifications["uronic"])
-    if not (deoxy_locants or amino_locants or uronic_locants):
+    halo_locants = sorted(modifications.get("halo", []))  # [(locant, halogen)]
+    if not (deoxy_locants or amino_locants or uronic_locants or halo_locants):
         # A clean ring is recognize_sugar_skeleton's / lookup_sugar's job.
         return None
 
@@ -1457,33 +1503,63 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     # (WR-01) at the function tail so no wrong name ships.
     if uronic_locants:
         # A uronic sugar is named purely by the -uronic acid suffix; it must not
-        # co-occur with deoxy/amino in this engine's scope (fail-closed if it does).
-        if deoxy_locants or amino_locants:
+        # co-occur with deoxy/amino/halo in this engine's scope (fail-closed).
+        if deoxy_locants or amino_locants or halo_locants:
             return None
         uronic_base = _URONIC_STEM_MAP.get(base)
         if uronic_base is None:
             return None  # out-of-map skeleton has no verified uronic name (D-11)
         candidate = uronic_free_acid_name(anomer, config, uronic_base)
     else:
-        # DEOXY / AMINO: build alphabetized detachable prefixes WITH structural
-        # locants (never string surgery on the derived base).  P-102.5.4 cites an
-        # amino sugar as ``x-amino-x-deoxy`` (the N replaces a C-OH, so each amino
-        # locant is also a deoxy locant).
+        # DEOXY / AMINO / HALO: build alphabetized detachable prefixes WITH
+        # structural locants (never string surgery on the derived base).
+        # P-102.5.4 cites an amino sugar as ``x-amino-x-deoxy`` (the N replaces a
+        # C-OH, so each amino locant is also a deoxy locant); a halogeno sugar is
+        # likewise ``x-deoxy-x-halogeno`` (the halogen replaces a C-OH), so each
+        # halo locant is also a deoxy locant.
         prefix_terms = []  # (alpha-sort-key, rendered-term)
-        all_deoxy = sorted(set(deoxy_locants) | set(amino_locants))
+        all_deoxy = sorted(
+            set(deoxy_locants) | set(amino_locants) | {loc for loc, _ in halo_locants}
+        )
         if amino_locants:
             prefix_terms.append(
                 ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
+            )
+        # HALO: group by halogen, cite locants + multiplier, alpha-key = halogen
+        # name (fluoro/chloro/bromo/iodo — ordered ignoring the di/tri multiplier).
+        _HALO_NAME = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+        _HALO_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+        halo_by_sym: Dict[str, list] = {}
+        for loc, sym in halo_locants:
+            halo_by_sym.setdefault(sym, []).append(loc)
+        for sym, locs in halo_by_sym.items():
+            hname = _HALO_NAME[sym]
+            mult = _HALO_MULT.get(len(locs))
+            if mult is None:
+                return None  # >4 of one halogen -> out of scope, fail-closed
+            locs = sorted(locs)
+            prefix_terms.append(
+                (hname, f"{','.join(str(x) for x in locs)}-{mult}{hname}")
             )
         if all_deoxy:
             prefix_terms.append(
                 ("deoxy", f"{','.join(str(x) for x in all_deoxy)}-deoxy")
             )
-        # Alphabetize the detachable prefixes (amino < deoxy).
+        # Alphabetize the detachable prefixes (amino < bromo < chloro < deoxy < ...).
         prefix_terms.sort(key=lambda t: t[0])
         prefix_str = "-".join(term for _, term in prefix_terms)
 
-        descriptor = f"{anomer}-{config}-" if anomer and config else ""
+        # Emit the configurational descriptor whenever it is known, even if the
+        # anomeric configuration is undefined (the anomeric C carries no stereo):
+        # "2-deoxy-2-fluoro-D-galactopyranose" (anomer unspecified) is the correct
+        # PIN, not the D-dropped "…-galactopyranose".  config is always recovered
+        # from the gate-proven fingerprint index, so it is reliable.
+        if anomer and config:
+            descriptor = f"{anomer}-{config}-"
+        elif config:
+            descriptor = f"{config}-"
+        else:
+            descriptor = ""
         if prefix_str:
             candidate = f"{prefix_str}-{descriptor}{base}"
         else:
