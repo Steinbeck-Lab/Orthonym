@@ -126,18 +126,26 @@ class TestSugarSkeletonCatalogReproduction:
     """D-13 HARD gate: the deriver reproduces the clean catalog, fails closed."""
 
     def test_clean_set_scope_self_validates(self):
-        """The clean-set scope is exactly what RESEARCH pins (catalog-drift trip)."""
-        # Keyword-clean is the plan's base-name filter: exactly 44 (includes the
-        # 4 deoxy-L rhamnose/fucose entries whose names carry no 'deoxy' token).
+        """The clean-set scope is exactly what the catalog pins (catalog-drift trip).
+
+        v23 CARB-02 grew the catalog with the complete systematic monosaccharide
+        stereo family (SYSTEMATIC_MONOSACCHARIDE_NAMES, +176 OPSIN-verified aldo/
+        keto tetro/pento/hexo D/L pyranose/furanose alpha/beta/unspec entries),
+        so both scopes grew by 176: keyword-clean 44 -> 220, structural-clean
+        40 -> 216.  The 4-entry difference (the deoxy-L rhamnose/fucose entries,
+        keyword-clean names but structurally deoxy ring-CH3) is unchanged.
+        """
+        # Keyword-clean is the base-name filter: 220 (includes the 4 deoxy-L
+        # rhamnose/fucose entries whose names carry no 'deoxy' token).
         clean = KEYWORD_CLEAN  # noqa: F841 - named for the acceptance grep
-        assert len(clean) == 44, (
-            f"keyword-clean catalog scope drifted: got {len(clean)} (expected 44)"
+        assert len(clean) == 220, (
+            f"keyword-clean catalog scope drifted: got {len(clean)} (expected 220)"
         )
-        # Structural-clean is the deriver's D-06 contract: exactly 40
+        # Structural-clean is the deriver's D-06 contract: 216
         # (rhamnose/fucose excluded — they are deoxy ring-CH3).
-        assert len(STRUCTURAL_CLEAN) == 40, (
+        assert len(STRUCTURAL_CLEAN) == 216, (
             f"structural-clean scope drifted: got {len(STRUCTURAL_CLEAN)} "
-            "(expected 40)"
+            "(expected 216)"
         )
         # The 4 deoxy entries are the difference between the two notions.
         assert len(KEYWORD_CLEAN) - len(STRUCTURAL_CLEAN) == 4
@@ -285,4 +293,54 @@ class TestGlycosideClassName:
         assert (
             sugar_to_glycoside_class_name("", "", "glucopyranose")
             == "glucopyranoside"
+        )
+
+
+@pytest.mark.unit
+class TestSystematicMonosaccharideFamilyCoverage:
+    """v23 CARB-02: the systematic monosaccharide family must be COMPLETE over the
+    full ALL_SUGAR_NAMES union — every family base has all six
+    {D,L} x {alpha,beta,unspecified-anomer} combos — with only the two
+    chemically-impossible exclusions.  Guards against future catalog drift and
+    against the coverage-asymmetry the PIN audit flagged (which was a false
+    positive: the alpha-D/beta-D forms of the natural sugars live in the
+    hand-curated SUGAR_RETAINED_NAMES, so completeness only holds over the union,
+    NOT over SYSTEMATIC_MONOSACCHARIDE_NAMES alone).
+    """
+
+    # 2-ketopentoses (ribulo/xylulo) form only furanoses (a pyranose would need a
+    # C6 the 5-carbon ketose lacks); aldotetroses (erythro/threo) likewise have no
+    # pyranose.  These are the ONLY legitimate exclusions (chemistry, not data).
+    _FAMILY_BASES = [
+        # aldohexoses (pyranose + furanose)
+        "allopyranose", "altropyranose", "glucopyranose", "mannopyranose",
+        "gulopyranose", "idopyranose", "galactopyranose", "talopyranose",
+        "allofuranose", "altrofuranose", "glucofuranose", "mannofuranose",
+        "gulofuranose", "idofuranose", "galactofuranose", "talofuranose",
+        # aldopentoses (pyranose + furanose)
+        "arabinopyranose", "lyxopyranose", "ribopyranose", "xylopyranose",
+        "arabinofuranose", "lyxofuranose", "ribofuranose", "xylofuranose",
+        # aldotetroses (furanose only)
+        "erythrofuranose", "threofuranose",
+        # 2-ketohexoses (pyranose + furanose)
+        "fructopyranose", "psicopyranose", "sorbopyranose", "tagatopyranose",
+        "fructofuranose", "psicofuranose", "sorbofuranose", "tagatofuranose",
+        # 2-ketopentoses (furanose only)
+        "ribulofuranose", "xylulofuranose",
+    ]
+    _WANT = {("D", "alpha"), ("D", "beta"), ("D", ""),
+             ("L", "alpha"), ("L", "beta"), ("L", "")}
+
+    def test_every_family_base_has_full_dl_anomer_coverage(self):
+        coverage = {}
+        for _smi, (anomer, config, base) in ALL_SUGAR_NAMES.items():
+            coverage.setdefault(base, set()).add((config, anomer))
+        missing = {
+            base: sorted(self._WANT - coverage.get(base, set()))
+            for base in self._FAMILY_BASES
+            if self._WANT - coverage.get(base, set())
+        }
+        assert not missing, (
+            "systematic monosaccharide family incomplete over ALL_SUGAR_NAMES: "
+            f"{missing}"
         )
