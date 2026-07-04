@@ -209,8 +209,15 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # acid and attaches to a chain carbon exactly the same way, so it elides its
     # locant on a symmetric 2-carbon (ethane) parent: 'ethanesulfonohydrazide'
     # (PIN), not 'ethane-1-sulfonohydrazide'. methane is covered by Rule 1; a
-    # 3+ carbon chain keeps its locant (parallels sulfonic_acid above).
+    # 3+ carbon chain keeps its locant (parallels sulfonohydrazide above).
     "sulfonohydrazide",
+    # Wave2 T1b (P-66.1.1.2 / P-14.3.4.4): the sulfonamide characteristic S attaches
+    # to a chain carbon exactly like sulfonic_acid, so its suffix locant elides on the
+    # symmetric 2-carbon (ethane) parent -> 'ethanesulfonamide' (PIN, OPSIN-RT), not
+    # 'ethane-1-sulfonamide'; N-substituents don't perturb the ethane symmetry
+    # (N-methylethanesulfonamide). A 3+ carbon chain keeps its locant
+    # (propane-1-sulfonamide). Sulfinamide (no FG defined yet) deferred.
+    "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
 })
 
 
@@ -1157,13 +1164,21 @@ def _join_multiplied_suffix(suffix_multiplier: str, suffix: str) -> str:
     elided before the suffix amine, i.e., 'tetramine', not 'tetraamine'",
     e.g. ``[1,1'-biphenyl]-3,3',4,4'-tetramine``, ``silanetetramine``).
 
-    The elision is SCOPED to '-ol' and '-amine' specifically: the ketone/aldehyde
-    suffixes do NOT take it (``butane-1,2,3,4-tetraone`` keeps its 'a' — verified
-    against OPSIN), and 'di'/'tri' carry no terminal 'a', so 'diol'/'triol'/
-    'diamine'/'triamine' are unaffected. Keeping the scope tight avoids emitting
-    wrong forms like the non-existent '-tetrone'.
+    Also elided before the ketone suffix '-one' (tetra+one → tetrone, penta+one →
+    pentone): **Blue Book P-64.2.2.1(1) states this verbatim** — "the final letter
+    'a' of a numerical multiplying prefix is elided before the suffix '-one', for
+    example, 'tetrone'", with PINs ``pentacosane-7,9,17,19-tetrone`` (BB 28363) and
+    ``pyrene-1,3,6,8(2H,7H)-tetrone`` (BB 28932). (Both '-tetraone' and '-tetrone'
+    happen to round-trip through OPSIN, so RT alone could not decide the PIN — the
+    Blue Book does.)
+
+    The elision fires only before a VOWEL-initial suffix, so it is scoped to the
+    explicit set {'ol', 'amine', 'one'}: the chalcogen ketone suffixes '-thione'/
+    '-selone'/'-tellone' begin with a consonant and take NO elision (tetrathione),
+    and 'di'/'tri' carry no terminal 'a', so 'diol'/'triol'/'dione'/'trione' are
+    unaffected.
     """
-    if suffix in ("ol", "amine") and suffix_multiplier.endswith("a"):
+    if suffix in ("ol", "amine", "one") and suffix_multiplier.endswith("a"):
         return suffix_multiplier[:-1] + suffix
     return suffix_multiplier + suffix
 

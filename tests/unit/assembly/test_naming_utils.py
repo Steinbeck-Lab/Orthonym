@@ -632,9 +632,14 @@ class TestPhase8MultipliedSuffixAndSilyl:
         assert _join_multiplied_suffix("penta", "amine") == "pentamine"
         assert _join_multiplied_suffix("di", "amine") == "diamine"
         assert _join_multiplied_suffix("tri", "amine") == "triamine"
-        # -ol elision preserved; -one keeps its 'a'.
+        # -ol elision preserved; -one elides its 'a' too (Blue Book P-64.2.2.1(1):
+        # 'tetrone', e.g. pentacosane-7,9,17,19-tetrone (PIN)). Wave2 T1b.
         assert _join_multiplied_suffix("tetra", "ol") == "tetrol"
-        assert _join_multiplied_suffix("tetra", "one") == "tetraone"
+        assert _join_multiplied_suffix("tetra", "one") == "tetrone"
+        assert _join_multiplied_suffix("penta", "one") == "pentone"
+        # 'di'/'tri' carry no terminal 'a' -> unaffected.
+        assert _join_multiplied_suffix("di", "one") == "dione"
+        assert _join_multiplied_suffix("tri", "one") == "trione"
 
     def test_is_complex_silyl_with_prefixes(self):
         # silyl/germyl carrying their own prefixes are compound -> enclosing marks.
