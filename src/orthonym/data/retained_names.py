@@ -246,10 +246,21 @@ RETAINED_NAMES = {
     # === RETAINED NITROGEN COMPOUNDS ===
     "NC(N)=O": "urea",
     "N=C(N)N": "guanidine",
+    # Wave2 T2d (P-34.1.1.5 / P-68.3.1.3.5): formazan HN=N-CH=N-NH2 is the
+    # retained PIN (fully substitutable; substituted formazans + the
+    # formazan-N-yl prefixes are a deferred follow-on, P-68.3.1.3.5.2). The
+    # systematic fall-through emitted the RT-correct but non-PIN functional-
+    # class name '1-diazenylmethanal hydrazone'.
+    "N=NC=NN": "formazan",
 
     # === OTHER COMMON COMPOUNDS ===
     "O": "water",
     "N": "ammonia",
+    # Wave2 T2d (P-34.1.1.5 / P-68.3.1.1): bare H2N-OH — retained parent
+    # hydride 'hydroxylamine'. The perception SMARTS requires a C on N (the
+    # handler names substituted forms), so the bare parent fell through to
+    # 'unknown'. Exact-SMILES match, same tier as water/ammonia.
+    "NO": "hydroxylamine",
     "O=C=O": "carbon dioxide",
     "C#N": "hydrogen cyanide",
     "O=S=O": "sulfur dioxide",

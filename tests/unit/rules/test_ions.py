@@ -668,12 +668,13 @@ class TestSUB01NegativeCanary:
         assert name_compound("[O-]C(=O)c1ccccc1") == "benzoate"
 
     def test_propanolate_unchanged(self):
-        # 169.6-03: the deleted carbon-counting _name_alkoxide_systematic stub
-        # emitted the locant-LESS 'propanolate'; the route_charged chokepoint
-        # names the IUPAC-mandated 'propan-1-olate' (PIN requires the locant).
-        # Verified RT-preserving: OPSIN parses both to the SAME InChI (q-1
-        # propan-1-olate), so this is a STRICT PIN improvement, not a regression.
-        assert name_compound("CCC[O-]") == "propan-1-olate"
+        # 169.6-03 named this 'propan-1-olate' (systematic, locant mandated).
+        # Wave2 T2d supersedes it: BB P-63.8.1 VERBATIM retains 'propoxide'
+        # as the PIN ("sodium propoxide (PIN) sodium propan-1-olate"), so the
+        # retained table now resolves the bare skeleton first. Substituted
+        # alkoxides still take the systematic -olate route this canary was
+        # written to protect (see test_tier2d_data_flips for the family).
+        assert name_compound("CCC[O-]") == "propoxide"
 
     def test_propanethiolate_unchanged(self):
         # 169.6-03: chokepoint adds the IUPAC locant ('propane-1-thiolate'),

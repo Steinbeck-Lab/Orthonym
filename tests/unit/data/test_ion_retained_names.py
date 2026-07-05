@@ -40,12 +40,17 @@ class TestRetainedAnions:
         assert get_anion_name('[O-]c1ccccc1') == 'phenoxide'
 
     def test_methanide(self):
-        """Test methanide (carbanion) lookup."""
-        assert get_anion_name('[CH3-]') == 'methanide'
+        """Methanide left the retained table (D-09, Plan 184-01): the
+        systematic emit_parent_hydride_cumulative_suffix primitive is the
+        single source of truth, so the TABLE lookup returns None (the name
+        path still emits 'methanide'). Assertion was stale since D-09."""
+        assert get_anion_name('[CH3-]') is None
 
     def test_unknown_returns_none(self):
-        """Test unknown anion returns None."""
-        assert get_anion_name('CCCC[O-]') is None
+        """Test unknown anion returns None. (Wave2 T2d: butoxide became a
+        retained PIN per BB P-63.8.1, so the old 'CCCC[O-]' probe now
+        resolves — use a genuinely untabled anion.)"""
+        assert get_anion_name('CCCCCCCC[O-]') is None
 
     def test_non_canonical_smiles(self):
         """Test non-canonical SMILES is canonicalized."""

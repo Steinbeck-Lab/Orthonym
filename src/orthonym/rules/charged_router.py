@@ -100,6 +100,19 @@ _RETAINED_FIRST_CHARGED = frozenset({
     '[SH3+]',                                     # sulfonium (P-73.1.1.1)
     'N[O-]',                                      # aminoxide (P-74)
     'O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F',     # bistriflimide (P-72)
+    # Wave2 T2d (P-63.8.1): the retained alkoxide names ARE the PINs
+    # ("sodium methoxide (PIN) sodium methanolate" — BB verbatim), so the
+    # salt path must hit them BEFORE the systematic -olate chokepoint (the
+    # standalone-anion path already resolves them via RETAINED_ANIONS).
+    # Exact bare skeletons only; substituted alkoxides keep systematic
+    # -olate. isopropoxide is general nomenclature (PIN propan-2-olate) and
+    # is deliberately absent.
+    'C[O-]',                                      # methoxide
+    'CC[O-]',                                     # ethoxide
+    'CCC[O-]',                                    # propoxide
+    'CCCC[O-]',                                   # butoxide
+    'CC(C)(C)[O-]',                               # tert-butoxide
+    '[O-]c1ccccc1',                               # phenoxide
 })
 
 

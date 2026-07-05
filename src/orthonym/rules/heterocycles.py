@@ -32,7 +32,7 @@ from rdkit import Chem
 from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
 
 from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority, get_hw_prefix
-from ..data.hw_stems import get_hw_stem
+from ..data.hw_stems import HW_STEMS, get_hw_stem
 from ..data.retained_names import get_retained_name
 from ..perception.rings import (
     get_ring_heteroatoms,
@@ -600,6 +600,14 @@ def build_hw_name(
 
     # Get stem based on ring size, saturation, and stem-driving heteroatom
     stem = get_hw_stem(ring_size, saturated_for_stem, stem_heteroatom)
+    # Wave2 T2d (P-22.2.2.1.5.1): a 3-membered mancude ring with ONLY
+    # nitrogen heteroatoms takes the 'irine' stem (1H-/2H-azirine,
+    # 3H-diazirine), not 'irene'. get_hw_stem's single-element signature
+    # cannot express "only N", so the variant is selected here where the
+    # full heteroatom set is known.
+    if (ring_size == 3 and not saturated_for_stem
+            and set(element_locants) == {'N'}):
+        stem = HW_STEMS[3].get('n_unsaturated', stem)
     if not stem:
         stem = ""
 
@@ -866,19 +874,133 @@ def name_heterocycle(mol, ring_atoms) -> str:
         info['is_aromatic']
     )
 
-    # Post-process: replace OPSIN-incompatible HW names with IUPAC-preferred
-    # retained names. "oxine" (6-membered unsaturated O-ring) is not recognized
-    # by OPSIN; IUPAC 2013 prefers "2H-pyran" for the monocyclic system and
-    # "4H-pyran" for the 4H tautomer. Similarly, "azine" should be "pyridine".
+    # Post-process: replace OPSIN-incompatible HW stems with the IUPAC-
+    # preferred retained STEMS. "oxine"/"thiine" (6-membered unsaturated
+    # O/S-rings) are not recognized by OPSIN; IUPAC 2013 uses "pyran"/
+    # "thiopyran" with the tautomer's indicated hydrogen — which is computed
+    # generically below (2H-pyran vs 4H-pyran; the old hardcoded '2H-'
+    # mislabelled the 4H tautomers). "azine" -> "pyridine" (aromatic, no
+    # indicated H).
     _HW_TO_RETAINED = {
-        'oxine': '2H-pyran',
+        'oxine': 'pyran',
         'azine': 'pyridine',
-        'thiine': '2H-thiopyran',
+        'thiine': 'thiopyran',
     }
     if hw_name in _HW_TO_RETAINED:
         hw_name = _HW_TO_RETAINED[hw_name]
 
+    # Wave2 T2d (P-22.2.2.1.4 / P-31.1.4.2.4): indicated hydrogen for a
+    # mancude monocyclic parent (2H-1,3-dioxole, 1H-azirine, 2H-/4H-pyran).
+    # Returns '' outside its fail-closed scope (aromatic, saturated, hydro
+    # forms, multi-indicated-H rings) — the bare-stem status quo.
+    ih = _monocycle_indicated_h_prefix(mol, oriented, info)
+    if ih:
+        hw_name = ih + hw_name
+
     return hw_name
+
+
+def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
+    """Indicated-hydrogen prefix ('2H-') for a mancude monocyclic HW parent.
+
+    P-22.2.2.1.4 / P-31.1.4.2.4: after the maximum number of noncumulative
+    double bonds is assigned, a ring atom connected only by single bonds and
+    bearing hydrogen takes the indicated-hydrogen descriptor, with the lowest
+    locant available once the heteroatom locants are fixed (BB examples:
+    2H-1,3-dioxole, 1H-azirine, 2H-pyran / 4H-pyran).
+
+    FAIL-CLOSED scope (returns '' -> caller keeps the bare stem, today's
+    behavior): the ring must be non-aromatic and unsaturated; the molecule
+    must carry EXACTLY the mancude maximum of ring double bonds (fewer = a
+    hydro form, owned by the partial-saturation namer); and exactly ONE sp3
+    H-bearing double-bond-eligible atom may remain (multi-indicated-H rings
+    like 1,3-dioxine are a documented follow-on).
+    """
+    if info.get('is_aromatic') or info.get('is_saturated'):
+        return ""
+    n = len(oriented)
+    ring_set = set(oriented)
+
+    # Actual ring double bonds (the aromatic case was excluded above).
+    db_pairs = []
+    for bond in mol.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                db_pairs.append((i, j))
+    if not db_pairs:
+        return ""
+
+    # Divalent chalcogens never carry a mancude ring double bond; every other
+    # ring atom (C, N, P, ...) is double-bond-eligible.
+    _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
+    eligible = [
+        mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT for i in oriented
+    ]
+
+    # Maximum noncumulative double bonds = maximum matching on the ring cycle
+    # restricted to eligible-eligible edges. Ring size <= 10 -> brute force
+    # (combinations over <= 10 edges) is exact and cheap.
+    from itertools import combinations
+    ok_edges = [p for p in range(n) if eligible[p] and eligible[(p + 1) % n]]
+    max_match = 0
+    for size in range(min(n // 2, len(ok_edges)), 0, -1):
+        found = False
+        for combo in combinations(ok_edges, size):
+            used: Set[int] = set()
+            good = True
+            for p in combo:
+                a, b = p, (p + 1) % n
+                if a in used or b in used:
+                    good = False
+                    break
+                used.add(a)
+                used.add(b)
+            if good:
+                found = True
+                break
+        if found:
+            max_match = size
+            break
+    if len(db_pairs) != max_match:
+        return ""  # hydro form (or over-perceived) — not this rule's scope
+
+    # The indicated-H atom: sp3 (no ring double bond), eligible, bearing H.
+    db_atoms = {a for pr in db_pairs for a in pr}
+    sp3h = [
+        idx for pos, idx in enumerate(oriented)
+        if idx not in db_atoms and eligible[pos]
+        and mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1
+    ]
+    if len(sp3h) != 1:
+        return ""
+    target = sp3h[0]
+
+    # Lowest indicated-H locant among the ring numberings that keep the
+    # chosen heteroatom locant->element assignment IDENTICAL (P-31.1.4.3.4:
+    # heteroatoms fixed first, then low locants to indicated hydrogen). This
+    # settles the direction tie the single-heteroatom numbering leaves open
+    # (2H-azirine, not 3H-azirine).
+    def _het_map(order):
+        return tuple(
+            (pos + 1, mol.GetAtomWithIdx(a).GetSymbol())
+            for pos, a in enumerate(order)
+            if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+        )
+
+    base_map = _het_map(oriented)
+    best_loc: Optional[int] = None
+    for start in range(n):
+        for step in (1, -1):
+            order = [oriented[(start + step * k) % n] for k in range(n)]
+            if _het_map(order) != base_map:
+                continue
+            loc = order.index(target) + 1
+            if best_loc is None or loc < best_loc:
+                best_loc = loc
+    if best_loc is None:
+        return ""
+    return f"{best_loc}H-"
 
 
 def _macrocycle_ordered_ring(mol, ring_set: Set[int]) -> Optional[List[int]]:

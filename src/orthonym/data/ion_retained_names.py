@@ -28,10 +28,19 @@ RETAINED_ANIONS = {
     'O=C([O-])CC(=O)[O-]': 'malonate',
     'O=C([O-])CCC(=O)[O-]': 'succinate',
 
-    # Alkoxide anions
+    # Alkoxide anions — Wave2 T2d, BB P-63.8.1 VERBATIM: "The traditional
+    # names methoxide, ethoxide, propoxide, butoxide, phenoxide, and
+    # aminoxide ... are retained as preferred IUPAC names and may be
+    # substituted in the same way as the corresponding alcohols. The
+    # traditional name tert-butoxide ... is also retained as a preferred
+    # IUPAC name but cannot be substituted. The traditional name
+    # isopropoxide ... is retained for general nomenclature" (its PIN is
+    # propan-2-olate: "potassium propan-2-olate (PIN) potassium
+    # isopropoxide") — so isopropoxide is deliberately NOT in this table.
     'C[O-]': 'methoxide',
     'CC[O-]': 'ethoxide',
-    'CC(C)[O-]': 'isopropoxide',
+    'CCC[O-]': 'propoxide',
+    'CCCC[O-]': 'butoxide',
     'CC(C)(C)[O-]': 'tert-butoxide',
     '[O-]c1ccccc1': 'phenoxide',  # Also called phenolate
 

@@ -33,7 +33,12 @@ from typing import Dict, Optional, Set, Any
 #   - 'n_saturated': Alternative suffix for N-containing saturated rings (optional)
 HW_STEMS: Dict[int, Dict[str, str]] = {
     3: {
-        'unsaturated': 'irene',      # e.g., oxirene, azirene (rarely used)
+        'unsaturated': 'irene',      # e.g., oxirene (non-N or mixed heteroatoms)
+        # Wave2 T2d (P-22.2.2.1.5.1): a 3-membered MANCUDE ring whose only
+        # heteroatoms are nitrogen uses 'irine' (1H-/2H-azirine, diazirine),
+        # not 'irene'. Selected in build_hw_name (needs the full heteroatom
+        # set, which get_hw_stem's single-element signature cannot express).
+        'n_unsaturated': 'irine',
         'saturated': 'irane',        # e.g., oxirane, aziridine
         'n_saturated': 'iridine',    # e.g., aziridine (N-containing)
     },
