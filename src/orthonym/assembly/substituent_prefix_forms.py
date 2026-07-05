@@ -1010,6 +1010,23 @@ def get_substituent_prefix_form(
     if fg_name == "amidine":
         return PREFIX_FORMS.get("amidine")  # "carbamimidoyl"
 
+    # Wave2 T2b (P-68.3.1.1.1.5): UNSUBSTITUTED -NH-OH as a non-principal
+    # substituent → 'hydroxyamino' (preselected prefix; BB PIN
+    # '4-(hydroxyamino)phenol'). Restricted to the unsubstituted form: the
+    # matched N must carry exactly OH + one C + one H. N-substituted
+    # hydroxylamines (R-N(CH3)-OH) return None → the static
+    # PREFIX_FORMS['hydroxylamine'] stays None → the group drops and the
+    # validity gate fails closed (their PIN needs a composed
+    # [hydroxy(methyl)amino] builder, not built here).
+    if fg_name == "hydroxylamine":
+        for _i in atoms:
+            _a = mol.GetAtomWithIdx(_i)
+            if _a.GetSymbol() == 'N':
+                if _a.GetDegree() == 2 and _a.GetTotalNumHs() == 1:
+                    return "hydroxyamino"
+                return None
+        return None
+
     # --- Phase 163 FRN attachment slot ---
     # Phase 163 FRN attachment: thio/seleno/telluro/imino chalcogen replacement
     # (additive on dispatcher; NO Plan-02 row deletion; NO signature change).

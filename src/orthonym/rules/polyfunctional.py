@@ -1511,6 +1511,19 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 # OPSIN-unparseable molecule). The urea match [NX3][CX3](=O)[NX3]
                 # covers the whole branch, so the subset test skips it here.
                 'urea',
+                # Wave2 T2b (claimed-atom mask): FG prefixes that fully name
+                # their branch — isocyanato/isothiocyanato (P-35.2.1),
+                # isocyano (P-66.5.3), guanidino (P-66.4.1.2.2). Without the
+                # skip the SAME branch is re-walked by the generic namers,
+                # which mis-read the heterocumulene/guanidine atoms and emit
+                # a phantom co-substituent on the same locant
+                # ('8-formamido-8-isocyanatooctanoic acid',
+                #  '8-isothiocyanato-8-(methylamino)octanoic acid',
+                #  '4-guanidino-4-(methylamino)butanoic acid') — a different,
+                # often unparseable molecule. Subset test: each SMARTS spans
+                # the whole branch (isocyanate/isothiocyanate/isocyanide
+                # include the chain-anchor C; guanidine IS the branch).
+                'isocyanate', 'isothiocyanate', 'isocyanide', 'guanidine',
             }
             _sub_set = set(sub_atoms)
             _skip_fg_branch = False

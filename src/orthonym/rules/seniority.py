@@ -180,6 +180,14 @@ SENIORITY_ORDER = [
     "disulfide",       # P-63.6.2: prefix-only
     "peroxide",        # DD2 Fix B (Phase D): R-OO-R' substitutive (R)peroxy prefix (P-63.3.1(1))
     "hydrazine_fg",    # P-62.4: prefix-only
+    # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
+    # P-68.3.1.1.1.5 / P-35.3.1) — prefix-only, junior to all suffix groups
+    "aminooxy",        # -O-NH2 aminooxy (P-68.3.1.1.1.5; no o-elision)
+    "diazenyl",        # HN=N- diazenyl (P-35.2.2 preselected)
+    "n_fluoroamine",   # -NH-F fluoroamino (P-35.3.1 compound prefix)
+    "n_chloroamine",   # -NH-Cl chloroamino (P-35.3.1)
+    "n_bromoamine",    # -NH-Br bromoamino (P-35.3.1)
+    "n_iodoamine",     # -NH-I iodoamino (P-35.3.1)
 
     # Sulfur oxidation states (functional class naming, lower seniority than amines)
     "sulfoxide",
@@ -213,6 +221,14 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     "disulfide",     # P-63.6.2
     "peroxide",      # DD2 Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
     "hydrazine_fg",  # P-62.4
+    # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
+    # P-68.3.1.1.1.5 / P-35.3.1)
+    "aminooxy",
+    "diazenyl",
+    "n_fluoroamine",
+    "n_chloroamine",
+    "n_bromoamine",
+    "n_iodoamine",
 })
 
 # ASML-18 / D-08: Map subtypes to canonical parent for seniority comparison.
@@ -425,6 +441,13 @@ SUFFIX_FORMS = {
     "disulfide": None,           # P-63.6.2: prefix-only
     "peroxide": None,            # DD2 Fix B (Phase D): prefix-only ((R)peroxy)
     "hydrazine_fg": None,        # P-62.4: prefix-only
+    # Wave2 T2b: terminal N-heteroatom preselected prefixes — prefix-only
+    "aminooxy": None,            # P-68.3.1.1.1.5
+    "diazenyl": None,            # P-35.2.2
+    "n_fluoroamine": None,       # P-35.3.1
+    "n_chloroamine": None,       # P-35.3.1
+    "n_bromoamine": None,        # P-35.3.1
+    "n_iodoamine": None,         # P-35.3.1
 }
 
 # Prefix forms for non-principal groups
@@ -490,6 +513,17 @@ PREFIX_FORMS = {
     "isothiocyanate": "isothiocyanato",
     "urea": "carbamoylamino",
     "guanidine": "guanidino",
+    # Wave2 T2b: terminal N-heteroatom preselected prefixes. BB verbatim:
+    # 'aminooxy (preselected prefix) (note that there is no elision of the
+    # final letter o of amino)' + '2-(aminooxy)ethan-1-amine (PIN)'
+    # (P-68.3.1.1.1.5); 'diazenyl (preselected prefix; see P-12.2)'
+    # (P-35.2.2); '-NH-Cl chloroamino (preselected prefix)' (P-35.3.1).
+    "aminooxy": "aminooxy",
+    "diazenyl": "diazenyl",
+    "n_fluoroamine": "fluoroamino",
+    "n_chloroamine": "chloroamino",
+    "n_bromoamine": "bromoamino",
+    "n_iodoamine": "iodoamino",
     "carbamate": None,                  # functional class only
     "boronic_acid": "borono",           # P-68.1.4.2: -B(OH)2 preselected prefix (not 'dihydroxyboranyl')
     "n_oxide_aromatic": None,           # functional class only

@@ -200,6 +200,21 @@ FUNCTIONAL_GROUP_SMARTS = {
     # matches it. Specifying only the OH + one C neighbour leaves the 3rd N connection
     # free (implicit H for R-NH-OH, or a 2nd C for R2N-OH) — so it matches BOTH forms.
     "hydroxylamine": "[OX2H1][NX3;!$([NX3][CX3]=[OX1,SX1,SeX1,TeX1]);!$([NX3]=*)][#6]",
+    # Wave2 T2b: -O-NH2 on carbon = 'aminooxy' preselected prefix
+    # (P-68.3.1.1.1.5; BB PIN '2-(aminooxy)ethan-1-amine'; no o-elision).
+    # NX3H2 pins the terminal unsubstituted N (its only heavy neighbour is the
+    # O), so N-substituted forms R'-NH-O-R stay unperceived → fail-closed
+    # (their PIN is O-substituted-hydroxylamine territory, P-68.3.1.1.1.2).
+    "aminooxy": "[NX3H2][OX2][#6]",
+    # Wave2 T2b: -NH-X N-haloamines → compound prefixes fluoroamino/
+    # chloroamino/bromoamino/iodoamino (P-35.3.1; BB verbatim '-NH-Cl
+    # chloroamino (preselected prefix)'). NX3H1 with the halogen + one C pins
+    # the mono-halo N-H form; N,N-dihalo and N-halo-N-alkyl stay unperceived
+    # → fail-closed.
+    "n_fluoroamine": "F[NX3H1][#6]",
+    "n_chloroamine": "Cl[NX3H1][#6]",
+    "n_bromoamine": "Br[NX3H1][#6]",
+    "n_iodoamine": "I[NX3H1][#6]",
     # === AMINES ===
     # WS-A task 9 (P-66.6.1): the N carries !R — a RING nitrogen is a
     # skeletal heteroatom of a ring parent hydride (morpholine, pyrrolidine,
@@ -268,6 +283,11 @@ FUNCTIONAL_GROUP_SMARTS = {
 
     # === AZO (PERC-03: P-67.2) ===
     "azo": "[#6][NX2]=[NX2][#6]",
+    # Wave2 T2b: terminal HN=N- = 'diazenyl' preselected prefix (P-35.2.2;
+    # BB 'diazenyl (preselected prefix; see P-12.2)', ledger 8-diazenyl-
+    # octanoic acid). NX2H1 pins the terminal =N-H (its only heavy neighbour
+    # is the other N); internal R-N=N-R' stays 'azo' (C on both ends, above).
+    "diazenyl": "[NX2H1]=[NX2][#6]",
 
     # === OTHER ===
     # BBR-PERC/DEF-4 (169.7): C-attached nitro only (P-65.3.1) via recursive-env so the

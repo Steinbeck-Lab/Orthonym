@@ -119,6 +119,15 @@ _COMPOUND_FG_PREFIXES = (
     'dibromo', 'tribromo',
 )
 
+# Wave2 T2b: heteroatom-substituted amino/oxy preselected prefixes
+# (P-68.3.1.1.1.5 / P-35.3.1) — compound substituents that take enclosing
+# marks per P-16.3.3. BB PINs: '4-(hydroxyamino)phenol',
+# '2-(aminooxy)ethan-1-amine', '8-(chloroamino)octanoic acid'.
+_COMPOUND_HETEROATOM_AMINO_PREFIXES = frozenset({
+    'hydroxyamino', 'aminooxy',
+    'fluoroamino', 'chloroamino', 'bromoamino', 'iodoamino',
+})
+
 # Used by alpha_sort_key() — pre-compiled regex patterns
 _LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
 _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
@@ -508,6 +517,14 @@ def needs_brackets(name: str) -> bool:
     # 'oylamino'). Already-bracketed forms returned False above, so this only
     # promotes the unbracketed urea prefix to '(carbamoylamino)'.
     if name.lower().endswith('oylamino'):
+        return True
+
+    # Wave2 T2b: heteroatom-substituted amino/oxy preselected prefixes are
+    # compound substituents and take enclosing marks (P-16.3.3) — BB PINs
+    # write 4-(hydroxyamino)phenol, 2-(aminooxy)ethan-1-amine and P-35.3.1
+    # 8-(chloroamino)octanoic acid. Simple preselected prefixes (diazenyl,
+    # amino, isocyanato) stay bare.
+    if name.lower() in _COMPOUND_HETEROATOM_AMINO_PREFIXES:
         return True
 
     # Functional group prefixes fused with alkyl names are compound substituents.
@@ -1113,6 +1130,14 @@ def alpha_sort_key(substituent_name: str) -> str:
                 # prefix never continues with these stems.
                 if remainder.startswith(
                         ('dec', 'cos', 'cont', 'acont', 'nam', 'noyl')):
+                    return text
+                # Wave2 T2b: 'diazenyl' (HN=N-, P-35.2.2) and 'diazo'
+                # (P-61.5) — the leading 'di' is structural (the two
+                # nitrogens of diazene/diazo), never a multiplier; the BB
+                # multiplies them with bis() ('bis(diazenyl)', not
+                # 'didiazenyl'). Exact-remainder match so 'diazido'
+                # (a genuine 2x azido) still strips to 'azido'.
+                if remainder in ('azenyl', 'azo'):
                     return text
                 return remainder
 
