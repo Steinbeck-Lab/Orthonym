@@ -80,6 +80,7 @@ from .ion_dispatch import name_ion_dispatch  # commit 02-26
 from .ring_nitrile import name_ring_nitrile  # commit 03-01
 from .amide import name_amide  # commit 03-02
 from .amine import name_amine  # commit 03-03
+from .imine import name_imine  # Wave2 T2a
 from .ring_ester import name_ring_ester  # commit 03-04
 from .organometallic import name_organometallic  # commit 02-04 (Phase 161)
 
@@ -120,6 +121,7 @@ __all__ = [
     "name_ring_nitrile",  # 03-01
     "name_amide",  # 03-02
     "name_amine",  # 03-03
+    "name_imine",  # Wave2 T2a
     "name_ring_ester",  # 03-04
     "name_organometallic",  # 02-04 (Phase 161)
     # ... (26 total at Plan-02 end after ester-family deferrals; 39 at Plan-03 end)

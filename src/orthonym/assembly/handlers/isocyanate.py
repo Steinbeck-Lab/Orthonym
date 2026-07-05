@@ -43,6 +43,19 @@ def name_isocyanate(
         _name_isocyanate, _enrich_handler_name, _inject_stereo_if_missing,
     )
 
+    # Wave2 T2a (P-61.8): the functional-class 'R isocyanate' form is
+    # general nomenclature only — the PIN is the substitutive isocyanato
+    # prefix on the parent hydride (BB VERBATIM 'isocyanatocyclohexane
+    # (PIN) cyclohexyl isocyanate'). Decline under PIN style so the
+    # generic prefix path (NO_SENIORITY_GROUPS) emits 'isocyanatoethane';
+    # the functional-class name stays available under --trivial. SCOPED to
+    # NON-AROMATIC attachment: the benzene ring path cannot emit
+    # 'isocyanatobenzene' yet, so aryl isocyanates keep the RT-valid
+    # functional-class form rather than regressing to unknown (deferred
+    # with the benzene FG-prefix table).
+    if style == "pin" and not _aromatic_attachment(features, 'isocyanate'):
+        return None
+
     iso_name = _name_isocyanate(features)
     if not iso_name:
         return None
@@ -63,4 +76,18 @@ def name_isocyanate(
     )
 
 
-__all__ = ["name_isocyanate", "_is_isocyanate"]
+def _aromatic_attachment(features: Any, fg_key: str) -> bool:
+    """True when the iso(thio)cyanate N is attached to an AROMATIC atom.
+
+    SMARTS match layout: (R_atom, N, C, O/S) — R_atom is match[0].
+    """
+    mol = getattr(features, 'mol', None)
+    if mol is None:
+        return False
+    for match in (getattr(features, 'functional_groups', None) or {}).get(fg_key, []):
+        if match and mol.GetAtomWithIdx(match[0]).GetIsAromatic():
+            return True
+    return False
+
+
+__all__ = ["name_isocyanate", "_is_isocyanate", "_aromatic_attachment"]

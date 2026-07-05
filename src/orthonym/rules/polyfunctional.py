@@ -55,6 +55,14 @@ NO_SENIORITY_GROUPS = {
     "nitro",
     "nitroso",
     "azido",
+    # Wave2 T2a (P-61.8): the substitutive 'isocyanato'/'isothiocyanato'
+    # prefixes are the PINs (BB VERBATIM 'isocyanatocyclohexane (PIN)
+    # cyclohexyl isocyanate'), so with no senior group present the parent
+    # hydride is named with the prefix (isocyanatoethane) — the functional-
+    # class handlers now decline under style='pin' and keep the 'ethyl
+    # isocyanate' form for general (--trivial) nomenclature.
+    "isocyanate",
+    "isothiocyanate",
     "alkene",  # Handled separately via unsaturation
     "alkyne",  # Handled separately via unsaturation
 }

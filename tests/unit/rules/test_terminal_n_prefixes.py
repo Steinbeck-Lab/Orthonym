@@ -91,8 +91,11 @@ class TestProtectedNeighbors:
         ("N=C(N)CCCC(=O)O", "4-carbamimidoylbutanoic acid"),
         # hydroxylamine as PARENT (senior path untouched by the prefix row)
         ("CCNO", "N-ethylhydroxylamine"),
-        # isocyanate functional-class naming when no senior group present
-        ("O=C=NCCCC", "butyl isocyanate"),
+        # Wave2 T2a supersedes the original 'butyl isocyanate' control here:
+        # P-61.8 substitutive isocyanato is the PIN (BB VERBATIM
+        # 'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the
+        # functional-class form remains under --trivial.
+        ("O=C=NCCCC", "1-isocyanatobutane"),
         # azide is not stolen by the diazenyl SMARTS
         ("[N-]=[N+]=NCCCC(=O)O", "4-azidobutanoic acid"),
         # oxime is not stolen by hydroxylamine/diazenyl

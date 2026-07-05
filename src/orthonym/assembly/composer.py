@@ -4330,6 +4330,85 @@ def _walk_amine_n_substituents(
     return n_subs
 
 
+def _assemble_imine_name(features: Any, style: str) -> Optional[str]:
+    """Wave2 T2a (P-62.3.1.1): N-substituted acyclic imine R-CH=N-R'.
+
+    BB VERBATIM: 'N-methylethanimine (PIN) [not N-ethylidenemethanamine; nor
+    N-ethylidene(methyl)amine]'. The imine nitrogen carries exactly one
+    substituent (its other neighbour is the double-bonded parent carbon),
+    cited as an italic N- prefix on the parent imine name — the single-N
+    shape of _assemble_amine_name with the imine suffix.
+
+    FAIL-CLOSED: returns None (generic path unchanged) for anything but a
+    single acyclic imine whose lone N-substituent names cleanly — bare
+    imines, di-imines, ring imines and unnameable substituents keep today's
+    behavior.
+    """
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms or len(pg_atoms) != 1:
+        return None
+    match = pg_atoms[0]
+    n_idx = None
+    c_idx = None
+    for idx in match:
+        sym = mol.GetAtomWithIdx(idx).GetSymbol()
+        if sym == 'N':
+            n_idx = idx
+        elif sym == 'C':
+            c_idx = idx
+    if n_idx is None or c_idx is None:
+        return None
+    nitrogen = mol.GetAtomWithIdx(n_idx)
+    if nitrogen.IsInRing():
+        return None
+    n_sub_roots = [nb.GetIdx() for nb in nitrogen.GetNeighbors()
+                   if nb.GetIdx() != c_idx]
+    if len(n_sub_roots) != 1:
+        return None  # bare =NH imine -> generic path unchanged
+    chain_set = set(features.principal_chain) if features.principal_chain else set()
+    if not chain_set or c_idx not in chain_set or n_idx in chain_set:
+        return None
+    n_subs = _walk_amine_n_substituents(mol, n_idx, chain_set)
+    if len(n_subs) != 1:
+        return None  # unnameable N-substituent -> fail closed downstream
+
+    n_prefix = f"N-{_wrap_n_substituent(n_subs[0])}"
+
+    # Base = parent + imine suffix (+ stereo); C-substituent prefixes render
+    # separately and merge with the N-block (mirrors _assemble_amine_name).
+    fragments = []
+    if not features.principal_chain:
+        return None
+    parent = _generate_chain_parent(features)
+    if not parent:
+        return None
+    fragments.append(parent)
+    suffix = _generate_suffix(features)
+    if not suffix:
+        return None
+    fragments.append(suffix)
+    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+        stereo = _generate_stereodescriptors(features)
+        if stereo:
+            fragments.append(stereo)
+    base_name = _assemble_fragments(fragments, style)
+    if not base_name:
+        return None
+
+    other_prefixes = _generate_prefixes(features)
+    c_prefix_parts = []
+    for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
+        if p.locants and not str(p.text)[:1].isdigit():
+            _loc = ",".join(str(_l) for _l in p.locants)
+            c_prefix_parts.append(f"{_loc}-{p.text}")
+        else:
+            c_prefix_parts.append(p.text)
+    if c_prefix_parts:
+        return f"{'-'.join(c_prefix_parts)}-{n_prefix}{base_name}"
+    return f"{n_prefix}{base_name}"
+
+
 def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     """
     Assemble name for secondary/tertiary amines with N-alkyl prefixes.
@@ -5752,6 +5831,11 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             'primary_amide', 'secondary_amide', 'tertiary_amide',
             'secondary_amine', 'tertiary_amine',
             'thioamide', 'selenoamide', 'telluroamide',
+            # Wave2 T2a (P-62.3.1.1): the N-substituted imine's N-branch is
+            # rendered as an italic-N prefix by _assemble_imine_name; without
+            # this skip the walker re-names it as a phantom '(methylamino)'
+            # co-substituent ('1-(methylamino)ethanimine' for CC=NC).
+            'imine',
         ):
             # For chalcogen amides extend pg_atom_set with all atoms reachable from
             # the principal-group N (excluding the carbonyl C) so the N-bonded
@@ -5839,6 +5923,14 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         _GUARD3B_FG_TYPES = {
             'primary_amide', 'carboxylic_acid',
             'acid_chloride', 'acid_bromide', 'acid_fluoride',
+            # Wave2 T2a (claimed-atom mask, general-acyclic path): the same
+            # skip Wave2 T2b added to polyfunctional _POLY_GUARD_FG_TYPES.
+            # These FG prefixes fully name their branch (isocyanato/
+            # isothiocyanato P-35.2.1, isocyano P-66.5.3, guanidino
+            # P-66.4.1.2.2); without the skip this walker re-reads the same
+            # atoms as a phantom co-substituent ('formamido-1-isocyanato-
+            # ethane' for O=C=NCC — a different molecule).
+            'isocyanate', 'isothiocyanate', 'isocyanide', 'guanidine',
         }
         _skip_as_fg_branch = False
         for _fg_name, _fg_matches in features.functional_groups.items():
@@ -7266,6 +7358,28 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
                     "DROP-07 substituent_defer: reason=complex_fg_only locant=%d",
                     sub_info.locant,
                 )
+            continue
+
+        # Wave2 T2a (claimed-atom mask, ring-parent path): mirror of guard 3b
+        # in _generate_alkyl_prefixes / _POLY_GUARD_FG_TYPES in polyfunctional.
+        # A branch fully covered by one of these FG matches is emitted by the
+        # global FG-prefix loop (isocyanato/isothiocyanato/isocyano/guanidino);
+        # re-walking it here mis-reads the heterocumulene ('formamido-1-
+        # isocyanatocyclohexane', 'isothiocyanic acidyl' garbage).
+        _RING_GUARD_FG_TYPES = (
+            'isocyanate', 'isothiocyanate', 'isocyanide', 'guanidine',
+        )
+        _skip_ring_fg_branch = False
+        for _fg_name in _RING_GUARD_FG_TYPES:
+            if _fg_name == features.principal_group:
+                continue
+            for _fg_match in features.functional_groups.get(_fg_name, []):
+                if _fg_match and sub_info.frag_atoms.issubset(set(_fg_match)):
+                    _skip_ring_fg_branch = True
+                    break
+            if _skip_ring_fg_branch:
+                break
+        if _skip_ring_fg_branch:
             continue
 
         # IUPAC P-31.1.3.1: Detect exocyclic double bond attachment.

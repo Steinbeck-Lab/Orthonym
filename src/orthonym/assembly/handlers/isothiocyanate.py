@@ -38,6 +38,16 @@ def name_isothiocyanate(
         _name_isothiocyanate, _enrich_handler_name, _inject_stereo_if_missing,
     )
 
+    # Wave2 T2a (P-61.8): functional-class 'R isothiocyanate' is general
+    # nomenclature only — the PIN is the substitutive isothiocyanato prefix
+    # on the parent hydride (parallel to isocyanato; BB P-61.8). Decline
+    # under PIN style; the form stays available under --trivial. SCOPED to
+    # non-aromatic attachment (aryl forms keep the RT-valid functional
+    # class until the benzene FG-prefix table learns isothiocyanato).
+    from .isocyanate import _aromatic_attachment
+    if style == "pin" and not _aromatic_attachment(features, 'isothiocyanate'):
+        return None
+
     isothio_name = _name_isothiocyanate(features)
     if not isothio_name:
         return None

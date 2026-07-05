@@ -79,6 +79,27 @@ def name_oxime(
         _inject_stereo_if_missing,
     )
 
+    # Wave2 T2a (P-66.6.5(f), BB VERBATIM): 'Oximes are named substitutively
+    # as N-hydroxy derivatives of imines and not by functional class
+    # nomenclature as in previous recommendations' — 'CH3-CH2-CH=N-OH
+    # propanal oxime ... N-hydroxypropan-1-imine (PIN)'. Try the substitutive
+    # PIN first; the functional-class form remains the fallback (and the
+    # --trivial rendering) when the bounded substitutive builder declines.
+    if style == "pin":
+        _subst = _substitutive_oxime_name(features)
+        if _subst:
+            pool = get_current_pool()
+            cand = pool.add(_subst, "oxime", features)
+            if cand is not None:
+                return NamingResult(
+                    name=cand.name,
+                    tree=NameTreeNode(
+                        parent_stem=cand.name, class_id="oxime",
+                        iupac_section_cite="P-66.6.5", fragment_legacy=cand.name,
+                    ),
+                    atom_to_locant_hint=None,
+                )
+
     oxime_name = _name_oxime_or_hydrazone(features, 'oxime')
     if not oxime_name:
         return None
@@ -107,4 +128,57 @@ def name_oxime(
     )
 
 
-__all__ = ["name_oxime", "_is_oxime"]
+import re as _re
+
+_PLAIN_IMINE_NAME_RE = _re.compile(r"^[a-z]+an(?:imine|-\d+-imine)$")
+
+
+def _substitutive_oxime_name(features: Any) -> Optional[str]:
+    """Bounded substitutive-oxime builder: R2C=N-OH -> 'N-hydroxy<imine PIN>'.
+
+    Derives the imine parent by deleting the oxime O (RWMol surgery) and
+    re-entering the full namer — the route_charged / acyl-amido re-entry
+    pattern — then prefixes 'N-hydroxy'.
+
+    FAIL-CLOSED scope (returns None -> functional-class fallback, today's
+    RT-valid behavior): exactly one oxime; no stereocenters / double-bond
+    stereo (the surgered imine would mis-derive the descriptor: the C=N-OH
+    E/Z priorities differ from C=N-H); and the recursive imine name must be
+    a PLAIN unsubstituted parent ('ethanimine', 'propan-1-imine',
+    'cyclohexan-1-imine') — a substituted imine name would need N-hydroxy
+    alphabetized among its prefixes, deferred with the oxime-ether class.
+    """
+    mol = getattr(features, 'mol', None)
+    matches = (getattr(features, 'functional_groups', None) or {}).get('oxime', [])
+    if mol is None or len(matches) != 1:
+        return None
+    if getattr(features, 'stereocenters', None) or \
+            getattr(features, 'double_bond_stereo', None):
+        return None
+    match = matches[0]  # SMARTS [CX3]=[NX2][OX2H] -> (C, N, O)
+    if len(match) != 3:
+        return None
+    o_idx = match[2]
+    if mol.GetAtomWithIdx(o_idx).GetSymbol() != 'O':
+        return None
+    from rdkit import Chem
+    try:
+        em = Chem.RWMol(mol)
+        em.RemoveAtom(o_idx)
+        imine_mol = em.GetMol()
+        Chem.SanitizeMol(imine_mol)
+        imine_smiles = Chem.MolToSmiles(imine_mol)
+    except Exception:
+        return None
+    from ...namer import name_compound as _name_compound
+    try:
+        sub = _name_compound(imine_smiles)
+    except Exception:
+        return None
+    if not sub or not _PLAIN_IMINE_NAME_RE.match(sub):
+        return None
+    joiner = "-" if sub[:1].isdigit() else ""
+    return f"N-hydroxy{joiner}{sub}"
+
+
+__all__ = ["name_oxime", "_is_oxime", "_substitutive_oxime_name"]

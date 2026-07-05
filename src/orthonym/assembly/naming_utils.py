@@ -227,6 +227,11 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # (N-methylethanesulfonamide). A 3+ carbon chain keeps its locant
     # (propane-1-sulfonamide). Sulfinamide (no FG defined yet) deferred.
     "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
+    # Wave2 T2a (P-62.3.1.1 / P-14.3.4.4): the imine =NH sits on a chain carbon;
+    # on the symmetric 2-carbon (ethane) parent the locant elides -> 'ethanimine'
+    # (BB VERBATIM 'N-methylethanimine (PIN)'), not 'ethan-1-imine'. A 3+ carbon
+    # chain keeps its locant (BB VERBATIM 'N-hydroxypropan-1-imine (PIN)').
+    "imine",
     # Wave2 T1b (P-63.1.5 / P-14.3.4.4): selenol/tellurol are monovalent-chalcogen
     # suffixes exactly like -ol/-thiol, so the locant elides on the symmetric 2-carbon
     # (ethane) parent -> 'ethaneselenol'/'ethanetellurol' (PIN, OPSIN-RT), not

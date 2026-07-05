@@ -229,7 +229,14 @@ FUNCTIONAL_GROUP_SMARTS = {
     "aromatic_amine": "[NX3H2][cX3]",
     
     # === IMINES ===
-    "imine": "[CX3]=[NX2H]",
+    # Wave2 T2a (P-62.3.1.1): broadened from [CX3]=[NX2H] to admit
+    # N-SUBSTITUTED imines R-CH=N-R' (BB VERBATIM 'N-methylethanimine
+    # (PIN)'). Guards keep the old blast radius: !R on N — a ring C=N is a
+    # skeletal feature of the ring parent (kekulized azirine/dihydroazine
+    # rings must NOT gain an imine FG); the $-exclusions keep oxime
+    # (C=N-OH), oxime ethers (C=N-OR), hydrazones (C=N-N<) and N-halo
+    # imines (P-62.4: named as amides) out — each is its own class.
+    "imine": "[CX3]=[NX2;!R;!$([NX2][OX2]);!$([NX2][NX2]);!$([NX2][NX3]);!$([NX2][F,Cl,Br,I])]",
     "oxime": "[CX3]=[NX2][OX2H]",
     "hydrazone": "[CX3]=[NX2][NX3]",
     "hydrazine_fg": "[NX3;H1;!$([NX3][CX3]=O)][NX3H2]",  # DATA-05c: P-62.4 -NH-NH2, excludes hydrazides

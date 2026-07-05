@@ -1010,6 +1010,22 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Wave2 T2a: N-substituted acyclic imine (P-62.3.1.1). BB VERBATIM
+#     'N-methylethanimine (PIN)'. Bare imines keep the generic suffix path;
+#     this fires only when the broadened imine SMARTS perceived an
+#     N-substituent on the imine nitrogen (amine-handler mutex gates).
+from .handlers.imine import _is_n_substituted_imine, name_imine  # noqa: E402
+
+_register_inner(
+    handler_id="imine",
+    priority=5290,
+    predicate=_is_n_substituted_imine,
+    handler=name_imine,
+    iupac_section="P-62.3.1.1",
+    description="N-substituted acyclic imine (italic-N prefix on the imine parent)",
+    side_effect_inventory=(),
+)
+
 # --- BBR-PERC (Phase 169.7): hydroxylamine handler. Parent hydride "hydroxylamine"
 #     (P-68.3.1.1) with N-/O- substituent locants. Fires when the perceived
 #     hydroxylamine FG is the PCG (senior to amine in SENIORITY_ORDER) — otherwise

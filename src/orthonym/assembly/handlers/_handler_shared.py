@@ -830,9 +830,31 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         # and should_omit_locant_one Rule 1 (chain_length == 1) must still omit for
         # methane regardless of substituent count (e.g. CBr4 -> 'tetrabromomethane',
         # NOT '1,1,1,1-tetrabromomethane').
+        # Wave2 T2a: ring parents never reached Rule 4 here (is_ring was not
+        # passed), so a lone FG prefix kept a spurious '1-' on a symmetric
+        # carbocycle ('1-isocyanatocyclohexane'; BB VERBATIM PIN is
+        # 'isocyanatocyclohexane', parallel to methylcyclohexane). Gate is
+        # CONSERVATIVE: all-carbon ring, all ring bonds single (aromatic /
+        # cycloalkene rings keep their locant — position is distinguishable).
+        _sym_carbo_ring = False
+        _oring = getattr(features, 'oriented_ring', None)
+        if (_oring and not getattr(features, 'chain_is_parent', False)
+                and features.mol is not None):
+            from rdkit import Chem as _Chem
+            _n_ring = len(_oring)
+            _sym_carbo_ring = all(
+                features.mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                for i in _oring
+            ) and all(
+                (lambda b: b is not None and b.GetBondType() == _Chem.BondType.SINGLE)(
+                    features.mol.GetBondBetweenAtoms(
+                        _oring[k], _oring[(k + 1) % _n_ring]))
+                for k in range(_n_ring)
+            )
         omit_locants = should_omit_locant_one(
             context="prefix",
             chain_length=chain_len,
+            is_ring=_sym_carbo_ring,
             is_monosubstituted=(total_substituents == 1 and fg_locants == [1]
                                 and features.principal_group is None),
         )

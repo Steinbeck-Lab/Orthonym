@@ -81,17 +81,21 @@ class TestNOxideRouting:
 # ============================================================================
 
 class TestIsocyanate:
-    """Isocyanates: R-N=C=O -> 'R isocyanate'."""
+    """Isocyanates. Wave2 T2a (P-61.8): the PIN is the SUBSTITUTIVE
+    isocyanato prefix on the parent hydride (BB VERBATIM
+    'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the functional-
+    class 'R isocyanate' remains for --trivial and (interim) for AROMATIC
+    attachment (the benzene FG table cannot emit isocyanatobenzene yet)."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("CN=C=O", "methyl isocyanate"),
-        ("CCN=C=O", "ethyl isocyanate"),
-        ("CCCN=C=O", "propyl isocyanate"),
-        ("CCCCN=C=O", "butyl isocyanate"),
-        ("c1ccc(cc1)N=C=O", "phenyl isocyanate"),
+        ("CN=C=O", "isocyanatomethane"),
+        ("CCN=C=O", "isocyanatoethane"),
+        ("CCCN=C=O", "1-isocyanatopropane"),
+        ("CCCCN=C=O", "1-isocyanatobutane"),
+        ("c1ccc(cc1)N=C=O", "phenyl isocyanate"),  # aryl: functional class kept
     ])
-    def test_isocyanate_functional_class(self, smiles, expected):
+    def test_isocyanate_pin_forms(self, smiles, expected):
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
@@ -100,14 +104,14 @@ class TestIsocyanate:
         """Isocyanate should NOT be named as a nitrile."""
         result = name_compound("CN=C=O")
         assert "nitrile" not in result
-        assert "isocyanate" in result
+        assert "isocyanato" in result
 
     @pytest.mark.unit
     def test_isocyanate_not_amide(self):
         """Isocyanate should NOT be named as an amide."""
         result = name_compound("CN=C=O")
         assert "amide" not in result
-        assert "isocyanate" in result
+        assert "isocyanato" in result
 
 
 # ============================================================================
@@ -115,15 +119,16 @@ class TestIsocyanate:
 # ============================================================================
 
 class TestIsothiocyanate:
-    """Isothiocyanates: R-N=C=S -> 'R isothiocyanate'."""
+    """Isothiocyanates. Wave2 T2a (P-61.8): substitutive isothiocyanato PIN
+    (parallel to isocyanato); aryl keeps functional class interim."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        ("CN=C=S", "methyl isothiocyanate"),
-        ("CCN=C=S", "ethyl isothiocyanate"),
-        ("c1ccc(cc1)N=C=S", "phenyl isothiocyanate"),
+        ("CN=C=S", "isothiocyanatomethane"),
+        ("CCN=C=S", "isothiocyanatoethane"),
+        ("c1ccc(cc1)N=C=S", "phenyl isothiocyanate"),  # aryl: kept
     ])
-    def test_isothiocyanate_functional_class(self, smiles, expected):
+    def test_isothiocyanate_pin_forms(self, smiles, expected):
         result = name_compound(smiles)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
