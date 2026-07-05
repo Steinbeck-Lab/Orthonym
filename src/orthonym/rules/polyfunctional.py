@@ -642,6 +642,16 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     suffix_locants = []
     if features.principal_group_atoms:
         for match in features.principal_group_atoms:
+            # Wave2 T2c (P-64.7.1): the suffix locant must come from the FG
+            # CENTER atom, not the first match atom that happens to be in the
+            # map. The ketone SMARTS match is (C_neighbor, C=O, O, C_neighbor)
+            # — taking match[0] read the NEIGHBOR's locant, producing the
+            # impossible '2-aminocyclohexan-2-one' for NC1CCCCC1=O (amino and
+            # oxo cannot share one carbon; PIN is 2-aminocyclohexan-1-one).
+            _center = _find_fg_center_atom(mol, match, principal_group)
+            if _center is not None and _center in atom_to_locant:
+                suffix_locants.append(atom_to_locant[_center])
+                continue
             for atom_idx in match:
                 if atom_idx in atom_to_locant:
                     suffix_locants.append(atom_to_locant[atom_idx])
