@@ -43,19 +43,17 @@ class TestAcylaminoRingFix:
         )
 
     def test_linear_acylamino_still_works(self):
-        """N-hexanoylglycine (linear chain) should still produce 'hexanoyl'."""
+        """N-hexanoylglycine (linear chain) -> 'hexanamido' (P-66.1.1.4.3)."""
         result = name_compound("OC(=O)CNC(=O)CCCCC")
-        assert "hexanoyl" in result.lower(), (
-            f"Expected 'hexanoyl' in result, got '{result}'"
+        assert "hexanamido" in result.lower(), (
+            f"Expected 'hexanamido' in result, got '{result}'"
         )
 
     def test_n_acetylglycine_still_works(self):
-        """N-acetylglycine (simplest acyl) should still produce 'ethanoyl' or 'acetyl'."""
+        """N-acetylglycine (simplest acyl) -> 'acetamido' (P-66.1.1.4.3)."""
         result = name_compound("OC(=O)CNC(=O)C")
-        has_ethanoyl = "ethanoyl" in result.lower()
-        has_acetyl = "acetyl" in result.lower()
-        assert has_ethanoyl or has_acetyl, (
-            f"Expected 'ethanoyl' or 'acetyl' in result, got '{result}'"
+        assert "acetamido" in result.lower(), (
+            f"Expected 'acetamido' in result, got '{result}'"
         )
 
     def test_n_cyclopentylcarbonylglycine_no_linearization(self):

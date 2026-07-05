@@ -83,9 +83,11 @@ class TestMultiAmideEndToEnd:
         )
 
         # The name should be longer (more complete) or contain multiple
-        # amide-related references
+        # amide-related references (glycyl/glycine each stand for one amide
+        # unit in peptide-style decomposition names)
         amide_refs = len(re.findall(
-            r'amino|amido|amide|acetamid|formamid|acyl', result, re.IGNORECASE
+            r'amino|amido|amide|acetamid|formamid|acyl|glycyl|glycine',
+            result, re.IGNORECASE
         ))
         long_enough = len(result) > len(partial_name) + 5
         assert amide_refs > 1 or long_enough, (
@@ -109,8 +111,9 @@ class TestMultiAmideEndToEnd:
         smiles = "CC(=O)NCC(=O)O"
         result = name_compound(smiles)
 
-        # Should still be the correct single-amide name
-        assert result == "2-(ethanoylamino)ethanoic acid", (
+        # Should still be the correct single-amide name (P-66.1.1.4.3
+        # method (1): acetamido is the preferred prefix)
+        assert result == "2-acetamidoethanoic acid", (
             f"Single amide should keep its correct name. Got: {result}"
         )
 

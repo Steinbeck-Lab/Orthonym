@@ -56,56 +56,42 @@ def opsin_parse(name: str) -> str:
 
 @pytest.mark.integration
 class TestAcylaminoFormat:
-    """Verify acylamino prefix produces OPSIN-compatible format with enclosing parens."""
+    """N-acyl prefixes use the amido form (P-66.1.1.4.3 method (1) = PIN).
 
-    def test_pentanoylamino_format(self):
-        """2-(pentanoylamino)pentanedioic acid: enclosing parens around compound substituent."""
+    Wave2 T1c: the method-(2) '(pentanoylamino)' forms were replaced by the
+    preferred amido family (formamido/acetamido/{stem}anamido), which are
+    simple prefixes taking NO enclosing marks — Blue Book:
+    4-formamidobenzoic acid, 4-acetamidobenzoic acid.
+    """
+
+    def test_pentanamido_format(self):
+        """N-pentanoylglutamic acid -> 2-pentanamidopentanedioic acid."""
         name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        assert "pentanoylamino" in name, f"Expected 'pentanoylamino' in '{name}'"
-        # Must NOT have the old format with inner parens around just the acyl part
-        assert "(pentanoyl)amino" not in name, (
-            f"Old format '(pentanoyl)amino' found in '{name}'"
+        assert name == "2-pentanamidopentanedioic acid", (
+            f"Expected '2-pentanamidopentanedioic acid', got '{name}'"
         )
 
-    def test_pentanoylamino_enclosing_parens(self):
-        """Compound substituent must have enclosing parens: (pentanoylamino)."""
-        name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        assert "(pentanoylamino)" in name, (
-            f"Expected enclosing parens '(pentanoylamino)' in '{name}'"
-        )
-
-    def test_ethanoylamino_format(self):
-        """Acetylamino group should use '(ethanoylamino)' format."""
+    def test_acetamido_format(self):
+        """N-acetylaspartic acid -> 2-acetamidobutanedioic acid."""
         name = name_compound("CC(=O)NC(CC(=O)O)C(=O)O")
-        assert "ethanoylamino" in name, f"Expected 'ethanoylamino' in '{name}'"
-        assert "(ethanoyl)amino" not in name, (
-            f"Old format '(ethanoyl)amino' found in '{name}'"
+        assert name == "2-acetamidobutanedioic acid", (
+            f"Expected '2-acetamidobutanedioic acid', got '{name}'"
         )
 
-    def test_ethanoylamino_enclosing_parens(self):
-        """Compound substituent must have enclosing parens: (ethanoylamino)."""
-        name = name_compound("CC(=O)NC(CC(=O)O)C(=O)O")
-        assert "(ethanoylamino)" in name, (
-            f"Expected enclosing parens '(ethanoylamino)' in '{name}'"
-        )
-
-    def test_octadecanoylamino_format(self):
-        """Long-chain acylamino: (octadecanoylamino) with enclosing parens."""
+    def test_octadecanamido_format(self):
+        """Long-chain N-acyl: octadecanamido, unbracketed."""
         name = name_compound("CCCCCCCCCCCCCCCCCC(=O)NCC(=O)O")
-        assert "octadecanoylamino" in name, (
-            f"Expected 'octadecanoylamino' in '{name}'"
-        )
-        assert "(octadecanoyl)amino" not in name, (
-            f"Old format '(octadecanoyl)amino' found in '{name}'"
+        assert "octadecanamido" in name, (
+            f"Expected 'octadecanamido' in '{name}'"
         )
 
     def test_no_inner_parens_pattern(self):
         """No generated name should contain the pattern (Xanoyl)amino."""
         smiles_list = [
-            "CCCCC(=O)NC(CCC(=O)O)C(=O)O",       # pentanoylamino
-            "CC(=O)NC(CC(=O)O)C(=O)O",             # ethanoylamino
-            "CCCCCCCC(=O)NCC(=O)O",                 # octanoylamino
-            "CCCCCCCCCCCCCCCCCC(=O)NCC(=O)O",       # octadecanoylamino
+            "CCCCC(=O)NC(CCC(=O)O)C(=O)O",       # pentanamido
+            "CC(=O)NC(CC(=O)O)C(=O)O",             # acetamido
+            "CCCCCCCC(=O)NCC(=O)O",                 # octanamido
+            "CCCCCCCCCCCCCCCCCC(=O)NCC(=O)O",       # octadecanamido
         ]
         pattern = re.compile(r"\([a-z]+anoyl\)amino")
         for smiles in smiles_list:
@@ -114,13 +100,12 @@ class TestAcylaminoFormat:
                 f"Inner-paren acyl format found in '{name}' for {smiles}"
             )
 
-    def test_enclosing_parens_with_locant(self):
-        """When locant present, format must be N-(Xanoylamino): locant followed by parens."""
+    def test_amido_with_locant_unbracketed(self):
+        """Amido prefixes are simple: locant attaches directly (2-pentanamido...)."""
         name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        # Must match pattern: digit-(Xanoylamino) -- enclosing parens around whole group
-        pattern = re.compile(r"\d-\([a-z]+anoylamino\)")
+        pattern = re.compile(r"\d-[a-z]+anamido")
         assert pattern.search(name), (
-            f"Expected locant-(anoylamino) pattern with enclosing parens in '{name}'"
+            f"Expected bare locant-amido pattern (no enclosing marks) in '{name}'"
         )
 
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")
@@ -168,19 +153,24 @@ class TestAcylaminoFormat:
 class TestAcyloxyFormat:
     """Verify acyloxy prefix produces OPSIN-compatible format with enclosing parens."""
 
-    def test_ethanoyloxy_format(self):
-        """Acyloxy should produce '(ethanoyloxy)' not '(ethanoyl)oxy'."""
+    def test_acetyloxy_format(self):
+        """Acetyl acyloxy uses the retained acyl -> '(acetyloxy)', no inner parens.
+
+        (acetic acid's retained acyl is 'acetyl'; the acetyloxy prefix is a
+        pre-existing retained-acyl emission, independent of the Wave2 T1c
+        acyl-N work.)
+        """
         name = name_compound("CC(=O)OCCC(=O)O")
-        assert "ethanoyloxy" in name, f"Expected 'ethanoyloxy' in '{name}'"
-        assert "(ethanoyl)oxy" not in name, (
-            f"Old format '(ethanoyl)oxy' found in '{name}'"
+        assert "acetyloxy" in name, f"Expected 'acetyloxy' in '{name}'"
+        assert "(acetyl)oxy" not in name, (
+            f"Old inner-paren format '(acetyl)oxy' found in '{name}'"
         )
 
-    def test_ethanoyloxy_enclosing_parens(self):
-        """Compound substituent must have enclosing parens: (ethanoyloxy)."""
+    def test_acetyloxy_enclosing_parens(self):
+        """Compound substituent must have enclosing parens: (acetyloxy)."""
         name = name_compound("CC(=O)OCCC(=O)O")
-        assert "(ethanoyloxy)" in name, (
-            f"Expected enclosing parens '(ethanoyloxy)' in '{name}'"
+        assert "(acetyloxy)" in name, (
+            f"Expected enclosing parens '(acetyloxy)' in '{name}'"
         )
 
     def test_no_inner_parens_acyloxy_pattern(self):
@@ -198,12 +188,12 @@ class TestAcyloxyFormat:
             )
 
     def test_enclosing_parens_with_locant(self):
-        """When locant present, format must be N-(Xanoyloxy): locant followed by parens."""
+        """When locant present, format must be digit-(acyloxy): locant + parens."""
         name = name_compound("CC(=O)OCCC(=O)O")
-        # Must match pattern: digit-(Xanoyloxy) -- enclosing parens around whole group
-        pattern = re.compile(r"\d-\([a-z]+anoyloxy\)")
+        # digit-(acetyloxy | Xanoyloxy) -- enclosing parens around the whole group
+        pattern = re.compile(r"\d-\((?:acetyl|[a-z]+anoyl)oxy\)")
         assert pattern.search(name), (
-            f"Expected locant-(anoyloxy) pattern with enclosing parens in '{name}'"
+            f"Expected locant-(acyloxy) pattern with enclosing parens in '{name}'"
         )
 
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")

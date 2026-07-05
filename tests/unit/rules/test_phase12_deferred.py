@@ -28,10 +28,10 @@ class TestUreido:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=CNCCCC(=O)O", "4-(methanoylamino)butanoic acid"),   # real formamido — unaffected
-        ("CC(=O)NCCC(=O)O", "3-(ethanoylamino)propanoic acid"),  # real acetamido — unaffected
-        ("NCCC(=O)O", "3-aminopropanoic acid"),                  # plain amino — unaffected
-        ("CNC(N)=O", "N-methylurea"),                            # terminal urea — unaffected
+        ("O=CNCCCC(=O)O", "4-formamidobutanoic acid"),    # real formamido — P-66.1.1.4.3(1)
+        ("CC(=O)NCCC(=O)O", "3-acetamidopropanoic acid"),  # real acetamido — P-66.1.1.4.3(1)
+        ("NCCC(=O)O", "3-aminopropanoic acid"),            # plain amino — unaffected
+        ("CNC(N)=O", "N-methylurea"),                      # terminal urea — unaffected
     ])
     def test_acylamino_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected

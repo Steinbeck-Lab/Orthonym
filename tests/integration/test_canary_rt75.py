@@ -284,7 +284,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCCCC(=O)N[C@@H](CO)C(=O)O",
-        "(2S)-3-hydroxy-2-(octadecanoylamino)propanoic acid",
+        "(2S)-3-hydroxy-2-octadecanamidopropanoic acid",
     ),
     (
         "CCCC(O)CC(O)C(O)C/C=C/CCCCCCCC(=O)O",
@@ -1548,7 +1548,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCC(=O)N[C@@H](CCSC)C(=O)[O-]",  # acyclic,charged,small
-        "(2S)-4-(methylsulfanyl)-2-(propanoylamino)butanoate",
+        "(2S)-4-(methylsulfanyl)-2-propanamidobutanoate",
     ),
     (
         "CC(C)[C@H](NC(=O)CN)C(=O)N[C@@H](C)C(=O)O",  # acyclic,polyfunctional,medium
@@ -1770,7 +1770,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCC(=O)NCC(=O)[O-]",  # acyclic,charged,medium
-        "2-(hexadecanoylamino)ethanoate",
+        "2-hexadecanamidoethanoate",
     ),
     (
         "COc1cc(CC(C)N)c(OC)cc1I",  # aromatic,small

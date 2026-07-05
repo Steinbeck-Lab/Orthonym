@@ -1659,7 +1659,8 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
       -NH2 -> amino (handled as fg_only, not here)
       -NH-CH3 -> methylamino
       -NH-phenyl -> anilino (retained name for phenylamino)
-      -NH-C(=O)-R -> acylamino (e.g., acetylamino, hexanoylamino)
+      -NH-C(=O)-R -> amido family (acetamido, hexanamido; P-66.1.1.4.3
+                     method (1) = PIN), legacy acylamino fallback otherwise
       -N(CH3)2 -> dimethylamino
 
     Args:
@@ -1706,6 +1707,18 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                     has_carbonyl = True
                     break
         if has_carbonyl:
+            # Wave2 T1c (P-66.1.1.4.3): method (1) amido prefix is the PIN
+            # (formamido/acetamido/{stem}anamido). The strict builder emits
+            # only for an exact -NH-CO-(unbranched saturated carbon chain)
+            # branch with full atom coverage; anything else keeps the legacy
+            # method-(2) fallback below.
+            from .substituent_naming import linear_acyl_amido_prefix
+            amido_name = linear_acyl_amido_prefix(
+                mol, branch_start, attach_idx, frag_atoms
+            )
+            if amido_name:
+                return amido_name
+
             # Count carbons in the acyl R-group (excluding the carbonyl C and =O)
             acyl_carbons = 0
             visited = set()
@@ -1725,9 +1738,8 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                         stack_c.append(n.GetIdx())
             if acyl_carbons >= 1:
                 # acyl_carbons includes the carbonyl C
-                # IUPAC acyl nomenclature: chain_prefix + "anoyl" + "amino"
-                # e.g., 2C = ethanoyl + amino, 3C = propanoyl + amino
-                # Special case: 1C = formyl (methanoyl), but formylamino is rare
+                # Legacy fallback (method (2), non-preferred):
+                # chain_prefix + "anoyl" + "amino"
                 acyl_name = get_chain_prefix(acyl_carbons) + "anoylamino"
                 return acyl_name
 

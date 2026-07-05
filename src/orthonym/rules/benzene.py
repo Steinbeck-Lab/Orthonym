@@ -870,6 +870,37 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
             'amine_candidate': {'suffix_name': 'amine', 'n_substituents': []},
         }
 
+    # Wave2 T1c (P-66.1.1.4.3): ring-attached amide N (R-CO-NH-ring) takes
+    # the amido-family prefix — formamido / acetamido / {stem}anamido /
+    # benzamido — method (1) generates the PIN (4-formamidobenzoic acid).
+    # Without this recognizer the branch fell to the generic fragment
+    # fallback below, which named it as if attached at the carbonyl C
+    # ('carbamoyl'), claiming a different molecule. Fail closed (None) for
+    # anything but a clean -N(H)-CO-R branch.
+    if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+        _acyl_c = neighbors[0]
+        _has_c_o = any(
+            nb.GetSymbol() == 'O' and nb.GetIdx() not in ring_atoms
+            and mol.GetBondBetweenAtoms(
+                _acyl_c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+            for nb in _acyl_c.GetNeighbors()
+        )
+        if _has_c_o:
+            sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+            from ..assembly.substituent_naming import (
+                acyl_amido_prefix_from_branch,
+            )
+            _amido = acyl_amido_prefix_from_branch(
+                mol, n_idx, _acyl_c.GetIdx(), sub_atoms
+            )
+            if _amido:
+                _complex = any(ch.isdigit() for ch in _amido) or '-' in _amido
+                return {
+                    'name': f'({_amido})' if _complex else _amido,
+                    'atoms': sub_atoms,
+                    'is_complex': _complex,
+                }
+
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
     # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':

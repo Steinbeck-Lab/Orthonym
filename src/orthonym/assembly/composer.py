@@ -6070,9 +6070,12 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
     Pattern: nitrogen bonded to chain, also bonded to a carbonyl carbon C(=O),
     which in turn is bonded to an alkyl chain R.
 
-    Returns name like "(hexacosenoylamino)" for -NH-C(=O)-C25H51.
-    Enclosing parens included for IUPAC compound substituent formatting.
-    OPSIN requires: 2-(pentanoylamino)pentanedioic acid.
+    P-66.1.1.4.3 method (1) generates the PIN: the amido-family prefix
+    (formamido/acetamido/{stem}anamido, benzamido for ring acyls), returned
+    BARE — amido prefixes are simple and take no enclosing marks
+    (4-formamidobenzoic acid). Locant-bearing forms self-wrap:
+    '(4-methylbenzamido)'. Branches the strict amido builder cannot fully
+    describe keep the legacy method-(2) '({acyl}amino)' fallback.
     """
     chain_set = set(principal_chain)
     sub_set = set(sub_atoms)
@@ -6260,6 +6263,22 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                     from .fragment_naming import name_fragment_recursively
                     _an = name_fragment_recursively(_fs)
                     if _an:
+                        # Wave2 T1c (P-66.1.1.4.3): method (1) amido prefix
+                        # is the PIN — benzamido, (4-methylbenzamido),
+                        # (naphthalene-1-carboxamido). Only when the walked
+                        # acyl fragment covers the whole substituent (the
+                        # carbon BFS above drops heteroatom decorations, and
+                        # a name must never claim atoms it dropped).
+                        if set(sub_atoms) == _af | {idx}:
+                            from .substituent_naming import (
+                                acid_name_to_amido_prefix,
+                            )
+                            _amido = acid_name_to_amido_prefix(_an)
+                            if _amido:
+                                if (any(ch.isdigit() for ch in _amido)
+                                        or '-' in _amido):
+                                    return f"({_amido})"
+                                return _amido
                         from ..decomposition.fragment_assembly import (
                             _acid_to_acyl,
                         )
@@ -6268,6 +6287,19 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                             return f"({_ac}amino)"
             except Exception:
                 pass  # Fall through to linear chain logic
+
+        # Wave2 T1c (P-66.1.1.4.3): method (1) — the amido-family prefix
+        # (formamido/acetamido/{stem}anamido) is the PIN; the acylamino form
+        # below is method (2), not preferred. The strict builder emits only
+        # when the branch is exactly -NH-CO-(unbranched saturated carbon
+        # chain) with every substituent atom covered, so it can never claim
+        # atoms it dropped. Impure branches keep the legacy fallback (which
+        # the self-consistency gate already blocks; the Tier-2 claimed-atom
+        # mask owns that class).
+        from .substituent_naming import linear_acyl_amido_prefix
+        _amido_nm = linear_acyl_amido_prefix(mol, carbonyl_c, idx, sub_atoms)
+        if _amido_nm:
+            return _amido_nm
 
         # Count carbons from carbonyl C through C-C bonds only
         # (don't traverse through N to reach other peptide fragments)
@@ -6278,8 +6310,9 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         if acyl_carbons == 0:
             acyl_carbons = 1  # at minimum the carbonyl C
 
-        # Build acylamino name: (prefixanoylamino) with enclosing parens
-        # OPSIN requires: 2-(pentanoylamino)pentanedioic acid
+        # Legacy fallback (method (2), non-preferred): (prefixanoylamino)
+        # with enclosing parens — kept only for branches the strict amido
+        # builder cannot fully describe.
         try:
             acyl_prefix = get_chain_prefix(acyl_carbons)
             return f"({acyl_prefix}anoylamino)"

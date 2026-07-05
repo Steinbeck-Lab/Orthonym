@@ -1104,6 +1104,16 @@ def alpha_sort_key(substituent_name: str) -> str:
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
             if remainder:
+                # Wave2 T1c: do NOT strip when the "multiplier" is really the
+                # start of a numeric CHAIN STEM — there it is part of the name
+                # and alphabetizes (P-14.5.2): tridecyl/octadecyl ('tri'/'octa'
+                # + 'dec...'), pentacosyl ('cos...'), triacontyl ('acont...'),
+                # pentanamido/octadecanamido ('penta'/'octa' + 'nam...'),
+                # decanoyloxy ('deca' + 'noyl...'). A genuine multiplied
+                # prefix never continues with these stems.
+                if remainder.startswith(
+                        ('dec', 'cos', 'cont', 'acont', 'nam', 'noyl')):
+                    return text
                 return remainder
 
     return text

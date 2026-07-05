@@ -310,7 +310,7 @@ class TestNAcylAmideNoCarbamoyl:
     """
 
     def test_n_acetylglycine_no_carbamoyl(self):
-        """CC(=O)NCC(=O)O -> 2-(ethanoylamino)ethanoic acid, no carbamoyl."""
+        """CC(=O)NCC(=O)O -> 2-acetamidoethanoic acid, no carbamoyl (P-66.1.1.4.3)."""
         result = name_compound("CC(=O)NCC(=O)O")
         assert result is not None
         assert "carbamoyl" not in result, (

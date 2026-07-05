@@ -104,46 +104,45 @@ class TestAnilinoPrefix:
 
 
 class TestAcylaminoBrackets:
-    """Verify acylamino prefixes use bracketed form for OPSIN compatibility."""
+    """N-acyl prefixes use the amido form (P-66.1.1.4.3 method (1) = PIN).
+
+    Wave2 T1c: the method-(2) '(pentanoylamino)' bracketed forms were
+    replaced by the preferred amido family — formamido/acetamido/
+    {stem}anamido — which are simple prefixes and take NO enclosing marks
+    (Blue Book: 4-formamidobenzoic acid, 4-acetamidobenzoic acid).
+    """
 
     @pytest.mark.unit
-    def test_acylamino_bracketed_short_chain(self):
-        """Short acylamino group (C2) should have brackets."""
-        # 2-(acetylamino)acetic acid: glycine with acetyl
+    def test_amido_short_chain(self):
+        """C2 acyl on glycine -> acetamido, unbracketed."""
         name = name_compound("CC(=O)NCC(=O)O")
-        # The acylamino prefix should be in brackets
-        assert name is not None
-        # Verify no bare unbracketed acetylamino
-        if "acetylamino" in name:
-            assert "(acetylamino)" in name or "acetyl" in name, (
-                f"Expected bracketed acetylamino in '{name}'"
-            )
+        assert name == "2-acetamidoethanoic acid", (
+            f"Expected '2-acetamidoethanoic acid', got '{name}'"
+        )
 
     @pytest.mark.unit
-    def test_acylamino_bracketed_long_chain(self):
-        """C5 acylamino group should produce '(pentanoylamino)' with brackets."""
-        # 2-(pentanoylamino)pentanedioic acid
+    def test_amido_long_chain(self):
+        """C5 acyl on glutamic acid -> pentanamido, unbracketed."""
         name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        assert "(pentanoylamino)" in name, f"Expected '(pentanoylamino)' in '{name}'"
+        assert name == "2-pentanamidopentanedioic acid", (
+            f"Expected '2-pentanamidopentanedioic acid', got '{name}'"
+        )
 
     @pytest.mark.unit
-    def test_acylamino_bracketed_medium_chain(self):
-        """C3 acylamino group should have brackets."""
-        # propanoylamino on a chain
+    def test_amido_medium_chain(self):
+        """C3 acyl on GABA -> propanamido, unbracketed."""
         name = name_compound("CCC(=O)NCCCC(=O)O")
-        assert name is not None
-        if "propanoylamino" in name:
-            assert "(propanoylamino)" in name, (
-                f"Expected '(propanoylamino)' with brackets in '{name}'"
-            )
+        assert name == "4-propanamidobutanoic acid", (
+            f"Expected '4-propanamidobutanoic acid', got '{name}'"
+        )
 
     @pytest.mark.unit
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")
-    def test_acylamino_opsin_parses(self):
-        """OPSIN should parse names with bracketed acylamino prefixes."""
+    def test_amido_opsin_parses(self):
+        """OPSIN should parse names with amido prefixes."""
         name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        if "(pentanoylamino)" in name:
-            assert opsin_parses(name), f"OPSIN failed to parse '{name}'"
+        assert "pentanamido" in name, f"Expected 'pentanamido' in '{name}'"
+        assert opsin_parses(name), f"OPSIN failed to parse '{name}'"
 
 
 # ---------------------------------------------------------------------------

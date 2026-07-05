@@ -1002,6 +1002,227 @@ _RETAINED_NAME_PREFIX = {
 }
 
 
+# ============================================================================
+# Acyl-nitrogen prefix subsystem — IUPAC P-66.1.1.4.3 (Wave 2 T1c)
+# ============================================================================
+# For R-CO-NH- on a parent with a senior characteristic group, the preferred
+# prefix (method (1)) is the amide name with its final 'e' changed to 'o':
+# amide -> amido, carboxamide -> carboxamido. Method (2) '{acyl}amino'
+# ('pentanoylamino', 'benzoylamino') does NOT generate preferred IUPAC names.
+# Blue Book examples: 4-formamidobenzoic acid (PIN), (4-acetamido-3-
+# methylphenyl)arsonic acid (PIN), 4-benzamidobenzene-1-sulfonic acid (PIN).
+
+# formamide/acetamide are retained amide PINs (P-66.1.1.1), so their amido
+# prefixes keep the retained stems instead of 'methanamido'/'ethanamido'.
+_AMIDO_BY_ACYL_CARBONS = {1: 'formamido', 2: 'acetamido'}
+
+_ACID_TO_AMIDO_RETAINED = {
+    'formic acid': 'formamido',
+    'acetic acid': 'acetamido',
+    # benzoic acid resolves via the generic '...oic acid' rule -> benzamido
+}
+
+
+def acyl_carbons_to_amido_prefix(acyl_carbons: int) -> Optional[str]:
+    """P-66.1.1.4.3 method (1) prefix for a linear saturated acyl R-CO-.
+
+    ``acyl_carbons`` counts the acyl carbons INCLUDING the carbonyl carbon:
+    1 -> 'formamido', 2 -> 'acetamido', n>=3 -> '{stem}anamido'
+    (propanamido, butanamido, ...). Returns None when no chain stem exists.
+    """
+    if acyl_carbons in _AMIDO_BY_ACYL_CARBONS:
+        return _AMIDO_BY_ACYL_CARBONS[acyl_carbons]
+    if acyl_carbons < 3:
+        return None
+    try:
+        from ..data.chain_names import get_chain_prefix
+        stem = get_chain_prefix(acyl_carbons)
+    except (ImportError, ValueError, KeyError):
+        return None
+    return f"{stem}anamido" if stem else None
+
+
+def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
+    """P-66.1.1.4.3 method (1): acid name -> amido prefix via the amide name.
+
+    'benzoic acid' -> 'benzamido', 'pentanoic acid' -> 'pentanamido',
+    'naphthalene-1-carboxylic acid' -> 'naphthalene-1-carboxamido'
+    (the amide names benzamide/pentanamide/naphthalene-1-carboxamide have
+    their final 'e' changed to 'o'). Returns None when no safe transform
+    exists — poly-acids ('...dioic acid', '...dicarboxylic acid') and
+    functional-replacement acids fail closed because a single amido prefix
+    cannot describe them.
+    """
+    if not acid_name:
+        return None
+    name = acid_name.strip()
+    low = name.lower()
+    retained = _ACID_TO_AMIDO_RETAINED.get(low)
+    if retained:
+        return retained
+    # Functional-replacement / peroxy acids: the plain amido transform would
+    # misdescribe them; fail closed (callers keep their legacy fallback).
+    if low.endswith(('thioic acid', 'selenoic acid', 'telluroic acid',
+                     'peroxoic acid', 'imidic acid', 'ohydroximic acid')):
+        return None
+    if low.endswith('carboxylic acid'):
+        stem = name[:-len('carboxylic acid')]
+        # 'X-1,2-dicarboxylic acid' etc. has >1 acid group; reject.
+        if re.search(r'(?:di|tri|tetra|penta|hexa)[-,\d]*$', stem.lower()):
+            return None
+        return stem + 'carboxamido'
+    if low.endswith('dioic acid'):
+        return None  # two acid groups — not describable by one amido prefix
+    if low.endswith('oic acid'):
+        return name[:-len('oic acid')] + 'amido'
+    return None
+
+
+def linear_acyl_amido_prefix(mol, carbonyl_c: int, n_idx: int,
+                             sub_atoms) -> Optional[str]:
+    """Amido prefix (P-66.1.1.4.3 method (1)) for an N-acyl substituent.
+
+    Emits 'formamido' (HCO-NH-), 'acetamido' (CH3-CO-NH-) or
+    '{stem}anamido' (>=3 C) ONLY when the substituent is exactly
+    -NH-CO-R with R an unbranched, saturated, acyclic, all-carbon chain
+    and every substituent atom accounted for (the N, the carbonyl O and
+    the chain carbons — nothing dropped). Returns None otherwise, so the
+    strict builder can never mint a name for a branch it cannot fully
+    describe; callers keep their legacy fallback for those.
+
+    Args:
+        mol: RDKit Mol.
+        carbonyl_c: atom index of the acyl C=O carbon.
+        n_idx: atom index of the amide nitrogen (the attachment atom).
+        sub_atoms: all atom indices of the substituent (including n_idx).
+    """
+    sub_set = set(sub_atoms)
+    if carbonyl_c not in sub_set or n_idx not in sub_set:
+        return None
+    ring_info = mol.GetRingInfo()
+    branch = set()
+    carbonyl_o = None
+    stack = [carbonyl_c]
+    while stack:
+        a_idx = stack.pop()
+        if a_idx in branch or a_idx == n_idx:
+            continue
+        if a_idx not in sub_set:
+            return None  # branch escapes the substituent
+        atom = mol.GetAtomWithIdx(a_idx)
+        sym = atom.GetSymbol()
+        if sym == 'O':
+            # allow exactly the carbonyl =O on the acyl carbon
+            bond = mol.GetBondBetweenAtoms(carbonyl_c, a_idx)
+            if (carbonyl_o is None and bond is not None
+                    and bond.GetBondTypeAsDouble() == 2.0):
+                carbonyl_o = a_idx
+                branch.add(a_idx)
+                continue
+            return None
+        if sym != 'C':
+            return None
+        if atom.GetIsAromatic() or ring_info.NumAtomRings(a_idx) > 0:
+            return None
+        if atom.GetFormalCharge() or atom.GetNumRadicalElectrons():
+            return None
+        branch.add(a_idx)
+        for nbr in atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni == n_idx or ni in branch:
+                continue
+            bond = mol.GetBondBetweenAtoms(a_idx, ni)
+            if (nbr.GetSymbol() == 'C' and bond is not None
+                    and bond.GetBondTypeAsDouble() != 1.0):
+                return None  # unsaturated acyl (prop-2-enamido) not built here
+            stack.append(ni)
+    if carbonyl_o is None:
+        return None
+    # every substituent atom must be the N, the carbonyl O, or a chain C
+    if sub_set != branch | {n_idx}:
+        return None
+    carbons = [a for a in branch
+               if mol.GetAtomWithIdx(a).GetSymbol() == 'C']
+    # unbranched: each chain carbon has <=2 carbon neighbours in-branch and
+    # the acyl carbon at most one
+    for c_idx in carbons:
+        c_nbrs = sum(
+            1 for nbr in mol.GetAtomWithIdx(c_idx).GetNeighbors()
+            if nbr.GetIdx() in branch and nbr.GetSymbol() == 'C'
+        )
+        if c_nbrs > (1 if c_idx == carbonyl_c else 2):
+            return None
+    return acyl_carbons_to_amido_prefix(len(carbons))
+
+
+def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
+                                  sub_atoms) -> Optional[str]:
+    """P-66.1.1.4.3 method (1) amido prefix for a full N-attached acyl branch.
+
+    ``sub_atoms`` is the ENTIRE substituent (the amide N plus the whole acyl
+    fragment). Fast path: :func:`linear_acyl_amido_prefix`. General path
+    (ring / substituted acyls): take ALL branch atoms except the N as the
+    acyl fragment — nothing can be silently dropped — convert it to the
+    corresponding acid by adding an -OH at the carbonyl carbon, name that
+    acid recursively, then apply :func:`acid_name_to_amido_prefix`
+    ('benzoic acid' -> 'benzamido', '4-methylbenzoic acid' ->
+    '4-methylbenzamido'). Returns the BARE prefix (callers add enclosing
+    marks for locant-bearing forms) or None (fail closed).
+    """
+    sub_set = set(sub_atoms)
+    if n_idx not in sub_set or carbonyl_c not in sub_set:
+        return None
+
+    linear = linear_acyl_amido_prefix(mol, carbonyl_c, n_idx, sub_atoms)
+    if linear:
+        return linear
+
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    # the N must connect to the branch ONLY through the acyl carbon
+    # (-N(H)-CO-R; N-substituted amido forms are not built here)
+    in_branch_nbrs = {
+        nb.GetIdx() for nb in n_atom.GetNeighbors() if nb.GetIdx() in sub_set
+    }
+    if in_branch_nbrs != {carbonyl_c}:
+        return None
+    # confirm the carbonyl =O inside the branch
+    has_carbonyl_o = any(
+        nb.GetSymbol() == 'O' and nb.GetIdx() in sub_set
+        and mol.GetBondBetweenAtoms(carbonyl_c, nb.GetIdx()) is not None
+        and mol.GetBondBetweenAtoms(
+            carbonyl_c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+        for nb in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+    )
+    if not has_carbonyl_o:
+        return None
+    # the fragment must be closed: every acyl atom's neighbours stay inside
+    # the substituent (otherwise MolFragmentToSmiles would silently cut a
+    # bond and the name would describe a different molecule)
+    for a_idx in sub_set - {n_idx}:
+        for nb in mol.GetAtomWithIdx(a_idx).GetNeighbors():
+            if nb.GetIdx() not in sub_set:
+                return None
+    try:
+        rw = Chem.RWMol(mol)
+        oh = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(carbonyl_c, oh, Chem.BondType.SINGLE)
+        hh = rw.AddAtom(Chem.Atom(1))
+        rw.AddBond(oh, hh, Chem.BondType.SINGLE)
+        frag_atoms = sorted((sub_set - {n_idx}) | {oh, hh})
+        frag_smi = Chem.MolFragmentToSmiles(rw, frag_atoms, canonical=True)
+        if not frag_smi:
+            return None
+        from .fragment_naming import name_fragment_recursively
+        acid_name = name_fragment_recursively(frag_smi)
+        if not acid_name:
+            return None
+        return acid_name_to_amido_prefix(acid_name)
+    except Exception:
+        return None
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
 
