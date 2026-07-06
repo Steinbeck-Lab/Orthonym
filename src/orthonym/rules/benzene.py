@@ -2434,13 +2434,27 @@ def _assemble_benzene_with_suffix(
             atom_to_locant, oriented_ring
         )
 
-    # C1 (P-65.3.1 / P-66.3.1.1): single sulfonohydrazide / carbohydrazide on
-    # benzene. Renumber relative to the group (position 1) and cite the locant of
-    # any other substituent, mirroring the benzenesulfonamide path:
-    # 'benzenesulfonohydrazide', '4-methylbenzenesulfonohydrazide',
-    # 'benzenecarbohydrazide'. (Multi-instance falls through to the general
-    # 'benzene-1,4-dicarbohydrazide' path below.)
-    if chosen_suffix in ('sulfonohydrazide', 'carbohydrazide') and chosen_count == 1:
+    # Wave2 ring-hydrazide (P-66.3.1.2.1): a single carbohydrazide on benzene
+    # keeps the RETAINED acyl stem — 'benzohydrazide' (PIN, substitutable the
+    # same way as benzamide) — not the systematic 'benzenecarbohydrazide':
+    # 'benzohydrazide', '4-methylbenzohydrazide'. (Multi-instance falls through
+    # to the general 'benzene-1,4-dicarbohydrazide' path below, P-66.3.1.2.2.)
+    if chosen_suffix == 'carbohydrazide' and chosen_count == 1:
+        if not remaining_prefix_groups:
+            return "benzohydrazide"
+        renumbered_groups = _renumber_relative_to(
+            remaining_prefix_groups, chosen_locants[0]
+        )
+        prefix_part = _build_prefix_string_with_locants(
+            renumbered_groups, mono_needs_locant=True
+        )
+        return f"{prefix_part}benzohydrazide"
+
+    # C1 (P-65.3.1): single sulfonohydrazide on benzene. Renumber relative to
+    # the group (position 1) and cite the locant of any other substituent,
+    # mirroring the benzenesulfonamide path: 'benzenesulfonohydrazide',
+    # '4-methylbenzenesulfonohydrazide'.
+    if chosen_suffix == 'sulfonohydrazide' and chosen_count == 1:
         if not remaining_prefix_groups:
             return f"benzene{chosen_suffix}"
         renumbered_groups = _renumber_relative_to(

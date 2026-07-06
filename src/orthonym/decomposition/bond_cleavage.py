@@ -503,6 +503,19 @@ def find_cleavable_bonds(mol) -> List[Dict]:
             if _atoms_in_same_ring(mol, carbonyl_c, nitrogen):
                 continue
 
+            # Wave2 ring-hydrazide (P-66.3.1.1): a C(=O)-N bond whose nitrogen
+            # belongs to an N-N unit is a HYDRAZIDE bond, not an amide bond.
+            # Functional-class cleavage cannot express which nitrogen carries
+            # the acyl group ('N-benzoylphenylhydrazine' names the WRONG
+            # constitution on an unsymmetric hydrazine) and the Blue Book
+            # rejects acyl-hydrazine names outright ['not
+            # (cyclohexanecarbonyl)hydrazine', 'not 1,2-dibenzoylhydrazine'].
+            # The substitutive hydrazide assemblers own this class -- skip so
+            # the dispatch cascade reaches them.
+            if any(nb.GetSymbol() == 'N'
+                   for nb in mol.GetAtomWithIdx(nitrogen).GetNeighbors()):
+                continue
+
             # Get the bond between carbonyl C and N
             bond = mol.GetBondBetweenAtoms(carbonyl_c, nitrogen)
             if bond and bond.GetIdx() not in seen_bond_indices:

@@ -1013,8 +1013,15 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         or (features.principal_group == 'carboxylic_acid'
             and 'hydrazide' in getattr(features, 'functional_groups', {}))
     )
-    if _hz_trigger and not getattr(features, 'is_cyclic', False):
-        _hz_name = _assemble_hydrazide_name(features, style)
+    if _hz_trigger:
+        # Ring parents route through the ring assembler (recursion on the
+        # des-N-substituted base: N'-methylbenzohydrazide,
+        # N-methylcyclohexanecarbohydrazide); acyclic parents keep the T3d
+        # chain assembler. Both are fail-closed (None -> general path).
+        if getattr(features, 'is_cyclic', False):
+            _hz_name = _assemble_ring_hydrazide_name(features, style)
+        else:
+            _hz_name = _assemble_hydrazide_name(features, style)
         if _hz_name:
             pool = get_current_pool()
             pool.add(_hz_name, "hydrazide", features)
@@ -3879,6 +3886,35 @@ def _find_amidine_carbon(mol, pg_atoms):
     return None
 
 
+def _hydrazide_n_sub_names(mol, n_atom_idx, exclude):
+    """Wave2 T3d/ring-hydrazide shared collector: the C-substituent names on a
+    hydrazide nitrogen, plus the atom indices they claim.
+
+    Returns ``(names, atoms)``; ``(None, None)`` fail-closed when any
+    substituent on the nitrogen is not a nameable pure-carbon fragment
+    (N-N-N / N-O / unnameable branches). An unsubstituted nitrogen returns
+    ``([], [])``.
+    """
+    from ..rules.benzene import _collect_pure_alkyl
+    from .substituent_naming import name_substituent_fragment
+    names, atoms = [], []
+    for nb in mol.GetAtomWithIdx(n_atom_idx).GetNeighbors():
+        ni = nb.GetIdx()
+        if ni in exclude:
+            continue
+        if nb.GetSymbol() != 'C':
+            return None, None  # N-N-N / N-O etc. out of scope
+        alk, cc = _collect_pure_alkyl(mol, ni, set(exclude) | {n_atom_idx})
+        if not alk or cc == 0:
+            return None, None
+        nm = name_substituent_fragment(mol, alk, ni, list(set(exclude) | {n_atom_idx}))
+        if not nm:
+            return None, None
+        names.append(nm)
+        atoms.extend(alk)
+    return names, atoms
+
+
 def _assemble_hydrazide_name(features: Any, style: str):
     """Wave2 T3d (P-66.3.3 / P-66.3.4 / P-66.3.5.1): assemble an acyclic
     N/N'-substituted (thio)hydrazide, or a hydrazinecarboxylic acid.
@@ -3892,8 +3928,6 @@ def _assemble_hydrazide_name(features: Any, style: str):
         (the C bears =O + OH + the hydrazine N; no R carbon).
     """
     from ..rules.benzene import _collect_pure_alkyl
-    from .substituent_naming import name_substituent_fragment
-    from .naming_utils import _wrap_n_substituent
     mol = features.mol
     pg = features.principal_group
     pg_atoms = features.principal_group_atoms
@@ -3955,28 +3989,11 @@ def _assemble_hydrazide_name(features: Any, style: str):
         # R chain atoms belong to the parent, not an N-substituent.
         pass
 
-    def _n_sub_names(n_atom_idx, exclude):
-        names = []
-        for nb in mol.GetAtomWithIdx(n_atom_idx).GetNeighbors():
-            ni = nb.GetIdx()
-            if ni in exclude:
-                continue
-            if nb.GetSymbol() != 'C':
-                return None  # N-N-N / N-O etc. out of scope
-            alk, cc = _collect_pure_alkyl(mol, ni, set(exclude) | {n_atom_idx})
-            if not alk or cc == 0:
-                return None
-            nm = name_substituent_fragment(mol, alk, ni, list(set(exclude) | {n_atom_idx}))
-            if not nm:
-                return None
-            names.append(nm)
-        return names
-
     # --- hydrazinecarboxylic acid (no R carbon; C = OH-bearing acid) ---
     if r_carbon is None and dbl_o == 1 and oh_o == 1 and dbl_s == 0:
         # N = the N bonded to the C (inner); N' = the terminal N (P-66.3.5.1).
-        inner_subs = _n_sub_names(n_inner, core)
-        term_subs = _n_sub_names(n_term, core)
+        inner_subs, _ = _hydrazide_n_sub_names(mol, n_inner, core)
+        term_subs, _ = _hydrazide_n_sub_names(mol, n_term, core)
         if inner_subs is None or term_subs is None:
             return None
         prefix = _format_hydrazide_nn_prefix(inner_subs, term_subs)
@@ -3994,8 +4011,8 @@ def _assemble_hydrazide_name(features: Any, style: str):
     else:
         return None
 
-    inner_subs = _n_sub_names(n_inner, core)
-    term_subs = _n_sub_names(n_term, core)
+    inner_subs, _ = _hydrazide_n_sub_names(mol, n_inner, core)
+    term_subs, _ = _hydrazide_n_sub_names(mol, n_term, core)
     if inner_subs is None or term_subs is None:
         return None
     if not inner_subs and not term_subs:
@@ -4046,28 +4063,200 @@ def _assemble_hydrazide_name(features: Any, style: str):
 def _format_hydrazide_nn_prefix(inner_subs, term_subs):
     """Wave2 T3d: build the italic-N / N' substituent prefix for a hydrazide.
     ``inner_subs`` sit on N (the nitrogen bonded to the C=O/C=S / acid C);
-    ``term_subs`` on N' (the terminal nitrogen). P-66.3.3: N before N',
-    alphabetical within, di- for duplicates on one N."""
+    ``term_subs`` on N' (the terminal nitrogen). P-66.3.3 / P-16.3.3:
+    identical substituents share one multiplier ACROSS the two nitrogens
+    ("N,N'-dimethyl...", BB 'N1,N'4-dimethylnaphthalene-1,4-dicarbohydrazide'
+    style), distinct substituents are cited alphabetically
+    ("N'-acetyl-N'-ethyl-N-methylbutanehydrazide", P-66.3.3.2)."""
     from .naming_utils import _wrap_n_substituent, get_multiplier_prefix, alpha_sort_key
-    parts = []  # (sort_key, rendered)
+    by_name: Dict[str, List[str]] = {}
     for locant, subs in (("N", inner_subs), ("N'", term_subs)):
-        if not subs:
-            continue
-        from collections import Counter
-        for nm, cnt in sorted(Counter(subs).items(), key=lambda kv: alpha_sort_key(kv[0])):
-            wrapped = _wrap_n_substituent(nm)
-            if cnt == 1:
-                parts.append((alpha_sort_key(nm), f"{locant}-{wrapped}"))
-            else:
-                mp = get_multiplier_prefix(cnt, nm)
-                loc = ",".join([locant] * cnt)
-                parts.append((alpha_sort_key(nm), f"{loc}-{mp}{wrapped}"))
-    if not parts:
+        for nm in subs or []:
+            by_name.setdefault(nm, []).append(locant)
+    if not by_name:
         return ""
+    parts = []  # (sort_key, rendered)
+    for nm, locs in by_name.items():
+        locs.sort(key=lambda l: (l.count("'"), l))  # N before N'
+        wrapped = _wrap_n_substituent(nm)
+        loc_str = ",".join(locs)
+        if len(locs) == 1:
+            parts.append((alpha_sort_key(nm), f"{loc_str}-{wrapped}"))
+        else:
+            mp = get_multiplier_prefix(len(locs), nm)
+            parts.append((alpha_sort_key(nm), f"{loc_str}-{mp}{wrapped}"))
     parts.sort(key=lambda p: p[0])
     # No trailing hyphen: the last N-substituent prepends directly to the base
     # ('N-ethyl-N'-methylacetohydrazide', 'N'-methylethanehydrazide').
     return "-".join(p[1] for p in parts)
+
+
+def _assemble_ring_hydrazide_name(features: Any, style: str):
+    """Wave2 ring-hydrazide (P-66.3.1.1 / P-66.3.1.2.1 / P-66.3.3): assemble a
+    ring-parent N/N'-substituted (thio)hydrazide — N'-methylbenzohydrazide,
+    N-methylcyclohexanecarbohydrazide, N'-methylpyridine-4-carbohydrazide.
+
+    Builds the base name by deleting the N-substituents (RWMol surgery) and
+    re-entering the full namer — the substitutive-oxime re-entry pattern — then
+    prepends the italic-N/N' prefix (N = the nitrogen bonded to the acyl C,
+    N' = the terminal nitrogen). Recursion terminates because the
+    des-N-substituted molecule has no N-substituents, for which this assembler
+    returns None (the retained/ring paths already name it correctly).
+
+    FAIL-CLOSED scope (returns None -> ring paths emit the bare suffix and the
+    validity gate keeps the result honest):
+      * exactly one (thio)hydrazide match; no stereocenters / double-bond
+        stereo (the shared fragment namers do not emit descriptors);
+      * the acyl C attaches to a ring CARBON (N-acyl ring hydrazides such as
+        N-substituted piperidine-1-carbohydrazide are deferred);
+      * every heavy atom is claimed by ring system + hydrazide core + N-subs.
+        A ring-substituted AND N-substituted combination needs the combined
+        alphanumeric ordering of italic-N + numeric locants (P-14.5.2), which
+        the prefix-prepend model cannot express — deferred, stays unknown;
+      * the recursive base name is a bare (thio)hydrazide ring parent
+        ('benzohydrazide' retained per P-66.3.1.2.1, or
+        '{ring}(-<loc>-)carbo(thio)hydrazide'), matching the suffix family of
+        the perceived group.
+    """
+    import re
+    from rdkit import Chem
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms or len(pg_atoms) != 1:
+        return None
+    if getattr(features, 'stereocenters', None) or \
+            getattr(features, 'double_bond_stereo', None):
+        return None
+
+    # Locate the characteristic C (double-bonded chalcogen + N-N), then
+    # classify its neighbors. Mirrors _assemble_hydrazide_name's locator.
+    match = pg_atoms[0]
+    c_idx = None
+    for a in match:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C':
+            continue
+        has_dbl_chalc = any(
+            nb.GetSymbol() in ('O', 'S')
+            and mol.GetBondBetweenAtoms(a, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+            for nb in at.GetNeighbors())
+        has_nn = any(nb.GetSymbol() == 'N' for nb in at.GetNeighbors())
+        if has_dbl_chalc and has_nn:
+            c_idx = a
+            break
+    if c_idx is None:
+        return None
+    c_atom = mol.GetAtomWithIdx(c_idx)
+
+    chalc = None
+    suffix_word = None
+    r_attach = None
+    n_inner = None
+    for nb in c_atom.GetNeighbors():
+        b = mol.GetBondBetweenAtoms(c_idx, nb.GetIdx())
+        sym = nb.GetSymbol()
+        if sym in ('O', 'S') and b.GetBondTypeAsDouble() == 2.0:
+            if chalc is not None:
+                return None
+            chalc = nb.GetIdx()
+            suffix_word = 'hydrazide' if sym == 'O' else 'thiohydrazide'
+        elif sym == 'C' and b.GetBondTypeAsDouble() == 1.0:
+            if r_attach is not None:
+                return None
+            r_attach = nb.GetIdx()
+        elif sym == 'N' and b.GetBondTypeAsDouble() == 1.0:
+            # the inner hydrazide N must itself bear the terminal N
+            if n_inner is not None:
+                return None
+            if not any(x.GetSymbol() == 'N' for x in nb.GetNeighbors()):
+                return None
+            n_inner = nb.GetIdx()
+        else:
+            return None
+    if chalc is None or n_inner is None or r_attach is None:
+        return None
+    # ring-C attachment only (the acyclic case belongs to the chain assembler)
+    if mol.GetRingInfo().NumAtomRings(r_attach) == 0:
+        return None
+
+    n_term = None
+    for nb in mol.GetAtomWithIdx(n_inner).GetNeighbors():
+        if nb.GetSymbol() == 'N' and nb.GetIdx() != c_idx:
+            if n_term is not None:
+                return None
+            n_term = nb.GetIdx()
+    if n_term is None:
+        return None
+
+    core = {c_idx, n_inner, n_term}
+    inner_subs, inner_atoms = _hydrazide_n_sub_names(mol, n_inner, core)
+    term_subs, term_atoms = _hydrazide_n_sub_names(mol, n_term, core)
+    if inner_subs is None or term_subs is None:
+        return None
+    if not inner_subs and not term_subs:
+        return None  # bare ring hydrazide -> retained/ring paths already correct
+
+    # Coverage guard: ring-system atoms ONLY (no decorations) + hydrazide core
+    # + N-substituent atoms must claim every heavy atom, so a ring substituent
+    # (or any second FG) leaves an unclaimed atom and we decline.
+    ri = mol.GetRingInfo()
+    ring_sys = set()
+    stack = [r_attach]
+    while stack:
+        i = stack.pop()
+        if i in ring_sys:
+            continue
+        ring_sys.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni not in ring_sys and ri.NumAtomRings(ni) > 0:
+                stack.append(ni)
+    claimed = (core | {chalc} | ring_sys
+               | set(inner_atoms) | set(term_atoms))
+    if any(a.GetIdx() not in claimed for a in mol.GetAtoms()):
+        return None
+
+    # Base = the des-N-substituted molecule, named through the full pipeline
+    # (retained lookup gives 'benzohydrazide'; ring suffix paths give
+    # '{ring}carbo(thio)hydrazide'). Deterministic: canonical SMILES in,
+    # descending-index atom removal.
+    nsub_atoms = sorted(set(inner_atoms) | set(term_atoms), reverse=True)
+    try:
+        em = Chem.RWMol(mol)
+        for a in nsub_atoms:
+            em.RemoveAtom(a)
+        base_mol = em.GetMol()
+        Chem.SanitizeMol(base_mol)
+        base_smiles = Chem.MolToSmiles(base_mol)
+    except Exception:
+        return None
+    from ..namer import name_compound as _name_compound
+    try:
+        base = _name_compound(base_smiles, style=style)
+    except Exception:
+        return None
+    if not base:
+        return None
+
+    # Validate the base shape: a bare ring (thio)hydrazide parent of the SAME
+    # suffix family — no substituent prefixes, brackets or multiplied suffixes.
+    if base == 'benzohydrazide':
+        base_is_thio = False
+    else:
+        m = re.match(
+            r"^(?:\d+(?:,\d+)*-)?(?:\d+H-)?[a-z]+(?:-\d+-)?carbo(thio)?hydrazide$",
+            base)
+        if not m:
+            return None
+        base_is_thio = bool(m.group(1))
+    if base_is_thio != (suffix_word == 'thiohydrazide'):
+        return None
+
+    prefix = _format_hydrazide_nn_prefix(inner_subs, term_subs)
+    if not prefix:
+        return None
+    joiner = "-" if base[:1].isdigit() else ""
+    return f"{prefix}{joiner}{base}"
 
 
 def _assemble_amidine_name(features: Any, style: str):
