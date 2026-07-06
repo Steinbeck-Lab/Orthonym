@@ -832,6 +832,82 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
+    # Wave2 T4 (P-25.2.2.4 benzo-heterocycles + P-25.7.1.3.2 fused indicated-H):
+    # bare fused-name catalog entries that were fail-closed 'unknown' at HEAD.
+    # OPSIN-RT + numbering verified (extendedsmi mapped onto RDKit-canonical,
+    # confirmed via methyl-isomer attachment). The benzoxepines/benzothiepine
+    # have a divalent O/S -> no indicated H; the benzazepines and the pyrrole-
+    # fused pairs carry a MANDATORY indicated hydrogen baked into 'name'.
+    'C1=COc2ccccc2C=C1': {
+        'name': '1-benzoxepine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: 9, 5: 8, 6: 7, 7: 6, 8: '5a', 9: 5, 10: 4},
+    },
+    'C1=COC=c2ccccc2=C1': {
+        'name': '2-benzoxepine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: 1, 4: '9a', 5: 9, 6: 8, 7: 7, 8: 6, 9: '5a', 10: 5},
+    },
+    'C1=Cc2ccccc2C=CO1': {
+        'name': '3-benzoxepine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 2, 1: 1, 2: '9a', 3: 9, 4: 8, 5: 7, 6: 6, 7: '5a', 8: 5, 9: 4, 10: 3},
+    },
+    'C1=Cc2ccccc2C=CS1': {
+        'name': '3-benzothiepine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 2, 1: 1, 2: '9a', 3: 9, 4: 8, 5: 7, 6: 6, 7: '5a', 8: 5, 9: 4, 10: 3},
+    },
+    'C1=CNc2ccccc2C=C1': {
+        'name': '1H-1-benzazepine',
+        'tautomer_locant': 1,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9a', 4: 9, 5: 8, 6: 7, 7: 6, 8: '5a', 9: 5, 10: 4},
+    },
+    'C1=CNC=c2ccccc2=C1': {
+        'name': '2H-2-benzazepine',
+        'tautomer_locant': 2,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: 1, 4: '9a', 5: 9, 6: 8, 7: 7, 8: 6, 9: '5a', 10: 5},
+    },
+    'C1=Cc2ccccc2C=CN1': {
+        'name': '3H-3-benzazepine',
+        'tautomer_locant': 3,
+        'ring_system': 'benzo-7-membered',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 2, 1: 1, 2: '9a', 3: 9, 4: 8, 5: 7, 6: 6, 7: '5a', 8: 5, 9: 4, 10: 3},
+    },
+    'c1cc2occc2[nH]1': {
+        'name': '4H-furo[3,2-b]pyrrole',
+        'tautomer_locant': 4,
+        'ring_system': 'bicyclic-5-5',
+        'parent_atoms': 8,
+        'iupac_locants': {0: '5', 1: '6', 2: '6a', 3: '1', 4: '2', 5: '3', 6: '3a', 7: '4'},
+    },
+    'c1cc2sccc2[nH]1': {
+        'name': '4H-thieno[3,2-b]pyrrole',
+        'tautomer_locant': 4,
+        'ring_system': 'bicyclic-5-5',
+        'parent_atoms': 8,
+        'iupac_locants': {0: '5', 1: '6', 2: '6a', 3: '1', 4: '2', 5: '3', 6: '3a', 7: '4'},
+    },
+    'c1cc2ccoc2[nH]1': {
+        'name': '6H-furo[2,3-b]pyrrole',
+        'tautomer_locant': 6,
+        'ring_system': 'bicyclic-5-5',
+        'parent_atoms': 8,
+        'iupac_locants': {0: '5', 1: '4', 2: '3a', 3: '3', 4: '2', 5: '1', 6: '6a', 7: '6'},
+    },
     # 1,3-dihydro-2-benzofuran (phthalan) — the 1,3-dihydro form of 2-benzofuran
     # (parallel to the cataloged 2,3-dihydro-1-benzofuran). PIN per BB P-25;
     # iupac_locants OPSIN-derived (O at 2, CH2 at 1 and 3).

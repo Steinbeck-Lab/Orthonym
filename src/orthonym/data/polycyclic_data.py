@@ -34,6 +34,51 @@ from typing import Dict, Optional, List, Tuple, Any, Set
 # Key: retained name
 # Value: dict with canonical_smiles, smarts, num_atoms, iupac_numbering, substituent_positions
 POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
+    # Wave2 T4 (P-25.1.2): higher fused-hydrocarbon series members (acene/aphene/
+    # helicene/pleiadene) that were fail-closed 'unknown' at HEAD. Bare-name
+    # catalog entries; OPSIN-RT + numbering verified (extendedsmi mapped onto
+    # RDKit-canonical, confirmed via methyl-isomer attachment).
+    'pentaphene': {
+        'canonical_smiles': 'c1ccc2cc3c(ccc4cc5ccccc5cc43)cc2c1',
+        'smarts': 'c1ccc2cc3c(ccc4cc5ccccc5cc43)cc2c1',
+        'num_atoms': 22,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '14a', 4: 14, 5: '13b', 6: '5a', 7: 6, 8: 7, 9: '7a', 10: 8, 11: '8a', 12: 9, 13: 10, 14: 11, 15: 12, 16: '12a', 17: 13, 18: '13a', 19: 5, 20: '4a', 21: 4},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'num_rings': 5,
+    },
+    'hexaphene': {
+        'canonical_smiles': 'c1ccc2cc3cc4c(ccc5cc6ccccc6cc54)cc3cc2c1',
+        'smarts': 'c1ccc2cc3cc4c(ccc5cc6ccccc6cc54)cc3cc2c1',
+        'num_atoms': 26,
+        'iupac_numbering': {0: 11, 1: 12, 2: 13, 3: '13a', 4: 14, 5: '14a', 6: 15, 7: '15a', 8: '7a', 9: 7, 10: 6, 11: '5a', 12: 5, 13: '4a', 14: 4, 15: 3, 16: 2, 17: 1, 18: '16a', 19: 16, 20: '15b', 21: 8, 22: '8a', 23: 9, 24: '9a', 25: 10},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        'num_rings': 6,
+    },
+    'hexacene': {
+        'canonical_smiles': 'c1ccc2cc3cc4cc5cc6ccccc6cc5cc4cc3cc2c1',
+        'smarts': 'c1ccc2cc3cc4cc5cc6ccccc6cc5cc4cc3cc2c1',
+        'num_atoms': 26,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '16a', 4: 16, 5: '15a', 6: 15, 7: '14a', 8: 14, 9: '13a', 10: 13, 11: '12a', 12: 12, 13: 11, 14: 10, 15: 9, 16: '8a', 17: 8, 18: '7a', 19: 7, 20: '6a', 21: 6, 22: '5a', 23: 5, 24: '4a', 25: 4},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        'num_rings': 6,
+    },
+    # (pentahelicene DEFERRED — [5]helicene's PIN is the fusion name
+    # dibenzo[c,g]phenanthrene, NOT 'pentahelicene': BB P-25.1.2.6 starts the
+    # helicene series at SIX rings. The fusion name needs the polycomponent
+    # (3+-component) fusion engine; a pre-existing tripwire (DD7-fusion-1)
+    # already defers this SMILES. Stays fail-closed.)
+    'hexahelicene': {
+        'canonical_smiles': 'c1ccc2c(c1)ccc1ccc3ccc4ccc5ccccc5c4c3c12',
+        'smarts': 'c1ccc2c(c1)ccc1ccc3ccc4ccc5ccccc5c4c3c12',
+        'num_atoms': 26,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '16e', 4: '4a', 5: 4, 6: 5, 7: 6, 8: '6a', 9: 7, 10: 8, 11: '8a', 12: 9, 13: 10, 14: '10a', 15: 11, 16: 12, 17: '12a', 18: 13, 19: 14, 20: 15, 21: 16, 22: '16a', 23: '16b', 24: '16c', 25: '16d'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        'num_rings': 6,
+    },
+    # (pleiadene DEFERRED — non-benzenoid o-quinoid PAH with 2 non-aromatic ring
+    # carbons; identify_polycyclic matches it but the aromatic-PAH dispatcher
+    # does not route there, so it stays fail-closed 'unknown'. Needs o-quinoid
+    # routing — out of this batch's scope.)
     'naphthalene': {
         'canonical_smiles': 'c1ccc2ccccc2c1',
         'smarts': 'c1ccc2ccccc2c1',  # For substructure matching
