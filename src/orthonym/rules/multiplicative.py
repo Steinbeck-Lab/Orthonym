@@ -281,119 +281,15 @@ def _central_arene_substituent_name(
     return f"benzene-{loc_str}-{yl}"
 
 
-def _arm_acid_parent(mol, attach_carbon_idx: int, ring_atoms: set):
-    """Verify the exocyclic arm rooted at ``attach_carbon_idx`` is a clean
-    UNBRANCHED aliphatic carboxylic acid ``-(CH2)k-COOH`` (k>=1) and return
-    ``(parent_acid_name, attach_locant, arm_atom_set)`` or ``None``.
-
-    The central group attaches at the terminal chain carbon, whose locant is the
-    carbon count (COOH carbon = C1).  The 2-carbon acid uses the retained PIN
-    "acetic acid" (BB line 2010); longer chains use "<stem>anoic acid".
-    """
-    # 1. arm = connected component of non-ring HEAVY atoms reached from attach C.
-    arm_atoms = set()
-    stack = [attach_carbon_idx]
-    while stack:
-        a = stack.pop()
-        if a in arm_atoms:
-            continue
-        arm_atoms.add(a)
-        for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
-            ni = nbr.GetIdx()
-            if ni in ring_atoms or ni in arm_atoms or nbr.GetAtomicNum() <= 1:
-                continue
-            stack.append(ni)
-
-    arm_carbons = [a for a in arm_atoms if mol.GetAtomWithIdx(a).GetSymbol() == "C"]
-    # Only carbons + carboxyl oxygens allowed (no other heteroatoms).
-    for a in arm_atoms:
-        if mol.GetAtomWithIdx(a).GetSymbol() not in ("C", "O"):
-            return None
-    if len(arm_carbons) < 2:
-        return None  # need the CH2 spacer + the COOH carbon (k>=1)
-
-    # 2. exactly one carboxylic-acid carbon (C(=O)-OH, one carbon neighbour).
-    carboxyl_c = None
-    for c in arm_carbons:
-        catom = mol.GetAtomWithIdx(c)
-        o_double = o_hydroxyl = c_in_arm = 0
-        ok = True
-        for nbr in catom.GetNeighbors():
-            ni, sym = nbr.GetIdx(), nbr.GetSymbol()
-            if sym == "H" or nbr.GetAtomicNum() <= 1:
-                continue
-            if sym == "O":
-                bond = mol.GetBondBetweenAtoms(c, ni)
-                if bond.GetBondType() == Chem.BondType.DOUBLE:
-                    o_double += 1
-                elif (
-                    bond.GetBondType() == Chem.BondType.SINGLE
-                    and nbr.GetTotalNumHs() == 1
-                    and nbr.GetDegree() == 1
-                ):
-                    o_hydroxyl += 1
-                else:
-                    ok = False
-            elif sym == "C" and ni in arm_atoms:
-                c_in_arm += 1
-            else:
-                ok = False
-        if ok and o_double == 1 and o_hydroxyl == 1 and c_in_arm == 1:
-            if carboxyl_c is not None:
-                return None  # >1 COOH in the arm -> not our clean class
-            carboxyl_c = c
-    if carboxyl_c is None:
-        return None
-
-    # 3. the chain carbons (incl. the attach carbon) are sp3, unbranched, with no
-    #    heteroatom/unsaturation/branch substituents; only the attach carbon may
-    #    touch the ring (exactly once).
-    arm_carbon_set = set(arm_carbons)
-    for c in arm_carbons:
-        if c == carboxyl_c:
-            continue
-        catom = mol.GetAtomWithIdx(c)
-        if catom.GetIsAromatic() or catom.IsInRing():
-            return None
-        for nbr in catom.GetNeighbors():
-            ni, sym = nbr.GetIdx(), nbr.GetSymbol()
-            if nbr.GetAtomicNum() <= 1:
-                continue
-            if ni in ring_atoms:
-                if c != attach_carbon_idx:
-                    return None  # only the attach carbon touches the ring
-                continue
-            if sym != "C" or ni not in arm_carbon_set:
-                return None  # heteroatom / non-chain substituent
-            if mol.GetBondBetweenAtoms(c, ni).GetBondType() != Chem.BondType.SINGLE:
-                return None  # unsaturated chain
-
-    # 4. unbranched-path check: every arm carbon has <=2 arm-carbon neighbours and
-    #    the two degree-1 ends are exactly {carboxyl carbon, attach carbon}.
-    deg = {}
-    for c in arm_carbons:
-        deg[c] = sum(
-            1 for nbr in mol.GetAtomWithIdx(c).GetNeighbors()
-            if nbr.GetIdx() in arm_carbon_set
-        )
-    if any(d > 2 for d in deg.values()):
-        return None
-    ends = {c for c, d in deg.items() if d == 1}
-    if ends != {carboxyl_c, attach_carbon_idx}:
-        return None
-
-    carbon_count = len(arm_carbons)
-    attach_locant = carbon_count  # terminal carbon; COOH carbon is C1
-    if carbon_count == 2:
-        parent_name = "acetic acid"
-    else:
-        parent_name = f"{get_chain_prefix(carbon_count)}anoic acid"
-    return parent_name, attach_locant, frozenset(arm_atoms)
-
-
 def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     """Multiplicative naming for a bare benzene bearing >=2 identical acyclic
-    carboxylic-acid arms (defect V-8).  Returns the PIN or ``None`` (fail closed).
+    functional-parent arms (defect V-8; Wave2 T5a extends the acid-only scope
+    to alcohol arms).  Returns the PIN or ``None`` (fail closed).
+
+    2,2',2''-(benzene-1,3,5-triyl)triacetic acid (P-15.3.1.1(d));
+    (benzene-1,3,5-triyl)trimethanol / (benzene-1,4-diyl)dimethanol
+    (P-15.3.2.1; mononuclear methanol units carry no locants, cf. the BB
+    "[oxydi(pyridazine-4,3,5-triyl)]tetramethanol" witness).
     """
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() != 1:
@@ -433,12 +329,26 @@ def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     for ra, ac in attachments.items():
         if mol.GetAtomWithIdx(ac).GetSymbol() != "C":
             return None  # arm must attach to the ring via a carbon
-        res = _arm_acid_parent(mol, ac, ring_atoms)
+        # Wave2 T5a: route through the shared strict linear-arm namer
+        # (acid + alcohol arms, saturation/charge/heteroatom-coverage
+        # hardened); the ring attachment atom acts as the bridge boundary.
+        res = _acyclic_arm_parent_and_locant(mol, ac, ra)
         if res is None:
             return None
-        parent_name, attach_locant, arm_atoms = res
+        parent_name, attach_locant = res
         parents.append((parent_name, attach_locant))
-        all_arm_atoms |= set(arm_atoms)
+        # collect the arm atoms for the whole-molecule coverage check
+        stack = [ac]
+        while stack:
+            a = stack.pop()
+            if a in all_arm_atoms or a in ring_atoms:
+                continue
+            all_arm_atoms.add(a)
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nbr.GetIdx()
+                if nbr.GetAtomicNum() > 1 and ni not in all_arm_atoms \
+                        and ni not in ring_atoms:
+                    stack.append(ni)
 
     if len(set(parents)) != 1:
         return None  # arms not identical -> multiplicative requires identical units
@@ -457,21 +367,41 @@ def _try_central_arene_acyclic_arms(mol) -> Optional[str]:
     if central is None:
         return None
 
-    arm_locants = ",".join(f"{attach_locant}{chr(39) * i}" for i in range(n))
-    return f"{arm_locants}-({central}){multiplier}{parent_name}"
+    # Mononuclear units (methanol) omit the meaningless '1' locants
+    # (P-14.3.4.2); locant-bearing unit names take parentheses (P-15.3.2.1).
+    if attach_locant is None:
+        locant_prefix = ""
+    else:
+        locant_prefix = ",".join(
+            f"{attach_locant}{chr(39) * i}" for i in range(n)
+        ) + "-"
+    if any(ch.isdigit() for ch in parent_name) or parent_name.startswith("dec"):
+        unit_token = f"({parent_name})"
+    else:
+        unit_token = parent_name
+    return f"{locant_prefix}({central}){multiplier}{unit_token}"
 
 
-def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int):
+def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
+                                   allow_amine: bool = False):
     """Name a linear ACYCLIC arm (a suffix PCG at one terminus, the bridge
     attachment at the other) and return ``(parent_name, attach_locant)``.
 
     Scope (fail-closed -> None otherwise): an unbranched carbon chain whose two
     ends are exactly {PCG carbon, bridge-attach carbon}; the only functional
-    atoms are the single PCG (carboxylic acid -OH/=O, or alcohol -OH).  The PCG
-    carbon is numbered 1 (lowest locant), so the bridge attaches at C(chain
-    length).  Examples: HO-CH2-CH2-* -> ("ethan-1-ol", 2);  HOOC-CH2-* ->
-    ("acetic acid", 2).  Tight by design (Risk R1: MULTIPLICATIVE@900 fires
-    before GENERAL@99999, so this must never claim an ordinary ester/ether).
+    atoms are the single PCG (carboxylic acid -OH/=O, or alcohol -OH; with
+    ``allow_amine`` also a terminal -NH2).  The PCG carbon is numbered 1
+    (lowest locant), so the bridge attaches at C(chain length).  Examples:
+    HO-CH2-CH2-* -> ("ethan-1-ol", 2);  HOOC-CH2-* -> ("acetic acid", 2);
+    H2N-CH2-CH2-* -> ("ethan-1-amine", 2) [allow_amine only].  Tight by
+    design (Risk R1: MULTIPLICATIVE@900 fires before GENERAL@99999, so this
+    must never claim an ordinary ester/ether).
+
+    ``allow_amine`` is opt-in for the CHALCOGEN bridges ONLY (BB P-15.3.2.1
+    verbatim: "2,2'-oxydi(ethan-1-amine)" (PIN)); the N bridges must never
+    pass it — with amine arms the substitutive polyamine parent is the PIN
+    (P-44.1.1 max-suffix rule; BB P-62: diethylenetriamine names as a
+    diamine, "not 2,2'-azanediyldi(ethan-1-amine)").
     """
     if mol.GetAtomWithIdx(attach_carbon).GetSymbol() != 'C':
         return None
@@ -495,7 +425,20 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int):
     arm_carbons = [a for a in arm if mol.GetAtomWithIdx(a).GetSymbol() == 'C']
     if not arm_carbons:
         return None
+    # Wave2 T5a hardening: the '{stem}anoic acid'/'{stem}an-1-ol' arm name
+    # asserts a SATURATED, uncharged chain — any C=C/C#C or formal charge in
+    # the arm would be silently dropped by the name.  Fail closed instead.
+    for a in arm:
+        if mol.GetAtomWithIdx(a).GetFormalCharge() != 0:
+            return None
     carbon_set = set(arm_carbons)
+    for c in arm_carbons:
+        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+            if nbr.GetIdx() not in carbon_set:
+                continue
+            bond = mol.GetBondBetweenAtoms(c, nbr.GetIdx())
+            if bond.GetBondTypeAsDouble() != 1.0:
+                return None  # unsaturated arm -> out of scope
     deg = {
         c: sum(1 for nbr in mol.GetAtomWithIdx(c).GetNeighbors()
                if nbr.GetIdx() in carbon_set)
@@ -537,10 +480,23 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int):
                     break
             if pcg_carbon is not None:
                 break
+    if pcg_carbon is None and allow_amine:
+        # Terminal primary amine -NH2 (BB "2,2'-oxydi(ethan-1-amine)" (PIN)).
+        for c in arm_carbons:
+            for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+                if (nbr.GetSymbol() == 'N' and nbr.GetIdx() in arm
+                        and nbr.GetTotalNumHs() == 2 and nbr.GetDegree() == 1
+                        and mol.GetBondBetweenAtoms(
+                            c, nbr.GetIdx()).GetBondTypeAsDouble() == 1.0):
+                    pcg_carbon, pcg = c, 'amine'
+                    pcg_oxygens = {nbr.GetIdx()}
+                    break
+            if pcg_carbon is not None:
+                break
     if pcg_carbon is None:
         return None
 
-    # The arm may carry ONLY its chain carbons + the PCG oxygens (no stray
+    # The arm may carry ONLY its chain carbons + the PCG heteroatoms (no stray
     # heteroatoms / extra FGs that the name would silently drop).
     arm_heteroatoms = {a for a in arm if mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H')}
     if arm_heteroatoms != pcg_oxygens:
@@ -551,7 +507,15 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int):
     if n == 1:
         if pcg_carbon != attach_carbon:
             return None
-        attach_locant = 1
+        if pcg == 'acid':
+            # A 1-carbon acid arm is the COOH carbon itself attached to the
+            # bridge — carboxy-on-parent territory (benzoic/carbonic class),
+            # never a 'methanoic acid' multiplicative unit.  Fail closed.
+            return None
+        # Mononuclear unit: locant omitted (P-14.3.4.2; BB
+        # '[oxydi(pyridazine-4,3,5-triyl)]tetramethanol' carries no unit
+        # locants).  attach_locant=None signals the elision to the assembler.
+        return ("methanol" if pcg == 'ol' else "methanamine"), None
     else:
         # PCG at one terminus (C1), bridge attachment at the other (C n).
         if ends != {pcg_carbon, attach_carbon}:
@@ -561,8 +525,10 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int):
     stem = get_chain_prefix(n)
     if pcg == 'acid':
         parent_name = "acetic acid" if n == 2 else f"{stem}anoic acid"
-    else:  # 'ol'
+    elif pcg == 'ol':
         parent_name = f"{stem}an-1-ol"
+    else:  # 'amine'
+        parent_name = f"{stem}an-1-amine"
     return parent_name, attach_locant
 
 
@@ -571,14 +537,20 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
     by a divalent heteroatom bridge (P-15.3): O -> oxy, S -> sulfanediyl.
 
     OCCSCCO -> 2,2'-sulfanediyldi(ethan-1-ol);
-    OC(=O)COCC(=O)O -> 2,2'-oxydiacetic acid.
+    OC(=O)COCC(=O)O -> 2,2'-oxydiacetic acid;
+    OC(=O)CNCC(=O)O -> 2,2'-azanediyldiacetic acid (Wave2 T5a, P-15.3.1.2.1.1
+    azanediyl; BB sibling "3,3'-azanediyldipropanenitrile" (PIN));
+    OCCNCCO -> 2,2'-azanediyldi(ethan-1-ol).
 
-    Fail-closed (Risk R1): the bridge is a single non-ring O/S with exactly two
-    acyclic-carbon neighbours, the two arms are identical, and each arm is a
-    linear chain with a single terminal PCG (handled by
+    Fail-closed (Risk R1): the bridge is a single non-ring O/S/NH with exactly
+    two acyclic-carbon neighbours, the two arms are identical, and each arm is
+    a linear chain with a single terminal PCG (handled by
     _acyclic_arm_parent_and_locant).  Returns None for everything else (e.g.
     diethyl ether has no PCG; 2-ethoxyethanol's arms differ) so the GENERAL
-    pipeline keeps ownership and no ester is ever stolen.
+    pipeline keeps ownership and no ester is ever stolen.  The arm namer's
+    acid/ol-only scope keeps the NH bridge away from polyamine parents where
+    substitutive names are the PINs (BB P-62.2.5.3: diethylenetriamine is a
+    diamine parent, "not 2,2'-azanediyldi(ethan-1-amine)").
     """
     ring_atoms = set()
     for ring in mol.GetRingInfo().AtomRings():
@@ -589,8 +561,11 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
         if idx in ring_atoms:
             continue
         bridge_type = _classify_single_atom_bridge(atom)
-        # Scope to the divalent chalcogen bridges that are multiplicative PINs.
-        if bridge_type not in ('O', 'S'):
+        # Divalent bridges that are multiplicative PINs: chalcogens (oxy /
+        # sulfanediyl) + NH (azanediyl, Wave2 T5a).
+        if bridge_type not in ('O', 'S', 'NH'):
+            continue
+        if atom.GetFormalCharge() != 0:
             continue
         bridge_name = _SINGLE_ATOM_BRIDGES.get(bridge_type)
         if bridge_name is None:
@@ -609,16 +584,140 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
         if Chem.CanonSmiles(smi_a) != Chem.CanonSmiles(smi_b):
             continue
 
-        arm = _acyclic_arm_parent_and_locant(mol, nbr_indices[0], idx)
+        # Amine arms only for the chalcogen bridges (BB "2,2'-oxydi(ethan-1-
+        # amine)" (PIN)); NEVER for the NH bridge (polyamine-parent trap).
+        allow_amine = bridge_type in ('O', 'S')
+        arm = _acyclic_arm_parent_and_locant(
+            mol, nbr_indices[0], idx, allow_amine=allow_amine
+        )
         if arm is None:
             continue
         # the other arm must resolve identically (same parent + locant)
-        arm_b = _acyclic_arm_parent_and_locant(mol, nbr_indices[1], idx)
+        arm_b = _acyclic_arm_parent_and_locant(
+            mol, nbr_indices[1], idx, allow_amine=allow_amine
+        )
         if arm_b != arm:
             continue
         parent_name, attach_locant = arm
         return _assemble_multiplicative_name(
             attach_locant, bridge_name, parent_name, unit_count=2
+        )
+
+    return None
+
+
+def _try_acyclic_nitrilo_bridge(mol) -> Optional[str]:
+    """Trivalent N joining THREE identical acyclic functional parents
+    (Wave2 T5a; P-15.3.2.1 star topology, acyclic sibling of the ring-path
+    nitrilo in _try_multi_atom_bridges):
+
+    N(CH2COOH)3 -> 2,2',2''-nitrilotriacetic acid (BB P-15.3.1.2 Table 15.1);
+    N(CCO)3     -> 2,2',2''-nitrilotri(ethan-1-ol) (BB P-15.3.2.1, PIN).
+
+    Fail-closed: bare uncharged non-ring N with exactly three acyclic-carbon
+    neighbours; all three arms resolve to the SAME (parent, locant) via the
+    strict linear-arm namer.  Amine-arm cases never arrive here (the arm
+    namer is acid/ol-only), so polyamine parents (P-44.1.1 max-suffix rule)
+    are never stolen.
+    """
+    ring_atoms = set()
+    for ring in mol.GetRingInfo().AtomRings():
+        ring_atoms.update(ring)
+
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if idx in ring_atoms:
+            continue
+        if atom.GetSymbol() != 'N' or atom.GetTotalNumHs() != 0:
+            continue
+        if atom.GetFormalCharge() != 0:
+            continue
+        heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy_nbrs) != 3:
+            continue
+        if any(n.GetIdx() in ring_atoms or n.GetSymbol() != 'C' for n in heavy_nbrs):
+            continue
+
+        arms = [
+            _acyclic_arm_parent_and_locant(mol, n.GetIdx(), idx)
+            for n in heavy_nbrs
+        ]
+        if arms[0] is None or any(a != arms[0] for a in arms[1:]):
+            continue
+        parent_name, attach_locant = arms[0]
+        return _assemble_multiplicative_name(
+            attach_locant, "nitrilo", parent_name, unit_count=3
+        )
+
+    return None
+
+
+def _try_ethylenedioxy_bridge(mol) -> Optional[str]:
+    """Composite central bridge -O-CH2-CH2-O- joining two identical acyclic
+    functional parents (Wave2 T5a; P-15.3.2.1):
+
+    HOOC-CH2-O-CH2CH2-O-CH2-COOH ->
+        2,2'-[ethane-1,2-diylbis(oxy)]diacetic acid (BB verbatim PIN);
+    HO-CH2CH2-O-CH2CH2-O-CH2CH2-OH (triethylene glycol) ->
+        2,2'-[ethane-1,2-diylbis(oxy)]di(ethan-1-ol).
+
+    Fail-closed: the central unit is exactly an acyclic, uncharged
+    CH2-CH2 flanked by two ether oxygens; each O's outer neighbour starts a
+    strict linear acid/ol arm; both arms resolve identically.  Longer
+    oxa-chains (tetraethylene glycol: the arm would contain a second ether O)
+    decline via the arm namer's heteroatom coverage check.
+    """
+    ring_atoms = set()
+    for ring in mol.GetRingInfo().AtomRings():
+        ring_atoms.update(ring)
+
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtom(), bond.GetEndAtom()
+        if a1.GetSymbol() != 'C' or a2.GetSymbol() != 'C':
+            continue
+        if a1.GetTotalNumHs() != 2 or a2.GetTotalNumHs() != 2:
+            continue
+        if a1.GetIdx() in ring_atoms or a2.GetIdx() in ring_atoms:
+            continue
+        if bond.GetBondTypeAsDouble() != 1.0:
+            continue
+        if a1.GetFormalCharge() != 0 or a2.GetFormalCharge() != 0:
+            continue
+
+        outer1 = [n for n in a1.GetNeighbors()
+                  if n.GetIdx() != a2.GetIdx() and n.GetAtomicNum() > 1]
+        outer2 = [n for n in a2.GetNeighbors()
+                  if n.GetIdx() != a1.GetIdx() and n.GetAtomicNum() > 1]
+        if len(outer1) != 1 or len(outer2) != 1:
+            continue
+        o1, o2 = outer1[0], outer2[0]
+        if not all(
+            o.GetSymbol() == 'O' and o.GetTotalNumHs() == 0
+            and o.GetFormalCharge() == 0 and o.GetIdx() not in ring_atoms
+            for o in (o1, o2)
+        ):
+            continue
+
+        arm_start1 = [n for n in o1.GetNeighbors()
+                      if n.GetIdx() != a1.GetIdx() and n.GetAtomicNum() > 1]
+        arm_start2 = [n for n in o2.GetNeighbors()
+                      if n.GetIdx() != a2.GetIdx() and n.GetAtomicNum() > 1]
+        if len(arm_start1) != 1 or len(arm_start2) != 1:
+            continue
+        c1, c2 = arm_start1[0], arm_start2[0]
+        if any(c.GetIdx() in ring_atoms or c.GetSymbol() != 'C' for c in (c1, c2)):
+            continue
+
+        arm_a = _acyclic_arm_parent_and_locant(mol, c1.GetIdx(), o1.GetIdx())
+        if arm_a is None:
+            continue
+        arm_b = _acyclic_arm_parent_and_locant(mol, c2.GetIdx(), o2.GetIdx())
+        if arm_b != arm_a:
+            continue
+
+        parent_name, attach_locant = arm_a
+        return _assemble_multiplicative_name(
+            attach_locant, "ethane-1,2-diylbis(oxy)", parent_name, unit_count=2
         )
 
     return None
@@ -648,6 +747,18 @@ def name_multiplicative(mol) -> Optional[str]:
     # >=2-ring gate below (which only guards the ring-system bridge logic).
     # Tightly fail-closed so it never preempts an ester (Risk R1).
     result = _try_acyclic_heteroatom_bridge(mol)
+    if result is not None:
+        return result
+
+    # Trivalent-N star over acyclic arms (Wave2 T5a):
+    # NTA -> 2,2',2''-nitrilotriacetic acid.
+    result = _try_acyclic_nitrilo_bridge(mol)
+    if result is not None:
+        return result
+
+    # Composite -O-CH2CH2-O- central bridge (Wave2 T5a):
+    # 2,2'-[ethane-1,2-diylbis(oxy)]diacetic acid (BB P-15.3.2.1 verbatim).
+    result = _try_ethylenedioxy_bridge(mol)
     if result is not None:
         return result
 
@@ -750,6 +861,23 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # Get locant of bridge attachment point in the parent
         locant = _get_bridge_locant(mol, idx, nbr_indices[0], ring_atoms)
 
+        # P-15.3.1.1(3) (Wave2 T5a): the attachment locants of BOTH units
+        # must be identical.  The H-filled fragments compare canonical-equal
+        # even when the bridge sits para on one ring and meta on the other —
+        # a jar-independent structural decline, not a SELF-01 suppression.
+        locant_b = _get_bridge_locant(mol, idx, nbr_indices[1], ring_atoms)
+        if locant_b != locant:
+            continue
+
+        # P-15.3.2.4.1 (Wave2 T5a): a SUBSTITUTED unit ("2-chlorobenzoic
+        # acid") is numbered by the fragment namer on the FREE unit,
+        # independent of the bridge locant computed here; the joint
+        # numbering is only direction-invariant at a para attachment on a
+        # benzene unit.  Everything else fails closed.
+        if _unit_name_is_substituted(parent_name) and not \
+                _ring_unit_direction_safe(canon_a, locant):
+            continue
+
         # Assemble multiplicative name (returns None for prefix-derived parents)
         result = _assemble_multiplicative_name(locant, bridge_name, parent_name)
         if result is not None:
@@ -758,6 +886,39 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         continue
 
     return None
+
+
+def _unit_name_is_substituted(parent_name: str) -> bool:
+    """A multiplied unit name beginning with a locant carries substituent
+    prefixes ("2-chlorobenzoic acid", "4-bromobenzene") — the P-15.3.2.4.1
+    bis class.  Mid-name suffix locants ("ethan-1-ol") are NOT substituted."""
+    import re
+    return re.match(r"^(?:\d|N[-,'0-9])", parent_name) is not None
+
+
+def _ring_unit_direction_safe(frag_canon: str, attach_locant) -> bool:
+    """True iff a substituted ring unit's prefix locants cannot disagree with
+    the bridge attachment locant: a para (locant 4) attachment on a benzene
+    unit is self-mirror, so the fragment namer's direction choice for the
+    substituents is consistent with attachment@4 (the BB P-15.3.2.4.1
+    witnesses 4,4'-oxybis(2-chloro/2-bromobenzoic acid)).  Any other shape
+    fails closed."""
+    if attach_locant != 4:
+        return False
+    frag = Chem.MolFromSmiles(frag_canon)
+    if frag is None:
+        return False
+    ring_info = frag.GetRingInfo()
+    if ring_info.NumRings() != 1:
+        return False
+    ring = ring_info.AtomRings()[0]
+    if len(ring) != 6:
+        return False
+    return all(
+        frag.GetAtomWithIdx(a).GetIsAromatic()
+        and frag.GetAtomWithIdx(a).GetSymbol() == "C"
+        for a in ring
+    )
 
 
 def _try_two_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
@@ -819,6 +980,15 @@ def _try_two_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
 
         # Get locant
         locant = _get_bridge_locant(mol, idx1, ring_conn_1, ring_atoms)
+
+        # P-15.3.1.1(3) + P-15.3.2.4.1 guards (Wave2 T5a) — see the
+        # single-atom sibling for rationale.
+        locant_b = _get_bridge_locant(mol, idx2, ring_conn_2, ring_atoms)
+        if locant_b != locant:
+            continue
+        if _unit_name_is_substituted(parent_name) and not \
+                _ring_unit_direction_safe(canon_a, locant):
+            continue
 
         # Assemble multiplicative name (returns None for prefix-derived parents)
         result = _assemble_multiplicative_name(locant, bridge_name, parent_name)
@@ -1384,10 +1554,18 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     import re
     from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
 
-    # P-14.2.2 trigger: parent name contains a comma-separated locant
-    # pattern.  Match at least one ",N" where N is a digit (e.g. "1,3-",
-    # "2,4,6-").  Bare digits without commas do NOT trigger.
-    if re.search(r"\d+,\d", parent_name):
+    # P-15.3.2.4.1 / P-15.3.2.3 trigger (Wave2 T5a): the unit name BEGINS
+    # with a locant — a SUBSTITUTED unit ("2-chlorobenzoic acid",
+    # "4-bromobenzene") or a locant-led ring name ("1,3-thiazole",
+    # "1-azacyclododecane").  'di' would sit ambiguously against the leading
+    # locant, and P-15.3.2.4.1 mandates bis/tris for substituted identical
+    # units: 4,4'-oxybis(2-chlorobenzoic acid) (PIN, BB P-45.1.1 verbatim),
+    # 1,1'-oxybis(4-bromobenzene) (PIN, P-15.3.2.4.1).
+    # Mid-name SUFFIX locants keep di/tri + parentheses per P-15.3.2.1:
+    # 2,2'-oxydi(ethan-1-ol) (PIN), 4,4'-oxydi(cyclohexane-1-carboxylic
+    # acid) (PIN), N1,N1'-methylenedi(benzene-1,4-diamine) (PIN,
+    # P-15.3.2.2.2 — mid-name comma locants do NOT trigger bis).
+    if re.match(r"^(?:\d|N[-,'0-9])", parent_name):
         return COMPLEX_MULTIPLIERS.get(unit_count)
 
     # P-14.2.1 default for clean parent names.
@@ -1395,7 +1573,7 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
 
 
 def _assemble_multiplicative_name(
-    locant: int, bridge_name: str, parent_name: str, unit_count: int = 2
+    locant: Optional[int], bridge_name: str, parent_name: str, unit_count: int = 2
 ) -> Optional[str]:
     """Assemble the final multiplicative name.
 
@@ -1438,31 +1616,47 @@ def _assemble_multiplicative_name(
     if not multiplier:
         return None
 
-    # Build primed locant string: e.g., "4,4'" for 2 units, "4,4',4''" for 3
-    locant_str = _build_primed_locant_str(locant, unit_count)
+    # Build primed locant string: e.g., "4,4'" for 2 units, "4,4',4''" for 3.
+    # locant=None signals a MONONUCLEAR parent unit (methanol): the locant is
+    # meaningless and omitted per P-14.3.4.2 (BB P-15.3.2.1 witness:
+    # "[oxydi(pyridazine-4,3,5-triyl)]tetramethanol" — no unit locants).
+    locant_prefix = (
+        "" if locant is None
+        else _build_primed_locant_str(locant, unit_count) + "-"
+    )
 
-    # Enclosure (P-16.3.3 / P-29.6.2): a BRIDGE name that itself carries locants
-    # (e.g. "ethane-1,2-diyl") is parenthesised so its boundary with the primed
-    # locant set and the multiplier is unambiguous -> "4,4'-(ethane-1,2-diyl)di...".
-    # Locant-free bridges ("oxy", "sulfanediyl", "azanediyl", "methylene",
-    # "peroxy", "disulfanediyl") have no digit and stay bare.
-    bridge_token = f"({bridge_name})" if any(ch.isdigit() for ch in bridge_name) else bridge_name
+    # Enclosure (P-16.3.3 / P-16.5): a BRIDGE name that itself contains
+    # parentheses (composite bridge "ethane-1,2-diylbis(oxy)") moves up the
+    # nesting order to SQUARE BRACKETS: "2,2'-[ethane-1,2-diylbis(oxy)]di..."
+    # (BB P-15.3.2.1 verbatim).  A bridge carrying bare locants
+    # ("ethane-1,2-diyl") is parenthesised -> "4,4'-(ethane-1,2-diyl)di...".
+    # Locant-free bridges ("oxy", "sulfanediyl", "azanediyl", "nitrilo",
+    # "methylene", "peroxy", "disulfanediyl") stay bare.
+    if "(" in bridge_name:
+        bridge_token = f"[{bridge_name}]"
+    elif any(ch.isdigit() for ch in bridge_name):
+        bridge_token = f"({bridge_name})"
+    else:
+        bridge_token = bridge_name
 
-    # Enclosure (P-15.3.1.2 / P-16.3.3): a parent name carrying locants (e.g.
-    # "ethan-1-ol", "propan-1-ol") is parenthesised so the parent boundary is
-    # unambiguous -> "...di(ethan-1-ol)".  The multiplier stays di/tri (NOT
-    # bis/tris -- bis/tris is for substituent prefixes, not multiplicative
-    # parents).  Locant-free parents ("aniline", "acetic acid", "benzoic acid")
-    # are unaffected (no digit -> no parentheses).
-    if any(ch.isdigit() for ch in parent_name):
-        return f"{locant_str}-{bridge_token}{multiplier}({parent_name})"
+    # Enclosure (P-15.3.2.1 / P-16.3.4): a parent name carrying locants (e.g.
+    # "ethan-1-ol", "2-chlorobenzoic acid") is enclosed in parentheses so the
+    # parent boundary is unambiguous -> "...di(ethan-1-ol)" /
+    # "...bis(2-chlorobenzoic acid)".  Names beginning with 'dec' are also
+    # enclosed per P-16.3.4(d) ("di(decanoic acid)" vs "didecanoic acid").
+    # Locant-free parents ("aniline", "acetic acid", "benzoic acid") are
+    # unaffected (no parentheses).  Whether the multiplier is di/tri
+    # (P-15.3.2.1) or bis/tris (P-15.3.2.4.1 substituted units) is decided by
+    # _select_multiplier on the leading-locant test.
+    if any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec"):
+        return f"{locant_prefix}{bridge_token}{multiplier}({parent_name})"
 
     # Handle names with spaces (e.g., "benzoic acid" -> "tribenzoic acid")
     if " " in parent_name:
         parts = parent_name.split(" ", 1)
         base = parts[0]  # "benzoic"
         suffix = parts[1]  # "acid"
-        return f"{locant_str}-{bridge_token}{multiplier}{base} {suffix}"
+        return f"{locant_prefix}{bridge_token}{multiplier}{base} {suffix}"
     else:
         # Simple name: "aniline" -> "dianiline"
-        return f"{locant_str}-{bridge_token}{multiplier}{parent_name}"
+        return f"{locant_prefix}{bridge_token}{multiplier}{parent_name}"

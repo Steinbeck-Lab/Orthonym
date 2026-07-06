@@ -488,7 +488,10 @@ class TestCentralAreneMultiplicative:
             ("OC(=O)c1ccc(C(=O)O)cc1", "terephthalic: -COOH on ring, k=0 (carbo suffix)"),
             ("OC(=O)c1ccccc1C(=O)O", "phthalic: k=0"),
             ("NC(=O)c1cc(C(N)=O)cc(C(N)=O)c1", "amide arms (k=0, not -COOH)"),
-            ("OCc1cc(CO)cc(CO)c1", "hydroxymethyl arms (not a carboxylic acid)"),
+            # Wave2 T5a: hydroxymethyl arms MOVED to the positive table below —
+            # the multiplicative alcohol-arm PIN "(benzene-1,3,5-triyl)tri-
+            # methanol" is now claimed (P-15.3.2.1; the MULT-01 gold's
+            # documented Tier-5a intent).
             ("COC(=O)Cc1ccc(CC(=O)OC)cc1", "methyl-ester arms (not free -COOH)"),
             ("[O-]C(=O)Cc1ccc(CC(=O)[O-])cc1", "carboxylate (anion, not -COOH)"),
             ("Cc1cc(CC(=O)O)cc(CC(=O)O)c1", "extra methyl substituent on ring"),

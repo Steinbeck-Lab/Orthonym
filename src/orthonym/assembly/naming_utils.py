@@ -1048,6 +1048,13 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     else:
         formatted_name = name
 
+    # Wave2 T5a: a simple multiplier joining an italicized-prefix-led name
+    # keeps the hyphen boundary: '1,2-di-tert-butylbenzene' (PIN, BB
+    # P-25.7.1.x example list), never 'ditert-butyl'.  Parenthesized names
+    # never start with 'tert-'/'sec-', so the bis/tris path is unaffected.
+    if multiplier and formatted_name.startswith(("tert-", "sec-")):
+        multiplier = f"{multiplier}-"
+
     # Assemble: locants-multiplier+name. An empty locant list (elided per
     # P-14.3.4, e.g. a mononuclear parent: phenylmethanol) takes no hyphen.
     if not locant_str:
