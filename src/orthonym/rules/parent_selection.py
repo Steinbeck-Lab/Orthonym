@@ -42,6 +42,25 @@ SKELETAL_SUFFIX_PGS = {
     "thioketone",
     "selenoketone",
     "telluroketone",
+    # Wave2 T3a (P-52.2.8 / P-29.4.2): the -ol/-thiol/-selenol/-tellurol/
+    # -amine/-imine suffixes likewise decorate a skeletal atom — there is no
+    # exocyclic-carbon form (no "-carbinol"). An exocyclic carbon bearing one
+    # of these can never be expressed as a ring suffix, so "on ring" is
+    # membership-only. Every entry here whose SMARTS leads with the
+    # heteroatom REQUIRES a paired PG_ATTACHMENT_INDICES override pointing at
+    # the locant-bearing carbon (seniority.py), else genuine ring suffixes
+    # (4-methylcyclohexan-1-ol) go false-negative. imine already leads with C.
+    "alcohol",
+    "primary_alcohol",
+    "secondary_alcohol",
+    "tertiary_alcohol",
+    "thiol",
+    "selenol",
+    "tellurol",
+    "primary_amine",
+    "secondary_amine",
+    "tertiary_amine",
+    "imine",
 }
 
 logger = logging.getLogger(__name__)
@@ -736,8 +755,15 @@ def select_parent(
             nbr.GetIdx() in all_ring_atoms
             for nbr in mol.GetAtomWithIdx(_single).GetNeighbors()
         )
+        # Wave2 T3a: the ring-neighbour relaxation presumes the ring can
+        # express the PCG through an exocyclic-carbon suffix (-carbaldehyde,
+        # -carboxylic acid, ...). SKELETAL_SUFFIX_PGS have no such form, so
+        # for them only the membership test inside is_principal_group_on_ring
+        # is a valid "on ring" and the shortcut must not fire
+        # (cyclohexylmethanol / cyclohexylmethanamine stay chain-parented).
+        _skeletal = principal_group in SKELETAL_SUFFIX_PGS
         if (not principal_group or not principal_group_atoms
-                or _single_ring_attached
+                or (_single_ring_attached and not _skeletal)
                 or is_principal_group_on_ring(
                     mol, all_ring_atoms, principal_group_atoms, principal_group)):
             return ParentSelectionResult(

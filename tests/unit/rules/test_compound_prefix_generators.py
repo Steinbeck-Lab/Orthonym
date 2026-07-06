@@ -41,18 +41,18 @@ class TestSulfinylPrefixGenerator:
 
     @pytest.mark.unit
     def test_methylsulfinyl_on_acid(self):
-        """Methyl sulfoxide on ethanoic acid -> methylsulfinyl."""
+        """Methyl sulfoxide on ethanoic acid -> methanesulfinyl (Wave2 T3b PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)C', 'sulfoxide')
         assert prefix is not None, "sulfoxide prefix should not be None"
         assert 'sulfinyl' in prefix, f"Expected 'sulfinyl' in '{prefix}'"
-        assert prefix == 'methylsulfinyl', f"Expected 'methylsulfinyl', got '{prefix}'"
+        assert prefix == 'methanesulfinyl', f"Expected 'methanesulfinyl', got '{prefix}'"
 
     @pytest.mark.unit
     def test_ethylsulfinyl_on_acid(self):
-        """Ethyl sulfoxide on ethanoic acid -> ethylsulfinyl."""
+        """Ethyl sulfoxide on ethanoic acid -> ethanesulfinyl (Wave2 T3b PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)CC', 'sulfoxide')
         assert prefix is not None
-        assert prefix == 'ethylsulfinyl', f"Expected 'ethylsulfinyl', got '{prefix}'"
+        assert prefix == 'ethanesulfinyl', f"Expected 'ethanesulfinyl', got '{prefix}'"
 
     @pytest.mark.unit
     def test_sulfinyl_on_aromatic(self):
@@ -80,18 +80,18 @@ class TestSulfonylPrefixGenerator:
 
     @pytest.mark.unit
     def test_methylsulfonyl_on_acid(self):
-        """Methyl sulfone on ethanoic acid -> methylsulfonyl."""
+        """Methyl sulfone on ethanoic acid -> methanesulfonyl (Wave2 T3b PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)(=O)C', 'sulfone')
         assert prefix is not None, "sulfone prefix should not be None"
         assert 'sulfonyl' in prefix, f"Expected 'sulfonyl' in '{prefix}'"
-        assert prefix == 'methylsulfonyl', f"Expected 'methylsulfonyl', got '{prefix}'"
+        assert prefix == 'methanesulfonyl', f"Expected 'methanesulfonyl', got '{prefix}'"
 
     @pytest.mark.unit
     def test_ethylsulfonyl_on_acid(self):
-        """Ethyl sulfone on ethanoic acid -> ethylsulfonyl."""
+        """Ethyl sulfone on ethanoic acid -> ethanesulfonyl (Wave2 T3b PIN acid-stem)."""
         prefix = _get_fg_prefix('OC(=O)CS(=O)(=O)CC', 'sulfone')
         assert prefix is not None
-        assert prefix == 'ethylsulfonyl', f"Expected 'ethylsulfonyl', got '{prefix}'"
+        assert prefix == 'ethanesulfonyl', f"Expected 'ethanesulfonyl', got '{prefix}'"
 
     @pytest.mark.unit
     def test_sulfonyl_on_aromatic(self):
@@ -198,16 +198,18 @@ class TestNoRegressions:
         assert result == '3-methoxypropanoic acid', f"Got '{result}'"
 
     @pytest.mark.unit
-    def test_dimethyl_sulfoxide_functional_class(self):
-        """dimethyl sulfoxide must remain functional class naming when principal."""
+    def test_dimethyl_sulfoxide_substitutive_pin(self):
+        """Wave2 T3b (P-63.6): the PIN is substitutive '(methanesulfinyl)methane'
+        (BB 46154 verbatim); 'dimethyl sulfoxide' demoted to --trivial."""
         result = name_compound('CS(=O)C')
-        assert result == 'dimethyl sulfoxide', f"Got '{result}'"
+        assert result == '(methanesulfinyl)methane', f"Got '{result}'"
 
     @pytest.mark.unit
-    def test_dimethyl_sulfone_functional_class(self):
-        """dimethyl sulfone must remain functional class naming when principal."""
+    def test_dimethyl_sulfone_substitutive_pin(self):
+        """Wave2 T3b (P-63.6): PIN '(methanesulfonyl)methane' (parallel to BB
+        28115 '(ethanesulfonyl)ethane'); functional class demoted to --trivial."""
         result = name_compound('CS(=O)(=O)C')
-        assert result == 'dimethyl sulfone', f"Got '{result}'"
+        assert result == '(methanesulfonyl)methane', f"Got '{result}'"
 
     @pytest.mark.unit
     def test_sulfinyl_prefix_in_name(self):

@@ -19,8 +19,15 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_sulfoxide(features: Any) -> bool:
-    """Mirrors composer.py:968 (``features.principal_group == 'sulfoxide'``)."""
-    return getattr(features, 'principal_group', None) == 'sulfoxide'
+    """Wave2 T3b: 'sulfoxide' joined _PREFIX_ONLY_PRINCIPAL (it has no
+    suffix form), so principal_group is never 'sulfoxide' anymore. The
+    handler covers the molecule-IS-the-sulfoxide case: FG present and no
+    senior suffix-capable group claimed the PCG (else the polyfunctional
+    path expresses the sulfinyl prefix)."""
+    return (
+        getattr(features, 'principal_group', None) is None
+        and bool(getattr(features, 'functional_groups', {}).get('sulfoxide'))
+    )
 
 
 def name_sulfoxide(
@@ -29,13 +36,35 @@ def name_sulfoxide(
     """Tier-B sulfoxide handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import _enrich_handler_name, _inject_stereo_if_missing
-    from ...rules.sulfur import name_sulfoxide as _name_sulfoxide
+    from ...rules.sulfur import (
+        chalcogen_oxide_fc_covers_molecule,
+        name_chalcogen_oxide_substitutive,
+        name_sulfoxide as _name_sulfoxide,
+    )
 
     matches = features.functional_groups.get('sulfoxide', [])
     if not matches:
         return None
 
-    name = _name_sulfoxide(features.mol, matches[0])
+    # Wave2 T3b conservation: both names below describe EXACTLY R-SO-R'.
+    # When the molecule has atoms beyond that unit, the functional-class
+    # walk silently dropped them ('CSCCS(=O)C' -> 'ethyl methyl sulfoxide',
+    # -S-CH3 lost). Decline so the polyfunctional path names the whole
+    # structure (1-(methanesulfinyl)-2-(methylsulfanyl)ethane, BB 18284).
+    if not chalcogen_oxide_fc_covers_molecule(features.mol, matches[0]):
+        return None
+
+    # Wave2 T3b (P-63.6): substitutive is the PIN — '(methanesulfinyl)methane'
+    # (BB 46154), '1-(ethanesulfinyl)butane' (28094), "1,1'-sulfinyldibenzene"
+    # (28110). Functional class stays for --trivial and as the fallback for
+    # shapes the substitutive builder declines (fail-open to a valid name).
+    name = None
+    if style == "pin":
+        name = name_chalcogen_oxide_substitutive(
+            features.mol, matches[0], 'sulfinyl'
+        )
+    if not name:
+        name = _name_sulfoxide(features.mol, matches[0])
     if not name:
         return None
 

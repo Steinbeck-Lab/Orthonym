@@ -243,6 +243,10 @@ class TestTerminalFGTypes:
             # Wave 1 R8a (P-66.3.1.1): hydrazide is a terminal group (locant-1
             # elided, e.g. pentanehydrazide) — added with the hydrazide-suffix fix.
             "hydrazide",
+            # Wave2 T3d: the amidrazone (hydrazonamide) / hydrazidine
+            # (hydrazonohydrazide) / thiohydrazide characteristic carbon is
+            # likewise always chain-terminal (P-66.4.2 / P-66.4.3 / P-66.3.4).
+            "hydrazonamide", "hydrazidine", "thiohydrazide",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -252,5 +256,6 @@ class TestTerminalFGTypes:
 
     def test_terminal_count_after_phase_163(self):
         """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
-        (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) = 27 entries."""
-        assert len(TERMINAL_FG_TYPES) == 27
+        (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) + 3 Wave2 T3d
+        (hydrazonamide/hydrazidine/thiohydrazide) = 30 entries."""
+        assert len(TERMINAL_FG_TYPES) == 30

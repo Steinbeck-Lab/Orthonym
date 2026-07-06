@@ -128,6 +128,20 @@ _COMPOUND_HETEROATOM_AMINO_PREFIXES = frozenset({
     'fluoroamino', 'chloroamino', 'bromoamino', 'iodoamino',
 })
 
+# Wave2 T3b: parent-hydride stems used as roots of the PIN acid-stem
+# chalcogen-oxide prefixes ('methanesulfinyl' / 'benzenesulfonyl' /
+# 'cyclohexanesulfinyl', P-63.6). Consumed by needs_brackets alongside
+# _ALKYL_ROOTS_FULL so those compound prefixes take enclosing marks.
+_HYDRIDE_STEM_ROOTS = tuple(
+    f"{p}ane" for p in (
+        'meth', 'eth', 'prop', 'but', 'pent', 'hex', 'hept', 'oct', 'non',
+        'dec', 'undec', 'dodec', 'tridec', 'tetradec', 'pentadec', 'hexadec',
+        'heptadec', 'octadec', 'nonadec', 'icos',
+    )
+) + ('benzene',) + tuple(
+    f"cyclo{p}ane" for p in ('prop', 'but', 'pent', 'hex', 'hept', 'oct')
+)
+
 # Used by alpha_sort_key() — pre-compiled regex patterns
 _LOCANT_PREFIX_RE = re.compile(r'^[\d,]+-')
 _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
@@ -178,6 +192,13 @@ TERMINAL_FG_TYPES = frozenset({
     # (C1), exactly like amide / nitrile / aldehyde — so its suffix locant-1 is
     # implicit and elided: 'pentanehydrazide' not 'pentane-1-hydrazide'.
     "hydrazide",
+    # Wave2 T3d: the amidrazone (hydrazonamide) / hydrazidine (hydrazonohydrazide)
+    # / thiohydrazide characteristic carbon is likewise ALWAYS chain-terminal —
+    # 'ethanehydrazonamide' / 'ethanehydrazonohydrazide' / 'ethanethiohydrazide',
+    # never a '-1-' locant (parallel to amidine/hydrazide).
+    "hydrazonamide",
+    "hydrazidine",
+    "thiohydrazide",
 })
 
 
@@ -227,6 +248,13 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # (N-methylethanesulfonamide). A 3+ carbon chain keeps its locant
     # (propane-1-sulfonamide). Sulfinamide (no FG defined yet) deferred.
     "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
+    # Wave2 T3d (P-66.1.1 / P-14.3.4.4): sulfonimidamide attaches to a chain
+    # carbon exactly like sulfonamide -> 'ethanesulfonimidamide' (OPSIN-RT),
+    # not 'ethane-1-sulfonimidamide'. propane-1- keeps its locant.
+    "sulfonimidamide",
+    # Wave2 T3d (P-66.1.1 item 25): sulfinimidamide, S-suffix parallel ->
+    # 'ethanesulfinimidamide' (propane-1- keeps its locant).
+    "sulfinimidamide",
     # Wave2 T2a (P-62.3.1.1 / P-14.3.4.4): the imine =NH sits on a chain carbon;
     # on the symmetric 2-carbon (ethane) parent the locant elides -> 'ethanimine'
     # (BB VERBATIM 'N-methylethanimine (PIN)'), not 'ethan-1-imine'. A 3+ carbon
@@ -549,7 +577,10 @@ def needs_brackets(name: str) -> bool:
     # Per IUPAC P-16.3.3, "methylsulfinyl" = methyl + sulfinyl = compound substituent
     # requiring parentheses: "2-(methylsulfinyl)ethanoic acid"
     # But NOT bare "sulfinyl", "sulfonyl", "sulfanyl" (simple, no alkyl prefix)
-    for alkyl in _ALKYL_ROOTS_FULL:
+    # Wave2 T3b: the PIN acid-stem forms build on the PARENT HYDRIDE
+    # ('methanesulfinyl', 'benzenesulfonyl', 'cyclohexanesulfinyl' — BB
+    # '2-(methanesulfonyl)ethan-1-ol' verbatim), so hydride stems are roots too.
+    for alkyl in _ALKYL_ROOTS_FULL + _HYDRIDE_STEM_ROOTS:
         if name_lower.startswith(alkyl):
             remainder = name_lower[len(alkyl):]
             for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
@@ -1017,7 +1048,10 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     else:
         formatted_name = name
 
-    # Assemble: locants-multiplier+name
+    # Assemble: locants-multiplier+name. An empty locant list (elided per
+    # P-14.3.4, e.g. a mononuclear parent: phenylmethanol) takes no hyphen.
+    if not locant_str:
+        return f"{multiplier}{formatted_name}"
     return f"{locant_str}-{multiplier}{formatted_name}"
 
 

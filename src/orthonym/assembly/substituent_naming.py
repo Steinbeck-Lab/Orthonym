@@ -127,6 +127,199 @@ def _attach_is_chain_terminus(mol, sub_atoms: List[int], attach_idx) -> bool:
 # ============================================================================
 
 
+def _name_aryl_vinyl_substituent(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Wave2 T3c (P-31.1.3.4 / P-29.6): name an acyclic UNSATURATED all-carbon
+    chain substituent that carries one or more RING substituents — the styryl /
+    aryl-vinyl class ``Ar-CH=CH-`` -> ``(E)-2-phenylethenyl`` (PIN
+    ``2-phenylethen-1-yl``).
+
+    The plain ``_name_unsaturated_chain`` rejects any ring atom (its all-carbon-
+    acyclic guard), and the ring chokepoint declines because the attachment is on
+    the acyclic vinyl carbon, not a ring — so this positive namer fills exactly
+    that gap. Fail-closed (return None) for: a saturated chain (defer to the
+    located/linear namers), a branched chain, a heteroatom in the chain, a ring
+    fused into the chain (attached to >1 chain carbon), or any ring the ring
+    engine cannot name — the caller's Wave2 T3a ring-fragment guard then keeps
+    it honest.
+
+    Returns the raw prefix WITHOUT enclosing marks (the caller's needs_brackets
+    adds them); the E/Z descriptor is prepended here (``_add_substituent_stereo``
+    handles only atom R/S, not bond E/Z).
+    """
+    if attach_idx is None or len(sub_atoms) < 3:
+        return None
+    sub_set = set(sub_atoms)
+    if attach_idx not in sub_set:
+        return None
+    from collections import deque as _dq
+    ri = mol.GetRingInfo()
+
+    # (1) The maximal acyclic all-carbon chain through the attachment: BFS over
+    # non-ring carbons only. Require unbranched (<=2 chain-C neighbours each) and
+    # at least one C=C / C#C.
+    chain_atoms = set()
+    q = _dq([attach_idx])
+    while q:
+        i = q.popleft()
+        if i in chain_atoms:
+            continue
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'C' or ri.NumAtomRings(i) > 0:
+            return None
+        chain_atoms.add(i)
+        for nb in a.GetNeighbors():
+            ni = nb.GetIdx()
+            if (ni in sub_set and ni not in chain_atoms
+                    and nb.GetSymbol() == 'C' and ri.NumAtomRings(ni) == 0):
+                q.append(ni)
+    has_unsat = False
+    for ci in chain_atoms:
+        cc = 0
+        for nb in mol.GetAtomWithIdx(ci).GetNeighbors():
+            if nb.GetIdx() in chain_atoms:
+                cc += 1
+                b = mol.GetBondBetweenAtoms(ci, nb.GetIdx())
+                if b is not None and b.GetBondTypeAsDouble() != 1.0:
+                    has_unsat = True
+        if cc > 2:
+            return None  # branched chain
+    if not has_unsat:
+        return None
+
+    # (2) Every remaining sub atom must belong to a ring system attached to
+    # EXACTLY ONE chain carbon by a single bond. Collect (chain_carbon, ring_seed).
+    ring_seeds = []  # (chain_carbon_idx, ring_atom_idx)
+    for ci in chain_atoms:
+        for nb in mol.GetAtomWithIdx(ci).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in chain_atoms or ni not in sub_set:
+                continue
+            if ri.NumAtomRings(ni) == 0:
+                return None  # a non-ring atom off the chain -> not this class
+            b = mol.GetBondBetweenAtoms(ci, ni)
+            if b is None or b.GetBondTypeAsDouble() != 1.0:
+                return None
+            ring_seeds.append((ci, ni))
+    if not ring_seeds:
+        return None  # no aryl arm -> plain unsaturated chain (other namer)
+
+    # (3) Order the chain linearly; number so the free valence is lowest, then
+    # lowest unsaturation locants (mirror _name_unsaturated_chain).
+    terminal = None
+    for ci in chain_atoms:
+        if sum(1 for nb in mol.GetAtomWithIdx(ci).GetNeighbors()
+               if nb.GetIdx() in chain_atoms) <= 1:
+            terminal = ci
+            break
+    if terminal is None:
+        return None
+    ordered = [terminal]
+    seen = {terminal}
+    while len(ordered) < len(chain_atoms):
+        nxt = None
+        for nb in mol.GetAtomWithIdx(ordered[-1]).GetNeighbors():
+            if nb.GetIdx() in chain_atoms and nb.GetIdx() not in seen:
+                nxt = nb.GetIdx()
+                break
+        if nxt is None:
+            break
+        ordered.append(nxt)
+        seen.add(nxt)
+    if len(ordered) != len(chain_atoms):
+        return None
+    n = len(ordered)
+
+    def _key(order):
+        a_loc = order.index(attach_idx) + 1
+        unsat = []
+        for i in range(n - 1):
+            b = mol.GetBondBetweenAtoms(order[i], order[i + 1])
+            if b is not None and b.GetBondTypeAsDouble() in (2.0, 3.0):
+                unsat.append(i + 1)
+        return (a_loc, sorted(unsat))
+
+    fwd, rev = ordered, list(reversed(ordered))
+    chain = fwd if _key(fwd) <= _key(rev) else rev
+    pos = {a: i + 1 for i, a in enumerate(chain)}
+    a_locant = pos[attach_idx]
+    double_locs, triple_locs = [], []
+    for i in range(n - 1):
+        b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if b is None:
+            continue
+        bt = b.GetBondTypeAsDouble()
+        if bt == 2.0:
+            double_locs.append(i + 1)
+        elif bt == 3.0:
+            triple_locs.append(i + 1)
+    stem = _build_alkenyl_name(n, a_locant, double_locs, triple_locs)
+    if not stem:
+        return None
+
+    # (4) Name each ring substituent via the trustworthy ring engine + its
+    # chain-position locant.
+    from .substituent_enumerator import name_substituent as _name_sub
+    from ..rules.ring_substituents import name_ring_system_substituent
+    from collections import defaultdict as _dd
+    ring_prefix_groups = _dd(list)
+    for ci, seed in ring_seeds:
+        ring_atoms = sorted(_ring_system_atoms(mol, seed, chain_atoms))
+        rn = name_ring_system_substituent(
+            mol, ring_atoms, seed, allow_enumerator_fallback=False)
+        if not rn:
+            return None
+        ring_prefix_groups[rn].append(pos[ci])
+
+    # (5) Assemble locant-sorted ring-substituent prefixes + stem.
+    from .composer import _format_prefix_groups
+    prefix = _format_prefix_groups(dict(ring_prefix_groups))
+    name = f"{prefix}{stem}"
+
+    # (6) E/Z descriptor for stereogenic chain double bonds (bond CIP, not atom).
+    from ..perception.stereo import get_double_bond_stereo
+    ez = []
+    for sb in get_double_bond_stereo(mol):
+        a, b = sb['atoms']
+        if a in chain_atoms and b in chain_atoms:
+            loc = min(pos[a], pos[b])
+            ez.append((loc, sb['stereo']))
+    if ez:
+        ez.sort()
+        if len(ez) == 1:
+            name = f"({ez[0][1]})-{name}"
+        else:
+            name = "(" + ",".join(f"{l}{s}" for l, s in ez) + ")-" + name
+    return name
+
+
+def _ring_system_atoms(mol, seed, exclude):
+    """All atoms of the ring system containing ``seed``, staying out of
+    ``exclude`` (the chain). BFS over ring-member atoms and their ring
+    system (fused partners), plus non-ring decorations reachable without
+    crossing the chain — so a substituted aryl arm is named whole."""
+    from collections import deque as _dq
+    ri = mol.GetRingInfo()
+    atoms = set()
+    q = _dq([seed])
+    while q:
+        i = q.popleft()
+        if i in atoms or i in exclude:
+            continue
+        atoms.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in exclude or ni in atoms:
+                continue
+            # include ring atoms + any atom reachable off the ring (decorations)
+            q.append(ni)
+    return atoms
+
+
 def _name_unsaturated_chain(
     mol,
     sub_atoms: List[int],
@@ -1223,6 +1416,89 @@ def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
         return None
 
 
+def imidamide_name_to_imidamido_prefix(name: str) -> Optional[str]:
+    """Wave2 T3d (P-66.4.1.3.5 method 1): turn an amidine parent name
+    (imidamide / carboximidamide) into the non-principal prefix by changing the
+    final 'e' -> 'o': 'ethanimidamide' -> 'ethanimidamido', 'benzenecarboximidamide'
+    -> 'benzenecarboximidamido'. Fail-closed (None) for di/poly-imidamide names
+    (one imidamido cannot describe a poly-amidine) or names carrying N-locants
+    the branch cannot describe."""
+    if not name:
+        return None
+    low = name.lower()
+    if not (low.endswith('imidamide')):
+        return None
+    if 'diimidamide' in low or 'dicarboximidamide' in low:
+        return None
+    if low.startswith('n-') or low.startswith("n'") or ',n' in low:
+        return None
+    return name[:-1] + 'o'
+
+
+def imidoyl_amido_prefix_from_branch(mol, n_idx: int, imino_c: int,
+                                     sub_atoms) -> Optional[str]:
+    """Wave2 T3d (P-66.4.1.3.5): imidamido prefix for a full N-attached amidine
+    branch ``-N(H)-C(=NH)-R`` (the amidine's AMINO nitrogen is the ring/chain
+    attachment). Mirrors :func:`acyl_amido_prefix_from_branch` but keyed on the
+    imino C=N instead of a carbonyl C=O. Reconstructs the imidamide parent
+    R-C(=NH)-NH2, names it recursively, then applies
+    :func:`imidamide_name_to_imidamido_prefix`. Returns the BARE prefix or None.
+
+    Guards (fail-closed): the imino carbon must have exactly one =N (double) whose
+    N bears only H/C (reject amidrazone -C(=N-NH2)-); exactly one single-bonded N
+    == n_idx (reject guanidine's second amino N); the attachment N connects to the
+    branch ONLY through this carbon; full-branch coverage (no dropped atoms)."""
+    sub_set = set(sub_atoms)
+    if n_idx not in sub_set or imino_c not in sub_set:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    if {nb.GetIdx() for nb in n_atom.GetNeighbors() if nb.GetIdx() in sub_set} != {imino_c}:
+        return None
+    c_atom = mol.GetAtomWithIdx(imino_c)
+    if c_atom.GetFormalCharge() != 0:
+        return None
+    # exactly one imino =N (H/C only) + exactly one single-bonded N (== n_idx)
+    imino_n = None
+    single_ns = []
+    for nb in c_atom.GetNeighbors():
+        b = mol.GetBondBetweenAtoms(imino_c, nb.GetIdx())
+        if nb.GetSymbol() == 'N':
+            if b.GetBondTypeAsDouble() == 2.0:
+                if imino_n is not None:
+                    return None
+                imino_n = nb
+            elif b.GetBondTypeAsDouble() == 1.0:
+                single_ns.append(nb.GetIdx())
+    if imino_n is None or single_ns != [n_idx]:
+        return None
+    # imino N must bear only H/C (reject amidrazone -C(=N-NH2)-)
+    for nb in imino_n.GetNeighbors():
+        if nb.GetIdx() != imino_c and nb.GetSymbol() not in ('C',):
+            return None
+    # closed fragment: every acyl-side atom's neighbours stay in the branch
+    for a_idx in sub_set - {n_idx}:
+        for nb in mol.GetAtomWithIdx(a_idx).GetNeighbors():
+            if nb.GetIdx() not in sub_set:
+                return None
+    try:
+        rw = Chem.RWMol(mol)
+        nh2 = rw.AddAtom(Chem.Atom(7))
+        rw.AddBond(imino_c, nh2, Chem.BondType.SINGLE)
+        frag_atoms = sorted((sub_set - {n_idx}) | {nh2})
+        frag_smi = Chem.MolFragmentToSmiles(rw, frag_atoms, canonical=True)
+        if not frag_smi:
+            return None
+        from .fragment_naming import name_fragment_recursively
+        parent = name_fragment_recursively(frag_smi)
+        if not parent:
+            return None
+        return imidamide_name_to_imidamido_prefix(parent)
+    except Exception:
+        return None
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
 
@@ -1866,8 +2142,32 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
         return None
 
     # Number so the free valence gets the LOWEST locant (P-46.1.8).
-    if (chain_len - chain.index(attach_idx)) < (chain.index(attach_idx) + 1):
+    _fwd_k = chain.index(attach_idx) + 1
+    _rev_k = chain_len - chain.index(attach_idx)
+    if _rev_k < _fwd_k:
         chain = list(reversed(chain))
+    elif _rev_k == _fwd_k:
+        # Wave2 T3c (P-29.4.1): the free-valence locant ties in both directions
+        # (attach at the exact chain centre, e.g. pentan-3-yl). Break the tie
+        # toward the LOWEST side-chain locant set (first point of difference),
+        # so CCC(-)C(C)C = pentan-3-yl with the methyl at 2, NOT 4 ->
+        # '2-methylpentan-3-yl' not '4-methylpentan-3-yl'.
+        _off = {chain[i]: i for i in range(chain_len)}
+
+        def _branch_locs(order):
+            oset = set(order)
+            opos = {a: i + 1 for i, a in enumerate(order)}
+            locs = []
+            for ci in order:
+                for nb in mol.GetAtomWithIdx(ci).GetNeighbors():
+                    ni = nb.GetIdx()
+                    if ni in oset or ni not in sub_set:
+                        continue
+                    locs.append(opos[ci])
+            return sorted(locs)
+
+        if _branch_locs(list(reversed(chain))) < _branch_locs(chain):
+            chain = list(reversed(chain))
     k = chain.index(attach_idx) + 1
     chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
@@ -2123,6 +2423,17 @@ def name_substituent_fragment(
         if _g14:
             return _g14
 
+    # Wave2 T3c (P-31.1.3.4): aryl-vinyl / styryl — an acyclic UNSATURATED chain
+    # bearing a ring substituent (Ar-CH=CH- -> (E)-2-phenylethenyl). MUST precede
+    # the Step 1c ring chokepoint (which declines because the free valence is on
+    # the acyclic vinyl C, not a ring) and the recursive path (which mis-anchors
+    # the free valence onto the ring -> the invalid 'ethenylbenzenyl'). Returns
+    # None for saturated / branched / non-aryl-arm cases -> falls through.
+    if attach_idx is not None:
+        _av = _name_aryl_vinyl_substituent(mol, sub_atoms, attach_idx, parent_set)
+        if _av is not None:
+            return _av
+
     # Step 1c (Phase 4 SUBST-01): ring-bearing fragment -> the trustworthy ring
     # chokepoint, BEFORE the recursive / cache paths which drop ene/yne locants
     # ('cyclohexenyl' for cyclohex-1-en-1-yl) or name a ring-on-chain as a
@@ -2219,6 +2530,25 @@ def name_substituent_fragment(
     if located is not None:
         located_name, _k = located
         return _add_substituent_stereo(mol, sub_atoms, located_name, attach_idx=attach_idx)
+
+    # Wave2 T3a constitution-conservation guard: a ring-bearing fragment
+    # reaching this point means the trustworthy ring chokepoint (Step 1c)
+    # DECLINED it. Steps 3-5 would cap the fragment, name it as a free
+    # molecule, and string-surgery the suffix into a prefix — anchoring the
+    # free valence wherever the name form implies, NOT at attach_idx
+    # (-CH2-O-CH2-Ar(OH) became 'hydroxy4-(methoxymethyl)phenyl': a direct
+    # ring-parent bond, a DIFFERENT constitution). Fail closed instead; the
+    # ring engine is the only namer that anchors ring fragments honestly.
+    try:
+        _ri_guard = mol.GetRingInfo()
+        if any(_ri_guard.NumAtomRings(a) > 0 for a in sub_atoms):
+            logger.debug(
+                "DROP-24 substituent_skip: reason=ring_fragment_declined_by_"
+                "ring_engine atom_count=%d", len(sub_atoms),
+            )
+            return None
+    except Exception:
+        pass
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)

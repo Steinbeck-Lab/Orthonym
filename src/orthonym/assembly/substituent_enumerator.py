@@ -495,6 +495,21 @@ def name_substituent(mol, frag_atoms, attach_idx):
             except Exception:
                 pass
 
+    # ---- Wave2 T3c: aryl-vinyl / styryl (SUBST-01 two-namer rule) ----
+    # Mirror name_substituent_fragment's aryl-vinyl handler here so the benzene
+    # generic-C fallback (benzene.py, which calls name_substituent and rejects the
+    # 'substituent' sentinel) also emits (E)-2-phenylethenyl. MUST precede the
+    # ring chokepoint below (which declines an acyclic-attached aryl-vinyl arm).
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from .substituent_naming import _name_aryl_vinyl_substituent
+            _av = _name_aryl_vinyl_substituent(
+                mol, list(frag_atoms_set), attach_idx, set())
+            if _av is not None:
+                return _stereo_route(_av)
+        except Exception:
+            pass
+
     # ---- Tier 1.95 (Phase 4 SUBST-01): ring-system substituent chokepoint ----
     # A ring-bearing fragment is named by the trustworthy ring engine
     # (get_ring_substituent_name + _compound_ring_on_chain_substituent) BEFORE the
@@ -620,6 +635,18 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
     """
     if not frag_atoms:
         return "substituent"
+
+    # Wave2 T3a constitution-conservation guard: a ring-bearing fragment down
+    # here was declined by every honest namer (incl. the ring engine). The
+    # carbon-count alkyl branch below would flatten it into a linear chain
+    # (methylcyclohexyl -> 'heptyl', a DIFFERENT constitution). Return the
+    # explicit unnameable marker instead.
+    try:
+        _ri = mol.GetRingInfo()
+        if any(_ri.NumAtomRings(a) > 0 for a in frag_atoms):
+            return "substituent"
+    except Exception:
+        pass
 
     # Analyze fragment composition
     carbons = 0

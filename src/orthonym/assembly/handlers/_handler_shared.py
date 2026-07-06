@@ -427,12 +427,82 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         # methane (chain_length==1) and a single non-terminal suffix on ethane
         # (chain_length==2) -> 'methanamine' / 'N,N-dimethylmethanamine' /
         # 'ethanamine', not 'methan-1-amine' / 'ethan-1-amine'.
+        # Wave2 T3a: is_monosubstituted means the parent bears ONLY this one
+        # decoration. A C-substituent (chain, ring-as-substituent, or a
+        # non-principal FG prefix) forces the suffix locant back, exactly like
+        # the dedicated -ol handler ('2-chloroethan-1-ol' P-14.3.4 verbatim):
+        # '1-cyclohexylethan-1-imine', not '1-cyclohexylethanimine'.
+        # N-substituents live on the FG nitrogen, not the parent chain, and
+        # are counted nowhere here (BB VERBATIM 'N-methylethanimine' stays).
         _suffix_chain_len = len(features.principal_chain)
+        _other_subs = 0
+        # Wave2 T3 determinism fix: the _other_subs tightening (cite the suffix
+        # locant when a substituent is present) is scoped to NEUTRAL parents.
+        # For a CHARGED principal group (aminium/-ium) the numbering follows
+        # P-74 and HEAD deterministically ELIDED the suffix locant
+        # ('2-hydroxy-N,N,N-trimethylethanaminium'); forcing the locant there
+        # exposed an order-dependent charged-species numbering
+        # ('1-hydroxy…ethan-2-aminium' vs '2-hydroxy…ethan-1-aminium'). The
+        # motivating imine/selenol cases (1-cyclohexylethan-1-imine,
+        # 2-chloroethane-1-selenol) are all neutral, so this scope keeps them.
+        _is_charged = features.mol is not None and any(
+            a.GetFormalCharge() != 0 for a in features.mol.GetAtoms()
+        )
+        _pg_match_atoms: set = set()
+        for _m in (features.principal_group_atoms or []):
+            _pg_match_atoms.update(_m)
+        # Charged parents keep HEAD behavior (_other_subs stays 0 ->
+        # is_monosubstituted = fg_count == 1); the tightening is neutral-only.
+        if not _is_charged:
+            if features.substituents:
+                # The chain-finder records the principal FG's own heteroatom(s)
+                # as a pseudo-substituent branch (imine =N on 'CC=N' shows up as
+                # {1: [[N]]}); those are the suffix itself, not a decoration —
+                # skip any branch wholly inside a principal-group match.
+                for _subs_at_pos in features.substituents.values():
+                    for _sub_atoms in _subs_at_pos:
+                        _sa = set(
+                            _sub_atoms
+                            if isinstance(_sub_atoms, (list, tuple, set, frozenset))
+                            else [_sub_atoms]
+                        )
+                        # Any overlap with the PG matches means the branch hangs
+                        # off the suffix heteroatom (an N-substituent: the
+                        # N-ethyl branch of CCNCC contains the amine N) — those
+                        # do not decorate the parent chain and must not force
+                        # the locant ('N-ethylethanamine' stays elided).
+                        if _sa & _pg_match_atoms:
+                            continue
+                        _other_subs += 1
+            if getattr(features, 'chain_is_parent', False):
+                # Ring substituents attached through the suffix HETEROATOM are
+                # N-substituents (N-phenylethanimine), not parent decorations;
+                # rings attached at a parent carbon force the locant
+                # (1-phenylethan-1-imine, parallel to 1-phenylethan-1-one).
+                for _rg in (getattr(features, 'ring_substituents_as_groups', None)
+                            or []):
+                    _rg_set = set(_rg)
+                    _on_het = False
+                    for _ra in _rg_set:
+                        for _nb in features.mol.GetAtomWithIdx(_ra).GetNeighbors():
+                            _ni = _nb.GetIdx()
+                            if (_ni not in _rg_set
+                                    and _ni in _pg_match_atoms
+                                    and features.mol.GetAtomWithIdx(_ni)
+                                    .GetAtomicNum() != 6):
+                                _on_het = True
+                                break
+                        if _on_het:
+                            break
+                    if not _on_het:
+                        _other_subs += 1
+            if getattr(features, 'non_principal_groups', None):
+                _other_subs += len(features.non_principal_groups)
         if should_omit_locant_one(
             context="suffix",
             fg_type=fg_name,
             chain_length=_suffix_chain_len,
-            is_monosubstituted=(fg_count == 1),
+            is_monosubstituted=(fg_count == 1 and _other_subs == 0),
         ):
             locants = ()
         else:

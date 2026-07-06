@@ -125,23 +125,18 @@ class TestEmitterEndToEnd:
 
 
 class TestWideningGate:
-    """The non-6-ring path fires ONLY on FG presence (skeptic correction:
-    no silent activation of alkyl/halo emission for the small-ring
-    population -- that change set needs its own enumerated A/B budget)."""
+    """Wave2 T3a: the old tripwire demanded that alkyl/halo emission on
+    non-6 rings only land as a conscious, separately-enumerated change —
+    T3a is that change. The former gate returned the bare base_name,
+    silently DROPPING the ring's substituents ('4-cyclopentylbutanoic acid'
+    for the 2-methylcyclopentyl input: a different molecule, caught only by
+    the OPSIN-armed SELF-01). The widened path names every branch exactly
+    via the recursive fragment namer or FAILS CLOSED (constitution-
+    conservation guard in _detect_ring_substituents /
+    _build_substituted_ring_name), so the skeptic's silent-activation
+    hazard no longer exists."""
 
-    def test_alkyl_on_5_ring_still_gated(self):
-        # TRIPWIRE, not an endorsement: the truly correct PIN is
-        # 4-(2-methylcyclopentyl)butanoic acid (see xfail below). This
-        # asserts the gate so the alkyl/halo widening can only land as a
-        # conscious, separately-enumerated change.
-        assert name_compound("CC1CCCC1CCCC(=O)O") == "4-cyclopentylbutanoic acid"
-
-    @pytest.mark.xfail(
-        reason="alkyl-on-small-ring emission deferred: needs its own "
-               "enumerated canary budget (V21 fix-plan WS-D.1 skeptic "
-               "correction); flip the tripwire above when landing it",
-        strict=True,
-    )
     def test_alkyl_on_5_ring_correct_name(self):
+        # The former strict-xfail, flipped per the tripwire's instruction.
         assert name_compound("CC1CCCC1CCCC(=O)O") == \
             "4-(2-methylcyclopentyl)butanoic acid"

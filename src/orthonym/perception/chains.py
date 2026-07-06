@@ -306,6 +306,11 @@ def _get_non_principal_terminal_carbons(
         # principal_group: continue' guard keeps the C in the chain for the
         # -imidamide suffix, e.g. ethanimidamide/propanimidamide).
         'amidine': 0,
+        # Wave2 T3d: the amidrazone (hydrazonamide) and hydrazidine
+        # (hydrazonohydrazide) characteristic carbon is always chain-terminal,
+        # exactly like amidine. SMARTS index 0 = that carbon.
+        'hydrazonamide': 0,
+        'hydrazidine': 0,
     }
 
     principal_carbons: Set[int] = set()

@@ -142,10 +142,14 @@ class TestBGroupRegression:
             "3-tetradecoxy-4,5-dihydroxybenzoic acid",
             "B3-tetradecoxy",
         ),
-        # B4: Complex ether chain -> decoxy
+        # B4: Complex ether chain. Wave2 T3a: the old snapshot
+        # '1-decoxy-3-fluorobenzene' was a wrong-molecule fabrication (the
+        # walker linearised the N-bearing chain into 'decoxy' and dropped
+        # the whole bromobenzoyl arm); the constitution-conservation guard
+        # now fails it closed. Deterministic honest refusal is the pin.
         (
             "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
-            "1-decoxy-3-fluorobenzene",
+            "unknown organic compound",
             "B4-decoxy",
         ),
         # B5: Sugar glycoside -> rhamnopyranosyloxy (retained sugar name)

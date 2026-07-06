@@ -117,6 +117,18 @@ def name_general_acyclic(
     else:
         parent = NameFragment(text="", fragment_type="parent")
 
+    # Wave2 T3a conservation: an EMPTY parent stem cannot describe any
+    # molecule — the assembler would glue suffixes onto the bare 'ane'
+    # filler ('anedicarboxylic acid' for the Si-bridge witness once the
+    # benzene handler learned to decline it). Per the ADR-19-04 handler
+    # contract, return None to cascade (-> honest unknown) instead.
+    if not parent.text:
+        logger.debug(
+            "fallback_chain_ring decline: empty parent stem (unnameable "
+            "parent hydride) smiles=%s", features.canonical_smiles,
+        )
+        return None
+
     fragments.append(parent)
 
     # Generate suffix for principal group

@@ -40,6 +40,25 @@ PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     "thioketone": [1],
     "selenoketone": [1],
     "telluroketone": [1],
+    # Wave2 T3a (P-52.2.8): the -ol/-thiol/-selenol/-tellurol/-amine family
+    # SMARTS lead with the characteristic HETEROATOM; the locant-bearing atom
+    # is the attached carbon. Alcohol-class matches reach
+    # principal_group_atoms normalized to (O, bearing-C) 2-tuples
+    # (_normalize_pcg_match), so index 1 is the carbinol carbon for every
+    # subtype. Without these, extending SKELETAL_SUFFIX_PGS to this family
+    # would false-negative every genuine ring suffix (4-methylcyclohexan-1-ol
+    # would lose its ring parent). Secondary/tertiary amines list every C on
+    # the N: the parent atom may be any of them.
+    "alcohol": [1],
+    "primary_alcohol": [1],
+    "secondary_alcohol": [1],
+    "tertiary_alcohol": [1],
+    "thiol": [1],
+    "selenol": [1],
+    "tellurol": [1],
+    "primary_amine": [1],
+    "secondary_amine": [1, 2],
+    "tertiary_amine": [1, 2, 3],
 }
 
 # Functional group seniority order (highest priority first)
@@ -110,12 +129,28 @@ SENIORITY_ORDER = [
     "primary_sulfonamide",
     "secondary_sulfonamide",
     "tertiary_sulfonamide",
+    # Wave2 T3d (P-66.1.1 Table 6.1 item 20): sulfonimidamide ranks just below
+    # sulfonamide (item 19).
+    "sulfonimidamide",
+    # Wave2 T3d (P-66.1.1 Table 6.1 item 25): sulfinimidamide -S(=NH)-NH2 ranks
+    # just below sulfonimidamide (item 20; sulfinamide item 24 not yet shipped).
+    "sulfinimidamide",
     # C1 (P-65.3.1): sulfono N-analogue; ranks with the sulfonamide family
     "sulfonohydrazide",
+    # Wave2 T3d (P-66.4.3.1): hydrazidine's nomenclatural properties are those of
+    # hydrazides; rank just ABOVE hydrazide so a molecule reading as both is the
+    # hydrazidine.
+    "hydrazidine",
     "hydrazide",
+    # Wave2 T3d (P-66.3.4): thiohydrazide = chalcogen analogue of hydrazide, same
+    # rank region (just below the oxo hydrazide).
+    "thiohydrazide",
     "hydroxamic_acid",  # IUPAC P-65.3.3: between hydrazides and imides
     "imide",
     "amidine",     # IUPAC P-66.4.1: between imide and nitrile
+    # Wave2 T3d (P-66.4.2, BB Table 6.1 item 18): amidrazone / hydrazonamide ranks
+    # immediately below amidine (item 17).
+    "hydrazonamide",
 
     # Nitriles
     "nitrile",
@@ -221,6 +256,15 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     "disulfide",     # P-63.6.2
     "peroxide",      # DD2 Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
     "hydrazine_fg",  # P-62.4
+    # Wave2 T3b (P-63.6): sulfoxides/sulfones have NO suffix form
+    # (SUFFIX_FORMS None) — the PIN is substitutive with sulfinyl/sulfonyl
+    # PREFIXES on the senior parent (1-(methanesulfinyl)-2-(methylsulfanyl)-
+    # ethane, BB 18284). Claiming PG starved the polyfunctional path
+    # (functional-class 'ethyl methyl sulfoxide' dropped the -S-CH3).
+    # Single-group molecules are named by the dedicated handler, whose
+    # predicate now keys on FG presence with no PCG.
+    "sulfoxide",
+    "sulfone",
     # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
     # P-68.3.1.1.1.5 / P-35.3.1)
     "aminooxy",
@@ -339,6 +383,9 @@ SUFFIX_FORMS = {
     "primary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "secondary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "tertiary_sulfonamide": ("sulfonamide", "sulfonamide"),
+    # Wave2 T3d (P-66.1.1 item 20): same word for chain/ring (like sulfonamide);
+    # methanesulfonimidamide / benzenesulfonimidamide.
+    "sulfonimidamide": ("sulfonimidamide", "sulfonimidamide"),
     # C1 (P-65.3.1): sulfono N-analogue -- parent stem + 'sulfonohydrazide'
     # ('methane' + 'sulfonohydrazide' = 'methanesulfonohydrazide'), exactly like
     # methanesulfonamide. Both simple and ring form are the same word.
@@ -406,6 +453,11 @@ SUFFIX_FORMS = {
     # carbohydrazide). The characteristic C is always terminal (chain-end), so
     # locant-1 is implicit and elided (see TERMINAL_FG_TYPES in naming_utils.py).
     "hydrazide": ("hydrazide", "carbohydrazide"),  # IUPAC P-66.3
+    # Wave2 T3d (P-66.3.4): thiohydrazide, chalcogen analogue of hydrazide.
+    "thiohydrazide": ("thiohydrazide", "carbothiohydrazide"),
+    # Wave2 T3d (P-66.4.3.1): hydrazidine — chain 'hydrazonohydrazide',
+    # ring/appended-C 'carbohydrazonohydrazide' (parallel to hydrazide).
+    "hydrazidine": ("hydrazonohydrazide", "carbohydrazonohydrazide"),
     "imide": ("imide", "dicarboximide"),  # IUPAC P-66.2
     # FGs with functional class naming only (no substitutive suffix)
     "thioester": None,           # IUPAC P-65.3.1: functional class naming (S-alkyl alkanethioate)
@@ -432,6 +484,13 @@ SUFFIX_FORMS = {
     # Phase 109: 6 new FG classes
     "acid_iodide": ("oyl iodide", "carbonyl iodide"),  # IUPAC P-65.5.1
     "amidine": ("imidamide", "carboximidamide"),        # IUPAC P-66.4.1
+    # Wave2 T3d (P-66.4.2, BB Table 6.1 item 18): amidrazone — chain
+    # 'hydrazonamide' (ethanehydrazonamide), ring/appended-C 'carbohydrazonamide'
+    # (benzenecarbohydrazonamide).
+    "hydrazonamide": ("hydrazonamide", "carbohydrazonamide"),
+    # Wave2 T3d (P-66.1.1 item 25): sulfinimidamide, same word chain/ring
+    # (like sulfonamide/sulfonimidamide).
+    "sulfinimidamide": ("sulfinimidamide", "sulfinimidamide"),
     # DD2 Fix C (Phase D): R-S-OH is now perceived as `so_thioperoxol` and emitted
     # as `-SO-thioperoxol` (P-56.2 PIN). `sulfenic_acid` is retired from the PIN path
     # (perception suppresses it on overlap) — this legacy suffix is unreachable for
@@ -534,6 +593,9 @@ PREFIX_FORMS = {
     # C1 (P-65.3.1): -SO2-NH-NH2 as a substituent prefix (defensive; target
     # compounds are mono-functional so it is normally the principal suffix).
     "sulfonohydrazide": "hydrazinesulfonyl",
+    # Wave2 T3d (P-66.1.1): sulfonimidamide as a non-principal prefix
+    # (defensive; target compounds are mono-functional -> principal suffix).
+    "sulfonimidamide": "sulfonimidoyl",
     "nitrile": "cyano",
     "isocyanide": "isocyano",
     # Amides as non-principal group prefix (IUPAC P-66.1.1.4 method 2)
@@ -592,6 +654,12 @@ PREFIX_FORMS = {
     "secondary_amide": None,      # Named via acylamino pathway in universal pipeline
     "tertiary_amide": None,       # Named via acylamino pathway in universal pipeline
     "hydrazide": "hydrazinecarbonyl",  # IUPAC P-66.3.5
+    # Wave2 T3d defensive non-principal prefixes (target compounds are
+    # mono-functional -> the suffix path is used; these guard the demoted case).
+    "thiohydrazide": "hydrazinecarbothioyl",       # P-66.3.4 / Table 4.4
+    "hydrazidine": "hydrazinecarbohydrazonoyl",    # P-66.4.3.4.1 (BB 56105)
+    "hydrazonamide": "carbamohydrazonoyl",         # P-66.4.2.3.2 (BB 34498)
+    "sulfinimidamide": "sulfinimidoyl",            # parallel to sulfonimidoyl
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
     # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5

@@ -209,6 +209,200 @@ def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -
     return f"{parent_name}sulfonic acid"
 
 
+def _classify_oxide_side(mol, c_idx: int, sulfur_idx: int):
+    """Classify one R side of R-S(=O)x-R' for substitutive P-63.6 naming.
+
+    Wave2 T3b. Returns ``(stem, kind, atoms)`` where ``stem`` is the
+    parent-hydride name used both for the acid-form prefix
+    ('{stem}sulfinyl': methanesulfinyl / benzenesulfinyl / cyclohexanesulfinyl)
+    and as the parent name when this side wins parent selection; ``kind`` is
+    'chain' or 'ring'; ``atoms`` is the side's full atom set. Returns None
+    for any side that is not one of the honestly-nameable shapes (linear
+    terminal saturated all-C chain; plain benzene; plain saturated
+    cycloalkane) — the caller then falls back to functional class, never
+    fabricating a name from a carbon count.
+    """
+    from ..data.chain_names import get_chain_prefix
+
+    # Full side BFS (never cross S)
+    side = set()
+    q = deque([c_idx])
+    while q:
+        i = q.popleft()
+        if i in side or i == sulfur_idx:
+            continue
+        side.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni not in side and ni != sulfur_idx:
+                q.append(ni)
+
+    # all-carbon only
+    if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in side):
+        return None
+
+    ri = mol.GetRingInfo()
+    in_ring = [i for i in side if ri.NumAtomRings(i) > 0]
+    if in_ring:
+        # the side must be EXACTLY one plain unsubstituted monocycle
+        if set(in_ring) != side:
+            return None
+        rings = [set(r) for r in ri.AtomRings() if set(r) == side]
+        if len(rings) != 1:
+            return None
+        n = len(side)
+        atoms = [mol.GetAtomWithIdx(i) for i in side]
+        if n == 6 and all(a.GetIsAromatic() for a in atoms):
+            return ('benzene', 'ring', side)
+        if all(not a.GetIsAromatic() for a in atoms) and all(
+            mol.GetBondBetweenAtoms(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+            .GetBondTypeAsDouble() == 1.0
+            for b in mol.GetBonds()
+            if b.GetBeginAtomIdx() in side and b.GetEndAtomIdx() in side
+        ):
+            try:
+                return (f"cyclo{get_chain_prefix(n)}ane", 'ring', side)
+            except (ValueError, KeyError):
+                return None
+        return None
+
+    # acyclic: linear unbranched saturated chain attached at its terminus
+    path = [c_idx]
+    seen = {c_idx}
+    cur = c_idx
+    while True:
+        nxt = [
+            nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+            if nb.GetIdx() in side and nb.GetIdx() not in seen
+        ]
+        if len(nxt) > 1:
+            return None
+        if not nxt:
+            break
+        b = mol.GetBondBetweenAtoms(cur, nxt[0])
+        if b is None or b.GetBondTypeAsDouble() != 1.0:
+            return None
+        cur = nxt[0]
+        seen.add(cur)
+        path.append(cur)
+    if len(path) != len(side):
+        return None
+    try:
+        return (f"{get_chain_prefix(len(side))}ane", 'chain', side)
+    except (ValueError, KeyError):
+        return None
+
+
+def name_chalcogen_oxide_substitutive(
+    mol, match_atoms: Tuple[int, ...], oxide_kind: str,
+) -> Optional[str]:
+    """P-63.6 substitutive PIN for R-S(=O)-R' / R-S(=O)(=O)-R' (Wave2 T3b).
+
+    BB-verbatim targets: '(methanesulfinyl)methane' (46154, DMSO),
+    '1-(ethanesulfinyl)butane' (28094), '(ethanesulfonyl)ethane' (28115),
+    '(methanesulfinyl)benzene', "1,1'-sulfinyldibenzene" (28110, symmetric
+    diaryl multiplicative; 'Multiplication of acyclic hydrocarbons is not
+    permitted' — identical chains stay substitutive).
+
+    Args:
+        mol: RDKit Mol.
+        match_atoms: sulfoxide/sulfone SMARTS match (S first).
+        oxide_kind: 'sulfinyl' (one =O) or 'sulfonyl' (two =O).
+
+    Returns:
+        The substitutive name, or None (caller keeps functional class).
+    """
+    from ..assembly.naming_utils import should_omit_locant_one
+
+    sulfur_idx = None
+    for idx in match_atoms:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'S':
+            sulfur_idx = idx
+            break
+    if sulfur_idx is None:
+        return None
+    c_nbrs = [
+        n.GetIdx() for n in mol.GetAtomWithIdx(sulfur_idx).GetNeighbors()
+        if n.GetSymbol() == 'C'
+    ]
+    if len(c_nbrs) != 2:
+        return None
+
+    sides = []
+    for c in c_nbrs:
+        s = _classify_oxide_side(mol, c, sulfur_idx)
+        if s is None:
+            return None
+        sides.append(s)
+
+    (stem_a, kind_a, atoms_a), (stem_b, kind_b, atoms_b) = sides
+
+    # Symmetric diaryl -> multiplicative (P-63.6 form (3) is the PIN).
+    if kind_a == 'ring' and kind_b == 'ring':
+        if stem_a == stem_b == 'benzene':
+            return f"1,1'-{oxide_kind}dibenzene"
+        # identical/different non-benzene ring pairs: the general
+        # multiplicative ring machinery lands in Tier 5a — fail through.
+        return None
+
+    # Ring + chain: ring is the senior parent (P-44.1.2.2).
+    if kind_a == 'ring' or kind_b == 'ring':
+        ring_stem = stem_a if kind_a == 'ring' else stem_b
+        chain_stem = stem_b if kind_a == 'ring' else stem_a
+        # monosubstituted benzene / symmetric saturated ring: no locant
+        return f"({chain_stem}{oxide_kind}){ring_stem}"
+
+    # Two chains: the longer chain is the parent (P-44.3); tie -> either
+    # (identical stems for the symmetric case).
+    n_a, n_b = len(atoms_a), len(atoms_b)
+    if n_a >= n_b:
+        parent_stem, parent_n, sub_stem = stem_a, n_a, stem_b
+    else:
+        parent_stem, parent_n, sub_stem = stem_b, n_b, stem_a
+    prefix = f"({sub_stem}{oxide_kind})"
+    if should_omit_locant_one(
+        context="prefix", chain_length=parent_n, is_monosubstituted=True,
+    ):
+        return f"{prefix}{parent_stem}"
+    return f"1-{prefix}{parent_stem}"
+
+
+def chalcogen_oxide_fc_covers_molecule(
+    mol, match_atoms: Tuple[int, ...],
+) -> bool:
+    """Wave2 T3b conservation guard for the functional-class sulfoxide/
+    sulfone namers: their name describes EXACTLY R-S(=O)x-R', so it is only
+    honest when S + its =O oxygens + both full side fragments account for
+    every heavy atom in the molecule. 'CSCCS(=O)C' used to emit 'ethyl
+    methyl sulfoxide' — the alkyl walk stopped at the second S, silently
+    dropping -S-CH3 (a different molecule). On False the handler declines
+    and the polyfunctional path names the whole structure.
+    """
+    sulfur_idx = None
+    for idx in match_atoms:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'S':
+            sulfur_idx = idx
+            break
+    if sulfur_idx is None:
+        return False
+    covered = {sulfur_idx}
+    for nb in mol.GetAtomWithIdx(sulfur_idx).GetNeighbors():
+        if nb.GetSymbol() == 'O' and nb.GetDegree() == 1:
+            covered.add(nb.GetIdx())
+            continue
+        # full side BFS
+        q = deque([nb.GetIdx()])
+        while q:
+            i = q.popleft()
+            if i in covered or i == sulfur_idx:
+                continue
+            covered.add(i)
+            for nb2 in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nb2.GetIdx() not in covered and nb2.GetIdx() != sulfur_idx:
+                    q.append(nb2.GetIdx())
+    return len(covered) == mol.GetNumHeavyAtoms()
+
+
 def _characterize_sulfur_substituent(mol, start_idx: int, exclude: set):
     """Characterize a substituent attached to sulfur as aryl or alkyl.
 
@@ -240,23 +434,19 @@ def _characterize_sulfur_substituent(mol, start_idx: int, exclude: set):
             return ("naphthyl", 10)
         return (None, 0)
 
-    # Alkyl group: BFS counting only carbon atoms
-    visited = set()
-    queue = deque([start_idx])
-    count = 0
-    while queue:
-        atom_idx = queue.popleft()
-        if atom_idx in visited or atom_idx in exclude:
-            continue
-        visited.add(atom_idx)
-        atom = mol.GetAtomWithIdx(atom_idx)
-        if atom.GetSymbol() == 'C':
-            count += 1
-            for neighbor in atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx not in visited and nbr_idx not in exclude:
-                    if neighbor.GetSymbol() == 'C':
-                        queue.append(nbr_idx)
+    # Alkyl group — Wave2 T3b conservation: the old C-only BFS silently
+    # flattened branched / ring / hetero-bearing sides into a linear alkyl
+    # count ('CSCCS(=O)C' -> 'ethyl methyl sulfoxide', the -S-CH3 dropped;
+    # a benzyl side became 'heptyl'). Route through the strict side
+    # classifier: only a linear terminal saturated all-C chain earns an
+    # alkyl name; everything else -> (None, 0) so the caller declines.
+    chalcogen_idx = next(iter(exclude), None)
+    if chalcogen_idx is None:
+        return (None, 0)
+    side = _classify_oxide_side(mol, start_idx, chalcogen_idx)
+    if side is None or side[1] != 'chain':
+        return (None, 0)
+    count = len(side[2])
     if count == 0 or count > 10:
         return (None, 0)
     return (get_alkyl_name(count), count)

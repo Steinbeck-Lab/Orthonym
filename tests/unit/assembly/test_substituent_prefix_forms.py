@@ -281,19 +281,19 @@ class TestSulfinyl:
     """Row 7: -S(=O)R -> R-sulfinyl per IUPAC P-63.6."""
 
     def test_methylsulfinyl_positive_minimal(self):
-        """-S(=O)CH3 -> methylsulfinyl per P-63.6."""
+        """-S(=O)CH3 -> methanesulfinyl (Wave2 T3b: PIN acid-stem form, BB 18284)."""
         mol = Chem.MolFromSmiles("CS(=O)CC")  # ethyl methyl sulfoxide
         atoms = _match_atoms(mol, "sulfoxide")
         result = get_sulfinyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "methylsulfinyl", f"got {result!r}"
+        assert result == "methanesulfinyl", f"got {result!r}"
 
     def test_ethylsulfinyl_positive_variant(self):
-        """-S(=O)C2H5 -> ethylsulfinyl per P-63.6."""
+        """-S(=O)C2H5 -> ethanesulfinyl (Wave2 T3b: PIN acid-stem form)."""
         # Both substituents are ethyl; smaller-fragment fallback selects one.
         mol = Chem.MolFromSmiles("CCS(=O)CC")  # diethyl sulfoxide
         atoms = _match_atoms(mol, "sulfoxide")
         result = get_sulfinyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "ethylsulfinyl", f"got {result!r}"
+        assert result == "ethanesulfinyl", f"got {result!r}"
 
     def test_short_tuple_negative(self):
         """Match tuple < 3 atoms returns None."""
@@ -321,18 +321,18 @@ class TestSulfonyl:
     """Row 8: -S(=O)(=O)R -> R-sulfonyl per IUPAC P-63.6."""
 
     def test_methylsulfonyl_positive_minimal(self):
-        """-S(=O)(=O)CH3 -> methylsulfonyl per P-63.6."""
+        """-S(=O)(=O)CH3 -> methanesulfonyl (Wave2 T3b: PIN acid-stem, BB 28150)."""
         mol = Chem.MolFromSmiles("CS(=O)(=O)CC")  # ethyl methyl sulfone
         atoms = _match_atoms(mol, "sulfone")
         result = get_sulfonyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "methylsulfonyl", f"got {result!r}"
+        assert result == "methanesulfonyl", f"got {result!r}"
 
     def test_ethylsulfonyl_positive_variant(self):
-        """-S(=O)(=O)C2H5 -> ethylsulfonyl per P-63.6."""
+        """-S(=O)(=O)C2H5 -> ethanesulfonyl (Wave2 T3b: PIN acid-stem)."""
         mol = Chem.MolFromSmiles("CCS(=O)(=O)CC")  # diethyl sulfone
         atoms = _match_atoms(mol, "sulfone")
         result = get_sulfonyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "ethylsulfonyl", f"got {result!r}"
+        assert result == "ethanesulfonyl", f"got {result!r}"
 
     def test_short_tuple_negative(self):
         """Match tuple < 3 atoms returns None."""

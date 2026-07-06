@@ -433,19 +433,28 @@ def get_sulfinyl_prefix(
         frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
         sub_carbon = c1 if frag1 <= frag2 else c2
 
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
+    # Wave2 T3b (P-63.6): the PIN prefix is the ACID-STEM form built on the
+    # parent hydride ('methanesulfinyl', BB 18284/28150-verbatim family;
+    # 'methylsulfinyl' is the non-PIN alternative). The side classifier also
+    # supplies the constitution guard the old carbons_only count lacked (a
+    # branched or hetero-bearing R' was silently flattened to a linear alkyl
+    # count). None -> the caller drops to its own fail-closed handling.
+    return _acid_stem_oxide_prefix(mol, sub_carbon, sulfur_idx, 'sulfinyl')
 
-    # Build compound prefix: methylsulfinyl, ethylsulfinyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfinyl"
-    except (ValueError, KeyError):
+
+def _acid_stem_oxide_prefix(
+    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str,
+) -> Optional[str]:
+    """Shared Wave2 T3b builder: '{parent-hydride-stem}sulfinyl/sulfonyl'
+    (methanesulfinyl / benzenesulfonyl / cyclohexanesulfinyl) with the
+    _classify_oxide_side constitution guard. None when the R' side is not an
+    honestly-nameable shape."""
+    from ..rules.sulfur import _classify_oxide_side
+    side = _classify_oxide_side(mol, sub_carbon, sulfur_idx)
+    if side is None:
         return None
+    stem, _kind, _atoms = side
+    return f"{stem}{oxide_kind}"
 
 
 def get_sulfonyl_prefix(
@@ -499,19 +508,9 @@ def get_sulfonyl_prefix(
         frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
         sub_carbon = c1 if frag1 <= frag2 else c2
 
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
-
-    # Build compound prefix: methylsulfonyl, ethylsulfonyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}sulfonyl"
-    except (ValueError, KeyError):
-        return None
+    # Wave2 T3b (P-63.6): ACID-STEM PIN form + constitution guard — see
+    # get_sulfinyl_prefix ('2-(methanesulfonyl)ethan-1-ol', BB 28150 verbatim).
+    return _acid_stem_oxide_prefix(mol, sub_carbon, sulfur_idx, 'sulfonyl')
 
 
 def get_sulfanyl_prefix(

@@ -1088,6 +1088,15 @@ def get_ring_substituent_name(
     elif ring_name.endswith('ine'):
         return ring_name[:-1] + 'yl'  # pyridine -> pyridinyl
 
+    # Wave2 T3c: benzene -> 'phenyl' (never the invalid 'benzenyl' token). The
+    # RING_SUBSTITUENT_NAMES table above already returns 'phenyl' for an
+    # unsubstituted benzene, so this is belt-and-suspenders — it only guarantees
+    # the malformed 'benzenyl' can never escape if any future path reaches this
+    # fallback with ring_name=='benzene'. Substituted-benzene decoration is
+    # handled upstream by decorated_ring_substituent_name (stem 'phenyl').
+    if ring_name == 'benzene':
+        return 'phenyl'
+
     return ring_name + 'yl'
 
 
@@ -1835,7 +1844,10 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     return f'{prefix_str}{stem}'
 
 
-def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> List[str]:
+def ring_atom_fg_prefixes(
+    mol, ring_atom_idx: int, ring_atom_set: Set[int],
+    return_atoms: bool = False,
+):
     """Characteristic-group prefixes carried by a single ring atom when its
     ring is demoted to a substituent.
 
@@ -1872,8 +1884,13 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
 
     Returns:
         Sorted list of prefix strings (``[]`` when the atom carries none).
+        With ``return_atoms=True``, returns ``(prefixes, claimed_atoms)``
+        where ``claimed_atoms`` is the set of exocyclic atom indices the
+        emitted prefixes account for (Wave2 T3a conservation accounting —
+        callers use it to prove every branch atom is represented in the name).
     """
     prefixes: List[str] = []
+    claimed: Set[int] = set()
     atom = mol.GetAtomWithIdx(ring_atom_idx)
     for nbr in atom.GetNeighbors():
         ni = nbr.GetIdx()
@@ -1887,6 +1904,7 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
                 and nbr.GetTotalNumHs() == 0
                 and nbr.GetDegree() == 1):
             prefixes.append('oxo')
+            claimed.add(ni)
             continue
         # cyano: exocyclic C, single bond, triple-bonded to a terminal N
         if (sym == 'C' and bond is not None
@@ -1897,6 +1915,8 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
                 cn_bond = mol.GetBondBetweenAtoms(ni, c_nbrs[0].GetIdx())
                 if cn_bond is not None and cn_bond.GetBondTypeAsDouble() == 3.0:
                     prefixes.append('cyano')
+                    claimed.add(ni)
+                    claimed.add(c_nbrs[0].GetIdx())
                     continue
         # carboxy (P-65.1.7.2.1): the ring atom bears an exocyclic carboxylic-acid
         # carbon — an exocyclic C (single bond) that carries =O (terminal, no H) AND
@@ -1918,5 +1938,11 @@ def ring_atom_fg_prefixes(mol, ring_atom_idx: int, ring_atom_set: Set[int]) -> L
                 for x in c_nbrs)
             if has_carbonyl_O and has_hydroxyl_O:
                 prefixes.append('carboxy')
+                claimed.add(ni)
+                claimed.update(
+                    x.GetIdx() for x in c_nbrs if x.GetSymbol() == 'O'
+                )
                 continue
+    if return_atoms:
+        return sorted(prefixes), claimed
     return sorted(prefixes)

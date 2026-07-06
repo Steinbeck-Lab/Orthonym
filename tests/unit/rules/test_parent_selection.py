@@ -495,11 +495,17 @@ class TestEnhancedParentSelection:
             "Pyridine score should be lower (more senior) than cyclohexane"
         )
 
-    def test_short_chain_prefers_ring(self):
-        """Short chain (1 carbon) with 6-membered ring -> ring is parent.
+    def test_short_chain_with_skeletal_pcg_prefers_chain(self):
+        """Wave2 T3a (P-52.2.8): OCC1CCCCC1 = cyclohexylmethanol.
 
-        OCC1CCCCC1 (hydroxymethylcyclohexane): OH on 1-carbon chain.
-        Ring should win because chain is just a substituent.
+        -ol is a SKELETAL suffix (no exocyclic-carbon form): the ring can
+        never express the PCG on the exocyclic carbinol carbon, so the
+        1-carbon methanol chain MUST be the parent (P-44.1(a)). The old
+        assertion ('ring is parent') pinned the mis-parenting that emitted
+        'cyclohexan-1-ol' — a different molecule, SELF-01-suppressed.
+        Exocyclic-carbon suffix classes keep the ring:
+        test_long_chain_with_fg_prefers_chain + the T3a suite's
+        cyclohexanecarboxylic-acid/carbaldehyde guards cover those.
         """
         smiles = 'OCC1CCCCC1'
         mol = Chem.MolFromSmiles(smiles)
@@ -522,8 +528,9 @@ class TestEnhancedParentSelection:
             principal_group_atoms=pg_atoms
         )
 
-        assert result.parent_type == 'ring', (
-            "Single carbon chain should favor ring as parent"
+        assert result.parent_type == 'chain', (
+            "Skeletal-suffix PCG on an exocyclic single carbon: the chain "
+            "(methanol) must be the parent (cyclohexylmethanol)"
         )
 
     def test_long_chain_with_fg_prefers_chain(self):

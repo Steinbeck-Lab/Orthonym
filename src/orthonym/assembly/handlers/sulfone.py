@@ -19,8 +19,12 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_sulfone(features: Any) -> bool:
-    """Mirrors composer.py:966 (``features.principal_group == 'sulfone'``)."""
-    return getattr(features, 'principal_group', None) == 'sulfone'
+    """Wave2 T3b: 'sulfone' joined _PREFIX_ONLY_PRINCIPAL (no suffix form);
+    fire on FG presence with no PCG (parallel to _is_sulfoxide)."""
+    return (
+        getattr(features, 'principal_group', None) is None
+        and bool(getattr(features, 'functional_groups', {}).get('sulfone'))
+    )
 
 
 def name_sulfone(
@@ -29,13 +33,32 @@ def name_sulfone(
     """Tier-B sulfone handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import _enrich_handler_name, _inject_stereo_if_missing
-    from ...rules.sulfur import name_sulfone as _name_sulfone
+    from ...rules.sulfur import (
+        chalcogen_oxide_fc_covers_molecule,
+        name_chalcogen_oxide_substitutive,
+        name_sulfone as _name_sulfone,
+    )
 
     matches = features.functional_groups.get('sulfone', [])
     if not matches:
         return None
 
-    name = _name_sulfone(features.mol, matches[0])
+    # Wave2 T3b conservation: decline when the R-SO2-R' unit does not cover
+    # the whole molecule (parallel to the sulfoxide handler; the functional-
+    # class alkyl walk silently dropped atoms beyond a heteroatom).
+    if not chalcogen_oxide_fc_covers_molecule(features.mol, matches[0]):
+        return None
+
+    # Wave2 T3b (P-63.6): substitutive PIN — '(ethanesulfonyl)ethane'
+    # (BB 28115), "1,1'-sulfonyldibenzene". Functional class stays for
+    # --trivial / builder-declined shapes.
+    name = None
+    if style == "pin":
+        name = name_chalcogen_oxide_substitutive(
+            features.mol, matches[0], 'sulfonyl'
+        )
+    if not name:
+        name = _name_sulfone(features.mol, matches[0])
     if not name:
         return None
 

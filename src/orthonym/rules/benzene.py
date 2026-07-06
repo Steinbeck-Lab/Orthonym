@@ -68,10 +68,19 @@ _SUFFIX_PRIORITY = [
     # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
     # carboxamide so a co-occurring amide would stay principal.
     'carbohydrazide',
+    # Wave2 T3d (P-66.4.3): ring-attached hydrazidine -C(=N-NH2)-NH-NH2 ->
+    # '-carbohydrazonohydrazide'. Ranks with the hydrazide family.
+    'carbohydrazonohydrazide',
+    # Wave2 T3d (P-66.3.4): ring-attached thiohydrazide -C(=S)-NH-NH2 ->
+    # '-carbothiohydrazide'.
+    'carbothiohydrazide',
     # C2 (P-66.4.1 / P-14.5.2 seniority): amidine ranks below amide and above
     # nitrile, so '-carboximidamide' sits between 'carboxamide' and
     # 'carbonitrile'. A co-occurring amide/acid therefore stays principal.
     'carboximidamide',
+    # Wave2 T3d (P-66.4.2): ring-attached amidrazone -C(=N-NH2)-NH2 ->
+    # '-carbohydrazonamide'. Ranks just below carboximidamide (amidine).
+    'carbohydrazonamide',
     'carbonitrile',
     'carbaldehyde',
     # v22 C-T2 (V-2): chalcogen analogues of the aldehyde-on-ring suffix
@@ -104,7 +113,10 @@ _SUFFIX_TO_PREFIX = {
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
     'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
+    'carbohydrazonohydrazide': 'hydrazinecarbohydrazonoyl',  # Wave2 T3d (P-66.4.3.4.1)
+    'carbothiohydrazide': 'hydrazinecarbothioyl',  # Wave2 T3d (P-66.3.4)
     'carboximidamide': 'carbamimidoyl',  # C2 (P-66.4.1.3.1)
+    'carbohydrazonamide': 'carbamohydrazonoyl',  # Wave2 T3d (P-66.4.2.3.2)
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
     'ol': 'hydroxy',  # ASML-13: when OH is not principal, use prefix form
@@ -137,6 +149,13 @@ _BENZENE_FG_SMARTS = {
     # wins on seniority. The C(=N)N guanidine/urea attach via N (start_idx would
     # be N, not this C), so the C-branch is never reached for them.
     'amidine': Chem.MolFromSmarts('[CX3](=[NX2])[NX3]'),
+    # Wave2 T3d: ring-attached composite-N added-carbon suffixes. Matched BEFORE
+    # amidine/hydrazide in the detector (they are more specific: amidine's
+    # [CX3](=[NX2])[NX3] and hydrazide's [CX3](=O)[NX3][NX3] both partially match
+    # these, so amidrazone/hydrazidine/thiohydrazide must be tested first).
+    'hydrazidine_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX3])[NX3][NX3]'),
+    'hydrazonamide_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX2,NX3])[NX3]'),
+    'thiohydrazide_ring': Chem.MolFromSmarts('[CX3](=S)[NX3][NX3]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
@@ -233,6 +252,20 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
             sub_info = _identify_substituent(mol, nbr_idx, ring_set)
             if sub_info:
                 substituents[ring_idx].append(sub_info)
+            else:
+                # Wave2 T3a constitution-conservation guard: an exocyclic
+                # branch NO recognizer could name used to be silently
+                # dropped — the assembled name then described a different
+                # molecule (bare 'benzoic acid' for the Ar-CH2-SiH2-CH2-Ar'
+                # witness) and only the OPSIN-dependent SELF-01 oracle
+                # caught it. Record an explicit unnameable sentinel: the
+                # name assemblers decline (fail closed) when one is present,
+                # and the atom-coverage accounting still sees the atoms.
+                substituents[ring_idx].append({
+                    'name': 'unknown',
+                    'atoms': _bfs_substituent_atoms(mol, nbr_idx, ring_set),
+                    'unnameable': True,
+                })
 
     return dict(substituents)
 
@@ -364,6 +397,22 @@ def _identify_suffix_fg_on_benzene(
         # substituent path (FIX c) when amidine is NOT the principal group; as a
         # ring SUFFIX the plain -carboximidamide base is emitted here and any
         # N/N'-substituents are carried on 'n_substituents'.
+        # Wave2 T3d: ring-attached composite-N suffixes, tested BEFORE amidine
+        # (more specific — amidine/hydrazide partially match these). Each is the
+        # added-carbon carbo* form on the ring; N/N'-substituent citation is out
+        # of scope here (fail-closed to the bare suffix, SELF-01 keeps honest).
+        for _fg, _suffix in (
+            ('hydrazidine_ring', 'carbohydrazonohydrazide'),
+            ('hydrazonamide_ring', 'carbohydrazonamide'),
+            ('thiohydrazide_ring', 'carbothiohydrazide'),
+        ):
+            for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS[_fg]):
+                if match[0] == start_idx:
+                    return {
+                        'name': _suffix, 'suffix_name': _suffix,
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
+
         _guanidine_patt = Chem.MolFromSmarts('[NX3][CX3](=[NX2])[NX3]')
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['amidine']):
             if match[0] != start_idx:
@@ -900,6 +949,33 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'atoms': sub_atoms,
                     'is_complex': _complex,
                 }
+        else:
+            # Wave2 T3d (P-66.4.1.3.5): ring-attached amidine via its AMINO N
+            # (-NH-C(=NH)-R) -> the {stem}imidamido prefix (4-ethanimidamido-
+            # benzoic acid). Parallel to the amido branch above but keyed on the
+            # imino C=N. Guards inside imidoyl_amido_prefix_from_branch reject
+            # guanidine (2nd amino N), amidrazone (=N-N), and Schiff bases.
+            _has_c_n = any(
+                nb.GetSymbol() == 'N' and nb.GetIdx() not in ring_atoms
+                and mol.GetBondBetweenAtoms(
+                    _acyl_c.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+                for nb in _acyl_c.GetNeighbors()
+            )
+            if _has_c_n:
+                sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+                from ..assembly.substituent_naming import (
+                    imidoyl_amido_prefix_from_branch,
+                )
+                _imid = imidoyl_amido_prefix_from_branch(
+                    mol, n_idx, _acyl_c.GetIdx(), sub_atoms
+                )
+                if _imid:
+                    _complex = any(ch.isdigit() for ch in _imid) or '-' in _imid
+                    return {
+                        'name': f'({_imid})' if _complex else _imid,
+                        'atoms': sub_atoms,
+                        'is_complex': _complex,
+                    }
 
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
     # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
@@ -1431,6 +1507,26 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
                 return {'name': 'ethenyl', 'atoms': all_atoms}
             return None
 
+    # Wave2 T3c constitution-conservation guard: the carbon-count name below
+    # ('octyl' from carbon_count==8) is only honest for an ACYCLIC SATURATED
+    # all-C fragment. A styryl arm -CH=CH-C6H5 walked into the far aromatic
+    # ring and was mislabelled '(4E)-4-octyl...' (8 C counted through the ring,
+    # the phenyl + the C=C both dropped — a different molecule that kept a
+    # nonsensical (4E) descriptor). Ring membership or any multiple bond in the
+    # fragment -> decline; the shared substituent namer (name_substituent_
+    # fragment) or fail-closed handles it. _is_vinyl_group already returned the
+    # plain-ethenyl case above.
+    ri = mol.GetRingInfo()
+    if any(ri.NumAtomRings(i) > 0 for i in all_atoms):
+        return None
+    for idx in all_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            j = nb.GetIdx()
+            if j in all_atoms:
+                b = mol.GetBondBetweenAtoms(idx, j)
+                if b is not None and b.GetBondTypeAsDouble() != 1.0:
+                    return None
+
     # Check for branched alkyl (isopropyl, tert-butyl, etc.)
     name = _get_alkyl_name(mol, start_idx, carbon_count, ring_atoms, sub_atoms=all_atoms)
     if name:
@@ -1537,6 +1633,57 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
     functional_group = _detect_chain_functional_group(mol, all_atoms)
     if not functional_group:
         return None
+
+    # Wave2 T3a constitution-conservation guard (P-29.4.2 safety): the name
+    # below is generated from carbon_count ALONE, so it is only honest when
+    # the collected branch IS a linear, unbranched, acyclic, saturated
+    # all-C chain bearing exactly one terminal FG. Anything else used to be
+    # silently collapsed into a fabricated linear chain that dropped or
+    # mutated atoms (Ar-CH2-SiH2-CH2-Ar' emitted as '8-carboxyoctyl': the Si
+    # dropped, the far ring's carbons re-linearised — a different molecule
+    # passing the coverage gate at 0.79). Reject -> the caller falls through
+    # to the exact recursive namers or fails closed.
+    _FG_O_COUNT = {'carboxylic_acid': 2, 'aldehyde': 1, 'alcohol': 1}
+    _o_count = 0
+    for a_idx in all_atoms:
+        _a = mol.GetAtomWithIdx(a_idx)
+        if _a.IsInRing() or _a.GetSymbol() not in ('C', 'O'):
+            return None
+        if _a.GetSymbol() == 'O':
+            _o_count += 1
+    if _o_count != _FG_O_COUNT[functional_group]:
+        return None
+    # Walk the carbon skeleton from the attachment: it must be one unbranched
+    # path covering every collected carbon, through single C-C bonds only,
+    # with the FG on the terminal carbon.
+    _branch_set = set(all_atoms)
+    _path = [start_idx]
+    _seen_c = {start_idx}
+    _cur = start_idx
+    while True:
+        _nxt = [
+            n.GetIdx() for n in mol.GetAtomWithIdx(_cur).GetNeighbors()
+            if n.GetIdx() in _branch_set and n.GetSymbol() == 'C'
+            and n.GetIdx() not in _seen_c
+        ]
+        if len(_nxt) > 1:
+            return None  # branched carbon skeleton
+        if not _nxt:
+            break
+        _b = mol.GetBondBetweenAtoms(_cur, _nxt[0])
+        if _b is None or _b.GetBondTypeAsDouble() != 1.0:
+            return None  # unsaturation would be dropped by the alkyl stem
+        _cur = _nxt[0]
+        _seen_c.add(_cur)
+        _path.append(_cur)
+    if len(_path) != carbon_count:
+        return None  # carbons not on one contiguous path (e.g. ether bridge)
+    _t_o = [
+        n for n in mol.GetAtomWithIdx(_path[-1]).GetNeighbors()
+        if n.GetIdx() in _branch_set and n.GetSymbol() == 'O'
+    ]
+    if len(_t_o) != _FG_O_COUNT[functional_group]:
+        return None  # FG not terminal (mid-chain OH would get a wrong locant)
 
     # Generate a proper substituent name based on FG type and chain length
     sub_name = _name_functionalized_chain_substituent(carbon_count, functional_group)
@@ -1917,8 +2064,17 @@ def name_substituted_benzene(
         substituents: Dict from get_benzene_substituents
 
     Returns:
-        IUPAC name string (e.g., "chlorobenzene" or "1,4-dimethylbenzene")
+        IUPAC name string (e.g., "chlorobenzene" or "1,4-dimethylbenzene"),
+        or None when any substituent is an unnameable sentinel (Wave2 T3a
+        conservation guard: emitting without it would drop its atoms).
     """
+    # Wave2 T3a: decline (fail closed) when any branch could not be named —
+    # see get_benzene_substituents. The caller treats None as handler decline.
+    for _subs in substituents.values():
+        for _s in _subs:
+            if _s.get('unnameable'):
+                return None
+
     # Build locant-to-substituent mapping
     # oriented_ring[0] = position 1, oriented_ring[1] = position 2, etc.
     atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(oriented_ring)}
@@ -2634,8 +2790,32 @@ def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
             sub_idx = sub.GetIdx()
             if sub_idx == c_idx or sub_idx in parent_atoms:
                 continue
+            if sub.GetSymbol() == 'O':
+                # Wave2 T3d (P-66.4.4): amidoxime -C(=N-OH)-NH2 is an N'-hydroxy
+                # (or N'-alkyloxy) amidine — the O on the imino N is the N'-hydroxy
+                # substituent, NOT a fail-closed case. -OH -> 'hydroxy'; -O-R ->
+                # '{alkyl}oxy'. Only the imino (=N, N') nitrogen bears it; a charged
+                # / ring / multi-heteroatom O still fails closed.
+                if (sub.GetFormalCharge() != 0
+                        or mol.GetRingInfo().NumAtomRings(sub_idx) > 0):
+                    return None
+                o_heavy = [x for x in sub.GetNeighbors() if x.GetIdx() != n_idx]
+                if not o_heavy:
+                    entries.append((nlocant, 'hydroxy'))
+                    continue
+                if (len(o_heavy) == 1 and o_heavy[0].GetSymbol() == 'C'
+                        and sub.GetTotalNumHs() == 0):
+                    from ..assembly.substituent_prefix_forms import get_alkoxy_prefix
+                    oxy = get_alkoxy_prefix(
+                        mol, (sub_idx, o_heavy[0].GetIdx(), o_heavy[0].GetIdx()),
+                        None,
+                    )
+                    if oxy:
+                        entries.append((nlocant, oxy))
+                        continue
+                return None
             if sub.GetSymbol() != 'C':
-                # A non-carbon substituent on the amidine N (e.g. N-N, N-O) is not
+                # A non-carbon substituent on the amidine N (e.g. N-N) is not
                 # a plain N-alkyl/aryl amidine -> fail closed.
                 return None
             alkyl_atoms, carbon_count = _collect_pure_alkyl(

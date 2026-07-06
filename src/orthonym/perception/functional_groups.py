@@ -41,7 +41,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     "telluroic_O_acid": "[CX3](=[TeX1])[OX2H1]", # R-C(=Te)-OH (P-65.3 parallel; AUDIT-FRN § 2)
     "ditelluroic_acid": "[CX3](=[TeX1])[TeX2H1]",# R-C(=Te)-TeH (P-65.3 parallel; AUDIT-FRN § 2)
     # Carbamic acid (IUPAC P-65.2.3): N-C(=O)-OH (free acid, not ester)
-    "carbamic_acid": "[NX3][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
+    # Wave2 T3d: the amino N must NOT itself bear a second N — else N-N-C(=O)-OH
+    # (a hydrazinecarboxylic acid, P-66.3.5.1) is mis-read as carbamic acid and the
+    # senior carbamic path DROPS the terminal N (wrong structure). The negated
+    # recursive keeps ordinary carbamic acids (NC(=O)O / CNC(=O)O — N has no N-neighbour).
+    "carbamic_acid": "[NX3;!$([NX3][NX3])][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     # BBR-PERC/DEF-4 (169.7): require a C neighbour on S/P (P-65.3: sulfonic/phosphonic
     # are CARBON acids). Recursive-env `$(...)` adds the constraint WITHOUT changing the
     # match-tuple arity, so inorganic oxoacids (sulfamic NS(=O)(=O)O, phosphoric OP(=O)(O)O)
@@ -94,6 +98,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     "secondary_amide": "[CX3](=O)[NX3H1][#6]",
     "tertiary_amide": "[CX3](=O)[NX3]([#6])[#6]",
     "hydrazide": "[CX3](=O)[NX3][NX3]",
+    # Wave2 T3d (P-66.3.4): thiohydrazide R-C(=S)-NH-NH2 (chalcogen analogue of
+    # hydrazide). Cascade-suppresses thioamide + hydrazine_fg on its atoms.
+    "thiohydrazide": "[CX3](=S)[NX3][NX3]",
     "imide": "[CX3](=O)[NX3][CX3](=O)",
     # Phase 163 Tier FRN-B: chalcogen-on-amide (P-66.1.4.1.1 + P-66.6.3) -- additive per CONTEXT D-08
     # AUDIT DECISION (AUDIT-FRN § 2.2): single-permissive [NX3] (NOT 3-way primary/secondary/tertiary
@@ -113,6 +120,17 @@ FUNCTIONAL_GROUP_SMARTS = {
     # sulfonic acid. The carbonyl-based hydrazide SMARTS above never matches a
     # sulfonyl S; mirror primary_sulfonamide but with the second N.
     "sulfonohydrazide": "[SX4](=O)(=O)[NX3][NX3]",
+    # Wave2 T3d (P-66.1.1 Table 6.1 item 20): sulfonimidamide -S(=O)(=NH)-NH2,
+    # a preselected suffix ranked just below sulfonamide (BB 18773). The whole
+    # group used to drop (CS(=O)(=N)N -> 'unknown'). SMARTS mirrors
+    # primary_sulfonamide with one =O replaced by the imido =NH. On sulfur, so
+    # NO overlap with the carbon-based imine/oxime/hydrazone SMARTS (the
+    # composite-N carbon families that need the perception-priority prototype).
+    "sulfonimidamide": "[SX4](=[OX1])(=[NX2])[NX3H2]",
+    # Wave2 T3d (P-66.1.1 Table 6.1 item 25): sulfinimidamide -S(=NH)-NH2 = the
+    # shipped sulfonimidamide with the S(=O) removed (SX4->SX3, one fewer O).
+    # SX3-vs-SX4 makes it disjoint from every shipped SMARTS -> no suppression.
+    "sulfinimidamide": "[SX3](=[NX2])[NX3H2]",
 
     # === CARBAMATES (must check before esters -- N-C(=O)-O is more specific) ===
     "carbamate": "[NX3][CX3](=O)[OX2][#6]",
@@ -133,6 +151,17 @@ FUNCTIONAL_GROUP_SMARTS = {
     # ['amidine']=0 remains correct. =[NX2] (not =O) still excludes urea; the N
     # (not O) neighbour still excludes imidates (COC(=N)C).
     "amidine": "[CX3](=[NX2])[NX3]",  # DATA-03 / D1
+    # Wave2 T3d (P-66.4.2, BB Table 6.1 items 17-18): amidrazone / hydrazonamide
+    # R-C(=N-NH2)-NH2 — an amidine whose imido =NH is a hydrazono =N-NH2. The
+    # =[NX2][NX2,NX3] (imino N bonded to another N) is the discriminant vs plain
+    # amidine (=NH, no N-neighbour). Ranks just below amidine; cascade-suppresses
+    # amidine/hydrazone/primary_amine on its atoms.
+    "hydrazonamide": "[CX3](=[NX2][NX2,NX3])[NX3]",
+    # Wave2 T3d (P-66.4.3, BB 34574): hydrazidine / hydrazonohydrazide
+    # R-C(=N-NH2)-NH-NH2 — the [NX3][NX3] hydrazido side is the discriminant vs
+    # amidrazone's single [NX3]. Cascade-suppresses hydrazone/amidine/hydrazonamide/
+    # hydrazine_fg on its atoms.
+    "hydrazidine": "[CX3](=[NX2][NX3])[NX3][NX3]",
 
     # === ISOCYANATES/ISOTHIOCYANATES (cumulated double bonds) ===
     "isocyanate": "[#6][NX2]=[CX2]=[OX1]",
@@ -173,7 +202,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     "phenol": "[OX2H][cX3]",
     "enol": "[OX2H][CX3]=[CX3]",
     "thiol": "[SX2H][#6]",
-    "selenol": "[SeX2H]",
+    # Wave2 T3a: carbon in match (parallel to thiol/tellurol) so
+    # PG_ATTACHMENT_INDICES["selenol"] = [1] can point at the locant-bearing C.
+    "selenol": "[SeX2H][#6]",
     # BBR-PERC/DEF-2 (169.7): tellurol — Te analogue of -ol/-thiol/-selenol (P-63.1.5).
     # Defines the resolver ref at line ~298 (was a dead ref, audit Dim-02 §4 #2).
     "tellurol": "[TeX2H1][#6]",
@@ -513,8 +544,26 @@ def _resolve_fg_collisions(results):
         ('azo', ['imine']),
         # DATA-03: guanidine suppresses amidine (guanidine is more specific)
         ('guanidine', ['amidine']),
-        # DATA-03: amidine suppresses imine and primary_amine on its atoms
-        ('amidine', ['imine', 'primary_amine']),
+        # Wave2 T3d composite-N precedence (ORDER LOAD-BEARING — the resolver
+        # applies top-to-bottom on live results):
+        #  1. hydrazidine (R-C(=N-NH2)-NH-NH2, the most specific: 2-N hydrazido
+        #     side) clears hydrazonamide/hydrazone/amidine/hydrazine_fg/primary_amine/
+        #     imine on its atoms.
+        ('hydrazidine', ['hydrazonamide', 'hydrazone', 'amidine',
+                         'hydrazine_fg', 'primary_amine', 'imine']),
+        #  2. hydrazonamide (amidrazone, 1-N amino side) clears amidine/hydrazone/
+        #     primary_amine. Placed BEFORE ('guanidine',['hydrazonamide']) so on the
+        #     carbonic-diamide NC(=NN)N it strips amidine/hydrazone first, THEN
+        #     guanidine strips hydrazonamide -> guanidine cleanly wins.
+        ('hydrazonamide', ['amidine', 'hydrazone', 'primary_amine']),
+        #  3. guanidine (3-N carbon) owns the carbonic-diamide case.
+        ('guanidine', ['hydrazonamide', 'hydrazidine']),
+        # DATA-03 + Wave2 T3d: amidine suppresses imine/primary_amine, AND oxime
+        # (the amidoxime -C(=N-OH)-NH2 is a P-66.4.4 N'-hydroxy amidine, NOT an
+        # oxime; atom-scoped so standalone oximes CC=NO are untouched).
+        ('amidine', ['imine', 'primary_amine', 'oxime']),
+        # Wave2 T3d (P-66.3.4): thiohydrazide suppresses thioamide + hydrazine_fg.
+        ('thiohydrazide', ['thioamide', 'hydrazine_fg']),
         # DATA-04: acid iodide suppresses aldehyde (parallel to other acid halides)
         ('acid_iodide', ['aldehyde']),
         # DATA-05b: disulfide suppresses thioether if S atoms overlap

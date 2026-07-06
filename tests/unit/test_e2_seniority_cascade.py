@@ -251,7 +251,7 @@ SEN02_INVARIANT = [
     ("CSCSC", "2,4-dithiapentane"),      # homogeneous dithioether -> skeletal kept
     ("CSC", "dimethyl sulfide"),         # simple sulfide -> functional-class kept
     ("CSCC", "ethyl methyl sulfide"),
-    ("CS(=O)C", "dimethyl sulfoxide"),   # sulfoxide -> functional-class kept (follow-on)
+    ("CS(=O)C", "(methanesulfinyl)methane"),   # Wave2 T3b: substitutive P-63.6 PIN (was functional-class 'dimethyl sulfoxide', now --trivial)
     ("OCCOCCOCCOC", "3,6,9-trioxadecan-1-ol"),  # terminal-OH polyether -> skeletal kept
 ]
 

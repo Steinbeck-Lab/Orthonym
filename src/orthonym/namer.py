@@ -1413,6 +1413,28 @@ class Orthonym:
         # Start runtime fragment cache session (only at top-level depth)
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         start_naming_session()
+        # Wave2 T3 (cross-molecule stereo-contamination fix): the confidence /
+        # candidate-pool / parent-correctness thread-locals are PER-MOLECULE, but
+        # they persist across name() calls (documented at the post-dispatch gate
+        # below). The pytest conftest clears them per-test; production (and the
+        # phase-gate / determinism loops, which name 1000+ molecules through one
+        # instance) never did — so a molecule whose handler leaves an
+        # allow-injecting {handler, atom_to_locant} entry (e.g. a benzene
+        # ring-substituent) contaminated the NEXT molecule's _final_stereo_check,
+        # injecting a spurious order-dependent descriptor ('(3R,5R)-stigmastane').
+        # Reset at the TOP of each top-level session so every molecule starts
+        # clean — the same invariant conftest enforces for the suite.
+        if is_top_level_naming():
+            try:
+                from .assembly.coverage_scoring import clear_confidence
+                clear_confidence()
+            except Exception:
+                pass
+            try:
+                from .assembly.candidate_pool import clear_pool
+                clear_pool()
+            except Exception:
+                pass
         try:
             # HYG-02: structural scope pre-check (opt-in). Only the wildcard
             # class is refused here — the one class with zero in-scope risk.
@@ -2062,6 +2084,24 @@ class Orthonym:
                     for nbr in features.mol.GetAtomWithIdx(_single).GetNeighbors()
                 ):
                     _run_parent_selection = True
+                else:
+                    # Wave2 T3a: skeletal suffixes (-ol/-amine/-thiol/-imine, ...)
+                    # have no exocyclic-carbon form, so a ring-attached single
+                    # PCG carbon still cannot put the suffix on the ring.
+                    # Parent selection is eligible when the single carbon IS a
+                    # PG attachment atom and NO attachment atom is a ring atom
+                    # (else the ring expresses the suffix itself — e.g. a
+                    # sugar's ring -OH union keeps the ring parent).
+                    from .rules.parent_selection import (
+                        SKELETAL_SUFFIX_PGS, _pg_attachment_atoms,
+                    )
+                    if features.principal_group in SKELETAL_SUFFIX_PGS:
+                        _att: set = set()
+                        for _m in features.principal_group_atoms:
+                            _att.update(_pg_attachment_atoms(
+                                features.principal_group, _m))
+                        if _single in _att and not (_att & all_ring_atoms):
+                            _run_parent_selection = True
             if _run_parent_selection:
                 # Phase 147 D-03: delegate ring-type dispatch to helper.
                 # Replaces the prior inline fused-hetero-only block; new
@@ -2176,6 +2216,32 @@ class Orthonym:
 
             ring_info = get_ring_info(features.mol)
             atom_rings = ring_info['atom_rings']
+
+            # Wave2 T3 (P-44.1 determinism): among monocyclic candidate rings,
+            # atom_rings[0] (first SSSR ring) is SMILES-order-dependent. When the
+            # principal characteristic group sits on EXACTLY ONE ring, P-44.1 makes
+            # that ring senior (it precedes the P-44.2 seniority tiebreak) — so move
+            # it to the front deterministically. Without this, a molecule with two
+            # equal rings where only one bears the PCG (e.g. 4-styrylbenzoic acid:
+            # the COOH benzene vs the styryl phenyl) flipped parent by spelling,
+            # dropping the acid to 'ethenylbenzene' for some orderings. Fused/PAH
+            # systems returned earlier; chain-parent cases are unaffected (the PCG
+            # then isn't on a ring). Tie (PCG on >1 ring) keeps SSSR order.
+            if (atom_rings and len(atom_rings) >= 2
+                    and features.principal_group_atoms
+                    and not features.chain_is_parent):
+                from .rules.parent_selection import is_principal_group_on_ring
+                _pcg_rings = [
+                    r for r in atom_rings
+                    if is_principal_group_on_ring(
+                        features.mol, set(r),
+                        features.principal_group_atoms,
+                        features.principal_group)
+                ]
+                if len(_pcg_rings) == 1 and _pcg_rings[0] is not atom_rings[0]:
+                    atom_rings = [_pcg_rings[0]] + [
+                        r for r in atom_rings if r is not _pcg_rings[0]
+                    ]
 
             if atom_rings:
                 # Select the most senior ring system per IUPAC P-44.2

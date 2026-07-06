@@ -1001,6 +1001,25 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 pool.add(_amidine_name, "amidine", features)
                 return pool.best().name
 
+    # Wave2 T3d (P-66.3): acyclic N/N'-substituted (thio)hydrazide, or a
+    # hydrazinecarboxylic acid. Runs BEFORE dispatch_inner for the same reason
+    # as the amidine branch (the general path mis-expresses the -NH-NH2 as a
+    # 'hydrazinyl'/'hydrazinecarbonyl' chain prefix). Fail-closed: returns None
+    # for the unsubstituted hydrazide (general path already correct) and for
+    # anything it cannot name cleanly. The hydrazinecarboxylic case perceives as
+    # carboxylic_acid (senior) + hydrazide co-located on the same C.
+    _hz_trigger = (
+        features.principal_group in ('hydrazide', 'thiohydrazide')
+        or (features.principal_group == 'carboxylic_acid'
+            and 'hydrazide' in getattr(features, 'functional_groups', {}))
+    )
+    if _hz_trigger and not getattr(features, 'is_cyclic', False):
+        _hz_name = _assemble_hydrazide_name(features, style)
+        if _hz_name:
+            pool = get_current_pool()
+            pool.add(_hz_name, "hydrazide", features)
+            return pool.best().name
+
     from .inner_dispatch import dispatch_inner
     _inner_result = dispatch_inner(features, mol=features.mol, style=style)
     if _inner_result is not None:
@@ -3860,6 +3879,197 @@ def _find_amidine_carbon(mol, pg_atoms):
     return None
 
 
+def _assemble_hydrazide_name(features: Any, style: str):
+    """Wave2 T3d (P-66.3.3 / P-66.3.4 / P-66.3.5.1): assemble an acyclic
+    N/N'-substituted (thio)hydrazide, or a hydrazinecarboxylic acid.
+
+    Three shapes, all fail-closed (return None -> general path -> SELF-01):
+      * acyl hydrazide  R-C(=O)-NH-NH2  -> {stem}hydrazide with N/N' locants
+        (N = the nitrogen bonded to the C=O; N' = the terminal nitrogen).
+        'CNNC(C)=O' -> N'-methylacetohydrazide; 'CN(N)C(C)=O' -> N-methyl...
+      * thiohydrazide  R-C(=S)-NH-NH2  -> {stem}thiohydrazide (same N/N' model).
+      * hydrazinecarboxylic acid  H2N-NH-C(=O)-OH  -> 'hydrazinecarboxylic acid'
+        (the C bears =O + OH + the hydrazine N; no R carbon).
+    """
+    from ..rules.benzene import _collect_pure_alkyl
+    from .substituent_naming import name_substituent_fragment
+    from .naming_utils import _wrap_n_substituent
+    mol = features.mol
+    pg = features.principal_group
+    pg_atoms = features.principal_group_atoms
+    if not pg_atoms:
+        return None
+
+    # Locate the characteristic carbon: the C double-bonded to O (hydrazide,
+    # hydrazinecarboxylic) or S (thiohydrazide) that also bears the -N-N-.
+    match = pg_atoms[0]
+    c_idx = None
+    for a in match:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C':
+            continue
+        has_dbl_chalc = any(
+            nb.GetSymbol() in ('O', 'S')
+            and mol.GetBondBetweenAtoms(a, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+            for nb in at.GetNeighbors())
+        has_nn = any(nb.GetSymbol() == 'N' for nb in at.GetNeighbors())
+        if has_dbl_chalc and has_nn:
+            c_idx = a
+            break
+    if c_idx is None:
+        return None
+    c_atom = mol.GetAtomWithIdx(c_idx)
+
+    # Classify the C: =O + -OH + N-N (no R carbon) = hydrazinecarboxylic acid;
+    # =O/=S + N-N + one R carbon = (thio)hydrazide.
+    dbl_o = dbl_s = oh_o = 0
+    r_carbon = None
+    n_inner = None
+    for nb in c_atom.GetNeighbors():
+        b = mol.GetBondBetweenAtoms(c_idx, nb.GetIdx())
+        sym = nb.GetSymbol()
+        if sym == 'O' and b.GetBondTypeAsDouble() == 2.0:
+            dbl_o += 1
+        elif sym == 'S' and b.GetBondTypeAsDouble() == 2.0:
+            dbl_s += 1
+        elif sym == 'O' and b.GetBondTypeAsDouble() == 1.0 and nb.GetTotalNumHs() >= 1:
+            oh_o += 1
+        elif sym == 'C':
+            r_carbon = nb.GetIdx()
+        elif sym == 'N':
+            n_inner = nb.GetIdx()
+    if n_inner is None:
+        return None
+    n_inner_atom = mol.GetAtomWithIdx(n_inner)
+    # the terminal N: the N bonded to n_inner that is not the C
+    n_term = None
+    for nb in n_inner_atom.GetNeighbors():
+        if nb.GetSymbol() == 'N' and nb.GetIdx() != c_idx:
+            n_term = nb.GetIdx()
+    if n_term is None:
+        return None
+
+    # Collect C-substituents on each hydrazide N (fail-closed on non-C / unnameable).
+    core = {c_idx, n_inner, n_term}
+    if r_carbon is not None:
+        # R chain atoms belong to the parent, not an N-substituent.
+        pass
+
+    def _n_sub_names(n_atom_idx, exclude):
+        names = []
+        for nb in mol.GetAtomWithIdx(n_atom_idx).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in exclude:
+                continue
+            if nb.GetSymbol() != 'C':
+                return None  # N-N-N / N-O etc. out of scope
+            alk, cc = _collect_pure_alkyl(mol, ni, set(exclude) | {n_atom_idx})
+            if not alk or cc == 0:
+                return None
+            nm = name_substituent_fragment(mol, alk, ni, list(set(exclude) | {n_atom_idx}))
+            if not nm:
+                return None
+            names.append(nm)
+        return names
+
+    # --- hydrazinecarboxylic acid (no R carbon; C = OH-bearing acid) ---
+    if r_carbon is None and dbl_o == 1 and oh_o == 1 and dbl_s == 0:
+        # N = the N bonded to the C (inner); N' = the terminal N (P-66.3.5.1).
+        inner_subs = _n_sub_names(n_inner, core)
+        term_subs = _n_sub_names(n_term, core)
+        if inner_subs is None or term_subs is None:
+            return None
+        prefix = _format_hydrazide_nn_prefix(inner_subs, term_subs)
+        if prefix is None:
+            return None
+        return f"{prefix}hydrazinecarboxylic acid"
+
+    # --- (thio)hydrazide: needs an R carbon (the acyl/thioacyl parent) ---
+    if r_carbon is None:
+        return None
+    if dbl_o == 1 and dbl_s == 0:
+        suffix_word = 'hydrazide'
+    elif dbl_s == 1 and dbl_o == 0:
+        suffix_word = 'thiohydrazide'
+    else:
+        return None
+
+    inner_subs = _n_sub_names(n_inner, core)
+    term_subs = _n_sub_names(n_term, core)
+    if inner_subs is None or term_subs is None:
+        return None
+    if not inner_subs and not term_subs:
+        return None  # unsubstituted -> general path already correct
+
+    # Build the {stem}(thio)hydrazide base via the SAME machinery the general
+    # path uses for the bare hydrazide (stem + 'ane' + suffix w/ elision), so it
+    # is 'ethanehydrazide' not the raw-stem 'ethhydrazide'. Mirror _assemble_
+    # amidine_name. thiohydrazide's SUFFIX_FORMS already gives the right word.
+    if not features.principal_chain:
+        return None
+    parent = _generate_chain_parent(features)
+    suffix = _generate_suffix(features)
+    if parent is None or suffix is None:
+        return None
+    base = _assemble_fragments([parent, suffix], style)
+    if not base or suffix_word not in base:
+        return None
+
+    # Guard: the chain must carry nothing but the hydrazide C — no dropped subs.
+    _grp = set(core)
+    if r_carbon is not None:
+        _grp.add(r_carbon)
+    # the carbonyl / thiocarbonyl chalcogen is part of the FG, not a dropped sub
+    for nb in c_atom.GetNeighbors():
+        if nb.GetSymbol() in ('O', 'S') and mol.GetBondBetweenAtoms(
+                c_idx, nb.GetIdx()).GetBondTypeAsDouble() == 2.0:
+            _grp.add(nb.GetIdx())
+    for nsub_n in (n_inner, n_term):
+        for nb in mol.GetAtomWithIdx(nsub_n).GetNeighbors():
+            if nb.GetSymbol() == 'C' and nb.GetIdx() != c_idx:
+                alk, _ = _collect_pure_alkyl(mol, nb.GetIdx(), _grp | {nsub_n})
+                if alk:
+                    _grp.update(alk)
+    chain_set = set(features.principal_chain)
+    if features.substituents:
+        for _pos, sub_list in features.substituents.items():
+            for sub_atoms in sub_list:
+                if not set(sub_atoms).issubset(_grp | chain_set):
+                    return None
+
+    prefix = _format_hydrazide_nn_prefix(inner_subs, term_subs)
+    if prefix is None:
+        return None
+    return f"{prefix}{base}"
+
+
+def _format_hydrazide_nn_prefix(inner_subs, term_subs):
+    """Wave2 T3d: build the italic-N / N' substituent prefix for a hydrazide.
+    ``inner_subs`` sit on N (the nitrogen bonded to the C=O/C=S / acid C);
+    ``term_subs`` on N' (the terminal nitrogen). P-66.3.3: N before N',
+    alphabetical within, di- for duplicates on one N."""
+    from .naming_utils import _wrap_n_substituent, get_multiplier_prefix, alpha_sort_key
+    parts = []  # (sort_key, rendered)
+    for locant, subs in (("N", inner_subs), ("N'", term_subs)):
+        if not subs:
+            continue
+        from collections import Counter
+        for nm, cnt in sorted(Counter(subs).items(), key=lambda kv: alpha_sort_key(kv[0])):
+            wrapped = _wrap_n_substituent(nm)
+            if cnt == 1:
+                parts.append((alpha_sort_key(nm), f"{locant}-{wrapped}"))
+            else:
+                mp = get_multiplier_prefix(cnt, nm)
+                loc = ",".join([locant] * cnt)
+                parts.append((alpha_sort_key(nm), f"{loc}-{mp}{wrapped}"))
+    if not parts:
+        return ""
+    parts.sort(key=lambda p: p[0])
+    # No trailing hyphen: the last N-substituent prepends directly to the base
+    # ('N-ethyl-N'-methylacetohydrazide', 'N'-methylethanehydrazide').
+    return "-".join(p[1] for p in parts)
+
+
 def _assemble_amidine_name(features: Any, style: str):
     """D1 (P-66.4.1 / P-66.4.1.2 / P-66.4.1.3.1): assemble an acyclic amidine
     name with N/N'-substituent locants (e.g. N-methylethanimidamide,
@@ -3909,6 +4119,22 @@ def _assemble_amidine_name(features: Any, style: str):
     for n_idx in amidine_n_idxs:
         for sub in mol.GetAtomWithIdx(n_idx).GetNeighbors():
             if sub.GetIdx() == c_idx or sub.GetIdx() in parent_atoms:
+                continue
+            # Wave2 T3d (amidoxime): the N'-O(H)/O-alkyl is part of the amidine
+            # group (named as N'-hydroxy/N'-alkyloxy by _detect_amidine_n_
+            # substituents), so it must be counted here or the extra-substituent
+            # guard below wrongly treats it as a dropped chain substituent.
+            if sub.GetSymbol() == 'O':
+                amidine_group_atoms.add(sub.GetIdx())
+                for o_nbr in sub.GetNeighbors():
+                    if o_nbr.GetIdx() == n_idx:
+                        continue
+                    o_alkyl, _ = _collect_pure_alkyl(
+                        mol, o_nbr.GetIdx(),
+                        set(parent_atoms) | {c_idx, n_idx, sub.GetIdx()},
+                    )
+                    if o_alkyl:
+                        amidine_group_atoms.update(o_alkyl)
                 continue
             alkyl_atoms, _ = _collect_pure_alkyl(
                 mol, sub.GetIdx(), set(parent_atoms) | {c_idx, n_idx}
@@ -5414,19 +5640,36 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         sub_name = _build_substituted_ring_name(
             features.mol, ring_atoms, chain_set, base_name
         )
+        # Wave2 T3a conservation: None = the ring carries branches this
+        # machinery cannot express — emit the honest fallback marker so the
+        # molecule surfaces as unknown rather than dropping the branch atoms
+        # (same convention as the unnameable-ring marker above).
+        if sub_name is None:
+            sub_name = 'unknown'
 
         ring_sub_groups[sub_name].append(locant)
 
     # Build prefix fragments
+    # Wave2 T3a (P-14.3.4 Rule 1): a mononuclear (1-atom) chain parent has a
+    # single trivially-1 position, so ring-substituent locants are never cited
+    # (phenylmethanol / diphenylmethanone, NOT 1-phenylmethanol). Route the
+    # decision through the shared chokepoint rather than an inline test.
+    _omit_ring_sub_locants = should_omit_locant_one(
+        context="prefix",
+        chain_length=len(features.principal_chain or ()),
+    )
     for name, locants in ring_sub_groups.items():
         count = len(locants)
         sorted_locants = sorted(locants)
 
-        formatted = format_substituent_prefix(name, sorted_locants, count)
+        if _omit_ring_sub_locants:
+            formatted = format_substituent_prefix(name, [], count)
+        else:
+            formatted = format_substituent_prefix(name, sorted_locants, count)
 
         prefixes.append(NameFragment(
             text=formatted,
-            locants=tuple(sorted_locants),
+            locants=() if _omit_ring_sub_locants else tuple(sorted_locants),
             fragment_type="prefix"
         ))
 
@@ -5445,14 +5688,30 @@ def _build_substituted_ring_name(
     For example, a benzene ring with two OH groups becomes
     "(3,4-dihydroxyphenyl)" instead of just "phenyl".
 
-    Only handles common cases: halogens, hydroxy, methoxy, amino, alkyl
-    on benzene-like rings. Falls back to bare base_name otherwise.
+    Only handles common cases on benzene-like rings, plus compound branches
+    via the recursive fragment namer (hydroxymethyl). Wave2 T3a
+    constitution-conservation guard: when the ring DOES carry exocyclic
+    branches but this function cannot express them (wrong ring class,
+    numbering failure, unnameable branch), it returns ``None`` — the caller
+    must fail closed. Returning the bare ``base_name`` in that situation
+    silently dropped the branch atoms (a different molecule; only the
+    OPSIN-dependent SELF-01 oracle caught it). ``base_name`` is still
+    returned unchanged when the ring genuinely has no branches.
     """
     from rdkit import Chem
     from ..perception.rings import get_containing_ring_system
 
     # Use the complete ring system as BFS boundary (IUPAC P-25.3)
     ring_atom_set = set(get_containing_ring_system(mol, ring_atoms))
+
+    # Wave2 T3a: does the ring system carry ANY exocyclic non-chain branch?
+    # Decides whether an early bare-base_name return is honest (no branches)
+    # or a constitution drop (branches present -> None, fail closed).
+    _has_exo_branches = any(
+        nbr.GetIdx() not in ring_atom_set and nbr.GetIdx() not in chain_set
+        for ra in ring_atom_set
+        for nbr in mol.GetAtomWithIdx(ra).GetNeighbors()
+    )
 
     # Find attachment point (ring atom bonded to chain atom)
     attachment_idx = None
@@ -5466,7 +5725,7 @@ def _build_substituted_ring_name(
             break
 
     if attachment_idx is None:
-        return base_name
+        return None if _has_exo_branches else base_name
 
     # Carbocyclic monocyclic rings only. 6-membered rings keep their existing
     # behaviour (alkyl/halo/hydroxy already enumerated). Other sizes (3-8) are
@@ -5474,25 +5733,28 @@ def _build_substituted_ring_name(
     # (oxo/cyano) — so the widening cannot silently activate alkyl/halo
     # emission across the whole small-ring population, which would be an
     # unbudgeted canary change (V21 WS-D.1 skeptic guard).
-    if not all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms):
+    # Wave2 T3a: a branch-free ring needs no decoration anywhere below; a
+    # branch-carrying ring that cannot reach (or survive) the decoration
+    # machinery must fail closed rather than emit the bare base_name.
+    if not _has_exo_branches:
         return base_name
+
+    if not all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms):
+        return None
     ring_size = len(ring_atoms)
     if ring_size != 6:
-        from ..rules.ring_substituents import ring_atom_fg_prefixes
         if not (3 <= ring_size <= 8):
-            return base_name
-        # FG-gated widening applies to true monocycles only (the FG locant is
-        # computed by attachment-relative single-ring numbering, unprovable
-        # for fused systems; D-09 missing > wrong).
+            return None
+        # Attachment-relative single-ring numbering is only provably correct
+        # when the numbered ring IS the complete ring system (a true
+        # monocycle; D-09 missing > wrong).
         if set(ring_atoms) != ring_atom_set:
-            return base_name
-        if not any(ring_atom_fg_prefixes(mol, a, ring_atom_set) for a in ring_atoms):
-            return base_name
+            return None
 
     # Try both numbering directions and pick lowest locant set
     numberings = _number_ring_from_attachment(mol, ring_atoms, attachment_idx)
     if numberings is None:
-        return base_name
+        return None
 
     # If single numbering returned (dict), wrap in list
     if isinstance(numberings, dict):
@@ -5504,9 +5766,13 @@ def _build_substituted_ring_name(
     for ring_order in numberings:
         if len(ring_order) != len(ring_atoms):
             continue
-        sub_groups = _detect_ring_substituents(
+        sub_groups, _complete = _detect_ring_substituents(
             mol, ring_order, ring_atom_set, chain_set
         )
+        if not _complete:
+            # An exocyclic branch could not be named: emitting any name here
+            # would drop its atoms. Fail closed (Wave2 T3a conservation).
+            return None
         if not sub_groups:
             continue
         # Collect all locants for comparison
@@ -5516,31 +5782,35 @@ def _build_substituted_ring_name(
             best_sub_groups = sub_groups
 
     if not best_sub_groups:
-        # No substituents on ring, or couldn't detect - check if any exist
-        # Try with first numbering just to detect
-        for ring_order in (numberings if isinstance(numberings, list) else [numberings]):
-            subs = _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set)
-            if not subs:
-                return base_name
-        return base_name
+        # Branches exist (checked above) but no numbering produced a complete
+        # substituent map -> fail closed rather than drop them.
+        return None
 
     sub_groups = best_sub_groups
 
     # Build prefix string for ring substituents
-    from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, is_complex_substituent, needs_brackets,
+    )
     prefix_parts = []
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         locs = sorted(sub_groups[name])
         count = len(locs)
         loc_str = ','.join(str(l) for l in locs)
+        # Wave2 T3a: compound FG-on-alkyl prefixes (hydroxymethyl) take
+        # enclosing marks with a simple multiplier — the Phase 11
+        # '1,3,5-tri(hydroxymethyl)benzene' convention (needs_brackets;
+        # is_complex_substituent / di-vs-bis deliberately unchanged, see the
+        # needs-parens-consolidation tripwire).
+        _enclose = is_complex_substituent(name) or needs_brackets(name)
         if count == 1:
-            if is_complex_substituent(name):
+            if _enclose and not name.startswith('('):
                 prefix_parts.append(f'{loc_str}-({name})')
             else:
                 prefix_parts.append(f'{loc_str}-{name}')
         else:
             mult = get_multiplier_prefix(count, name)
-            if is_complex_substituent(name):
+            if _enclose and not name.startswith('('):
                 prefix_parts.append(f'{loc_str}-{mult}({name})')
             else:
                 prefix_parts.append(f'{loc_str}-{mult}{name}')
@@ -5594,7 +5864,17 @@ def _number_ring_from_attachment(mol, ring_atoms, attachment_idx):
 
 
 def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
-    """Detect substituents on ring atoms and return {prefix_name: [locants]}."""
+    """Detect substituents on ring atoms.
+
+    Returns ``(sub_groups, complete)``:
+      * ``sub_groups``: ``{prefix_name: [locants]}`` or ``None`` when the ring
+        carries no substituents.
+      * ``complete``: False when ANY exocyclic branch could not be named —
+        the caller must fail closed instead of emitting a name that silently
+        drops atoms (Wave2 T3a constitution-conservation guard; the old
+        contract skipped unrecognised branches, so a -CH2OH arm vanished from
+        the name and only the OPSIN-dependent SELF-01 oracle caught it).
+    """
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy'}
 
@@ -5607,22 +5887,32 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
     # so FG emission is guarded off there and the legacy form is kept.
     _fg_ring_is_monocyclic = set(ring_order.values()) == set(ring_atom_set)
 
+    complete = True
     sub_groups = defaultdict(list)
     for ring_pos, atom_idx in ring_order.items():
         # Characteristic groups carried by the ring atom itself (oxo, cyano)
         # via the shared primitive — applies even to the attachment atom
         # (e.g. 1-cyanocyclohexyl), unlike the neighbour-substituent scan
         # below which skips the chain attachment point.
+        fg_claimed_atoms = set()
         if _fg_ring_is_monocyclic:
-            for fg in ring_atom_fg_prefixes(mol, atom_idx, ring_atom_set):
+            _fgs, fg_claimed_atoms = ring_atom_fg_prefixes(
+                mol, atom_idx, ring_atom_set, return_atoms=True
+            )
+            for fg in _fgs:
                 sub_groups[fg].append(ring_pos)
-        if ring_pos == 1:
-            continue  # Skip attachment point for substituent-on-ring detection
         atom = mol.GetAtomWithIdx(atom_idx)
         for nbr in atom.GetNeighbors():
             ni = nbr.GetIdx()
             if ni in ring_atom_set or ni in chain_set:
                 continue
+            if ni in fg_claimed_atoms:
+                continue  # already expressed by an atom-level FG prefix
+            # Wave2 T3a: track whether this branch got named. The attachment
+            # position (ring_pos 1) previously skipped the whole scan — its
+            # extra substituents silently vanished; now they are named (with
+            # locant 1) or flagged incomplete like every other position.
+            _before = sum(len(v) for v in sub_groups.values())
             sym = nbr.GetSymbol()
             if sym in _HALOGEN_PREFIX:
                 sub_groups[_HALOGEN_PREFIX[sym]].append(ring_pos)
@@ -5708,8 +5998,57 @@ def _detect_ring_substituents(mol, ring_order, ring_atom_set, chain_set):
                                 pass
                         if sub_name:
                             sub_groups[sub_name].append(ring_pos)
+                    else:
+                        # Wave2 T3a: hetero-containing branch (-CH2OH, -CF3,
+                        # ...) — name it exactly via the recursive fragment
+                        # namer over the FULL branch atom set. A branch that
+                        # reconnects to the chain (bridge topology) or that
+                        # the namer declines stays unnamed and flags
+                        # incomplete below (fail closed; never drop atoms).
+                        _branch, _touches_chain = _collect_branch_atoms(
+                            mol, ni, ring_atom_set, chain_set
+                        )
+                        if _branch and not _touches_chain:
+                            from .substituent_naming import name_substituent_fragment
+                            _bname = name_substituent_fragment(
+                                mol, _branch, ni, list(ring_atom_set)
+                            )
+                            if _bname:
+                                sub_groups[_bname].append(ring_pos)
 
-    return dict(sub_groups) if sub_groups else None
+            # Wave2 T3a conservation check: this exocyclic branch produced no
+            # prefix through any recognizer above -> the assembled ring name
+            # would silently drop its atoms. Flag the detection incomplete so
+            # the caller fails closed (P-29.4.2 safety; missing > wrong).
+            if sum(len(v) for v in sub_groups.values()) == _before:
+                complete = False
+
+    return (dict(sub_groups) if sub_groups else None), complete
+
+
+def _collect_branch_atoms(mol, start_idx, ring_atom_set, chain_set):
+    """BFS a substituent branch from ``start_idx``, never entering the ring.
+
+    Returns ``(atoms, touches_chain)`` — ``touches_chain`` is True when the
+    branch reaches a principal-chain atom (bridge topology, not a simple
+    substituent; Wave2 T3a conservation guard support).
+    """
+    visited = {start_idx}
+    queue = deque([start_idx])
+    atoms = []
+    touches_chain = False
+    while queue:
+        idx = queue.popleft()
+        if idx in chain_set:
+            touches_chain = True
+            continue
+        atoms.append(idx)
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in visited and nidx not in ring_atom_set:
+                visited.add(nidx)
+                queue.append(nidx)
+    return atoms, touches_chain
 
 
 def _count_pure_alkyl(mol, start_idx, excluded):
