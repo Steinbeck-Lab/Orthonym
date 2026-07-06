@@ -944,6 +944,76 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                             return ring_name
         return None
 
+    # --- Wave2 T5b (P-66.1.1.3): OFF-CHAIN acyl secondary/tertiary amide ---
+    # When the PCG amide's acyl carbon is NOT on the principal chain (the
+    # chain is the N-side), the chain-suffix machinery below is structurally
+    # WRONG: it double-expresses the amide (acetamido prefix + a phantom
+    # '...anamide' suffix whose carbonyl C isn't in the chain) — production
+    # SELF-01 suppressed these to unknown. The PIN keeps the amide as PCG
+    # with the ACYL side as parent and the whole N-side as a located
+    # N-substituent prefix carrying its own junior FGs:
+    # CC(CO)NC(C)=O -> N-(1-hydroxypropan-2-yl)acetamide (amide senior to
+    # alcohol, P-41). Delegate to rules.amides.name_amide (whose N-substituent
+    # namer now handles simple internal substituents) under fail-closed
+    # guards; decline to None (jar-independent) when they don't hold.
+    if principal_group in ('secondary_amide', 'tertiary_amide'):
+        _amide_matches = features.functional_groups.get(principal_group, [])
+        if len(_amide_matches) == 1:
+            _match = list(_amide_matches[0])
+            _acyl_c = next(
+                (i for i in _match
+                 if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                 and any(
+                     nb.GetSymbol() == 'O'
+                     and mol.GetBondBetweenAtoms(i, nb.GetIdx())
+                            .GetBondTypeAsDouble() == 2.0
+                     for nb in mol.GetAtomWithIdx(i).GetNeighbors())),
+                None,
+            )
+            if _acyl_c is not None and _acyl_c not in set(principal_chain):
+                from .amides import (
+                    name_amide as _rules_name_amide, get_n_substituents,
+                )
+                # Fail closed on any DEFINED stereocentre/stereobond: the
+                # delegated path emits no parent-level descriptors (the T3d
+                # oxime-decline precedent).
+                from rdkit import Chem as _Chem
+                _has_stereo = bool(
+                    _Chem.FindMolChiralCenters(mol, includeUnassigned=False)
+                ) or any(
+                    b.GetStereo() != _Chem.BondStereo.STEREONONE
+                    for b in mol.GetBonds()
+                )
+                _n_subs = get_n_substituents(mol, tuple(_match))
+                _n_atom = next(
+                    (i for i in _match
+                     if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
+                # Coverage: every heavy N-neighbour besides the acyl C must
+                # have produced a named substituent (get_n_substituents
+                # silently omits unnameable ones), and every junior FG must
+                # live wholly inside those N-substituent fragments.
+                _claimed = set()
+                for _s in _n_subs:
+                    _claimed |= set(_s.get('atoms') or [])
+                _expected_n_branches = 0
+                if _n_atom is not None:
+                    _expected_n_branches = sum(
+                        1 for nb in mol.GetAtomWithIdx(_n_atom).GetNeighbors()
+                        if nb.GetAtomicNum() > 1 and nb.GetIdx() != _acyl_c
+                    )
+                _fgs_contained = all(
+                    set(_fm).issubset(_claimed)
+                    for _fg_matches in (non_principal or {}).values()
+                    for _fm in _fg_matches
+                )
+                if (not _has_stereo and _claimed
+                        and len(_n_subs) == _expected_n_branches
+                        and _fgs_contained):
+                    _nm = _rules_name_amide(mol, tuple(_match))
+                    if _nm:
+                        return _nm
+                return None
+
     # --- Ester is the most-senior group (P-41: esters outrank acyl halides,
     # amides, nitriles, aldehydes, ketones, alcohols) ---
     # When get_principal_group selected the ester, the ester IS the most senior

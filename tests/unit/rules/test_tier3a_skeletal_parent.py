@@ -207,7 +207,10 @@ class TestConstitutionConservation:
     @pytest.mark.parametrize("smiles,expected", [
         # Compound (hetero-bearing) ring branches now named exactly via the
         # recursive fragment namer instead of being dropped.
-        ("OCc1cc(CO)cc(CO)c1", "(3,5-di(hydroxymethyl)phenyl)methanol"),
+        # Wave2 T5a: the multiplicative alcohol-arm PIN now claims this row
+        # (P-15.3.2.1); the T3a substitutive form remains the conservation
+        # fallback when the multiplicative path declines.
+        ("OCc1cc(CO)cc(CO)c1", "(benzene-1,3,5-triyl)trimethanol"),
         ("ClCc1ccccc1CO", "(2-(chloromethyl)phenyl)methanol"),
         # Working functionalized-chain forms must survive the guard.
         ("OC(=O)c1ccc(CCC(=O)O)cc1", "4-(2-carboxyethyl)benzoic acid"),

@@ -755,6 +755,19 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if alkyl_result:
             return alkyl_result
 
+        # Wave2 T5c (P-66.6.3): ketone-acyl branch DEMOTED to a retained/
+        # systematic acyl prefix — ONLY when another branch on this ring bears
+        # a SENIOR suffix FG (acid/amide/nitrile/... — all senior to ketone,
+        # P-41), so the ketone can never be the PCG here: 4-acetylbenzoic
+        # acid, 4-acetylbenzamide. Without a senior suffix (acetophenone
+        # class) the gate is False and the chain-parent ketone PIN
+        # (1-phenylethan-1-one) keeps ownership. Fail-closed: branched/
+        # unsaturated/hetero acyls return None -> unnameable sentinel.
+        if _ring_bears_senior_suffix(mol, ring_atoms, start_idx):
+            acyl_result = _identify_acyl_group(mol, start_idx, ring_atoms)
+            if acyl_result:
+                return acyl_result
+
         # Try functionalized chain (chains with FG like -CCCC(=O)O)
         func_chain = _identify_functionalized_chain(mol, start_idx, ring_atoms)
         if func_chain:
@@ -811,6 +824,140 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
                         }
 
     return None
+
+
+def _ring_bears_senior_suffix(
+    mol, ring_atoms: Set[int], exclude_branch_start: int
+) -> bool:
+    """True iff ANOTHER exocyclic branch of this ring is a suffix-forming FG
+    (carboxylic acid / carboxamide / carbonitrile / sulfonic acid ... — every
+    record `_identify_suffix_fg_on_benzene` emits is senior to ketone, P-41).
+    Gates the Wave2 T5c acyl-prefix demotion so a lone aryl ketone (the PCG
+    case, acetophenone class) never routes here.
+
+    Scoped to C-ATTACHED suffix branches (carboxylic acid / carboxamide /
+    carbonitrile / carbaldehyde ...): the S-suffix assembly currently drops
+    ring locants when combined with an acyl prefix ('acetylbenzenesulfonic
+    acid', wrong constitution), so acetyl+sulfonic stays on its HEAD path
+    (fail-closed) until that assembly is fixed — documented deferral."""
+    for ra in ring_atoms:
+        for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in ring_atoms or nbr.GetAtomicNum() <= 1:
+                continue
+            if ni == exclude_branch_start:
+                continue
+            if nbr.GetSymbol() != 'C':
+                continue
+            sub_atoms = _bfs_substituent_atoms(mol, ni, ring_atoms)
+            if _identify_suffix_fg_on_benzene(mol, ni, sub_atoms, ring_atoms):
+                return True
+    return False
+
+
+def _identify_acyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
+    """Recognize a ring-attached ketone-acyl branch -C(=O)-R and return its
+    retained/systematic acyl PREFIX record (Wave2 T5c, P-66.6.3 / P-66.6.1):
+
+      R = unbranched saturated all-C chain -> acetyl / propanoyl / {stem}anoyl
+      R = plain (unsubstituted) benzene    -> benzoyl
+
+    Fail-closed None for everything else (branched / unsaturated / hetero /
+    substituted-aryl acyls, formyl [aldehyde suffix territory], esters/acids
+    [second O]) so the unnameable sentinel keeps the molecule honest. The
+    returned 'atoms' cover the ENTIRE branch (carbonyl C + O + R) — no
+    silent atom drops."""
+    start_atom = mol.GetAtomWithIdx(start_idx)
+    if start_atom.GetSymbol() != 'C' or start_atom.GetFormalCharge() != 0:
+        return None
+    if start_atom.IsInRing():
+        return None
+    carbonyl_o = None
+    r_neighbors = []
+    for nbr in start_atom.GetNeighbors():
+        ni = nbr.GetIdx()
+        if ni in ring_atoms:
+            continue
+        if nbr.GetAtomicNum() <= 1:
+            continue
+        bond = mol.GetBondBetweenAtoms(start_idx, ni)
+        if (nbr.GetSymbol() == 'O' and bond.GetBondTypeAsDouble() == 2.0
+                and nbr.GetDegree() == 1 and nbr.GetFormalCharge() == 0):
+            if carbonyl_o is not None:
+                return None
+            carbonyl_o = ni
+        else:
+            r_neighbors.append(nbr)
+    if carbonyl_o is None or len(r_neighbors) != 1:
+        return None  # formyl (no R) is aldehyde-suffix territory; acids/esters have a 2nd O
+    r0 = r_neighbors[0]
+    if mol.GetBondBetweenAtoms(
+            start_idx, r0.GetIdx()).GetBondTypeAsDouble() != 1.0:
+        return None
+
+    # R = plain benzene -> benzoyl (retained acyl prefix, P-66.6.1)
+    if r0.GetIsAromatic() and r0.IsInRing():
+        r_ring = None
+        for ring in mol.GetRingInfo().AtomRings():
+            if r0.GetIdx() in ring:
+                r_ring = ring
+                break
+        if r_ring is None or len(r_ring) != 6:
+            return None
+        for a in r_ring:
+            atom = mol.GetAtomWithIdx(a)
+            if not atom.GetIsAromatic() or atom.GetSymbol() != 'C':
+                return None
+            for nb in atom.GetNeighbors():
+                if (nb.GetIdx() not in r_ring and nb.GetAtomicNum() > 1
+                        and nb.GetIdx() != start_idx):
+                    return None  # substituted aryl acyl -> fail closed
+        return {
+            'name': 'benzoyl',
+            'atoms': [start_idx, carbonyl_o] + list(r_ring),
+        }
+
+    # R = unbranched saturated all-C chain -> acetyl / {stem}anoyl
+    if r0.GetSymbol() != 'C' or r0.IsInRing() or r0.GetIsAromatic():
+        return None
+    chain = []
+    prev = start_idx
+    cur = r0
+    while True:
+        if cur.GetSymbol() != 'C' or cur.GetFormalCharge() != 0 \
+                or cur.IsInRing() or cur.GetIsAromatic():
+            return None
+        nxt = []
+        for nb in cur.GetNeighbors():
+            ni = nb.GetIdx()
+            if ni == prev or nb.GetAtomicNum() <= 1:
+                continue
+            if mol.GetBondBetweenAtoms(
+                    cur.GetIdx(), ni).GetBondTypeAsDouble() != 1.0:
+                return None
+            if nb.GetSymbol() != 'C':
+                return None  # hetero on the acyl chain -> fail closed
+            nxt.append(nb)
+        chain.append(cur.GetIdx())
+        if not nxt:
+            break
+        if len(nxt) > 1:
+            return None  # branched acyl -> fail closed
+        prev, cur = cur.GetIdx(), nxt[0]
+
+    n_acyl = len(chain) + 1  # + the carbonyl carbon
+    if n_acyl == 2:
+        acyl_name = 'acetyl'
+    else:
+        from ..data.chain_names import get_chain_prefix
+        try:
+            acyl_name = f"{get_chain_prefix(n_acyl)}anoyl"
+        except (ValueError, KeyError):
+            return None
+    return {
+        'name': acyl_name,
+        'atoms': [start_idx, carbonyl_o] + chain,
+    }
 
 
 def _identify_nitrile_group(mol, c_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:

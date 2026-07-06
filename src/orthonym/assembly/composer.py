@@ -4460,6 +4460,53 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             # descriptor in its bracket). Falls back to features.* when the acyl
             # parent cannot be resolved.
             _acyl_locants = _amide_acyl_parent_locants(mol, amide_atoms)
+
+            # Wave2 T5b: when the acyl carbon is OFF the features principal
+            # chain (the N-side chain won parent selection), the features-
+            # level prefixes carry locants of the WRONG parent — appending
+            # them double-expresses substituents already named inside the
+            # N-substituent bracket ('2-bromo-4-chloro-N-(2-bromo-4-chloro-
+            # pentan-3-yl)acetamide', a different molecule). base_name (acyl
+            # parent + N + located N-substituents) must then account for
+            # EVERY heavy atom; if it does, emit it bare; if not, decline
+            # (fail-closed) rather than attach mis-locanted prefixes.
+            _acyl_c = next(
+                (i for i in amide_atoms
+                 if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                 and any(
+                     nb.GetSymbol() in ('O', 'S', 'Se', 'Te')
+                     and mol.GetBondBetweenAtoms(i, nb.GetIdx())
+                            .GetBondTypeAsDouble() == 2.0
+                     for nb in mol.GetAtomWithIdx(i).GetNeighbors())),
+                None,
+            )
+            _pchain = set(features.principal_chain or [])
+            if _acyl_c is not None and _pchain and _acyl_c not in _pchain:
+                _n_idx = next(
+                    (i for i in amide_atoms
+                     if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
+                _covered = set(amide_atoms)
+                _stack = [_acyl_c]
+                while _stack:
+                    _a = _stack.pop()
+                    if _a in _covered and _a != _acyl_c:
+                        continue
+                    _covered.add(_a)
+                    for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        _ni = _nb.GetIdx()
+                        if (_nb.GetAtomicNum() > 1 and _ni != _n_idx
+                                and _ni not in _covered):
+                            _stack.append(_ni)
+                for _s in get_n_substituents(mol, amide_atoms):
+                    _covered |= set(_s.get('atoms') or [])
+                _heavy = {
+                    a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1
+                }
+                if _covered == _heavy:
+                    return _inject_stereo_if_missing(
+                        features, base_name, atom_to_locant=_acyl_locants,
+                    )
+                return "amide"
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: _generate_prefixes returns NameFragments whose .text
             # already includes locants (e.g., "2-methyl"), so use .text

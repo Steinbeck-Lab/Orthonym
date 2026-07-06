@@ -1442,6 +1442,14 @@ def get_heterocycle_substituents(
                     sub_info['suffix_name'] = suffix_info['suffix_name']
                     if suffix_info.get('n_hydroxy'):
                         sub_info['n_hydroxy'] = True
+                    # Wave2 T5d: N-substituted ring carboxamide — thread the
+                    # detected N-substituent names to the suffix N-prefix
+                    # builder (the C4 amine mechanism).
+                    if suffix_info.get('n_substituents'):
+                        sub_info['amine_n_substituents'] = [
+                            _s['name'] if isinstance(_s, dict) else _s
+                            for _s in suffix_info['n_substituents']
+                        ]
 
             if locant not in substituents:
                 substituents[locant] = []
@@ -1502,6 +1510,44 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
         for match in mol.GetSubstructMatches(amide_pat):
             if match[0] == start_idx:
                 return {'suffix_name': 'carboxamide'}
+
+    # Wave2 T5d (P-66.1.1.3.4): N-SUBSTITUTED ring carboxamides — secondary
+    # C(=O)NHR and tertiary C(=O)NR2. The benzene path has handled these
+    # since Phase 85 (N,N-dimethylbenzamide); the heterocycle detector only
+    # matched primary amides, so every N-substituted heterocycle-carboxamide
+    # fell to unknown. Reuses the benzene N-substituent extractor; FAIL-CLOSED
+    # count check: _detect_n_substituents silently omits branches it cannot
+    # name, so a mismatch with the N's real branch count declines the whole
+    # suffix record (missing-beats-wrong) rather than dropping a substituent.
+    for _pat_smarts in ('[CX3](=O)[NX3;H1][#6]', '[CX3](=O)[NX3;H0]([#6])[#6]'):
+        _pat = Chem.MolFromSmarts(_pat_smarts)
+        if _pat is None:
+            continue
+        for match in mol.GetSubstructMatches(_pat):
+            if match[0] != start_idx:
+                continue
+            # exclude hydrazide/hydroxamic shapes (N bonded to N/O) — those
+            # were claimed by the earlier blocks; defensive re-check
+            _n_atom = next(
+                (mol.GetAtomWithIdx(i) for i in match
+                 if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
+            if _n_atom is None or any(
+                nb.GetSymbol() in ('N', 'O') for nb in _n_atom.GetNeighbors()
+                if nb.GetIdx() != start_idx
+                and mol.GetBondBetweenAtoms(
+                    _n_atom.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+                and nb.GetIdx() != start_idx
+            ):
+                continue
+            from .benzene import _detect_n_substituents
+            n_subs = _detect_n_substituents(mol, match, set(ring_set))
+            _expected = sum(
+                1 for nb in _n_atom.GetNeighbors()
+                if nb.GetAtomicNum() > 1 and nb.GetIdx() != start_idx
+            )
+            if not n_subs or len(n_subs) != _expected:
+                return None  # unnameable N-branch -> decline (fail-closed)
+            return {'suffix_name': 'carboxamide', 'n_substituents': n_subs}
 
     # Check for nitrile: C#N
     nitrile_pat = Chem.MolFromSmarts('[CX2]#[NX1]')
@@ -1870,8 +1916,10 @@ def name_substituted_heterocycle(
 
         # C4 (P-62.2.1.1.1): prepend the amine N-substituent prefixes
         # (N-methyl / N-phenyl / N,N-dimethyl) to the ring-amine suffix name.
-        # Emitted only for the amine suffix; other suffixes are unaffected.
-        if chosen_suffix == 'amine' and chosen_suffix in suffix_n_substituents:
+        # Wave2 T5d (P-66.1.1.3.4): same mechanism serves the N-substituted
+        # ring carboxamide (N,N-diethylfuran-2-carboxamide).
+        if chosen_suffix in ('amine', 'carboxamide') \
+                and chosen_suffix in suffix_n_substituents:
             _n_subs = suffix_n_substituents[chosen_suffix]
             _n_prefix = ""
             if len(_n_subs) == 1:
