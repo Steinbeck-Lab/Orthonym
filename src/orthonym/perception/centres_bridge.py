@@ -45,6 +45,20 @@ from rdkit import Chem
 logger = logging.getLogger(__name__)
 
 
+# PERF: process-level CIP cache keyed by SMILES. centres CIP labels are a pure
+# function of the molecular structure, and centres_label_mol feeds centres the
+# CANONICAL SMILES (Chem.MolToSmiles), so every respelling of a molecule sends
+# the IDENTICAL input — 7x per stereo probe in the determinism eval. Caching the
+# {1-based-pos: descriptor} map by that SMILES turns ~2000 redundant ~1.7s JVM
+# boots into cache hits. SAFE for the determinism gate: the naming logic still
+# runs fresh per respelling (only identical centres runs are deduped), so a
+# naming order-dependence still manifests; and the per-mol _smiles_output_order
+# remap is recomputed each call, so cached labels land on the right atoms. Only
+# DEFINITIVE per-SMILES results are cached (an achiral empty map included); the
+# 'engine unavailable' (None) outcome is never cached.
+_CENTRES_LABEL_CACHE: Dict[str, Dict[int, str]] = {}
+
+
 # Project root: 4 levels up from this file
 # (src/orthonym/perception/centres_bridge.py -> project root)
 # Same depth / parent chain as src/orthonym/validation/opsin_roundtrip.py.
@@ -162,6 +176,17 @@ def centres_label_batch(
     if not smiles_list:
         return {}
 
+    # PERF: serve cached SMILES; only spawn a JVM for the uncached remainder.
+    out: Dict[str, Dict[int, str]] = {}
+    uncached: List[str] = []
+    for smi in smiles_list:
+        if smi in _CENTRES_LABEL_CACHE:
+            out[smi] = _CENTRES_LABEL_CACHE[smi]
+        else:
+            uncached.append(smi)
+    if not uncached:
+        return out  # every SMILES served from cache -> no JVM, no jar probe
+
     jar = _find_centres_jar()
     if jar is None or not _java_available():
         # Engine unavailable -- signal the caller to fall back to RDKit.
@@ -172,7 +197,7 @@ def centres_label_batch(
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".smi", delete=False, encoding="utf-8"
         ) as f:
-            for i, smi in enumerate(smiles_list):
+            for i, smi in enumerate(uncached):
                 # ID = integer position so we can recover the exact input SMILES.
                 f.write(f"{smi}\t{i}\n")
             temp_input = f.name
@@ -183,7 +208,6 @@ def centres_label_batch(
             cmd, capture_output=True, text=True, timeout=timeout
         )
 
-        out: Dict[str, Dict[int, str]] = {}
         for line in proc.stdout.split("\n") if proc.stdout else []:
             if "\t" not in line:
                 continue
@@ -192,8 +216,17 @@ def centres_label_batch(
             if not idx_str.isdigit():
                 continue
             pos = int(idx_str)
-            if 0 <= pos < len(smiles_list):
-                out[smiles_list[pos]] = parse_centres_labels(labels_str)
+            if 0 <= pos < len(uncached):
+                labels = parse_centres_labels(labels_str)
+                smi = uncached[pos]
+                out[smi] = labels
+                # Cache ONLY a SMILES centres actually emitted a line for (a
+                # definitive per-structure result; an achiral molecule yields an
+                # empty-labels line, so this includes achiral {}). A SMILES with
+                # NO line is a per-SMILES skip/failure — left absent (matching
+                # the original .get(smi, {}) contract) and NOT cached, so it is
+                # retried rather than pinned to a possibly-wrong empty map.
+                _CENTRES_LABEL_CACHE[smi] = labels
         return out
 
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as exc:

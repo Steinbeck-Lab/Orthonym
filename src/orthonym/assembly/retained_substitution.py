@@ -164,6 +164,25 @@ class OpsinOracle:
             pressure). This is a transient/environmental failure that callers
             MUST NOT treat as a rejection (CR-01).
         """
+        # PERF: try the persistent-OPSIN process first (one long-lived JVM
+        # instead of a fresh ~1.7s boot per distinct name — the dominant gate
+        # cost). It preserves this method's exact contract: (smiles, True) parse,
+        # (None, True) clean rejection, (None, False) transient/unavailable. On
+        # (None, False) — server absent/dead/timeout/protocol-guard — we FALL
+        # THROUGH to the one-shot subprocess below, so correctness never depends
+        # on the optimization; it only removes JVM-startup latency.
+        try:
+            from ..validation.opsin_server import get_persistent_opsin
+            _srv = get_persistent_opsin(self._jar, ("-r", "-osmi"))
+        except Exception:  # pragma: no cover - import guard
+            _srv = None
+        if _srv is not None:
+            raw, ran = _srv.invoke(name)
+            if ran:
+                return (raw or None), True
+            # ran is False: transient/unavailable -> fall through to the
+            # definitive one-shot subprocess (never cached by callers).
+
         try:
             result = subprocess.run(
                 # -r (--allowRadicals): the single source-of-truth subprocess call
