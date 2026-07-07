@@ -425,6 +425,16 @@ def name_substituent(mol, frag_atoms, attach_idx):
             )
             if _chal:
                 return _stereo_route(_chal)
+        # Wave2 T6c (P-63.3.2): MIXED divalent-chalcogen bridge (-O-S-R etc.).
+        # Positive name for the O-attached sulfanyl case ((methylsulfanyl)oxy);
+        # every other mixed shape is a TERMINAL decline — the generic tiers
+        # below mangle the bridge into a wrong-constitution fragment, so
+        # falling through is never allowed for this shape.
+        if _is_mixed_chalcogen_bridge_attach(mol, attach_idx, frag_atoms_set):
+            _parent_atoms = set(range(mol.GetNumAtoms())) - frag_atoms_set
+            _mixed = _name_mixed_chalcogen_branch(
+                mol, list(frag_atoms_set), attach_idx, _parent_atoms)
+            return _stereo_route(_mixed) if _mixed else None
 
     # ---- Tier 1.8 (DD5 RC-6 / SEN-04): located acyclic alkyl ----
     # A BRANCHED or INTERNALLY-attached acyclic all-carbon saturated alkyl
@@ -1461,6 +1471,15 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
             if name:
                 return name
 
+    # Wave2 T6c (P-63.3.2): MIXED divalent-chalcogen bridge — must be decided
+    # BEFORE the alkoxy/sulfanyl branches (an -O-S-R attach O would otherwise
+    # be mis-read as a plain alkoxy with a mangled R). Terminal decline on a
+    # detected bridge the namer can't express; never fall through.
+    if attach_idx is not None and _is_mixed_chalcogen_bridge_attach(
+            mol, attach_idx, frag_set_for_chalcogen):
+        return _name_mixed_chalcogen_branch(
+            mol, frag_atoms, attach_idx, parent_atoms)
+
     # Special case: O-attached branches (ether substituents)
     # -O-R -> "alkoxy" (e.g., methoxy, ethoxy, phenoxy)
     if attach_idx is not None:
@@ -2087,6 +2106,67 @@ def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
     if not r_name:
         return None
     return f"{r_name}disulfanyl"
+
+
+def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
+    """Wave2 T6c (P-63.3.2): name a MIXED divalent-chalcogen bridge substituent.
+
+    Supported positively: attach through O with an S inner atom, i.e.
+    -O-S-R -> ``(Rsulfanyl)oxy`` ([(methylsulfanyl)oxy]ethane for CCOSC,
+    OPSIN-verified). Everything else in the mixed-bridge family — S-attached
+    -S-O-R (needs the alkoxy contraction), Se/Te bridges, terminal-H inner
+    chalcogens — returns None; the CALLERS treat a detected mixed bridge whose
+    namer declined as a terminal decline (fail closed), never falling through
+    to the generic tiers that mangle the bridge into a bogus
+    'hydroxymethane-SO-thioperoxyl' fragment.
+    """
+    frag_set = set(frag_atoms)
+    a1 = mol.GetAtomWithIdx(attach_idx)
+    if a1.GetSymbol() != 'O' or not _is_divalent_chalcogen_atom(a1):
+        return None
+    s_idx = None
+    for nbr in a1.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+            continue
+        if nbr.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(nbr):
+            s_idx = nbr_idx
+            break
+    if s_idx is None:
+        return None
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    r_start = None
+    for nbr in s_atom.GetNeighbors():
+        nbr_idx = nbr.GetIdx()
+        if nbr_idx == attach_idx or nbr_idx not in frag_set:
+            continue
+        r_start = nbr_idx
+        break
+    if r_start is None:
+        return None  # terminal -O-SH is the os_thioperoxol suffix, not this path
+    r_name = _name_peroxy_or_disulfanyl_R(
+        mol, r_start, {attach_idx, s_idx}, frag_set)
+    if not r_name:
+        return None
+    return f"({r_name}sulfanyl)oxy"
+
+
+def _is_mixed_chalcogen_bridge_attach(mol, attach_idx, frag_atoms_set):
+    """True when ``attach_idx`` is a divalent chalcogen whose in-fragment
+    neighbor is a DIFFERENT divalent chalcogen — the P-63.3.2 mixed-bridge
+    shape the generic substituent tiers must never be allowed to mangle."""
+    _CHALCOGENS = ('O', 'S', 'Se', 'Te')
+    a = mol.GetAtomWithIdx(attach_idx)
+    sym = a.GetSymbol()
+    if sym not in _CHALCOGENS or not _is_divalent_chalcogen_atom(a):
+        return False
+    return any(
+        n.GetIdx() in frag_atoms_set
+        and n.GetSymbol() in _CHALCOGENS
+        and n.GetSymbol() != sym
+        and _is_divalent_chalcogen_atom(n)
+        for n in a.GetNeighbors()
+    )
 
 
 def _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms):

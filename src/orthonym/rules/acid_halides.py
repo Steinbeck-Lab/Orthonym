@@ -39,6 +39,12 @@ HALIDE_WORDS = {
     "acid_bromide": "bromide",
     "acid_fluoride": "fluoride",
     "acid_iodide": "iodide",
+    # Wave2 T6c: acyl pseudohalides (P-65.5.2.1) — the same two-word
+    # functional-class grammar ('butanoyl azide', 'propanoyl cyanide',
+    # 'acetyl isocyanate', all BB-verbatim PINs).
+    "acyl_azide": "azide",
+    "acyl_cyanide": "cyanide",
+    "acyl_isocyanate": "isocyanate",
 }
 
 # Halogen prefix names (for substituent halogens that are NOT part of acid halide)
@@ -102,7 +108,16 @@ def name_acid_halide(features) -> Optional[str]:
     # Acyclic acid halide: determine chain length
     # Find the principal chain (the carbon chain ending at the carbonyl C)
     chain = features.principal_chain
-    chain_length = len(chain) if chain else 0
+    # Wave2 T6c: a PSEUDOhalide (azide/cyanide/isocyanate) contributes its own
+    # skeletal atoms — the cyanide CARBON sits inside features.principal_chain
+    # and inflated the acyl count (CCC(=O)C#N mis-sized to 'butanoyl
+    # cyanide'). The acyl chain = chain atoms not consumed by the halide
+    # group, plus the carbonyl carbon itself (which IS consumed).
+    _carbonyl_cs = {m[0] for m in acid_halide_matches}
+    chain_length = (
+        sum(1 for a in chain if a not in consumed_atoms or a in _carbonyl_cs)
+        if chain else 0
+    )
 
     if chain_length == 0:
         # Fallback: count carbons connected to carbonyl

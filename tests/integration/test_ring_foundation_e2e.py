@@ -321,5 +321,5 @@ class TestPhase1Regression:
         """Unsaturated compounds should still be named correctly."""
         assert name_compound('C=C') == 'ethene'
         assert name_compound('C#C') == 'acetylene'  # retained name (P-31.1.2.1 PIN)
-        # IUPAC PIN style uses locants: prop-1-ene not propene
-        assert name_compound('CC=C') == 'prop-1-ene'
+        # P-14.3.4.2(d): unsubstituted propene omits the bond locant (PIN)
+        assert name_compound('CC=C') == 'propene'

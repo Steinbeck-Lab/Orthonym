@@ -302,9 +302,13 @@ def should_omit_locant_one(
     if chain_length == 1:
         return True
 
-    # Rule 2: 2-carbon bond locants (ethene/ethyne): omit bond locant
-    # Only one possible position for the double/triple bond.
-    if context == "bond" and chain_length == 2:
+    # Rule 2: di-/trinuclear bond locants (P-14.3.4.2(d)): omit bond locant.
+    # ethene/ethyne (chain_length 2, only one bond position) always omit;
+    # propene/propyne (chain_length 3) omit ONLY when the caller passes
+    # chain_length=3, which it does solely for an UNSUBSTITUTED trinuclear
+    # parent (Wave2 T6a — a substituent makes the position distinctive:
+    # '3-chloroprop-1-ene' keeps its locant).
+    if context == "bond" and chain_length in (2, 3):
         return True
 
     # Rule 3: Terminal groups: suffix locant-1 is implicit

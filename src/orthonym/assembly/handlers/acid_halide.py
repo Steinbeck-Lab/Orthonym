@@ -24,9 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 def _is_acid_halide(features: Any) -> bool:
-    """Mirrors composer.py:919 (3-class principal_group check)."""
+    """Mirrors composer.py:919 (3-class principal_group check).
+
+    Wave2 T6c: extended with the acyl pseudohalides (P-65.5.2.1) — the same
+    two-word functional-class grammar via rules.acid_halides.HALIDE_WORDS.
+    """
     return getattr(features, 'principal_group', None) in (
         'acid_chloride', 'acid_bromide', 'acid_fluoride',
+        'acyl_azide', 'acyl_cyanide', 'acyl_isocyanate',
     )
 
 

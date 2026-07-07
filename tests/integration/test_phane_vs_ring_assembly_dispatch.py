@@ -164,10 +164,16 @@ class TestPhaneVsRingAssemblyDispatch:
     def test_name_compound_full_dispatch_lands_on_phane(
         self, smiles, expected_name_endswith, label
     ) -> None:
-        """End-to-end name_compound pipeline produces a cyclophane name."""
+        """End-to-end name_compound REFUSES the phane name (Wave2 T6c).
+
+        The phane handler still classifies + composes (asserted above), but
+        production withholds the name: no phane form is OPSIN-parseable, so
+        emitting it is a guaranteed round-trip failure. The dispatch handler
+        raises the G0 UNSUPPORTED_RING_SYSTEM refusal -> 'unknown organic
+        compound'."""
         result = name_compound(smiles)
-        assert result is not None, f"name_compound({label}) returned None"
-        assert result.endswith(expected_name_endswith), (
-            f"name_compound({label}) returned {result!r}; expected ends-with "
-            f"{expected_name_endswith!r}"
+        assert result == "unknown organic compound", (
+            f"name_compound({label}) returned {result!r}; expected the T6c "
+            f"fail-closed 'unknown organic compound' (composed form ends with "
+            f"{expected_name_endswith!r})"
         )

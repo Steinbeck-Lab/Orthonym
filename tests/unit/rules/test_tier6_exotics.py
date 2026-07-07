@@ -1,0 +1,273 @@
+"""Wave2 Tier 6 — fail-closed conversions + splice fixes for exotic classes.
+
+6a  Spiro ring-unsaturation splice (P-24.2.0 / P-31.1.5.1) + tri+ polyspiro
+    fail-closed (P-24.2.2/.2.3) + propene/propyne locant elision
+    (P-14.3.4.2(d)).
+6b  Substituent-mode hydro emitter for heteromonocyclic mancude substituents
+    (P-32.2.1) + the saturated-stem (oxanyl) wrong-constitution guard.
+6c  Acyl pseudohalides (P-65.5.2.1 functional-class PINs), mixed
+    divalent-chalcogen bridge (P-63.3.2), phane production refusal (P-26).
+
+Every positive expectation below was OPSIN-round-trip verified at build time.
+The fail-closed expectations are exception-based (UNSUPPORTED_RING_SYSTEM) or
+structural declines, so they hold with the validity gate on OR off.
+"""
+import pytest
+from rdkit import Chem
+
+from orthonym import name_compound
+from orthonym.rules.spiro import name_spiro_system
+from orthonym.rules.ring_substituents import (
+    get_ring_substituent_name,
+    _unsaturated_heteromonocyclic_substituent,
+)
+
+
+@pytest.fixture
+def _validity_gate_on(monkeypatch):
+    import orthonym.namer as _namer
+    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    yield
+
+
+# ---------------------------------------------------------------------------
+# 6a — spiro unsaturation splice
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("C1CCCC12C=CCCC2", "spiro[4.5]dec-6-ene"),      # BB P-31.1.5.1.1 verbatim
+    ("C1=CCCC11CCCCC1", "spiro[4.5]dec-1-ene"),      # OPSIN-corrected ledger row
+    ("C1CCC2(CC1)C=CCCC2", "spiro[5.5]undec-1-ene"),
+    ("N1CC=CC12CCCCC2", "1-azaspiro[4.5]dec-3-ene"),  # BB P-31.1.5.1.3 verbatim
+])
+def test_spiro_unsaturation_splice(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("C1CCC2(CC1)CCCC2", "spiro[4.5]decane"),
+    ("O1CCCC12CCCCC2", "1-oxaspiro[4.5]decane"),
+    ("C1CC2(C1)CCC3(CC2)CCC3", "dispiro[3.2.3.2]dodecane"),
+])
+def test_saturated_spiro_protected(smiles, expected):
+    """The splice pass must not disturb saturated spiro/dispiro naming."""
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+def test_polyspiro_unsaturated_fails_closed():
+    """A dispiro with a ring double bond declines (splice is monospiro-only) —
+    never a silently-saturated '-ane'."""
+    mol = Chem.MolFromSmiles("C1CC2(C1)CCC3(CC2)CC=C3")
+    assert name_spiro_system(mol) is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles", [
+    # branched trispiro: leaked 'cyclononane' (drops 3 rings)
+    "C1CC12CCC1(CC1)CCC1(CC1)CC2",
+    # linear 4-ring trispiro: descriptor order wrong for >=4 rings — OPSIN
+    # reparsed 'trispiro[4.2.2.2.2.5]icosane' to a DIFFERENT structure
+    "C1CCC2(CC1)CCC3(CC2)CCC4(CC3)CCCC4",
+])
+def test_tri_plus_polyspiro_fails_closed(smiles):
+    """Tri+ polyspiro needs superscript revisit locants (unbuilt): the spiro
+    module declines AND the tier_a_ring pure-spiro guard refuses the monocycle
+    fallback (jar-independent UNSUPPORTED_RING_SYSTEM)."""
+    mol = Chem.MolFromSmiles(smiles)
+    assert name_spiro_system(mol) is None
+    assert "unknown" in name_compound(smiles)
+
+
+# ---------------------------------------------------------------------------
+# 6a — propene/propyne bond-locant elision (P-14.3.4.2(d))
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("C=CC", "propene"),
+    ("CC#C", "propyne"),
+    ("C=C", "ethene"),
+    # substituent restores the locant
+    ("C=CCCl", "3-chloroprop-1-ene"),
+    # length-4+ always cites
+    ("C=CCC", "but-1-ene"),
+    ("CC=CC", "but-2-ene"),
+    # diene unaffected (two locants, no elision path)
+    ("C=C=C", "propa-1,2-diene"),
+])
+def test_trinuclear_bond_locant_elision(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+# ---------------------------------------------------------------------------
+# 6b — heteromonocyclic mancude-substituent hydro emitter (P-32.2.1)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("OC(=O)CCC1CCC=CO1",
+     "3-(3,4-dihydro-2H-pyran-2-yl)propanoic acid"),
+    ("OC(=O)CCC1=CCCCO1",
+     "3-(3,4-dihydro-2H-pyran-6-yl)propanoic acid"),
+    ("OC(=O)CCC1CC=CO1",
+     "3-(2,3-dihydrofuran-2-yl)propanoic acid"),
+    ("OC(=O)CCC1CCC=CS1",
+     "3-(3,4-dihydro-2H-thiopyran-2-yl)propanoic acid"),
+    ("OC(=O)CCC1CCC=CN1",
+     "3-(1,2,3,4-tetrahydropyridin-2-yl)propanoic acid"),
+    ("OC(=O)CCC1CCCC=N1",
+     "3-(2,3,4,5-tetrahydropyridin-2-yl)propanoic acid"),
+])
+def test_hetero_hydro_substituent(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    # saturated het ring keeps its plain stem
+    ("OC(=O)CCC1CCCCO1", "3-(oxan-2-yl)propanoic acid"),
+    # aromatic het rings keep their mancude stems
+    ("OC(=O)CCc1ccco1", "3-(furan-2-yl)propanoic acid"),
+    ("OC(=O)CCc1ccncc1", "3-(pyridin-4-yl)propanoic acid"),
+    # carbocyclic ene-substituent path untouched
+    ("OC(=O)CCC1CCC=CC1", "3-(cyclohex-3-en-1-yl)propanoic acid"),
+])
+def test_hydro_emitter_protections(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+def test_unsaturated_het_ring_never_saturated_stem():
+    """The oxanyl wrong-constitution guard: an unsaturated heteromonocycle
+    whose emitter declines must return None (fail closed), never the
+    saturated dictionary stem."""
+    mol = Chem.MolFromSmiles("OC(=O)CCC1OC=CO1")  # 2 heteroatoms -> declines
+    ring = next(
+        r for r in mol.GetRingInfo().AtomRings()
+    )
+    attach = next(
+        i for i in ring
+        if any(n.GetIdx() not in ring for n in
+               mol.GetAtomWithIdx(i).GetNeighbors())
+    )
+    assert _unsaturated_heteromonocyclic_substituent(mol, ring, attach) is None
+    assert get_ring_substituent_name(mol, ring, attach) is None
+
+
+@pytest.mark.unit
+def test_het_attach_on_heteroatom_declines():
+    """N-attached would need added indicated hydrogen -> decline."""
+    mol = Chem.MolFromSmiles("OC(=O)CCN1CCC=CC1")
+    ring = next(r for r in mol.GetRingInfo().AtomRings())
+    n_idx = next(i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "N")
+    assert _unsaturated_heteromonocyclic_substituent(mol, ring, n_idx) is None
+
+
+# ---------------------------------------------------------------------------
+# 6c — acyl pseudohalides (P-65.5.2.1)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("CCCC(=O)N=[N+]=[N-]", "butanoyl azide"),       # BB verbatim
+    ("CC(=O)N=[N+]=[N-]", "acetyl azide"),
+    ("O=C(N=[N+]=[N-])c1ccccc1", "benzoyl azide"),
+    ("CC(=O)N=C=O", "acetyl isocyanate"),            # BB verbatim
+    ("CCC(=O)C#N", "propanoyl cyanide"),             # BB verbatim
+    ("CC(=O)C#N", "acetyl cyanide"),
+    ("O=C(C#N)c1ccccc1", "benzoyl cyanide"),
+    ("CC(C)C(=O)N=[N+]=[N-]", "2-methylpropanoyl azide"),
+])
+def test_acyl_pseudohalides(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    # plain halides through the same word table — untouched
+    ("CCCC(=O)Cl", "butanoyl chloride"),
+    ("CC(=O)Cl", "acetyl chloride"),
+    ("ClCCC(=O)Cl", "3-chloropropanoyl chloride"),
+    ("O=C(Cl)CCCC(=O)Cl", "pentanedioyl dichloride"),
+    # bare azide/isocyanate/nitrile (no acyl) keep their substitutive names
+    ("CCN=[N+]=[N-]", "azidoethane"),
+    ("CCN=C=O", "isocyanatoethane"),
+    ("CCC#N", "propanenitrile"),
+    # sulfonyl cyanide is NOT an acyl pseudohalide ([CX3] anchor) — the
+    # substitutive RT-correct form is retained
+    ("CS(=O)(=O)C#N", "1-(methanesulfonyl)methanenitrile"),
+])
+def test_pseudohalide_protections(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+def test_carbonyl_dicyanide_fails_closed(_validity_gate_on):
+    """Carbonic-acid pseudohalides (P-65.5.3) are out of scope -> unknown."""
+    assert "unknown" in name_compound("O=C(C#N)C#N")
+
+
+# ---------------------------------------------------------------------------
+# 6c — mixed divalent-chalcogen bridge (P-63.3.2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    ("CCOSC", "(methylsulfanyl)oxyethane"),
+    ("COSC", "(methylsulfanyl)oxymethane"),
+])
+def test_mixed_chalcogen_bridge(smiles, expected):
+    """R-O-S-R' concatenated prefix — was a mangled
+    '(hydroxymethane-SO-thioperoxyl)ethane' wrong-constitution fragment."""
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    # like-pair chalcogen bridges untouched
+    ("COOC", "(methylperoxy)methane"),
+    ("CCOOC", "(methylperoxy)ethane"),
+    ("CSSC", "(methyldisulfanyl)methane"),
+    ("CCSSC", "(methyldisulfanyl)ethane"),
+    # terminal-H thioperoxol suffixes untouched
+    ("CSO", "methane-SO-thioperoxol"),
+    ("COS", "methane-OS-thioperoxol"),
+])
+def test_chalcogen_bridge_protections(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+def test_s_attached_mixed_bridge_fails_closed(_validity_gate_on):
+    """-S-O-R (S-attached) needs the alkoxy contraction (unbuilt) -> the
+    detected bridge declines TERMINALLY, never falling through to the
+    mangling tiers."""
+    assert "unknown" in name_compound("CCSOC")
+
+
+# ---------------------------------------------------------------------------
+# 6c — phane production refusal (P-26)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles", [
+    "C1Cc2ccc(cc2)CCc2ccc1cc2",     # [2.2]paracyclophane
+    "C1CCc2ccccc2CCCc2ccccc21",     # [3.3]orthocyclophane
+])
+def test_phane_production_refused(smiles):
+    """No phane name is OPSIN-parseable — production refuses via
+    UNSUPPORTED_RING_SYSTEM (exception-based, gate-independent)."""
+    assert name_compound(smiles) == "unknown organic compound"
+
+
+@pytest.mark.unit
+def test_phane_composer_machinery_intact():
+    """The rules.phane composer still classifies + composes (kept for the
+    future P-26 build); only the production routing gate withholds it."""
+    from orthonym.rules.phane import is_cyclophane, name_cyclophane
+    mol = Chem.MolFromSmiles("C1Cc2ccc(cc2)CCc2ccc1cc2")
+    assert is_cyclophane(mol)
+    assert name_cyclophane(mol) == "[2.2]paracyclophane"

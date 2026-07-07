@@ -165,9 +165,15 @@ class TestBondContext:
         """Ethene/ethyne: bond locant omitted (only one position)."""
         assert should_omit_locant_one(context="bond", chain_length=2) is True
 
-    def test_three_carbon_chain_keeps_bond_locant(self):
-        """Propene: bond locant needed (could be prop-1-ene or prop-2-ene)."""
-        assert should_omit_locant_one(context="bond", chain_length=3) is False
+    def test_three_carbon_chain_omits_bond_locant(self):
+        """Wave2 T6a (P-14.3.4.2(d)): callers pass chain_length=3 ONLY for an
+        unsubstituted trinuclear parent, which omits the bond locant
+        (propene/propyne PINs). Substituted propene never reaches here with
+        chain_length=3 (composition_primitives gates on
+        chain_bond_locant_omittable)."""
+        assert should_omit_locant_one(context="bond", chain_length=3) is True
+        # Length 4+ always keeps the locant.
+        assert should_omit_locant_one(context="bond", chain_length=4) is False
 
     def test_mono_cycloalkene_omits_bond_locant(self):
         """Cyclohexene: single double bond in ring, locant omitted."""

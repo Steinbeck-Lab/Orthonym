@@ -92,6 +92,14 @@ FUNCTIONAL_GROUP_SMARTS = {
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
     "acid_iodide": "[CX3](=O)[I]",  # DATA-04: IUPAC P-65.5.1
+    # Wave2 T6c: acyl PSEUDOhalides (P-65.5.2.1 — functional-class PINs
+    # 'butanoyl azide' / 'propanoyl cyanide' / 'acetyl isocyanate'). Without
+    # these the bare azido/isocyanate/nitrile SMARTS claim only the tail and
+    # the acyl C=O is DROPPED (1-azidobutane / isocyanatoethane — wrong
+    # constitution). P-41 class-10 pseudohalogen seniority: N3 > CN > NCO.
+    "acyl_azide": "[CX3](=[OX1])[NX2]=[NX2,NX3+]=[NX1-]",
+    "acyl_cyanide": "[CX3;!$([CX3][OX2]);!$([CX3][NX3])](=[OX1])[CX2]#[NX1]",
+    "acyl_isocyanate": "[CX3](=[OX1])[NX2]=[CX2]=[OX1]",
 
     # === NITROGEN ACID DERIVATIVES ===
     "primary_amide": "[CX3](=O)[NX3H2]",
@@ -463,6 +471,13 @@ def _resolve_fg_collisions(results):
         ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),
         ('isothiocyanate', ['nitrile', 'primary_amide']),
+        # Wave2 T6c: acyl pseudohalides (P-65.5.2.1) own their whole
+        # C(=O)-pseudohalogen unit — atom-overlap-scoped, so a separate
+        # azide/nitrile/ketone elsewhere in the molecule is untouched.
+        ('acyl_azide', ['azido', 'ketone', 'aldehyde', 'imine', 'azo']),
+        ('acyl_cyanide', ['nitrile', 'ketone', 'aldehyde']),
+        ('acyl_isocyanate', ['isocyanate', 'ketone', 'aldehyde', 'imine',
+                             'nitrile', 'primary_amide', 'secondary_amide']),
         # Carbamic acid: N-C(=O)-OH must NOT also match carboxylic_acid or amide
         ('carbamic_acid', ['carboxylic_acid', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         # Thiocarboxylic acids: SH in C(=O)SH or C(=S)SH must NOT match thiol

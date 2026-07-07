@@ -168,6 +168,7 @@ def _build_hydrocarbon_name(
     double_locants: List[int],
     triple_locants: List[int],
     ring_bond_locant_omittable: Optional[bool] = None,
+    chain_bond_locant_omittable: Optional[bool] = None,
 ) -> str:
     """
     Build a complete hydrocarbon name (no functional group suffix).
@@ -231,7 +232,21 @@ def _build_hydrocarbon_name(
     # `bromocyclohexene`). The caller passes ``ring_bond_locant_omittable`` (False
     # when the ring carries a substituent); the old ``num_double==1`` count proxy is
     # the fallback for callers that don't supply it.
-    _chain_len = 2 if stem == "eth" else 0
+    # P-14.3.4.2(d): dinuclear ethene/ethyne always omit the bond locant.
+    # TRInuclear propene/propyne (Wave2 T6a) omit it ONLY when the caller
+    # certifies the parent is unsubstituted via chain_bond_locant_omittable —
+    # a substituent makes the position distinctive (3-chloroprop-1-ene). A
+    # single terminal multiple bond is implied (a 3-chain 2-ene cannot exist).
+    if stem == "eth":
+        _chain_len = 2
+    elif (
+        stem == "prop"
+        and chain_bond_locant_omittable
+        and (len(double_locants) + len(triple_locants)) == 1
+    ):
+        _chain_len = 3
+    else:
+        _chain_len = 0
     _ring_mono = (
         ring_bond_locant_omittable
         if (is_cyclic and ring_bond_locant_omittable is not None)

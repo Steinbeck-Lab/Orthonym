@@ -242,6 +242,20 @@ def name_tier_a_ring(
                     _complex_ring_accepted = True
         # If complex ring naming fails, fall through.
 
+    # === Wave2 T6a fail-closed guard: pure-monocyclic spiro system ===
+    # A molecule whose rings are monocycles joined ONLY at spiro atoms has no
+    # valid fallback below this point: the generic paths name a single ring
+    # and silently drop the others (branched trispiro -> 'cyclononane'), or
+    # re-perceive a wrong core. If the spiro subsystem itself declined (tri+
+    # polyspiro descriptors, compound-locant unsaturation, ...), refuse via
+    # the G0 UNSUPPORTED_RING_SYSTEM signal — jar-independent, never a wrong
+    # name. Fused/bridged hybrids are untouched (their own paths run below).
+    if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):
+        from ...rules.spiro import is_spiro_system as _t6_is_pure_spiro
+        if _t6_is_pure_spiro(features.mol):
+            from ...errors import unsupported_ring_system
+            raise unsupported_ring_system()
+
     # === Sub-path 2 fallback: polycyclic + partial_sat post-rejection
     # (composer.py:1083-1110 verbatim) ===
     if not _complex_ring_accepted and not getattr(features, 'chain_is_parent', False):

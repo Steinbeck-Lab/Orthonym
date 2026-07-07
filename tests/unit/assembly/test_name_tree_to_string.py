@@ -60,11 +60,12 @@ class TestSerializerContract:
         """Parent + unsaturation bond locant (Phase 179: on a chain, bond
         locants live in `unsaturation_locants`, NOT the generic `locants`
         field, which carries SUFFIX locants — byte-identical to the legacy
-        assembler). prop + ((1,),()) -> prop-1-ene."""
+        assembler). Wave2 T6a (P-14.3.4.2(d)): an unsubstituted prop node
+        omits the bond locant -> propene."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((1,), ()))
         out = name_tree_to_string(n)
-        assert out == "prop-1-ene"
+        assert out == "propene"
 
     def test_legacy_path_falls_through_to_assemble_fragments(self):
         """node.fragment_legacy is None + parent_stem present -> explicit branch."""
@@ -207,18 +208,22 @@ class TestUnsaturationInfix:
         assert out == "ethane"
 
     def test_single_double_bond(self):
-        """prop + ((1,), ()) -> prop-1-ene."""
+        """prop + ((1,), ()) unsubstituted -> propene (P-14.3.4.2(d));
+        but + ((1,), ()) keeps the locant."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((1,), ()))
         out = name_tree_to_string(n)
-        assert out == "prop-1-ene"
+        assert out == "propene"
+        n4 = NameTreeNode(parent_stem="but", class_id="general_acyclic",
+                          unsaturation_locants=((1,), ()))
+        assert name_tree_to_string(n4) == "but-1-ene"
 
     def test_single_triple_bond(self):
-        """prop + ((), (1,)) -> prop-1-yne."""
+        """prop + ((), (1,)) unsubstituted -> propyne (P-14.3.4.2(d))."""
         n = NameTreeNode(parent_stem="prop", class_id="general_acyclic",
                          unsaturation_locants=((), (1,)))
         out = name_tree_to_string(n)
-        assert out == "prop-1-yne"
+        assert out == "propyne"
 
     def test_two_double_bonds_dien(self):
         """prop + ((1, 2), ()) -> propa-1,2-diene."""

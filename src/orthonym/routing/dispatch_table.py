@@ -938,9 +938,23 @@ def _handle_skeletal_replacement(mol, smiles, canonical_smiles, features=None, *
 
 def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1111-1113."""
+    """Mirrors namer.py:1111-1113.
+
+    Wave2 T6c fail-closed (P-26): OPSIN 2.9.0 cannot parse ANY phane name —
+    neither the bracket-prefix '[2.2]paracyclophane' nor the P-26.2.1
+    simplified-skeleton PIN '1,4(1,4)-dibenzenacyclohexaphane' — so the
+    composed name is a guaranteed round-trip failure with no oracle to verify
+    it. When the phane composer produces a name, refuse via the G0
+    UNSUPPORTED_RING_SYSTEM signal (jar-independent 'unknown') instead of
+    emitting it. The rules.phane composition machinery stays intact (and
+    unit-tested) for the future P-26 subsystem build; only this production
+    routing gate withholds its output.
+    """
     from orthonym.rules.phane import name_cyclophane
-    return name_cyclophane(mol)
+    if name_cyclophane(mol) is not None:
+        from orthonym.errors import unsupported_ring_system
+        raise unsupported_ring_system()
+    return None
 
 
 def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,

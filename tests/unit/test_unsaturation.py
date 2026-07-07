@@ -18,8 +18,8 @@ class TestAlkeneNaming:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("C=C", "ethene"),
-        ("C=CC", "prop-1-ene"),
-        ("CC=C", "prop-1-ene"),  # Same molecule, different SMILES
+        ("C=CC", "propene"),   # P-14.3.4.2(d): unsubstituted trinuclear omits '1'
+        ("CC=C", "propene"),   # Same molecule, different SMILES
         ("CC=CC", "but-2-ene"),
         ("C=CCC", "but-1-ene"),
         ("C=CCCC", "pent-1-ene"),
@@ -40,11 +40,13 @@ class TestAlkeneNaming:
         assert "-" not in result  # No hyphen means no locant
 
     @pytest.mark.unit
-    def test_propene_has_locant(self):
-        """Propene should have a locant (prop-1-ene)."""
+    def test_propene_no_locant(self):
+        """Unsubstituted propene omits the bond locant (P-14.3.4.2(d) PIN);
+        a substituent restores it (3-chloroprop-1-ene)."""
         result = name_compound("C=CC")
-        assert result == "prop-1-ene"
-        assert "-1-" in result
+        assert result == "propene"
+        assert "-" not in result
+        assert name_compound("C=CCCl") == "3-chloroprop-1-ene"
 
     @pytest.mark.unit
     def test_butene_locant_position(self):
@@ -59,8 +61,8 @@ class TestAlkyneNaming:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("C#C", "acetylene"),
-        ("C#CC", "prop-1-yne"),
-        ("CC#C", "prop-1-yne"),  # Same molecule, different SMILES
+        ("C#CC", "propyne"),   # P-14.3.4.2(d): unsubstituted trinuclear omits '1'
+        ("CC#C", "propyne"),   # Same molecule, different SMILES
         ("CC#CC", "but-2-yne"),
         ("C#CCC", "but-1-yne"),
         ("C#CCCC", "pent-1-yne"),
@@ -78,11 +80,11 @@ class TestAlkyneNaming:
         assert "-" not in result
 
     @pytest.mark.unit
-    def test_propyne_has_locant(self):
-        """Propyne should have a locant (prop-1-yne)."""
+    def test_propyne_no_locant(self):
+        """Unsubstituted propyne omits the bond locant (P-14.3.4.2(d) PIN)."""
         result = name_compound("C#CC")
-        assert result == "prop-1-yne"
-        assert "-1-" in result
+        assert result == "propyne"
+        assert "-" not in result
 
 
 class TestEnyneNaming:

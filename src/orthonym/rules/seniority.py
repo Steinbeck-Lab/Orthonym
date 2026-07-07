@@ -116,6 +116,11 @@ SENIORITY_ORDER = [
     "acid_bromide",
     "acid_fluoride",
     "acid_iodide",    # IUPAC P-65.5.1: parallel to other acid halides
+    # Wave2 T6c: acyl pseudohalides (P-65.5.2.1). P-41 class 10 orders
+    # halides before pseudohalides, pseudohalogens as N3 > CN > NC > NCO.
+    "acyl_azide",
+    "acyl_cyanide",
+    "acyl_isocyanate",
 
     # Nitrogen acid derivatives
     "primary_amide",
@@ -373,6 +378,10 @@ SUFFIX_FORMS = {
     "acid_chloride": ("oyl chloride", "carbonyl chloride"),
     "acid_bromide": ("oyl bromide", "carbonyl bromide"),
     "acid_fluoride": ("oyl fluoride", "carbonyl fluoride"),
+    # Wave2 T6c: acyl pseudohalides (P-65.5.2.1 functional-class PINs)
+    "acyl_azide": ("oyl azide", "carbonyl azide"),
+    "acyl_cyanide": ("oyl cyanide", "carbonyl cyanide"),
+    "acyl_isocyanate": ("oyl isocyanate", "carbonyl isocyanate"),
     "primary_amide": ("amide", "carboxamide"),
     "secondary_amide": ("amide", "carboxamide"),
     "tertiary_amide": ("amide", "carboxamide"),
@@ -620,6 +629,11 @@ PREFIX_FORMS = {
     "acid_chloride": "carbonochloridoyl",
     "acid_bromide": "bromocarbonyl",
     "acid_fluoride": "fluorocarbonyl",
+    # Wave2 T6c: acyl-pseudohalide prefixes (P-65.5.4, parallel to
+    # bromocarbonyl/fluorocarbonyl above)
+    "acyl_azide": "azidocarbonyl",
+    "acyl_cyanide": "cyanocarbonyl",
+    "acyl_isocyanate": "isocyanatocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
     # Ethers and thioethers

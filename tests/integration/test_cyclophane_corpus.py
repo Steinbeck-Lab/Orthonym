@@ -134,10 +134,17 @@ def test_cyclophane_name_compound(fixture):
 
     smi = fixture["smiles"]
     expected = fixture["expected_name"]
+    # Wave2 T6c fail-closed (P-26): production REFUSES all phane names — OPSIN
+    # cannot parse any phane form (bracket-prefix or the P-26.2.1 PIN), so the
+    # composed name is a guaranteed non-round-tripping emission. The dispatch
+    # handler converts it to the G0 UNSUPPORTED_RING_SYSTEM 'unknown'. The
+    # composition machinery itself is still exercised by the name_cyclophane
+    # unit/fixture tests; this end-to-end test now pins the refusal.
     actual = name_compound(smi)
-    assert actual == expected, (
+    assert actual == "unknown organic compound", (
         f"name_compound({fixture['fixture_id']}, smiles={smi!r}) returned "
-        f"{actual!r}; expected {expected!r}"
+        f"{actual!r}; expected the T6c fail-closed 'unknown organic compound' "
+        f"(composed form would have been {expected!r})"
     )
 
 

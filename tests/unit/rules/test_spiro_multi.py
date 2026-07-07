@@ -209,6 +209,21 @@ class TestDispiro:
             pytest.skip(f"corpus fixture not pure spiro at SSSR layer: "
                         f"{fixture['fixture_id']}")
         result = name_spiro_system(mol)
+        # Wave2 T6a (P-24.2.0/P-31.1.5.1): a POLYSPIRO system with a ring
+        # multiple bond now fails closed — the unsaturation splice is
+        # monospiro-only, and the old '-ane' core silently dropped the ring
+        # double bond (the exact defect T6a fixes). Assert that contract.
+        _has_ring_unsat = any(
+            b.IsInRing()
+            and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+            for b in mol.GetBonds()
+        )
+        if len(get_spiro_atoms(mol)) >= 2 and _has_ring_unsat:
+            assert result is None, (
+                f"{fixture['fixture_id']}: unsaturated polyspiro must fail "
+                f"closed, got {result[0]!r}"
+            )
+            return
         assert result is not None, fixture["fixture_id"]
         name = result[0]
         n_spiro = len(get_spiro_atoms(mol))

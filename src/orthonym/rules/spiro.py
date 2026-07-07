@@ -172,6 +172,16 @@ def _generate_polyspiro_descriptor(mol, spiro_atoms: Set[int]) -> Optional[str]:
     ri = mol.GetRingInfo()
     all_rings = [list(r) for r in ri.AtomRings()]
 
+    # Wave2 T6a (P-24.2.2/P-24.2.3): tri+ polyspiro descriptors need
+    # superscript revisit locants and the terminal-ring reordering walk;
+    # _reorder_segments_iupac is only correct for dispiro (3 rings). A 4+-ring
+    # descriptor in ring-sequential order names a DIFFERENT constitution
+    # (OPSIN reparses trispiro[4.2.2.2.2.5]icosane to another molecule), so
+    # fail closed. The tier_a_ring pure-polyspiro guard converts this decline
+    # into an UNSUPPORTED_RING_SYSTEM refusal instead of a one-ring fallback.
+    if len(spiro_atoms) >= 3:
+        return None
+
     ring_chain, spiro_chain = _build_ring_chain(mol, all_rings, spiro_atoms)
     if ring_chain is None or spiro_chain is None:
         return None
@@ -645,6 +655,19 @@ def get_spiro_numbering(
     canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     suffix_set = set(suffix_ring_atoms or ())
 
+    # Wave2 T6a (P-31.1.5.1): ring multiple bonds of the spiro system, so the
+    # numbering choice can give them low locants. Computed once — every
+    # candidate maps the same atom set.
+    ring_atom_set = set(r1) | set(r2)
+    mult_bonds = [
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(),
+         b.GetBondType() == Chem.BondType.DOUBLE)
+        for b in mol.GetBonds()
+        if b.GetBeginAtomIdx() in ring_atom_set
+        and b.GetEndAtomIdx() in ring_atom_set
+        and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+    ]
+
     def _key(mapping: Dict[int, int]):
         heteros = [
             (a, loc) for a, loc in mapping.items()
@@ -661,10 +684,22 @@ def get_spiro_numbering(
         # (after heteroatoms) so a symmetric spiro SUBSTITUENT is minimal AND
         # deterministic (spiro[5.5]undecan-3-yl, never -9-yl).
         suffix_locs = sorted(loc for a, loc in mapping.items() if a in suffix_set)
+        # (3b) Wave2 T6a (P-31.1.5.1.1/.2): lowest locants to ring multiple
+        # bonds as a set, then to double bonds. Ranked after heteroatoms
+        # (P-31.1.5.1.3) and the free-valence tier (P-32.2.1: free valence
+        # outranks unsaturated sites); empty for saturated systems, so their
+        # ordering is unchanged.
+        unsat_all = sorted(
+            min(mapping[a], mapping[b]) for a, b, _is_dbl in mult_bonds
+        )
+        unsat_dbl = sorted(
+            min(mapping[a], mapping[b]) for a, b, is_dbl in mult_bonds if is_dbl
+        )
         # (4) deterministic, spelling-independent tiebreak for symmetric rings
         seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
         canon_seq = tuple(canon[a] for a in seq)
-        return (het_locs, het_by_seniority, suffix_locs, canon_seq)
+        return (het_locs, het_by_seniority, suffix_locs, unsat_all, unsat_dbl,
+                canon_seq)
 
     return min(candidates, key=_key)
 
@@ -771,6 +806,22 @@ def _get_alkane_name(atom_count: int) -> str:
     return f"{_get_chain_prefix(atom_count)}ane"
 
 
+def _unsaturated_spiro_parent(
+    total_atoms: int,
+    double_locants: List[int],
+    triple_locants: List[int],
+) -> Optional[str]:
+    """Unsaturated spiro parent stem per P-31.1.5.1 ('dec-6-ene',
+    'undeca-1,8-diene'). Reuses the shared P-31 hydrocarbon-name grammar
+    (composition_primitives) so the ene/yne morphology has one source of
+    truth. Returns None when no chain prefix exists for ``total_atoms``."""
+    from ..assembly.composition_primitives import _build_hydrocarbon_name
+    stem = _get_chain_prefix(total_atoms)
+    if not stem:
+        return None
+    return _build_hydrocarbon_name(stem, double_locants, triple_locants)
+
+
 def name_spiro_system(mol):
     """
     Generate the complete IUPAC name for a spiro compound.
@@ -817,8 +868,6 @@ def name_spiro_system(mol):
                 spiro_ring_atoms |= ring_set
         total_atoms = len(spiro_ring_atoms)
 
-    parent_name = _get_alkane_name(total_atoms)
-
     # Collect all ring atoms in the spiro system
     ring_atoms_to_check: Set[int] = set()
     for ring in all_rings:
@@ -834,6 +883,50 @@ def name_spiro_system(mol):
         atom_to_locant = _get_polyspiro_numbering(mol, spiro_atoms_set)
         if atom_to_locant is None:
             atom_to_locant = {}
+
+    # --- Wave2 T6a: ring unsaturation splice (P-24.2.0 / P-31.1.5.1) ---
+    # Map each ring multiple bond onto the fixed spiro numbering and emit the
+    # unsaturated parent stem (spiro[4.5]dec-6-ene). The numbering itself is
+    # ene-aware (get_spiro_numbering tier 3b). Anything not expressible with
+    # plain consecutive locants fails closed — never a silently-saturated
+    # '-ane' for an unsaturated system.
+    ring_mult_bonds = []
+    for bond in mol.GetBonds():
+        a_idx, b_idx = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a_idx not in ring_atoms_to_check or b_idx not in ring_atoms_to_check:
+            continue
+        btype = bond.GetBondType()
+        if btype == Chem.BondType.SINGLE:
+            continue
+        if btype not in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+            # Aromatic / dative ring bond — not a plain ene/yne system.
+            return None
+        ring_mult_bonds.append((a_idx, b_idx, btype))
+
+    if not ring_mult_bonds:
+        parent_name = _get_alkane_name(total_atoms)
+    else:
+        if n_spiro != 1 or not atom_to_locant:
+            # Polyspiro unsaturation (P-31.1.5.1 on a dispiro+ numbering) is
+            # not implemented — fail closed rather than drop the bond.
+            return None
+        double_locs: List[int] = []
+        triple_locs: List[int] = []
+        for a_idx, b_idx, btype in ring_mult_bonds:
+            loc_a = atom_to_locant.get(a_idx)
+            loc_b = atom_to_locant.get(b_idx)
+            if loc_a is None or loc_b is None or abs(loc_a - loc_b) != 1:
+                # Needs a compound locant (P-31.1.4.2.3) — unsupported.
+                return None
+            if btype == Chem.BondType.DOUBLE:
+                double_locs.append(min(loc_a, loc_b))
+            else:
+                triple_locs.append(min(loc_a, loc_b))
+        parent_name = _unsaturated_spiro_parent(
+            total_atoms, sorted(double_locs), sorted(triple_locs)
+        )
+        if parent_name is None:
+            return None
 
     has_heteroatoms = any(
         mol.GetAtomWithIdx(idx).GetSymbol() != 'C'

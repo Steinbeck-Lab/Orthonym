@@ -72,8 +72,12 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         # R4/P-63.2.4: COCCOC now routes substitutive ('1,2-dimethoxyethane'); use
         # a 3-O chain (>= 3 O keeps skeletal) as the SKELETAL_REPLACEMENT representative.
         (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOCCOC",              "2,5,8-trioxanonane")),
+        # Wave2 T6c fail-closed (P-26): the CYCLOPHANE entry still matches and
+        # dispatches, but production REFUSES the composed bracket-prefix name
+        # ('[3.3]orthocyclophane' — no phane form is OPSIN-parseable) via the
+        # G0 UNSUPPORTED_RING_SYSTEM signal.
         (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
-                                              "[3.3]orthocyclophane")),
+                                              "unknown organic compound")),
         (StoutClass.DECOMPOSITION_PRE_GENERAL,
                                               ("CCCCCCCCCCCCCCCC(=O)OCCC",
                                               "propyl palmitate")),

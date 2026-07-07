@@ -1315,9 +1315,13 @@ def _assemble_fragments(
         # ring is unsubstituted (no substituent prefixes). Acyclic / non-cyclo stems
         # pass None to preserve the existing count-proxy behavior.
         _ring_bond_omittable = (not prefix_str) if stem.startswith("cyclo") else None
+        # Wave2 T6a (P-14.3.4.2(d)): an UNSUBSTITUTED propene/propyne omits
+        # the bond locant; any prefix keeps it (3-chloroprop-1-ene).
+        _chain_bond_omittable = (not prefix_str) if stem == "prop" else None
         name = _build_hydrocarbon_name(
             stem, double_locants, triple_locants,
             ring_bond_locant_omittable=_ring_bond_omittable,
+            chain_bond_locant_omittable=_chain_bond_omittable,
         )
 
     # Add prefixes with proper hyphenation at boundary
