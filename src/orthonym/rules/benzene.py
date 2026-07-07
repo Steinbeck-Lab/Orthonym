@@ -635,6 +635,49 @@ def _identify_boron_group(
     return None
 
 
+def _identify_ring_heteroatom_fg(mol, start_idx: int,
+                                 ring_atoms: Set[int]) -> Optional[Dict]:
+    """Wave-2 completion (P-61 ring-FG root): recognize a small closed set of
+    hypervalent-iodine / oxophosphanyl ring substituents that the plain-symbol
+    branches would otherwise mis-name or drop. Returns the prefix dict or None
+    (fail-closed -> the caller continues its normal per-symbol dispatch).
+
+    Handled (all OPSIN-RT verified):
+      * iodine with one terminal =O  -> 'iodosyl'   (P-61.3.2.3)
+      * iodine with two terminal =O  -> 'iodyl'
+      * phosphorus with one terminal =O (bare -PH=O) -> 'oxophosphanyl' (P-61.6)
+    """
+    atom = mol.GetAtomWithIdx(start_idx)
+    sym = atom.GetSymbol()
+    if sym not in ('I', 'P'):
+        return None
+    if atom.GetFormalCharge() != 0:
+        return None
+    oxo = []
+    other_heavy = 0
+    for nbr in atom.GetNeighbors():
+        if nbr.GetIdx() in ring_atoms:
+            continue
+        bond = mol.GetBondBetweenAtoms(start_idx, nbr.GetIdx())
+        if (nbr.GetSymbol() == 'O' and nbr.GetDegree() == 1
+                and bond.GetBondType() == Chem.BondType.DOUBLE):
+            oxo.append(nbr.GetIdx())
+        else:
+            other_heavy += 1
+    if other_heavy != 0:
+        return None  # any extra substituent -> not this clean class
+    if sym == 'I':
+        if len(oxo) == 1:
+            return {'name': 'iodosyl', 'atoms': [start_idx] + oxo}
+        if len(oxo) == 2:
+            return {'name': 'iodyl', 'atoms': [start_idx] + oxo}
+    elif sym == 'P':
+        # bare -P(=O)H2 attached to the ring -> oxophosphanyl (P-61.6)
+        if len(oxo) == 1:
+            return {'name': 'oxophosphanyl', 'atoms': [start_idx] + oxo}
+    return None
+
+
 def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
@@ -649,6 +692,16 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     """
     start_atom = mol.GetAtomWithIdx(start_idx)
     symbol = start_atom.GetSymbol()
+
+    # Wave-2 completion (P-61 ring-FG root): explicit hypervalent-iodine and
+    # oxophosphanyl ring substituents, recognized BEFORE the plain-halogen
+    # branch so a =O-bearing iodine is not mis-emitted as bare 'iodo' (which
+    # would drop the oxide and name a different molecule). O=I- -> iodosyl,
+    # O=I(=O)- -> iodyl (P-61.3.2.3); O=PH- -> oxophosphanyl (P-61.6). All
+    # OPSIN-RT verified; fail-closed (fall through) on any other decoration.
+    _ring_fg = _identify_ring_heteroatom_fg(mol, start_idx, ring_atoms)
+    if _ring_fg is not None:
+        return _ring_fg
 
     # Halogens - single atom substituents
     if symbol in SUBSTITUENT_PREFIXES:
@@ -1211,6 +1264,26 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 'name': 'nitroso',
                 'atoms': [n_idx, neighbors[0].GetIdx()]
             }
+
+    # Wave-2 completion (P-61.11.1 / P-15.2.1.1): azido -N=[N+]=[N-] on the ring.
+    # The ring-attached N is neutral with a single N neighbour (=[N+]); the
+    # chain is exactly three N atoms. -> 'azido' (azidobenzene, OPSIN-RT).
+    if h_count == 0 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'N':
+        sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+        if (len(sub_atoms) == 3
+                and all(mol.GetAtomWithIdx(i).GetSymbol() == 'N' for i in sub_atoms)):
+            return {'name': 'azido', 'atoms': sub_atoms}
+
+    # Wave-2 completion (P-15.2.1.1): isocyano -[N+]#[C-] on the ring. The
+    # ring-attached N is positively charged, triple-bonded to a terminal
+    # negative C. -> 'isocyano' (isocyanobenzene, OPSIN-RT).
+    if (n_atom.GetFormalCharge() == 1 and len(neighbors) == 1
+            and neighbors[0].GetSymbol() == 'C' and neighbors[0].GetDegree() == 1):
+        c_nbr = neighbors[0]
+        bond = mol.GetBondBetweenAtoms(n_idx, c_nbr.GetIdx())
+        if (bond and bond.GetBondType() == Chem.BondType.TRIPLE
+                and c_nbr.GetFormalCharge() == -1):
+            return {'name': 'isocyano', 'atoms': [n_idx, c_nbr.GetIdx()]}
 
     # Fallback: complex N-substituent (non-alkyl chains, heteroatom-containing
     # groups like guanidino, ureido, etc.).  Collect all atoms via BFS and try

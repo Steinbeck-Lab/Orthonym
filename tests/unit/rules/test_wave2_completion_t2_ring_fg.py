@@ -1,0 +1,45 @@
+"""Wave-2 completion Tier 2: benzene ring-FG walker root (P-61 / P-15.2.1.1).
+
+Explicit recognizers for azido / isocyano / iodosyl / iodyl / oxophosphanyl ring
+substituents that the plain-symbol walker branches mis-named or dropped. All
+OPSIN-RT probed at build time.
+"""
+
+import pytest
+from rdkit import Chem
+
+from orthonym import name_compound
+
+pytestmark = pytest.mark.unit
+
+
+def _name(smiles):
+    return name_compound(Chem.CanonSmiles(smiles))
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),               # P-15.2.1.1
+    ("O=Ic1ccccc1", "iodosylbenzene"),                     # P-61.3.2.3
+    ("O=I(=O)c1ccccc1", "iodylbenzene"),
+    ("O=Pc1ccccc1", "oxophosphanylbenzene"),               # P-61.6
+    ("[C-]#[N+]c1ccccc1", "isocyanobenzene"),              # P-15.2.1.1
+    ("[N-]=[N+]=Nc1ccc(F)cc1", "1-azido-4-fluorobenzene"),
+    ("[N-]=[N+]=Nc1ccc(Cl)cc1Cl", "1-azido-2,4-dichlorobenzene"),
+])
+def test_ring_fg_recognizers(smiles, expected):
+    assert _name(smiles) == expected
+
+
+def test_halogen_and_nitroso_unchanged():
+    # Protect: plain halogens + nitroso keep their names (iodosyl must not
+    # steal plain iodobenzene).
+    assert _name("Ic1ccccc1") == "iodobenzene"
+    assert _name("Clc1ccccc1") == "chlorobenzene"
+    assert _name("O=Nc1ccccc1") == "nitrosobenzene"
+    assert _name("Brc1ccccc1") == "bromobenzene"
+
+
+def test_azido_nitro_coexistence_fails_closed():
+    # azido + nitro coexistence is a separate charged-FG gap (even acyclic
+    # fails); must fail closed to 'unknown', never a wrong name.
+    assert _name("[N-]=[N+]=Nc1ccccc1[N+](=O)[O-]") == "unknown organic compound"
