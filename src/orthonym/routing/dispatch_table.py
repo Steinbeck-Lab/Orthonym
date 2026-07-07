@@ -126,6 +126,7 @@ class StoutClass(_StrEnumBase):
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
+    CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -1125,6 +1126,22 @@ def _handle_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> Op
     return name_ketene(mol)
 
 
+def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Wave-2 completion (P-21.2.3/P-52.1.3); priority 47.5. An alternating
+    homonuclear Group-14/bridge catenated hydride (disiloxane/trisiloxane/
+    disilazane). PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.catenated_hydrides import name_catenated_hydride
+    return name_catenated_hydride(mol) is not None
+
+
+def _handle_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the catenated Group-14/bridge hydride PIN (P-21.2.3), else None."""
+    from orthonym.rules.catenated_hydrides import name_catenated_hydride
+    return name_catenated_hydride(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -1209,6 +1226,23 @@ _register_dispatch(
     iupac_section="Blue Book P-68.3.1.1 / P-68.3.1.3 / P-21.2.2",
     description="Polyazane-family parent hydride (hydrazine / diazene / triazane / "
                 "triaz-1-ene / 1,2-diphenyldiazene); graph classifier, fail-closed",
+)
+
+
+# --- Wave-2 completion: CATENATED_HYDRIDE at priority 47.5 (after POLYAZANE@47, ---
+# before DINUCLEAR_HYDRIDE@48 / ORGM@50). Alternating homonuclear Group-14/bridge
+# catenated parent hydride (P-21.2.3/P-52.1.3): [SiH3]O[SiH3] -> disiloxane,
+# [SiH3]O[SiH2]O[SiH3] -> trisiloxane, [SiH3]N[SiH3] -> disilazane, [SnH3]O[SnH3]
+# -> distannoxane. These are exactly what skeletal_replacement Gate 3b declines
+# (terminal Group-14) to avoid the dimethoxysilane structure-loss. Graph
+# classifier, fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.CATENATED_HYDRIDE, priority=47.5, tier=1,
+    predicate=_is_catenated_hydride, handler=_handle_catenated_hydride,
+    iupac_section="Blue Book P-21.2.3 / P-52.1.3",
+    description="Alternating Group-14/bridge catenated parent hydride "
+                "(disiloxane / trisiloxane / disilazane / distannoxane); "
+                "graph classifier, fail-closed",
 )
 
 

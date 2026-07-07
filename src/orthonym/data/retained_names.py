@@ -245,6 +245,14 @@ RETAINED_NAMES = {
     
     # === RETAINED NITROGEN COMPOUNDS ===
     "NC(N)=O": "urea",
+    # Wave-2 completion (P-66.1.6.1.3 / P-15.5.3.4.3): thiourea is the retained
+    # functional-parent PIN for the standalone NC(=S)N (thio-analogue of urea).
+    # The thiourea-as-substituent prefix 'carbamothioylamino' is separate.
+    "NC(N)=S": "thiourea",
+    # Wave-2 completion (P-52.1.5.1): pentazolidine — the saturated homogeneous
+    # all-nitrogen 5-ring (HW-preselected). RDKit aromatises the all-NH ring to
+    # [nH]1[nH][nH][nH][nH]1, distinct from 1H-pentazole; exact-SMILES lookup.
+    "[nH]1[nH][nH][nH][nH]1": "pentazolidine",
     "N=C(N)N": "guanidine",
     # Wave2 T2d (P-34.1.1.5 / P-68.3.1.3.5): formazan HN=N-CH=N-NH2 is the
     # retained PIN (fully substitutable; substituted formazans + the
