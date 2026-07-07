@@ -809,25 +809,32 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
 
         neighbors = atom.GetNeighbors()
         heavy_neighbors = [n for n in neighbors if n.GetAtomicNum() > 1]
+        ring_nbrs = [n for n in heavy_neighbors if n.GetIdx() in ring_atoms]
+        sub_nbrs = [n for n in heavy_neighbors if n.GetIdx() not in ring_atoms]
 
-        # Single-atom bridge: exactly 2 heavy neighbors, both in rings
-        if len(heavy_neighbors) != 2:
-            continue
-        if not all(n.GetIdx() in ring_atoms for n in heavy_neighbors):
-            continue
-
-        # Classify the bridge atom
-        bridge_type = _classify_single_atom_bridge(atom)
-        if bridge_type is None:
+        # Single-atom bridge: exactly 2 ring neighbours. The plain bridges
+        # (O/S/NH/CH2) have no other heavy neighbour; the Wave-2 carbonyl /
+        # halomethylene bridges carry one bridge-owned substituent (=O / halo).
+        if len(ring_nbrs) != 2:
             continue
 
-        bridge_name = _SINGLE_ATOM_BRIDGES.get(bridge_type)
-        if bridge_name is None:
-            continue
+        extra_remove: List[int] = []
+        if not sub_nbrs:
+            bridge_type = _classify_single_atom_bridge(atom)
+            if bridge_type is None:
+                continue
+            bridge_name = _SINGLE_ATOM_BRIDGES.get(bridge_type)
+            if bridge_name is None:
+                continue
+        else:
+            ext = _classify_single_atom_bridge_ext(mol, atom, ring_nbrs, sub_nbrs)
+            if ext is None:
+                continue
+            bridge_type, bridge_name, extra_remove = ext
 
-        # Split the molecule at the bridge
-        nbr_indices = [n.GetIdx() for n in heavy_neighbors]
-        fragments = _split_at_bridge(mol, idx, nbr_indices)
+        # Split the molecule at the bridge (removing bridge-owned substituents)
+        nbr_indices = [n.GetIdx() for n in ring_nbrs]
+        fragments = _split_at_bridge(mol, idx, nbr_indices, extra_remove)
         if fragments is None:
             continue
 
@@ -1017,6 +1024,41 @@ def _classify_single_atom_bridge(atom) -> Optional[str]:
         return "NH"
     elif sym == "S" and total_h == 0:
         return "S"
+    return None
+
+
+_HALO_METHYLENE = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+
+def _classify_single_atom_bridge_ext(
+    mol, atom, ring_nbr_idxs, sub_nbrs
+) -> Optional[Tuple[str, str, List[int]]]:
+    """Wave-2 completion (P-15.3.1.2.1.1/.1.2): classify a bridge atom that
+    carries a bridge-owned substituent — a carbonyl =O or a halomethylene
+    halogen — into (bridge_type_key, bridge_display_name, extra_atoms_to_remove).
+
+    ``sub_nbrs`` are the bridge atom's NON-ring heavy neighbours. Returns None
+    (fail-closed) for anything but the two clean cases:
+      * C with exactly one terminal =O, 0 H, 2 ring neighbours -> 'carbonyl'
+      * C with exactly one terminal single-bonded halogen, 1 H -> '{halo}methylene'
+    """
+    sym = atom.GetSymbol()
+    if sym != "C" or len(sub_nbrs) != 1:
+        return None
+    sub = sub_nbrs[0]
+    if sub.GetDegree() != 1:
+        return None
+    bond = mol.GetBondBetweenAtoms(atom.GetIdx(), sub.GetIdx())
+    total_h = atom.GetTotalNumHs()
+    # Carbonyl bridge: C(=O) linking two rings (P-15.3.1.2.1.1).
+    if (sub.GetSymbol() == "O" and total_h == 0
+            and bond.GetBondType() == Chem.BondType.DOUBLE):
+        return ("carbonyl", "carbonyl", [sub.GetIdx()])
+    # Substituted-methylene bridge: C(H)(X) linking two rings (P-15.3.1.2.1.2).
+    if (sub.GetSymbol() in _HALO_METHYLENE and total_h == 1
+            and bond.GetBondType() == Chem.BondType.SINGLE):
+        name = f"{_HALO_METHYLENE[sub.GetSymbol()]}methylene"
+        return ("halomethylene", name, [sub.GetIdx()])
     return None
 
 
@@ -1214,9 +1256,11 @@ def _try_multi_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
 
 
 def _split_at_bridge(
-    mol, bridge_idx: int, nbr_indices: List[int]
+    mol, bridge_idx: int, nbr_indices: List[int],
+    extra_remove: Optional[List[int]] = None,
 ) -> Optional[Tuple[str, str, int, int]]:
-    """Split molecule by removing a single bridge atom.
+    """Split molecule by removing a single bridge atom (plus any ``extra_remove``
+    atoms belonging to the bridge, e.g. the carbonyl =O or a halomethylene Cl).
 
     Returns:
         (frag_smiles_a, frag_smiles_b, conn_atom_in_a, conn_atom_in_b)
@@ -1227,8 +1271,11 @@ def _split_at_bridge(
     # Record neighbors before removal (atom indices will shift!)
     nbr_a, nbr_b = nbr_indices[0], nbr_indices[1]
 
-    # Remove bridge atom
-    emol.RemoveAtom(bridge_idx)
+    # Remove the bridge atom + any bridge-owned substituent atoms. Remove in
+    # descending index order so earlier removals don't shift later indices.
+    remove_set = {bridge_idx} | set(extra_remove or [])
+    for ridx in sorted(remove_set, reverse=True):
+        emol.RemoveAtom(ridx)
 
     try:
         Chem.SanitizeMol(emol)
@@ -1248,10 +1295,12 @@ def _split_at_bridge(
     smi_a = Chem.MolToSmiles(frag_mols[0])
     smi_b = Chem.MolToSmiles(frag_mols[1])
 
-    # Adjust neighbor indices for atom removal
-    # When atom at bridge_idx is removed, all atoms with idx > bridge_idx shift down by 1
-    adj_a = nbr_a if nbr_a < bridge_idx else nbr_a - 1
-    adj_b = nbr_b if nbr_b < bridge_idx else nbr_b - 1
+    # Adjust neighbor indices for atom removal: each removed atom with a lower
+    # index shifts a surviving atom's index down by one.
+    def _shift(orig):
+        return orig - sum(1 for r in remove_set if r < orig)
+    adj_a = _shift(nbr_a)
+    adj_b = _shift(nbr_b)
 
     return (smi_a, smi_b, adj_a, adj_b)
 
@@ -1632,9 +1681,16 @@ def _assemble_multiplicative_name(
     # ("ethane-1,2-diyl") is parenthesised -> "4,4'-(ethane-1,2-diyl)di...".
     # Locant-free bridges ("oxy", "sulfanediyl", "azanediyl", "nitrilo",
     # "methylene", "peroxy", "disulfanediyl") stay bare.
+    # A SUBSTITUTED simple bridge (a compound substituent name like
+    # "chloromethylene" = chloro + methylene) is also parenthesised even
+    # though it carries no locant/digit — P-16.3.3 "4,4'-(chloromethylene)
+    # diphenol" (Wave-2 completion).
+    _substituted_methylene = (
+        bridge_name != "methylene" and bridge_name.endswith("methylene")
+    )
     if "(" in bridge_name:
         bridge_token = f"[{bridge_name}]"
-    elif any(ch.isdigit() for ch in bridge_name):
+    elif any(ch.isdigit() for ch in bridge_name) or _substituted_methylene:
         bridge_token = f"({bridge_name})"
     else:
         bridge_token = bridge_name
