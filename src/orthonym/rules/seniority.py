@@ -580,6 +580,7 @@ PREFIX_FORMS = {
     "isocyanate": "isocyanato",
     "isothiocyanate": "isothiocyanato",
     "urea": "carbamoylamino",
+    "thiourea": "carbamothioylamino",  # Wave-2 completion P-66.1.6.1.3.3 (thio-urea prefix)
     "guanidine": "guanidino",
     # Wave2 T2b: terminal N-heteroatom preselected prefixes. BB verbatim:
     # 'aminooxy (preselected prefix) (note that there is no elision of the

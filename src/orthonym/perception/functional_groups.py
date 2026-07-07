@@ -146,6 +146,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === UREA (must check before amides -- N-C(=O)-N is more specific) ===
     "urea": "[NX3][CX3](=O)[NX3]",
 
+    # === THIOUREA (Wave-2 completion, P-66.1.6.1.3.3): thio-analogue of urea,
+    # N-C(=S)-N. Prefix form 'carbamothioylamino' (mirror of urea's
+    # carbamoylamino). More specific than thioamide (which requires a C
+    # neighbour) and primary_amine — suppresses those on its atoms below. ===
+    "thiourea": "[NX3][CX3](=[SX1])[NX3]",
+
     # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
     "guanidine": "[NX3][CX3](=[NX2])[NX3]",
 
@@ -467,6 +473,11 @@ def _resolve_fg_collisions(results):
     """
     for fg_specific, fg_generic_list in [
         ('urea', ['primary_amide', 'secondary_amide', 'tertiary_amide']),
+        # Wave-2 completion (P-66.1.6.1.3.3): thiourea N-C(=S)-N owns its whole
+        # unit — suppress the terminal-N amine perception and any thioamide/
+        # thioketone match on its atoms (thiourea is the more specific FG).
+        ('thiourea', ['thioamide', 'thioketone',
+                      'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('guanidine', ['imine']),
         ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),

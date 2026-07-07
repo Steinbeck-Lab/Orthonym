@@ -1612,6 +1612,9 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 # the whole branch (isocyanate/isothiocyanate/isocyanide
                 # include the chain-anchor C; guanidine IS the branch).
                 'isocyanate', 'isothiocyanate', 'isocyanide', 'guanidine',
+                # Wave-2 completion: thiourea -NH-C(=S)-NH2 -> carbamothioylamino
+                # FG prefix (whole branch), same double-count guard as urea.
+                'thiourea',
             }
             _sub_set = set(sub_atoms)
             _skip_fg_branch = False

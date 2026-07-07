@@ -1001,6 +1001,8 @@ def get_substituent_prefix_form(
         return PREFIX_FORMS.get("nitrile")  # "cyano"
     if fg_name == "urea":
         return PREFIX_FORMS.get("urea")  # "carbamoylamino"
+    if fg_name == "thiourea":
+        return PREFIX_FORMS.get("thiourea")  # "carbamothioylamino" (P-66.1.6.1.3.3)
     if fg_name == "isocyanate":
         return PREFIX_FORMS.get("isocyanate")  # "isocyanato"
     if fg_name == "isothiocyanate":
@@ -1052,7 +1054,7 @@ _PREFIX_FORM_FG_NAMES = (
     "nitrile",
     "sulfoxide", "sulfone", "thioether",
     "selenoether", "telluroether",  # BBR-PERC (169.7)
-    "carbamate", "urea",
+    "carbamate", "urea", "thiourea",
     "isocyanate", "isothiocyanate",
     "amidine",  # R8b (P-66.4.1.3.1): carbamimidoyl prefix
 )
