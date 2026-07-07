@@ -196,7 +196,9 @@ class TestNewEntries:
         # Additional compounds
         ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
         ("O=C(O)c1ccco1", "furan-2-carboxylic acid"),
-        ("c1ccc(-c2ccncc2)nc1", "2,2'-bipyridine"),
+        # (Wave-2 completion) c1ccc(-c2ccncc2)nc1 was REMOVED: that canonical
+        # SMILES is 2,4'-bipyridine, wrongly keyed to "2,2'-bipyridine" —
+        # ring_assemblies now names all bipyridines systematically (P-28.2.1).
         ("Oc1cc(O)cc(O)c1", "phloroglucinol"),
         ("Oc1ccc2c(c1)OCO2", "sesamol"),
         ("O=Cc1ccc2c(c1)OCO2", "piperonal"),

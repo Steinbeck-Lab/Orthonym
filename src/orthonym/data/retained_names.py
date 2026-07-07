@@ -515,7 +515,10 @@ RETAINED_NAMES = {
     # All canonical SMILES verified via Chem.CanonSmiles 2026-03-16
     "C1CCC2CCCCC2C1": "decahydronaphthalene",         # decalin
     "O=C(O)c1ccco1": "furan-2-carboxylic acid",       # furoic acid
-    "c1ccc(-c2ccncc2)nc1": "2,2'-bipyridine",         # bipyridyl
+    # (Wave-2 completion) The old "bipyridyl" row here keyed the canonical
+    # SMILES of 2,4'-bipyridine to the NAME "2,2'-bipyridine" — a wrong-key
+    # data bug (SELF-01 suppressed it to unknown). Bipyridines are named
+    # systematically by rules/ring_assemblies.py (P-28.2.1); no retained row.
     "Oc1cc(O)cc(O)c1": "phloroglucinol",              # benzene-1,3,5-triol
     "c1ccc2c(c1)ccc1cccnc12": "benzo[f]quinoline",
     "c1ccc2c(c1)ccc1ncccc12": "benzo[h]quinoline",

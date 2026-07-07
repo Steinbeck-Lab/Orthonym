@@ -448,6 +448,22 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     else:
         backbone = _orient_for_lowest_locants(backbone, mol)
 
+    # ----------------------------------------------------------------
+    # P-15.4.3.2.4: double/triple bonds get locants per the FIXED heterochain
+    # numbering (2,4,6,8-tetrasiladec-9-ene). The scan fails closed on any
+    # multiple bond that is not a clean C=C / C#C between consecutive backbone
+    # atoms — WITHOUT it the builder emitted the SATURATED stem for an
+    # unsaturated chain (structure loss, caught only by the downstream RT
+    # gate). Suffix + ene integration (P-15.4.3.2.3 interplay) is not built
+    # yet — fail closed rather than guess the composite numbering.
+    # ----------------------------------------------------------------
+    unsat = _backbone_unsaturation(mol, backbone)
+    if unsat is None:
+        return None
+    ene_locants, yne_locants = unsat
+    if (ene_locants or yne_locants) and has_terminal_oh:
+        return None
+
     # Rebuild heteroatom positions after reorientation. A non-standard-valence
     # embedded heteroatom carries the λ-convention (P-21.2.4); standard valences
     # (every ordinary oxa/aza/thia chain) record no λ -> byte-identical output.
@@ -481,6 +497,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     return _build_replacement_name(
         len(backbone), heteroatom_positions, suffix=suffix,
         lambda_by_locant=lambda_by_locant,
+        ene_locants=ene_locants, yne_locants=yne_locants,
     )
 
 
@@ -809,6 +826,40 @@ def _orient_oh_end_first(
         return _orient_for_lowest_locants(backbone, mol)
 
 
+def _backbone_unsaturation(
+    mol: Chem.Mol, backbone: List[int]
+) -> Optional[Tuple[List[int], List[int]]]:
+    """Return ``(ene_locants, yne_locants)`` for the backbone's multiple bonds
+    under the given orientation, or ``None`` (fail-closed).
+
+    P-15.4.3.2.4: double/triple bonds take locants from the FIXED heterochain
+    numbering. Fail-closed conditions (any -> None, never a lossy name):
+      * an aromatic/exotic bond order anywhere in the molecule;
+      * a multiple bond not between two CONSECUTIVE backbone atoms;
+      * a multiple bond involving a heteroatom (C=N / S=O etc. are
+        characteristic groups or λ-territory, not chain ene/yne).
+    A fully saturated chain returns ``([], [])`` — byte-identical downstream.
+    """
+    pos = {idx: i for i, idx in enumerate(backbone)}
+    ene: List[int] = []
+    yne: List[int] = []
+    for bond in mol.GetBonds():
+        bond_type = bond.GetBondType()
+        if bond_type == Chem.BondType.SINGLE:
+            continue
+        if bond_type not in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+            return None
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a1 not in pos or a2 not in pos or abs(pos[a1] - pos[a2]) != 1:
+            return None
+        if (bond.GetBeginAtom().GetAtomicNum() != 6
+                or bond.GetEndAtom().GetAtomicNum() != 6):
+            return None
+        locant = min(pos[a1], pos[a2]) + 1
+        (ene if bond_type == Chem.BondType.DOUBLE else yne).append(locant)
+    return sorted(ene), sorted(yne)
+
+
 def _orient_for_lowest_locants(
     backbone: List[int], mol: Chem.Mol
 ) -> List[int]:
@@ -848,6 +899,19 @@ def _orient_for_lowest_locants(
     )
     if decision == 1:
         return reverse
+    if decision == 0:
+        # Heteroatom tie: P-15.4.3.2.4 "if there is a choice" — break by the
+        # general multiple-bond priorities (P-31.1.2.2.2): lowest locants to
+        # all multiple bonds as a set, then to double bonds. A saturated chain
+        # (or an unclassifiable one — the caller fails closed later) keeps
+        # forward, preserving the pre-existing byte-identical behaviour.
+        fwd_unsat = _backbone_unsaturation(mol, forward)
+        rev_unsat = _backbone_unsaturation(mol, reverse)
+        if fwd_unsat is not None and rev_unsat is not None:
+            fwd_key = (sorted(fwd_unsat[0] + fwd_unsat[1]), fwd_unsat[0])
+            rev_key = (sorted(rev_unsat[0] + rev_unsat[1]), rev_unsat[0])
+            if rev_key < fwd_key:
+                return reverse
     # decision <= 0: forward preferred OR a genuine symmetry tie (either
     # orientation is correct and byte-identical) — return forward.
     return forward
@@ -902,6 +966,8 @@ def _build_replacement_name(
     heteroatom_positions: List[Tuple[int, str]],
     suffix: Optional[Tuple[str, int]] = None,
     lambda_by_locant: Optional[Dict[int, int]] = None,
+    ene_locants: Optional[List[int]] = None,
+    yne_locants: Optional[List[int]] = None,
 ) -> str:
     """Build the skeletal replacement name from chain length and heteroatom info.
 
@@ -923,6 +989,8 @@ def _build_replacement_name(
         Complete replacement name string.
     """
     lambda_by_locant = lambda_by_locant or {}
+    ene_locants = ene_locants or []
+    yne_locants = yne_locants or []
     # Get the chain prefix (hex, oct, non, etc.)
     chain_prefix = get_chain_prefix(chain_length)
 
@@ -976,9 +1044,33 @@ def _build_replacement_name(
         else:
             stem = f'{chain_prefix}ane'
         return f'{replacement_prefix}{stem}-{suffix_locant}-{suffix_name}'
-    else:
-        # Plain replacement name: "3,6-dioxaoctane"
-        return f'{replacement_prefix}{chain_prefix}ane'
+
+    # P-15.4.3.2.4 ene/yne endings on the fixed heterochain numbering:
+    # 2,4,6,8-tetrasiladec-9-ene / ...deca-2,4-diene / ...dec-1-en-9-yne.
+    # Standard elision: the multiplied form keeps the connecting 'a'
+    # (octa-2,6-diene); 'ene' drops its final 'e' before '-N-yne'.
+    if ene_locants or yne_locants:
+        stem = chain_prefix
+        if ene_locants:
+            multiplier = (SIMPLE_MULTIPLIERS[len(ene_locants)]
+                          if len(ene_locants) > 1 else '')
+            if multiplier:
+                stem += 'a'
+            locs = ','.join(str(loc) for loc in ene_locants)
+            stem += f'-{locs}-{multiplier}en'
+            if not yne_locants:
+                stem += 'e'
+        if yne_locants:
+            multiplier = (SIMPLE_MULTIPLIERS[len(yne_locants)]
+                          if len(yne_locants) > 1 else '')
+            if multiplier and not ene_locants:
+                stem += 'a'
+            locs = ','.join(str(loc) for loc in yne_locants)
+            stem += f'-{locs}-{multiplier}yne'
+        return f'{replacement_prefix}{stem}'
+
+    # Plain replacement name: "3,6-dioxaoctane"
+    return f'{replacement_prefix}{chain_prefix}ane'
 
 
 def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:

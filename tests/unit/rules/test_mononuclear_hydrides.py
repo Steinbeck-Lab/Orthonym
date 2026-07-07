@@ -79,6 +79,9 @@ class TestGroup14Halides:
         ("Br[Si](Br)(Br)Br", "tetrabromosilane"),   # SiBr4
         ("F[Ge](F)(F)F", "tetrafluorogermane"),     # GeF4
         ("Cl[Ge](Cl)(Cl)Cl", "tetrachlorogermane"),  # GeCl4
+        # Wave-2 completion: Sn/Pb complete the Group-14 column (OPSIN-RT ok)
+        ("Cl[Sn](Cl)(Cl)Cl", "tetrachlorostannane"),  # SnCl4
+        ("Cl[Pb](Cl)(Cl)Cl", "tetrachloroplumbane"),  # PbCl4
     ])
     def test_group14_tetrahalides(self, smiles, expected):
         assert _name(smiles) == expected
@@ -87,7 +90,6 @@ class TestGroup14Halides:
         ("C[Si](C)(C)C", "tetramethylsilane: organyl Si -> P-69 namer owns it"),
         ("C[Si](F)(F)F", "methyltrifluorosilane: mixed organyl+halide -> fail-closed"),
         ("CO[Si](OC)(OC)OC", "tetramethoxysilane: alkoxy ligands, not halides"),
-        ("Cl[Sn](Cl)(Cl)Cl", "SnCl4: Sn not in the Phase-8 Si/Ge scope"),
         ("c1cc[siH]c1", "silole: Si ring member, not a parent hydride"),
     ])
     def test_group14_declines(self, smiles, why):

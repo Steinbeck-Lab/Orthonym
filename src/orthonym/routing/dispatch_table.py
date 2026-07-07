@@ -125,6 +125,7 @@ class StoutClass(_StrEnumBase):
     CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
+    KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -1108,6 +1109,22 @@ def _handle_dinuclear_hydride(mol, smiles, canonical_smiles, features=None, **kw
     return name_dinuclear_hydride(mol)
 
 
+def _is_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Wave-2 completion (P-64.2.2.4); priority 49. The exact (halo)ketene
+    heterocumulene O=C=C(H/X)2 (ethenone parent). PURE graph classifier,
+    fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.ketenes import name_ketene
+    return name_ketene(mol) is not None
+
+
+def _handle_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the ethenone-parent ketene PIN (P-64.2.2.4), else None (cascade-continuation)."""
+    from orthonym.rules.ketenes import name_ketene
+    return name_ketene(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -1211,6 +1228,21 @@ _register_dispatch(
     description="Di-nuclear Group-14/Group-15 catenated parent hydride "
                 "(germylstibane / silylarsane / plumbylbismuthane); graph "
                 "classifier, fail-closed",
+)
+
+
+# --- Wave-2 completion: KETENE at priority 49 (after DINUCLEAR_HYDRIDE@48, ---
+# before ORGANOMETALLIC@50). The exact (halo)ketene heterocumulene named on the
+# ethenone parent (P-64.2.2.4): C=C=O -> ethenone, BrC(Br)=C=O ->
+# dibromoethenone (both BB verbatim; 'unknown' before this). Alkyl/aryl and
+# ylidene ketenes fail the classifier and cascade (general ketone principles,
+# not built). Graph classifier, fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.KETENE, priority=49, tier=1,
+    predicate=_is_ketene, handler=_handle_ketene,
+    iupac_section="Blue Book P-64.2.2.4",
+    description="(Halo)ketene heterocumulene on the ethenone parent "
+                "(ethenone / dibromoethenone); graph classifier, fail-closed",
 )
 
 

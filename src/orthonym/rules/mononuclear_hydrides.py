@@ -84,6 +84,12 @@ _HUB_STEMS = {
     # claimed here (a mixed methyltrifluorosilane fails both guards -> cascades).
     'Si': 'silane',
     'Ge': 'germane',
+    # Wave-2 completion (P-21.1.1.1): Sn/Pb complete the Group-14 column for the
+    # bare-hydride regime ([SnH4] -> stannane) and the all-halogen regime
+    # (SnCl4 -> tetrachlorostannane). Same OUT-of-_ORGANYL_HUBS reasoning as
+    # Si/Ge: carbon-substituted forms stay with the P-69 organometallic namer.
+    'Sn': 'stannane',
+    'Pb': 'plumbane',
 }
 
 # Hubs that additionally accept ORGANYL / bare substituents (no pre-existing
@@ -210,6 +216,15 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     hub_idx = hub.GetIdx()
     stem = _HUB_STEMS[hub.GetSymbol()]
     lam = nonstandard_bonding_number(mol, hub_idx)
+
+    # --- Bare parent hydride (P-21.1.1.1 / P-52.1.1): the hub is the ONLY
+    #     heavy atom (single-fragment guard above makes zero heavy neighbours
+    #     equivalent), saturated with hydrogen. [SiH4] -> silane, [SH2] ->
+    #     sulfane, and the lambda-convention hypervalent forms (P-21.1.2):
+    #     [PH5] -> lambda5-phosphane, [SH4] -> lambda4-sulfane,
+    #     [IH3] -> lambda3-iodane. ---
+    if not any(n.GetSymbol() != 'H' for n in hub.GetNeighbors()):
+        return _assemble("", lam, stem)
 
     # --- All-halogen regime (every hub element; hub degree >= 2 excludes the
     #     diatomic interhalogens ICl/IBr). Halogens are simple substituents:
