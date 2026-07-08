@@ -211,3 +211,48 @@ def name_inorganic_acid(mol) -> Optional[str]:
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).
     return name_silicate_ester(mol)
+
+
+def name_azinic_derivative(mol) -> Optional[str]:
+    """P-61.5.3 ylidene derivatives of azinic acid H2N(O)OH (Wave-2
+    completion C): CH3-CH=N(O)-OH -> ethylideneazinic acid (BB verbatim;
+    aci-nitroethane). Fail-closed: exactly one N+ with a -O(-), an -OH and a
+    DOUBLE bond to an unbranched all-carbon chain; net charge 0; nitro
+    tautomers (=O on N) and nitronate anions never match. Pure."""
+    from rdkit import Chem
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    ns = [a for a in mol.GetAtoms()
+          if a.GetSymbol() == 'N' and a.GetFormalCharge() == 1]
+    if len(ns) != 1:
+        return None
+    n = ns[0]
+    if n.IsInRing() or n.GetDegree() != 3:
+        return None
+    o_minus = oh = c = None
+    for b in n.GetBonds():
+        other = b.GetOtherAtom(n)
+        if (other.GetSymbol() == 'O' and other.GetDegree() == 1
+                and b.GetBondType() == Chem.BondType.SINGLE):
+            if other.GetFormalCharge() == -1 and other.GetTotalNumHs() == 0:
+                o_minus = other
+            elif other.GetFormalCharge() == 0 and other.GetTotalNumHs() == 1:
+                oh = other
+        elif (other.GetSymbol() == 'C'
+                and b.GetBondType() == Chem.BondType.DOUBLE):
+            c = other
+    if o_minus is None or oh is None or c is None:
+        return None
+    if any(a.GetFormalCharge() != 0 for a in mol.GetAtoms()
+           if a.GetIdx() not in (n.GetIdx(), o_minus.GetIdx())):
+        return None
+    from ..assembly.naming_utils import unbranched_alkylidene_name
+    ylidene = unbranched_alkylidene_name(mol, c.GetIdx(), n.GetIdx())
+    if ylidene is None:
+        return None
+    if mol.GetNumHeavyAtoms() != 3 + sum(
+            1 for a in mol.GetAtoms() if a.GetAtomicNum() == 6):
+        return None
+    return f"{ylidene}azinic acid"

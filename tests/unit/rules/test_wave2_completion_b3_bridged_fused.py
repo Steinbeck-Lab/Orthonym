@@ -51,10 +51,12 @@ class TestMancudeBridgedConstructor:
         assert (_pin("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)CC3")
                 == "9,10-ethanoanthracene")
 
-    def test_dihydro_path_unchanged(self):
-        # sp3 bridgeheads keep the established dihydro/tetrahydro path.
+    def test_dihydro_path_hydro_first_order(self):
+        # sp3 bridgeheads keep the dihydro/tetrahydro path; Wave-2 completion C
+        # fixed the citation order to hydro-BEFORE-bridge (P-31.1.4.2.4 --
+        # hydro sits between detachable and nondetachable prefixes).
         assert (_pin("C1CC2CCC1c1ccccc21")
-                == "1,4-ethano-1,2,3,4-tetrahydronaphthalene")
+                == "1,2,3,4-tetrahydro-1,4-ethanonaphthalene")
 
     def test_peri_fused_declines(self):
         # acenaphthene: peri attachment (bridgeheads in different rings) is

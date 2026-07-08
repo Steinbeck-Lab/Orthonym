@@ -1407,6 +1407,81 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 3, 1: 4, 2: '4a', 3: 5, 4: 6, 5: 7, 6: 8, 7: '8a', 8: 1, 9: 2},
     },
+
+    # ── Wave-2 completion C (P-25.3.4/.5/.6/.8 BB-cited multi-component
+    # fusion parents; the general multi-prime descriptor ENGINE remains
+    # unbuilt — these are the specific BB-named parents, locants
+    # OPSIN-extendedsmi-derived; T4 pentaphene/hexahelicene precedent). ──
+    'c1ccc2nc3cc4nc5c(nc4cc3nc2c1)nc1ccccn15': {
+        'name': "pyrido[1'',2'':1',2']imidazo[4',5':5,6]pyrazino[2,3-b]phenazine",
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 25,
+        'iupac_locants': {0: 10, 1: 11, 2: 12, 3: '12a', 4: 13, 5: '13a', 6: 14, 7: '14a', 8: 15, 9: '15a', 10: '5a', 11: 6, 12: '6a', 13: 7, 14: '7a', 15: 8, 16: '8a', 17: 9, 18: 5, 19: '4a', 20: 4, 21: 3, 22: 2, 23: 1, 24: 16},
+    },
+    'c1cc2c3ccc4cncc5ccc(c6ccc7cncc1c7c26)c3c45': {
+        'name': "anthra[2,1,9-def:6,5,10-d'e'f']diisoquinoline",
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 26,
+        'iupac_locants': {0: 11, 1: 12, 2: '12a', 3: '12b', 4: 13, 5: 14, 6: '14a', 7: 1, 8: 2, 9: 3, 10: '3a', 11: 4, 12: 5, 13: '5a', 14: '5b', 15: 6, 16: 7, 17: '7a', 18: 8, 19: 9, 20: 10, 21: '10a', 22: '14d', 23: '14e', 24: '14c', 25: '14b'},
+    },
+    'C1=Cc2c(c3ccccc3c3ncoc23)C1': {
+        'name': '8H-cyclopenta[3,4]naphtho[1,2-d][1,3]oxazole',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 16,
+        'iupac_locants': {0: 9, 1: 10, 2: '10a', 3: '7b', 4: '7a', 5: 7, 6: 6, 7: 5, 8: 4, 9: '3b', 10: '3a', 11: 3, 12: 2, 13: 1, 14: '10b', 15: 8},
+    },
+    'c1ccc2c(c1)ccc1c3ccsc3c3ccc4ccccc4c3c21': {
+        'name': "naphtho[2',1':3,4]phenanthro[1,2-b]thiophene",
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 25,
+        'iupac_locants': {0: 9, 1: 10, 2: 11, 3: '11a', 4: '7a', 5: 8, 6: 7, 7: 6, 8: '5b', 9: '5a', 10: 5, 11: 4, 12: 3, 13: '2b', 14: '2a', 15: 2, 16: 1, 17: '15a', 18: 15, 19: 14, 20: 13, 21: 12, 22: '11d', 23: '11c', 24: '11b'},
+    },
+    'C1=CN2C=CC3=CNOC3=C2O1': {
+        'name': '2H-[1,2]oxazolo[5,4-c][1,3]oxazolo[3,2-a]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 8, 1: 7, 2: 6, 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '9b', 10: '9a', 11: 9},
+    },
+    'C1=NC=c2ccc3c(c21)N=c1cc2occc2cc1=3': {
+        'name': 'furo[3,2-h]pyrrolo[3,4-a]carbazole',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 19,
+        'iupac_locants': {0: 1, 1: 2, 2: 3, 3: '3a', 4: 4, 5: 5, 6: '5a', 7: '11a', 8: '11b', 9: 11, 10: '10a', 11: 10, 12: '9a', 13: 9, 14: 8, 15: 7, 16: '6a', 17: 6, 18: '5b'},
+    },
+    'c1cc2cc3csnc3cc2s1': {
+        'name': 'thieno[3,2-f][2,1]benzothiazole',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 5, 2: '4a', 3: 4, 4: '3a', 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8, 10: '7a', 11: 7},
+    },
+    'c1cc2c(o1)oc1cc3cocc3nc12': {
+        'name': "furo[3,4-b]furo[3',2':4,5]furo[2,3-e]pyridine",
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 15,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: '9a', 4: 1, 5: 9, 6: '8a', 7: 8, 8: '7a', 9: 7, 10: 6, 11: 5, 12: '4a', 13: 4, 14: '3b'},
+    },
+    'C1=CC2=c3ccncc3=NC2=C1': {
+        'name': 'cyclopenta[4,5]pyrrolo[2,3-c]pyridine',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 5, 2: '4b', 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '8a', 9: 8, 10: '7a', 11: 7},
+    },
+    'c1cc2ccc3ccnc4ccc(c1)c2c34': {
+        'name': 'naphtho[2,1,8-def]quinoline',
+        'tautomer_locant': None,
+        'ring_system': 'polycyclic',
+        'parent_atoms': 16,
+        'iupac_locants': {0: 7, 1: 6, 2: '5a', 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '10a', 10: 10, 11: 9, 12: '8a', 13: 8, 14: '10c', 15: '10b'},
+    },
 }
 
 

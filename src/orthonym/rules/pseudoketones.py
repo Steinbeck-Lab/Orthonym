@@ -199,3 +199,134 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
 
 
 __all__ = ["is_hidden_amide", "name_pseudoketone"]
+
+
+def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
+    """P-64.1.2.1(b) / P-64.5.2.2 acyl on Si/Ge/P/As (Wave-2 completion C):
+    CC(=O)[SiH3] -> 1-silylethan-1-one, [PH2]C(=O)CCC -> 1-phosphanylbutan-1-one
+    (both BB verbatim). The ketone SMARTS requires C on both flanks, so these
+    molecules previously perceived NO functional group and died unnamed.
+
+    Fail-closed graph classifier (mirrors name_pseudoketone): exactly one
+    non-ring carbonyl C whose heavy neighbours are {terminal =O, one chain C,
+    one acyclic hub in Si/Ge/P/As}; the acyl chain is clean unbranched all-C;
+    the hub carries only H (silyl/phosphanyl) or pure organyls
+    (trimethylsilyl/dimethylphosphanyl); nothing else in the molecule."""
+    from rdkit import Chem
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    _HUBS = {'Si', 'Ge', 'P', 'As'}
+
+    carbonyls = []
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            continue
+        oxo = hub = chain_c = None
+        extra = False
+        for b in atom.GetBonds():
+            other = b.GetOtherAtom(atom)
+            if (other.GetSymbol() == 'O' and other.GetDegree() == 1
+                    and b.GetBondType() == Chem.BondType.DOUBLE):
+                oxo = other
+            elif (other.GetSymbol() in _HUBS
+                    and b.GetBondType() == Chem.BondType.SINGLE
+                    and not other.GetIsAromatic() and not other.IsInRing()):
+                hub = other
+            elif (other.GetSymbol() == 'C'
+                    and b.GetBondType() == Chem.BondType.SINGLE):
+                chain_c = other
+            else:
+                extra = True
+        if oxo is not None and hub is not None and chain_c is not None \
+                and not extra and atom.GetTotalNumHs() == 0:
+            carbonyls.append((atom, oxo, hub, chain_c))
+    if len(carbonyls) != 1:
+        return None
+    catom, oxo, hub, chain_c = carbonyls[0]
+
+    # Hub fragment: the hub + everything on its far side.
+    from collections import deque
+    hub_frag = []
+    seen = {catom.GetIdx()}
+    queue = deque([hub.GetIdx()])
+    while queue:
+        a = queue.popleft()
+        if a in seen:
+            continue
+        seen.add(a)
+        hub_frag.append(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() not in seen:
+                queue.append(nb.GetIdx())
+
+    # Acyl chain: longest all-C chain excluding the hub side; carbonyl C at
+    # a terminus; clean (no other substituents/heteroatoms).
+    chain = find_longest_carbon_chain(mol, exclude_atoms=set(hub_frag))
+    if not chain or catom.GetIdx() not in chain:
+        return None
+    if chain[0] != catom.GetIdx() and chain[-1] != catom.GetIdx():
+        return None
+    if chain[0] != catom.GetIdx():
+        chain = list(reversed(chain))
+    chain_set = set(chain)
+    for c in chain:
+        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in chain_set:
+                continue
+            if c == catom.GetIdx() and ni in (oxo.GetIdx(), hub.GetIdx()):
+                continue
+            return None
+
+    # Hub scope (fail-closed): the hub carries only H or pure ORGANYL
+    # substituents — a heteroatom on the hub (Si-OH: silanol territory,
+    # P-68.2 suffix seniority interplay) is not built here.
+    if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6
+           for a in hub_frag if a != hub.GetIdx()):
+        return None
+
+    # Hub substituent name.
+    hubyl = None
+    if hub.GetSymbol() in ('Si', 'Ge'):
+        from ..assembly.substituent_naming import _name_group14_substituent
+        hubyl = _name_group14_substituent(mol, hub_frag, hub.GetIdx())
+    else:
+        organyls = [n for n in mol.GetAtomWithIdx(hub.GetIdx()).GetNeighbors()
+                    if n.GetIdx() != catom.GetIdx() and n.GetAtomicNum() > 1]
+        base = 'phosphanyl' if hub.GetSymbol() == 'P' else 'arsanyl'
+        if not organyls:
+            if len(hub_frag) == 1:
+                hubyl = base
+        else:
+            from .substituent_purity import pure_organyl_prefix_name
+            from collections import Counter
+            names = []
+            for n in organyls:
+                nm = pure_organyl_prefix_name(mol, n.GetIdx(), hub.GetIdx())
+                if nm is None:
+                    return None
+                names.append(nm)
+            counts = Counter(names)
+            _MULT = {1: '', 2: 'di', 3: 'tri'}
+            parts = []
+            for nm in sorted(counts):
+                m = _MULT.get(counts[nm])
+                if m is None:
+                    return None
+                parts.append(f"{m}{nm}")
+            hubyl = ''.join(parts) + base
+    if not hubyl:
+        return None
+    # Compound hub names take enclosing marks (1-(trimethylsilyl)propan-2-one
+    # engine precedent); the bare silyl/phosphanyl forms stay unmarked.
+    token = hubyl if hubyl in ('silyl', 'germyl', 'phosphanyl', 'arsanyl') \
+        else f"({hubyl})"
+
+    length = len(chain)
+    base_name = f"{get_chain_prefix(length)}an"
+    return f"1-{token}{base_name}-1-one"

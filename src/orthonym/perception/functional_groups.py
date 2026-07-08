@@ -580,6 +580,10 @@ def _resolve_fg_collisions(results):
         ('azo', ['imine']),
         # DATA-03: guanidine suppresses amidine (guanidine is more specific)
         ('guanidine', ['amidine']),
+        # Wave2 completion C (P-61.4): the diazo C=[N+] matches the imine
+        # SMARTS, injecting a bogus 'imino' prefix that the validity gate
+        # then suppressed (ethyl diazoacetate / diazomethane were unknown).
+        ('diazo', ['imine']),
         # Wave2 completion (P-43.1): the acyl -OOH matches the hydroperoxide
         # SMARTS; the peroxy-acid FG owns those atoms.
         ('peroxy_acid', ['hydroperoxide', 'peroxide', 'ester', 'ketone',

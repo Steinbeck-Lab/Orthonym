@@ -791,6 +791,10 @@ def _name_polyfunctional_acyclic_substituent(
                 if (bt == Chem.BondType.DOUBLE and nb.GetSymbol() == 'O'
                         and ni not in backbone_set):
                     continue             # ketone/aldehyde C=O (oxo) — handled below
+                if (bt == Chem.BondType.DOUBLE
+                        and nb.GetSymbol() in ('S', 'Se', 'Te')
+                        and ni not in backbone_set):
+                    continue             # C=S/Se/Te ylidene (Wave-2 C) — handled below
                 return None              # C=C / C#C / C#N / C=N etc. -> decline
             continue
         # Non-backbone, non-consumed heavy atom -> must be a simple prefix.
@@ -843,15 +847,37 @@ def _name_polyfunctional_acyclic_substituent(
                 return None
             _add_prefix(c_host[0], _HALOGEN_PREFIX[sym])
             fg_count += 1
+        elif sym in ('S', 'Se', 'Te'):
+            # Wave-2 completion C (P-64.6.1): a TERMINAL =S/=Se/=Te on a
+            # backbone C is the chalcogenylidene prefix (2-sulfanylidenebutyl,
+            # BB P-64.7.3 verbatim witness). Single-bonded chalcogens
+            # (sulfanyl / thioether) stay declined — other tiers own them.
+            if len(in_frag_nbrs) != 1 or len(c_host) != 1:
+                return None
+            bond = mol.GetBondBetweenAtoms(idx, c_host[0])
+            if (bond.GetBondType() != Chem.BondType.DOUBLE
+                    or a.GetTotalNumHs() != 0):
+                return None
+            _add_prefix(c_host[0], {'S': 'sulfanylidene',
+                                    'Se': 'selanylidene',
+                                    'Te': 'tellanylidene'}[sym])
+            fg_count += 1
         else:
-            return None                  # S / P / B / etc. -> decline
+            return None                  # P / B / etc. -> decline
 
     # A single carbon bearing BOTH oxo and hydroxy is a carboxyl carbon (-C(=O)OH)
     # that Pass-1 did not consume as 'carboxy' (e.g. its only non-O neighbour is the
     # non-carbon parent — a carbamic acid C-N). Never emit 'hydroxyoxomethyl' for a
     # carboxylic acid: fail-closed so another tier names it (P-65.1.1).
+    _YLIDENES = ('sulfanylidene', 'selanylidene', 'tellanylidene')
     for _prefixes in prefix_on.values():
         if _POLYFUNC_OXO_PREFIX in _prefixes and _POLYFUNC_HYDROXY_PREFIX in _prefixes:
+            return None
+        # Chalcogenylidene + hydroxy/oxo on ONE carbon = a thioic-acid-type
+        # carbon (Wave-2 C) — other tiers own those; never 'hydroxysulfanylidene...'.
+        if any(y in _prefixes for y in _YLIDENES) and (
+                _POLYFUNC_HYDROXY_PREFIX in _prefixes
+                or _POLYFUNC_OXO_PREFIX in _prefixes):
             return None
 
     if fg_count < 1:
@@ -865,6 +891,10 @@ def _name_polyfunctional_acyclic_substituent(
     # left untouched: an acyl bearing a second detachable group is a rare edge that
     # those golds do not exercise -> follow-on.)
     if fg_count == 1 and _POLYFUNC_OXO_PREFIX in prefix_on.get(attach_idx, []):
+        return None
+    # Same rule for a thioacyl attachment (-C(=S)-R = alkanethioyl, Wave-2 C).
+    if fg_count == 1 and any(
+            y in prefix_on.get(attach_idx, []) for y in _YLIDENES):
         return None
 
     # ---- Backbone must be a single linear chain attached at a terminus. ----

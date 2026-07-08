@@ -341,6 +341,32 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
         'num_rings': 2,
     },
+    # ── Wave-2 completion C (P-25.3.4.2.1 BB-cited PAH parents;
+    # locants OPSIN-extendedsmi-derived). ──
+    'cyclopenta[ij]pentaleno[2,1,6-cde]azulene': {
+        'canonical_smiles': 'c1cc2ccc3cc4cc5ccc1c5c4c23',
+        'smarts': 'c1cc2ccc3cc4cc5ccc1c5c4c23',
+        'num_atoms': 16,
+        'iupac_numbering': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: '1a', 6: 1, 7: '8a', 8: 8, 9: '7a', 10: 7, 11: 6, 12: '5a', 13: '8c', 14: '8b', 15: '8d'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
+        'num_rings': 5,
+    },
+    'dibenzo[c,g]phenanthrene': {
+        'canonical_smiles': 'c1ccc2c(c1)ccc1ccc3ccc4ccccc4c3c12',
+        'smarts': 'c1ccc2c(c1)ccc1ccc3ccc4ccccc4c3c12',
+        'num_atoms': 22,
+        'iupac_numbering': {0: 13, 1: 12, 2: 11, 3: '10d', 4: '14a', 5: 14, 6: 1, 7: 2, 8: '2a', 9: 3, 10: 4, 11: '4a', 12: 5, 13: 6, 14: '6a', 15: 7, 16: 8, 17: 9, 18: 10, 19: '10a', 20: '10b', 21: '10c'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'num_rings': 5,
+    },
+    "dinaphtho[1,2-c:2',1'-m]picene": {
+        'canonical_smiles': 'c1ccc2c(c1)ccc1c2ccc2c1ccc1c2ccc2c3ccc4c5ccccc5ccc4c3ccc21',
+        'smarts': 'c1ccc2c(c1)ccc1c2ccc2c1ccc1c2ccc2c3ccc4c5ccccc5ccc4c3ccc21',
+        'num_atoms': 38,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '22b', 4: '4a', 5: 4, 6: 5, 7: 6, 8: '6a', 9: '22a', 10: 22, 11: 21, 12: '20b', 13: '6b', 14: 7, 15: 8, 16: '8a', 17: '20a', 18: 20, 19: 19, 20: '18b', 21: '18a', 22: 18, 23: 17, 24: '16b', 25: '16a', 26: 16, 27: 15, 28: 14, 29: 13, 30: '12a', 31: 12, 32: 11, 33: '10b', 34: '10a', 35: 10, 36: 9, 37: '8b'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+        'num_rings': 9,
+    },
 }
 
 

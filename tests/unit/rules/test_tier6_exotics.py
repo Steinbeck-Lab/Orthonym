@@ -205,9 +205,10 @@ def test_pseudohalide_protections(smiles, expected):
 
 
 @pytest.mark.unit
-def test_carbonyl_dicyanide_fails_closed(_validity_gate_on):
-    """Carbonic-acid pseudohalides (P-65.5.3) are out of scope -> unknown."""
-    assert "unknown" in name_compound("O=C(C#N)C#N")
+def test_carbonyl_dicyanide_retained_pin(_validity_gate_on):
+    """P-66.5.3.1 (Wave-2 completion C): functional-class IS the PIN for
+    carbonic-acid nitriles -- retained exact-SMILES row, OPSIN-RT verified."""
+    assert name_compound("O=C(C#N)C#N") == "carbonyl dicyanide"
 
 
 # ---------------------------------------------------------------------------

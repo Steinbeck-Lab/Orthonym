@@ -33,8 +33,8 @@ from orthonym.errors import is_failure_name
 # (smiles, expected PIN) — each verified: OPSIN parse(name) InChIKey == input InChIKey.
 BRIDGED_FUSED_GOLD = [
     ("C1C2C=CC1c1ccccc12", "1,4-dihydro-1,4-methanonaphthalene"),   # benzonorbornadiene
-    ("C1=CC2OC1c1ccccc12", "1,4-epoxy-1,4-dihydronaphthalene"),     # epoxy bridge
-    ("C1CC2CCC1c1ccccc12", "1,4-ethano-1,2,3,4-tetrahydronaphthalene"),  # ethano bridge
+    ("C1=CC2OC1c1ccccc12", "1,4-dihydro-1,4-epoxynaphthalene"),     # epoxy bridge
+    ("C1CC2CCC1c1ccccc12", "1,2,3,4-tetrahydro-1,4-ethanonaphthalene"),  # ethano bridge
 ]
 
 

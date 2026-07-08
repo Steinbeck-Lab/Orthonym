@@ -248,6 +248,103 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     return None
 
 
+_HETERONE_STEMS = {'Si': 'silanone', 'Ge': 'germanone',
+                   'P': 'phosphanone', 'As': 'arsanone'}
+
+
+def name_heterone(mol) -> Optional[str]:
+    """P-64.1.2.2 / P-64.4.1 heterone parents (Wave-2 completion C):
+    (CH3)2Si=O -> dimethylsilanone (BB verbatim), CH3SiH=O -> methylsilanone,
+    R3P=O -> lambda5-phosphanone forms. Chalcogens are EXCLUDED (sulfoxides /
+    sulfones are P-63.6 compulsory-prefix exceptions per P-64.4), as is N.
+    Fail-closed; pure."""
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    hubs = [a for a in mol.GetAtoms() if a.GetSymbol() in _HETERONE_STEMS]
+    if len(hubs) != 1:
+        return None
+    hub = hubs[0]
+    if hub.IsInRing():
+        return None
+    doubles = [b for b in hub.GetBonds()
+               if b.GetBondType() == Chem.BondType.DOUBLE]
+    if len(doubles) != 1:
+        return None
+    oxo = doubles[0].GetOtherAtom(hub)
+    if oxo.GetSymbol() != 'O' or oxo.GetDegree() != 1:
+        return None
+    from .substituent_purity import pure_organyl_prefix_name
+    prefixes = []
+    for nb in hub.GetNeighbors():
+        if nb.GetIdx() == oxo.GetIdx():
+            continue
+        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        if name is None:
+            return None
+        prefixes.append(name)
+    from .lambda_convention import nonstandard_bonding_number
+    lam = nonstandard_bonding_number(mol, hub.GetIdx())
+    from collections import Counter
+    counts = Counter(prefixes)
+    _MULT = {1: '', 2: 'di', 3: 'tri'}
+    parts = []
+    for name in sorted(counts):
+        m = _MULT.get(counts[name])
+        if m is None:
+            return None
+        parts.append(f"{m}{name}")
+    return _assemble(''.join(parts), lam, _HETERONE_STEMS[hub.GetSymbol()])
+
+
+def name_sulfine(mol) -> Optional[str]:
+    """P-64.4.2 acyclic thiocarbonyl S-oxides (Wave-2 completion C):
+    CH3-CH2-CH=S=O -> propylidene-lambda4-sulfanone (BB verbatim). The S has
+    exactly two double bonds — one terminal O, one to an unbranched
+    all-carbon chain. Ring S-oxides belong to ring_chalcogen_oxide; thials
+    (no O) keep their FG path. Fail-closed; pure."""
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    sulfurs = [a for a in mol.GetAtoms() if a.GetSymbol() == 'S']
+    if len(sulfurs) != 1:
+        return None
+    s = sulfurs[0]
+    if s.IsInRing() or s.GetDegree() != 2 or s.GetTotalNumHs() != 0:
+        return None
+    bonds = list(s.GetBonds())
+    if any(b.GetBondType() != Chem.BondType.DOUBLE for b in bonds):
+        return None
+    oxo = c = None
+    for b in bonds:
+        other = b.GetOtherAtom(s)
+        if other.GetSymbol() == 'O' and other.GetDegree() == 1:
+            oxo = other
+        elif other.GetSymbol() == 'C':
+            c = other
+    if oxo is None or c is None:
+        return None
+    from ..assembly.naming_utils import unbranched_alkylidene_name
+    ylidene = unbranched_alkylidene_name(mol, c.GetIdx(), s.GetIdx())
+    if ylidene is None:
+        return None
+    # Full coverage: nothing outside chain + S + O (the chain walker already
+    # refused branches/heteroatoms, so the atom count closes the guard).
+    if mol.GetNumHeavyAtoms() != 2 + sum(
+            1 for a in mol.GetAtoms() if a.GetAtomicNum() == 6):
+        return None
+    return f"{ylidene}-lambda4-sulfanone"
+
+
 def name_dinuclear_hydride(mol) -> Optional[str]:
     """Return the substitutive PIN for a two-atom Group-14/Group-15 catenated
     parent hydride (P-69.5.3 two-class-2-metal substitutive), else ``None``

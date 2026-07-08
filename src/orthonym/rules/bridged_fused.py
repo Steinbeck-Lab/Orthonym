@@ -829,10 +829,11 @@ def name_bridged_fused_pin(mol):
 
 
 def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring_atoms: Set[int]):
-    """Build the P-25.4 name for one (bridge, naphthalene-residual) excision, or None
-    if the excision is not an in-scope, correctly-nameable bridged-fused system. Every
-    guard here is a no-wrong-name guard: a None return cascades to G0 fail-closed."""
-    res_mol, orig_to_res, _res_ring_atoms = residual
+    """Build the P-25.4 name for one (bridge, residual) excision — naphthalene,
+    anthracene, or acridine residual — or None if the excision is not an
+    in-scope, correctly-nameable bridged-fused system. Every guard here is a
+    no-wrong-name guard: a None return cascades to G0 fail-closed."""
+    res_mol, orig_to_res, _res_ring_atoms, base_name, ring_map = residual
 
     # Bridgeheads = original-mol neighbours of bridge atoms that are not themselves
     # bridge atoms. A single divalent bridge has exactly two.
@@ -867,54 +868,115 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     if n_hetero > 1 or (n_hetero == 1 and len(bridge_atoms) != 1):
         return None
 
-    # Unsaturated bridge (etheno -CH=CH-, methylidene) would be mis-named 'ethano'/
-    # 'methano' by the length-keyed prefix table — fail closed if any bond incident to
-    # a bridge atom (within the bridge or to a bridgehead) is not single.
-    bridge_and_heads = bridge_atoms | bridgeheads
+    # Bridge unsaturation (Wave-2 completion C, P-25.4.2.1.1): a single inner
+    # C=C in a 2-carbon all-C bridge is the 'etheno' bridge (9,10-dihydro-
+    # 9,10-ethenoanthracene = dibenzobarrelene). Any bond from a bridge atom
+    # to a BRIDGEHEAD must stay single, and any other unsaturation pattern
+    # (3-atom bridges needing prop[x]eno bracket grammar, cumulated,
+    # hetero-unsaturated) fails closed — the length-keyed prefix table would
+    # otherwise mis-name it 'ethano'/'propano'.
+    n_inner_double = 0
     for b in bridge_atoms:
         for bond in mol.GetAtomWithIdx(b).GetBonds():
             other = bond.GetOtherAtomIdx(b)
-            if other in bridge_and_heads and bond.GetBondType() != Chem.BondType.SINGLE:
+            if bond.GetBondType() == Chem.BondType.SINGLE:
+                continue
+            if other in bridgeheads:
                 return None
+            if other in bridge_atoms:
+                n_inner_double += 1  # counted twice (once per endpoint)
+    n_inner_double //= 2
+    if n_inner_double > 0 and not (
+            n_inner_double == 1 and len(bridge_atoms) == 2 and n_hetero == 0):
+        return None
 
-    # Number the bridged ring of the naphthalene residual (1,2,3,4 around it,
-    # bridgeheads at the lowest locants), reusing the fixed naphthalene numbering.
+    # Number the bridge attachment pair on the residual's fixed numbering.
     bh_res = {orig_to_res[x] for x in bridgeheads}
-    numbering = _number_naphthalene_bridged_ring(res_mol, bh_res)
-    if numbering is None:
-        return None  # bridge not across a numberable (alpha) position pair
+    if base_name == 'naphthalene':
+        numbering = _number_naphthalene_bridged_ring(res_mol, bh_res)
+        if numbering is None:
+            return None  # bridge not across a numberable (alpha) position pair
+        bridge_locants = sorted(numbering[orig_to_res[x]] for x in bridgeheads)
+        hydro_locants = sorted(
+            loc for res_idx, loc in numbering.items()
+            if res_mol.GetAtomWithIdx(res_idx).GetHybridization()
+            == Chem.HybridizationType.SP3
+        )
+    elif bh_res == ring_map['meso']:
+        # Meso pair of anthracene/acridine: fixed retained locants 9,10
+        # (acridine: N is 10 — verified a bridgehead by the residual
+        # detector via n_meso ∈ meso).
+        bridge_locants = [9, 10]
+        sp3 = {i for i in _res_ring_atoms
+               if res_mol.GetAtomWithIdx(i).GetHybridization()
+               == Chem.HybridizationType.SP3}
+        if base_name == 'acridine':
+            # P-25.4.3.4.1: bridging N10 forbids the quinoid mancude form,
+            # so the compound carries INDICATED hydrogen at C9, not hydro.
+            # Exactly the C-bridgehead may be sp3; H counts are checked on
+            # the ORIGINAL molecule (the residual's cut bridgeheads gain H).
+            n_idx = ring_map['n_meso']
+            c_bh = next(iter(bh_res - {n_idx}), None)
+            if c_bh is None or sp3 - {c_bh}:
+                return None
+            orig_n = next(o for o, r in orig_to_res.items() if r == n_idx)
+            orig_c = next(o for o, r in orig_to_res.items() if r == c_bh)
+            if (mol.GetAtomWithIdx(orig_n).GetTotalNumHs() != 0
+                    or mol.GetAtomWithIdx(orig_c).GetTotalNumHs() != 1):
+                return None
+            hydro_locants = []  # indicated-H handled at assembly
+        else:
+            # X,Y-dihydro-X,Y-(bridge)anthracene: the sp3 set must be
+            # EXACTLY the bridgeheads (wider hydro sets not built).
+            if sp3 != bh_res:
+                return None
+            hydro_locants = [9, 10]
+    elif base_name == 'anthracene':
+        # Terminal-ring alpha,alpha pair -> 1,4 (host-ring adjacency check
+        # mirrors the mancude helper).
+        locs = _mancude_bridge_locants(res_mol, bh_res, 'anthracene', ring_map)
+        if locs is None:
+            return None
+        bridge_locants = locs
+        sp3 = {i for i in _res_ring_atoms
+               if res_mol.GetAtomWithIdx(i).GetHybridization()
+               == Chem.HybridizationType.SP3}
+        if sp3 != bh_res:
+            return None
+        hydro_locants = [1, 4]
+    else:
+        return None
 
-    bridge_locants = sorted(numbering[orig_to_res[x]] for x in bridgeheads)
-
-    # Hydro prefix: the sp3 ring atoms of the residual (the saturated positions of the
-    # mancude parent), with their locants. Only the bridged ring saturates; the benzo
-    # ring stays aromatic.
-    hydro_locants = sorted(
-        loc for res_idx, loc in numbering.items()
-        if res_mol.GetAtomWithIdx(res_idx).GetHybridization() == Chem.HybridizationType.SP3
-    )
-
-    # Bridge prefix (methano/ethano/propano | epoxy/epithio/epimino).
+    # Bridge prefix (methano/ethano/propano | epoxy/epithio/epimino | etheno).
     hetero = next((e for e in elements if e != 'C'), None)
-    bridge_prefix = get_bridge_prefix({
-        'length': len(bridge_atoms),
-        'element': hetero or 'C',
-        'heteroatom': hetero,
-    })
+    if n_inner_double == 1:
+        bridge_prefix = 'etheno'
+    else:
+        bridge_prefix = get_bridge_prefix({
+            'length': len(bridge_atoms),
+            'element': hetero or 'C',
+            'heteroatom': hetero,
+        })
     if not bridge_prefix:
         return None
 
-    # Cite bridge + hydro prefixes together, alphanumerically (ignoring the hydro
-    # multiplying prefix), each with its locant set; the last prefix abuts the parent.
-    entries = [(bridge_prefix, _format_locants(bridge_locants), bridge_prefix)]
+    # Assembly (P-31.1.4.2.4, Wave-2 completion C ordering fix): hydro
+    # prefixes sit between detachable and NONDETACHABLE prefixes; the bridge
+    # prefix is nondetachable and abuts the parent — so hydro is cited
+    # BEFORE the bridge in every BB example (1,4-dihydro-1,4-ethano-
+    # anthracene BB:14399, octahydro-9,10-ethanoanthracene BB:19964). The
+    # old alphanumeric mixing emitted '1,4-ethano-1,2,3,4-tetrahydro-'
+    # (BB-nonconformant; OPSIN accepts both, so RT never caught it).
+    parts = []
     if hydro_locants:
         hydro_prefix = _hydro_prefix(len(hydro_locants))
         if hydro_prefix is None:
             return None
-        entries.append(('hydro', _format_locants(hydro_locants), hydro_prefix))
-    entries.sort(key=lambda e: e[0])
-
-    name = '-'.join(f"{loc}-{pref}" for _key, loc, pref in entries) + 'naphthalene'
+        parts.append(f"{_format_locants(hydro_locants)}-{hydro_prefix}")
+    parts.append(f"{_format_locants(bridge_locants)}-{bridge_prefix}")
+    name = '-'.join(parts) + base_name
+    if base_name == 'acridine':
+        name = f"9H-{name}"
 
     # atom_to_locant is a ring-MEMBERSHIP map only (not real IUPAC locants); harmless
     # because substituents_included=True makes the caller skip substituent enrichment.
@@ -1271,9 +1333,12 @@ def _bridge_is_connected(mol, atoms: Set[int]) -> bool:
 
 def _excise_to_naphthalene_residual(mol, bridge_atoms: Set[int], all_ring_atoms: Set[int]):
     """Excise *bridge_atoms*; if the residual ring system is a clean naphthalene
-    (two ortho-fused 6-rings, 10 carbons) whose atoms PARTITION the original ring
-    atoms with the bridge (no dangling leftover), return
-    ``(residual_mol, orig_to_res_index_map, residual_ring_atoms)``; else None.
+    (2 ortho-fused 6-rings, 10 C), linear anthracene (3 six-rings, 14 C), or
+    acridine (3 six-rings, 13 C + 1 N at a MESO position) whose atoms PARTITION
+    the original ring atoms with the bridge (no dangling leftover), return
+    ``(residual_mol, orig_to_res, residual_ring_atoms, base_name, ring_map)``;
+    else None. ``ring_map`` carries the topology needed for locant assignment
+    (empty for naphthalene; meso/terminals/fusion for the 3-ring bases).
     """
     rw = Chem.RWMol(mol)
     for a in rw.GetAtoms():
@@ -1291,14 +1356,61 @@ def _excise_to_naphthalene_residual(mol, bridge_atoms: Set[int], all_ring_atoms:
     six = [r for r in res_rings if len(r) == 6]
     res_ring_atoms = set().union(*res_rings) if res_rings else set()
 
-    is_naphthalene = (
-        len(res_rings) == 2
-        and len(six) == 2
-        and len(six[0] & six[1]) == 2
-        and len(res_ring_atoms) == 10
-        and all(res.GetAtomWithIdx(i).GetSymbol() == 'C' for i in res_ring_atoms)
-    )
-    if not is_naphthalene:
+    base_name = None
+    ring_map: Dict[str, Any] = {}
+    if (len(res_rings) == 2 and len(six) == 2
+            and len(six[0] & six[1]) == 2
+            and len(res_ring_atoms) == 10
+            and all(res.GetAtomWithIdx(i).GetSymbol() == 'C'
+                    for i in res_ring_atoms)):
+        base_name = 'naphthalene'
+    elif len(res_rings) == 3 and len(six) == 3 and len(res_ring_atoms) == 14:
+        # Wave-2 completion C: linear 3-ring residual — anthracene (all-C) or
+        # acridine (one N at a meso position). Terminal benzo rings must stay
+        # fully aromatic (fail-closed on anything partly reduced there).
+        syms = [res.GetAtomWithIdx(i).GetSymbol() for i in res_ring_atoms]
+        n_n = syms.count('N')
+        if n_n > 1 or any(s not in ('C', 'N') for s in syms):
+            return None
+        shared = [(i, j, six[i] & six[j])
+                  for i in range(3) for j in range(i + 1, 3)]
+        pairs = [(i, j, s) for i, j, s in shared if len(s) == 2]
+        if len(pairs) != 2:
+            return None
+        mids = set([pairs[0][0], pairs[0][1]]) & set([pairs[1][0], pairs[1][1]])
+        if len(mids) != 1:
+            return None
+        mid = mids.pop()
+        terminals = [k for k in range(3) if k != mid]
+        fusion = (six[mid] & six[terminals[0]]) | (six[mid] & six[terminals[1]])
+        meso = six[mid] - fusion
+        if len(meso) != 2:
+            return None
+        meso_l = sorted(meso)
+        if res.GetBondBetweenAtoms(meso_l[0], meso_l[1]) is not None:
+            return None  # angular (phenanthrene-type) — not built
+        # Exactly ONE ring may carry the saturated (bridgehead) positions —
+        # the middle ring for a 9,10-bridge, one terminal for a 1,4-bridge;
+        # the other two rings must be fully aromatic (fail-closed).
+        non_arom_rings = [k for k in range(3)
+                          if not all(res.GetAtomWithIdx(i).GetIsAromatic()
+                                     for i in six[k])]
+        if len(non_arom_rings) > 1:
+            return None
+        if n_n == 1:
+            n_idx = next(i for i in res_ring_atoms
+                         if res.GetAtomWithIdx(i).GetSymbol() == 'N')
+            if n_idx not in meso:
+                return None  # N elsewhere = a different fused base — closed
+            base_name = 'acridine'
+            ring_map['n_meso'] = n_idx
+        else:
+            base_name = 'anthracene'
+        ring_map['meso'] = meso
+        ring_map['fusion'] = fusion
+        ring_map['rings'] = six
+        ring_map['terminals'] = terminals
+    else:
         return None
 
     orig_to_res = {
@@ -1311,7 +1423,7 @@ def _excise_to_naphthalene_residual(mol, bridge_atoms: Set[int], all_ring_atoms:
     if res_ring_orig | bridge_atoms != all_ring_atoms:
         return None
 
-    return (res, orig_to_res, res_ring_atoms)
+    return (res, orig_to_res, res_ring_atoms, base_name, ring_map)
 
 
 def _number_naphthalene_bridged_ring(res_mol, bridgeheads_res: Set[int]) -> Optional[Dict[int, int]]:

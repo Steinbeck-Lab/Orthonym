@@ -127,6 +127,10 @@ class StoutClass(_StrEnumBase):
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
+    AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
+    HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
+    SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
+    PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
@@ -1121,6 +1125,70 @@ def _is_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     return name_ketene(mol) is not None
 
 
+def _is_azinic_derivative(mol, smiles, canonical_smiles, features=None,
+                          **kwargs) -> bool:
+    """Wave-2 completion C (P-61.5.3); priority 48.3. Ylidene azinic acid
+    (aci-nitro) parents. PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.inorganic_acids import name_azinic_derivative
+    return name_azinic_derivative(mol) is not None
+
+
+def _handle_azinic_derivative(mol, smiles, canonical_smiles, features=None,
+                              **kwargs) -> Optional[str]:
+    from orthonym.rules.inorganic_acids import name_azinic_derivative
+    return name_azinic_derivative(mol)
+
+
+def _is_heterone(mol, smiles, canonical_smiles, features=None,
+                 **kwargs) -> bool:
+    """Wave-2 completion C (P-64.1.2.2/P-64.4.1); priority 48.4. Si/Ge/P/As
+    =O heterone parents (dimethylsilanone). PURE graph classifier."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_heterone
+    return name_heterone(mol) is not None
+
+
+def _handle_heterone(mol, smiles, canonical_smiles, features=None,
+                     **kwargs) -> Optional[str]:
+    from orthonym.rules.mononuclear_hydrides import name_heterone
+    return name_heterone(mol)
+
+
+def _is_sulfine(mol, smiles, canonical_smiles, features=None,
+                **kwargs) -> bool:
+    """Wave-2 completion C (P-64.4.2); priority 48.5. Acyclic thiocarbonyl
+    S-oxides (propylidene-lambda4-sulfanone). PURE graph classifier."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_sulfine
+    return name_sulfine(mol) is not None
+
+
+def _handle_sulfine(mol, smiles, canonical_smiles, features=None,
+                    **kwargs) -> Optional[str]:
+    from orthonym.rules.mononuclear_hydrides import name_sulfine
+    return name_sulfine(mol)
+
+
+def _is_pseudoketone_hetero(mol, smiles, canonical_smiles, features=None,
+                            **kwargs) -> bool:
+    """Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2); priority 48.6. Acyl
+    on Si/Ge/P/As hub (1-silylethan-1-one). PURE graph classifier."""
+    if mol is None:
+        return False
+    from orthonym.rules.pseudoketones import name_acyl_hetero_pseudoketone
+    return name_acyl_hetero_pseudoketone(mol) is not None
+
+
+def _handle_pseudoketone_hetero(mol, smiles, canonical_smiles, features=None,
+                                **kwargs) -> Optional[str]:
+    from orthonym.rules.pseudoketones import name_acyl_hetero_pseudoketone
+    return name_acyl_hetero_pseudoketone(mol)
+
+
 def _is_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
                              **kwargs) -> bool:
     """Wave-2 completion (P-25.6/P-74.3.1.3); priority 49.5. A neutral ring
@@ -1284,6 +1352,35 @@ _register_dispatch(
                 "classifier, fail-closed",
 )
 
+
+_register_dispatch(
+    class_id=StoutClass.AZINIC_DERIVATIVE, priority=48.3, tier=1,
+    predicate=_is_azinic_derivative, handler=_handle_azinic_derivative,
+    iupac_section="Blue Book P-61.5.3",
+    description="Ylidene azinic acid (aci-nitro) parents "
+                "(ethylideneazinic acid); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.HETERONE, priority=48.4, tier=1,
+    predicate=_is_heterone, handler=_handle_heterone,
+    iupac_section="Blue Book P-64.1.2.2 / P-64.4.1",
+    description="Si/Ge/P/As heterone parents (dimethylsilanone / "
+                "methylsilanone); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.SULFINE, priority=48.5, tier=1,
+    predicate=_is_sulfine, handler=_handle_sulfine,
+    iupac_section="Blue Book P-64.4.2",
+    description="Acyclic thiocarbonyl S-oxides (propylidene-lambda4-"
+                "sulfanone); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.PSEUDOKETONE_HETERO, priority=48.6, tier=1,
+    predicate=_is_pseudoketone_hetero, handler=_handle_pseudoketone_hetero,
+    iupac_section="Blue Book P-64.1.2.1 (b) / P-64.5.2.2",
+    description="Acyl on Si/Ge/P/As hub (1-silylethan-1-one / "
+                "1-phosphanylbutan-1-one); graph classifier, fail-closed",
+)
 
 # --- Wave-2 completion: KETENE at priority 49 (after DINUCLEAR_HYDRIDE@48, ---
 # before ORGANOMETALLIC@50). The exact (halo)ketene heterocumulene named on the

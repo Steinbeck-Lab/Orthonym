@@ -859,6 +859,128 @@ def _try_triyl_two_atom_bridge(mol, ring_atoms: set) -> Optional[str]:
     return None
 
 
+def _try_methylenebis_oxy_bridge(mol, ring_atoms: set) -> Optional[str]:
+    """Composite O-CH2-O central bridge joining two identical ring parents
+    (Wave-2 completion C, P-15.3.1.2.2.1): Oc1ccc(OCOc2ccc(O)cc2)cc1 ->
+    4,4'-[methylenebis(oxy)]diphenol (BB verbatim).
+
+    Fail-closed: central non-ring neutral CH2 with exactly two non-ring
+    ether-O neighbours, each attached to exactly one ring atom; identical
+    fragments; unit resolution via the shared _resolve_unit_and_assemble."""
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 2:
+            continue
+        idx = atom.GetIdx()
+        if idx in ring_atoms or atom.GetFormalCharge() != 0:
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 2:
+            continue
+        if any(n.GetIdx() in ring_atoms or n.GetSymbol() != 'O'
+               or n.GetTotalNumHs() != 0 or n.GetFormalCharge() != 0
+               for n in heavy):
+            continue
+        ring_conns = []
+        ok = True
+        for o in heavy:
+            rn = [n for n in o.GetNeighbors() if n.GetAtomicNum() > 1
+                  and n.GetIdx() != idx]
+            if len(rn) != 1 or rn[0].GetIdx() not in ring_atoms:
+                ok = False
+                break
+            ring_conns.append(rn[0].GetIdx())
+        if not ok:
+            continue
+
+        fragments = _split_at_bridge(
+            mol, idx, ring_conns, extra_remove=[o.GetIdx() for o in heavy])
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = Chem.CanonSmiles(smi_a)
+        if canon_a != Chem.CanonSmiles(smi_b):
+            continue
+        result = _resolve_unit_and_assemble(
+            mol, [o.GetIdx() for o in heavy], ring_conns, [idx],
+            "methylenebis(oxy)", ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
+def _try_oxybis_azanylylidenemethanylylidene_bridge(
+    mol, ring_atoms: set,
+) -> Optional[str]:
+    """Composite =CH-N= -O- =N-CH= central bridge joining two identical ring
+    parents (Wave-2 completion C, P-15.3.1.2.2.2 yl/ylidene composite):
+    PhCH=N-O-N=CHPh -> 1,1'-[oxybis(azanylylidenemethanylylidene)]dibenzene.
+
+    Fail-closed: central non-ring ether O with two =N neighbours, each N
+    double-bonded to a CH that attaches to exactly one ring atom; any
+    ASSIGNED C=N stereo declines (the composite bridge name cannot carry
+    stereo descriptors); identical fragments."""
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'O' or atom.GetTotalNumHs() != 0:
+            continue
+        idx = atom.GetIdx()
+        if idx in ring_atoms or atom.GetFormalCharge() != 0:
+            continue
+        n_nbrs = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(n_nbrs) != 2 or any(n.GetSymbol() != 'N' or n.GetIdx()
+                                   in ring_atoms for n in n_nbrs):
+            continue
+        bridge_idxs = [idx]
+        ring_conns = []
+        ok = True
+        for n in n_nbrs:
+            if n.GetFormalCharge() != 0 or n.GetTotalNumHs() != 0:
+                ok = False
+                break
+            c_nbrs = [m for m in n.GetNeighbors() if m.GetAtomicNum() > 1
+                      and m.GetIdx() != idx]
+            bond = None if not c_nbrs else mol.GetBondBetweenAtoms(
+                n.GetIdx(), c_nbrs[0].GetIdx())
+            if (len(c_nbrs) != 1 or c_nbrs[0].GetSymbol() != 'C'
+                    or bond.GetBondType() != Chem.BondType.DOUBLE
+                    or bond.GetStereo() != Chem.BondStereo.STEREONONE):
+                ok = False
+                break
+            c = c_nbrs[0]
+            if (c.GetIdx() in ring_atoms or c.GetTotalNumHs() != 1
+                    or c.GetFormalCharge() != 0):
+                ok = False
+                break
+            rn = [m for m in c.GetNeighbors() if m.GetAtomicNum() > 1
+                  and m.GetIdx() != n.GetIdx()]
+            if len(rn) != 1 or rn[0].GetIdx() not in ring_atoms:
+                ok = False
+                break
+            bridge_idxs.extend([n.GetIdx(), c.GetIdx()])
+            ring_conns.append(rn[0].GetIdx())
+        if not ok:
+            continue
+
+        fragments = _split_at_bridge(
+            mol, idx, ring_conns,
+            extra_remove=[b for b in bridge_idxs if b != idx])
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = Chem.CanonSmiles(smi_a)
+        if canon_a != Chem.CanonSmiles(smi_b):
+            continue
+        result = _resolve_unit_and_assemble(
+            mol, bridge_idxs, ring_conns, [],
+            "oxybis(azanylylidenemethanylylidene)", ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
 def _try_silanediyl_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     """Composite CH2-SiH2-CH2 central bridge joining two identical ring
     parents (P-29.4.2): HOOC-C6H4-CH2-SiH2-CH2-C6H4-COOH ->
@@ -1078,6 +1200,16 @@ def name_multiplicative(mol) -> Optional[str]:
     if result is not None:
         return result
 
+    # --- Composite O-CH2-O bridge (Wave2 completion C, P-15.3.1.2.2.1) ---
+    result = _try_methylenebis_oxy_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Composite =CH-N=O=N-CH= bridge (Wave2 completion C, P-15.3.1.2.2.2) ---
+    result = _try_oxybis_azanylylidenemethanylylidene_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
     return None
 
 
@@ -1148,7 +1280,7 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # '1,1'-carbonyldibenzene'. Units bearing a senior PCG (the
         # 4,4'-carbonyldibenzoic acid rings) keep the multiplicative name —
         # there the bridge C=O is correctly a mere bridge (P-15.3.1.2.1.1).
-        if (bridge_type == 'carbonyl'
+        if (bridge_type in ('carbonyl', 'carbonothioyl')
                 and _all_fragments_are_simple_carbocycles(
                     mol, idx, extra_remove=extra_remove)):
             continue
@@ -1329,9 +1461,20 @@ def _fragment_attachment_locant(
     unit, so split the bridge out and query the ring-numbering cascade on the
     FREE fragment). Returns None (fail-closed) when the cascade offers no
     authoritative locant."""
+    affected = set()
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (a1 in remove_set) != (a2 in remove_set):
+            affected.add(a2 if a1 in remove_set else a1)
     emol = RWMol(Chem.RWMol(mol))
     for ridx in sorted(remove_set, reverse=True):
         emol.RemoveAtom(ridx)
+    # Aromatic ring-N H repair (Wave-2 completion C) — see _split_at_bridge.
+    for orig in affected:
+        _s = orig - sum(1 for r in remove_set if r < orig)
+        _a = emol.GetAtomWithIdx(_s)
+        if _a.GetSymbol() == 'N' and _a.GetIsAromatic():
+            _a.SetNumExplicitHs(1)
     try:
         Chem.SanitizeMol(emol)
     except Exception:
@@ -1416,6 +1559,19 @@ def _resolve_unit_and_assemble(
         if locs[0] is None or any(l != locs[0] for l in locs[1:]):
             return None
         return _assemble_multiplicative_name(locs[0], bridge_name,
+                                             parent_name)
+
+    # Wave-2 completion C: when EVERY attachment is a ring NITROGEN, the
+    # PG-distance heuristic mis-anchors (returns 2 for pyridin-2(1H)-one);
+    # use the unit's own P-16.5.1.1 fragment-cascade numbering or fail closed.
+    if ring_conns and all(mol.GetAtomWithIdx(c).GetAtomicNum() == 7
+                          for c in ring_conns):
+        remove_set = set(bridge_idxs) | set(extra_remove or [])
+        _nlocs = [_fragment_attachment_locant(mol, remove_set, c)
+                  for c in ring_conns]
+        if _nlocs[0] is None or any(l != _nlocs[0] for l in _nlocs[1:]):
+            return None
+        return _assemble_multiplicative_name(_nlocs[0], bridge_name,
                                              parent_name)
 
     locants = [_get_bridge_locant(mol, _bridge_for(c), c, ring_atoms)
@@ -1541,6 +1697,11 @@ def _classify_single_atom_bridge_ext(
     if (sub.GetSymbol() == "O" and total_h == 0
             and bond.GetBondType() == Chem.BondType.DOUBLE):
         return ("carbonyl", "carbonyl", [sub.GetIdx()])
+    # Carbonothioyl bridge: C(=S) linking two rings (Wave-2 completion C,
+    # P-64.6.2: 1,1'-carbonothioyldi(pyridin-2(1H)-one) BB verbatim).
+    if (sub.GetSymbol() == "S" and total_h == 0
+            and bond.GetBondType() == Chem.BondType.DOUBLE):
+        return ("carbonothioyl", "carbonothioyl", [sub.GetIdx()])
     # Substituted-methylene bridge: C(H)(X) linking two rings (P-15.3.1.2.1.2).
     if (sub.GetSymbol() in _HALO_METHYLENE and total_h == 1
             and bond.GetBondType() == Chem.BondType.SINGLE):
@@ -1766,6 +1927,16 @@ def _split_at_bridge(
     remove_set = {bridge_idx} | set(extra_remove or [])
     for ridx in sorted(remove_set, reverse=True):
         emol.RemoveAtom(ridx)
+
+    # Wave-2 completion C: a connection atom that is an AROMATIC ring N
+    # genuinely gains an H in the free unit (pyridin-2(1H)-one). Without the
+    # repair, sanitize fails and every ring-N-attached unit silently declined.
+    def _shift_pre(orig):
+        return orig - sum(1 for r in remove_set if r < orig)
+    for conn in nbr_indices:
+        _a = emol.GetAtomWithIdx(_shift_pre(conn))
+        if _a.GetSymbol() == 'N' and _a.GetIsAromatic():
+            _a.SetNumExplicitHs(1)
 
     try:
         Chem.SanitizeMol(emol)

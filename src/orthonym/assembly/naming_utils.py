@@ -158,6 +158,41 @@ _INDICATED_H_PREFIX_RE = re.compile(r'^\d+[hH]-')
 # Terminal functional groups that always occupy position 1 by definition.
 # The chain is numbered FROM the terminal group, so locant-1 is implicit.
 # Canonical source: IUPAC P-14.3.4.1. Used by should_omit_locant_one().
+def unbranched_alkylidene_name(mol, c_idx, exclude_idx):
+    """Ylidene name for an UNBRANCHED all-carbon H-saturated chain rooted at
+    the double-bonded carbon *c_idx* (walking away from *exclude_idx*):
+    methylidene / ethylidene / propylidene (Wave-2 completion C; shared by the
+    sulfine P-64.4.2 and azinic-acid P-61.5.3 namers). Fail-closed None on
+    branching, heteroatoms, rings, charges, or further unsaturation."""
+    from rdkit import Chem as _Chem
+    from ..data.chain_names import get_chain_prefix as _gcp
+    seen = {c_idx}
+    prev, cur, length = exclude_idx, c_idx, 1
+    while True:
+        atom = mol.GetAtomWithIdx(cur)
+        if (atom.GetAtomicNum() != 6 or atom.GetFormalCharge() != 0
+                or atom.IsInRing()):
+            return None
+        for b in atom.GetBonds():
+            other = b.GetOtherAtomIdx(cur)
+            if other == prev and cur == c_idx:
+                continue  # the defining double bond
+            if b.GetBondType() != _Chem.BondType.SINGLE and other != prev:
+                return None
+        nxts = [n.GetIdx() for n in atom.GetNeighbors()
+                if n.GetAtomicNum() > 1 and n.GetIdx() != prev
+                and n.GetIdx() not in seen]
+        if len(nxts) > 1:
+            return None
+        if not nxts:
+            break
+        seen.add(nxts[0])
+        prev, cur = cur, nxts[0]
+        length += 1
+    prefix = _gcp(length)
+    return f"{prefix}ylidene" if prefix else None
+
+
 TERMINAL_FG_TYPES = frozenset({
     "carboxylic_acid",  # Always at chain end (locant 1)
     "peroxy_acid",      # Always at chain end (P-43.1: propaneperoxoic acid)

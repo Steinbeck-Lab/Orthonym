@@ -150,7 +150,9 @@ class TestOrgmDispatch:
             if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
                        StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE,
                        StoutClass.CATENATED_HYDRIDE, StoutClass.DINUCLEAR_HYDRIDE,
-                       StoutClass.KETENE, StoutClass.RING_CHALCOGEN_OXIDE):
+                       StoutClass.KETENE, StoutClass.RING_CHALCOGEN_OXIDE,
+                       StoutClass.AZINIC_DERIVATIVE, StoutClass.HETERONE,
+                       StoutClass.SULFINE, StoutClass.PSEUDOKETONE_HETERO):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

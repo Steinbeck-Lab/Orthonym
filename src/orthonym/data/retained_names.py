@@ -193,6 +193,9 @@ RETAINED_NAMES = {
     # it goes to unknown otherwise). Canonical key of ClC(=O)Cl. The trivial
     # 'phosgene' (OPSIN import) is denied in iupac_2013_pin_list.json.
     "O=C(Cl)Cl": "carbonyl dichloride",
+    # P-66.5.3.1 (Wave-2 completion C): functional-class IS the PIN for
+    # carbonic-acid nitriles; the engine cannot derive these word-forms.
+    "N#CC(=O)C#N": "carbonyl dicyanide",
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",
