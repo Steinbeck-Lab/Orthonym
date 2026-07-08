@@ -28,6 +28,7 @@ from typing import List, Optional, Tuple
 
 from rdkit import Chem
 
+from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 from .substituent_purity import pure_organyl_prefix_name
 
 # Chalcogen element -> parent-hydride stem (P-21.1 / P-21.2.2).
@@ -160,11 +161,23 @@ def name_chalcogen_chain(mol) -> Optional[str]:
         return None
     n = len(chain)
 
-    # Standard valence only: every chalcogen has total valence 2 (a λ-chain such
-    # as 2λ4-trisulfane is a distinct, rarer parent hydride — fail-closed here).
-    for idx in chain:
-        if mol.GetAtomWithIdx(idx).GetTotalValence() != 2:
+    # P-21.2.4: an INTERNAL chalcogen may carry a nonstandard bonding number
+    # filled entirely by H (2λ6,5λ4-hexasulfane, 2λ4-trisulfane — both BB
+    # verbatim preselected names). A λ terminal, an organyl/heteroatom on the
+    # λ atom, or a valence the shared table cannot certify fails closed.
+    lam_by_pos = {}
+    for pos, idx in enumerate(chain):
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetTotalValence() == 2:
+            continue
+        if pos in (0, len(chain) - 1):
             return None
+        # _terminal_substituents below already refuses internal heavy
+        # substituents; the extra valences here are H by construction.
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam is None:
+            return None
+        lam_by_pos[pos] = lam
 
     subs = _terminal_substituents(mol, chain)
     if subs is None:
@@ -174,6 +187,18 @@ def name_chalcogen_chain(mol) -> Optional[str]:
     base = f"{_MULTIPLIER[n]}{stem}" if n in _MULTIPLIER else None
     if base is None:
         return None  # chain too long for the basic multiplier table
+
+    if lam_by_pos:
+        if subs:
+            return None  # substituted λ-chains not built — fail closed
+        # P-21.2.4.1: low locants to the λ set; P-21.2.4.2: on a positional
+        # tie the HIGHER bonding number takes the lower locant (λ6 before λ4).
+        # sorted (locant, -λ) keys implement both tiers lexicographically.
+        fwd = sorted((p + 1, -l) for p, l in lam_by_pos.items())
+        rev = sorted((n - p, -l) for p, l in lam_by_pos.items())
+        chosen = min(fwd, rev)
+        prefix = ','.join(format_lambda_token(loc, -neg) for loc, neg in chosen)
+        return f"{prefix}-{base}"
 
     if not subs:
         return base

@@ -37,6 +37,10 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # ADR-19-09). Each entry mirrors its non-chalcogen ester counterpart's functional-class
     # PIN rule. Substituent rendering is handled by acyl-derived prefixes (alkanimidoyl,
     # alkaneselenoyl, alkanetelluroyl) where needed; none is the principal-group prefix.
+    # Wave2 completion B4 (fail-closed demotions, no BB-attested prefix):
+    'peroxy_acid',       # P-43.1: demoted case fails closed (no PIN acid prefix)
+    'imidic_acid',       # P-65.1.3.1: demoted case fails closed
+    'sulfinohydrazonohydrazide',  # P-66.4.3.2: demoted case fails closed
     'iminoester',        # P-65.1.7: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
     'selenoester',       # P-65.3: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester
     'telluroester',      # P-65.3: functional class (Te-alkyl alkanetelluroate); chalcogen analog of ester

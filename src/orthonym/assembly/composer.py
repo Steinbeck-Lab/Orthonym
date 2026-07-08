@@ -2427,8 +2427,21 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     substituents = features.benzene_substituents
 
     # If no substituents, return "benzene" (should be caught by retained names,
-    # but handle here as fallback)
+    # but handle here as fallback). P-31.2.4.1 (Wave-2 completion): a bare
+    # ring whose carbons are H-deficient is benzyne — emit the
+    # didehydrobenzene parent instead of the structure-dropping 'benzene'.
     if not substituents:
+        from ..rules.benzene import didehydro_benzene_name
+        _ddh = didehydro_benzene_name(mol, ring_atoms)
+        if _ddh is not None:
+            return _ddh
+        # CONSERVATION (jar-independent, Wave-2 completion B4): bare benzene
+        # has exactly 6 heavy atoms; MORE heavy atoms with zero perceived
+        # substituents means dropped atoms (a fused system whose fused namer
+        # failed and fell through here) -- decline instead of emitting the
+        # partial 'benzene'.
+        if mol.GetNumHeavyAtoms() != 6:
+            return None
         return "benzene"
 
     # INST-01: Atom coverage audit for benzene naming path

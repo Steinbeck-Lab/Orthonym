@@ -176,6 +176,34 @@ MONOCYCLIC_COMPONENTS: Dict[str, Dict[str, Any]] = {
         'aromatic': True,
     },
 
+    # ---- 5-membered Se analogues (Wave-2 completion, P-25.3.2.4(g)) ----
+    # Seniority keys sit just after their S siblings (S band 80/81/85); this
+    # last-resort tiebreaker is only consulted after FR-2.3 (a)-(f).
+    'selenazole': {
+        'prefix': 'selenazolo',
+        'ring_size': 5,
+        'heteroatoms': ['N', 'Se'],
+        'hetero_positions': [1, 3],   # Se at 1, N at 3
+        'seniority': 82,
+        'aromatic': True,
+    },
+    'isoselenazole': {
+        'prefix': 'isoselenazolo',
+        'ring_size': 5,
+        'heteroatoms': ['N', 'Se'],
+        'hetero_positions': [1, 2],   # Se at 1, N at 2
+        'seniority': 83,
+        'aromatic': True,
+    },
+    'selenophene': {
+        'prefix': 'selenopheno',
+        'ring_size': 5,
+        'heteroatoms': ['Se'],
+        'hetero_positions': [1],
+        'seniority': 86,
+        'aromatic': True,
+    },
+
     # ---- 6-membered 1-heteroatom ----
     'pyridine': {
         'prefix': 'pyrido',

@@ -908,6 +908,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 8,
         'iupac_locants': {0: '5', 1: '4', 2: '3a', 3: '3', 4: '2', 5: '1', 6: '6a', 7: '6'},
     },
+    # 1,6-dihydropyrrolo[2,3-b]pyrrole (Wave-2 completion, P-25.7.1.3.2).
+    # The two-NH compound is the DIHYDRO derivative: the bare mancude
+    # 'pyrrolo[2,3-b]pyrrole' is a different molecule (4 noncumulative double
+    # bonds, no NH) — the ledger's bare-name expectation was a lenient OPSIN
+    # parse. Locants OPSIN-derived (extended-SMILES atom values).
+    'c1cc2cc[nH]c2[nH]1': {
+        'name': '1,6-dihydropyrrolo[2,3-b]pyrrole',
+        'tautomer_locant': None,
+        'ring_system': 'bicyclic-5-5',
+        'parent_atoms': 8,
+        'iupac_locants': {0: '5', 1: '4', 2: '3a', 3: '3', 4: '2', 5: '1', 6: '6a', 7: '6'},
+    },
     # 1,3-dihydro-2-benzofuran (phthalan) — the 1,3-dihydro form of 2-benzofuran
     # (parallel to the cataloged 2,3-dihydro-1-benzofuran). PIN per BB P-25;
     # iupac_locants OPSIN-derived (O at 2, CH2 at 1 and 3).

@@ -66,6 +66,9 @@ PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
 SENIORITY_ORDER = [
     # Acids (highest priority)
     "carboxylic_acid",
+    # Peroxy acid (P-43.1 / Table 4.3) -- directly below its parent acid,
+    # above the chalcogen replacements
+    "peroxy_acid",
     # Thiocarboxylic acids (IUPAC P-65.3) -- just below carboxylic acid
     "thioic_S_acid",
     "thioic_O_acid",
@@ -78,6 +81,9 @@ SENIORITY_ORDER = [
     "telluroic_Te_acid",
     "telluroic_O_acid",
     "ditelluroic_acid",
+    # Imidic acid (P-65.1.3.1) -- N-replacement ranks after the O/S/Se/Te
+    # chalcogen-replacement block
+    "imidic_acid",
     # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
@@ -142,6 +148,7 @@ SENIORITY_ORDER = [
     "sulfinimidamide",
     # C1 (P-65.3.1): sulfono N-analogue; ranks with the sulfonamide family
     "sulfonohydrazide",
+    "sulfinohydrazonohydrazide",   # P-66.4.3.2 (Table 6.1 item 41)
     # Wave2 T3d (P-66.4.3.1): hydrazidine's nomenclatural properties are those of
     # hydrazides; rank just ABOVE hydrazide so a molecule reading as both is the
     # hydrazidine.
@@ -352,6 +359,7 @@ def _normalize_pcg_match(mol, match, het_z: Optional[int]) -> tuple:
 # Format: (chain_terminal_suffix, ring_attached_suffix), or None for functional-class-only
 SUFFIX_FORMS = {
     "carboxylic_acid": ("oic acid", "carboxylic acid"),
+    "peroxy_acid": ("peroxoic acid", "carboperoxoic acid"),  # P-43.1 / Table 4.3
     "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
     "thioic_O_acid": ("thioic O-acid", "carbothioic O-acid"),
     "dithioic_acid": ("dithioic acid", "carbodithioic acid"),
@@ -362,6 +370,7 @@ SUFFIX_FORMS = {
     "telluroic_Te_acid": ("telluroic Te-acid", "carbotelluroic Te-acid"),
     "telluroic_O_acid": ("telluroic O-acid", "carbotelluroic O-acid"),
     "ditelluroic_acid": ("ditelluroic acid", "carboditelluroic acid"),
+    "imidic_acid": ("imidic acid", "carboximidic acid"),  # P-65.1.3.1 / Table 4.3
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
@@ -399,6 +408,7 @@ SUFFIX_FORMS = {
     # ('methane' + 'sulfonohydrazide' = 'methanesulfonohydrazide'), exactly like
     # methanesulfonamide. Both simple and ring form are the same word.
     "sulfonohydrazide": ("sulfonohydrazide", "sulfonohydrazide"),
+    "sulfinohydrazonohydrazide": ("sulfinohydrazonohydrazide", "sulfinohydrazonohydrazide"),  # P-66.4.3.2
     "nitrile": ("nitrile", "carbonitrile"),
     "aldehyde": ("al", "carbaldehyde"),
     "ketone": ("one", "one"),
@@ -674,7 +684,14 @@ PREFIX_FORMS = {
     "thiohydrazide": "hydrazinecarbothioyl",       # P-66.3.4 / Table 4.4
     "hydrazidine": "hydrazinecarbohydrazonoyl",    # P-66.4.3.4.1 (BB 56105)
     "hydrazonamide": "carbamohydrazonoyl",         # P-66.4.2.3.2 (BB 34498)
-    "sulfinimidamide": "sulfinimidoyl",            # parallel to sulfonimidoyl
+    # P-66.4.1.3.4 (BB 34352/55484): the preselected prefix for the WHOLE
+    # H2N-S(=NH)- group is 'S-aminosulfinimidoyl' -- the old bare
+    # 'sulfinimidoyl' is the divalent -S(=NH)- connector (P-65.3.2.3) and
+    # silently dropped the amino N (wrong name, RT-gate suppressed).
+    "sulfinimidamide": "S-aminosulfinimidoyl",
+    "peroxy_acid": None,          # demoted case fails closed (P-43.1)
+    "imidic_acid": None,          # demoted case fails closed (P-65.1.3.1)
+    "sulfinohydrazonohydrazide": None,  # demoted case fails closed (P-66.4.3.2)
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
     # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5

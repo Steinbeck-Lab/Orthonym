@@ -39,7 +39,9 @@ def test_halogen_and_nitroso_unchanged():
     assert _name("Brc1ccccc1") == "bromobenzene"
 
 
-def test_azido_nitro_coexistence_fails_closed():
-    # azido + nitro coexistence is a separate charged-FG gap (even acyclic
-    # fails); must fail closed to 'unknown', never a wrong name.
-    assert _name("[N-]=[N+]=Nc1ccccc1[N+](=O)[O-]") == "unknown organic compound"
+def test_azido_nitro_coexistence_heals():
+    # Wave-2 completion B4 BUILT the former charged-FG gap: the zwitterion
+    # detector now masks internal-charge FG atoms (P-59 Table 5.1), so the
+    # pre-dispatch neutralisation no longer corrupts azide+nitro molecules.
+    # OPSIN-RT verified.
+    assert _name("[N-]=[N+]=Nc1ccccc1[N+](=O)[O-]") == "1-azido-2-nitrobenzene"

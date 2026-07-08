@@ -160,6 +160,8 @@ _INDICATED_H_PREFIX_RE = re.compile(r'^\d+[hH]-')
 # Canonical source: IUPAC P-14.3.4.1. Used by should_omit_locant_one().
 TERMINAL_FG_TYPES = frozenset({
     "carboxylic_acid",  # Always at chain end (locant 1)
+    "peroxy_acid",      # Always at chain end (P-43.1: propaneperoxoic acid)
+    "imidic_acid",      # Always at chain end (P-65.1.3.1: ethanimidic acid)
     "aldehyde",         # Always at chain end (locant 1)
     "nitrile",          # Always at chain end (locant 1)
     "primary_amide",    # Always at chain end (locant 1)

@@ -95,7 +95,11 @@ STILL_REFUSED = [
     # out-of-class examples; v22 Phase G1b (2026-06-20) now NAMES them correctly
     # (difuro[3,2-b:2',3'-e]pyridine etc.) via the polycomponent ortho-fusion
     # constructor, so they moved out of this fail-closed list.
-    "C1Cc2ccccc2C13Cc1ccccc1C3",   # spirobi-indane (polyspiro -> G4)
+    # Wave-2 completion B4 (2026-07-07): spirobi-indane
+    # C1Cc2ccccc2C13Cc1ccccc1C3 moved OUT of this list — the cata-fused skip
+    # in is_polycyclic_system lets the spirobi path name it correctly as
+    # "1,2'-spirobi[indane]" (OPSIN-RT verified); it was previously refused
+    # only because the VB misroute raised before the spirobi check.
     # CRITICAL-1 (code review): ortho-fused small rings share a BOND with naphthalene
     # (fusion nomenclature, e.g. 1H-cyclopropa[b]naphthalene) — the bridgeheads are
     # adjacent + aromatic, so they are NOT a P-25.4 bridge. Must NOT emit

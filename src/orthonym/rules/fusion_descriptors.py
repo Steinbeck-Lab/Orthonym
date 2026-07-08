@@ -76,6 +76,9 @@ FUSION_PREFIXES: Dict[str, str] = {
     'isoxazole': 'isoxazolo',
     'thiazole': 'thiazolo',
     'isothiazole': 'isothiazolo',
+    'selenazole': 'selenazolo',
+    'isoselenazole': 'isoselenazolo',
+    'selenophene': 'selenopheno',
     'triazole': 'triazolo',
     'tetrazole': 'tetrazolo',
 
@@ -611,7 +614,9 @@ def _get_iupac_ring_order(mol, ring_atoms: List[int]) -> List[int]:
 
     # Collect heteroatoms with their priority
     # Priority: O (highest) > S > N (among common heteroatoms)
-    HETERO_PRIORITY = {'O': 0, 'S': 1, 'N': 2}
+    # Hantzsch-Widman O > S > Se > Te > N (P-25.3.3; Se/Te inserted for the
+    # Wave-2 selenazolo class -- same order as _PCF_HET_NUM_SENIORITY).
+    HETERO_PRIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4}
     hetero_info = []  # (priority, atom_idx)
     for idx in ring_atoms:
         atom = mol.GetAtomWithIdx(idx)
@@ -988,7 +993,9 @@ def _get_iupac_ring_order_for_fusion(
     ring_set = set(ring_atoms)
 
     # Collect heteroatoms with priority
-    HETERO_PRIORITY = {'O': 0, 'S': 1, 'N': 2}
+    # Hantzsch-Widman O > S > Se > Te > N (P-25.3.3; Se/Te inserted for the
+    # Wave-2 selenazolo class -- same order as _PCF_HET_NUM_SENIORITY).
+    HETERO_PRIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3, 'N': 4}
     hetero_info = []
     for idx in ring_atoms:
         atom = mol.GetAtomWithIdx(idx)

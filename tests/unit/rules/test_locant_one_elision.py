@@ -253,6 +253,10 @@ class TestTerminalFGTypes:
             # (hydrazonohydrazide) / thiohydrazide characteristic carbon is
             # likewise always chain-terminal (P-66.4.2 / P-66.4.3 / P-66.3.4).
             "hydrazonamide", "hydrazidine", "thiohydrazide",
+            # Wave2 completion B4: peroxy acid (P-43.1, propaneperoxoic acid)
+            # + imidic acid (P-65.1.3.1, ethanimidic acid) -- the acid carbon
+            # is always chain-terminal.
+            "peroxy_acid", "imidic_acid",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -263,5 +267,6 @@ class TestTerminalFGTypes:
     def test_terminal_count_after_phase_163(self):
         """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
         (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) + 3 Wave2 T3d
-        (hydrazonamide/hydrazidine/thiohydrazide) = 30 entries."""
-        assert len(TERMINAL_FG_TYPES) == 30
+        (hydrazonamide/hydrazidine/thiohydrazide) + 2 Wave2-completion-B4
+        (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) = 32 entries."""
+        assert len(TERMINAL_FG_TYPES) == 32

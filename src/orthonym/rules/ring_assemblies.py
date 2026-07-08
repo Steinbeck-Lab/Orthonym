@@ -1178,6 +1178,13 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
                 prefix = get_chain_prefix(carbon_count)
                 return f"{prefix}oxy"
 
+    # Explicit -C(=O)OH recognizer (Wave-2 completion): the recursive
+    # fallback below mis-prefixed a carboxyl as 'formyl' (the -OH oxygen was
+    # dropped in the fragment round-trip — a wrong name the RT gate had to
+    # suppress). P-65.1.1.2: the prefix for -COOH is 'carboxy'.
+    if _is_carboxyl_substituent(mol, sub_atoms, attachment_atom):
+        return 'carboxy'
+
     # Fallback: use recursive naming via name_fragment_recursively()
     # This handles compound substituents (C + heteroatoms) on ring assemblies,
     # such as COOH, CONH2, CHO, etc., that the simple patterns above miss.
@@ -1201,6 +1208,33 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
 
     # Last resort: return generic placeholder (should be rare after recursive fallback)
     return "substituent"
+
+
+def _is_carboxyl_substituent(mol, sub_atoms: List[int],
+                             attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral -C(=O)OH group attached via
+    its carbon: {C, =O (degree 1), -OH (degree 1)}."""
+    if len(sub_atoms) != 3:
+        return False
+    c = mol.GetAtomWithIdx(attachment_atom)
+    if c.GetSymbol() != 'C' or c.GetFormalCharge() != 0:
+        return False
+    others = [i for i in sub_atoms if i != attachment_atom]
+    if len(others) != 2:
+        return False
+    oxo = oh = None
+    for i in others:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'O' or a.GetDegree() != 1 or a.GetFormalCharge():
+            return False
+        bond = mol.GetBondBetweenAtoms(attachment_atom, i)
+        if bond is None:
+            return False
+        if bond.GetBondType() == Chem.BondType.DOUBLE and a.GetTotalNumHs() == 0:
+            oxo = i
+        elif bond.GetBondType() == Chem.BondType.SINGLE and a.GetTotalNumHs() == 1:
+            oh = i
+    return oxo is not None and oh is not None
 
 
 def _format_prime(ring_index: int) -> str:
@@ -1360,6 +1394,57 @@ def name_ring_assembly(
 
     if not substituent_list:
         return base_name
+
+    # P-28.2.1 / P-16.5.2.1 (Wave-2 completion): a carboxylic acid on a ring
+    # assembly is the PRINCIPAL characteristic group and must be expressed as
+    # a SUFFIX on the enclosed assembly parent — '[1,1'-biphenyl]-4,4'-
+    # dicarboxylic acid' — never as a prefix (there is no PIN acid prefix).
+    # Scope (fail-closed): EVERY substituent is a clean -C(=O)OH; mixed
+    # prefix+suffix assemblies keep the established prefix-only path below
+    # (which cannot express an acid and correctly yields no name for them).
+    if all(
+        _is_carboxyl_substituent(
+            mol, s['sub_atoms'],
+            s['sub_atoms'][0] if len(s['sub_atoms']) == 1
+            else next(
+                (i for i in s['sub_atoms']
+                 if mol.GetAtomWithIdx(i).GetSymbol() == 'C'), s['sub_atoms'][0]
+            ),
+        )
+        for s in substituent_list
+    ):
+        suffix_pairs = [(s['locant'], s['system_idx'])
+                        for s in substituent_list]
+        # P-14.4(c) determinism: the suffix takes the LOWEST locants -- the
+        # ring carrying it must be the UNPRIMED one ([1,1'-biphenyl]-4-
+        # carboxylic acid, never -4'-). get_ring_systems order is SMILES-
+        # spelling dependent, so for a symmetric 2-ring connection (equal
+        # attachment locants) relabel the priming when that lowers the
+        # suffix locant set; asymmetric connections keep their citation-
+        # order labels (relabelling would alter the connection locants).
+        if count == 2 and sorted_connections:
+            _a1, _a2, _s1, _s2 = sorted_connections[0]
+            _l1 = _lookup_locant(per_system_locants, _s1, _a1,
+                                 ring_systems[_s1])
+            _l2 = _lookup_locant(per_system_locants, _s2, _a2,
+                                 ring_systems[_s2])
+            if _l1 == _l2:
+                _swapped = [(loc, 1 - sys_idx) for loc, sys_idx in
+                            suffix_pairs]
+                if sorted(_swapped) < sorted(suffix_pairs):
+                    suffix_pairs = _swapped
+        suffix_locants = sorted(suffix_pairs)
+        locant_str = ",".join(
+            f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in suffix_locants
+        )
+        n = len(suffix_locants)
+        mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(n)
+        if mult is None:
+            return None
+        if indicated_h_match:
+            return None  # indicated-H + suffix threading not built
+        return (f"[{connection_str}-{multiplier}{ring_name}]"
+                f"-{locant_str}-{mult}carboxylic acid")
 
     # Build substituent prefix
     # Group by name for multipliers

@@ -144,12 +144,14 @@ class TestMononuclearParentLocants:
 class TestConstitutionConservation:
     """Named form must account for every branch atom — else fail closed."""
 
-    def test_si_bridge_stays_unknown(self):
+    def test_si_bridge_heals_multiplicative(self):
         # Was '4-(8-carboxyoctyl)benzoic acid' raw (Si dropped, ring
-        # re-linearised); guard makes the refusal deterministic.
+        # re-linearised); the tier-3a guard made the refusal deterministic.
+        # Wave-2 completion B2 then built the proper P-29.4.2 composite
+        # CH2-SiH2-CH2 multiplicative bridge -- the OPSIN-RT-verified PIN.
         assert name_compound(
             "OC(=O)c1ccc(C[SiH2]Cc2ccc(C(=O)O)cc2)cc1"
-        ) == "unknown organic compound"
+        ) == "4,4'-[silanediylbis(methylene)]dibenzoic acid"
 
     def test_oxy_bridge_stays_unknown(self):
         assert name_compound(

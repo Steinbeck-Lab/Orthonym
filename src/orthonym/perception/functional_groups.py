@@ -29,6 +29,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     "ammonium": "[NX4+]",                          # P-73.1.2.1 (protonated/quaternary N+)
     # === ACIDS (highest priority) ===
     "carboxylic_acid": "[CX3](=O)[OX2H1]",
+    # Peroxy acid R-C(=O)-OOH (P-43.1 / Table 4.3 'peroxoic acid'); the [#6]
+    # guard keeps OOC(=O)O routing to the exact-SMILES carbonoperoxoic entry.
+    "peroxy_acid": "[CX3;$([CX3]([#6])(=[OX1])[OX2][OX2H1])](=[OX1])[OX2][OX2H1]",
     # Thiocarboxylic acids (IUPAC P-65.3) -- rank just below carboxylic acid
     "thioic_S_acid": "[CX3](=O)[SX2H1]",    # R-C(=O)-SH -> thioic S-acid
     "thioic_O_acid": "[CX3](=S)[OX2H1]",    # R-C(=S)-OH -> thioic O-acid
@@ -84,6 +87,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (R-C(=NR')-O-R'') deferred to Phase 163.1 per Open Question 4. Free imidic acid form
     # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
     "iminoester": "[CX3](=[NX2H1])[OX2][#6]",     # R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")
+    # Imidic acid R-C(=NH)-OH (P-65.1.3.1 / Table 4.3 'imidic acid'); the
+    # [#6] guard keeps N=C(O)O / N=C(N)O on the exact-SMILES
+    # carbonimidic/carbamimidic inorganic-acid entries.
+    "imidic_acid": "[CX3;$([CX3]([#6])(=[NX2H1])[OX2H1])](=[NX2H1])[OX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
     # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
@@ -139,6 +146,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     # shipped sulfonimidamide with the S(=O) removed (SX4->SX3, one fewer O).
     # SX3-vs-SX4 makes it disjoint from every shipped SMARTS -> no suppression.
     "sulfinimidamide": "[SX3](=[NX2])[NX3H2]",
+    # P-66.4.3.2: -S(=N-NH2)-NH-NH2 (cannot collide with sulfinimidamide --
+    # the S-NH- nitrogen here is H1, not the [NX3H2] amide N).
+    "sulfinohydrazonohydrazide": "[SX3](=[NX2][NX3])[NX3][NX3]",
 
     # === CARBAMATES (must check before esters -- N-C(=O)-O is more specific) ===
     "carbamate": "[NX3][CX3](=O)[OX2][#6]",
@@ -570,6 +580,18 @@ def _resolve_fg_collisions(results):
         ('azo', ['imine']),
         # DATA-03: guanidine suppresses amidine (guanidine is more specific)
         ('guanidine', ['amidine']),
+        # Wave2 completion (P-43.1): the acyl -OOH matches the hydroperoxide
+        # SMARTS; the peroxy-acid FG owns those atoms.
+        ('peroxy_acid', ['hydroperoxide', 'peroxide', 'ester', 'ketone',
+                         'aldehyde', 'carboxylic_acid']),
+        # Wave2 completion (P-65.1.3.1): the C=NH of an imidic acid matches
+        # the imine SMARTS and its -OH the alcohol/enol patterns.
+        ('imidic_acid', ['imine', 'alcohol', 'primary_alcohol',
+                         'secondary_alcohol', 'tertiary_alcohol', 'enol']),
+        # Wave2 completion (P-66.4.3.2): the S-hydrazido/hydrazono N pairs
+        # match the hydrazine/hydrazone/imine/amine patterns.
+        ('sulfinohydrazonohydrazide', ['hydrazine_fg', 'sulfinimidamide',
+                                       'hydrazone', 'imine', 'primary_amine']),
         # Wave2 T3d composite-N precedence (ORDER LOAD-BEARING — the resolver
         # applies top-to-bottom on live results):
         #  1. hydrazidine (R-C(=N-NH2)-NH-NH2, the most specific: 2-N hydrazido

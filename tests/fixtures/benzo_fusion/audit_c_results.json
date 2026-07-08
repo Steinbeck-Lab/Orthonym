@@ -132,6 +132,41 @@
     "ring_size": 5
   },
   {
+    "actual_seniority": 82,
+    "classification": "NO-EXPECTED-TIER",
+    "expected_hi": null,
+    "expected_lo": null,
+    "heteroatoms": [
+      "N",
+      "Se"
+    ],
+    "name": "selenazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 83,
+    "classification": "NO-EXPECTED-TIER",
+    "expected_hi": null,
+    "expected_lo": null,
+    "heteroatoms": [
+      "N",
+      "Se"
+    ],
+    "name": "isoselenazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 86,
+    "classification": "NO-EXPECTED-TIER",
+    "expected_hi": null,
+    "expected_lo": null,
+    "heteroatoms": [
+      "Se"
+    ],
+    "name": "selenophene",
+    "ring_size": 5
+  },
+  {
     "actual_seniority": 49,
     "classification": "CORRECT-tier",
     "expected_hi": 49,

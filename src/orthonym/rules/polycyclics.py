@@ -110,15 +110,28 @@ def identify_polycyclic(mol) -> Optional[str]:
 
             # If the core matches and we have substituents, this is the PAH
             if core_atoms == pah_data['num_atoms']:
-                # Guard: PAH core must account for majority of ring atoms.
-                # A 10-atom naphthalene inside a 40-atom system is NOT
-                # "substituted naphthalene" -- it's a larger polycyclic.
-                # IUPAC P-44.2.1(e): greater skeletal atoms preferred.
-                all_ring_atoms_in_mol = set()
+                # Coverage veto (Wave-2 completion; replaces the loose 0.6
+                # majority ratio): the fused ring COMPONENT containing the
+                # matched core must BE exactly the core. Any extra RING atom
+                # fused/bridged onto the core (the 1,4-epoxynaphthalene O, a
+                # spiro ring, a larger uncataloged polycycle) means the parent
+                # is NOT this PAH -- naming it core+substituents DROPS the
+                # extra ring atoms (a wrong name the RT gate had to suppress).
+                # Ring systems connected only by single bonds
+                # (1-phenylnaphthalene) are separate components and pass.
+                # IUPAC P-44.2.1(e): greater number of skeletal ring atoms.
+                components = []
                 for ring in mol.GetRingInfo().AtomRings():
-                    all_ring_atoms_in_mol.update(ring)
-                total_ring_atoms = len(all_ring_atoms_in_mol)
-                if total_ring_atoms > 0 and core_atoms < total_ring_atoms * 0.6:
+                    rs = set(ring)
+                    merged = [c for c in components if c & rs]
+                    for c in merged:
+                        components.remove(c)
+                    components.append(rs.union(*merged) if merged else rs)
+                covered = set()
+                for c in components:
+                    if c & match_atoms:
+                        covered |= c
+                if covered != match_atoms:
                     continue  # Skip, try smaller PAH or return None
                 return pah_name
 
@@ -1097,11 +1110,21 @@ def name_substituted_polycyclic(
             prefixes.append(prefix_str)
             prefix_part = _join_pah_prefixes(sorted(prefixes, key=lambda s: alpha_sort_key(s.lstrip('0123456789,-'))))
 
-        name = f"{prefix_part}{pah_name}{suffix_part}"
+        # P-31.1.4.3.4 (Wave-2 completion): the indicated hydrogen attaches
+        # to the parent stem, after any substituent prefixes -- 9H-fluorene-
+        # 9-carboxylic acid / 9-methyl-9H-fluorene. The bare-parent early
+        # return keeps the retained short form ('fluorene').
+        _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
+        _stem = f"{_ih}-{pah_name}" if _ih else pah_name
+        _sep = '-' if (_ih and prefix_part and not prefix_part.endswith('-')) else ''
+        name = f"{prefix_part}{_sep}{_stem}{suffix_part}"
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     # Build final name (prefix-only, no suffix FGs)
-    name = f"{prefix_part}{pah_name}"
+    _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
+    _stem = f"{_ih}-{pah_name}" if _ih else pah_name
+    _sep = '-' if (_ih and prefix_part and not prefix_part.endswith('-')) else ''
+    name = f"{prefix_part}{_sep}{_stem}"
     return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 

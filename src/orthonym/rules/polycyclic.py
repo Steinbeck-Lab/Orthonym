@@ -1701,13 +1701,42 @@ def is_polycyclic_system(mol) -> bool:
     ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
 
     # Skip fully aromatic ring systems (PAHs like naphthalene, perylene, coronene)
-    # These should use retained names from fused_rings, not VB nomenclature
+    # These should use retained names from fused_rings, not VB nomenclature.
+    # EXEMPT (Wave-2 completion): a divalent O/S that is a genuine BRIDGE across
+    # non-adjacent positions of another ring (1,4-epoxynaphthalene) — RDKit's
+    # extended aromaticity marks it aromatic, but the system is bridged-fused
+    # (P-25.4), not a plain fused aromatic; the VB path delegates it to
+    # name_bridged_fused_pin. Fusion chalcogens (dibenzofuran) stay skipped.
     all_ring_aromatic = all(
         mol.GetAtomWithIdx(idx).GetIsAromatic()
         for idx in ring_atoms
     )
     if all_ring_aromatic:
-        return False
+        from .bridged_fused import has_aromatic_chalcogen_bridge
+        if not has_aromatic_chalcogen_bridge(mol):
+            return False
+
+    # Purely CATA-fused skip (Wave-2 completion, honours the documented
+    # "Returns False for purely fused systems" contract): when every SSSR
+    # ring-pair shares <=2 atoms AND no atom belongs to >=3 SSSR rings, the
+    # system is ortho-fused (fluorene, 9,10-dihydroanthracene) — fusion
+    # nomenclature territory, NOT a von Baeyer cage. Without this, sp3
+    # positions defeated the all-aromatic skip and fluorene-9-carboxylic
+    # acid RAISED UNSUPPORTED_RING_SYSTEM before the working PAH-substituent
+    # path could fire. Bridged/peri cages keep True: adamantane (pair share
+    # 3), cubane / acenaphthylene (ring membership 3).
+    _sssr = [set(r) for r in ri.AtomRings()
+             if set(r) <= ring_atoms]
+    if len(_sssr) >= 2:
+        _max_share = max(
+            (len(a & b) for i, a in enumerate(_sssr)
+             for b in _sssr[i + 1:]), default=0)
+        _membership = {}
+        for r in _sssr:
+            for a in r:
+                _membership[a] = _membership.get(a, 0) + 1
+        if _max_share <= 2 and max(_membership.values(), default=0) <= 2:
+            return False
 
     analyzer = VonBaeyerAnalyzer()
     ring_count = analyzer._get_ring_count(mol, ring_atoms)

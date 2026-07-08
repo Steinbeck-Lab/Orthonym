@@ -174,11 +174,19 @@ def _has_true_zwitterion_character(mol) -> bool:
     if mol is None:
         return False
 
-    # Collect positive and negative atoms
+    # Collect positive and negative atoms. Atoms belonging to an internal-
+    # charge characteristic group (nitro / azide / diazo / N-oxide, the P-59
+    # Table 5.1 SMARTS set) are NOT zwitterion charges -- without this mask a
+    # nitro O- cross-paired with an azide central N+ (4-azidonitrobenzene)
+    # false-positived here, and the pre-dispatch neutralisation then corrupted
+    # the molecule (valence error -> unknown). Wave-2 completion.
+    internal = _get_internal_charge_atoms(mol)
     positive_atoms = []
     negative_atoms = []
 
     for atom in mol.GetAtoms():
+        if atom.GetIdx() in internal:
+            continue
         charge = atom.GetFormalCharge()
         if charge > 0:
             positive_atoms.append(atom)

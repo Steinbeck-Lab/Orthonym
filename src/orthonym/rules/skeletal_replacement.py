@@ -53,6 +53,22 @@ REPLACEMENT_TERMS: Dict[str, str] = {
     'B': 'bora',
 }
 
+# P-15.4.3.1: replacement ('a') prefixes are cited in the name in the element
+# seniority order of P-15.4.1.2 / Table 2.4 — NOT in ascending-locant order.
+# BB verbatim: "3-phospha-2,5,7-trisilaoctane" (phospha cited first although
+# sila holds the lower locant 2); "8-thia-2,4,6-trisiladecane".
+_A_CITATION_ORDER = ['F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P',
+                     'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B',
+                     'Al', 'Ga', 'In', 'Tl']
+_A_CITATION_INDEX = {el: i for i, el in enumerate(_A_CITATION_ORDER)}
+
+# P-15.4.3.1 / P-51.4.1.4: a heterochain may be TERMINATED by C or one of
+# P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga, In, Tl (BB example:
+# 2-oxa-4-thia-1,5-disilapentane). Al/Ga/In/Tl carry no entry in
+# REPLACEMENT_TERMS, so they fail closed at the terminator check.
+_ALLOWED_HETERO_TERMINATORS = {'P', 'As', 'Sb', 'Bi',
+                               'Si', 'Ge', 'Sn', 'Pb', 'B'}
+
 
 def _qualifies_for_pin_skeletal_replacement(
     backbone: List[int], mol,
@@ -173,6 +189,174 @@ for sma in _PRIORITY_FG_SMARTS:
         _PRIORITY_FG_PATTERNS.append(pat)
 
 
+# P-51.4.1.3: carboxylic-acid suffix integration on a fixed-numbered heterochain
+# (3,6,9,12-tetraoxatetradecanedioic acid; 3,6,9,12-tetraoxapentadecan-15-oic
+# acid, P-59.2.2 — the acid carbon takes locant 15 because the heteroatoms own
+# the numbering, P-51.4.1.2).
+_ACID_PATTERN = Chem.MolFromSmarts('[CX3](=[OX1])[OX2H1]')
+
+
+def _detect_terminal_acid_groups(mol: Chem.Mol) -> Optional[List[Dict]]:
+    """Detect -C(=O)OH groups eligible for P-51.4.1.3 suffix integration.
+
+    Returns ``[]`` when the molecule carries no carboxyl at all (classic path),
+    a list of ``{'c', 'oxo', 'oh'}`` dicts for 1-2 clean chain-terminal acid
+    carbons, or ``None`` when a carboxyl exists but is not of that clean shape
+    (geminal diacid carbon, formic-type, charged, >2 acids) — the caller fails
+    closed exactly as Gate 2 always did for acids.
+    """
+    matches = mol.GetSubstructMatches(_ACID_PATTERN)
+    if not matches:
+        return []
+    groups: List[Dict] = []
+    used_c = set()
+    for c, oxo, oh in matches:
+        if c in used_c:
+            return None  # two carboxyls on one carbon (carbonic-type)
+        used_c.add(c)
+        c_atom = mol.GetAtomWithIdx(c)
+        if c_atom.GetFormalCharge() != 0:
+            return None
+        chain_nbrs = [n for n in c_atom.GetNeighbors()
+                      if n.GetIdx() not in (oxo, oh)]
+        if len(chain_nbrs) != 1:
+            return None  # formic acid / exotic substitution on the acid carbon
+        for o_idx in (oxo, oh):
+            o_atom = mol.GetAtomWithIdx(o_idx)
+            if o_atom.GetFormalCharge() != 0 or o_atom.GetDegree() != 1:
+                return None
+        groups.append({'c': c, 'oxo': oxo, 'oh': oh})
+    if len(groups) > 2:
+        return None
+    return groups
+
+
+def _strict_heterounit_chain_ok(mol: Chem.Mol, backbone: List[int]) -> bool:
+    """P-51.4.1.1 strict qualification for the NEW classes (suffix-bearing,
+    heteroatom-terminated, or substituted heterochains): the replacement name
+    is the PIN only when FOUR OR MORE heterounits sit in the unbranched chain
+    together with at least one carbon.
+
+    Conservative unit accounting: every isolated heteroatom is one unit; a
+    same-element adjacent pair (–SS–/–OO–/–NN–) is a catenated-hydride unit
+    class handled elsewhere (peroxide/disulfide/polyazane) → fail closed; a
+    heteroatom run of 3+ is a parent hydride in its own right (BB: trisulfane
+    "is not allowed to be a heterounit") → fail closed. Mixed-element adjacent
+    pairs (Si-O, S-Si — 2-oxa-4-thia-1,5-disilapentane) each count singly.
+    """
+    syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in backbone]
+    if 'C' not in syms:
+        return False
+    hetero_count = 0
+    run_len = 0
+    prev_sym = None
+    for idx, sym in zip(backbone, syms):
+        if sym == 'C':
+            run_len = 0
+            prev_sym = None
+            continue
+        if sym not in REPLACEMENT_TERMS:
+            return False
+        if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
+            return False
+        hetero_count += 1
+        run_len += 1
+        if run_len >= 3:
+            return False
+        if prev_sym == sym:
+            return False
+        prev_sym = sym
+    return hetero_count >= 4
+
+
+def _collect_simple_alkyl_substituents(
+    mol: Chem.Mol, backbone_set: set, allowed_extra: set,
+) -> Optional[List[Tuple[int, str]]]:
+    """Group every off-backbone heavy atom into substituent branches and name
+    each one, or return None (fail-closed) on anything but a simple unbranched
+    saturated all-carbon alkyl bonded to exactly one backbone atom.
+
+    P-15.4.3.2.2: substituent locants follow the FIXED heterochain numbering
+    (5,5-dimethyl-2,5λ4,8,11-tetrathiadodecane). Returns a list of
+    ``(backbone_atom_idx, prefix_name)`` — locants are assigned by the caller
+    after orientation.
+    """
+    num_atoms = mol.GetNumAtoms()
+    off = [i for i in range(num_atoms)
+           if i not in backbone_set and i not in allowed_extra]
+    if not off:
+        return []
+    off_set = set(off)
+    seen: set = set()
+    subs: List[Tuple[int, str]] = []
+    for start in off:
+        if start in seen:
+            continue
+        comp = [start]
+        seen.add(start)
+        qi = 0
+        while qi < len(comp):
+            a = comp[qi]
+            qi += 1
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j in off_set and j not in seen:
+                    seen.add(j)
+                    comp.append(j)
+        attach = set()
+        for a in comp:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j in backbone_set:
+                    attach.add((j, a))
+                elif j in allowed_extra:
+                    return None  # branch touching a suffix oxygen — malformed
+        if len(attach) != 1:
+            return None  # multiply-attached / detached branch
+        b_idx, root = next(iter(attach))
+        comp_set = set(comp)
+        for a in comp:
+            atom = mol.GetAtomWithIdx(a)
+            if (atom.GetAtomicNum() != 6 or atom.GetFormalCharge() != 0
+                    or atom.GetNumRadicalElectrons() != 0):
+                return None
+            for b in atom.GetBonds():
+                if b.GetBondType() != Chem.BondType.SINGLE:
+                    return None
+        # Unbranched: a single walk from the attachment root must cover it all.
+        prev, cur, length = None, root, 1
+        while True:
+            nxts = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+                    if nb.GetIdx() in comp_set and nb.GetIdx() != prev]
+            if len(nxts) > 1:
+                return None
+            if not nxts:
+                break
+            prev, cur = cur, nxts[0]
+            length += 1
+        if length != len(comp):
+            return None
+        prefix = get_chain_prefix(length)
+        if not prefix:
+            return None
+        subs.append((b_idx, f'{prefix}yl'))
+    return subs
+
+
+def _format_substituent_prefix(placed: List[Tuple[int, str]]) -> str:
+    """``[(5, 'methyl'), (5, 'methyl')]`` -> ``'5,5-dimethyl'``; distinct
+    prefixes are alphabetised (multiplying prefixes ignored, P-14.5.2)."""
+    by_name: Dict[str, List[int]] = defaultdict(list)
+    for loc, name in placed:
+        by_name[name].append(loc)
+    parts = []
+    for name in sorted(by_name):
+        locs = sorted(by_name[name])
+        mult = SIMPLE_MULTIPLIERS.get(len(locs), '') if len(locs) > 1 else ''
+        parts.append(f"{','.join(str(l) for l in locs)}-{mult}{name}")
+    return '-'.join(parts)
+
+
 def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     """Try to name a molecule using skeletal replacement nomenclature.
 
@@ -249,11 +433,36 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return _try_cyclic_replacement_name(mol, ring_info)
 
     # ----------------------------------------------------------------
-    # Gate 2: No priority functional groups
+    # P-51.4.1.3 acid-suffix integration: a clean chain-terminal -C(=O)OH
+    # (1 or 2 of them) is expressed as the -oic/-dioic acid suffix on the
+    # fixed-numbered heterochain instead of tripping Gate 2. [] = no acid
+    # (classic path, byte-identical); None = malformed acid (fail closed,
+    # exactly what Gate 2 did for every acid before this branch existed).
+    # ----------------------------------------------------------------
+    acid_groups = _detect_terminal_acid_groups(mol)
+    if acid_groups is None:
+        return None
+    acid_mode = bool(acid_groups)
+    acid_atoms: set = set()
+    acid_oxygens: set = set()
+    for _g in acid_groups:
+        acid_atoms.update((_g['c'], _g['oxo'], _g['oh']))
+        acid_oxygens.update((_g['oxo'], _g['oh']))
+
+    # ----------------------------------------------------------------
+    # Gate 2: No priority functional groups. In acid mode the acid's own
+    # carbonyl matches the acid/ketone/ester/aldehyde patterns — matches
+    # confined to the acid groups are the suffix itself; any match touching
+    # atoms OUTSIDE them is a genuine second FG and still rejects.
     # ----------------------------------------------------------------
     for pat in _PRIORITY_FG_PATTERNS:
-        if mol.HasSubstructMatch(pat):
-            return None
+        if not acid_mode:
+            if mol.HasSubstructMatch(pat):
+                return None
+        else:
+            for match in mol.GetSubstructMatches(pat):
+                if acid_atoms.isdisjoint(match):
+                    return None
 
     # ----------------------------------------------------------------
     # Gate 2c (P-62.2.2): acyclic carbon-chain amines use substitutive naming.
@@ -290,7 +499,10 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # Terminal OH is allowed (suffix integration). Other terminal FGs
     # (NH2, SH) cause fallback to substitutive naming.
     # ----------------------------------------------------------------
-    terminal_oh_info = _detect_terminal_oh(mol)
+    # In acid mode the -oic suffix owns the chain ends: -ol integration is
+    # disabled (a coexisting hydroxyl leaves an unaccounted oxygen and fails
+    # the atom-coverage gate below — never a lossy name).
+    terminal_oh_info = None if acid_mode else _detect_terminal_oh(mol)
     has_other_terminal_fg = _has_terminal_functional_group(mol, exclude_oh=True)
 
     if has_other_terminal_fg:
@@ -301,9 +513,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     has_terminal_oh = terminal_oh_info is not None
 
     # ----------------------------------------------------------------
-    # Find the longest chain backbone including heteroatoms
+    # Find the longest chain backbone including heteroatoms. The acid oxygens
+    # are suffix atoms, not skeletal atoms — excise them so the acid CARBON
+    # terminates the chain (P-51.4.1.3).
     # ----------------------------------------------------------------
-    backbone = _find_replacement_chain(mol)
+    backbone = _find_replacement_chain(mol, exclude_atoms=acid_oxygens)
     if backbone is None:
         return None
 
@@ -325,33 +539,64 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             return None
 
     # ----------------------------------------------------------------
-    # Gate 3b (v23 Phase 8, P-68.2.1.1; E2-owned terminal-atom gate): a TERMINAL
-    # Group-14 backbone atom (Si/Ge/Sn/Pb) is NOT a skeletal-replacement chain
-    # atom. Gate 5 only marks INTERIOR atoms (0 < i < len-1) as embedded
-    # replacements, so a terminal Si/Ge/Sn/Pb is silently counted as a CARBON of
-    # the alkane stem — structure loss: trisiloxane [SiH3]O[SiH2]O[SiH3] ->
-    # '2,4-dioxa-3-silapentane' (RTs to dimethoxysilane, a DIFFERENT molecule). A
-    # terminal Group-14 atom belongs to a silyl substituent or makes the molecule a
-    # homonuclear parent hydride (siloxane), neither of which is built here, so we
-    # fail-closed rather than walk it into the stem. (Coordinated with the Phase-7
-    # chalcogen-suffix path; this single gate owns the terminal-atom rule.)
-    _GROUP14_SKELETAL = {'Si', 'Ge', 'Sn', 'Pb'}
-    if backbone and (
-        mol.GetAtomWithIdx(backbone[0]).GetSymbol() in _GROUP14_SKELETAL
-        or mol.GetAtomWithIdx(backbone[-1]).GetSymbol() in _GROUP14_SKELETAL
-    ):
-        return None
+    # Acid carbons must be the chain terminals (a mid-chain carboxyl would be
+    # a -carboxylic acid on a branch point, a different class — fail closed).
+    # ----------------------------------------------------------------
+    acid_carbons = {g['c'] for g in acid_groups}
+    if acid_mode:
+        ends = {backbone[0], backbone[-1]}
+        if not acid_carbons <= ends:
+            return None
+        if len(acid_groups) == 2 and ends != acid_carbons:
+            return None
 
     # ----------------------------------------------------------------
-    # Gate 4: All heavy atoms must be on the backbone (no substituents)
-    # Branched molecules with substituents off the replacement chain
-    # are not handled. Only unbranched replacement chains.
-    # For terminal OH: the OH oxygen is excluded from backbone count,
-    # so add 1 to expected atom count.
+    # Gate 3b (P-15.4.3.1 / P-51.4.1.4 terminator rule): the chain must be
+    # terminated by C or by P/As/Sb/Bi/Si/Ge/Sn/Pb/B (BB verbatim example:
+    # 2-oxa-4-thia-1,5-disilapentane). An allowed heteroatom terminator is
+    # admitted ONLY into the strict >=4-heterounit class validated below —
+    # everything else (terminal F/Cl, λ-bearing terminals, Al/Ga/In/Tl with
+    # no 'a' term, O/S/N terminals) fails closed rather than being silently
+    # counted as a carbon of the alkane stem (the old structure-loss hazard:
+    # trisiloxane [SiH3]O[SiH2]O[SiH3] -> '2,4-dioxa-3-silapentane' RTs to
+    # dimethoxysilane, a DIFFERENT molecule — carbon-less chains still exit
+    # here to the catenated-hydride namer).
     # ----------------------------------------------------------------
-    expected_atoms = len(backbone) + (1 if has_terminal_oh else 0)
-    if expected_atoms != mol.GetNumAtoms():
-        return None
+    hetero_terminal_mode = False
+    for end_pos in (0, len(backbone) - 1):
+        end_sym = mol.GetAtomWithIdx(backbone[end_pos]).GetSymbol()
+        if end_sym == 'C':
+            continue
+        if end_sym not in _ALLOWED_HETERO_TERMINATORS:
+            return None
+        if end_sym not in REPLACEMENT_TERMS:
+            return None
+        if acid_mode or has_terminal_oh:
+            return None
+        # λ-bearing terminal parents (P-45.3.2 territory) are not built here.
+        if nonstandard_bonding_number(mol, backbone[end_pos]) is not None:
+            return None
+        hetero_terminal_mode = True
+
+    # ----------------------------------------------------------------
+    # Gate 4: atom coverage. Every heavy atom must be a backbone atom, a
+    # suffix oxygen (-ol / -oic acid), or part of a SIMPLE unbranched alkyl
+    # substituent named as a prefix on the fixed numbering (P-15.4.3.2.2:
+    # 5,5-dimethyl-2,5λ4,8,11-tetrathiadodecane). Anything else fails closed.
+    # ----------------------------------------------------------------
+    backbone_set = set(backbone)
+    suffix_extra = set(acid_oxygens)
+    if has_terminal_oh:
+        suffix_extra.add(terminal_oh_info['oh_idx'])
+    substituents: List[Tuple[int, str]] = []
+    if len(backbone_set) + len(suffix_extra) != mol.GetNumAtoms():
+        substituents = _collect_simple_alkyl_substituents(
+            mol, backbone_set, suffix_extra)
+        if substituents is None:
+            return None
+        if has_terminal_oh:
+            return None  # substituted -ol heterochains not built — fail closed
+    substituted_mode = bool(substituents)
 
     # ----------------------------------------------------------------
     # Gate 5: Check heteroatom count and chain length thresholds
@@ -363,7 +608,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         if symbol in REPLACEMENT_TERMS and i > 0 and i < len(backbone) - 1:
             embedded_heteroatoms.append((i, symbol))
 
-    if len(embedded_heteroatoms) == 0:
+    if len(embedded_heteroatoms) == 0 and not hetero_terminal_mode:
         return None
 
     # ----------------------------------------------------------------
@@ -383,7 +628,19 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     #
     # Non-O single heteroatom (thia, aza, sila, ...) and >= 3 O-ethers keep
     # the existing skeletal-replacement path.
-    if not has_terminal_oh:
+    # ----------------------------------------------------------------
+    # NEW-class qualification (P-51.4.1.1): a suffix-bearing, heteroatom-
+    # terminated, or substituted heterochain is the PIN class ONLY with >=4
+    # heterounits alongside at least one chain carbon — anything short of
+    # that belongs to the substitutive namers and fails closed here. The
+    # classic unsubstituted embedded-heteroatom path below keeps its
+    # established gates byte-identically.
+    # ----------------------------------------------------------------
+    _special_mode = acid_mode or hetero_terminal_mode or substituted_mode
+    if _special_mode and not _strict_heterounit_chain_ok(mol, backbone):
+        return None
+
+    if not has_terminal_oh and not _special_mode:
         _emb_elements = [sym for _, sym in embedded_heteroatoms]
         _emb_O_count = _emb_elements.count('O')
         _all_O = (_emb_O_count == len(_emb_elements))
@@ -412,7 +669,7 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     #   - a carbon-less chain ([O-]SS[O-]) has no carbon parent -> keeps skeletal;
     #   - terminal-OH polyether-ol (3,6,9-trioxadecan-1-ol, has_terminal_oh) exempt.
     #   - homogeneous 1-O or 2-O chain (ether/diether) handled by R4 block above.
-    if not has_terminal_oh and len(embedded_heteroatoms) == 2:
+    if not has_terminal_oh and not _special_mode and len(embedded_heteroatoms) == 2:
         _CHALCOGEN_LINK = {'O', 'S', 'Se', 'Te'}
         _elements = {sym for _, sym in embedded_heteroatoms}
         _has_carbon = any(
@@ -428,9 +685,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # branch labels. Rationale string is for debug logging + 154-AUDIT-A.md
     # evidence trail.
     # ----------------------------------------------------------------
-    qualifies, _rationale = _qualifies_for_pin_skeletal_replacement(backbone, mol)
-    if not qualifies:
-        return None
+    if not _special_mode:
+        qualifies, _rationale = _qualifies_for_pin_skeletal_replacement(
+            backbone, mol)
+        if not qualifies:
+            return None
     # NOTE: _rationale (">=4-same-kind", ">=3-mixed-kind", "undue-complexity",
     # "single-hetero-long-chain", "two-hetero-substitutive-equivalent") is
     # currently unused but available for debug logging via:
@@ -446,7 +705,12 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             backbone, mol, terminal_oh_info['carbon_idx']
         )
     else:
-        backbone = _orient_for_lowest_locants(backbone, mol)
+        backbone = _orient_for_lowest_locants(
+            backbone, mol,
+            suffix_atoms=acid_carbons if acid_mode else None,
+            substituent_atoms=(
+                {b for b, _ in substituents} if substituents else None),
+        )
 
     # ----------------------------------------------------------------
     # P-15.4.3.2.4: double/triple bonds get locants per the FIXED heterochain
@@ -457,22 +721,25 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # gate). Suffix + ene integration (P-15.4.3.2.3 interplay) is not built
     # yet — fail closed rather than guess the composite numbering.
     # ----------------------------------------------------------------
-    unsat = _backbone_unsaturation(mol, backbone)
+    unsat = _backbone_unsaturation(mol, backbone, ignore_atoms=acid_oxygens)
     if unsat is None:
         return None
     ene_locants, yne_locants = unsat
-    if (ene_locants or yne_locants) and has_terminal_oh:
+    if (ene_locants or yne_locants) and (has_terminal_oh or acid_mode):
         return None
 
     # Rebuild heteroatom positions after reorientation. A non-standard-valence
     # embedded heteroatom carries the λ-convention (P-21.2.4); standard valences
     # (every ordinary oxa/aza/thia chain) record no λ -> byte-identical output.
+    # Terminal positions are included: whitelisted heteroatom terminators
+    # (Gate 3b) take their own 'a' prefix ("1,5-disila..."), and no classic
+    # path can reach here with a heteroatom terminal.
     heteroatom_positions = []
     lambda_by_locant: Dict[int, int] = {}
     for i, atom_idx in enumerate(backbone):
         atom = mol.GetAtomWithIdx(atom_idx)
         symbol = atom.GetSymbol()
-        if symbol in REPLACEMENT_TERMS and i > 0 and i < len(backbone) - 1:
+        if symbol in REPLACEMENT_TERMS:
             # Locants are 1-based
             locant = i + 1
             heteroatom_positions.append((locant, symbol))
@@ -484,21 +751,36 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         return None
 
     # ----------------------------------------------------------------
-    # Determine suffix info for terminal OH
+    # Determine the suffix: terminal -ol, or the P-51.4.1.3 acid forms on
+    # the fixed heterochain numbering (the acid carbon can hold the HIGH
+    # locant — 3,6,9,12-tetraoxapentadecan-15-oic acid, P-59.2.2).
     # ----------------------------------------------------------------
     suffix = None
     if has_terminal_oh:
         # The OH-bearing carbon should be at position 0 (locant 1) after orient
         suffix = ('ol', 1)
+    elif acid_mode:
+        if len(acid_groups) == 2:
+            suffix = ('dioic acid', None)
+        else:
+            pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
+            suffix = ('oic acid',
+                      pos_by_idx[next(iter(acid_carbons))] + 1)
 
     # ----------------------------------------------------------------
-    # Build the replacement name
+    # Build the replacement name (+ substituent prefixes on the fixed
+    # numbering, P-15.4.3.2.2)
     # ----------------------------------------------------------------
-    return _build_replacement_name(
+    name = _build_replacement_name(
         len(backbone), heteroatom_positions, suffix=suffix,
         lambda_by_locant=lambda_by_locant,
         ene_locants=ene_locants, yne_locants=yne_locants,
     )
+    if name is not None and substituents:
+        pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
+        placed = [(pos_by_idx[b] + 1, s) for b, s in substituents]
+        name = f'{_format_substituent_prefix(placed)}-{name}'
+    return name
 
 
 def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
@@ -592,8 +874,11 @@ def _has_terminal_functional_group(
         if symbol == 'N' and num_h >= 2 and len(heavy_neighbors) <= 1:
             # Terminal NH2 (primary amine at chain end)
             return True
-        if symbol == 'S' and num_h >= 1:
-            # Terminal SH (thiol)
+        if symbol == 'S' and num_h >= 1 and len(heavy_neighbors) <= 1:
+            # Terminal SH (thiol). An H-bearing S with TWO heavy neighbours is
+            # an EMBEDDED nonstandard-valence skeletal atom (λ4-SH2 / λ6-SH4,
+            # P-21.2.4 — 2,5λ4,8,11-tetrathiadodecane), not a thiol; genuine
+            # thiols are already rejected by Gate 2's [SX2H] pattern.
             return True
 
     return False
@@ -660,7 +945,9 @@ def _dichalcogen_bond_set(mol: Chem.Mol) -> set:
     return bonds
 
 
-def _find_replacement_chain(mol: Chem.Mol) -> Optional[List[int]]:
+def _find_replacement_chain(
+    mol: Chem.Mol, exclude_atoms: Optional[set] = None,
+) -> Optional[List[int]]:
     """Find the longest chain backbone including heteroatoms.
 
     For acyclic molecules, finds the longest simple path between
@@ -668,14 +955,18 @@ def _find_replacement_chain(mol: Chem.Mol) -> Optional[List[int]]:
 
     Args:
         mol: RDKit molecule object.
+        exclude_atoms: atom indices removed from the graph before the walk
+            (the acid-suffix oxygens — they are suffix atoms, not skeletal
+            atoms, and would otherwise win the diameter as leaves).
 
     Returns:
         List of atom indices forming the backbone, or None if no valid
         backbone found.
     """
+    exclude_atoms = exclude_atoms or set()
     # Build adjacency list for heavy atoms only
     num_atoms = mol.GetNumAtoms()
-    if num_atoms < 3:
+    if num_atoms - len(exclude_atoms) < 3:
         return None
 
     # DD2 Fix A.1: never traverse a peroxide/disulfide/thioperoxol
@@ -689,13 +980,16 @@ def _find_replacement_chain(mol: Chem.Mol) -> Optional[List[int]]:
     for bond in mol.GetBonds():
         a1 = bond.GetBeginAtomIdx()
         a2 = bond.GetEndAtomIdx()
+        if a1 in exclude_atoms or a2 in exclude_atoms:
+            continue
         if _veto_bonds and frozenset((a1, a2)) in _veto_bonds:
             continue
         adj[a1].append(a2)
         adj[a2].append(a1)
 
     # Find terminal atoms (degree 1 in heavy-atom graph)
-    terminals = [idx for idx in range(num_atoms) if len(adj[idx]) == 1]
+    terminals = [idx for idx in range(num_atoms)
+                 if idx not in exclude_atoms and len(adj[idx]) == 1]
 
     if len(terminals) < 2:
         # No clear chain endpoints -- not a chain molecule
@@ -827,7 +1121,8 @@ def _orient_oh_end_first(
 
 
 def _backbone_unsaturation(
-    mol: Chem.Mol, backbone: List[int]
+    mol: Chem.Mol, backbone: List[int],
+    ignore_atoms: Optional[set] = None,
 ) -> Optional[Tuple[List[int], List[int]]]:
     """Return ``(ene_locants, yne_locants)`` for the backbone's multiple bonds
     under the given orientation, or ``None`` (fail-closed).
@@ -843,9 +1138,15 @@ def _backbone_unsaturation(
     pos = {idx: i for i, idx in enumerate(backbone)}
     ene: List[int] = []
     yne: List[int] = []
+    ignore_atoms = ignore_atoms or set()
     for bond in mol.GetBonds():
         bond_type = bond.GetBondType()
         if bond_type == Chem.BondType.SINGLE:
+            continue
+        # Suffix oxygens (the acid C=O) are accounted for by the suffix
+        # itself, not as chain unsaturation.
+        if (bond.GetBeginAtomIdx() in ignore_atoms
+                or bond.GetEndAtomIdx() in ignore_atoms):
             continue
         if bond_type not in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
             return None
@@ -860,8 +1161,25 @@ def _backbone_unsaturation(
     return sorted(ene), sorted(yne)
 
 
+def _lambda_orientation_key(
+    chain: List[int], mol: Chem.Mol,
+) -> List[Tuple[int, int]]:
+    """P-21.2.4.1/2 orientation key: sorted ``(locant, -bonding_number)`` for
+    every nonstandard-valence backbone atom. Lexicographic minimum implements
+    both tiers — lowest locants to the λ set, and (P-21.2.4.2) the HIGHER
+    bonding number at the lower locant on a positional tie (λ6 before λ4)."""
+    key: List[Tuple[int, int]] = []
+    for i, idx in enumerate(chain):
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam is not None:
+            key.append((i + 1, -lam))
+    return sorted(key)
+
+
 def _orient_for_lowest_locants(
-    backbone: List[int], mol: Chem.Mol
+    backbone: List[int], mol: Chem.Mol,
+    suffix_atoms: Optional[set] = None,
+    substituent_atoms: Optional[set] = None,
 ) -> List[int]:
     """Orient the backbone chain to give lowest locants to heteroatoms.
 
@@ -900,11 +1218,22 @@ def _orient_for_lowest_locants(
     if decision == 1:
         return reverse
     if decision == 0:
-        # Heteroatom tie: P-15.4.3.2.4 "if there is a choice" — break by the
-        # general multiple-bond priorities (P-31.1.2.2.2): lowest locants to
-        # all multiple bonds as a set, then to double bonds. A saturated chain
-        # (or an unclassifiable one — the caller fails closed later) keeps
-        # forward, preserving the pre-existing byte-identical behaviour.
+        # Heteroatom tie — apply the fixed-numbering tie-break cascade:
+        # λ (P-21.2.4.1/2) -> suffix (P-15.4.3.2.3) -> ene/yne
+        # (P-15.4.3.2.4 / P-31.1.2.2.2) -> substituent prefixes (P-14.4(f)).
+        fwd_lam = _lambda_orientation_key(forward, mol)
+        rev_lam = _lambda_orientation_key(reverse, mol)
+        if fwd_lam != rev_lam:
+            return forward if fwd_lam < rev_lam else reverse
+
+        if suffix_atoms:
+            fwd_suf = sorted(i + 1 for i, idx in enumerate(forward)
+                             if idx in suffix_atoms)
+            rev_suf = sorted(i + 1 for i, idx in enumerate(reverse)
+                             if idx in suffix_atoms)
+            if fwd_suf != rev_suf:
+                return forward if fwd_suf < rev_suf else reverse
+
         fwd_unsat = _backbone_unsaturation(mol, forward)
         rev_unsat = _backbone_unsaturation(mol, reverse)
         if fwd_unsat is not None and rev_unsat is not None:
@@ -912,6 +1241,16 @@ def _orient_for_lowest_locants(
             rev_key = (sorted(rev_unsat[0] + rev_unsat[1]), rev_unsat[0])
             if rev_key < fwd_key:
                 return reverse
+            if fwd_key < rev_key:
+                return forward
+
+        if substituent_atoms:
+            fwd_sub = sorted(i + 1 for i, idx in enumerate(forward)
+                             if idx in substituent_atoms)
+            rev_sub = sorted(i + 1 for i, idx in enumerate(reverse)
+                             if idx in substituent_atoms)
+            if fwd_sub != rev_sub:
+                return forward if fwd_sub < rev_sub else reverse
     # decision <= 0: forward preferred OR a genuine symmetry tie (either
     # orientation is correct and byte-identical) — return forward.
     return forward
@@ -935,8 +1274,10 @@ def _get_heteroatom_pairs(
     """
     pairs: List[Tuple[int, str]] = []
     for i, atom_idx in enumerate(backbone):
-        if i == 0 or i == len(backbone) - 1:
-            continue  # Skip terminal atoms
+        # Terminal positions are included: a whitelisted heteroatom terminator
+        # (Gate 3b, P-51.4.1.4) carries its own 'a' prefix and must steer the
+        # numbering ("2-oxa-4-thia-1,5-disilapentane"). No classic-path chain
+        # reaches numbering with a heteroatom terminal (Gates 3/3b refuse).
         atom = mol.GetAtomWithIdx(atom_idx)
         symbol = atom.GetSymbol()
         if symbol in REPLACEMENT_TERMS:
@@ -1003,10 +1344,13 @@ def _build_replacement_name(
     for symbol in element_groups:
         element_groups[symbol].sort()
 
-    # Sort groups: by lowest locant, then alphabetically by replacement term
+    # P-15.4.3.1 / P-22.2.3: cite the 'a' prefixes in the ELEMENT SENIORITY
+    # order of P-15.4.1.2 (O > S > Se > Te > N > P > ... > Si > ...), NOT by
+    # ascending locant. BB verbatim: "3-phospha-2,5,7-trisilaoctane" (phospha
+    # cited first although sila holds locant 2); "8-thia-2,4,6-trisiladecane".
     sorted_groups = sorted(
         element_groups.items(),
-        key=lambda item: (min(item[1]), REPLACEMENT_TERMS[item[0]])
+        key=lambda item: _A_CITATION_INDEX.get(item[0], 99)
     )
 
     # Build replacement term parts
@@ -1035,6 +1379,15 @@ def _build_replacement_name(
         # Build name with functional group suffix
         # e.g., "3,6-dioxaoctan-1-ol"
         suffix_name, suffix_locant = suffix
+        # P-51.4.1.3 acid suffixes on the fixed heterochain numbering:
+        # "3,6,9,12-tetraoxatetradecanedioic acid" (terminal diacid — no
+        # locants needed) / "3,6,9,12-tetraoxapentadecan-15-oic acid"
+        # (P-59.2.2 — the heteroatoms own the low locants).
+        if suffix_name == 'dioic acid':
+            return f'{replacement_prefix}{chain_prefix}anedioic acid'
+        if suffix_name == 'oic acid':
+            return (f'{replacement_prefix}{chain_prefix}an'
+                    f'-{suffix_locant}-oic acid')
         # Vowel elision: remove terminal 'e' before suffix starting with vowel
         # "octane" -> "octan" before "-1-ol"
         stem = f'{chain_prefix}an'
@@ -1162,6 +1515,20 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
 
             hetero_locant_set = sorted(pos[0] for pos in positions)
 
+            # P-22.2.3 (mirrors P-15.4.3.2.1): on a positional tie, low
+            # locants go to the element cited first in the seniority order
+            # (O before N — 1,4,10,13-tetraoxa-7,16-diazacyclooctadecane,
+            # NOT 1,10-diaza-...). Key = per-element locant lists in
+            # seniority order, compared lexicographically.
+            by_element: Dict[str, List[int]] = defaultdict(list)
+            for loc, sym in positions:
+                by_element[sym].append(loc)
+            seniority_key = [
+                sorted(by_element[sym])
+                for sym in sorted(by_element,
+                                  key=lambda s: _A_CITATION_INDEX.get(s, 99))
+            ]
+
             # Compute double bond locants for tiebreaker
             db_locants = []
             if not all_single:
@@ -1174,8 +1541,9 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                         db_locants.append(i + 1)
                 db_locants.sort()
 
-            # Combined comparison key: heteroatom locants first, then DB locants
-            comparison_key = (hetero_locant_set, db_locants)
+            # Comparison key: heteroatom locant set, then element seniority,
+            # then DB locants
+            comparison_key = (hetero_locant_set, seniority_key, db_locants)
 
             if best_key is None or comparison_key < best_key:
                 best_key = comparison_key
@@ -1196,10 +1564,13 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     for symbol in element_groups:
         element_groups[symbol].sort()
 
-    # Sort groups: by lowest locant, then alphabetically by replacement term
+    # P-15.4.3.1 / P-22.2.3: cite the 'a' prefixes in the ELEMENT SENIORITY
+    # order of P-15.4.1.2 (O > S > Se > Te > N > P > ... > Si > ...), NOT by
+    # ascending locant. BB verbatim: "3-phospha-2,5,7-trisilaoctane" (phospha
+    # cited first although sila holds locant 2); "8-thia-2,4,6-trisiladecane".
     sorted_groups = sorted(
         element_groups.items(),
-        key=lambda item: (min(item[1]), REPLACEMENT_TERMS[item[0]])
+        key=lambda item: _A_CITATION_INDEX.get(item[0], 99)
     )
 
     parts = []

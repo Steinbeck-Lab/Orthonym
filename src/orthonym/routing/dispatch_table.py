@@ -126,6 +126,7 @@ class StoutClass(_StrEnumBase):
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
+    RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
@@ -1120,6 +1121,25 @@ def _is_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     return name_ketene(mol) is not None
 
 
+def _is_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
+                             **kwargs) -> bool:
+    """Wave-2 completion (P-25.6/P-74.3.1.3); priority 49.5. A neutral ring
+    S/Se/Te bearing 1-2 exocyclic =O on an otherwise-bare nameable ring system
+    (dibenzothiophene 5-oxide / 5,5-dioxide). Fail-closed classifier+namer."""
+    if mol is None:
+        return False
+    from orthonym.rules.ring_chalcogen_oxide import name_ring_chalcogen_oxide
+    return name_ring_chalcogen_oxide(mol) is not None
+
+
+def _handle_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
+                                 **kwargs) -> Optional[str]:
+    """Return the additive ring-chalcogen oxide name (P-25.6), else None
+    (cascade-continuation)."""
+    from orthonym.rules.ring_chalcogen_oxide import name_ring_chalcogen_oxide
+    return name_ring_chalcogen_oxide(mol)
+
+
 def _handle_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
     """Return the ethenone-parent ketene PIN (P-64.2.2.4), else None (cascade-continuation)."""
     from orthonym.rules.ketenes import name_ketene
@@ -1277,6 +1297,22 @@ _register_dispatch(
     iupac_section="Blue Book P-64.2.2.4",
     description="(Halo)ketene heterocumulene on the ethenone parent "
                 "(ethenone / dibromoethenone); graph classifier, fail-closed",
+)
+
+
+# --- Wave-2 completion: RING_CHALCOGEN_OXIDE at priority 49.5 (after
+# KETENE@49, before ORGANOMETALLIC@50). A neutral ring S/Se/Te with 1-2
+# exocyclic =O on an otherwise-bare ring system, named additively on the
+# intact ring parent (P-25.6 / P-74.3.1.3): dibenzo[b,d]thiophene 5-oxide /
+# 5,5-dioxide (the ring-S sibling of pyridine 1-oxide). The de-oxidised base
+# must resolve both a name AND an authoritative chalcogen locant; anything
+# else cascades. Fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.RING_CHALCOGEN_OXIDE, priority=49.5, tier=1,
+    predicate=_is_ring_chalcogen_oxide, handler=_handle_ring_chalcogen_oxide,
+    iupac_section="Blue Book P-25.6 / P-74.3.1.3",
+    description="Ring-chalcogen oxide named additively on the ring parent "
+                "(dibenzo[b,d]thiophene 5-oxide / 5,5-dioxide); fail-closed",
 )
 
 

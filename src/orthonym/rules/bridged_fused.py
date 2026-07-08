@@ -813,9 +813,19 @@ def name_bridged_fused_pin(mol):
                 results.append(res)
 
     distinct = {r[0] for r in results}
-    if len(distinct) != 1:
-        return None  # 0 valid excisions, or an ambiguous (>1 distinct) name
-    return results[0]
+    if len(distinct) == 1:
+        return results[0]
+    if results:
+        return None  # ambiguous (>1 distinct) name — fail closed
+
+    # Wave-2 completion (P-25.4.3.4.1): the MANCUDE bridged classes — the
+    # residual keeps its full aromatic system and the bridgeheads stay sp2
+    # (0 H, part of a ring double bond), so there is NO hydro prefix:
+    # 1,4-epoxynaphthalene / 1,4-ethanonaphthalene / 9,10-ethanoanthracene /
+    # 1,4-ethano-5,8-methanoanthracene (all BB verbatim). The dihydro path
+    # above cannot see these (its bridge candidates are non-aromatic atoms
+    # with sp3 bridgeheads); this path fires only when it found nothing.
+    return _try_mancude_bridged(mol, all_ring_atoms)
 
 
 def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring_atoms: Set[int]):
@@ -910,6 +920,316 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     # because substituents_included=True makes the caller skip substituent enrichment.
     atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}
     return (name, set(all_ring_atoms), atom_to_locant, True)
+
+
+def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
+    """P-25.4.3.4.1 mancude bridged-fused constructor (Wave-2 completion).
+
+    Handles bare ring systems where excising every saturated (all-single-bond)
+    ring atom leaves a fully AROMATIC naphthalene or anthracene residual and
+    every bridgehead keeps its ring double bond (0 H) — so the name carries no
+    hydro prefix: '1,4-epoxynaphthalene', '1,4-ethano-5,8-methanoanthracene'.
+
+    Deterministic (no subset enumeration): for the residual to be mancude,
+    the removed set must be EXACTLY the saturated atoms; each connected
+    component of that set is one bridge. Every guard is a no-wrong-name
+    guard — any deviation returns None and cascades to G0 fail-closed.
+    Analysis runs on a kekulized copy because RDKit marks the epoxy oxygen
+    of 1,4-epoxynaphthalene aromatic (extended-ring perception), which
+    hides it from aromatic-flag-based candidate selection.
+    """
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+
+    # Candidate bridge atoms: every incident bond single on the kekulized
+    # copy. In a mancude system every non-bridge ring atom carries a double
+    # bond, so this is exactly the removed set.
+    def _all_single(idx: int) -> bool:
+        return all(b.GetBondType() == Chem.BondType.SINGLE
+                   for b in kek.GetAtomWithIdx(idx).GetBonds())
+
+    saturated = {i for i in all_ring_atoms if _all_single(i)}
+    if not saturated:
+        return None
+
+    # Connected components of the saturated set = the bridges (1 or 2).
+    components: List[Set[int]] = []
+    remaining = set(saturated)
+    while remaining:
+        start = min(remaining)
+        comp = {start}
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            for nb in kek.GetAtomWithIdx(cur).GetNeighbors():
+                j = nb.GetIdx()
+                if j in remaining and j not in comp:
+                    comp.add(j)
+                    stack.append(j)
+        components.append(comp)
+        remaining -= comp
+    if len(components) > 2 or any(len(c) > 3 for c in components):
+        return None
+
+    # Excise ALL bridges at once; the residual must be a clean fully-aromatic
+    # naphthalene or anthracene whose ring atoms partition the original ring
+    # atoms with the bridges (same no-phantom-substituent rule as the
+    # dihydro path).
+    residual = _excise_to_mancude_residual(mol, saturated, all_ring_atoms)
+    if residual is None:
+        return None
+    res_mol, orig_to_res, base_name, ring_map = residual
+
+    # Validate each bridge and collect (prefix, sorted locant pair).
+    entries: List[Tuple[str, List[int]]] = []
+    for comp in components:
+        bridgeheads: Set[int] = set()
+        for b in comp:
+            for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+                if nb.GetIdx() not in comp:
+                    bridgeheads.add(nb.GetIdx())
+        if len(bridgeheads) != 2:
+            return None
+        bh = sorted(bridgeheads)
+        if mol.GetBondBetweenAtoms(bh[0], bh[1]) is not None:
+            return None  # adjacent attachment = ortho-fusion, not a bridge
+        if any(bh_i not in orig_to_res for bh_i in bh):
+            return None
+        # Mancude form: the bridgehead keeps its ring double bond -> 0 H.
+        if any(mol.GetAtomWithIdx(b).GetTotalNumHs() != 0 for b in bh):
+            return None
+        # Composition: all-C saturated bridge or a single O (epoxy) — same
+        # scope rule as the dihydro path.
+        elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in comp]
+        n_hetero = sum(1 for e in elements if e != 'C')
+        if n_hetero > 1 or (n_hetero == 1 and (len(comp) != 1
+                                               or elements[0] != 'O')):
+            return None
+        hetero = next((e for e in elements if e != 'C'), None)
+        prefix = get_bridge_prefix({
+            'length': len(comp), 'element': hetero or 'C',
+            'heteroatom': hetero,
+        })
+        if not prefix:
+            return None
+        locants = _mancude_bridge_locants(
+            res_mol, {orig_to_res[x] for x in bh}, base_name, ring_map)
+        if locants is None:
+            return None
+        entries.append((prefix, locants))
+
+    if len(entries) == 2:
+        if base_name != 'anthracene':
+            return None
+        # Both bridges must sit on DISTINCT terminal rings at the alpha,alpha
+        # positions ((1,4)-type); _mancude_bridge_locants returned the
+        # ring-local pattern [1, 4] for each. P-25.4.3.3(b): the first-cited
+        # (alphabetical) bridge takes the lower pair (1,4), the other (5,8) —
+        # legitimate because bare anthracene's terminal rings are equivalent.
+        if any(loc != [1, 4] for _, loc in entries):
+            return None
+        # Each component's bridgeheads must belong to different terminal rings.
+        ring_ids = []
+        for comp in components:
+            bh_rings = set()
+            for b in comp:
+                for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+                    if nb.GetIdx() in orig_to_res:
+                        t = ring_map['terminal_ring_of'].get(
+                            orig_to_res[nb.GetIdx()])
+                        if t is not None:
+                            bh_rings.add(t)
+            if len(bh_rings) != 1:
+                return None
+            ring_ids.append(bh_rings.pop())
+        if ring_ids[0] == ring_ids[1]:
+            return None
+        entries.sort(key=lambda e: e[0])
+        if entries[0][0] == entries[1][0]:
+            # identical bridges: 1,4:5,8-di<prefix> (P-25.4.3.2.1)
+            name = (f"1,4:5,8-di{entries[0][0]}{base_name}")
+        else:
+            name = (f"1,4-{entries[0][0]}-5,8-{entries[1][0]}{base_name}")
+    else:
+        prefix, locants = entries[0]
+        name = f"{_format_locants(locants)}-{prefix}{base_name}"
+
+    atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}
+    return (name, set(all_ring_atoms), atom_to_locant, True)
+
+
+def has_aromatic_chalcogen_bridge(mol) -> bool:
+    """True when a divalent O/S ring atom is a genuine BRIDGE that RDKit's
+    extended aromaticity model hides (Wave-2 completion, P-25.4.3.3(a)):
+    its two neighbours share a ring that does NOT contain the chalcogen, at
+    NON-ADJACENT positions of that ring (1,4-epoxynaphthalene). A fusion
+    chalcogen (dibenzofuran O) shares only its own ring with its neighbours
+    and returns False. Used to exempt this class from the all-aromatic
+    routing skips that would otherwise strand it on a partial-parent namer.
+    """
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for r in ri.AtomRings():
+        ring_atoms.update(r)
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() not in ('O', 'S'):
+            continue
+        if atom.GetDegree() != 2 or atom.GetFormalCharge() != 0:
+            continue
+        idx = atom.GetIdx()
+        if idx not in ring_atoms:
+            continue
+        n1, n2 = (n.GetIdx() for n in atom.GetNeighbors())
+        if mol.GetBondBetweenAtoms(n1, n2) is not None:
+            continue
+        # Bridge test robust to SSSR ring choice: delete the chalcogen; if
+        # its two neighbours still share a ring of the residual, the atom
+        # closed a SHORTCUT across that ring (a bridge). A fusion chalcogen's
+        # neighbours fall into separate rings (dibenzofuran -> biphenyl).
+        rw = Chem.RWMol(mol)
+        for a in rw.GetAtoms():
+            a.SetIntProp('__bf_chal_orig', a.GetIdx())
+        rw.RemoveAtom(idx)
+        res = rw.GetMol()
+        try:
+            Chem.SanitizeMol(res)
+        except Exception:
+            continue
+        orig_of = {i: res.GetAtomWithIdx(i).GetIntProp('__bf_chal_orig')
+                   for i in range(res.GetNumAtoms())}
+        for r in res.GetRingInfo().AtomRings():
+            r_orig = {orig_of[i] for i in r}
+            if n1 in r_orig and n2 in r_orig:
+                return True
+    return False
+
+
+def _excise_to_mancude_residual(mol, removed: Set[int], all_ring_atoms: Set[int]):
+    """Excise *removed*; if the residual is a clean FULLY-AROMATIC naphthalene
+    (2 ortho-fused 6-rings, 10 C) or linear anthracene (3 six-rings, 14 C),
+    return ``(res_mol, orig_to_res, base_name, ring_map)``; else None.
+    ``ring_map`` carries the ring topology used for locant assignment."""
+    rw = Chem.RWMol(mol)
+    for a in rw.GetAtoms():
+        a.SetIntProp('__bf_orig', a.GetIdx())
+    for idx in sorted(removed, reverse=True):
+        rw.RemoveAtom(idx)
+    res = rw.GetMol()
+    try:
+        Chem.SanitizeMol(res)
+    except Exception:
+        return None
+
+    ri = res.GetRingInfo()
+    res_rings = [set(r) for r in ri.AtomRings()]
+    six = [r for r in res_rings if len(r) == 6]
+    res_ring_atoms = set().union(*res_rings) if res_rings else set()
+    if not all(res.GetAtomWithIdx(i).GetSymbol() == 'C'
+               and res.GetAtomWithIdx(i).GetIsAromatic()
+               for i in res_ring_atoms):
+        return None  # not mancude (leftover sp3 / heteroatom in the parent)
+
+    base_name = None
+    ring_map: Dict[str, Any] = {}
+    if (len(res_rings) == 2 and len(six) == 2
+            and len(six[0] & six[1]) == 2 and len(res_ring_atoms) == 10):
+        base_name = 'naphthalene'
+        ring_map['rings'] = six
+        ring_map['fusion'] = six[0] & six[1]
+    elif (len(res_rings) == 3 and len(six) == 3
+            and len(res_ring_atoms) == 14):
+        # Linear anthracene: the middle ring shares 2 atoms with EACH
+        # terminal ring; the terminal rings share none (angular phenanthrene
+        # has terminal rings meeting the same criteria? no — in phenanthrene
+        # every ring pair shares atoms only along the fusion chain, but the
+        # two OUTER rings still share 0 atoms; distinguish by the fusion
+        # atoms: anthracene's middle ring carries 4 fusion atoms in two
+        # OPPOSITE (para-type) pairs, phenanthrene's in adjacent pairs —
+        # check: the two fusion BONDS of the middle ring do not share atoms
+        # AND are separated by 2 atoms on both sides (meso carbons).
+        shared = [(i, j, six[i] & six[j])
+                  for i in range(3) for j in range(i + 1, 3)]
+        pairs = [(i, j, s) for i, j, s in shared if len(s) == 2]
+        if len(pairs) != 2:
+            return None
+        mid_candidates = set([pairs[0][0], pairs[0][1]]) & set(
+            [pairs[1][0], pairs[1][1]])
+        if len(mid_candidates) != 1:
+            return None
+        mid = mid_candidates.pop()
+        terminals = [k for k in range(3) if k != mid]
+        fusion_atoms = (six[mid] & six[terminals[0]]) | (
+            six[mid] & six[terminals[1]])
+        meso = six[mid] - fusion_atoms
+        if len(meso) != 2:
+            return None
+        # Linear check: the meso carbons are non-adjacent and each bonds to
+        # one fusion atom of EACH terminal pair (true for anthracene; in
+        # phenanthrene the middle ring has 2 non-fusion atoms ADJACENT to
+        # each other).
+        meso_l = sorted(meso)
+        if res.GetBondBetweenAtoms(meso_l[0], meso_l[1]) is not None:
+            return None
+        base_name = 'anthracene'
+        ring_map['rings'] = six
+        ring_map['mid'] = mid
+        ring_map['terminals'] = terminals
+        ring_map['meso'] = meso
+        ring_map['fusion'] = fusion_atoms
+        ring_map['terminal_ring_of'] = {
+            a: t for t in terminals for a in six[t] - fusion_atoms
+        }
+    else:
+        return None
+
+    orig_to_res = {
+        res.GetAtomWithIdx(i).GetIntProp('__bf_orig'): i
+        for i in range(res.GetNumAtoms())
+    }
+    res_ring_orig = {res.GetAtomWithIdx(i).GetIntProp('__bf_orig')
+                     for i in res_ring_atoms}
+    if res_ring_orig | removed != all_ring_atoms:
+        return None  # unclean partition (phantom substituent)
+    return (res, orig_to_res, base_name, ring_map)
+
+
+def _mancude_bridge_locants(res_mol, bh_res: Set[int], base_name: str,
+                            ring_map: Dict[str, Any]):
+    """Locants for one bridge's attachment pair on the mancude residual.
+
+    naphthalene: both bridgeheads must be the alpha,alpha pair (1,4) of ONE
+    ring — non-fusion, each adjacent to a fusion atom, not adjacent to each
+    other. (1,3/2,3/peri patterns fail closed: fusion nomenclature or the
+    unbuilt P-25.4.3.3 locant cascade owns them.)
+    anthracene: the meso pair -> [9, 10]; a terminal alpha,alpha pair ->
+    [1, 4] (ring-local; the caller maps the second bridge to 5,8)."""
+    if base_name == 'anthracene' and bh_res == ring_map['meso']:
+        return [9, 10]
+
+    rings = ring_map['rings']
+    if base_name == 'anthracene':
+        rings = [rings[t] for t in ring_map['terminals']]
+    host = next((r for r in rings if bh_res <= r), None)
+    if host is None:
+        return None
+    fusion_in_host = host & ring_map['fusion']
+    non_fusion = host - ring_map['fusion']
+    if not bh_res <= non_fusion:
+        return None
+    bh = sorted(bh_res)
+    if res_mol.GetBondBetweenAtoms(bh[0], bh[1]) is not None:
+        return None
+    # alpha positions: adjacent to a fusion atom of the host ring.
+    for b in bh:
+        nbrs = {n.GetIdx() for n in res_mol.GetAtomWithIdx(b).GetNeighbors()}
+        if not (nbrs & fusion_in_host):
+            return None
+    return [1, 4]
 
 
 # Multiplying prefixes only matter for the hydro term, whose multiplier is always

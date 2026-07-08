@@ -190,6 +190,7 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'num_rings': 4,
     },
     'fluorene': {
+        'indicated_h': '9H',  # P-31.1.4.3.4 (Wave-2 completion): leads substituted names
         'canonical_smiles': 'c1ccc2c(c1)Cc1ccccc1-2',  # Has sp3 carbon (position 9)
         'smarts': 'c1ccc2c(c1)Cc1ccccc1-2',
         'num_atoms': 13,

@@ -62,6 +62,9 @@ _SUFFIX_PRIORITY = [
     # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
     # the S parent; here it is the sole principal group in the target set).
     'sulfonohydrazide',
+    # Wave2 completion (P-66.4.3.2, Table 6.1 item 41): -S(=NNH2)-NHNH2
+    # ranks below sulfonohydrazide (item 34).
+    'sulfinohydrazonohydrazide',
     'carbonyl chloride',
     'carboxamide',
     # C1 (P-66.3.1.1): ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
@@ -163,6 +166,10 @@ _BENZENE_FG_SMARTS = {
     # [NX3H1] bonded to N (not H2), so the sulfonamide SMARTS above never matches
     # it; check this pattern first for cleanliness.
     'sulfonohydrazide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3][NX3]'),
+    # Wave2 completion (P-66.4.3.2): -S(=N-NH2)-NH-NH2 (SX3 keeps it disjoint
+    # from the SX4 sulfonohydrazide).
+    'sulfinohydrazonohydrazide':
+        Chem.MolFromSmarts('[SX3](=[NX2][NX3])[NX3][NX3]'),
     'sulfonic': Chem.MolFromSmarts('[SX4](=O)(=O)[OX2H1]'),
     # D-FOLLOWON item 5 (P-67.1.1.2 / P-65.3): the P/Se/Te ring oxoacids + ring
     # sulfinic acid as demotable suffix FGs (mirrors the sulfonic/borono ring path;
@@ -200,6 +207,64 @@ def is_benzene_ring(mol, ring_atoms: Tuple[int, ...]) -> bool:
             return False
 
     return True
+
+
+def didehydro_benzene_name(mol, ring_atoms) -> Optional[str]:
+    """P-31.2.4.1 (Wave-2 completion): a bare benzene ring in which 2 (or 4)
+    ring carbons carry NO hydrogen (RDKit perceives benzyne as an aromatic C6
+    ring with a triple bond) is the didehydrobenzene parent:
+    '1,2-didehydrobenzene' (BB verbatim; was 'benzene' -> SELF-01 unknown).
+
+    Fail-closed: exactly 6 neutral ring carbons, no exocyclic heavy neighbour
+    anywhere (substituted didehydrobenzenes are not built), every ring atom
+    has 0 or 1 H, dehydro count in {2, 4}. Locants = the minimal tuple over
+    all 12 ring walks.
+    """
+    if ring_atoms is None or len(ring_atoms) != 6:
+        return None
+    ring = list(ring_atoms)
+    ring_set = set(ring)
+    dehydro = []
+    for idx in ring:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.GetFormalCharge() != 0:
+            return None
+        if any(n.GetIdx() not in ring_set and n.GetAtomicNum() > 1
+               for n in atom.GetNeighbors()):
+            return None  # substituent -- class not built, stay fail-closed
+        h = atom.GetTotalNumHs()
+        if h == 0:
+            dehydro.append(idx)
+        elif h != 1:
+            return None
+    mult = {2: 'di', 4: 'tetra'}.get(len(dehydro))
+    if mult is None:
+        return None
+    # Order the ring as a cycle walk.
+    order = [ring[0]]
+    prev = None
+    cur = ring[0]
+    while len(order) < 6:
+        nxt = [n.GetIdx() for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+               if n.GetIdx() in ring_set and n.GetIdx() != prev]
+        nxt = [i for i in nxt if i not in order]
+        if not nxt:
+            return None
+        prev, cur = cur, nxt[0]
+        order.append(cur)
+    dehydro_set = set(dehydro)
+    best = None
+    for start in range(6):
+        for step in (1, -1):
+            locs = tuple(sorted(
+                (pos % 6) + 1
+                for pos, i in enumerate(range(0, 6 * step, step))
+                if order[(start + i) % 6] in dehydro_set
+            ))
+            if best is None or locs < best:
+                best = locs
+    locant_str = ','.join(str(l) for l in best)
+    return f"{locant_str}-{mult}dehydrobenzene"
 
 
 def get_benzene_ring(mol) -> Optional[Tuple[int, ...]]:
@@ -488,6 +553,18 @@ def _identify_suffix_fg_on_benzene(
 
     # Sulfur-based suffix FGs
     if symbol == 'S':
+        # Wave2 completion (P-66.4.3.2): -S(=N-NH2)-NH-NH2 ->
+        # '-sulfinohydrazonohydrazide' (BB verbatim benzene example). SX3 vs
+        # SX4 keeps this disjoint from the sulfonohydrazide match below.
+        for match in mol.GetSubstructMatches(
+                _BENZENE_FG_SMARTS['sulfinohydrazonohydrazide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfinohydrazonohydrazide',
+                    'suffix_name': 'sulfinohydrazonohydrazide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
         # C1 (P-65.3.1): ring-attached sulfonohydrazide S(=O)(=O)-NH-NH2 ->
         # '-sulfonohydrazide'. Checked BEFORE sulfonamide (the N-N form is more
         # specific; the sulfonamide SMARTS requires [NX3H2] so it never matches).
@@ -2674,7 +2751,8 @@ def _assemble_benzene_with_suffix(
     # the group (position 1) and cite the locant of any other substituent,
     # mirroring the benzenesulfonamide path: 'benzenesulfonohydrazide',
     # '4-methylbenzenesulfonohydrazide'.
-    if chosen_suffix == 'sulfonohydrazide' and chosen_count == 1:
+    if chosen_suffix in ('sulfonohydrazide',
+                         'sulfinohydrazonohydrazide') and chosen_count == 1:
         if not remaining_prefix_groups:
             return f"benzene{chosen_suffix}"
         renumbered_groups = _renumber_relative_to(

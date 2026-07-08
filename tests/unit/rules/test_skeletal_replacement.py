@@ -461,8 +461,11 @@ class TestCyclicReplacement:
         ("O1CCOCCOCCOCC1", "1,4,7,10-tetraoxacyclododecane", 12),
         # Corpus fixtures (audit §6 rows 3-6)
         ("C1CNCCNCCCNCCNC1", "1,4,8,11-tetraazacyclotetradecane", 14),
+        # P-22.2.3: positional tie -> low locants to the SENIOR element (O),
+        # and 'a' prefixes cited in seniority order (oxa before aza) — the
+        # Kryptofix-22 PIN, not the former '1,10-diaza-4,7,13,16-tetraoxa-'.
         ("C1COCCOCCNCCOCCOCCN1",
-         "1,10-diaza-4,7,13,16-tetraoxacyclooctadecane", 18),
+         "1,4,10,13-tetraoxa-7,16-diazacyclooctadecane", 18),
         ("C1COCCOCCOCCOCCOCCO1",
          "1,4,7,10,13,16-hexaoxacyclooctadecane", 18),
     ])
