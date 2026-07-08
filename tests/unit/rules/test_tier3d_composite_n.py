@@ -62,9 +62,10 @@ class TestAmidineAsPrefix:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        # carbon-attached amidine stays carbamimidoyl (unchanged)
+        # RING-attached amidine stays carbamimidoyl (PIN for ring/off-chain, BB 34332)
         ("N=C(N)c1ccc(C(=O)O)cc1", "4-carbamimidoylbenzoic acid"),
-        ("N=C(N)CCC(=O)O", "3-carbamimidoylpropanoic acid"),
+        # AM-4 (P-66.4.1.3.2, BB 34338): chain-terminal amidine -> amino+imino
+        ("N=C(N)CCC(=O)O", "4-amino-4-iminobutanoic acid"),
         # amido family unaffected (C=O branch)
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
         # Schiff base (imino N on ring) must NOT be captured as imidamido

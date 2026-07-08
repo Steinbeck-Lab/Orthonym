@@ -1,8 +1,10 @@
 """C2 gap-fix tests — amidines (Blue Book P-66.4.1, completes task 1.3).
 
 Three sub-fixes, each OPSIN-verified:
-  (a) aliphatic-chain carbamimidoyl off-by-one — the amidine C must be
-      excluded from parent-chain enumeration (analog of cyano/carbamoyl).
+  (a) aliphatic-chain amidine — SUPERSEDED by AM-4 (P-66.4.1.3.2, BB 34338):
+      a chain-terminal amidine C stays IN the chain and is cited as amino+imino
+      ('4-amino-4-iminobutanoic acid'), NOT 'carbamimidoyl' (that prefix is the
+      PIN only for RING / off-chain amidine carbons).
   (b) amidine-as-PCG on plain benzene emits the -carboximidamide SUFFIX
       (benzenecarboximidamide), not the carbamimidoyl PREFIX.
   (c) N-substituted amidine — N/N'-aware carbamimidoyl prefix
@@ -27,14 +29,18 @@ def _pin(smiles):
 # FIX (a) — aliphatic chain off-by-one (amidine C excluded from chain)
 # ---------------------------------------------------------------------------
 class TestAmidineChainOffByOne:
-    def test_3_carbamimidoylpropanoic_acid(self):
-        assert _pin("N=C(N)CCC(=O)O") == "3-carbamimidoylpropanoic acid"
+    # AM-4 (P-66.4.1.3.2, BB 34338): the chain-terminal amidine carbon stays IN
+    # the chain and is expressed as amino (-NH2) + imino (=NH), NOT the
+    # 'carbamimidoyl' prefix. The new forms are OPSIN-RT canonical-equal to the
+    # same SMILES (was '3-carbamimidoylpropanoic acid' etc. before AM-4).
+    def test_4_amino_4_iminobutanoic_acid(self):
+        assert _pin("N=C(N)CCC(=O)O") == "4-amino-4-iminobutanoic acid"
 
-    def test_2_carbamimidoylethanoic_acid(self):
-        assert _pin("N=C(N)CC(=O)O") == "2-carbamimidoylethanoic acid"
+    def test_3_amino_3_iminopropanoic_acid(self):
+        assert _pin("N=C(N)CC(=O)O") == "3-amino-3-iminopropanoic acid"
 
-    def test_4_carbamimidoylbutanoic_acid(self):
-        assert _pin("N=C(N)CCCC(=O)O") == "4-carbamimidoylbutanoic acid"
+    def test_5_amino_5_iminopentanoic_acid(self):
+        assert _pin("N=C(N)CCCC(=O)O") == "5-amino-5-iminopentanoic acid"
 
     def test_already_working_4_carbamimidoylbenzoic_acid(self):
         # benzene ring case already worked; must remain correct.

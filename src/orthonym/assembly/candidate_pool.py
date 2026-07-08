@@ -243,6 +243,7 @@ HANDLER_POLICIES: Dict[str, HandlerPolicy] = {
     'carbamate':       HandlerPolicy('carbamate',       'ring_b', priority=HANDLER_PRIORITY['carbamate'],       direct_return=True),
     'urea':            HandlerPolicy('urea',            'ring_b', priority=HANDLER_PRIORITY['urea'],            direct_return=True),
     'guanidine':       HandlerPolicy('guanidine',       'ring_b', priority=HANDLER_PRIORITY['guanidine'],       direct_return=True),
+    'cyanamide':       HandlerPolicy('cyanamide',       'ring_b', priority=HANDLER_PRIORITY['cyanamide'],       direct_return=True),
     'sulfoxide':       HandlerPolicy('sulfoxide',       'ring_b', priority=HANDLER_PRIORITY['sulfoxide'],       direct_return=True),
     'sulfone':         HandlerPolicy('sulfone',         'ring_b', priority=HANDLER_PRIORITY['sulfone'],         direct_return=True),
     'thioether':       HandlerPolicy('thioether',       'ring_b', priority=HANDLER_PRIORITY['thioether'],       direct_return=True),

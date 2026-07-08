@@ -298,14 +298,14 @@ def _get_non_principal_terminal_carbons(
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).
         'nitrile': 0,
-        # C2 (P-66.4.1.3.1): a non-principal amidine is the 'carbamimidoyl' prefix
-        # whose carbon (the -C(=NH)NH2 C) is excluded from the parent chain — the
-        # direct analog of cyano/carbamoyl. SMARTS '[CX3](=[NX2H])[NX3H2]' /
-        # '[CX3](=[NX2])[NX3]' both give match index 0 = the amidine C. Skipped
-        # automatically when amidine IS the principal group (the 'if fg_name ==
-        # principal_group: continue' guard keeps the C in the chain for the
-        # -imidamide suffix, e.g. ethanimidamide/propanimidamide).
-        'amidine': 0,
+        # AM-4 (P-66.4.1.3.2, BB 34338): amidine is DELIBERATELY NOT in this set.
+        # "When the carbon atom of the H2N-C(=NH)- group terminates a chain,
+        # -NH2 and =NH are designated amino and imino" — so on a CHAIN parent the
+        # amidine carbon stays IN the chain and is expressed via 'amino' + 'imino'
+        # prefixes (methyl 4-(dimethylamino)-4-(ethylimino)butanoate), mirroring
+        # the acid-halide note above. The 'carbamimidoyl' prefix is the PIN only
+        # for RING parents / genuinely off-chain amidine carbons (BB 34332);
+        # those never use chain enumeration so they are unaffected.
         # Wave2 T3d: the amidrazone (hydrazonamide) and hydrazidine
         # (hydrazonohydrazide) characteristic carbon is always chain-terminal,
         # exactly like amidine. SMARTS index 0 = that carbon.

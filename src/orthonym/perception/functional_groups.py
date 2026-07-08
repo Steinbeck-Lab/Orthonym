@@ -165,6 +165,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
     "guanidine": "[NX3][CX3](=[NX2])[NX3]",
 
+    # === CYANAMIDE (AM-1, P-66.1.6.2): H2N-C#N and its N-substituted
+    # derivatives use 'cyanamide' as the retained parent ((propan-2-yl)cyanamide,
+    # dimethylcyanamide). ACYCLIC amine N only ([NX3;!R]) — a ring N-C#N stays
+    # 'piperidine-1-carbonitrile'. Collision resolver below suppresses the
+    # nitrile + amine reads on these atoms so principal_group becomes None. ===
+    "cyanamide": "[NX3;!R][CX2]#[NX1]",
+
     # === AMIDINE (IUPAC P-66.4.1: C(=N)N, less specific than guanidine) ===
     # D1: broadened from [CX3](=[NX2H])[NX3H2] (both N unsubstituted) to
     # [CX3](=[NX2])[NX3] so N-/N'-substituted amidines are classified too. This
@@ -489,6 +496,12 @@ def _resolve_fg_collisions(results):
         ('thiourea', ['thioamide', 'thioketone',
                       'primary_amine', 'secondary_amine', 'tertiary_amine']),
         ('guanidine', ['imine']),
+        # AM-1 (P-66.1.6.2): cyanamide N-C#N owns its whole unit — suppress the
+        # nitrile and amine reads on its atoms so principal_group -> None and the
+        # cyanamide handler names it. Atom-scoped: a separate nitrile/amine
+        # elsewhere is untouched.
+        ('cyanamide', ['nitrile', 'primary_amine', 'secondary_amine',
+                       'tertiary_amine']),
         ('carbamate', ['ester', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         ('isocyanate', ['nitrile', 'primary_amide']),
         ('isothiocyanate', ['nitrile', 'primary_amide']),

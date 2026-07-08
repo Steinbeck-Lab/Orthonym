@@ -1529,6 +1529,94 @@ def imidoyl_amido_prefix_from_branch(mol, n_idx: int, imino_c: int,
         return None
 
 
+def hydrazonamide_name_to_hydrazonamido_prefix(name: str) -> Optional[str]:
+    """PF-2 (P-66.4.2.3.5): turn an amidrazone parent name (hydrazonamide) into
+    the non-principal prefix by changing the final 'e' -> 'o':
+    'ethanehydrazonamide' -> 'ethanehydrazonamido'. Fail-closed (None) for
+    di/poly names or names carrying N-locants the branch cannot describe."""
+    if not name:
+        return None
+    low = name.lower()
+    if not low.endswith('hydrazonamide'):
+        return None
+    if 'dihydrazonamide' in low or 'dicarbohydrazonamide' in low:
+        return None
+    if low.startswith('n-') or low.startswith("n'") or ',n' in low:
+        return None
+    return name[:-1] + 'o'
+
+
+def hydrazonoyl_amido_prefix_from_branch(mol, n_idx: int, imino_c: int,
+                                         sub_atoms) -> Optional[str]:
+    """PF-2 (P-66.4.2.3.5): hydrazonamido prefix for a full N-attached amidrazone
+    branch ``-N(H)-C(=N-NH2)-R`` (the amidrazone AMINO nitrogen is the ring/chain
+    attachment). Sibling of :func:`imidoyl_amido_prefix_from_branch`, but keyed
+    on the hydrazono ``C=N-NH2`` — the terminal ``NH2`` on the imino N is the
+    discriminant vs a plain amidine (which that sibling rejects by design).
+    Reconstructs the amidrazone parent R-C(=N-NH2)-NH2, names it recursively
+    (-> 'ethanehydrazonamide'), then applies the e->o transform. Returns the
+    BARE prefix or None.
+
+    Guards (fail-closed): the imino carbon has exactly one =N (double) whose N
+    bears exactly one terminal degree-1 NH2 (neutral); exactly one single-bonded
+    N == n_idx (rejects hydrazidine/guanidine); the attachment N connects to the
+    branch ONLY through this carbon; zero formal charges; full-branch coverage."""
+    sub_set = set(sub_atoms)
+    if n_idx not in sub_set or imino_c not in sub_set:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    if {nb.GetIdx() for nb in n_atom.GetNeighbors()
+            if nb.GetIdx() in sub_set} != {imino_c}:
+        return None
+    c_atom = mol.GetAtomWithIdx(imino_c)
+    if c_atom.GetFormalCharge() != 0:
+        return None
+    imino_n = None
+    single_ns = []
+    for nb in c_atom.GetNeighbors():
+        b = mol.GetBondBetweenAtoms(imino_c, nb.GetIdx())
+        if nb.GetSymbol() == 'N':
+            if b.GetBondTypeAsDouble() == 2.0:
+                if imino_n is not None:
+                    return None
+                imino_n = nb
+            elif b.GetBondTypeAsDouble() == 1.0:
+                single_ns.append(nb.GetIdx())
+    if imino_n is None or single_ns != [n_idx]:
+        return None
+    # hydrazono discriminant: the imino =N's sole non-imino_c neighbour is a
+    # single terminal degree-1 neutral NH2 (rejects plain amidine =NH / =N-C).
+    imino_n_heavy = [nb for nb in imino_n.GetNeighbors()
+                     if nb.GetIdx() != imino_c]
+    if (imino_n.GetFormalCharge() != 0 or len(imino_n_heavy) != 1
+            or imino_n_heavy[0].GetSymbol() != 'N'
+            or imino_n_heavy[0].GetDegree() != 1
+            or imino_n_heavy[0].GetFormalCharge() != 0):
+        return None
+    # closed fragment: every acyl-side atom's neighbours stay in the branch
+    for a_idx in sub_set - {n_idx}:
+        for nb in mol.GetAtomWithIdx(a_idx).GetNeighbors():
+            if nb.GetIdx() not in sub_set:
+                return None
+    try:
+        rw = Chem.RWMol(mol)
+        nh2 = rw.AddAtom(Chem.Atom(7))
+        rw.AddBond(imino_c, nh2, Chem.BondType.SINGLE)
+        frag_atoms = sorted((sub_set - {n_idx}) | {nh2})
+        frag_smi = Chem.MolFragmentToSmiles(rw, frag_atoms, canonical=True)
+        if not frag_smi:
+            return None
+        from .fragment_naming import name_fragment_recursively
+        parent = name_fragment_recursively(frag_smi)
+        if not parent:
+            return None
+        return hydrazonamide_name_to_hydrazonamido_prefix(parent)
+    except Exception:
+        return None
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
 

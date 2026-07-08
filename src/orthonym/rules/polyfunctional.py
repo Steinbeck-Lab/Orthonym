@@ -367,6 +367,42 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     return f"{locant_str}-{prefix_form}"
 
 
+def _name_amidine_chain_side(
+    mol, n_idx: int, amidine_c: int, base: str
+) -> Optional[str]:
+    """Amino-/imino-side prefix for a chain-terminal amidine (AM-4, P-66.4.1.3.2).
+
+    ``base`` is 'amino' (single-bonded N) or 'imino' (double-bonded =N). Returns
+    the decorated prefix — 'amino'/'imino' when the N is unsubstituted, else
+    '{alkyl}{base}' (e.g. 'dimethylamino', 'ethylimino') — or None (fail closed)
+    when any N-substituent branch is un-nameable.
+    """
+    from ..assembly.composer import _name_r_group
+    from collections import Counter as _C
+
+    _names = []
+    for _nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+        _ni = _nb.GetIdx()
+        if _ni == amidine_c or _nb.GetAtomicNum() <= 1:
+            continue
+        _rn = _name_r_group(mol, _ni, exclude_atoms={n_idx})
+        if not _rn:
+            return None
+        _names.append(_rn)
+    if not _names:
+        return base
+    _counts = _C(_names)
+    _parts = []
+    for _nm in sorted(_counts):
+        _c = _counts[_nm]
+        _parts.append(
+            _nm if _c == 1 else f"{get_multiplier_prefix(_c, _nm)}{_nm}"
+        )
+    # Substituted amino/imino is a compound substituent (P-16.3.3): enclose in
+    # parens so it alphabetizes on its complete name ('(dimethylamino)' at 'd').
+    return f"({''.join(_parts)}{base})"
+
+
 # WS-A task 9 / P-66.6.1.2: FGs whose PREFIX_FORMS string ('oxo',
 # 'hydroxy') decorates a SKELETAL atom — valid only when the FG center
 # carbon is part of the parent ring. Carbon-including prefixes
@@ -1064,6 +1100,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
     # Collect all prefixes (FG prefixes + alkyl substituents)
     all_prefixes = []
+    # AM-4: N atoms of chain-terminal amidines whose 'amino'/'imino' prefixes
+    # are emitted below — their substituent branches must be skipped by the
+    # alkyl-substituent walk (else double-counted as (ethylamino)/(dimethylamino)).
+    _amidine_excluded_n: Set[int] = set()
 
     # Add ester acyloxy prefixes if esters were demoted
     if ester_acyloxy_prefixes:
@@ -1230,6 +1270,101 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 )
                 continue
 
+        # AM-6 (P-66.1.1.4.3): a sulfonamide bonded to the chain via its N
+        # (R-SO2-NH-chain) is expressed by _check_for_acylamino as the
+        # '(...sulfonamido)' prefix, NOT the 'sulfamoyl' FG prefix (which is the
+        # S-attached orientation, chain-SO2-NH2). Skip the sulfamoyl prefix when
+        # NO match has its sulfonyl S bonded to a chain atom. S-on-chain matches
+        # (e.g. 3-sulfamoylpropanoic acid) keep the existing path byte-identical.
+        _SULFONAMIDE_N_ATTACH_FGS = {
+            'primary_sulfonamide', 'secondary_sulfonamide',
+            'tertiary_sulfonamide',
+        }
+        if fg_name in _SULFONAMIDE_N_ATTACH_FGS and chain_set:
+            _s_on_chain = False
+            for _m in matches:
+                for _a in _m:
+                    if mol.GetAtomWithIdx(_a).GetSymbol() != 'S':
+                        continue
+                    if any(nb.GetIdx() in chain_set
+                           for nb in mol.GetAtomWithIdx(_a).GetNeighbors()):
+                        _s_on_chain = True
+                    break
+                if _s_on_chain:
+                    break
+            if not _s_on_chain:
+                continue
+
+        # AM-4 (P-66.4.1.3.2, BB 34338): an amidine carbon that TERMINATES a
+        # chain parent is expressed with -NH2 -> 'amino' and =NH -> 'imino'
+        # (each N-substituent decorating the prefix), NOT 'carbamimidoyl' (the
+        # PIN only for ring / off-chain amidine carbons, BB 34332). Fires only
+        # when every amidine carbon is a chain member with exactly one =N and
+        # one single-bonded -N, both nameable; else falls through to the
+        # carbamimidoyl prefix path below.
+        if fg_name == 'amidine' and chain_set:
+            _seen_amc = {}
+            _am_ok = True
+            for _m in matches:
+                _amc = _dbl = _sgl = None
+                for _a in _m:
+                    _at = mol.GetAtomWithIdx(_a)
+                    if _at.GetSymbol() != 'C':
+                        continue
+                    _dN = [
+                        nb.GetIdx() for nb in _at.GetNeighbors()
+                        if nb.GetSymbol() == 'N'
+                        and mol.GetBondBetweenAtoms(
+                            _a, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+                    ]
+                    _sN = [
+                        nb.GetIdx() for nb in _at.GetNeighbors()
+                        if nb.GetSymbol() == 'N'
+                        and mol.GetBondBetweenAtoms(
+                            _a, nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+                    ]
+                    if len(_dN) == 1 and len(_sN) == 1:
+                        _amc, _dbl, _sgl = _a, _dN[0], _sN[0]
+                        break
+                if _amc is None or _amc not in chain_set:
+                    _am_ok = False
+                    break
+                _seen_amc[_amc] = (_dbl, _sgl)
+            if _am_ok and _seen_amc:
+                _am_prefixes = []
+                for _amc, (_dbl, _sgl) in _seen_amc.items():
+                    _loc = atom_to_locant.get(_amc)
+                    _amino = _name_amidine_chain_side(mol, _sgl, _amc, 'amino')
+                    _imino = _name_amidine_chain_side(mol, _dbl, _amc, 'imino')
+                    if _loc is None or _amino is None or _imino is None:
+                        _am_ok = False
+                        break
+                    _am_prefixes.append(format_fg_prefix(_amino, [_loc], 1))
+                    _am_prefixes.append(format_fg_prefix(_imino, [_loc], 1))
+                if _am_ok:
+                    all_prefixes.extend(_am_prefixes)
+                    for _amc, (_dbl, _sgl) in _seen_amc.items():
+                        _amidine_excluded_n.add(_dbl)
+                        _amidine_excluded_n.add(_sgl)
+                    continue
+
+        # PF-2 (P-66.4.2.3.5): an amidrazone attached to the chain via its AMINO
+        # nitrogen (chain-N(H)-C(=N-NH2)-R) is expressed by _check_for_acylamino
+        # as the '(...hydrazonamido)' prefix, NOT the C-attached
+        # 'carbamohydrazonoyl' FG prefix. SMARTS [CX3](=[NX2][NX2,NX3])[NX3] ->
+        # match[0] is the amidrazone carbon; keep a match only when THAT carbon
+        # is bonded to a chain atom (the genuine C-attached direction). If none
+        # survive (all N-attached) -> skip the FG prefix.
+        if fg_name == 'hydrazonamide' and chain_set:
+            _c_attached = [
+                _m for _m in matches
+                if _m and any(nb.GetIdx() in chain_set
+                              for nb in mol.GetAtomWithIdx(_m[0]).GetNeighbors())
+            ]
+            if not _c_attached:
+                continue
+            matches = _c_attached
+
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(
             fg_name, mol, matches[0], principal_chain
@@ -1296,7 +1431,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # --- Generate alkyl substituent prefixes ---
     if features.substituents:
         alkyl_prefixes = _generate_alkyl_prefixes_for_polyfunctional(
-            features, skip_acyloxy=_esters_demoted
+            features, skip_acyloxy=_esters_demoted,
+            exclude_branch_atoms=_amidine_excluded_n,
         )
         all_prefixes.extend(alkyl_prefixes)
 
@@ -1504,7 +1640,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
 
 def _generate_alkyl_prefixes_for_polyfunctional(
-    features: Any, skip_acyloxy: bool = False
+    features: Any, skip_acyloxy: bool = False,
+    exclude_branch_atoms: Optional[Set[int]] = None,
 ) -> List[str]:
     """
     Generate alkyl substituent prefixes for polyfunctional compounds.
@@ -1516,6 +1653,9 @@ def _generate_alkyl_prefixes_for_polyfunctional(
         features: MolecularFeatures object
         skip_acyloxy: If True, skip acyloxy detection (esters already handled
                       by ester demotion in name_polyfunctional)
+        exclude_branch_atoms: Atom indices whose containing substituent branch
+                      must be skipped (owned by a dedicated FG-prefix path, e.g.
+                      AM-4 chain-terminal amidine N atoms named amino/imino).
     """
     from collections import defaultdict
 
@@ -1550,11 +1690,15 @@ def _generate_alkyl_prefixes_for_polyfunctional(
     # in name_polyfunctional). Di-/polyamines fall back to the prior path.
     _exclude_principal_amine = len(_principal_amine_n) == 1
 
+    _excl_branch = exclude_branch_atoms or set()
     for position, sub_list in features.substituents.items():
         for sub_atoms in sub_list:
             # HYG-04 site#2: don't name the principal amine's own branch as a
             # substituent — its N-substituents are emitted as N,N- prefixes.
             if _exclude_principal_amine and (_principal_amine_n & set(sub_atoms)):
+                continue
+            # AM-4: skip branches owned by the amidine amino/imino FG-prefix path.
+            if _excl_branch & set(sub_atoms):
                 continue
             # Skip substituents whose ring atoms are handled by
             # _generate_ring_substituent_prefixes (ring + its own substituents).

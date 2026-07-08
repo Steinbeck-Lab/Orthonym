@@ -87,8 +87,10 @@ class TestProtectedNeighbors:
         # ureido: the SEPARATE carbamoylamino PIN (P-66.1.1.4.5.1)
         ("NC(=O)NCCC[C@H](N)C(=O)O",
          "(2S)-2-amino-5-(carbamoylamino)pentanoic acid"),
-        # amidine substituent -> carbamimidoyl (P-66.4.1.3.1), no phantom
-        ("N=C(N)CCCC(=O)O", "4-carbamimidoylbutanoic acid"),
+        # AM-4 (P-66.4.1.3.2, BB 34338): a chain-terminal amidine carbon stays
+        # IN the chain -> amino+imino (was '4-carbamimidoylbutanoic acid'; the
+        # new form is OPSIN-RT canonical-equal to the same SMILES).
+        ("N=C(N)CCCC(=O)O", "5-amino-5-iminopentanoic acid"),
         # hydroxylamine as PARENT (senior path untouched by the prefix row)
         ("CCNO", "N-ethylhydroxylamine"),
         # Wave2 T2a supersedes the original 'butyl isocyanate' control here:

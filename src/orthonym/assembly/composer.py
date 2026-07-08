@@ -994,7 +994,12 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             and features.principal_chain
             and not getattr(features, 'is_cyclic', False)):
         _pg_count = len(features.principal_group_atoms) if features.principal_group_atoms else 1
-        if _pg_count == 1:
+        # AM-5: also accept a conjoined diamidine (two matches sharing one N) —
+        # the shared-N amidine is named as an N-imidoyl substituent on the other.
+        if _pg_count == 1 or (
+            _pg_count == 2
+            and _amidines_share_one_n(features.mol, features.principal_group_atoms)
+        ):
             _amidine_name = _assemble_amidine_name(features, style)
             if _amidine_name:
                 pool = get_current_pool()
@@ -2124,6 +2129,64 @@ def _try_name_urea(features: Any) -> Optional[str]:
         tagged_subs.append(("N'", s))
 
     return _build_n_substituted_name(tagged_subs, "urea")
+
+
+def _try_name_cyanamide(features: Any) -> Optional[str]:
+    """AM-1 (P-66.1.6.2): name a cyanamide (H2N-C#N) and its N-substituted
+    derivatives with 'cyanamide' as the retained parent — no N-locants
+    ('(propan-2-yl)cyanamide', 'diethylcyanamide', BB 33531/33535/33537).
+
+    Modelled on _try_name_urea but single-nitrogen. Fail-closed: returns None
+    when any N-substituent branch is un-nameable, so a structure-dropping name
+    is never emitted (SELF-01 keeps it honest).
+    """
+    from collections import Counter
+    from .naming_utils import needs_brackets
+
+    mol = features.mol
+    matches = (getattr(features, 'functional_groups', {}) or {}).get(
+        'cyanamide', [])
+    if not matches:
+        return None
+    match = matches[0]
+    if len(match) < 3:
+        return None
+    # SMARTS [NX3;!R][CX2]#[NX1] -> (amine_N, C, terminal_N)
+    n_idx, c_idx, term_n_idx = match[0], match[1], match[2]
+    core = {n_idx, c_idx, term_n_idx}
+
+    def _wrap(nm):
+        # A compound substituent directly abutting 'cyanamide' takes enclosing
+        # marks (P-16.3.3): '(propan-2-yl)cyanamide'; simple 'methyl' stays bare.
+        return f"({nm})" if needs_brackets(nm) else nm
+
+    sub_names = []
+    for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+        nb = nbr.GetIdx()
+        if nb in core or nbr.GetAtomicNum() <= 1:
+            continue
+        nm = _name_r_group(mol, nb, exclude_atoms=core)
+        if not nm:
+            return None  # un-nameable branch -> fail closed
+        sub_names.append(nm)
+
+    if not sub_names:
+        return "cyanamide"
+    if len(sub_names) == 1:
+        return f"{_wrap(sub_names[0])}cyanamide"
+    _counts = Counter(sub_names)
+    if len(_counts) == 1:
+        nm = next(iter(_counts))
+        return f"{get_multiplier_prefix(len(sub_names), nm)}{_wrap(nm) if needs_brackets(nm) else nm}cyanamide"
+    # 2+ distinct substituents -> alphanumeric order, wrap compounds
+    _parts = []
+    for nm in sorted(_counts, key=alpha_sort_key):
+        _c = _counts[nm]
+        piece = _wrap(nm)
+        if _c > 1:
+            piece = f"{get_multiplier_prefix(_c, nm)}{piece}"
+        _parts.append(piece)
+    return f"{''.join(_parts)}cyanamide"
 
 
 def _try_name_guanidine(features: Any) -> Optional[str]:
@@ -3888,7 +3951,7 @@ def _amide_acyl_parent_locants(mol, amide_atoms) -> Optional[Dict[int, int]]:
     return dist
 
 
-def _find_amidine_carbon(mol, pg_atoms):
+def _find_amidine_carbon(mol, pg_atoms, chain=None):
     """D1: locate the amidine central carbon from the principal_group_atoms.
 
     The classifier may re-order the raw SMARTS match tuple, so identify the
@@ -3898,11 +3961,18 @@ def _find_amidine_carbon(mol, pg_atoms):
     guanidine C has two single-bonded N besides the =N, so it is still an
     amidine-shaped C, but guanidine never reaches this path because perception
     suppresses the amidine read on it).
+
+    AM-5: a conjoined diamidine (CC(=N)NC(C)=N) has TWO amidine carbons; ``chain``
+    (the principal chain) disambiguates the parent — a chain member is preferred,
+    ties broken by lowest atom index so selection is deterministic (a bare set
+    iteration order is not).
     """
     from rdkit import Chem
     candidate_atoms = set()
     for grp in pg_atoms:
         candidate_atoms.update(grp)
+    _chain_set = set(chain or [])
+    _candidates = []
     for idx in candidate_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() != 'C':
@@ -3918,8 +3988,25 @@ def _find_amidine_carbon(mol, pg_atoms):
             elif bond.GetBondType() == Chem.BondType.SINGLE:
                 single_n += 1
         if double_n == 1 and single_n >= 1:
-            return idx
-    return None
+            _candidates.append(idx)
+    if not _candidates:
+        return None
+    _candidates.sort(key=lambda i: (0 if i in _chain_set else 1, i))
+    return _candidates[0]
+
+
+def _amidines_share_one_n(mol, pg_atoms) -> bool:
+    """AM-5 (P-66.4.1.6): True for exactly two amidine matches that intersect on
+    a single shared N atom (a conjoined diamidine, R-C(=NH)-NH-C(=NH)-R'). Two
+    amidines at opposite chain ends (NC(=N)CCC(=N)N -> butanediimidamide) share
+    no atom and stay on the general path."""
+    if not pg_atoms or len(pg_atoms) != 2:
+        return False
+    _a, _b = set(pg_atoms[0]), set(pg_atoms[1])
+    _shared = _a & _b
+    if len(_shared) != 1:
+        return False
+    return mol.GetAtomWithIdx(next(iter(_shared))).GetSymbol() == 'N'
 
 
 def _hydrazide_n_sub_names(mol, n_atom_idx, exclude):
@@ -4317,7 +4404,7 @@ def _assemble_amidine_name(features: Any, style: str):
     if not pg_atoms:
         return None
 
-    c_idx = _find_amidine_carbon(mol, pg_atoms)
+    c_idx = _find_amidine_carbon(mol, pg_atoms, features.principal_chain)
     if c_idx is None:
         return None
 
@@ -4361,6 +4448,28 @@ def _assemble_amidine_name(features: Any, style: str):
                     if o_alkyl:
                         amidine_group_atoms.update(o_alkyl)
                 continue
+            # AM-5 (P-66.4.1.6): an imidoyl-carbon N-substituent R-C(=NH)- (named
+            # '{stem}animidoyl' by the detector) — its imino =N and alkyl carbons
+            # belong to the amidine group, not a dropped chain substituent.
+            if sub.GetSymbol() == 'C':
+                _sub_imino = [
+                    x for x in sub.GetNeighbors()
+                    if x.GetSymbol() == 'N'
+                    and mol.GetBondBetweenAtoms(
+                        sub.GetIdx(), x.GetIdx()).GetBondTypeAsDouble() == 2.0
+                ]
+                if (len(_sub_imino) == 1
+                        and not [y for y in _sub_imino[0].GetNeighbors()
+                                 if y.GetIdx() != sub.GetIdx()]):
+                    amidine_group_atoms.add(sub.GetIdx())
+                    amidine_group_atoms.add(_sub_imino[0].GetIdx())
+                    _im_alk, _ = _collect_pure_alkyl(
+                        mol, sub.GetIdx(),
+                        set(parent_atoms) | {c_idx, n_idx, _sub_imino[0].GetIdx()},
+                    )
+                    if _im_alk:
+                        amidine_group_atoms.update(_im_alk)
+                    continue
             alkyl_atoms, _ = _collect_pure_alkyl(
                 mol, sub.GetIdx(), set(parent_atoms) | {c_idx, n_idx}
             )
@@ -6832,6 +6941,79 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 break
 
         if carbonyl_c is None:
+            # AM-6 (P-66.1.1.4.3 method (1), BB 33019): an R-SO2-NH- branch on
+            # a chain is the '(...sulfonamido)' prefix (sulfonamide final 'e' ->
+            # 'o'), NOT an 'amino' split of the N. Only fires when the N attaches
+            # to the chain via a sulfonyl S (SX4, two =O) and carries no other
+            # heavy substituent (heavy degree 2: chain + S). N-alkyl sulfonamido
+            # (BB 33029 N-cyclopropyl) fails closed to None (unknown).
+            if atom.GetDegree() == 2:
+                _sulfonyl = None
+                for _sn in atom.GetNeighbors():
+                    if _sn.GetSymbol() != 'S' or _sn.GetIdx() not in sub_set:
+                        continue
+                    _dbl_o = [
+                        _o.GetIdx() for _o in _sn.GetNeighbors()
+                        if _o.GetSymbol() == 'O' and _o.GetIdx() in sub_set
+                        and mol.GetBondBetweenAtoms(
+                            _sn.GetIdx(), _o.GetIdx()
+                        ).GetBondTypeAsDouble() == 2.0
+                    ]
+                    _rest = [
+                        _x.GetIdx() for _x in _sn.GetNeighbors()
+                        if _x.GetIdx() != idx and _x.GetIdx() not in _dbl_o
+                    ]
+                    if len(_dbl_o) == 2 and len(_rest) == 1:
+                        _sulfonyl = (_sn.GetIdx(), _rest[0])
+                        break
+                if _sulfonyl is not None:
+                    _s_idx, _acyl = _sulfonyl
+                    _n = _pure_linear_alkyl_len(mol, _acyl, {_s_idx})
+                    if _n is not None and _n >= 1:
+                        return f"({get_chain_prefix(_n)}anesulfonamido)"
+                    # isolated benzene wholly in sub -> (benzenesulfonamido)
+                    _ra = mol.GetAtomWithIdx(_acyl)
+                    if _ra.GetIsAromatic() and _ra.GetSymbol() == 'C':
+                        _ri_s = mol.GetRingInfo()
+                        for _ring in _ri_s.AtomRings():
+                            if (_acyl in _ring and len(_ring) == 6
+                                    and all(r in sub_set for r in _ring)
+                                    and all(
+                                        mol.GetAtomWithIdx(r).GetIsAromatic()
+                                        and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                                        for r in _ring)):
+                                _rset = set(_ring)
+                                if not any(set(o) != _rset and set(o) & _rset
+                                           for o in _ri_s.AtomRings()):
+                                    return "(benzenesulfonamido)"
+                    # sulfonyl-N present but the acyl is un-nameable -> fail closed
+                    return None
+            # PF-2 (P-66.4.2.3.5, BB 34537): an -N(H)-C(=N-NH2)-R amidrazone
+            # branch is the '(...hydrazonamido)' prefix (analogous to acetamido
+            # but with =N-NH2 in place of =O). Detect an in-branch hydrazono C
+            # neighbour of the N and delegate to the shared builder BEFORE the
+            # alkylamino fallback (which would drop the =N-NH2 as '(ethylamino)').
+            for _cn in atom.GetNeighbors():
+                if _cn.GetSymbol() != 'C' or _cn.GetIdx() not in sub_set:
+                    continue
+                _is_hydrazono = any(
+                    _x.GetSymbol() == 'N'
+                    and mol.GetBondBetweenAtoms(
+                        _cn.GetIdx(), _x.GetIdx()).GetBondTypeAsDouble() == 2.0
+                    and any(_y.GetSymbol() == 'N' and _y.GetDegree() == 1
+                            for _y in _x.GetNeighbors()
+                            if _y.GetIdx() != _cn.GetIdx())
+                    for _x in _cn.GetNeighbors()
+                )
+                if _is_hydrazono:
+                    from .substituent_naming import (
+                        hydrazonoyl_amido_prefix_from_branch,
+                    )
+                    _hp = hydrazonoyl_amido_prefix_from_branch(
+                        mol, idx, _cn.GetIdx(), sub_atoms
+                    )
+                    if _hp:
+                        return f"({_hp})"
             # No carbonyl - could be a simple alkylamino
             # Check for ring in substituent first
             ring_info = mol.GetRingInfo()
@@ -7809,6 +7991,51 @@ def _count_carbon_chain(mol, start_idx: int, exclude: set) -> int:
                     queue.append(nbr_idx)
 
     return count
+
+
+def _pure_linear_alkyl_len(mol, start_idx: int, exclude: set) -> Optional[int]:
+    """Length of a pure, unbranched, acyclic, saturated all-carbon chain.
+
+    Returns the carbon count only when EVERY atom reachable from ``start_idx``
+    (via single C-C bonds, ignoring ``exclude``) is a non-ring carbon whose
+    only heavy neighbours are other chain carbons or an atom in ``exclude``
+    (the attachment point), and the chain is unbranched (no carbon has >2
+    in-fragment carbon neighbours). Returns ``None`` for branched, cyclic,
+    unsaturated, or hetero-decorated fragments so callers fail closed. Used by
+    the AM-6 (P-66.1.1.4.3) sulfonamido recognizer.
+    """
+    from collections import deque
+
+    ri = mol.GetRingInfo()
+    frag = set()
+    queue = deque([start_idx])
+    while queue:
+        a = queue.popleft()
+        if a in frag or a in exclude:
+            continue
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C' or ri.NumAtomRings(a) > 0:
+            return None
+        frag.add(a)
+        for nb in at.GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in exclude:
+                continue
+            bond = mol.GetBondBetweenAtoms(a, ni)
+            if nb.GetSymbol() == 'C':
+                if bond.GetBondTypeAsDouble() != 1.0:
+                    return None  # unsaturated -> different stem
+                queue.append(ni)
+            else:
+                return None  # hetero decoration -> impure
+    if not frag:
+        return None
+    for a in frag:
+        deg = sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                  if nb.GetIdx() in frag)
+        if deg > 2:
+            return None  # branched
+    return len(frag)
 
 
 def _convert_yl_to_ylidene(name: str) -> str:

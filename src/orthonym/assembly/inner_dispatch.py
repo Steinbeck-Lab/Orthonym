@@ -582,6 +582,21 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- AM-1: cyanamide (P-66.1.6.2; retained parent with N-substitution).
+#     Priority 950 sits between guanidine (900) and boronic_acid (1000);
+#     predicate is mutex on principal_group is None (same as urea/guanidine).
+from .handlers.cyanamide import _is_cyanamide, name_cyanamide  # noqa: E402
+
+_register_inner(
+    handler_id="cyanamide",
+    priority=950,
+    predicate=_is_cyanamide,
+    handler=name_cyanamide,
+    iupac_section="P-66.1.6.2",
+    description="Cyanamide retained name with N-substitution",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-10: boronic_acid (Tier-1 LIFT; audit § 1 row + § 2.23).
 #     Note: source inline branch is at composer.py:1205-1214 (far below the
 #     other Tier-1 leaves). Cross-predicate mutex via principal_group string

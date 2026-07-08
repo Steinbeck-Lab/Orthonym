@@ -122,6 +122,7 @@ HANDLER_PRIORITY: Dict[str, int] = {
     'carbamate': 5,
     'urea': 5,
     'guanidine': 5,
+    'cyanamide': 5,
     'sulfoxide': 5,
     'sulfone': 5,
     'thioether': 5,

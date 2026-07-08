@@ -3149,6 +3149,39 @@ def _detect_amidine_n_substituents(mol, c_idx: int, parent_atoms: Set[int]):
                 # A non-carbon substituent on the amidine N (e.g. N-N) is not
                 # a plain N-alkyl/aryl amidine -> fail closed.
                 return None
+            # AM-5 (P-66.4.1.6, BB 30468): an N-substituent that is itself an
+            # imidoyl carbon R-C(=NH)- is the '{stem}animidoyl' prefix
+            # ('ethanimidoyl' for CH3-C(=NH)-, 'methanimidoyl' for HC(=NH)-).
+            # Detect: sub C with exactly one DOUBLE bond to a terminal, neutral,
+            # unsubstituted =NH (degree 1) whose remaining heavy neighbours form
+            # a pure alkyl. A substituted imino N fails closed (return None).
+            _imino_ns = [
+                x for x in sub.GetNeighbors()
+                if x.GetSymbol() == 'N'
+                and mol.GetBondBetweenAtoms(
+                    sub_idx, x.GetIdx()).GetBondTypeAsDouble() == 2.0
+            ]
+            if _imino_ns:
+                if len(_imino_ns) != 1:
+                    return None
+                _imN = _imino_ns[0]
+                _imN_heavy = [
+                    y for y in _imN.GetNeighbors() if y.GetIdx() != sub_idx
+                ]
+                if (_imN.GetFormalCharge() != 0 or _imN_heavy
+                        or mol.GetRingInfo().NumAtomRings(sub_idx) > 0):
+                    return None
+                _im_alkyl, _im_cc = _collect_pure_alkyl(
+                    mol, sub_idx,
+                    set(parent_atoms) | {c_idx, n_idx, _imN.GetIdx()},
+                )
+                if _im_alkyl is None or _im_cc < 1:
+                    return None
+                from ..data.chain_names import get_chain_prefix
+                entries.append(
+                    (nlocant, f"{get_chain_prefix(_im_cc)}animidoyl")
+                )
+                continue
             alkyl_atoms, carbon_count = _collect_pure_alkyl(
                 mol, sub_idx, set(parent_atoms) | {c_idx, n_idx}
             )
