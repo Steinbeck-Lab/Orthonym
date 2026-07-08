@@ -265,6 +265,9 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     "cyanate",       # P-65.5
     "thiocyanate",   # P-65.5
     "diazo",         # P-61.5
+    "isocyanide",    # P-61.9 (Wave-2 C2): PIN is the substitutive 'isocyano' prefix;
+                     # no suffix form — pg='isocyanide' made the general handler
+                     # misread N#C as an amine ('(methylamino)methane', suppressed)
     "disulfide",     # P-63.6.2
     "peroxide",      # DD2 Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
     "hydrazine_fg",  # P-62.4
@@ -328,7 +331,11 @@ _CLASS_CHARACTERISTIC_Z: Dict[str, int] = {"alcohol": 8, "amine": 7}
 # as a 'methylamino' prefix); that needs the amine-assembler N-substituent path,
 # a documented follow-on. Same-subtype amine diamines (NCC(N)C -> propane-1,2-
 # diamine) already work via the single-subtype count and are unaffected.
-_RC4_UNION_CLASSES = frozenset({"alcohol"})
+# Wave-2 completion C2 (P-62.2.4.1.2): amine joins the RC-4 class union so a
+# mixed primary+secondary diamine (CNCCCN) collects ALL amine matches and the
+# polyamine assembler emits N-methylpropane-1,3-diamine instead of the
+# double-counted '3-amino-3-(methylamino)propan-1-amine' (SELF-01-suppressed).
+_RC4_UNION_CLASSES = frozenset({"alcohol", "amine"})
 
 
 def _normalize_pcg_match(mol, match, het_z: Optional[int]) -> tuple:
@@ -348,11 +355,20 @@ def _normalize_pcg_match(mol, match, het_z: Optional[int]) -> tuple:
     )
     if het is None:
         return tuple(match)
-    carbon = next(
-        (nb.GetIdx() for nb in mol.GetAtomWithIdx(het).GetNeighbors()
-         if nb.GetAtomicNum() == 6 and nb.GetIdx() in match_set),
-        None,
-    )
+    # Wave-2 completion C2: among in-match carbon neighbours prefer the one
+    # with the most heavy neighbours (the CHAIN carbon), tie-broken by index.
+    # 'next(first-in-match)' picked an arbitrary carbon — for a secondary
+    # amine in a diamine union (CNCCCN) it chose the METHYL, so the suffix
+    # anchored off-chain and the branch was double-expressed downstream.
+    _cands = [nb.GetIdx() for nb in mol.GetAtomWithIdx(het).GetNeighbors()
+              if nb.GetAtomicNum() == 6 and nb.GetIdx() in match_set]
+    carbon = None
+    if _cands:
+        carbon = min(
+            _cands,
+            key=lambda ci: (-sum(1 for nb in mol.GetAtomWithIdx(ci).GetNeighbors()
+                                 if nb.GetAtomicNum() > 1), ci),
+        )
     return (het, carbon) if carbon is not None else (het,)
 
 # Suffix forms for principal groups

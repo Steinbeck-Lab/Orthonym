@@ -101,6 +101,10 @@ _INORGANIC_ACID_DERIVATIVES = {
     "O=S(=O)(F)F": build_acyl_halide_name("sulfuryl", "fluoride", 2),           # SO2F2
     "NP(N)(N)=O": "phosphoric triamide",   # P-67.1.2.6.1 PIN ('phosphoramide' = non-PIN alt)
     "NS(N)(=O)=O": "sulfuric diamide",     # P-67.1.2.6.1 PIN ('sulfamide' = general name)
+    # Wave-2 completion C2 (carbonic-family composite-N parents; exact keys):
+    "N=C(N)SSC(=N)N": "carbamimidic dithioperoxyanhydride",  # P-66.4.1.5 (formamidine disulfide; anhydride is the senior class per P-41)
+    "NN=C(N)N": "carbonohydrazonic diamide",                 # P-66.4.2.2 (aminoguanidine, BB verbatim)
+    "NN=C(NN)NN": "hydrazinecarbohydrazonohydrazide",        # P-66.4.3.3 (BB verbatim)
     "NS(=O)(=O)O": "sulfamic acid",        # P-67.1.2.4.1.1 H2N-SO2-OH (contraction of sulfuramidic)
 }
 

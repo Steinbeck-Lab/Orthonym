@@ -912,6 +912,24 @@ def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[
     return f"{alkyl_prefix} carbamate"
 
 
+_POSITION_INVARIANT_PARENTS = frozenset({
+    # every substitutable position equivalent — an unlocanted prefix join is
+    # unambiguous (Wave-2 C2; the methoxybenzene RET-01 policy gold lives here)
+    'benzene', 'methane', 'ethane',
+})
+
+
+def _parent_is_position_invariant(parent_name: str) -> bool:
+    """True when *parent_name* is a bare parent whose substitutable positions
+    are all equivalent (P-14.3.2: no locant needed). Unsubstituted
+    monocycloalkanes qualify; anything carrying locants, substituents or a
+    positional suffix (benzonitrile, phenol, naphthalene) does not."""
+    import re as _re
+    if parent_name in _POSITION_INVARIANT_PARENTS:
+        return True
+    return bool(_re.fullmatch(r'cyclo[a-z]+ane', parent_name))
+
+
 def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]:
     """Assemble ether name as 'alkoxy + parent' (IUPAC P-63.2.3).
 
@@ -935,6 +953,15 @@ def _assemble_ether(fragment_names: Dict[str, str], style: str) -> Optional[str]
 
     alkoxy = _alcohol_to_alkoxy(alkyl_name)
     if not alkoxy:
+        return None
+
+    # Wave-2 C2 (P-14.3.2): this join carries NO attachment locant, so it is
+    # only correct when every position of the parent is equivalent. Joining
+    # onto a positional parent silently mis-placed the ether
+    # ('phenoxybenzonitrile' for the 2-isomer; meta/para SELF-01-suppressed).
+    # Decline otherwise — the cascade falls to the benzene handler, which
+    # emits the locanted form.
+    if not _parent_is_position_invariant(parent_name):
         return None
 
     return _join_components(alkoxy, parent_name)
@@ -963,6 +990,10 @@ def _assemble_thioether(fragment_names: Dict[str, str], style: str) -> Optional[
 
     alkylthio = _alcohol_to_alkylthio(alkyl_name)
     if not alkylthio:
+        return None
+
+    # Wave-2 C2: same locant-blind join as _assemble_ether — see there.
+    if not _parent_is_position_invariant(parent_name):
         return None
 
     return _join_components(alkylthio, parent_name)

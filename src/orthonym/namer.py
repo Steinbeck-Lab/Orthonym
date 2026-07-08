@@ -2324,7 +2324,33 @@ class Orthonym:
                                 best_ring = ring
                         features.principal_ring = best_ring
                     else:
-                        features.principal_ring = atom_rings[0]
+                        # Wave-2 C2 (P-45.2.1): when the PG sits on TWO OR
+                        # MORE benzene rings (the dicyano-diaryl-ether BB
+                        # example), atom_rings[0] is SMILES-order-dependent
+                        # — the parent flipped with the spelling (a genuine
+                        # NEW-NONDET gate catch). Break the tie with the
+                        # deterministic substituent-count + canonical-rank
+                        # selector; everything else keeps atom_rings[0].
+                        _pg_ring_count = 0
+                        if features.principal_group_atoms:
+                            for rs in features.ring_systems:
+                                if is_principal_group_on_ring(
+                                        features.mol, set(rs),
+                                        features.principal_group_atoms,
+                                        features.principal_group):
+                                    _pg_ring_count += 1
+                        _det_ring = None
+                        if _pg_ring_count >= 2:
+                            from .rules.benzene import (
+                                _select_benzene_parent_ring as _sbpr,
+                                is_benzene_ring as _ibr,
+                            )
+                            if all(_ibr(features.mol, r) for r in atom_rings):
+                                _det_ring = _sbpr(features.mol)
+                        features.principal_ring = (
+                            _det_ring if _det_ring is not None
+                            else atom_rings[0]
+                        )
                 else:
                     features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)

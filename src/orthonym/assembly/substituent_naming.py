@@ -2499,6 +2499,35 @@ def name_substituent_fragment(
 
     parent_set = set(parent_chain) if parent_chain else set()
 
+    # Step 0 (Wave-2 C2, P-63.2.2): an O-ATTACHED fragment is an R-oxy prefix.
+    # The generic Steps 3-5 mis-anchored it ('1-hydroxy-1-methoxymethyl' for
+    # -O-CH2-O-CH3, constitution-wrong and SELF-01-suppressed) — recurse on
+    # the carbon portion and convert yl -> oxy; fail closed on anything the
+    # recursion cannot express (never garbage).
+    if len(sub_atoms) >= 2:
+        _a = mol.GetAtomWithIdx(attach_idx)
+        if (_a.GetSymbol() == 'O' and _a.GetFormalCharge() == 0
+                and _a.GetTotalNumHs() == 0 and not _a.IsInRing()):
+            _inner_nbrs = [n.GetIdx() for n in _a.GetNeighbors()
+                           if n.GetIdx() in set(sub_atoms)]
+            if len(_inner_nbrs) == 1 and mol.GetAtomWithIdx(
+                    _inner_nbrs[0]).GetSymbol() == 'C':
+                _rest = [i for i in sub_atoms if i != attach_idx]
+                _inner = name_substituent_fragment(
+                    mol, _rest, _inner_nbrs[0], parent_chain + [attach_idx])
+                # Fail closed on generic-path mis-expressions: 'hydroxy'/
+                # 'oxo' garbage for embedded ethers the C-attach recursion
+                # cannot yet express (depth >=2 nesting stays closed).
+                if (not _inner or _inner == 'substituent'
+                        or 'hydroxy' in _inner or 'oxo' in _inner
+                        or _inner.endswith('ylyl')):
+                    return None
+                if _inner.endswith('yl'):
+                    _stem = _inner[:-2] + 'oxy'
+                else:
+                    _stem = f'({_inner})oxy'
+                return _stem
+
     # Step 1: Check retained PREFERRED substituent names FIRST (phenyl, benzyl,
     # retained cycloalkyls, tert-butyl). F-T9/DD6 RET-02: isopropyl/sec-butyl/
     # isobutyl/neopentyl are NOT returned (their located PINs come from Step 2d).

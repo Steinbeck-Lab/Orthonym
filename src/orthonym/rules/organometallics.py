@@ -478,10 +478,54 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             else:
                 organic_ligs.append(lg)
 
-        # Identify organic ligand names from atom indices
+        # Identify organic ligand names from atom indices. Wave-2 C2
+        # extensions (hydride-parent Group-14 scope only, fail-closed):
+        # (a) an O-attached ligand (R-O-[Si], NOT bare -OH — the G2 COV-02
+        #     silanol suffix diversion above keeps priority) names as R-oxy
+        #     via the substituent chokepoint ('methoxy', 'oxiranylmethoxy');
+        # (b) an all-C ligand the simple table rejects (tert-butyl) falls
+        #     back to the same chokepoint. Anything unresolvable stays None.
+        def _extended_ligand_name(lg):
+            simple = _ligand_name_from_atoms(mol, lg.ligand_atom_indices)
+            if simple is not None:
+                return simple
+            if not is_group14 or naming_system != 'hydride_parent':
+                return None
+            atoms = list(lg.ligand_atom_indices)
+            attach = mol.GetAtomWithIdx(atoms[0]) if atoms else None
+            # find the metal-bonded ligand atom
+            metal_z = {14, 32, 50, 82}
+            attach_idx = None
+            for a in atoms:
+                if any(nb.GetAtomicNum() in metal_z
+                       for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
+                    attach_idx = a
+                    break
+            if attach_idx is None:
+                return None
+            from ..assembly.substituent_enumerator import name_substituent
+            a0 = mol.GetAtomWithIdx(attach_idx)
+            if (a0.GetSymbol() == 'O' and a0.GetFormalCharge() == 0
+                    and a0.GetTotalNumHs() == 0):
+                inner = [i for i in atoms if i != attach_idx]
+                c_start = [n.GetIdx() for n in a0.GetNeighbors()
+                           if n.GetIdx() in inner]
+                if len(c_start) != 1 or mol.GetAtomWithIdx(
+                        c_start[0]).GetSymbol() != 'C':
+                    return None
+                nm = name_substituent(mol, set(inner), c_start[0])
+                if not nm or nm == 'substituent' or not nm.endswith('yl'):
+                    return None
+                return nm[:-2] + 'oxy'
+            if all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in atoms):
+                nm = name_substituent(mol, set(atoms), attach_idx)
+                if not nm or nm == 'substituent':
+                    return None
+                return nm
+            return None
+
         organic_names: List[Optional[str]] = [
-            _ligand_name_from_atoms(mol, lg.ligand_atom_indices)
-            for lg in organic_ligs
+            _extended_ligand_name(lg) for lg in organic_ligs
         ]
         if any(n is None for n in organic_names):
             return None  # cascade to SALT@100
@@ -497,8 +541,25 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # Group identical ligands
             grouped = _group_ligand_counts(organic_names)
             sorted_groups = _alphabetize_simple_ligands(grouped)
+            # Wave-2 C2 (P-16.3.3): a COMPOUND ligand name (compound R-oxy,
+            # tert-, or ring-yl forms) takes enclosing marks at the join so
+            # the boundary is unambiguous ('tert-butyl(dimethyl)[(oxiran-2-
+            # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
+            # unless multiplied next to a compound neighbour.
+            def _ligand_token(count, name):
+                mult = _multiplicative_prefix(count)
+                complex_name = ('-' in name or '(' in name
+                                or name.endswith('oxy'))
+                if complex_name:
+                    inner = f'({name})' if '(' not in name else f'[{name}]'
+                    return f'{mult}{inner}' if not mult else f'{mult}{inner}'
+                if mult and any('-' in n or '(' in n or n.endswith('oxy')
+                                for _c, n in sorted_groups):
+                    return f'{mult}({name})'
+                return f'{mult}{name}'
+
             ligand_prefix = ''.join(
-                _multiplicative_prefix(count) + name
+                _ligand_token(count, name)
                 for count, name in sorted_groups
             )
             ligand_tree_nodes = [
@@ -781,7 +842,13 @@ def _alphabetize_simple_ligands(
     Multiplicative prefixes (di-, tri-, tetra-) are IGNORED — alphabetize
     by the ligand name itself (the input here is already stripped).
     """
-    return sorted(grouped, key=lambda entry: entry[1])
+    # Wave-2 C2: alphabetize on the real first letter — the italic 'tert-'
+    # multiplying-style prefix is ignored (P-14.5.2: tert-butyl sorts at 'b').
+    def _alpha_key(entry):
+        name = entry[1]
+        return name[5:] if name.startswith('tert-') else name
+
+    return sorted(grouped, key=_alpha_key)
 
 
 __all__ = [

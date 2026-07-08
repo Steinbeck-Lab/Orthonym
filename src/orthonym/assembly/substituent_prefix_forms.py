@@ -1197,6 +1197,16 @@ def _check_substituent_prefix_form(
                     and attach_idx is not None
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue
+            # Wave-2 completion C2 (P-15.2.1.1, same bug shape as the ether
+            # guard above): the isocyanate/isothiocyanate SMARTS includes the
+            # linker carbon at match[0]; a benzyl fragment {CH2,N,C,S} passed
+            # the strict-scope test and returned bare 'isothiocyanato',
+            # DROPPING the CH2. The prefix is valid only when the fragment
+            # attaches through the FG nitrogen (match[1]).
+            if (fg_name in ("isocyanate", "isothiocyanate")
+                    and attach_idx is not None
+                    and len(match) >= 2 and attach_idx != match[1]):
+                continue
             prefix = get_substituent_prefix_form(
                 fg_name, mol, tuple(match), principal_chain=None
             )

@@ -1120,7 +1120,12 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
     # ASML-10 complete: Amine handler uses _assemble_amine_name() which adds
     # N-alkyl prefixes and generates chain/ring substituent prefixes.
     # Stereo: handled by _assemble_amine_name() (calls _generate_stereodescriptors)
-    if features.principal_group in ('secondary_amine', 'tertiary_amine'):
+    # Wave-2 completion C2: 'primary_amine' joins the gate — the RC-4 amine
+    # union can leave a mixed diamine classified primary; _assemble_amine_name
+    # is a verified no-op (None -> general fallback) for amines without
+    # N-substituents, so pure-primary molecules are untouched.
+    if features.principal_group in ('primary_amine', 'secondary_amine',
+                                    'tertiary_amine'):
         amine_name = _assemble_amine_name(features, style)
         if amine_name:
             if logger.isEnabledFor(logging.DEBUG):
@@ -1630,6 +1635,24 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     carbon_count = len(carbon_atoms)
 
     if carbon_count == 0:
+        # Wave-2 completion C2 (P-61.5.2): a carbon-free -N=O branch on a
+        # functional-parent N is the 'nitroso' prefix (N-methyl-N-nitrosourea
+        # BB verbatim). Returning None here made _try_name_urea silently DROP
+        # the branch (structure loss the RT gate then suppressed).
+        _heavy_frag = [i for i in frag_atoms
+                       if mol.GetAtomWithIdx(i).GetAtomicNum() > 1]
+        if len(_heavy_frag) == 2:
+            _n = mol.GetAtomWithIdx(start_idx)
+            _other = mol.GetAtomWithIdx(
+                next(i for i in _heavy_frag if i != start_idx))
+            _bond = mol.GetBondBetweenAtoms(start_idx, _other.GetIdx())
+            if (_n.GetSymbol() == 'N' and _n.GetFormalCharge() == 0
+                    and _other.GetSymbol() == 'O'
+                    and _other.GetDegree() == 1
+                    and _other.GetFormalCharge() == 0
+                    and _bond is not None
+                    and _bond.GetBondType() == Chem.BondType.DOUBLE):
+                return "nitroso"
         return None
 
     # RETAINED PREFERRED branched alkyl: only tert-butyl (P-29.6.1) is emitted
@@ -5138,8 +5161,27 @@ def _assemble_polyamine_name(
 
     # C-substituent prefixes (halogens, hydroxy, chain-alkyls, ...) as their own
     # entries, mirroring the single-N path; alphabetized WITH the N-prefixes.
+    # Wave-2 completion C2: perceived chain-substituent branches that CONTAIN a
+    # principal amine N (the '(methylamino)' record for a suffix N's branch)
+    # are already fully expressed by the -diamine suffix + the N-prefixes above
+    # — filter them out or the branch is double-counted (the SELF-01-suppressed
+    # 'N-methyl-3-(methylamino)propane-1,3-diamine' defect).
+    _subs_backup = features.substituents
+    if _subs_backup:
+        _filtered = {}
+        for _loc, _branches in _subs_backup.items():
+            _kept = [b for b in _branches
+                     if not (set(b) & principal_n_set)]
+            if _kept:
+                _filtered[_loc] = _kept
+        features.substituents = _filtered
+    try:
+        _gen_prefixes = _generate_prefixes(features)
+    finally:
+        features.substituents = _subs_backup
+
     c_prefix_entries = []  # (alpha_key, rendered)
-    for p in _generate_prefixes(features):
+    for p in _gen_prefixes:
         if p.locants and not str(p.text)[:1].isdigit():
             _loc = ",".join(str(_l) for _l in p.locants)
             rendered = f"{_loc}-{p.text}"

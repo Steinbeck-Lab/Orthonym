@@ -21,7 +21,8 @@ def _name(smiles):
     ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),               # P-15.2.1.1
     ("O=Ic1ccccc1", "iodosylbenzene"),                     # P-61.3.2.3
     ("O=I(=O)c1ccccc1", "iodylbenzene"),
-    ("O=Pc1ccccc1", "oxophosphanylbenzene"),               # P-61.6
+    # Wave-2 C: BB P-64.1.2.2 PIN via the heterone namer (was the prefix form)
+    ("O=Pc1ccccc1", "phenylphosphanone"),
     ("[C-]#[N+]c1ccccc1", "isocyanobenzene"),              # P-15.2.1.1
     ("[N-]=[N+]=Nc1ccc(F)cc1", "1-azido-4-fluorobenzene"),
     ("[N-]=[N+]=Nc1ccc(Cl)cc1Cl", "1-azido-2,4-dichlorobenzene"),

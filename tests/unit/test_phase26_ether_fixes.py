@@ -120,10 +120,13 @@ class TestBGroupRegression:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected_name,test_id", [
-        # B1: Biphenyl ether -> phenoxy
+        # B1: Biphenyl ether -> DECORATED aryloxy (Wave-2 C2: the old bare
+        # 'phenoxy' pin DROPPED the second ring's 2 OH + methyl — a
+        # structure-losing name; the decorated recognizer now emits the
+        # complete OPSIN-RT-verified form).
         (
             "COc1cc(O)cc(C)c1Oc1cc(C)cc(O)c1O",
-            "3-methoxy-5-methyl-4-phenoxyphenol",  # ASML-13: phenol suffix routing
+            "4-(2,3-dihydroxy-5-methylphenoxy)-3-methoxy-5-methylphenol",
             "B1-phenoxy",
         ),
         # B2: Glycoside -> (oxan-2-yl)oxy

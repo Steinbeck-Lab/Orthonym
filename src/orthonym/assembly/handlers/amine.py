@@ -35,7 +35,12 @@ from ..name_tree import NameTreeNode, NamingResult
 
 logger = logging.getLogger(__name__)
 
-_AMINE_PRINCIPAL_GROUPS = ('secondary_amine', 'tertiary_amine')
+# Wave-2 completion C2: 'primary_amine' included — the RC-4 amine union can
+# leave a mixed primary+secondary diamine classified primary; the body
+# (_assemble_amine_name) is a no-op (None) for amines without N-substituents,
+# so pure-primary molecules fall through unchanged.
+_AMINE_PRINCIPAL_GROUPS = ('primary_amine', 'secondary_amine',
+                           'tertiary_amine')
 
 
 def _is_amine(features: Any) -> bool:

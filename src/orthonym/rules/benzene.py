@@ -1473,6 +1473,25 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             for r in ring
                         )
                         if all_arom_c:
+                            # Wave-2 C2 (P-45.2.1): a SUBSTITUTED aryloxy ring
+                            # (O + C6H5 = 7 atoms; more means decoration) must
+                            # carry its substituents — bare 'phenoxy' silently
+                            # DROPPED them (2-phenoxy... for the dicyano BB
+                            # example, SELF-01-suppressed). Fail closed when
+                            # the decorated name cannot be built.
+                            if len(sub_atoms) > 7:
+                                from .ring_substituents import (
+                                    decorated_ring_substituent_name,
+                                )
+                                dec = decorated_ring_substituent_name(
+                                    mol, ring, c_atom.GetIdx(),
+                                    expected_atoms=set(sub_atoms) - {o_idx},
+                                )
+                                if dec is None or not dec.endswith('phenyl'):
+                                    return None
+                                return {'name': dec[:-6] + 'phenoxy',
+                                        'atoms': sub_atoms,
+                                        'is_complex': True}
                             return {'name': 'phenoxy', 'atoms': sub_atoms}
 
             # Case 2: O -> C(=O)R -> acyloxy group (ester linkage on benzene)
@@ -3631,9 +3650,23 @@ def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
                     return True
         return False
 
+    def _substituent_count(ring: Tuple[int, ...]) -> int:
+        ring_set = set(ring)
+        return sum(
+            1 for a in ring
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors()
+            if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1
+        )
+
     def _key(ring: Tuple[int, ...]):
-        # carbon-linked first (0 < 1), then lowest canonical-rank tuple.
+        # carbon-linked first (0 < 1); then P-45.2.1 (Wave-2 C2): the ring
+        # with the GREATER number of substituent attachments is the parent
+        # (the BB dicyano-phenoxy example — this tier also killed a genuine
+        # spelling-dependence: the old rank-only tie-break flipped parent
+        # rings with the input SMILES order); then lowest canonical-rank
+        # tuple (a structure-derived, spelling-independent total order).
         return (0 if _carbon_linked(ring) else 1,
+                -_substituent_count(ring),
                 tuple(sorted(ranks[a] for a in ring)))
 
     return min(benzene_rings, key=_key)

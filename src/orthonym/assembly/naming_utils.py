@@ -114,6 +114,8 @@ _COMPOUND_S_SUFFIXES_COMPLEX = (
 _COMPOUND_FG_PREFIXES = (
     'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
     'nitro', 'mercapto', 'sulfanyl', 'phospho',
+    # Wave-2 C2 (P-16.3.3): '(isothiocyanatomethyl)benzene' BB verbatim
+    'isothiocyanato', 'isocyanato',
     'fluoro', 'chloro', 'bromo', 'iodo',
     'difluoro', 'trifluoro', 'dichloro', 'trichloro',
     'dibromo', 'tribromo',
