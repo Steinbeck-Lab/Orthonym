@@ -1462,6 +1462,48 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.update({_dbl, _nh2, _sgl})
                     continue
 
+        # P-66.4.2.3.1 (BB 34490, plan P1AM Task 6/7): the imidohydrazide
+        # tautomer -C(=NH)-NH-NH2 that TERMINATES a chain parent is the same
+        # chain-end split as the amidine hydrazinyl case: =NH -> 'imino' and
+        # -NH-NH2 -> 'hydrazinyl' ('3-hydrazinyl-3-iminopropanoic acid' for
+        # N=C(NN)CC(=O)O). Perception (Task 7) reclassified this molecule from
+        # amidine+hydrazine_fg to imidohydrazide, so the amidine block above no
+        # longer catches it — handle the same shape here. SMARTS
+        # [CX3](=[NX2;D1])[NX3][NX3H2]: match[0]=C, [1]==NH, [2]=NH, [3]=NH2.
+        # Fires only when every C is a chain member and the -NH-NH2 arm is a
+        # terminal NH2; else falls through (fail closed).
+        if fg_name == 'imidohydrazide' and chain_set:
+            _ih_ok = True
+            _ih_units = {}
+            for _m in matches:
+                if len(_m) < 4:
+                    _ih_ok = False
+                    break
+                _ihc, _ih_dbl, _ih_sgl, _ih_nh2 = _m[0], _m[1], _m[2], _m[3]
+                if _ihc not in chain_set:
+                    _ih_ok = False
+                    break
+                # -NH-NH2 arm must terminate in a degree-1 NH2
+                if mol.GetAtomWithIdx(_ih_nh2).GetDegree() != 1:
+                    _ih_ok = False
+                    break
+                _ih_units[_ihc] = (_ih_dbl, _ih_sgl, _ih_nh2)
+            if _ih_ok and _ih_units:
+                _ih_prefixes = []
+                for _ihc, (_ih_dbl, _ih_sgl, _ih_nh2) in _ih_units.items():
+                    _loc = atom_to_locant.get(_ihc)
+                    _imino = _name_amidine_chain_side(mol, _ih_dbl, _ihc, 'imino')
+                    if _loc is None or _imino is None:
+                        _ih_ok = False
+                        break
+                    _ih_prefixes.append(format_fg_prefix('hydrazinyl', [_loc], 1))
+                    _ih_prefixes.append(format_fg_prefix(_imino, [_loc], 1))
+                if _ih_ok:
+                    all_prefixes.extend(_ih_prefixes)
+                    for _ihc, (_ih_dbl, _ih_sgl, _ih_nh2) in _ih_units.items():
+                        _amidine_excluded_n.update({_ih_dbl, _ih_sgl, _ih_nh2})
+                    continue
+
         # PF-2 (P-66.4.2.3.5): an amidrazone attached to the chain via its AMINO
         # nitrogen (chain-N(H)-C(=N-NH2)-R) is expressed by _check_for_acylamino
         # as the '(...hydrazonamido)' prefix, NOT the C-attached
