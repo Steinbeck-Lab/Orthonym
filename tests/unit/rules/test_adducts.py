@@ -225,3 +225,54 @@ class TestAdductDispatch:
         # was a structure-dropping hazard: the legacy handler skipped
         # unnameable fragments and joined the rest
         assert self._nc("O.NCC(=O)Nc1ccc(OCC)cc1") == "unknown organic compound"
+
+
+class TestHydrateWordForms:
+    """P-14.8.1 -e / P-14.8.2 -c: general-nomenclature hydrate word forms.
+    OPSIN parses every emitted form (plan Oracle table)."""
+
+    @staticmethod
+    def _nc(smi, style="general"):
+        from orthonym.namer import name_compound
+        return name_compound(smi, style=style)
+
+    def test_monohydrate(self):
+        assert self._nc("O.OC(=O)C(=O)O") == "oxalic acid monohydrate"
+
+    def test_dihydrate(self):
+        assert self._nc("O.O.OC(=O)C(=O)O") == "oxalic acid dihydrate"
+
+    def test_trihydrate(self):
+        assert self._nc("O.O.O.OC(=O)C(=O)O") == "oxalic acid trihydrate"
+
+    def test_hemihydrate(self):
+        # water:parent = 1/2 -> hemi (line 4657)
+        assert self._nc("O.OC(=O)C(=O)O.OC(=O)C(=O)O") == (
+            "oxalic acid hemihydrate")
+
+    def test_sesquihydrate_multi_parent(self):
+        # BB line 4686: 'oxalic acid—ethane-1,2-diamine sesquihydrate'
+        # (2/2/3): non-water components em-dash joined WITHOUT proportions
+        smi = "OC(=O)C(=O)O.OC(=O)C(=O)O.NCCN.NCCN.O.O.O"
+        assert self._nc(smi) == (
+            "oxalic acid—ethane-1,2-diamine sesquihydrate")
+
+    def test_mixed_inorganic_monohydrate(self):
+        # P-14.8.2 -c (OPSIN verified)
+        assert self._nc("O.Cl.CCO") == (
+            "ethanol—hydrogen chloride monohydrate")
+
+    def test_pin_style_unchanged(self):
+        # P-14.8: PINs MUST use the proportion notation
+        assert self._nc("O.OC(=O)C(=O)O", style="pin") == (
+            "oxalic acid—water (1/1)")
+
+    def test_general_without_water_uses_adduct_form(self):
+        assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
+
+    def test_unequal_parent_counts_fall_back_to_proportions(self):
+        # 2 oxalic + 1 pyridine + 1 water: no single parent count -> the
+        # word form is undefined; fall back to the always-valid PIN form
+        smi = "OC(=O)C(=O)O.OC(=O)C(=O)O.c1ccncc1.O"
+        name = self._nc(smi)
+        assert name.endswith("(2/1/1)") and "hydrate" not in name

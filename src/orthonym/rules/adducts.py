@@ -147,6 +147,48 @@ def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
     return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)
 
 
+# P-14.8.2: "an appropriate numerical prefix, such as 'mono','di', 'tri'"
+_HYDRATE_MULTIPLIERS = {
+    1: "mono", 2: "di", 3: "tri", 4: "tetra", 5: "penta",
+    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
+}
+
+
+def _hydrate_word_form(named: List[Tuple[str, int]],
+                       water_index: int) -> Optional[str]:
+    """General-nomenclature '<components> <prefix>hydrate', or None.
+
+    Defined ONLY when every non-water component shares one count p; the
+    prefix encodes the reduced water:parent ratio w/p — n/1 -> mono/di/
+    tri/... , 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
+    pairs (2/2/3) with 'sesquihydrate'). Anything else returns None and
+    the caller emits the always-valid proportion notation instead.
+    """
+    from math import gcd
+    water_count = named[water_index][1]
+    others = [nc for i, nc in enumerate(named) if i != water_index]
+    if not others:
+        return None  # water-only input is not a hydrate of anything
+    parent_counts = {count for _name, count in others}
+    if len(parent_counts) != 1:
+        return None
+    parent_count = parent_counts.pop()
+    g = gcd(water_count, parent_count)
+    w, p = water_count // g, parent_count // g
+    if p == 1:
+        prefix = _HYDRATE_MULTIPLIERS.get(w)
+    elif p == 2 and w == 1:
+        prefix = "hemi"
+    elif p == 2 and w == 3:
+        prefix = "sesqui"
+    else:
+        prefix = None
+    if prefix is None:
+        return None
+    base = EM_DASH.join(name for name, _count in others)
+    return f"{base} {prefix}hydrate"
+
+
 def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
     """P-14.8.1: names joined by em-dash; proportions '(n/m/...)' appended
     'separated from the name by a space'. Proportions are ALWAYS cited in
@@ -191,4 +233,11 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))
+    if style == "general":
+        water_indices = [i for i, (smi, _c) in enumerate(ordered)
+                         if smi == "O"]
+        if water_indices:
+            word = _hydrate_word_form(named, water_indices[0])
+            if word is not None:
+                return word
     return _assemble_adduct_name(named)
