@@ -565,6 +565,21 @@ def name_substituent(mol, frag_atoms, attach_idx):
         except Exception:
             pass
 
+    # W2E-P1FG Task 11 (P-66.1.6.1.1.3): a carbon chain terminated by a
+    # -NH-C(=O)-NH2 urea unit -> '{loc}-(carbamoylamino){chain}yl' ('not
+    # ureido'). MUST precede the Tier-2 cache / Tier-4 recursive path, which
+    # name the H-capped fragment as 'N-propylurea' -> 'N-propylureayl'.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from .substituent_naming import _name_carbamoylamino_chain_substituent
+            _cba = _name_carbamoylamino_chain_substituent(
+                mol, list(frag_atoms_set), attach_idx
+            )
+            if _cba:
+                return _stereo_route(_cba)
+        except Exception:
+            pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))

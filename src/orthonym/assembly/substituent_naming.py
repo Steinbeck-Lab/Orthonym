@@ -647,6 +647,88 @@ _POLYFUNC_AMINO_PREFIX = "amino"
 _POLYFUNC_CARBOXY_PREFIX = "carboxy"
 
 
+def _name_carbamoylamino_chain_substituent(
+    mol, sub_atoms: List[int], attach_idx: int,
+) -> Optional[str]:
+    """P-66.1.6.1.1.3 (BB 33338/55463, W2E-P1FG Task 11): an unbranched
+    saturated all-carbon chain rooted at ``attach_idx`` and terminated by a
+    single -NH-C(=O)-NH2 unit -> '{loc}-(carbamoylamino){chain}yl' ('not
+    ureido'), e.g. -CH2CH2CH2-NH-C(=O)-NH2 -> '3-(carbamoylamino)propyl'.
+
+    Fail-closed: exactly one urea unit, a terminal unsubstituted NH2, an
+    unsubstituted bridge NH, and a pure linear carbon chain from the free
+    valence; anything else -> None (caller falls through)."""
+    sub_set = set(sub_atoms)
+    if attach_idx not in sub_set:
+        return None
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in sub_set):
+        return None
+    # Locate the urea unit: an -NH- bridge N bonded to a carbamoyl C(=O)NH2.
+    bridge_n = carbonyl_c = term_n = None
+    for i in sub_set:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetAtomicNum() != 7 or a.GetFormalCharge() != 0:
+            continue
+        heavy = [nb for nb in a.GetNeighbors() if nb.GetAtomicNum() > 1]
+        # bridge N: exactly one C-chain neighbour + one carbonyl-C neighbour
+        c_nbrs = [nb for nb in heavy if nb.GetAtomicNum() == 6]
+        if len(c_nbrs) != 2 or a.GetTotalNumHs() != 1:
+            continue
+        for _c in c_nbrs:
+            o2 = [n for n in _c.GetNeighbors() if n.GetAtomicNum() == 8 and
+                  mol.GetBondBetweenAtoms(_c.GetIdx(), n.GetIdx())
+                     .GetBondTypeAsDouble() == 2.0]
+            nh2 = [n for n in _c.GetNeighbors() if n.GetAtomicNum() == 7
+                   and n.GetIdx() != i and n.GetDegree() == 1
+                   and n.GetTotalNumHs() == 2 and n.GetFormalCharge() == 0]
+            if len(o2) == 1 and len(nh2) == 1 and _c.GetDegree() == 3:
+                bridge_n, carbonyl_c, term_n = i, _c.GetIdx(), nh2[0].GetIdx()
+                o_idx = o2[0].GetIdx()
+                break
+        if bridge_n is not None:
+            break
+    if bridge_n is None:
+        return None
+    urea_atoms = {bridge_n, carbonyl_c, term_n, o_idx}
+    # The remaining fragment atoms form the carbon chain from the free valence.
+    chain = [i for i in sub_set if i not in urea_atoms]
+    if not chain or any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in chain):
+        return None
+    # Linear chain: trace from attach (free valence = locant 1) to bridge_n.
+    ordered = [attach_idx]
+    visited = {attach_idx}
+    cur = attach_idx
+    while len(ordered) < len(chain):
+        nxt = None
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in chain and ni not in visited:
+                nxt = ni
+                break
+        if nxt is None:
+            return None
+        ordered.append(nxt)
+        visited.add(nxt)
+        cur = nxt
+    if len(ordered) != len(chain):
+        return None
+    # The last chain carbon must bear the bridge N (urea at the far end).
+    if bridge_n not in [n.GetIdx() for n in
+                        mol.GetAtomWithIdx(ordered[-1]).GetNeighbors()]:
+        return None
+    # No branching on the chain (each interior C bonds exactly 2 chain C).
+    for pos, ci in enumerate(ordered):
+        c_in_chain = sum(1 for nb in mol.GetAtomWithIdx(ci).GetNeighbors()
+                         if nb.GetIdx() in chain)
+        max_chain = 1 if pos in (0, len(ordered) - 1) else 2
+        if c_in_chain > max_chain:
+            return None
+    loc = len(ordered)  # bridge-N carbon is the far end
+    from ..data.chain_names import get_chain_prefix
+    stem = get_chain_prefix(len(chain))
+    return f"{loc}-(carbamoylamino){stem}yl"
+
+
 def _name_polyfunctional_acyclic_substituent(
     mol,
     sub_atoms: List[int],
