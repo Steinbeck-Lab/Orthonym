@@ -1364,6 +1364,23 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                         'is_complex': _complex,
                     }
 
+    # P-66.4.2.3.5 / P-66.4.3.2 (plan P1AM Task 8): ring-attached
+    # -NH-S(=N-NH2)(R)[=O]? -> '(...sulfino/sulfonohydrazonamido)'.
+    if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'S':
+        sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+        from ..assembly.substituent_naming import (
+            sulfino_hydrazonoyl_amido_prefix_from_branch,
+        )
+        _shz = sulfino_hydrazonoyl_amido_prefix_from_branch(
+            mol, n_idx, neighbors[0].GetIdx(), sub_atoms
+        )
+        if _shz:
+            return {
+                'name': f'({_shz})',
+                'atoms': sub_atoms,
+                'is_complex': True,
+            }
+
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
     # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':

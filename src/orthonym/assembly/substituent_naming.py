@@ -1617,6 +1617,125 @@ def hydrazonoyl_amido_prefix_from_branch(mol, n_idx: int, imino_c: int,
         return None
 
 
+def _pure_linear_alkyl_len_local(mol, start_idx, exclude) -> Optional[int]:
+    """Length of a pure, unbranched, acyclic, saturated all-carbon chain
+    (local copy of composer._pure_linear_alkyl_len to avoid an import cycle).
+    Returns None for branched/cyclic/unsaturated/hetero-decorated fragments."""
+    from collections import deque
+    ri = mol.GetRingInfo()
+    frag = set()
+    queue = deque([start_idx])
+    while queue:
+        a = queue.popleft()
+        if a in frag or a in exclude:
+            continue
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C' or ri.NumAtomRings(a) > 0:
+            return None
+        frag.add(a)
+        for nb in at.GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in exclude:
+                continue
+            bond = mol.GetBondBetweenAtoms(a, ni)
+            if nb.GetSymbol() == 'C':
+                if bond.GetBondTypeAsDouble() != 1.0:
+                    return None
+                queue.append(ni)
+            else:
+                return None
+    # unbranched: no in-fragment carbon has > 2 fragment-carbon neighbours
+    for a in frag:
+        c_nbrs = sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                     if nb.GetIdx() in frag)
+        if c_nbrs > 2:
+            return None
+    return len(frag) if frag else None
+
+
+def _isolated_benzene_wholly_in(mol, c_idx, sub_set) -> bool:
+    """True when ``c_idx`` is in an isolated (non-fused) all-carbon aromatic
+    6-ring wholly contained in ``sub_set``."""
+    a = mol.GetAtomWithIdx(c_idx)
+    if not (a.GetIsAromatic() and a.GetSymbol() == 'C'):
+        return False
+    ri = mol.GetRingInfo()
+    for ring in ri.AtomRings():
+        if (c_idx in ring and len(ring) == 6
+                and all(r in sub_set for r in ring)
+                and all(mol.GetAtomWithIdx(r).GetIsAromatic()
+                        and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                        for r in ring)):
+            rset = set(ring)
+            if not any(set(o) != rset and set(o) & rset for o in ri.AtomRings()):
+                return True
+    return False
+
+
+def sulfino_hydrazonoyl_amido_prefix_from_branch(mol, n_idx: int, s_idx: int,
+                                                 sub_atoms) -> Optional[str]:
+    """P-66.4.2.3.5 / P-66.4.3.2 (plan P1AM Task 8): N-attached
+    R-S(=N-NH2)(-NH-)[=O]? branch -> '{R-stem}sulfinohydrazonamido' (no =O)
+    or '{R-stem}sulfonohydrazonamido' (one =O). Fail-closed None on any
+    deviation (charges, extra substitution, unnameable R).
+    """
+    sub_set = set(sub_atoms)
+    s = mol.GetAtomWithIdx(s_idx)
+    if s.GetSymbol() != 'S' or s.GetFormalCharge() != 0:
+        return None
+    dbl_o = []
+    dbl_n = []
+    r_root = None
+    for nb in s.GetNeighbors():
+        bt = mol.GetBondBetweenAtoms(s_idx, nb.GetIdx()).GetBondTypeAsDouble()
+        if nb.GetIdx() == n_idx:
+            if bt != 1.0:
+                return None
+            continue
+        if bt == 2.0 and nb.GetSymbol() == 'O':
+            dbl_o.append(nb.GetIdx())
+        elif bt == 2.0 and nb.GetSymbol() == 'N':
+            dbl_n.append(nb.GetIdx())
+        elif bt == 1.0 and nb.GetSymbol() == 'C':
+            if r_root is not None:
+                return None
+            r_root = nb.GetIdx()
+        else:
+            return None
+    if len(dbl_n) != 1 or r_root is None or len(dbl_o) > 1:
+        return None
+    # =N-NH2 hydrazono arm: exactly one terminal NH2 on the =N
+    hz = mol.GetAtomWithIdx(dbl_n[0])
+    if hz.GetFormalCharge() != 0:
+        return None
+    hz_tails = [nb for nb in hz.GetNeighbors() if nb.GetIdx() != s_idx
+                and nb.GetAtomicNum() > 1]
+    if (len(hz_tails) != 1 or hz_tails[0].GetSymbol() != 'N'
+            or hz_tails[0].GetDegree() != 1
+            or hz_tails[0].GetFormalCharge() != 0):
+        return None
+    # attachment N carries nothing else heavy besides the parent + S
+    # (N-substituted forms fail closed)
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    n_heavy_in_sub = [nb.GetIdx() for nb in n_atom.GetNeighbors()
+                      if nb.GetIdx() in sub_set and nb.GetAtomicNum() > 1]
+    if n_heavy_in_sub != [s_idx]:
+        return None
+    # R must be an isolated benzene ring or an unbranched n-alkyl wholly in sub.
+    if _isolated_benzene_wholly_in(mol, r_root, sub_set):
+        stem = "benzene"
+    else:
+        n_len = _pure_linear_alkyl_len_local(mol, r_root, {s_idx})
+        if n_len is None or n_len < 1:
+            return None
+        from ..data.chain_names import get_chain_prefix
+        stem = f"{get_chain_prefix(n_len)}ane"
+    word = "sulfono" if len(dbl_o) == 1 else "sulfino"
+    return f"{stem}{word}hydrazonamido"
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
 

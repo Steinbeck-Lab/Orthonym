@@ -130,3 +130,24 @@ class TestT7ImidohydrazideFamily:
     ])
     def test_protect_family_reps(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT8SulfinoSulfonoHydrazonamido:
+    """P-66.4.2.3.5 (BB 34540 verbatim PIN) + P-66.4.3.2 (BB 34617):
+    S(=N-NH2) N-attached branches take the e->o amide-name prefix."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # BB 34540 verbatim:
+        ("OC(=O)c1ccc(NS(=NN)c2ccccc2)cc1",
+         "4-(benzenesulfinohydrazonamido)benzoic acid"),
+        # sulfono analogue (OPSIN-verified during planning):
+        ("O=S(=NN)(Nc1ccc(C(=O)O)cc1)c1ccccc1",
+         "4-(benzenesulfonohydrazonamido)benzoic acid"),
+    ])
+    def test_heals(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    def test_protect_parent_direction(self):
+        assert name_compound("NNS(=NN)c1ccccc1") == \
+            "benzenesulfinohydrazonohydrazide"
