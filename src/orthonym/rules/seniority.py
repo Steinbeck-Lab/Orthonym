@@ -642,9 +642,12 @@ PREFIX_FORMS = {
     # C1 (P-65.3.1): -SO2-NH-NH2 as a substituent prefix (defensive; target
     # compounds are mono-functional so it is normally the principal suffix).
     "sulfonohydrazide": "hydrazinesulfonyl",
-    # Wave2 T3d (P-66.1.1): sulfonimidamide as a non-principal prefix
-    # (defensive; target compounds are mono-functional -> principal suffix).
-    "sulfonimidamide": "sulfonimidoyl",
+    # P-66.4.1.3.4 (BB 34346/55487, W2E-P1FG Task 13): the PRESELECTED prefix
+    # for -S(O)(=NH)-NH2 is 'S-aminosulfonimidoyl' (the italic 'S' locant
+    # disambiguates substitution on the imido N); bare 'sulfonimidoyl' is the
+    # divalent connector, so it must NOT be the FG prefix here. Mirrors the
+    # sulfinimidamide row ('S-aminosulfinimidoyl') above.
+    "sulfonimidamide": "S-aminosulfonimidoyl",
     "nitrile": "cyano",
     "isocyanide": "isocyano",
     # Amides as non-principal group prefix (IUPAC P-66.1.1.4 method 2)
