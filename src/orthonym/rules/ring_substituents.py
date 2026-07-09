@@ -1222,6 +1222,15 @@ def _compound_ring_on_chain_substituent(
     from ..assembly.naming_utils import is_complex_substituent
     inner = f'({ring_name})' if is_complex_substituent(ring_name) else ring_name
     if len(path) == 1:
+        # P-29.6.1 (BB 16270): the UNSUBSTITUTED -CH2-C6H5 group is the retained
+        # PREFERRED prefix 'benzyl', not 'phenylmethyl'. Gated tightly to the
+        # bare phenyl case (ring_name == 'phenyl' means the ring carries no
+        # substituent — a substituted phenyl comes back as '4-chlorophenyl' and
+        # correctly stays the systematic (4-chlorophenyl)methyl per P-29.6.2.1).
+        # The single -CH2- carrier is already guaranteed by len(path)==1 plus
+        # the saturated/undecorated carrier guards above.
+        if ring_name == 'phenyl':
+            return 'benzyl'
         return f'{inner}methyl'
     return f'{loc}-{inner}{alkyl}'
 
