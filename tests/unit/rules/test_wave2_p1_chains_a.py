@@ -103,3 +103,17 @@ class TestP58NondetachableHydroDione:
     def test_dihydronaphthalenedione(self):
         # P-58.2.5: added-IH/hydro dione, NOT tetrahydro
         assert name_compound("O=C1CCC(=O)c2ccccc21") == "2,3-dihydronaphthalene-1,4-dione"
+
+
+@pytest.mark.unit
+class TestP58AddedIHDistribution:
+    @pytest.mark.xfail(reason="P-58.2.3.1.2 BLOCKED on the fusion engine: the "
+                              "cyclopenta[a]naphthalene 3-ring parent does not "
+                              "resolve (fused-ring namer -> cyclopentane, "
+                              "SELF-01-suppressed). name_cyclic_oxo_compound "
+                              "returns None; row FAIL_CLOSED (fusion-parent "
+                              "numbering follow-up). No wrong name emitted.")
+    def test_cyclopentanaphthalene_dione(self):
+        # P-58.2.3.1.2: extra IH spills to lowest nonfusion peripheral atom
+        assert name_compound("C1(C(CC=2C1=C1C=CC=CC1=CC2)=O)=O") == \
+            "1H-cyclopenta[a]naphthalene-1,2(3H)-dione"
