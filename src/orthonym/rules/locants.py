@@ -271,11 +271,13 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
     that symmetry) and either is correct & byte-identical.
 
     Each candidate is a dict carrying only the tiers relevant to the call; a
-    missing key means that tier is unconstrained (ties). Tiers, applied in order:
+    missing key means that tier is unconstrained (ties). Tiers, applied in the
+    P-59.1.10 order:
 
-      'pcg'          principal-characteristic-group locant set     (P-14.4(c))
-      'heteroatoms'  list of (locant, element) — positional set    (P-15.4.3.2.1)
-                     then element-seniority lowest-locant           (P-15.4.1.2)
+      'heteroatoms'  list of (locant, element) — positional set    (P-59.1.10(b)
+                     then element-seniority lowest-locant            / P-15.4.1.2)
+      'indicated_h'  indicated-hydrogen locant set                  (P-59.1.10(c))
+      'pcg'          principal-characteristic-group locant set      (P-59.1.10(d))
       'substituents' detachable-prefix locant set                   (P-14.4(f))
       'alpha'        sortable key giving the alphabetically-first    (P-14.4(g))
                      prefix the lowest locant
@@ -284,28 +286,38 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
     every active tier ties. ``compare_locant_sets`` is reused unchanged as the
     positional primitive — this comparator is additive alongside it.
     """
-    # Tier 1 — principal characteristic group (P-14.4(c)).
-    a_pcg, b_pcg = candidate_a.get('pcg'), candidate_b.get('pcg')
-    if a_pcg is not None or b_pcg is not None:
-        result = compare_locant_sets(a_pcg or [], b_pcg or [])
-        if result != 0:
-            return result
-
-    # Tier 2 — heteroatom set (positional, then element seniority).
+    # Tier 1 — heteroatom set (P-59.1.10(b) / P-14.4(b)): positional, then
+    # element seniority. Heteroatoms are part of the parent hydride and
+    # outrank the suffix for numbering.
     a_het, b_het = candidate_a.get('heteroatoms'), candidate_b.get('heteroatoms')
     if a_het is not None or b_het is not None:
         result = _compare_heteroatom_seniority(a_het or [], b_het or [])
         if result != 0:
             return result
 
-    # Tier 3 — detachable-substituent set (P-14.4(f)).
+    # Tier 2 — indicated hydrogen (P-59.1.10(c)): lowest locants for
+    # indicated hydrogen, before the principal-group suffix tier.
+    a_ih, b_ih = candidate_a.get('indicated_h'), candidate_b.get('indicated_h')
+    if a_ih is not None or b_ih is not None:
+        result = compare_locant_sets(a_ih or [], b_ih or [])
+        if result != 0:
+            return result
+
+    # Tier 3 — principal characteristic group (P-59.1.10(d) / P-14.4(d)).
+    a_pcg, b_pcg = candidate_a.get('pcg'), candidate_b.get('pcg')
+    if a_pcg is not None or b_pcg is not None:
+        result = compare_locant_sets(a_pcg or [], b_pcg or [])
+        if result != 0:
+            return result
+
+    # Tier 4 — detachable-substituent set (P-14.4(f)).
     a_sub, b_sub = candidate_a.get('substituents'), candidate_b.get('substituents')
     if a_sub is not None or b_sub is not None:
         result = compare_locant_sets(a_sub or [], b_sub or [])
         if result != 0:
             return result
 
-    # Tier 4 — alphabetically-first prefix lowest locant (P-14.4(g)).
+    # Tier 5 — alphabetically-first prefix lowest locant (P-14.4(g)).
     a_alpha, b_alpha = candidate_a.get('alpha'), candidate_b.get('alpha')
     if a_alpha is not None or b_alpha is not None:
         if a_alpha is None:
