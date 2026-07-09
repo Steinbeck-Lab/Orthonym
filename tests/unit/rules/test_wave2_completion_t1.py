@@ -151,9 +151,13 @@ def test_ketene_e2e(smiles, expected):
 
 
 def test_ketene_fail_closed():
-    # Alkyl / ylidene ketenes -> general ketone principles (unbuilt) -> None.
+    # Alkyl / mono-substituted ketenes needing chain-ketone numbering ->
+    # general ketone principles (unbuilt) -> None.
     assert name_ketene(Chem.MolFromSmiles("CC=C=O")) is None
-    assert name_ketene(Chem.MolFromSmiles("O=C=C1CCCCC1")) is None
+    # NOTE: O=C=C1CCCCC1 (cyclohexylidenemethanone) is now BUILT — see
+    # W2E-P1FG Task 3 (scope-decision #4, P-64.5(3) oxomethylidene ring case).
+    assert name_ketene(Chem.MolFromSmiles("O=C=C1CCCCC1")) == \
+        "cyclohexylidenemethanone"
     # Non-ketene cumulenes / carbonyls decline.
     assert name_ketene(Chem.MolFromSmiles("O=C=O")) is None
     assert name_ketene(Chem.MolFromSmiles("N=C=O")) is None

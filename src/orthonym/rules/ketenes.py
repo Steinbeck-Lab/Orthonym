@@ -20,11 +20,27 @@ principles, which are NOT built here; never a wrong name.
 Graph/atom classifier (no SMARTS broadening); pure — no mol mutation.
 """
 
+from collections import deque
 from typing import Optional
 
 from rdkit import Chem
 
 _HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+
+
+def _branch_atoms(mol, start: int, exclude: int) -> set:
+    """Connected atom set reachable from ``start`` without crossing
+    ``exclude`` (the shared terminal carbon)."""
+    seen = {start}
+    queue = deque([start])
+    while queue:
+        idx = queue.popleft()
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            j = nbr.GetIdx()
+            if j != exclude and j not in seen:
+                seen.add(j)
+                queue.append(j)
+    return seen
 
 
 def name_ketene(mol) -> Optional[str]:
@@ -33,8 +49,9 @@ def name_ketene(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    if mol.GetRingInfo().NumRings() > 0:
-        return None
+    # NOTE: rings ARE allowed now — Branch 3 (cyclohexylidenemethanone) and
+    # Branch 2 (diphenylethenone) need ring substituents. The halogen branch
+    # still fails closed on any ring atom via its own coverage check.
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
@@ -63,6 +80,53 @@ def name_ketene(mol) -> Optional[str]:
                       if n.GetSymbol() == 'C')
     if oxygen.GetDegree() != 1:
         return None
+
+    # Branch 3 (P-64.5(3) oxomethylidene on a ring): terminal C is a RING
+    # atom (spiro-exocyclic cumulene) -> '<ring-ylidene>methanone'
+    # (cyclohexylidenemethanone). Ring must be a plain cycloalkane fragment
+    # nameable as a '-yl' substituent; else fail closed.
+    if terminal_c.IsInRing():
+        ring_atoms = ({a.GetIdx() for a in mol.GetAtoms()}
+                      - {sp_carbon.GetIdx(), oxygen.GetIdx()})
+        from ..assembly.substituent_enumerator import name_substituent
+        base = name_substituent(mol, ring_atoms, terminal_c.GetIdx())
+        if not base or not base.endswith("yl"):
+            return None
+        if mol.GetNumHeavyAtoms() != len(ring_atoms) + 2:
+            return None
+        return f"{base}idene" + "methanone"
+
+    # Branch 2 (P-64.2.2.4): BOTH substituents identical ARYL groups, zero H
+    # on the terminal C -> '<di><name>ethenone' (BB/scope-decision verbatim:
+    # diphenylethenone). Only aromatic-ring substituents take this
+    # ethenone form; ACYCLIC alkyl cumulated chains use ordinary ketone
+    # '-one' numbering (scope decision #4: 2-butylhex-1-en-1-one) and are
+    # NOT this namer's class -> fail closed. Any asymmetry or H fails too.
+    heavy_subs = [n for n in terminal_c.GetNeighbors()
+                  if n.GetIdx() != sp_carbon.GetIdx()
+                  and n.GetSymbol() not in _HALO_PREFIX]
+    if heavy_subs:
+        if len(heavy_subs) != 2 or terminal_c.GetTotalNumHs() != 0:
+            return None
+        # Both attachment atoms must be aromatic ring atoms (aryl only).
+        if not all(n.GetIsAromatic() and n.IsInRing() for n in heavy_subs):
+            return None
+        from ..assembly.substituent_enumerator import name_substituent
+        names, covered = [], {sp_carbon.GetIdx(), oxygen.GetIdx(),
+                              terminal_c.GetIdx()}
+        for nbr in heavy_subs:
+            frag = _branch_atoms(mol, nbr.GetIdx(),
+                                 exclude=terminal_c.GetIdx())
+            nm = name_substituent(mol, frag, nbr.GetIdx())
+            if not nm:
+                return None
+            names.append(nm)
+            covered |= frag
+        if names[0] != names[1]:
+            return None
+        if covered != {a.GetIdx() for a in mol.GetAtoms()}:
+            return None
+        return f"di{names[0]}ethenone"
 
     # The terminal carbon may carry only H and/or single-bonded halogens.
     halo_counts: dict = {}
