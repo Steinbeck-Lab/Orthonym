@@ -1154,6 +1154,39 @@ def _compound_ring_on_chain_substituent(
     """Build '(ring-yl)alkyl' for an unbranched all-carbon carrier rooted at
     the attachment with exactly ONE ring system hanging off it. Returns None
     (caller falls back) whenever any guard fails — never guesses."""
+    # P-29.6.2.1 (BB 16304): a substituent ON the ring (e.g. -Cl at para of a
+    # benzyl's phenyl) belongs to the ring-yl name '(4-chlorophenyl)', NOT to
+    # the carrier. Fold single non-H heavy atoms that hang off a ring atom (and
+    # are NOT part of the ring themselves) INTO frag_ring_atoms BEFORE computing
+    # the carrier, so a halogen/alkyl decoration is never mistaken for a
+    # non-carbon carrier atom (which would decline at the all-carbon guard).
+    # name_ring_system_substituent renders the widened single-substituent phenyl
+    # as '4-chlorophenyl' and fails closed on anything it cannot fully describe,
+    # so no wrong name leaks; multi-substituent rings still trip the coverage
+    # guard below (frag_ring_atoms names as bare 'phenyl' -> caller declines).
+    ring_substituent_atoms = set()
+    for rc in list(frag_ring_atoms):
+        for n in mol.GetAtomWithIdx(rc).GetNeighbors():
+            ni = n.GetIdx()
+            if not (ni in frag_set and ni not in frag_ring_atoms
+                    and n.GetAtomicNum() > 1
+                    and ring_info.NumAtomRings(ni) == 0):
+                continue
+            # A ring SUBSTITUENT is terminal to the substituent fragment: it is
+            # NOT the free-valence attachment atom, and it touches nothing
+            # outside the fragment (the CARRIER, by contrast, bridges the ring
+            # to the parent and so is bonded to a non-fragment atom). This
+            # cleanly separates the para-Cl (folds in) from the -CH2- carrier
+            # (stays carrier).
+            if ni == attach_idx:
+                continue
+            if any(nn.GetIdx() not in frag_set
+                   for nn in n.GetNeighbors()):
+                continue
+            if n.GetDegree() != 1:
+                continue
+            ring_substituent_atoms.add(ni)
+    frag_ring_atoms = set(frag_ring_atoms) | ring_substituent_atoms
     carrier = frag_set - frag_ring_atoms
     # Guards: all-carbon, fully SATURATED, undecorated carrier; attach is a
     # carrier atom. The saturation guard is load-bearing: get_alkyl_name
@@ -1198,7 +1231,8 @@ def _compound_ring_on_chain_substituent(
                 ring_side_atoms.append(n.GetIdx())
     if len(ring_attach_positions) != 1:
         return None
-    # No stray decorations: every fragment atom is carrier or ring.
+    # No stray decorations: every fragment atom is carrier or ring (ring
+    # substituents were folded into frag_ring_atoms at function entry).
     if carrier | frag_ring_atoms != frag_set:
         return None
     ring_name = name_ring_system_substituent(
