@@ -117,3 +117,18 @@ class TestP58AddedIHDistribution:
         # P-58.2.3.1.2: extra IH spills to lowest nonfusion peripheral atom
         assert name_compound("C1(C(CC=2C1=C1C=CC=CC1=CC2)=O)=O") == \
             "1H-cyclopenta[a]naphthalene-1,2(3H)-dione"
+
+
+@pytest.mark.unit
+class TestP59DetachableHydroPlacement:
+    @pytest.mark.xfail(reason="P-59.2.3.2 BLOCKED: name_partially_saturated_"
+                              "carbocycle (polycyclics.py) is a bare-skeleton "
+                              "namer with NO substituent/suffix support — it "
+                              "emits '5,6-dihydroazulene', dropping the -COOH "
+                              "and bromo (SELF-01-suppressed -> unknown, so no "
+                              "wrong name leaks). Building the "
+                              "detachable-hydro+PCG-suffix+halogen combined-"
+                              "numbering azulene assembly is deferred.")
+    def test_bromo_dihydroazulene_carboxylic_acid(self):
+        assert name_compound("BrC=1CCC=C2C=C(C=C2C1)C(=O)O") == \
+            "7-bromo-5,6-dihydroazulene-2-carboxylic acid"
