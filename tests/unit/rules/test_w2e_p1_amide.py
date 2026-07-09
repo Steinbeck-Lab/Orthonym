@@ -107,3 +107,26 @@ class TestT6AmidrazonePrefixes:
     ])
     def test_protect_shared_machinery(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT7ImidohydrazideFamily:
+    """P-66.4.2.1 (BB 34430): the R-C(=NH)-NH-NH2 amidrazone tautomer takes
+    the 'imidohydrazide'/'carboximidohydrazide' suffix; P-14.3.4.1 (BB 2877):
+    no terminal locants. Family reps per WAVE2-BUILD-PLAN-ALL §2a."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("N=CNN", "methanimidohydrazide"),
+        ("CC(=N)NN", "ethanimidohydrazide"),
+    ])
+    def test_heals(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # family reps already healed elsewhere — protect:
+        ("NC(=N)SSC(=N)N", "carbamimidic dithioperoxyanhydride"),
+        ("NNS(=NN)c1ccccc1", "benzenesulfinohydrazonohydrazide"),
+        ("CC(=NN)NN", "ethanehydrazonohydrazide"),
+    ])
+    def test_protect_family_reps(self, smiles, expected):
+        assert name_compound(smiles) == expected

@@ -200,6 +200,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # amidrazone's single [NX3]. Cascade-suppresses hydrazone/amidine/hydrazonamide/
     # hydrazine_fg on its atoms.
     "hydrazidine": "[CX3](=[NX2][NX3])[NX3][NX3]",
+    # Wave-2 P1AM Task 7 (P-66.4.2.1, BB 34430): the R-C(=NH)-NH-NH2
+    # amidrazone tautomer -> 'imidohydrazide' suffix. Terminal =NH (D1)
+    # distinguishes it from hydrazonamide (C=N-N) and hydrazidine
+    # (C=N-N + N-N). Cascade-suppresses amidine/hydrazine_fg.
+    "imidohydrazide": "[CX3](=[NX2;D1])[NX3][NX3H2]",
 
     # === ISOCYANATES/ISOTHIOCYANATES (cumulated double bonds) ===
     "isocyanate": "[#6][NX2]=[CX2]=[OX1]",
@@ -621,6 +626,11 @@ def _resolve_fg_collisions(results):
         #  1. hydrazidine (R-C(=N-NH2)-NH-NH2, the most specific: 2-N hydrazido
         #     side) clears hydrazonamide/hydrazone/amidine/hydrazine_fg/primary_amine/
         #     imine on its atoms.
+        # Wave-2 P1AM Task 7 (P-66.4.2.1): the imidohydrazide tautomer
+        # R-C(=NH)-NH-NH2 -- terminal =NH (D1) -- clears the amidine (the
+        # C=NH + first NH) and hydrazine_fg (the NH-NH2) matches on its atoms.
+        # Placed BEFORE hydrazidine so the most-specific composite wins first.
+        ('imidohydrazide', ['amidine', 'hydrazine_fg', 'imine']),
         ('hydrazidine', ['hydrazonamide', 'hydrazone', 'amidine',
                          'hydrazine_fg', 'primary_amine', 'imine']),
         #  2. hydrazonamide (amidrazone, 1-N amino side) clears amidine/hydrazone/

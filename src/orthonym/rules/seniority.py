@@ -167,6 +167,10 @@ SENIORITY_ORDER = [
     # Wave2 T3d (P-66.4.2, BB Table 6.1 item 18): amidrazone / hydrazonamide ranks
     # immediately below amidine (item 17).
     "hydrazonamide",
+    # Wave-2 P1AM Task 7 (P-66.4.2.1, BB 34460): the imidohydrazide amidrazone
+    # tautomer — an imidamide (amidine) is senior to an imidohydrazide; keep it
+    # adjacent to hydrazonamide (same amidrazone class, tautomer pair).
+    "imidohydrazide",
 
     # Nitriles
     "nitrile",
@@ -529,6 +533,9 @@ SUFFIX_FORMS = {
     # 'hydrazonamide' (ethanehydrazonamide), ring/appended-C 'carbohydrazonamide'
     # (benzenecarbohydrazonamide).
     "hydrazonamide": ("hydrazonamide", "carbohydrazonamide"),
+    # Wave-2 P1AM Task 7 (P-66.4.2.1): amidrazone =NH tautomer — chain
+    # 'imidohydrazide', ring/appended-C 'carboximidohydrazide'.
+    "imidohydrazide": ("imidohydrazide", "carboximidohydrazide"),
     # Wave2 T3d (P-66.1.1 item 25): sulfinimidamide, same word chain/ring
     # (like sulfonamide/sulfonimidamide).
     "sulfinimidamide": ("sulfinimidamide", "sulfinimidamide"),
@@ -706,6 +713,7 @@ PREFIX_FORMS = {
     "thiohydrazide": "hydrazinecarbothioyl",       # P-66.3.4 / Table 4.4
     "hydrazidine": "hydrazinecarbohydrazonoyl",    # P-66.4.3.4.1 (BB 56105)
     "hydrazonamide": "carbamohydrazonoyl",         # P-66.4.2.3.2 (BB 34498)
+    "imidohydrazide": None,  # demoted case: Task 6 owns the chain-end split; ring prefix P-66.4.2.3.6 not yet built -- fail closed
     # P-66.4.1.3.4 (BB 34352/55484): the preselected prefix for the WHOLE
     # H2N-S(=NH)- group is 'S-aminosulfinimidoyl' -- the old bare
     # 'sulfinimidoyl' is the divalent -S(=NH)- connector (P-65.3.2.3) and
