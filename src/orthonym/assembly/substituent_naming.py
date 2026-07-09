@@ -1086,17 +1086,19 @@ def _name_ether_substituted_chain(
     if attach_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(attach_idx) > 0:
         return None  # attach via heteroatom / ring -> not this handler
 
-    # Identify ether oxygens: neutral, divalent, acyclic, both neighbours in the
-    # fragment, both bonds single. Anything else (charged O, =O, -OH, ring O,
-    # peroxide -O-O-) disqualifies the whole fragment (fail-closed).
+    # Identify ether-type links: neutral, divalent, acyclic, both neighbours in
+    # the fragment, both bonds single. P-63.2.5/P-29.5.2: O -> (R)oxy prefix, S
+    # -> (R)sulfanyl prefix (W2E-P1FC Task 8, the -CH2-S-R concatenation). Any
+    # other decoration (charged, =O, -OH, ring, peroxide -O-O-/-S-S-) disqualifies
+    # the whole fragment (fail-closed).
     ether_os: List[int] = []
     for idx in sub_atoms:
         atom = mol.GetAtomWithIdx(idx)
         sym = atom.GetSymbol()
         if sym == 'C':
             continue
-        if sym != 'O':
-            return None  # any non-C, non-O heteroatom -> richer case
+        if sym not in ('O', 'S'):
+            return None  # any non-C, non-O/S heteroatom -> richer case
         if (atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0
                 or atom.GetDegree() != 2 or ring_info.NumAtomRings(idx) > 0):
             return None
@@ -1105,6 +1107,10 @@ def _name_ether_substituted_chain(
             return None
         if any(mol.GetBondBetweenAtoms(idx, n).GetBondType()
                != Chem.BondType.SINGLE for n in nbrs):
+            return None
+        # Exclude chalcogen-chalcogen catenation (peroxide/disulfide): that is a
+        # (R)peroxy/(R)disulfanyl, owned by a different producer.
+        if any(mol.GetAtomWithIdx(n).GetSymbol() in ('O', 'S') for n in nbrs):
             return None
         ether_os.append(idx)
     if not ether_os:
@@ -1193,15 +1199,44 @@ def _name_ether_substituted_chain(
         return None  # disconnected backbone -> fall through
     pos = {idx: i + 1 for i, idx in enumerate(ordered)}
 
-    # Name each ether as an (R-oxy) prefix at its backbone-carbon locant.
+    # Name each ether-type link as an (R-oxy)/(R-sulfanyl) prefix at its
+    # backbone-carbon locant.
     from collections import defaultdict
     from ..data.chain_names import get_chain_prefix
-    from .substituent_prefix_forms import get_alkoxy_prefix
+    from .substituent_prefix_forms import get_alkoxy_prefix, get_sulfanyl_prefix
+    from .naming_utils import is_complex_substituent, apply_enclosing_marks
     groups: dict = defaultdict(list)
     for bb_c, o_idx, r_side in ether_links:
-        oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
-        if not oxy or oxy == "alkoxy":
-            return None  # un-nameable R -> fall through (fail-closed)
+        if mol.GetAtomWithIdx(o_idx).GetSymbol() == 'O':
+            oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
+            if not oxy or oxy == "alkoxy":
+                return None  # un-nameable R -> fall through (fail-closed)
+        else:  # S -> (R)sulfanyl (P-29.5.2 concatenation)
+            # Name the R side with the proper substituent namer so a RING-bearing
+            # R (benzyl -> 'benzyl') is not flattened to a carbon count
+            # (get_sulfanyl_prefix mis-counts benzyl's 7 carbons as 'heptyl').
+            # Collect R's atoms (everything on the far side of the S link).
+            _r_atoms: List[int] = []
+            _r_seen = {o_idx}
+            _stack = [r_side]
+            while _stack:
+                _cur = _stack.pop()
+                if _cur in _r_seen:
+                    continue
+                _r_seen.add(_cur)
+                _r_atoms.append(_cur)
+                for _n in mol.GetAtomWithIdx(_cur).GetNeighbors():
+                    if _n.GetIdx() in sub_set and _n.GetIdx() not in _r_seen:
+                        _stack.append(_n.GetIdx())
+            _r_name = name_substituent_fragment(mol, _r_atoms, r_side, [o_idx])
+            if not _r_name or ' ' in _r_name:
+                return None  # un-nameable R -> fall through (fail-closed)
+            # P-16.3.3/P-16.5: '{R}sulfanyl' concatenated onto the backbone stem
+            # is a compound substituent prefix, so it is ALWAYS enclosed
+            # ('(benzylsulfanyl)', '(methylsulfanyl)'); the outer enclosing mark
+            # then escalates on the parent ('(benzylsulfanyl)methyl' ->
+            # '[(benzylsulfanyl)methyl]benzoic acid').
+            oxy = apply_enclosing_marks(f"{_r_name}sulfanyl", 0)
         groups[oxy].append(pos[bb_c])
 
     _MULT = {1: "", 2: "bis", 3: "tris", 4: "tetrakis"}

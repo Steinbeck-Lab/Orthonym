@@ -1054,6 +1054,30 @@ def _wrap_n_substituent(name: str) -> str:
     return name
 
 
+def _is_fully_enclosed(name: str) -> bool:
+    """True when ``name`` is a single fully-bracketed token: it opens with a
+    bracket whose MATCHING close is the final character (e.g. '(2-methylpropyl)',
+    '[bis(sulfanyl)]'). False when trailing text lies outside the leading
+    bracket ('(oxan-2-yl)oxy', '(benzylsulfanyl)methyl') — those still need an
+    OUTER enclosing mark. Used by format_substituent_prefix's P-16.5 escalation.
+    """
+    if not name or name[0] not in '([{':
+        return False
+    pairs = {'(': ')', '[': ']', '{': '}'}
+    close = pairs[name[0]]
+    depth = 0
+    for i, ch in enumerate(name):
+        if ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth -= 1
+            if depth == 0:
+                # Matched the opening bracket; fully enclosed only if this is
+                # the last character AND the close matches the open type.
+                return i == len(name) - 1 and ch == close
+    return False
+
+
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 
@@ -1123,6 +1147,15 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         # Complex name (or a simple name taking a derived bis/tris/...kis
         # multiplier, P-16.5.1.10) without existing enclosing marks: wrap.
         formatted_name = f"({name})"
+    elif name.startswith('(') and not _is_fully_enclosed(name):
+        # P-16.5.4.1 (W2E-P1FC Task 8): the name has an INNER enclosing mark but
+        # is not itself fully wrapped — e.g. '(benzylsulfanyl)methyl', where the
+        # trailing 'methyl' lies OUTSIDE the parens. Such a name is a compound
+        # substituent by construction (regardless of is_complex_substituent,
+        # which keys on digits/hyphens and misses this shape); it still needs an
+        # OUTER enclosing mark, escalated to the next bracket level:
+        # '(benzylsulfanyl)methyl' -> '[(benzylsulfanyl)methyl]'.
+        formatted_name = apply_enclosing_marks(name, -1)
     else:
         formatted_name = name
 
