@@ -25,3 +25,15 @@ class TestT2CarbonicFamilyParents:
     def test_protect_carbonohydrazonic_diamide_unchanged(self):
         # existing exact row in the same dict must keep working
         assert name_compound("NC(=NN)N") == "carbonohydrazonic diamide"
+
+
+@pytest.mark.unit
+class TestT3AromaticCarboximidamideProtect:
+    """P-66.4.1.1 (BB 34173/34393). Already healed at HEAD — protect pins."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("NC(=N)c1ccccc1", "benzenecarboximidamide"),
+        ("C(=N)(Nc1ccccc1)c1ccccc1", "N-phenylbenzenecarboximidamide"),
+    ])
+    def test_protect(self, smiles, expected):
+        assert name_compound(smiles) == expected
