@@ -106,6 +106,18 @@ _INORGANIC_ACID_DERIVATIVES = {
     "NN=C(N)N": "carbonohydrazonic diamide",                 # P-66.4.2.2 (aminoguanidine, BB verbatim)
     "NN=C(NN)NN": "hydrazinecarbohydrazonohydrazide",        # P-66.4.3.3 (BB verbatim)
     "NS(=O)(=O)O": "sulfamic acid",        # P-67.1.2.4.1.1 H2N-SO2-OH (contraction of sulfuramidic)
+    # Wave-2 P1AM (2026-07-09): hydrazine-parent carbonic-family parents.
+    # P-66.1.1.1.1.3 (BB 32675): 'carboxamide' is ALWAYS the suffix on a
+    # heteroacyclic parent -> hydrazinecarboxamide (PIN); P-68.3.1.2.4
+    # (BB 38623): "The systematic name is the preferred IUPAC name"
+    # (semicarbazide = general nomenclature only). Intercepts @40 before
+    # RETAINED_NAME@1300 which emitted 'semicarbazide'.
+    "NNC(N)=O": "hydrazinecarboxamide",
+    # P-66.4.2.2 (BB 34480 verbatim): amidrazone of carbonic acid.
+    "N=C(NN)NN": "hydrazinecarboximidohydrazide",
+    # P-66.4.2.2 family (aminoguanidine =NH tautomer; hydrazine parent +
+    # carboximidamide suffix per P-66.4.1.1; OPSIN-RT verified).
+    "N=C(N)NN": "hydrazinecarboximidamide",
 }
 
 # --- v23 Phase 9: carbonic/carbamic functional-replacement acids ---

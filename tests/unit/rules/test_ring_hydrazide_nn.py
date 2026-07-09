@@ -132,7 +132,9 @@ def test_chain_hydrazide_merged_nn_multiplier(smiles, expected):
         ("O=C(Nc1ccccc1)c1ccccc1", "N-phenylbenzamide"),
         ("O=C(NCC(=O)O)c1ccccc1", "2-benzamidoethanoic acid"),
         # semicarbazide / urea family (urea C(=O)-NH2 side still cleavable)
-        ("O=C(NN)N", "semicarbazide"),
+        # P-68.3.1.2.4 (BB 38623): hydrazinecarboxamide is the PIN;
+        # semicarbazide is general nomenclature only (plan P1AM Task 2).
+        ("O=C(NN)N", "hydrazinecarboxamide"),
         ("NC(=O)N", "urea"),
         # phenylhydrazine parent itself (polyazane)
         ("NNc1ccccc1", "phenylhydrazine"),
