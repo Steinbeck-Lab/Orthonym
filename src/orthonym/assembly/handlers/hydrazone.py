@@ -41,11 +41,19 @@ def name_hydrazone(
     # Lazy imports per PATTERNS § Lazy Import.
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _name_oxime_or_hydrazone, _enrich_handler_name,
-        _inject_stereo_if_missing,
+        _name_oxime_or_hydrazone, _try_name_semicarbazone,
+        _enrich_handler_name, _inject_stereo_if_missing,
     )
 
-    hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
+    # P-15.2.2 (W2E-P1FG Task 12): a semicarbazone R2C=N-NH-CO-NH2 is
+    # perceived as principal_group='hydrazone' (the C=N-N arm) whose N-NH2
+    # tail is acylated by a carbamoyl. Name it substitutively as
+    # '2-(ylidene)hydrazine-1-carboxamide' BEFORE the generic hydrazone
+    # functional-class rebuild (which drops the carbamoyl -> a different
+    # molecule). Fail-closed -> falls through to the plain hydrazone path.
+    hydrazone_name = _try_name_semicarbazone(features)
+    if not hydrazone_name:
+        hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
     if not hydrazone_name:
         return None
 

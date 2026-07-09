@@ -1994,6 +1994,48 @@ def _name_carbamate(features: Any) -> Optional[str]:
     return f"{r_name} {n_prefix}carbamate"
 
 
+def _try_name_semicarbazone(features: Any) -> Optional[str]:
+    """P-15.2.2 (BB 5074ff, W2E-P1FG Task 12): R2C=N-NH-C(=O)-NH2 ->
+    '2-({R2C}ylidene)hydrazine-1-carboxamide' (PIN; acetone semicarbazone
+    -> 2-(propan-2-ylidene)hydrazine-1-carboxamide).
+
+    Fail-closed: exactly one motif; the terminal carboxamide N and the
+    bridge N must be UNSUBSTITUTED (the SMARTS [NX3H2]/[NX3H1] enforces
+    this — N-methyl variants need N-locant machinery not built here); the
+    ylidene fragment must name via the substituent pipeline as a '-yl'."""
+    from rdkit import Chem
+    mol = features.mol
+    patt = Chem.MolFromSmarts("[CX3](=[NX2][NX3H1][CX3](=[OX1])[NX3H2])")
+    matches = mol.GetSubstructMatches(patt)
+    if len(matches) != 1:
+        return None
+    c, n2, n1, cc, o, n_am = matches[0]
+    core = {n2, n1, cc, o, n_am}
+    # BFS the ylidene fragment from the sp2 C, never crossing into the core.
+    frag = {c}
+    _stack = [c]
+    while _stack:
+        _i = _stack.pop()
+        for _nb in mol.GetAtomWithIdx(_i).GetNeighbors():
+            _j = _nb.GetIdx()
+            if _j not in frag and _j not in core:
+                frag.add(_j)
+                _stack.append(_j)
+    if frag | core != {a.GetIdx() for a in mol.GetAtoms()}:
+        return None
+    # The ylidene C's only bond leaving the fragment must be the =N2 (double).
+    c_atom = mol.GetAtomWithIdx(c)
+    _ext = [nb.GetIdx() for nb in c_atom.GetNeighbors()
+            if nb.GetIdx() not in frag]
+    if _ext != [n2]:
+        return None
+    from .substituent_enumerator import name_substituent
+    yl = name_substituent(mol, frag, c)
+    if not yl or not yl.endswith("yl"):
+        return None
+    return f"2-({yl}idene)hydrazine-1-carboxamide"
+
+
 def _try_name_urea(features: Any) -> Optional[str]:
     """Name urea derivatives as retained name with N-substitution.
 

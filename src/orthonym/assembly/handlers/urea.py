@@ -30,10 +30,16 @@ def name_urea(
     """Phase 160 Tier-B urea handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _try_name_urea, _enrich_handler_name, _inject_stereo_if_missing,
+        _try_name_urea, _try_name_semicarbazone,
+        _enrich_handler_name, _inject_stereo_if_missing,
     )
 
-    urea_name = _try_name_urea(features)
+    # P-15.2.2 (W2E-P1FG Task 12): a semicarbazone (R2C=N-NH-CO-NH2) is a urea
+    # FG with principal_group None; name it substitutively BEFORE the plain
+    # urea path (which would drop the ylidene). Fail-closed -> falls through.
+    urea_name = _try_name_semicarbazone(features)
+    if not urea_name:
+        urea_name = _try_name_urea(features)
     if not urea_name:
         return None
 
