@@ -1418,6 +1418,62 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     },
                 }
 
+    # P-35.4.1 (BB 18108, W2E-P1FC Task 6): complex substituent prefix by
+    # SUBSTITUTION — an -NH-R amino whose R is a compound/substituted prefix
+    # (e.g. -NH-CH2Cl chloromethyl) is the complex prefix '(chloromethyl)amino'.
+    # The N-monoalkyl branch above only handles a PURE (all-carbon) alkyl via
+    # _collect_pure_alkyl; a substituted branch (halomethyl, alkoxyalkyl, ...)
+    # skips it and previously mis-parsed as separate amino + chloromethyl. Name
+    # the WHOLE N-substituent branch with the universal substituent namer and
+    # wrap it as '({branch}amino)'. Fail-closed: decline (fall through) if the
+    # branch cannot be fully named, so a partial/ambiguous prefix never leaks.
+    if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+        _branch_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+        _branch_atoms = [a for a in _branch_atoms if a != n_idx]
+        # Fail-closed guard: this LOCAL complex-prefix build is only safe when
+        # the N-substituent branch is a plain acyclic substituted alkyl (e.g.
+        # -CH2Cl). A RING-bearing branch (-NH-pyridinyl, -NH-phenyl) triggers a
+        # parent-hydride SENIORITY competition between the two ring systems
+        # (P-44) that must be resolved by the parent-selection pipeline, not
+        # forced onto the benzene ring here — so decline and let it fall
+        # through (N-phenylpyridin-4-amine, not [(pyridin-4-yl)amino]benzene).
+        _branch_has_ring = any(mol.GetAtomWithIdx(a).IsInRing()
+                               for a in _branch_atoms)
+        if _branch_atoms and not _branch_has_ring:
+            from ..assembly.substituent_naming import name_substituent_fragment
+            _bname = name_substituent_fragment(
+                mol, _branch_atoms, neighbors[0].GetIdx(),
+                list(ring_atoms | {n_idx}),
+            )
+            if _bname and ' ' not in _bname:
+                # P-16.3.3: the inner substituted prefix ('chloromethyl') is
+                # itself enclosed in parentheses, then concatenated with the
+                # 'amino' compound prefix -> '(chloromethyl)amino'. Mark complex
+                # so the outer composer escalates the enclosing marks to square
+                # brackets on the senior parent -> '4-[(chloromethyl)amino]-
+                # benzoic acid'. A bare (already-simple) branch name that is not
+                # itself compound is left unwrapped inside (handled by
+                # is_complex_substituent).
+                from ..assembly.naming_utils import (
+                    is_complex_substituent, apply_enclosing_marks,
+                )
+                # Inner substituted prefix gets its own parens (P-16.3.3);
+                # 'chloromethyl' -> '(chloromethyl)'.
+                _inner = (f'({_bname})'
+                          if is_complex_substituent(_bname) else _bname)
+                _complex_prefix = f'{_inner}amino'
+                # Escalate the OUTER enclosing mark by nesting depth (P-16.5):
+                # '(chloromethyl)amino' -> '[(chloromethyl)amino]'. Passing the
+                # already-escalated form to format_substituent_prefix (which
+                # only wraps-if-unwrapped) yields '4-[(chloromethyl)amino]-...'.
+                _wrapped = (apply_enclosing_marks(_complex_prefix, -1)
+                            if _inner != _bname else _complex_prefix)
+                return {
+                    'name': _wrapped,
+                    'atoms': [n_idx] + list(_branch_atoms),
+                    'is_complex': True,
+                }
+
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
     # IUPAC 2013: (N,N-dialkylamino) (e.g., (N,N-dimethylamino))
     if h_count == 0 and len(neighbors) == 2:
