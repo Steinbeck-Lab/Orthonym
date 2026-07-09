@@ -127,6 +127,37 @@ def _find_unique_hub(mol):
     return hubs[0] if len(hubs) == 1 else None
 
 
+# P-44.1.2 class seniority for the senior-atom parent choice (N>P>As>...>Si>C).
+_GROUP15_CLASS_RANK = {'N': 0, 'P': 1, 'As': 2, 'Sb': 3, 'Bi': 4,
+                       'Si': 5, 'Ge': 6, 'Sn': 7, 'Pb': 8, 'C': 20}
+
+
+def _find_senior_phosphane_silyl_hub(mol):
+    """Return the phosphane P atom for a senior-atom-parent molecule of the
+    shape ``(organyl/H)_n P (SiH3)_m`` (m>=1), else None.
+
+    P-44.1.2: P is senior to Si, so P is the parent hydride and each SiH3 is a
+    'silyl' substituent. Restricted (fail-closed) to: a single P; every other
+    heavy atom is either part of a pure-hydrocarbyl organyl or a bare SiH3
+    directly on the P; at least one silyl present (else the C-only phosphane
+    stays with name_phosphine)."""
+    p_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == 'P']
+    if len(p_atoms) != 1:
+        return None
+    p = p_atoms[0]
+    if p.IsInRing():
+        return None
+    # No hub-eligible atom more senior than P may be present (N-P etc. handled
+    # elsewhere); a Si is allowed only as a bare-silyl substituent (checked in
+    # _classify_phosphane_subs). Any Ge/Sn/Pb/other-metal hub -> fail closed.
+    for a in mol.GetAtoms():
+        sym = a.GetSymbol()
+        if sym in ('H', 'C', 'P', 'Si'):
+            continue
+        return None
+    return p
+
+
 def _classify_halogens(mol, hub) -> Optional[dict]:
     """Return ``{halogen_symbol: count}`` iff EVERY non-hub heavy atom is a
     terminal halogen single-bonded to the hub, else None."""
@@ -206,7 +237,15 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
 
     hub = _find_unique_hub(mol)
     if hub is None:
-        return None
+        # P-44.1.2: multiple hub-eligible atoms -> the SENIOR element (class
+        # order N>P>As>...>Si>...>C) is the parent hydride; the rest are
+        # substituents. Restricted to a phosphane P parent bearing a bare silyl
+        # (C[PH][SiH3] -> methyl(silyl)phosphane); handled by the dedicated
+        # branch below (fail-closed for any other senior-atom shape).
+        senior = _find_senior_phosphane_silyl_hub(mol)
+        if senior is None:
+            return None
+        hub = senior
     # The hub itself must NOT be a ring member (an arsenin/thiophene/arsole ring
     # parent is a heterocycle, not a mononuclear parent hydride) — but aromatic
     # ring SUBSTITUENTS (triphenylarsane) are fine: the per-substituent purity
@@ -245,7 +284,44 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
             prefix_block = _build_substituent_string(organyls) if organyls else ""
             return _assemble(prefix_block, lam, stem)
 
+    # --- P-44.1.2: a phosphane hub bearing a SILYL (SiH3) substituent (with
+    #     optional pure-hydrocarbyl organyls). P > Si in the seniority of
+    #     classes, so P is the parent; the SiH3 is the 'silyl' substituent
+    #     (name_phosphine only counts C neighbours and would silently DROP the
+    #     silyl). Only fires when >=1 silyl is present, so plain C-only
+    #     phosphanes stay with name_phosphine (no double-path). ---
+    if hub.GetSymbol() == 'P':
+        subs = _classify_phosphane_subs(mol, hub)
+        if subs is not None and 'silyl' in subs:
+            prefix_block = _build_substituent_string(subs)
+            return _assemble(prefix_block, lam, stem)
+
     return None
+
+
+def _classify_phosphane_subs(mol, hub) -> Optional[List[str]]:
+    """Classify EVERY heavy hub-neighbour of a phosphane P as either a pure
+    hydrocarbyl organyl (methyl/ethyl/phenyl...) or a bare silyl (-SiH3), else
+    None. Returns the list of substituent prefix names. Fail-closed: any other
+    heteroatom substituent, a substituted silyl, or an impure organyl -> None."""
+    hub_idx = hub.GetIdx()
+    names: List[str] = []
+    for nbr in hub.GetNeighbors():
+        if nbr.GetSymbol() == 'H':
+            continue
+        if nbr.GetSymbol() == 'Si':
+            # bare silyl only: SiH3 attached solely to the hub (degree 1)
+            if nbr.GetDegree() != 1 or nbr.GetTotalNumHs() != 3:
+                return None
+            if nonstandard_bonding_number(mol, nbr.GetIdx()) is not None:
+                return None
+            names.append('silyl')
+            continue
+        name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+        if name is None:
+            return None
+        names.append(name)
+    return names or None
 
 
 _HETERONE_STEMS = {'Si': 'silanone', 'Ge': 'germanone',
@@ -434,6 +510,24 @@ def name_dinuclear_hydride(mol) -> Optional[str]:
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
+
+    # P-41 cls 21 / P-44.1.2: the neutral 2-heteroatom H2P-NH2 parent. N is the
+    # senior skeletal class, so the parent is a phosphane skeleton carrying the
+    # senior N as the '-amine' terminal -> 'phosphanamine' (a(ba)n preselected,
+    # P-21.2.3.1). Guard: exactly one P + one N, single-bonded, both H-saturated
+    # (PH2-NH2), neutral, acyclic, no other heavy atom. Fail-closed otherwise.
+    heavy = [a for a in mol.GetAtoms() if a.GetSymbol() != 'H']
+    if len(heavy) == 2:
+        syms = sorted(a.GetSymbol() for a in heavy)
+        if syms == ['N', 'P']:
+            p = next(a for a in heavy if a.GetSymbol() == 'P')
+            n = next(a for a in heavy if a.GetSymbol() == 'N')
+            if (not p.IsInRing() and not n.IsInRing()
+                    and p.GetTotalNumHs() == 2 and n.GetTotalNumHs() == 2
+                    and nonstandard_bonding_number(mol, p.GetIdx()) is None):
+                bond = mol.GetBondBetweenAtoms(p.GetIdx(), n.GetIdx())
+                if bond is not None and bond.GetBondType() == Chem.BondType.SINGLE:
+                    return "phosphanamine"
 
     # Every heavy atom must be one of the two hub elements (a carbon, halide or
     # stray heteroatom -> not a bare catenated hydride -> fail-closed).

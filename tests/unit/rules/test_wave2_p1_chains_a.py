@@ -54,3 +54,13 @@ class TestP41RadicalMostSenior:
         # free valence is C-1 of the ethyl point-of-attachment chain.
         mol = Chem.MolFromSmiles("[CH2]CC(=O)O")
         assert name_radical(mol) == "2-carboxyethyl"
+
+
+@pytest.mark.unit
+class TestP44SeniorAtomParent:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("C[PH][SiH3]", "methyl(silyl)phosphane"),  # P>Si>C: P is the senior parent atom
+        ("[PH2]N", "phosphanamine"),                  # N senior heterane class (P-41 cls 21)
+    ])
+    def test_senior_atom_parent(self, smiles, expected):
+        assert name_compound(smiles) == expected
