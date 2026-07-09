@@ -755,6 +755,57 @@ def _identify_ring_heteroatom_fg(mol, start_idx: int,
     return None
 
 
+def _nitrile_oxide_prefix(mol, start_idx: int,
+                          ring_atoms: Set[int]) -> Optional[Dict]:
+    """P-66.5.4.2 lambda-branch: ring substituent -C#[N+]-[O-] (nitrile
+    oxide, ON#C-) -> preferred prefix '(oxo-lambda5-azanylidyne)methyl'
+    (not isofulminato).
+
+    Three-state return:
+      * prefix dict  — pattern matched AND the fragment being named is an
+        ANION (net formal charge < 0): P-41 class-2 anion parent outranks the
+        zwitterionic nitrile oxide, so the prefix form is the PIN (BB
+        'sodium 4-[(oxo-lambda5-azanylidyne)methyl]benzoate', 34897).
+      * {'name': None} — pattern matched in a NON-anion context: the nitrile
+        oxide itself is senior (P-41 zwitterion) and the PIN is the
+        functional-class '...nitrile oxide' SUFFIX form, unbuilt -> the
+        caller must FAIL CLOSED (today's walker silently mis-names the group).
+      * None — pattern absent: continue normal dispatch.
+    """
+    atom = mol.GetAtomWithIdx(start_idx)
+    if atom.GetSymbol() != 'C' or atom.GetFormalCharge() != 0:
+        return None
+    if atom.GetTotalNumHs() != 0:
+        return None
+    triple_n = None
+    for nbr in atom.GetNeighbors():
+        if nbr.GetIdx() in ring_atoms:
+            continue
+        bond = mol.GetBondBetweenAtoms(start_idx, nbr.GetIdx())
+        if (nbr.GetSymbol() == 'N' and nbr.GetFormalCharge() == 1
+                and bond.GetBondType() == Chem.BondType.TRIPLE):
+            if triple_n is not None:
+                return None
+            triple_n = nbr
+        else:
+            return None  # any other exocyclic decoration -> not this class
+    if triple_n is None:
+        return None
+    o_minus = [n for n in triple_n.GetNeighbors()
+               if n.GetIdx() != start_idx]
+    if (len(o_minus) != 1 or o_minus[0].GetSymbol() != 'O'
+            or o_minus[0].GetFormalCharge() != -1
+            or o_minus[0].GetDegree() != 1):
+        return None
+    if Chem.GetFormalCharge(mol) < 0:  # anion context (see investigation)
+        return {
+            'name': '(oxo-lambda5-azanylidyne)methyl',
+            'atoms': [start_idx, triple_n.GetIdx(), o_minus[0].GetIdx()],
+            'is_complex': True,
+        }
+    return {'name': None}
+
+
 def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
@@ -779,6 +830,13 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     _ring_fg = _identify_ring_heteroatom_fg(mol, start_idx, ring_atoms)
     if _ring_fg is not None:
         return _ring_fg
+
+    # P-66.5.4.2: nitrile oxide -C#[N+]-[O-]. Must run BEFORE the generic C
+    # branches, which mis-name the group (silent structure loss). Prefix form
+    # is PIN only in anion context; neutral context fails closed.
+    _no = _nitrile_oxide_prefix(mol, start_idx, ring_atoms)
+    if _no is not None:
+        return _no if _no.get('name') else None
 
     # Halogens - single atom substituents
     if symbol in SUBSTITUENT_PREFIXES:
