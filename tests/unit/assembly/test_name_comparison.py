@@ -64,3 +64,41 @@ class TestCompareLocantStrSets:
     def test_compare_locant_strings_scalar(self):
         assert compare_locant_strings("4'", "4a") == -1
         assert compare_locant_strings("4a", "4a") == 0
+
+
+from orthonym.assembly.name_comparison import compare_names
+
+
+class TestCompareNamesP455:
+    """BB P-45.5 (BlueBookV2.md:22234ff) worked examples, string-level."""
+
+    def test_bb_example_1_bromo_before_dibromo(self):
+        # BB P-45.5 example (2): 'bromo' earlier alphabetically than 'dibromo'
+        a = "2-bromo-4-chloro-N-(2,4-dibromophenyl)aniline"
+        b = "2,4-dibromo-N-(2-bromo-4-chlorophenyl)aniline"
+        assert compare_names(a, b) == -1
+        assert compare_names(b, a) == 1
+
+    def test_bb_example_4_difluoro_before_dinitro(self):
+        # BB P-45.5 example (4) — the row's corroborating acyclic parent
+        a = "4-(1,2-difluoropropyl)-5,6-dinitroheptanoic acid"
+        b = "4-(1,2-dinitropropyl)-5,6-difluoroheptanoic acid"
+        assert compare_names(a, b) == -1
+
+    def test_numeric_locants_in_order_of_appearance(self):
+        # BB line 6407: '1-chloroethoxy' precedes '2-chloroethoxy' when
+        # letters are identical — numerals compared in APPEARANCE order.
+        a = "4-{2-[2-(4-carboxyphenyl)-1-chloroethoxy]-1-chloroethyl}benzoic acid"
+        b = "4-{2-[2-(4-carboxyphenyl)-2-chloroethoxy]-2-chloroethyl}benzoic acid"
+        assert compare_names(a, b) == -1
+
+    def test_letters_before_italic_letters(self):
+        # Roman-letter tier decides before the fusion italic letter tier:
+        # identical Roman letters, fusion letters 'f' < 'g' (BB P-14.5.3
+        # naphtho[1,2-f]quinolin-2-yl preferred to naphtho[1,2-g]quinolin-1-yl).
+        a = "naphtho[1,2-f]quinolin-2-yl"
+        b = "naphtho[1,2-g]quinolin-1-yl"
+        assert compare_names(a, b) == -1
+
+    def test_equal_names(self):
+        assert compare_names("hexan-1-ol", "hexan-1-ol") == 0

@@ -97,3 +97,71 @@ def compare_locant_str_sets(set_a: List[str], set_b: List[str]) -> int:
     if len(a_sorted) > len(b_sorted):
         return 1
     return 0
+
+
+# ---------------------------------------------------------------------------
+# P-45.5 — alphanumerical order of complete names
+# ---------------------------------------------------------------------------
+
+# Stereodescriptor parenthetical: (R)-, (2S)-, (1R,2S)-, (E)-, (2E,4Z)- ...
+_STEREO_DESC_RE = re.compile(r"\((?:\d*[a-zA-Z]?'*[RSEZrsez](?:,\d*[a-zA-Z]?'*[RSEZrsez])*)\)-?")
+# Leading/embedded indicated hydrogen: 1H-, 9aH-, 2H,3H- (italic H + locant)
+_IH_STEM_RE = re.compile(r"\d+[a-z]?'*H[,-]")
+# Italic heteroatom locants: N-, N,N'-, N2-, O-, S- (locant position only)
+_ITALIC_LOCANT_RE = re.compile(r"(?<![a-zA-Z])[NOSP]\d*'*(?=[,-])")
+# Numeral locant tokens in appearance order (incl. primes/superscript/lambda)
+_LOCANT_TOKEN_FINDER = re.compile(r"\d+'*[a-z]?'*(?:\^\d+)?(?:(?:λ|lambda)\d+)?")
+
+# naming_utils owns the nesting-relevant bracket grammar — reuse it.
+from .naming_utils import _FUSION_BRACKET_RE, _INDICATED_H_RE  # noqa: E402
+
+
+def _roman_letter_key(name: str) -> str:
+    """Tier 1: Roman letters in order of appearance; italic elements removed.
+
+    Removes (per BB P-45.5) stereodescriptors, indicated-hydrogen descriptors,
+    fusion/von-Baeyer bracket contents, and italic heteroatom locants, then
+    keeps only alphabetic characters, lowercased.
+    """
+    work = _STEREO_DESC_RE.sub('', name)
+    work = _INDICATED_H_RE.sub('', work)
+    work = _IH_STEM_RE.sub('', work)
+    work = _FUSION_BRACKET_RE.sub('', work)
+    work = _ITALIC_LOCANT_RE.sub('', work)
+    return ''.join(ch for ch in work if ch.isalpha()).lower()
+
+
+def _italic_letter_key(name: str) -> str:
+    """Tier 2: italic letters in order of appearance (fusion letters, H,
+    heteroatom locants) — BB P-45.5 / P-14.5.3."""
+    out: List[str] = []
+    for m in _FUSION_BRACKET_RE.finditer(name):
+        out.extend(ch for ch in m.group(0) if ch.isalpha())
+    for m in _IH_STEM_RE.finditer(name):
+        out.append('h')
+    for m in _ITALIC_LOCANT_RE.finditer(name):
+        out.append(m.group(0)[0].lower())
+    return ''.join(out)
+
+
+def _numeral_key(name: str) -> Tuple[tuple, ...]:
+    """Tier 3: numerical locants in order of APPEARANCE (not sorted) —
+    BB P-45.5 final sentence."""
+    return tuple(locant_sort_key(t) for t in _LOCANT_TOKEN_FINDER.findall(name))
+
+
+def compare_names(a: str, b: str) -> int:
+    """P-45.5 alphanumerical comparison of two complete candidate names.
+
+    Returns -1 if a is earlier (preferred as PIN), 1 if b, 0 if equal.
+    Tier 1: Roman letters in order of appearance (italics excluded).
+    Tier 2: italic letters in order of appearance.
+    Tier 3: numerical locants in order of appearance (locant_sort_key each).
+    """
+    for keyf in (_roman_letter_key, _italic_letter_key, _numeral_key):
+        ka, kb = keyf(a), keyf(b)
+        if ka < kb:
+            return -1
+        if ka > kb:
+            return 1
+    return 0
