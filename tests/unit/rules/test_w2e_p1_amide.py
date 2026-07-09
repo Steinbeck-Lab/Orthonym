@@ -9,6 +9,15 @@ import pytest
 from orthonym.namer import name_compound
 
 
+@pytest.fixture()
+def _validity_gate_on(monkeypatch):
+    """Turn the OPSIN validity gate (SELF-01) back ON — conftest disables it
+    for unit-test speed. Required to assert end-to-end fail-closed behavior."""
+    import orthonym.namer as _namer
+    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    yield
+
+
 @pytest.mark.unit
 class TestT2CarbonicFamilyParents:
     """P-66.1.1.1.1.3 (BB 32675) + P-68.3.1.2.4 (BB 38623: 'The systematic
@@ -211,4 +220,38 @@ class TestT11Am2PoolDiscard:
         ("CC(=O)NC", "N-methylacetamide"),
     ])
     def test_protect_amide_pool(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT12GeminalDicarboximidamide:
+    """AM-3 (P-66.4.1.4.2 / P-16.9.1): geminal ring diamide/diimidamide."""
+
+    def test_geminal_diamide_base(self):
+        # step (a): the {1,1} locant dedup fix (BUILT, OPSIN-RT verified)
+        assert name_compound("NC(=O)C1(C(N)=O)CCCCC1") == \
+            "cyclohexane-1,1-dicarboxamide"
+
+    @pytest.mark.xfail(reason=(
+        "AM-3 step (b) DEFERRED (plan P1AM Task 12): the substituted geminal "
+        "dicarboximidamide needs the per-group primed-N superscript locant "
+        "subsystem (N''1-ethyl / N1,N1-dimethyl with load-bearing priming "
+        "order). Not built — fails closed (unknown) which is correct behavior "
+        "(never a wrong name). Residual recorded in WAVE2-COMPLETION-DEFERRED.md."
+    ), strict=True)
+    def test_geminal_dicarboximidamide_substituted(self):
+        assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
+            "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
+
+    def test_substituted_stays_fail_closed(self, _validity_gate_on):
+        # the deferred substituted form must fail CLOSED end-to-end (the
+        # assembler's N-subs-dropping 'cyclohexane-1,1-dicarboximidamide' is
+        # a DIFFERENT molecule; SELF-01 suppresses it -> never a wrong name).
+        assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
+            "unknown organic compound"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("NC(=N)C1CCCCC1", "cyclohexanecarboximidamide"),  # mono form OK at HEAD
+    ])
+    def test_protect_mono(self, smiles, expected):
         assert name_compound(smiles) == expected

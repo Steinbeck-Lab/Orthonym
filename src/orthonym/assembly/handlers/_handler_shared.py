@@ -546,7 +546,14 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
                     break
             if anchor_locant is not None:
                 anchored_locants.append(anchor_locant)
-        anchored_locants = sorted(set(anchored_locants))
+        # AM-3 (P-66.4.1.4.2, plan P1AM Task 12): keep the MULTISET of anchor
+        # locants for the appended ring-suffix family so a GEMINAL di-suffix
+        # (two -carboxamide carbons on the SAME ring atom -> cyclohexane-1,1-
+        # dicarboxamide) is not collapsed to a single suffix. features.
+        # principal_group_atoms is already de-overlapped upstream, so each
+        # entry is a DISTINCT group; only a set() would wrongly merge two
+        # geminal groups. Sort the multiset (duplicates preserved).
+        anchored_locants = sorted(anchored_locants)
         if anchored_locants:
             fg_count = len(anchored_locants)
             # Locant presentation: the bare mono case keeps the historical
