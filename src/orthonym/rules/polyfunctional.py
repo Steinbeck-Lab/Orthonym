@@ -1346,20 +1346,97 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 _seen_amc[_amc] = (_dbl, _sgl)
             if _am_ok and _seen_amc:
                 _am_prefixes = []
+                _am_hydrazinyl_tails = {}
                 for _amc, (_dbl, _sgl) in _seen_amc.items():
                     _loc = atom_to_locant.get(_amc)
-                    _amino = _name_amidine_chain_side(mol, _sgl, _amc, 'amino')
+                    # P-66.4.2.3.1 (BB 34490, plan P1AM Task 6): when the
+                    # single-bonded N's sole heavy branch is a terminal NH2,
+                    # the -NH-NH2 unit is ONE 'hydrazinyl' prefix (PIN
+                    # '3-hydrazinyl-3-iminopropanoic acid'), never the
+                    # fragmenting '(aminoamino)'.
+                    _sgl_branches = [
+                        nb.GetIdx()
+                        for nb in mol.GetAtomWithIdx(_sgl).GetNeighbors()
+                        if nb.GetIdx() != _amc and nb.GetAtomicNum() > 1]
+                    _hydrazinyl_tail = None
+                    if (len(_sgl_branches) == 1
+                            and mol.GetAtomWithIdx(_sgl_branches[0]).GetSymbol() == 'N'
+                            and mol.GetAtomWithIdx(_sgl_branches[0]).GetDegree() == 1):
+                        _amino = 'hydrazinyl'
+                        _hydrazinyl_tail = _sgl_branches[0]
+                    else:
+                        _amino = _name_amidine_chain_side(mol, _sgl, _amc, 'amino')
                     _imino = _name_amidine_chain_side(mol, _dbl, _amc, 'imino')
                     if _loc is None or _amino is None or _imino is None:
                         _am_ok = False
                         break
                     _am_prefixes.append(format_fg_prefix(_amino, [_loc], 1))
                     _am_prefixes.append(format_fg_prefix(_imino, [_loc], 1))
+                    if _hydrazinyl_tail is not None:
+                        _am_hydrazinyl_tails[_amc] = _hydrazinyl_tail
                 if _am_ok:
                     all_prefixes.extend(_am_prefixes)
                     for _amc, (_dbl, _sgl) in _seen_amc.items():
                         _amidine_excluded_n.add(_dbl)
                         _amidine_excluded_n.add(_sgl)
+                        if _amc in _am_hydrazinyl_tails:
+                            _amidine_excluded_n.add(_am_hydrazinyl_tails[_amc])
+                    continue
+
+        # P-66.4.2.3.2 (BB 34498, plan P1AM Task 6): an amidrazone carbon
+        # -C(=N-NH2)-NH2 that TERMINATES a chain parent is expressed with
+        # -NH2 -> 'amino' and =N-NH2 -> 'hydrazinylidene'. Fires only when
+        # every match's amidrazone C is a chain member, the =N-NH2 hydrazono
+        # arm is UNSUBSTITUTED (terminal NH2), and the amino side is
+        # nameable; else falls through (off-chain matches reach the PF-2
+        # filter + 'carbamohydrazonoyl' path below unchanged).
+        if fg_name == 'hydrazonamide' and chain_set:
+            _hz_ok = True
+            _hz_units = {}
+            for _m in matches:
+                _hc = _m[0]  # SMARTS [CX3](=[NX2][NX2,NX3])[NX3]: match[0]=C
+                if _hc not in chain_set:
+                    _hz_ok = False
+                    break
+                _at = mol.GetAtomWithIdx(_hc)
+                _dbl = next((nb.GetIdx() for nb in _at.GetNeighbors()
+                             if nb.GetSymbol() == 'N'
+                             and mol.GetBondBetweenAtoms(
+                                 _hc, nb.GetIdx()).GetBondTypeAsDouble() == 2.0),
+                            None)
+                _sgl = next((nb.GetIdx() for nb in _at.GetNeighbors()
+                             if nb.GetSymbol() == 'N'
+                             and mol.GetBondBetweenAtoms(
+                                 _hc, nb.GetIdx()).GetBondTypeAsDouble() == 1.0),
+                            None)
+                if _dbl is None or _sgl is None:
+                    _hz_ok = False
+                    break
+                # =N-NH2 arm must be exactly one terminal NH2 (unsubstituted)
+                _dbl_branches = [nb.GetIdx()
+                                 for nb in mol.GetAtomWithIdx(_dbl).GetNeighbors()
+                                 if nb.GetIdx() != _hc and nb.GetAtomicNum() > 1]
+                if (len(_dbl_branches) != 1
+                        or mol.GetAtomWithIdx(_dbl_branches[0]).GetSymbol() != 'N'
+                        or mol.GetAtomWithIdx(_dbl_branches[0]).GetDegree() != 1):
+                    _hz_ok = False
+                    break
+                _hz_units[_hc] = (_dbl, _dbl_branches[0], _sgl)
+            if _hz_ok and _hz_units:
+                _hz_prefixes = []
+                for _hc, (_dbl, _nh2, _sgl) in _hz_units.items():
+                    _loc = atom_to_locant.get(_hc)
+                    _amino = _name_amidine_chain_side(mol, _sgl, _hc, 'amino')
+                    if _loc is None or _amino is None:
+                        _hz_ok = False
+                        break
+                    _hz_prefixes.append(format_fg_prefix(_amino, [_loc], 1))
+                    _hz_prefixes.append(
+                        format_fg_prefix('hydrazinylidene', [_loc], 1))
+                if _hz_ok:
+                    all_prefixes.extend(_hz_prefixes)
+                    for _hc, (_dbl, _nh2, _sgl) in _hz_units.items():
+                        _amidine_excluded_n.update({_dbl, _nh2, _sgl})
                     continue
 
         # PF-2 (P-66.4.2.3.5): an amidrazone attached to the chain via its AMINO

@@ -306,10 +306,14 @@ def _get_non_principal_terminal_carbons(
         # the acid-halide note above. The 'carbamimidoyl' prefix is the PIN only
         # for RING parents / genuinely off-chain amidine carbons (BB 34332);
         # those never use chain enumeration so they are unaffected.
-        # Wave2 T3d: the amidrazone (hydrazonamide) and hydrazidine
-        # (hydrazonohydrazide) characteristic carbon is always chain-terminal,
-        # exactly like amidine. SMARTS index 0 = that carbon.
-        'hydrazonamide': 0,
+        # P-66.4.2.3.2 (BB 34498, plan P1AM Task 6): the amidrazone
+        # (hydrazonamide) carbon at a chain end stays IN the chain and is
+        # expressed via 'amino' + 'hydrazinylidene' prefixes, mirroring the
+        # AM-4 amidine note above. 'carbamohydrazonoyl' remains the PIN
+        # prefix only for ring/off-chain amidrazone carbons.
+        # ('hydrazidine' stays excluded: its chain-end split form
+        # (P-66.4.3.4.1 hydrazinyl+hydrazinylidene) is Task 7 scope-checked
+        # and currently fails closed.)
         'hydrazidine': 0,
     }
 

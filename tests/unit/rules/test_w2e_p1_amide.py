@@ -76,3 +76,34 @@ class TestT5Biguanide:
 
     def test_protect_plain_guanidine(self):
         assert name_compound("NC(=N)N") == "guanidine"
+
+
+@pytest.mark.unit
+class TestT6AmidrazonePrefixes:
+    """P-66.4.2.3.1 (BB 34490) + P-66.4.2.3.2 (BB 34498): chain-terminal
+    amidrazone C stays IN the chain (hydrazinyl+imino / amino+hydrazinylidene);
+    ring-attached keeps the full acyl prefix (hydrazinecarboximidoyl)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # BB 34494 verbatim PIN:
+        ("N=C(NN)CC(=O)O", "3-hydrazinyl-3-iminopropanoic acid"),
+        # P-66.4.2.3.2 chain-end pattern (OPSIN-verified):
+        ("NC(=NN)CC(=O)O", "3-amino-3-hydrazinylidenepropanoic acid"),
+        ("NN=C(N)CCC(=O)O", "4-amino-4-hydrazinylidenebutanoic acid"),
+        # BB 34496 verbatim PIN (ring parent -> acyl prefix retained):
+        ("NNC(=N)c1cccc(C(=O)O)c1", "3-(hydrazinecarboximidoyl)benzoic acid"),
+    ])
+    def test_heals(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # PF-2 pass-D pins share the hydrazonamide FG machinery — protect:
+        ("CC(=NN)NCCC(=O)O", "3-(ethanehydrazonamido)propanoic acid"),
+        ("CC(=NN)N", "ethanehydrazonamide"),
+        # AM-4 pass-D chain-amidine pins share _TERMINAL_C_FGS + the amidine
+        # block — protect:
+        ("CCN=C(CCC(=O)OC)N(C)C",
+         "methyl 4-(dimethylamino)-4-(ethylimino)butanoate"),
+    ])
+    def test_protect_shared_machinery(self, smiles, expected):
+        assert name_compound(smiles) == expected

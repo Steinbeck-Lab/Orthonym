@@ -508,6 +508,41 @@ def _identify_suffix_fg_on_benzene(
             }
             if n_subs:
                 result['n_substituents'] = n_subs
+            # P-66.4.2.3.1 (BB 34490/34496, plan P1AM Task 6): ring-attached
+            # -C(=NH)-NH-NH2 is 'hydrazinecarboximidoyl' (PIN) when demoted;
+            # plain carbamimidoyl would DROP the hydrazino N (structure-wrong).
+            # Detect: the amidine C's single-bonded N carries exactly one
+            # terminal NH2 and no other heavy substituent -> record the swapped
+            # prefix stem. A terminal-N branch PLUS anything else -> fail
+            # closed (mark unnameable so the caller declines).
+            _amc = start_idx  # match[0] == the amidine carbon
+            _sgl = next(
+                (nb.GetIdx() for nb in mol.GetAtomWithIdx(_amc).GetNeighbors()
+                 if nb.GetSymbol() == 'N'
+                 and mol.GetBondBetweenAtoms(
+                     _amc, nb.GetIdx()).GetBondTypeAsDouble() == 1.0),
+                None)
+            if _sgl is not None:
+                _sgl_heavy = [
+                    nb.GetIdx()
+                    for nb in mol.GetAtomWithIdx(_sgl).GetNeighbors()
+                    if nb.GetIdx() != _amc and nb.GetAtomicNum() > 1]
+                if (len(_sgl_heavy) == 1
+                        and mol.GetAtomWithIdx(_sgl_heavy[0]).GetSymbol() == 'N'
+                        and mol.GetAtomWithIdx(_sgl_heavy[0]).GetDegree() == 1):
+                    # P-16.3.3: 'hydrazinecarboximidoyl' is a compound
+                    # substituent prefix -> enclose in parentheses so it
+                    # alphabetises on its complete name and cites cleanly
+                    # ('3-(hydrazinecarboximidoyl)benzoic acid').
+                    result['demoted_prefix_override'] = '(hydrazinecarboximidoyl)'
+                elif len(_sgl_heavy) >= 1 and any(
+                        mol.GetAtomWithIdx(_h).GetSymbol() == 'N'
+                        and mol.GetAtomWithIdx(_h).GetDegree() == 1
+                        for _h in _sgl_heavy):
+                    # hydrazino N present but with extra substitution -> the
+                    # N/N-prime semantics of a decorated hydrazinecarboximidoyl
+                    # are not built; fail closed rather than drop the N.
+                    result['unnameable'] = True
             return result
 
         # Aldehyde: C(=O)H
@@ -2484,6 +2519,8 @@ def name_substituted_benzene(
     prefix_groups: Dict[str, List[int]] = defaultdict(list)
     # Track N-substituents for amides keyed by suffix_name
     n_substituents_map: Dict[str, List[str]] = {}
+    # P-66.4.2.3.1 (plan P1AM Task 6): demoted-prefix stem override by suffix_name
+    demoted_prefix_overrides: Dict[str, str] = {}
     # C4: track amine prefixes that CAN be promoted to the aniline suffix.
     # Maps locant -> {'prefix_name': <existing prefix>, 'n_substituents': [...]}.
     amine_candidates: Dict[int, Dict] = {}
@@ -2499,6 +2536,11 @@ def name_substituted_benzene(
                 # Track N-substituents if present
                 if 'n_substituents' in sub_info and sub_info['n_substituents']:
                     n_substituents_map[sub_info['suffix_name']] = sub_info['n_substituents']
+                # P-66.4.2.3.1 (plan P1AM Task 6): carry a demoted-prefix stem
+                # override (hydrazinecarboximidoyl) if the detector set one.
+                if sub_info.get('demoted_prefix_override'):
+                    demoted_prefix_overrides[sub_info['suffix_name']] = \
+                        sub_info['demoted_prefix_override']
             else:
                 prefix_groups[sub_info['name']].append(locant)
                 # C4: record a promotable amine (payload set by
@@ -2581,7 +2623,7 @@ def name_substituted_benzene(
     if suffix_groups:
         name = _assemble_benzene_with_suffix(
             mol, suffix_groups, prefix_groups, n_substituents_map,
-            atom_to_locant, oriented_ring
+            atom_to_locant, oriented_ring, demoted_prefix_overrides
         )
         if stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
@@ -2678,6 +2720,7 @@ def _assemble_benzene_with_suffix(
     n_substituents_map: Dict[str, List[str]],
     atom_to_locant: Dict[int, int],
     oriented_ring: List[int],
+    demoted_prefix_overrides: Optional[Dict[str, str]] = None,
 ) -> str:
     """
     Assemble benzene name with suffix functional groups.
@@ -2744,10 +2787,18 @@ def _assemble_benzene_with_suffix(
         # hyphenated name is 'complex', so format_substituent_prefix wraps it in
         # parentheses. Bare carbamimidoyl (no N-subs) keeps the plain prefix.
         if sfx_name == 'carboximidamide':
-            n_subs = n_substituents_map.get('carboximidamide', [])
-            n_prefix = _build_amidine_n_prefix(n_subs)
-            if n_prefix:
-                prefix_form = f"{n_prefix}{prefix_form}"
+            # P-66.4.2.3.1 (BB 34490/34496, plan P1AM Task 6): a hydrazino-
+            # bearing ring amidine demotes to 'hydrazinecarboximidoyl', not the
+            # N-dropping 'carbamimidoyl'. The override carries no N/N' subs
+            # (decorated hydrazino forms are fail-closed at detection).
+            _override = (demoted_prefix_overrides or {}).get('carboximidamide')
+            if _override:
+                prefix_form = _override
+            else:
+                n_subs = n_substituents_map.get('carboximidamide', [])
+                n_prefix = _build_amidine_n_prefix(n_subs)
+                if n_prefix:
+                    prefix_form = f"{n_prefix}{prefix_form}"
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
 

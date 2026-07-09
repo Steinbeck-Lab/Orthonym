@@ -131,7 +131,10 @@ class TestPF2Hydrazonamido:
 class TestFailClosed:
     @pytest.mark.parametrize("smiles", [
         "O=C(O)CNC#N",     # cyanamide + senior COOH coexistence (AM-1 out of scope)
-        "NN=C(N)CCC(=O)O",  # C-attached hydrazonamide (PF-2 out of scope)
+        # NB: "NN=C(N)CCC(=O)O" was pass-D-fail-closed; plan P1AM Task 6
+        # (P-66.4.2.3.2) now HEALS it to '4-amino-4-hydrazinylidenebutanoic
+        # acid' (chain-terminal amidrazone amino/hydrazinylidene split) — it
+        # is a W2E-P1AM Task-6 heal, no longer a fail-closed case.
         "CC(=N)NCCC(=O)O",  # N-attached amidine sibling (separate row)
     ])
     def test_stays_unknown(self, _validity_gate_on, smiles):
