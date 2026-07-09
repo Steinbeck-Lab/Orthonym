@@ -176,3 +176,21 @@ class TestT9ComplexPolyamines:
     ])
     def test_protect_simple_diamines(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT10Am2AcylChainSubstituents:
+    """AM-2 ROOT-1 (P-66.1.7, BB 33576 verbatim): the T5b off-chain amide
+    block must express acyl-chain substituents or decline."""
+
+    def test_heals(self):
+        assert name_compound("CN(CC(O)CO)C(=O)CN") == \
+            "2-amino-N-(2,3-dihydroxypropyl)-N-methylacetamide"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # T5b's existing clean-coverage case must not regress — the plain
+        # off-chain amide with NO acyl-chain substituents:
+        ("CCCC(NC(C)=O)CC", "N-(hexan-3-yl)acetamide"),
+    ])
+    def test_protect_plain_off_chain(self, smiles, expected):
+        assert name_compound(smiles) == expected

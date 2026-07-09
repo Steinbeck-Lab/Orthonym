@@ -4648,6 +4648,101 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1
                 }
                 if _covered == _heavy:
+                    # AM-2 ROOT-1 (P-66.1.7, plan P1AM Task 10): atom-coverage is
+                    # NOT name-coverage — name_amide never enumerates acyl-CHAIN
+                    # substituents, so any heavy atom hanging off the acyl parent
+                    # (beyond the amide N + its substituents + the acyl =O/chain)
+                    # is silently dropped. Enumerate them here and prepend
+                    # located prefixes; decline on any un-nameable branch.
+                    from ..perception.functional_groups import (
+                        detect_functional_groups as _detect_fgs_am2,
+                    )
+                    from ..rules.polyfunctional import (
+                        get_fg_prefix_form as _get_fg_prefix_am2,
+                        format_fg_prefix as _fmt_fg_prefix_am2,
+                    )
+                    _acyl_atom_set = set(_acyl_locants.keys())
+                    _named_atoms = set(amide_atoms) | _acyl_atom_set
+                    for _s in get_n_substituents(mol, amide_atoms):
+                        _named_atoms |= set(_s.get('atoms') or [])
+                    # simple FG prefixes whose CENTER lies on an acyl-chain atom
+                    # (amino/hydroxy/halo/... on the acyl parent, e.g. the 2-amino
+                    # of 2-amino-N-...-acetamide). Center = the atom bonded to a
+                    # chain carbon; render via the shared FG-prefix machinery.
+                    _acyl_prefixes = []  # (locant:int, alpha_name:str, rendered)
+                    _acyl_ok = True
+                    _fg_by_center = {}
+                    _detected = _detect_fgs_am2(mol)
+                    _acyl_principal_chain = sorted(_acyl_atom_set)
+                    for _ci in list(_acyl_locants.keys()):
+                        _cl = _acyl_locants[_ci]
+                        for _nb in mol.GetAtomWithIdx(_ci).GetNeighbors():
+                            _bi = _nb.GetIdx()
+                            if _bi in _named_atoms or _nb.GetAtomicNum() <= 1:
+                                continue
+                            # (a) simple FG-prefix branch (amino/hydroxy/halo/...)
+                            _pfx_name = None
+                            if _nb.GetSymbol() in ('N', 'O', 'S', 'F', 'Cl',
+                                                   'Br', 'I') and _nb.GetDegree() == 1:
+                                for _fgn, _matches in _detected.items():
+                                    for _m in _matches:
+                                        if _m and _m[0] == _bi:
+                                            _pf = _get_fg_prefix_am2(
+                                                _fgn, mol, _m,
+                                                _acyl_principal_chain)
+                                            if _pf:
+                                                _pfx_name = _pf
+                                                break
+                                    if _pfx_name:
+                                        break
+                                # fallback: a lone terminal N/O/halogen prefix
+                                if _pfx_name is None:
+                                    _pfx_name = {
+                                        'N': 'amino', 'O': 'hydroxy',
+                                        'F': 'fluoro', 'Cl': 'chloro',
+                                        'Br': 'bromo', 'I': 'iodo',
+                                        'S': 'sulfanyl',
+                                    }.get(_nb.GetSymbol())
+                                if _pfx_name is None:
+                                    _acyl_ok = False
+                                    break
+                                _acyl_prefixes.append(
+                                    (_cl, _pfx_name,
+                                     _fmt_fg_prefix_am2(_pfx_name, [_cl], 1)))
+                                _named_atoms.add(_bi)
+                            else:
+                                # (b) carbon (or complex) branch -> _name_r_group
+                                _rn = _name_r_group(
+                                    mol, _bi, exclude_atoms=_acyl_atom_set)
+                                if not _rn:
+                                    _acyl_ok = False
+                                    break
+                                _acyl_prefixes.append(
+                                    (_cl, _rn,
+                                     _fmt_fg_prefix_am2(_rn, [_cl], 1)))
+                                # BFS the branch atoms into _named_atoms
+                                _bstack = [_bi]
+                                while _bstack:
+                                    _ba = _bstack.pop()
+                                    if _ba in _named_atoms:
+                                        continue
+                                    _named_atoms.add(_ba)
+                                    for _bnb in mol.GetAtomWithIdx(_ba).GetNeighbors():
+                                        if (_bnb.GetIdx() not in _named_atoms
+                                                and _bnb.GetIdx() not in _acyl_atom_set
+                                                and _bnb.GetAtomicNum() > 1):
+                                            _bstack.append(_bnb.GetIdx())
+                        if not _acyl_ok:
+                            break
+                    # every heavy atom must now be accounted for
+                    if not _acyl_ok or _named_atoms != _heavy:
+                        return "amide"  # fail-closed fallthrough, as before
+                    if _acyl_prefixes:
+                        _acyl_prefixes.sort(
+                            key=lambda t: (alpha_sort_key(t[1]), t[0]))
+                        _pfx = "-".join(r for _l, _n, r in _acyl_prefixes)
+                        _sep = "-" if base_name[:1] == "N" else ""
+                        base_name = f"{_pfx}{_sep}{base_name}"
                     return _inject_stereo_if_missing(
                         features, base_name, atom_to_locant=_acyl_locants,
                     )
