@@ -38,6 +38,8 @@ def _is_partial_sat(features: Any) -> bool:
     instead of three. CONTEXT D-25 predicate purity is preserved — the cache
     is per-features-instance state owned by features itself.
     """
+    from rdkit import Chem
+
     from ._handler_shared import cached_is_complex_ring_system
 
     if not getattr(features, 'is_cyclic', False):
@@ -47,6 +49,19 @@ def _is_partial_sat(features: Any) -> bool:
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
+    # A ring ketone (ring C=O) makes this a cyclic-oxo compound, not a bare
+    # partially-saturated carbocycle — _try_partially_saturated_carbocycle would
+    # DROP the C=O (2,3-dihydronaphthalene-1,4-dione -> 2,3-dihydronaphthalene,
+    # a wrong structure suppressed by SELF-01). Decline so tier_a_ring@4500
+    # (name_cyclic_oxo_compound) names it correctly (P-58.2.5 / P-58.2.3.1.2).
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() == 'C' and atom.IsInRing():
+            for b in atom.GetBonds():
+                o = b.GetOtherAtom(atom)
+                if (b.GetBondType() == Chem.BondType.DOUBLE
+                        and o.GetSymbol() == 'O' and o.GetDegree() == 1
+                        and not o.IsInRing()):
+                    return False
     if cached_is_complex_ring_system(features):
         # WSD-02 (RING-04): an ortho-fused tetralin is ALWAYS "complex", which
         # used to veto the (correct) partially-saturated-carbocycle namer and let

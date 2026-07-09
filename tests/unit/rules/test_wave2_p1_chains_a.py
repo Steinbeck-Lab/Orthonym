@@ -96,3 +96,10 @@ class TestP64RingKetonicSuffixSeniority:
         # P-64.6.2: C=O senior to C=S -> ring C=O is the '-one' suffix,
         # ring C=S is the 'sulfanylidene' prefix.
         assert name_compound("S=C1NC(=O)CS1") == "2-sulfanylidene-1,3-thiazolidin-4-one"
+
+
+@pytest.mark.unit
+class TestP58NondetachableHydroDione:
+    def test_dihydronaphthalenedione(self):
+        # P-58.2.5: added-IH/hydro dione, NOT tetrahydro
+        assert name_compound("O=C1CCC(=O)c2ccccc21") == "2,3-dihydronaphthalene-1,4-dione"
