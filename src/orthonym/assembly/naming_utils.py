@@ -672,8 +672,9 @@ def get_bracket_depth(name: str) -> int:
 # Pre-compiled patterns for compute_nesting_depth (P-16.5.4.1)
 # P-16.5.4.1.1: Indicated hydrogen -- (1H), (3H), (9aH) etc.
 _INDICATED_H_RE = re.compile(r'\(\d+[a-z]?H\)')
-# P-16.5.4.1.2: Fusion/spiro/von Baeyer brackets -- [2,3-b], [4.5], [2.2.1]
-_FUSION_BRACKET_RE = re.compile(r'\[[0-9a-z,.\-]+\]')
+# P-16.5.4.1.2: Fusion/spiro/ring-assembly/von Baeyer brackets -- [2,3-b],
+# [4.5], [2.2.1], [1,1'-biphenyl] (ring-assembly enclosures carry primes)
+_FUSION_BRACKET_RE = re.compile(r"\[[0-9a-z,.'\-]+\]")
 # P-16.5.4.1.3: Stereo descriptors -- (R), (S), (E), (Z), (1R,2S), etc.
 _STEREO_PAREN_RE = re.compile(r'\((?:\d+[a-z]?,)*[RSEZ](?:,\d+[a-z]?[RSEZ]?)*\)')
 
