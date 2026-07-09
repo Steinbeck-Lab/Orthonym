@@ -58,3 +58,48 @@ class TestNameComponent:
         # never emit/propagate an unknown placeholder.
         from orthonym.rules.adducts import _name_component
         assert _name_component("NCC(=O)Nc1ccc(OCC)cc1", "pin") is None
+
+
+class TestComponentOrdering:
+    """P-14.8.1 -a: P-41 class seniority; P-14.8.2 -a buckets (internal
+    oracle — OPSIN parses any component order, so ORDER is asserted here)."""
+
+    @staticmethod
+    def _ordered(smiles_list):
+        from orthonym.rules.adducts import component_sort_key
+        canon = [Chem.CanonSmiles(s) for s in smiles_list]
+        return sorted(canon, key=component_sort_key)
+
+    def test_alcohol_before_no_pcg_ring(self):
+        # BB line 4661: 'ethanol—pyridine (1/1) (PIN)'
+        assert self._ordered(["c1ccncc1", "CCO"]) == [
+            Chem.CanonSmiles("CCO"), Chem.CanonSmiles("c1ccncc1")]
+
+    def test_acid_before_amine(self):
+        # BB line 4686: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
+        assert self._ordered(["NCCN", "OC(=O)C(=O)O"]) == [
+            Chem.CanonSmiles("OC(=O)C(=O)O"), Chem.CanonSmiles("NCCN")]
+
+    def test_no_pcg_tie_break_benzene_before_pyridine(self):
+        # WAVE2-SCOPE-DECISIONS-RESOLVED decision 2: 'benzene—pyridine (1/1)'
+        assert self._ordered(["c1ccncc1", "c1ccccc1"]) == [
+            Chem.CanonSmiles("c1ccccc1"), Chem.CanonSmiles("c1ccncc1")]
+
+    def test_organic_before_inorganic_acid(self):
+        # BB line 4675: '...pentane-1,4-diamine—phosphoric acid (1/2)':
+        # phosphoric acid carries a PCG rank (idx 23 < amine 84) but has NO
+        # carbon -> inorganic bucket, cited AFTER every organic component.
+        assert self._ordered(["OP(=O)(O)O", "NCCN"]) == [
+            Chem.CanonSmiles("NCCN"), Chem.CanonSmiles("OP(=O)(O)O")]
+
+    def test_organic_before_hydrogen_chloride(self):
+        # BB line 4677 nicotine—hydrogen chloride pattern
+        assert self._ordered(["Cl", "CN1CCCC1c1cccnc1"]) == [
+            Chem.CanonSmiles("CN1CCCC1c1cccnc1"), Chem.CanonSmiles("Cl")]
+
+    def test_water_cited_last(self):
+        # P-14.8.2 line 4665: 'water (if present), is cited last' — even
+        # after other inorganics.
+        assert self._ordered(["O", "Cl", "CCO"]) == [
+            Chem.CanonSmiles("CCO"), Chem.CanonSmiles("Cl"),
+            Chem.CanonSmiles("O")]

@@ -107,3 +107,41 @@ def _name_component(frag_smi: str, style: str) -> Optional[str]:
     if _validity_gate_status(name) == "rejected":
         return None
     return name
+
+
+def _component_bucket(frag_mol, frag_smi: str) -> int:
+    """P-14.8.1/P-14.8.2 citation buckets: 0 organic, 1 inorganic, 2 water."""
+    if frag_smi == "O":
+        return 2  # "water (if present), is cited last" (P-14.8.2)
+    if any(a.GetAtomicNum() == 6 for a in frag_mol.GetAtoms()):
+        return 0  # "organic compounds precede inorganic compounds" (P-14.8.1)
+    return 1
+
+
+def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
+    """Deterministic P-14.8 citation order for one component.
+
+    (bucket, P-41 seniority index, -heavy_atoms, canonical_smiles):
+    organic components ordered by the seniority of the class of their
+    principal characteristic group (P-14.8.1: "cited in the order of
+    seniority of classes (see P-41)"); components without a suffix-capable
+    PCG (hydrocarbons, N-heterocycles-as-π-bases) rank after all
+    PCG-bearing organics; ties by descending size then canonical SMILES —
+    reproduces every P-14.8 Blue Book example (coronene—trinitrobenzene
+    big-first; benzene—pyridine resolved form).
+    """
+    frag_mol = Chem.MolFromSmiles(frag_smi)
+    if frag_mol is None:  # unreachable behind split_components; belt+braces
+        return (3, 0, 0, frag_smi)
+    bucket = _component_bucket(frag_mol, frag_smi)
+    from orthonym.perception.functional_groups import detect_functional_groups
+    from orthonym.rules.seniority import SENIORITY_ORDER, get_principal_group
+    seniority = len(SENIORITY_ORDER)
+    if bucket == 0:
+        try:
+            pg, _ = get_principal_group(frag_mol, detect_functional_groups(frag_mol))
+            if pg is not None and pg in SENIORITY_ORDER:
+                seniority = SENIORITY_ORDER.index(pg)
+        except Exception:
+            pass  # no PCG -> ranks after PCG-bearing organics
+    return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)
