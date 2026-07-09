@@ -103,3 +103,52 @@ class TestComponentOrdering:
         assert self._ordered(["O", "Cl", "CCO"]) == [
             Chem.CanonSmiles("CCO"), Chem.CanonSmiles("Cl"),
             Chem.CanonSmiles("O")]
+
+
+class TestNameAdduct:
+    """P-14.8.1 / -b / -c + P-14.8.2 -b: em-dash + (n/m/...) assembly.
+    Every expected name OPSIN-2.9.0 verified (plan Oracle table)."""
+
+    @staticmethod
+    def _name(smi, style="pin"):
+        from orthonym.rules.adducts import name_adduct
+        return name_adduct(Chem.MolFromSmiles(smi), style=style)
+
+    def test_hydrate_1_1(self):
+        assert self._name("O.OC(=O)C(=O)O") == "oxalic acid—water (1/1)"
+
+    def test_hydrate_1_2(self):
+        assert self._name("O.O.OC(=O)C(=O)O") == "oxalic acid—water (1/2)"
+
+    def test_organic_pair_em_dash(self):
+        # P-14.8.1 -b: em-dash U+2014, never hyphen
+        name = self._name("c1ccccc1.c1ccncc1")
+        assert name == "benzene—pyridine (1/1)"
+        assert "—" in name and " (1/1)" in name
+
+    def test_bb_ethanol_pyridine(self):
+        # BB line 4661 worked example
+        assert self._name("CCO.c1ccncc1") == "ethanol—pyridine (1/1)"
+
+    def test_bb_2_2_3_proportions(self):
+        # BB line 4686: 'oxalic acid—ethane-1,2-diamine—water (2/2/3)'
+        smi = "OC(=O)C(=O)O.OC(=O)C(=O)O.NCCN.NCCN.O.O.O"
+        assert self._name(smi) == (
+            "oxalic acid—ethane-1,2-diamine—water (2/2/3)")
+
+    def test_any_unnameable_fragment_fails_closed(self):
+        # glycinamide-aryl fragment unnameable at HEAD (probe 2026-07-09)
+        assert self._name("O.NCC(=O)Nc1ccc(OCC)cc1") is None
+
+    def test_all_identical_fragments_decline(self):
+        # >=2 DISTINCT components required (adducts are combinations of
+        # SEPARATE molecular entities); identical-only sets keep the
+        # frozen legacy space-join in the dispatch handler (Task 4).
+        assert self._name("CCO.OCC") is None
+
+    def test_unrecognized_single_atom_declines(self):
+        # bare-metal fragment -> not an adduct (organometallics@50 own it)
+        assert self._name("[Ni].C=CC.C=CC") is None
+
+    def test_single_component_declines(self):
+        assert self._name("CCO") is None

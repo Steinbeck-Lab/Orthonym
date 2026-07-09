@@ -145,3 +145,50 @@ def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
         except Exception:
             pass  # no PCG -> ranks after PCG-bearing organics
     return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)
+
+
+def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
+    """P-14.8.1: names joined by em-dash; proportions '(n/m/...)' appended
+    'separated from the name by a space'. Proportions are ALWAYS cited in
+    the PIN form, including (1/1) (BB: 'benzene—pyridine (1/1)')."""
+    names = EM_DASH.join(name for name, _count in named)
+    proportions = "/".join(str(count) for _name, count in named)
+    return f"{names} ({proportions})"
+
+
+def name_adduct(mol, canonical_smiles: Optional[str] = None,
+                style: str = "pin") -> Optional[str]:
+    """Name an all-neutral multi-component input per P-14.8, or None.
+
+    Fail-closed refusals (return None; the dispatch cascade then falls
+    through to the honest 'unknown organic compound'):
+      * fewer than 2 DISTINCT components (identical-only sets are not
+        adducts — the dispatch handler keeps the frozen space-join there);
+      * no multi-atom component at all;
+      * any single-heavy-atom fragment outside SINGLE_ATOM_COMPONENT_NAMES
+        (bare metals -> organometallic routing, never swallowed here);
+      * any charged fragment (salt/ion routing owns charged input);
+      * ANY component the single-component pipeline cannot name.
+    """
+    components = split_components(mol)
+    if components is None or len(components) < 2:
+        return None
+    frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
+    if any(fm is None for fm in frag_mols.values()):
+        return None
+    if not any(fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
+        return None
+    for smi, fm in frag_mols.items():
+        if Chem.GetFormalCharge(fm) != 0:
+            return None
+        if (fm.GetNumHeavyAtoms() == 1
+                and smi not in SINGLE_ATOM_COMPONENT_NAMES):
+            return None
+    ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
+    named: List[Tuple[str, int]] = []
+    for smi, count in ordered:
+        component_name = _name_component(smi, style)
+        if component_name is None:
+            return None  # fail-closed: never drop or placeholder a component
+        named.append((component_name, count))
+    return _assemble_adduct_name(named)
