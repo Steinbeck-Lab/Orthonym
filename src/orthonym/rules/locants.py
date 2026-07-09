@@ -450,6 +450,26 @@ def orient_chain(
             if rev_alpha < fwd_alpha:
                 return reverse
 
+    # --- Criterion (f): P-45.6.3 — 'R' before 'S' at first difference ---
+    # Reached only when (a)-(e) all tie: the two orientations yield names
+    # identical except for the stereodescriptor sequence (meso-type
+    # symmetry). BB P-45.6.3 (BlueBookV2.md:22603). CIP labels are computed
+    # on a COPY (never mutate the shared mol); guarded to molecules that
+    # actually carry chiral tags so achiral chains stay byte-identical.
+    from rdkit import Chem as _Chem
+    if any(a.GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED
+           for a in mol.GetAtoms()):
+        try:
+            from rdkit.Chem import rdCIPLabeler
+            probe = _Chem.Mol(mol)
+            rdCIPLabeler.AssignCIPLabels(probe)
+            fwd_seq = _cip_sequence(forward, fwd_map, probe)
+            rev_seq = _cip_sequence(reverse, rev_map, probe)
+            if fwd_seq != rev_seq:
+                return forward if fwd_seq < rev_seq else reverse
+        except Exception:
+            pass  # fail-closed to the deterministic forward fallback
+
     # All criteria tied -- return forward (arbitrary but deterministic)
     return forward
 
@@ -735,3 +755,17 @@ def _get_bond_locant_atoms(
                 result.add(b)
 
     return result
+
+
+def _cip_sequence(chain: List[int], atom_to_locant: Dict[int, int],
+                  labeled_mol) -> tuple:
+    """P-45.6.3 key: (locant, CIP code) pairs for chain stereocentres,
+    sorted by locant. 'R' < 'S' lexicographically, so tuple comparison
+    implements 'alphabetic order of the stereochemical descriptors'."""
+    pairs = []
+    for a in chain:
+        atom = labeled_mol.GetAtomWithIdx(a)
+        if atom.HasProp('_CIPCode'):
+            pairs.append((atom_to_locant[a], atom.GetProp('_CIPCode')))
+    pairs.sort()
+    return tuple(pairs)
