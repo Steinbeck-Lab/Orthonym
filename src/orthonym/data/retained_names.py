@@ -318,7 +318,11 @@ RETAINED_NAMES = {
 
     # === ADDITIONAL SATURATED HETEROCYCLES (Phase 8 expansion) ===
     "C1COCCO1": "1,4-dioxane",
-    "C1CSCCO1": "thiomorpholine",
+    # P-15.5.3.1 / Table 2.3: morpholine chalcogen-replacement parents.
+    "C1CSCCO1": "1,4-oxathiane",        # O+S ring (was MISLABELED thiomorpholine)
+    "C1CSCCN1": "thiomorpholine",       # S-for-O morpholine (PIN; wins OPSIN 'thiamorpholine')
+    "C1C[Se]CCN1": "selenomorpholine",  # Se-for-O morpholine (PIN)
+    "C1C[Te]CCN1": "telluromorpholine", # Te-for-O morpholine (PIN)
     "C1CN2CCC1CC2": "quinuclidine",
     "C1CCC2NCCCC2C1": "decahydroquinoline",
     "C1CCN2CCCCC2C1": "decahydroisoquinoline",
