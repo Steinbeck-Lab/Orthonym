@@ -131,6 +131,7 @@ class StoutClass(_StrEnumBase):
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
+    HETEROIMINE = "heteroimine"                      # W2E-P1FG (P-62.3.1.3 X=NH -> 1-methylphosphanimine; priority 48.7)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
@@ -1212,6 +1213,22 @@ def _handle_pseudoketone_hetero(mol, smiles, canonical_smiles, features=None,
     return name_acyl_hetero_pseudoketone(mol)
 
 
+def _is_heteroimine(mol, smiles, canonical_smiles, features=None,
+                    **kwargs) -> bool:
+    """W2E-P1FG (P-62.3.1.3); priority 48.7. X=NH where X is a mononuclear
+    P/As/Si hub (CH3-P=NH -> 1-methylphosphanimine). PURE graph classifier."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_heteroimine
+    return name_heteroimine(mol) is not None
+
+
+def _handle_heteroimine(mol, smiles, canonical_smiles, features=None,
+                        **kwargs) -> Optional[str]:
+    from orthonym.rules.mononuclear_hydrides import name_heteroimine
+    return name_heteroimine(mol)
+
+
 def _is_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
                              **kwargs) -> bool:
     """Wave-2 completion (P-25.6/P-74.3.1.3); priority 49.5. A neutral ring
@@ -1403,6 +1420,13 @@ _register_dispatch(
     iupac_section="Blue Book P-64.1.2.1 (b) / P-64.5.2.2",
     description="Acyl on Si/Ge/P/As hub (1-silylethan-1-one / "
                 "1-phosphanylbutan-1-one); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.HETEROIMINE, priority=48.7, tier=1,
+    predicate=_is_heteroimine, handler=_handle_heteroimine,
+    iupac_section="Blue Book P-62.3.1.3",
+    description="Heteroatom imine X=NH on a P/As/Si mononuclear hub "
+                "(1-methylphosphanimine); graph classifier, fail-closed",
 )
 
 # --- Wave-2 completion: KETENE at priority 49 (after DINUCLEAR_HYDRIDE@48, ---

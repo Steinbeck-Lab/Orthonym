@@ -146,13 +146,15 @@ class TestOrgmDispatch:
             # CHALCOGEN_CHAIN@46, POLYAZANE@47, CATENATED_HYDRIDE@47.5,
             # DINUCLEAR_HYDRIDE@48, KETENE@49 (Wave-2 completion: disiloxane,
             # C=C=O -> ethenone), RING_CHALCOGEN_OXIDE@49.5 (Wave-2 completion
-            # B4: dibenzothiophene 5-oxide) — all < 50, all mutually decline).
+            # B4: dibenzothiophene 5-oxide), HETEROIMINE@48.7 (W2E-P1FG:
+            # CP=N -> 1-methylphosphanimine) — all < 50, all mutually decline).
             if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
                        StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE,
                        StoutClass.CATENATED_HYDRIDE, StoutClass.DINUCLEAR_HYDRIDE,
                        StoutClass.KETENE, StoutClass.RING_CHALCOGEN_OXIDE,
                        StoutClass.AZINIC_DERIVATIVE, StoutClass.HETERONE,
-                       StoutClass.SULFINE, StoutClass.PSEUDOKETONE_HETERO):
+                       StoutClass.SULFINE, StoutClass.PSEUDOKETONE_HETERO,
+                       StoutClass.HETEROIMINE):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

@@ -302,6 +302,62 @@ def name_heterone(mol) -> Optional[str]:
     return _assemble(''.join(parts), lam, _HETERONE_STEMS[hub.GetSymbol()])
 
 
+_HETEROIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Si': 'silan'}
+
+
+def name_heteroimine(mol) -> Optional[str]:
+    """P-62.3.1.3 (BB 26568): X=NH, X a mononuclear-hydride heteroatom hub
+    -> '<organyls><stem>imine' (CH3-P=NH -> 1-methylphosphanimine).
+
+    Mirrors ``name_heterone`` with =NH in place of =O. Fail-closed: single
+    neutral fragment, no rings, exactly one terminal =NH on the hub, only
+    pure-hydrocarbyl organyl co-substituents, at most one organyl (multi-
+    organyl N/locant machinery not built here). Pure — no mol mutation."""
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    # Exactly one terminal =N (degree-1, double-bonded to the hub): the =NH
+    # imine group. An N-substituted =N-R (degree 2) fails this guard.
+    imine_n = [a for a in mol.GetAtoms()
+               if a.GetAtomicNum() == 7 and a.GetDegree() == 1
+               and a.GetBonds()[0].GetBondType() == Chem.BondType.DOUBLE]
+    if len(imine_n) != 1:
+        return None
+    hub = imine_n[0].GetNeighbors()[0]
+    stem = _HETEROIMINE_STEMS.get(hub.GetSymbol())
+    if stem is None:
+        return None
+    if hub.IsInRing():
+        return None
+    # Remaining hub neighbours must be pure organyls (else fail-closed).
+    organyls: List[str] = []
+    for nb in hub.GetNeighbors():
+        if nb.GetIdx() == imine_n[0].GetIdx():
+            continue
+        if nb.GetSymbol() == 'H':
+            continue
+        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        if name is None:
+            return None
+        organyls.append(name)
+    # No stray heteroatom beyond the hub + the imine N.
+    if any(a.GetSymbol() not in ('C', 'H')
+           and a.GetIdx() not in (hub.GetIdx(), imine_n[0].GetIdx())
+           for a in mol.GetAtoms()):
+        return None
+    if not organyls:
+        return f"{stem}imine"
+    if len(organyls) != 1:
+        return None      # multi-organyl locant assembly not built here
+    return f"1-{organyls[0]}{stem}imine"
+
+
 def name_sulfine(mol) -> Optional[str]:
     """P-64.4.2 acyclic thiocarbonyl S-oxides (Wave-2 completion C):
     CH3-CH2-CH=S=O -> propylidene-lambda4-sulfanone (BB verbatim). The S has
