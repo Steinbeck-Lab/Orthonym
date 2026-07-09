@@ -132,3 +132,15 @@ class TestP59DetachableHydroPlacement:
     def test_bromo_dihydroazulene_carboxylic_acid(self):
         assert name_compound("BrC=1CCC=C2C=C(C=C2C1)C(=O)O") == \
             "7-bromo-5,6-dihydroazulene-2-carboxylic acid"
+
+
+@pytest.mark.unit
+class TestP66CarboxamideSeniorToUrea:
+    def test_formamide_senior_to_urea(self):
+        # P-66.1.6.1.1.5: carboxamide/formamide senior to urea (already correct
+        # at HEAD; locked against regression). urea cited as carbamoylamino.
+        assert name_compound("NC(=O)NCCCNC=O") == "N-[3-(carbamoylamino)propyl]formamide"
+
+    def test_pure_urea_unchanged(self):
+        assert name_compound("NC(=O)N") == "urea"
+        assert name_compound("NC(=O)NCC") == "N-ethylurea"
