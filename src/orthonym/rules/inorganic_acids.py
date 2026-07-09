@@ -144,6 +144,15 @@ _CARBONIC_FRN = {
 _ALL_INORGANIC = {**_INORGANIC_OXOACIDS, **_INORGANIC_ACID_DERIVATIVES, **_CARBONIC_FRN}
 
 
+def lookup_exact_acid_name(canonical_smiles: str) -> Optional[str]:
+    """Return the retained / functional-replacement inorganic-acid PIN for an
+    EXACT canonical-SMILES key (carbamimidic acid, carbonimidic acid, ...), or
+    None. Consumed by the ester path so a tabled acid analog keeps its
+    retained '-ic acid' stem instead of the systematic-but-non-PIN chain name
+    (P-66.1.6.1.2.1: 'carbamimidic acid', not '1-aminomethanimidic acid')."""
+    return _ALL_INORGANIC.get(canonical_smiles)
+
+
 def name_silicate_ester(mol) -> Optional[str]:
     """Tetraalkyl silicate ester PIN (P-68.2.4 / BB 35978): a NEUTRAL silicon
     bearing exactly four ``-O-R`` groups (a fully-esterified silicic acid) ->

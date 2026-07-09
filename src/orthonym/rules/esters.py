@@ -1941,11 +1941,27 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     from ..assembly.composer import assemble_name
     try:
         acid_smiles = Chem.MolToSmiles(acid_mol)
-        feats = compute_features(acid_mol, acid_smiles)
-        _diacid_namer()._classify(feats)
-        acid_name = assemble_name(feats, style="pin")
     except Exception:
         return None
+
+    # P-66.1.6.1.2.1 (BB 33398): if the acid analog is EXACTLY one of the
+    # retained / functional-replacement inorganic-acid parents (carbamimidic
+    # acid, carbonimidic acid, ...), its '-ic acid' name is the PIN stem — the
+    # general chain pipeline (which does not consult the inorganic-acids
+    # dispatch row @40) would emit the systematic-but-non-PIN
+    # '1-aminomethanimidic acid' instead. Only substitute when the whole acid
+    # analog is the exact table SMILES (no substituents to drop).
+    from .inorganic_acids import lookup_exact_acid_name
+    retained = lookup_exact_acid_name(acid_smiles)
+    if retained is not None:
+        acid_name = retained
+    else:
+        try:
+            feats = compute_features(acid_mol, acid_smiles)
+            _diacid_namer()._classify(feats)
+            acid_name = assemble_name(feats, style="pin")
+        except Exception:
+            return None
 
     ate = _acid_name_to_ate(acid_name)
     if ate is None:

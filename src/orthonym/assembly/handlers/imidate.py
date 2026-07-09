@@ -92,13 +92,22 @@ def name_imidate(
     if alkyl_word is None:
         return None
 
-    # Branch 2: chain stem with -imidate suffix
-    # Collect subgraph from C_carbonyl excluding =NH and =O paths
-    stem_atoms = _collect_subgraph(mol, c_carbonyl_idx,
-                                   exclude={nh_idx, o_idx})
-    # Chain length includes c_carbonyl (it's the locant-1 carbon of the stem)
-    stem_word = _name_chain_with_imidate_suffix(mol, stem_atoms,
-                                                anchor=c_carbonyl_idx)
+    # P-66.1.6.1.2.1 (BB 33398): the imidic-ester tautomer of urea,
+    # H2N-C(OH)=NH -> 'carbamimidic acid', has the retained stem
+    # 'carbamimidate' (NOT the systematic '1-aminomethanimidate' the chain
+    # path would emit). Detect it by building the acid analog (ester O-alkyl
+    # -> OH) and consulting the inorganic-acids exact-SMILES table. Only
+    # fires when the whole acid analog is EXACTLY a tabled retained acid.
+    stem_word = _retained_imidate_stem(mol, c_carbonyl_idx, nh_idx,
+                                       o_idx, c_alkyl_idx)
+    if stem_word is None:
+        # Branch 2: chain stem with -imidate suffix
+        # Collect subgraph from C_carbonyl excluding =NH and =O paths
+        stem_atoms = _collect_subgraph(mol, c_carbonyl_idx,
+                                       exclude={nh_idx, o_idx})
+        # Chain length includes c_carbonyl (locant-1 carbon of the stem)
+        stem_word = _name_chain_with_imidate_suffix(mol, stem_atoms,
+                                                    anchor=c_carbonyl_idx)
     if stem_word is None:
         return None
 
@@ -119,6 +128,42 @@ def name_imidate(
         tree=NameTreeNode(parent_stem=final_name, class_id="imidate", iupac_section_cite="P-65.6", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
+
+
+def _retained_imidate_stem(mol: Any, c_carbonyl_idx: int, nh_idx: int,
+                           o_idx: int, c_alkyl_idx: int) -> Optional[str]:
+    """P-66.1.6.1.2.1 (BB 33398): if the imidate's ACID analog (ester
+    -O-alkyl replaced by -OH) is EXACTLY a tabled retained / functional-
+    replacement inorganic acid (carbamimidic acid, carbonimidic acid, ...),
+    return its '-ate' stem ('carbamimidate'), else None (chain path owns it).
+
+    PURE: builds a throwaway RWMol copy; no mutation of the input mol."""
+    from rdkit import Chem
+    from ...rules.inorganic_acids import lookup_exact_acid_name
+    from ...rules.esters import _acid_name_to_ate
+
+    # The alkyl side must carry no extra functional atoms (else the acid
+    # analog would silently drop them -> a different molecule -> fail closed).
+    alkyl_atoms = set(_collect_subgraph(mol, c_alkyl_idx, exclude={o_idx}))
+    for a in alkyl_atoms:
+        if mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6):
+            return None
+
+    rw = Chem.RWMol(mol)
+    # Remove alkyl atoms (high->low so indices stay valid); the ester O keeps
+    # its remaining valence and RDKit fills it with an implicit H -> -OH.
+    for idx in sorted(alkyl_atoms, reverse=True):
+        rw.RemoveAtom(idx)
+    acid = rw.GetMol()
+    try:
+        Chem.SanitizeMol(acid)
+        acid_smiles = Chem.MolToSmiles(acid)
+    except Exception:
+        return None
+    retained = lookup_exact_acid_name(acid_smiles)
+    if retained is None:
+        return None
+    return _acid_name_to_ate(retained)
 
 
 def _collect_subgraph(mol: Any, anchor_idx: int,
