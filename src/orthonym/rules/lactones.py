@@ -104,12 +104,30 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                 if not is_monocyclic:
                     continue
 
+                # P-64.1.2.1(a) cyclic carbonate: carbonyl bonded to TWO
+                # ring oxygens -> 1,3-dioxan-2-one class. Detect a SECOND
+                # ring O bonded to the carbonyl C.
+                extra_o = None
+                for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors():
+                    i = nbr.GetIdx()
+                    if i in ring_set and i != ester_o and nbr.GetAtomicNum() == 8:
+                        extra_o = i
+                # Any OTHER ring heteroatom -> not this namer's class
+                # (fail closed). Plain lactones have an all-carbon ring
+                # besides the ester O (and the optional carbonate extra O).
+                for i in ring_set:
+                    if i in (ester_o, extra_o):
+                        continue
+                    if mol.GetAtomWithIdx(i).GetAtomicNum() != 6:
+                        return None
+
                 return {
                     "ring_atoms": ring,
                     "carbonyl_idx": carbonyl_c,
                     "ester_O_idx": ester_o,
                     "carbonyl_O_idx": carbonyl_o,
                     "ring_size": len(ring),
+                    "extra_ring_O_idx": extra_o,
                 }
 
     return None
@@ -126,7 +144,7 @@ _HW_RING_SIZES = frozenset(range(3, 11))
 _MAX_MACROLIDE_SIZE = 50
 
 
-def name_lactone_ring(ring_size: int) -> Optional[str]:
+def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> Optional[str]:
     """
     Get the IUPAC name for a monocyclic lactone of a given ring size.
 
@@ -135,6 +153,11 @@ def name_lactone_ring(ring_size: int) -> Optional[str]:
 
     Args:
         ring_size: Number of atoms in the lactone ring (3-50 supported).
+        extra_o_locant: locant of a SECOND ring oxygen bonded to the
+            carbonyl carbon (cyclic carbonate, P-64.1.2.1(a)). When set to
+            3 (the only geometry this namer describes), builds the
+            1,3-dioxa Hantzsch-Widman parent (1,3-dioxan-2-one). Any other
+            value returns None (fail closed).
 
     Returns:
         IUPAC name string (e.g., 'oxolan-2-one'), or None if ring size
@@ -153,9 +176,29 @@ def name_lactone_ring(ring_size: int) -> Optional[str]:
         'oxacycloundecan-2-one'
         >>> name_lactone_ring(13)
         'oxacyclotridecan-2-one'
+        >>> name_lactone_ring(6, extra_o_locant=3)
+        '1,3-dioxan-2-one'
     """
     if ring_size < 3:
         return None
+
+    # P-64.1.2.1(a) cyclic carbonate: two ring oxygens bonded to the
+    # carbonyl C. Only the 1,3 geometry (extra O at locant 3) is a valid
+    # dioxanone/dioxolanone; anything else is out of this namer's scope.
+    if extra_o_locant is not None:
+        if extra_o_locant != 3 or ring_size not in _HW_RING_SIZES:
+            return None
+        parent_name = build_hw_name(
+            heteroatoms=[(1, "O"), (3, "O")],
+            ring_size=ring_size,
+            is_saturated=True,
+            is_aromatic=False,
+        )
+        if not parent_name:
+            return None
+        # build_hw_name already emits the '1,3-' locant prefix.
+        stem = parent_name[:-1] if parent_name.endswith("e") else parent_name
+        return f"{stem}-2-one"
 
     # Hantzsch-Widman naming for ring sizes 3-10
     if ring_size in _HW_RING_SIZES:
@@ -229,7 +272,10 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     if info is None:
         return None
 
-    parent_name = name_lactone_ring(info["ring_size"])
+    # P-64.1.2.1(a) cyclic carbonate: the second ring O bonded to the
+    # carbonyl C sits at locant 3 by the O=1, carbonyl C=2 numbering.
+    extra_o_locant = 3 if info.get("extra_ring_O_idx") is not None else None
+    parent_name = name_lactone_ring(info["ring_size"], extra_o_locant=extra_o_locant)
     if parent_name is None:
         return None
 
