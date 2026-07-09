@@ -59,6 +59,8 @@ _SUFFIX_PRIORITY = [
     'selenonic acid',
     'telluronic acid',
     'sulfonamide',
+    # Wave-2 P1AM (P-66.4.1.1): sulfonimidamide ranks just below sulfonamide.
+    'sulfonimidamide',
     # C1 (P-65.3.1): sulfonohydrazide ranks with the sulfonamide family, above
     # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
     # the S parent; here it is the sole principal group in the target set).
@@ -163,6 +165,10 @@ _BENZENE_FG_SMARTS = {
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
+    # Wave-2 P1AM (P-66.4.1.1, BB 34173): ring-attached sulfonimidamide
+    # -S(=O)(=NH)-NH2. The imido =N breaks the sulfonamide (=O)(=O) SMARTS so
+    # there is no overlap; checked BEFORE sulfonamide (more specific).
+    'sulfonimidamide': Chem.MolFromSmarts('[SX4](=[OX1])(=[NX2])[NX3H2]'),
     # C1 (P-65.3.1): ring-attached sulfonohydrazide -SO2-NH-NH2. The N is
     # [NX3H1] bonded to N (not H2), so the sulfonamide SMARTS above never matches
     # it; check this pattern first for cleanliness.
@@ -573,6 +579,16 @@ def _identify_suffix_fg_on_benzene(
             if match[0] == start_idx:
                 return {
                     'name': 'sulfonohydrazide', 'suffix_name': 'sulfonohydrazide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
+        # Wave-2 P1AM (P-66.4.1.1, BB 34173): ring-attached sulfonimidamide
+        # -S(=O)(=NH)-NH2 -> '-sulfonimidamide'. Checked BEFORE sulfonamide
+        # (the imido =N makes it disjoint from the sulfonamide (=O)(=O) SMARTS).
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfonimidamide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfonimidamide', 'suffix_name': 'sulfonimidamide',
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
@@ -2808,6 +2824,15 @@ def _assemble_benzene_with_suffix(
             remaining_prefix_groups, chosen_locants[0],
             atom_to_locant, oriented_ring
         )
+
+    # Wave-2 P1AM (P-66.4.1.1, BB 34173): single sulfonimidamide on benzene ->
+    # 'benzenesulfonimidamide'. Only the unsubstituted parent is built here;
+    # ANY additional ring substituent (or N/N' substitution, which carries
+    # N/N' locant semantics not yet built) -> fail closed (return None).
+    if chosen_suffix == 'sulfonimidamide' and chosen_count == 1:
+        if remaining_prefix_groups:
+            return None
+        return "benzenesulfonimidamide"
 
     # Wave2 ring-hydrazide (P-66.3.1.2.1): a single carbohydrazide on benzene
     # keeps the RETAINED acyl stem — 'benzohydrazide' (PIN, substitutable the

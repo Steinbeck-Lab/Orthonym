@@ -146,6 +146,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     # shipped sulfonimidamide with the S(=O) removed (SX4->SX3, one fewer O).
     # SX3-vs-SX4 makes it disjoint from every shipped SMARTS -> no suppression.
     "sulfinimidamide": "[SX3](=[NX2])[NX3H2]",
+    # Wave-2 P1AM (P-66.4.1.1, BB 34173): Se analogues named "similarly" --
+    # -seleninimidamide (preselected) / -selenonimidamide. Te analogues are
+    # DEFERRED until an OPSIN oracle exists for the -telluron- form
+    # (methanetellurinimidamide parses; the selenon/telluron =O forms were
+    # only OPSIN-verified for Se during planning). Fail-closed by absence.
+    "seleninimidamide": "[SeX3](=[NX2])[NX3H2]",
+    "selenonimidamide": "[SeX4](=[OX1])(=[NX2])[NX3H2]",
     # P-66.4.3.2: -S(=N-NH2)-NH-NH2 (cannot collide with sulfinimidamide --
     # the S-NH- nitrogen here is H1, not the [NX3H2] amide N).
     "sulfinohydrazonohydrazide": "[SX3](=[NX2][NX3])[NX3][NX3]",

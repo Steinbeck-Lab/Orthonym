@@ -143,9 +143,13 @@ SENIORITY_ORDER = [
     # Wave2 T3d (P-66.1.1 Table 6.1 item 20): sulfonimidamide ranks just below
     # sulfonamide (item 19).
     "sulfonimidamide",
+    # Wave-2 P1AM (P-66.4.1.1): Se analogue of sulfonimidamide, ranks with it.
+    "selenonimidamide",
     # Wave2 T3d (P-66.1.1 Table 6.1 item 25): sulfinimidamide -S(=NH)-NH2 ranks
     # just below sulfonimidamide (item 20; sulfinamide item 24 not yet shipped).
     "sulfinimidamide",
+    # Wave-2 P1AM (P-66.4.1.1): Se analogue of sulfinimidamide, ranks with it.
+    "seleninimidamide",
     # C1 (P-65.3.1): sulfono N-analogue; ranks with the sulfonamide family
     "sulfonohydrazide",
     "sulfinohydrazonohydrazide",   # P-66.4.3.2 (Table 6.1 item 41)
@@ -420,6 +424,8 @@ SUFFIX_FORMS = {
     # Wave2 T3d (P-66.1.1 item 20): same word for chain/ring (like sulfonamide);
     # methanesulfonimidamide / benzenesulfonimidamide.
     "sulfonimidamide": ("sulfonimidamide", "sulfonimidamide"),
+    "selenonimidamide": ("selenonimidamide", "selenonimidamide"),  # P-66.4.1.1 (Se analogue of sulfonimidamide)
+    "seleninimidamide": ("seleninimidamide", "seleninimidamide"),  # P-66.4.1.1 (Se analogue of sulfinimidamide)
     # C1 (P-65.3.1): sulfono N-analogue -- parent stem + 'sulfonohydrazide'
     # ('methane' + 'sulfonohydrazide' = 'methanesulfonohydrazide'), exactly like
     # methanesulfonamide. Both simple and ring form are the same word.
@@ -708,6 +714,8 @@ PREFIX_FORMS = {
     "peroxy_acid": None,          # demoted case fails closed (P-43.1)
     "imidic_acid": None,          # demoted case fails closed (P-65.1.3.1)
     "sulfinohydrazonohydrazide": None,  # demoted case fails closed (P-66.4.3.2)
+    "selenonimidamide": None,   # demoted case fails closed (P-66.4.1.1)
+    "seleninimidamide": None,   # demoted case fails closed (P-66.4.1.1)
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
     # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5

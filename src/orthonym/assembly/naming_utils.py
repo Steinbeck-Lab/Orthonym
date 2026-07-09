@@ -294,6 +294,10 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # Wave2 T3d (P-66.1.1 item 25): sulfinimidamide, S-suffix parallel ->
     # 'ethanesulfinimidamide' (propane-1- keeps its locant).
     "sulfinimidamide",
+    # Wave-2 P1AM (P-66.4.1.1): Se imidamide suffixes attach to a chain carbon
+    # like the S siblings -> 'methaneseleninimidamide' / 'methaneselenonimidamide'.
+    "seleninimidamide",
+    "selenonimidamide",
     # Wave2 T2a (P-62.3.1.1 / P-14.3.4.4): the imine =NH sits on a chain carbon;
     # on the symmetric 2-carbon (ethane) parent the locant elides -> 'ethanimine'
     # (BB VERBATIM 'N-methylethanimine (PIN)'), not 'ethan-1-imine'. A 3+ carbon

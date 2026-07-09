@@ -37,3 +37,23 @@ class TestT3AromaticCarboximidamideProtect:
     ])
     def test_protect(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT4SulfonimidamideRingAndSe:
+    """P-66.4.1.1 (BB 34173): S/Se/Te imidamide suffixes; ring parent form."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("N=S(N)(=O)c1ccccc1", "benzenesulfonimidamide"),
+        ("C[Se](=N)N", "methaneseleninimidamide"),
+        ("C[Se](=N)(=O)N", "methaneselenonimidamide"),
+    ])
+    def test_heals(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CS(=N)(=O)N", "methanesulfonimidamide"),
+        ("CS(=N)N", "methanesulfinimidamide"),
+    ])
+    def test_protect_chain_s_forms(self, smiles, expected):
+        assert name_compound(smiles) == expected
