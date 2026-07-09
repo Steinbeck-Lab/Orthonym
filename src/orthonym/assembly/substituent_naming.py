@@ -1301,6 +1301,32 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
     return None
 
 
+def oxamoyl_branch_name(mol, n_idx: int, acyl_c_idx: int) -> Optional[str]:
+    """P-66.1.1.4.5.1 (BB 33071/55479): recognize the EXACT H2N-CO-CO- branch
+    hanging from an imine N -> 'oxamoyl' (the preferred prefix for the
+    H2N-CO-CO-N= group's acyl part). Returns None for anything else
+    (fail-closed): the first carbon must be a carbonyl (=O, no other
+    substituents besides the =N-bearing N and the second carbonyl C); the
+    second carbon must be a carbamoyl (=O + terminal NH2)."""
+    a = mol.GetAtomWithIdx(acyl_c_idx)
+    if a.GetAtomicNum() != 6:
+        return None
+    nbrs = {n.GetIdx(): n for n in a.GetNeighbors() if n.GetIdx() != n_idx}
+    dbl_o = [i for i, n in nbrs.items() if n.GetAtomicNum() == 8 and
+             mol.GetBondBetweenAtoms(acyl_c_idx, i).GetBondTypeAsDouble() == 2.0]
+    c2 = [i for i, n in nbrs.items() if n.GetAtomicNum() == 6]
+    if len(dbl_o) != 1 or len(c2) != 1 or len(nbrs) != 2:
+        return None
+    c2a = mol.GetAtomWithIdx(c2[0])
+    o2 = [n for n in c2a.GetNeighbors() if n.GetAtomicNum() == 8 and
+          mol.GetBondBetweenAtoms(c2[0], n.GetIdx()).GetBondTypeAsDouble() == 2.0]
+    n2 = [n for n in c2a.GetNeighbors() if n.GetAtomicNum() == 7 and
+          n.GetIdx() != acyl_c_idx and n.GetDegree() == 1 and n.GetTotalNumHs() == 2]
+    if len(o2) == 1 and len(n2) == 1 and c2a.GetDegree() == 3:
+        return "oxamoyl"
+    return None
+
+
 def linear_acyl_amido_prefix(mol, carbonyl_c: int, n_idx: int,
                              sub_atoms) -> Optional[str]:
     """Amido prefix (P-66.1.1.4.3 method (1)) for an N-acyl substituent.

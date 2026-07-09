@@ -1119,6 +1119,33 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # alkyl-substituent walk (else double-counted as (ethylamino)/(dimethylamino)).
     _amidine_excluded_n: Set[int] = set()
 
+    # W2E-P1FG Task 10 (P-66.1.1.4.5.1): pre-pass to suppress the primary_amide
+    # FG whose H2N-CO-CO- unit is consumed by an '(oxamoylimino)' prefix on a
+    # chain imine. The amide FG is a SEPARATE perception match that would
+    # otherwise emit a spurious 'carbamoyl'; drop those matches whose amide C
+    # is part of a recognized oxamoyl branch. Done before the FG loop so it is
+    # order-independent w.r.t. the imine block below.
+    if non_principal.get('imine') and non_principal.get('primary_amide'):
+        from ..assembly.substituent_naming import oxamoyl_branch_name as _oxa_fn
+        _oxamoyl_amide_c: Set[int] = set()
+        for _im in non_principal['imine']:
+            _imc, _imn = _im[0], _im[1]
+            for _nb in mol.GetAtomWithIdx(_imn).GetNeighbors():
+                if _nb.GetIdx() == _imc or _nb.GetAtomicNum() <= 1:
+                    continue
+                if _oxa_fn(mol, _imn, _nb.GetIdx()) is not None:
+                    # both acyl carbons of the oxamoyl unit are consumed
+                    _oxamoyl_amide_c.add(_nb.GetIdx())
+                    for _c2 in mol.GetAtomWithIdx(_nb.GetIdx()).GetNeighbors():
+                        if (_c2.GetAtomicNum() == 6
+                                and _c2.GetIdx() != _imn):
+                            _oxamoyl_amide_c.add(_c2.GetIdx())
+        if _oxamoyl_amide_c:
+            non_principal = dict(non_principal)
+            non_principal['primary_amide'] = [
+                _m for _m in non_principal['primary_amide']
+                if not any(a in _oxamoyl_amide_c for a in _m)]
+
     # Add ester acyloxy prefixes if esters were demoted
     if ester_acyloxy_prefixes:
         # Group identical acyloxy prefixes for multipliers
@@ -1365,6 +1392,43 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     for _tac, (_tas, _tan) in _ta_units.items():
                         _amidine_excluded_n.add(_tan)
                     continue
+
+        # P-66.1.1.4.5.1 (BB 33071/55479, W2E-P1FG Task 10): a chain imine C
+        # whose =N bears the exact H2N-CO-CO- branch is cited as the preferred
+        # composite prefix '(oxamoylimino)' at the imine C's locant. A =N
+        # carrying ANY OTHER heavy substituent the recognizer cannot name is
+        # SKIPPED WITHOUT emitting bare 'imino' (fail closed — the dropped
+        # branch then fails coverage -> unknown). An unsubstituted =NH keeps
+        # the existing bare-'imino' generic path.
+        if fg_name == 'imine' and chain_set:
+            from ..assembly.substituent_naming import oxamoyl_branch_name
+            _im_prefixes = []
+            _im_ok = True
+            _im_handled = False
+            for _m in matches:
+                _imc, _imn = _m[0], _m[1]
+                _imn_a = mol.GetAtomWithIdx(_imn)
+                _heavy = [nb.GetIdx() for nb in _imn_a.GetNeighbors()
+                          if nb.GetIdx() != _imc and nb.GetAtomicNum() > 1]
+                if not _heavy:
+                    continue  # unsubstituted =NH -> generic 'imino' path owns it
+                if _imc not in chain_set or len(_heavy) != 1:
+                    _im_ok = False
+                    break
+                _oxa = oxamoyl_branch_name(mol, _imn, _heavy[0])
+                _loc = atom_to_locant.get(_imc)
+                if _oxa is None or _loc is None:
+                    _im_ok = False   # substituted =N we cannot name -> fail closed
+                    break
+                _im_prefixes.append(
+                    format_fg_prefix(f"({_oxa}imino)", [_loc], 1))
+                _amidine_excluded_n.add(_imn)
+                _im_handled = True
+            if not _im_ok:
+                return None  # never a bare 'imino' dropping the branch
+            if _im_handled:
+                all_prefixes.extend(_im_prefixes)
+                continue
 
         # AM-4 (P-66.4.1.3.2, BB 34338): an amidine carbon that TERMINATES a
         # chain parent is expressed with -NH2 -> 'amino' and =NH -> 'imino'
