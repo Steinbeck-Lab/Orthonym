@@ -8299,6 +8299,16 @@ def _detect_fg_only_prefix(mol, frag_atoms, attach_mol_idx):
             return 'hydroxy'
 
         if sym == 'N':
+            # P-62.3.1.2 (BB 26540): distinguish exocyclic =NH (imino
+            # prefix, in the presence of a senior C=O suffix) from -NH2
+            # (amino). Mirror the oxygen branch's bond-order check. An
+            # N-substituted =N-R (degree 2) is NOT bare 'imino' and would
+            # drop the R substituent -> fail closed (None).
+            bond = mol.GetBondBetweenAtoms(idx, attach_mol_idx)
+            if bond and bond.GetBondTypeAsDouble() == 2.0:
+                if atom.GetFormalCharge() == 0 and atom.GetDegree() == 1:
+                    return 'imino'
+                return None
             return 'amino'
         if sym == 'S':
             return 'sulfanyl'
