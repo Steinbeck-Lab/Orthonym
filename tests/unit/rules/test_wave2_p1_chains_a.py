@@ -32,3 +32,14 @@ class TestP15ReplacementMorpholine:
     ])
     def test_chalcogen_morpholine(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestP54HWPhosphorusPartialSat:
+    def test_dihydrophosphole(self):
+        # P-54.4.1: 2,3-dihydro-1H-phosphole (PIN)
+        # NOTE: the plan's evidence SMILES "C1=CCP1" is a 4-membered ring
+        # (phosphete-derived); the actual 2,3-dihydro-1H-phosphole is the
+        # 5-membered "P1CCC=C1" (OPSIN-verified). Corrected here per
+        # reproduce-first CODE-level divergence.
+        assert name_compound("P1CCC=C1") == "2,3-dihydro-1H-phosphole"

@@ -646,11 +646,14 @@ def _mancude_monocycle_parent(mol, ring_atoms):
     # the 2-N azoles, e.g. 4,5-dihydro-1H-imidazole), then all-pyridine-type
     # (azines, where the N-H N is itself a hydro position, e.g. dihydropyridine),
     # then other combinations as a fallback.
-    ring_n = [i for i in sorted(ring) if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
-    mol_nh = frozenset(i for i in ring_n if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1)
+    # P-54.4.1: phosphole's ring P behaves like pyrrole's ring N (1H-phosphole)
+    # — an explicit ring-H at that atom completes the mancude 6-pi aromatic count.
+    ring_xh = [i for i in sorted(ring)
+               if mol.GetAtomWithIdx(i).GetSymbol() in ('N', 'P')]
+    mol_nh = frozenset(i for i in ring_xh if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1)
     nh_options = [mol_nh, frozenset()]
-    for r in range(1, len(ring_n) + 1):
-        nh_options.extend(frozenset(c) for c in combinations(ring_n, r))
+    for r in range(1, len(ring_xh) + 1):
+        nh_options.extend(frozenset(c) for c in combinations(ring_xh, r))
     seen = set()
     nh_options = [o for o in nh_options if not (o in seen or seen.add(o))]
     for nh_set in nh_options:
@@ -1025,10 +1028,48 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     H-bearing double-bond-eligible atom may remain (multi-indicated-H rings
     like 1,3-dioxine are a documented follow-on).
     """
-    if info.get('is_aromatic') or info.get('is_saturated'):
+    if info.get('is_saturated'):
         return ""
     n = len(oriented)
     ring_set = set(oriented)
+
+    if info.get('is_aromatic'):
+        # P-54.4.1: an aromatic mancude ring with a single "pyrrole-type"
+        # heteroatom (trivalent N/P/As/Sb bearing an explicit H, donating its
+        # lone pair to the aromatic sextet, NOT in a ring double bond) carries
+        # an indicated hydrogen at that atom -> 1H-phosphole (like 1H-pyrrole;
+        # pyrrole itself never reaches here, it is a retained name). Pyridine-
+        # type =N- (no H) and >1 such atom fall through to '' (status quo).
+        _PYRROLE_TYPE = frozenset({'N', 'P', 'As', 'Sb'})
+        pyrrole_atoms = [
+            idx for idx in oriented
+            if mol.GetAtomWithIdx(idx).GetSymbol() in _PYRROLE_TYPE
+            and mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1
+        ]
+        if len(pyrrole_atoms) != 1:
+            return ""
+        target = pyrrole_atoms[0]
+
+        def _het_map_arom(order):
+            return tuple(
+                (pos + 1, mol.GetAtomWithIdx(a).GetSymbol())
+                for pos, a in enumerate(order)
+                if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+            )
+
+        base_map = _het_map_arom(oriented)
+        best_loc: Optional[int] = None
+        for start in range(n):
+            for step in (1, -1):
+                order = [oriented[(start + step * k) % n] for k in range(n)]
+                if _het_map_arom(order) != base_map:
+                    continue
+                loc = order.index(target) + 1
+                if best_loc is None or loc < best_loc:
+                    best_loc = loc
+        if best_loc is None:
+            return ""
+        return f"{best_loc}H-"
 
     # Actual ring double bonds (the aromatic case was excluded above).
     db_pairs = []
