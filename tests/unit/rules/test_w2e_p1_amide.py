@@ -57,3 +57,22 @@ class TestT4SulfonimidamideRingAndSe:
     ])
     def test_protect_chain_s_forms(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT5Biguanide:
+    """P-66.4.1.2.1.2 (BB 34298): condensed guanidines are named as diamides
+    of imidodicarbonimidic acid; 'biguanide' no longer recommended."""
+
+    def test_bare_biguanide_pin(self):
+        assert name_compound("NC(=N)NC(=N)N") == "imidodicarbonimidic diamide"
+
+    def test_substituted_keeps_rt_valid_general_name(self):
+        # Substituted condensed guanidines await the N^n superscript
+        # subsystem (Task 12 investigation). Until then the RT-valid
+        # general name must NOT regress to unknown.
+        assert name_compound("CCN=C(NC(N)=N)N(c1ccccc1)c1ccccc1") == \
+            "N-carbamimidoyl-N''-ethyl-N',N'-diphenylguanidine"
+
+    def test_protect_plain_guanidine(self):
+        assert name_compound("NC(=N)N") == "guanidine"

@@ -118,6 +118,12 @@ _INORGANIC_ACID_DERIVATIVES = {
     # P-66.4.2.2 family (aminoguanidine =NH tautomer; hydrazine parent +
     # carboximidamide suffix per P-66.4.1.1; OPSIN-RT verified).
     "N=C(N)NN": "hydrazinecarboximidamide",
+    # P-66.4.1.2.1.2 (BB 34298): "The names biguanide, triguanide, etc., are
+    # no longer recommended. Condensed guanidines ... are named systematically
+    # as the diamides of imidodicarbonimidic acid". Bare parent only; the
+    # @40 exact key never matches substituted forms, which keep the guanidine
+    # handler's RT-valid general name until the N^n locant subsystem exists.
+    "N=C(N)NC(=N)N": "imidodicarbonimidic diamide",
 }
 
 # --- v23 Phase 9: carbonic/carbamic functional-replacement acids ---
