@@ -1332,6 +1332,40 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if not _s_on_chain:
                 continue
 
+        # P-66.1.4.4 (BB 33196, W2E-P1FG Task 9): a thioamide carbon on the
+        # principal chain, junior to a senior suffix (acid/ester), is expressed
+        # by 'amino' (the single-bonded N; '({alkyl}amino)' if substituted) +
+        # 'sulfanylidene' (the =S) at that C's locant — BB verbatim
+        # '3-amino-3-sulfanylidenepropanoic acid'. Mirrors AM-4. Off-chain /
+        # ring thioamide keeps the existing 'carbamothioyl' PREFIX_FORMS path
+        # (seniority.py). Fires only when EVERY thioamide C is a chain member
+        # with the amino side nameable; else falls through to carbamothioyl.
+        if fg_name == 'thioamide' and chain_set:
+            _ta_ok = True
+            _ta_units = {}  # thioamide C -> (S idx, N idx)
+            for _m in matches:
+                _tac, _tas, _tan = _m[0], _m[1], _m[2]
+                if _tac not in chain_set:
+                    _ta_ok = False
+                    break
+                _ta_units[_tac] = (_tas, _tan)
+            if _ta_ok and _ta_units:
+                _ta_prefixes = []
+                for _tac, (_tas, _tan) in _ta_units.items():
+                    _loc = atom_to_locant.get(_tac)
+                    _amino = _name_amidine_chain_side(mol, _tan, _tac, 'amino')
+                    if _loc is None or _amino is None:
+                        _ta_ok = False
+                        break
+                    _ta_prefixes.append(format_fg_prefix(_amino, [_loc], 1))
+                    _ta_prefixes.append(
+                        format_fg_prefix('sulfanylidene', [_loc], 1))
+                if _ta_ok:
+                    all_prefixes.extend(_ta_prefixes)
+                    for _tac, (_tas, _tan) in _ta_units.items():
+                        _amidine_excluded_n.add(_tan)
+                    continue
+
         # AM-4 (P-66.4.1.3.2, BB 34338): an amidine carbon that TERMINATES a
         # chain parent is expressed with -NH2 -> 'amino' and =NH -> 'imino'
         # (each N-substituent decorating the prefix), NOT 'carbamimidoyl' (the
