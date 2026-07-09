@@ -1918,6 +1918,18 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     m_oic = re.match(r'^(.+?)(?:an)?oic acid$', name)
     if m_oic:
         stem = m_oic.group(1)
+        # P-59.2.1.5 (W2E-P1FC Task 10) fail-closed guard: this chain converter
+        # must NEVER flatten a RING acid ('benzoic acid', 'naphthoic acid') into
+        # a carboxy-alkyl chain ('6-carboxyhexyl') — that describes a DIFFERENT
+        # molecule (the historical phenyl->hexyl corruption). A systematic chain
+        # acid is '{chainstem}anoic acid' whose bare stem IS a known chain prefix
+        # (meth/eth/prop/...); a trivial ring acid ('benz', 'naphth') is not.
+        # Decline (return "") when the stem is not a recognized chain prefix so
+        # the caller falls through to the ring-substituent namer / fails closed.
+        from ..data.chain_names import get_chain_prefix as _gcp
+        _valid_chain_stems = {_gcp(i) for i in range(1, 31)}
+        if stem.lower() not in _valid_chain_stems:
+            return ""
         # Carboxy goes on the terminal carbon (chain_length for original chain)
         # The stem is shortened by one carbon (the COOH carbon becomes "carboxy")
         carboxy_locant = chain_length
