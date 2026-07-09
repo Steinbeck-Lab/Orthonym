@@ -154,7 +154,7 @@ class TestOrgmDispatch:
                        StoutClass.KETENE, StoutClass.RING_CHALCOGEN_OXIDE,
                        StoutClass.AZINIC_DERIVATIVE, StoutClass.HETERONE,
                        StoutClass.SULFINE, StoutClass.PSEUDOKETONE_HETERO,
-                       StoutClass.HETEROIMINE):
+                       StoutClass.HETEROIMINE, StoutClass.HYDRO_FUSED_PEROXOL):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

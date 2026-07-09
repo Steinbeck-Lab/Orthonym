@@ -1054,6 +1054,60 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
 
 
 # =============================================================================
+# Ring peroxol suffix on a partially-saturated fused carbocycle (P-63.4.1)
+# =============================================================================
+
+
+def name_hydro_fused_chalcogen_suffix(mol: Chem.Mol) -> Optional[str]:
+    """P-63.4.1 (BB 27935): -OOH on an sp3 carbon of a partially saturated
+    fused carbocycle -> '<hydro-parent>-<locant>-peroxol' (BB verbatim PIN:
+    1,2,3,4-tetrahydronaphthalene-1-peroxol).
+
+    Fail-closed (accuracy-first): exactly one -OOH, no other heteroatoms and
+    no other substituents; the skeleton (molecule minus the two O) must be the
+    numbering-verified tetralin family (names to '1,2,3,4-tetrahydronaphthalene'
+    via the normal pipeline) and the OOH carbon must sit at locant 1 (the sp3
+    ring carbon bonded to an aromatic fusion carbon). Structured so -OH can join
+    later; this task ships only the -OOH case."""
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    patt = Chem.MolFromSmarts("[OX2H][OX2][CX4;R]")
+    matches = mol.GetSubstructMatches(patt)
+    if len(matches) != 1:
+        return None
+    oh, o2, c = matches[0]
+    # whole molecule minus the two -OOH oxygens must be an all-carbon skeleton
+    skeleton = Chem.RWMol(mol)
+    for idx in sorted((oh, o2), reverse=True):
+        skeleton.RemoveAtom(idx)
+    sk = skeleton.GetMol()
+    try:
+        Chem.SanitizeMol(sk)
+    except Exception:
+        return None
+    for atom in sk.GetAtoms():
+        if atom.GetAtomicNum() != 6:
+            return None      # any residual heteroatom/other substituent -> fail closed
+    # Name the bare skeleton through the normal pipeline; only the
+    # numbering-verified tetralin family is in scope for this task.
+    from ..namer import name_compound
+    base = name_compound(Chem.MolToSmiles(sk), style="pin")
+    if base != "1,2,3,4-tetrahydronaphthalene":
+        return None
+    # The OOH carbon must sit at locant 1 of the saturated ring: it is the sp3
+    # carbon bonded to an aromatic fusion carbon (verify structurally).
+    c_atom = mol.GetAtomWithIdx(c)
+    if not any(n.GetIsAromatic() for n in c_atom.GetNeighbors()):
+        return None
+    return f"{base}-1-peroxol"
+
+
+# =============================================================================
 # Added indicated hydrogen + ring-ketone suffix (P-31.1.4.2.4 / P-58.2)
 # =============================================================================
 

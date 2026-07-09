@@ -127,6 +127,7 @@ class StoutClass(_StrEnumBase):
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
+    HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG (P-63.4.1 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
@@ -1248,6 +1249,24 @@ def _handle_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
     return name_ring_chalcogen_oxide(mol)
 
 
+def _is_hydro_fused_peroxol(mol, smiles, canonical_smiles, features=None,
+                            **kwargs) -> bool:
+    """W2E-P1FG (P-63.4.1); priority 49.6. -OOH on an sp3 carbon of a
+    partially saturated fused carbocycle (1,2,3,4-tetrahydronaphthalene-1-
+    peroxol). Fail-closed classifier+namer."""
+    if mol is None:
+        return False
+    from orthonym.rules.partial_saturation import name_hydro_fused_chalcogen_suffix
+    return name_hydro_fused_chalcogen_suffix(mol) is not None
+
+
+def _handle_hydro_fused_peroxol(mol, smiles, canonical_smiles, features=None,
+                                **kwargs) -> Optional[str]:
+    """Return the ring peroxol PIN (P-63.4.1), else None (cascade-continuation)."""
+    from orthonym.rules.partial_saturation import name_hydro_fused_chalcogen_suffix
+    return name_hydro_fused_chalcogen_suffix(mol)
+
+
 def _handle_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
     """Return the ethenone-parent ketene PIN (P-64.2.2.4), else None (cascade-continuation)."""
     from orthonym.rules.ketenes import name_ketene
@@ -1457,6 +1476,18 @@ _register_dispatch(
     iupac_section="Blue Book P-25.6 / P-74.3.1.3",
     description="Ring-chalcogen oxide named additively on the ring parent "
                 "(dibenzo[b,d]thiophene 5-oxide / 5,5-dioxide); fail-closed",
+)
+# --- W2E-P1FG: HYDRO_FUSED_PEROXOL at priority 49.6 (before ORGM@50). The
+# -OOH suffix on an sp3 carbon of a partially saturated fused carbocycle
+# (1,2,3,4-tetrahydronaphthalene-1-peroxol, BB verbatim P-63.4.1) — the
+# fallback ring-parent path silently DROPPED the -OOH before this. Fail-
+# closed classifier+namer; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.HYDRO_FUSED_PEROXOL, priority=49.6, tier=1,
+    predicate=_is_hydro_fused_peroxol, handler=_handle_hydro_fused_peroxol,
+    iupac_section="Blue Book P-63.4.1",
+    description="-OOH suffix on a partially saturated fused carbocycle "
+                "(1,2,3,4-tetrahydronaphthalene-1-peroxol); fail-closed",
 )
 
 
