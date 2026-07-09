@@ -2556,6 +2556,145 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
 # ============================================================================
 
 
+def _find_amine_oxide_n(mol, sub_atoms):
+    """P-62.5(2) detector: an amine-oxide nitrogen inside a substituent
+    fragment — N with formal charge +1, ALL bonds single (excludes nitro,
+    azide, aromatic N-oxides), exactly one terminal single-bonded O- inside
+    the fragment. Returns (n_idx, o_idx) or None. Two oxide-N in one
+    fragment -> None (out of scope, fail closed at the caller)."""
+    from rdkit import Chem
+    sub_set = set(sub_atoms)
+    found = None
+    for idx in sub_atoms:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != 'N' or a.GetFormalCharge() != 1 or a.GetIsAromatic():
+            continue
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds()):
+            continue
+        o_minus = [n.GetIdx() for n in a.GetNeighbors()
+                   if n.GetSymbol() == 'O' and n.GetFormalCharge() == -1
+                   and n.GetDegree() == 1 and n.GetIdx() in sub_set]
+        if len(o_minus) != 1:
+            continue
+        if found is not None:
+            return None
+        found = (idx, o_minus[0])
+    return found
+
+
+def _collect_plain_alkyl_branch(mol, start_idx, blocked):
+    """BFS a plain saturated acyclic all-carbon branch; None if anything
+    else is reached (fail-closed helper for _lambda5_azanyl_prefix). Distinct
+    from _collect_branch_atoms (which uses a single block_idx and does not
+    reject heteroatoms)."""
+    from rdkit import Chem
+    seen, queue = set(), [start_idx]
+    while queue:
+        i = queue.pop()
+        if i in seen or i in blocked:
+            continue
+        a = mol.GetAtomWithIdx(i)
+        if (a.GetSymbol() != 'C' or a.GetIsAromatic() or a.IsInRing()
+                or a.GetFormalCharge() != 0):
+            return None
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds()):
+            return None
+        seen.add(i)
+        queue.extend(nb.GetIdx() for nb in a.GetNeighbors()
+                     if nb.GetIdx() not in blocked)
+    return sorted(seen)
+
+
+def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
+    """P-62.5(2): build the lambda5-azane substituent prefix for a fragment
+    whose terminal atom is an amine-oxide N reached through an UNBRANCHED
+    saturated all-carbon chain from the attachment atom:
+      -CH2-N+(CH3)2(O-)   -> '[dimethyl(oxo)-lambda5-azanyl]methyl'
+      -CH2-CH2-NH2+(O-)   -> '2-(oxo-lambda5-azanyl)ethyl'
+    Fail-closed: branched chains, ring/aromatic/charged chain atoms,
+    non-alkyl N-substituents, or uncovered fragment atoms -> None."""
+    from rdkit import Chem
+    from .naming_utils import get_multiplier_prefix, get_alkyl_name
+    hit = _find_amine_oxide_n(mol, sub_atoms)
+    if hit is None:
+        return None
+    n_idx, o_idx = hit
+    # Determinism guard (P-62.5 / P-44): choosing the principal among two
+    # equal-seniority amine-oxide centres is an atom-order-dependent parent
+    # tie-break that is not yet built. Naming the substituent-side oxide while
+    # that choice is nondeterministic would make the whole-molecule name
+    # order-dependent -> fail closed (deterministic unknown) for molecules with
+    # >1 amine-oxide nitrogen. Single-substituent-oxide molecules are unaffected.
+    _all_ox_n = sum(
+        1 for a in mol.GetAtoms()
+        if a.GetSymbol() == 'N' and a.GetFormalCharge() == 1
+        and not a.GetIsAromatic()
+        and all(b.GetBondType() == Chem.BondType.SINGLE for b in a.GetBonds())
+        and sum(1 for nb in a.GetNeighbors()
+                if nb.GetSymbol() == 'O' and nb.GetFormalCharge() == -1
+                and nb.GetDegree() == 1) == 1
+    )
+    if _all_ox_n > 1:
+        return None
+    sub_set = set(sub_atoms)
+    # walk attach -> ... -> C bonded to N (plain saturated unbranched C chain)
+    chain = []
+    prev, cur = None, attach_idx
+    while True:
+        a = mol.GetAtomWithIdx(cur)
+        if (a.GetSymbol() != 'C' or a.GetIsAromatic() or a.IsInRing()
+                or a.GetFormalCharge() != 0):
+            return None
+        chain.append(cur)
+        nxt = [nb.GetIdx() for nb in a.GetNeighbors()
+               if nb.GetIdx() in sub_set and nb.GetIdx() != prev]
+        if any(mol.GetBondBetweenAtoms(cur, i).GetBondType()
+               != Chem.BondType.SINGLE for i in nxt):
+            return None
+        if nxt == [n_idx]:
+            break
+        if len(nxt) != 1:
+            return None
+        prev, cur = cur, nxt[0]
+    # N substituents besides the chain carbon and the oxide O: plain alkyls
+    covered = set(chain) | {n_idx, o_idx}
+    alkyl_names = []
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    for nb in n_atom.GetNeighbors():
+        i = nb.GetIdx()
+        if i in (o_idx, chain[-1]):
+            continue
+        if i not in sub_set:
+            return None
+        branch = _collect_plain_alkyl_branch(mol, i, {n_idx})
+        if branch is None:
+            return None
+        bname = name_substituent_fragment(mol, branch, i, [n_idx])
+        if bname is None or not bname.isalpha():
+            return None  # only simple unlocanted alkyls (methyl, ethyl, ...)
+        alkyl_names.append(bname)
+        covered.update(branch)
+    if covered != sub_set:
+        return None  # never drop an atom silently
+    alkyl_names.sort()
+    if not alkyl_names:
+        core = "(oxo-lambda5-azanyl)"
+    elif len(alkyl_names) == 2 and alkyl_names[0] == alkyl_names[1]:
+        mp = get_multiplier_prefix(2, alkyl_names[0])
+        core = f"[{mp}{alkyl_names[0]}(oxo)-lambda5-azanyl]"
+    elif len(alkyl_names) == 1:
+        core = f"[{alkyl_names[0]}(oxo)-lambda5-azanyl]"
+    else:
+        return None
+    chain_len = len(chain)
+    alkyl = get_alkyl_name(chain_len)  # 'methyl', 'ethyl', ...
+    if alkyl is None:
+        return None
+    if chain_len == 1:
+        return f"{core}{alkyl}"
+    return f"{chain_len}-{core}{alkyl}"
+
+
 def name_substituent_fragment(
     mol,
     sub_atoms: List[int],
@@ -2615,6 +2754,14 @@ def name_substituent_fragment(
                 else:
                     _stem = f'({_inner})oxy'
                 return _stem
+
+    # Step 0b (P-62.5(2)): a fragment carrying an amine-oxide nitrogen is
+    # named ONLY via the lambda5-azanyl builder. The generic recursion drops
+    # the oxide (raw HEAD emitted '(methylmethyl)methyl' for
+    # -CH2-N+(CH3)2(O-), a different molecule) -> if the builder declines,
+    # FAIL CLOSED rather than fall through.
+    if _find_amine_oxide_n(mol, sub_atoms) is not None:
+        return _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx)
 
     # Step 1: Check retained PREFERRED substituent names FIRST (phenyl, benzyl,
     # retained cycloalkyls, tert-butyl). F-T9/DD6 RET-02: isopropyl/sec-butyl/
