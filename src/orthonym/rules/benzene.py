@@ -27,6 +27,7 @@ from ..assembly.naming_utils import (
     get_multiplier_prefix,
     format_substituent_prefix,
     alpha_sort_key,
+    prefix_citation_sort_key,
     is_complex_substituent,
     should_omit_locant_one,
 )
@@ -3020,7 +3021,7 @@ def _name_substituted_aniline(
 
     # Alphabetize N- and ring-substituents together (P-14.5.2).
     all_entries = n_prefix_entries + ring_prefix_entries
-    all_entries.sort(key=lambda e: e[0])
+    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(e[1])[1]))
     prefix_part = "-".join(rendered for _key, rendered in all_entries)
 
     return f"{prefix_part}aniline"
@@ -3136,7 +3137,7 @@ def _name_substituted_benzenediamine(
     all_entries = n_prefix_entries + ring_prefix_entries
     if not all_entries:
         return suffix_part
-    all_entries.sort(key=lambda e: e[0])
+    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(e[1])[1]))
     prefix_part = "-".join(rendered for _k, rendered in all_entries)
     return f"{prefix_part}{suffix_part}"
 

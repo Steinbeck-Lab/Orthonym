@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    prefix_citation_sort_key,
     get_multiplier_prefix,
     format_suffix_with_locants,
     get_alkyl_name,
@@ -824,8 +825,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     except Exception as exc:
         logger.debug("Ring-as-parent universal prefix failed: %s", exc)
 
-    # Sort prefixes alphabetically
-    all_prefixes.sort(key=alpha_sort_key)
+    # Sort prefixes alphabetically (P-14.5.2), with P-14.5.4 lowest-locant
+    # tie-break for identical-letter prefixes.
+    all_prefixes.sort(key=prefix_citation_sort_key)
 
     # --- Step 7: Assemble the complete name ---
     # Format: [prefixes]-[ring_parent]-[suffix_locants]-[multiplier][suffix]
@@ -1494,8 +1496,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # are merged; locanted prefixes represent distinct chain positions.
     all_prefixes = _merge_bare_duplicate_prefixes(all_prefixes)
 
-    # Sort all prefixes alphabetically
-    all_prefixes.sort(key=alpha_sort_key)
+    # Sort all prefixes alphabetically (P-14.5.2), with P-14.5.4 lowest-locant
+    # tie-break for identical-letter prefixes.
+    all_prefixes.sort(key=prefix_citation_sort_key)
 
     # --- Build the name ---
     from ..data.chain_names import get_chain_prefix

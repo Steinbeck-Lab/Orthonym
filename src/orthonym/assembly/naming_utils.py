@@ -1234,6 +1234,33 @@ def alpha_sort_key(substituent_name: str) -> str:
     return text
 
 
+def prefix_citation_sort_key(prefix: str) -> tuple:
+    """P-14.5.2 alpha key + P-14.5.4 lowest-locant tie-break for citation.
+
+    BB P-14.5.4 (BlueBookV2.md:3517): 'When two or more prefixes consist of
+    identical Roman letters, priority for order of citation is given to the
+    group that contains the lowest locant(s) at the first point of
+    difference.' The prefix's LEADING parent-locant set is stripped (those
+    locants are assigned BY citation order, they may not decide it); the
+    remaining locant tokens are compared in order of appearance via
+    locant_sort_key. Drop-in replacement key for alpha_sort_key at
+    citation-sort sites: identical alpha keys now resolve by locants
+    instead of stable-sort input order.
+    """
+    from .name_comparison import locant_sort_key, _LOCANT_TOKEN_FINDER
+    # Tier 1 is the Roman LETTERS of the complete-name alpha key (P-14.5.2):
+    # digits/hyphens are dropped so identical-letter prefixes (pentan-2-yl vs
+    # pentan-3-yl) collide here and the locant tier below decides, per
+    # P-14.5.4. (alpha_sort_key already strips leading positional locants and
+    # multiplicative prefixes; here we additionally strip the *internal*
+    # locant digits so the tier is letters-only.)
+    alpha_letters = ''.join(ch for ch in alpha_sort_key(prefix) if ch.isalpha())
+    core = _LOCANT_PREFIX_RE.sub('', prefix)
+    locs = tuple(locant_sort_key(t)
+                 for t in _LOCANT_TOKEN_FINDER.findall(core))
+    return (alpha_letters, locs)
+
+
 # ============================================================================
 # Vowel Elision
 # ============================================================================
