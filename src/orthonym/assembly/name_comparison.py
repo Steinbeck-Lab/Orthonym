@@ -165,3 +165,42 @@ def compare_names(a: str, b: str) -> int:
         if ka > kb:
             return 1
     return 0
+
+
+# ---------------------------------------------------------------------------
+# P-45.3.2 — lower locant set for higher-bonding-number (λ) prefixes
+# ---------------------------------------------------------------------------
+
+_LAMBDA_SPLIT_RE = re.compile(r"^(?P<base>\d+'*[a-z]?'*)(?:λ|lambda)(?P<bond>\d+)$")
+
+
+def parse_lambda_locant(token: str):
+    """Split '1λ5' / '1lambda5' / "2'λ4" into (base_locant, bonding_number).
+
+    Returns None for tokens without a λ mark. P-14.1.3: the λ symbol is
+    'cited in conjunction with an appropriate locant'.
+    """
+    m = _LAMBDA_SPLIT_RE.match(token.strip())
+    if not m:
+        return None
+    return (m.group('base'), int(m.group('bond')))
+
+
+def compare_lambda_locant_sets(set_a: List[str], set_b: List[str]) -> int:
+    """P-45.3.2 (BlueBookV2.md:22200): 'The preferred IUPAC name has the
+    lower locant set for substituent group(s) with the higher bonding
+    number(s) cited as prefixes.'
+
+    Only λ-bearing tokens participate; their BASE locants are compared with
+    P-14.3.5 first-point-of-difference semantics. Returns 0 when neither
+    side cites a λ prefix (tier does not apply).
+    """
+    a_bases = [p[0] for p in (parse_lambda_locant(t) for t in set_a) if p]
+    b_bases = [p[0] for p in (parse_lambda_locant(t) for t in set_b) if p]
+    if not a_bases and not b_bases:
+        return 0
+    if a_bases and not b_bases:
+        return -1   # P-45.3.1: more higher-bonding-number prefixes wins
+    if b_bases and not a_bases:
+        return 1
+    return compare_locant_str_sets(a_bases, b_bases)

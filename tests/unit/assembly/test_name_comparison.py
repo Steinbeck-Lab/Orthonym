@@ -102,3 +102,32 @@ class TestCompareNamesP455:
 
     def test_equal_names(self):
         assert compare_names("hexan-1-ol", "hexan-1-ol") == 0
+
+
+from orthonym.assembly.name_comparison import (
+    parse_lambda_locant,
+    compare_lambda_locant_sets,
+)
+
+
+class TestLambdaLocantsP4532:
+    def test_parse(self):
+        assert parse_lambda_locant("1λ5") == ("1", 5)
+        assert parse_lambda_locant("1lambda5") == ("1", 5)
+        assert parse_lambda_locant("2'λ4") == ("2'", 4)
+        assert parse_lambda_locant("4a") is None
+
+    def test_bb_p4532_example(self):
+        # BB line 22204: '1λ5' ... is lower than '2λ5' — the 1λ5 candidate wins.
+        assert compare_lambda_locant_sets(["1λ5"], ["2λ5"]) == -1
+        assert compare_lambda_locant_sets(["2λ5"], ["1λ5"]) == 1
+
+    def test_ascii_spelling_equivalent(self):
+        assert compare_lambda_locant_sets(["1lambda5"], ["2lambda5"]) == -1
+
+    def test_non_lambda_tokens_ignored(self):
+        # Only λ-bearing locants participate in the P-45.3.2 tier.
+        assert compare_lambda_locant_sets(["9", "1λ5"], ["2", "2λ5"]) == -1
+
+    def test_no_lambda_on_either_side_ties(self):
+        assert compare_lambda_locant_sets(["3", "4"], ["1", "2"]) == 0
