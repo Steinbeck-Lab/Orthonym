@@ -495,7 +495,8 @@ def build_hw_name(
     heteroatoms: List[Tuple[int, str]],
     ring_size: int,
     is_saturated: bool,
-    is_aromatic: bool
+    is_aromatic: bool,
+    lambda_by_locant: Optional[Dict[int, int]] = None,
 ) -> str:
     """
     Build Hantzsch-Widman systematic name for a heterocycle.
@@ -549,11 +550,19 @@ def build_hw_name(
     # azepane). This is the fix that keeps mixed-element medium rings from
     # dropping their locants (bare 'oxazepane' is the 1,2-isomer — a different
     # molecule).
+    lambda_by_locant = lambda_by_locant or {}
     all_locants = sorted(loc for locs in element_locants.values() for loc in locs)
     total_het = len(all_locants)
     locant_prefix = ""
-    if total_het > 1:
-        locant_prefix = ','.join(str(loc) for loc in all_locants) + '-'
+    # P-22.2.7.1: a lambda-bearing ring ALWAYS cites its heteroatom locants,
+    # even for a single heteroatom (1lambda3-iodinane, not 'lambda3-iodinane'),
+    # with the lambda token immediately after its locant (1,3lambda5-oxaphosphole).
+    if total_het > 1 or lambda_by_locant:
+        from .lambda_convention import format_lambda_token
+        locant_prefix = ','.join(
+            format_lambda_token(loc, lambda_by_locant.get(loc))
+            for loc in all_locants
+        ) + '-'
 
     # Build the element prefix chain in seniority order, each element carrying
     # only its di/tri/... multiplier (locants already collected above).
@@ -800,6 +809,93 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
     return f"{locant_str}-{prefix}{sep}{parent_name}"
 
 
+def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Optional[str]:
+    """P-22.2.7.1: heteromonocycle with nonstandard-bonding-number heteroatom(s).
+
+    Emits '<locants-with-lambda>-<HW name>' with indicated hydrogen when a
+    lambda heteroatom is the saturated skeletal position (1H-1lambda4-thiophene).
+    Fail-closed contract — returns None for: rings >10 / aromatic-perceived
+    rings; lambda on a skeletal CARBON; two same-element heteroatoms with
+    different lambda values (P-22.2.7.2 tie-break unbuilt); any unsaturated
+    ring that is not a perfect mancude matching with only HETEROATOM
+    saturated positions (hydro forms); >1 indicated-H position.
+    """
+    from .lambda_convention import nonstandard_bonding_number, STANDARD_BONDING_NUMBER
+    ring_size = info['ring_size']
+    if ring_size > 10 or info.get('is_aromatic'):
+        return None
+    loc_of = {idx: pos + 1 for pos, idx in enumerate(oriented)}
+    lambda_by_locant = {}
+    lam_elem_values = {}
+    for idx in oriented:
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam is None:
+            continue
+        sym = mol.GetAtomWithIdx(idx).GetSymbol()
+        if sym == 'C':
+            return None  # lambda carbon skeleton: out of scope, fail closed
+        lam_elem_values.setdefault(sym, set()).add(lam)
+        lambda_by_locant[loc_of[idx]] = lam
+    if not lambda_by_locant:
+        return None
+    # P-22.2.7.2 (same element, different bonding numbers) not implemented:
+    # the lower-locant-to-higher-lambda tie-break is unbuilt -> refuse.
+    for sym, vals in lam_elem_values.items():
+        n_same_elem = sum(
+            1 for i in oriented if mol.GetAtomWithIdx(i).GetSymbol() == sym
+        )
+        if n_same_elem > 1 and len(vals) >= 1:
+            return None
+    ih_prefix = ''
+    if not info['is_saturated']:
+        ring_set = set(oriented)
+        in_double = set()
+        n_double = 0
+        for bond in mol.GetBonds():
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set and bond.GetBondTypeAsDouble() >= 2.0:
+                in_double.update((i, j))
+                n_double += 1
+        sp3 = [idx for idx in oriented if idx not in in_double]
+        # a saturated ring CARBON means a hydro form, not a mancude lambda
+        # parent (2,3-dihydro-... unbuilt for lambda rings) -> refuse
+        if any(mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in sp3):
+            return None
+        # perfect mancude matching on the unsaturated part
+        if 2 * n_double != ring_size - len(sp3):
+            return None
+        ih_locs = []
+        for idx in sp3:
+            atom = mol.GetAtomWithIdx(idx)
+            capacity = lambda_by_locant.get(
+                loc_of[idx], STANDARD_BONDING_NUMBER.get(atom.GetSymbol(), 0)
+            )
+            if capacity - 2 >= 1:  # 2 ring sigma bonds; spare valence -> H position
+                ih_locs.append(loc_of[idx])
+        if len(ih_locs) > 1:
+            return None  # multi-indicated-H lambda rings: out of scope
+        if ih_locs:
+            ih_prefix = f"{ih_locs[0]}H-"
+    hw = build_hw_name(
+        heteroatom_locants, ring_size, info['is_saturated'], False,
+        lambda_by_locant=lambda_by_locant,
+    )
+    if not hw:
+        return None
+    # P-22.2.1 retained stems: the mancude S/Se/Te 5-ring HW names are
+    # replaced by their retained parents (BB example: 1H-1lambda4-THIOPHENE,
+    # not 1H-1lambda4-thiole).
+    for hw_stem, retained in (
+        ('thiole', 'thiophene'),
+        ('selenole', 'selenophene'),
+        ('tellurole', 'tellurophene'),
+    ):
+        if hw.endswith(hw_stem):
+            hw = hw[: -len(hw_stem)] + retained
+            break
+    return ih_prefix + hw
+
+
 def name_heterocycle(mol, ring_atoms) -> str:
     """
     Generate IUPAC name for a heterocyclic ring.
@@ -833,6 +929,19 @@ def name_heterocycle(mol, ring_atoms) -> str:
     retained = get_retained_name(ring_smiles)
     if retained:
         return retained
+
+    # P-22.2.7.1: lambda-convention heteromonocycle. Must run BEFORE the
+    # partial-saturation and plain-HW paths so a hypervalent ring never
+    # silently names as its standard-valence parent ('thiophene'/'2,3-dihydro-
+    # thiophene' for [SH2]1C=CC=C1 / [SH2]1CCC=C1 — different molecules).
+    from .lambda_convention import nonstandard_bonding_number as _nsbn
+    _oriented_pre, _ = orient_heterocycle(mol, ring_atoms)
+    if _oriented_pre and any(_nsbn(mol, i) is not None for i in _oriented_pre):
+        _info_pre = classify_heterocycle(mol, ring_atoms)
+        _het_pre = get_heteroatom_locants(_oriented_pre, mol)
+        return _name_lambda_heteromonocycle(
+            mol, _oriented_pre, _het_pre, _info_pre
+        )
 
     # Partially-saturated mancude monocyclic heterocycle (e.g. 1,2-dihydro-
     # pyridine): the systematic HW path below drops the hydrogenation and emits

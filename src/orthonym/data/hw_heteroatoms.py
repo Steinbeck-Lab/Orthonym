@@ -28,6 +28,14 @@ from typing import Dict, Optional
 # Hantzsch-Widman 'a' term prefixes for heteroatoms
 # Maps element symbol to the standard HW prefix
 HW_PREFIXES: Dict[str, str] = {
+    # Group 17 (halogens — only reachable in lambda-convention rings,
+    # P-22.2.7.1: 1lambda3-iodinane; standard-valence halogens cannot be
+    # skeletal ring atoms)
+    'F': 'fluora',
+    'Cl': 'chlora',
+    'Br': 'broma',
+    'I': 'ioda',
+
     # Group 16 (Chalcogens)
     'O': 'oxa',
     'S': 'thia',
