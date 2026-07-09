@@ -55,6 +55,94 @@ HALOGEN_PREFIX = {
 }
 
 
+# P-65.2.1: the acid-anion word of a mono-ester of carbonic acid, keyed by the
+# acyl-halide FG type. 'chloride' -> 'carbonochloridate', etc. (OPSIN-verified).
+_CARBONO_HALIDATE_WORDS = {
+    "acid_chloride": "carbonochloridate",
+    "acid_bromide": "carbonobromidate",
+    "acid_fluoride": "carbonofluoridate",
+    "acid_iodide": "carbonoiodidate",
+}
+
+
+def name_carbonic_monoester_acyl_halide(
+    mol, match, halide_word: str
+) -> Optional[str]:
+    """P-35.4.2/P-65.2.1: X-C(=O)-O-R  ->  '<R> carbono<halide>idate'.
+
+    ``match`` is the acyl-halide SMARTS tuple (carbonyl C, carbonyl O, halide).
+    Returns None (fail-closed) unless the carbonyl C is a genuine carbonic-acid
+    mono-ester acyl halide: exactly one =O, one halide, one single-bonded ester
+    O leading to a fully nameable R group, and NO carbon neighbour on the
+    carbonyl. R is named with the universal substituent namer (benzyl, ethyl).
+    """
+    from ..assembly.substituent_naming import name_substituent_fragment
+
+    carbonyl_c = match[0]
+    c_atom = mol.GetAtomWithIdx(carbonyl_c)
+    if c_atom.GetSymbol() != 'C':
+        return None
+    halide_key = None
+    for k, w in HALIDE_WORDS.items():
+        if w == halide_word:
+            halide_key = k
+            break
+    carbono_word = _CARBONO_HALIDATE_WORDS.get(halide_key)
+    if carbono_word is None:
+        return None
+
+    o_double = o_single = ester_o = halide = carbon_nbr = None
+    n_double = n_single = 0
+    for nb in c_atom.GetNeighbors():
+        bt = mol.GetBondBetweenAtoms(carbonyl_c, nb.GetIdx()).GetBondTypeAsDouble()
+        sym = nb.GetSymbol()
+        if sym == 'O' and bt == 2.0:
+            o_double = nb.GetIdx()
+        elif sym == 'O' and bt == 1.0:
+            # ester O must carry the alkyl R and no H (an -OH would be the acid)
+            if nb.GetTotalNumHs() != 0:
+                return None
+            ester_o = nb.GetIdx()
+        elif sym in ('Cl', 'Br', 'F', 'I'):
+            halide = nb.GetIdx()
+        elif sym == 'C':
+            carbon_nbr = nb.GetIdx()
+        else:
+            return None
+    # Exactly the carbonic mono-ester acyl-halide skeleton, no C chain.
+    if o_double is None or ester_o is None or halide is None:
+        return None
+    if carbon_nbr is not None:
+        return None
+    # R = the alkyl hanging off the ester O (exclude the carbonyl C side).
+    r_root = next(
+        (nb.GetIdx() for nb in mol.GetAtomWithIdx(ester_o).GetNeighbors()
+         if nb.GetIdx() != carbonyl_c),
+        None,
+    )
+    if r_root is None:
+        return None
+    # Collect R's atoms (everything reachable from r_root without crossing the
+    # ester O), then name it as a substituent word.
+    from collections import deque as _dq
+    seen = {ester_o}
+    r_atoms = []
+    q = _dq([r_root])
+    while q:
+        cur = q.popleft()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        r_atoms.append(cur)
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if nb.GetIdx() not in seen:
+                q.append(nb.GetIdx())
+    r_name = name_substituent_fragment(mol, r_atoms, r_root, [ester_o])
+    if not r_name or ' ' in r_name:
+        return None
+    return f"{r_name} {carbono_word}"
+
+
 def name_acid_halide(features) -> Optional[str]:
     """
     Name an acid halide compound using functional class nomenclature.
@@ -81,6 +169,18 @@ def name_acid_halide(features) -> Optional[str]:
         return None
 
     num_halide_groups = len(acid_halide_matches)
+
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl halide of a
+    # MONO-ester of carbonic acid, X-C(=O)-O-R, is the functional-class name
+    # '<R> carbono<halide>idate' (benzyl carbonochloridate, ethyl
+    # carbonochloridate). The carbonyl C bears exactly: one =O, one halide, and
+    # one ester-O to a nameable alkyl R; NO carbon neighbour (so it is NOT a
+    # plain R-CO-X acyl halide). Fail-closed on any other decoration.
+    if num_halide_groups == 1:
+        _cc = name_carbonic_monoester_acyl_halide(mol, acid_halide_matches[0],
+                                                  halide_word)
+        if _cc is not None:
+            return _cc
 
     # Collect all atoms consumed by acid halide groups (C=O, halogen)
     consumed_atoms = set()

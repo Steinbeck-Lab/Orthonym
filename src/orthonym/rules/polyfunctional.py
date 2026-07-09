@@ -1073,6 +1073,43 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # (The legacy EL-02 fallback below DEMOTED the ester and promoted a LESS
     # senior group to PCG -- a different, wrong molecule; kept only as a
     # fail-closed fallback for cases the acid-analog path declines.)
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl HALIDE of a
+    # mono-ester of carbonic acid, X-C(=O)-O-R, is perceived here as ester +
+    # acid_halide on the SAME carbonyl and would otherwise be mis-built as
+    # 'ethyl 1-chloro-1-oxomethanoate' (OPSIN-invalid). It is the functional-
+    # class name '<R> carbono<halide>idate' (benzyl carbonochloridate). Fires
+    # ONLY on that exact skeleton (carbonyl C: one =O, one halide, one ester-O
+    # to a nameable R, NO carbon neighbour); else falls through fail-closed.
+    if principal_group == "ester":
+        _ester_matches_all = features.functional_groups.get("ester", [])
+        _halide_fgs = ("acid_chloride", "acid_bromide",
+                       "acid_fluoride", "acid_iodide")
+        if (len(_ester_matches_all) == 1
+                and any(features.functional_groups.get(h)
+                        for h in _halide_fgs)):
+            from ..rules.acid_halides import (
+                name_carbonic_monoester_acyl_halide, HALIDE_WORDS,
+            )
+            _em = _ester_matches_all[0]
+            _acyl_c = _em[0]
+            _c_at = mol.GetAtomWithIdx(_acyl_c)
+            _hal = next((nb for nb in _c_at.GetNeighbors()
+                         if nb.GetSymbol() in ('Cl', 'Br', 'F', 'I')), None)
+            _o_dbl = next((nb.GetIdx() for nb in _c_at.GetNeighbors()
+                           if nb.GetSymbol() == 'O'
+                           and mol.GetBondBetweenAtoms(
+                               _acyl_c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0),
+                          None)
+            if _hal is not None and _o_dbl is not None:
+                _hal_pg = {'Cl': 'acid_chloride', 'Br': 'acid_bromide',
+                           'F': 'acid_fluoride', 'I': 'acid_iodide'}[
+                    _hal.GetSymbol()]
+                _cc = name_carbonic_monoester_acyl_halide(
+                    mol, (_acyl_c, _o_dbl, _hal.GetIdx()), HALIDE_WORDS[_hal_pg]
+                )
+                if _cc is not None:
+                    return _cc
+
     if principal_group == "ester":
         _ester_matches_all = features.functional_groups.get("ester", [])
         if len(_ester_matches_all) == 1:

@@ -833,6 +833,39 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
 
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): a mono-ester of carbonic
+    # acid whose OTHER acid function is an acyl HALIDE, X-C(=O)-O-R, is named as
+    # the functional-class '<R> carbono<halide>idate' (benzyl carbonochloridate).
+    # This is perceived as ester+acid_halide on the SAME carbonyl; the acid-side
+    # carbonyl bears a halide and NO carbon. Delegate to the carbono-halidate
+    # namer BEFORE the ordinary alkanoate path (which would mis-name the -C(=O)Cl
+    # as a '1-chloro-1-oxo' substituent). Fail-closed: only fires on that exact
+    # skeleton, else falls through to the normal ester logic.
+    _acyl_c = ester_match[0]
+    _c_at = mol.GetAtomWithIdx(_acyl_c)
+    if _c_at.GetSymbol() == 'C':
+        _hal = next((nb for nb in _c_at.GetNeighbors()
+                     if nb.GetSymbol() in ('Cl', 'Br', 'F', 'I')), None)
+        _has_c = any(nb.GetSymbol() == 'C' for nb in _c_at.GetNeighbors())
+        if _hal is not None and not _has_c:
+            from .acid_halides import (
+                name_carbonic_monoester_acyl_halide, HALIDE_WORDS,
+            )
+            _hal_pg = {'Cl': 'acid_chloride', 'Br': 'acid_bromide',
+                       'F': 'acid_fluoride', 'I': 'acid_iodide'}[_hal.GetSymbol()]
+            _o_dbl = next((nb.GetIdx() for nb in _c_at.GetNeighbors()
+                           if nb.GetSymbol() == 'O'
+                           and mol.GetBondBetweenAtoms(
+                               _acyl_c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0),
+                          None)
+            if _o_dbl is not None:
+                _cc = name_carbonic_monoester_acyl_halide(
+                    mol, (_acyl_c, _o_dbl, _hal.GetIdx()),
+                    HALIDE_WORDS[_hal_pg],
+                )
+                if _cc is not None:
+                    return _cc
+
     # Guard: a true RING ACID (carbonyl bonded to the ring) whose ring
     # naming fails defers to complex naming. WS-A task 9: an acid that
     # merely CONTAINS a ring down-chain is a chain acid with a ring
