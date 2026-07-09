@@ -141,6 +141,20 @@ def is_monocyclic_lactam(mol) -> Optional[Dict]:
                 if not is_monocyclic:
                     continue
 
+                # Fail closed if the ring carries ANY ring heteroatom besides
+                # the single amide N. _PARENT_NAMES keys purely on ring size
+                # (azolidine/azinane family), so a second ring heteroatom
+                # (S/O/extra N) would be silently DROPPED — a wrong structure
+                # (e.g. O=C1CSCN1 mis-named 'pyrrolidin-2-one'). Let such rings
+                # fall through to the heterocycle-ketone cascade (tier_a_ring),
+                # which produces the correct 1,3-thiazolidin-4-one-family name.
+                extra_ring_hetero = any(
+                    mol.GetAtomWithIdx(a).GetSymbol() != "C" and a != n_idx
+                    for a in ring_set
+                )
+                if extra_ring_hetero:
+                    continue
+
                 return {
                     "ring_atoms": ring,
                     "nitrogen_idx": n_idx,

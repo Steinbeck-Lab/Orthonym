@@ -1346,6 +1346,29 @@ def _build_replacement_name(
 # ---------------------------------------------------------------------------
 
 
+def _is_monocyclic_lactam(mol):
+    """Late-bound wrapper for lactams.is_monocyclic_lactam (avoids a module-load
+    circular import between heterocycles and lactams)."""
+    from .lactams import is_monocyclic_lactam
+    return is_monocyclic_lactam(mol)
+
+
+def _ring_has_extra_heteroatom(mol, ring_set, carbonyl_idx) -> bool:
+    """True if the ring containing `carbonyl_idx` carries a ring heteroatom
+    besides the single amide N — i.e. it is a multi-heteroatom saturated
+    heteroring (thiazolidine, oxazolidine, ...) that the lactam handler
+    declined. Counts a ring O/S/Se/Te, or a 2nd ring N, as the extra."""
+    n_count = 0
+    other_hetero = 0
+    for a_idx in ring_set:
+        sym = mol.GetAtomWithIdx(a_idx).GetSymbol()
+        if sym == 'N':
+            n_count += 1
+        elif sym not in ('C', 'H'):
+            other_hetero += 1
+    return other_hetero >= 1 or n_count >= 2
+
+
 def get_heterocycle_substituents(
     mol,
     ring_atoms,
@@ -1581,9 +1604,27 @@ def get_heterocycle_substituents(
                 and hetero_sub_name == pg_prefix
             )
 
+            # P-64.6.2 / P-66.1.6: a ring carbonyl whose principal group is a
+            # CYCLIC secondary amide that the lactam handler DECLINED (a
+            # multi-heteroatom saturated heteroring, e.g. 1,3-thiazolidin-4-one)
+            # is named as the ketone '-one' suffix on the heterocycle parent,
+            # NOT an 'oxo' prefix (the lactam/carboxamide name is unavailable).
+            # Single-heteroatom lactams route through the lactam handler and
+            # never reach here, so they are untouched.
+            ring_ketone_suffix = (
+                not is_principal_suffix
+                and principal_group == 'secondary_amide'
+                and hetero_sub_name == 'oxo'
+                and _is_monocyclic_lactam(mol) is None
+                and _ring_has_extra_heteroatom(mol, ring_set, ring_atom_idx)
+            )
+
             if is_principal_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = pg_ring_suffix
+            elif ring_ketone_suffix:
+                sub_info['is_suffix'] = True
+                sub_info['suffix_name'] = 'one'
             else:
                 if hetero_sub_name:
                     sub_info['hetero_name'] = hetero_sub_name
