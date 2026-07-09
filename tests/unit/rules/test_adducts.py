@@ -152,3 +152,76 @@ class TestNameAdduct:
 
     def test_single_component_declines(self):
         assert self._name("CCO") is None
+
+
+class TestAdductDispatch:
+    """End-to-end via name_compound with the OPSIN validity gate FORCE-ENABLED
+    (production semantics).
+
+    These are production-faithful acceptance tests. The unit suite disables
+    the module-wide OPSIN validity gate by default (conftest
+    _disable_opsin_validity_gate_for_tests), but for the adduct dispatch the
+    gate is load-bearing: (a) an OPSIN-unparseable single-fragment name (e.g.
+    the HEAD name '2-amino-1-anilinoethanamide' for the aryl-glycinamide) must
+    resolve to 'unknown organic compound', not leak; (b) the organometallic
+    '[Ni].C=CC.C=CC' names to the OPSIN-unparseable 'bis(η3-...)nickel' which
+    the gate turns into 'nickel compound (not supported)'. So we re-enable the
+    gate here exactly as test_opsin_validity_gate.py does — this is the true
+    production path that  exercises."""
+
+    @pytest.fixture(autouse=True)
+    def _force_enable_gate(self, monkeypatch):
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False)
+
+    @staticmethod
+    def _nc(smi, style="pin"):
+        from orthonym.namer import name_compound
+        return name_compound(smi, style=style)
+
+    def test_oxalic_monohydrate_pin(self):
+        # was 'unknown organic compound' at HEAD (predicate required >=2
+        # multi-atom fragments; water has 1 heavy atom)
+        assert self._nc("O.OC(=O)C(=O)O") == "oxalic acid—water (1/1)"
+
+    def test_benzene_pyridine_flips_to_adduct_pin(self):
+        # was the space-join 'benzene pyridine' at HEAD
+        assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
+
+    def test_mixed_hydrochloride(self):
+        # P-14.8.2 pattern (BB line 4677). DIVERGENCE from the plan's stale
+        # expected: at this HEAD the organic fragment names to the RETAINED
+        # name 'nicotine' (not '3-(1-methylpyrrolidin-2-yl)pyridine'); the
+        # resulting 'nicotine—hydrogen chloride (1/1)' OPSIN-RTs cleanly to
+        # Cl.N1=CC(C2N(C)CCC2)=CC=C1 (== input). Verified 2026-07-09.
+        assert self._nc("Cl.CN1CCCC1c1cccnc1") == (
+            "nicotine—hydrogen chloride (1/1)")
+
+    def test_mixed_phosphoric_1_2(self):
+        # P-14.8.2 -a/-b (BB line 4675 pattern; OPSIN verified)
+        assert self._nc("OP(=O)(O)O.OP(=O)(O)O.NCCN") == (
+            "ethane-1,2-diamine—phosphoric acid (1/2)")
+
+    def test_mixed_three_buckets_water_last(self):
+        # organic -> inorganic -> water (P-14.8.2 -a; OPSIN verified)
+        assert self._nc("O.Cl.CCO") == (
+            "ethanol—hydrogen chloride—water (1/1/1)")
+
+    def test_salt_routing_protected(self):
+        # charged multi-fragment stays with the ions/salt router
+        assert self._nc("[Na+].[Cl-]") == "sodium chloride"
+
+    def test_organometallic_not_swallowed(self):
+        # ORGANOMETALLIC@50 owns bare-metal dot-SMILES; the adduct
+        # predicate must also decline ([Ni] not in the single-atom table)
+        assert self._nc("[Ni].C=CC.C=CC") == "nickel compound (not supported)"
+
+    def test_identical_fragments_keep_frozen_space_join(self):
+        # Plan-01 byte-identical representative
+        # (tests/unit/routing/test_dispatcher.py:61)
+        assert self._nc("CCO.OCC") == "ethanol ethanol"
+
+    def test_unnameable_distinct_set_fails_closed(self):
+        # was a structure-dropping hazard: the legacy handler skipped
+        # unnameable fragments and joined the rest
+        assert self._nc("O.NCC(=O)Nc1ccc(OCC)cc1") == "unknown organic compound"

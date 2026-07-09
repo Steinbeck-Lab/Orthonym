@@ -350,19 +350,39 @@ def _is_poly_anion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
 
 
 def _is_multi_component_neutral(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-1; mirrors namer.py:967-998 (audit § 1 row 8; § 2.8 purity proof)."""
+    """Tier-1; mirrors namer.py:967-998 (audit § 1 row 8; § 2.8 purity proof).
+
+    Wave-2 P0A (P-14.8): broadened so single-multi-atom + recognized-
+    inorganic-single-atom sets (oxalic acid + water; nicotine + HCl) also
+    dispatch here. The legacy >=2-multi-atom condition is kept verbatim as
+    the first accept. Bare-metal single atoms ([Ni], [Fe]) are NOT
+    recognized components -> those inputs keep their current routing
+    (ORGANOMETALLIC@50 fires earlier anyway). Charged input never reaches
+    here (detect_species_type != 'neutral').
+    """
     from orthonym.perception.ions import detect_species_type
     if not ('.' in canonical_smiles and detect_species_type(mol) == 'neutral'):
         return False
     frags = canonical_smiles.split('.')
     if len(frags) < 2:
         return False
+    from orthonym.rules.adducts import SINGLE_ATOM_COMPONENT_NAMES
     multi_atom_count = 0
+    single_atoms_recognized = True
     for frag_smi in frags:
         frag_mol = Chem.MolFromSmiles(frag_smi)
-        if frag_mol is not None and frag_mol.GetNumHeavyAtoms() >= 2:
+        if frag_mol is None:
+            return False
+        if frag_mol.GetNumHeavyAtoms() >= 2:
             multi_atom_count += 1
-    return multi_atom_count >= 2
+        elif (Chem.MolToSmiles(frag_mol, canonical=True)
+              not in SINGLE_ATOM_COMPONENT_NAMES):
+            single_atoms_recognized = False
+    if multi_atom_count >= 2:
+        return True  # legacy condition — byte-identical accept set
+    # P0A extension: exactly the P-14.8 solvate/hydrate/hydracid shape
+    return (multi_atom_count >= 1 and single_atoms_recognized
+            and len(set(frags)) >= 2)
 
 
 def _is_multiplicative(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -788,38 +808,41 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None, *,
                                     style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:967-996 — per-component recursive naming.
+    """P-14.8 adduct assembly first; frozen space-join for identical-only
+    sets; otherwise fail-closed (None -> cascade-continue).
 
-    Per audit § 3.3 RL-4 fresh-instance pattern: each fragment's
-    ``Orthonym(style).name(frag_smi)`` call hits a FRESH router. Returns
-    None when no fragment names produce content (v18 falls through to
-    normal pipeline).
+    Wave-2 P0A replaces the legacy per-component ' '.join: distinct
+    component sets now emit the P-14.8.1 em-dash + (n/m) proportion form
+    via rules.adducts.name_adduct (each fragment named by a FRESH
+    Orthonym(style) — audit § 3.3 RL-4 pattern — so the per-fragment
+    OPSIN validity gate stays on). The ONLY preserved legacy behavior is
+    the all-identical-fragments space-join ('CCO.OCC' -> 'ethanol
+    ethanol', the Plan-01 byte-identical representative): identical
+    entities are not an adduct of SEPARATE molecular entities (P-14.8.1
+    definition). The old silent skip of unnameable fragments (a
+    structure-dropping hazard) is removed — partial sets refuse.
     """
+    from orthonym.rules.adducts import name_adduct
+    adduct_name = name_adduct(mol, canonical_smiles, style=style)
+    if adduct_name is not None:
+        return adduct_name
+    # Frozen legacy path: ALL fragments constitutionally identical.
     frags = canonical_smiles.split('.')
-    frag_mols = []
-    for frag_smi in frags:
-        frag_mol = Chem.MolFromSmiles(frag_smi)
-        if frag_mol:
-            ha = frag_mol.GetNumHeavyAtoms()
-            frag_mols.append((frag_smi, ha))
-    multi_atom_frags = [(s, ha) for s, ha in frag_mols if ha >= 2]
-    if len(multi_atom_frags) < 2:
+    frag_mols = [Chem.MolFromSmiles(f) for f in frags]
+    if any(fm is None for fm in frag_mols):
         return None
-    # Sort by descending heavy atom count for consistent output (v18 line 984)
-    frag_mols.sort(key=lambda x: -x[1])
-    component_names = []
-    for frag_smi, _ in frag_mols:
-        try:
-            from orthonym.namer import Orthonym
-            frag_namer = Orthonym(style=style)
-            frag_name = frag_namer.name(frag_smi)
-            if frag_name and frag_name != "unknown":
-                component_names.append(frag_name)
-        except Exception:
-            pass  # Skip unnamed fragments (v18 line 992-993)
-    if component_names:
-        return ' '.join(component_names)
-    return None
+    if len({Chem.MolToSmiles(fm, canonical=True) for fm in frag_mols}) != 1:
+        return None  # distinct set already refused by name_adduct
+    if sum(1 for fm in frag_mols if fm.GetNumHeavyAtoms() >= 2) < 2:
+        return None
+    try:
+        from orthonym.namer import Orthonym
+        frag_name = Orthonym(style=style).name(frags[0])
+    except Exception:
+        return None
+    if not frag_name or frag_name.startswith("unknown"):
+        return None
+    return ' '.join([frag_name] * len(frags))
 
 
 def _handle_multiplicative(mol, smiles, canonical_smiles, features=None, *,
