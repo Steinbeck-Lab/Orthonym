@@ -558,9 +558,19 @@ def select_best_candidate(candidates: List[CandidateName]) -> CandidateName:
         if c.confidence > best.confidence + EPSILON:
             best = c
         elif abs(c.confidence - best.confidence) <= EPSILON:
-            # Tiebreak: prefer more specific handler
-            if HANDLER_PRIORITY.get(c.handler, 0) > HANDLER_PRIORITY.get(best.handler, 0):
+            # Tiebreak 1: prefer more specific handler
+            c_pri = HANDLER_PRIORITY.get(c.handler, 0)
+            b_pri = HANDLER_PRIORITY.get(best.handler, 0)
+            if c_pri > b_pri:
                 best = c
+            elif c_pri == b_pri:
+                # Tiebreak 2 (P-45.5): earlier in alphanumerical order.
+                # Replaces the input-order first-wins fallback so equal
+                # candidates resolve identically regardless of registration
+                # or SMILES-spelling order.
+                from .name_comparison import compare_names
+                if compare_names(c.name, best.name) == -1:
+                    best = c
     return best
 
 
