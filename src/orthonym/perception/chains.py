@@ -401,6 +401,23 @@ def find_principal_chain(
     # tuples list (for correct instance counting per P-44.1(b)).
     fg_atoms = set()
     fg_matches: List[tuple] = []
+    # Characteristic heteroatom set for the principal-group class (N for amine,
+    # O for alcohol, …). Populated below when the PCG is a heteroatom-suffix
+    # class; used by criterion 8 (max prefix substituents) to count the
+    # N-substituents on a suffix amine nitrogen — see _count_substituents.
+    fg_hetero_atoms: Set[int] = set()
+    # P-44.1(b) counting support: one entry per PCG INSTANCE, each the SET of
+    # carbons DIRECTLY bonded to that instance's characteristic heteroatom (its
+    # true bearing carbons). fg_count(chain) counts an instance iff the chain
+    # contains ANY of its bearing carbons. This is the IUPAC-correct semantics:
+    # a suffix group counts for a parent chain when a carbon that directly bears
+    # it is on the chain. For a secondary amine/alcohol whose heteroatom bridges
+    # TWO carbons (N-CH2-N junction, e.g. NCCNCN), BOTH carbons are bearing
+    # carbons, so the instance counts for whichever of the two chains is chosen
+    # as parent — instead of being collapsed to ONE arbitrary (order-dependent)
+    # carbon by _normalize_pcg_match, which deflated the other chain's count and
+    # let a 1-carbon "chain" out-score the genuine ethane-1,2-diamine backbone.
+    fg_bearing_carbons: List[Set[int]] = []
     if principal_group and principal_group in functional_groups:
         # DD5 RC-4 (P-44.1.1): count the principal characteristic group over its
         # WHOLE equal-seniority class (e.g. primary + secondary OH = two hydroxy
@@ -413,21 +430,60 @@ def find_principal_chain(
         )
         _parent_class = _SENIORITY_PARENT.get(principal_group)
         _members = _SENIORITY_CLASS_MEMBERS.get(_parent_class)
+        _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
         if _members is None or _parent_class not in _RC4_UNION_CLASSES:
             fg_matches = functional_groups[principal_group]
         else:
             # Union over the equal-seniority class, normalized to the
-            # (heteroatom, bearing-carbon) shape so fg_count intersects the chain
-            # ONLY at the bearing carbon — the raw secondary-OH SMARTS includes
-            # FLANKING carbons that would otherwise falsely count the group for a
-            # longer chain that does not actually carry the OH.
-            _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
+            # (heteroatom, bearing-carbon) shape so fg_atoms / locant scoring
+            # anchor at the (single) bearing carbon — the raw secondary-OH SMARTS
+            # includes FLANKING carbons that would otherwise falsely place the
+            # group for a longer chain that does not actually carry the OH.
             fg_matches = [
                 _normalize_pcg_match(mol, m, _het_z)
                 for sub in _members for m in functional_groups.get(sub, [])
             ]
         for match in fg_matches:
             fg_atoms.update(match)
+        # Build the bearing-carbon set for each PCG instance (deduped by
+        # heteroatom so a group present under >1 SMARTS subtype counts once).
+        # Bearing carbons = carbons DIRECTLY bonded to the characteristic
+        # heteroatom (never flanking carbons). When the heteroatom cannot be
+        # located (het_z is None, e.g. carbonyl/acid classes) the instance keeps
+        # the legacy whole-match semantics so their P-44.1(b) count is unchanged.
+        _seen_het: Set[int] = set()
+        for match in fg_matches:
+            het = None
+            if _het_z is not None:
+                het = next(
+                    (a for a in match
+                     if mol.GetAtomWithIdx(a).GetAtomicNum() == _het_z),
+                    None,
+                )
+            if het is None:
+                # Legacy fallback: count where any match atom is on the chain.
+                fg_bearing_carbons.append(set(match))
+                continue
+            if het in _seen_het:
+                continue
+            _seen_het.add(het)
+            fg_hetero_atoms.add(het)
+            bearing = {
+                nb.GetIdx()
+                for nb in mol.GetAtomWithIdx(het).GetNeighbors()
+                if nb.GetAtomicNum() == 6
+            }
+            fg_bearing_carbons.append(bearing if bearing else {het})
+            # Also register EVERY bearing carbon in fg_atoms so criterion-6
+            # (lowest-PCG-locant, _compute_fg_locant_score) and chain ORIENTATION
+            # recognise the PCG on whichever chain carries it. _normalize_pcg_match
+            # collapsed a bridging secondary amine (N bonded to two candidate
+            # chain carbons) to ONE order-dependent carbon, so the OTHER chain saw
+            # one fewer on-chain PCG position and lost criterion 6 spelling-
+            # dependently. Only carbons DIRECTLY bonded to the heteroatom are
+            # added (never flanking carbons), preserving the anti-over-count the
+            # original normalization intended.
+            fg_atoms.update(bearing)
 
     def count_bonds_in_chain(chain: List[int]) -> Tuple[int, int]:
         """Count double and triple bonds within the chain."""
@@ -479,7 +535,22 @@ def find_principal_chain(
         return max(fwd_score, rev_score)
 
     def _count_substituents(chain: List[int]) -> int:
-        """Criterion 8: Maximum number of substituents on chain."""
+        """Criterion 8 (P-44.4.1.1): Maximum number of substituents cited as
+        prefixes on the chain.
+
+        Counts every heavy chain-carbon neighbour off the chain (as before) AND,
+        additionally, the prefix substituents hanging off a SUFFIX heteroatom (an
+        amine N / alcohol O in ``fg_hetero_atoms``) directly bonded to the chain:
+        N-methyl, N-(2-aminoethyl), … are genuine prefix substituents. This is
+        strictly additive to the previous count (the heteroatom is still counted
+        once as before), so it only ever changes the RESULT of a tie between two
+        equal-length equal-PCG chains — never a chain that was already uniquely
+        best. It breaks the P-44.4.1.1 tie for ``CN(C)CCN(C)CCN``: the middle
+        ethane-1,2-diamine (N's carry 3 methyls + a 2-aminoethyl -> +4) beats the
+        terminal one (1 methyl + a 2-(dimethylamino)ethyl -> +2) deterministically
+        and spelling-independently. The old counter saw only the two amine N's
+        (2 vs 2) and left the winner to enumeration order.
+        """
         chain_set = set(chain)
         count = 0
         for atom_idx in chain:
@@ -489,6 +560,16 @@ def find_principal_chain(
                 if nbr_idx not in chain_set and nbr_idx not in exclude:
                     if nbr.GetSymbol() != 'H':
                         count += 1
+                        if nbr_idx in fg_hetero_atoms:
+                            # Suffix heteroatom: also count the prefix
+                            # substituents ON it (its heavy neighbours other
+                            # than this chain carbon). P-44.4.1.1.
+                            for sub in nbr.GetNeighbors():
+                                si = sub.GetIdx()
+                                if si == atom_idx or si in exclude:
+                                    continue
+                                if sub.GetAtomicNum() > 1:
+                                    count += 1
         return count
 
     def _cascade_reverse(chain: List[int]) -> bool:
@@ -615,11 +696,15 @@ def find_principal_chain(
         contains_fg = 1 if (fg_atoms & chain_set) else 0
 
         # Criterion 2: Count of principal group INSTANCES in chain.
-        # P-44.1(b): Count how many FG match tuples have at least one
-        # atom on the chain. This counts instances (e.g., 2 for two COOH
-        # groups) rather than total atoms (which would be 6 for two COOH).
+        # P-44.1(b): count how many PCG INSTANCES are borne by this chain — an
+        # instance counts iff a carbon DIRECTLY bearing its characteristic
+        # heteroatom is on the chain (fg_bearing_carbons). This counts instances
+        # (e.g. 2 for two COOH) rather than atoms, AND correctly counts a
+        # secondary amine/alcohol whose heteroatom bridges two chain-carbon
+        # candidates for whichever chain is chosen as the parent (see the
+        # NCCNCN ethane-1,2-diamine case at fg_bearing_carbons construction).
         fg_count = sum(
-            1 for match in fg_matches if set(match) & chain_set
+            1 for bearing in fg_bearing_carbons if bearing & chain_set
         )
 
         # Criterion 3: Chain length (IUPAC 2013 prioritizes length!)
