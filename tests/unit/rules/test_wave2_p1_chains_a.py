@@ -14,3 +14,10 @@ class TestWave2P1ChainsAVerify:
     ])
     def test_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestP22SingleHeteroatomLocantElision:
+    def test_thiacyclododecane_omits_locant_1(self):
+        # P-22.2.3.2.1: single heteroatom -> locant '1' omitted
+        assert name_compound("S1CCCCCCCCCCC1") == "thiacyclododecane"

@@ -1573,10 +1573,16 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
         key=lambda item: _A_CITATION_INDEX.get(item[0], 99)
     )
 
+    total_hetero = sum(len(locs) for _, locs in sorted_groups)
+    # P-22.2.3.2.1: a single ring heteroatom is assigned locant '1', which is
+    # OMITTED from the name (unless an indicated-hydrogen locant is present;
+    # saturated replacement rings carry none).
+    elide_single = total_hetero == 1
+
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = ','.join(str(loc) for loc in locants)
+        locant_str = '' if elide_single else ','.join(str(loc) for loc in locants)
         count = len(locants)
 
         if count == 1:
@@ -1586,7 +1592,8 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
         else:
             multiplier = SIMPLE_MULTIPLIERS.get(count, f'{count}')
 
-        parts.append(f'{locant_str}-{multiplier}{term}')
+        sep = '' if elide_single else '-'
+        parts.append(f'{locant_str}{sep}{multiplier}{term}')
 
     replacement_prefix = '-'.join(parts)
 
