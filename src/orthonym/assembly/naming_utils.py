@@ -898,6 +898,22 @@ def is_complex_substituent(name: str) -> bool:
     return False
 
 
+# P-35.1 (BlueBookV2.md:17954): simple prefixes whose 'di'/'tri' concatenation
+# collides with a P-29.3.1 catenated-hydride prefix (disulfanyl = -SSH, NOT
+# two -SH). These take the derived multipliers bis/tris/... even though the
+# name itself is simple; P-16.5.1.10 then parenthesizes the multiplied term.
+CATENATION_AMBIGUOUS_PREFIXES = frozenset({
+    "sulfanyl",   # disulfanyl -SSH          (P-35.1 verbatim example)
+    "selanyl",    # diselanyl -SeSeH         (P-35.1: 'diselanyl, -SeSeH')
+    "tellanyl",   # ditellanyl -TeTeH
+    "phosphanyl", # diphosphanyl (P-45.3.1 examples)
+    "arsanyl",    # diarsanyl (diarsane P-21.1.2)
+    "stibanyl",   # distibanyl (distibane P-21.1.2)
+    "azanyl",     # diazanyl = hydrazinyl -NH-NH2
+    "oxidanyl",   # dioxidanyl -OOH
+})
+
+
 def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     """Get the appropriate multiplier prefix for a count of substituents.
 
@@ -927,7 +943,8 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     if count <= 1:
         return ""
 
-    if is_complex_substituent(substituent_name):
+    if is_complex_substituent(substituent_name) \
+            or substituent_name in CATENATION_AMBIGUOUS_PREFIXES:
         if count in COMPLEX_MULTIPLIERS:
             return COMPLEX_MULTIPLIERS[count]
         # For counts > 20, build compositional multiplier using chain_names
@@ -1074,6 +1091,13 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # Get the multiplier prefix
     multiplier = get_multiplier_prefix(count, name)
 
+    # P-16.5.1.10: any term modified by a DERIVED multiplier (bis/tris/
+    # tetrakis/...kis) is enclosed in parentheses, even when the base name
+    # is simple (bis(sulfanyl), P-35.1).
+    derived_multiplier = bool(multiplier) and (
+        multiplier in COMPLEX_MULTIPLIERS.values() or multiplier.endswith("kis")
+    )
+
     # Complex substituents get parentheses around the name.
     # Per IUPAC P-14.5.2, compound substituent names containing numeric locants
     # need enclosing marks to avoid ambiguity:
@@ -1086,8 +1110,10 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
         # use square brackets per IUPAC P-16.3.3 nesting rules
         formatted_name = f"[{name}]"
-    elif complex and not name.startswith('(') and not name.startswith('['):
-        # Complex name without existing enclosing marks: wrap in parentheses
+    elif (complex or derived_multiplier) and not name.startswith('(') \
+            and not name.startswith('['):
+        # Complex name (or a simple name taking a derived bis/tris/...kis
+        # multiplier, P-16.5.1.10) without existing enclosing marks: wrap.
         formatted_name = f"({name})"
     else:
         formatted_name = name

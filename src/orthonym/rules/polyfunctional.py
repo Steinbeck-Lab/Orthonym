@@ -341,12 +341,24 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     Returns:
         Formatted prefix string (e.g., "2-hydroxy", "3-oxo", "2-(methylsulfinyl)")
     """
-    from ..assembly.naming_utils import needs_brackets
+    from ..assembly.naming_utils import (
+        needs_brackets, COMPLEX_MULTIPLIERS,
+    )
+
+    def _is_derived(multiplier: str) -> bool:
+        # P-16.5.1.10: a term modified by a DERIVED multiplier (bis/tris/
+        # tetrakis/...kis) is parenthesized, even for a simple base name
+        # (bis(sulfanyl), P-35.1).
+        return bool(multiplier) and (
+            multiplier in COMPLEX_MULTIPLIERS.values()
+            or multiplier.endswith("kis"))
 
     if not locants:
         # No locants - just return prefix with multiplier if needed
         if count > 1:
             multiplier = get_multiplier_prefix(count, prefix_form)
+            if _is_derived(multiplier) and not prefix_form.startswith(("(", "[")):
+                return f"{multiplier}({prefix_form})"
             return f"{multiplier}{prefix_form}"
         return prefix_form
 
@@ -359,7 +371,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Get multiplier if multiple instances
     if count > 1:
         multiplier = get_multiplier_prefix(count, prefix_form)
-        if compound:
+        if compound or _is_derived(multiplier):
             return f"{locant_str}-{multiplier}({prefix_form})"
         return f"{locant_str}-{multiplier}{prefix_form}"
 
