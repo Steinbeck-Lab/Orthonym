@@ -2202,7 +2202,14 @@ class Orthonym:
                     if pah_name:
                         # D-03: reuse the one authoritative computation
                         _senior = _principal_ring_system
-                        if _senior and not (set(_senior) & _core_set):
+                        # FR-4 / P-66.2.2 build (P-44.1 precedes P-44.2): when
+                        # the principal characteristic group sits ON the PAH
+                        # core, a senior heterocyclic SUBSTITUENT ring must not
+                        # steal the parent (5-(1,3-dioxo-...-isoindol-2-yl)-
+                        # naphthalene-1-carboxylic acid). Only the among-rings
+                        # tie-break (P-44.2) is skipped; P-44.1 already ran.
+                        if (_senior and not (set(_senior) & _core_set)
+                                and not _pg_on_pah):
                             pah_name = None
             if pah_name:
                 features.polycyclic_name = pah_name

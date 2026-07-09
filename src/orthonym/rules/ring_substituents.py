@@ -1035,6 +1035,41 @@ def _polycyclic_substituent_name(
     return None
 
 
+def _phthalimido_substituent_name(mol, frag_set: Set[int],
+                                  attach_idx: int) -> Optional[str]:
+    """P-66.2.2 (BB 33859/55900): the phthalimido fragment
+    O=C1N([*])C(=O)c2ccccc21 -> '1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl'
+    (the BB preferred prefix). Matched by SUBGRAPH (attach N carries the
+    two flanking carbonyls of a benzo-fused 5-ring imide) with EXACT
+    fragment coverage. Returns None for anything else (fail-closed)."""
+    from rdkit import Chem
+    if attach_idx not in frag_set:
+        attach_idx = next(
+            (n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+             if n.GetIdx() in frag_set), None)
+        if attach_idx is None:
+            return None
+    a = mol.GetAtomWithIdx(attach_idx)
+    if a.GetAtomicNum() != 7:
+        return None
+    patt = Chem.MolFromSmarts("O=C1N([*])C(=O)c2ccccc21")
+    if patt is None:
+        return None
+    for match in mol.GetSubstructMatches(patt):
+        # match atoms: O, C, N, [*], C, O, c, c, c, c, c, c  (12 atoms)
+        # the [*] (index 3) is the attachment substituent, OUTSIDE the frag.
+        n_in_match = match[2]
+        star = match[3]
+        if n_in_match != attach_idx:
+            continue
+        # every matched atom except the [*] wildcard must be IN the fragment,
+        # and the fragment must contain NOTHING else (exact coverage).
+        core = set(match) - {star}
+        if core == frag_set:
+            return "1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl"
+    return None
+
+
 def name_ring_system_substituent(
     mol,
     frag_atoms,
@@ -1075,6 +1110,16 @@ def name_ring_system_substituent(
             return None
 
     name: Optional[str] = None
+    # P-66.2.2 (BB 33859/55900, W2E-P1FG Task 15 L2): the exact phthalimido
+    # fragment — a benzo-fused 5-ring imide N-attached, with the two ring
+    # carbons flanking the N each bearing an exocyclic =O -> the BB preferred
+    # prefix '1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl'. Matched by subgraph
+    # (not a SMILES string compare) with full-fragment coverage; anything else
+    # falls through to the generic producers (fail-closed).
+    _phth = _phthalimido_substituent_name(mol, frag_set, attach_idx)
+    if _phth is not None:
+        return _phth
+
     frag_ring_atoms = {a for a in frag_atoms if ring_info.NumAtomRings(a) > 0}
     if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
         try:
