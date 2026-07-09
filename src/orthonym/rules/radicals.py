@@ -216,6 +216,94 @@ def _count_chain_carbons(mol, start_idx: int, exclude: set) -> int:
     return count
 
 
+def _is_carboxyl_carbon(mol, idx: int, from_idx: int) -> bool:
+    """True if atom `idx` is a carboxylic-acid carbon -C(=O)OH reached from
+    `from_idx` (a chain carbon) — i.e. C bonded to =O and -OH and nothing else
+    heavy but `from_idx`."""
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+        return False
+    dbl_o = single_oh = 0
+    other_heavy = 0
+    for nbr in atom.GetNeighbors():
+        n_idx = nbr.GetIdx()
+        if n_idx == from_idx:
+            continue
+        bond = mol.GetBondBetweenAtoms(idx, n_idx)
+        if nbr.GetSymbol() == 'O':
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                dbl_o += 1
+            elif bond.GetBondType() == Chem.BondType.SINGLE and nbr.GetTotalNumHs() >= 1:
+                single_oh += 1
+            else:
+                other_heavy += 1
+        else:
+            other_heavy += 1
+    return dbl_o == 1 and single_oh == 1 and other_heavy == 0
+
+
+def _name_carboxy_alkyl_radical(mol, radical_idx: int) -> Optional[str]:
+    """P-41 Table 4.1 cls 1: the radical (free valence) is the MOST senior
+    class, senior to a carboxylic acid. A monovalent alkyl radical whose linear
+    carbon chain (starting at the free valence = C-1) terminates in a
+    carboxylic-acid carbon names the chain as the -yl parent and cites the acid
+    as a 'carboxy' prefix, e.g. ``HOOC-CH2-CH2.`` -> ``2-carboxyethyl``.
+
+    Fail-closed (returns None) for anything but a single unbranched all-carbon
+    chain from the free valence bearing exactly one terminal -COOH and no other
+    substituent/heteroatom/ring/unsaturation.
+    """
+    if mol.GetRingInfo().NumRings():
+        return None
+    # Walk the chain from the radical carbon. Each step: the current C must have
+    # exactly one onward C neighbour (unbranched), until we reach a carboxyl C.
+    chain: List[int] = [radical_idx]
+    prev = -1
+    cur = radical_idx
+    acid_locant: Optional[int] = None
+    while True:
+        atom = mol.GetAtomWithIdx(cur)
+        if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+            return None
+        # onward heavy neighbours (excluding where we came from)
+        onward = [n.GetIdx() for n in atom.GetNeighbors()
+                  if n.GetIdx() != prev]
+        # any onward atom must be C (no ethers/amines etc. in scope)
+        carboxyls = [i for i in onward if _is_carboxyl_carbon(mol, i, cur)]
+        carbons = [i for i in onward
+                   if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                   and i not in carboxyls]
+        others = [i for i in onward
+                  if i not in carboxyls and i not in carbons]
+        if others:
+            return None
+        if carboxyls:
+            if len(carboxyls) != 1 or carbons:
+                return None  # branch or >1 acid: out of scope
+            acid_locant = len(chain)  # current carbon's chain locant
+            break
+        if len(carbons) != 1:
+            return None  # branch or chain terminus without an acid
+        prev, cur = cur, carbons[0]
+        chain.append(cur)
+        if len(chain) > 30:
+            return None
+    if acid_locant is None:
+        return None
+    # any ring/unsaturation on the chain is out of scope (keep it simple)
+    for a_idx in chain:
+        a = mol.GetAtomWithIdx(a_idx)
+        for b in a.GetBonds():
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return None
+    stem = _get_chain_prefix(len(chain))
+    # A single-carbon stem carries no locant ambiguity: 'carboxymethyl'
+    # (not '1-carboxymethyl').
+    if len(chain) == 1:
+        return f"carboxy{stem}yl"
+    return f"{acid_locant}-carboxy{stem}yl"
+
+
 # 169.6-03 (CHOKE-01, kill-list §2.2): the carbon-counting chain-counter that
 # fed the alkyl / -ylidene / -ylidyne radical naming was DELETED. The three
 # helpers below are now thin shims over route_charged (the single chokepoint),
@@ -474,6 +562,15 @@ def name_radical(mol, style: str = 'pin') -> str:
             return name_acyl_radical(mol, site)
         elif subtype == 'aryl':
             return name_aryl_radical(mol, site)
+
+        # P-41 Table 4.1 cls 1: the free valence is the MOST senior class,
+        # senior to a carboxylic acid — a chain-terminal -COOH on an alkyl
+        # radical is demoted to a 'carboxy' prefix (2-carboxyethyl). Try this
+        # before route_charged (which H-saturates the acid and mis-drops it).
+        if info['radical_type'] == 'monovalent':
+            carboxy_name = _name_carboxy_alkyl_radical(mol, site['atom_idx'])
+            if carboxy_name:
+                return carboxy_name
 
         # 169.6-03 (CHOKE-01, kill-list §2.2): the alkyl / -ylidene / -ylidyne
         # carbon-counting paths are DELETED. Delegate to route_charged, which

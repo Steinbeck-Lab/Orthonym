@@ -1,5 +1,7 @@
 import pytest
+from rdkit import Chem
 from orthonym.namer import name_compound
+from orthonym.rules.radicals import name_radical
 
 
 @pytest.mark.unit
@@ -43,3 +45,12 @@ class TestP54HWPhosphorusPartialSat:
         # 5-membered "P1CCC=C1" (OPSIN-verified). Corrected here per
         # reproduce-first CODE-level divergence.
         assert name_compound("P1CCC=C1") == "2,3-dihydro-1H-phosphole"
+
+
+@pytest.mark.unit
+class TestP41RadicalMostSenior:
+    def test_carboxyethyl_radical(self):
+        # P-41 cls 1: radical senior to acid -> acid demoted to 'carboxy' prefix,
+        # free valence is C-1 of the ethyl point-of-attachment chain.
+        mol = Chem.MolFromSmiles("[CH2]CC(=O)O")
+        assert name_radical(mol) == "2-carboxyethyl"
