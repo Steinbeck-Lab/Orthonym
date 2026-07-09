@@ -4754,7 +4754,8 @@ def _assemble_amide_name(features: Any, style: str) -> str:
 
 
 def _walk_amine_n_substituents(
-    mol: Any, n_idx: int, chain_set: set, stop_set: Optional[set] = None
+    mol: Any, n_idx: int, chain_set: set, stop_set: Optional[set] = None,
+    hetero_aware: bool = False,
 ) -> list:
     """Walk the N-substituent fragments off one amine nitrogen and return
     their prefix names (e.g. ['methyl'], ['ethyl'], ['phenyl'], ['methyl','methyl']).
@@ -4884,7 +4885,31 @@ def _walk_amine_n_substituents(
                                 break
             # --- End Phase 79-01 direct ring identification ---
 
-            if not has_phenyl and not has_ring_sub and not has_fused_het_sub and cc > 0:
+            # P-62.2.4.1.3 (plan P1AM Task 9): in the COMPLEX-polyamine path a
+            # demoted amine N lives INSIDE this branch (-CH2-NH2 = aminomethyl,
+            # -CH2CH2-NH2 = 2-aminoethyl). get_alkyl_name counts only carbons
+            # and would DROP the amino N (structure-wrong). When hetero_aware is
+            # set and the fragment carries a non-carbon heavy atom, name it with
+            # the hetero-aware recursive namer instead. Fail-closed on decline.
+            _hetero_named = False
+            if (hetero_aware and not has_phenyl and not has_ring_sub
+                    and not has_fused_het_sub and cc > 0
+                    and any(mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6)
+                            for i in frag)):
+                sub_name = name_substituent_fragment(
+                    mol, frag, frag[0], list(chain_set) + [n_idx]
+                )
+                if sub_name:
+                    n_subs.append(sub_name)
+                    _hetero_named = True
+                else:
+                    # a hetero branch we cannot name -> fail closed (drop the
+                    # whole molecule rather than emit a name missing the N).
+                    n_subs.append(None)
+                    _hetero_named = True
+
+            if (not _hetero_named and not has_phenyl and not has_ring_sub
+                    and not has_fused_het_sub and cc > 0):
                 # Check if substituent is branched (any carbon with 3+ heavy
                 # atom neighbors = branching point). Branched groups need
                 # recursive naming for correct IUPAC 2013 names
@@ -5190,9 +5215,27 @@ def _assemble_polyamine_name(
     # the atom index for determinism.
     ordered_n = sorted(principal_n, key=lambda ni: (amine_carbon_locant(ni), ni))
 
+    # P-62.2.4.1.3 (BB 26375, plan P1AM Task 9): in a COMPLEX polyamine the
+    # parent is the senior DIAMINE on the principal chain (P-44.3 longest
+    # chain / P-45.2.1 most substituted); principal nitrogens with NO chain-
+    # carbon neighbour are NOT suffix nitrogens — they belong inside an
+    # N-substituent branch of a chain-attached nitrogen (aminomethyl,
+    # 2-aminoethyl). Demote them: they leave principal_n so the branch walk
+    # names them as part of the branch (hetero_aware).
+    chain_n = [ni for ni in ordered_n
+               if amine_carbon_locant(ni) != float('inf')]
+    demoted_n = [ni for ni in ordered_n if ni not in chain_n]
+    if demoted_n:
+        if len(chain_n) < 2:
+            return None  # not a diamine parent — fail closed
+        ordered_n = chain_n
+        principal_n_set = set(chain_n)
+
     # Walk each nitrogen's substituents, excluding the parent chain/ring AND all
     # OTHER principal nitrogens (and their chain carbons) so branches are never
-    # cross-attributed (spec risk 3).
+    # cross-attributed (spec risk 3). In the complex-polyamine case the demoted
+    # nitrogens are NO LONGER in principal_n_set, so the walk follows the branch
+    # THROUGH them (with hetero_aware naming -> aminomethyl / 2-aminoethyl).
     from collections import Counter
     per_n_subs = []  # list of (n_idx, Counter(sub_name -> count))
     for n_idx in ordered_n:
@@ -5201,17 +5244,57 @@ def _assemble_polyamine_name(
         # stop_set hard-blocks traversal at every OTHER principal nitrogen so a
         # branch is never re-attributed across nitrogens (spec risk 3).
         stop_set = principal_n_set - {n_idx}
-        subs = _walk_amine_n_substituents(mol, n_idx, chain_set, stop_set)
+        subs = _walk_amine_n_substituents(
+            mol, n_idx, chain_set, stop_set, hetero_aware=bool(demoted_n))
+        if any(s is None for s in subs):
+            return None  # un-nameable hetero branch -> fail closed
         per_n_subs.append((n_idx, Counter(subs)))
+
+    # P-31.1.4.3.4 / P-45.2.1 (plan P1AM Task 9): choose the chain numbering
+    # that gives the LOWEST locants to the set of cited N-substituents. The
+    # symmetric ethane-1,2-diamine parent admits two carbon-locant assignments
+    # (a swap of {1,2}); pick the direction whose sorted (locant, alpha-name)
+    # substituent set wins first-point-of-difference. Scoped to the complex-
+    # polyamine (demoted) case; the primed 2-N path keeps atom_to_locant as-is.
+    carbon_locant_of = amine_carbon_locant
+    if demoted_n and len(chain_n) == 2:
+        _base_locs = sorted(amine_carbon_locant(ni) for ni in chain_n)
+        _n_names = {ni: sorted(cnt.elements())
+                    for ni, cnt in per_n_subs}
+
+        def _locset_for(assign):
+            # assign: dict n_idx -> chain locant; produce the sorted list of
+            # (locant, alpha_name) pairs over every cited N-substituent.
+            pairs = []
+            for ni in chain_n:
+                for nm in _n_names.get(ni, []):
+                    pairs.append((assign[ni], alpha_sort_key(nm)))
+            return sorted(pairs)
+
+        _asc = {chain_n[i]: _base_locs[i] for i in range(2)}
+        _desc = {chain_n[i]: _base_locs[1 - i] for i in range(2)}
+        _chosen = _asc if _locset_for(_asc) <= _locset_for(_desc) else _desc
+        carbon_locant_of = lambda ni, _c=_chosen, _f=amine_carbon_locant: (
+            _c.get(ni, _f(ni)))
 
     # Assign primed italic-N tags: only SUBSTITUTED nitrogens receive a tag, in
     # amine-carbon-locant order (lowest -> bare 'N', then N', N'', ...).
+    # Re-order the substituted nitrogens by the CHOSEN carbon locant so the
+    # lowest-locant substituted N is cited first.
+    if demoted_n:
+        per_n_subs = sorted(per_n_subs, key=lambda t: (carbon_locant_of(t[0]), t[0]))
     n_tag_by_idx = {}
     tag_count = 0
     for n_idx, counter in per_n_subs:
         if not counter:
             continue
-        n_tag_by_idx[n_idx] = "N" + ("'" * tag_count)
+        if demoted_n:
+            # P-62.2.4.1.3 examples: numeric superscript tags (flattened),
+            # e.g. N1-(aminomethyl)..., N1,N2,N2-trimethyl... — load-bearing
+            # for OPSIN disambiguation when a third amine lives in a branch.
+            n_tag_by_idx[n_idx] = f"N{carbon_locant_of(n_idx)}"
+        else:
+            n_tag_by_idx[n_idx] = "N" + ("'" * tag_count)
         tag_count += 1
 
     if not n_tag_by_idx:
@@ -5229,42 +5312,64 @@ def _assemble_polyamine_name(
             sub_tags.setdefault(name, []).extend([tag] * counter[name])
 
     def tag_sort_key(t: str):
-        return (t.count("'"), t)
+        return (t.count("'"), int(t[1:]) if t[1:].isdigit() else 0, t)
 
     n_prefix_entries = []  # (alpha_key, rendered)
     for name, tags in sub_tags.items():
         tags_sorted = sorted(tags, key=tag_sort_key)
         count = len(tags_sorted)
         loc_str = ",".join(tags_sorted)
+        # P-16.3.3 (plan P1AM Task 9): a compound N-substituent that carries
+        # its own locant/hyphen ('2-aminoethyl') or the simple 'aminomethyl'
+        # is enclosed in parentheses so it alphabetises on and cites as its
+        # complete name. Simple alkyls ('methyl') stay bare.
+        _wrapped = _wrap_n_substituent(name)
+        if demoted_n and _wrapped == name and (
+                any(ch.isdigit() for ch in name) or 'amino' in name):
+            _wrapped = f"({name})"
         if count == 1:
-            rendered = f"{loc_str}-{_wrap_n_substituent(name)}"
+            rendered = f"{loc_str}-{_wrapped}"
         else:
             mult = get_multiplier_prefix(count, name)
-            rendered = f"{loc_str}-{mult}{_wrap_n_substituent(name)}"
+            rendered = f"{loc_str}-{mult}{_wrapped}"
         n_prefix_entries.append((alpha_sort_key(name), rendered))
 
-    # Base name: parent + '-diamine' suffix (+ stereo). Already correct — built
-    # from ALL principal nitrogens by _generate_suffix/_generate_chain_parent.
-    fragments = []
-    if features.principal_chain:
-        parent = _generate_chain_parent(features)
-    elif features.ring_systems:
-        parent = _generate_ring_parent(features)
-    else:
-        return None
-    fragments.append(parent)
+    # Base name: parent + '-diamine' suffix (+ stereo). Built from the SUFFIX
+    # nitrogens by _generate_suffix/_generate_chain_parent. In the complex-
+    # polyamine case the demoted nitrogens must NOT inflate the multiplier
+    # (P-62.2.4.1.3: the parent is a DIAMINE), so filter principal_group_atoms
+    # to the chain nitrogens for the duration of suffix generation (a scoped
+    # override, mirroring _assemble_amide_name's _acyl_locants pattern — no
+    # persistent mutation of shared state).
+    _pga_backup = features.principal_group_atoms
+    if demoted_n:
+        _chain_n_set = set(chain_n)
+        features.principal_group_atoms = [
+            _m for _m in (_pga_backup or [])
+            if any(a in _chain_n_set for a in _m)]
+    try:
+        fragments = []
+        if features.principal_chain:
+            parent = _generate_chain_parent(features)
+        elif features.ring_systems:
+            parent = _generate_ring_parent(features)
+        else:
+            return None
+        fragments.append(parent)
 
-    if features.principal_group:
-        suffix = _generate_suffix(features)
-        if suffix:
-            fragments.append(suffix)
+        if features.principal_group:
+            suffix = _generate_suffix(features)
+            if suffix:
+                fragments.append(suffix)
 
-    if features.stereocenters or getattr(features, 'double_bond_stereo', None):
-        stereo = _generate_stereodescriptors(features)
-        if stereo:
-            fragments.append(stereo)
+        if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+            stereo = _generate_stereodescriptors(features)
+            if stereo:
+                fragments.append(stereo)
 
-    base_name = _assemble_fragments(fragments, style)
+        base_name = _assemble_fragments(fragments, style)
+    finally:
+        features.principal_group_atoms = _pga_backup
     if not base_name:
         return None
 

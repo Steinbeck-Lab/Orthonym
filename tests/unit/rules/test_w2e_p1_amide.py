@@ -151,3 +151,28 @@ class TestT8SulfinoSulfonoHydrazonamido:
     def test_protect_parent_direction(self):
         assert name_compound("NNS(=NN)c1ccccc1") == \
             "benzenesulfinohydrazonohydrazide"
+
+
+@pytest.mark.unit
+class TestT9ComplexPolyamines:
+    """P-62.2.4.1.3 (BB 26375): senior parent DIAMINE retained; other amine
+    N demoted into N-substituent branches; numeric N-locant tags."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # BB verbatim PINs:
+        ("NCCNCN", "N1-(aminomethyl)ethane-1,2-diamine"),
+        ("CN(C)CCN(C)CCN",
+         "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine"),
+        # same class, OPSIN-verified during planning:
+        ("NCCNCCN", "N1-(2-aminoethyl)ethane-1,2-diamine"),
+    ])
+    def test_heals(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # existing 2-N path must stay byte-identical (primed style):
+        ("NCCN", "ethane-1,2-diamine"),
+        ("CNCCN", "N-methylethane-1,2-diamine"),
+    ])
+    def test_protect_simple_diamines(self, smiles, expected):
+        assert name_compound(smiles) == expected
