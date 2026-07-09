@@ -20,3 +20,13 @@ class TestP3522SystematicChalcogenPrefixes:
     ])
     def test_pinned(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestP59218SubstitutedSubstituent:
+    """P-59.2.1.8 (BB 25269): subsidiary substituents named as prefixes;
+    attachment point takes the lowest locant. Verified healed at HEAD."""
+
+    def test_dichlorocyclohexanecarboxylic_acid(self):
+        assert name_compound("ClC1(C(CCCC1)C(=O)O)Cl") == \
+            "2,2-dichlorocyclohexane-1-carboxylic acid"
