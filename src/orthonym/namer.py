@@ -2182,6 +2182,11 @@ class Orthonym:
                 _core = get_polycyclic_core_atoms(features.mol, pah_name)
                 _core_set = set(_core) if _core else set()
                 if _core_set:
+                    # Default False so the P-44.2 among-rings veto below runs
+                    # unchanged when there is NO principal characteristic group
+                    # (no PCG => none can sit on the PAH core). Assigned only
+                    # inside the principal_group_atoms branch otherwise.
+                    _pg_on_pah = False
                     if features.principal_group_atoms:
                         _pg_on_pah = is_principal_group_on_ring(
                             features.mol, _core_set,
