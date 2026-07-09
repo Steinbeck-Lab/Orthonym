@@ -194,3 +194,21 @@ class TestT10Am2AcylChainSubstituents:
     ])
     def test_protect_plain_off_chain(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestT11Am2PoolDiscard:
+    """AM-2 ROOT-2: the correct amide candidate must win the pool; the
+    polyfunctional double-express (amide N named twice) must not be
+    emitted for ANY input (structure-wrong)."""
+
+    def test_heals(self):
+        assert name_compound("NCC(=O)N(C)C") == "2-amino-N,N-dimethylacetamide"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # neighbouring amide pins that exercise the same pool branch:
+        ("CC(=O)N(C)C", "N,N-dimethylacetamide"),
+        ("CC(=O)NC", "N-methylacetamide"),
+    ])
+    def test_protect_amide_pool(self, smiles, expected):
+        assert name_compound(smiles) == expected

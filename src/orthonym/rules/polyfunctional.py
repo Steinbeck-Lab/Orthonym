@@ -1230,7 +1230,30 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # FG-prefix remains its sole, correct name. Mirrors the BUG-B guard above
         # but keyed on the nitrogen (the amine match also spans the chain carbon,
         # so an "entirely on branch" test would miss it).
+        # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): an amine match
+        # whose nitrogen IS the nitrogen of a perceived amide FG double-
+        # expresses that N (suffix 'amide' + '(dimethylamino)' prefix = a
+        # DIFFERENT molecule, e.g. '2-amino-1-(dimethylamino)ethanamide' for
+        # NCC(=O)N(C)C). The amide handler owns that N; drop such amine matches
+        # unconditionally (P-41: the amide class outranks the amine).
         _N_SUBSTITUTED_AMINE_FGS = {'secondary_amine', 'tertiary_amine'}
+        if fg_name in ({'primary_amine', 'aromatic_amine'}
+                       | _N_SUBSTITUTED_AMINE_FGS):
+            _amide_n_atoms = set()
+            for _ak in ('primary_amide', 'secondary_amide', 'tertiary_amide',
+                        'thioamide', 'selenoamide', 'telluroamide'):
+                for _am in features.functional_groups.get(_ak, ()):
+                    _amide_n_atoms.update(
+                        a for a in _am
+                        if mol.GetAtomWithIdx(a).GetSymbol() == 'N')
+            if _amide_n_atoms:
+                matches = [
+                    _m for _m in matches
+                    if not any(a in _amide_n_atoms for a in _m
+                               if mol.GetAtomWithIdx(a).GetSymbol() == 'N')]
+                if not matches:
+                    continue
+
         if fg_name in _N_SUBSTITUTED_AMINE_FGS and features.substituents:
             _amine_kept = []
             for _match in matches:

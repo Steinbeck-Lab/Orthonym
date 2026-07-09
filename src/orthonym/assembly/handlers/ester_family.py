@@ -62,6 +62,21 @@ def _is_ester_family(features: Any) -> bool:
     # Sub-path 1: polyfunctional. Only match conditions name_polyfunctional
     # actually handles successfully.
     if getattr(features, 'is_polyfunctional', False):
+        # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): DECLINE a single
+        # acyclic amide whose only junior group is an amine — the dedicated
+        # amide handler (@5200, _assemble_amide_name) names it correctly; the
+        # polyfunctional path double-expresses the amide N (a WRONG name, not a
+        # losing candidate). Mirror of amide._amide_only_junior_is_amine.
+        pg_atoms = getattr(features, 'principal_group_atoms', None)
+        is_cyclic = getattr(features, 'is_cyclic', False)
+        chain_is_parent = getattr(features, 'chain_is_parent', False)
+        if (pg in ('primary_amide', 'secondary_amide', 'tertiary_amide',
+                   'thioamide', 'selenoamide', 'telluroamide')
+                and pg_atoms and len(pg_atoms) == 1
+                and (not is_cyclic or chain_is_parent)):
+            from .amide import _amide_only_junior_is_amine
+            if _amide_only_junior_is_amine(features):
+                return False
         # Chain-parent polyfunctional (rules/polyfunctional.py:1077-1082):
         # name_polyfunctional handles this when principal_chain + atom_to_locant
         # are populated AND the molecule has a principal characteristic group.

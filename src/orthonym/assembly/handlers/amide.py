@@ -64,18 +64,55 @@ def _is_amide(features: Any) -> bool:
     pg_count = len(pg_atoms) if pg_atoms else 1
     if pg_count != 1:
         return False
-    # Polyfunctional mutex: polyfunctional inline branch (composer.py:870-888)
-    # fires BEFORE amide in the inline cascade order. Without this mutex,
-    # dispatch_inner preempts the polyfunctional path for amide-bearing
-    # polyfunctional molecules.
-    if getattr(features, 'is_polyfunctional', False):
-        return False
     # Tier-A mutex: only fast-path when ring competition wouldn't fire.
     is_cyclic = getattr(features, 'is_cyclic', False)
     chain_is_parent = getattr(features, 'chain_is_parent', False)
     if is_cyclic and not chain_is_parent:
         return False
+    # Polyfunctional mutex: polyfunctional inline branch (composer.py:870-888)
+    # fires BEFORE amide in the inline cascade order. Without this mutex,
+    # dispatch_inner preempts the polyfunctional path for amide-bearing
+    # polyfunctional molecules.
+    #
+    # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): EXCEPTION for a
+    # single acyclic amide whose only junior group is an amine (the amide's
+    # own N or a chain amino). The polyfunctional chain-parent path renders no
+    # amide N-substituents — it wrongly expresses the amide N as a
+    # '(dimethylamino)' chain substituent AND leaves the amide bare
+    # ('2-amino-1-(dimethylamino)ethanamide' for NCC(=O)N(C)C, a DIFFERENT
+    # molecule). _assemble_amide_name (this handler) names it correctly
+    # ('2-amino-N,N-dimethylacetamide'). Claim it here so the correct handler
+    # wins; _is_ester_family declines the mirror condition.
+    if getattr(features, 'is_polyfunctional', False):
+        if _amide_only_junior_is_amine(features):
+            return True
+        return False
     return True
+
+
+def _amide_only_junior_is_amine(features: Any) -> bool:
+    """AM-2 ROOT-2 (P-66.1.1.3 / P-41): True when a single acyclic amide is
+    the principal group and every OTHER perceived functional group is an
+    amine class (primary/secondary/tertiary/aromatic amine). In that case the
+    amide handler (with acyl-chain-substituent enumeration, plan Task 10) is
+    the correct namer; the polyfunctional chain path would double-express the
+    amide N. Pure read-only."""
+    fgs = getattr(features, 'functional_groups', None) or {}
+    _AMIDE = {'primary_amide', 'secondary_amide', 'tertiary_amide',
+              'thioamide', 'selenoamide', 'telluroamide'}
+    _AMINE = {'primary_amine', 'secondary_amine', 'tertiary_amine',
+              'aromatic_amine'}
+    saw_amide = False
+    for fg_name, matches in fgs.items():
+        if not matches:
+            continue
+        if fg_name in _AMIDE:
+            saw_amide = True
+            continue
+        if fg_name in _AMINE:
+            continue
+        return False  # some other junior group -> keep the polyfunctional path
+    return saw_amide
 
 
 def name_amide(
