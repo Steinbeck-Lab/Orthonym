@@ -138,6 +138,85 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     return ''.join(p[1] for p in parts)
 
 
+def _name_azane_carboxylic_acid(mol) -> Optional[str]:
+    """P-58.3.2 (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
+
+    Peels a single terminal bare carboxyl -C(=O)OH bonded to a chain-terminal N,
+    verifies the remainder is a PURE homogeneous saturated N-chain of length
+    >= 3, and returns '<parent>-1-carboxylic acid' (the acid-bearing N is locant
+    1 per P-31.1.4, lowest locant to the suffix). Returns None (fail-closed) for
+    the 2-N member (retained hydrazinecarboxylic acid path), any other
+    decoration, an interior attachment, unsaturation, ring/charge, or a
+    non-nameable parent. Pure: no mol mutation of the input.
+    """
+    # Locate exactly ONE carboxyl carbon: =O, -OH, exactly one N neighbour,
+    # degree 3 (no other heavy neighbour).
+    carboxyl_c = terminal_n = None
+    n_carboxyls = 0
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C':
+            continue
+        nbrs = atom.GetNeighbors()
+        o_double = [n for n in nbrs if n.GetSymbol() == 'O'
+                    and mol.GetBondBetweenAtoms(
+                        atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 2.0]
+        o_single = [n for n in nbrs if n.GetSymbol() == 'O'
+                    and mol.GetBondBetweenAtoms(
+                        atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 1.0
+                    and n.GetTotalNumHs() >= 1]
+        n_nbrs = [n for n in nbrs if n.GetSymbol() == 'N']
+        if (len(o_double) == 1 and len(o_single) == 1 and len(n_nbrs) == 1
+                and atom.GetDegree() == 3):
+            n_carboxyls += 1
+            carboxyl_c = atom.GetIdx()
+            terminal_n = n_nbrs[0].GetIdx()
+    if carboxyl_c is None or n_carboxyls != 1:
+        return None
+
+    # Build a fragment view WITHOUT the carboxyl C and its two O's.
+    rw = Chem.RWMol(mol)
+    to_del = {carboxyl_c}
+    for n in mol.GetAtomWithIdx(carboxyl_c).GetNeighbors():
+        if n.GetSymbol() == 'O':
+            to_del.add(n.GetIdx())
+    for idx in sorted(to_del, reverse=True):
+        rw.RemoveAtom(idx)
+    frag = rw.GetMol()
+    try:
+        Chem.SanitizeMol(frag)
+    except Exception:
+        return None
+    if len(Chem.GetMolFrags(frag)) != 1:
+        return None
+    # The remaining fragment must be a PURE homogeneous saturated N-chain: every
+    # heavy atom is an N of a simple N-N path, none in a ring, no double bond.
+    chain = _nitrogen_chain(frag)
+    if chain is None:
+        return None
+    if any(a.GetSymbol() != 'N' for a in frag.GetAtoms() if a.GetSymbol() != 'H'):
+        return None
+    if any(frag.GetAtomWithIdx(i).IsInRing() for i in chain):
+        return None
+    if _chain_double_bond(frag, chain) != -1:
+        return None  # unsaturated / triple -> not a saturated azane parent
+    n = len(chain)
+    if n < 3:
+        return None  # 2-N keeps retained 'hydrazinecarboxylic acid' via cascade
+    # The carboxyl-bearing N must be a chain terminus (endpoint of the N-N path)
+    # so the acid takes locant 1. terminal_n is an index in the ORIGINAL mol; in
+    # the peeled frag the N indices shift only for atoms after the deletions —
+    # re-verify chain-endpoint status structurally in the ORIGINAL mol instead.
+    orig_n = mol.GetAtomWithIdx(terminal_n)
+    orig_n_neighbors = [nb for nb in orig_n.GetNeighbors()
+                        if nb.GetSymbol() == 'N']
+    if len(orig_n_neighbors) != 1:
+        return None  # acid-bearing N is interior, not a terminus -> decline
+    parent = _saturated_parent(n)
+    if parent is None:
+        return None
+    return f"{parent}-1-carboxylic acid"
+
+
 def name_polyazane(mol) -> Optional[str]:
     """Return the PIN for a polyazane-family parent hydride, else None
     (fail-closed cascade-continuation). Pure: no mol mutation."""
@@ -148,6 +227,18 @@ def name_polyazane(mol) -> Optional[str]:
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
+
+    # P-58.3.2 (BB 24896): a homogeneous heteroatom (N-N-N…) chain may be BROKEN
+    # to express a senior characteristic group. H2N-(NH)k-COOH -> the carboxylic
+    # acid is senior to the carbonic-acid derivative, so the N-chain is the
+    # 'azane' parent and -COOH is the '-carboxylic acid' suffix at the N bearing
+    # it: tetraazane-1-carboxylic acid (PIN). Peel a terminal bare -C(=O)OH on a
+    # chain-terminal N when the remaining fragment is a PURE >=3-N homogeneous
+    # azane chain. Gated to n>=3: the 2-N acid (NNC(=O)O) keeps its retained
+    # 'hydrazinecarboxylic acid' PIN via the existing cascade (do not hijack).
+    _peeled = _name_azane_carboxylic_acid(mol)
+    if _peeled is not None:
+        return _peeled
 
     chain = _nitrogen_chain(mol)
     if chain is None:
