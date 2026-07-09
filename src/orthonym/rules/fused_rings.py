@@ -243,9 +243,36 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     ring_atom_set = set(ring1) | set(ring2)
     indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
 
+    # P-25.3.2.5.2: lambda (nonstandard bonding number) tokens follow the
+    # atom's fused-system locant and are cited at the beginning of the name,
+    # after any indicated hydrogen (monocyclic precedent 1H-1lambda4-thiophene,
+    # P-22.2.7.1). Fail-closed: a lambda atom without a determinate NUMERIC
+    # fused locant (or on skeletal carbon) invalidates the whole name — the
+    # lambda-less name would denote a DIFFERENT molecule.
+    from .lambda_convention import nonstandard_bonding_number
+    lam_entries = []
+    for idx in sorted(ring_atom_set):
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam is None:
+            continue
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C':
+            return None
+        loc = atom_to_locant.get(idx)
+        if loc is None or not str(loc).isdigit():
+            return None  # fusion-junction letter locants (4a) out of scope
+        lam_entries.append((int(loc), lam))
+    lam_prefix = ''
+    if lam_entries:
+        lam_entries.sort()
+        lam_prefix = ','.join(
+            f"{loc}lambda{lam}" for loc, lam in lam_entries
+        ) + '-'
+
     if indicated_h:
         h_parts = ','.join(str(loc) + 'H' for loc in indicated_h)
-        name = f"{h_parts}-{name}"
+        name = f"{h_parts}-{lam_prefix}{name}"
+    elif lam_prefix:
+        name = f"{lam_prefix}{name}"
 
     logger.debug(
         "Algorithmic fusion name for %s: %s",
@@ -800,6 +827,18 @@ def name_fused_heterocycle(mol):
     ring_atoms = set()
     for r in ri.AtomRings():
         ring_atoms.update(r)
+
+    # P-25.3.2.5.2 / P-25.6: a fused system containing a nonstandard-bonding-
+    # number atom may ONLY be named by the algorithmic path (which emits the
+    # mandatory lambda tokens). Catalog and core-substructure matches are
+    # standard-valence structures — matching one here would name a different
+    # molecule. Fail closed if the algorithmic path declines.
+    from .lambda_convention import nonstandard_bonding_number as _nsbn
+    if any(_nsbn(mol, i) is not None for i in ring_atoms):
+        _lam_name = _try_algorithmic_fusion_name(mol)
+        if _lam_name and 'lambda' in _lam_name:
+            return (_lam_name, ring_atoms, {}, True)
+        return None
 
     # Check xanthine derivatives FIRST (caffeine, theophylline, etc.)
     # These have specific N-position numbering that differs from standard
