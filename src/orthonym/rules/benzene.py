@@ -1545,6 +1545,36 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 and c_nbr.GetFormalCharge() == -1):
             return {'name': 'isocyano', 'atoms': [n_idx, c_nbr.GetIdx()]}
 
+    # W2E-D2 (P-16.3.3 / P-35.5.1): mixed additive-prefix N-substituents whose
+    # attach atom is a heteroatom centre — (alkoxy)sulfinyl [-S(=O)-OR] and
+    # [bis(sulfanyl)phosphoryl] [-P(=O)(SH)n]. The single N-neighbour is the S or
+    # P (not a carbon), so the C/O/N branches above all decline. Name the whole
+    # centre as a compound additive prefix and promote the amine to the 'aniline'
+    # suffix (N-<prefix>aniline). Fail-closed inside the helper on any other shape.
+    if h_count == 1 and len(neighbors) == 1:
+        _het = neighbors[0]
+        _het_sym = _het.GetSymbol()
+        if _het_sym in ('S', 'P'):
+            from ..assembly.substituent_prefix_forms import (
+                get_alkoxysulfinyl_prefix, get_phosphoryl_prefix,
+            )
+            _mixed = None
+            if _het_sym == 'S':
+                _mixed = get_alkoxysulfinyl_prefix(mol, _het.GetIdx(), n_idx)
+            else:
+                _mixed = get_phosphoryl_prefix(mol, _het.GetIdx(), n_idx)
+            if _mixed:
+                _sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+                return {
+                    'name': f'(N-{_mixed}amino)',
+                    'atoms': _sub_atoms,
+                    'is_complex': True,
+                    # Promote to 'N-<prefix>aniline' when the amine is principal.
+                    'amine_candidate': {
+                        'suffix_name': 'amine', 'n_substituents': [_mixed],
+                    },
+                }
+
     # Fallback: complex N-substituent (non-alkyl chains, heteroatom-containing
     # groups like guanidino, ureido, etc.).  Collect all atoms via BFS and try
     # recursive naming.

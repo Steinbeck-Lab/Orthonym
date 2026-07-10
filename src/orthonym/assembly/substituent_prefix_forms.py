@@ -625,6 +625,150 @@ def get_sulfanyl_prefix(
         return None
 
 
+def get_alkoxysulfinyl_prefix(
+    mol,
+    s_idx: int,
+    attach_idx: int,
+) -> Optional[str]:
+    """Build the O-alkyl (alkoxy)sulfinyl compound prefix (P-16.3.3 / P-35.5.1).
+
+    For an S(=O) centre attached to the parent through ``attach_idx`` and
+    carrying exactly ONE ``-O-alkyl`` arm and the single ``=O`` oxo (no C
+    neighbours), name the O-alkyl arm as ``<alkyl>oxy`` and concatenate the
+    additive ``sulfinyl`` stem -> ``ethoxysulfinyl``. The compound prefix is
+    returned already enclosed in parentheses per P-16.3.3
+    (``(ethoxysulfinyl)``); the caller's N-substituent wrapper leaves a
+    balanced single-paren name unchanged.
+
+    The C-linked ``R-S(=O)-R'`` case is handled by ``get_sulfinyl_prefix``
+    (which requires two C-neighbours on S and declines here — S has an O and
+    the attachment N, zero C). This assembler is the O-linked complement.
+
+    Args:
+        mol: RDKit Mol object.
+        s_idx: Atom index of the sulfinyl sulfur.
+        attach_idx: Atom index of the parent atom the sulfur is bonded to
+            (excluded from the arm walk — e.g. the aniline nitrogen).
+
+    Returns:
+        ``"(ethoxysulfinyl)"`` etc., or None (fail-closed) if the shape is not
+        exactly one O-alkyl arm + one =O oxo + the single attachment.
+    """
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    if s_atom.GetSymbol() != "S":
+        return None
+    # S(=O) sulfinyl: exactly one double-bonded terminal oxo.
+    oxo = []
+    ether_o = []
+    other = []
+    for nbr in s_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        bond = mol.GetBondBetweenAtoms(s_idx, nidx)
+        if nidx == attach_idx:
+            continue
+        if (nbr.GetSymbol() == "O" and nbr.GetDegree() == 1
+                and bond is not None
+                and bond.GetBondTypeAsDouble() == 2.0):
+            oxo.append(nidx)
+        elif (nbr.GetSymbol() == "O" and nbr.GetDegree() == 2
+                and bond is not None
+                and bond.GetBondTypeAsDouble() == 1.0):
+            ether_o.append(nidx)
+        else:
+            other.append(nidx)
+    # Fail-closed: exactly one =O oxo, exactly one -O-alkyl arm, nothing else.
+    if len(oxo) != 1 or len(ether_o) != 1 or other:
+        return None
+    o_idx = ether_o[0]
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    # The alkyl carbon on the far side of the ether oxygen.
+    alkyl_c = [n.GetIdx() for n in o_atom.GetNeighbors()
+               if n.GetIdx() != s_idx]
+    if len(alkyl_c) != 1:
+        return None
+    # Reuse the ether alkoxy namer via its (O, C1, C2) tuple contract; pass the
+    # ether O and both its carbons (S side, alkyl side). With no principal
+    # chain it selects the smaller (alkyl) fragment automatically.
+    alkoxy = get_alkoxy_prefix(mol, (o_idx, s_idx, alkyl_c[0]), None)
+    if not alkoxy:
+        return None
+    return f"({alkoxy}sulfinyl)"
+
+
+def get_phosphoryl_prefix(
+    mol,
+    p_idx: int,
+    attach_idx: int,
+) -> Optional[str]:
+    """Build the [(...)phosphoryl] additive compound prefix (P-16.3.3 / P-16.3.6).
+
+    For a ``P(=O)`` centre attached to the parent through ``attach_idx``, name
+    every remaining (non-oxo, non-attachment) P substituent as a substitutive
+    prefix, apply the multiplicative disambiguation (``bis(sulfanyl)`` for two
+    ``-SH`` arms), and concatenate the additive ``phosphoryl`` stem ->
+    ``bis(sulfanyl)phosphoryl``. Returned WITHOUT an outer enclosure; the
+    caller's N-substituent wrapper escalates the parens-bearing name to square
+    brackets per P-16.3.3 -> ``[bis(sulfanyl)phosphoryl]``.
+
+    Only ``-SH`` arms are recognised today (the sole verified class); any other
+    arm shape fails closed so a partial/ambiguous name never leaks.
+
+    Args:
+        mol: RDKit Mol object.
+        p_idx: Atom index of the phosphoryl phosphorus.
+        attach_idx: Atom index of the parent atom the phosphorus is bonded to.
+
+    Returns:
+        ``"bis(sulfanyl)phosphoryl"`` etc., or None (fail-closed).
+    """
+    from .naming_utils import get_multiplier_prefix, apply_enclosing_marks
+
+    p_atom = mol.GetAtomWithIdx(p_idx)
+    if p_atom.GetSymbol() != "P":
+        return None
+    oxo = []
+    arms: List[int] = []
+    for nbr in p_atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == attach_idx:
+            continue
+        bond = mol.GetBondBetweenAtoms(p_idx, nidx)
+        if (nbr.GetSymbol() == "O" and nbr.GetDegree() == 1
+                and bond is not None
+                and bond.GetBondTypeAsDouble() == 2.0):
+            oxo.append(nidx)
+        else:
+            arms.append(nidx)
+    # Fail-closed: exactly one P=O oxo required for the 'phosphoryl' core.
+    if len(oxo) != 1 or not arms:
+        return None
+    # Name each remaining arm as a substitutive prefix. Only bare -SH (sulfanyl)
+    # is honestly nameable here; anything else -> fail closed.
+    arm_names: List[str] = []
+    for a_idx in arms:
+        a_atom = mol.GetAtomWithIdx(a_idx)
+        if (a_atom.GetSymbol() == "S" and a_atom.GetDegree() == 1
+                and a_atom.GetTotalNumHs() == 1
+                and a_atom.GetFormalCharge() == 0):
+            arm_names.append("sulfanyl")
+        else:
+            return None
+    if not arm_names:
+        return None
+    # Group identical arms with the P-16.3.6 multiplicative prefix. All-identical
+    # is the only verified case; distinct arms would need locants -> fail closed.
+    if len(set(arm_names)) != 1:
+        return None
+    name = arm_names[0]
+    count = len(arm_names)
+    if count == 1:
+        core = f"{name}phosphoryl"
+    else:
+        mult = get_multiplier_prefix(count, name)
+        core = f"{mult}{apply_enclosing_marks(name, 0)}phosphoryl"
+    return core
+
+
 def _alkoxy_name_for_branch(
     mol,
     alkyl_atom: int,
