@@ -83,3 +83,26 @@ class TestP15CompositeBridges:
         # parses to exactly this structure (reproduce-first divergence, recorded).
         assert name_compound("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)OC3") == \
             "9,10-(epoxymethano)anthracene"
+
+
+@pytest.mark.unit
+class TestP25CompositeBridgeOrdering:
+    """P-25.4.2.3.1/.3.2 composite bridge on a fused-heterocycle parent."""
+
+    @pytest.mark.xfail(reason="blocked on furo[3,4-b]pyran fusion parent — p5_fused "
+                              "(bare 2H-furo[3,4-b]pyran not deterministically named yet)",
+                       strict=False)
+    def test_epoxymethano_furopyran_bb_pin(self):
+        # BB-verbatim PIN, OPSIN-RT-verified: 2H-3,5-(epoxymethano)furo[3,4-b]pyran.
+        # Reproduce-first showed the residual parent is not yet cataloged by the
+        # fusion engine, so this is xfail (documented follow-up), not a wrong name.
+        assert name_compound("O1C=2C=3C=C(C1)OCC3OC2") == \
+            "2H-3,5-(epoxymethano)furo[3,4-b]pyran"
+
+    def test_bis_epoxymethano_anthracene_internal_oracle(self):
+        # BB PIN 1,4:8,5-bis(epoxymethano)anthracene — OPSIN 2.9 UNPARSEABLE.
+        # INTERNAL ORACLE: either the BB-conformant name or fail closed.
+        smi = "C1=CC2=C(C=C1)C1=CC3=C(C=C1C2)OCOC3"
+        name = name_compound(smi)
+        assert name in ("unknown organic compound",
+                        "1,4:8,5-bis(epoxymethano)anthracene")
