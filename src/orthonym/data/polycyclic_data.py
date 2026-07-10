@@ -320,6 +320,18 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 7,
     },
+    'benzo[ghi]perylene': {
+        # P-52.2.4.2 large peri-fused PAH (6 rings, 22 atoms). AUTHORITATIVE
+        # IUPAC numbering derived 2026-07-09 from OPSIN
+        # `benzo[ghi]perylene -o extendedsmi` ($_AV: locants), mapped onto this
+        # canonical SMILES via GetSubstructMatch.
+        'canonical_smiles': 'c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56',
+        'smarts': 'c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56',
+        'num_atoms': 22,
+        'iupac_numbering': {0: 9, 1: 10, 2: '10a', 3: 11, 4: 12, 5: '12a', 6: 1, 7: 2, 8: '2a', 9: 3, 10: 4, 11: '4a', 12: 5, 13: 6, 14: 7, 15: '7a', 16: '7b', 17: 8, 18: '12d', 19: '12b', 20: '12c', 21: '12e'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        'num_rings': 6,
+    },
     # ==========================================================================
     # Partially saturated PAHs
     # ==========================================================================

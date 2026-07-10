@@ -27,3 +27,11 @@ class TestWave2P5FusedVerify:
         # P-25.3.2.4: parent/orientation selection must not depend on the
         # RDKit atom order induced by the input SMILES spelling.
         assert name_compound(s1) == name_compound(s2)
+
+
+@pytest.mark.unit
+class TestP52BenzoGhiPerylene:
+    def test_benzo_ghi_perylene(self):
+        # P-52.2.4.2 / large peri-fused PAH catalog parent.
+        # OPSIN-RT-verified: benzo[ghi]perylene -> c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56
+        assert name_compound("c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56") == "benzo[ghi]perylene"
