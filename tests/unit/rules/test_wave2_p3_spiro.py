@@ -171,3 +171,31 @@ class TestP24LambdaSpiroDifferent:
         assert name_spiro_vonbaeyer(Chem.MolFromSmiles(self._SMILES)) is None
         assert name_compound(self._SMILES) != \
             "3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-[1,3,5,2]triazaphosphinine]"
+
+
+@pytest.mark.unit
+class TestP24LambdaUnbranchedPolyspiro:
+    # P-24.8.5: unbranched polyspiro, DIFFERENT components, >=1 λ spiro atom.
+    # Terminals are heteromonocycles (thiane, thiolane) and the central is
+    # benzo[1,2-c:4,5-c']dithiophene — all require heterocycle namings not yet
+    # built (the same monocyclic-HW spiro-component namer deferred in Task 10),
+    # plus indicated-H (1'H,3'H) + multi-λ front prefix. UNDER-SCOPE (plan rule
+    # 7): DEFERRED xfail + fail-closed guarantee below.
+    _SMILES = "S12(CCCC1)C=C1C(=C2)C=C2CS3(CC2=C1)CCCCC3"
+    _TARGET = ("1'H,3'H-1lambda4,1''lambda4-dispiro[thiane-1,2'-"
+               "benzo[1,2-c:4,5-c']dithiophene-6',1''-thiolane]")
+
+    @pytest.mark.xfail(reason="P-24.8.5 λ unbranched polyspiro DIFFERENT: needs "
+                              "heteromonocycle spiro-component naming (thiane/"
+                              "thiolane) + benzo-dithiophene catalog + indicated-H"
+                              "/multi-λ front prefix; deferred (fail-closed).")
+    def test_lambda_dispiro_thiane_dithiophene_thiolane(self):
+        assert name_compound(self._SMILES) == self._TARGET
+
+    def test_lambda_unbranched_polyspiro_fail_closed(self):
+        # The polyspiro-different core declines (no wrong name): terminal
+        # heteromonocycles are not yet nameable as spiro components.
+        from rdkit import Chem
+        from orthonym.rules.spiro import name_unbranched_polyspiro_different
+        assert name_unbranched_polyspiro_different(Chem.MolFromSmiles(self._SMILES)) is None
+        assert name_compound(self._SMILES) != self._TARGET
