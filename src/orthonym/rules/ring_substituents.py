@@ -880,8 +880,12 @@ def _extract_ring_submol(mol, ring_atoms, attachment_atom):
 def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
     """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
     ring system, reusing the bicyclo parent namer (P-23) with the free valence
-    treated as the lowest-locant feature (P-31.1.4.3.4). Carbocyclic only;
-    heteroatom von-Baeyer stems are out of this phase's scope -> None."""
+    treated as the lowest-locant feature (P-31.1.4.3.4). A ring double bond is
+    cited with the ``-<loc>-en-`` infix (P-32.1.3: free valence gets the lowest
+    locant first, THEN the unsaturation) -> ``bicyclo[2.2.2]oct-5-en-2-yl``.
+    Carbocyclic only; heteroatom von-Baeyer stems are out of this phase's
+    scope -> None."""
+    from rdkit import Chem
     from . import bicyclo
     try:
         if not bicyclo.is_bicyclo_system(sub):
@@ -897,6 +901,30 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
             return None
         loc = numbering[attach_sub]
         stem = bicyclo._get_alkane_name(sub.GetNumAtoms())  # 'heptane'
+
+        # Ring double bonds (skeletal, non-aromatic). Cite each as an 'ene' at
+        # the lower of its two atom locants (P-31.1.4). Fail closed if a ring
+        # double-bond atom is not in the numbering (should not happen).
+        ene: List[int] = []
+        for b in sub.GetBonds():
+            if b.GetBondType() != Chem.BondType.DOUBLE or b.GetIsAromatic():
+                continue
+            a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if a1 not in numbering or a2 not in numbering:
+                return None
+            ene.append(min(numbering[a1], numbering[a2]))
+        ene.sort()
+
+        if ene:
+            # stem 'octane' -> 'oct' base; _build_ene_yne_infix appends the
+            # ene suffix WITHOUT the trailing 'e', then '-<loc>-yl'.
+            base = stem[:-3] if stem.endswith('ane') else (
+                stem[:-1] if stem.endswith('e') else stem)
+            infix = _build_ene_yne_infix(base, ene, [])
+            if infix is None:
+                return None
+            return f'{desc}{infix}-{loc}-yl'  # bicyclo[2.2.2]oct-5-en-2-yl
+
         parent = desc + stem  # 'bicyclo[2.2.1]heptane'
         if parent.endswith('e'):
             parent = parent[:-1]

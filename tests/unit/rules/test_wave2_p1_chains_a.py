@@ -176,3 +176,20 @@ class TestP57ReplacementSubstituent:
         # A long homogeneous oxa chain stays a REPLACEMENT PARENT (not a nested
         # substituent) — the recursion must not steal it.
         assert name_compound("COCOCOCOCCc1ccccc1") == "10-phenyl-2,4,6,8-tetraoxadecane"
+
+
+@pytest.mark.unit
+class TestP32FixedNumberingSubstituent:
+    def test_bicyclooctenyl_propanoic_acid(self):
+        # P-32.1.3: fixed-numbering ring substituent; free valence lowest (2),
+        # then the ring double bond (5) -> bicyclo[2.2.2]oct-5-en-2-yl.
+        assert name_compound("OC(=O)CCC1CC2CCC1C=C2") == \
+            "3-(bicyclo[2.2.2]oct-5-en-2-yl)propanoic acid"
+
+    def test_saturated_bicyclo_substituent_unchanged(self):
+        # The saturated von-Baeyer substituent must be UNCHANGED.
+        assert name_compound("OC(=O)CCC1CC2CCC1CC2") == \
+            "3-(bicyclo[2.2.2]octan-2-yl)propanoic acid"
+
+    def test_monocyclic_substituent_unchanged(self):
+        assert name_compound("OC(=O)CCC1CCCCC1") == "3-cyclohexylpropanoic acid"
