@@ -317,6 +317,66 @@ def _spiro_fusion_count(mol: Chem.Mol, system_atoms: Set[int]) -> int:
     return len(get_spiro_atoms(mol) & set(system_atoms))
 
 
+# Fixed width for the spiro-atom locant tuple term (padded with a high sentinel
+# so tuples stay length-comparable and a non-spiro / shorter set never spuriously
+# wins the "lower locant" tier). No real spiro system exceeds this many atoms.
+_SPIRO_LOCANT_WIDTH = 8
+_SPIRO_LOCANT_SENTINEL = 10 ** 6
+
+
+def _is_saturated_monocyclic_spiro(mol: Chem.Mol, system_atoms: Set[int]) -> bool:
+    """P-44.2.2.2.1.2 criterion (b): the system is a spiro system whose every
+    component ring is a SATURATED MONOCYCLE (no ring multiple/aromatic bonds).
+    Deterministic (atom-set only)."""
+    spiro_in = get_spiro_atoms(mol) & set(system_atoms)
+    if not spiro_in:
+        return False
+    ri = mol.GetRingInfo()
+    rings_in = [set(r) for r in ri.AtomRings() if set(r) <= set(system_atoms)]
+    if not rings_in:
+        return False
+    # each ring must be a monocycle (no fused edge = shares >=2 atoms with another
+    # ring in the same system) and fully saturated.
+    for i, ra in enumerate(rings_in):
+        for j, rb in enumerate(rings_in):
+            if i != j and len(ra & rb) >= 2:
+                return False  # fused component, not monocyclic
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in system_atoms and b in system_atoms:
+            if (bond.GetIsAromatic()
+                    or bond.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)):
+                return False
+    return True
+
+
+def _spiro_atom_locant_set(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
+    """P-44.2.2.2.1.2: the spiro-atom locant set (increasing, fixed-width padded).
+    Uses the deterministic spiro numbering (get_spiro_numbering /
+    _get_polyspiro_numbering, both CanonicalRankAtoms-tiebroken). Returns an
+    all-sentinel tuple for a non-spiro system (so it never wins the tier).
+    Spelling-independent."""
+    spiro_in = sorted(get_spiro_atoms(mol) & set(system_atoms))
+    pad = [_SPIRO_LOCANT_SENTINEL] * _SPIRO_LOCANT_WIDTH
+    if not spiro_in:
+        return tuple(pad)
+    try:
+        from .spiro import get_spiro_numbering, _get_polyspiro_numbering
+        if len(spiro_in) == 1:
+            numbering = get_spiro_numbering(mol, spiro_in[0])
+        else:
+            numbering = _get_polyspiro_numbering(mol, set(spiro_in))
+    except Exception:
+        return tuple(pad)
+    if not numbering:
+        return tuple(pad)
+    locs = sorted(numbering[a] for a in spiro_in if a in numbering)
+    if len(locs) != len(spiro_in):
+        return tuple(pad)
+    out = (locs + pad)[:_SPIRO_LOCANT_WIDTH]
+    return tuple(out)
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -347,6 +407,8 @@ def ring_system_score(
     - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
     - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
     - [29] -spiro_fusions: P-44.2.2.2.1.1 more spiro fusions = senior (negated)
+    - [30] -sat_monocyclic_spiro: P-44.2.2.2.1.2(b) all-sat-monocyclic (negated)
+    - [31..38] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (fixed width 8)
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
@@ -364,7 +426,11 @@ def ring_system_score(
         Tuple suitable for comparison with min() to select most senior
     """
     if not system_atoms:
-        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999, 0, 0, 0)
+        return (
+            (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER)
+            + (999, 0, 0, 0, 0)
+            + ((_SPIRO_LOCANT_SENTINEL,) * _SPIRO_LOCANT_WIDTH,)
+        )
 
     # 1. Type rank
     type_rank = int(classify_ring_system_type(mol, system_atoms))
@@ -427,6 +493,11 @@ def ring_system_score(
     # and never overrides type/unsaturation seniority. Deterministic (atom-set
     # only), so it introduces no spelling dependence.
     spiro_fusions = _spiro_fusion_count(mol, system_atoms)
+    # P-44.2.2.2.1.2 (Task 13): (b) all-saturated-monocyclic-spiro preferred,
+    # then the lower spiro-atom locant set. Applied AFTER the Task-12 spiro-
+    # fusion term (P-44.2.2.2.1 "applied successively"). Both are deterministic.
+    sat_mono = _is_saturated_monocyclic_spiro(mol, system_atoms)
+    spiro_locants = _spiro_atom_locant_set(mol, system_atoms)
 
     # P-44.2: General criteria (P-44.2.1) applied BEFORE type hierarchy (P-44.2.2)
     return (
@@ -441,6 +512,8 @@ def ring_system_score(
         -num_multiple_bonds,                # P-44.4.1.1: max ring multiple bonds
         -num_double_bonds,                  # P-44.4.1.2: then max double bonds
         -spiro_fusions,                     # P-44.2.2.2.1.1: more spiro fusions
+        -int(sat_mono),                     # P-44.2.2.2.1.2(b): sat-monocyclic-spiro
+        spiro_locants,                      # P-44.2.2.2.1.2: lower spiro-atom locants
     )
 
 

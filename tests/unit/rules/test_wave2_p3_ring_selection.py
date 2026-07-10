@@ -1,15 +1,21 @@
 import pytest
 from rdkit import Chem
-from orthonym.rules.ring_selection import ring_system_score, select_principal_ring_system
+from orthonym.rules.ring_selection import (
+    ring_system_score, select_principal_ring_system, _spiro_fusion_count,
+)
 
 
 @pytest.mark.unit
 class TestP44SpiroFusionCount:
     def test_score_tuple_has_spiro_fusion_term(self):
         # P-44.2.2.2.1.1: greater number of spiro fusions = more senior.
+        # The tuple grows as later ring_selection tasks append terms; this asserts
+        # the CURRENT cumulative length (spiro-fusion term is present at idx 29).
         m = Chem.MolFromSmiles("C1CC2(CC1)CC1(CC2)CCCC1")
         tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
-        assert len(tup) == 30  # 29 existing + 1 spiro-fusion-count term
+        assert len(tup) >= 30  # 29 existing + spiro-fusion-count term (+later tasks)
+        assert tup[29] == -_spiro_fusion_count(
+            m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
 
     def test_more_spiro_fusions_wins(self):
         # A dispiro system (2 fusions) is senior to a monospiro system (1 fusion)
@@ -39,3 +45,28 @@ class TestP44SpiroFusionCount:
         for _ in range(5):
             alt = Chem.MolFromSmiles(Chem.MolToSmiles(m0, doRandom=True))
             assert winner_score(alt) == base
+
+
+@pytest.mark.unit
+class TestP44SaturatedMonocyclicSpiro:
+    def test_score_tuple_grows(self):
+        m = Chem.MolFromSmiles("C1CC2(CC1)CC1(CC2)CCCC1")
+        tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert len(tup) == 32  # 30 + saturated-monocyclic bool + spiro-atom locant set term
+
+    def test_lower_spiro_locants_win(self):
+        # Two saturated monocyclic spiro systems: the one with the lower spiro-atom
+        # locant set is senior (P-44.2.2.2.1.2). Scorer-level assertion.
+        from orthonym.rules.ring_selection import _spiro_atom_locant_set
+        m = Chem.MolFromSmiles("C1CCC2(CC1)CCCC2")  # spiro[4.5]decane
+        all_ring = {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()}
+        locs = _spiro_atom_locant_set(m, all_ring)
+        assert isinstance(locs, tuple)
+
+    def test_locant_set_spelling_independent(self):
+        from orthonym.rules.ring_selection import _spiro_atom_locant_set
+        def locs(smi):
+            m = Chem.MolFromSmiles(smi)
+            return _spiro_atom_locant_set(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        # spiro[4.5]decane spelled two ways -> identical spiro-atom locant set
+        assert locs("C1CCC2(CC1)CCCC2") == locs("C1CCCC12CCCCC2")
