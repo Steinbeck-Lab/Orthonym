@@ -739,3 +739,48 @@ def _shortest_chain_path_via_anchor(
             parent[ni] = cur
             queue.append(ni)
     return None
+
+
+# ---------------------------------------------------------------------------
+# P-52.2.7.3 boundary: phane preferred over ring-assembly at >= 7 rings
+# ---------------------------------------------------------------------------
+# BB P-52.2.7.3 (BlueBookV2.md:24088): "Phane names are preferred IUPAC names
+# rather than ring assembly names when seven or more rings or ring systems are
+# present." The full linear-phane amplification/simplification engine
+# (P-52.2.5, >= 7 nodes) is NOT built in Wave-2 P2. This module owns only the
+# P-26.4 CYCLOphane class above. The [n]cyclophane / large-ring-assembly path
+# is p1_chains_b territory (P-28.5 extended ASSEMBLY_MULTIPLIERS; INTERNAL
+# oracle since OPSIN cannot parse e.g. [5]paracyclophane). The guard below is
+# the fail-closed seam: it detects the >= 7-ring-assembly trigger but ALWAYS
+# declines, so Orthonym never emits a WRONG phane name for this class.
+
+
+def is_seven_plus_ring_assembly(mol) -> bool:
+    """True iff ``mol`` is >= 7 ring systems joined only by single bonds
+    (the P-52.2.7.3 trigger). Detection only — used by the scope guard's
+    contract tests; does NOT drive emission."""
+    if mol is None:
+        return False
+    ring_info = mol.GetRingInfo()
+    atom_rings = ring_info.AtomRings()
+    if len(atom_rings) < 7:
+        return False
+    # Each ring must be linked to the assembly by a single (non-fused,
+    # non-shared-atom) bond: assemblies have no atoms shared between rings.
+    all_ring_atoms = set()
+    for r in atom_rings:
+        s = set(r)
+        if s & all_ring_atoms:
+            return False  # shared atom -> fused/spiro, not a single-bond assembly
+        all_ring_atoms |= s
+    return True
+
+
+def linear_phane_scope_guard(mol) -> "Optional[str]":
+    """Fail-closed boundary for P-52.2.7.3 linear-phane PIN generation.
+
+    ALWAYS returns None: the linear-phane amplification engine (P-52.2.5,
+    >= 7 nodes) is not implemented in Wave-2 P2. Present so (a) the boundary is
+    contract-tested and (b) a future engine has a named seam. Never emits a
+    (possibly wrong) phane name. BB P-52.2.7.3 (BlueBookV2.md:24088)."""
+    return None
