@@ -1639,6 +1639,45 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                         oxy_name = alkyl_name + 'oxy'
                     return {'name': oxy_name, 'atoms': [o_idx] + alkyl_atoms}
 
+            # P-57.1.6.2 / P-46.1.3: _collect_pure_alkyl declines when the R
+            # side carries an INTERIOR ether O / thioether S
+            # (-O-CH2CH2-O-CH3). The Case-4 carbon count below would DROP that
+            # heteroatom (constitutionally WRONG -> 'propoxy'). Name the R side
+            # with the full substituent namer (nested (R-oxy)/(R-sulfanyl)
+            # recursion) and cite '({R}oxy)'. Guard: acyclic, non-aromatic R
+            # whose only heteroatoms are neutral divalent ether O / thioether S.
+            r_side = _bfs_substituent_atoms(mol, c_atom.GetIdx(), ring_atoms | {o_idx})
+            _ring_info = mol.GetRingInfo()
+            _r_ok = bool(r_side) and all(
+                _ring_info.NumAtomRings(a) == 0
+                and not mol.GetAtomWithIdx(a).GetIsAromatic()
+                and (
+                    mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+                    or (mol.GetAtomWithIdx(a).GetSymbol() in ('O', 'S')
+                        and mol.GetAtomWithIdx(a).GetFormalCharge() == 0
+                        and mol.GetAtomWithIdx(a).GetTotalNumHs() == 0
+                        and mol.GetAtomWithIdx(a).GetDegree() == 2)
+                )
+                for a in r_side
+            )
+            _r_has_hetero = any(
+                mol.GetAtomWithIdx(a).GetSymbol() in ('O', 'S') for a in r_side
+            )
+            if _r_ok and _r_has_hetero:
+                from ..assembly.substituent_naming import name_substituent_fragment
+                from ..assembly.naming_utils import apply_enclosing_marks
+                r_name = name_substituent_fragment(
+                    mol, r_side, c_atom.GetIdx(), list(ring_atoms | {o_idx})
+                )
+                if r_name and ' ' not in r_name:
+                    # alkyl -> alkoxy: the terminal '...yl' becomes '...oxy'
+                    # (2-methoxyethyl -> 2-methoxyethoxy, NOT '...ethyloxy').
+                    r_oxy = r_name[:-2] + 'oxy' if r_name.endswith('yl') else r_name + 'oxy'
+                    return {'name': apply_enclosing_marks(r_oxy, 0),
+                            'atoms': [o_idx] + r_side,
+                            'is_complex': True}
+                return None  # ether-bearing R not nameable -> fail closed (never drop a hetero)
+
         # Alkoxy fallback for O-C where C is not pure alkyl
         # (aromatic carbon, sugar ring carbon, carbonyl carbon, etc.)
         if nbr_symbol == 'C':
@@ -2757,9 +2796,18 @@ def name_substituted_benzene(
         if _omit:
             # Monosubstituted: just "chloro", "methyl", etc. - no locant
             if name.startswith('(') or name.startswith('['):
-                # Already has enclosing marks (possibly internal, e.g.
-                # "(oxan-2-yl)oxy") -- keep as-is to avoid double-wrapping
-                prefix_str = name
+                # A name with a leading bracket may be either FULLY enclosed
+                # ("(oxan-2-yl)oxy" is NOT — trailing 'oxy'; "(2-methylpropyl)"
+                # IS). When it is NOT fully enclosed the whole substituent still
+                # needs an OUTER enclosing mark, escalated per P-16.5.4.1
+                # ("(methoxymethoxy)methyl" -> "[(methoxymethoxy)methyl]").
+                from ..assembly.naming_utils import (
+                    _is_fully_enclosed, apply_enclosing_marks,
+                )
+                if _is_fully_enclosed(name):
+                    prefix_str = name
+                else:
+                    prefix_str = apply_enclosing_marks(name, -1)
             elif is_complex_substituent(name):
                 # Complex substituent needs enclosing marks per IUPAC P-14.5.2
                 # e.g., "(2-methylbut-2-en-1-yl)benzene"

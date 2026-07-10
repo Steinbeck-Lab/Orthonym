@@ -144,3 +144,35 @@ class TestP66CarboxamideSeniorToUrea:
     def test_pure_urea_unchanged(self):
         assert name_compound("NC(=O)N") == "urea"
         assert name_compound("NC(=O)NCC") == "N-ethylurea"
+
+
+@pytest.mark.unit
+class TestP57ReplacementSubstituent:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("COCCOc1ccccc1", "(2-methoxyethoxy)benzene"),                       # P-57.1.6.2
+        ("COCOCc1ccccc1", "[(methoxymethoxy)methyl]benzene"),                # nested alkoxy
+    ])
+    def test_oxa_thia_substituent(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.xfail(reason="P-46.1.3 thioether case UNDER-SCOPED: the "
+                              "substituent PRODUCER now builds the correct "
+                              "'{[(methoxymethyl)sulfanyl]methyl}benzene' "
+                              "(verified via name_benzene_derivative, OPSIN-RT "
+                              "OK), but the GENERAL parent-selection routes "
+                              "-CH2-S-CH2-O-CH3 on benzene to an acyclic-chain "
+                              "parent (heptylsulfanyl...methoxymethane) instead "
+                              "of the senior benzene ring, so SELF-01 suppresses "
+                              "to unknown. Fixing the thioether classification/"
+                              "parent-selection is a separate follow-up; no "
+                              "wrong name leaks.")
+    def test_thioether_substituent_underscoped(self):
+        # Strict P-16.3.3 cycling nesting: inner () -> [] -> outer {}.
+        # name_benzene_derivative already yields the correct RT-OK PIN;
+        # only the whole-molecule parent selection blocks it today.
+        assert name_compound("COCSCc1ccccc1") == "{[(methoxymethyl)sulfanyl]methyl}benzene"
+
+    def test_standalone_replacement_chain_unchanged(self):
+        # A long homogeneous oxa chain stays a REPLACEMENT PARENT (not a nested
+        # substituent) — the recursion must not steal it.
+        assert name_compound("COCOCOCOCCc1ccccc1") == "10-phenyl-2,4,6,8-tetraoxadecane"

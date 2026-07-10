@@ -98,11 +98,14 @@ class TestNestedAlkoxy:
     def test_one_level_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_depth_two_fails_closed(self, _validity_gate_on):
-        # The C-attach recursion cannot yet express depth-2 nesting — the
-        # jar-armed validity gate must suppress the raw candidate (never the
-        # old '1-hydroxy-...' garbage reaching users).
-        assert "unknown" in name_compound("C(OCOCOC)(CCCCCCCC)CCCCCCCC")
+    def test_depth_two_heals(self, _validity_gate_on):
+        # Wave2-P1ChainsA Task 12 (P-57.1.6.2 / P-46.1.3): the get_alkoxy_prefix
+        # + _name_ether_substituted_chain recursion now expresses depth-2 nesting
+        # for an ether-bearing R side. -O-CH2-O-CH2-O-CH3 on heptadecane-C9 ->
+        # '9-[(methoxymethoxy)methoxy]heptadecane' (OPSIN-RT verified). Was
+        # fail-closed before Task 12; the correct name now round-trips.
+        assert name_compound("C(OCOCOC)(CCCCCCCC)CCCCCCCC") == \
+            "9-[(methoxymethoxy)methoxy]heptadecane"
 
 
 @pytest.mark.unit

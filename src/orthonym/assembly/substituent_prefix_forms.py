@@ -192,6 +192,43 @@ def get_alkoxy_prefix(
     if _aryl_ether is not None:
         return _aryl_ether
 
+    # P-57.1.6.2 / P-46.1.3: the R side of the ether may itself be an
+    # ether/thioether-bearing (replacement-numbered) chain, e.g.
+    # -O-CH2CH2-O-CH3 -> '(2-methoxyethoxy)'. A bare carbon count would DROP
+    # the interior heteroatom (constitutionally WRONG: -> 'propoxy'). When the
+    # R fragment contains an interior ether O or thioether S, name R with the
+    # full substituent namer (which handles the nested (R-oxy)/(R-sulfanyl)
+    # recursion) and cite '({R}oxy)'.
+    r_atoms: List[int] = []
+    _r_seen = {oxygen_idx}
+    _stack = [sub_carbon]
+    while _stack:
+        _cur = _stack.pop()
+        if _cur in _r_seen:
+            continue
+        _r_seen.add(_cur)
+        r_atoms.append(_cur)
+        for _n in mol.GetAtomWithIdx(_cur).GetNeighbors():
+            if _n.GetIdx() != oxygen_idx and _n.GetIdx() not in _r_seen:
+                _stack.append(_n.GetIdx())
+    _has_interior_hetero = any(
+        mol.GetAtomWithIdx(a).GetSymbol() in ('O', 'S')
+        for a in r_atoms
+    )
+    if _has_interior_hetero:
+        from .substituent_naming import name_substituent_fragment
+        from .naming_utils import apply_enclosing_marks
+        _r_name = name_substituent_fragment(mol, r_atoms, sub_carbon, [oxygen_idx])
+        # Only accept a clean, single-token (bracketable) recursive name; a
+        # name with a space (a full compound name) means the R side is not a
+        # nameable substituent here -> fall through / fail-closed.
+        if _r_name and ' ' not in _r_name:
+            # alkyl -> alkoxy ('methoxymethyl' -> 'methoxymethoxy'); the
+            # compound '{R}oxy' prefix is always enclosed.
+            _r_oxy = _r_name[:-2] + 'oxy' if _r_name.endswith('yl') else _r_name + 'oxy'
+            return apply_enclosing_marks(_r_oxy, 0)
+        return None  # un-nameable ether-bearing R -> fail closed (never drop a hetero)
+
     # Count carbons in the substituent fragment
     carbon_count = _count_fragment_atoms(
         mol, sub_carbon, {oxygen_idx}, carbons_only=True

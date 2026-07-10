@@ -1091,7 +1091,10 @@ def _name_ether_substituted_chain(
     # -> (R)sulfanyl prefix (W2E-P1FC Task 8, the -CH2-S-R concatenation). Any
     # other decoration (charged, =O, -OH, ring, peroxide -O-O-/-S-S-) disqualifies
     # the whole fragment (fail-closed).
-    ether_os: List[int] = []
+    # Every heteroatom in the fragment must be a neutral, divalent, acyclic,
+    # single-bonded ether O / thioether S (no charge, no =O/-OH, no ring, no
+    # peroxide/disulfide catenation) — otherwise a richer producer owns it.
+    all_hetero: List[int] = []
     for idx in sub_atoms:
         atom = mol.GetAtomWithIdx(idx)
         sym = atom.GetSymbol()
@@ -1112,13 +1115,13 @@ def _name_ether_substituted_chain(
         # (R)peroxy/(R)disulfanyl, owned by a different producer.
         if any(mol.GetAtomWithIdx(n).GetSymbol() in ('O', 'S') for n in nbrs):
             return None
-        ether_os.append(idx)
-    if not ether_os:
+        all_hetero.append(idx)
+    if not all_hetero:
         return None  # plain alkyl is the fast path; need >=1 ether here
-    ether_set = set(ether_os)
+    all_hetero_set = set(all_hetero)
 
-    # Backbone = carbons reachable from the attachment WITHOUT crossing an ether
-    # oxygen. Must be all-carbon, acyclic, saturated (single C-C bonds only).
+    # Backbone = carbons reachable from the attachment WITHOUT crossing ANY
+    # ether/thioether heteroatom. Must be all-carbon, acyclic, saturated.
     backbone: List[int] = []
     seen = {attach_idx}
     stack = [attach_idx]
@@ -1130,7 +1133,7 @@ def _name_ether_substituted_chain(
         backbone.append(cur)
         for nbr in cur_atom.GetNeighbors():
             ni = nbr.GetIdx()
-            if ni in ether_set or ni not in sub_set or ni in seen:
+            if ni in all_hetero_set or ni not in sub_set or ni in seen:
                 continue
             if nbr.GetSymbol() != 'C':
                 return None  # non-C, non-ether neighbour on the backbone
@@ -1140,6 +1143,25 @@ def _name_ether_substituted_chain(
             seen.add(ni)
             stack.append(ni)
     backbone_set = set(backbone)
+
+    # P-46/P-57.1.6.2: classify each heteroatom. A BACKBONE ether-link bridges
+    # the backbone (exactly one neighbour on the backbone) to an R group;
+    # heteroatoms with NO backbone neighbour are INTERIOR to an R group and are
+    # named by the recursive R namer, not treated as backbone links here. An
+    # O/S with BOTH neighbours on the backbone is an in-backbone (replacement)
+    # heteroatom -> not this handler (fail closed).
+    ether_os: List[int] = []
+    for idx in all_hetero:
+        bb_n = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                   if n.GetIdx() in backbone_set)
+        if bb_n == 1:
+            ether_os.append(idx)
+        elif bb_n == 2:
+            return None  # in-backbone ether -> replacement parent, not a link
+        # bb_n == 0: interior to an R group; absorbed by the R walk below.
+    if not ether_os:
+        return None  # no backbone-bridging ether -> fall through
+    ether_set = set(ether_os)
 
     # Linear backbone, attachment at a terminal (primary) carbon.
     for idx in backbone:
@@ -1231,12 +1253,16 @@ def _name_ether_substituted_chain(
             _r_name = name_substituent_fragment(mol, _r_atoms, r_side, [o_idx])
             if not _r_name or ' ' in _r_name:
                 return None  # un-nameable R -> fall through (fail-closed)
-            # P-16.3.3/P-16.5: '{R}sulfanyl' concatenated onto the backbone stem
-            # is a compound substituent prefix, so it is ALWAYS enclosed
-            # ('(benzylsulfanyl)', '(methylsulfanyl)'); the outer enclosing mark
-            # then escalates on the parent ('(benzylsulfanyl)methyl' ->
-            # '[(benzylsulfanyl)methyl]benzoic acid').
-            oxy = apply_enclosing_marks(f"{_r_name}sulfanyl", 0)
+            # P-16.3.3/P-16.5: a COMPOUND R ('methoxymethyl') must itself be
+            # enclosed before concatenating 'sulfanyl' -> '(methoxymethyl)
+            # sulfanyl'; a simple/retained R ('benzyl','methyl') stays bare ->
+            # 'benzylsulfanyl'. Then '{R}sulfanyl' is a compound prefix and is
+            # ALWAYS enclosed (escalating when it already carries brackets):
+            # '(benzylsulfanyl)', '[(methoxymethyl)sulfanyl]'. The outer mark
+            # escalates again on the parent.
+            _r_enclosed = (apply_enclosing_marks(_r_name, -1)
+                           if is_complex_substituent(_r_name) else _r_name)
+            oxy = apply_enclosing_marks(f"{_r_enclosed}sulfanyl", -1)
         groups[oxy].append(pos[bb_c])
 
     _MULT = {1: "", 2: "bis", 3: "tris", 4: "tetrakis"}
