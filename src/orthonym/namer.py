@@ -1435,6 +1435,25 @@ class Orthonym:
                 clear_pool()
             except Exception:
                 pass
+        # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
+        # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
+        # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
+        # fail-closed decorator BEFORE _name_impl strips the label. Clean
+        # pass-through when the mol carries no isotope (has_isotopes gate) —
+        # zero cost + byte-identical on the entire unlabeled corpus.
+        if is_top_level_naming():
+            _iso_probe = Chem.MolFromSmiles(smiles)
+            if _iso_probe is not None:
+                from .rules.isotopes import has_isotopes, decorate_isotopic_name
+                if has_isotopes(_iso_probe):
+                    _iso_name = decorate_isotopic_name(smiles, self.style, self)
+                    if _iso_name is not None:
+                        end_naming_session()
+                        return _iso_name
+                    # Decorator failed closed (no round-tripping placement):
+                    # fall through to the normal pipeline (which yields the
+                    # skeleton name); the OPSIN-validity gate marks it as a
+                    # non-round-tripping best-effort — never a wrong LABELED PIN.
         try:
             # HYG-02: structural scope pre-check (opt-in). Only the wildcard
             # class is refused here — the one class with zero in-scope risk.
