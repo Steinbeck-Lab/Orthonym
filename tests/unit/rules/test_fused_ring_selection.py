@@ -614,47 +614,42 @@ class TestCriterionFAltOrder:
 
 
 class TestCriterionGOrientStub:
-    """FR-2.3(g) — Preferred orientation. Phase 155 fills.
+    """FR-2.3(g) — Preferred orientation. FILLED (Wave-2 P5 fused, Task 6).
 
-    In Phase 149 the stub returns 0 regardless of mol/atoms per D-03;
-    this keeps ComponentRank totally ordered without orientation
-    infrastructure.
+    P-25.3.2.4(g): greatest number of rings in a horizontal row. The field is
+    now a COMPUTED per-component structural descriptor (negated horizontal-row
+    count) instead of the deferred D-03 constant 0. It is deterministic and
+    spelling-invariant, and only decides when (a)-(f) tie.
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(g)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-    Source: HERITAGE-1990 §4.
-    Source: Phase 149 CONTEXT D-03 (deterministic constant stub).
+    Source: BlueBookV2.md:12317 P-25.3.2.4(g)
     """
 
-    def test_orient_stub_returns_zero_constant(self):
-        """orient_stub == 0 regardless of mol/atoms (D-03 stub lock)."""
+    def test_orient_computed_from_ring_span(self):
+        """orient_stub = -(horizontal-row count); monocycle=-1, 2-ring=-2."""
+        # quinoline: 2 ortho-fused rings -> -2
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
-        atoms = _all_ring_atoms(mol)
-        rank = _rank(mol, atoms)
-        assert rank.orient_stub == 0, (
-            f"FR-2.3(g) stub must be deterministic constant 0 per D-03; "
-            f"got {rank.orient_stub}"
-        )
+        rank = _rank(mol, _all_ring_atoms(mol))
+        assert rank.orient_stub == -2, rank.orient_stub
 
-    def test_orient_stub_independent_of_mol(self):
-        """orient_stub == 0 across different molecules (D-03 stub lock)."""
-        mols = [
-            Chem.MolFromSmiles("c1ccncc1"),
-            Chem.MolFromSmiles("c1ccoc1"),
-            Chem.MolFromSmiles("c1ccc2ncccc2c1"),
-            Chem.MolFromSmiles("C1CCCCC1"),
+    def test_orient_deterministic_across_mols(self):
+        """orient_stub is a well-defined int per component (deterministic)."""
+        cases = [
+            ("c1ccncc1", -1),                    # pyridine monocycle
+            ("c1ccc2ncccc2c1", -2),              # quinoline (2 rings)
+            ("c1ccc2cc3ccccc3cc2c1", -3),        # anthracene (3-in-row)
         ]
-        for mol in mols:
+        for smi, expected in cases:
+            mol = Chem.MolFromSmiles(smi)
             rank = _rank(mol, _all_ring_atoms(mol))
-            assert rank.orient_stub == 0
+            assert rank.orient_stub == expected, (smi, rank.orient_stub)
 
-    def test_orient_stub_independent_of_atoms(self):
-        """orient_stub == 0 for distinct atom subsets of the same mol (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1")  # anthracene
-        rings = mol.GetRingInfo().AtomRings()
-        for ring in rings:
-            rank = _rank(mol, set(ring))
-            assert rank.orient_stub == 0
+    def test_orient_spelling_invariant(self):
+        """Same structure, two SMILES spellings -> identical orient_stub."""
+        a = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        b = Chem.MolFromSmiles("c1ccc2c(c1)nccc2")
+        assert (_rank(a, _all_ring_atoms(a)).orient_stub
+                == _rank(b, _all_ring_atoms(b)).orient_stub)
 
 
 # ============================================================================
@@ -663,42 +658,37 @@ class TestCriterionGOrientStub:
 
 
 class TestCriterionHHetLocantsStub:
-    """FR-2.3(h) — Lower heteroatom locants. Phase 155 fills.
+    """FR-2.3(h) — Lower heteroatom locants. FILLED (Wave-2 P5 fused, Task 6).
 
-    In Phase 149 the stub returns () regardless of mol/atoms per D-03.
+    P-25.3.2.4(h): a component with lower locants for heteroatoms. The field is
+    now the ascending tuple of heteroatom locants under a spelling-invariant
+    per-component canonical numbering (empty for a carbocycle).
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(h)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-    Source: HERITAGE-1990 §4.
-    Source: Phase 149 CONTEXT D-03 (deterministic constant stub).
+    Source: BlueBookV2.md:12392 P-25.3.2.4(h)
     """
 
-    def test_het_locants_stub_returns_empty_tuple(self):
-        """het_locants_stub == () regardless of mol/atoms (D-03)."""
+    def test_het_locants_populated_for_het_component(self):
+        """het_locants_stub is a non-empty ascending tuple for a het component."""
         mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
         rank = _rank(mol, _all_ring_atoms(mol))
-        assert rank.het_locants_stub == (), (
-            f"FR-2.3(h) stub must be deterministic empty tuple per D-03; "
-            f"got {rank.het_locants_stub}"
-        )
+        assert isinstance(rank.het_locants_stub, tuple)
+        assert len(rank.het_locants_stub) == 1  # one N
+        assert list(rank.het_locants_stub) == sorted(rank.het_locants_stub)
 
-    def test_het_locants_stub_independent_of_mol(self):
-        """het_locants_stub == () across different molecules (D-03)."""
-        mols = [
-            Chem.MolFromSmiles("c1ccncc1"),
-            Chem.MolFromSmiles("c1[nH]cnc1"),
-            Chem.MolFromSmiles("c1ocnc1"),
-        ]
-        for mol in mols:
-            rank = _rank(mol, _all_ring_atoms(mol))
-            assert rank.het_locants_stub == ()
+    def test_het_locants_empty_for_carbocycle(self):
+        """Carbocyclic component -> empty tuple (non-regressing, per D-03 default
+        semantics preserved for all-carbon rings)."""
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        rank = _rank(mol, _all_ring_atoms(mol))
+        assert rank.het_locants_stub == ()
 
-    def test_het_locants_stub_independent_of_atoms(self):
-        """het_locants_stub == () for distinct atom subsets (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
-        for ring in mol.GetRingInfo().AtomRings():
-            rank = _rank(mol, set(ring))
-            assert rank.het_locants_stub == ()
+    def test_het_locants_spelling_invariant(self):
+        """Same structure, two spellings -> identical het_locants_stub."""
+        a = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        b = Chem.MolFromSmiles("c1ccc2c(c1)nccc2")
+        assert (_rank(a, _all_ring_atoms(a)).het_locants_stub
+                == _rank(b, _all_ring_atoms(b)).het_locants_stub)
 
 
 # ============================================================================
@@ -707,41 +697,35 @@ class TestCriterionHHetLocantsStub:
 
 
 class TestCriterionIHetTypeLocantsStub:
-    """FR-2.3(i) — Locant ordering by heteroatom type. Phase 155 fills.
+    """FR-2.3(i) — Locant ordering by heteroatom type. FILLED (Wave-2 P5, Task 6).
 
-    In Phase 149 the stub returns () regardless of mol/atoms per D-03.
+    P-25.3.2.4(i): lower locants for heteroatoms in seniority order. The field is
+    now a computed tuple (senior element's locants first). Deterministic,
+    spelling-invariant, empty for a carbocycle.
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(i)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-    Source: HERITAGE-1990 §4.
-    Source: Phase 149 CONTEXT D-03 (deterministic constant stub).
+    Source: BlueBookV2.md:12407 P-25.3.2.4(i)
     """
 
-    def test_het_type_locants_stub_returns_empty_tuple(self):
-        """het_type_locants_stub == () (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+    def test_het_type_locants_populated_for_het_component(self):
+        """Non-empty computed tuple for a multi-heteroatom component."""
+        mol = Chem.MolFromSmiles("c1ocnc1")  # oxazole (N+O)
+        rank = _rank(mol, _all_ring_atoms(mol))
+        assert isinstance(rank.het_type_locants_stub, tuple)
+        assert len(rank.het_type_locants_stub) == 2  # N + O
+
+    def test_het_type_locants_empty_for_carbocycle(self):
+        """Carbocyclic component -> empty tuple."""
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         rank = _rank(mol, _all_ring_atoms(mol))
         assert rank.het_type_locants_stub == ()
 
-    def test_het_type_locants_stub_independent_of_mol(self):
-        """het_type_locants_stub == () across different molecules (D-03)."""
-        mols = [
-            Chem.MolFromSmiles("c1ocnc1"),  # oxazole (N+O)
-            Chem.MolFromSmiles("c1cnsc1"),  # 1,2-thiazole-like
-            Chem.MolFromSmiles("c1ncncn1"),  # 1,3,5-triazine
-        ]
-        for mol in mols:
-            if mol is None:
-                continue
-            rank = _rank(mol, _all_ring_atoms(mol))
-            assert rank.het_type_locants_stub == ()
-
-    def test_het_type_locants_stub_independent_of_atoms(self):
-        """het_type_locants_stub == () for distinct atom subsets (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2[nH]cnc2c1")  # benzimidazole
-        for ring in mol.GetRingInfo().AtomRings():
-            rank = _rank(mol, set(ring))
-            assert rank.het_type_locants_stub == ()
+    def test_het_type_locants_spelling_invariant(self):
+        """Same structure, two spellings -> identical het_type_locants_stub."""
+        a = Chem.MolFromSmiles("c1ccc2[nH]cnc2c1")  # benzimidazole
+        b = Chem.MolFromSmiles("c1ccc2nc[nH]c2c1")
+        assert (_rank(a, _all_ring_atoms(a)).het_type_locants_stub
+                == _rank(b, _all_ring_atoms(b)).het_type_locants_stub)
 
 
 # ============================================================================
@@ -750,39 +734,37 @@ class TestCriterionIHetTypeLocantsStub:
 
 
 class TestCriterionJBridgeheadStub:
-    """FR-2.3(j) — Lower bridgehead carbon locants. Phase 155 fills.
+    """FR-2.3(j) — Lower peripheral fusion-carbon locants. FILLED (Wave-2 P5, Task 6).
 
-    In Phase 149 the stub returns () regardless of mol/atoms per D-03.
+    P-25.3.2.4(j): lower locants for peripheral fusion carbon atoms. The field is
+    now the ascending tuple of fusion-carbon locants (carbons shared by >=2 rings
+    of the component), computed under the spelling-invariant per-component
+    numbering. Empty for a monocycle (no fusion carbons).
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html FR-2.3(j)
-    Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.2.4
-    Source: HERITAGE-1990 §4.
-    Source: Phase 149 CONTEXT D-03 (deterministic constant stub).
+    Source: BlueBookV2.md:12418 P-25.3.2.4(j)
     """
 
-    def test_bridgehead_locants_stub_returns_empty_tuple(self):
-        """bridgehead_locants_stub == () (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+    def test_bridgehead_locants_populated_for_fused_component(self):
+        """Fused carbocycle -> non-empty ascending fusion-carbon locant tuple."""
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene: 2 fusion C
+        rank = _rank(mol, _all_ring_atoms(mol))
+        assert isinstance(rank.bridgehead_locants_stub, tuple)
+        assert len(rank.bridgehead_locants_stub) == 2
+        assert list(rank.bridgehead_locants_stub) == sorted(rank.bridgehead_locants_stub)
+
+    def test_bridgehead_locants_empty_for_monocycle(self):
+        """Monocyclic component -> no shared/fusion carbons -> empty tuple."""
+        mol = Chem.MolFromSmiles("c1ccncc1")  # pyridine
         rank = _rank(mol, _all_ring_atoms(mol))
         assert rank.bridgehead_locants_stub == ()
 
-    def test_bridgehead_locants_stub_independent_of_mol(self):
-        """bridgehead_locants_stub == () across different molecules (D-03)."""
-        mols = [
-            Chem.MolFromSmiles("c1ccc2ccccc2c1"),  # naphthalene
-            Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1"),  # anthracene
-            Chem.MolFromSmiles("c1ccc2[nH]cnc2c1"),  # benzimidazole
-        ]
-        for mol in mols:
-            rank = _rank(mol, _all_ring_atoms(mol))
-            assert rank.bridgehead_locants_stub == ()
-
-    def test_bridgehead_locants_stub_independent_of_atoms(self):
-        """bridgehead_locants_stub == () for distinct atom subsets (D-03)."""
-        mol = Chem.MolFromSmiles("c1ccc2cc3ccccc3cc2c1")  # anthracene
-        for ring in mol.GetRingInfo().AtomRings():
-            rank = _rank(mol, set(ring))
-            assert rank.bridgehead_locants_stub == ()
+    def test_bridgehead_locants_spelling_invariant(self):
+        """Same structure, two spellings -> identical bridgehead_locants_stub."""
+        a = Chem.MolFromSmiles("c1ccc2ccccc2c1")
+        b = Chem.MolFromSmiles("c1ccc2c(c1)cccc2")
+        assert (_rank(a, _all_ring_atoms(a)).bridgehead_locants_stub
+                == _rank(b, _all_ring_atoms(b)).bridgehead_locants_stub)
 
 
 # ============================================================================

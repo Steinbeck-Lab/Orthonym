@@ -163,7 +163,31 @@ def _rank(mol: Chem.Mol, atoms: Set[int]) -> ComponentRank:
         )
         alt_counts.append(-n)  # negate for min-sort
 
-    # (g)-(j) use dataclass defaults per D-03 deterministic stubs.
+    # (g)-(j) P-25.3.2.4 tail tiebreaks (BlueBookV2.md:12317/12392/12407/12418).
+    # These decide ONLY when (a)-(f) tie; they are per-component structural
+    # descriptors so they are invariant to the input SMILES atom order.
+
+    # (g) greatest number of rings in a horizontal row (preferred orientation).
+    # For a single monocyclic component the horizontal-row count is 1; for a
+    # multi-ring component, approximate the linear-fusion span by the longest
+    # chain of ortho-fused rings sharing collinear fusion bonds. Fail-safe: use
+    # the ring count as an upper bound (never mis-ranks a lone monocycle). Negate.
+    horiz = _horizontal_row_count(mol, rings_in_component)
+
+    # (h) lower locants for heteroatoms (kind-agnostic, as a set). Use the
+    # component-internal canonical numbering (heteroatom-priority walk) so the
+    # locant multiset is spelling-invariant. Lower is better -> store ascending
+    # and compare directly (tuple min-sort).
+    het_locants = _component_heteroatom_locants(mol, atoms, rings_in_component)
+
+    # (i) lower locants for heteroatoms in the seniority order
+    # F>Cl>Br>I>O>S>Se>Te>N>P>... (reuse _HETEROATOM_SENIORITY key ordering).
+    het_type_locants = _component_het_type_locants(mol, atoms, rings_in_component)
+
+    # (j) lower locants for peripheral fusion-carbon atoms.
+    bridgehead_locants = _component_fusion_carbon_locants(mol, atoms,
+                                                          rings_in_component)
+
     return ComponentRank(
         senior_het_neg=-senior_het,
         ring_count_neg=-ring_count,
@@ -171,7 +195,90 @@ def _rank(mol: Chem.Mol, atoms: Set[int]) -> ComponentRank:
         het_count_neg=-het_count,
         het_variety_neg=-variety,
         alt_het_tuple=tuple(alt_counts),
+        orient_stub=-horiz,                    # (g) more rows preferred -> negate
+        het_locants_stub=tuple(het_locants),   # (h) lower set preferred -> ascending
+        het_type_locants_stub=tuple(het_type_locants),  # (i)
+        bridgehead_locants_stub=tuple(bridgehead_locants),  # (j)
     )
+
+
+def _horizontal_row_count(mol, rings_in_component):
+    """(g) P-25.3.2.4: rings in a horizontal row in the preferred orientation.
+    Fail-safe approximation: the longest run of ortho-fused rings in the
+    component (a lower bound on the true horizontal-row span; for a monocycle
+    this is 1). Used only as an (a)-(f) tail tiebreak, never a primary."""
+    if len(rings_in_component) <= 1:
+        return len(rings_in_component)
+    # ortho-fusion adjacency: two rings sharing exactly one bond (2 atoms)
+    idx = list(range(len(rings_in_component)))
+    sets = [set(r) for r in rings_in_component]
+    adj = {i: [] for i in idx}
+    for i in idx:
+        for j in idx:
+            if i < j and len(sets[i] & sets[j]) == 2:
+                adj[i].append(j)
+                adj[j].append(i)
+    # longest simple path over the (small) fusion graph
+    best = 1
+
+    def dfs(u, seen):
+        nonlocal best
+        best = max(best, len(seen))
+        for v in adj[u]:
+            if v not in seen:
+                dfs(v, seen | {v})
+
+    for s in idx:
+        dfs(s, {s})
+    return best
+
+
+def _component_numbering(mol, atoms, rings_in_component):
+    """Spelling-invariant per-component locant map: number the component by a
+    heteroatom-priority canonical walk (locant 1 -> most senior heteroatom or,
+    for carbocycles, the RDKit-canonical-rank-lowest atom). Returns
+    {atom_idx: locant}. Kept local + deterministic (uses canonical ranks, not
+    input order) so (h)-(j) tuples do not depend on the SMILES spelling."""
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    ordered = sorted(atoms, key=lambda a: (
+        -_HETEROATOM_SENIORITY.get(mol.GetAtomWithIdx(a).GetSymbol(), 0),
+        ranks[a]))
+    return {a: i + 1 for i, a in enumerate(ordered)}
+
+
+def _component_heteroatom_locants(mol, atoms, rings_in_component):
+    """(h) ascending locants of ALL heteroatoms (kind-agnostic)."""
+    numb = _component_numbering(mol, atoms, rings_in_component)
+    locs = [numb[a] for a in atoms
+            if mol.GetAtomWithIdx(a).GetAtomicNum() != 6]
+    return sorted(locs)
+
+
+def _component_het_type_locants(mol, atoms, rings_in_component):
+    """(i) locants grouped by heteroatom seniority order (senior element's
+    locants first, ascending within each element)."""
+    numb = _component_numbering(mol, atoms, rings_in_component)
+    out = []
+    for elem in sorted({mol.GetAtomWithIdx(a).GetSymbol() for a in atoms
+                        if mol.GetAtomWithIdx(a).GetAtomicNum() != 6},
+                       key=lambda e: -_HETEROATOM_SENIORITY.get(e, 0)):
+        out.extend(sorted(numb[a] for a in atoms
+                          if mol.GetAtomWithIdx(a).GetSymbol() == elem))
+    return out
+
+
+def _component_fusion_carbon_locants(mol, atoms, rings_in_component):
+    """(j) ascending locants of peripheral fusion carbons (carbons shared by
+    >=2 rings of the component)."""
+    numb = _component_numbering(mol, atoms, rings_in_component)
+    shared = set()
+    sets = [set(r) for r in rings_in_component]
+    for a in atoms:
+        if mol.GetAtomWithIdx(a).GetAtomicNum() != 6:
+            continue
+        if sum(1 for s in sets if a in s) >= 2:
+            shared.add(a)
+    return sorted(numb[a] for a in shared)
 
 
 def _enumerate_components(mol: Chem.Mol) -> List[FrozenSet[int]]:

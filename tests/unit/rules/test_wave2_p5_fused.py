@@ -70,3 +70,39 @@ class TestP25MultiparentTriplePrimed:
         # OPSIN-RT-verified BB-verbatim PIN.
         expected = "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran"
         assert name_compound("O1C2=C(C=C1)C=1C2=CC2=C(C3=COC=C32)C1") == expected
+
+
+@pytest.mark.unit
+class TestP25ParentSelectionTiebreakGtoJ:
+    """P-25.3.2.4 (g)-(j) parent-selection tiebreaks. No OPSIN-parseable
+    example isolates a (g)-(j) decision, so this locks: (1) the (a)-(f)-decided
+    examples are unchanged after the stubs become computed; (2) the computed
+    (g)-(j) fields are spelling-invariant (determinism-sensitive scorer)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("c1ccc2ccccc2c1", "naphthalene"),
+        ("c1ccc2ncccc2c1", "quinoline"),
+        ("c1ccc2[nH]ccc2c1", "1H-indole"),
+        ("c1ccc2nc[nH]c2c1", "1H-benzimidazole"),
+    ])
+    def test_af_decided_unchanged(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("s1,s2", [
+        ("c1ccc2ncccc2c1", "c1ccc2c(c1)nccc2"),      # quinoline, two spellings (same structure)
+        ("c1ccc2nc[nH]c2c1", "c1ccc2[nH]cnc2c1"),    # benzimidazole, two spellings
+    ])
+    def test_rank_is_spelling_invariant(self, s1, s2):
+        # The (g)-(j) fields must be per-component structural descriptors,
+        # not RDKit-atom-order artifacts -> identical name for both spellings.
+        assert name_compound(s1) == name_compound(s2)
+
+    def test_gj_fields_are_computed_not_constant(self):
+        from rdkit import Chem
+        from orthonym.rules.fused_ring_selection import _rank
+        # A heteroatom-bearing component now yields a computed (h)/(i) tail
+        # (tuple of locants), not the empty-tuple default.
+        r = _rank(Chem.MolFromSmiles('c1ccc2ncccc2c1'), set(range(10)))
+        # (h) lower-locants-for-heteroatoms tuple is populated for a het component.
+        assert isinstance(r.het_locants_stub, tuple)
+        assert len(r.het_locants_stub) >= 1
