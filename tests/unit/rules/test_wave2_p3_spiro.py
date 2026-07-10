@@ -143,3 +143,31 @@ class TestP24LambdaSpirobiSpiroter:
     def test_lambda6_spiroter_benzodioxathiole(self):
         assert name_compound("O1S23(OC4=C1C=CC=C4)(OC4=C(O2)C=CC=C4)OC4=C(O3)C=CC=C4") == \
             "2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]"
+
+
+@pytest.mark.unit
+class TestP24LambdaSpiroDifferent:
+    # P-24.8.4.1: monospiro, DIFFERENT polycyclic components, >=1 with a λ spiro
+    # atom. This target needs BOTH a [1,3,2]benzoxazaphosphole catalog entry AND
+    # a monocyclic-HW spiro-component namer for [1,3,5,2]triazaphosphinine, plus
+    # indicated-H (3H) + λ5 front-prefix assembly. The monocyclic-HW
+    # spiro-component namer is a genuinely new sub-engine. UNDER-SCOPE
+    # (plan rule 7): DEFERRED xfail + fail-closed guarantee below.
+    _SMILES = "N1=P2(N=CN=C1)OC1=C(N2)C=CC=C1"
+
+    @pytest.mark.xfail(reason="P-24.8.4.1 λ spiro DIFFERENT components: needs a "
+                              "monocyclic-HW spiro-component namer "
+                              "([1,3,5,2]triazaphosphinine) + indicated-H/λ front "
+                              "prefix; deferred (fail-closed, never a wrong name).")
+    def test_lambda5_spiro_benzoxazaphosphole_triazaphosphinine(self):
+        assert name_compound(self._SMILES) == \
+            "3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-[1,3,5,2]triazaphosphinine]"
+
+    def test_lambda_spiro_different_fail_closed(self):
+        # The spiro-VB path declines (no wrong name): both components require
+        # catalog/HW naming that is a documented follow-on.
+        from rdkit import Chem
+        from orthonym.rules.spiro import name_spiro_vonbaeyer
+        assert name_spiro_vonbaeyer(Chem.MolFromSmiles(self._SMILES)) is None
+        assert name_compound(self._SMILES) != \
+            "3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-[1,3,5,2]triazaphosphinine]"
