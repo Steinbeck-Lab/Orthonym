@@ -182,3 +182,26 @@ class TestP31TripleBondBridge:
         name = name_compound("C12=CC=C(C3=CC=CC=C13)C#C2")
         assert name == "unknown organic compound" or (
             "ethano" not in name and "etheno" not in name)
+
+
+@pytest.mark.unit
+class TestP25MultiParentFallbacks:
+    """P-25.5.1.2/.5.2/.5.3 — multi-parent fused fallbacks."""
+
+    @pytest.mark.xfail(reason="P-25.5.1.2 residual cyclopenta[cd]azulene not cataloged "
+                              "(+ skeletal-replacement 'a' front-citation) — blocked on "
+                              "fused catalog (p5_fused), documented follow-up", strict=False)
+    def test_trioxa_methano_cyclopentaazulene(self):
+        # P-25.5.1.2: skeletal-replacement 'a'-heteroatoms + methano bridge.
+        # OPSIN-RT-verified PIN; blocked because the bare cyclopenta[cd]azulene
+        # residual is not yet nameable (reproduce-first divergence, recorded).
+        assert name_compound("C=1OC2=C3C(C4=CC=C(C13)O4)=CO2") == \
+            "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
+
+    def test_indeno_naphthalene_is_fusion_not_bridged(self):
+        # P-25.5.2: pure fusion (NO bridge). The bridged constructor must decline;
+        # the correct PIN (cyclobuta[1,7]indeno[5,6-b]naphthalene) comes from the
+        # fusion engine (p5_fused), not the bridged constructor.
+        from orthonym.rules.bridged_fused import name_bridged_fused_pin
+        m = Chem.MolFromSmiles("C1=C2C=CC3=CC4=CC=5C=CC=CC5C=C4C1=C23")
+        assert name_bridged_fused_pin(m) is None  # not a bridge -> delegate
