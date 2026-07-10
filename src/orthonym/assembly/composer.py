@@ -2702,6 +2702,13 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_spirobi(mol):
         return True
 
+    # P-24.4.1 dispiroter (three identical polycyclic components, two spiro
+    # atoms): n_rings > n_spiro+1 so is_spiro_system rejects; two spiro atoms so
+    # is_spirobi declines.
+    from ..rules.spiro import is_dispiroter as _is_dispiroter
+    if _is_dispiroter(mol):
+        return True
+
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
     # to return True. Spiro check must precede polycyclic to avoid misrouting.
@@ -2779,6 +2786,11 @@ def _classify_complex_ring(mol) -> str:
     # whole two-component spiro system, so the spirobi branch never fires.
     from ..rules.spiro import is_spirobi as _is_spirobi_classify
     _input_is_spirobi = _is_spirobi_classify(mol)
+    # P-24.4.1 dispiroter (three identical polycyclic components, two spiro
+    # atoms): SAME catalog-skip hazard as spirobi — the catalog matches one
+    # component. Computed once, reused at the dispatch branch below.
+    from ..rules.spiro import is_dispiroter as _is_dispiroter_classify
+    _input_is_dispiroter = _is_dispiroter_classify(mol)
     # P-24.5 spiro-of-von-Baeyer / spiro-PAH (Phase 13B): SAME hazard. When a
     # spiro component is a fused HETEROCYCLE (e.g. spiro[fluorene-9,9'-xanthene])
     # the catalog matches the xanthene sub-core; worse, get_ring_systems splits
@@ -2801,7 +2813,7 @@ def _classify_complex_ring(mol) -> str:
     # is the largest ring system (nucleotide cofactors: adenine + ribose),
     # use only the core's ring system atom count.
     from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
-    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi or _input_is_spiro_vb) else match_fused_heterocycle_core(mol)
+    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi or _input_is_dispiroter or _input_is_spiro_vb) else match_fused_heterocycle_core(mol)
     if core_match is not None:
         core_smiles = core_match[2]
         core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
@@ -2855,6 +2867,12 @@ def _classify_complex_ring(mol) -> str:
     # computed above for the catalog-skip (avoid a second full partition).
     if _input_is_spirobi:
         return 'spirobi'
+
+    # P-24.4.1 dispiroter (three identical polycyclic components, two spiro
+    # atoms). n_rings > n_spiro + 1 so is_spiro_system declines; two spiro atoms
+    # so is_spirobi declines. Must precede pure-spiro and polycyclic-bridged.
+    if _input_is_dispiroter:
+        return 'dispiroter'
 
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
@@ -2996,6 +3014,17 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Spirobi naming failed for molecule")
+            return None
+
+        elif ring_type == 'dispiroter':
+            # P-24.4.1: three identical polycyclic components at two spiro atoms
+            # (e.g. 3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]).
+            from ..rules.spiro import name_dispiroter
+            result = name_dispiroter(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Dispiroter naming failed for molecule")
             return None
 
         elif ring_type == 'spiro-vonbaeyer':

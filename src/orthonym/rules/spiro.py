@@ -2248,6 +2248,186 @@ def name_spirobi(
     return (name, all_ring_atoms, combined_locants, False)
 
 
+def _name_dispiroter_core(mol):
+    """P-24.4.1: three IDENTICAL polycyclic components sharing exactly TWO spiro
+    atoms -> ``a,a':b',b''-dispiroter[component]`` (e.g.
+    ``3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]``). Returns
+    ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed).
+
+    Fail closed unless: exactly 2 spiro atoms, exactly 3 components (a linear
+    chain terminal-middle-terminal where the middle component holds BOTH spiro
+    atoms), all three graph-isomorphic and identically named, and the system is
+    unsubstituted. P-24.4.2: the lowest spiro-atom locant set is chosen (compare
+    the two terminals as unprimed vs double-primed). The 'a'-replacement
+    heterocyclic dispiroter form (P-24.4.3(b)) is a documented fail-closed
+    follow-on."""
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 2:
+        return None
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms.update(r)
+    # Unsubstituted only.
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+
+    # Split the ring-atom graph by removing BOTH spiro atoms -> 3 components.
+    _, adj = _ring_atom_graph(mol)
+    sa_list = sorted(spiro_atoms)
+    seen: Set[int] = set(sa_list)
+    comps: List[Set[int]] = []
+    for start in adj:
+        if start in seen:
+            continue
+        stack = [start]
+        comp = {start}
+        seen.add(start)
+        while stack:
+            cur = stack.pop()
+            for nbr in adj[cur]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    comp.add(nbr)
+                    stack.append(nbr)
+        comps.append(comp)
+    if len(comps) != 3:
+        return None
+
+    # Attach each spiro atom to the components it touches. A terminal component
+    # touches exactly ONE spiro atom; the middle component touches BOTH.
+    def _touching_spiros(comp: Set[int]) -> List[int]:
+        touch = []
+        for sa in sa_list:
+            if any(nbr in comp for nbr in adj[sa]):
+                touch.append(sa)
+        return touch
+
+    terminals = []
+    middle = None
+    for comp in comps:
+        touch = _touching_spiros(comp)
+        if len(touch) == 1:
+            terminals.append((comp, touch[0]))
+        elif len(touch) == 2:
+            if middle is not None:
+                return None
+            middle = (comp, touch)
+        else:
+            return None
+    if middle is None or len(terminals) != 2:
+        return None
+
+    # Name each component (component atoms + its spiro atom(s)); require identity.
+    def _name_comp(comp_atoms: Set[int], spiros: List[int]):
+        atoms = set(comp_atoms) | set(spiros)
+        # name via the first spiro atom (numbering is component-intrinsic)
+        named = _name_spiro_component(mol, atoms, spiros[0])
+        if named is None:
+            return None
+        ext = _extract_subfragment(mol, atoms)
+        if ext is None:
+            return None
+        return named[0], named[1], ext
+
+    mid_named = _name_comp(middle[0], middle[1])
+    if mid_named is None:
+        return None
+    mid_name, mid_loc, mid_ext = mid_named
+
+    term_named = []
+    for comp, sa in terminals:
+        tn = _name_comp(comp, [sa])
+        if tn is None:
+            return None
+        term_named.append((tn, sa))
+
+    # All three components must be identical (isomorphic skeleton + same name).
+    canon_mid = Chem.MolToSmiles(mid_ext[0])
+    for (tn, _sa) in term_named:
+        if tn[0] != mid_name:
+            return None
+        if Chem.MolToSmiles(tn[2][0]) != canon_mid:
+            return None
+
+    # Spiro locants (canonical, symmetry-lowest) on each component.
+    mid_loc_1 = _canonical_spiro_locant(mid_ext, mid_loc, middle[1][0])
+    mid_loc_2 = _canonical_spiro_locant(mid_ext, mid_loc, middle[1][1])
+    if mid_loc_1 is None or mid_loc_2 is None:
+        return None
+    term_locs = []
+    for (tn, sa) in term_named:
+        tl = _canonical_spiro_locant(tn[2], tn[1], sa)
+        if tl is None:
+            return None
+        term_locs.append((tl, sa, tn))
+
+    # Middle spiro-atom locants: the one shared with the unprimed terminal is
+    # primed as the lower, the other primed as the higher; per P-24.4.2 pick the
+    # lowest spiro-atom locant set overall. Both terminals identical here, so
+    # order the middle's two primed locants ascending and pair each spiro atom.
+    # Map: spiro atom -> its middle-component locant.
+    mid_locant_of = {middle[1][0]: mid_loc_1, middle[1][1]: mid_loc_2}
+    # Choose which terminal is unprimed vs double-primed to minimise the full
+    # spiro-atom locant set (unprimed term loc, its middle primed loc,
+    # other middle primed loc, double-primed term loc).
+    best = None
+    for order in ([0, 1], [1, 0]):
+        (u_loc, u_sa, u_tn) = term_locs[order[0]]
+        (d_loc, d_sa, d_tn) = term_locs[order[1]]
+        u_mid = mid_locant_of[u_sa]
+        d_mid = mid_locant_of[d_sa]
+        locset = (u_loc, u_mid, d_mid, d_loc)
+        key = (min(u_loc, d_loc), u_loc, u_mid, d_mid, d_loc)
+        if best is None or key < best[0]:
+            best = (key, u_loc, u_mid, d_mid, d_loc, order)
+    _, u_loc, u_mid, d_mid, d_loc, _order = best
+
+    component_name = _strip_consumed_indicated_h(mid_name, u_loc)
+    # a,a':b',b''-dispiroter[component]
+    name = f"{u_loc},{u_mid}':{d_mid}',{d_loc}''-dispiroter[{component_name}]"
+
+    # Combined locants: unprimed terminal, primed middle, double-primed terminal.
+    (u_loc0, u_sa0, u_tn0) = term_locs[_order[0]]
+    (d_loc0, d_sa0, d_tn0) = term_locs[_order[1]]
+    combined: Dict[int, _Locant] = {}
+    for atom_idx, locant in u_tn0[1].items():
+        combined[atom_idx] = locant
+    for atom_idx, locant in mid_loc.items():
+        if atom_idx in combined:
+            continue
+        combined[atom_idx] = (locant, "'")
+    for atom_idx, locant in d_tn0[1].items():
+        if atom_idx in combined:
+            continue
+        combined[atom_idx] = (locant, "''")
+    if not (set(combined.keys()) >= all_ring_atoms):
+        return None  # coverage invariant (Pitfall 7)
+    return name, all_ring_atoms, combined
+
+
+def is_dispiroter(mol) -> bool:
+    """P-24.4.1: three identical polycyclic components sharing two spiro atoms."""
+    if mol is None:
+        return False
+    return _name_dispiroter_core(mol) is not None
+
+
+def name_dispiroter(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.4.1 ``dispiroter`` name. Fail-closed (see
+    ``_name_dispiroter_core``)."""
+    core = _name_dispiroter_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
 # ============================================================================
 # P-24.5 — spiro systems with at least one von Baeyer (bridged) ring component
 # (Phase 13B(c) — spiro-of-von-Baeyer). The existing spirobi / mixed-spiro-fused

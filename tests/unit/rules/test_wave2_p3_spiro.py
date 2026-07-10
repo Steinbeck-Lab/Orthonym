@@ -26,3 +26,11 @@ class TestP24BranchedPolyspiro:
     def test_dispiro_unchanged(self):
         # 2-spiro-atom path must NOT regress.
         assert name_compound("C1CC2(CC1)CC1(CC2)CCCC1") == "dispiro[4.1.4.2]tridecane"
+
+
+@pytest.mark.unit
+class TestP24Dispiroter:
+    def test_dispiroter_bicyclohexane(self):
+        # P-24.4.1: three identical bicyclo[3.1.0]hexane components, 2 spiro atoms.
+        assert name_compound("C12CC3(CC2C1)CC1C2(C1C3)C3CCCC32") == \
+            "3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]"
