@@ -52,3 +52,17 @@ class TestP25CyclicBridges:
         smi = "C12CCC1c1ccccc1-2"  # out-of-scope ring bridge
         name = name_compound(smi)
         assert name == "unknown organic compound" or "epicyclobuta" not in name
+
+
+@pytest.mark.unit
+class TestP25HeterocyclicBridgesFailClosed:
+    """P-25.4.2.1.5 — heterocyclic bridges. OPSIN 2.9 cannot parse any PIN in
+    this class ([2,3]furanobenzo[g]quinoline / epipyrroloacridine both fail),
+    so there is NO verifiable oracle. Orthonym MUST fail closed (never emit a
+    wrong name). Follow-up: build + verify when a parseable oracle exists."""
+
+    @pytest.mark.parametrize("smiles", [
+        "c1ccc2c(c1)C1C=COC1c1ccccc21",   # furano-type ring bridge across a fused core
+    ])
+    def test_heterocyclic_bridge_declines(self, smiles):
+        assert name_compound(smiles) == "unknown organic compound"
