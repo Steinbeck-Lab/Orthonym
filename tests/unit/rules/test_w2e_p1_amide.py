@@ -232,23 +232,30 @@ class TestT12GeminalDicarboximidamide:
         assert name_compound("NC(=O)C1(C(N)=O)CCCCC1") == \
             "cyclohexane-1,1-dicarboxamide"
 
-    @pytest.mark.xfail(reason=(
-        "AM-3 step (b) DEFERRED (plan P1AM Task 12): the substituted geminal "
-        "dicarboximidamide needs the per-group primed-N superscript locant "
-        "subsystem (N''1-ethyl / N1,N1-dimethyl with load-bearing priming "
-        "order). Not built — fails closed (unknown) which is correct behavior "
-        "(never a wrong name). Residual recorded in WAVE2-COMPLETION-DEFERRED.md."
-    ), strict=True)
     def test_geminal_dicarboximidamide_substituted(self):
+        # AM-3 step (b) BUILT (W2E-D4, P-66.4.1.4.2 / P-16.9.1): per-group
+        # primed-N superscript locant subsystem (N''1-ethyl / N1,N1-dimethyl
+        # with load-bearing priming + lowest-locant group assignment).
         assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
             "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
 
     def test_substituted_stays_fail_closed(self, _validity_gate_on):
-        # the deferred substituted form must fail CLOSED end-to-end (the
-        # assembler's N-subs-dropping 'cyclohexane-1,1-dicarboximidamide' is
-        # a DIFFERENT molecule; SELF-01 suppresses it -> never a wrong name).
+        # W2E-D4: now BUILT — the substituted geminal dicarboximidamide names
+        # correctly and round-trips (SELF-01 accepts it). Verifies the built
+        # class survives the end-to-end validity gate (not a wrong name).
         assert name_compound("CCNC(=N)C1(C(=N)N(C)C)CCCCC1") == \
-            "unknown organic compound"
+            "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
+
+    @pytest.mark.parametrize("smiles", [
+        # OUT-OF-CLASS forms must still fail closed (never a wrong name):
+        # mixed amide/imidamide (one C=O, one C=N) on the geminal carbon.
+        "NC(=O)C1(C(=N)N(C)C)CCCCC1",
+    ])
+    def test_out_of_class_fails_closed(self, _validity_gate_on, smiles):
+        # Mixed carboxamide+carboximidamide is not the built (di)imidamide
+        # class; must not emit the N-superscript dicarboximidamide name.
+        assert name_compound(smiles) != \
+            "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NC(=N)C1CCCCC1", "cyclohexanecarboximidamide"),  # mono form OK at HEAD

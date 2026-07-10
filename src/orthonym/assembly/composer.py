@@ -1006,6 +1006,25 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                 pool.add(_amidine_name, "amidine", features)
                 return pool.best().name
 
+    # W2E-D4 (P-66.4.1.4.2 / P-16.9.1): N-substituted GEMINAL ring
+    # dicarboximidamide -> per-group primed + superscript italic-N locants
+    # (N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide). Runs BEFORE
+    # dispatch_inner because the general_acyclic catch-all names the bare
+    # 'cyclohexane-1,1-dicarboximidamide' base and DROPS the N-substituents
+    # (a different molecule; SELF-01 then -> unknown). The assembler is
+    # fail-closed: it returns None for anything outside the two-geminal-amidine
+    # ring class (unsubstituted, mixed amide/imidamide, non-geminal, aryl,
+    # non-nameable N-sub, >2 groups), so this branch only upgrades unknown ->
+    # correct and NEVER emits a wrong name.
+    if (features.principal_group == 'amidine'
+            and getattr(features, 'is_cyclic', False)
+            and len(features.principal_group_atoms or []) == 2):
+        _gem_name = _assemble_geminal_dicarboximidamide_name(features, style)
+        if _gem_name:
+            pool = get_current_pool()
+            pool.add(_gem_name, "amidine", features)
+            return pool.best().name
+
     # Wave2 T3d (P-66.3): acyclic N/N'-substituted (thio)hydrazide, or a
     # hydrazinecarboxylic acid. Runs BEFORE dispatch_inner for the same reason
     # as the amidine branch (the general path mis-expresses the -NH-NH2 as a
@@ -4707,6 +4726,206 @@ def _assemble_amidine_name(features: Any, style: str):
         return None
 
     n_prefix = _build_amidine_n_prefix(n_subs)
+    if not n_prefix:
+        return None
+    return f"{n_prefix}{base_name}"
+
+
+def _assemble_geminal_dicarboximidamide_name(features: Any, style: str):
+    """W2E-D4 (P-66.4.1.4.2 / P-16.9.1): assemble an N-substituted GEMINAL
+    ring dicarboximidamide with per-group primed + superscript N-locants.
+
+    A geminal ring dicarboximidamide is a saturated (or unsaturated) ring
+    carbon bearing TWO amidine groups -C(=NH)-NH2, named
+    ``{ring}-{loc},{loc}-dicarboximidamide`` (P-66.4.1). When one or both of
+    the four amidine nitrogens carries a substituent, IUPAC cites the
+    substituent with an *italic-N* locant that pairs a **prime count**
+    (which of the two amidine groups it belongs to) with a **superscript
+    numeral** (the ring locant of the geminal carbon), per P-66.4.1.4.2 and
+    P-16.9.1. For two geminal groups both at ring locant ``L`` the four N
+    tokens are:
+
+        N{L}    (0 primes)  -> group-1 amino   (single-bonded  -NH-)
+        N'{L}   (1 prime)   -> group-1 imino    (double-bonded  =N-)
+        N''{L}  (2 primes)  -> group-2 amino
+        N'''{L} (3 primes)  -> group-2 imino
+
+    matching OPSIN's ``N1 / N'1 / N''1 / N'''1`` locant grammar (verified
+    2026-07-10). The ASCII rendering keeps the superscript numeral inline
+    (``N''1``), so ``CCNC(=N)C1(C(=N)N(C)C)CCCCC1`` ->
+    ``N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide``.
+
+    Group -> prime assignment follows the lowest-locant rule (P-14.3.2 /
+    P-31.1.4.3.4): the assignment whose sorted N-locant multiset is lowest at
+    the first point of difference wins (so the more-substituted group takes
+    the lower prime -> more low locants). Substituent CITATION order is
+    alphanumerical (P-14.5.2).
+
+    Fail-closed: returns ``None`` (caller falls through -> general path ->
+    SELF-01 keeps it honest, never a wrong name) unless ALL of these hold:
+      * principal group is 'amidine' with exactly TWO matches,
+      * both amidine carbons attach to the SAME single ring atom (geminal),
+      * the ring parent + '-dicarboximidamide' base assembles cleanly,
+      * every N-substituent is a nameable pure fragment,
+      * at least one nitrogen actually carries a substituent (the
+        unsubstituted case is already named by the general path).
+    """
+    from rdkit import Chem
+    from ..rules.benzene import _detect_amidine_n_substituents
+    from ..assembly.naming_utils import (
+        _wrap_n_substituent,
+        get_multiplier_prefix,
+    )
+
+    mol = features.mol
+    pg_atoms = features.principal_group_atoms
+    if features.principal_group != 'amidine' or not pg_atoms:
+        return None
+    if len(pg_atoms) != 2:
+        return None
+    if not getattr(features, 'is_cyclic', False):
+        return None
+
+    # Locate the two amidine carbons structurally (a pg_atoms tuple may be
+    # re-ordered by the classifier). Each must be a C with exactly one =N and
+    # one -NH- and no extra heteroatom bonds.
+    amidine_carbons = []
+    for grp in pg_atoms:
+        c_idx = None
+        for idx in grp:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            dbl = sgl = 0
+            for nbr in atom.GetNeighbors():
+                if nbr.GetSymbol() != 'N':
+                    continue
+                b = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+                if b.GetBondType() == Chem.BondType.DOUBLE:
+                    dbl += 1
+                elif b.GetBondType() == Chem.BondType.SINGLE:
+                    sgl += 1
+            if dbl == 1 and sgl == 1:
+                c_idx = idx
+                break
+        if c_idx is None:
+            return None
+        amidine_carbons.append(c_idx)
+    if len(set(amidine_carbons)) != 2:
+        return None
+
+    # Geminal check: both amidine carbons must attach to ONE common ring atom.
+    ring_info = mol.GetRingInfo()
+    common = None
+    for a in mol.GetAtomWithIdx(amidine_carbons[0]).GetNeighbors():
+        if a.GetIdx() in [n.GetIdx() for n in
+                          mol.GetAtomWithIdx(amidine_carbons[1]).GetNeighbors()]:
+            common = a.GetIdx()
+            break
+    if common is None or ring_info.NumAtomRings(common) == 0:
+        return None
+    # The amidine carbons themselves must be acyclic (ring-attached, not in-ring)
+    # and must not carry any heavy neighbour besides the ring atom + their two N.
+    ring_atom_set = set()
+    for ring in ring_info.AtomRings():
+        if common in ring:
+            ring_atom_set.update(ring)
+    for c_idx in amidine_carbons:
+        if ring_info.NumAtomRings(c_idx) != 0:
+            return None
+        heavy = [nb.GetIdx() for nb in mol.GetAtomWithIdx(c_idx).GetNeighbors()]
+        n_heavy = [i for i in heavy
+                   if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        non_n = [i for i in heavy if i not in n_heavy]
+        if len(n_heavy) != 2 or non_n != [common]:
+            return None
+
+    # Perceive N-substituents per amidine group. parent_atoms excludes the ring
+    # + both amidine carbons so the detector walks only true N-substituents.
+    base_parent = set(ring_atom_set) | set(amidine_carbons)
+    groups_subs = []   # list per amidine carbon of [(local_nlocant, name), ...]
+    any_sub = False
+    for c_idx in amidine_carbons:
+        subs = _detect_amidine_n_substituents(mol, c_idx, base_parent)
+        if subs is None:
+            return None
+        if subs:
+            any_sub = True
+        groups_subs.append(subs)
+    if not any_sub:
+        return None  # unsubstituted -> general path already correct
+
+    # Build the bare dicarboximidamide base via the general fragment pipeline
+    # (same path the unsubstituted case uses); it embeds the ring locants.
+    parent = _generate_ring_parent(features)
+    suffix = _generate_suffix(features)
+    if parent is None or suffix is None or not parent.text:
+        return None
+    base_name = _assemble_fragments([parent, suffix], style)
+    if not base_name or 'dicarboximidamide' not in base_name:
+        return None
+
+    # The geminal carbon's ring locant (all suffix instances share it here).
+    suffix_locants = [loc for loc in (suffix.locants or ()) if loc]
+    if not suffix_locants:
+        return None
+    ring_loc = suffix_locants[0]
+    # Guard: this builder only handles the truly geminal case where BOTH
+    # carboximidamide suffixes sit on the same ring locant.
+    if any(loc != ring_loc for loc in suffix_locants):
+        return None
+
+    # Build, for each group->index permutation, the composite N-locant tokens
+    # and pick the assignment with the lowest sorted locant multiset (lowest
+    # locants rule, P-14.3.2). Prime count = 2*group_index (amino) or
+    # 2*group_index + 1 (imino); the local nlocant 'N' -> amino, "N'" -> imino.
+    import itertools
+
+    def _tokens_for(assignment):
+        """assignment: tuple mapping amidine-carbon position -> group index.
+        Returns list of (prime_count, token, sub_name)."""
+        out = []
+        for carbon_pos, grp_index in enumerate(assignment):
+            for local_nloc, sub_name in groups_subs[carbon_pos]:
+                base_primes = 2 * grp_index + (1 if local_nloc == "N'" else 0)
+                token = "N" + ("'" * base_primes) + str(ring_loc)
+                out.append((base_primes, token, sub_name))
+        return out
+
+    best_tokens = None
+    best_key = None
+    for assignment in itertools.permutations(range(len(amidine_carbons))):
+        toks = _tokens_for(assignment)
+        # locant multiset sorted by (prime_count) at first point of difference
+        key = tuple(sorted(t[0] for t in toks))
+        if best_key is None or key < best_key:
+            best_key = key
+            best_tokens = toks
+
+    if not best_tokens:
+        return None
+
+    # Render: collapse identical substituent names sharing a multiplier
+    # (N1,N1-dimethyl); cite distinct substituents alphanumerically (P-14.5.2).
+    from collections import defaultdict
+    by_name = defaultdict(list)
+    for prime_count, token, sub_name in best_tokens:
+        by_name[sub_name].append((prime_count, token))
+
+    segments = []  # (alpha_key, rendered)
+    for sub_name, toks in by_name.items():
+        toks_sorted = sorted(toks, key=lambda t: t[0])
+        loc_str = ",".join(tok for _p, tok in toks_sorted)
+        count = len(toks_sorted)
+        if count > 1:
+            mp = get_multiplier_prefix(count, sub_name)
+            rendered = f"{loc_str}-{mp}{_wrap_n_substituent(sub_name)}"
+        else:
+            rendered = f"{loc_str}-{_wrap_n_substituent(sub_name)}"
+        segments.append((alpha_sort_key(sub_name), rendered))
+
+    segments.sort(key=lambda s: s[0])
+    n_prefix = "-".join(rendered for _k, rendered in segments)
     if not n_prefix:
         return None
     return f"{n_prefix}{base_name}"
