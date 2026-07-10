@@ -205,3 +205,21 @@ class TestP25MultiParentFallbacks:
         from orthonym.rules.bridged_fused import name_bridged_fused_pin
         m = Chem.MolFromSmiles("C1=C2C=CC3=CC4=CC=5C=CC=CC5C=C4C1=C23")
         assert name_bridged_fused_pin(m) is None  # not a bridge -> delegate
+
+
+@pytest.mark.unit
+class TestP51MultiCarbonBridgeMultiplicative:
+    """P-51.3.2.1 — multi-carbon bridges in multiplicative parent enumeration.
+    The bridged constructor names the genuine bridged case (9,10-ethanoanthracene)
+    and must NOT hijack a structure whose PIN is a multiplicative parent
+    enumeration (that is the multiplicative engine's job)."""
+
+    def test_ethanoanthracene_locked(self):
+        # OPSIN-RT-verified multi-carbon bridge PIN
+        assert name_compound("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)CC3") == "9,10-ethanoanthracene"
+
+    def test_multiplicative_parent_not_hijacked(self):
+        # a biphenyl-type identical-parent structure must NOT become a bridged name
+        from orthonym.rules.bridged_fused import name_bridged_fused_pin
+        m = Chem.MolFromSmiles("c1ccc(-c2ccccc2)cc1")  # biphenyl = 1,1'-biphenyl, not bridged
+        assert name_bridged_fused_pin(m) is None

@@ -784,6 +784,12 @@ def name_bridged_fused_pin(mol):
     ri = mol.GetRingInfo()
     rings = [set(r) for r in ri.AtomRings()]
     # Need fused parent (>=2 rings) + at least one extra ring created by a bridge.
+    # P-51.3.2.1: a multiplicative-parent-enumeration structure (e.g. biphenyl =
+    # two rings joined by a single bond) is owned by multiplicative.py, NOT this
+    # constructor; the <3-ring guard here (plus the clean-partition / bare-ring
+    # guards below) declines it so a bridged name never hijacks a multiplicative
+    # PIN. The genuine multi-carbon bridge (9,10-ethanoanthracene) is a real
+    # 3-ring bridged-fused system and is named by the mancude path.
     if len(rings) < 3:
         return None
     all_ring_atoms: Set[int] = set().union(*rings)
