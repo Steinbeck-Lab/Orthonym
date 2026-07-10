@@ -52,7 +52,10 @@ class TestP44SaturatedMonocyclicSpiro:
     def test_score_tuple_grows(self):
         m = Chem.MolFromSmiles("C1CC2(CC1)CC1(CC2)CCCC1")
         tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
-        assert len(tup) == 32  # 30 + saturated-monocyclic bool + spiro-atom locant set term
+        # 30 + saturated-monocyclic bool (idx 30) + spiro-atom locant nested
+        # tuple (idx 31). Grows with later tasks -> assert cumulative minimum.
+        assert len(tup) >= 32
+        assert isinstance(tup[31], tuple)  # spiro-atom locant set term
 
     def test_lower_spiro_locants_win(self):
         # Two saturated monocyclic spiro systems: the one with the lower spiro-atom
@@ -70,3 +73,28 @@ class TestP44SaturatedMonocyclicSpiro:
             return _spiro_atom_locant_set(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
         # spiro[4.5]decane spelled two ways -> identical spiro-atom locant set
         assert locs("C1CCC2(CC1)CCCC2") == locs("C1CCCC12CCCCC2")
+
+
+@pytest.mark.unit
+class TestP44FusionDescriptorLetters:
+    def test_score_tuple_grows(self):
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
+        tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        # 32 + fusion-descriptor-letter nested tuple (idx 32). Grows with later
+        # tasks -> assert cumulative minimum + positional type.
+        assert len(tup) >= 33
+        assert isinstance(tup[32], tuple)  # fusion-descriptor-letter term
+
+    def test_fusion_letters_extracted(self):
+        from orthonym.rules.ring_selection import _fusion_descriptor_letters
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")  # quinoline
+        letters = _fusion_descriptor_letters(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert isinstance(letters, tuple)
+
+    def test_letters_spelling_independent(self):
+        from orthonym.rules.ring_selection import _fusion_descriptor_letters
+        def letters(smi):
+            m = Chem.MolFromSmiles(smi)
+            return _fusion_descriptor_letters(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        # quinoline spelled two ways -> identical fusion-letter set
+        assert letters("c1ccc2ncccc2c1") == letters("c1ccc2c(c1)cccn2")

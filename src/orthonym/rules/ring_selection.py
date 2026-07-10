@@ -377,6 +377,58 @@ def _spiro_atom_locant_set(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, 
     return tuple(out)
 
 
+import re as _re
+
+# Fixed width for the fusion-descriptor letter / number terms. Padded with a
+# high sentinel so a system WITH (lower) descriptor letters/numbers wins the tie
+# and tuples stay length-comparable.
+_FUSION_LETTER_WIDTH = 8
+_FUSION_LETTER_SENTINEL = 999
+_FUSION_NUMBER_WIDTH = 8
+_FUSION_NUMBER_SENTINEL = 10 ** 6
+
+
+def _fused_system_name(mol: Chem.Mol, system_atoms: Set[int]) -> Optional[str]:
+    """Deterministically produce the fused-ring name of ``system_atoms`` (the
+    sub-system) so its von-Baeyer-style fusion descriptor can be parsed. Returns
+    None when the system is not a nameable fused ring system. Depends only on the
+    atom set (the underlying namers are spelling-independent by design)."""
+    ri = mol.GetRingInfo()
+    rings_in = [set(r) for r in ri.AtomRings() if set(r) <= set(system_atoms)]
+    if len(rings_in) < 2:
+        return None  # monocyclic / non-fused -> no fusion descriptor
+    try:
+        from .spiro import _name_fused_component
+        rings = [list(r) for r in rings_in]
+        named = _name_fused_component(mol, rings)
+    except Exception:
+        return None
+    if named is None:
+        return None
+    return named[0]
+
+
+def _fusion_descriptor_letters(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
+    """P-44.2.2.2.3.3 criterion (c): the fused system's italic fusion-descriptor
+    LETTERS, compared as a set (lower letters = senior). Returns a fixed-width
+    tuple of letter ordinals (a>=1), padded with a sentinel. ``()``-equivalent
+    (all sentinel) when the system has no explicit fusion descriptor (retained
+    names like quinoline/isoquinoline, or non-fused). Spelling-independent."""
+    pad = (_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH
+    name = _fused_system_name(mol, system_atoms)
+    if not name:
+        return pad
+    # fusion descriptors carry italic letters inside the bracket, e.g. furo[3,2-b]
+    letters = sorted(
+        ord(m.group(1)) - ord('a') + 1
+        for m in _re.finditer(r"-([a-z])\]", name)
+    )
+    if not letters:
+        return pad
+    out = (letters + list(pad))[:_FUSION_LETTER_WIDTH]
+    return tuple(out)
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -408,7 +460,8 @@ def ring_system_score(
     - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
     - [29] -spiro_fusions: P-44.2.2.2.1.1 more spiro fusions = senior (negated)
     - [30] -sat_monocyclic_spiro: P-44.2.2.2.1.2(b) all-sat-monocyclic (negated)
-    - [31..38] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (fixed width 8)
+    - [31] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (nested tuple)
+    - [32] fusion-descriptor letters: P-44.2.2.2.3.3 lower letters (nested tuple)
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
@@ -430,6 +483,7 @@ def ring_system_score(
             (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER)
             + (999, 0, 0, 0, 0)
             + ((_SPIRO_LOCANT_SENTINEL,) * _SPIRO_LOCANT_WIDTH,)
+            + ((_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH,)
         )
 
     # 1. Type rank
@@ -514,6 +568,7 @@ def ring_system_score(
         -spiro_fusions,                     # P-44.2.2.2.1.1: more spiro fusions
         -int(sat_mono),                     # P-44.2.2.2.1.2(b): sat-monocyclic-spiro
         spiro_locants,                      # P-44.2.2.2.1.2: lower spiro-atom locants
+        _fusion_descriptor_letters(mol, system_atoms),  # P-44.2.2.2.3.3: fusion letters
     )
 
 
