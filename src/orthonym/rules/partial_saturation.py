@@ -458,6 +458,7 @@ def _match_mancude_parent_numbering(
     ring_double_bonds: List[Tuple[int, int]],
     candidate_parents: List[str],
     substituent_ring_atoms: Optional[Set[int]] = None,
+    pcg_ring_atoms: Optional[Set[int]] = None,
 ) -> Optional[Tuple[str, Dict[int, Any]]]:
     """Number a (partly) saturated fused carbocycle by its mancude parent.
 
@@ -465,8 +466,10 @@ def _match_mancude_parent_numbering(
     the stored aromatic parent skeleton onto ``mol`` and read off the parent's
     fixed ``iupac_numbering`` (incl. the lettered fusion locants 4a/8a/...).
     Among ALL matching numberings (across all candidates) pick the one giving
-    the LOWEST locant set to the hydro positions (the sp3 ring atoms), then to
-    the residual ring double bonds — IUPAC 2013 P-31.1.4.3.4.
+    the LOWEST locant set FIRST to the principal-characteristic-group ring atoms
+    (``pcg_ring_atoms``, P-59.2.3.2 — the suffix outranks hydro), then to the
+    hydro positions (the sp3 ring atoms), then to the residual ring double bonds
+    — IUPAC 2013 P-31.1.4.3.4.
 
     Returns ``(parent_name, {atom_idx: locant})`` for the winning numbering, or
     ``None`` if no candidate's skeleton matches the ring system exactly (fail
@@ -521,9 +524,18 @@ def _match_mancude_parent_numbering(
                 min(_locant_key(atom_to_locant[i]), _locant_key(atom_to_locant[j]))
                 for i, j in ring_double_bonds
             )
-            # P-14.4 / P-15.1.5.3: after hydro + ene, the detachable substituents
-            # take the lowest locants (breaks ties among equivalent numberings,
-            # e.g. 5-methyl- vs 8-methyl-tetrahydronaphthalene).
+            # P-59.2.3.2: a ring principal-characteristic-group suffix takes the
+            # lowest locant FIRST — before hydro and before detachable prefixes.
+            if pcg_ring_atoms:
+                pcg_locs = sorted(
+                    _locant_key(atom_to_locant[a]) for a in pcg_ring_atoms
+                    if a in atom_to_locant
+                )
+            else:
+                pcg_locs = []
+            # P-14.4 / P-15.1.5.3: after PCG + hydro + ene, the detachable
+            # substituents take the lowest locants (breaks ties among equivalent
+            # numberings, e.g. 5-methyl- vs 8-methyl-tetrahydronaphthalene).
             if substituent_ring_atoms:
                 sub_locs = sorted(
                     _locant_key(atom_to_locant[a]) for a in substituent_ring_atoms
@@ -531,12 +543,34 @@ def _match_mancude_parent_numbering(
                 )
             else:
                 sub_locs = []
-            key = (hydro_locs, ene_locs, sub_locs)
+            key = (pcg_locs, hydro_locs, ene_locs, sub_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best = (parent, atom_to_locant)
 
     return best
+
+
+# P-65.1.1.1: a ring carbon bearing an exocyclic -C(=O)OH is a ring
+# 'carboxylic acid' PCG. Named as the '-carboxylic acid' suffix on a
+# partially-saturated named-carbocycle parent; the acid carbon is exocyclic
+# (not a ring atom), so it never enters the ring numbering — the ring carbon it
+# hangs off is the locant-bearing atom.
+_RING_COOH_SMARTS = Chem.MolFromSmarts('[#6;R][CX3](=O)[OX2H1]')
+
+
+def _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms: Set[int]) -> Set[int]:
+    """Ring atoms bearing a ring-attached carboxylic-acid PCG ('-carboxylic
+    acid' suffix). Empty set when none. Only ring carbons in the fused system
+    count; the exocyclic acid carbon/oxygens are not ring atoms."""
+    out: Set[int] = set()
+    if _RING_COOH_SMARTS is None:
+        return out
+    for match in mol.GetSubstructMatches(_RING_COOH_SMARTS):
+        ring_c = match[0]
+        if ring_c in fused_ring_atoms:
+            out.add(ring_c)
+    return out
 
 
 def detect_carbocyclic_partial_saturation(
@@ -682,9 +716,16 @@ def detect_carbocyclic_partial_saturation(
         if any(n.GetIdx() not in fused_ring_atoms
                for n in mol.GetAtomWithIdx(idx).GetNeighbors())
     }
+    # P-59.2.3.2: ring atoms bearing a principal-characteristic-group suffix
+    # (here a ring-attached carboxylic acid -> '-carboxylic acid') must be
+    # numbered LOWEST, before the hydro set. Detected here so the numbering
+    # primitive can prioritise them; the assembly reads them back off the
+    # locant map. Scoped to the ring-carboxylic-acid PCG.
+    pcg_ring_atoms = _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms)
     matched = _match_mancude_parent_numbering(
         mol, fused_ring_atoms, sp3_set, ring_double_bonds, candidates,
         substituent_ring_atoms=substituent_ring_atoms,
+        pcg_ring_atoms=pcg_ring_atoms,
     )
     if matched is None:
         return None

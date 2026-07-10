@@ -1457,6 +1457,42 @@ def _assemble_partially_saturated_carbocycle_name(
         locants = get_saturation_locants(mol, saturated_indices, atom_to_locant)
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
+    # P-59.2.3.2: a ring principal-characteristic-group suffix (here a
+    # ring-attached carboxylic acid -> '-carboxylic acid') at its lowest locant.
+    # The acid carbon/oxygens are exocyclic, so they must be EXCLUDED from the
+    # detachable-prefix discovery below (otherwise the acid is mis-flagged an
+    # un-nameable prefix and the whole candidate declines). Scoped to the
+    # ring-COOH PCG + named-carbocycle-table parents; fail-closed otherwise.
+    from .partial_saturation import _partial_sat_pcg_ring_atoms
+    ring_set = set(atom_to_locant)
+    pcg_ring_atoms = _partial_sat_pcg_ring_atoms(mol, ring_set)
+    pcg_suffix = ""
+    pcg_exclude: Set[int] = set()
+    if pcg_ring_atoms:
+        # Collect the exocyclic acid atoms (C, =O, -OH) hanging off each PCG ring
+        # carbon so they are not treated as detachable prefixes.
+        pcg_locants: List[Any] = []
+        for rc in sorted(pcg_ring_atoms):
+            loc = atom_to_locant.get(rc)
+            if loc is None:
+                return None
+            pcg_locants.append(loc)
+            for n in mol.GetAtomWithIdx(rc).GetNeighbors():
+                if n.GetIdx() in ring_set:
+                    continue
+                if n.GetSymbol() == 'C':
+                    # the carboxyl carbon + its two oxygens
+                    pcg_exclude.add(n.GetIdx())
+                    for nn in n.GetNeighbors():
+                        if nn.GetIdx() != rc and nn.GetSymbol() == 'O':
+                            pcg_exclude.add(nn.GetIdx())
+        pcg_locants.sort(key=lambda x: (isinstance(x, str), x))
+        _mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(pcg_locants))
+        if _mult is None:
+            return None  # too many acid groups for this scoped path
+        _loc_str = ",".join(str(l) for l in pcg_locants)
+        pcg_suffix = f"-{_loc_str}-{_mult}carboxylic acid"
+
     # P-15.1.5.3: detachable substituent prefixes on the AROMATIC (non-hydro)
     # ring of a partially-saturated fused carbocycle, cited (alphanumerically)
     # BEFORE the nondetachable 'hydro' prefix. The composer's normal decoration
@@ -1467,13 +1503,19 @@ def _assemble_partially_saturated_carbocycle_name(
     # name that SELF-01 suppresses). Fail-closed only when an aromatic-ring
     # substituent that WOULD be dropped cannot be named.
     sat_set = set(saturation_info['saturated_indices'])
-    sub_prefix = _partial_sat_substituent_prefix(mol, atom_to_locant, sat_set)
-    if sub_prefix is None and _has_offring_substituent(
-            mol, atom_to_locant, set(atom_to_locant) - sat_set):
+    sub_prefix = _partial_sat_substituent_prefix(
+        mol, atom_to_locant, sat_set, exclude_atoms=pcg_exclude
+    )
+    # An aromatic-ring off-ring substituent (other than the excluded PCG) that
+    # could not be named -> decline (never drop it).
+    _remaining = _offring_substituent_atoms(
+        mol, atom_to_locant, set(atom_to_locant) - sat_set
+    ) - pcg_exclude
+    if sub_prefix is None and _remaining:
         return None  # aromatic-ring substituent present but not nameable
 
     # Assemble final name
-    name = f"{sub_prefix or ''}{formatted_prefix}{parent_name}"
+    name = f"{sub_prefix or ''}{formatted_prefix}{parent_name}{pcg_suffix}"
     return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 
@@ -1491,16 +1533,38 @@ def _has_offring_substituent(
     return False
 
 
+def _offring_substituent_atoms(
+    mol, atom_to_locant: Dict[int, Any], only_atoms: Optional[Set[int]] = None
+) -> Set[int]:
+    """The off-ring heavy neighbour atoms of ring atoms (restricted to
+    ``only_atoms`` when given). Used to detect substituents that WOULD be
+    dropped."""
+    ring_set = set(atom_to_locant)
+    scope = (ring_set & only_atoms) if only_atoms is not None else ring_set
+    out: Set[int] = set()
+    for idx in scope:
+        for n in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if n.GetIdx() not in ring_set:
+                out.add(n.GetIdx())
+    return out
+
+
 def _partial_sat_substituent_prefix(
-    mol, atom_to_locant: Dict[int, Any], sat_set: Set[int]
+    mol, atom_to_locant: Dict[int, Any], sat_set: Set[int],
+    exclude_atoms: Optional[Set[int]] = None,
 ) -> Optional[str]:
     """Build the alphanumerically-sorted detachable-substituent prefix string
     (with trailing hyphen) for substituents on the AROMATIC (non-sp3) ring of a
     partially-saturated fused carbocycle, or None if there are none / any cannot
-    be named (fail-closed). P-15.1.5.3 / P-14.5.2."""
+    be named (fail-closed). P-15.1.5.3 / P-14.5.2.
+
+    ``exclude_atoms`` are off-ring atoms already accounted for elsewhere (e.g.
+    the exocyclic atoms of a ring principal-characteristic-group suffix) and are
+    skipped so they are not mis-named as prefixes."""
     from ..assembly.substituent_naming import name_substituent_fragment
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
 
+    exclude = exclude_atoms or set()
     ring_set = set(atom_to_locant)
     from collections import defaultdict
     grouped: Dict[str, List[Any]] = defaultdict(list)
@@ -1510,11 +1574,18 @@ def _partial_sat_substituent_prefix(
             continue  # sp3-ring substituents are the composer path's job
         ring_atom = mol.GetAtomWithIdx(idx)
         for n in ring_atom.GetNeighbors():
-            if n.GetIdx() in ring_set:
+            if n.GetIdx() in ring_set or n.GetIdx() in exclude:
                 continue
             found_any = True
+            # A bare halogen (single-atom substituent) — name_substituent_fragment
+            # mis-names it ('hydrobromic acidyl'), so map it directly to its
+            # detachable prefix (P-31.1.2.1).
+            _HALO = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+            if n.GetSymbol() in _HALO and n.GetDegree() == 1:
+                grouped[_HALO[n.GetSymbol()]].append(atom_to_locant[idx])
+                continue
             sub_atoms: List[int] = []
-            seen = set(ring_set)
+            seen = set(ring_set) | exclude
             stack = [n.GetIdx()]
             while stack:
                 cur = stack.pop()
