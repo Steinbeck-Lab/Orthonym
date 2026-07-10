@@ -71,3 +71,46 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         return None
     # Task 3 completes this. Stub fails closed.
     return None
+
+
+# ---------------------------------------------------------------------------
+# P-82.2.1 — isotopic descriptor formatting
+# ---------------------------------------------------------------------------
+
+
+def nuclide_symbol(mass: int, element: str) -> str:
+    """Nuclide symbol with the mass number as a leading integer (ASCII form).
+
+    Orthonym emits ASCII (no <sup>); OPSIN accepts the leading-digit form
+    (probe: (2-14C)ethan-1-ol -> C([14CH3])O). P-82.2.1.
+    """
+    return f"{mass}{element}"
+
+
+def format_isotope_descriptor(groups) -> str:
+    """Build the parenthesized isotopic descriptor from grouped labels.
+
+    ``groups`` = list of (locant, mass, element, count):
+      locant None  -> no leading locant (single-position parent / front
+                      descriptor, e.g. (2H3)methoxybenzene, (12C1)methane).
+      locant int   -> the count locants are repeated then hyphen-joined to the
+                      nuclide, e.g. (2,2,2-2H3), (2-14C1).
+    Multiple groups at (possibly) the same place are cited alphabetically by
+    element then by mass number (P-82.2.1 / P-82.3); groups are comma-joined.
+    The count subscript is ALWAYS emitted (P-82.2.1 line 43720 + tritium
+    parseability, Task 4).
+    """
+    def _one(locant, mass, element, count):
+        sym = nuclide_symbol(mass, element)
+        if locant is None:
+            return f"{sym}{count}"
+        # BB: the locant is repeated once per substituted atom at that position
+        # for a grouped multi-count token (2,2,2-2H3); for count 1 a single
+        # locant + hyphen (2-14C1).
+        loc_part = ",".join(str(locant) for _ in range(count))
+        return f"{loc_part}-{sym}{count}"
+
+    # P-82.2.1: alphabetical by element symbol, then by mass number, then locant.
+    ordered = sorted(groups, key=lambda g: (g[2], g[1], g[0] if g[0] is not None else -1))
+    inner = ",".join(_one(*g) for g in ordered)
+    return f"({inner})"

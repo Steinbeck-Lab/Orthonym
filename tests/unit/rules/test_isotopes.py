@@ -52,3 +52,54 @@ class TestStripIsotopes:
         stripped, label_map = strip_isotopes(mol)
         assert sorted(label_map.values()) == [2, 2, 2]
         assert Chem.MolToSmiles(stripped) == Chem.MolToSmiles(Chem.MolFromSmiles("CCO"))
+
+
+from orthonym.rules.isotopes import (
+    nuclide_symbol,
+    format_isotope_descriptor,
+)
+
+
+class TestNuclideSymbol:
+    @pytest.mark.parametrize("mass,element,out", [
+        (14, "C", "14C"),
+        (2, "H", "2H"),
+        (3, "H", "3H"),
+        (13, "C", "13C"),
+        (18, "O", "18O"),
+        (12, "C", "12C"),
+        (81, "Br", "81Br"),
+    ])
+    def test_symbol(self, mass, element, out):
+        assert nuclide_symbol(mass, element) == out
+
+
+class TestFormatIsotopeDescriptor:
+    def test_trideuterio_with_locant(self):
+        # (2,2,2-2H3)  three 2H at locant 2 -> single grouped token, count 3
+        # BB P-84 (BlueBookV2.md:44506): (2,2,2-2H3)ethan-1-ol
+        groups = [(2, 2, "H", 3)]
+        assert format_isotope_descriptor(groups) == "(2,2,2-2H3)"
+
+    def test_single_14c_with_locant(self):
+        # BB:43740 (2-13C); here (2-14C)
+        assert format_isotope_descriptor([(2, 14, "C", 1)]) == "(2-14C1)"
+
+    def test_deuterio_no_locant_single_position_ring_substituent(self):
+        # BB:43730 (2H3)methoxybenzene — descriptor at front, count 3, no locant
+        assert format_isotope_descriptor([(None, 2, "H", 3)]) == "(2H3)"
+
+    def test_12c_methane_no_locant(self):
+        # BB:43724 trichloro(12C)methane — single position; Orthonym emits the
+        # count-subscript form (12C1) which OPSIN also parses.
+        assert format_isotope_descriptor([(None, 12, "C", 1)]) == "(12C1)"
+
+    def test_deuterio_methane_count_one(self):
+        # BB:43726 (2H1)methane — count subscript kept even for count 1
+        assert format_isotope_descriptor([(None, 2, "H", 1)]) == "(2H1)"
+
+    def test_two_nuclides_same_place_alphabetical_then_mass(self):
+        # P-82.2.1: cited alphabetically by element, then by mass number.
+        # elements alphabetical C < H, so 13C first.
+        groups = [(1, 2, "H", 1), (1, 13, "C", 1)]
+        assert format_isotope_descriptor(groups) == "(1-13C1,1-2H1)"
