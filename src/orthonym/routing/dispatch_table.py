@@ -128,6 +128,7 @@ class StoutClass(_StrEnumBase):
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG (P-63.4.1 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
+    THIOIMIDE = "thioimide"                          # W2E-D3 (P-66.1.4.2 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
@@ -1273,6 +1274,24 @@ def _handle_ketene(mol, smiles, canonical_smiles, features=None, **kwargs) -> Op
     return name_ketene(mol)
 
 
+def _is_thioimide(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """W2E-D3 (P-66.1.4.2); priority 49.7. The exact acyclic N-H thioimide
+    R-C(=S)-NH-C(=S)-R' with plain alkanethioyl branches. The decomposition
+    engine never reaches this class (its amide-bond SMARTS requires C(=O)), so
+    this dedicated graph classifier fills the gap. PURE graph classifier,
+    fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.thioimides import name_thioimide
+    return name_thioimide(mol) is not None
+
+
+def _handle_thioimide(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the N-(alkanethioyl)alkanethioamide PIN (P-66.1.4.2), else None."""
+    from orthonym.rules.thioimides import name_thioimide
+    return name_thioimide(mol)
+
+
 def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Wave-2 completion (P-21.2.3/P-52.1.3); priority 47.5. An alternating
     homonuclear Group-14/bridge catenated hydride (disiloxane/trisiloxane/
@@ -1488,6 +1507,20 @@ _register_dispatch(
     iupac_section="Blue Book P-63.4.1",
     description="-OOH suffix on a partially saturated fused carbocycle "
                 "(1,2,3,4-tetrahydronaphthalene-1-peroxol); fail-closed",
+)
+# --- W2E-D3: THIOIMIDE at priority 49.7 (after HYDRO_FUSED_PEROXOL@49.6,
+# before ORGM@50). The acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' (BB verbatim
+# P-66.1.4.2: CH3-CS-NH-CS-CH3 -> N-(ethanethioyl)ethanethioamide). The
+# O-imide analogue is named by the decomposition engine, which never reaches
+# the thio case because its amide-bond SMARTS requires C(=O); this dedicated
+# graph classifier + namer fills exactly that gap. Fail-closed; cascade-
+# continuation on None (N-substituted / branched / aryl / mixed-O forms). ---
+_register_dispatch(
+    class_id=StoutClass.THIOIMIDE, priority=49.7, tier=1,
+    predicate=_is_thioimide, handler=_handle_thioimide,
+    iupac_section="Blue Book P-66.1.4.2",
+    description="Acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' on the "
+                "N-(alkanethioyl)alkanethioamide PIN; fail-closed",
 )
 
 

@@ -1,22 +1,22 @@
 """P-66.1.4.2 (BB 33172): "CH3-CS-NH-CS-CH3
 N-(ethanethioyl)ethanethioamide (PIN)" — BB verbatim example.
 
-UNDER-SCOPE (W2E-P1FG Task 8, standing rule 7): reproduce-first at the CODE
-level exposed that this requires a *dedicated thioimide subsystem*, not the
-localized "add =S to the acyl branch" the plan assumed:
-  1. Perception classifies CC(=S)NC(C)=S as TWO 'thioamide' FGs, while the
-     O-analog CCC(=O)NC=O is a single 'imide' FG — there is no thioimide FG
-     nor a thioamide->thioimide collision-resolution row.
-  2. The O-imide's 'N-propanoylformamide' name comes from an imide-specific
-     path; even get_n_substituents / name_substituent name the O-acyl branch
-     '3-oxopropyl', NOT 'propanoyl' — the reusable acyl-substituent-prefix
-     producer the plan assumed does not exist.
-  3. No 'ethanethioyl' (alkanethioyl acyl-substituent) name producer exists;
-     thioamide's prefix today is the whole-group 'carbamothioyl'.
-Building all three is the "dedicated subsystem" class deferred here. The
-molecule already fails CLOSED (returns 'unknown organic compound', never a
-wrong name) — pinned below. Follow-up: add a thioimide FG + collision row +
-N-thioacyl-substituent naming, then flip test_target to a positive assert.
+BUILT (W2E-D3): a dedicated fail-closed thioimide subsystem
+(``rules/thioimides.py``, dispatch THIOIMIDE@49.7). Reproduce-first at the
+CODE level showed the original W2E-P1FG spec named the wrong subsystem: the
+O-imide analogue ``CCC(=O)NC=O -> N-propanoylformamide`` is produced by the
+DECOMPOSITION engine (it cleaves the C(=O)-N amide bond and reassembles),
+NOT by the amide handler / a substituent producer. The decomposition engine
+never reaches the thio case because its amide-bond SMARTS ``[CX3](=O)[NX3]``
+requires C(=O); the C(=S)-N bond is classified as a secondary amine and the
+molecule falls through to GENERAL and fails closed ('unknown organic
+compound'). Rather than make the whole decomposition/amide/perception stack
+chalcogen-aware (broad ripple), a dedicated graph classifier recognises
+exactly the acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' with plain
+alkanethioyl branches, names parent = shorter chain's alkanethioamide +
+N-(longer chain)alkanethioyl (mirroring the O-imide decomposition
+convention), and returns None for everything else (N-substituted / branched
+/ aryl / unsaturated / mixed-O forms) so the cascade continues.
 """
 import pytest
 from orthonym.namer import name_compound
@@ -24,23 +24,25 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestThioacylThioamide:
-    @pytest.mark.xfail(reason="W2E-P1FG Task 8 under-scope: thioimide "
-                              "perception + N-thioacyl naming subsystem not "
-                              "built; fails closed today (see module docstring).",
-                       strict=True)
     def test_n_ethanethioyl_ethanethioamide(self):
         assert name_compound("CC(=S)NC(C)=S", style="pin") \
             == "N-(ethanethioyl)ethanethioamide"
 
-    def test_thioacyl_thioamide_never_wrong_positive(self):
-        # Under-scope fail-closed contract: we must NEVER emit the wrong
-        # target as if it were built. At production runtime the SELF-01 OPSIN
-        # backstop suppresses the structure-dropping bare-parent candidate to
-        # 'unknown organic compound' (verified via ); the
-        # unit harness disables OPSIN so the raw un-round-tripped 'ethanethioamide'
-        # surfaces here. Either way, the one thing that must hold in ALL modes:
-        # the confident wrong PIN is never produced.
-        n = name_compound("CC(=S)NC(C)=S", style="pin")
+    def test_thioimide_asymmetric_propanethioyl(self):
+        # Asymmetric: shorter chain (C2) is the parent thioamide, longer (C3)
+        # is the N-(alkanethioyl) substituent (OPSIN round-trips to CCC(=S)NC(C)=S).
+        assert name_compound("CCC(=S)NC(C)=S", style="pin") \
+            == "N-(propanethioyl)ethanethioamide"
+
+    def test_thioimide_methanethioyl(self):
+        # C1 formyl-analogue branch (methanethioyl / methanethioamide).
+        assert name_compound("CC(=S)NC=S", style="pin") \
+            == "N-(ethanethioyl)methanethioamide"
+
+    def test_n_substituted_thioimide_fails_closed(self):
+        # N-substituted thioimides are NOT built (defer). Must never emit the
+        # N-H thioimide target as if it were this different molecule.
+        n = name_compound("CC(=S)N(C)C(C)=S", style="pin")
         assert n != "N-(ethanethioyl)ethanethioamide"
 
     def test_thioamide_parent_protect(self):
