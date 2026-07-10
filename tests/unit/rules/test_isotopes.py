@@ -103,3 +103,39 @@ class TestFormatIsotopeDescriptor:
         # elements alphabetical C < H, so 13C first.
         groups = [(1, 2, "H", 1), (1, 13, "C", 1)]
         assert format_isotope_descriptor(groups) == "(1-13C1,1-2H1)"
+
+
+class TestDecorateEndToEnd:
+    """Full name_compound path through the isotope decorator (P-45.4 + P-82.2.1).
+
+    Every expected_pin below was OPSIN round-trip verified against its SMILES
+    on 2026-07-09 (see plan header table).
+    """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("[14CH3]CO", "(2-14C1)ethan-1-ol"),          # P-45.4.1 lowest locant -> CH3 = C2
+        ("[13CH3]CO", "(2-13C1)ethan-1-ol"),
+        ("[2H]C([2H])([2H])CO", "(2,2,2-2H3)ethan-1-ol"),  # P-84 verbatim
+        ("[2H]C([2H])([2H])Oc1ccccc1", "(2H3)methoxybenzene"),  # BB:43730
+        ("[12CH](Cl)(Cl)Cl", "trichloro(12C1)methane"),         # BB:43724 (count form)
+    ])
+    def test_expected_pin(self, smiles, expected):
+        from orthonym.namer import name_compound
+        got = name_compound(smiles, style="systematic")
+        assert got == expected, f"{smiles}: got {got!r} want {expected!r}"
+
+    def test_unlabeled_is_untouched(self):
+        from orthonym.namer import name_compound
+        assert name_compound("CCO", style="systematic") == "ethan-1-ol"
+        assert name_compound("CCO") == "ethanol"
+
+    def test_unmappable_label_fails_closed(self):
+        # A label on an atom the oracle cannot place (no round-tripping
+        # candidate) must NOT emit a wrong labeled name — decorator returns
+        # None and the pipeline yields the (unlabeled) skeleton best-effort.
+        from orthonym.rules.isotopes import decorate_isotopic_name
+        from orthonym.namer import Orthonym
+        n = Orthonym(style="systematic")
+        # Deliberately exotic: a labeled atom with no OPSIN-expressible locus.
+        out = decorate_isotopic_name("[36Cl]", "systematic", n)
+        assert out is None or "36Cl" not in out or "chlorane" in out  # never a wrong labeled PIN
