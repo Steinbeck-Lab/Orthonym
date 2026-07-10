@@ -2282,6 +2282,39 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     return SIMPLE_MULTIPLIERS.get(unit_count)
 
 
+# P-16.3.4(e): a multiplied FUNCTIONALIZED parent hydride carrying a
+# characteristic-group suffix that takes a locant must be enclosed in
+# parentheses after the numerical multiplier, with the suffix locant made
+# explicit: di(cyclohexane-1-carboxylic acid), di(benzene-1-sulfonic acid).
+# (Retained/added-name acids like 'benzoic acid'/'acetic acid' do NOT match
+# these systematic suffix stems and keep their existing bare form.)
+_P1634_PARENS_SUFFIXES = (
+    'carboxylic acid', 'sulfonic acid', 'sulfinic acid',
+    'phosphonic acid', 'phosphinic acid', 'carbaldehyde', 'carbonitrile',
+)
+
+
+def _needs_p1634_parens(parent_name: str) -> bool:
+    """True iff the parent is a functionalized parent hydride whose systematic
+    characteristic-group suffix takes a ring locant (P-16.3.4(e))."""
+    return any(parent_name.endswith(s) for s in _P1634_PARENS_SUFFIXES)
+
+
+def _insert_ring_pg_locant(parent_name: str, locant: int = 1) -> Optional[str]:
+    """Insert the explicit ring PG locant before the characteristic-group
+    suffix: 'cyclohexanecarboxylic acid' -> 'cyclohexane-1-carboxylic acid';
+    'benzenesulfonic acid' -> 'benzene-1-sulfonic acid'. Returns None if the
+    suffix cannot be located."""
+    for suffix in _P1634_PARENS_SUFFIXES:
+        if parent_name.endswith(suffix):
+            stem = parent_name[: -len(suffix)]
+            # Already carries a locant right before the suffix -> leave as-is.
+            if stem.endswith('-'):
+                return parent_name
+            return f"{stem}-{locant}-{suffix}"
+    return None
+
+
 def _assemble_multiplicative_name(
     locant: Optional[int], bridge_name: str, parent_name: str, unit_count: int = 2
 ) -> Optional[str]:
@@ -2334,6 +2367,26 @@ def _assemble_multiplicative_name(
         "" if locant is None
         else _build_primed_locant_str(locant, unit_count) + "-"
     )
+
+    # P-16.3.4(e): a multiplied functionalized parent hydride whose systematic
+    # characteristic-group suffix takes a ring locant is enclosed in parentheses
+    # after the multiplier, with the suffix locant made explicit, and the bridge
+    # is parenthesised too:
+    #   1,1'-(disulfanediyl)di(cyclohexane-1-carboxylic acid)
+    # (This precedes the generic space/digit assembly below; it fires only when
+    #  the parent carries no substituent-prefix locant of its own, i.e. the PG
+    #  sits at ring position 1 — the multiplied attachment carbon.)
+    if (_needs_p1634_parens(parent_name)
+            and not _unit_name_is_substituted(parent_name)
+            and "(" not in bridge_name):
+        unit_with_locant = _insert_ring_pg_locant(parent_name, 1)
+        if unit_with_locant is not None:
+            _bridge = bridge_name
+            # Parenthesise the bridge unless it is already enclosed.
+            if not (_bridge.startswith("(") or _bridge.startswith("[")):
+                _bridge = f"({_bridge})"
+            return (f"{locant_prefix}{_bridge}"
+                    f"{multiplier}({unit_with_locant})")
 
     # Enclosure (P-16.3.3 / P-16.5): a BRIDGE name that itself contains
     # parentheses (composite bridge "ethane-1,2-diylbis(oxy)") moves up the
