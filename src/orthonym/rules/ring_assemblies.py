@@ -168,6 +168,179 @@ def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
     return (tuple(elements), tuple(sorted(ring_sizes)), is_aromatic)
 
 
+# P-28.4.2 skeletal-replacement ring-assembly heteroatoms (element-seniority
+# citation order O > S > Se > Te; reuse the 'a'-terms from skeletal_replacement).
+_RA_REPL_TERMS = {'O': 'oxa', 'S': 'thia', 'Se': 'selena', 'Te': 'tellura'}
+_RA_REPL_ORDER = ['O', 'S', 'Se', 'Te']  # element seniority (P-28.4.2 set order)
+
+
+def _is_replacement_assembly_candidate(
+    mol, ring_systems: List[Set[int]], connections: List[Tuple[int, int, int, int]]
+) -> bool:
+    """P-28.4.2 gate: exactly two SAME-SIZE saturated monocyclic components,
+    each all-carbon except AT MOST one neutral divalent ring heteroatom from
+    {O,S,Se,Te}, joined by exactly one ring-to-ring SINGLE bond. At least one
+    component must carry a heteroatom (else it is a plain carbocyclic assembly
+    handled elsewhere). Fail-closed for anything richer."""
+    if len(ring_systems) != 2 or len(connections) != 1:
+        return False
+    a1, a2, _, _ = connections[0]
+    bond = mol.GetBondBetweenAtoms(a1, a2)
+    if bond is None or bond.GetBondType() != rdchem.BondType.SINGLE:
+        return False
+    ri = mol.GetRingInfo()
+    sizes = []
+    total_hetero = 0
+    for sys_atoms in ring_systems:
+        rings = [r for r in ri.AtomRings() if set(r) <= sys_atoms]
+        if len(rings) != 1:
+            return False  # multi-ring component -> not this class
+        ring = rings[0]
+        if set(ring) != set(sys_atoms):
+            return False  # exocyclic atoms in the system -> not a clean monocycle
+        sizes.append(len(ring))
+        het = 0
+        for i in ring:
+            a = mol.GetAtomWithIdx(i)
+            sym = a.GetSymbol()
+            if sym == 'C':
+                if a.GetIsAromatic():
+                    return False
+                continue
+            if (sym not in _RA_REPL_TERMS or a.GetFormalCharge() != 0
+                    or a.GetDegree() != 2 or a.GetIsAromatic()):
+                return False
+            het += 1
+        if het > 1:
+            return False  # >1 heteroatom per ring -> outside this narrow class
+        total_hetero += het
+        # No ring double bonds (saturated replacement ring).
+        for b in mol.GetBonds():
+            i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if i in sys_atoms and j in sys_atoms and \
+                    b.GetBondType() == rdchem.BondType.DOUBLE:
+                return False
+    if sizes[0] != sizes[1] or total_hetero == 0:
+        return False
+    # No substituents beyond the inter-ring bond (each ring atom degree <=2
+    # except the two attachment atoms which are degree 3 via the junction).
+    attach = {a1, a2}
+    for sys_atoms in ring_systems:
+        for i in sys_atoms:
+            deg = mol.GetAtomWithIdx(i).GetDegree()
+            if i in attach:
+                if deg != 3:
+                    return False
+            elif deg != 2:
+                return False
+    return True
+
+
+def _name_replacement_ring_assembly(mol, assembly_info: Dict) -> Optional[str]:
+    """P-28.4.2: name a two-component same-skeleton monocyclic ring assembly by
+    skeletal-replacement ('a') nomenclature. Each ring is numbered from its
+    attachment atom (locant 1); the heteroatom takes the lower of the two ring
+    directions. Across the two rings, the unprimed/primed assignment is the one
+    giving the LOWEST COMBINED heteroatom locant set; 'a'-prefixes are cited in
+    element-seniority order (O>S>Se>Te). Emits e.g.
+    '3'-oxa-2-thia-1,1'-bi(cyclotetradecane)'. Fail-closed on any ambiguity."""
+    from ..data.chain_names import get_chain_prefix
+    ring_systems = assembly_info['ring_systems']
+    connections = assembly_info['connections']
+    a1, a2, s1, s2 = connections[0]
+    ri = mol.GetRingInfo()
+
+    def _component(sys_atoms, attach):
+        """Return (ring_size, hetero_locant_or_None, hetero_symbol_or_None):
+        number the monocycle from ``attach`` (=1), choosing the direction that
+        gives the single heteroatom (if any) the lowest locant."""
+        ring = next(r for r in ri.AtomRings() if set(r) <= sys_atoms)
+        n = len(ring)
+        # Build the two cyclic orderings starting at `attach`.
+        # Neighbours of attach within the ring:
+        nbrs = [x.GetIdx() for x in mol.GetAtomWithIdx(attach).GetNeighbors()
+                if x.GetIdx() in sys_atoms]
+        if len(nbrs) != 2:
+            return None
+        best = None  # (hetero_locant or n+1, ordering)
+        for start_nbr in nbrs:
+            order = [attach, start_nbr]
+            prev, cur = attach, start_nbr
+            while len(order) < n:
+                nxt = next(
+                    (x.GetIdx() for x in mol.GetAtomWithIdx(cur).GetNeighbors()
+                     if x.GetIdx() in sys_atoms and x.GetIdx() != prev),
+                    None)
+                if nxt is None:
+                    break
+                order.append(nxt)
+                prev, cur = cur, nxt
+            if len(order) != n:
+                continue
+            het_loc = None
+            het_sym = None
+            for pos, idx in enumerate(order, start=1):
+                if mol.GetAtomWithIdx(idx).GetSymbol() != 'C':
+                    het_loc = pos
+                    het_sym = mol.GetAtomWithIdx(idx).GetSymbol()
+                    break
+            key = het_loc if het_loc is not None else n + 1
+            if best is None or key < best[0]:
+                best = (key, het_loc, het_sym)
+        if best is None:
+            return None
+        return (n, best[1], best[2])
+
+    c1 = _component(ring_systems[s1], a1)
+    c2 = _component(ring_systems[s2], a2)
+    if c1 is None or c2 is None:
+        return None
+    n1, loc1, sym1 = c1
+    n2, loc2, sym2 = c2
+    if n1 != n2:
+        return None
+
+    # Assign which ring is unprimed to minimise the combined heteroatom locant
+    # set (P-28.4.2: low locants to heteroatoms as a set). Each ring contributes
+    # at most one heteroatom; compare the two orientations.
+    def _combined(order):
+        # order = list of (loc, sym, is_primed) sorted by (loc, prime)
+        out = []
+        for loc, sym, primed in order:
+            if loc is None:
+                continue
+            out.append((loc, primed))
+        return sorted(out)
+
+    # Orientation A: ring1 unprimed, ring2 primed.
+    optA = [(loc1, sym1, False), (loc2, sym2, True)]
+    # Orientation B: ring2 unprimed, ring1 primed.
+    optB = [(loc2, sym2, False), (loc1, sym1, True)]
+    setA = _combined(optA)
+    setB = _combined(optB)
+    chosen = optA if setA <= setB else optB
+
+    # Cite 'a'-prefixes in element-seniority order (O>S>Se>Te), each with its
+    # (possibly primed) locant.
+    cited = []
+    for loc, sym, primed in chosen:
+        if loc is None or sym is None:
+            continue
+        term = _RA_REPL_TERMS.get(sym)
+        if term is None:
+            return None
+        prime = "'" if primed else ""
+        cited.append((_RA_REPL_ORDER.index(sym), f"{loc}{prime}-{term}"))
+    if not cited:
+        return None
+    cited.sort(key=lambda x: x[0])
+    prefix = "-".join(part for _, part in cited)
+
+    stem = get_chain_prefix(n1)  # e.g. 'tetradec' for 14
+    # Both attachment atoms are locant 1 in their rings -> '1,1'-bi(cyclo...ane)'.
+    return f"{prefix}-1,1'-bi(cyclo{stem}ane)"
+
+
 def _find_inter_system_bonds(
     mol, ring_systems: List[Set[int]]
 ) -> List[Tuple[int, int, int, int]]:
@@ -431,6 +604,22 @@ def detect_ring_assembly(
     # Compare signatures -- all must be identical
     signatures = [_system_signature(mol, sys_atoms) for sys_atoms in ring_systems]
     if len(set(signatures)) != 1:
+        # P-28.4.2: ring-assembly components need NOT be identical when they
+        # share the same ring SKELETON and differ only by skeletal-replacement
+        # heteroatoms; then 'a'-nomenclature names the assembly
+        # (3'-oxa-2-thia-1,1'-bi(cyclotetradecane)). Admit ONLY that narrow
+        # class (2 same-size single-heteroatom saturated monocycles, one
+        # ring-to-ring single-bond junction) tagged for the replacement namer;
+        # everything else keeps failing closed.
+        if _is_replacement_assembly_candidate(mol, ring_systems, connections):
+            return {
+                'ring_systems': ring_systems,
+                'connections': connections,
+                'count': len(ring_systems),
+                'ring_type': 'heterocyclic',
+                'double_bond_junction': False,
+                'replacement': True,
+            }
         return None
 
     # IUPAC P-28.2.2: a junction may be a DOUBLE bond (bi(...ylidene)).
@@ -1274,6 +1463,11 @@ def name_ring_assembly(
         2,2'-bipyridine -> "2,2'-bipyridine"
         4-chlorobiphenyl -> "4-chloro-1,1'-biphenyl"
     """
+    # P-28.4.2: skeletal-replacement ring assembly (mixed/single-heteroatom
+    # same-skeleton monocycles) -> dedicated 'a'-nomenclature namer.
+    if assembly_info.get('replacement'):
+        return _name_replacement_ring_assembly(mol, assembly_info)
+
     ring_systems = assembly_info['ring_systems']
     connections = assembly_info['connections']
     count = assembly_info['count']

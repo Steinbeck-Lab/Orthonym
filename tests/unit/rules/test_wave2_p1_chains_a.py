@@ -193,3 +193,12 @@ class TestP32FixedNumberingSubstituent:
 
     def test_monocyclic_substituent_unchanged(self):
         assert name_compound("OC(=O)CCC1CCCCC1") == "3-cyclohexylpropanoic acid"
+
+
+@pytest.mark.unit
+class TestP28MixedHeteroatomAssembly:
+    def test_oxa_thia_bicyclotetradecane(self):
+        # P-28.4.2: mixed-heteroatom ring-assembly 'a'-replacement; lowest
+        # COMBINED locant set (2,3') + element-seniority citation (oxa < thia).
+        assert name_compound("C1(SCCCCCCCCCCCC1)C1COCCCCCCCCCCC1") == \
+            "3'-oxa-2-thia-1,1'-bi(cyclotetradecane)"
