@@ -87,3 +87,11 @@ class TestP24BranchedPolyspiroDifferent:
         # And it must NEVER emit the (unbuilt) correct branched-different name.
         assert name_compound("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1") != \
             "trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',2'''-indene]"
+
+
+@pytest.mark.unit
+class TestP31SpiroVonBaeyerUnsaturation:
+    def test_spirobi_bicyclononane_diene(self):
+        # P-31.1.5.2.1: ring 'ene'/'diene' cited AFTER the last bracket.
+        assert name_compound("C12CC3(CC(C=CC1)C2)CC2CC=CC(C3)C2") == \
+            "3,3'-spirobi[bicyclo[3.3.1]nonane]-6,6'-diene"

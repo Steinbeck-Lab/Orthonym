@@ -2808,11 +2808,21 @@ def _name_vonbaeyer_spiro_component(
     if not descriptor:
         return None
 
+    # Ring multiple bonds of the component (mapped to the frag). P-31.1.5.2.1:
+    # low locants to spiro junction, then heteroatoms, then double bonds.
+    frag_multibonds = [
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+        for b in frag.GetBonds()
+        if b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+        and b.GetBeginAtomIdx() in set(ring_atom_idxs)
+        and b.GetEndAtomIdx() in set(ring_atom_idxs)
+    ]
     spiro_frag = orig_to_frag.get(spiro_center) if spiro_center is not None else None
-    if hetero_frag or spiro_frag is not None:
+    if hetero_frag or spiro_frag is not None or frag_multibonds:
         # Enumerate the admissible von-Baeyer numberings (topology-defined on the
-        # carbon skeleton) and pick per P-24.5.2 (lowest spiro-atom locant) then
-        # P-24.2.4.1.1 (lowest heteroatom locants). Deterministic tie-break.
+        # carbon skeleton) and pick per P-24.5.2 (lowest spiro-atom locant), then
+        # P-24.2.4.1.1 (lowest heteroatom locants), then P-31.1.5.2.1 (lowest
+        # double-bond locants). Deterministic tie-break.
         bridgeheads = list(find_true_bridgeheads(skel))
         if len(bridgeheads) != 2:
             return None
@@ -2828,7 +2838,9 @@ def _name_vonbaeyer_spiro_component(
             spiro_loc = (a2l.get(spiro_frag, 10 ** 6)
                          if spiro_frag is not None else 0)
             het = sorted(a2l[i] for i in hetero_frag if i in a2l)
-            return (spiro_loc, het)
+            ene = sorted(min(a2l[a], a2l[b]) for a, b in frag_multibonds
+                         if a in a2l and b in a2l)
+            return (spiro_loc, het, ene)
 
         best = None
         for c in cands:
@@ -2836,10 +2848,16 @@ def _name_vonbaeyer_spiro_component(
             if best is None:
                 best = (k, c)
                 continue
-            # compare (spiro_loc, then hetero locant set)
-            if k[0] < best[0][0]:
-                best = (k, c)
-            elif k[0] == best[0][0] and compare_locant_sets(k[1], best[0][1]) < 0:
+            if k[0] != best[0][0]:
+                if k[0] < best[0][0]:
+                    best = (k, c)
+                continue
+            ch = compare_locant_sets(k[1], best[0][1])
+            if ch != 0:
+                if ch < 0:
+                    best = (k, c)
+                continue
+            if compare_locant_sets(k[2], best[0][2]) < 0:
                 best = (k, c)
         numbering = best[1]
     else:
@@ -3057,7 +3075,73 @@ def _name_spiro_vonbaeyer_core(mol):
             return None
     elif hetero_prefix:
         name = f"{hetero_prefix}{name}"
+
+    # P-31.1.5.2.1: unsaturation of a von-Baeyer spiro system is cited by
+    # 'ene'/'diene' AFTER the closing bracket, low locants to spiro junctions
+    # then double bonds (the component numbering already did this). Fail closed
+    # on any ring multiple bond that cannot be expressed with plain adjacent
+    # locants (never a silently-saturated name for an unsaturated cage).
+    unsat = _spiro_vb_unsaturation_suffix(mol, combined_locants, all_ring_atoms)
+    if unsat is None:
+        if _has_ring_multiple_bonds(mol, all_ring_atoms):
+            return None
+    elif unsat:
+        name = name + unsat
     return name, all_ring_atoms, combined_locants
+
+
+def _has_ring_multiple_bonds(mol, ring_atoms: Set[int]) -> bool:
+    for b in mol.GetBonds():
+        if (b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
+                and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)):
+            return True
+    return False
+
+
+def _locant_sort_key(loc: _Locant) -> Tuple[int, int]:
+    """Sort key for a plain-or-primed locant: (prime_count, int)."""
+    if isinstance(loc, tuple):
+        return (len(loc[1]), loc[0])
+    return (0, loc)
+
+
+def _spiro_vb_unsaturation_suffix(
+    mol, combined_locants: Dict[int, _Locant], ring_atoms: Set[int],
+) -> Optional[str]:
+    """P-31.1.5.2.1 '-ene'/'-diene' suffix (e.g. ``-6,6'-diene``) mapping each
+    ring DOUBLE bond onto its combined (primed/unprimed) locant. Returns the
+    suffix string ('' when saturated), or None (fail-closed) for aromatic /
+    triple / non-adjacent-locant ring bonds."""
+    doubles: List[_Locant] = []
+    for b in mol.GetBonds():
+        a, c = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if a not in ring_atoms or c not in ring_atoms:
+            continue
+        bt = b.GetBondType()
+        if bt == Chem.BondType.SINGLE:
+            continue
+        if bt != Chem.BondType.DOUBLE:
+            return None  # aromatic / triple -> unsupported here
+        la, lc = combined_locants.get(a), combined_locants.get(c)
+        if la is None or lc is None:
+            return None
+        # both endpoints must share the same prime tier and be adjacent ints
+        ka, kc = _locant_sort_key(la), _locant_sort_key(lc)
+        if ka[0] != kc[0] or abs(ka[1] - kc[1]) != 1:
+            return None  # compound / cross-component locant -> unsupported
+        doubles.append(la if ka[1] <= kc[1] else lc)
+    if not doubles:
+        return ''
+    doubles.sort(key=_locant_sort_key)
+    from ..assembly.naming_utils import get_multiplier_prefix
+    tokens = []
+    for loc in doubles:
+        if isinstance(loc, tuple):
+            tokens.append(f"{loc[0]}{loc[1]}")
+        else:
+            tokens.append(str(loc))
+    mult = get_multiplier_prefix(len(doubles), 'ene')
+    return f"-{','.join(tokens)}-{mult}ene"
 
 
 def _spiro_vb_a_prefix(
