@@ -2102,6 +2102,90 @@ def _get_dioate_name(backbone_length: int) -> str:
 #   mixed triester -> "1,3-di(acetyloxy)-2-(propanoyloxy)propane"
 
 
+def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str]:
+    """P-13.6.2 / P-65.6.3.2: a symmetric diol diester (two IDENTICAL acyl
+    groups esterifying a divalent acyclic diol) is the functional-class
+    multiplicative PIN '<diol-diyl> di<acid>oate' (ethane-1,2-diyl diacetate),
+    NOT the substitutive bis(acyloxy) form.
+
+    Fail-closed scope: exactly two esters, identical acyl fragments, a clean
+    acyclic diol backbone whose two attachment carbons are the two chain ends,
+    carrying no other substituents. Returns the PIN or None (fall through).
+    """
+    from collections import defaultdict
+
+    if len(ester_matches) != 2:
+        return None
+
+    ester_oxygens = set()
+    carbonyl_carbons = set()
+    for match in ester_matches:
+        ester_oxygens.add(match[2])
+        carbonyl_carbons.add(match[0])
+    exclude = ester_oxygens | carbonyl_carbons
+
+    # (1) identical acyl groups (as '-oate' anion names)
+    anions = []
+    for c_c, c_o, e_o, alk_c in ester_matches:
+        acid_atoms = _bfs_fragment(mol, c_c, exclude_atom=e_o)
+        acid_name = get_acid_fragment_name(mol, acid_atoms)
+        if not acid_name:
+            return None
+        # get_acid_fragment_name returns e.g. 'acetic' (no ' acid' tail);
+        # _acid_name_to_ate needs the '...ic acid' form.
+        acid_full = acid_name if acid_name.endswith("acid") else acid_name + " acid"
+        anion = _acid_name_to_ate(acid_full)
+        if anion is None:
+            return None
+        anions.append(anion)
+    if len(set(anions)) != 1:
+        return None
+
+    # (2) name the diol residue as a divalent -diyl group with attachment locants.
+    backbone_start_atoms = [m[3] for m in ester_matches]
+    backbone = _find_polyol_backbone(mol, backbone_start_atoms, exclude)
+    if backbone is None or len(backbone) < 2:
+        return None
+    ordered = _order_backbone_chain(mol, backbone, exclude)
+    if ordered is None:
+        return None
+
+    # Fail closed if any backbone carbon carries a heavy substituent outside
+    # the backbone / the two ester oxygens (keep it a clean unsubstituted diol).
+    backbone_set = set(ordered)
+    allowed = backbone_set | ester_oxygens
+    for idx in ordered:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            return None
+        for nbr in atom.GetNeighbors():
+            if nbr.GetAtomicNum() <= 1:
+                continue
+            if nbr.GetIdx() not in allowed:
+                return None
+
+    n = len(ordered)
+    parent_prefix = get_chain_prefix(n)
+    if not parent_prefix:
+        return None
+
+    # Attachment locants = positions of the two ester-bearing carbons, numbered
+    # for lowest locant set (first-point-of-difference over both directions).
+    fwd = {idx: i + 1 for i, idx in enumerate(ordered)}
+    rev = {idx: n - i for i, idx in enumerate(ordered)}
+    attach_atoms = [m[3] for m in ester_matches]
+    fwd_locs = sorted(fwd[a] for a in attach_atoms)
+    rev_locs = sorted(rev[a] for a in attach_atoms)
+    locs = fwd_locs if fwd_locs <= rev_locs else rev_locs
+
+    loc_str = ",".join(str(x) for x in locs)
+    diyl = f"{parent_prefix}ane-{loc_str}-diyl"
+
+    # (3) multiplied acid anion: 'di' + 'acetate' -> 'diacetate' (P-16.3.3,
+    #     'di' before a consonant, no elision).
+    return f"{diyl} di{anions[0]}"
+
+
 def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
     """
     Name a fully-esterified polyol compound using acyloxy prefixes.

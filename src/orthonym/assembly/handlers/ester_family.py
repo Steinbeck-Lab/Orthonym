@@ -209,6 +209,7 @@ def name_ester_family(
                 name_dicarboxylic_diester,
                 name_polyol_polyester,
                 name_independent_esters,
+                _try_functional_class_diol_diester,
             )
             ester_type = classify_multi_ester(features.mol, all_esters)
             # Phase 160.1 Plan-03-01 D-16: all multi_ester sub-paths mirror
@@ -234,7 +235,16 @@ def name_ester_family(
                         atom_to_locant_hint=None,
                     )
             elif ester_type == "polyol_polyester":
-                polyol_name = name_polyol_polyester(features.mol, all_esters)
+                # P-13.6.2 / P-65.6.3.2: a symmetric diol diester (identical
+                # acyl arms on a clean divalent diol) is the functional-class
+                # multiplicative PIN 'ethane-1,2-diyl diacetate', senior to the
+                # substitutive bis(acyloxy) form. Try it first; fall through to
+                # the acyloxy-prefix polyol path when it declines.
+                polyol_name = _try_functional_class_diol_diester(
+                    features.mol, all_esters
+                )
+                if polyol_name is None:
+                    polyol_name = name_polyol_polyester(features.mol, all_esters)
                 if polyol_name:
                     if logger.isEnabledFor(logging.DEBUG):
                         _ha = features.mol.GetNumHeavyAtoms()

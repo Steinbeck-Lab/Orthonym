@@ -41,3 +41,13 @@ class TestP22AnnuleneMonocyclic:
     def test_cyclodecapentaene(self):
         # P-22.1.2(b) / P-25.3.2.1.1: mancude 10-membered carbocycle standalone PIN
         assert name_compound("C1=CC=CC=CC=CC=C1") == "cyclodeca-1,3,5,7,9-pentaene"
+
+
+@pytest.mark.unit
+class TestP13FunctionalClassDiolDiester:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CC(=O)OCCOC(C)=O", "ethane-1,2-diyl diacetate"),       # P-13.6.2 (BB 5066)
+        ("CCC(=O)OCCOC(=O)CC", "ethane-1,2-diyl dipropanoate"),  # P-13.6.2
+    ])
+    def test_diol_diester(self, smiles, expected):
+        assert name_compound(smiles) == expected
