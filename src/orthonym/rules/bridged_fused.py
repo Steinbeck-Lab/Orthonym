@@ -842,6 +842,11 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
         for nb in mol.GetAtomWithIdx(b).GetNeighbors():
             if nb.GetIdx() not in bridge_atoms:
                 bridgeheads.add(nb.GetIdx())
+    # P-25.4.1.7/.2.2.1/.2.2.2 fail-closed backstop: a POLYVALENT (tripodal,
+    # 3+-attachment) bridge has >2 bridgeheads and no OPSIN-2.9-parseable oracle
+    # (metheno==methano for the monocyclic case; [1,1,2]triyl forms unparseable).
+    # Declining here guarantees a divalent bridge name is never emitted for a
+    # trivalent attachment — documented follow-up when a parseable oracle exists.
     if len(bridgeheads) != 2:
         return None
     if any(bh not in orig_to_res for bh in bridgeheads):

@@ -106,3 +106,24 @@ class TestP25CompositeBridgeOrdering:
         name = name_compound(smi)
         assert name in ("unknown organic compound",
                         "1,4:8,5-bis(epoxymethano)anthracene")
+
+
+@pytest.mark.unit
+class TestP25PolyvalentBridgesFailClosed:
+    """P-25.4.1.7/.2.2.1/.2.2.2 — polyvalent (tripodal) bridges. OPSIN 2.9
+    cannot parse the polyvalent PINs (metheno==methano for the monocyclic
+    case; [1,1,2]triyl forms unparseable), so genuine tripodal bridges have
+    no oracle and MUST fail closed."""
+
+    def test_monocyclic_methano_locked(self):
+        # metheno/methano round-trip identically in OPSIN -> the correct PIN is methano
+        assert name_compound("C12=CC=C(C3=CC=CC=C13)C2") == "1,4-methanonaphthalene"
+
+    def test_tripodal_bridge_declines(self):
+        # a genuine 3-bond (tripodal) bridge carbon across a fused core -> no
+        # verifiable oracle -> must decline (never a divalent-methano wrong name).
+        smi = "C1(c2ccccc2C2c3ccccc3-1)c1ccccc12"  # triptycene-bridgehead-like 3-attachment probe
+        name = name_compound(smi)
+        # never emit a divalent bridge name for a trivalent attachment
+        assert name == "unknown organic compound" or (
+            "methano" not in name and "metheno" not in name)
