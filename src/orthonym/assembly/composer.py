@@ -2720,6 +2720,12 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_branched_polyspiro(mol):
         return True
 
+    # P-24.8.1.3 λ spiro atom in >=3 rings — recognised so the dispatcher can
+    # FAIL CLOSED rather than leaking a partial monocyclic name.
+    from ..rules.spiro import is_lambda_multiring_spiro as _is_lambda_multiring
+    if _is_lambda_multiring(mol):
+        return True
+
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
     # to return True. Spiro check must precede polycyclic to avoid misrouting.
@@ -2792,6 +2798,13 @@ def _classify_complex_ring(mol) -> str:
     from ..rules.spiro import is_branched_polyspiro as _is_branched_polyspiro_classify
     if _is_branched_polyspiro_classify(mol):
         return 'polyspiro-branched-different'
+
+    # P-24.8.1.3 λ spiro atom in >=3 monocyclic rings: detection-only, FAIL
+    # CLOSED (the λ von-Baeyer build is a follow-on). Refuse rather than leak a
+    # partial monocyclic name.
+    from ..rules.spiro import is_lambda_multiring_spiro as _is_lambda_multiring_classify
+    if _is_lambda_multiring_classify(mol):
+        return 'lambda-multiring-spiro'
 
     # Check bridged-fused FIRST (fused core + bridges)
     # Must come before bicyclo/polycyclic to avoid misclassification
@@ -3082,6 +3095,16 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Branched-polyspiro-different unsupported (fail-closed)")
+            return None
+
+        elif ring_type == 'lambda-multiring-spiro':
+            # P-24.8.1.3: λ spiro atom in >=3 rings -> FAIL CLOSED (follow-on).
+            from ..rules.spiro import name_lambda_multiring_spiro
+            result = name_lambda_multiring_spiro(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Lambda-multiring-spiro unsupported (fail-closed)")
             return None
 
         elif ring_type == 'spiro-vonbaeyer':

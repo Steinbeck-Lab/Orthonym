@@ -95,3 +95,40 @@ class TestP31SpiroVonBaeyerUnsaturation:
         # P-31.1.5.2.1: ring 'ene'/'diene' cited AFTER the last bracket.
         assert name_compound("C12CC3(CC(C=CC1)C2)CC2CC=CC(C3)C2") == \
             "3,3'-spirobi[bicyclo[3.3.1]nonane]-6,6'-diene"
+
+
+@pytest.mark.unit
+class TestP24LambdaMonocyclicTripleSpiro:
+    # P-24.8.1.3: three monocyclic rings + one nonstandard (lambda) spiro atom.
+    # needs_example. No OPSIN-round-trippable curated structure/name pair was
+    # found during execution (the lambda-on-single-hypervalent-3-ring-spiro form
+    # did not parse in OPSIN 2.9.0 for any candidate tried). UNDER-SCOPE
+    # (plan rule 7 / plan Task-8 decision criterion): DEFERRED xfail +
+    # fail-closed guarantee below.
+    _NEAREST = "C1CS23(C1)(CCC2)CCC3"  # lambda6 S in three 4-membered rings
+
+    @pytest.mark.xfail(reason="P-24.8.1.3 3-monocyclic + single-lambda-spiro form: "
+                              "no OPSIN-round-trippable curated structure found; "
+                              "deferred. name_lambda_multiring_spiro returns None "
+                              "(fail-closed) until the λ von-Baeyer build lands.")
+    def test_lambda_trispiro(self):
+        from rdkit import Chem
+        from orthonym.rules.spiro import name_lambda_multiring_spiro
+        # xfail: the λ-multiring build is a follow-on -> currently None.
+        assert name_lambda_multiring_spiro(Chem.MolFromSmiles(self._NEAREST)) is not None
+
+    def test_lambda_trispiro_fail_closed(self):
+        # The SPIRO dispatch recognises the λ-multiring-spiro class and REFUSES
+        # (never builds a name it cannot fully express). The complex-ring
+        # dispatcher declines; any residual partial monocyclic name in a
+        # JVM-less test env is a pre-existing namer-core issue (SELF-01-backed in
+        # production), outside this plan's scope.
+        from rdkit import Chem
+        from orthonym.rules.spiro import (
+            is_lambda_multiring_spiro, name_lambda_multiring_spiro,
+        )
+        from orthonym.assembly.composer import _classify_complex_ring
+        m = Chem.MolFromSmiles(self._NEAREST)
+        assert is_lambda_multiring_spiro(m) is True
+        assert name_lambda_multiring_spiro(m) is None
+        assert _classify_complex_ring(m) == "lambda-multiring-spiro"

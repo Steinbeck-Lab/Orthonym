@@ -2611,6 +2611,42 @@ def name_branched_polyspiro(
     return None
 
 
+def is_lambda_multiring_spiro(mol) -> bool:
+    """P-24.8.1.3 detection: a single spiro atom shared by THREE OR MORE rings
+    that carries a NONSTANDARD (λ) bonding number (e.g. a λ6 S in three
+    monocyclic rings). ``get_spiro_atoms`` misses it (it requires exactly 2
+    rings), so without this the system falls through to a partial monocyclic
+    name. The component-name / von-Baeyer-λ build for this rare form is a
+    documented follow-on (Task 8 deferred), so this is detection-only and routes
+    to a FAIL-CLOSED tag — never a wrong (structure-dropping) name."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings()]
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        in_rings = sum(1 for r in rings if idx in r)
+        if in_rings < 3:
+            continue
+        if _nonstandard_bonding_number(mol, idx) is None:
+            continue
+        # cut vertex separating >=3 ring components -> spiro (not fused/bridged)
+        _, adj = _ring_atom_graph(mol)
+        comps = _ring_components_excluding(adj, idx)
+        if len(comps) >= 3:
+            return True
+    return False
+
+
+def name_lambda_multiring_spiro(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """P-24.8.1.3 λ spiro atom in >=3 monocyclic rings — FAIL CLOSED (return
+    None). The λ von-Baeyer-descriptor build is a documented follow-on; refusing
+    here prevents a structure-dropping partial monocyclic name."""
+    return None
+
+
 def is_unbranched_polyspiro_different(mol) -> bool:
     """P-24.6: unbranched polyspiro, different components, >=1 polycyclic."""
     if mol is None:
