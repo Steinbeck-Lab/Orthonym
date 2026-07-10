@@ -2746,16 +2746,21 @@ def name_polycyclic_complete(mol, features=None):
     # named limit, caught at Orthonym.name). Raising (not returning None) is
     # required so the molecule fails closed rather than cascading to a fragment
     # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
+    # v22 Phase G1 (DD7 COV-01): a fused-aromatic core + bridge
+    # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
+    # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
+    # Try the P-25.4 constructor whenever the cage carries RDKit aromaticity OR
+    # is a MANCUDE bridged cage whose aromaticity RDKit fails to perceive
+    # (Wave-2 P5: 1,4:5,8-dimethanonaphthalene — the two bridges warp the
+    # naphthalene out of plane, so RDKit marks nothing aromatic and von Baeyer
+    # would emit a WRONG -polyene cage). name_bridged_fused_pin returns a name
+    # only for the class it can name correctly (kekulizing + validating its own
+    # aromatic residual), and None otherwise -> we then fail closed (G0).
+    from .bridged_fused import name_bridged_fused_pin
+    bridged = name_bridged_fused_pin(mol)
+    if bridged is not None:
+        return bridged
     if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
-        # v22 Phase G1 (DD7 COV-01): a fused-aromatic core + bridge
-        # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
-        # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
-        # Try the P-25.4 constructor first; it returns a name only for the class
-        # it can name correctly, and None otherwise -> we then fail closed (G0).
-        from .bridged_fused import name_bridged_fused_pin
-        bridged = name_bridged_fused_pin(mol)
-        if bridged is not None:
-            return bridged
         # v23 IH-01 (Phase 2): a partially-saturated PAH (e.g. 9,10-dihydro-
         # anthracene) reaches this von-Baeyer path because its cage still
         # carries the intact aromatic ring(s); von Baeyer would de-aromatise

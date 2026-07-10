@@ -788,7 +788,13 @@ def name_bridged_fused_pin(mol):
 
     aromatic = {i for i in all_ring_atoms if mol.GetAtomWithIdx(i).GetIsAromatic()}
     if not aromatic:
-        return None  # the fused parent must be (at least partly) aromatic (benzo)
+        # RDKit may not perceive aromaticity for a rigid multi-bridged mancude
+        # cage (e.g. 1,4:5,8-dimethanonaphthalene — the two methano bridges warp
+        # the naphthalene out of plane). The mancude constructor kekulizes and
+        # validates its OWN aromatic residual, so route straight to it; the
+        # dihydro enumeration below needs an RDKit-aromatic residual and would
+        # find nothing here.
+        return _try_mancude_bridged(mol, all_ring_atoms)
 
     # Enumerate ALL candidate bridge excisions: connected subsets of NON-aromatic
     # ring atoms whose excision leaves a clean naphthalene residual ("clean" = the
@@ -1195,37 +1201,60 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
         entries.append((prefix, locants))
 
     if len(entries) == 2:
-        if base_name != 'anthracene':
-            return None
-        # Both bridges must sit on DISTINCT terminal rings at the alpha,alpha
-        # positions ((1,4)-type); _mancude_bridge_locants returned the
-        # ring-local pattern [1, 4] for each. P-25.4.3.3(b): the first-cited
-        # (alphabetical) bridge takes the lower pair (1,4), the other (5,8) —
-        # legitimate because bare anthracene's terminal rings are equivalent.
-        if any(loc != [1, 4] for _, loc in entries):
-            return None
-        # Each component's bridgeheads must belong to different terminal rings.
-        ring_ids = []
-        for comp in components:
-            bh_rings = set()
-            for b in comp:
-                for nb in mol.GetAtomWithIdx(b).GetNeighbors():
-                    if nb.GetIdx() in orig_to_res:
-                        t = ring_map['terminal_ring_of'].get(
-                            orig_to_res[nb.GetIdx()])
-                        if t is not None:
-                            bh_rings.add(t)
-            if len(bh_rings) != 1:
+        if base_name == 'naphthalene':
+            # P-25.4.5.x (Wave-2 P5): two (1,4)-type bridges on naphthalene's two
+            # distinct 6-rings -> 1,4:5,8-di<prefix>. Each bridge's bridgeheads
+            # must lie in ONE naphthalene ring and the two bridges in DIFFERENT
+            # rings; naphthalene's two rings are equivalent, so the first-cited
+            # (alphanumerical) bridge takes the low pair.
+            if any(loc != [1, 4] for _, loc in entries):
                 return None
-            ring_ids.append(bh_rings.pop())
-        if ring_ids[0] == ring_ids[1]:
+            fusion = ring_map['fusion']
+            ring_ids = []
+            for comp in components:
+                bh_rings = set()
+                for b in comp:
+                    for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+                        if nb.GetIdx() in orig_to_res:
+                            r_idx = orig_to_res[nb.GetIdx()]
+                            for k, r in enumerate(ring_map['rings']):
+                                if r_idx in r and r_idx not in fusion:
+                                    bh_rings.add(k)
+                if len(bh_rings) != 1:
+                    return None
+                ring_ids.append(bh_rings.pop())
+            if ring_ids[0] == ring_ids[1]:
+                return None
+            ordered = _order_two_bridges(entries)
+            name = _assemble_two_bridge_name(ordered, base_name)
+        elif base_name != 'anthracene':
             return None
-        entries.sort(key=lambda e: e[0])
-        if entries[0][0] == entries[1][0]:
-            # identical bridges: 1,4:5,8-di<prefix> (P-25.4.3.2.1)
-            name = (f"1,4:5,8-di{entries[0][0]}{base_name}")
         else:
-            name = (f"1,4-{entries[0][0]}-5,8-{entries[1][0]}{base_name}")
+            # Two bridges on DISTINCT anthracene terminal rings, each a (1,4)
+            # alpha,alpha or (1,3) alpha,beta pattern. P-25.4.4.1: assign the
+            # two ring windows (1-4 / 5-8) to MINIMISE the combined locant set;
+            # cite alphanumerically (P-25.4.3.2.2), heteroatom bridge senior.
+            if any(loc not in ([1, 4], [1, 3]) for _, loc in entries):
+                return None
+            # Each component's bridgeheads must belong to different terminal rings.
+            ring_ids = []
+            for comp in components:
+                bh_rings = set()
+                for b in comp:
+                    for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+                        if nb.GetIdx() in orig_to_res:
+                            t = ring_map['terminal_ring_of'].get(
+                                orig_to_res[nb.GetIdx()])
+                            if t is not None:
+                                bh_rings.add(t)
+                if len(bh_rings) != 1:
+                    return None
+                ring_ids.append(bh_rings.pop())
+            if ring_ids[0] == ring_ids[1]:
+                return None
+            name = _assemble_anthracene_two_bridge(entries)
+            if name is None:
+                return None
     else:
         prefix, locants = entries[0]
         name = f"{_format_locants(locants)}-{prefix}{base_name}"
@@ -1418,12 +1447,42 @@ def _mancude_bridge_locants(res_mol, bh_res: Set[int], base_name: str,
     bh = sorted(bh_res)
     if res_mol.GetBondBetweenAtoms(bh[0], bh[1]) is not None:
         return None
-    # alpha positions: adjacent to a fusion atom of the host ring.
-    for b in bh:
-        nbrs = {n.GetIdx() for n in res_mol.GetAtomWithIdx(b).GetNeighbors()}
-        if not (nbrs & fusion_in_host):
+    # Number the four non-fusion atoms of the host ring 1..4 (endpoints adjacent
+    # to a fusion atom = alpha = 1,4; the two interior = beta = 2,3). Choose the
+    # direction giving the bridgeheads the lower locant pair. A 1,4 (alpha,alpha)
+    # bridge is the common case; a 1,3 (alpha,beta) bridge is P-25.4.4.1 too
+    # (5,8-epoxy-1,3-methanoanthracene). Peri/2,3 patterns still fail closed.
+    endpoints = [a for a in non_fusion
+                 if {n.GetIdx() for n in res_mol.GetAtomWithIdx(a).GetNeighbors()}
+                 & fusion_in_host]
+    if len(endpoints) != 2 or len(non_fusion) != 4:
+        return None
+    # walk the 4-atom path between the two alpha endpoints
+    path = [endpoints[0]]
+    prev, cur = None, endpoints[0]
+    while len(path) < 4:
+        nxt = None
+        for n in res_mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = n.GetIdx()
+            if j in non_fusion and j != prev and j not in path:
+                nxt = j
+                break
+        if nxt is None:
             return None
-    return [1, 4]
+        path.append(nxt)
+        prev, cur = cur, nxt
+    if path[-1] not in endpoints:
+        return None
+    cand = []
+    for order in (path, list(reversed(path))):
+        numb = {idx: i + 1 for i, idx in enumerate(order)}
+        pair = tuple(sorted(numb[b] for b in bh))
+        cand.append(pair)
+    pair = min(cand)
+    # Only alpha,alpha (1,4) or alpha,beta (1,3) bridges are named here.
+    if pair not in ((1, 4), (1, 3)):
+        return None
+    return list(pair)
 
 
 # Multiplying prefixes only matter for the hydro term, whose multiplier is always
@@ -1512,6 +1571,74 @@ def _composite_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int])
     if name is None:
         return None
     return (name, sorted(bridgeheads))
+
+
+# P-25.4.4.1(a): heteroatom bridges are senior (get low locants); within a tier
+# citation is alphanumerical by prefix name (P-25.4.3.2.2). Kept as the seniority
+# key used by _order_two_bridges below.
+_HETEROATOM_BRIDGE_PREFIX_SET = frozenset({'epoxy', 'epithio', 'epimino',
+                                           'epidioxy'})
+
+
+def _order_two_bridges(entries: List[Tuple[str, List[int]]]):
+    """P-25.4.4.1(a) + P-25.4.3.2.2: order two bridge (prefix, ring-local-locants)
+    entries for citation. Heteroatom bridges sort before carbon bridges; within a
+    tier, alphanumerically by prefix. Returns the ordered [(prefix, locants), ...]
+    list (the low-locant assignment is applied by _assemble_two_bridge_name)."""
+    def key(e):
+        het = 0 if e[0] in _HETEROATOM_BRIDGE_PREFIX_SET else 1
+        return (het, e[0])
+    return sorted(entries, key=key)
+
+
+def _assemble_two_bridge_name(ordered: List[Tuple[str, List[int]]], base_name: str):
+    """Assemble a two-bridge name from the ORDERED entries (each locant pair is
+    the ring-local (1,4)-type pattern). Identical bridges -> 1,4:5,8-di<prefix>
+    (P-25.4.3.2.1); different bridges -> 1,4-<a>-5,8-<b> in citation order."""
+    a, b = ordered[0], ordered[1]
+    if a[0] == b[0]:
+        return f"1,4:5,8-di{a[0]}{base_name}"
+    return f"1,4-{a[0]}-5,8-{b[0]}{base_name}"
+
+
+def _assemble_anthracene_two_bridge(entries: List[Tuple[str, List[int]]]):
+    """P-25.4.4.1/.3.2.2: two bridges on anthracene's two terminal rings, each a
+    ring-local (1,4) alpha,alpha or (1,3) alpha,beta pattern. Assign the two ring
+    windows (1-4 / 5-8) to MINIMISE the combined locant set (first point of
+    difference); on a tie, the heteroatom bridge takes the low window. Cite the
+    two bridges alphanumerically (heteroatom senior). Returns the name or None."""
+    (pa, la), (pb, lb) = entries[0], entries[1]
+
+    def windowed(pair, window_base):
+        # map a ring-local pair (e.g. [1,3]) into the 1-4 (base 0) or 5-8 (base 4)
+        return [p + window_base for p in pair]
+
+    # option 1: entry0 in the 1-4 window, entry1 in 5-8; option 2: swapped.
+    opt1 = {pa: windowed(la, 0), pb: windowed(lb, 4)} if pa != pb else None
+    opt2 = {pa: windowed(la, 4), pb: windowed(lb, 0)} if pa != pb else None
+    if pa == pb:
+        # identical bridges -> di<prefix>, low window is the (1,4)/(1,3) pattern.
+        s0 = tuple(windowed(la, 0)) + tuple(windowed(lb, 4))
+        s1 = tuple(windowed(la, 4)) + tuple(windowed(lb, 0))
+        lo = min(s0, s1)
+        pair_lo = list(lo[:2])
+        pair_hi = list(lo[2:])
+        return (f"{_format_locants(pair_lo)}:{_format_locants(pair_hi)}"
+                f"-di{pa}")
+
+    # cite alphanumerically, heteroatom bridge senior (P-25.4.3.2.2).
+    senior_pfx = _order_two_bridges(entries)[0][0]
+
+    def combined(opt):
+        # P-25.4.4.1 minimise combined locant set; TIE-BREAK: the senior
+        # (alphanumerically-first / heteroatom) bridge takes the LOW window.
+        return (tuple(sorted(opt[pa] + opt[pb])),
+                tuple(sorted(opt[senior_pfx])))
+
+    best = min((opt1, opt2), key=combined)
+    ordered = _order_two_bridges([(pa, best[pa]), (pb, best[pb])])
+    parts = [f"{_format_locants(sorted(loc))}-{pfx}" for pfx, loc in ordered]
+    return "-".join(parts) + "anthracene"
 
 
 def _cyclic_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):

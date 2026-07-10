@@ -127,3 +127,26 @@ class TestP25PolyvalentBridgesFailClosed:
         # never emit a divalent bridge name for a trivalent attachment
         assert name == "unknown organic compound" or (
             "methano" not in name and "metheno" not in name)
+
+
+@pytest.mark.unit
+class TestP25BridgeLocantSeniority:
+    """P-25.4.4.1/.5.2/.5.3/.3.2.2 — two-bridge locant seniority & citation."""
+
+    def test_dimethanonaphthalene(self):
+        # two identical bridges: 1,4:5,8-dimethanonaphthalene (OPSIN-RT-verified)
+        assert name_compound("C12=CC=C(C=3C4=CC=C(C13)C4)C2") == "1,4:5,8-dimethanonaphthalene"
+
+    def test_epoxy_methano_anthracene_different_bridges(self):
+        # DIFFERENT bridges: epoxy (heteroatom, low locants) + methano;
+        # alphanumerical citation epoxy<methano (OPSIN-RT-verified)
+        assert name_compound("C12=CC(=CC3=CC=4C5=CC=C(C4C=C13)O5)C2") == \
+            "5,8-epoxy-1,3-methanoanthracene"
+
+    def test_ab_order_determinism(self):
+        # DETERMINISM: two SMILES spellings of the same molecule -> identical name.
+        smi_a = "C12=CC=C(C=3C4=CC=C(C13)C4)C2"
+        m = Chem.MolFromSmiles(smi_a)
+        smi_b = Chem.MolToSmiles(m)
+        smi_c = Chem.MolToSmiles(m, rootedAtAtom=5)
+        assert name_compound(smi_a) == name_compound(smi_b) == name_compound(smi_c)
