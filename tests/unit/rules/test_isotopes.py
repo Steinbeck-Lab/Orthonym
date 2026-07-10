@@ -139,3 +139,27 @@ class TestDecorateEndToEnd:
         # Deliberately exotic: a labeled atom with no OPSIN-expressible locus.
         out = decorate_isotopic_name("[36Cl]", "systematic", n)
         assert out is None or "36Cl" not in out or "chlorane" in out  # never a wrong labeled PIN
+
+
+class TestNuclideTieBreaks:
+    def test_tritium_round_trips_via_count_form(self):
+        # P-45.4.3 / oracle: [3H] parses only as (nH1); the count form does.
+        from orthonym.namer import name_compound
+        got = name_compound("[3H]C([3H])([3H])CO", style="systematic")
+        assert got == "(2,2,2-3H3)ethan-1-ol", f"got {got!r}"
+
+    def test_p4543_higher_mass_lower_locant_key(self):
+        # 14C preferred at the lower locant over 13C (BB:22232).
+        from orthonym.rules.isotopes import _p4542_p4543_key
+        # two candidate placements of the SAME structure differing only in which
+        # nuclide sits at the lower locant; higher mass -> lower locant wins.
+        hi_at_2 = [(2, 14, "C", 1), (4, 13, "C", 1)]
+        hi_at_4 = [(4, 14, "C", 1), (2, 13, "C", 1)]
+        assert _p4542_p4543_key(hi_at_2) < _p4542_p4543_key(hi_at_4)
+
+    def test_p4542_higher_z_lower_locant_key(self):
+        # 18O (Z=8) preferred at the lower locant over 13C (Z=6) (BB:22224).
+        from orthonym.rules.isotopes import _p4542_p4543_key
+        o_low = [(1, 18, "O", 1), (2, 13, "C", 1)]
+        c_low = [(1, 13, "C", 1), (2, 18, "O", 1)]
+        assert _p4542_p4543_key(o_low) < _p4542_p4543_key(c_low)
