@@ -106,3 +106,68 @@ class TestP25ParentSelectionTiebreakGtoJ:
         # (h) lower-locants-for-heteroatoms tuple is populated for a het component.
         assert isinstance(r.het_locants_stub, tuple)
         assert len(r.het_locants_stub) >= 1
+
+
+@pytest.mark.unit
+class TestP25InteriorAtomNumberingFailClosed:
+    """P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2 — interior-atom numbering needs
+    superscript interior locants (3a1 / 2a1H). OPSIN 2.9 CANNOT parse any
+    name carrying such a token (verified: '2a1H-cyclopenta[cd]pyrene' and
+    'pyracylene' both yield blank), so there is NO verifiable oracle.
+    Orthonym MUST fail closed (never emit an unverifiable interior-locant
+    name). Follow-up: build the interior_atom_numbering_engine when a
+    parseable oracle exists.
+
+    NOTE 1: the plan's original probe SMILES (benzo[ghi]perylene with an
+    interior N/O forced) are INVALID in RDKit; per the plan's fallback
+    instruction they are replaced with the RDKit-valid interior-heteroatom
+    phenalene skeletons (central N shared by all three peri-fused rings = the
+    3a1 interior position).
+
+    NOTE 2 (reproduce-first finding): the test-suite conftest autouse fixture
+    `_disable_opsin_validity_gate_for_tests` turns the production SELF-01 OPSIN
+    validity gate OFF, so with the gate off the namer emits a von-Baeyer
+    fallback (e.g. '13-aza-tricyclo[...]...') rather than the sentinel. That
+    von-Baeyer name is NOT an interior-superscript FUSION name, and in
+    PRODUCTION (gate ON) it is suppressed because it does not OPSIN-round-trip.
+    The fail-closed contract is therefore asserted two ways: (1) the emitted
+    name never carries a fused-ring interior superscript-locant token, and
+    (2) with the production gate re-enabled the namer declines to the sentinel.
+    """
+
+    _INTERIOR_SMILES = [
+        "C1=CC2=CC=CC3=CC=CC(=C1)N23",   # interior-N phenalene skeleton (3a1 needs superscript)
+        "C1=CC2=CC=CN3C=CC=C(C1)C23",    # interior-N variant (peri-fused, superscript needed)
+    ]
+
+    @pytest.mark.parametrize("smiles", _INTERIOR_SMILES)
+    def test_no_interior_superscript_fusion_name_emitted(self, smiles):
+        # Gate-independent: Orthonym must never emit a fused-ring interior
+        # superscript-locant PIN (the '3a1'/'2a1H' form OPSIN 2.9 cannot parse).
+        m = Chem.MolFromSmiles(smiles)
+        if m is None:
+            pytest.skip("probe SMILES invalid in RDKit; substitute a valid interior-heteroatom peri-fused system")
+        out = name_compound(smiles)
+        # a fused interior superscript locant looks like <digit>a<digit> or a
+        # '<digit>a<digit>H-' indicated-H prefix (NOT the von-Baeyer '^n,m').
+        import re
+        assert not re.search(r"\d+a\d+", out or ""), (
+            f"emitted an interior-superscript fusion name: {out!r}"
+        )
+
+    @pytest.mark.parametrize("smiles", _INTERIOR_SMILES)
+    def test_production_gate_declines(self, smiles, monkeypatch):
+        # Re-enable the production SELF-01 validity gate (the conftest autouse
+        # fixture disables it) and assert the namer fails closed to the sentinel
+        # for these no-verifiable-oracle interior-atom systems.
+        m = Chem.MolFromSmiles(smiles)
+        if m is None:
+            pytest.skip("probe SMILES invalid in RDKit; substitute a valid interior-heteroatom peri-fused system")
+        import orthonym.namer as _namer
+        if not _namer._validity_gate_jar_present():
+            pytest.skip("OPSIN jar not present; production gate cannot run")
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        out = name_compound(smiles)
+        assert out in (None, "unknown organic compound"), (
+            f"production gate should decline interior-atom system, got {out!r}"
+        )

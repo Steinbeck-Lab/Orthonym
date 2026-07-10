@@ -880,6 +880,18 @@ def name_fused_heterocycle(mol):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
+        # Wave-2 P5 fused (Task 7) FAIL-CLOSED follow-up: interior-heteroatom
+        # ortho-/peri-fused systems (P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2) require
+        # a superscript interior locant (e.g. 3a1 / 2a1H). OPSIN 2.9 CANNOT
+        # parse any name carrying that token (verified: '2a1H-cyclopenta[cd]-
+        # pyrene', 'pyracylene' -> blank), so there is NO verifiable oracle for
+        # the interior-locant PIN. We deliberately decline here (return None)
+        # rather than emit an unverifiable interior-superscript fusion name;
+        # the SELF-01 production gate additionally suppresses any von-Baeyer
+        # fallback that does not round-trip. Build the interior-atom-numbering
+        # engine when a parseable oracle (newer OPSIN / hand-checked internal
+        # oracle) exists. See tests/unit/rules/test_wave2_p5_fused.py
+        # ::TestP25InteriorAtomNumberingFailClosed.
         return None
 
     core_name, atom_mapping, _core_smiles = core_result
