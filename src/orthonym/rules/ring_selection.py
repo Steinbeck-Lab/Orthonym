@@ -689,6 +689,76 @@ def ring_system_score(
 # ============================================================================
 
 
+def _ylidene_linked_parent_ring(
+    mol: Chem.Mol,
+    ring_systems: List[Set[int]],
+) -> Optional[Set[int]]:
+    """Return the ring system that is the parent under P-31.1.4 ylidene linkage.
+
+    Detects a single exocyclic methine/methanediyl carbon that is double-bonded
+    into exactly ONE ring system and single-bonded into exactly ONE OTHER ring
+    system (and bonded to nothing else heavy). The double-bonded ring is the
+    parent; the single-bonded ring + the methine carbon form the ylidene
+    substituent (P-29.6.1 benzylidene for a bare phenyl).
+
+    Fail-closed: returns None (no override) unless there is exactly one such
+    linking carbon connecting exactly two of the given ring systems, with the
+    two rings distinct and the double/single sides unambiguous. Any other shape
+    (>2 rings involved, branching on the methine, no double bond, ring-directly-
+    bonded-ring) leaves the P-44.2 score selector in charge.
+    """
+    def _ring_of(atom_idx: int) -> Optional[int]:
+        for i, sysset in enumerate(ring_systems):
+            if atom_idx in sysset:
+                return i
+        return None
+
+    matches: List[Tuple[int, int]] = []  # (double_ring_idx, single_ring_idx)
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            continue
+        if atom.GetFormalCharge() != 0:
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        # exactly two heavy neighbours: one via '=' into a ring, one via '-'
+        # into a different ring (a bare =CH- or =C< methine bridging two rings).
+        if len(heavy) != 2:
+            continue
+        dbl_ring = None
+        sgl_ring = None
+        ok = True
+        for n in heavy:
+            nb = mol.GetBondBetweenAtoms(atom.GetIdx(), n.GetIdx())
+            r = _ring_of(n.GetIdx())
+            if r is None:
+                ok = False
+                break
+            if nb.GetBondTypeAsDouble() == 2.0:
+                if dbl_ring is not None:
+                    ok = False
+                    break
+                dbl_ring = r
+            elif nb.GetBondTypeAsDouble() == 1.0:
+                if sgl_ring is not None:
+                    ok = False
+                    break
+                sgl_ring = r
+            else:
+                ok = False
+                break
+        if not ok or dbl_ring is None or sgl_ring is None:
+            continue
+        if dbl_ring == sgl_ring:
+            continue
+        matches.append((dbl_ring, sgl_ring))
+
+    # Exactly one unambiguous ylidene linker between two distinct rings.
+    if len(matches) != 1:
+        return None
+    dbl_ring, _sgl = matches[0]
+    return ring_systems[dbl_ring]
+
+
 def select_principal_ring_system(
     mol: Chem.Mol,
     ring_systems: List[Set[int]]
@@ -712,6 +782,20 @@ def select_principal_ring_system(
 
     if len(ring_systems) == 1:
         return tuple(sorted(ring_systems[0]))
+
+    # W2E-D2 (P-29.6.1 / P-31.1.4): a substituent attached to a ring by an
+    # exocyclic DOUBLE bond (ylidene) belongs to the ring on the double-bond
+    # side; the ring it is single-bonded to is cited as the ylidene substituent
+    # (e.g. benzylidenecyclohexane: the =CH-C6H5 methine double-bonds cyclohexane
+    # and single-bonds benzene, so cyclohexane is parent and 'benzylidene' the
+    # substituent). The P-44.2 ring_system_score below would otherwise pick the
+    # senior aromatic ring as parent and try to name the aliphatic ring as a
+    # (never-nameable) ylidene substituent, failing closed. Force the
+    # double-bonded ring here. Fail-closed (no override) on any shape but the
+    # single-methine-between-exactly-two-ring-systems case.
+    _ylidene_ring = _ylidene_linked_parent_ring(mol, ring_systems)
+    if _ylidene_ring is not None:
+        return tuple(sorted(_ylidene_ring))
 
     # Score each ring system and select the one with minimum score
     best_idx = 0

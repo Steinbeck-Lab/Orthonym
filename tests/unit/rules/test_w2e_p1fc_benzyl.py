@@ -19,15 +19,14 @@ class TestP2961Benzyl:
     def test_benzyl_on_pyridine(self):
         assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"
 
-    @pytest.mark.xfail(
-        reason="benzylidene routes through the alkylidene producer, not the "
-        "len(path)==1 CH2 branch — W2E-P1FC follow-up: apply P-29.6.1 "
-        "benzylidene at the ylidene/alkylidene site",
-        strict=False,
-    )
     def test_benzylidene(self):
         # -CH=C6H5 on a ring parent -> benzylidene (P-29.6.1). OPSIN-verified:
-        # benzylidenecyclohexane -> C(C1=CC=CC=C1)=C1CCCCC1.
+        # benzylidenecyclohexane -> C(C1=CC=CC=C1)=C1CCCCC1. W2E-D2: the fix is
+        # in parent selection (ring_selection.select_principal_ring_system) — the
+        # =CH- methine double-bonds cyclohexane (parent) and single-bonds benzene,
+        # so benzene + methine are the retained 'benzylidene' ylidene substituent
+        # (existing _convert_yl_to_ylidene turns the 'benzyl' fragment name into
+        # 'benzylidene' for the exocyclic double bond).
         assert name_compound("C(=C1CCCCC1)c1ccccc1") == "benzylidenecyclohexane"
 
     def test_chloromethylbenzene_unaffected(self):
