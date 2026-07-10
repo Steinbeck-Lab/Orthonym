@@ -1213,6 +1213,40 @@ def name_multiplicative(mol) -> Optional[str]:
     return None
 
 
+def _bridge_units_config_mismatch(mol, bridge_idx: int, conn_atoms: List[int]) -> bool:
+    """P-45.6.2: multiplicative names are configuration-dependent. When the ring
+    double bonds directly borne by the two (or more) bridge-attached carbons carry
+    DIFFERENT specified E/Z configurations, the units are NOT identical and the
+    multiplicative name must decline (the substitutive path names the
+    mixed-configuration isomer).
+
+    The fragment split drops ring-double-bond stereo, so the identity test on the
+    split fragments cannot see it; this compares the specified bond stereo on the
+    whole molecule BEFORE the split. Conservative / fail-closed: it can only make
+    the namer DECLINE more often, never emit a new wrong name. Unspecified stereo
+    on all units (the common no-stereo case) is treated as matching.
+    """
+    stereos = []
+    for c in conn_atoms:
+        atom = mol.GetAtomWithIdx(c)
+        db_stereo = None
+        for b in atom.GetBonds():
+            if b.GetBondType() != Chem.BondType.DOUBLE:
+                continue
+            # only ring double bonds (both ends in a ring, bond in a ring)
+            if not b.IsInRing():
+                continue
+            db_stereo = b.GetStereo()
+            break
+        stereos.append(db_stereo)
+    # Ignore units with no ring double bond on the bridge carbon.
+    present = [s for s in stereos if s is not None]
+    if len(present) < 2:
+        return False
+    # Decline if any two specified/unspecified states disagree.
+    return any(s != present[0] for s in present[1:])
+
+
 def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
     """Try to find single-atom bridges between identical ring systems."""
     for atom in mol.GetAtoms():
@@ -1257,6 +1291,12 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         canon_a = Chem.CanonSmiles(frag_smiles_a)
         canon_b = Chem.CanonSmiles(frag_smiles_b)
         if canon_a != canon_b:
+            continue
+
+        # P-45.6.2: decline when the bridge-attached ring double bonds carry
+        # DIFFERENT specified configurations (the units are then not identical;
+        # the substitutive path names the mixed-config isomer). Fail-closed.
+        if _bridge_units_config_mismatch(mol, idx, nbr_indices):
             continue
 
         # C4 (P-62.2.2 / P-14.5): substitutive-PIN decline for the NITROGEN

@@ -125,3 +125,23 @@ class TestP45SubstitutiveFallthrough:
         # Control: no-Cl symmetric oxydibenzoic acid unchanged.
         assert name_compound("OC(=O)c1ccc(Oc2ccc(C(=O)O)cc2)cc1") == \
             "4,4'-oxydibenzoic acid"
+
+
+@pytest.mark.unit
+class TestP45StereoConfigMismatch:
+    def test_no_stereo_keeps_multiplicative(self):
+        # baseline: no stereo -> identical units -> multiplicative form retained
+        assert name_compound("C1(=CCCCCCC1)SC1=CCCCCCC1") == "1,1'-sulfanediyldicyclooctene"
+
+    def test_mismatched_config_declines_multiplicative(self):
+        # P-45.6.2: a sulfanediyl bridge linking two cyclooctene units of DIFFERENT
+        # ring-double-bond configuration must NOT be named multiplicatively.
+        # name_multiplicative declines. (NOTE: RDKit does not retain E/Z on both
+        # 8-membered ring double bonds through the fragment split, so the identity
+        # test cannot see it post-split; the decline is enforced by a config-aware
+        # guard on the bridge-adjacent ring double bonds BEFORE the split.)
+        from orthonym.rules.multiplicative import name_multiplicative
+        from rdkit import Chem
+        mixed = Chem.MolFromSmiles(r"C1(=C/CCCCCC1)S/C1=C\CCCCCC1")
+        assert mixed is not None
+        assert name_multiplicative(mixed) is None
