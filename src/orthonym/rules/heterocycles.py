@@ -1851,6 +1851,48 @@ def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
     return result
 
 
+# P-31.1.4.3.4 (heteroatom-locant citation for retained Hantzsch-Widman-derived
+# saturated hetero-ring parents when they carry a characteristic-group suffix).
+# Bare parent names ('thiazolidine') carry the numbering implicitly, but a
+# suffixed PIN must cite the heteroatom locant set immediately before the parent
+# stem: '1,3-thiazolidin-4-one', '1,3-oxazolidin-2-one'. Curated + OPSIN-verified:
+# only these two retained stems BOTH require and accept the explicit locant
+# citation in OPSIN 2.9. The 'iso' (1,2-) forms and the all-nitrogen
+# imidazolidine/pyrazolidine and the retained morpholine/piperazine/piperidine
+# families do NOT take (and OPSIN rejects) an explicit heteroatom-locant prefix,
+# so they are deliberately excluded. Value = expected element-ordered heteroatom
+# locant set; the fix is gated on a match against the actual ring numbering so it
+# fails closed if the numbering is not deterministically the canonical one.
+_RETAINED_HETERO_LOCANT_CITATION = {
+    'thiazolidine': [1, 3],   # S=1, N=3
+    'oxazolidine': [1, 3],    # O=1, N=3
+}
+
+
+def _retained_heteroatom_locant_prefix(
+    mol, ring_atoms, parent_name: str, atom_to_locant: Dict[int, int]
+) -> str:
+    """Return the heteroatom-locant prefix ('1,3-') for a suffixed retained
+    Hantzsch-Widman-derived saturated hetero-ring parent, else '' (fail-closed).
+
+    Only fires for the curated `_RETAINED_HETERO_LOCANT_CITATION` stems, and only
+    when the ring's actual heteroatom locants (from `atom_to_locant`) match the
+    stem's canonical set exactly — so a nonstandard numbering never fabricates a
+    wrong locant string.
+    """
+    expected = _RETAINED_HETERO_LOCANT_CITATION.get(parent_name)
+    if expected is None:
+        return ''
+    ring_set = set(ring_atoms) if ring_atoms else set()
+    hetero_locants = sorted(
+        loc for aidx, loc in atom_to_locant.items()
+        if aidx in ring_set and mol.GetAtomWithIdx(aidx).GetSymbol() != 'C'
+    )
+    if hetero_locants != expected:
+        return ''
+    return ",".join(str(loc) for loc in expected) + "-"
+
+
 def name_substituted_heterocycle(
     mol,
     ring_atoms,
@@ -2105,6 +2147,21 @@ def name_substituted_heterocycle(
         multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
         suffix_token = f"{multiplier}{chosen_suffix}"
+        # P-31.1.4.3.4: a suffixed retained HW-derived saturated hetero-ring
+        # parent must cite its heteroatom locant set immediately before the
+        # parent stem (thiazolidine -> 1,3-thiazolidin-4-one). Inject it at the
+        # parent-stem boundary within `combined` (after any detachable prefix).
+        _het_loc_prefix = _retained_heteroatom_locant_prefix(
+            mol, ring_atoms, parent_name, atom_to_locant
+        )
+        if _het_loc_prefix and combined.endswith(parent_name):
+            _stem_start = len(combined) - len(parent_name)
+            _head = combined[:_stem_start]
+            # A preceding detachable prefix ends in a letter/closing-mark; insert
+            # a hyphen so '2-methyl' + '1,3-' reads '2-methyl-1,3-thiazolidin...'.
+            if _head and (_head[-1].isalpha() or _head[-1] in (')', ']', '}')):
+                _head += "-"
+            combined = _head + _het_loc_prefix + parent_name
         # IUPAC P-16.3.3: elide the parent's terminal 'e' before a suffix token
         # that begins with a vowel (piperidine -> piperidin-4-one,
         # pyridine -> pyridin-2-ol). A consonant-initial token (multiplied

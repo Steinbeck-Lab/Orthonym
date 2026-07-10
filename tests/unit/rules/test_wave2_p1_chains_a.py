@@ -72,18 +72,14 @@ class TestP64RingKetonicSuffixSeniority:
         # P-64.6.2 root heal: the lactam handler was DROPPING the ring S
         # (O=C1CSCN1 -> 'pyrrolidin-2-one', SELF-01-suppressed). The narrowed
         # lactam predicate + the ring-ketone '-one' suffix now name it
-        # structurally correctly (OPSIN-RT verified). The PIN form carries the
-        # '1,3-' heteroatom locants (see xfail below); this asserts the shipped
-        # structural heal (RT-OK).
-        assert name_compound("O=C1CSCN1") == "thiazolidin-4-one"
+        # structurally correctly (OPSIN-RT verified). Since the P-31.1.4.3.4
+        # heteroatom-locant citation shipped, the exact PIN form '1,3-...' is
+        # now emitted (see test_thiazolidinone_exact_pin).
+        assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
-    @pytest.mark.xfail(reason="P-64.6.2 follow-up: retained-name parent "
-                              "(thiazolidine) omits heteroatom locants when "
-                              "suffixed; PIN needs '1,3-'. Shipped RT-OK "
-                              "'thiazolidin-4-one'. Broad locant-citation fix "
-                              "for retained multi-heteroatom saturated parents "
-                              "deferred.")
     def test_thiazolidinone_exact_pin(self):
+        # P-31.1.4.3.4: suffixed retained HW-derived saturated hetero-ring parent
+        # cites its heteroatom locant set before the stem ('1,3-thiazolidin-4-one').
         assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
     @pytest.mark.xfail(reason="P-64.6.2 sulfanylidene follow-up: the ring C=S "
