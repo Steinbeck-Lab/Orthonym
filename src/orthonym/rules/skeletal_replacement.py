@@ -1575,9 +1575,12 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
 
     total_hetero = sum(len(locs) for _, locs in sorted_groups)
     # P-22.2.3.2.1: a single ring heteroatom is assigned locant '1', which is
-    # OMITTED from the name (unless an indicated-hydrogen locant is present;
-    # saturated replacement rings carry none).
-    elide_single = total_hetero == 1
+    # OMITTED from the name (unless an indicated-hydrogen locant is present).
+    # The omission applies ONLY to the SATURATED ring (all_single): when the
+    # ring carries unsaturation (ene/yne locants are cited), the heteroatom
+    # locant '1' is retained as the reference for those locants
+    # (1-azacyclopentadeca-2,4,6,8,10,12,14-heptaene, NOT azacyclopentadeca-...).
+    elide_single = total_hetero == 1 and all_single
 
     parts = []
     for symbol, locants in sorted_groups:
