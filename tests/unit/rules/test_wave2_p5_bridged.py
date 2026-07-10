@@ -168,3 +168,17 @@ class TestP23SecondaryBridgesFailClosed:
         # protect the simple dihydro-methano bridge (not a secondary bridge)
         assert name_compound("C12C=CC(C3=CC=CC=C13)C2") == \
             "1,4-dihydro-1,4-methanonaphthalene"
+
+
+@pytest.mark.unit
+class TestP31TripleBondBridge:
+    """P-31.1.4.3 — triple-bond ('ethyno') bridges. No OPSIN-parseable
+    bridged-fused PIN; the constructor MUST detect the triple bond and fail
+    closed rather than mis-name it as ethano/etheno (which would drop a bond
+    = a wrong structure)."""
+
+    def test_acetylenic_bridge_declines(self):
+        # -C#C- bridge across naphthalene -> must NOT emit ethano/etheno
+        name = name_compound("C12=CC=C(C3=CC=CC=C13)C#C2")
+        assert name == "unknown organic compound" or (
+            "ethano" not in name and "etheno" not in name)
