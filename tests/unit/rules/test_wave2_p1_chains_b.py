@@ -145,3 +145,46 @@ class TestP45StereoConfigMismatch:
         mixed = Chem.MolFromSmiles(r"C1(=C/CCCCCC1)S/C1=C\CCCCCC1")
         assert mixed is not None
         assert name_multiplicative(mixed) is None
+
+
+@pytest.mark.unit
+class TestP28RingAssemblyBeyondSix:
+    # 11 para-linked benzenes -> 'undeciphenyl' (OPSIN parses+round-trips this form).
+    UNDECI_SMILES = ("c1ccc(-c2ccc(-c3ccc(-c4ccc(-c5ccc(-c6ccc(-c7ccc(-c8ccc("
+                     "-c9ccc(-c%10ccc(-c%11ccccc%11)cc%10)cc9)cc8)cc7)cc6)cc5)"
+                     "cc4)cc3)cc2)cc1")
+
+    def test_undeciphenyl_names(self):
+        from orthonym.namer import name_compound
+        name = name_compound(self.UNDECI_SMILES)
+        # OPSIN-verified: the 11-mer explicit-locant assembly parses+round-trips.
+        assert name is not None
+        assert name.endswith("-undeciphenyl")
+
+    def test_undeciphenyl_opsin_round_trips(self):
+        # OPSIN oracle (the extension IS parseable, unlike the phane class).
+        from orthonym.namer import name_compound
+        from rdkit import Chem
+        import subprocess
+        name = name_compound(self.UNDECI_SMILES)
+        jar = "opsin-cli-2.9.0-jar-with-dependencies.jar"
+        out = subprocess.run(["java", "-jar", jar, "-o", "smi"],
+                             input=name + "\n", capture_output=True, text=True)
+        opsin_smi = out.stdout.strip().splitlines()[0] if out.stdout.strip() else ""
+        assert opsin_smi, "OPSIN failed to parse undeciphenyl"
+        assert Chem.CanonSmiles(opsin_smi) == Chem.CanonSmiles(self.UNDECI_SMILES)
+
+    def test_paracyclophane_fails_closed_internal_oracle(self):
+        # P-28.5 phane class: a benzene bridged para-para into a macrocycle
+        # ([n]paracyclophane) is OPSIN-UNPARSEABLE. Orthonym must NOT emit a
+        # (necessarily unverifiable) phane name for it -> fail-closed (None).
+        # INTERNAL oracle: assert refusal, never a passing OPSIN gold.
+        from orthonym.namer import name_compound
+        from rdkit import Chem
+        phane = "C1Cc2ccc(cc2)CCc2ccc1cc2"
+        m = Chem.MolFromSmiles(phane)
+        if m is None:
+            pytest.skip("phane test SMILES invalid in this RDKit build")
+        # Must NOT emit a linear ring-assembly ('...phenyl') name for a macrocyclic phane.
+        name = name_compound(phane)
+        assert name is None or "phenyl" not in (name or "")

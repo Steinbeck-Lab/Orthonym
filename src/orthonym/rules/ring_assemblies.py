@@ -65,6 +65,12 @@ ASSEMBLY_MULTIPLIERS = {
     8: "octi",
     9: "novi",
     10: "deci",
+    # P-28.5 / IUPAC multiplying affixes: ring assemblies of more than six (and
+    # beyond the old deci cap) identical cyclic systems. OPSIN-verified that the
+    # explicit-locant assembly with 'undeci' (11) round-trips. Counts above 12
+    # keep the .get(count)->None decline (no OPSIN-verifiable affix -> fail closed).
+    11: "undeci",
+    12: "dodeci",
 }
 
 
