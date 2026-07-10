@@ -490,6 +490,48 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
     return tuple(out)
 
 
+def _bridged_fused_prebridge_metrics(
+    mol: Chem.Mol, system_atoms: Set[int]
+) -> Tuple[int, int, int, int]:
+    """P-44.2.2.2.4 criteria (a),(b),(c),(n) — the cheaply + deterministically
+    computable subset of the 14 bridged-fused tiebreakers:
+      (a) more rings, (b) more ring atoms, (c) fewer heteroatoms,
+      (n) more noncumulative double bonds — scoped to the bridged-fused system.
+    Criteria (d)-(m) need the full bridge parse (attachment locants, composite/
+    dependent-bridge classification) and are DEFERRED (fail-closed): the scorer
+    never emits a spelling-dependent difference for them (p5_bridged engine).
+    Returns (0,0,0,0) for a non-bridged-fused system so the term is inert
+    elsewhere. Deterministic (atom-set only)."""
+    zero = (0, 0, 0, 0)
+    try:
+        from .bridged_fused import detect_bridged_fused
+    except ImportError:
+        return zero
+    sub = _build_submol(mol, system_atoms)
+    if sub is None:
+        return zero
+    try:
+        if not detect_bridged_fused(sub):
+            return zero
+    except Exception:
+        return zero
+    ri = mol.GetRingInfo()
+    num_rings = sum(1 for r in ri.AtomRings() if set(r) <= set(system_atoms))
+    num_ring_atoms = len(system_atoms)
+    num_hetero = sum(
+        1 for i in system_atoms if mol.GetAtomWithIdx(i).GetAtomicNum() != 6
+    )
+    num_double = 0
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in system_atoms and b in system_atoms:
+            if bond.GetIsAromatic() or bond.GetBondType() == Chem.BondType.DOUBLE:
+                num_double += 1
+    # (a) more rings, (b) more atoms, (n) more double bonds -> negate for min();
+    # (c) FEWER heteroatoms -> keep positive so fewer sorts first.
+    return (-num_rings, -num_ring_atoms, num_hetero, -num_double)
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -550,6 +592,7 @@ def ring_system_score(
             + ((_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH,)
             + ((_FUSION_NUMBER_SENTINEL,) * _FUSION_NUMBER_WIDTH,)
             + ((_P25_8_SENTINEL,) * _P25_8_HET_LOCANT_WIDTH,)
+            + (0, 0, 0, 0)
         )
 
     # 1. Type rank
@@ -637,6 +680,7 @@ def ring_system_score(
         _fusion_descriptor_letters(mol, system_atoms),  # P-44.2.2.2.3.3: fusion letters
         _fusion_descriptor_numbers(mol, system_atoms),  # P-44.2.2.2.3.4: fusion numbers
         _p25_8_component_rank(mol, system_atoms),        # P-44.2.2.2.3.5: P-25.8 component
+        *_bridged_fused_prebridge_metrics(mol, system_atoms),  # P-44.2.2.2.4 (a,b,c,n)
     )
 
 

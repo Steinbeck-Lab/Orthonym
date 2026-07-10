@@ -155,3 +155,35 @@ class TestP44ComponentSeniorityP25_8:
         for _ in range(5):
             alt = Chem.MolFromSmiles(Chem.MolToSmiles(m0, doRandom=True))
             assert winner_score(alt) == base
+
+
+@pytest.mark.unit
+class TestP44BridgedFusedTiebreakers:
+    def test_score_tuple_grows(self):
+        m = Chem.MolFromSmiles("C1CC2CCC1CC2")
+        tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert len(tup) == 39  # 35 + 4 pre-bridge metric terms (a,b,c,n) spread
+        assert all(isinstance(x, int) for x in tup[35:39])  # pre-bridge metrics
+
+    def test_prebridge_metrics(self):
+        from orthonym.rules.ring_selection import _bridged_fused_prebridge_metrics
+        m = Chem.MolFromSmiles("C1CC2CCC1CC2")
+        metrics = _bridged_fused_prebridge_metrics(
+            m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert len(metrics) == 4
+
+    @pytest.mark.xfail(reason="P-44.2.2.2.4 criteria (d)-(m) need the full bridge parse "
+                              "(attachment locants, composite/dependent-bridge classification); "
+                              "deferred to the bridged-fused engine (p5_bridged). The scorer never "
+                              "emits a spelling-dependent difference for these — fail-closed.")
+    def test_bridge_attachment_locant_tiebreak(self):
+        # (e) lower bridge-attachment locants — not resolvable without the bridge parse.
+        assert False
+
+    def test_prebridge_metrics_spelling_independent(self):
+        from orthonym.rules.ring_selection import _bridged_fused_prebridge_metrics
+        def m4(smi):
+            m = Chem.MolFromSmiles(smi)
+            return _bridged_fused_prebridge_metrics(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        # bicyclo[2.2.2]octane spelled two ways -> identical pre-bridge metrics
+        assert m4("C1CC2CCC1CC2") == m4("C1CC2CCC(C1)CC2")
