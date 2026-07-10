@@ -150,3 +150,21 @@ class TestP25BridgeLocantSeniority:
         smi_b = Chem.MolToSmiles(m)
         smi_c = Chem.MolToSmiles(m, rootedAtAtom=5)
         assert name_compound(smi_a) == name_compound(smi_b) == name_compound(smi_c)
+
+
+@pytest.mark.unit
+class TestP23SecondaryBridgesFailClosed:
+    """P-23.2.6.2.3/.2.4/.2.5 — secondary (dependent) bridges are von Baeyer
+    territory (superscript locants, tetracyclo[...0^2,7]). The bridged-fused
+    constructor MUST decline them (return None) so it never emits a wrong
+    partial name; the von Baeyer engine owns them downstream."""
+
+    def test_secondary_bridge_fused_declines_in_constructor(self):
+        from orthonym.rules.bridged_fused import name_bridged_fused_pin
+        m = Chem.MolFromSmiles("C12CC3CC(C1)C(C2)C3c1ccccc1")
+        assert name_bridged_fused_pin(m) is None
+
+    def test_simple_single_bridge_still_named(self):
+        # protect the simple dihydro-methano bridge (not a secondary bridge)
+        assert name_compound("C12C=CC(C3=CC=CC=C13)C2") == \
+            "1,4-dihydro-1,4-methanonaphthalene"

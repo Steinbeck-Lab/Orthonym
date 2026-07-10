@@ -768,6 +768,15 @@ def name_bridged_fused_pin(mol):
     own locant set, then the parent (Blue Book P-25.4.3.4 / P-31.1.4.3.4):
     '1,4-dihydro-1,4-methanonaphthalene', '1,4-epoxy-1,4-dihydronaphthalene',
     '1,4-ethano-1,2,3,4-tetrahydronaphthalene'.
+
+    SECONDARY BRIDGES (P-23.2.6.2.3/.2.4/.2.5) are NOT handled here: a dependent
+    secondary bridge (a bridge whose termini are themselves bridge atoms,
+    numbered with superscript locants like ``0^2,7``) is von Baeyer territory
+    (``tetracyclo[...0^2,7]...``), owned by ``polycyclic_von_baeyer.py``. Such a
+    topology never yields a clean naphthalene/anthracene residual through the
+    excision/partition guards below, so it fails closed here and cascades to the
+    von Baeyer engine — a documented follow-up if a fused-parent secondary-bridge
+    PIN ever needs Orthonym emission.
     """
     if mol is None:
         return None
