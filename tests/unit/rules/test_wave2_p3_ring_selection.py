@@ -98,3 +98,25 @@ class TestP44FusionDescriptorLetters:
             return _fusion_descriptor_letters(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
         # quinoline spelled two ways -> identical fusion-letter set
         assert letters("c1ccc2ncccc2c1") == letters("c1ccc2c(c1)cccn2")
+
+
+@pytest.mark.unit
+class TestP44FusionDescriptorNumbers:
+    def test_score_tuple_grows(self):
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert len(tup) >= 34  # 33 + fusion-descriptor-number term
+        assert isinstance(tup[33], tuple)
+
+    def test_numbers_extracted(self):
+        from orthonym.rules.ring_selection import _fusion_descriptor_numbers
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        nums = _fusion_descriptor_numbers(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert isinstance(nums, tuple)
+
+    def test_numbers_spelling_independent(self):
+        from orthonym.rules.ring_selection import _fusion_descriptor_numbers
+        def nums(smi):
+            m = Chem.MolFromSmiles(smi)
+            return _fusion_descriptor_numbers(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert nums("c1ccc2ncccc2c1") == nums("c1ccc2c(c1)cccn2")

@@ -429,6 +429,27 @@ def _fusion_descriptor_letters(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[i
     return tuple(out)
 
 
+def _fusion_descriptor_numbers(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
+    """P-44.2.2.2.3.4 criterion (d): the fused system's fusion-descriptor NUMBERS
+    (attachment locants inside the bracket, in citation order; lower = senior).
+    Returns a fixed-width tuple padded with a sentinel; all-sentinel when no
+    explicit descriptor. Spelling-independent (deterministic namer)."""
+    pad = (_FUSION_NUMBER_SENTINEL,) * _FUSION_NUMBER_WIDTH
+    name = _fused_system_name(mol, system_atoms)
+    if not name:
+        return pad
+    nums: List[int] = []
+    # descriptor numbers appear as "[2,3-c]" (and multi-attachment "[3,2-b:...]")
+    for m in _re.finditer(r"\[([0-9,]+)-[a-z]", name):
+        for tok in m.group(1).split(','):
+            if tok.isdigit():
+                nums.append(int(tok))
+    if not nums:
+        return pad
+    out = (nums + list(pad))[:_FUSION_NUMBER_WIDTH]
+    return tuple(out)
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -462,6 +483,7 @@ def ring_system_score(
     - [30] -sat_monocyclic_spiro: P-44.2.2.2.1.2(b) all-sat-monocyclic (negated)
     - [31] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (nested tuple)
     - [32] fusion-descriptor letters: P-44.2.2.2.3.3 lower letters (nested tuple)
+    - [33] fusion-descriptor numbers: P-44.2.2.2.3.4 lower numbers (nested tuple)
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
@@ -484,6 +506,7 @@ def ring_system_score(
             + (999, 0, 0, 0, 0)
             + ((_SPIRO_LOCANT_SENTINEL,) * _SPIRO_LOCANT_WIDTH,)
             + ((_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH,)
+            + ((_FUSION_NUMBER_SENTINEL,) * _FUSION_NUMBER_WIDTH,)
         )
 
     # 1. Type rank
@@ -569,6 +592,7 @@ def ring_system_score(
         -int(sat_mono),                     # P-44.2.2.2.1.2(b): sat-monocyclic-spiro
         spiro_locants,                      # P-44.2.2.2.1.2: lower spiro-atom locants
         _fusion_descriptor_letters(mol, system_atoms),  # P-44.2.2.2.3.3: fusion letters
+        _fusion_descriptor_numbers(mol, system_atoms),  # P-44.2.2.2.3.4: fusion numbers
     )
 
 
