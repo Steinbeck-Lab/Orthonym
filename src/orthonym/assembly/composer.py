@@ -2714,6 +2714,12 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_polyspiro_diff(mol):
         return True
 
+    # P-24.7 branched polyspiro (central >=3-junction). Recognised as complex so
+    # the dispatcher can FAIL CLOSED (refuse) rather than leaking a partial name.
+    from ..rules.spiro import is_branched_polyspiro as _is_branched_polyspiro
+    if _is_branched_polyspiro(mol):
+        return True
+
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
     # to return True. Spiro check must precede polycyclic to avoid misrouting.
@@ -2778,6 +2784,14 @@ def _classify_complex_ring(mol) -> str:
     _input_is_polyspiro_diff = _is_polyspiro_diff_classify(mol)
     if _input_is_polyspiro_diff:
         return 'polyspiro-different'
+
+    # P-24.7 BRANCHED polyspiro (central component with >=3 spiro junctions).
+    # The full component-name build is a follow-on; recognise the class here and
+    # route to a FAIL-CLOSED tag so it refuses (UNSUPPORTED_RING_SYSTEM) rather
+    # than leaking a structure-dropping partial name from the ortho-fused path.
+    from ..rules.spiro import is_branched_polyspiro as _is_branched_polyspiro_classify
+    if _is_branched_polyspiro_classify(mol):
+        return 'polyspiro-branched-different'
 
     # Check bridged-fused FIRST (fused core + bridges)
     # Must come before bicyclo/polycyclic to avoid misclassification
@@ -3056,6 +3070,18 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Unbranched-polyspiro-different naming failed for molecule")
+            return None
+
+        elif ring_type == 'polyspiro-branched-different':
+            # P-24.7: branched polyspiro (central >=3-junction component). The
+            # component-name build is a documented follow-on -> FAIL CLOSED
+            # (refuse) so no structure-dropping partial name leaks.
+            from ..rules.spiro import name_branched_polyspiro
+            result = name_branched_polyspiro(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Branched-polyspiro-different unsupported (fail-closed)")
             return None
 
         elif ring_type == 'spiro-vonbaeyer':

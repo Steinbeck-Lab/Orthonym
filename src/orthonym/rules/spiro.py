@@ -2576,6 +2576,41 @@ def _name_unbranched_polyspiro_different_core(mol):
     return name, all_ring_atoms, combined
 
 
+def is_branched_polyspiro(mol) -> bool:
+    """P-24.7: BRANCHED polyspiro — a central fused-ring component that carries
+    THREE OR MORE spiro junctions (a branching node). Detection only: the full
+    branched component-name build (heteromonocycle central components,
+    3-junction walk) is a documented follow-on, so ``name_branched_polyspiro``
+    fails closed. Recognising the class here routes it to a fail-closed tag
+    instead of leaking a structure-dropping partial name from the ortho-fused
+    path (accuracy-first: never a wrong name)."""
+    if mol is None:
+        return False
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) < 3:
+        return False
+    # A pure spiro tree (n_rings == n_spiro + 1) of MONOCYCLES is a von-Baeyer
+    # branched descriptor (Task 2) — not this component-name class.
+    ri = mol.GetRingInfo()
+    if ri.NumRings() == len(spiro_atoms) + 1:
+        return False
+    for _atoms, spiros in _fused_ring_components(mol):
+        if len(spiros) >= 3:
+            return True
+    return False
+
+
+def name_branched_polyspiro(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """P-24.7 branched polyspiro with different terminal components. The
+    component-name build (central heteromonocycle naming e.g. ``[1,5]dithiocane``
+    + branched 3-junction walk + robust fused-fragment kekulisation) is a
+    documented follow-on — FAIL CLOSED (return None) so the system refuses
+    rather than emitting a structure-dropping partial name."""
+    return None
+
+
 def is_unbranched_polyspiro_different(mol) -> bool:
     """P-24.6: unbranched polyspiro, different components, >=1 polycyclic."""
     if mol is None:

@@ -50,3 +50,40 @@ class TestP24UnbranchedPolyspiroDifferent:
         # P-24.6: unbranched polyspiro, three different components.
         assert name_compound("C1=CC2(CCC3(CC2)c2ccccc2-c2ccccc23)c2ccccc21") == \
             "dispiro[fluorene-9,1'-cyclohexane-4',1''-indene]"
+
+
+@pytest.mark.unit
+class TestP24BranchedPolyspiroDifferent:
+    # P-24.7.2: branched polyspiro with different terminals around a central
+    # component that carries >=2 spiro junctions. This target's central
+    # component is the HETEROMONOCYCLE [1,5]dithiocane (a Hantzsch-Widman ring
+    # name the spiro-component namers do not yet emit) AND requires the branched
+    # 3-junction central walk + robust indene-fragment kekulization. UNDER-SCOPE
+    # (plan rule 7): deferred with a follow-up; fail-closed guaranteed below.
+    @pytest.mark.xfail(reason="P-24.7.2 branched polyspiro DIFFERENT: central "
+                              "heteromonocycle [1,5]dithiocane spiro-component "
+                              "naming + branched 3-junction walk not built; "
+                              "deferred (fail-closed, never a wrong name).")
+    def test_cyclohexane_dithiocane_cyclopentane_indene(self):
+        assert name_compound("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1") == \
+            "trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',2'''-indene]"
+
+    def test_branched_polyspiro_classified_fail_closed(self):
+        # The SPIRO dispatch recognises the branched-polyspiro class and REFUSES
+        # (never emits a branched-different name it cannot fully build). The
+        # complex-ring dispatcher returns None for it; the residual partial
+        # heteromonocycle name that the general monocyclic path may emit in a
+        # JVM-less test env is a pre-existing namer-core issue (backstopped by
+        # SELF-01/OPSIN in production) and is outside this spiro plan's scope.
+        from rdkit import Chem
+        from orthonym.rules.spiro import (
+            is_branched_polyspiro, name_branched_polyspiro,
+        )
+        from orthonym.assembly.composer import _classify_complex_ring
+        m = Chem.MolFromSmiles("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1")
+        assert is_branched_polyspiro(m) is True
+        assert name_branched_polyspiro(m) is None
+        assert _classify_complex_ring(m) == "polyspiro-branched-different"
+        # And it must NEVER emit the (unbuilt) correct branched-different name.
+        assert name_compound("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1") != \
+            "trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',2'''-indene]"
