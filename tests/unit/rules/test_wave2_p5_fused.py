@@ -209,3 +209,29 @@ class TestP25ThreeComponentOrthoPeri:
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
         out = name_compound("C1=CC=C2C(=C1)C=CC3=C2C4=CC=CC=C4C5=CC=CC=C35")
         assert out in (None, "unknown organic compound")
+
+
+@pytest.mark.unit
+class TestP31HeteroatomicRingAssembly:
+    def test_bi_oxaphosphinine(self):
+        # P-31.1.7.3: heteroatomic ring assembly named by a-replacement;
+        # low locants to ring junctions -> heteroatoms -> unsaturation.
+        # OPSIN-RT-verified: 4,4'-bi(4H-1,4-oxaphosphinine) -> O1C=CP(C=C1)P1C=COC=C1
+        # Three defects fixed: (1) stem 'oxaphosphine' -> 'oxaphosphinine'
+        # (HW Table 2.7 class 6C '-inine' unsaturated ending); (2) missing '4H'
+        # indicated hydrogen (computed on the isolated parent hydride, not the
+        # assembly-embedded ring); (3) missing enclosing parentheses (P-28.2.1
+        # compound-component enclosure with the indicated-H kept inside).
+        assert name_compound("O1C=CP(C=C1)P1C=COC=C1") == "4,4'-bi(4H-1,4-oxaphosphinine)"
+
+    def test_hw_6c_inine_stem_monomer(self):
+        # HW Table 2.7 class 6C: an unsaturated 6-ring with a 6C heteroatom
+        # (P) takes the '-inine' ending. The free parent hydride is the
+        # indicated-H mancude form.
+        assert name_compound("O1C=CPC=C1") == "4H-1,4-oxaphosphinine"
+
+    def test_existing_carbocyclic_assembly_unchanged(self):
+        # regression: a plain N-heterocyclic assembly is unchanged (the HW-6C
+        # stem + enclosed-component changes must not perturb the 'ine' 6-ring
+        # classes: pyridine stays bare, no '-inine', no parentheses).
+        assert name_compound("c1ccncc1-c1ccncc1") == "3,4'-bipyridine"

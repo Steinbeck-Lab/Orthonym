@@ -240,9 +240,30 @@ class TestHWStemsHelpers:
 
     @pytest.mark.unit
     def test_heteroatoms_use_inane_set(self):
-        """Test HETEROATOMS_USE_INANE set contents."""
-        expected = {'N', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'P', 'As', 'Sb'}
+        """Test HETEROATOMS_USE_INANE set contents.
+
+        P-22.2.2.1.3 / Table 2.7: the SATURATED 6-ring '-inane' ending applies
+        to class 6B (N, Si, Ge, Sn, Pb) AND class 6C (P, As, Sb, B, Al, Ga, In,
+        Tl, and the halogens). Wave-2 P5 fused Task 9 corrected the set: the
+        earlier pin omitted the halogens and Al/Ga/In/Tl (6C atoms whose
+        saturated 6-ring also ends '-inane')."""
+        expected = {'N', 'Si', 'Ge', 'Sn', 'Pb',
+                    'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl',
+                    'F', 'Cl', 'Br', 'I'}
         assert HETEROATOMS_USE_INANE == expected
+
+    @pytest.mark.unit
+    def test_heteroatoms_use_inine_set(self):
+        """Test HETEROATOMS_USE_ININE (class 6C) set contents.
+
+        P-22.2.2.1.3 / Table 2.7 class 6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga,
+        In, Tl): an UNSATURATED 6-ring bearing any of these takes the '-inine'
+        ending (1,4-oxaphosphinine, 1,3,5-triphosphinine). Added Wave-2 P5
+        fused Task 9."""
+        from orthonym.data.hw_stems import HETEROATOMS_USE_ININE
+        expected = {'F', 'Cl', 'Br', 'I',
+                    'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl'}
+        assert HETEROATOMS_USE_ININE == expected
 
 
 # =============================================================================

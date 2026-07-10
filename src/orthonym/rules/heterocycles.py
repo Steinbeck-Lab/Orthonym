@@ -612,8 +612,12 @@ def build_hw_name(
     dominant_elem = elements_by_priority[0] if elements_by_priority else 'O'
     stem_heteroatom = 'N' if has_nitrogen else dominant_elem
 
-    # Get stem based on ring size, saturation, and stem-driving heteroatom
-    stem = get_hw_stem(ring_size, saturated_for_stem, stem_heteroatom)
+    # Get stem based on ring size, saturation, and stem-driving heteroatom.
+    # P-22.2.2.1.3 / Table 2.7 class 6C: pass the FULL ring heteroatom set so an
+    # unsaturated 6-ring bearing a 6C atom (P/As/Sb/B/... e.g. 1,4-oxaphosphinine)
+    # gets the '-inine' ending, not '-ine'.
+    stem = get_hw_stem(ring_size, saturated_for_stem, stem_heteroatom,
+                       ring_heteroatoms=set(element_locants.keys()))
     # Wave2 T2d (P-22.2.2.1.5.1): a 3-membered mancude ring with ONLY
     # nitrogen heteroatoms takes the 'irine' stem (1H-/2H-azirine,
     # 3H-diazirine), not 'irene'. get_hw_stem's single-element signature

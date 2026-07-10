@@ -717,8 +717,31 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
         )
 
         if has_heteroatom:
-            # Use the heterocycle naming infrastructure
+            # Use the heterocycle naming infrastructure.
             from .heterocycles import name_heterocycle
+            # P-28.2.1 / P-31.1.7.3: the component name is the free PARENT
+            # HYDRIDE name of the ring, so its indicated hydrogen must be
+            # computed on the ISOLATED ring — not on the ring embedded in the
+            # assembly, where the inter-ring bond at the connection atom
+            # suppresses the indicated-H (e.g. the assembly's ring gave
+            # '1,4-oxaphosphinine' with no '4H', but the parent hydride is
+            # '4H-1,4-oxaphosphinine'). Extract the ring as a standalone mol,
+            # name it there, then let the assembly composer add the connection
+            # locant + enclosing parentheses. Fail-safe: if the isolated
+            # fragment cannot be built or named, fall back to the embedded name.
+            try:
+                frag_smi = Chem.MolFragmentToSmiles(
+                    mol, atomsToUse=sorted(ring), canonical=True)
+                frag = Chem.MolFromSmiles(frag_smi) if frag_smi else None
+            except Exception:
+                frag = None
+            if frag is not None:
+                frag_rings = [r for r in frag.GetRingInfo().AtomRings()
+                              if len(r) == ring_size]
+                if len(frag_rings) == 1:
+                    iso = name_heterocycle(frag, frag_rings[0])
+                    if iso:
+                        return iso
             return name_heterocycle(mol, ring)
 
         # All-carbon ring
@@ -1580,12 +1603,25 @@ def name_ring_assembly(
             indicated_h_match.group(1),
             indicated_h_match.group(2),
         )
-        indicated_h_replicated = ",".join(
-            f"{locant_int}{_format_prime(i)}H" for i in range(count)
-        ) + "-"
-        base_name = (
-            f"{indicated_h_replicated}{connection_str}-{multiplier}{ring_stem}"
-        )
+        # P-28.2.1 / P-31.1.7.3: a COMPOUND component name (a skeletal-'a'
+        # mancude heterocycle carrying its own heteroatom-locant set, e.g.
+        # '4H-1,4-oxaphosphinine') is ENCLOSED in parentheses with its
+        # indicated-H kept INSIDE, cited once — '4,4'-bi(4H-1,4-oxaphosphinine)'.
+        # This differs from the biindole class (bare stem 'indole', no internal
+        # locants), which front-replicates the indicated-H per primed ring
+        # ("1H,1'H-2,2'-biindole", P-31.1.4). Distinguish by whether the stem
+        # itself carries a locant set (a comma-locant '<d>,<d>-' prefix).
+        if re.match(r"^\d[\d,]*-", ring_stem):
+            base_name = (
+                f"{connection_str}-{multiplier}({ring_name})"
+            )
+        else:
+            indicated_h_replicated = ",".join(
+                f"{locant_int}{_format_prime(i)}H" for i in range(count)
+            ) + "-"
+            base_name = (
+                f"{indicated_h_replicated}{connection_str}-{multiplier}{ring_stem}"
+            )
     else:
         # IUPAC P-28.2.1: enclose the component in parentheses when needed to
         # avoid confusion with von Baeyer names (cycloalkanes / spiro / bicyclo);

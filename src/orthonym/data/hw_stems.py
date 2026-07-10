@@ -53,9 +53,17 @@ HW_STEMS: Dict[int, Dict[str, str]] = {
         'n_saturated': 'olidine',    # e.g., pyrrolidine (aza-olidine)
     },
     6: {
-        'unsaturated': 'ine',        # e.g., azine (pyridine); oxine overridden by retained "2H-pyran"
-        'saturated_os': 'ane',       # For O, S, Se, Te, Bi, Hg: oxane, thiane
-        'saturated_n': 'inane',      # For N, Si, Ge, Sn, Pb, B, P: azinane
+        # P-22.2.2.1.3 / Table 2.7: the 6-membered stem ending depends on the
+        # heteroatom CLASS present in the ring:
+        #   6A (O, S, Se, Te, Bi): unsaturated 'ine',   saturated 'ane'
+        #   6B (N, Si, Ge, Sn, Pb): unsaturated 'ine',  saturated 'inane'
+        #   6C (F, Cl, Br, I, P, As, Sb, B, Al, Ga, In, Tl):
+        #                           unsaturated 'inine', saturated 'inane'
+        # Precedence for stem selection when classes mix: 6C > 6B > 6A.
+        'unsaturated': 'ine',        # 6A/6B unsaturated: azine (pyridine); oxine overridden by retained "2H-pyran"
+        'unsaturated_6c': 'inine',   # 6C unsaturated: 1,4-oxaphosphinine, 1,3,5-triphosphinine
+        'saturated_os': 'ane',       # 6A: O, S, Se, Te, Bi, Hg -> oxane, thiane
+        'saturated_n': 'inane',      # 6B/6C: N, Si, Ge, Sn, Pb, B, P, As, Sb -> azinane
     },
     7: {
         'unsaturated': 'epine',      # e.g., oxepine, azepine
@@ -82,10 +90,23 @@ HETEROATOMS_USE_ANE: Set[str] = {'O', 'S', 'Se', 'Te', 'Bi', 'Hg'}
 
 
 # Heteroatoms that use '-inane' for saturated 6-membered rings
-HETEROATOMS_USE_INANE: Set[str] = {'N', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'P', 'As', 'Sb'}
+# (6B ∪ 6C: N, Si, Ge, Sn, Pb  +  P, As, Sb, B, Al, Ga, In, Tl, and halogens)
+HETEROATOMS_USE_INANE: Set[str] = {'N', 'Si', 'Ge', 'Sn', 'Pb',
+                                   'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl',
+                                   'F', 'Cl', 'Br', 'I'}
 
 
-def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O') -> Optional[str]:
+# P-22.2.2.1.3 / Table 2.7 class 6C: these heteroatoms give a 6-membered
+# UNSATURATED (mancude) ring the '-inine' ending (not '-ine'). Saturated form
+# is still '-inane' (shared with 6B). Precedence: a ring containing ANY 6C
+# heteroatom uses the 6C unsaturated stem, even when 6A/6B atoms are also
+# present (e.g. 1,4-oxaphosphinine: O is 6A, P is 6C -> 'inine').
+HETEROATOMS_USE_ININE: Set[str] = {'F', 'Cl', 'Br', 'I',
+                                   'P', 'As', 'Sb', 'B', 'Al', 'Ga', 'In', 'Tl'}
+
+
+def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O',
+                ring_heteroatoms: Optional[Set[str]] = None) -> Optional[str]:
     """
     Get the Hantzsch-Widman stem suffix for a heterocycle.
 
@@ -94,6 +115,13 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O') -> Op
         is_saturated: True for saturated, False for unsaturated
         heteroatom: Principal heteroatom symbol (used for 6-membered ring
                     suffix selection: O/S use 'ane', N/P/Si use 'inane')
+        ring_heteroatoms: OPTIONAL set of ALL heteroatom symbols in the ring.
+                    P-22.2.2.1.3 / Table 2.7 class 6C (P, As, Sb, B, halogens,
+                    ...) gives an UNSATURATED 6-ring the '-inine' ending; that
+                    depends on whether ANY 6C atom is present, not on the single
+                    dominant heteroatom, so callers pass the full set. When
+                    omitted, the single `heteroatom` is treated as the ring's
+                    only heteroatom (backwards-compatible).
 
     Returns:
         HW stem suffix string, or None if ring size not supported
@@ -107,6 +135,8 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O') -> Op
         'ane'
         >>> get_hw_stem(6, True, 'N')  # Saturated 6-ring with N
         'inane'
+        >>> get_hw_stem(6, False, 'O', {'O', 'P'})  # unsaturated O+P 6-ring
+        'inine'
         >>> get_hw_stem(3, True, 'N')  # Saturated 3-ring with N
         'iridine'
     """
@@ -116,6 +146,13 @@ def get_hw_stem(ring_size: int, is_saturated: bool, heteroatom: str = 'O') -> Op
     stems = HW_STEMS[ring_size]
 
     if not is_saturated:
+        # P-22.2.2.1.3 / Table 2.7 class 6C: an UNSATURATED 6-ring containing
+        # ANY 6C heteroatom (P, As, Sb, B, Al, Ga, In, Tl, halogens) uses the
+        # '-inine' ending, even when 6A/6B atoms are also present.
+        if ring_size == 6:
+            check_set = ring_heteroatoms if ring_heteroatoms is not None else {heteroatom}
+            if check_set & HETEROATOMS_USE_ININE:
+                return stems.get('unsaturated_6c')
         return stems.get('unsaturated')
 
     # Saturated case - handle special cases
