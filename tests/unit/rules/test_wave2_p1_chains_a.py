@@ -214,3 +214,24 @@ class TestP15DetachablePrefixOnHydroFused:
 
     def test_bare_tetralin_unchanged(self):
         assert name_compound("c1ccc2c(c1)CCCC2") == "1,2,3,4-tetrahydronaphthalene"
+
+
+@pytest.mark.unit
+class TestP15RetainedNameSubstitution:
+    def test_o_methylhydroxylamine(self):
+        # P-15.1.8.2 Type 2c: O-methylhydroxylamine (PIN) [not methoxyamine]
+        assert name_compound("CON") == "O-methylhydroxylamine"
+
+    def test_naphthalene_1_sulfonic_acid(self):
+        # P-15.1.8.2 Type 2: fused-ring sulfonic acid
+        assert name_compound("OS(=O)(=O)c1cccc2ccccc12") == "naphthalene-1-sulfonic acid"
+
+    def test_benzenesulfonic_acid_unchanged(self):
+        assert name_compound("OS(=O)(=O)c1ccccc1") == "benzenesulfonic acid"
+
+    def test_bare_hydroxylamine_unchanged(self):
+        assert name_compound("NO") == "hydroxylamine"
+
+    def test_n_hydroxylamine_unchanged(self):
+        # N-substituent case (existing handler path) must stay correct.
+        assert name_compound("CCCNO") == "N-propylhydroxylamine"

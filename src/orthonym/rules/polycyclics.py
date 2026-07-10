@@ -712,6 +712,37 @@ def _identify_pah_substituent(mol, start_idx: int, core_atoms: Set[int]) -> Opti
     if symbol == 'O':
         return _identify_pah_oxygen_group(mol, start_idx, core_atoms)
 
+    # Sulfur oxoacids attached directly to the ring (P-15.1.8.2 Type 2 /
+    # P-65.3.1): -S(=O)(=O)OH -> 'sulfonic acid' suffix (naphthalene-1-sulfonic
+    # acid). The S is bonded to the ring carbon + two =O + one -OH; nothing else.
+    if symbol == 'S':
+        _o_double = 0
+        _o_h = 0
+        _other = 0
+        for nb in start_atom.GetNeighbors():
+            if nb.GetIdx() in core_atoms:
+                continue
+            if nb.GetSymbol() != 'O':
+                _other += 1
+                continue
+            b = mol.GetBondBetweenAtoms(start_idx, nb.GetIdx())
+            if b.GetBondTypeAsDouble() == 2.0:
+                _o_double += 1
+            elif b.GetBondType() == Chem.BondType.SINGLE and nb.GetTotalNumHs() == 1:
+                _o_h += 1
+            else:
+                _other += 1
+        # -S(=O)(=O)-OH: exactly two =O + one -OH, no other neighbour.
+        if (_o_double == 2 and _o_h == 1 and _other == 0
+                and start_atom.GetFormalCharge() == 0):
+            _sulfo_atoms = [start_idx] + [
+                nb.GetIdx() for nb in start_atom.GetNeighbors()
+                if nb.GetIdx() not in core_atoms
+            ]
+            return {'name': 'sulfonic acid', 'atoms': _sulfo_atoms,
+                    'is_suffix': True, 'suffix_type': 'sulfonic_acid'}
+        return None  # other S groups outside this narrow class -> fail closed
+
     return None
 
 
@@ -1068,9 +1099,11 @@ def name_substituted_polycyclic(
 
     # Handle suffix-type functional groups
     if suffix_groups:
-        # Pick the highest-priority suffix (carboxylic acid > aldehyde > amide, etc.)
+        # Pick the highest-priority suffix (P-41: carboxylic acid > S-oxoacid >
+        # amide > nitrile > aldehyde ...).
         _SUFFIX_PRIORITY = [
-            'carboxylic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde',
+            'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
+            'carbaldehyde',
         ]
         chosen_suffix = None
         chosen_locants = []

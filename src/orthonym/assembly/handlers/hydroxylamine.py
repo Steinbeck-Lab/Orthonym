@@ -30,8 +30,54 @@ logger = logging.getLogger(__name__)
 
 
 def _is_hydroxylamine(features: Any) -> bool:
-    """Fire when hydroxylamine is the principal characteristic group."""
-    return getattr(features, "principal_group", None) == "hydroxylamine"
+    """Fire when hydroxylamine is the principal characteristic group, OR when the
+    ONLY functional group is 'aminooxy' (H2N-O-R) and the whole molecule is a
+    hydroxylamine derivative with no more-senior parent (P-68.3.1.1.1.2: the
+    O-substituted-N-bare form's PIN is O-substituted hydroxylamine, e.g.
+    CON -> O-methylhydroxylamine, NOT the prefix 'aminooxy...' which applies only
+    when a senior parent is present)."""
+    if getattr(features, "principal_group", None) == "hydroxylamine":
+        return True
+    return _is_pure_aminooxy_hydroxylamine(features)
+
+
+def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
+    """True when the molecule is exactly a hydroxylamine derivative perceived
+    only as 'aminooxy' (H2N-O-R): a single N-O bond, N and O neutral acyclic,
+    every other heavy atom reachable through a carbon substituent, and NO other
+    functional group / no more-senior PCG. Fail-closed for anything richer."""
+    if getattr(features, "principal_group", None) is not None:
+        return False
+    fgs = getattr(features, "functional_groups", None) or {}
+    active = [k for k, v in fgs.items() if v]
+    if active != ["aminooxy"]:
+        return False
+    mol = getattr(features, "mol", None)
+    if mol is None:
+        return False
+    # Exactly one N and one O forming the hydroxylamine core, both neutral,
+    # acyclic, single-bonded to each other; no ring anywhere; no other hetero.
+    n_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
+    o_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "O"]
+    if len(n_atoms) != 1 or len(o_atoms) != 1:
+        return False
+    for a in mol.GetAtoms():
+        if a.GetSymbol() not in ("C", "N", "O"):
+            return False
+        if a.IsInRing() or a.GetFormalCharge() != 0:
+            return False
+    n_idx, o_idx = n_atoms[0].GetIdx(), o_atoms[0].GetIdx()
+    bond = mol.GetBondBetweenAtoms(n_idx, o_idx)
+    from rdkit import Chem
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return False
+    # No C=O / C=N (would be a senior oxime/amide territory).
+    for b in mol.GetBonds():
+        if b.GetBondType() == Chem.BondType.DOUBLE:
+            syms = {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()}
+            if syms & {"N", "O"}:
+                return False
+    return True
 
 
 def _collect_substituent_fragment(mol, start_idx: int, block_idx: int) -> List[int]:
@@ -96,14 +142,21 @@ def name_hydroxylamine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Name a substituted hydroxylamine on the ``hydroxylamine`` parent."""
-    matches = features.functional_groups.get("hydroxylamine", [])
-    if not matches:
-        return None
-
     m = features.mol
-    # SMARTS [OX2H1][NX3...][#6] -> match[0]=O, match[1]=N.
-    match = matches[0]
-    o_idx, n_idx = match[0], match[1]
+    matches = features.functional_groups.get("hydroxylamine", [])
+    if matches:
+        # SMARTS [OX2H1][NX3...][#6] -> match[0]=O, match[1]=N.
+        match = matches[0]
+        o_idx, n_idx = match[0], match[1]
+    else:
+        # Pure aminooxy whole-molecule case (H2N-O-R -> O-substituted
+        # hydroxylamine, P-68.3.1.1.1.2): locate the single N-O core.
+        amx = features.functional_groups.get("aminooxy", [])
+        if not amx or not _is_pure_aminooxy_hydroxylamine(features):
+            return None
+        # SMARTS [NX3H2][OX2][#6] -> match[0]=N, match[1]=O.
+        match = amx[0]
+        n_idx, o_idx = match[0], match[1]
     if m.GetAtomWithIdx(o_idx).GetSymbol() != "O" or m.GetAtomWithIdx(n_idx).GetSymbol() != "N":
         return None
 
