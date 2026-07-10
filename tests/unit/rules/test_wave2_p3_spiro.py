@@ -13,3 +13,16 @@ class TestWave2P3SpiroVerify:
     ])
     def test_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestP24BranchedPolyspiro:
+    def test_trispiro_superscript(self):
+        # P-24.2.3: superscript revisit locants are essential; without them the
+        # name is ambiguous (BB note at :10018).
+        assert name_compound("C1CC12CCC1(CC1)CCC1(CC1)CC2") == \
+            "trispiro[2.2.2^6.2.2^11.2^3]pentadecane"
+
+    def test_dispiro_unchanged(self):
+        # 2-spiro-atom path must NOT regress.
+        assert name_compound("C1CC2(CC1)CC1(CC2)CCCC1") == "dispiro[4.1.4.2]tridecane"

@@ -173,14 +173,18 @@ def _generate_polyspiro_descriptor(mol, spiro_atoms: Set[int]) -> Optional[str]:
     all_rings = [list(r) for r in ri.AtomRings()]
 
     # Wave2 T6a (P-24.2.2/P-24.2.3): tri+ polyspiro descriptors need
-    # superscript revisit locants and the terminal-ring reordering walk;
+    # superscript revisit locants and the branched von-Baeyer spiro walk;
     # _reorder_segments_iupac is only correct for dispiro (3 rings). A 4+-ring
     # descriptor in ring-sequential order names a DIFFERENT constitution
-    # (OPSIN reparses trispiro[4.2.2.2.2.5]icosane to another molecule), so
-    # fail closed. The tier_a_ring pure-polyspiro guard converts this decline
-    # into an UNSUPPORTED_RING_SYSTEM refusal instead of a one-ring fallback.
+    # (OPSIN reparses trispiro[4.2.2.2.2.5]icosane to another molecule).
+    # Wave2 P3-T2 (P-24.2.3/.3.1/.3.2): build the branched superscript-revisit
+    # descriptor. Fail closed (None -> UNSUPPORTED_RING_SYSTEM refusal via the
+    # tier_a_ring pure-polyspiro guard) if the branched walk cannot be resolved.
     if len(spiro_atoms) >= 3:
-        return None
+        built = _build_branched_polyspiro(mol, spiro_atoms)
+        if built is None:
+            return None
+        return built[0]
 
     ring_chain, spiro_chain = _build_ring_chain(mol, all_rings, spiro_atoms)
     if ring_chain is None or spiro_chain is None:
@@ -200,6 +204,204 @@ def _generate_polyspiro_descriptor(mol, spiro_atoms: Set[int]) -> Optional[str]:
 
     seg_str = '.'.join(str(s) for s in segments)
     return f"{prefix}[{seg_str}]"
+
+
+def _spiro_ring_adjacency(
+    mol, all_rings: List[List[int]], spiro_atoms: Set[int]
+) -> Optional[Dict[int, List[Tuple[int, int]]]]:
+    """Ring adjacency graph for a pure spiro tree: ring i ~ ring j when they
+    share exactly one spiro atom (and NO fused edge). Returns None if any two
+    rings share >1 atom (fused/bridged — not a pure spiro system)."""
+    n = len(all_rings)
+    adj: Dict[int, List[Tuple[int, int]]] = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            shared = set(all_rings[i]) & set(all_rings[j])
+            if not shared:
+                continue
+            if len(shared) != 1:
+                return None  # fused/bridged edge — not pure spiro
+            sa = next(iter(shared))
+            if sa not in spiro_atoms:
+                return None
+            adj[i].append((j, sa))
+            adj[j].append((i, sa))
+    return adj
+
+
+def _branched_spiro_walk(
+    mol,
+    all_rings: List[List[int]],
+    adj: Dict[int, List[Tuple[int, int]]],
+    spiro_atoms: Set[int],
+    start_ring: int,
+    start_neighbor: int,
+) -> Optional[Tuple[List[str], Dict[int, int]]]:
+    """Perform one branched von-Baeyer spiro walk (P-24.2.3).
+
+    Starting in ``start_ring`` at the non-spiro neighbour ``start_neighbor`` of
+    that ring's single spiro atom, walk the ring tree via a depth-first
+    traversal: number non-spiro atoms as they are first encountered, number a
+    spiro atom on first visit, and each time a spiro atom is revisited emit its
+    (first-visit) locant as a superscript on the preceding segment. Segment
+    lengths count the linking (non-spiro) atoms traversed since the previous
+    spiro atom. Returns (descriptor_tokens, atom_to_locant) or None if the walk
+    cannot be resolved (e.g. a ring is not a simple cycle)."""
+    numbering: Dict[int, int] = {}
+    counter = [0]
+    tokens: List[str] = []
+    seg = [0]  # linking atoms accumulated since last spiro atom
+
+    def _number(atom: int):
+        counter[0] += 1
+        numbering[atom] = counter[0]
+
+    def _flush(superscript: Optional[int]):
+        if superscript is None:
+            tokens.append(str(seg[0]))
+        else:
+            tokens.append(f"{seg[0]}^{superscript}")
+        seg[0] = 0
+
+    def _ring_cycle_order(ring: List[int], entry: int) -> Optional[List[int]]:
+        """Return the ring atoms as a cyclic order starting at ``entry``."""
+        ring_set = set(ring)
+        adj_map: Dict[int, List[int]] = {a: [] for a in ring}
+        for a in ring:
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in ring_set:
+                    adj_map[a].append(ni)
+        if any(len(v) != 2 for v in adj_map.values()):
+            return None  # not a simple cycle
+        order = [entry]
+        prev = None
+        cur = entry
+        while len(order) < len(ring):
+            nxts = [x for x in adj_map[cur] if x != prev]
+            if not nxts:
+                return None
+            nxt = nxts[0]
+            order.append(nxt)
+            prev, cur = cur, nxt
+        return order
+
+    def _traverse(ring_idx: int, entry_spiro: Optional[int], parent_ring: Optional[int]):
+        """Traverse ``ring_idx`` in cyclic order.
+
+        entry_spiro is the spiro atom we entered on (already numbered) for a
+        non-root ring, or None for the root (start) terminal ring. For a
+        non-root ring the cyclic walk closes back at entry_spiro and emits the
+        closing ``seg^{entry_spiro.locant}`` (the revisit). Along the way, each
+        first-visit child spiro atom closes its own leading segment, is numbered,
+        and its child ring is recursed into (which returns having emitted its own
+        superscript close)."""
+        ring = all_rings[ring_idx]
+        if entry_spiro is None:
+            order = _ring_cycle_order(ring, start_neighbor)
+            if order is None:
+                return False
+        else:
+            full = _ring_cycle_order(ring, entry_spiro)
+            if full is None:
+                return False
+            order = full[1:]  # skip entry_spiro (already numbered)
+        # child spiro atoms on this ring keyed by atom idx -> child ring idx
+        child_of: Dict[int, int] = {}
+        for (nbr_ring, sa) in adj[ring_idx]:
+            if nbr_ring != parent_ring:
+                child_of[sa] = nbr_ring
+        for atom in order:
+            if atom in spiro_atoms:
+                # first-visit child spiro atom: close the leading segment,
+                # number it, descend the child ring (which closes back here).
+                _number(atom)
+                _flush(None)
+                if atom in child_of:
+                    if not _traverse(child_of[atom], atom, ring_idx):
+                        return False
+            else:
+                _number(atom)
+                seg[0] += 1
+        # Non-root ring: the cycle returns to entry_spiro -> closing revisit.
+        if entry_spiro is not None:
+            _flush(numbering[entry_spiro])
+        return True
+
+    if not _traverse(start_ring, None, None):
+        return None
+    return tokens, numbering
+
+
+def _build_branched_polyspiro(
+    mol, spiro_atoms: Set[int]
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """P-24.2.3 branched polyspiro: superscript-revisit descriptor + numbering.
+
+    Enumerates candidate starts (each non-spiro neighbour of the single spiro
+    atom in each smallest terminal ring) and directions, runs the von-Baeyer
+    spiro walk for each, then chooses per P-24.2.3.1 (lowest spiro-atom locant
+    set) and P-24.2.3.2 (lowest descriptor numbers at first point of
+    difference). Fail closed (None) if the topology is not a clean spiro tree
+    or the descriptor-atom count does not equal total_atoms - n_spiro."""
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+    adj = _spiro_ring_adjacency(mol, all_rings, spiro_atoms)
+    if adj is None:
+        return None
+    n_spiro = len(spiro_atoms)
+    if n_spiro + 1 != len(all_rings):
+        return None  # not exactly N spiro atoms sharing N+1 rings
+    # each spiro atom must be in exactly 2 rings (standard spiro)
+    for sa in spiro_atoms:
+        if sum(1 for r in all_rings if sa in r) != 2:
+            return None
+
+    ring_atom_union: Set[int] = set()
+    for r in all_rings:
+        ring_atom_union |= set(r)
+    total_atoms = len(ring_atom_union)
+
+    terminal = [i for i, r in enumerate(all_rings)
+                if len(set(r) & spiro_atoms) == 1]
+    if not terminal:
+        return None
+    min_term_size = min(len(all_rings[i]) for i in terminal)
+    start_rings = [i for i in terminal if len(all_rings[i]) == min_term_size]
+
+    candidates: List[Tuple[Tuple[int, ...], List[int], str, Dict[int, int]]] = []
+    for sr in start_rings:
+        ring = all_rings[sr]
+        sa = next(iter(set(ring) & spiro_atoms))
+        ring_set = set(ring)
+        neighbors = [n.GetIdx() for n in mol.GetAtomWithIdx(sa).GetNeighbors()
+                     if n.GetIdx() in ring_set]
+        for start_nbr in neighbors:
+            walked = _branched_spiro_walk(
+                mol, all_rings, adj, spiro_atoms, sr, start_nbr)
+            if walked is None:
+                continue
+            tokens, numbering = walked
+            if len(numbering) != total_atoms:
+                continue
+            # integrity: descriptor linking-atom count == total - n_spiro
+            seg_sum = 0
+            for t in tokens:
+                seg_sum += int(t.split('^')[0])
+            if seg_sum != total_atoms - n_spiro:
+                continue
+            spiro_locs = tuple(sorted(numbering[s] for s in spiro_atoms))
+            desc_nums = [int(t.split('^')[0]) for t in tokens]
+            candidates.append((spiro_locs, desc_nums, '.'.join(tokens), numbering))
+
+    if not candidates:
+        return None
+    # P-24.2.3.1 lowest spiro-atom locant set, then P-24.2.3.2 lowest descriptor
+    candidates.sort(key=lambda c: (list(c[0]), c[1], c[2]))
+    _, _, desc_body, numbering = candidates[0]
+    prefix = (_POLYSPIRO_PREFIXES[n_spiro]
+              if n_spiro < len(_POLYSPIRO_PREFIXES) else f'{n_spiro}spiro')
+    return f"{prefix}[{desc_body}]", numbering
 
 
 def _build_ring_chain(
@@ -548,6 +750,15 @@ def _get_polyspiro_numbering(
     """Generate IUPAC numbering for a polyspiro system."""
     ri = mol.GetRingInfo()
     all_rings = [list(r) for r in ri.AtomRings()]
+
+    # P-24.2.3 branched polyspiro (>=3 spiro atoms) uses the superscript-revisit
+    # walk, whose numbering is defined BY the descriptor citation order. Reuse
+    # the same walk here so heteroatom prefixes see a consistent numbering.
+    if len(spiro_atoms) >= 3:
+        built = _build_branched_polyspiro(mol, spiro_atoms)
+        if built is None:
+            return None
+        return built[1]
 
     ring_chain, spiro_chain = _build_ring_chain(mol, all_rings, spiro_atoms)
     if ring_chain is None:
