@@ -202,3 +202,15 @@ class TestP28MixedHeteroatomAssembly:
         # COMBINED locant set (2,3') + element-seniority citation (oxa < thia).
         assert name_compound("C1(SCCCCCCCCCCCC1)C1COCCCCCCCCCCC1") == \
             "3'-oxa-2-thia-1,1'-bi(cyclotetradecane)"
+
+
+@pytest.mark.unit
+class TestP15DetachablePrefixOnHydroFused:
+    def test_methyl_tetrahydronaphthalene(self):
+        # P-15.1.5.3: a detachable substituent on a partially-saturated fused
+        # carbocycle; methyl gets locant 5 (lowest after the 1,2,3,4 hydro set)
+        # and is cited before the nondetachable 'tetrahydro'.
+        assert name_compound("Cc1cccc2c1CCCC2") == "5-methyl-1,2,3,4-tetrahydronaphthalene"
+
+    def test_bare_tetralin_unchanged(self):
+        assert name_compound("c1ccc2c(c1)CCCC2") == "1,2,3,4-tetrahydronaphthalene"

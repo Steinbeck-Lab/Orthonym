@@ -1424,9 +1424,91 @@ def _assemble_partially_saturated_carbocycle_name(
         locants = get_saturation_locants(mol, saturated_indices, atom_to_locant)
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
+    # P-15.1.5.3: detachable substituent prefixes on the AROMATIC (non-hydro)
+    # ring of a partially-saturated fused carbocycle, cited (alphanumerically)
+    # BEFORE the nondetachable 'hydro' prefix. The composer's normal decoration
+    # path already carries substituents on the SATURATED (sp3) ring, so this
+    # assembler only supplies the aromatic-ring substituents it would otherwise
+    # DROP (5-methyl-1,2,3,4-tetrahydronaphthalene). It must NOT add sp3-ring
+    # substituents (the composer does that; double-citing would leak a wrong
+    # name that SELF-01 suppresses). Fail-closed only when an aromatic-ring
+    # substituent that WOULD be dropped cannot be named.
+    sat_set = set(saturation_info['saturated_indices'])
+    sub_prefix = _partial_sat_substituent_prefix(mol, atom_to_locant, sat_set)
+    if sub_prefix is None and _has_offring_substituent(
+            mol, atom_to_locant, set(atom_to_locant) - sat_set):
+        return None  # aromatic-ring substituent present but not nameable
+
     # Assemble final name
-    name = f"{formatted_prefix}{parent_name}"
+    name = f"{sub_prefix or ''}{formatted_prefix}{parent_name}"
     return f"{stereo_prefix}{name}" if stereo_prefix else name
+
+
+def _has_offring_substituent(
+    mol, atom_to_locant: Dict[int, Any], only_atoms: Optional[Set[int]] = None
+) -> bool:
+    """True if any ring atom (restricted to ``only_atoms`` when given) bears an
+    off-ring heavy neighbour."""
+    ring_set = set(atom_to_locant)
+    scope = (ring_set & only_atoms) if only_atoms is not None else ring_set
+    for idx in scope:
+        for n in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if n.GetIdx() not in ring_set:
+                return True
+    return False
+
+
+def _partial_sat_substituent_prefix(
+    mol, atom_to_locant: Dict[int, Any], sat_set: Set[int]
+) -> Optional[str]:
+    """Build the alphanumerically-sorted detachable-substituent prefix string
+    (with trailing hyphen) for substituents on the AROMATIC (non-sp3) ring of a
+    partially-saturated fused carbocycle, or None if there are none / any cannot
+    be named (fail-closed). P-15.1.5.3 / P-14.5.2."""
+    from ..assembly.substituent_naming import name_substituent_fragment
+    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+
+    ring_set = set(atom_to_locant)
+    from collections import defaultdict
+    grouped: Dict[str, List[Any]] = defaultdict(list)
+    found_any = False
+    for idx in atom_to_locant:
+        if idx in sat_set:
+            continue  # sp3-ring substituents are the composer path's job
+        ring_atom = mol.GetAtomWithIdx(idx)
+        for n in ring_atom.GetNeighbors():
+            if n.GetIdx() in ring_set:
+                continue
+            found_any = True
+            sub_atoms: List[int] = []
+            seen = set(ring_set)
+            stack = [n.GetIdx()]
+            while stack:
+                cur = stack.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                sub_atoms.append(cur)
+                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    if nn.GetIdx() not in seen:
+                        stack.append(nn.GetIdx())
+            sub_name = name_substituent_fragment(
+                mol, sub_atoms, n.GetIdx(), list(ring_set)
+            )
+            if not sub_name or ' ' in sub_name:
+                return None  # un-nameable substituent -> fail closed
+            grouped[sub_name].append(atom_to_locant[idx])
+    if not found_any:
+        return None
+    parts = []
+    for name in sorted(grouped.keys(), key=alpha_sort_key):
+        locs = sorted(grouped[name], key=lambda x: (isinstance(x, str), x))
+        parts.append(format_substituent_prefix(name, locs, len(locs)))
+    if not parts:
+        return None
+    from .benzene import _join_benzene_prefixes
+    joined = _join_benzene_prefixes(parts)
+    return joined if joined.endswith('-') else joined + '-'
 
 
 # ============================================================================

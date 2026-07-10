@@ -457,6 +457,7 @@ def _match_mancude_parent_numbering(
     sp3_atoms: Set[int],
     ring_double_bonds: List[Tuple[int, int]],
     candidate_parents: List[str],
+    substituent_ring_atoms: Optional[Set[int]] = None,
 ) -> Optional[Tuple[str, Dict[int, Any]]]:
     """Number a (partly) saturated fused carbocycle by its mancude parent.
 
@@ -520,7 +521,17 @@ def _match_mancude_parent_numbering(
                 min(_locant_key(atom_to_locant[i]), _locant_key(atom_to_locant[j]))
                 for i, j in ring_double_bonds
             )
-            key = (hydro_locs, ene_locs)
+            # P-14.4 / P-15.1.5.3: after hydro + ene, the detachable substituents
+            # take the lowest locants (breaks ties among equivalent numberings,
+            # e.g. 5-methyl- vs 8-methyl-tetrahydronaphthalene).
+            if substituent_ring_atoms:
+                sub_locs = sorted(
+                    _locant_key(atom_to_locant[a]) for a in substituent_ring_atoms
+                    if a in atom_to_locant
+                )
+            else:
+                sub_locs = []
+            key = (hydro_locs, ene_locs, sub_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best = (parent, atom_to_locant)
@@ -663,8 +674,17 @@ def detect_carbocyclic_partial_saturation(
     # e.g. 1,4-dihydronaphthalene -> wrong "1,2-").
     sp3_set = set(sp3_indices)
     candidates = _carbocyclic_mancude_parents_by_size(total_ring_atoms)
+    # P-14.4 tiebreak: ring atoms bearing an off-ring (substituent) heavy atom.
+    # Among numberings tied on hydro+ene locants, the one giving these the
+    # lowest locants wins (5-methyl- not 8-methyl-tetrahydronaphthalene).
+    substituent_ring_atoms = {
+        idx for idx in fused_ring_atoms
+        if any(n.GetIdx() not in fused_ring_atoms
+               for n in mol.GetAtomWithIdx(idx).GetNeighbors())
+    }
     matched = _match_mancude_parent_numbering(
         mol, fused_ring_atoms, sp3_set, ring_double_bonds, candidates,
+        substituent_ring_atoms=substituent_ring_atoms,
     )
     if matched is None:
         return None
