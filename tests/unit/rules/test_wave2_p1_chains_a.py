@@ -235,3 +235,35 @@ class TestP15RetainedNameSubstitution:
     def test_n_hydroxylamine_unchanged(self):
         # N-substituent case (existing handler path) must stay correct.
         assert name_compound("CCCNO") == "N-propylhydroxylamine"
+
+
+@pytest.mark.unit
+class TestP13HomoSecoFailClosed:
+    """P-13.3.1: homo/seco steroid PINs do NOT parse in OPSIN (no oracle) and
+    Orthonym has no deterministic homo/seco builder, so a ring-expanded (homo)
+    or bond-cleaved (seco) skeleton must FAIL CLOSED — never emit the bare
+    scaffold name (a wrong name for a modified skeleton). The exact-scaffold
+    matcher already achieves this; these tests lock it against regression."""
+
+    def test_homo_pregnane_fails_closed(self):
+        from orthonym.rules.natural_products import name_natural_product
+        # 4a-homo: one extra ring CH2 in ring A (ring 6->7 expansion). The NP
+        # scaffold matcher must NOT emit 'pregnane' for the modified skeleton
+        # (a wrong name); it returns None so no homo/seco name is fabricated.
+        mol = Chem.MolFromSmiles(
+            "CC[C@H]1CC[C@H]2[C@@H]3CCC4CCCCC[C@]4(C)[C@H]3CC[C@]12C")
+        assert name_natural_product(mol) is None
+
+    def test_seco_pregnane_fails_closed(self):
+        from orthonym.rules.natural_products import name_natural_product
+        # seco: a ring of the pregnane skeleton is cleaved (ring-opened). The
+        # scaffold matcher must decline (no bare-scaffold name for a cleaved
+        # skeleton) -> None; exact seco PINs do not parse in OPSIN either.
+        mol = Chem.MolFromSmiles(
+            "CC[C@@H](C)[C@@]1(C)CC[C@H]2[C@@H](CCC3CCCC[C@@]32C)[C@@H]1C")
+        assert name_natural_product(mol) is None
+
+    def test_bare_pregnane_still_names(self):
+        assert name_compound(
+            "CC[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C"
+        ) == "pregnane"
