@@ -280,7 +280,8 @@ class TestPrimedLocants:
 # TestMultiplierClosed (D-17)
 # ============================================================================
 class TestMultiplierClosed:
-    """D-17: multiplier table closed at deci(10)."""
+    """D-17: multiplier table. Extended to dodeci(12) by P-28.5 (Wave2 P1CB
+    Task 8, OPSIN-RT verified for undeci); still closed above 12."""
 
     @pytest.mark.unit
     def test_deci_present(self):
@@ -288,28 +289,37 @@ class TestMultiplierClosed:
         assert ra.ASSEMBLY_MULTIPLIERS[10] == "deci"
 
     @pytest.mark.unit
-    def test_size_11_returns_none(self):
+    def test_size_11_12_present(self):
+        # P-28.5 (Wave2 P1CB Task 8): undeci(11)/dodeci(12) now supported.
         ra = _ra_import()
-        assert ra.ASSEMBLY_MULTIPLIERS.get(11) is None
+        assert ra.ASSEMBLY_MULTIPLIERS.get(11) == "undeci"
+        assert ra.ASSEMBLY_MULTIPLIERS.get(12) == "dodeci"
+
+    @pytest.mark.unit
+    def test_size_13_returns_none(self):
+        """Table stops at dodeci(12); count 13+ has no OPSIN-verifiable affix
+        here -> .get->None decline (fail closed)."""
+        ra = _ra_import()
+        assert ra.ASSEMBLY_MULTIPLIERS.get(13) is None
 
     @pytest.mark.unit
     def test_size_15_returns_none(self):
-        """OPSIN multipliers.xml extends to 15; D-17 deliberately stops at 10."""
+        """OPSIN multipliers.xml extends to 15; the table deliberately stops at 12."""
         ra = _ra_import()
         assert ra.ASSEMBLY_MULTIPLIERS.get(15) is None
 
     @pytest.mark.unit
-    def test_name_ring_assembly_returns_none_above_deci(self):
+    def test_name_ring_assembly_returns_none_above_table(self):
         ra = _ra_import()
-        # Build an 11-system mock info dict directly to exercise the gate
+        # Build a 13-system mock info dict directly to exercise the gate
+        # (13 is above the dodeci(12) cap -> multiplier lookup fails -> None).
         fake_info = {
-            "ring_systems": [set() for _ in range(11)],
+            "ring_systems": [set() for _ in range(13)],
             "connections": [],
-            "count": 11,
+            "count": 13,
             "ring_type": "carbocyclic",
         }
         # name_ring_assembly returns None when multiplier lookup fails
-        # (line 736: ``if multiplier is None: return None``)
         result = ra.name_ring_assembly(Chem.MolFromSmiles("CC"), fake_info, None)
         assert result is None
 

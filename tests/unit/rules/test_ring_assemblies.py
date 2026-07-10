@@ -245,11 +245,16 @@ class TestHigherMultipliers:
         assert ASSEMBLY_MULTIPLIERS[10] == "deci"
 
     @pytest.mark.unit
-    def test_all_nine_entries(self):
-        """ASSEMBLY_MULTIPLIERS has exactly 9 entries (2 through 10)."""
+    def test_all_eleven_entries(self):
+        """ASSEMBLY_MULTIPLIERS has exactly 11 entries (2 through 12).
+
+        P-28.5 (Wave2 P1CB Task 8): extended past the old deci(10) cap with
+        undeci(11)/dodeci(12) so ring assemblies of >6 (and >10) identical
+        systems name correctly. Counts above 12 keep the .get->None decline.
+        """
         from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
-        assert len(ASSEMBLY_MULTIPLIERS) == 9
-        for k in range(2, 11):
+        assert len(ASSEMBLY_MULTIPLIERS) == 11
+        for k in range(2, 13):
             assert k in ASSEMBLY_MULTIPLIERS
 
     @pytest.mark.unit
@@ -285,10 +290,14 @@ class TestHigherMultipliers:
         assert "quinquephenyl" in result
 
     @pytest.mark.unit
-    def test_count_11_unsupported(self):
-        """ASSEMBLY_MULTIPLIERS does not contain count=11."""
+    def test_count_11_12_supported_13_unsupported(self):
+        """P-28.5 (Wave2 P1CB Task 8): undeci(11)/dodeci(12) supported (OPSIN-RT
+        verified); count 13 and above keep the .get->None decline (no
+        OPSIN-verifiable affix -> fail closed)."""
         from orthonym.rules.ring_assemblies import ASSEMBLY_MULTIPLIERS
-        assert 11 not in ASSEMBLY_MULTIPLIERS
+        assert ASSEMBLY_MULTIPLIERS[11] == "undeci"
+        assert ASSEMBLY_MULTIPLIERS[12] == "dodeci"
+        assert 13 not in ASSEMBLY_MULTIPLIERS
 
     @pytest.mark.unit
     def test_regression_biphenyl(self):
