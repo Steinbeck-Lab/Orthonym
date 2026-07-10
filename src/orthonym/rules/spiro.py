@@ -2428,6 +2428,172 @@ def name_dispiroter(
     return (name, all_ring_atoms, combined_locants, False)
 
 
+def _fused_ring_components(mol) -> List[Tuple[Set[int], Set[int]]]:
+    """Partition the ring system into fused-ring COMPONENTS (maximal ring sets
+    connected by fused edges, i.e. sharing >=2 atoms). Returns a list of
+    (component_atoms, spiro_atoms_touched) tuples. Spiro atoms (the single-atom
+    junctions between components) belong to every component they touch."""
+    spiro = set(get_spiro_atoms(mol))
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings()]
+    n = len(rings)
+    fadj: Dict[int, List[int]] = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            if len(rings[i] & rings[j]) >= 2:
+                fadj[i].append(j)
+                fadj[j].append(i)
+    seen: Set[int] = set()
+    out: List[Tuple[Set[int], Set[int]]] = []
+    for s in range(n):
+        if s in seen:
+            continue
+        stack = [s]
+        comp_rings = {s}
+        seen.add(s)
+        while stack:
+            c = stack.pop()
+            for nb in fadj[c]:
+                if nb not in seen:
+                    seen.add(nb)
+                    comp_rings.add(nb)
+                    stack.append(nb)
+        atoms: Set[int] = set()
+        for ridx in comp_rings:
+            atoms |= rings[ridx]
+        out.append((atoms, atoms & spiro))
+    return out
+
+
+def _name_unbranched_polyspiro_different_core(mol):
+    """P-24.6: unbranched polyspiro with DIFFERENT ring components, >=1
+    polycyclic, along a LINEAR chain (terminal-middle-terminal). Returns
+    ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed).
+
+    Currently builds the 3-component / 2-spiro-atom linear chain
+    (``dispiro[fluorene-9,1'-cyclohexane-4',1''-indene]``): a central component
+    holding BOTH spiro atoms and two terminals each holding one. Terminals are
+    cited in alphanumerical order (P-24.5.1); the first is unprimed, the middle
+    primed, the last double-primed. Fail closed unless the components are NOT
+    all identical (else dispiroter, Task 3), the chain is unbranched (no
+    component holds >2 spiro atoms), and every component names."""
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 2:
+        return None
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms.update(r)
+    for atom in mol.GetAtoms():  # unsubstituted only
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+
+    comps = _fused_ring_components(mol)
+    if len(comps) != 3:
+        return None
+    # P-24.6 scope: >=1 component must be polycyclic (a component spanning >=2
+    # fused rings). A pure spiro of monocyclic rings uses the von-Baeyer
+    # descriptor form (dispiro[a.b.c.d]) via name_spiro_system, not this
+    # component-name form.
+    ri_full = mol.GetRingInfo()
+    all_ring_list = [set(r) for r in ri_full.AtomRings()]
+    def _ring_count_in(atoms: Set[int]) -> int:
+        return sum(1 for r in all_ring_list if r <= atoms)
+    if not any(_ring_count_in(atoms) >= 2 for atoms, _s in comps):
+        return None
+    middle = None
+    terminals = []
+    for atoms, spiros in comps:
+        if len(spiros) == 2:
+            if middle is not None:
+                return None  # >1 two-spiro component -> branched (Task 6)
+            middle = (atoms, sorted(spiros))
+        elif len(spiros) == 1:
+            terminals.append((atoms, next(iter(spiros))))
+        else:
+            return None
+    if middle is None or len(terminals) != 2:
+        return None
+
+    # Name each terminal + spiro locant.
+    term_info = []
+    for atoms, sa in terminals:
+        named = _name_spiro_component(mol, atoms, sa)
+        if named is None:
+            return None
+        ext = _extract_subfragment(mol, atoms)
+        if ext is None:
+            return None
+        loc = _canonical_spiro_locant(ext, named[1], sa)
+        if loc is None:
+            return None
+        term_info.append({'atoms': atoms, 'spiro': sa, 'name': named[0],
+                          'loc': loc, 'map': named[1]})
+
+    # P-24.5.1 alphanumerical: first-cited (unprimed) terminal is the lower key.
+    if _component_alpha_key(term_info[0]['name']) <= _component_alpha_key(term_info[1]['name']):
+        first, last = term_info[0], term_info[1]
+    else:
+        first, last = term_info[1], term_info[0]
+
+    # NOT all-identical (else dispiroter owns it).
+    if first['name'] == last['name']:
+        mid_named = _name_spiro_component(mol, middle[0], middle[1][0])
+        if mid_named is not None and mid_named[0] == first['name']:
+            return None
+
+    # Middle component numbered so the FIRST (unprimed) terminal's junction spiro
+    # atom is locant 1; the other spiro atom takes its walk position.
+    mid_named = _name_spiro_component(mol, middle[0], first['spiro'])
+    if mid_named is None:
+        return None
+    mid_name, mid_map = mid_named
+    mid_loc_first = mid_map.get(first['spiro'])
+    mid_loc_last = mid_map.get(last['spiro'])
+    if mid_loc_first is None or mid_loc_last is None:
+        return None
+
+    first_name = _strip_consumed_indicated_h(first['name'], first['loc'])
+    mid_name_s = _strip_consumed_indicated_h(mid_name, mid_loc_first)
+    last_name = _strip_consumed_indicated_h(last['name'], last['loc'])
+    name = (f"dispiro[{first_name}-{first['loc']},{mid_loc_first}'-"
+            f"{mid_name_s}-{mid_loc_last}',{last['loc']}''-{last_name}]")
+
+    combined: Dict[int, _Locant] = {}
+    for a, loc in first['map'].items():
+        combined[a] = loc
+    for a, loc in mid_map.items():
+        if a in combined:
+            continue
+        combined[a] = (loc, "'")
+    for a, loc in last['map'].items():
+        if a in combined:
+            continue
+        combined[a] = (loc, "''")
+    if not (set(combined.keys()) >= all_ring_atoms):
+        return None
+    return name, all_ring_atoms, combined
+
+
+def is_unbranched_polyspiro_different(mol) -> bool:
+    """P-24.6: unbranched polyspiro, different components, >=1 polycyclic."""
+    if mol is None:
+        return False
+    return _name_unbranched_polyspiro_different_core(mol) is not None
+
+
+def name_unbranched_polyspiro_different(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.6 unbranched-polyspiro-different name. Fail-closed."""
+    core = _name_unbranched_polyspiro_different_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
 # ============================================================================
 # P-24.5 — spiro systems with at least one von Baeyer (bridged) ring component
 # (Phase 13B(c) — spiro-of-von-Baeyer). The existing spirobi / mixed-spiro-fused

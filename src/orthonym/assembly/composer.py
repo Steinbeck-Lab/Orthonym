@@ -2709,6 +2709,11 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_dispiroter(mol):
         return True
 
+    # P-24.6 unbranched polyspiro, different components (>=1 polycyclic).
+    from ..rules.spiro import is_unbranched_polyspiro_different as _is_polyspiro_diff
+    if _is_polyspiro_diff(mol):
+        return True
+
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
     # to return True. Spiro check must precede polycyclic to avoid misrouting.
@@ -2765,6 +2770,15 @@ def _classify_complex_ring(mol) -> str:
         classify_fused_system() incorrectly flags adamantane as ortho-peri-fused.
         So we check is_polycyclic_system BEFORE classify_fused_system.
     """
+    # P-24.6 unbranched polyspiro, DIFFERENT components (>=1 polycyclic).
+    # Computed FIRST: a fluorene/cyclohexane/indene polyspiro chain trips
+    # detect_bridged_fused (a fused core + a spiro-linked ring reads as a bridge),
+    # so this positive gate must guard the bridged-fused branch below.
+    from ..rules.spiro import is_unbranched_polyspiro_different as _is_polyspiro_diff_classify
+    _input_is_polyspiro_diff = _is_polyspiro_diff_classify(mol)
+    if _input_is_polyspiro_diff:
+        return 'polyspiro-different'
+
     # Check bridged-fused FIRST (fused core + bridges)
     # Must come before bicyclo/polycyclic to avoid misclassification
     if detect_bridged_fused(mol):
@@ -2791,6 +2805,9 @@ def _classify_complex_ring(mol) -> str:
     # component. Computed once, reused at the dispatch branch below.
     from ..rules.spiro import is_dispiroter as _is_dispiroter_classify
     _input_is_dispiroter = _is_dispiroter_classify(mol)
+    # _input_is_polyspiro_diff (P-24.6) was computed + returned at the top of
+    # this function (it must guard the bridged-fused branch); reused here only
+    # for the catalog-skip guard.
     # P-24.5 spiro-of-von-Baeyer / spiro-PAH (Phase 13B): SAME hazard. When a
     # spiro component is a fused HETEROCYCLE (e.g. spiro[fluorene-9,9'-xanthene])
     # the catalog matches the xanthene sub-core; worse, get_ring_systems splits
@@ -2813,7 +2830,7 @@ def _classify_complex_ring(mol) -> str:
     # is the largest ring system (nucleotide cofactors: adenine + ribose),
     # use only the core's ring system atom count.
     from ..data.fused_heterocycles import match_fused_heterocycle_core, FUSED_HETEROCYCLE_DATA
-    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi or _input_is_dispiroter or _input_is_spiro_vb) else match_fused_heterocycle_core(mol)
+    core_match = None if (_phase151_input_is_mixed or _input_is_spirobi or _input_is_dispiroter or _input_is_polyspiro_diff or _input_is_spiro_vb) else match_fused_heterocycle_core(mol)
     if core_match is not None:
         core_smiles = core_match[2]
         core_data = FUSED_HETEROCYCLE_DATA.get(core_smiles, {})
@@ -2873,6 +2890,9 @@ def _classify_complex_ring(mol) -> str:
     # so is_spirobi declines. Must precede pure-spiro and polycyclic-bridged.
     if _input_is_dispiroter:
         return 'dispiroter'
+
+    # P-24.6 polyspiro-different already handled at the top of this function
+    # (returned before detect_bridged_fused).
 
     # Check spiro BEFORE polycyclic-bridged (P-24.2).
     # Dispiro compounds have 3+ SSSR rings, causing is_polycyclic_system()
@@ -3025,6 +3045,17 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Dispiroter naming failed for molecule")
+            return None
+
+        elif ring_type == 'polyspiro-different':
+            # P-24.6: unbranched polyspiro, different components (>=1 polycyclic)
+            # (e.g. dispiro[fluorene-9,1'-cyclohexane-4',1''-indene]).
+            from ..rules.spiro import name_unbranched_polyspiro_different
+            result = name_unbranched_polyspiro_different(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Unbranched-polyspiro-different naming failed for molecule")
             return None
 
         elif ring_type == 'spiro-vonbaeyer':

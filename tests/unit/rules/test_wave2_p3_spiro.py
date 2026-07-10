@@ -42,3 +42,11 @@ class TestP24ThiaSpiroVonBaeyer:
         # P-24.5.2: 'a'-replacement prefix cited before spiro.
         assert name_compound("C1=CC=CC=2C3=CC=CC=C3C3(C12)C1CCC(S3)CC1") == \
             "3-thiaspiro[bicyclo[2.2.2]octane-2,9'-fluorene]"
+
+
+@pytest.mark.unit
+class TestP24UnbranchedPolyspiroDifferent:
+    def test_fluorene_cyclohexane_indene(self):
+        # P-24.6: unbranched polyspiro, three different components.
+        assert name_compound("C1=CC2(CCC3(CC2)c2ccccc2-c2ccccc23)c2ccccc21") == \
+            "dispiro[fluorene-9,1'-cyclohexane-4',1''-indene]"
