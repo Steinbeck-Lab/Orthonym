@@ -2720,6 +2720,11 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_branched_polyspiro(mol):
         return True
 
+    # P-24.8.3 λ spiroter (three identical components + λ spiro atom in 3 rings).
+    from ..rules.spiro import is_spiroter as _is_spiroter
+    if _is_spiroter(mol):
+        return True
+
     # P-24.8.1.3 λ spiro atom in >=3 rings — recognised so the dispatcher can
     # FAIL CLOSED rather than leaking a partial monocyclic name.
     from ..rules.spiro import is_lambda_multiring_spiro as _is_lambda_multiring
@@ -2798,6 +2803,12 @@ def _classify_complex_ring(mol) -> str:
     from ..rules.spiro import is_branched_polyspiro as _is_branched_polyspiro_classify
     if _is_branched_polyspiro_classify(mol):
         return 'polyspiro-branched-different'
+
+    # P-24.8.3 λ spiroter (three identical polycyclic components + one λ spiro
+    # atom in 3 rings). Must precede the lambda-multiring FAIL-CLOSED guard.
+    from ..rules.spiro import is_spiroter as _is_spiroter_classify
+    if _is_spiroter_classify(mol):
+        return 'spiroter'
 
     # P-24.8.1.3 λ spiro atom in >=3 monocyclic rings: detection-only, FAIL
     # CLOSED (the λ von-Baeyer build is a follow-on). Refuse rather than leak a
@@ -3061,6 +3072,17 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Spirobi naming failed for molecule")
+            return None
+
+        elif ring_type == 'spiroter':
+            # P-24.8.3: three identical polycyclic components at one λ spiro atom
+            # (e.g. 2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]).
+            from ..rules.spiro import name_spiroter
+            result = name_spiroter(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Spiroter naming failed for molecule")
             return None
 
         elif ring_type == 'dispiroter':

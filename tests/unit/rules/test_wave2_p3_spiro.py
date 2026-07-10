@@ -132,3 +132,14 @@ class TestP24LambdaMonocyclicTripleSpiro:
         assert is_lambda_multiring_spiro(m) is True
         assert name_lambda_multiring_spiro(m) is None
         assert _classify_complex_ring(m) == "lambda-multiring-spiro"
+
+
+@pytest.mark.unit
+class TestP24LambdaSpirobiSpiroter:
+    def test_lambda4_spirobi_benzodioxathiole(self):
+        assert name_compound("O1S2(OC3=C1C=CC=C3)OC3=C(O2)C=CC=C3") == \
+            "2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]"
+
+    def test_lambda6_spiroter_benzodioxathiole(self):
+        assert name_compound("O1S23(OC4=C1C=CC=C4)(OC4=C(O2)C=CC=C4)OC4=C(O3)C=CC=C4") == \
+            "2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]"

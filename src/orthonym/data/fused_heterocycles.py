@@ -124,6 +124,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
+    # [1,3,2]benzodioxathiole (spiro-component form; the ring S is the spiro
+    # atom, cited with a λ token in the spiro PIN — P-24.8.2). Canonical key uses
+    # the λ4 [SH2] valence as it appears in the extracted spiro component.
+    # OPSIN numbering: O1, S2, O3, C3a, C4-C7, C7a (verified via -o extendedsmi).
+    'c1ccc2c(c1)O[SH2]O2': {
+        'name': '[1,3,2]benzodioxathiole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {6: 1, 7: 2, 8: 3, 3: '3a', 2: 4, 1: 5, 0: 6, 5: 7, 4: '7a'},
+    },
     # quinoline
     'c1ccc2ncccc2c1': {
         'name': 'quinoline',

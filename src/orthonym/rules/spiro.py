@@ -2219,7 +2219,11 @@ def _name_spirobi_core(mol):
     # P-24.3.2 / P-24.5.1: indicated hydrogen of the individual component is not
     # cited when the spiro atom occupies that locant.
     component_name = _strip_consumed_indicated_h(name_a, lo)
-    name = f"{lo},{hi}'-spirobi[{component_name}]"
+    # P-24.8.2: a NONSTANDARD (λ) spiro atom carries its λ token on the UNPRIMED
+    # locant (e.g. 2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]).
+    lam = _nonstandard_bonding_number(mol, spiro_center)
+    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+    name = f"{lo_tok},{hi}'-spirobi[{component_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
     for atom_idx, locant in unprimed_map.items():
@@ -2242,6 +2246,106 @@ def name_spirobi(
     matches ``name_mixed_spiro_fused`` (name, ring_atoms, atom_to_locant,
     substituents_included=False). Fail-closed (see ``_name_spirobi_core``)."""
     core = _name_spirobi_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
+def _name_spiroter_core(mol):
+    """P-24.8.3: three IDENTICAL polycyclic components sharing ONE nonstandard
+    (λ) spiro atom that lies in THREE rings (a λ6 spiroter, e.g.
+    ``2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]``). Returns
+    ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed).
+
+    Fail closed unless: exactly one atom in >=3 rings with a nonstandard bonding
+    number, that atom is a cut vertex splitting the ring graph into exactly 3
+    components, all three graph-isomorphic and identically named, and the system
+    is unsubstituted."""
+    ri = mol.GetRingInfo()
+    all_rings = [set(r) for r in ri.AtomRings()]
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms |= r
+    for atom in mol.GetAtoms():  # unsubstituted only
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+
+    # Locate the unique λ spiro atom in >=3 rings.
+    spiro_center = None
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if sum(1 for r in all_rings if idx in r) < 3:
+            continue
+        if _nonstandard_bonding_number(mol, idx) is None:
+            continue
+        if spiro_center is not None:
+            return None  # >1 candidate -> not a clean λ spiroter
+        spiro_center = idx
+    if spiro_center is None:
+        return None
+    lam = _nonstandard_bonding_number(mol, spiro_center)
+
+    _, adj = _ring_atom_graph(mol)
+    comps = _ring_components_excluding(adj, spiro_center)
+    if len(comps) != 3:
+        return None
+
+    named = []
+    canon = None
+    for comp in comps:
+        atoms = comp | {spiro_center}
+        nm = _name_spiro_component(mol, atoms, spiro_center)
+        if nm is None:
+            return None
+        ext = _extract_subfragment(mol, atoms)
+        if ext is None:
+            return None
+        loc = _canonical_spiro_locant(ext, nm[1], spiro_center)
+        if loc is None:
+            return None
+        c_smi = Chem.MolToSmiles(ext[0])
+        if canon is None:
+            canon = (nm[0], c_smi)
+        elif nm[0] != canon[0] or c_smi != canon[1]:
+            return None  # not all identical
+        named.append((nm[0], nm[1], loc, comp))
+
+    # All identical: unprimed / primed / double-primed by ascending spiro locant
+    # (they are equal here). Emit the λ token on the unprimed spiro locant.
+    named.sort(key=lambda t: t[2])
+    lo = named[0][2]
+    mid = named[1][2]
+    hi = named[2][2]
+    component_name = _strip_consumed_indicated_h(named[0][0], lo)
+    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+    name = f"{lo_tok},{mid}',{hi}''-spiroter[{component_name}]"
+
+    combined: Dict[int, _Locant] = {}
+    for atom_idx, locant in named[0][1].items():
+        combined[atom_idx] = locant
+    for prime, entry in (("'", named[1]), ("''", named[2])):
+        for atom_idx, locant in entry[1].items():
+            if atom_idx == spiro_center or atom_idx in combined:
+                continue
+            combined[atom_idx] = (locant, prime)
+    if not (set(combined.keys()) >= all_ring_atoms):
+        return None
+    return name, all_ring_atoms, combined
+
+
+def is_spiroter(mol) -> bool:
+    """P-24.8.3: three identical polycyclic components + one λ spiro atom."""
+    if mol is None:
+        return False
+    return _name_spiroter_core(mol) is not None
+
+
+def name_spiroter(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.8.3 ``spiroter`` name. Fail-closed."""
+    core = _name_spiroter_core(mol)
     if core is None:
         return None
     name, all_ring_atoms, combined_locants = core
