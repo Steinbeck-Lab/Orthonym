@@ -120,3 +120,38 @@ class TestP44FusionDescriptorNumbers:
             m = Chem.MolFromSmiles(smi)
             return _fusion_descriptor_numbers(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
         assert nums("c1ccc2ncccc2c1") == nums("c1ccc2c(c1)cccn2")
+
+
+@pytest.mark.unit
+class TestP44ComponentSeniorityP25_8:
+    def test_score_tuple_grows(self):
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1")
+        tup = ring_system_score(m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
+        assert len(tup) >= 35  # 34 + P-25.8 component-rank term
+        assert isinstance(tup[34], tuple)
+
+    def test_quinoline_senior_to_isoquinoline(self):
+        # P-44.2.2.2.3.5 / P-25.8: quinoline > isoquinoline. Two fused N-systems
+        # that tie on every prior criterion are now separated.
+        from orthonym.perception.rings import get_ring_systems
+        m = Chem.MolFromSmiles("c1ccc2ncccc2c1Cc1cccc2cnccc12")
+        rs = get_ring_systems(m)
+        tups = [ring_system_score(m, s) for s in rs]
+        assert tups[0] != tups[1]  # tie is now broken deterministically
+
+    @pytest.mark.parametrize("smi", [
+        "c1ccc2ncccc2c1Cc1cccc2cnccc12",  # quinoline-CH2-isoquinoline
+    ])
+    def test_component_seniority_spelling_independent(self, smi):
+        from orthonym.perception.rings import get_ring_systems
+        m0 = Chem.MolFromSmiles(smi)
+
+        def winner_score(mol):
+            rs = get_ring_systems(mol)
+            pr = set(select_principal_ring_system(mol, rs))
+            return tuple(ring_system_score(mol, pr))
+
+        base = winner_score(m0)
+        for _ in range(5):
+            alt = Chem.MolFromSmiles(Chem.MolToSmiles(m0, doRandom=True))
+            assert winner_score(alt) == base

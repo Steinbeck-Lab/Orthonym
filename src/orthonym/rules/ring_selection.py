@@ -450,6 +450,46 @@ def _fusion_descriptor_numbers(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[i
     return tuple(out)
 
 
+_P25_8_HET_LOCANT_WIDTH = 8
+_P25_8_SENTINEL = 10 ** 6
+
+
+def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, ...]:
+    """P-44.2.2.2.3.5 criterion (e): the senior ring COMPONENT per P-25.8. Two
+    fused systems that tie on all prior criteria are separated by the seniority
+    of their (base) component. The P-25.8 sub-criterion that distinguishes e.g.
+    quinoline (N at locant 1) from isoquinoline (N at 2) is the HETEROATOM
+    LOCANT SET in the component's own numbering (lower = senior). Returns a
+    fixed-width tuple (lower = senior), all-sentinel when not resolvable so the
+    term is INERT (fail-safe: never introduces a spelling-dependent difference).
+    Deterministic (the component namer is spelling-independent)."""
+    pad = (_P25_8_SENTINEL,) * _P25_8_HET_LOCANT_WIDTH
+    ri = mol.GetRingInfo()
+    rings_in = [set(r) for r in ri.AtomRings() if set(r) <= set(system_atoms)]
+    if len(rings_in) < 2:
+        return pad  # monocyclic / non-fused -> no component seniority tiebreak
+    # any heteroatom present? if not, the (e) heteroatom-locant tiebreak is inert
+    if not any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in system_atoms):
+        return pad
+    try:
+        from .spiro import _name_fused_component
+        named = _name_fused_component(mol, [list(r) for r in rings_in])
+    except Exception:
+        return pad
+    if named is None:
+        return pad
+    _name, a2l = named
+    het_locs = sorted(
+        a2l[i] for i in a2l
+        if i in system_atoms and mol.GetAtomWithIdx(i).GetAtomicNum() != 6
+        and isinstance(a2l[i], int)
+    )
+    if not het_locs:
+        return pad
+    out = (het_locs + list(pad))[:_P25_8_HET_LOCANT_WIDTH]
+    return tuple(out)
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -484,6 +524,8 @@ def ring_system_score(
     - [31] spiro-atom locant set: P-44.2.2.2.1.2 lower locants (nested tuple)
     - [32] fusion-descriptor letters: P-44.2.2.2.3.3 lower letters (nested tuple)
     - [33] fusion-descriptor numbers: P-44.2.2.2.3.4 lower numbers (nested tuple)
+    - [34] P-25.8 component rank: P-44.2.2.2.3.5 senior component (nested tuple;
+           het-locant set — quinoline<isoquinoline)
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
@@ -507,6 +549,7 @@ def ring_system_score(
             + ((_SPIRO_LOCANT_SENTINEL,) * _SPIRO_LOCANT_WIDTH,)
             + ((_FUSION_LETTER_SENTINEL,) * _FUSION_LETTER_WIDTH,)
             + ((_FUSION_NUMBER_SENTINEL,) * _FUSION_NUMBER_WIDTH,)
+            + ((_P25_8_SENTINEL,) * _P25_8_HET_LOCANT_WIDTH,)
         )
 
     # 1. Type rank
@@ -593,6 +636,7 @@ def ring_system_score(
         spiro_locants,                      # P-44.2.2.2.1.2: lower spiro-atom locants
         _fusion_descriptor_letters(mol, system_atoms),  # P-44.2.2.2.3.3: fusion letters
         _fusion_descriptor_numbers(mol, system_atoms),  # P-44.2.2.2.3.4: fusion numbers
+        _p25_8_component_rank(mol, system_atoms),        # P-44.2.2.2.3.5: P-25.8 component
     )
 
 
