@@ -82,15 +82,12 @@ class TestP64RingKetonicSuffixSeniority:
         # cites its heteroatom locant set before the stem ('1,3-thiazolidin-4-one').
         assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
-    @pytest.mark.xfail(reason="P-64.6.2 sulfanylidene follow-up: the ring C=S "
-                              "thiocarbonyl co-occurring with a ring amide C=O "
-                              "mis-perceives (N-substituentcyclopentane... "
-                              "garbage, SELF-01-suppressed -> unknown). Deep "
-                              "multi-path thiocarbonyl+ring-amide defect, "
-                              "beyond this row's scope; deferred.")
     def test_thiazolidine_thione_one(self):
         # P-64.6.2: C=O senior to C=S -> ring C=O is the '-one' suffix,
-        # ring C=S is the 'sulfanylidene' prefix.
+        # ring C=S is the 'sulfanylidene' prefix. Root cause was the exocyclic
+        # ring C=S being flagged 'unnameable' (whole heterocycle candidate
+        # declined); _identify_hetero_substituent now recognises =S/=Se/=Te on a
+        # ring carbon as the sulfanylidene/selanylidene/tellanylidene prefix.
         assert name_compound("S=C1NC(=O)CS1") == "2-sulfanylidene-1,3-thiazolidin-4-one"
 
 

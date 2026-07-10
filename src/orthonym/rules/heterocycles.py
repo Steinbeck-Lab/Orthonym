@@ -1808,6 +1808,21 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
             if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
                 return 'oxo'
 
+    # Chalcogen ylidene (=S/=Se/=Te) on a ring carbon (P-64.6.2): the heavier
+    # chalcogen analogues of 'oxo'. When a ring C=O is present it is the senior
+    # ('-one' suffix, chalcogen order O>S>Se>Te) and the C=S/C=Se/C=Te is cited
+    # as a 'sulfanylidene'/'selanylidene'/'tellanylidene' detachable prefix at
+    # its ring locant (2-sulfanylidene-1,3-thiazolidin-4-one). Without this the
+    # exocyclic chalcogen was mis-flagged 'unnameable' and the whole heterocycle
+    # candidate declined.
+    _CHALCOGEN_YLIDENE = {'S': 'sulfanylidene', 'Se': 'selanylidene',
+                          'Te': 'tellanylidene'}
+    if symbol in _CHALCOGEN_YLIDENE and h_count == 0 and len(sub_atoms) == 1:
+        for bond in first_atom.GetBonds():
+            other_idx = bond.GetOtherAtomIdx(sub_atoms[0])
+            if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
+                return _CHALCOGEN_YLIDENE[symbol]
+
     # Imino (=NH) -- IUPAC P-31.1.3
     if symbol == 'N' and h_count == 1 and len(sub_atoms) == 1:
         for bond in first_atom.GetBonds():
