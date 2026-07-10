@@ -1161,18 +1161,26 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
             if prefix is None:
                 return None
         else:
-            # Composition: all-C saturated bridge or a single O (epoxy) — same
-            # scope rule as the dihydro path.
-            elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in comp]
-            n_hetero = sum(1 for e in elements if e != 'C')
-            if n_hetero > 1 or (n_hetero == 1 and (len(comp) != 1
-                                                   or elements[0] != 'O')):
-                return None
-            hetero = next((e for e in elements if e != 'C'), None)
-            prefix = get_bridge_prefix({
-                'length': len(comp), 'element': hetero or 'C',
-                'heteroatom': hetero,
-            })
+            # P-15.3.1.2.2.1 composite bridge (-O-CH2-, -CH2-O-CH2-): a
+            # multi-atom bridge with a heteroatom that the single-simple-bridge
+            # composition guard would reject. Recognize it FIRST; composite
+            # prefixes are parenthesized (P-25.4.2.3.2).
+            comp_bridge = _composite_bridge_prefix(mol, comp, bridgeheads)
+            if comp_bridge is not None:
+                prefix = f"({comp_bridge[0]})"
+            else:
+                # Composition: all-C saturated bridge or a single O (epoxy) —
+                # same scope rule as the dihydro path.
+                elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in comp]
+                n_hetero = sum(1 for e in elements if e != 'C')
+                if n_hetero > 1 or (n_hetero == 1 and (len(comp) != 1
+                                                       or elements[0] != 'O')):
+                    return None
+                hetero = next((e for e in elements if e != 'C'), None)
+                prefix = get_bridge_prefix({
+                    'length': len(comp), 'element': hetero or 'C',
+                    'heteroatom': hetero,
+                })
         if not prefix:
             return None
         locants = _mancude_bridge_locants(
@@ -1466,6 +1474,39 @@ def _linear_bridge_order(mol, comp: Set[int], bridgeheads: Set[int]):
         path.append(nxt)
         prev, cur = cur, nxt
     return path if path[-1] in ends else None
+
+
+# Composite two/three-atom bridge sequences (P-15.3.1.2.2.1 + P-25.4.2.3.1).
+# Key = tuple of element symbols in atom order from one bridgehead to the other;
+# value = the concatenated prefix (senior simple bridge first, 'epi' elided when
+# not first). Heteroatom seniority O > S > Se > N (P-25.4.2.3.1).
+_COMPOSITE_BRIDGE_SEQUENCES: Dict[Tuple[str, ...], str] = {
+    ('O', 'C'): 'epoxymethano',            # -O-CH2-
+    ('C', 'O', 'C'): 'methanooxymethano',  # -CH2-O-CH2-
+}
+
+
+def _composite_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):
+    """P-15.3.1.2.2.1/.2.2.4 + P-25.4.2.3.1: a composite (multi-simple-bridge)
+    acyclic bridge. Order the bridge atoms into a chain between the two
+    bridgeheads, look up the element sequence (tried both directions). Returns
+    ('epoxymethano', sorted([bh_lo, bh_hi])) or None (fail closed). Only
+    OPSIN-verifiable composite sequences are tabulated."""
+    chain = _linear_bridge_order(mol, set(bridge_atoms), set(bridgeheads))
+    if chain is None or len(chain) < 2:
+        return None
+    # composite bridges are all-single-bonded internally (no C=C/C#C here).
+    for i in range(len(chain) - 1):
+        b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            return None
+    elems = tuple(mol.GetAtomWithIdx(a).GetSymbol() for a in chain)
+    name = _COMPOSITE_BRIDGE_SEQUENCES.get(elems)
+    if name is None:
+        name = _COMPOSITE_BRIDGE_SEQUENCES.get(tuple(reversed(elems)))
+    if name is None:
+        return None
+    return (name, sorted(bridgeheads))
 
 
 def _cyclic_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):

@@ -66,3 +66,20 @@ class TestP25HeterocyclicBridgesFailClosed:
     ])
     def test_heterocyclic_bridge_declines(self, smiles):
         assert name_compound(smiles) == "unknown organic compound"
+
+
+@pytest.mark.unit
+class TestP15CompositeBridges:
+    """P-15.3.1.2.2.1/.2.2.4 concatenated composite bridges on a fused parent."""
+
+    def test_epoxymethano_naphthalene(self):
+        # OPSIN-RT-verified: 1,4-(epoxymethano)naphthalene -> C12=CC=C(C3=CC=CC=C13)CO2
+        assert name_compound("C12=CC=C(C3=CC=CC=C13)CO2") == "1,4-(epoxymethano)naphthalene"
+
+    def test_epoxymethano_anthracene(self):
+        # The plan's placeholder SMILES turned out to be an -O-CH2- (epoxymethano)
+        # bridge across anthracene's meso 9,10 positions, NOT a naphthalene
+        # methanooxymethano case. OPSIN-RT-verified: 9,10-(epoxymethano)anthracene
+        # parses to exactly this structure (reproduce-first divergence, recorded).
+        assert name_compound("C1=CC=CC2=C3C4=CC=CC=C4C(=C12)OC3") == \
+            "9,10-(epoxymethano)anthracene"
