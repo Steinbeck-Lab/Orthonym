@@ -27,3 +27,10 @@ class TestWave2P1ChainsBVerify:
     ])
     def test_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
+class TestP22MultiplierAElision:
+    def test_tetrazine_elides_multiplier_a(self):
+        # P-22.2.2.1.2: 'tetra' + 'aza' -> 'tetraza' -> '...tetrazine'
+        assert name_compound("N1=NN=NC=C1") == "1,2,3,4-tetrazine"

@@ -574,6 +574,11 @@ def build_hw_name(
         count = len(element_locants[elem])
         if count > 1:
             multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            # P-22.2.2.1.2: elide the multiplier's terminal 'a' before an 'a'
+            # (aza/oxa/thia/...) term that begins with a vowel -> tetra+aza=tetraza.
+            # (di/tri end in 'i'; only tetra/penta/hexa/... trigger this elision.)
+            if multiplier.endswith('a') and hw_prefix and hw_prefix[0] in 'aeiou':
+                multiplier = multiplier[:-1]
             prefix_parts.append(f"{multiplier}{hw_prefix}")
         else:
             prefix_parts.append(hw_prefix)
