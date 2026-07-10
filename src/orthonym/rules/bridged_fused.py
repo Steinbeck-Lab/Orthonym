@@ -858,6 +858,18 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     if any(mol.GetAtomWithIdx(b).GetIsAromatic() for b in bridgeheads):
         return None
 
+    # P-25.4.2.1.2/.1.3 CYCLIC (ring) bridge guard. A ring bridge (the bridge
+    # atoms close a ring with the two bridgeheads: [1,2]benzeno, [1,2]epicyclopenta)
+    # has its own free-valence-bracket grammar and OPSIN 2.9 cannot round-trip the
+    # BB PIN (9,10-[1,2]benzenoanthracene) — an INTERNAL-ORACLE-only class. The
+    # recognizer below identifies the two named ring bridges; the full residual +
+    # bracket assembly is a documented follow-up, so we fail closed (return None)
+    # rather than emit an unverifiable name for anything not already handled. A
+    # heterocyclic ring bridge (P-25.4.2.1.5) returns None here too (all-carbon
+    # check), which is the correct fail-closed for its no-OPSIN-oracle class.
+    if _cyclic_bridge_prefix(mol, bridge_atoms, bridgeheads) is not None:
+        return None
+
     # Bridge composition: only an all-carbon bridge (methano/ethano/propano) or a
     # SINGLE-atom heteroatom bridge (epoxy/epithio/epimino) is named correctly here.
     # A multi-atom or multi-heteroatom bridge (epidioxy -O-O-, composite -CH2-O-,
@@ -1454,6 +1466,29 @@ def _linear_bridge_order(mol, comp: Set[int], bridgeheads: Set[int]):
         path.append(nxt)
         prev, cur = cur, nxt
     return path if path[-1] in ends else None
+
+
+def _cyclic_bridge_prefix(mol, bridge_atoms: Set[int], bridgeheads: Set[int]):
+    """P-25.4.2.1.2/.1.3 divalent monocyclic hydrocarbon bridge prefix.
+    A ring bridge is the bridge atoms forming, WITH the two bridgeheads, a single
+    ring. Return '[1,2]benzeno' for a benzene ring bridge, '[1,2]epicyclopenta'
+    for a cyclopentane ring bridge, else None (fail closed). All-carbon only — a
+    heteroatom ring bridge (P-25.4.2.1.5 furano/epipyrrolo) returns None (no
+    OPSIN 2.9 oracle for that class)."""
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in bridge_atoms):
+        return None
+    ring_atoms = set(bridge_atoms) | set(bridgeheads)
+    ri = mol.GetRingInfo()
+    # the bridge + the two bridgeheads must be exactly one SSSR ring.
+    if not any(set(r) == ring_atoms for r in ri.AtomRings()):
+        return None
+    size = len(ring_atoms)
+    aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in bridge_atoms)
+    if size == 6 and aromatic:
+        return '[1,2]benzeno'
+    if size == 5 and not aromatic:
+        return '[1,2]epicyclopenta'
+    return None
 
 
 def _unsaturated_bridge_prefix(mol, comp: Set[int], bridgeheads: Set[int]):
