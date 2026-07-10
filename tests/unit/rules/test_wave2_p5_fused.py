@@ -47,3 +47,17 @@ class TestP25MultiparentDifuranC:
     def test_benzo_difuran_c_prime_ab_order(self):
         # determinism: alternate spelling -> identical output
         assert name_compound("o1cc2cc3ccoc3cc2c1") == name_compound("c1cc2cc3cocc3cc2o1")
+
+
+@pytest.mark.unit
+class TestP25MultiparentDifuranB:
+    def test_benzo_difuran_b_prime(self):
+        # P-25.3.7.1: multiparent, one interparent (benzene) component; primed letters, colon-separated.
+        # OPSIN-RT-verified: benzo[1,2-b:4,5-b']difuran -> c1cc2cc3occc3cc2o1
+        assert name_compound("c1cc2cc3occc3cc2o1") == "benzo[1,2-b:4,5-b']difuran"
+
+    def test_benzo_difuran_b_prime_ab_order(self):
+        # determinism: alternate spelling of the SAME b' structure (the plan's
+        # original probe SMILES was a distinct isomer; replaced with an RDKit
+        # rooted respelling that canon-matches the b' key) -> identical output.
+        assert name_compound("c1coc2c1cc1occc1c2") == name_compound("c1cc2cc3occc3cc2o1")

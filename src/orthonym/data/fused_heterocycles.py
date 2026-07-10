@@ -663,6 +663,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 12,
         'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: '4a', 5: 5, 6: 6, 7: 7, 8: '7a', 9: 8, 10: '8a', 11: 1},
     },
+    # P-25.3.7.1 multiparent difuran (b' isomer): one interparent benzene
+    # component; primed letters + colon-separated locant sets. DISTINCT canonical
+    # key from the c' isomer above. Numbering derived 2026-07-09 from OPSIN
+    # `benzo[1,2-b:4,5-b']difuran -o extendedsmi`.
+    'c1cc2cc3occc3cc2o1': {
+        'name': "benzo[1,2-b:4,5-b']difuran",
+        'tautomer_locant': None,
+        'ring_system': 'benzodifuran',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 8, 4: '8a', 5: 1, 6: 2, 7: 3, 8: '3a', 9: 4, 10: '4a', 11: 5},
+    },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
         'name': 'furo[2,3-b]pyridine',
