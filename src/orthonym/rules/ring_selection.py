@@ -310,6 +310,13 @@ def _build_submol(mol: Chem.Mol, atom_indices: Set[int]) -> Optional[Chem.Mol]:
 # ============================================================================
 
 
+def _spiro_fusion_count(mol: Chem.Mol, system_atoms: Set[int]) -> int:
+    """P-44.2.2.2.1.1: number of spiro fusions in this ring system (spiro atoms
+    that lie within the system). 0 for a non-spiro system. Deterministic
+    (depends only on the atom set, not SMILES order)."""
+    return len(get_spiro_atoms(mol) & set(system_atoms))
+
+
 def ring_system_score(
     mol: Chem.Mol,
     system_atoms: Set[int]
@@ -325,7 +332,8 @@ def ring_system_score(
     tiebreaker, applied only after P-44.2.2 type seniority (so e.g.
     spiro > phane > fused stays senior to a mere double-bond difference).
 
-    Tuple ordering (29 elements):
+    Tuple ordering (30 elements; Tasks 12-17 append P-44.2.2.2.x tiebreakers
+    AFTER the P-44.4.1 tier so they only break within-type ties):
     - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
     - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
     - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
@@ -338,6 +346,7 @@ def ring_system_score(
     - [26] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
     - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
     - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
+    - [29] -spiro_fusions: P-44.2.2.2.1.1 more spiro fusions = senior (negated)
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
@@ -355,7 +364,7 @@ def ring_system_score(
         Tuple suitable for comparison with min() to select most senior
     """
     if not system_atoms:
-        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999, 0, 0)
+        return (0, 0, 0, 0, 0, 0) + (0,) * len(_HETEROATOM_VARIETY_ORDER) + (999, 0, 0, 0)
 
     # 1. Type rank
     type_rank = int(classify_ring_system_type(mol, system_atoms))
@@ -413,6 +422,12 @@ def ring_system_score(
         for elem in _HETEROATOM_VARIETY_ORDER
     )
 
+    # P-44.2.2.2.1.1 (Task 12): number of spiro fusions (more = senior). Appended
+    # AFTER the P-44.4.1 unsaturation tier so it only breaks a WITHIN-spiro tie
+    # and never overrides type/unsaturation seniority. Deterministic (atom-set
+    # only), so it introduces no spelling dependence.
+    spiro_fusions = _spiro_fusion_count(mol, system_atoms)
+
     # P-44.2: General criteria (P-44.2.1) applied BEFORE type hierarchy (P-44.2.2)
     return (
         -int(has_heteroatom),               # P-44.2.1(a): heterocyclic preferred
@@ -425,6 +440,7 @@ def ring_system_score(
         type_rank,                          # P-44.2.2: type hierarchy (tiebreaker)
         -num_multiple_bonds,                # P-44.4.1.1: max ring multiple bonds
         -num_double_bonds,                  # P-44.4.1.2: then max double bonds
+        -spiro_fusions,                     # P-44.2.2.2.1.1: more spiro fusions
     )
 
 
