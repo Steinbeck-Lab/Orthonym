@@ -34,3 +34,11 @@ class TestP24Dispiroter:
         # P-24.4.1: three identical bicyclo[3.1.0]hexane components, 2 spiro atoms.
         assert name_compound("C12CC3(CC2C1)CC1C2(C1C3)C3CCCC32") == \
             "3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]"
+
+
+@pytest.mark.unit
+class TestP24ThiaSpiroVonBaeyer:
+    def test_thiaspiro_bicyclooctane_fluorene(self):
+        # P-24.5.2: 'a'-replacement prefix cited before spiro.
+        assert name_compound("C1=CC=CC=2C3=CC=CC=C3C3(C12)C1CCC(S3)CC1") == \
+            "3-thiaspiro[bicyclo[2.2.2]octane-2,9'-fluorene]"

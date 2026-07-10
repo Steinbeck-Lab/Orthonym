@@ -2556,34 +2556,95 @@ def _name_carbocyclic_monocycle_component(
 
 
 def _name_vonbaeyer_spiro_component(
-    mol, component_atoms: Set[int],
+    mol, component_atoms: Set[int], spiro_center: Optional[int] = None,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
     """Name a von-Baeyer (bicyclic cage) component by its SYSTEMATIC
     ``bicyclo[...]alkane`` descriptor — NOT a retained name: the component-name
     spiro PIN cites the von Baeyer name (P-24.5), e.g. ``bicyclo[2.2.1]heptane``
     not ``norbornane`` (and the alphanumerical citation order depends on it).
     Returns ``(name, {orig_idx: locant})`` or None (non-bicyclo cage, tricyclo+,
-    or heteroatom cage -> follow-on, fail-closed)."""
+    or unnamed heteroatom cage -> follow-on, fail-closed).
+
+    P-24.5.2 / P-24.2.4.1.1: a von Baeyer cage may carry skeletal heteroatoms
+    named by 'a'-replacement. The descriptor is that of the corresponding
+    all-CARBON cage. Among the admissible von-Baeyer numberings the one giving
+    the LOWEST locant to the spiro atom is chosen (P-24.5.2 '2,9'' locant set),
+    then the lowest heteroatom locants (P-24.2.4.1.1) — coordinated so the
+    result is spelling-independent."""
     from .bicyclo import (
         is_bicyclo_system, generate_bicyclo_descriptor,
         get_bicyclo_numbering, _get_alkane_name,
+        find_true_bridgeheads, _enumerate_bicyclo_numberings,
+        _legacy_bicyclo_numbering,
     )
+    from .locants import compare_locant_sets
     extracted = _extract_subfragment(mol, component_atoms)
     if extracted is None:
         return None
     frag, orig_to_frag = extracted
     frag_to_orig = {v: k for k, v in orig_to_frag.items()}
-    if not is_bicyclo_system(frag):
+    ring_atom_idxs = [a.GetIdx() for a in frag.GetAtoms() if a.IsInRing()]
+    hetero_frag = {
+        i for i in ring_atom_idxs if frag.GetAtomWithIdx(i).GetAtomicNum() != 6
+    }
+    if hetero_frag:
+        rw = Chem.RWMol(frag)
+        for a in rw.GetAtoms():
+            if a.GetAtomicNum() != 6:
+                a.SetAtomicNum(6)
+                a.SetNoImplicit(False)
+                a.SetFormalCharge(0)
+        skel = rw.GetMol()
+        try:
+            Chem.SanitizeMol(skel)
+        except Exception:
+            return None
+    else:
+        skel = frag
+    if not is_bicyclo_system(skel):
         return None
-    descriptor = generate_bicyclo_descriptor(frag)
+    descriptor = generate_bicyclo_descriptor(skel)
     if not descriptor:
         return None
-    numbering = get_bicyclo_numbering(frag)
+
+    spiro_frag = orig_to_frag.get(spiro_center) if spiro_center is not None else None
+    if hetero_frag or spiro_frag is not None:
+        # Enumerate the admissible von-Baeyer numberings (topology-defined on the
+        # carbon skeleton) and pick per P-24.5.2 (lowest spiro-atom locant) then
+        # P-24.2.4.1.1 (lowest heteroatom locants). Deterministic tie-break.
+        bridgeheads = list(find_true_bridgeheads(skel))
+        if len(bridgeheads) != 2:
+            return None
+        cands: List[Dict[int, int]] = []
+        legacy = _legacy_bicyclo_numbering(skel)
+        if legacy:
+            cands.append(legacy)
+        cands.extend(_enumerate_bicyclo_numberings(skel, bridgeheads))
+        if not cands:
+            return None
+
+        def _key(a2l):
+            spiro_loc = (a2l.get(spiro_frag, 10 ** 6)
+                         if spiro_frag is not None else 0)
+            het = sorted(a2l[i] for i in hetero_frag if i in a2l)
+            return (spiro_loc, het)
+
+        best = None
+        for c in cands:
+            k = _key(c)
+            if best is None:
+                best = (k, c)
+                continue
+            # compare (spiro_loc, then hetero locant set)
+            if k[0] < best[0][0]:
+                best = (k, c)
+            elif k[0] == best[0][0] and compare_locant_sets(k[1], best[0][1]) < 0:
+                best = (k, c)
+        numbering = best[1]
+    else:
+        numbering = get_bicyclo_numbering(skel)
     if not numbering:
         return None
-    ring_atom_idxs = [a.GetIdx() for a in frag.GetAtoms() if a.IsInRing()]
-    if any(frag.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in ring_atom_idxs):
-        return None  # heteroatom cage -> follow-on (oxa/aza VB spiro component)
     name = descriptor + _get_alkane_name(len(ring_atom_idxs))
     a2l = {
         frag_to_orig[fi]: loc
@@ -2678,7 +2739,7 @@ def _name_spiro_component(
         return _name_carbocyclic_monocycle_component(
             mol, component_atoms, spiro_center
         )
-    vb = _name_vonbaeyer_spiro_component(mol, component_atoms)
+    vb = _name_vonbaeyer_spiro_component(mol, component_atoms, spiro_center)
     if vb is not None:
         return vb
     fused = _name_fused_component(mol, _component_rings(mol, component_atoms))
@@ -2771,7 +2832,80 @@ def _name_spiro_vonbaeyer_core(mol):
         combined_locants[atom_idx] = (locant, "'")
     if not (set(combined_locants.keys()) >= all_ring_atoms):
         return None  # coverage invariant (Pitfall 7)
+
+    # P-24.5.2: skeletal heteroatoms of a von-Baeyer CAGE component are cited as
+    # an 'a'-replacement prefix BEFORE 'spiro'. Heteroatoms belonging to a fused
+    # / catalog component (e.g. the O of xanthene) are already implicit in that
+    # component's retained name and must NOT be double-cited. Only the atoms of
+    # bicyclo-cage-named components are 'a'-expressible here.
+    a_expressible: Set[int] = set()
+    if name_a.startswith('bicyclo'):
+        a_expressible |= atoms_a
+    if name_b.startswith('bicyclo'):
+        a_expressible |= atoms_b
+    hetero_prefix = _spiro_vb_a_prefix(
+        mol, a_expressible, spiro_center, unprimed_map, primed_map
+    )
+    if hetero_prefix is None:
+        # A heteroatom in a VB cage that we could not deterministically cite ->
+        # fail closed (never a silently-carbo name).
+        if any(
+            mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)
+            for a in a_expressible
+        ):
+            return None
+    elif hetero_prefix:
+        name = f"{hetero_prefix}{name}"
     return name, all_ring_atoms, combined_locants
+
+
+def _spiro_vb_a_prefix(
+    mol,
+    a_expressible: Set[int],
+    spiro_center: int,
+    unprimed_map: Dict[int, int],
+    primed_map: Dict[int, int],
+) -> Optional[str]:
+    """P-24.5.2 'a'-replacement prefix (e.g. ``3-thia``) for skeletal
+    heteroatoms of a von-Baeyer CAGE component, cited before 'spiro'. Returns the
+    prefix string ('' when there are no heteroatoms), or None (fail-closed) if a
+    heteroatom is the spiro atom, has a nonstandard bonding number (λ family),
+    or cannot be located deterministically."""
+    hetero = [
+        a for a in a_expressible
+        if mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)
+    ]
+    if not hetero:
+        return ''
+    from ..assembly.naming_utils import get_multiplier_prefix
+    # element -> list of (locant_token, sort_key). Prime the token if the atom
+    # is in the primed component.
+    by_element: Dict[str, List[Tuple[str, Tuple]]] = {}
+    for a in hetero:
+        if a == spiro_center:
+            return None  # λ-spiro family, not P-24.5.2
+        if _nonstandard_bonding_number(mol, a) is not None:
+            return None  # λ heteroatom -> Tasks 8-11
+        sym = mol.GetAtomWithIdx(a).GetSymbol()
+        if a in unprimed_map:
+            loc = unprimed_map[a]
+            token = str(loc)
+            key = (0, loc)
+        elif a in primed_map:
+            loc = primed_map[a]
+            token = f"{loc}'"
+            key = (1, loc)
+        else:
+            return None
+        by_element.setdefault(sym, []).append((token, key))
+    parts = []
+    for element in sort_heteroatoms_by_priority(list(by_element.keys())):
+        entries = sorted(by_element[element], key=lambda t: t[1])
+        prefix_name = get_hw_prefix(element) or get_heteroatom_prefix(element)
+        mult = get_multiplier_prefix(len(entries), prefix_name)
+        locs = ','.join(t[0] for t in entries)
+        parts.append(f"{locs}-{mult}{prefix_name}")
+    return ''.join(parts)
 
 
 def is_spiro_vonbaeyer(mol) -> bool:
