@@ -35,3 +35,15 @@ class TestP52BenzoGhiPerylene:
         # P-52.2.4.2 / large peri-fused PAH catalog parent.
         # OPSIN-RT-verified: benzo[ghi]perylene -> c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56
         assert name_compound("c1cc2ccc3ccc4ccc5cccc6c(c1)c2c3c4c56") == "benzo[ghi]perylene"
+
+
+@pytest.mark.unit
+class TestP25MultiparentDifuranC:
+    def test_benzo_difuran_c_prime(self):
+        # P-25.3.5.3: multiparent name preferred to a fused-ring name.
+        # OPSIN-RT-verified: benzo[1,2-b:4,5-c']difuran -> c1cc2cc3cocc3cc2o1
+        assert name_compound("c1cc2cc3cocc3cc2o1") == "benzo[1,2-b:4,5-c']difuran"
+
+    def test_benzo_difuran_c_prime_ab_order(self):
+        # determinism: alternate spelling -> identical output
+        assert name_compound("o1cc2cc3ccoc3cc2c1") == name_compound("c1cc2cc3cocc3cc2o1")

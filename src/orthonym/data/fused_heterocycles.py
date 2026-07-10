@@ -653,6 +653,16 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 6, 1: 5, 2: 4, 3: '3a', 4: 3, 5: 2, 6: 1, 7: '7a', 8: 7},
     },
+    # P-25.3.5.3 multiparent difuran (a multiparent name is preferred to a
+    # two-component fused name furo[3,4-f][1]benzofuran). Numbering derived
+    # 2026-07-09 from OPSIN `benzo[1,2-b:4,5-c']difuran -o extendedsmi`.
+    'c1cc2cc3cocc3cc2o1': {
+        'name': "benzo[1,2-b:4,5-c']difuran",
+        'tautomer_locant': None,
+        'ring_system': 'benzodifuran',
+        'parent_atoms': 12,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: '4a', 5: 5, 6: 6, 7: 7, 8: '7a', 9: 8, 10: '8a', 11: 1},
+    },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
         'name': 'furo[2,3-b]pyridine',
