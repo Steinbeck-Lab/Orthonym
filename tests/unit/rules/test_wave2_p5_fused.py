@@ -61,3 +61,12 @@ class TestP25MultiparentDifuranB:
         # original probe SMILES was a distinct isomer; replaced with an RDKit
         # rooted respelling that canon-matches the b' key) -> identical output.
         assert name_compound("c1coc2c1cc1occc1c2") == name_compound("c1cc2cc3occc3cc2o1")
+
+
+@pytest.mark.unit
+class TestP25MultiparentTriplePrimed:
+    def test_dicyclobuta_difuran(self):
+        # P-25.3.7.3: three+ interparent components, double-primed benzo interparent.
+        # OPSIN-RT-verified BB-verbatim PIN.
+        expected = "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran"
+        assert name_compound("O1C2=C(C=C1)C=1C2=CC2=C(C3=COC=C32)C1") == expected

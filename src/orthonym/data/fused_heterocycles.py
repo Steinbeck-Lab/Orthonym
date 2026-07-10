@@ -674,6 +674,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 12,
         'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 8, 4: '8a', 5: 1, 6: 2, 7: 3, 8: '3a', 9: 4, 10: '4a', 11: 5},
     },
+    # P-25.3.7.3 three+-interparent multiparent (BB-verbatim PIN,
+    # BlueBookV2.md:23751): double-primed benzo interparent, dicyclobuta
+    # first-order interparent, difuran parents. Numbering derived 2026-07-09
+    # from OPSIN `<PIN> -o extendedsmi`.
+    'c1cc2c3cc4c5cocc5c4cc3c2o1': {
+        'name': "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran",
+        'tautomer_locant': None,
+        'ring_system': 'benzodicyclobutadifuran',
+        'parent_atoms': 16,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: '3b', 4: 4, 5: '4a', 6: '4b', 7: 5, 8: 6, 9: 7, 10: '7a', 11: '7b', 12: 8, 13: '8a', 14: '8b', 15: 1},
+    },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
         'name': 'furo[2,3-b]pyridine',
