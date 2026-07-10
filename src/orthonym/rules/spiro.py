@@ -2704,15 +2704,184 @@ def is_branched_polyspiro(mol) -> bool:
     return False
 
 
+def _number_central_monocycle_branch(
+    mol, component_atoms: Set[int], spiro_atoms: List[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Number a monocyclic HETEROCYCLIC central branch component (>=2 spiro
+    junctions) so heteroatoms take the lowest locant SET (P-22.2.4 / element
+    seniority), then the spiro-junction atoms take the lowest locant SET
+    (P-24.7). Returns ``(hw_name, {orig_idx: locant})`` or None (fail-closed)."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    rings = frag.GetRingInfo().AtomRings()
+    if len(rings) != 1:
+        return None
+    ring = list(rings[0])
+    ring_size = len(ring)
+    ring_set = set(ring)
+    hetero_frag = {fi for fi in ring
+                   if frag.GetAtomWithIdx(fi).GetAtomicNum() not in (1, 6)}
+    if not hetero_frag:
+        return None
+    # saturated only (mancude central branch is a follow-on)
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in frag.GetBonds()
+           if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set):
+        return None
+    fadj: Dict[int, List[int]] = {a: [] for a in ring}
+    for bond in frag.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            fadj[i].append(j)
+            fadj[j].append(i)
+    spiro_frag = {orig_to_frag[s] for s in spiro_atoms if s in orig_to_frag}
+    if len(spiro_frag) != len(spiro_atoms):
+        return None
+    from ..data.hw_heteroatoms import HETEROATOM_PRIORITY as _HP
+
+    def _sym(fi):
+        return frag.GetAtomWithIdx(fi).GetSymbol()
+
+    best = None
+    for start in ring:
+        for first in fadj[start]:
+            path = [start, first]
+            visited = {start, first}
+            cur = first
+            ok = True
+            while len(path) < ring_size:
+                nxts = [nb for nb in fadj[cur] if nb not in visited]
+                if len(nxts) != 1:
+                    ok = False
+                    break
+                cur = nxts[0]
+                path.append(cur)
+                visited.add(cur)
+            if not ok or len(path) != ring_size:
+                continue
+            pos = {fi: idx + 1 for idx, fi in enumerate(path)}
+            het_locs = sorted(pos[fi] for fi in hetero_frag)
+            het_prio = sorted((pos[fi], _HP.get(_sym(fi), 999)) for fi in hetero_frag)
+            spiro_locs = sorted(pos[fi] for fi in spiro_frag)
+            key = (het_locs, [p for _, p in het_prio], spiro_locs)
+            if best is None or key < best[0]:
+                best = (key, pos)
+    if best is None:
+        return None
+    pos = best[1]
+    numbered_het = sorted(((pos[fi], _sym(fi)) for fi in hetero_frag))
+    name = _hw_bracket_name(numbered_het, ring_size)
+    if not name:
+        return None
+    a2l = {frag_to_orig[fi]: pos[fi] for fi in ring if fi in frag_to_orig}
+    return name, a2l
+
+
+def _name_branched_polyspiro_different_core(mol):
+    """P-24.7.2: branched polyspiro with a monocyclic-heterocycle CENTRAL branch
+    node carrying THREE spiro junctions and three DIFFERENT terminal components,
+    e.g. ``trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',
+    2'''-indene]``. Returns ``(name, all_ring_atoms, combined_locants)`` or None
+    (fail-closed). Scope: exactly one central monocyclic-HW branch with 3 spiro
+    junctions + three mono-junction terminals, all unsubstituted, every
+    component nameable."""
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 3:
+        return None
+    ri = mol.GetRingInfo()
+    all_ring_atoms: Set[int] = set()
+    for r in ri.AtomRings():
+        all_ring_atoms.update(r)
+    for atom in mol.GetAtoms():  # unsubstituted ring system only
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+    comps = _fused_ring_components(mol)
+    central = None
+    terminals = []
+    for atoms, spiros in comps:
+        if len(spiros) == 3:
+            if central is not None:
+                return None
+            central = (atoms, sorted(spiros))
+        elif len(spiros) == 1:
+            terminals.append((atoms, next(iter(spiros))))
+        else:
+            return None
+    if central is None or len(terminals) != 3:
+        return None
+
+    # Central branch: number it (heteroatoms lowest, then junctions lowest).
+    cen = _number_central_monocycle_branch(mol, central[0], central[1])
+    if cen is None:
+        return None
+    cen_name, cen_map = cen
+
+    # Name each terminal + its own spiro locant.
+    term_info = []
+    for atoms, sa in terminals:
+        named = _name_spiro_component(mol, atoms, sa)
+        if named is None:
+            return None
+        ext = _extract_subfragment(mol, atoms)
+        if ext is None:
+            return None
+        loc = _canonical_spiro_locant(ext, named[1], sa)
+        if loc is None:
+            return None
+        term_info.append({
+            'atoms': atoms, 'spiro': sa, 'name': named[0], 'loc': loc,
+            'map': named[1], 'cen_loc': cen_map.get(sa),
+        })
+    if any(t['cen_loc'] is None for t in term_info):
+        return None
+
+    # P-24.5.1 alphanumerical citation: terminals cited in ascending name key.
+    term_info.sort(key=lambda t: (_component_alpha_key(t['name']), t['cen_loc']))
+    t1, t2, t3 = term_info
+
+    # Branched descriptor (P-24.7.2): term1 - central - term2 - (back to
+    # central) - term3, with sequential primes in citation order
+    # (term1=unprimed, central=', term2='', term3=''').
+    n1 = _strip_consumed_indicated_h(t1['name'], t1['loc'])
+    ncen = _strip_consumed_indicated_h(cen_name, t1['cen_loc'])
+    n2 = _strip_consumed_indicated_h(t2['name'], t2['loc'])
+    n3 = _strip_consumed_indicated_h(t3['name'], t3['loc'])
+    name = (
+        f"trispiro[{n1}-{t1['loc']},{t1['cen_loc']}'-{ncen}-"
+        f"{t2['cen_loc']}',{t2['loc']}''-{n2}-"
+        f"{t3['cen_loc']}',{t3['loc']}'''-{n3}]"
+    )
+
+    combined: Dict[int, _Locant] = {}
+    for a, loc in t1['map'].items():
+        combined[a] = loc
+    for a, loc in cen_map.items():
+        if a not in combined:
+            combined[a] = (loc, "'")
+    for a, loc in t2['map'].items():
+        if a not in combined:
+            combined[a] = (loc, "''")
+    for a, loc in t3['map'].items():
+        if a not in combined:
+            combined[a] = (loc, "'''")
+    if not (set(combined.keys()) >= all_ring_atoms):
+        return None
+    return name, all_ring_atoms, combined
+
+
 def name_branched_polyspiro(
     mol,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
-    """P-24.7 branched polyspiro with different terminal components. The
-    component-name build (central heteromonocycle naming e.g. ``[1,5]dithiocane``
-    + branched 3-junction walk + robust fused-fragment kekulisation) is a
-    documented follow-on — FAIL CLOSED (return None) so the system refuses
-    rather than emitting a structure-dropping partial name."""
-    return None
+    """P-24.7.2 branched polyspiro with different terminal components around a
+    monocyclic-heterocycle central branch node. Fail-closed (return None) when
+    the topology / components are outside the built class."""
+    core = _name_branched_polyspiro_different_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
 
 
 def is_lambda_multiring_spiro(mol) -> bool:
@@ -3032,6 +3201,9 @@ _CARBO_PAH_TEMPLATE_SPECS = [
     # fluorene  |$_AV:1;2;3;4;4a;4b;5;6;7;8;8a;9;9a$|  (C9 = the sp3 spiro centre)
     ("9H-fluorene", "C1=CC=CC=2C3=CC=CC=C3CC12",
      [1, 2, 3, 4, "4a", "4b", 5, 6, 7, 8, "8a", 9, "9a"]),
+    # 2H-indene  |$_AV:1;2;3;3a;4;5;6;7;7a$|  (C2 = the sp3 spiro centre)
+    ("2H-indene", "C=1CC=C2C=CC=CC12",
+     [1, 2, 3, "3a", 4, 5, 6, 7, "7a"]),
 ]
 
 
@@ -3083,21 +3255,176 @@ def _component_rings(mol, component_atoms: Set[int]) -> List[List[int]]:
     ]
 
 
+def _hw_bracket_name(heteroatoms: List[Tuple[int, str]], ring_size: int) -> str:
+    """Hantzsch-Widman name of a monocyclic heterocycle spiro component with the
+    P-24 enclosing-marks convention: a multiplied-locant HW name cites its
+    heteroatom locants inside square brackets, grouped by element in HW citation
+    order (O > S > Se > Te > N > P ...), each group ascending, e.g.
+    ``[1,5]dithiocane`` and ``[1,3,5,2]triazaphosphinine``.
+
+    ``heteroatoms`` is the numbered ``(locant, element)`` set of the chosen ring
+    numbering (saturated ring assumed; mancude rings are handled by the caller
+    via ``build_hw_name``'s aromatic path). A single-heteroatom ring carries no
+    locant/bracket at all (``thiane``, ``thiolane``)."""
+    from .heterocycles import build_hw_name
+    # Saturation: a saturated monocyclic HW component (thiane, dithiocane,...);
+    # the mancude/aromatic case is decided by the caller.
+    if len(heteroatoms) <= 1:
+        # No bracket, no locant (P-22 single-heteroatom stems).
+        return build_hw_name(heteroatoms, ring_size, True, False)
+    # Multi-heteroatom: build the plain HW name, then splice the ascending
+    # locant prefix into square brackets with element-citation order.
+    from ..data.hw_heteroatoms import HETEROATOM_PRIORITY as _HP
+    plain = build_hw_name(heteroatoms, ring_size, True, False)
+    # Strip the leading 'x,y-' locant prefix build_hw_name emits.
+    import re as _re
+    m = _re.match(r'^[\d,]+-(.+)$', plain)
+    stem = m.group(1) if m else plain
+    # Element-citation-order locant list.
+    by_elem: Dict[str, List[int]] = {}
+    for loc, el in heteroatoms:
+        by_elem.setdefault(el, []).append(loc)
+    order = sorted(by_elem.keys(), key=lambda e: _HP.get(e, 999))
+    bracket_locs = []
+    for el in order:
+        bracket_locs.extend(sorted(by_elem[el]))
+    return f"[{','.join(str(x) for x in bracket_locs)}]{stem}"
+
+
+def _name_hw_monocycle_component(
+    mol, component_atoms: Set[int], spiro_center: int,
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """P-24.6/.7/.8: name a monocyclic HETEROCYCLIC ring spiro component by its
+    Hantzsch-Widman name with the enclosing-marks convention (``thiane``,
+    ``thiolane``, ``[1,5]dithiocane``, ``[1,3,5,2]triazaphosphinine``). Returns
+    ``(name, {orig_idx: locant})`` or None (fail-closed) for a carbocyclic ring
+    (handled elsewhere) or any ring whose numbering cannot be resolved
+    deterministically.
+
+    Numbering (P-22.2.4 / P-31.1.4.3): heteroatoms take the lowest locant SET
+    first (element seniority tie-break), then among those numberings the spiro
+    atom takes the lowest locant. A λ (nonstandard-valence) spiro atom is NOT
+    λ-cited inside the component name — the λ descriptor is a front-of-name
+    prefix (P-24.8), so the ring is numbered/named as if the spiro atom were of
+    standard valence."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    rings = frag.GetRingInfo().AtomRings()
+    if len(rings) != 1:
+        return None
+    ring = list(rings[0])
+    ring_size = len(ring)
+    # Must contain at least one skeletal heteroatom (else carbocyclic path).
+    hetero_frag = {fi for fi in ring
+                   if frag.GetAtomWithIdx(fi).GetAtomicNum() not in (1, 6)}
+    if not hetero_frag:
+        return None
+    # Saturated ring only (mancude monocyclic HW spiro components are a
+    # follow-on): every ring bond single. (An aromatic/mancude ring like the
+    # item-2 triazaphosphinine is delegated to the mancude branch below.)
+    ring_set = set(ring)
+    has_ring_multibond = any(
+        b.GetBondType() != Chem.BondType.SINGLE
+        for b in frag.GetBonds()
+        if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set
+    )
+    # Element symbols for the frag heteroatoms.
+    def _sym(fi):
+        return frag.GetAtomWithIdx(fi).GetSymbol()
+    # Adjacency around the ring.
+    fadj: Dict[int, List[int]] = {a: [] for a in ring}
+    for bond in frag.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            fadj[i].append(j)
+            fadj[j].append(i)
+    spiro_frag = orig_to_frag.get(spiro_center)
+    if spiro_frag is None:
+        return None
+    # Enumerate all ring numberings (each start atom, each direction).
+    from ..data.hw_heteroatoms import HETEROATOM_PRIORITY as _HP
+    best = None  # (het_locset, het_priority_key, spiro_loc, walk)
+    for start in ring:
+        for first in fadj[start]:
+            path = [start, first]
+            visited = {start, first}
+            cur = first
+            ok = True
+            while len(path) < ring_size:
+                nxts = [nb for nb in fadj[cur] if nb not in visited]
+                if len(nxts) != 1:
+                    ok = False
+                    break
+                cur = nxts[0]
+                path.append(cur)
+                visited.add(cur)
+            if not ok or len(path) != ring_size:
+                continue
+            pos = {fi: idx + 1 for idx, fi in enumerate(path)}
+            het_locs = sorted(pos[fi] for fi in hetero_frag)
+            # Element-seniority tie-break: lowest locants to the most senior
+            # element (P-31.1.4.3.4). Represent as (locant, priority) sorted.
+            het_prio = sorted((pos[fi], _HP.get(_sym(fi), 999)) for fi in hetero_frag)
+            spiro_loc = pos[spiro_frag]
+            key = (het_locs, [p for _, p in het_prio], spiro_loc)
+            if best is None or key < best[0]:
+                best = (key, pos)
+    if best is None:
+        return None
+    pos = best[1]
+    numbered_het = sorted(((pos[fi], _sym(fi)) for fi in hetero_frag))
+    is_mancude = has_ring_multibond or any(
+        frag.GetAtomWithIdx(fi).GetIsAromatic() for fi in ring
+    )
+    if is_mancude:
+        # Mancude/aromatic monocyclic HW component: build_hw_name aromatic path,
+        # then apply the bracket convention.
+        from .heterocycles import build_hw_name
+        plain = build_hw_name(numbered_het, ring_size, False, True)
+        if len(numbered_het) > 1:
+            import re as _re
+            m = _re.match(r'^[\d,]+-(.+)$', plain)
+            stem = m.group(1) if m else plain
+            by_elem: Dict[str, List[int]] = {}
+            for loc, el in numbered_het:
+                by_elem.setdefault(el, []).append(loc)
+            order = sorted(by_elem.keys(), key=lambda e: _HP.get(e, 999))
+            bl = []
+            for el in order:
+                bl.extend(sorted(by_elem[el]))
+            name = f"[{','.join(str(x) for x in bl)}]{stem}"
+        else:
+            name = plain
+    else:
+        name = _hw_bracket_name(numbered_het, ring_size)
+    if not name:
+        return None
+    a2l = {frag_to_orig[fi]: pos[fi] for fi in ring if fi in frag_to_orig}
+    return name, a2l
+
+
 def _name_spiro_component(
     mol, component_atoms: Set[int], spiro_center: int,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
     """Dispatch one spiro component to the right namer, in order: a single
-    saturated carbocyclic ring; a von Baeyer cage (systematic bicyclo); a fused
-    heterocycle (catalog, e.g. xanthene); a fused carbocyclic PAH (template,
-    e.g. fluorene). Returns ``(name, {orig_idx: locant})`` or None (fail-closed
-    when none of these name the component)."""
+    saturated carbocyclic ring; a monocyclic heterocycle (Hantzsch-Widman); a
+    von Baeyer cage (systematic bicyclo); a fused heterocycle (catalog, e.g.
+    xanthene); a fused carbocyclic PAH (template, e.g. fluorene). Returns
+    ``(name, {orig_idx: locant})`` or None (fail-closed when none of these name
+    the component)."""
     extracted = _extract_subfragment(mol, component_atoms)
     if extracted is None:
         return None
     if extracted[0].GetRingInfo().NumRings() == 1:
-        return _name_carbocyclic_monocycle_component(
+        carbo = _name_carbocyclic_monocycle_component(
             mol, component_atoms, spiro_center
         )
+        if carbo is not None:
+            return carbo
+        return _name_hw_monocycle_component(mol, component_atoms, spiro_center)
     vb = _name_vonbaeyer_spiro_component(mol, component_atoms, spiro_center)
     if vb is not None:
         return vb

@@ -55,26 +55,18 @@ class TestP24UnbranchedPolyspiroDifferent:
 @pytest.mark.unit
 class TestP24BranchedPolyspiroDifferent:
     # P-24.7.2: branched polyspiro with different terminals around a central
-    # component that carries >=2 spiro junctions. This target's central
+    # component that carries >=3 spiro junctions. This target's central
     # component is the HETEROMONOCYCLE [1,5]dithiocane (a Hantzsch-Widman ring
-    # name the spiro-component namers do not yet emit) AND requires the branched
-    # 3-junction central walk + robust indene-fragment kekulization. UNDER-SCOPE
-    # (plan rule 7): deferred with a follow-up; fail-closed guaranteed below.
-    @pytest.mark.xfail(reason="P-24.7.2 branched polyspiro DIFFERENT: central "
-                              "heteromonocycle [1,5]dithiocane spiro-component "
-                              "naming + branched 3-junction walk not built; "
-                              "deferred (fail-closed, never a wrong name).")
+    # name now emitted by _name_hw_monocycle_component), assembled by the
+    # branched 3-junction walk (_name_branched_polyspiro_different_core) with
+    # the indene terminal from the carbo-PAH template. BUILT (Wave2 D5a).
     def test_cyclohexane_dithiocane_cyclopentane_indene(self):
         assert name_compound("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1") == \
             "trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',2'''-indene]"
 
-    def test_branched_polyspiro_classified_fail_closed(self):
-        # The SPIRO dispatch recognises the branched-polyspiro class and REFUSES
-        # (never emits a branched-different name it cannot fully build). The
-        # complex-ring dispatcher returns None for it; the residual partial
-        # heteromonocycle name that the general monocyclic path may emit in a
-        # JVM-less test env is a pre-existing namer-core issue (backstopped by
-        # SELF-01/OPSIN in production) and is outside this spiro plan's scope.
+    def test_branched_polyspiro_classified(self):
+        # The SPIRO dispatch recognises the branched-polyspiro class and now
+        # BUILDS it (component-name method).
         from rdkit import Chem
         from orthonym.rules.spiro import (
             is_branched_polyspiro, name_branched_polyspiro,
@@ -82,10 +74,18 @@ class TestP24BranchedPolyspiroDifferent:
         from orthonym.assembly.composer import _classify_complex_ring
         m = Chem.MolFromSmiles("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1")
         assert is_branched_polyspiro(m) is True
-        assert name_branched_polyspiro(m) is None
+        assert name_branched_polyspiro(m) is not None
         assert _classify_complex_ring(m) == "polyspiro-branched-different"
-        # And it must NEVER emit the (unbuilt) correct branched-different name.
-        assert name_compound("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1") != \
+
+    def test_branched_polyspiro_deterministic(self):
+        # P1_amide determinism lesson: spiro component ordering/numbering must be
+        # spelling-independent — name the SAME molecule from randomized SMILES.
+        from rdkit import Chem
+        m = Chem.MolFromSmiles("C=1C2(C=C3C=CC=CC13)CC1(SCCC3(CCCC3)S2)CCCCC1")
+        outs = {name_compound(Chem.MolToSmiles(m, doRandom=True))
+                for _ in range(8)}
+        assert len(outs) == 1
+        assert next(iter(outs)) == \
             "trispiro[cyclohexane-1,2'-[1,5]dithiocane-6',1''-cyclopentane-4',2'''-indene]"
 
 
@@ -99,39 +99,24 @@ class TestP31SpiroVonBaeyerUnsaturation:
 
 @pytest.mark.unit
 class TestP24LambdaMonocyclicTripleSpiro:
-    # P-24.8.1.3: three monocyclic rings + one nonstandard (lambda) spiro atom.
-    # needs_example. No OPSIN-round-trippable curated structure/name pair was
-    # found during execution (the lambda-on-single-hypervalent-3-ring-spiro form
-    # did not parse in OPSIN 2.9.0 for any candidate tried). UNDER-SCOPE
-    # (plan rule 7 / plan Task-8 decision criterion): DEFERRED xfail +
-    # fail-closed guarantee below.
+    # P-24.8.1.3: three monocyclic rings sharing ONE nonstandard (lambda6 S)
+    # spiro atom. Once the monocyclic-HW spiro-component namer landed (Wave2 D5a)
+    # this resolves to the spiroter multiplicative form
+    # ``1lambda6,1',1''-spiroter[thietane]`` (OPSIN-round-trippable, verified),
+    # so the previously-deferred case now BUILDS via the spiroter path (the
+    # dedicated name_lambda_multiring_spiro von-Baeyer form is unneeded here).
     _NEAREST = "C1CS23(C1)(CCC2)CCC3"  # lambda6 S in three 4-membered rings
+    _TARGET = "1lambda6,1',1''-spiroter[thietane]"
 
-    @pytest.mark.xfail(reason="P-24.8.1.3 3-monocyclic + single-lambda-spiro form: "
-                              "no OPSIN-round-trippable curated structure found; "
-                              "deferred. name_lambda_multiring_spiro returns None "
-                              "(fail-closed) until the λ von-Baeyer build lands.")
     def test_lambda_trispiro(self):
-        from rdkit import Chem
-        from orthonym.rules.spiro import name_lambda_multiring_spiro
-        # xfail: the λ-multiring build is a follow-on -> currently None.
-        assert name_lambda_multiring_spiro(Chem.MolFromSmiles(self._NEAREST)) is not None
+        assert name_compound(self._NEAREST) == self._TARGET
 
-    def test_lambda_trispiro_fail_closed(self):
-        # The SPIRO dispatch recognises the λ-multiring-spiro class and REFUSES
-        # (never builds a name it cannot fully express). The complex-ring
-        # dispatcher declines; any residual partial monocyclic name in a
-        # JVM-less test env is a pre-existing namer-core issue (SELF-01-backed in
-        # production), outside this plan's scope.
+    def test_lambda_trispiro_deterministic(self):
         from rdkit import Chem
-        from orthonym.rules.spiro import (
-            is_lambda_multiring_spiro, name_lambda_multiring_spiro,
-        )
-        from orthonym.assembly.composer import _classify_complex_ring
         m = Chem.MolFromSmiles(self._NEAREST)
-        assert is_lambda_multiring_spiro(m) is True
-        assert name_lambda_multiring_spiro(m) is None
-        assert _classify_complex_ring(m) == "lambda-multiring-spiro"
+        outs = {name_compound(Chem.MolToSmiles(m, doRandom=True))
+                for _ in range(8)}
+        assert outs == {self._TARGET}
 
 
 @pytest.mark.unit
