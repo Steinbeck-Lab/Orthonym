@@ -48,6 +48,38 @@ def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, i
     return double_bonds
 
 
+def is_mancude_monocyclic_hydrocarbon(mol, ring_atoms: Tuple[int, ...]) -> bool:
+    """P-22.1.2(b) / P-25.3.2.1.1 detection: a mancude monocyclic hydrocarbon
+    that RDKit marks aromatic but which is NOT benzene is named as the
+    cyclo-polyene (cyclodeca-1,3,5,7,9-pentaene), never as an [n]annulene
+    component prefix.
+
+    Fail-closed scope: exactly one ring, all-carbon, every ring atom RDKit-
+    aromatic, size >= 7 (benzene size 6 keeps its retained name), and every
+    ring atom a bare CH (unsubstituted mancude hydrocarbon). Returns True only
+    when the ring should be re-routed through the cycloalkene (polyene) path.
+    """
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return False
+    ring = list(ring_atoms)
+    if len(ring) < 7:
+        return False
+    ring_set = set(ring)
+    for i in ring:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'C':
+            return False
+        if not a.GetIsAromatic():
+            return False
+        # every ring atom must be a bare CH (no exocyclic heavy neighbours)
+        heavy_ext = [n for n in a.GetNeighbors()
+                     if n.GetIdx() not in ring_set and n.GetAtomicNum() > 1]
+        if heavy_ext:
+            return False
+    return True
+
+
 def get_ring_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List[List[int]]]:
     """
     Find substituents attached to ring atoms.

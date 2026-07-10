@@ -2367,6 +2367,26 @@ class Orthonym:
                     features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
 
+                # P-22.1.2(b) / P-25.3.2.1.1: a mancude monocyclic hydrocarbon
+                # (all-carbon, RDKit-aromatic, NOT benzene, n>=7) is named as the
+                # cyclo-polyene (cyclodeca-1,3,5,7,9-pentaene), never as an
+                # [n]annulene component prefix and never dropped as "unknown".
+                # RDKit marks it aromatic (10-pi Huckel), routing it to the
+                # aromatic decline; kekulise it so it takes the existing
+                # cycloalkene (polyene) path exactly like cyclooctatetraene.
+                if features.ring_type == 'aromatic':
+                    from .rules.cycloalkanes import (
+                        is_mancude_monocyclic_hydrocarbon as _is_mancude_ring,
+                    )
+                    if _is_mancude_ring(features.mol, features.principal_ring):
+                        _km = Chem.Mol(features.mol)
+                        try:
+                            Chem.Kekulize(_km, clearAromaticFlags=True)
+                            features.mol = _km
+                            features.ring_type = 'cycloalkene'
+                        except Exception:
+                            pass  # fail closed: leave as aromatic (declines)
+
                 # Check if this is a benzene ring
                 from .rules.benzene import is_benzene_ring, get_benzene_substituents
                 if is_benzene_ring(features.mol, features.principal_ring):

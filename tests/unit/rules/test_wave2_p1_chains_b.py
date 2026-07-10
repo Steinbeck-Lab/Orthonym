@@ -34,3 +34,10 @@ class TestP22MultiplierAElision:
     def test_tetrazine_elides_multiplier_a(self):
         # P-22.2.2.1.2: 'tetra' + 'aza' -> 'tetraza' -> '...tetrazine'
         assert name_compound("N1=NN=NC=C1") == "1,2,3,4-tetrazine"
+
+
+@pytest.mark.unit
+class TestP22AnnuleneMonocyclic:
+    def test_cyclodecapentaene(self):
+        # P-22.1.2(b) / P-25.3.2.1.1: mancude 10-membered carbocycle standalone PIN
+        assert name_compound("C1=CC=CC=CC=CC=C1") == "cyclodeca-1,3,5,7,9-pentaene"
