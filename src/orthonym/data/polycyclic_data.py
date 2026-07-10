@@ -172,6 +172,29 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 3,
     },
+    '1H-cyclopenta[a]naphthalene': {
+        # Ortho-fused cyclopenta + naphthalene (3-ring cata-fused carbocycle,
+        # P-25.3.1.3). The mancude parent CARRIES an intrinsic indicated hydrogen
+        # (the >CH2 at position 1), so the parent-name KEY itself is
+        # '1H-cyclopenta[a]naphthalene' (as '1H-indene' is stored in
+        # FUSED_HETEROCYCLE_DATA) — the '1H-' is a detachable added-IH cited
+        # before the stem (P-31.1.4). Emitting the bare 'cyclopenta[a]naphthalene'
+        # would drop the mandatory indicated hydrogen (a non-conformant PIN).
+        # AUTHORITATIVE numbering: OPSIN `1H-cyclopenta[a]naphthalene
+        # -o extendedsmi` ($_AV) = C1C=CC=2C1=C1C=CC=CC1=CC2
+        # |$1;2;3;3a;9b;9a;9;8;7;6;5a;5;4$|, mapped onto this canonical SMILES
+        # (RDKit parses in written order so index i -> the i-th $_AV locant).
+        # 5-ring: 1,2,3,3a,9b ; 6-rings share the 3a/5a/9a/9b fusion carbons.
+        'canonical_smiles': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
+        'smarts': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
+        'num_atoms': 13,
+        'iupac_numbering': {
+            0: 1, 1: 2, 2: 3, 3: '3a', 4: '9b', 5: '9a',
+            6: 9, 7: 8, 8: 7, 9: 6, 10: '5a', 11: 5, 12: 4,
+        },
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        'num_rings': 3,
+    },
     'pyrene': {
         'canonical_smiles': 'c1cc2ccc3cccc4ccc(c1)c2c34',
         'smarts': 'c1cc2ccc3cccc4ccc(c1)c2c34',
