@@ -1008,39 +1008,110 @@ def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
 
     # Candidate bridge atoms: every incident bond single on the kekulized
     # copy. In a mancude system every non-bridge ring atom carries a double
-    # bond, so this is exactly the removed set.
+    # bond, so this is exactly the removed set for SATURATED bridges.
     def _all_single(idx: int) -> bool:
         return all(b.GetBondType() == Chem.BondType.SINGLE
                    for b in kek.GetAtomWithIdx(idx).GetBonds())
 
+    # P-25.4.2.1.1 (Wave-2 P5): an UNSATURATED acyclic bridge (-CH=CH-, etc.)
+    # carries an internal C=C, so its atoms are not all-single and are invisible
+    # to the saturated seed above. Grow bridge components on the kekulized copy
+    # by absorbing double-bonded ring neighbours, then keep only components whose
+    # every EXTERNAL bond (to an atom outside the component) is single. That is
+    # the exact bridge criterion: a genuine bridge attaches to the mancude parent
+    # via single bonds; a parent ring atom (e.g. the naphthalene 1,2 edge) leaves
+    # via a ring double bond and is correctly rejected.
+    def _external_bonds_all_single(comp: Set[int]) -> bool:
+        for a in comp:
+            for b in kek.GetAtomWithIdx(a).GetBonds():
+                o = b.GetOtherAtomIdx(a)
+                if o not in comp and b.GetBondType() != Chem.BondType.SINGLE:
+                    return False
+        return True
+
+    def _external_bonds_all_single(comp: Set[int]) -> bool:
+        for a in comp:
+            for b in kek.GetAtomWithIdx(a).GetBonds():
+                o = b.GetOtherAtomIdx(a)
+                if o not in comp and b.GetBondType() != Chem.BondType.SINGLE:
+                    return False
+        return True
+
     saturated = {i for i in all_ring_atoms if _all_single(i)}
-    if not saturated:
-        return None
 
-    # Connected components of the saturated set = the bridges (1 or 2).
+    # Discover bridge components. A SATURATED bridge is a connected component of
+    # the all-single atoms (the fast, common path — 1,4-methano/ethano/epoxy).
+    # An UNSATURATED acyclic bridge (P-25.4.2.1.1: -CH=CH-, -CH=CH-CH=CH-) has
+    # NO all-single atom, so it is discovered by enumerating short connected
+    # subsets of the ring atoms whose EXTERNAL bonds are all single (the exact
+    # bridge attachment criterion — a parent aromatic edge like naphthalene's
+    # 1,2 leaves via a ring double bond and is rejected). Both classes reduce to
+    # the same downstream validation.
     components: List[Set[int]] = []
-    remaining = set(saturated)
-    while remaining:
-        start = min(remaining)
-        comp = {start}
-        stack = [start]
-        while stack:
-            cur = stack.pop()
-            for nb in kek.GetAtomWithIdx(cur).GetNeighbors():
-                j = nb.GetIdx()
-                if j in remaining and j not in comp:
-                    comp.add(j)
-                    stack.append(j)
-        components.append(comp)
-        remaining -= comp
-    if len(components) > 2 or any(len(c) > 3 for c in components):
-        return None
+    if saturated:
+        remaining = set(saturated)
+        while remaining:
+            start = min(remaining)
+            comp = {start}
+            stack = [start]
+            while stack:
+                cur = stack.pop()
+                for nb in kek.GetAtomWithIdx(cur).GetNeighbors():
+                    j = nb.GetIdx()
+                    if j in remaining and j not in comp:
+                        comp.add(j)
+                        stack.append(j)
+            components.append(comp)
+            remaining -= comp
+    else:
+        # Pure-unsaturated-bridge case: enumerate connected subsets (size 2..4)
+        # of ring atoms whose external bonds are all single; each such subset is
+        # a candidate single-bridge excision. Try each independently through the
+        # shared validator and require a UNIQUE resulting name (determinism guard
+        # — atom-index / SMILES-spelling order must not change the answer).
+        cand_sets: List[frozenset] = []
+        ring_list = sorted(all_ring_atoms)
+        for k in (2, 3, 4):
+            for combo in combinations(ring_list, k):
+                s = set(combo)
+                if not _bridge_is_connected(kek, s):
+                    continue
+                if not _external_bonds_all_single(s):
+                    continue
+                cand_sets.append(frozenset(s))
+        if not cand_sets:
+            return None
+        by_name: Dict[str, Any] = {}
+        for cs in cand_sets:
+            res = _validate_and_name_mancude(
+                mol, [set(cs)], all_ring_atoms, _all_single, kek)
+            if res is not None:
+                by_name[res[0]] = res
+        if len(by_name) == 1:
+            return next(iter(by_name.values()))
+        return None  # 0 or ambiguous (>1 distinct) — fail closed
 
+    if not components:
+        return None
+    if len(components) > 2 or any(len(c) > 4 for c in components):
+        return None
+    return _validate_and_name_mancude(mol, components, all_ring_atoms,
+                                      _all_single, kek)
+
+
+def _validate_and_name_mancude(mol, components: List[Set[int]],
+                               all_ring_atoms: Set[int], _all_single, kek):
+    """Shared validator/assembler for the mancude bridged path: given the bridge
+    *components* (each a connected set of removed ring atoms), excise them, verify
+    a clean naphthalene/anthracene residual, validate every bridge, and assemble
+    the P-25.4.3.4.1 name. Returns the complex-ring tuple or None (fail closed).
+    """
+    removed = set().union(*components)
     # Excise ALL bridges at once; the residual must be a clean fully-aromatic
     # naphthalene or anthracene whose ring atoms partition the original ring
     # atoms with the bridges (same no-phantom-substituent rule as the
     # dihydro path).
-    residual = _excise_to_mancude_residual(mol, saturated, all_ring_atoms)
+    residual = _excise_to_mancude_residual(mol, removed, all_ring_atoms)
     if residual is None:
         return None
     res_mol, orig_to_res, base_name, ring_map = residual
@@ -1063,18 +1134,33 @@ def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
         # Mancude form: the bridgehead keeps its ring double bond -> 0 H.
         if any(mol.GetAtomWithIdx(b).GetTotalNumHs() != 0 for b in bh):
             return None
-        # Composition: all-C saturated bridge or a single O (epoxy) — same
-        # scope rule as the dihydro path.
-        elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in comp]
-        n_hetero = sum(1 for e in elements if e != 'C')
-        if n_hetero > 1 or (n_hetero == 1 and (len(comp) != 1
-                                               or elements[0] != 'O')):
-            return None
-        hetero = next((e for e in elements if e != 'C'), None)
-        prefix = get_bridge_prefix({
-            'length': len(comp), 'element': hetero or 'C',
-            'heteroatom': hetero,
-        })
+        # P-25.4.2.1.1: classify saturated vs unsaturated-acyclic bridge. A
+        # component with an internal double bond (not all-single on the
+        # kekulized copy) is an etheno/buta[1,3]dieno bridge; the length-keyed
+        # 'ano' table would silently drop the double bond, so route it through
+        # the unsaturated recognizer (which fails closed on hetero/branched/
+        # triple/non-tabulated).
+        comp_all_single = all(_all_single(a) for a in comp)
+        if not comp_all_single:
+            # Bond-order analysis on the KEKULIZED copy: RDKit's extended
+            # aromaticity marks a -CH=CH- bridge aromatic, so the double bond is
+            # only visible after kekulization.
+            prefix = _unsaturated_bridge_prefix(kek, comp, bridgeheads)
+            if prefix is None:
+                return None
+        else:
+            # Composition: all-C saturated bridge or a single O (epoxy) — same
+            # scope rule as the dihydro path.
+            elements = [mol.GetAtomWithIdx(b).GetSymbol() for b in comp]
+            n_hetero = sum(1 for e in elements if e != 'C')
+            if n_hetero > 1 or (n_hetero == 1 and (len(comp) != 1
+                                                   or elements[0] != 'O')):
+                return None
+            hetero = next((e for e in elements if e != 'C'), None)
+            prefix = get_bridge_prefix({
+                'length': len(comp), 'element': hetero or 'C',
+                'heteroatom': hetero,
+            })
         if not prefix:
             return None
         locants = _mancude_bridge_locants(
@@ -1121,6 +1207,27 @@ def _try_mancude_bridged(mol, all_ring_atoms: Set[int]):
 
     atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}
     return (name, set(all_ring_atoms), atom_to_locant, True)
+
+
+def has_aromatic_mancude_bridge(mol) -> bool:
+    """True when a FULLY-AROMATIC-perceived ring system is actually a mancude
+    bridged-fused hydrocarbon that ``name_bridged_fused_pin`` can name
+    (P-25.4.2.1.1 etheno/buta[1,3]dieno on naphthalene: RDKit's extended
+    aromaticity marks the -CH=CH- bridge aromatic, so the von-Baeyer gate's
+    all-aromatic skip would otherwise strand it). Used only to EXEMPT this class
+    from that skip; returns False for a plain fused PAH (no bridge) so the
+    retained-name / fusion path keeps it."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings()]
+    if len(rings) < 3:
+        return False
+    all_ring_atoms: Set[int] = set().union(*rings)
+    heavy = {a.GetIdx() for a in mol.GetAtoms()}
+    if heavy != all_ring_atoms:
+        return False  # bare ring systems only (substituted -> other paths)
+    return _try_mancude_bridged(mol, all_ring_atoms) is not None
 
 
 def has_aromatic_chalcogen_bridge(mol) -> bool:
@@ -1310,6 +1417,79 @@ _HYDRO_PREFIXES = {
 def _hydro_prefix(n_sp3: int) -> Optional[str]:
     """Hydro prefix for *n_sp3* saturated ring positions (each adds one H)."""
     return _HYDRO_PREFIXES.get(n_sp3)
+
+
+# Prefix table for acyclic unsaturated bridges (P-25.4.2.1.1). The double-bond
+# locant is the bridge-INTERNAL numbering (prop[1]eno etc.), NOT the final
+# ring-system locant. Keyed on (n_carbons, tuple(sorted internal db positions)).
+_UNSATURATED_ACYCLIC_BRIDGE: Dict[Tuple[int, Tuple[int, ...]], str] = {
+    (2, (1,)): 'etheno',            # -CH=CH-
+    (3, (1,)): 'prop[1]eno',        # -CH=CH-CH2-
+    (4, (1, 3)): 'buta[1,3]dieno',  # -CH=CH-CH=CH-
+}
+
+
+def _linear_bridge_order(mol, comp: Set[int], bridgeheads: Set[int]):
+    """Return the bridge atoms as a path (list) whose ends each bond a distinct
+    bridgehead, or None if *comp* is not a simple path between the two
+    bridgeheads (branched / cyclic bridge)."""
+    ends = [a for a in comp
+            if any(nb.GetIdx() in bridgeheads
+                   for nb in mol.GetAtomWithIdx(a).GetNeighbors())]
+    if len(comp) == 1:
+        return list(comp) if len(ends) == 1 else None
+    if len(ends) != 2:
+        return None
+    start = ends[0]
+    path, prev, cur = [start], None, start
+    while len(path) < len(comp):
+        nxt = None
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j in comp and j != prev and j not in path:
+                nxt = j
+                break
+        if nxt is None:
+            return None
+        path.append(nxt)
+        prev, cur = cur, nxt
+    return path if path[-1] in ends else None
+
+
+def _unsaturated_bridge_prefix(mol, comp: Set[int], bridgeheads: Set[int]):
+    """P-25.4.2.1.1 prefix for an all-carbon acyclic bridge that carries one or
+    more internal C=C. Returns None (fail closed) for any hetero, branched,
+    cumulated, triple-bond (P-31.1.4.3), or non-tabulated pattern — the
+    length-keyed 'ano' table would otherwise mis-name it. Bonds from a bridge
+    atom to a bridgehead MUST be single (a double bond to the aromatic ring is
+    fusion, not a bridge)."""
+    atoms = list(comp)
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in atoms):
+        return None
+    # Order the bridge into a linear chain from one bridgehead-neighbour to the
+    # other; refuse if it is not a simple path (branched/cyclic bridge).
+    chain = _linear_bridge_order(mol, comp, bridgeheads)
+    if chain is None:
+        return None
+    # P-31.1.4.3: a triple bond anywhere in the bridge has no verified
+    # bridged-fused oracle — decline rather than mis-name it 'ano'/'eno'.
+    for a in atoms:
+        for bond in mol.GetAtomWithIdx(a).GetBonds():
+            if bond.GetBondType() == Chem.BondType.TRIPLE:
+                return None
+    db_positions = []
+    for i in range(len(chain) - 1):
+        b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if b.GetBondType() == Chem.BondType.DOUBLE:
+            db_positions.append(i + 1)  # 1-based internal position
+    # any double bond to a bridgehead => fusion, not a bridge
+    for a in atoms:
+        for bond in mol.GetAtomWithIdx(a).GetBonds():
+            o = bond.GetOtherAtomIdx(a)
+            if o in bridgeheads and bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+    key = (len(atoms), tuple(sorted(db_positions)))
+    return _UNSATURATED_ACYCLIC_BRIDGE.get(key)
 
 
 def _bridge_is_connected(mol, atoms: Set[int]) -> bool:

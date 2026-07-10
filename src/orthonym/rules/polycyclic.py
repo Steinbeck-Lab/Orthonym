@@ -1712,8 +1712,14 @@ def is_polycyclic_system(mol) -> bool:
         for idx in ring_atoms
     )
     if all_ring_aromatic:
-        from .bridged_fused import has_aromatic_chalcogen_bridge
-        if not has_aromatic_chalcogen_bridge(mol):
+        from .bridged_fused import (has_aromatic_chalcogen_bridge,
+                                    has_aromatic_mancude_bridge)
+        # Also exempt an all-carbon UNSATURATED bridge (P-25.4.2.1.1 etheno):
+        # RDKit aromatizes the -CH=CH- bridge of 1,4-ethenonaphthalene, so the
+        # system reads fully-aromatic even though it is bridged-fused, not a
+        # plain PAH. name_bridged_fused_pin names it; a real PAH returns False.
+        if (not has_aromatic_chalcogen_bridge(mol)
+                and not has_aromatic_mancude_bridge(mol)):
             return False
 
     # Purely CATA-fused skip (Wave-2 completion, honours the documented
