@@ -3027,6 +3027,46 @@ def _assemble_complex_ring_name(mol, features):
     ring_type = _classify_complex_ring(mol)
 
     try:
+        # Wave-2 P5 fused (Task 8): an exact-match cataloged carbocyclic PAH
+        # parent (POLYCYCLIC_DATA) must be nameable regardless of how
+        # _classify_complex_ring labels it. A 3-component all-carbon fusion
+        # parent that includes a non-aromatic cyclobuta/cyclopenta ring (P-25.5.2
+        # cyclobuta[1,7]indeno[5,6-b]naphthalene) is misclassified 'polycyclic-
+        # bridged' and routed to von Baeyer, which declines -> the cataloged
+        # fusion PIN was unreachable. Check the exact PAH catalog FIRST, guarded
+        # to a bare (unsubstituted) parent with a full authoritative locant map;
+        # fail-closed (fall through) if the map is incomplete. Substituted PAHs
+        # keep their existing dedicated route (this only fires when every heavy
+        # atom is core).
+        from ..rules.polycyclics import (
+            identify_polycyclic,
+            get_polycyclic_iupac_locants,
+            get_polycyclic_core_atoms,
+        )
+        _pah_name = identify_polycyclic(mol)
+        if _pah_name is not None:
+            _core = get_polycyclic_core_atoms(mol, _pah_name)
+            if _core is not None and len(_core) == mol.GetNumAtoms():
+                _pah_locants = get_polycyclic_iupac_locants(mol, _pah_name)
+                if (_pah_locants is not None
+                        and len(_pah_locants) == mol.GetNumAtoms()):
+                    return ComplexRingResult(
+                        _pah_name, tuple(_core), _pah_locants, True)
+
+        # Wave-2 P5 fused (Task 8): likewise an exact-match cataloged fused
+        # HETEROCYCLE (FUSED_HETEROCYCLE_DATA) parent must be nameable even when
+        # _classify_complex_ring misroutes it (P-25.5.1.2
+        # 2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene — skeletal-'a' + methano
+        # bridge — classifies 'polycyclic-bridged' and would decline). The
+        # exact-SMILES lookup inside name_fused_heterocycle only returns a bare
+        # closed-structure catalog name; it is fail-closed for anything not in
+        # the table (returns None -> normal dispatch continues).
+        _fh = name_fused_heterocycle(mol)
+        if _fh is not None:
+            _fname, _fring_atoms, _fmap, _fsubs = _fh
+            if _fused_core_covers_ring_system(mol, _fmap):
+                return ComplexRingResult(_fname, _fring_atoms, _fmap, _fsubs)
+
         if ring_type == 'bridged-fused':
             # FR-8 nomenclature for bridged fused systems
             result = name_bridged_fused_system(mol)

@@ -685,6 +685,19 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 16,
         'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: '3b', 4: 4, 5: '4a', 6: '4b', 7: 5, 8: 6, 9: 7, 10: '7a', 11: '7b', 12: 8, 13: '8a', 14: '8b', 15: 1},
     },
+    # P-25.5.1.2 three-component: skeletal-replacement 'a' heteroatoms +
+    # methano bridge on a cyclopenta[cd]azulene residual (the bare residual is
+    # not yet nameable by the fusion engine; catalog the closed structure).
+    # p5_bridged DEFERRED this to the fused catalog (xfail). Numbering derived
+    # 2026-07-09 from OPSIN `2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene
+    # -o extendedsmi`.
+    'c1cc2oc1-c1coc3occ-2c13': {
+        'name': "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene",
+        'tautomer_locant': None,
+        'ring_system': 'trioxamethanocyclopentaazulene',
+        'parent_atoms': 13,
+        'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 9, 4: 8, 5: '8a', 6: 1, 7: 2, 8: '2a', 9: 3, 10: 4, 11: '4a', 12: '8b'},
+    },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
         'name': 'furo[2,3-b]pyridine',

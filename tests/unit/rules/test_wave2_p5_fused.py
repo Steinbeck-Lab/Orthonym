@@ -171,3 +171,41 @@ class TestP25InteriorAtomNumberingFailClosed:
         assert out in (None, "unknown organic compound"), (
             f"production gate should decline interior-atom system, got {out!r}"
         )
+
+
+@pytest.mark.unit
+class TestP25ThreeComponentOrthoPeri:
+    """P-25.5.1.2 / P-25.5.2 — three-component ortho/peri-fused systems.
+
+    REPRODUCE-FIRST DIVERGENCE (recorded): the plan's Task 8 premise was that
+    the sibling p5_bridged plan builds these two targets and this plan only
+    verifies. In fact p5_bridged DEFERRED both to the fusion engine (this plan):
+    its `test_trioxa_methano_cyclopentaazulene` is xfail'd "blocked on ... p5_fused"
+    and its `test_indeno_naphthalene_is_fusion_not_bridged` asserts the bridged
+    constructor DECLINES so the fusion engine names it. Both PINs are
+    OPSIN-RT-verified, so this plan CATALOGS them (closed-structure exact match,
+    the Tasks 2-5 precedent). The P-25.5 header evidence has no OPSIN-2.9-
+    verifiable PIN -> fail closed."""
+
+    def test_cyclobuta_indeno_naphthalene(self):
+        # P-25.5.2 — OPSIN-RT-verified (all-carbon 18-atom PAH catalog parent)
+        assert name_compound("C1=C2C=CC3=CC4=CC=5C=CC=CC5C=C4C1=C23") == \
+            "cyclobuta[1,7]indeno[5,6-b]naphthalene"
+
+    def test_trioxa_methanocyclopenta_azulene(self):
+        # P-25.5.1.2 — OPSIN-RT-verified (skeletal-'a' + methano bridge on a
+        # cyclopenta[cd]azulene residual; cataloged as a closed exact-match)
+        assert name_compound("C=1OC2=C3C(C4=CC=C(C13)O4)=CO2") == \
+            "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
+
+    def test_p25_5_header_fails_closed(self, monkeypatch):
+        # P-25.5 header evidence has no OPSIN-2.9-verifiable PIN
+        # (proposed benzo[4,5-b]naphtho[2,3-d]anthracene parses to a DIFFERENT
+        # structure) -> must decline, never emit a guessed name. Assert under the
+        # production gate (the conftest autouse fixture disables it by default).
+        import orthonym.namer as _namer
+        if not _namer._validity_gate_jar_present():
+            pytest.skip("OPSIN jar not present; production gate cannot run")
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        out = name_compound("C1=CC=C2C(=C1)C=CC3=C2C4=CC=CC=C4C5=CC=CC=C35")
+        assert out in (None, "unknown organic compound")

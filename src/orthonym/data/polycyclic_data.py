@@ -332,6 +332,19 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 6,
     },
+    'cyclobuta[1,7]indeno[5,6-b]naphthalene': {
+        # P-25.5.2 three-component ortho/peri-fused PAH (18 atoms, 5 rings incl.
+        # a cyclobuta ring). Less-senior-hydrocarbon-parent fusion name that the
+        # bridged constructor delegates here (p5_bridged deferred it). Numbering
+        # derived 2026-07-09 from OPSIN
+        # `cyclobuta[1,7]indeno[5,6-b]naphthalene -o extendedsmi`.
+        'canonical_smiles': 'C1=Cc2cc3cc4ccccc4cc3c3c2C1=C3',
+        'smarts': 'C1=Cc2cc3cc4ccccc4cc3c3c2C1=C3',
+        'num_atoms': 18,
+        'iupac_numbering': {0: 2, 1: 3, 2: '3a', 3: 4, 4: '4a', 5: 5, 6: '5a', 7: 6, 8: 7, 9: 8, 10: 9, 11: '9a', 12: 10, 13: '10a', 14: '10b', 15: '10c', 16: '1a', 17: 1},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        'num_rings': 5,
+    },
     # ==========================================================================
     # Partially saturated PAHs
     # ==========================================================================

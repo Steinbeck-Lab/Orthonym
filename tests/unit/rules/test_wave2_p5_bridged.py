@@ -188,13 +188,12 @@ class TestP31TripleBondBridge:
 class TestP25MultiParentFallbacks:
     """P-25.5.1.2/.5.2/.5.3 — multi-parent fused fallbacks."""
 
-    @pytest.mark.xfail(reason="P-25.5.1.2 residual cyclopenta[cd]azulene not cataloged "
-                              "(+ skeletal-replacement 'a' front-citation) — blocked on "
-                              "fused catalog (p5_fused), documented follow-up", strict=False)
     def test_trioxa_methano_cyclopentaazulene(self):
         # P-25.5.1.2: skeletal-replacement 'a'-heteroatoms + methano bridge.
-        # OPSIN-RT-verified PIN; blocked because the bare cyclopenta[cd]azulene
-        # residual is not yet nameable (reproduce-first divergence, recorded).
+        # OPSIN-RT-verified PIN. Was xfail'd here pending the fused catalog;
+        # p5_fused (Task 8) built it as a FUSED_HETEROCYCLE_DATA exact-match
+        # closed-structure entry (reachable via the composer's early
+        # fused-heterocycle catalog check). No longer blocked.
         assert name_compound("C=1OC2=C3C(C4=CC=C(C13)O4)=CO2") == \
             "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
 
