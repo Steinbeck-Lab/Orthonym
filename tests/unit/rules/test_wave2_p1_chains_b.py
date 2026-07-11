@@ -81,23 +81,27 @@ class TestP45SubstitutiveFallthrough:
     #     multiplicative path. multiplicative NEVER emits a wrong name here.
     # Disposition: FAIL_CLOSED; both full-molecule assertions ship xfail.
 
-    @pytest.mark.xfail(reason="P-45.1.1: multiplicative correctly declines (units "
-                              "not symmetrically substituted relative to the PG); "
-                              "the substitutive biaryl-ether-diacid decomposition "
-                              "is owned by the parent-selection cluster (follow-up). "
-                              "multiplicative never emits a wrong name -- fail-closed.")
     def test_asymmetric_falls_through_to_substitutive(self):
+        # P-45.1.1: multiplicative correctly declines (units NOT symmetrically
+        # substituted relative to the PG). The substitutive biaryl-ether-diacid
+        # path then picks the lowest-locant COOH benzene as parent and names the
+        # other acid-bearing aryloxy ring as a '(4-carboxyphenoxy)' prefix
+        # (P-65.1.7.2.1 carboxy prefix). OPSIN-verified: the PIN round-trips to
+        # this exact SMILES. (The prior xfail PIN
+        # '4-(4-carboxyphenoxy)-2-chlorobenzoic acid' was positionally WRONG.)
         assert name_compound("OC(=O)c1cc(Cl)ccc1Oc1ccc(C(=O)O)cc1") == \
-            "4-(4-carboxyphenoxy)-2-chlorobenzoic acid"
+            "2-(4-carboxyphenoxy)-5-chlorobenzoic acid"
 
-    @pytest.mark.xfail(reason="P-45.1.1: the plan's 'symmetric control' SMILES is "
-                              "actually asymmetric (O attaches ortho vs para to COOH "
-                              "on the two rings); multiplicative correctly declines. "
-                              "Substitutive fallthrough owned by parent-selection "
-                              "cluster (follow-up). fail-closed.")
     def test_symmetric_stays_multiplicative(self):
+        # The plan's 'symmetric control' SMILES is actually ASYMMETRIC (O
+        # attaches ortho vs para to COOH on the two rings), so multiplicative
+        # correctly declines and the substitutive biaryl-ether-diacid path
+        # names it. Here the prefix ring additionally carries an ortho-Cl ->
+        # '(4-carboxy-2-chlorophenoxy)'. OPSIN-verified round-trip. (The prior
+        # xfail PIN "4,4'-oxybis(2-chlorobenzoic acid)" is a DIFFERENT
+        # molecule -- see test_witness_true_symmetric_works.)
         assert name_compound("OC(=O)c1cc(Cl)ccc1Oc1ccc(C(=O)O)cc1Cl") == \
-            "4,4'-oxybis(2-chlorobenzoic acid)"
+            "2-(4-carboxy-2-chlorophenoxy)-5-chlorobenzoic acid"
 
     def test_multiplicative_declines_asymmetric(self):
         # The load-bearing fail-closed invariant: multiplicative returns None for

@@ -2006,7 +2006,7 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                 covered.update(x.GetIdx() for x in n_os)
                 continue
             return None
-        # cyano (-C#N) or unbranched pure alkyl
+        # cyano (-C#N) or carboxy (-COOH) or unbranched pure alkyl
         if sym == 'C' and order == 1.0 and charge == 0:
             c_nbrs = [x for x in nbr.GetNeighbors() if x.GetIdx() != ring_atom_idx]
             if (len(c_nbrs) == 1 and c_nbrs[0].GetSymbol() == 'N'
@@ -2017,6 +2017,28 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                 covered.add(ni)
                 covered.add(c_nbrs[0].GetIdx())
                 continue
+            # carboxy (P-65.1.7.2.1): exocyclic C (single bond, no H) bearing a
+            # terminal =O AND a hydroxyl -OH (second O carries an H). The H on the
+            # -OH is the ester-exclusion guard: -C(=O)OR esters have 0 H on that O
+            # and stay out of scope (alkoxycarbonyl). Mirrors the carboxy branch in
+            # name_ring_system_substituent. BlueBookV2:1804 (-COOH), :5154/:3262.
+            if (len(c_nbrs) == 2 and nbr.GetTotalNumHs() == 0
+                    and all(x.GetSymbol() == 'O' for x in c_nbrs)):
+                has_carbonyl_O = any(
+                    x.GetDegree() == 1 and x.GetTotalNumHs() == 0
+                    and x.GetFormalCharge() == 0
+                    and mol.GetBondBetweenAtoms(ni, x.GetIdx()).GetBondTypeAsDouble() == 2.0
+                    for x in c_nbrs)
+                has_hydroxyl_O = any(
+                    x.GetTotalNumHs() >= 1 and x.GetFormalCharge() == 0
+                    and mol.GetBondBetweenAtoms(ni, x.GetIdx()).GetBondTypeAsDouble() == 1.0
+                    for x in c_nbrs)
+                if has_carbonyl_O and has_hydroxyl_O:
+                    prefixes.append('carboxy')
+                    covered.add(ni)
+                    covered.update(x.GetIdx() for x in c_nbrs)
+                    continue
+                return None
             chain = _linear_carbon_chain(ni, ring_atom_set)
             if chain is not None and chain in _ALKYL:
                 prefixes.append(_ALKYL[chain])

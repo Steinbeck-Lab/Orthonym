@@ -44,12 +44,11 @@ class TestP59215MultiRingPG:
         # 'fluorene-2-carboxylic acid' may surface — still never the hexyl leak.)
         assert "carboxyhexyl" not in name_compound(FLUORENE_DIACID)
 
-    @pytest.mark.xfail(
-        reason="P-59.2.1.5 pendant (4-carboxyphenyl)-as-substituent rendering "
-        "needs a substituted-aromatic ring-substituent namer (carboxy "
-        "suffix-substituent) — W2E-P1FC follow-up",
-        strict=True,
-    )
     def test_fluorene_diacid_target(self):
+        # P-59.2.1.5 pendant (4-carboxyphenyl)-as-substituent rendering. HEALED by
+        # the W2E-D7 carboxy-prefix root fix: _ring_atom_simple_substituents now
+        # recognizes -COOH, so decorated_ring_substituent_name names the pendant
+        # benzene bearing a carboxylic acid as '4-carboxyphenyl' (P-65.1.7.2.1).
+        # OPSIN-RT verified.
         assert name_compound(FLUORENE_DIACID) == \
             "6-(4-carboxyphenyl)-9H-fluorene-2-carboxylic acid"
