@@ -788,6 +788,79 @@ def _collect_ring_substituent_positions(features, ring_atoms):
     return positions
 
 
+def _demote_offring_principal_group_matches(features, ring_atoms) -> None:
+    """P-59.2.1.6 (BB 25207): the principal group appears in BOTH the ring and
+    a chain; the portion with the GREATER number of the group is the parent
+    (tie -> ring, P-52.2.8). When the ring wins, an off-ring principal-group
+    match must NOT be expressed as a second ring suffix — it stays on its
+    demoted chain and is named as a substituent prefix (e.g. the pendant
+    butan-2-one on a cyclopentane-1,2-dione -> '4-(2-oxobutyl)').
+
+    This filters ``features.principal_group_atoms`` in place to the ring-anchored
+    matches only, WHEN:
+      * the ring is the chosen parent (this helper is called only then);
+      * the principal group is a NON-terminal, skeletal-carbon carbonyl-type
+        group (ketone family) whose exocyclic form can be expressed as an
+        oxo-substituent prefix — terminal/appended groups (-carbaldehyde,
+        -carboxylic acid, ...) legitimately anchor exocyclically and are
+        untouched (they route through the ring_anchored_pg_atoms path);
+      * the ring's on-ring match count is STRICTLY GREATER than the off-ring
+        count (ring wins outright) OR they TIE (P-52.2.8 ring default) — but
+        only demote when there is at least one on-ring match to keep as the
+        ring suffix (else the ring cannot express the group and we must not
+        strip it; fail closed by leaving matches unchanged).
+
+    The demoted matches remain in ``features.functional_groups`` so the pendant
+    chain is picked up by the ring-substituent enumerator and named honestly.
+    Fail-closed: any ambiguity leaves ``principal_group_atoms`` unchanged.
+    """
+    pg = features.principal_group
+    matches = features.principal_group_atoms
+    if not pg or not matches or len(matches) < 2:
+        return
+    # Only the ketone family (non-terminal, exocyclic-expressible as 'oxo').
+    # These are exactly the PGs whose off-ring form has an oxo-substituent
+    # prefix; expanding beyond this set risks stripping a group the ring
+    # cannot re-express, so gate tightly (accuracy-first).
+    _KETONE_FAMILY = {"ketone", "thioketone", "selenoketone", "telluroketone"}
+    if pg not in _KETONE_FAMILY:
+        return
+    ring_set = set(ring_atoms)
+    on_ring, off_ring = [], []
+    for match in matches:
+        # A match is 'on-ring' when its carbonyl carbon is a ring atom.
+        # For a ketone SMARTS the carbonyl C is the skeletal carbon; require a
+        # ring CARBON in the match bonded to the FG heteroatom in the match.
+        match_set = set(match)
+        is_on_ring = False
+        for atom_idx in match:
+            if atom_idx not in ring_set:
+                continue
+            atom = features.mol.GetAtomWithIdx(atom_idx)
+            if atom.GetSymbol() != 'C':
+                continue
+            if any(
+                nbr.GetIdx() in match_set
+                and nbr.GetIdx() not in ring_set
+                and nbr.GetSymbol() != 'C'
+                for nbr in atom.GetNeighbors()
+            ):
+                is_on_ring = True
+                break
+        (on_ring if is_on_ring else off_ring).append(match)
+    # P-59.2.1.6: ring is parent only when it has the GREATER count, or ties
+    # (ring default). Require >=1 on-ring match to keep as the suffix and
+    # >=1 off-ring match to demote; otherwise nothing to do / fail closed.
+    if not on_ring or not off_ring:
+        return
+    if len(on_ring) < len(off_ring):
+        # Chain has more of the group -> ring should NOT be parent for this
+        # group. Leave unchanged and let the normal path decide (fail closed
+        # rather than force a wrong ring-parent split).
+        return
+    features.principal_group_atoms = on_ring
+
+
 def _build_ring_info_for_parent_selection(features):
     """Phase 147 D-03: dispatch on ring type and produce authoritative IUPAC locants.
 
@@ -2385,6 +2458,18 @@ class Orthonym:
                 else:
                     features.principal_ring = atom_rings[0]
                 features.ring_type = classify_ring(features.mol, features.principal_ring)
+
+                # P-59.2.1.6 (BB 25207): the principal ketone-family group sits
+                # in BOTH the ring and a pendant chain; the ring won parent
+                # selection (more of the group, or ring default on tie), so an
+                # off-ring match must NOT become a second ring '-one' suffix —
+                # demote it to its chain, which the ring-substituent enumerator
+                # then names as an oxo-alkyl prefix (2-oxobutyl). Fail-closed:
+                # leaves principal_group_atoms unchanged on any ambiguity.
+                if not getattr(features, 'chain_is_parent', False):
+                    _demote_offring_principal_group_matches(
+                        features, features.principal_ring
+                    )
 
                 # P-22.1.2(b) / P-25.3.2.1.1: a mancude monocyclic hydrocarbon
                 # (all-carbon, RDKit-aromatic, NOT benzene, n>=7) is named as the

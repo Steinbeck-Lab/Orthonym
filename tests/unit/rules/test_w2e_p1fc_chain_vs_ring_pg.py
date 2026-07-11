@@ -30,12 +30,20 @@ class TestP59216ChainVsRingPG:
         assert name_compound("O=C1CC(C)CC1=O") == "4-methylcyclopentane-1,2-dione"
         assert name_compound("O=C1C(=O)CCC1") == "cyclopentane-1,2-dione"
 
-    @pytest.mark.xfail(
-        reason="P-59.2.1.6 chain-vs-ring PG-count parent selection + oxo-alkyl "
-        "prefix needs broad parent-selection work (determinism risk) — "
-        "W2E-P1FC follow-up",
-        strict=True,
-    )
     def test_oxobutyl_cyclopentanedione_target(self):
         assert name_compound(OXOBUTYL_CYCLOPENTANEDIONE) == \
             "4-(2-oxobutyl)cyclopentane-1,2-dione"
+
+    def test_oxobutyl_determinism_random_spellings(self):
+        # Determinism guard: the P-59.2.1.6 off-ring-PG demotion must be
+        # spelling-independent (parent/suffix split keyed on canonical ring
+        # membership, not atom/registration order). Name 8 random SMILES
+        # renderings and assert one identical PIN.
+        from rdkit import Chem
+
+        mol = Chem.MolFromSmiles(OXOBUTYL_CYCLOPENTANEDIONE)
+        names = {
+            name_compound(Chem.MolToSmiles(mol, doRandom=True), style="pin")
+            for _ in range(8)
+        }
+        assert names == {"4-(2-oxobutyl)cyclopentane-1,2-dione"}
