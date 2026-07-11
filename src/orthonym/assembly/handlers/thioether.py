@@ -20,8 +20,16 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_thioether(features: Any) -> bool:
-    """Mirrors composer.py:970 (``features.principal_group == 'thioether'``)."""
-    return getattr(features, 'principal_group', None) == 'thioether'
+    """Wave2 D7c: 'thioether' joined _PREFIX_ONLY_PRINCIPAL (it has no suffix
+    form, P-63.2.2), so principal_group is never 'thioether' anymore. Mirrors
+    _is_sulfoxide/_is_sulfone: the handler covers the molecule-IS-the-sulfide
+    case — the thioether FG is present and no senior suffix-capable group
+    claimed the PCG (else the senior parent expresses the sulfanyl prefix).
+    Was composer.py:970 (``features.principal_group == 'thioether'``)."""
+    return (
+        getattr(features, 'principal_group', None) is None
+        and bool(getattr(features, 'functional_groups', {}).get('thioether'))
+    )
 
 
 def name_thioether(

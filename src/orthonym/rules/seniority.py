@@ -288,6 +288,21 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     # predicate now keys on FG presence with no PCG.
     "sulfoxide",
     "sulfone",
+    # Wave2 D7c (P-63.2.2 / P-44): thioether/selenoether/telluroether have NO
+    # suffix form (SUFFIX_FORMS None) — the PIN is substitutive (sulfanyl/
+    # selanyl/tellanyl PREFIXES) or functional-class (dialkyl sulfide), never a
+    # suffix. Keeping them out of _PREFIX_ONLY_PRINCIPAL let get_principal_group
+    # claim 'thioether' as the PCG, which made select_parent treat -CH2-S-CH2-
+    # O-CH3 on benzene as a chain PCG and pick an acyclic parent over the senior
+    # ring (P-44.1.2.2), building the wrong '(heptylsulfanyl)methoxymethane'
+    # (SELF-01-suppressed to unknown). With no PCG claimed, the benzene ring is
+    # correctly senior and name_benzene_derivative yields the nested PIN
+    # '{[(methoxymethyl)sulfanyl]methyl}benzene'. The dedicated thioether handler
+    # now keys on FG-presence-with-no-PCG (mirrors sulfoxide/sulfone above), so
+    # simple dialkyl sulfides keep their functional-class name.
+    "thioether",
+    "selenoether",
+    "telluroether",
     # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
     # P-68.3.1.1.1.5 / P-35.3.1)
     "aminooxy",

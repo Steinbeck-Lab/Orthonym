@@ -139,22 +139,27 @@ class TestP57ReplacementSubstituent:
     def test_oxa_thia_substituent(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    @pytest.mark.xfail(reason="P-46.1.3 thioether case UNDER-SCOPED: the "
-                              "substituent PRODUCER now builds the correct "
-                              "'{[(methoxymethyl)sulfanyl]methyl}benzene' "
-                              "(verified via name_benzene_derivative, OPSIN-RT "
-                              "OK), but the GENERAL parent-selection routes "
-                              "-CH2-S-CH2-O-CH3 on benzene to an acyclic-chain "
-                              "parent (heptylsulfanyl...methoxymethane) instead "
-                              "of the senior benzene ring, so SELF-01 suppresses "
-                              "to unknown. Fixing the thioether classification/"
-                              "parent-selection is a separate follow-up; no "
-                              "wrong name leaks.")
     def test_thioether_substituent_underscoped(self):
         # Strict P-16.3.3 cycling nesting: inner () -> [] -> outer {}.
-        # name_benzene_derivative already yields the correct RT-OK PIN;
-        # only the whole-molecule parent selection blocks it today.
+        # Wave2 D7c (P-63.2.2 / P-44.1.2.2): thioether joined
+        # _PREFIX_ONLY_PRINCIPAL (it has no suffix form), so it is no longer
+        # mis-claimed as the PCG. With no PCG, the benzene ring is correctly
+        # senior to the acyclic -CH2-S-CH2-O-CH3 substituent chain and the
+        # nested substitutive PIN is built. OPSIN-RT verified.
         assert name_compound("COCSCc1ccccc1") == "{[(methoxymethyl)sulfanyl]methyl}benzene"
+
+    def test_thioether_substituent_determinism_random_spellings(self):
+        # Wave2 D7c permanent A/B guard: the fix REMOVES a spurious PCG claim
+        # (thioether -> _PREFIX_ONLY_PRINCIPAL), letting the existing
+        # deterministic no-PG ring-parent path run. No parent tie-break is
+        # added, so the PIN must be byte-identical across random SMILES
+        # spellings. Any spelling-dependence would surface here.
+        m = Chem.MolFromSmiles("COCSCc1ccccc1")
+        names = set()
+        for seed in range(15):
+            rand = Chem.MolToSmiles(m, doRandom=True)
+            names.add(name_compound(rand))
+        assert names == {"{[(methoxymethyl)sulfanyl]methyl}benzene"}
 
     def test_standalone_replacement_chain_unchanged(self):
         # A long homogeneous oxa chain stays a REPLACEMENT PARENT (not a nested
