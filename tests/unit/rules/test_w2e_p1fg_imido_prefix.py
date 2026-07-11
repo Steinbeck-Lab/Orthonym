@@ -23,15 +23,28 @@ from orthonym.namer import name_compound
 
 @pytest.mark.unit
 class TestImidoPrefix:
-    @pytest.mark.xfail(reason="W2E-P1FG Task 15 under-scope: L1+L2 shipped and "
-                              "correct, but tier_a_ring complex_ring preempts "
-                              "the PAH-carboxylic-acid candidate for this "
-                              "molecule; fails closed at runtime (see docstring).",
-                       strict=True)
     def test_phthalimido_on_naphthoic_acid(self):
         assert name_compound(
             "O=C(O)c1cccc2c(N3C(=O)c4ccccc4C3=O)cccc12", style="pin") \
             == "5-(1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl)naphthalene-1-carboxylic acid"
+
+    def test_phthalimido_on_naphthoic_acid_determinism(self):
+        # Determinism guard: the complex_ring-vs-PAH skip decision must be
+        # spelling-independent (keyed on canonical PAH-core membership + PCG
+        # locus, not ring-system/registration order). 8 random renderings ->
+        # one identical PIN.
+        from rdkit import Chem
+
+        mol = Chem.MolFromSmiles(
+            "O=C(O)c1cccc2c(N3C(=O)c4ccccc4C3=O)cccc12")
+        names = {
+            name_compound(Chem.MolToSmiles(mol, doRandom=True), style="pin")
+            for _ in range(8)
+        }
+        assert names == {
+            "5-(1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl)"
+            "naphthalene-1-carboxylic acid"
+        }
 
     def test_l2_phthalimido_substituent_recognizer(self):
         # L2: the phthalimido-fragment recognizer returns the exact BB

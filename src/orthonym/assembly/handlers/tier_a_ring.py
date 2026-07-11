@@ -168,6 +168,32 @@ def name_tier_a_ring(
     #       than the senior one (P-44.1 — that system is the parent).
     _skip_complex_non_senior = False
     _ring_systems = getattr(features, 'ring_systems', None) or []
+
+    # FR-4 / P-66.2.2 + P-44.1 (BB 33859 imido preferred prefix): classification
+    # already chose a PAH parent (features.polycyclic_name set via the namer L1
+    # among-rings exemption) BECAUSE the principal characteristic group sits ON
+    # the PAH core while a senior fused-heterocyclic ring is only a SUBSTITUENT
+    # (5-(1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl)naphthalene-1-carboxylic acid).
+    # In that case the whole-molecule complex_ring path must NOT preempt the
+    # already-correct polycyclic assembler — the L1 decision is authoritative.
+    # The namer's PAH block early-returns before senior_ring_system is set, so
+    # the senior-based skip below never fires here; gate directly on the PAH
+    # decision instead. Determinism-safe: keyed on canonical PAH-core membership
+    # + PCG locus (is_principal_group_on_ring), never ring/registration order.
+    _pah_name = getattr(features, 'polycyclic_name', None)
+    if (_pah_name
+            and features.is_cyclic
+            and not getattr(features, 'chain_is_parent', False)
+            and getattr(features, 'principal_group_atoms', None)):
+        from ...rules.polycyclics import get_polycyclic_core_atoms
+        from ...rules.parent_selection import is_principal_group_on_ring
+        _pah_core = get_polycyclic_core_atoms(features.mol, _pah_name)
+        if _pah_core and is_principal_group_on_ring(
+                features.mol, set(_pah_core),
+                features.principal_group_atoms,
+                features.principal_group):
+            _skip_complex_non_senior = True
+
     if features.is_cyclic and len(_ring_systems) >= 2:
         _senior = getattr(features, 'senior_ring_system', None)
         # The among-rings P-44.2 decision applies to SEPARATE ring systems
