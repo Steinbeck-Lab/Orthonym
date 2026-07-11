@@ -89,15 +89,25 @@ class TestP15CompositeBridges:
 class TestP25CompositeBridgeOrdering:
     """P-25.4.2.3.1/.3.2 composite bridge on a fused-heterocycle parent."""
 
-    @pytest.mark.xfail(reason="blocked on furo[3,4-b]pyran fusion parent — p5_fused "
-                              "(bare 2H-furo[3,4-b]pyran not deterministically named yet)",
-                       strict=False)
     def test_epoxymethano_furopyran_bb_pin(self):
         # BB-verbatim PIN, OPSIN-RT-verified: 2H-3,5-(epoxymethano)furo[3,4-b]pyran.
-        # Reproduce-first showed the residual parent is not yet cataloged by the
-        # fusion engine, so this is xfail (documented follow-up), not a wrong name.
+        # P-25.4.2.3.1 composite epoxymethano bridge on a fused-heterocycle parent.
+        # The bare residual furo[3,4-b]pyran is not yet nameable by the algorithmic
+        # fusion engine (it emits a wrong [4,3-b] descriptor, SELF-01-suppressed), so
+        # the closed bridged structure is cataloged verbatim (mirrors the shipped
+        # 2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene precedent in
+        # fused_heterocycles.py). Wave-2 D6.
         assert name_compound("O1C=2C=3C=C(C1)OCC3OC2") == \
             "2H-3,5-(epoxymethano)furo[3,4-b]pyran"
+
+    def test_epoxymethano_furopyran_determinism_ab(self):
+        # Determinism A/B: two distinct SMILES spellings of the same structure must
+        # produce the byte-identical BB PIN (spelling-independent catalog lookup).
+        spelling_a = "O1C=2C=3C=C(C1)OCC3OC2"
+        spelling_b = "C1=C2COc3coc(c31)CO2"  # rdkit-canonical form
+        name_a = name_compound(spelling_a)
+        name_b = name_compound(spelling_b)
+        assert name_a == name_b == "2H-3,5-(epoxymethano)furo[3,4-b]pyran"
 
     def test_bis_epoxymethano_anthracene_internal_oracle(self):
         # BB PIN 1,4:8,5-bis(epoxymethano)anthracene — OPSIN 2.9 UNPARSEABLE.

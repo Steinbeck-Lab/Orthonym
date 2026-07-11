@@ -698,6 +698,20 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 13,
         'iupac_locants': {0: 7, 1: 6, 2: 5, 3: 9, 4: 8, 5: '8a', 6: 1, 7: 2, 8: '2a', 9: 3, 10: 4, 11: '4a', 12: '8b'},
     },
+    # P-25.4.2.3.1 composite epoxymethano bridge on a fused-heterocycle parent.
+    # The bare residual furo[3,4-b]pyran is not deterministically nameable by the
+    # algorithmic fusion engine (it emits a wrong '[4,3-b]' descriptor, SELF-01-
+    # suppressed), so the closed bridged structure is cataloged verbatim (same
+    # pattern as the 2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene entry above).
+    # p5_bridged DEFERRED this to the fused catalog (xfail). Numbering derived
+    # 2026-07-11 from OPSIN `2H-3,5-(epoxymethano)furo[3,4-b]pyran -o extendedsmi`.
+    'C1=C2COc3coc(c31)CO2': {
+        'name': "2H-3,5-(epoxymethano)furo[3,4-b]pyran",
+        'tautomer_locant': None,
+        'ring_system': 'epoxymethanofuropyran',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 4, 1: 3, 2: 2, 3: 1, 4: '7a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 8, 10: 9},
+    },
     # furo[2,3-b]pyridine
     'c1cnc2occc2c1': {
         'name': 'furo[2,3-b]pyridine',
