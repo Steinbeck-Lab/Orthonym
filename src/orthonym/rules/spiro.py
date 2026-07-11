@@ -1934,6 +1934,96 @@ def _strip_consumed_indicated_h(component_name: str, spiro_locant) -> str:
     return component_name
 
 
+def _prime_token(base: int, prime: str) -> str:
+    """Format a locant with its prime suffix: (5, "'") -> "5'"."""
+    return f"{base}{prime}"
+
+
+def _extract_leading_indicated_h(name: str) -> Tuple[List[int], str]:
+    """Split a leading indicated-hydrogen descriptor off a component name.
+    ``"1H,3H-benzo[...]"`` -> ``([1, 3], "benzo[...]")``; ``"benzo[...]"`` ->
+    ``([], "benzo[...]")``. Only strips a full ``<loc>H(,<loc>H)*-`` run."""
+    import re
+    m = re.match(r'^((?:\d+H,)*\d+H)-(.+)$', name)
+    if not m:
+        return [], name
+    locs = [int(tok[:-1]) for tok in m.group(1).split(',')]
+    return locs, m.group(2)
+
+
+def _build_lambda_ih_front_prefix(
+    mol,
+    components: List[Dict],
+) -> Tuple[str, Dict[int, str]]:
+    """P-24.8: build the combined front-of-name prefix for a λ / indicated-H
+    spiro system and return ``(prefix, {component_id: stripped_name})``.
+
+    ``components`` is an ordered list of dicts, each with keys:
+      ``id`` (any hashable), ``name`` (component name), ``prime`` (prime suffix
+      string: '', "'", "''", "'''"), ``spiro_atoms`` (list of the component's
+      spiro atom original indices), ``map`` (orig_idx -> int locant for THIS
+      component's own numbering).
+
+    The prefix is ``<indicated-H set>-<lambda set>-`` (P-24.8.4/.5): the
+    indicated-H descriptors of every component are front-cited, each locant
+    carrying that component's prime, in ascending (prime, locant) order; then
+    each λ (nonstandard-valence) spiro atom is cited as ``<loc><prime>lambda<n>``
+    in ascending order. Empty string when neither is present."""
+    ih_tokens: List[Tuple[Tuple[int, int], str]] = []
+    lambda_tokens: List[Tuple[Tuple[int, int], str]] = []
+    stripped: Dict = {}
+    for comp in components:
+        locs, bare = _extract_leading_indicated_h(comp['name'])
+        stripped[comp['id']] = bare
+        prime = comp['prime']
+        prime_rank = len(prime)
+        # P-24.8: indicated-H whose locant COINCIDES with one of this component's
+        # own spiro-junction atoms is CONSUMED at the junction (removed with the
+        # component's name), NOT front-cited. Only indicated-H at NON-spiro
+        # positions moves to the front. (e.g. 9H-fluorene / 1H-indene spiro'd at
+        # 9 and 1 emit a bare 'fluorene'/'indene' with no front '9H,1''H-'; the
+        # 1'H,3'H of a benzodithiophene spiro'd at 2'/6' DO front-cite.)
+        comp_spiro_locs = {
+            comp['map'].get(sa)
+            for sa in comp.get('spiro_atoms', [])
+        }
+        comp_spiro_locs.discard(None)
+        for loc in locs:
+            if loc in comp_spiro_locs:
+                continue
+            ih_tokens.append(((prime_rank, loc), f"{loc}{prime}H"))
+    # λ tokens: each spiro atom with a nonstandard bonding number is cited ONCE.
+    # A junction λ atom is shared by two components (it has a locant/prime in
+    # each); cite it at its LOWEST (locant, prime_rank) — the lowest-LOCANT rule
+    # (P-24.8) selects a terminal's low bare locant (1) over the central's
+    # higher primed one (2'/6'), even when the terminal is more-primed.
+    best_by_atom: Dict[int, Tuple[Tuple[int, int], str]] = {}
+    for comp in components:
+        prime = comp['prime']
+        prime_rank = len(prime)
+        for sa in comp.get('spiro_atoms', []):
+            lam = _nonstandard_bonding_number(mol, sa)
+            if lam is None:
+                continue
+            loc = comp['map'].get(sa)
+            if loc is None:
+                continue
+            key = (loc, prime_rank)
+            tok = f"{loc}{prime}lambda{lam}"
+            if sa not in best_by_atom or key < best_by_atom[sa][0]:
+                best_by_atom[sa] = (key, tok)
+    lambda_tokens = list(best_by_atom.values())
+    parts = []
+    if ih_tokens:
+        ih_tokens.sort(key=lambda t: t[0])
+        parts.append(','.join(tok for _, tok in ih_tokens))
+    if lambda_tokens:
+        lambda_tokens.sort(key=lambda t: t[0])
+        parts.append(','.join(tok for _, tok in lambda_tokens))
+    prefix = '-'.join(parts) + '-' if parts else ''
+    return prefix, stripped
+
+
 def name_mixed_spiro_fused(
     mol,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
@@ -2658,10 +2748,32 @@ def _name_unbranched_polyspiro_different_core(mol):
     if mid_loc_first is None or mid_loc_last is None:
         return None
 
-    first_name = _strip_consumed_indicated_h(first['name'], first['loc'])
-    mid_name_s = _strip_consumed_indicated_h(mid_name, mid_loc_first)
-    last_name = _strip_consumed_indicated_h(last['name'], last['loc'])
-    name = (f"dispiro[{first_name}-{first['loc']},{mid_loc_first}'-"
+    # P-24.8.5: build the combined indicated-H + λ front-of-name prefix (empty
+    # for a plain, standard-valence system). Indicated-H that is NOT consumed by
+    # the spiro atom is front-cited & primed; a λ (hypervalent) spiro atom is
+    # cited as '<loc><prime>lambda<n>'. Then the descriptor cites the components
+    # with their leading indicated-H stripped (it moved to the front).
+    front_prefix, _stripped = _build_lambda_ih_front_prefix(mol, [
+        {'id': 'first', 'name': first['name'], 'prime': '',
+         'spiro_atoms': [first['spiro']], 'map': first['map']},
+        {'id': 'mid', 'name': mid_name, 'prime': "'",
+         'spiro_atoms': [first['spiro'], last['spiro']], 'map': mid_map},
+        {'id': 'last', 'name': last['name'], 'prime': "''",
+         'spiro_atoms': [last['spiro']], 'map': last['map']},
+    ])
+    if front_prefix:
+        # Front prefix present -> the descriptor drops leading indicated-H that
+        # was moved to the front (P-24.8.5); consumed-at-spiro stripping still
+        # applies for any component with no front-cited indicated-H.
+        _, first_bare = _extract_leading_indicated_h(first['name'])
+        _, mid_bare = _extract_leading_indicated_h(mid_name)
+        _, last_bare = _extract_leading_indicated_h(last['name'])
+        first_name, mid_name_s, last_name = first_bare, mid_bare, last_bare
+    else:
+        first_name = _strip_consumed_indicated_h(first['name'], first['loc'])
+        mid_name_s = _strip_consumed_indicated_h(mid_name, mid_loc_first)
+        last_name = _strip_consumed_indicated_h(last['name'], last['loc'])
+    name = (f"{front_prefix}dispiro[{first_name}-{first['loc']},{mid_loc_first}'-"
             f"{mid_name_s}-{mid_loc_last}',{last['loc']}''-{last_name}]")
 
     combined: Dict[int, _Locant] = {}
@@ -3246,6 +3358,90 @@ def _name_carbopah_spiro_component(
     return None
 
 
+# --- Fused-HETEROCYCLE numbered templates for spiro components ---------------
+# A fused heterocyclic ring system whose ring heteroatom is the (hypervalent, λ)
+# spiro atom cannot be matched against the global fused-heterocycle catalog: the
+# extracted fragment carries a hypervalent heteroatom (e.g. λ4 S, λ5 P) so its
+# skeleton SMILES does not equal any catalog key. This local, normalized-skeleton
+# template table names those fused spiro components: it strips the excess Hs on
+# the hypervalent ring heteroatoms to standard valence, then matches by canonical
+# SMILES and reads the fixed IUPAC peripheral numbering. Fail-closed beyond the
+# registered templates (a general fused-hetero spiro-component engine is out of
+# scope). Locants are (display_name, skeleton SMILES, per-atom IUPAC locants in
+# that SMILES' atom order).
+_FUSED_HET_SPIRO_TEMPLATE_SPECS = [
+    # [1,3,2]benzoxazaphosphole  OPSIN 'O1PNC2=C1C=CC=C2' |$_AV:1;2;3;3a;7a;7;6;5;4$|
+    # (P = the λ spiro centre at locant 2). Cited with front indicated-H (3H).
+    ("3H-[1,3,2]benzoxazaphosphole", "O1PNC2=C1C=CC=C2",
+     [1, 2, 3, "3a", "7a", 7, 6, 5, 4]),
+    # benzo[1,2-c:4,5-c']dithiophene  OPSIN 'C1C=2C(CS1)=CC=1C(=CSC1)C2'
+    # |$_AV:1;8a;3a;3;2;4;4a;7a;7;6;5;8$| (both S = λ spiro centres at 2 and 6).
+    ("1H,3H-benzo[1,2-c:4,5-c']dithiophene", "C1C=2C(CS1)=CC=1C(=CSC1)C2",
+     [1, "8a", "3a", 3, 2, 4, "4a", "7a", 7, 6, 5, 8]),
+]
+
+
+def _build_fused_het_spiro_templates():
+    out = []
+    for name, smi, locants in _FUSED_HET_SPIRO_TEMPLATE_SPECS:
+        tmpl = Chem.MolFromSmiles(smi)
+        if tmpl is not None:
+            out.append((name, tmpl, locants, Chem.CanonSmiles(smi)))
+    return out
+
+
+_FUSED_HET_SPIRO_TEMPLATES = _build_fused_het_spiro_templates()
+
+
+def _normalize_hypervalent_ring_heteroatoms(frag) -> Optional[Chem.Mol]:
+    """Return a copy of ``frag`` with excess explicit Hs stripped from its
+    hypervalent (λ) ring heteroatoms so the resulting skeleton matches a
+    standard-valence template. None if the normalized molecule cannot sanitize."""
+    rw = Chem.RWMol(frag)
+    for a in rw.GetAtoms():
+        if a.GetAtomicNum() not in (1, 6):
+            a.SetNumExplicitHs(0)
+            a.SetNoImplicit(False)
+    norm = rw.GetMol()
+    try:
+        Chem.SanitizeMol(norm)
+    except Exception:
+        return None
+    return norm
+
+
+def _name_fused_het_spiro_component(
+    mol, component_atoms: Set[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a fused HETEROCYCLIC spiro component whose ring heteroatom is the
+    (hypervalent, λ) spiro atom, by matching the normalized skeleton to a
+    numbered template. Returns ``(name, {orig_idx: base_int_locant})`` or None
+    (not a registered fused-hetero spiro skeleton -> fail-closed)."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    norm = _normalize_hypervalent_ring_heteroatoms(frag)
+    if norm is None:
+        return None
+    norm_canon = Chem.MolToSmiles(norm)
+    for name, tmpl, locants, tmpl_canon in _FUSED_HET_SPIRO_TEMPLATES:
+        if norm_canon != tmpl_canon:
+            continue
+        match = norm.GetSubstructMatch(tmpl)  # match[i] = norm atom for template i
+        if not match or len(match) != tmpl.GetNumAtoms():
+            continue
+        a2l: Dict[int, int] = {}
+        for ti, norm_atom in enumerate(match):
+            # norm shares atom indices with frag (same RWMol atom order).
+            orig = frag_to_orig.get(norm_atom)
+            if orig is not None:
+                a2l[orig] = _carbopah_loc_base(locants[ti])
+        return name, a2l
+    return None
+
+
 def _component_rings(mol, component_atoms: Set[int]) -> List[List[int]]:
     """Rings of ``mol`` fully contained in ``component_atoms`` (the list-of-rings
     interface that ``_name_fused_component`` expects)."""
@@ -3431,7 +3627,10 @@ def _name_spiro_component(
     fused = _name_fused_component(mol, _component_rings(mol, component_atoms))
     if fused is not None:
         return fused
-    return _name_carbopah_spiro_component(mol, component_atoms)
+    carbopah = _name_carbopah_spiro_component(mol, component_atoms)
+    if carbopah is not None:
+        return carbopah
+    return _name_fused_het_spiro_component(mol, component_atoms)
 
 
 def _name_spiro_vonbaeyer_core(mol):
@@ -3454,17 +3653,22 @@ def _name_spiro_vonbaeyer_core(mol):
         return None
     from .bicyclo import is_bicyclo_system
     # At least one component must be a von Baeyer cage OR a registered carbo-PAH
-    # (fluorene); otherwise this is plain spiro / spirobi / mixed-spiro-fused —
-    # the existing branches own those and are checked FIRST in the composer
-    # dispatch, so this path only sees what they declined. Keeping a positive
-    # gate (rather than relying solely on dispatch order) bounds the blast
-    # radius: a fused-heterocycle-only spiro stays fail-closed here (follow-on).
+    # (fluorene) OR the spiro atom must be a λ (nonstandard-valence) heteroatom
+    # joining two DIFFERENT ring components (P-24.8.4.1, e.g. the λ5-P spiro of
+    # [1,3,2]benzoxazaphosphole + [1,3,5,2]triazaphosphinine); otherwise this is
+    # plain spiro / spirobi / mixed-spiro-fused — the existing branches own those
+    # and are checked FIRST in the composer dispatch, so this path only sees what
+    # they declined. Keeping a positive gate (rather than relying solely on
+    # dispatch order) bounds the blast radius.
     a_vb = is_bicyclo_system(ext_a[0])
     b_vb = is_bicyclo_system(ext_b[0])
+    lambda_spiro = _nonstandard_bonding_number(mol, spiro_center) is not None and \
+        mol.GetAtomWithIdx(spiro_center).GetAtomicNum() not in (1, 6)
     if not (
         a_vb or b_vb
         or _name_carbopah_spiro_component(mol, atoms_a) is not None
         or _name_carbopah_spiro_component(mol, atoms_b) is not None
+        or lambda_spiro
     ):
         return None
     named_a = _name_spiro_component(mol, atoms_a, spiro_center)
@@ -3505,9 +3709,24 @@ def _name_spiro_vonbaeyer_core(mol):
             first_name, first_loc = name_b, loc_b
             second_name, second_loc = name_a, loc_a
             unprimed_map, primed_map = locmap_b, locmap_a
-        first_name = _strip_consumed_indicated_h(first_name, first_loc)
-        second_name = _strip_consumed_indicated_h(second_name, second_loc)
-        name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
+        if lambda_spiro:
+            # P-24.8.4.1: the λ spiro atom + any indicated-H are cited at the
+            # FRONT of the name (indicated-H set, then λ set); the descriptor
+            # cites the components with their leading indicated-H stripped.
+            front_prefix, _stripped = _build_lambda_ih_front_prefix(mol, [
+                {'id': 'first', 'name': first_name, 'prime': '',
+                 'spiro_atoms': [spiro_center], 'map': unprimed_map},
+                {'id': 'second', 'name': second_name, 'prime': "'",
+                 'spiro_atoms': [spiro_center], 'map': primed_map},
+            ])
+            _, first_bare = _extract_leading_indicated_h(first_name)
+            _, second_bare = _extract_leading_indicated_h(second_name)
+            name = (f"{front_prefix}spiro[{first_bare}-{first_loc},"
+                    f"{second_loc}'-{second_bare}]")
+        else:
+            first_name = _strip_consumed_indicated_h(first_name, first_loc)
+            second_name = _strip_consumed_indicated_h(second_name, second_loc)
+            name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
     for atom_idx, locant in unprimed_map.items():
@@ -3543,14 +3762,22 @@ def _name_spiro_vonbaeyer_core(mol):
     elif hetero_prefix:
         name = f"{hetero_prefix}{name}"
 
-    # P-31.1.5.2.1: unsaturation of a von-Baeyer spiro system is cited by
+    # P-31.1.5.2.1: unsaturation of a von-Baeyer CAGE spiro component is cited by
     # 'ene'/'diene' AFTER the closing bracket, low locants to spiro junctions
-    # then double bonds (the component numbering already did this). Fail closed
-    # on any ring multiple bond that cannot be expressed with plain adjacent
-    # locants (never a silently-saturated name for an unsaturated cage).
-    unsat = _spiro_vb_unsaturation_suffix(mol, combined_locants, all_ring_atoms)
+    # then double bonds (the component numbering already did this). This suffix
+    # applies ONLY to von-Baeyer cage components: a MANCUDE / aromatic / HW /
+    # catalog component (e.g. [1,3,5,2]triazaphosphinine, [1,3,2]benzoxaza-
+    # phosphole) carries its ring unsaturation INSIDE the component name, so its
+    # ring double bonds must be excluded from both the suffix and the fail-closed
+    # guard (otherwise the aromatic C=N/N=P bonds would wrongly force a decline).
+    cage_atoms: Set[int] = set()
+    if a_vb:
+        cage_atoms |= atoms_a
+    if b_vb:
+        cage_atoms |= atoms_b
+    unsat = _spiro_vb_unsaturation_suffix(mol, combined_locants, cage_atoms)
     if unsat is None:
-        if _has_ring_multiple_bonds(mol, all_ring_atoms):
+        if _has_ring_multiple_bonds(mol, cage_atoms):
             return None
     elif unsat:
         name = name + unsat

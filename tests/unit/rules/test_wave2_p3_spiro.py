@@ -133,54 +133,70 @@ class TestP24LambdaSpirobiSpiroter:
 @pytest.mark.unit
 class TestP24LambdaSpiroDifferent:
     # P-24.8.4.1: monospiro, DIFFERENT polycyclic components, >=1 with a λ spiro
-    # atom. This target needs BOTH a [1,3,2]benzoxazaphosphole catalog entry AND
-    # a monocyclic-HW spiro-component namer for [1,3,5,2]triazaphosphinine, plus
-    # indicated-H (3H) + λ5 front-prefix assembly. The monocyclic-HW
-    # spiro-component namer is a genuinely new sub-engine. UNDER-SCOPE
-    # (plan rule 7): DEFERRED xfail + fail-closed guarantee below.
+    # atom. BUILT (Wave2 D5a): _name_spiro_component names both the
+    # [1,3,2]benzoxazaphosphole fused catalog component and the monocyclic-HW
+    # [1,3,5,2]triazaphosphinine, and the spiro-VB core assembles the indicated-H
+    # (3H) + λ5 front prefix. The mancude C=N/N=P ring bonds are expressed by the
+    # component names, so the von-Baeyer '-ene' suffix machinery (which is scoped
+    # to cage components only) does NOT fire. OPSIN-round-trippable.
     _SMILES = "N1=P2(N=CN=C1)OC1=C(N2)C=CC=C1"
+    _TARGET = ("3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-"
+               "[1,3,5,2]triazaphosphinine]")
 
-    @pytest.mark.xfail(reason="P-24.8.4.1 λ spiro DIFFERENT components: needs a "
-                              "monocyclic-HW spiro-component namer "
-                              "([1,3,5,2]triazaphosphinine) + indicated-H/λ front "
-                              "prefix; deferred (fail-closed, never a wrong name).")
     def test_lambda5_spiro_benzoxazaphosphole_triazaphosphinine(self):
-        assert name_compound(self._SMILES) == \
-            "3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-[1,3,5,2]triazaphosphinine]"
+        assert name_compound(self._SMILES) == self._TARGET
 
-    def test_lambda_spiro_different_fail_closed(self):
-        # The spiro-VB path declines (no wrong name): both components require
-        # catalog/HW naming that is a documented follow-on.
+    def test_lambda_spiro_different_builds(self):
+        # The spiro-VB path builds the full name over every ring atom.
         from rdkit import Chem
         from orthonym.rules.spiro import name_spiro_vonbaeyer
-        assert name_spiro_vonbaeyer(Chem.MolFromSmiles(self._SMILES)) is None
-        assert name_compound(self._SMILES) != \
-            "3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-[1,3,5,2]triazaphosphinine]"
+        res = name_spiro_vonbaeyer(Chem.MolFromSmiles(self._SMILES))
+        assert res is not None
+        assert res[0] == self._TARGET
+
+    def test_lambda_spiro_different_deterministic(self):
+        # Determinism: name the SAME molecule from randomized SMILES spellings;
+        # component citation order (alphanumerical) + numbering must be
+        # spelling-independent.
+        from rdkit import Chem
+        m = Chem.MolFromSmiles(self._SMILES)
+        outs = {name_compound(Chem.MolToSmiles(m, doRandom=True))
+                for _ in range(8)}
+        assert outs == {self._TARGET}
 
 
 @pytest.mark.unit
 class TestP24LambdaUnbranchedPolyspiro:
     # P-24.8.5: unbranched polyspiro, DIFFERENT components, >=1 λ spiro atom.
     # Terminals are heteromonocycles (thiane, thiolane) and the central is
-    # benzo[1,2-c:4,5-c']dithiophene — all require heterocycle namings not yet
-    # built (the same monocyclic-HW spiro-component namer deferred in Task 10),
-    # plus indicated-H (1'H,3'H) + multi-λ front prefix. UNDER-SCOPE (plan rule
-    # 7): DEFERRED xfail + fail-closed guarantee below.
+    # benzo[1,2-c:4,5-c']dithiophene. BUILT (Wave2 D5a): the heteromonocycle
+    # spiro-component namer names thiane/thiolane, the benzo[1,2-c:4,5-c']-
+    # dithiophene central is nameable, and the combined indicated-H (1'H,3'H) +
+    # multi-λ (1lambda4,1''lambda4) front prefix is assembled by
+    # _build_lambda_ih_front_prefix (indicated-H NOT at a spiro atom is
+    # front-cited; the λ spiro atoms are cited once each). OPSIN-round-trippable.
     _SMILES = "S12(CCCC1)C=C1C(=C2)C=C2CS3(CC2=C1)CCCCC3"
     _TARGET = ("1'H,3'H-1lambda4,1''lambda4-dispiro[thiane-1,2'-"
                "benzo[1,2-c:4,5-c']dithiophene-6',1''-thiolane]")
 
-    @pytest.mark.xfail(reason="P-24.8.5 λ unbranched polyspiro DIFFERENT: needs "
-                              "heteromonocycle spiro-component naming (thiane/"
-                              "thiolane) + benzo-dithiophene catalog + indicated-H"
-                              "/multi-λ front prefix; deferred (fail-closed).")
     def test_lambda_dispiro_thiane_dithiophene_thiolane(self):
         assert name_compound(self._SMILES) == self._TARGET
 
-    def test_lambda_unbranched_polyspiro_fail_closed(self):
-        # The polyspiro-different core declines (no wrong name): terminal
-        # heteromonocycles are not yet nameable as spiro components.
+    def test_lambda_unbranched_polyspiro_builds(self):
+        # The polyspiro-different core builds the full name (component maps cover
+        # every ring atom).
         from rdkit import Chem
         from orthonym.rules.spiro import name_unbranched_polyspiro_different
-        assert name_unbranched_polyspiro_different(Chem.MolFromSmiles(self._SMILES)) is None
-        assert name_compound(self._SMILES) != self._TARGET
+        res = name_unbranched_polyspiro_different(Chem.MolFromSmiles(self._SMILES))
+        assert res is not None
+        assert res[0] == self._TARGET
+
+    def test_lambda_unbranched_polyspiro_deterministic(self):
+        # P1_amide determinism lesson: the indicated-H/λ front prefix, component
+        # citation order and numbering must be spelling-independent — name the
+        # SAME molecule from randomized SMILES and require one identical output.
+        from rdkit import Chem
+        m = Chem.MolFromSmiles(self._SMILES)
+        outs = {name_compound(Chem.MolToSmiles(m, doRandom=True))
+                for _ in range(8)}
+        assert outs == {self._TARGET}
