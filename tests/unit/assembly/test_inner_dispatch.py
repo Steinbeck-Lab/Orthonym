@@ -1036,8 +1036,10 @@ class TestPhase160_2_Registrations:
         # N-substituents, N1-methylbutanediamide) [39 → 40]
         # + phosphinic_acid@2400 (P-67.1.2.2 substituent-prefix PIN) [40 → 41]
         # + cyanamide@950 (Wave-2 completion D, AM-1, P-66.1.6.2 — cyanamide
-        # retained parent with N-substitution) [41 → 42].
-        assert len(INNER_DISPATCH_TABLE) == 42
+        # retained parent with N-substitution) [41 → 42]
+        # + nitrile_oxide@975 (W2F p4, P-66.5.4.1 — neutral nitrile-oxide
+        # functional-class '<nitrile> oxide' suffix) [42 → 43].
+        assert len(INNER_DISPATCH_TABLE) == 43
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1070,10 +1072,11 @@ class TestPhase160_2_Registrations:
         # grew 37 → 38 (phosphonic_acid@2350, P-67.1.1.2), Wave 1 R8c
         # grew 38 → 39 (hydroxamic_acid@5210, P-66.1.1.3.2), D3
         # grew 39 → 40 (chain_diamide@1490, P-66.1.1.1.1), phosphinic_acid@2400
-        # grew 40 → 41 (P-67.1.2.2), and Wave-2 completion D grew 41 → 42
-        # (cyanamide@950, AM-1, P-66.1.6.2).
+        # grew 40 → 41 (P-67.1.2.2), Wave-2 completion D grew 41 → 42
+        # (cyanamide@950, AM-1, P-66.1.6.2), and W2F p4 grew 42 → 43
+        # (nitrile_oxide@975, P-66.5.4.1).
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 42
+        assert len(_SORTED_ENTRIES_CACHE) == 43
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)

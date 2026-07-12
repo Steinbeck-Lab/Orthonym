@@ -597,6 +597,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- W2F-p4 (P-66.5.4.1/2): nitrile_oxide (neutral functional-class '... oxide'
+#     suffix). Priority 975 places it in the specialty-intercept tier BEFORE the
+#     acid/ester handlers (acid_halide@1100 .. ester_family@1500) so the senior
+#     zwitterion-class nitrile oxide wins and a co-present ester/acid demotes to a
+#     prefix (P-66.5.4.1). Neutral-only predicate; the anion/salt prefix path
+#     (benzene.py, GetFormalCharge<0) is disjoint. Mirrors nitrite_ester.
+from .handlers.nitrile_oxide import _is_nitrile_oxide, name_nitrile_oxide  # noqa: E402
+
+_register_inner(
+    handler_id="nitrile_oxide",
+    priority=975,
+    predicate=_is_nitrile_oxide,
+    handler=name_nitrile_oxide,
+    iupac_section="P-66.5.4.1",
+    description="Neutral nitrile-oxide functional-class suffix ('<nitrile> oxide')",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-10: boronic_acid (Tier-1 LIFT; audit § 1 row + § 2.23).
 #     Note: source inline branch is at composer.py:1205-1214 (far below the
 #     other Tier-1 leaves). Cross-predicate mutex via principal_group string
