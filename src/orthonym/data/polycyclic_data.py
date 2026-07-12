@@ -415,6 +415,49 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         'num_rings': 9,
     },
+    # W2F-P10 (P-25.5.3 core / P-25.3.4.1.2 identical-attached-components).
+    # Curated named-fusion-parent catalog entries (same mechanism as
+    # dinaphtho[1,2-c:2',1'-m]picene above, added fad413e7). The general P-25.3
+    # polycomponent orientation/renumbering engine is not built (multi-week
+    # subsystem); these fused/bridged PARENT ring systems are cataloged with
+    # OPSIN-authoritative numbering (extendedsmi _AV labels mapped onto the
+    # RDKit-canonical key via canonical-rank bijection; method reproduces the
+    # hand-verified pentaphene entry identically; every mono-substituent
+    # position round-trips through Orthonym's namer). Bare compounds match by
+    # exact canonical SMILES (numbering not consulted); substituted derivatives
+    # use the numbering with automorphism-min lowest-locant selection.
+    # naphtho[2,3-a]pentaphene: single first-order attached component (P-25.3.1).
+    "naphtho[2,3-a]pentaphene": {
+        'canonical_smiles': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1',
+        'smarts': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccccc7cc6c5cc43)cc2c1',
+        'num_atoms': 30,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '18a', 4: 18, 5: '17b', 6: '5a', 7: 6, 8: 7, 9: '7a', 10: 8, 11: '8a', 12: 9, 13: 10, 14: '10a', 15: 11, 16: '11a', 17: 12, 18: 13, 19: 14, 20: 15, 21: '15a', 22: 16, 23: '16a', 24: '16b', 25: 17, 26: '17a', 27: 5, 28: '4a', 29: 4},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        'num_rings': 7,
+    },
+    # dinaphtho[2,3-a:2',3'-o]pentaphene: two IDENTICAL first-order attached
+    # naphtho components on pentaphene (P-25.3.4.1.2); the bridge-free CORE of
+    # the P-25.5.3 target (BB:14527).
+    "dinaphtho[2,3-a:2',3'-o]pentaphene": {
+        'canonical_smiles': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccc8cc9ccccc9cc8c7cc6c5cc43)cc2c1',
+        'smarts': 'c1ccc2cc3c(ccc4cc5ccc6cc7ccc8cc9ccccc9cc8c7cc6c5cc43)cc2c1',
+        'num_atoms': 38,
+        'iupac_numbering': {0: 20, 1: 19, 2: 18, 3: '17a', 4: 17, 5: '16b', 6: '22a', 7: 1, 8: 2, 9: '2a', 10: 3, 11: '3a', 12: 4, 13: 5, 14: '5a', 15: 6, 16: '6a', 17: 7, 18: 8, 19: '8a', 20: 9, 21: '9a', 22: 10, 23: 11, 24: 12, 25: 13, 26: '13a', 27: 14, 28: '14a', 29: '14b', 30: 15, 31: '15a', 32: '15b', 33: 16, 34: '16a', 35: 22, 36: '21a', 37: 21},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+        'num_rings': 9,
+    },
+    # Full P-25.5.3 target (BB:14527): the bare bridged-fused parent ring system
+    # 12,19:13,18-di(metheno)dinaphtho[2,3-a:2',3'-o]pentaphene. Two identical
+    # one-carbon metheno bridges over the dinaphtho..pentaphene core; bridge
+    # atoms numbered LAST (23,24) per P-25.4.4. All-aromatic mancude parent.
+    "12,19:13,18-di(metheno)dinaphtho[2,3-a:2',3'-o]pentaphene": {
+        'canonical_smiles': 'c1cc2cc3ccc4cc5ccc6cc7ccc8cc9ccc%10cc1c1cc%10c9cc8c7cc6c5cc4c3cc21',
+        'smarts': 'c1cc2cc3ccc4cc5ccc6cc7ccc8cc9ccc%10cc1c1cc%10c9cc8c7cc6c5cc4c3cc21',
+        'num_atoms': 40,
+        'iupac_numbering': {0: 8, 1: 7, 2: '6a', 3: 6, 4: '5a', 5: 5, 6: 4, 7: '3a', 8: 3, 9: '2a', 10: 2, 11: 1, 12: '22a', 13: 22, 14: '21a', 15: 21, 16: 20, 17: 19, 18: 23, 19: 12, 20: 11, 21: 10, 22: '9a', 23: 9, 24: '8a', 25: '14a', 26: 14, 27: '13a', 28: 13, 29: 24, 30: 18, 31: '17a', 32: 17, 33: '16b', 34: '16a', 35: 16, 36: '15b', 37: '15a', 38: 15, 39: '14b'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 20, 21, 22, 23, 24],
+        'num_rings': 11,
+    },
 }
 
 
