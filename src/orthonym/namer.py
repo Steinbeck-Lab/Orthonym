@@ -432,8 +432,18 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is not None:
         return _self_consistency_decision(name, smiles, opsin_smiles, stats)
-    if _validity_gate_status(name) != "rejected":
-        return name  # unavailable -> fail-OPEN (transient; never suppress)
+    # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: no jar /
+    # timeout / OSError), OR OPSIN PARSED the name but emitted a SMILES that RDKit
+    # cannot canonicalise (an impossible valence — e.g. the lambda6 candidate
+    # '1,2lambda6,3-dioxathiolane' produced for a lambda6-multiring-spiro that the
+    # spiro engine fail-closes). ONLY 'unavailable' fails OPEN (a transient hiccup
+    # must never suppress a valid, round-trip-passing name — CR-01). A
+    # 'parsed'-but-uncanonicalisable output is UNVERIFIABLE: we cannot confirm the
+    # name describes the input structure, so it must fall through to the whitelist
+    # carve-outs below and, absent a whitelist hit, suppress to the honest fallback
+    # (fail-closed, accuracy #1). Conflating the two here shipped the wrong name.
+    if _validity_gate_status(name) == "unavailable":
+        return name  # transient -> fail-OPEN (never suppress)
     # DD2 / BBR-GATE (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:

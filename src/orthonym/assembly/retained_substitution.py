@@ -239,8 +239,19 @@ class OpsinOracle:
         if not ran:
             return None  # transient — do NOT cache (WR-04)
         try:
-            canon = Chem.CanonSmiles(raw) if raw else None
-        except ValueError as exc:
+            # OPSIN can emit a SMILES that RDKit cannot parse (e.g. an impossible
+            # valence from a lambda-convention candidate such as
+            # '1,2lambda6,3-dioxathiolane'): MolFromSmiles then returns None, so
+            # guard BEFORE canonicalising — Chem.CanonSmiles(None-parse) calls
+            # MolToSmiles(None) which raises Boost.Python.ArgumentError, NOT
+            # ValueError, and would escape this handler. Any failure to obtain a
+            # clean canonical form means "OPSIN produced no valid structure" ->
+            # None (definitive, cached) -> the SUB-03 validity gate suppresses the
+            # candidate -> fail-closed. Behaviour-preserving for parseable output
+            # (MolToSmiles default isomericSmiles=True == CanonSmiles useChiral=1).
+            parsed = Chem.MolFromSmiles(raw) if raw else None
+            canon = Chem.MolToSmiles(parsed) if parsed is not None else None
+        except Exception as exc:  # noqa: BLE001 - any RDKit failure on OPSIN output => no structure
             logger.debug("OpsinOracle.name_to_smiles canonicalisation failed for %r: %s", name, exc)
             canon = None
         self._name_cache[name] = canon
