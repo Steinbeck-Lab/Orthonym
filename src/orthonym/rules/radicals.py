@@ -581,14 +581,8 @@ def name_radical(mol, style: str = 'pin') -> str:
         from .charged_router import route_charged
         return route_charged(mol, style)
 
-    # Multiple radicals (diradicals/polyradicals): the oxyl/acyl helpers still
-    # apply to the first site; otherwise out of scope -> route_charged ('' on
-    # multi-radical, the v18 fall-through).
-    first_site = sites[0]
-    info = classify_radical(mol, first_site)
-    if info['subtype'] == 'oxyl':
-        return name_oxyl_radical(mol, first_site)
-    elif info['subtype'] == 'acyl':
-        return name_acyl_radical(mol, first_site)
+    # Multiple radicals: delegate to route_charged (P-71.2.3 multi-site free-valence
+    # namer). No first-site oxyl/acyl shortcut — it produced structure-dropping names
+    # (e.g. [O]CC[O] -> 'ethoxyl') that SELF-01 only suppressed. Fail closed on ''.
     from .charged_router import route_charged
     return route_charged(mol, style)

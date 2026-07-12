@@ -884,8 +884,20 @@ def route_charged(mol, style: str = 'pin') -> str:
         # loss (acyl -> -oyl on the acid name; oxyl -> -oxyl; aryl -> the ring
         # radical) and keep their structured radicals.py helpers -> bail here so
         # name_radical / _handle_radical fall through to them.
-        if len(radical_sites) != 1:
-            return ''  # di/poly-radicals out of scope -> legacy fallthrough
+        if len(radical_sites) >= 2:
+            # P-71.2.3 multi-site free valences on ONE acyclic all-carbon parent.
+            # Scope: every site element C, n_electrons<=3, none acyl/oxyl/aryl/
+            # aminyl/thiyl (those are not plain parent-hydride H-loss). The namer
+            # fail-closes ('') on anything else (hetero/ring/off-parent/mixed).
+            from .radicals import classify_radical
+            if any(s['element'] != 'C' or s['n_electrons'] > 3 for s in radical_sites):
+                return ''
+            if any(classify_radical(mol, s)['subtype'] in
+                   ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl') for s in radical_sites):
+                return ''
+            from .ions import emit_parent_hydride_polyvalent_suffixes
+            centers = [(s['atom_idx'], s['n_electrons']) for s in radical_sites]
+            return emit_parent_hydride_polyvalent_suffixes(mol, centers) or ''
         from .radicals import classify_radical
         rinfo = classify_radical(mol, radical_sites[0])
         if rinfo['subtype'] in ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl'):

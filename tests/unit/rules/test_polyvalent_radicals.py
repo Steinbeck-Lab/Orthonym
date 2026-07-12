@@ -61,3 +61,31 @@ class TestScopeGuardsFailClosed:
         # ethan-1-yl-2-ylidene (1e+2e) is out of THIS task's homogeneous scope
         mol, centers = _mol_centers("[CH2][CH]")   # canon [CH][CH2]
         assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""
+
+
+class TestRouteChargedMultiSite:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("[CH2][CH2]",     "ethane-1,2-diyl"),
+        ("[CH2]C[CH2]",    "propane-1,3-diyl"),
+        ("[CH2][CH][CH2]", "propane-1,2,3-triyl"),
+        ("CC([CH2])[CH2]", "2-methylpropane-1,3-diyl"),
+    ])
+    def test_route_charged_emits_polyradical(self, smiles, expected):
+        from orthonym.rules.charged_router import route_charged
+        assert route_charged(Chem.MolFromSmiles(smiles), "pin") == expected
+
+    @pytest.mark.parametrize("smiles", ["[O]CC[O]", "[CH2][N]", "[CH]1CC[CH]CC1"])
+    def test_route_charged_bails_out_of_scope(self, smiles):
+        from orthonym.rules.charged_router import route_charged
+        assert route_charged(Chem.MolFromSmiles(smiles), "pin") == ""
+
+    def test_name_radical_no_structure_dropping_oxyl(self):
+        # deleted shortcut: [O]CC[O] must NOT return 'ethoxyl' (structure-dropping)
+        from orthonym.rules.radicals import name_radical
+        assert name_radical(Chem.MolFromSmiles("[O]CC[O]"), style="pin") == ""
+
+    def test_single_site_radical_unchanged(self):
+        # PROTECT: single-site path (route_charged -> emit_parent_hydride_cumulative_suffix) byte-identical
+        from orthonym.rules.charged_router import route_charged
+        assert route_charged(Chem.MolFromSmiles("CC[CH]CC"), "pin") == "pentan-3-yl"
+        assert route_charged(Chem.MolFromSmiles("C[CH]C"), "pin") == "propan-2-yl"
