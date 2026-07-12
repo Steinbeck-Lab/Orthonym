@@ -3378,6 +3378,17 @@ _FUSED_HET_SPIRO_TEMPLATE_SPECS = [
     # |$_AV:1;8a;3a;3;2;4;4a;7a;7;6;5;8$| (both S = λ spiro centres at 2 and 6).
     ("1H,3H-benzo[1,2-c:4,5-c']dithiophene", "C1C=2C(CS1)=CC=1C(=CSC1)C2",
      [1, "8a", "3a", 3, 2, 4, "4a", "7a", 7, 6, 5, 8]),
+    # [1,2,3]benzoxadithiole  OPSIN 'O1SSC2=C1C=CC=C2' |$_AV:1;2;3;3a;7a;7;6;5;4$|
+    # (the middle S = the λ spiro centre at locant 2). Component of the
+    # P-24.8.4.2 target (BlueBookV2.md:11250).
+    ("[1,2,3]benzoxadithiole", "O1SSC2=C1C=CC=C2",
+     [1, 2, 3, "3a", "7a", 7, 6, 5, 4]),
+    # dibenzo[b,d]thiophene  OPSIN 'C1=CC=CC=2SC3=C(C21)C=CC=C3'
+    # |$_AV:1;2;3;4;4a;5;5a;9a;9b;9;8;7;6$| (S = the λ spiro centre at locant 5).
+    # PIN form for the spiro name (BlueBookV2.md:11250); the standalone catalog
+    # still uses the short 'dibenzothiophene' — untouched here.
+    ("dibenzo[b,d]thiophene", "C1=CC=CC=2SC3=C(C21)C=CC=C3",
+     [1, 2, 3, 4, "4a", 5, "5a", "9a", "9b", 9, 8, 7, 6]),
 ]
 
 
