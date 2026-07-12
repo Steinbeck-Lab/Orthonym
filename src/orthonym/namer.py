@@ -1527,10 +1527,13 @@ class Orthonym:
                     if _iso_name is not None:
                         end_naming_session()
                         return _iso_name
-                    # Decorator failed closed (no round-tripping placement):
-                    # fall through to the normal pipeline (which yields the
-                    # skeleton name); the OPSIN-validity gate marks it as a
-                    # non-round-tripping best-effort — never a wrong LABELED PIN.
+                    # Decorator failed closed on an isotope-labeled molecule: REFUSE.
+                    # Falling through would emit the UNLABELED skeleton name (label
+                    # silently dropped) — a wrong name the OPSIN validity gate cannot
+                    # catch (it parses to the unlabeled structure; SELF-01 ignores
+                    # isotopes). Accuracy-first: never emit a label-dropping name.
+                    end_naming_session()
+                    return _descriptive_fallback(smiles)
         try:
             # HYG-02: structural scope pre-check (opt-in). Only the wildcard
             # class is refused here — the one class with zero in-scope risk.

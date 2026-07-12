@@ -196,3 +196,30 @@ class TestDeMultiplicationP4542:
         from orthonym.namer import name_compound
         assert name_compound(smiles, style="systematic") == expected \
             or name_compound(smiles, style="pin") == expected
+
+
+class TestRefuseOnUndecoratablePolicy:
+    def test_mixed_two_label_construct_refuses(self):
+        # mixed 18O/13C two-copy: two DIFFERENT (mass,el) groups -> de-mult inert
+        # (single-group only) and the combined single-token candidate does NOT RT
+        # -> decorator None -> REFUSE, never the label-dropping '1,2-dimethoxyethane'.
+        from orthonym.namer import name_compound
+        assert name_compound("C[18O]CCO[13CH3]", style="pin") == "unknown organic compound"
+
+    def test_labeled_molecule_never_drops_label(self):
+        from orthonym.namer import name_compound
+        out = name_compound("C[18O]CCO[13CH3]", style="pin")
+        assert "dimethoxyethane" not in out   # the unlabeled skeleton is NOT emitted
+
+    def test_unlabeled_corpus_byte_identical(self):
+        # the has_isotopes gate keeps the new policy inert on unlabeled input
+        from orthonym.namer import name_compound
+        assert name_compound("CCO") == "ethanol"
+        assert name_compound("CCO", style="systematic") == "ethan-1-ol"
+
+    def test_decoratable_labels_still_ship(self):
+        # Task 7 target + shipped golds still emit their labeled PIN (policy only
+        # fires on decorator None)
+        from orthonym.namer import name_compound
+        assert name_compound("[13CH3]OCCOC", style="pin") == "1-(13C1)methoxy-2-methoxyethane"
+        assert name_compound("[14CH3]CO", style="systematic") == "(2-14C1)ethan-1-ol"
