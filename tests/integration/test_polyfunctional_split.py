@@ -274,3 +274,37 @@ class TestAcylSulfanylWholeMolecule:
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
         assert name_compound(smiles) == "unknown organic compound"
+
+
+@pytest.mark.integration
+class TestW2FP2Determinism:
+    """W2F-P2 Task 6: the default split + acyl branch are spelling-invariant
+    (P-45-adjacent determinism; seeded random spellings, reproducible)."""
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("canonical_smiles,expected", [
+        ("O=C(OCc1ccccc1)CCCCCCCC(=O)O", "9-(benzyloxy)-9-oxononanoic acid"),
+        ("CC(=O)SC(=O)CCCCCCCC(=O)O", "9-(acetylsulfanyl)-9-oxononanoic acid"),
+        ("CCSC(=O)CCC(=O)O", "4-(ethylsulfanyl)-4-oxobutanoic acid"),
+    ])
+    def test_spelling_invariance(self, canonical_smiles, expected):
+        from rdkit import Chem
+        from rdkit.Chem import rdmolfiles
+        mol = Chem.MolFromSmiles(canonical_smiles)
+        spellings = set(rdmolfiles.MolToRandomSmilesVect(mol, 10, randomSeed=42))
+        names = {name_compound(s) for s in spellings}
+        assert names == {expected}, names
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    def test_multi_anchored_mixed_diester_fail_closed(self, monkeypatch):
+        # TWO ester carbonyls + one free acid: v1 splits only when EXACTLY ONE
+        # anchored match exists; whichever chain perception picks, the unsplit
+        # ester's atoms stay unaccounted -> RT gate/SELF-01 refuse. Production
+        # is 'unknown' (diagnose 2026-07-11). The autouse fixture disables the
+        # validity gate for speed; re-enable it to see the production refusal
+        # instead of a gate-off raw leak.
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        assert name_compound("COC(=O)CC(CC(=O)OCC)CC(=O)O") == "unknown organic compound"
