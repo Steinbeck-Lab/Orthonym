@@ -163,3 +163,36 @@ class TestNuclideTieBreaks:
         o_low = [(1, 18, "O", 1), (2, 13, "C", 1)]
         c_low = [(1, 13, "C", 1), (2, 18, "O", 1)]
         assert _p4542_p4543_key(o_low) < _p4542_p4543_key(c_low)
+
+
+class TestDeMultiplicationP4542:
+    """P-82.2.2.1 / P-45.4.1 — one labeled copy among identical substituent prefixes.
+
+    Target OPSIN-verified in  §Item-2 §A/§D.
+    """
+    def test_evidence_target(self):
+        from orthonym.namer import name_compound
+        got = name_compound("[13CH3]OCCOC", style="pin")
+        assert got == "1-(13C1)methoxy-2-methoxyethane", f"got {got!r}"
+
+    def test_ambiguity_tiebreak_lowest_labeled_locant(self):
+        # both 1- and 2- forms RT (symmetric); P-45.4.1 picks the labeled copy at locant 1
+        from orthonym.namer import name_compound
+        got = name_compound("[13CH3]OCCOC", style="pin")
+        assert got.startswith("1-(13C1)methoxy"), got
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # PROTECT: existing shipped isotope golds unaffected (skeletons carry no
+        # LEADING locanted simple multiplier -> de-mult branch inert)
+        ("[14CH3]CO",               "(2-14C1)ethan-1-ol"),
+        ("[13CH3]CO",               "(2-13C1)ethan-1-ol"),
+        ("[2H]C([2H])([2H])CO",     "(2,2,2-2H3)ethan-1-ol"),
+        ("[2H]C([2H])([2H])Oc1ccccc1", "(2H3)methoxybenzene"),
+        ("[12CH](Cl)(Cl)Cl",        "trichloro(12C1)methane"),  # 'tri' but NO leading locant -> inert
+        ("[13CH3]OC(C)=O",          "(13C1)methyl acetate"),    # front descriptor path
+        ("CC[18OH]",                "(18O1)ethan-1-ol"),        # parent-front, unaffected
+    ])
+    def test_existing_isotope_placements_unaffected(self, smiles, expected):
+        from orthonym.namer import name_compound
+        assert name_compound(smiles, style="systematic") == expected \
+            or name_compound(smiles, style="pin") == expected

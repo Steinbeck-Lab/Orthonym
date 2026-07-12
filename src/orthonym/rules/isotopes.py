@@ -247,6 +247,38 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
             # do not consider higher-locant forms once a lower one succeeds.
             break
     if not winners:
+        # P-82.2.2.1 de-multiplication (offset enumerator found nothing). When the
+        # skeleton is a leading-locanted simple-multiplier form (1,2-dimethoxy…)
+        # and there is ONE (mass,element) group modifying exactly ONE of the
+        # identical copies, the 'di'/'tri' multiplier must be SPLIT and the
+        # descriptor scoped to a single copy (P-82.2.2.1:
+        # 2-(13C)methyl-3-methylpyridine [not 2,3-(2-13C)dimethylpyridine]). Each
+        # candidate is OPSIN-round-trip-gated WITH isotopes; P-45.4.1 (lowest
+        # locant to the modified substituent group) breaks the symmetric tie.
+        import re
+        m = re.match(
+            r"^(?P<locs>\d+(?:,\d+)+)-(?P<mult>di|tri|tetra|penta|hexa)(?P<tail>[a-z].+)$",
+            skeleton,
+        )
+        if m and len(keys) == 1:                       # single (mass,element) group only (v1 scope)
+            mult_count = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[m.group("mult")]
+            locs = [int(x) for x in m.group("locs").split(",")]
+            (mass, el), total = keys[0]
+            if len(locs) == mult_count and total == 1:  # exactly one labeled copy (v1 scope)
+                desc = format_isotope_descriptor([(None, mass, el, total)])   # e.g. (13C1)
+                tail = m.group("tail")
+                demux = []                              # (Lk, k, candidate)
+                for Lk in locs:
+                    for k in range(1, len(tail)):
+                        base, parent = tail[:k], tail[k:]
+                        segs = [f"{L}-{desc}{base}" if L == Lk else f"{L}-{base}"
+                                for L in sorted(locs)]
+                        cand = "-".join(segs) + parent
+                        if _isotope_round_trips(cand, original):
+                            demux.append((Lk, k, cand))
+                if demux:
+                    demux.sort(key=lambda t: (t[0], t[1], t[2]))  # P-45.4.1 lowest labeled locant
+                    return demux[0][2]
         return None
     # Among equally-low-locant round-trippers, P-45.4.2/.4.3 then front-first.
     winners.sort(key=lambda w: (w[0], w[1], w[2]))
