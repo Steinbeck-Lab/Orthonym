@@ -40,7 +40,7 @@ class TestEsterOrientationGuard:
         assert result is None, f"Expected None when both ends on chain, got: {result}"
 
     def test_normal_ester_c_on_chain_o_off(self):
-        """Normal alkoxycarbonyl: C on chain, O off chain -> returns prefix.
+        """In-chain ester carbonyl -> None per P-65.6.3.3.5 (was the pre-2026 alkoxycarbonyl case).
 
         Ethyl propanoate: CCC(=O)OCC
         The carbonyl C is on the principal chain but the ester O is not.
@@ -59,6 +59,7 @@ class TestEsterOrientationGuard:
         carbonyl_c = ester_atoms[0]
         principal_chain = [0, 1, carbonyl_c]  # chain through C-C-C(=O)
         result = _get_alkoxycarbonyl_prefix(mol, ester_atoms, principal_chain)
-        # Should return a non-None prefix (alkoxycarbonyl or similar)
-        # Note: may still return None for other reasons (lactone check, etc.)
-        # This test verifies the new guard doesn't reject valid cases
+        # W2F-P2 (P-65.6.3.3.5 method (1)): a CHAIN-MEMBER ester carbonyl is
+        # never R-oxycarbonyl; it decomposes to oxo + alkoxy. This test was
+        # previously assertion-free; it now pins the None contract.
+        assert result is None, f"in-chain ester C must return None, got {result!r}"

@@ -306,6 +306,14 @@ def get_alkoxycarbonyl_prefix(
     if chain_set and ester_o is not None:
         c_on_chain = carbonyl_c in chain_set
         o_on_chain = ester_o in chain_set
+        if c_on_chain:
+            # W2F-P2 (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
+            # ester carbonyl is expressed substitutively as oxo + alkoxy on the
+            # acid parent ('5-butoxy-2-methyl-5-oxopentanoic acid'), never as
+            # R-oxycarbonyl (double-counts the carbonyl carbon = names a
+            # one-carbon-longer homolog). The oxo+alkoxy pair is emitted by the
+            # polyfunctional group-splitting branch (OPSIN-RT gated).
+            return None
         c_adj_chain = c_on_chain or any(
             nbr.GetIdx() in chain_set
             for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()

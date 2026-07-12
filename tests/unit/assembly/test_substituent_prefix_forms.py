@@ -6,6 +6,7 @@ Acceptance threshold: >= 56 tests (14 generators x 4 fixtures each).
 Per-FG isolation: each test class targets ONE generator function.
 IUPAC-canonical: every positive test asserts the exact IUPAC §-cited prefix string.
 """
+import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_prefix_forms import (
@@ -752,3 +753,53 @@ class TestWR05PrefixFormCacheThreadSafe:
         assert results[0] >= 10, (
             f"cache underpopulated post-init: size={results[0]}"
         )
+
+
+@pytest.mark.unit
+class TestAlkoxycarbonylChainMembership:
+    """W2F-P2 Task 1 (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
+    ester carbonyl is expressed as oxo + alkoxy (group split), never as
+    R-oxycarbonyl — that spelling double-counts the carbonyl carbon
+    ('4-methoxycarbonylbutanoic acid' OPSIN-parses to monomethyl GLUTARATE,
+    a one-carbon-longer different molecule)."""
+
+    def _ester_match(self, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        pat = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(pat)
+        assert matches
+        return mol, matches[0]
+
+    def test_monomethyl_succinate_carbonyl_in_chain_returns_none(self):
+        # Perception chain for COC(=O)CCC(=O)O is [2, 4, 5] (probed 2026-07-11);
+        # ester match (2, 3, 1, 0): carbonyl C2 IS a chain member.
+        mol, m = self._ester_match("COC(=O)CCC(=O)O")
+        assert m[0] == 2
+        result = get_alkoxycarbonyl_prefix(mol, m, principal_chain=[2, 4, 5])
+        assert result is None, (
+            f"P-65.6.3.3.5: in-chain ester C must not be R-oxycarbonyl, got {result!r}"
+        )
+
+    def test_benzyl_evidence_carbonyl_in_chain_returns_none(self):
+        # O=C(OCc1ccccc1)CCCCCCCC(=O)O: chain [1,10..16] (probed); match (1,0,2,3).
+        mol, m = self._ester_match("O=C(OCc1ccccc1)CCCCCCCC(=O)O")
+        assert m[0] == 1
+        result = get_alkoxycarbonyl_prefix(
+            mol, m, principal_chain=[1, 10, 11, 12, 13, 14, 15, 16]
+        )
+        assert result is None
+
+    def test_carbonyl_adjacent_but_off_chain_keeps_prefix(self):
+        # BB 31950 shape: the carbonyl is ATTACHED to the parent, not a member.
+        # Ethyl propanoate CCC(=O)OCC with a chain stopping before the carbonyl.
+        mol, m = self._ester_match("CCC(=O)OCC")
+        assert m[0] == 2  # carbonyl C
+        result = get_alkoxycarbonyl_prefix(mol, m, principal_chain=[0, 1])
+        assert result == "ethoxycarbonyl", f"got {result!r}"
+
+    def test_none_chain_tier05_unchanged(self):
+        # Tier-0.5 sub-fragment callers pass principal_chain=None -> the whole
+        # Guard-2 block (incl. the new guard) is skipped (chain_set falsy).
+        mol, m = self._ester_match("COC(=O)CCC(=O)O")
+        assert get_alkoxycarbonyl_prefix(mol, m, principal_chain=None) == "methoxycarbonyl"
