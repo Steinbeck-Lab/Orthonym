@@ -505,6 +505,27 @@ def name_substituent(mol, frag_atoms, attach_idx):
             except Exception:
                 pass
 
+    # ---- Tier 1.93 (W2F-P7, P-68.3): phosphanyl (P-rooted) substituent ----
+    # A phosphorus-rooted substituent (-PH2 -> phosphanyl, -PR2 -> dialkyl/
+    # diarylphosphanyl) is cited via rules/phosphorus.name_phosphanyl_substituent.
+    # MUST precede the Tier-5 descriptive fallback, which returns the
+    # 'substituent' sentinel for a lone P — dropping it and failing the molecule
+    # closed ('OC(=O)CCP' -> propanoic acid -> SELF-01 rejects -> 'unknown').
+    # The helper fires ONLY for a clean neutral organyl/hydride P (excludes a
+    # phosphoryl/phosphonic P=O, named by the oxoacid subsystem) -> fail-closed
+    # (falls through to 'substituent') on any decline. The λ5 branch is Task 3.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
+            try:
+                from ..rules.phosphorus import name_phosphanyl_substituent
+                _ph = name_phosphanyl_substituent(
+                    mol, list(frag_atoms_set), attach_idx
+                )
+                if _ph:
+                    return _stereo_route(_ph)
+            except Exception:
+                pass
+
     # ---- Wave2 T3c: aryl-vinyl / styryl (SUBST-01 two-namer rule) ----
     # Mirror name_substituent_fragment's aryl-vinyl handler here so the benzene
     # generic-C fallback (benzene.py, which calls name_substituent and rejects the

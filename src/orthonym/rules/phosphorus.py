@@ -15,6 +15,7 @@ from collections import deque, Counter
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
+from .lambda_convention import nonstandard_bonding_number
 
 
 def _characterize_substituent(mol, start_idx: int, exclude: set) -> Optional[Tuple[str, str]]:
@@ -465,6 +466,51 @@ def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -
     # Build substituent string with multipliers and alphabetical ordering
     prefix = _build_substituent_string(sub_names)
     return f"{prefix}phosphanyl"
+
+
+def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
+    """P-68.3: name a phosphorus-rooted substituent on an acyclic parent.
+
+    ``-PH2`` -> ``phosphanyl``; ``-PR2`` -> ``dialkyl/diarylphosphanyl`` (via
+    :func:`get_phosphanyl_prefix`). Wired into the chain/acid substituent path
+    (``name_substituent`` Tier 1.93) so a trivalent-P substituent on a carbon
+    chain is cited as the ``phosphanyl`` prefix rather than dropped.
+
+    Fail-closed collision guard (P-45.3.1 load-bearing case): fires ONLY when
+    ``attach_idx`` is a NEUTRAL, radical-free phosphorus whose every in-fragment
+    heavy neighbour is a single-bonded carbon (organyl) — so a phosphoryl /
+    phosphonic ``P=O`` (bonding number 5, but with an O neighbour) is EXCLUDED
+    and left to the oxoacid subsystem. Standard-valence (bonding number 3) only
+    in this task; the λ5 hydride branch is added in Task 3.
+
+    Returns None (caller falls through, fail-closed) for any non-P attachment,
+    a P bearing a heteroatom / multiple bond, a non-standard bonding number, or
+    an unrecognised organyl ligand.
+    """
+    if attach_idx is None:
+        return None
+    frag_set = set(frag_atoms)
+    if attach_idx not in frag_set:
+        return None
+    p = mol.GetAtomWithIdx(attach_idx)
+    if (p.GetSymbol() != 'P' or p.GetFormalCharge() != 0
+            or p.GetNumRadicalElectrons() != 0):
+        return None
+    # Every heavy neighbour is either the parent attachment (out of fragment) or
+    # an in-fragment single-bonded carbon; any O/N/S neighbour or multiple bond
+    # (i.e. a phosphoryl/phosphonic/phosphine-oxide P=O) declines here.
+    for b in p.GetBonds():
+        nb = b.GetOtherAtom(p)
+        if nb.GetIdx() not in frag_set:
+            continue  # bond to the parent structure
+        if nb.GetSymbol() != 'C' or b.GetBondType() != Chem.BondType.SINGLE:
+            return None
+    # Standard-valence phosphanyl only (bonding number 3); the non-standard (λ5)
+    # hydride is handled by the Task-3 lambda branch.
+    if nonstandard_bonding_number(mol, attach_idx) is not None:
+        return None
+    exclude = set(range(mol.GetNumAtoms())) - frag_set
+    return get_phosphanyl_prefix(mol, attach_idx, exclude_atoms=exclude)
 
 
 def get_phosphorus_prefix(fg_name: str) -> Optional[str]:

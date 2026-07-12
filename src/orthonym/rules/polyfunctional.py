@@ -2232,6 +2232,29 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
+            # W2F-P7 (P-68.3): a CARBON-FREE phosphanyl substituent (-PH2) on a
+            # polyfunctional parent (e.g. the acid OC(=O)CCP) is dropped by the
+            # carbon_count==0 guard below and is NOT recoverable via the FG-prefix
+            # loop ('phosphanyl' is a substituent prefix, not a functional group)
+            # -> the whole -PH2 vanished ('propanoic acid', SELF-01-suppressed to
+            # unknown). Name it via the shared phosphorus namer (the SAME one wired
+            # into name_substituent Tier 1.93); its all-H/organyl-only guard
+            # EXCLUDES a phosphoryl/phosphonic P=O (named by the oxoacid subsystem).
+            # Fail-closed (falls through to the carbon_count==0 drop) on decline.
+            if carbon_count == 0:
+                _p_attach = next(
+                    (si for si in sub_atoms
+                     if mol.GetAtomWithIdx(si).GetSymbol() == 'P'),
+                    None,
+                )
+                if _p_attach is not None:
+                    from ..rules.phosphorus import name_phosphanyl_substituent
+                    _ph = name_phosphanyl_substituent(
+                        mol, list(sub_atoms), _p_attach)
+                    if _ph:
+                        substituent_groups[_ph].append(position)
+                        continue
+
             # Skip non-alkyl substituents
             if carbon_count == 0:
                 continue
