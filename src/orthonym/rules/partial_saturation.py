@@ -1193,6 +1193,31 @@ def _ring_carbonyl_carbons(mol, ring_set: Set[int]) -> List[int]:
     return out
 
 
+def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
+    """Ring carbons bearing an exocyclic bare imine =NH (P-62.3.1.1), suitable for
+    the -imine / -diimine suffix with the same added-indicated-H numbering as -one.
+
+    The nitrogen must be exocyclic, double-bonded, degree 1 (no N-substituent) and
+    neutral: an N-substituted =NR or a charged =N(+) is outside the v1 scope and
+    the imine branch declines (fail closed) — the degree-1 requirement here is the
+    gate that keeps N-methyl ring imines from reaching the suffix engine."""
+    out: List[int] = []
+    for idx in ring_set:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            o = bond.GetOtherAtom(atom)
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and o.GetSymbol() == 'N'
+                    and o.GetIdx() not in ring_set
+                    and o.GetDegree() == 1
+                    and o.GetFormalCharge() == 0):
+                out.append(idx)
+                break
+    return out
+
+
 def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
     """Return the atoms of the single FUSED ring system that contains a seed atom.
 
@@ -1517,23 +1542,51 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     # connected by a single bond, sharing 0-1 atoms) is a SUBSTITUENT, not part of
     # the parent, so it must be excluded from ring_set (else _resolve_oxo_parent
     # can't match the parent skeleton, and the carbonyl/substituent split breaks).
+    # Suffix source: a ring exocyclic =O (ketone/lactam/lactone -one, P-64.2.2.2)
+    # OR, when there is NO ring =O anywhere, a ring exocyclic bare =NH (imine,
+    # P-62.3.1.1). Imine is the LAST seniority class (P-41 Table 4.5 #52), so a
+    # ring bearing BOTH =O and =NH keeps the -one suffix + 'imino' prefix — that
+    # path stays on the =O branch below and is byte-identical. The added-indicated-
+    # hydrogen engine (matching + numbering + (nH) formatting) is suffix-agnostic.
+    suffix_symbol = 'O'
+    suffix_table = {1: 'one', 2: 'dione', 3: 'trione', 4: 'tetrone'}
+    suffix_hetero_name = 'oxo'
     all_carbonyls = set(_ring_carbonyl_carbons(mol, all_ring_atoms))
     if not all_carbonyls:
-        return None
+        all_carbonyls = set(_ring_imine_carbons(mol, all_ring_atoms))
+        if not all_carbonyls:
+            return None
+        suffix_symbol = 'N'
+        suffix_table = {1: 'imine', 2: 'diimine', 3: 'triimine'}
+        suffix_hetero_name = 'imino'
+
+    def _suffix_carbons(rs):
+        return (_ring_carbonyl_carbons(mol, rs) if suffix_symbol == 'O'
+                else _ring_imine_carbons(mol, rs))
+
     ring_set: Set[int] = _fused_ring_system_atoms(rings, all_carbonyls)
     if not ring_set:
         return None
 
-    carbonyls = set(_ring_carbonyl_carbons(mol, ring_set))
+    carbonyls = set(_suffix_carbons(ring_set))
     if not carbonyls:
         return None
-    # The carbonyl O's belong to the suffix, not to substituents.
+    # P-62.3.1.1 v1 imine gate (fail closed): every imine C's RING neighbours must
+    # be carbon — a ring-heteroatom neighbour is a cyclic amidine/imidate shape
+    # whose seniority is unresolved (buildable follow-on), never a bare ring imine.
+    if suffix_symbol == 'N':
+        for c in carbonyls:
+            for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+                if nb.GetIdx() in ring_set and nb.GetSymbol() != 'C':
+                    return None
+    # The suffix heteroatom(s) (=O for -one, =NH for -imine) belong to the suffix,
+    # not to substituents.
     carbonyl_oxygens: Set[int] = set()
     for c in carbonyls:
         ca = mol.GetAtomWithIdx(c)
         for bond in ca.GetBonds():
             o = bond.GetOtherAtom(ca)
-            if (bond.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == 'O'
+            if (bond.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == suffix_symbol
                     and o.GetIdx() not in ring_set and o.GetDegree() == 1):
                 carbonyl_oxygens.add(o.GetIdx())
     substituent_atoms = {a.GetIdx() for a in mol.GetAtoms()
@@ -1653,7 +1706,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
 
     carb_sorted = sorted(carbonyls, key=lambda c: _locant_key(loc[c]))
     carb_str = ','.join(_locant_display(loc[c]) for c in carb_sorted)
-    suffix = {1: 'one', 2: 'dione', 3: 'trione', 4: 'tetrone'}.get(len(carbonyls))
+    suffix = suffix_table.get(len(carbonyls))
     if suffix is None:
         return None
     if added_ih:
@@ -1661,8 +1714,10 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         ih_str = '(' + ','.join(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
     else:
         ih_str = ''
-    # P-16.3.3: elide terminal 'e' only before the vowel-initial '-one' suffix.
-    elide = parent_name.endswith('e') and len(carbonyls) == 1
+    # P-16.3.3: elide terminal 'e' only before a vowel-initial suffix. For the
+    # oxo table this is exactly the single-carbonyl '-one' case; for imine it is
+    # single '-imine' (vowel-initial) but NOT '-diimine'/'-triimine' (consonant).
+    elide = parent_name.endswith('e') and bool(suffix) and suffix[0] in 'aeiou'
     stem = parent_name[:-1] if elide else parent_name
     name = f"{stem}-{carb_str}{ih_str}-{suffix}"
     if hydro:
@@ -1687,7 +1742,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         filtered = {}
         for locant, slist in subs.items():
             keep = [s for s in slist
-                    if s.get('hetero_name') != 'oxo'
+                    if s.get('hetero_name') != suffix_hetero_name
                     and not any(a in carbonyl_oxygens for a in s.get('atoms', []))]
             if keep:
                 filtered[locant] = keep
