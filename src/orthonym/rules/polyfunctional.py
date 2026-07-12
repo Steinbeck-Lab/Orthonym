@@ -349,7 +349,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         Formatted prefix string (e.g., "2-hydroxy", "3-oxo", "2-(methylsulfinyl)")
     """
     from ..assembly.naming_utils import (
-        needs_brackets, COMPLEX_MULTIPLIERS,
+        needs_brackets, COMPLEX_MULTIPLIERS, apply_enclosing_marks,
     )
 
     def _is_derived(multiplier: str) -> bool:
@@ -372,18 +372,33 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Format locants
     locant_str = ",".join(str(loc) for loc in sorted(locants))
 
-    # Check if prefix is a compound substituent needing parentheses (P-16.3.3)
-    compound = needs_brackets(prefix_form)
+    # Check if prefix is a compound substituent needing parentheses (P-16.3.3).
+    # A prefix that already carries inner enclosing marks but is not itself
+    # fully wrapped (e.g. '(methylcarbamoyl)amino', the N-substituted urea
+    # prefix, W2F-P6) is compound and needs an ESCALATED outer enclosure
+    # ('[(methylcarbamoyl)amino]') per the P-16.3.3 nesting order (( ) -> [ ]).
+    _partially_enclosed = (
+        (')' in prefix_form or ']' in prefix_form)
+        and not (prefix_form.startswith(('(', '['))
+                 and prefix_form.endswith((')', ']')))
+    )
+    compound = needs_brackets(prefix_form) or _partially_enclosed
+
+    def _enclose(_p: str) -> str:
+        # Auto-detect nesting depth (P-16.3.3): no inner marks -> '(p)';
+        # already contains '()' -> '[p]'. Byte-identical to the previous
+        # hard-coded '(p)' for prefixes without inner enclosing marks.
+        return apply_enclosing_marks(_p, -1)
 
     # Get multiplier if multiple instances
     if count > 1:
         multiplier = get_multiplier_prefix(count, prefix_form)
         if compound or _is_derived(multiplier):
-            return f"{locant_str}-{multiplier}({prefix_form})"
+            return f"{locant_str}-{multiplier}{_enclose(prefix_form)}"
         return f"{locant_str}-{multiplier}{prefix_form}"
 
     if compound:
-        return f"{locant_str}-({prefix_form})"
+        return f"{locant_str}-{_enclose(prefix_form)}"
     return f"{locant_str}-{prefix_form}"
 
 
@@ -2089,9 +2104,33 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 if not _fg_ms:
                     continue
                 for _fg_m in _fg_ms:
-                    if set(_fg_m) and _sub_set.issubset(set(_fg_m)):
+                    _fg_set = set(_fg_m)
+                    if not _fg_set:
+                        continue
+                    if _sub_set.issubset(_fg_set):
                         _skip_fg_branch = True
                         break
+                    # W2F-P6 (P-66.1.6.1.1.3): when the urea/thiourea DISTAL N is
+                    # substituted (-NH-CO-NHR), the R atoms lie OUTSIDE the
+                    # 4-atom [NX3][CX3](=O)[NX3] match, so branch-subset-of-match
+                    # fails. The whole branch is still named by the
+                    # '(R-carbamoyl)amino' FG prefix emitted by the FG loop; also
+                    # skip when the urea match is fully INSIDE this branch and a
+                    # urea atom is directly chain-attached (the extra branch
+                    # atoms are then necessarily the distal substituents).
+                    # Without this the branch is re-walked by
+                    # _check_for_acylamino -> a spurious 'methanoylamino'
+                    # co-prefix on the same locant (a wrong, OPSIN-unparseable
+                    # molecule).
+                    if (_fg_nm in ('urea', 'thiourea')
+                            and _fg_set.issubset(_sub_set)):
+                        _cs_guard = (set(features.principal_chain)
+                                     if features.principal_chain else set())
+                        if any(_nbg.GetIdx() in _cs_guard
+                               for _ua in _fg_set
+                               for _nbg in mol.GetAtomWithIdx(_ua).GetNeighbors()):
+                            _skip_fg_branch = True
+                            break
                 if _skip_fg_branch:
                     break
             if _skip_fg_branch:
