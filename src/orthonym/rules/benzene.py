@@ -17,6 +17,7 @@ IUPAC 2013 PIN Rules:
 - benzamide = retained name for C6H5CONH2 (P-66.1.1.1)
 """
 
+import re
 from typing import Dict, List, Tuple, Optional, Set
 from collections import defaultdict, deque
 from rdkit import Chem
@@ -1655,8 +1656,14 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
         if nbr_symbol == 'O' and nbr.GetTotalNumHs() >= 1:
             return {'name': 'hydroperoxy', 'atoms': [o_idx, nbr.GetIdx()]}
 
-        # Alkoxy (-O-C...): methoxy, ethoxy, propoxy, etc.
-        if nbr_symbol == 'C':
+        # Alkoxy (-O-C...): methoxy, ethoxy, propoxy, etc. An ARYLOXY
+        # (-O-aromatic-ring-C) is NOT an alkoxy — route it to Case 1 below so a
+        # bare ring gives 'phenoxy' and a decorated ring is built by the
+        # substituted-aryloxy path (P-45.6). Without this guard _collect_pure_alkyl
+        # greedily walks the aromatic ring as if it were a chain
+        # (4-ethylphenoxy -> 'octoxy', a structure-dropping name suppressed to
+        # 'unknown' by the validity gate).
+        if nbr_symbol == 'C' and not (nbr.GetIsAromatic() and nbr.IsInRing()):
             c_atom = nbr
             # Collect the alkyl part
             alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, c_atom.GetIdx(), ring_atoms | {o_idx})
@@ -3941,9 +3948,11 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
             last_char = result[-1]
             first_char = current[0]
 
-            # Hyphen needed between alpha/paren and digit
-            # e.g., "1-(N,N-dimethylamino)" + "4-amino" needs hyphen after ")"
-            if (last_char.isalpha() or last_char == ')') and first_char.isdigit():
+            # Hyphen needed between alpha/closing-mark and digit
+            # e.g. "1-(N,N-dimethylamino)" + "4-amino" needs a hyphen after ")";
+            # likewise after a bracket/brace-closed complex prefix
+            # ("1-[4-(1-chloroethyl)phenoxy]" + "4-methyl", P-45.6).
+            if (last_char.isalpha() or last_char in ')]}') and first_char.isdigit():
                 result += "-"
 
         result += current
@@ -4007,6 +4016,110 @@ def _select_benzene_parent_ring(mol) -> Optional[Tuple[int, ...]]:
     return min(benzene_rings, key=_key)
 
 
+def _benzene_parent_candidates(mol) -> List[Tuple[int, ...]]:
+    """The benzene rings that tie for the parent role after the structure-derived
+    pre-filter of ``_select_benzene_parent_ring`` (carbon-linked, then greater
+    substituent count).
+
+    A single-benzene molecule returns its lone ring (so naming is byte-identical
+    to the old single-parent path). When two or more benzene rings tie — the
+    P-45.5 diaryl-linked-by-heteroatom class (e.g. a stereo-differing diaryl
+    ether) — ALL tied rings are returned so ``name_benzene_derivative`` can name
+    each candidate and select the preferred parent by the alphanumerical order of
+    the complete names (P-45.5.1) with the 'R' < 'S' tie-break (P-45.6.3). The
+    canonical-rank total order that formerly broke the tie is retained only as a
+    defensive last resort inside the name comparison.
+    """
+    benzene_rings = [r for r in mol.GetRingInfo().AtomRings()
+                     if is_benzene_ring(mol, r)]
+    if len(benzene_rings) <= 1:
+        return benzene_rings
+
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    def _carbon_linked(ring: Tuple[int, ...]) -> bool:
+        ring_set = set(ring)
+        for a in ring:
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nbr.GetIdx() not in ring_set and nbr.GetSymbol() == 'C':
+                    return True
+        return False
+
+    def _substituent_count(ring: Tuple[int, ...]) -> int:
+        ring_set = set(ring)
+        return sum(
+            1 for a in ring
+            for nbr in mol.GetAtomWithIdx(a).GetNeighbors()
+            if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1
+        )
+
+    def _tier(ring: Tuple[int, ...]):
+        return (0 if _carbon_linked(ring) else 1, -_substituent_count(ring))
+
+    best_tier = min(_tier(r) for r in benzene_rings)
+    tied = [r for r in benzene_rings if _tier(r) == best_tier]
+    # deterministic order for the defensive fallback (canonical-rank tuple)
+    tied.sort(key=lambda r: tuple(sorted(ranks[a] for a in r)))
+    return tied
+
+
+_STEREO_PAREN_BLOCK_RE = re.compile(r'\((\d*[RSEZ*](?:,\d*[RSEZ*])*)\)')
+
+
+def _alphanumerical_name_key(name: str):
+    """P-45.5.1 / P-45.6.3 preference key for choosing between candidate parent
+    names of a diaryl-linked scaffold.
+
+    Returns ``(letters, locants, stereo)`` so ``min`` selects the preferred PIN:
+      * ``letters`` — the Roman letters in order of appearance, lowercased, with
+        stereodescriptor blocks removed (P-14.5 / line 3446: stereodescriptors are
+        NOT part of the alphanumerical comparison) — P-45.5.1 primary;
+      * ``locants`` — the numeric locants in order of appearance — P-45.5.1
+        secondary (compared only when the letters are identical);
+      * ``stereo`` — the 'R'/'S' descriptor letters in order of appearance
+        ('R' < 'S') — P-45.6.3 final tie-break, applied only when letters and
+        locants are identical (the constitution-symmetric stereo-differing case).
+    """
+    stereo = tuple(
+        ch for block in _STEREO_PAREN_BLOCK_RE.findall(name)
+        for ch in block if ch in 'RS'
+    )
+    core = _STEREO_PAREN_BLOCK_RE.sub('', name)
+    letters = ''.join(ch.lower() for ch in core if ch.isalpha())
+    locants = tuple(int(m) for m in re.findall(r'\d+', core))
+    return (letters, locants, stereo)
+
+
+def _preferred_benzene_parent_ring(mol):
+    """Name each candidate parent benzene ring and return the (ring, name) whose
+    complete name is preferred by P-45.5.1 (alphanumerical order) with the
+    P-45.6.3 'R' < 'S' tie-break. Single-benzene molecules return their lone
+    (ring, name). Returns None when no benzene ring can be named.
+
+    This is the single authority for the diaryl-linked-by-heteroatom parent
+    choice (P-45.5 / P-45.6): both ``name_benzene_derivative`` and the main
+    namer dispatch consult it, so the pipeline names exactly the ring this
+    selects. The comparison is over the NAME STRINGS (structure-derived, so
+    deterministic — never atom-order-dependent).
+    """
+    candidates = _benzene_parent_candidates(mol)
+    if not candidates:
+        return None
+    scored = []
+    for ring_atoms in candidates:
+        substituents = get_benzene_substituents(mol, ring_atoms)
+        if not substituents:
+            nm = "benzene"
+        else:
+            oriented_ring = orient_benzene(mol, ring_atoms, substituents)
+            nm = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
+        if nm:
+            scored.append((ring_atoms, nm))
+    if not scored:
+        return None
+    return min(scored, key=lambda rn: _alphanumerical_name_key(rn[1]))
+
+
 def name_benzene_derivative(mol) -> Optional[str]:
     """
     Generate name for a benzene derivative.
@@ -4019,21 +4132,9 @@ def name_benzene_derivative(mol) -> Optional[str]:
     Returns:
         IUPAC name string, or None if not a benzene derivative
     """
-    # Find benzene ring (deterministic parent-ring choice when >1 benzene ring;
-    # v22 C-T2 / V-3 — see _select_benzene_parent_ring).
-    ring_atoms = _select_benzene_parent_ring(mol)
-    if ring_atoms is None:
+    # Preferred parent benzene ring (P-45.5.1 / P-45.6.3 for diaryl scaffolds;
+    # the lone ring for a single-benzene molecule).
+    preferred = _preferred_benzene_parent_ring(mol)
+    if preferred is None:
         return None
-
-    # Get substituents
-    substituents = get_benzene_substituents(mol, ring_atoms)
-
-    if not substituents:
-        # Unsubstituted benzene - should be caught by retained names
-        return "benzene"
-
-    # Orient the ring for lowest locants
-    oriented_ring = orient_benzene(mol, ring_atoms, substituents)
-
-    # Generate systematic name
-    return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
+    return preferred[1]

@@ -2510,15 +2510,26 @@ class Orthonym:
                     # parent ring deterministically (carbon-linked preference +
                     # canonical rank). Single-benzene and PCG-bearing rings are
                     # left to the existing principal-ring selection.
-                    from .rules.benzene import _select_benzene_parent_ring
+                    from .rules.benzene import (
+                        _select_benzene_parent_ring, _preferred_benzene_parent_ring,
+                    )
                     _benzene_rings = [
                         r for r in features.mol.GetRingInfo().AtomRings()
                         if is_benzene_ring(features.mol, r)
                     ]
                     if len(_benzene_rings) > 1 and not features.principal_group:
-                        _bz = _select_benzene_parent_ring(features.mol)
-                        if _bz is not None:
-                            features.principal_ring = _bz
+                        # P-45.5.1 / P-45.6.3 (diaryl-linked-by-heteroatom):
+                        # pick the parent whose COMPLETE name is preferred by
+                        # alphanumerical order (R<S tie-break), naming each tied
+                        # candidate. Falls back to the structure-only selector
+                        # when the name-based choice is unavailable.
+                        _pref = _preferred_benzene_parent_ring(features.mol)
+                        if _pref is not None:
+                            features.principal_ring = _pref[0]
+                        else:
+                            _bz = _select_benzene_parent_ring(features.mol)
+                            if _bz is not None:
+                                features.principal_ring = _bz
                     features.benzene_ring = features.principal_ring
                     features.benzene_substituents = get_benzene_substituents(
                         features.mol, features.principal_ring
