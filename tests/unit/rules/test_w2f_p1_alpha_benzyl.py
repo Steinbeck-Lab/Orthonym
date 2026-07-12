@@ -53,3 +53,61 @@ class TestCitationLayerEscalation:
         from orthonym.assembly.naming_utils import format_substituent_prefix
         assert format_substituent_prefix("furo[3,2-b]pyridin-2-yl", [4], 1) == \
             "4-(furo[3,2-b]pyridin-2-yl)"
+
+
+@pytest.mark.unit
+class TestAlphaHaloBenzylEndToEnd:
+    """Task 8: research §3.D buildable rows (all OPSIN-verified)."""
+
+    def test_curated_target(self):
+        assert name_compound("Brc1ccc(C(Br)c2ccccc2)cc1") == \
+            "1-bromo-4-[bromo(phenyl)methyl]benzene"
+
+    def test_pcg_parent_benzoic_acid(self):
+        # P-44.1: the acid fixes the parent outright — no ring-choice question
+        assert name_compound("OC(=O)c1ccc(C(Cl)c2ccccc2)cc1") == \
+            "4-[chloro(phenyl)methyl]benzoic acid"
+
+    def test_mixed_halogens_alpha_f_ring_br(self):
+        # 'bromo' cited first on the parent (b < f)
+        assert name_compound("FC(c1ccccc1)c1ccc(Br)cc1") == \
+            "1-bromo-4-[fluoro(phenyl)methyl]benzene"
+
+    def test_interleave_ring_yl_first_keeps_parens(self):
+        # '(4-bromophenyl)' sorts as 'bromophenyl' < 'chloro' -> cited FIRST
+        # but LOCANT-BEARING so it KEEPS its parens (P-16.5.1.3.1 "unless it
+        # includes a locant")
+        assert name_compound("OC(=O)c1ccc(C(Cl)c2ccc(Br)cc2)cc1") == \
+            "4-[(4-bromophenyl)(chloro)methyl]benzoic acid"
+
+    def test_gem_dichloro_different_rings(self):
+        # rings DIFFER -> substitutive IS the PIN; 'dichloro' sorts as
+        # 'chloro' (multiplying prefix ignored for alphanumerical order)
+        assert name_compound("Clc1ccc(C(Cl)(Cl)c2ccccc2)cc1") == \
+            "1-chloro-4-[dichloro(phenyl)methyl]benzene"
+
+    def test_gem_mixed_halogens(self):
+        # first-cited 'chloro' bare; every further prefix parenthesized
+        assert name_compound("Brc1ccc(C(F)(Cl)c2ccccc2)cc1") == \
+            "1-bromo-4-[chloro(fluoro)(phenyl)methyl]benzene"
+
+
+@pytest.mark.unit
+class TestAlphaHaloBuilderDirect:
+    """Task 8: producer level — the builder emits the BARE compound prefix
+    (the Task-6 citation layer owns the outer bracket)."""
+
+    def test_builder_emits_bare_compound_prefix(self):
+        from orthonym.rules.ring_substituents import name_ring_system_substituent
+        mol = Chem.MolFromSmiles("Brc1ccc(C(Br)c2ccccc2)cc1")
+        # fragment seen from the Br-ring parent: CH(5) + Br(6) + phenyl(7-12)
+        frag = [5, 6, 7, 8, 9, 10, 11, 12]
+        assert name_ring_system_substituent(mol, frag, 5) == \
+            "bromo(phenyl)methyl"
+
+    def test_builder_undecorated_byte_identical(self):
+        from orthonym.rules.ring_substituents import name_ring_system_substituent
+        mol = Chem.MolFromSmiles("C(c1ccccc1)c1ccccn1")
+        # retained-benzyl gate (:1294) untouched for bare-phenyl fragments
+        assert name_ring_system_substituent(mol, [0, 1, 2, 3, 4, 5, 6], 0) == \
+            "benzyl"

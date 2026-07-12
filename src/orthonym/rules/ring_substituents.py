@@ -1215,7 +1215,35 @@ def _compound_ring_on_chain_substituent(
                 continue
             ring_substituent_atoms.add(ni)
     frag_ring_atoms = set(frag_ring_atoms) | ring_substituent_atoms
-    carrier = frag_set - frag_ring_atoms
+    raw_carrier = frag_set - frag_ring_atoms
+    # w2f p1 (P-29.6.2.1, BB 16322 'bromo(4-methylphenyl)methyl (preferred
+    # prefix)'): an α-HALOGEN on the carrier is a carrier DECORATION cited
+    # as a prefix, not a carrier atom (it used to land in `carrier` and
+    # fail the all-carbon guard at the return-None below). v1 whitelist:
+    # halogens ONLY — compulsory prefix-only groups (Table 5.1), valence-1,
+    # locant-free on a mononuclear carrier; they can never re-parent the
+    # substituent nor form a PCG. Everything else (nitro / OH / NH2 / =O)
+    # stays fail-closed or is owned by parent selection (research §3.C).
+    _halogen_z = {9, 17, 35, 53}
+    decorations = set()
+    for _a in raw_carrier:
+        _atom = mol.GetAtomWithIdx(_a)
+        if _atom.GetAtomicNum() not in _halogen_z:
+            continue
+        if _atom.GetDegree() != 1 or _atom.GetFormalCharge() != 0:
+            continue
+        _bond = _atom.GetBonds()[0]
+        _nbr = _bond.GetOtherAtom(_atom)
+        if (_bond.GetBondTypeAsDouble() == 1.0
+                and _nbr.GetIdx() in raw_carrier
+                and _nbr.GetSymbol() == 'C'):
+            decorations.add(_a)
+    carrier = raw_carrier - decorations
+    if decorations and (len(carrier) != 1 or len(decorations) > 2):
+        # v1: decorated MONONUCLEAR carriers with 1-2 halogens only (the
+        # P-29.6.2.1 benzylic α class). Decorated LONGER carriers need
+        # decoration locants — not built; stays fail-closed as today.
+        return None
     # Guards: all-carbon, fully SATURATED, undecorated carrier; attach is a
     # carrier atom. The saturation guard is load-bearing: get_alkyl_name
     # cannot express -ene/-yne, so an unsaturated carrier here silently
@@ -1259,10 +1287,33 @@ def _compound_ring_on_chain_substituent(
                 ring_side_atoms.append(n.GetIdx())
     if len(ring_attach_positions) != 1:
         return None
-    # No stray decorations: every fragment atom is carrier or ring (ring
-    # substituents were folded into frag_ring_atoms at function entry).
-    if carrier | frag_ring_atoms != frag_set:
+    # Coverage: every fragment atom is carrier, ring (ring substituents
+    # were folded into frag_ring_atoms at function entry), or an admitted
+    # α-halogen decoration (w2f p1) — anything else declines.
+    if carrier | frag_ring_atoms | decorations != frag_set:
         return None
+    if decorations:
+        # P-45.1.1 identical-units decline (research §3.C.4 — LOAD-BEARING,
+        # the item's #1 hazard): when the in-fragment ring unit equals the
+        # parent side, the PIN is MULTIPLICATIVE
+        # (1,1'-(dichloromethylene)dibenzene). Shapes name_multiplicative
+        # CAN build never reach here (dispatch @900); shapes it cannot yet
+        # build (gem-dihalo, classifier requires 1 sub + 1 H) MUST
+        # refuse — the substitutive '[dichloro(phenyl)methyl]benzene' is
+        # RT-valid but non-PIN (a SELF-01-invisible wrong name, leak proof
+        # research §3.D).
+        from rdkit import Chem
+        try:
+            _unit_a = Chem.MolFragmentToSmiles(
+                mol, atomsToUse=sorted(frag_ring_atoms))
+            _complement = [a.GetIdx() for a in mol.GetAtoms()
+                           if a.GetIdx() not in frag_set]
+            _unit_b = Chem.MolFragmentToSmiles(mol, atomsToUse=_complement)
+            if (not _unit_a or not _unit_b
+                    or Chem.CanonSmiles(_unit_a) == Chem.CanonSmiles(_unit_b)):
+                return None
+        except Exception:
+            return None
     ring_name = name_ring_system_substituent(
         mol, sorted(frag_ring_atoms), ring_side_atoms[0]
     )
@@ -1276,6 +1327,51 @@ def _compound_ring_on_chain_substituent(
     if not alkyl:
         return None
     loc = ring_attach_positions[0]
+    if decorations:
+        # w2f p1 (P-29.6.2.1 / P-16.5.1.3.1, BB 7272): cite ALL carrier
+        # substituents (halo prefixes + ring-yl) in ONE alphanumerical
+        # sequence by the letters-only key; first-cited bare UNLESS it
+        # includes a locant; every further item parenthesized; multiplying
+        # prefixes outside parens. OPSIN-verified surfaces (research §3.D):
+        # bromo(phenyl)methyl / dichloro(phenyl)methyl /
+        # chloro(fluoro)(phenyl)methyl / (4-bromophenyl)(chloro)methyl.
+        # An α-decorated carrier NEVER takes retained 'benzyl' (P-29.6.2.1:
+        # any α-substitution kills the retained form in PINs) — the tail
+        # below (incl. the benzyl gate) is unreachable from here.
+        from collections import Counter
+        from ..assembly.naming_utils import alpha_sort_key
+        _halo_name = {9: 'fluoro', 17: 'chloro', 35: 'bromo', 53: 'iodo'}
+        _halo_counts = Counter(
+            _halo_name[mol.GetAtomWithIdx(_d).GetAtomicNum()]
+            for _d in decorations
+        )
+        if any(_k > 1 for _k in _halo_counts.values()) and \
+                any(_ch.isdigit() for _ch in ring_name):
+            # gem-dihalo + locant-bearing ring-yl: no OPSIN-verified
+            # surface (research §3.C.5) — refuse rather than guess.
+            return None
+        _items = []
+        for _hname, _k in _halo_counts.items():
+            _rendered = _hname if _k == 1 else f'di{_hname}'
+            _items.append((alpha_sort_key(_rendered), _rendered, False))
+        _items.append((alpha_sort_key(ring_name), ring_name, True))
+        _items.sort(key=lambda _t: _t[0])
+        _parts = []
+        for _pos_i, (_key, _rendered, _is_ring) in enumerate(_items):
+            if _pos_i == 0:
+                # first-cited: bare unless it includes a locant
+                _parts.append(f'({_rendered})'
+                              if any(_ch.isdigit() for _ch in _rendered)
+                              else _rendered)
+            else:
+                if not _is_ring and _rendered.startswith('di'):
+                    return None  # unreachable in v1 scope; fail closed
+                _parts.append(f'({_rendered})')
+        # Returned BARE (no spaces -> passes the space-guard); the citation
+        # layer (naming_utils.format_substituent_prefix, Task 6) escalates
+        # the outer mark to brackets (P-16.5.2.4). Mononuclear carrier
+        # cites no locant.
+        return f"{''.join(_parts)}{alkyl}"
     # P-16.3.3: enclose the ring-yl in marks only when it is itself complex
     # (carries locants/parens, e.g. '(naphthalen-2-yl)methyl'); a simple ring-yl
     # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained

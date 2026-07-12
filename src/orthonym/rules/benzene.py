@@ -1053,9 +1053,18 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
                     from ..assembly.naming_utils import needs_brackets
                     prefix_name = name_substituent(mol, set(sub_atoms), start_idx)
                     if prefix_name and prefix_name != "substituent":
-                        # Wrap in parentheses if compound name per IUPAC P-14.5.2
+                        # Wrap MARKLESS compound names in parentheses per IUPAC
+                        # P-14.5.2. w2f p1 (research §3.C.6): a name already
+                        # carrying an enclosing mark ('(4-bromophenyl)(chloro)
+                        # methyl') must NOT take plain parens here — the naive
+                        # startswith('(')/endswith(')') test misfires on
+                        # interior/trailing-stem marks (the non-PIN '((...)...)'
+                        # parens-in-parens). Left BARE, the escalating consumer
+                        # (format_substituent_prefix / _omit branch) applies the
+                        # P-16.5.2.4 brackets '[(4-bromophenyl)(chloro)methyl]'.
                         is_compound = needs_brackets(prefix_name)
-                        if is_compound and not (prefix_name.startswith('(') and prefix_name.endswith(')')):
+                        if (is_compound and '(' not in prefix_name
+                                and '[' not in prefix_name):
                             prefix_name = f'({prefix_name})'
                         return {
                             'name': prefix_name,
@@ -2259,11 +2268,18 @@ def _identify_functionalized_chain(mol, start_idx: int, ring_atoms: Set[int]) ->
         # Cannot produce a valid name; return None so caller can handle gracefully
         return None
 
-    # Wrap compound substituent names in parentheses per IUPAC P-14.5.2
-    # e.g., "hydroxymethyl" -> "(hydroxymethyl)", "carboxymethyl" -> "(carboxymethyl)"
+    # Wrap MARKLESS compound substituent names in parentheses per IUPAC
+    # P-14.5.2: "hydroxymethyl" -> "(hydroxymethyl)". w2f p1 (research §3.C.6):
+    # a name that ALREADY carries an enclosing mark ('(4-bromophenyl)(chloro)
+    # methyl', '(oxan-2-yl)oxy') must NOT take plain parens here — the naive
+    # startswith('(')/endswith(')') test misfires on interior/trailing-stem
+    # marks and produced the non-PIN parens-in-parens '((...)...)'. Left BARE,
+    # it flows to the escalating consumers (format_substituent_prefix / the
+    # _omit branch), which apply P-16.5.2.4 brackets ('[(4-bromophenyl)(chloro)
+    # methyl]').
     from ..assembly.naming_utils import needs_brackets
     is_compound = needs_brackets(sub_name)
-    if is_compound and not (sub_name.startswith('(') and sub_name.endswith(')')):
+    if is_compound and '(' not in sub_name and '[' not in sub_name:
         sub_name = f'({sub_name})'
 
     return {
