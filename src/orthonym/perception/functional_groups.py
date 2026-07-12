@@ -87,6 +87,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (R-C(=NR')-O-R'') deferred to Phase 163.1 per Open Question 4. Free imidic acid form
     # (R-C(=NH)-OH) deferred per CONTEXT line 120. Cyclic imidates deferred per RESEARCH §5.4.
     "iminoester": "[CX3](=[NX2H1])[OX2][#6]",     # R-C(=NH)-O-R' (P-65.1.7; "alkyl alkanimidate")
+    # W2F-P6 (P-66.1.6.1.2.1): N-substituted carbamimidate ester
+    # R''2N-C(=NR')-O-R -> "R N'-R'-N,N-R''2-carbamimidate". A DEDICATED pattern
+    # (imino N-substitution ALLOWED, plus a REQUIRED second amino N) so the
+    # restricted [NX2H1] iminoester pattern above stays untouched (its
+    # AUDIT-FRN 2.4 =NH guard holds). Atom order: (central_C, imino_N, amino_N,
+    # ester_O, alkyl_C).
+    "carbamimidate": "[CX3](=[NX2])([NX3])[OX2][#6]",  # R''2N-C(=NR')-O-R (P-66.1.6.1.2.1)
     # Imidic acid R-C(=NH)-OH (P-65.1.3.1 / Table 4.3 'imidic acid'); the
     # [#6] guard keeps N=C(O)O / N=C(N)O on the exact-SMILES
     # carbonimidic/carbamimidic inorganic-acid entries.
@@ -562,6 +569,19 @@ def _resolve_fg_collisions(results):
         # cascade discipline; imine/primary_amine suppress the =NH from being double-claimed;
         # ether suppresses the -O-C portion from being double-claimed.
         ('iminoester', ['ester', 'imine', 'primary_amine', 'ether']),
+        # W2F-P6 (P-66.1.6.1.2.1): the N-substituted carbamimidate ester
+        # R''2N-C(=NR')-O-R owns its whole -O-C(=N-)-N unit. Suppress the
+        # constituent ester (O-C), imine/amine (the two N's), and ether reads so
+        # they are not double-claimed. Also suppress the FALSE-POSITIVE amidine
+        # match: a C bearing =N + N + an ester -O-C is a carbamimidate ESTER,
+        # not a plain amidine (amidine is R-C(=NH)-NH2, no O). This makes the
+        # imidate handler win over the amidine namer for the N-substituted case
+        # (the unsubstituted case already routes via iminoester, which outranks
+        # amidine in SENIORITY_ORDER). Atom-overlap-scoped -> a separate amidine
+        # elsewhere is untouched.
+        ('carbamimidate', ['ester', 'imine', 'primary_amine',
+                           'secondary_amine', 'tertiary_amine', 'ether',
+                           'amidine']),
         # Phase 163 Tier FRN-E: chalcogen-ester suppressions (AUDIT-FRN § 2.5 + RESEARCH §3.5).
         # Note: Tier FRN-A suppressions at lines above already declared
         # ('selenoic_Se_acid', ['selenol', 'selenoester', 'thioester']) and
