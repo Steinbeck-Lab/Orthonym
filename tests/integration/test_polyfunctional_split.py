@@ -227,3 +227,50 @@ class TestNarrowDefaultOnP6563:
         # anchored filter empty -> byte-identical continue; composer acyloxy
         # path keeps ownership.
         assert name_compound("OC(=O)CCOC(=O)C") == "3-(acetyloxy)propanoic acid"
+
+
+@pytest.mark.integration
+class TestAcylSulfanylWholeMolecule:
+    """W2F-P2 Task 4: P-35.5.1 whole-molecule anchors (all expected names
+    OPSIN-2.9-verified 2026-07-11, research P-35.5.1 §D)."""
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles,expected", [
+        # curated target, brief item 7 (acetylsulfanyl < oxo, P-14.5.2)
+        ("CC(=O)SC(=O)CCCCCCCC(=O)O", "9-(acetylsulfanyl)-9-oxononanoic acid"),
+        # thioether-prefix leg ALONE (thioester carbonyl off-chain, no split)
+        ("CC(=O)SCCCCCCCC(=O)O", "8-(acetylsulfanyl)octanoic acid"),
+        ("CCC(=O)SCCC(=O)O", "3-(propanoylsulfanyl)propanoic acid"),
+        # genuine-alkyl split sibling (BB 31946 parallel); GS-ON preview OK at HEAD
+        ("CCSC(=O)CCC(=O)O", "4-(ethylsulfanyl)-4-oxobutanoic acid"),
+    ])
+    def test_thioester_class(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    def test_benzoylsulfanyl_whole_molecule(self):
+        # Conditional gold W2F-P2-09: the prefix builder is proven at unit
+        # level; if the assembly routes this ring-bearing molecule elsewhere
+        # and refuses, record the deviation and DROP the gold (fail-closed
+        # beats forcing). Do NOT weaken the assert to make it pass.
+        assert name_compound("O=C(c1ccccc1)SCCC(=O)O") == "3-(benzoylsulfanyl)propanoic acid"
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles", [
+        "OCC(=O)SCCC(=O)O",   # substituted acyl -> v1 refuses (research §E Q4)
+        "CC(=O)SC(=O)C",      # symmetric thioanhydride: class = anhydride
+                              # (P-65.7.3), no free acid -> substitutive naming
+                              # would be WRONG-class; thioanhydride namer not
+                              # built -> must refuse
+    ])
+    def test_fail_closed_boundaries(self, smiles, monkeypatch):
+        # These molecules fail-close via the PRODUCTION OPSIN validity gate /
+        # per-split RT gate. The autouse test fixture disables the validity gate
+        # for speed; re-enable it so the assertion sees the real production
+        # refusal instead of a gate-off raw leak.
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        assert name_compound(smiles) == "unknown organic compound"

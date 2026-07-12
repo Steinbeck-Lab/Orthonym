@@ -803,3 +803,84 @@ class TestAlkoxycarbonylChainMembership:
         # Guard-2 block (incl. the new guard) is skipped (chain_set falsy).
         mol, m = self._ester_match("COC(=O)CCC(=O)O")
         assert get_alkoxycarbonyl_prefix(mol, m, principal_chain=None) == "methoxycarbonyl"
+
+
+@pytest.mark.unit
+class TestAcylOnChalcogenSulfanyl:
+    """W2F-P2 Task 4 (P-35.5.1 BB 18128 + P-65.1.7.2.1): CH3-CO-S- is
+    'acetylsulfanyl'. The alkyl counter previously collapsed the acyl C=O into
+    the alkyl count ('ethylsulfanyl' = a constitutionally different molecule).
+    v1 scope: unsubstituted LINEAR alkanoyl (retained formyl/acetyl +
+    systematic alkanoyl via rules/acid_halides._build_acyl_name) + benzoyl;
+    everything else fail-closed (None)."""
+
+    def _thioether_atoms(self, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        pat = Chem.MolFromSmarts("[SX2]([#6])[#6]")
+        matches = mol.GetSubstructMatches(pat)
+        assert matches
+        return mol, matches[0]
+
+    def test_acetylsulfanyl_s_on_chain(self):
+        # CC(=O)SCCCCCCCC(=O)O: perception chain [4..10] (probed 2026-07-11)
+        mol, m = self._thioether_atoms("CC(=O)SCCCCCCCC(=O)O")
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[4, 5, 6, 7, 8, 9, 10])
+        assert result == "acetylsulfanyl", f"got {result!r}"
+
+    def test_acetylsulfanyl_evidence_in_chain_carbonyl(self):
+        # CC(=O)SC(=O)CCCCCCCC(=O)O: chain [4,6..12]; sub side = acetyl C1
+        mol, m = self._thioether_atoms("CC(=O)SC(=O)CCCCCCCC(=O)O")
+        result = get_sulfanyl_prefix(
+            mol, m, principal_chain=[4, 6, 7, 8, 9, 10, 11, 12]
+        )
+        assert result == "acetylsulfanyl", f"got {result!r}"
+
+    def test_propanoylsulfanyl_systematic(self):
+        # CCC(=O)SCCC(=O)O: atoms C0 C1 C2(=O3) S4 C5 C6 C7(=O8)O9
+        mol, m = self._thioether_atoms("CCC(=O)SCCC(=O)O")
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[5, 6])
+        assert result == "propanoylsulfanyl", f"got {result!r}"
+
+    def test_benzoylsulfanyl_plain_phenyl(self):
+        # O=C(c1ccccc1)SCCC(=O)O: O0=C1(ring 2-7) S8 C9 C10 C11(=O12)O13
+        mol, m = self._thioether_atoms("O=C(c1ccccc1)SCCC(=O)O")
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[9, 10])
+        assert result == "benzoylsulfanyl", f"got {result!r}"
+
+    def test_formylsulfanyl_retained_n1(self):
+        # O=CSCCC(=O)O: O0=C1 S2 C3 C4 C5(=O6)O7 ('3-(formylsulfanyl)propanoic
+        # acid' OPSIN-verified 2026-07-11)
+        mol, m = self._thioether_atoms("O=CSCCC(=O)O")
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[3, 4])
+        assert result == "formylsulfanyl", f"got {result!r}"
+
+    def test_substituted_acyl_fail_closed(self):
+        # 2-hydroxyacetyl: heteroatom inside the acyl -> v1 refuses (P-65.1.7.2.1
+        # 'acetyl' cannot be chain-extended; substituted-acyl assembly out of v1)
+        mol, m = self._thioether_atoms("OCC(=O)SCCC(=O)O")
+        assert get_sulfanyl_prefix(mol, m, principal_chain=[5, 6]) is None
+
+    def test_thioacyl_fail_closed(self):
+        # C(=S) on the S-side (dithioester): ethanethioyl not built -> None
+        # (was a wrong collapsed alkyl string; a clean refusal is strictly safer)
+        mol, m = self._thioether_atoms("CC(=S)SCCC(=O)O")
+        assert get_sulfanyl_prefix(mol, m, principal_chain=[4, 5]) is None
+
+    def test_branched_acyl_fail_closed(self):
+        # 2-methylpropanoyl (branched) -> v1 refuses
+        mol, m = self._thioether_atoms("CC(C)C(=O)SCCC(=O)O")
+        assert get_sulfanyl_prefix(mol, m, principal_chain=[6, 7]) is None
+
+    def test_selanyl_acyl_fail_closed(self):
+        # acylselanyl spellings not OPSIN-verified -> v1 refuses for Se/Te
+        mol = Chem.MolFromSmiles("CC(=O)[Se]CCC(=O)O")
+        pat = Chem.MolFromSmarts("[SeX2]([#6])[#6]")
+        m = mol.GetSubstructMatches(pat)[0]
+        assert get_sulfanyl_prefix(mol, m, principal_chain=[4, 5], suffix="selanyl") is None
+
+    def test_plain_alkyl_unchanged(self):
+        # No =O/=S on the sub-carbon -> the alkyl path is byte-identical
+        mol, m = self._thioether_atoms("CSCCC(=O)O")
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[2, 3])
+        assert result == "methylsulfanyl", f"got {result!r}"

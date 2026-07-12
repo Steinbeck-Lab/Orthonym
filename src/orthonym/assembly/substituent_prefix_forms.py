@@ -306,6 +306,14 @@ def get_alkoxycarbonyl_prefix(
     if chain_set and ester_o is not None:
         c_on_chain = carbonyl_c in chain_set
         o_on_chain = ester_o in chain_set
+        if c_on_chain:
+            # W2F-P2 (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
+            # ester carbonyl is expressed substitutively as oxo + alkoxy on the
+            # acid parent ('5-butoxy-2-methyl-5-oxopentanoic acid'), never as
+            # R-oxycarbonyl (double-counts the carbonyl carbon = names a
+            # one-carbon-longer homolog). The oxo+alkoxy pair is emitted by the
+            # polyfunctional group-splitting branch (OPSIN-RT gated).
+            return None
         c_adj_chain = c_on_chain or any(
             nbr.GetIdx() in chain_set
             for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
@@ -550,6 +558,101 @@ def get_sulfonyl_prefix(
     return _acid_stem_oxide_prefix(mol, sub_carbon, sulfur_idx, 'sulfonyl')
 
 
+def _acyl_on_chalcogen_name(mol, acyl_c: int, chalcogen_idx: int) -> Optional[str]:
+    """Name the R-CO- group bonded to a chalcogen as an acyl prefix stem
+    (P-35.5.1 'acetylsulfanyl', BB 18128).
+
+    v1 scope (None outside it, fail-closed): the acyl carbon carries exactly
+    one terminal =O, the single chalcogen link, and at most one R; R is either
+    an unsubstituted LINEAR acyclic all-carbon chain -> retained formyl/acetyl
+    or systematic alkanoyl via rules/acid_halides._build_acyl_name
+    (P-65.1.7.2.1) — the single acyl-name authority, NOT a local table — or an
+    unsubstituted phenyl -> retained 'benzoyl' (P-66.6.1.2).
+    """
+    atom = mol.GetAtomWithIdx(acyl_c)
+    if atom.GetSymbol() != "C" or atom.IsInRing():
+        return None
+    oxo = []
+    r_side = []
+    for b in atom.GetBonds():
+        other = b.GetOtherAtom(atom)
+        if other.GetIdx() == chalcogen_idx:
+            if b.GetBondTypeAsDouble() != 1.0:
+                return None
+            continue
+        if (
+            b.GetBondTypeAsDouble() == 2.0
+            and other.GetSymbol() == "O"
+            and other.GetDegree() == 1
+        ):
+            oxo.append(other.GetIdx())
+            continue
+        if b.GetBondTypeAsDouble() in (1.0, 1.5) and other.GetSymbol() == "C":
+            r_side.append(other.GetIdx())
+            continue
+        return None  # =S, N, second O-function, charged O, ... -> fail-closed
+    if len(oxo) != 1 or len(r_side) > 1:
+        return None
+
+    from ..rules.acid_halides import _build_acyl_name  # Pattern-S3 lazy import
+
+    if not r_side:
+        return _build_acyl_name(1)  # H-CO- -> retained 'formyl'
+
+    r0 = mol.GetAtomWithIdx(r_side[0])
+    if r0.GetIsAromatic():
+        # 'benzoyl' iff plain UNSUBSTITUTED benzene (P-66.6.1.2); substituted
+        # aroyl assembly is out of v1 -> None.
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if r0.GetIdx() not in ring or len(ring) != 6:
+                continue
+            if not all(
+                mol.GetAtomWithIdx(i).GetIsAromatic()
+                and mol.GetAtomWithIdx(i).GetSymbol() == "C"
+                for i in ring
+            ):
+                return None
+            for i in ring:
+                for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                    if (
+                        nb.GetIdx() not in ring
+                        and nb.GetIdx() != acyl_c
+                        and nb.GetAtomicNum() > 1
+                    ):
+                        return None
+            return "benzoyl"
+        return None
+
+    # Linear unsubstituted alkanoyl walk (acyclic, pure C, unbranched,
+    # all single bonds). n counts the acyl carbon + the chain carbons.
+    n = 1
+    prev, cur = acyl_c, r_side[0]
+    while True:
+        a = mol.GetAtomWithIdx(cur)
+        if a.GetSymbol() != "C" or a.GetIsAromatic() or a.IsInRing():
+            return None
+        nxt = []
+        for b in a.GetBonds():
+            other = b.GetOtherAtom(a)
+            if other.GetIdx() == prev:
+                if b.GetBondTypeAsDouble() != 1.0:
+                    return None
+                continue
+            if other.GetAtomicNum() <= 1:
+                continue
+            if other.GetSymbol() != "C" or b.GetBondTypeAsDouble() != 1.0:
+                return None
+            nxt.append(other.GetIdx())
+        n += 1
+        if not nxt:
+            break
+        if len(nxt) > 1:
+            return None  # branched -> v1 fail-closed
+        prev, cur = cur, nxt[0]
+    return _build_acyl_name(n)
+
+
 def get_sulfanyl_prefix(
     mol,
     thioether_atoms: tuple,
@@ -609,6 +712,29 @@ def get_sulfanyl_prefix(
         frag1 = _count_fragment_atoms(mol, c1, {sulfur_idx})
         frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
         sub_carbon = c1 if frag1 <= frag2 else c2
+
+    # W2F-P2 (P-35.5.1, BB 18128): acyl-on-chalcogen. When the substituent-side
+    # carbon bears a =O/=S it is an ACYL group (thioester S-side); the alkyl
+    # counter below would collapse the carbonyl into the alkyl count
+    # ('ethylsulfanyl' for CH3-CO-S- — a DIFFERENT molecule). Name it as the
+    # acyl prefix ('acetylsulfanyl') or fail closed.
+    _sub_atom = mol.GetAtomWithIdx(sub_carbon)
+    _dbl_chalc = [
+        b.GetOtherAtom(_sub_atom).GetSymbol()
+        for b in _sub_atom.GetBonds()
+        if b.GetBondTypeAsDouble() == 2.0
+        and b.GetOtherAtom(_sub_atom).GetSymbol() in ("O", "S")
+    ]
+    if _dbl_chalc:
+        if suffix != "sulfanyl" or "S" in _dbl_chalc:
+            # v1: acylselanyl/acyltellanyl spellings and thioacyl (C=S) stems
+            # are not OPSIN-verified -> refuse rather than emit a collapsed
+            # alkyl name (fail-closed, accuracy-first).
+            return None
+        acyl = _acyl_on_chalcogen_name(mol, sub_carbon, sulfur_idx)
+        if not acyl:
+            return None
+        return f"{acyl}{suffix}"
 
     # Count carbons in substituent fragment
     carbon_count = _count_fragment_atoms(
