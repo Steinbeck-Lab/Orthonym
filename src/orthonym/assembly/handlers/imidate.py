@@ -42,10 +42,12 @@ def _is_imidate(features: Any) -> bool:
     exception swallowing.
     """
     fg = getattr(features, 'functional_groups', None) or {}
-    if not fg.get('iminoester'):
+    # W2F-P6 (P-66.1.6.1.2.1): also fire on the N-substituted carbamimidate
+    # ester (dedicated SMARTS; amidine is suppressed on its atoms so pg is None).
+    if not (fg.get('iminoester') or fg.get('carbamimidate')):
         return False
     pg = getattr(features, 'principal_group', None)
-    return pg in (None, 'iminoester')
+    return pg in (None, 'iminoester', 'carbamimidate')
 
 
 def name_imidate(
@@ -70,6 +72,37 @@ def name_imidate(
     """
     from ..candidate_pool import get_current_pool
     from ..composer import _enrich_handler_name, _inject_stereo_if_missing
+
+    if mol is None:
+        mol = getattr(features, 'mol', None)
+    if mol is None:
+        return None
+
+    # W2F-P6 (P-66.1.6.1.2.1): the N-substituted carbamimidate ester
+    # R''2N-C(=NR')-O-R owns the whole -O-C(=N-)-N unit (a diamino imidate;
+    # the central C carries NO carbon, so the parent acid is carbamimidic acid
+    # -> the retained stem 'carbamimidate'). When present, name it here with
+    # N/N' substituent citation. Fail closed (return None) rather than falling
+    # back to the iminoester path, which would drop the amino-N substituents.
+    carb_matches = features.functional_groups.get('carbamimidate', [])
+    if carb_matches:
+        name = _name_carbamimidate(mol, carb_matches[0])
+        if name is None:
+            return None
+        name = _enrich_handler_name(features, name, "imidate")
+        pool = get_current_pool()
+        cand = pool.add(name, "imidate", features)
+        if cand is None:
+            return None
+        final_name = _inject_stereo_if_missing(features, cand.name,
+                                               atom_to_locant=None)
+        return NamingResult(
+            name=final_name,
+            tree=NameTreeNode(parent_stem=final_name, class_id="imidate",
+                              iupac_section_cite="P-66.1.6.1.2.1",
+                              fragment_legacy=final_name),
+            atom_to_locant_hint=None,
+        )
 
     matches = features.functional_groups.get('iminoester', [])
     if not matches:
@@ -128,6 +161,72 @@ def name_imidate(
         tree=NameTreeNode(parent_stem=final_name, class_id="imidate", iupac_section_cite="P-65.6", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
+
+
+def _name_carbamimidate(mol: Any, match: "tuple[int, ...]") -> Optional[str]:
+    """P-66.1.6.1.2.1 (BB 33408): R''2N-C(=NR')-O-R -> the carbamimidate ester
+    PIN 'R N'-R'-N,N-R''-carbamimidate'.
+
+    N = amino (sp3) N substituents; N' = imino (=N-) N substituent. The whole
+    prefix set is cited alphanumerically by substituent name (methyl < phenyl).
+    Unsubstituted -> 'R carbamimidate'. Fail closed (None) on any un-nameable
+    ester-alkyl side or N-substituent fragment.
+
+    PURE per D-07: read-only mol queries; no mutation.
+
+    ``match`` = (central_C, imino_N, amino_N, ester_O, alkyl_C) per the
+    carbamimidate SMARTS ``[CX3](=[NX2])([NX3])[OX2][#6]``.
+    """
+    from collections import OrderedDict
+    from ..substituent_enumerator import name_substituent
+    from ..naming_utils import (
+        alpha_sort_key, get_multiplier_prefix, needs_brackets,
+        apply_enclosing_marks,
+    )
+
+    central_c, imino_n, amino_n, o_idx, alkyl_c = match
+
+    # Leading word: the ester O-alkyl side (R).
+    alkyl_atoms = _collect_subgraph(mol, alkyl_c, exclude={o_idx})
+    alkyl_word = _name_alkyl_fragment(mol, alkyl_atoms, anchor=alkyl_c)
+    if alkyl_word is None:
+        return None
+
+    # Enumerate N (amino, sp3) and N' (imino, =N-) substituents. Each distinct
+    # substituent NAME collects its locant symbols ('N' / "N'").
+    by_name: "OrderedDict[str, list]" = OrderedDict()
+    for n_idx, locant in ((amino_n, 'N'), (imino_n, "N'")):
+        for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni == central_c or nbr.GetAtomicNum() <= 1:
+                continue
+            frag = _collect_subgraph(mol, ni, exclude={n_idx})
+            sub_name = name_substituent(mol, set(frag), ni)
+            # Fail closed on an un-nameable N-fragment: name_substituent returns
+            # the documented 'substituent' sentinel (or junk like
+            # 'boronic acidyl' containing a space) as a last resort rather than
+            # None. A genuine single-substituent name never contains a space,
+            # so refuse both -> the whole carbamimidate name is never truncated.
+            if (not sub_name or sub_name == "substituent"
+                    or " " in sub_name):
+                return None
+            by_name.setdefault(sub_name, []).append(locant)
+
+    prefix_parts = []
+    for nm in sorted(by_name, key=alpha_sort_key):
+        locs = sorted(by_name[nm])   # 'N' sorts before "N'"
+        loc_str = ','.join(locs)
+        disp = apply_enclosing_marks(nm, -1) if needs_brackets(nm) else nm
+        if len(locs) == 1:
+            prefix_parts.append(f"{loc_str}-{disp}")
+        else:
+            mult = get_multiplier_prefix(len(locs), nm)
+            prefix_parts.append(f"{loc_str}-{mult}{disp}")
+    n_prefix = '-'.join(prefix_parts)
+
+    if n_prefix:
+        return f"{alkyl_word} {n_prefix}carbamimidate"
+    return f"{alkyl_word} carbamimidate"
 
 
 def _retained_imidate_stem(mol: Any, c_carbonyl_idx: int, nh_idx: int,
