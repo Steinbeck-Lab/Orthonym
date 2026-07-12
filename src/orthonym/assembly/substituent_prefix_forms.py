@@ -1113,6 +1113,142 @@ def get_n_n_dialkyl_carbamoyl_prefix(
     return f"N-{first}-N-{second}carbamoyl"
 
 
+def _urea_distal_n(mol, urea_atoms, principal_chain) -> Optional[int]:
+    """P-66.1.6.1.1.3 proximal/distal disambiguation for a urea substituent.
+
+    A urea substituent ``parent-N(H?)-C(=O)-N(H?)(R?)`` attaches to the parent
+    through the PROXIMAL N; the DISTAL N carries the substituents that decorate
+    the carbamoyl acyl name (``(R-carbamoyl)amino``). The urea SMARTS match
+    tuple ``[NX3][CX3](=O)[NX3]`` is NOT orientation-stable, so identify the
+    distal N structurally:
+
+      * principal_chain given -> proximal N is the one bonded into the chain;
+      * else the distal N is the pure-substituent side (its external branches
+        are all nameable simple substituents) while the parent side is not.
+
+    Returns the distal N atom index, or None when the orientation is ambiguous
+    (fail closed).
+    """
+    urea_set = set(urea_atoms)
+    n_idxs = [i for i in urea_atoms
+              if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+    if len(n_idxs) != 2:
+        return None
+    na, nb = n_idxs
+
+    def _external_heavy(n_idx):
+        return [nbr.GetIdx()
+                for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors()
+                if nbr.GetIdx() not in urea_set and nbr.GetAtomicNum() > 1]
+
+    # Cue 1: principal chain -> the proximal N touches the chain.
+    if principal_chain:
+        cs = set(principal_chain)
+        na_prox = na in cs or any(x in cs for x in _external_heavy(na))
+        nb_prox = nb in cs or any(x in cs for x in _external_heavy(nb))
+        if na_prox and not nb_prox:
+            return nb
+        if nb_prox and not na_prox:
+            return na
+
+    # Cue 2: the distal N is a pure-substituent side (all external branches are
+    # nameable simple substituents); the proximal/parent side is not. An
+    # unsubstituted distal N (no external heavy neighbours) is vacuously pure.
+    def _pure_side(n_idx):
+        ext = _external_heavy(n_idx)
+        excl = urea_set | {n_idx}
+        for x in ext:
+            if _name_alkyl_branch_from_atom(
+                    mol, x, exclude=excl | (set(ext) - {x})) is None:
+                return False
+        return True
+
+    na_pure = _pure_side(na)
+    nb_pure = _pure_side(nb)
+    if na_pure and not nb_pure:
+        return na
+    if nb_pure and not na_pure:
+        return nb
+
+    # Cue 3 (degenerate no-parent-context tie-break, e.g. a bare urea molecule
+    # where both sides are nameable): the -CO-NH2 end is the carbamoyl terminus
+    # (distal), the substituted N is treated as the parent-attachment
+    # (proximal). Both-substituted -> genuinely ambiguous -> None (fail closed).
+    # An unsubstituted N is always pure, so "both not-pure" implies both
+    # substituted and falls through to None.
+    na_ext = _external_heavy(na)
+    nb_ext = _external_heavy(nb)
+    if not na_ext and nb_ext:
+        return na
+    if not nb_ext and na_ext:
+        return nb
+    if not na_ext and not nb_ext:
+        return na  # both unsubstituted -> carbamoylamino either way
+    return None
+
+
+def _carbamoyl_with_distal_substituents(
+    mol, distal_n: int, urea_set: Set[int]
+) -> Optional[str]:
+    """Name the distal-N substituents into the carbamoyl acyl (P-66.1.6.1.1.3).
+
+    Unsubstituted distal N -> ``"carbamoyl"``. Substituted -> the substituents
+    cited with plain di-/tri- multipliers, alphanumerically ordered, prefixed
+    to ``carbamoyl`` (``methylcarbamoyl`` / ``dimethylcarbamoyl``; the enclosed
+    carbamoyl form drops N-locants per BB 33354). Any un-nameable substituent
+    -> None (fail closed).
+    """
+    from collections import Counter
+    from .naming_utils import get_multiplier_prefix
+
+    ext = [nbr.GetIdx() for nbr in mol.GetAtomWithIdx(distal_n).GetNeighbors()
+           if nbr.GetIdx() not in urea_set and nbr.GetAtomicNum() > 1]
+    if not ext:
+        return "carbamoyl"
+    names: List[str] = []
+    for x in ext:
+        excl = urea_set | {distal_n} | (set(ext) - {x})
+        nm = _name_alkyl_branch_from_atom(mol, x, exclude=excl)
+        if not nm:
+            return None
+        names.append(nm)
+    counts = Counter(names)
+    parts = []
+    for base in sorted(counts, key=alpha_sort_key):
+        c = counts[base]
+        parts.append(base if c == 1 else f"{get_multiplier_prefix(c, base)}{base}")
+    return "".join(parts) + "carbamoyl"
+
+
+def get_n_substituted_carbamoylamino_prefix(
+    mol, atoms: tuple, principal_chain: Optional[List[int]] = None
+) -> Optional[str]:
+    """P-66.1.6.1.1.3: ``-NH-CO-NR2`` substituent -> ``(carbamoyl-decorated)amino``.
+
+    Replaces the fixed ``PREFIX_FORMS['urea'] = 'carbamoylamino'`` with a
+    dynamic builder that enumerates the distal N's substituents:
+
+      * unsubstituted distal N -> ``"carbamoylamino"`` (BB preselected prefix,
+        NOT 'ureido'/'3-methylureido');
+      * substituted distal N -> ``"(methylcarbamoyl)amino"`` /
+        ``"(dimethylcarbamoyl)amino"`` (compound-prefix enclosure, P-16.3.3);
+      * un-nameable distal substituent or ambiguous orientation -> None
+        (fail closed).
+    """
+    if not atoms:
+        return None
+    urea_set = set(atoms)
+    distal_n = _urea_distal_n(mol, atoms, principal_chain)
+    if distal_n is None:
+        return None
+    core = _carbamoyl_with_distal_substituents(mol, distal_n, urea_set)
+    if core is None:
+        return None
+    if core == "carbamoyl":
+        return "carbamoylamino"
+    return f"({core})amino"
+
+
 def _compute_branch_b_carbamoyloxy_name(
     mol,
     carbamate_atoms: tuple,
@@ -1307,7 +1443,11 @@ def get_substituent_prefix_form(
     if fg_name == "nitrile":
         return PREFIX_FORMS.get("nitrile")  # "cyano"
     if fg_name == "urea":
-        return PREFIX_FORMS.get("urea")  # "carbamoylamino"
+        # P-66.1.6.1.1.3 (BlueBookV2.md:33338,33354): dynamic N-substituted
+        # urea prefix. Distal-N substituents decorate the carbamoyl acyl:
+        # -NH-CO-NH2 -> carbamoylamino; -NH-CO-NHMe -> (methylcarbamoyl)amino;
+        # -NH-CO-NMe2 -> (dimethylcarbamoyl)amino. Un-nameable/ambiguous -> None.
+        return get_n_substituted_carbamoylamino_prefix(mol, atoms, principal_chain)
     if fg_name == "thiourea":
         return PREFIX_FORMS.get("thiourea")  # "carbamothioylamino" (P-66.1.6.1.3.3)
     if fg_name == "isocyanate":
