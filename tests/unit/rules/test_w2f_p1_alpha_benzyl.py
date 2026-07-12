@@ -111,3 +111,75 @@ class TestAlphaHaloBuilderDirect:
         # retained-benzyl gate (:1294) untouched for bare-phenyl fragments
         assert name_ring_system_substituent(mol, [0, 1, 2, 3, 4, 5, 6], 0) == \
             "benzyl"
+
+
+@pytest.mark.unit
+class TestAlphaBenzylFailClosedAndGuards:
+    """Task 9: research §3.D fail-closed + adjacent-class guard rows."""
+
+    def test_alpha_nitro_stays_unknown_or_verified_heal(self):
+        # nitro NOT in the v1 halogen whitelist (zwitterion-mask adjacency);
+        # heal-optional: the OPSIN-verified nitro form (v1.5, out of scope).
+        out = name_compound("Brc1ccc(C([N+](=O)[O-])c2ccccc2)cc1")
+        assert out in (UNKNOWN, "1-bromo-4-[nitro(phenyl)methyl]benzene")
+
+    def test_identical_units_gem_dichloro_stays_unknown(self):
+        # THE leak hazard (research §3.F): '[dichloro(phenyl)methyl]benzene'
+        # is RT-valid but non-PIN (PIN = multiplicative
+        # 1,1'-(dichloromethylene)dibenzene, not yet buildable). The
+        # in-builder identical-units decline must keep this refused.
+        assert name_compound("ClC(Cl)(c1ccccc1)c1ccccc1") == UNKNOWN
+
+    def test_identical_units_sibling_multiplicative_untouched(self):
+        # P-45.1.1: identical units -> multiplicative@900 stays senior
+        assert name_compound("c1ccccc1C(Br)c1ccccc1") == \
+            "1,1'-(bromomethylene)dibenzene"
+
+    def test_alpha_oh_stays_with_methanol_parent(self):
+        # α-OH = PCG -> carbinol/methanol path owns it; the halogen
+        # whitelist excludes O by construction. HEAD emits the RT-OK
+        # '(4-bromophenyl)phenylmethanol' (pre-existing marks style defect,
+        # research §3.D — do NOT pin the exact marks, only the parent).
+        out = name_compound("OC(c1ccccc1)c1ccc(Br)cc1")
+        assert out.endswith("methanol")
+
+    def test_halomethylene_bridge_gold_untouched(self):
+        # gold W2C-MBRIDGE-02: identical PCG units + α-Cl on the BRIDGE ->
+        # multiplicative@900; the identical-units decline ALSO protects it
+        # if dispatch ever reorders.
+        assert name_compound("Oc1ccc(C(Cl)c2ccc(O)cc2)cc1") == \
+            "4,4'-(chloromethylene)diphenol"
+
+    def test_retained_benzyl_untouched(self):
+        # gold W2E-P1FC-04 neighbourhood (undecorated bare-phenyl fragment)
+        assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"
+
+    def test_ring_fold_path_untouched(self):
+        # gold W2E-P1FC-05 shape: ring decoration folds BEFORE the new
+        # decoration split — '(4-chlorophenyl)methyl' unchanged.
+        assert name_compound("Clc1ccc(Cc2ccccn2)cc1") == \
+            "2-[(4-chlorophenyl)methyl]pyridine"
+
+
+@pytest.mark.unit
+class TestAlphaBenzylDeterminism:
+    """Task 9: research §3.C det-probe protocol — evidence, sibling,
+    gem-dichloro (d2 refusal), gem-mixed; 10+ random spellings each,
+    byte-identical. All citation inputs are spelling-invariant strings
+    (fixed halo-name map + letters-only key); any spread is a REAL bug."""
+
+    @pytest.mark.parametrize("smi,expected", [
+        ("Brc1ccc(C(Br)c2ccccc2)cc1",
+         "1-bromo-4-[bromo(phenyl)methyl]benzene"),
+        ("c1ccccc1C(Br)c1ccccc1", "1,1'-(bromomethylene)dibenzene"),
+        ("ClC(Cl)(c1ccccc1)c1ccccc1", UNKNOWN),
+        ("Brc1ccc(C(F)(Cl)c2ccccc2)cc1",
+         "1-bromo-4-[chloro(fluoro)(phenyl)methyl]benzene"),
+    ])
+    def test_random_spellings_byte_identical(self, smi, expected):
+        mol = Chem.MolFromSmiles(smi)
+        outs = {
+            name_compound(Chem.MolToSmiles(mol, doRandom=True, canonical=False))
+            for _ in range(12)
+        }
+        assert outs == {expected}
