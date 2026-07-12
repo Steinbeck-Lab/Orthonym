@@ -215,25 +215,26 @@ def classify_failure_limit(mol: Chem.Mol,
     if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
         return _make('WILDCARD_ATOMS', smiles=smiles)
 
-    # Non-organic elements (iterate in atom-index order for deterministic output;
-    # this mirrors the legacy _descriptive_fallback's stable-order metal pick).
-    non_organic_in_order = []
-    seen = set()
-    for atom in mol.GetAtoms():
-        sym = atom.GetSymbol()
-        if sym in _ORGANIC_ELEMENTS or sym in seen:
-            continue
-        seen.add(sym)
-        non_organic_in_order.append(sym)
-
-    if non_organic_in_order:
-        for elem in non_organic_in_order:
-            if elem in _METAL_NAMES:
-                return _make(
-                    'UNSUPPORTED_ELEMENT',
-                    message=f"{_METAL_NAMES[elem]} compound (not supported)",
-                    smiles=smiles,
-                )
+    # Non-organic elements. Pick the reported metal DETERMINISTICALLY by lowest
+    # atomic number — NOT atom-index order. Atom-index order varies with the
+    # SMILES spelling, so a multi-metal molecule (e.g. an Hg+Sb organometallic)
+    # emitted 'mercury compound (not supported)' on some spellings and 'antimony
+    # compound (not supported)' on others (determinism defect flagged by the
+    # w2f-p11 gate). Which metal a fail-closed diagnostic names is arbitrary;
+    # only determinism matters. Single-metal molecules (the common case) are
+    # byte-identical — the sole metal is trivially lowest.
+    non_organic = {atom.GetSymbol() for atom in mol.GetAtoms()
+                   if atom.GetSymbol() not in _ORGANIC_ELEMENTS}
+    if non_organic:
+        pt = Chem.GetPeriodicTable()
+        metals = sorted((s for s in non_organic if s in _METAL_NAMES),
+                        key=lambda s: pt.GetAtomicNumber(s))
+        if metals:
+            return _make(
+                'UNSUPPORTED_ELEMENT',
+                message=f"{_METAL_NAMES[metals[0]]} compound (not supported)",
+                smiles=smiles,
+            )
         return _make(
             'UNSUPPORTED_ELEMENT',
             message='inorganic compound (not supported)',
