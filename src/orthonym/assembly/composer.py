@@ -8701,12 +8701,13 @@ def _name_c_attached_chain_substituent_fallback(
                     except (ValueError, KeyError):
                         pass
 
-        # For simple case: just name as alkyl (ignoring heteroatoms)
-        # This is imperfect but better than dropping entirely
-        try:
-            return get_alkyl_name(total_carbons)
-        except (ValueError, KeyError):
-            pass
+        # W2F-P3 (defect b-het, P-45.5 / P-29.2): do NOT fall back to a carbon-count
+        # alkyl name here — it DROPS heteroatom FGs + the branch shape
+        # (-CH(NO2)CH(NO2)CH3 -> 'propyl'), shadowing the faithful Tier-4 enumerator
+        # (classify_and_name_fragment names it '1,2-dinitropropyl', verified). Return
+        # None so the sole runtime caller (polyfunctional.py:2100 via
+        # _name_heteroatom_substituent) reaches the enumerator fallback. Side benefit:
+        # >3C haloalkyl branches (past the total_carbons<=3 gate) also reach it.
 
     return None
 

@@ -70,16 +70,20 @@ _COMPOUND_OXY_PREFIXES = frozenset((
 # composer.py code paths. FG types NOT in this set stay in the polyfunctional
 # prefix list (IUPAC P-59.1).
 #
-# NOTE: thiol, nitro, azido, secondary_amine, tertiary_amine were previously in
-# composer.py's inline set but NOT in polyfunctional.py's set. Testing showed that
-# the polyfunctional path's substituent naming does NOT reliably handle these FG
-# types on small branches (drops sulfanyl, nitro, amino, azido prefixes).
-# These are excluded from the unified set to prevent silent FG drops.
+# NOTE (W2F-P3): 'nitro' is now IN this set. The historical exclusion (drops
+# sulfanyl/nitro/amino/azido on small branches) was caused by
+# composer.py's carbon-count terminal fallback returning alkyl names; with that
+# fallback deleted (composer.py:8704-8711 -> None) the Tier-4 enumerator names
+# nitro branches faithfully ('nitromethyl' / '1,2-dinitropropyl', verified). thiol,
+# azido, secondary_amine, tertiary_amine stay OUT (their branch-path behaviour is
+# unverified — separate follow-on). FG types NOT in this set stay in the
+# polyfunctional prefix list (IUPAC P-59.1).
 BRANCH_HANDLED_FGS: frozenset = frozenset({
     'primary_alcohol',    # -> "hydroxymethyl", "2-hydroxypropyl"
     'secondary_alcohol',  # -> "hydroxy" included in branch name
     'primary_amine',      # -> "aminomethyl", "2-aminoethyl"
     'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
+    'nitro',              # W2F-P3 -> "nitromethyl", "1,2-dinitropropyl"
 })
 
 # Shared C1-C20 alkyl roots used by needs_brackets(), is_complex_substituent(),

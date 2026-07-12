@@ -1744,12 +1744,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             mol, matches, principal_chain, atom_to_locant, fg_name
         )
 
-        # Reconcile count with locants: if we found fewer locants than
-        # matches, some FG instances are off-chain (inside substituent branches)
-        # and should not inflate the multiplier. Use locant count as truth.
-        count = len(matches)
-        if locants:
-            count = len(locants)
+        # W2F-P3 (defect a, fail-closed, P-14.3.2): get_non_principal_fg_locants
+        # returns exactly one locant per on-chain / chain-adjacent match (no short-chain
+        # empty-return special case — 'nitromethane' locant omission happens later via
+        # should_omit_locant). After the BUG-B branch filter has already skipped
+        # branch-OWNED matches (BRANCH_HANDLED_FGS now includes 'nitro'), any shortfall
+        # here means an unlocatable off-chain FG instance that no branch namer owns ->
+        # emitting a bare un-locanted prefix ('dinitro') or silently dropping instances
+        # is structure loss. Refuse the whole handler (namer falls through / fails
+        # closed) rather than emit a wrong name.
+        if len(locants) < len(matches):
+            return None
+        count = len(locants)
 
         # Format the prefix
         formatted = format_fg_prefix(prefix_form, locants, count)
