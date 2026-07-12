@@ -1142,20 +1142,27 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
         # use square brackets per IUPAC P-16.3.3 nesting rules
         formatted_name = f"[{name}]"
+    elif ('(' in name or '[' in name) and not _is_fully_enclosed(name):
+        # P-16.5.4.1 (W2E-P1FC Task 8, generalized by w2f p1 per
+        # P-16.5.2.4/P-16.5.3.1): the name CARRIES an enclosing mark
+        # anywhere — leading '(benzylsulfanyl)methyl', interior
+        # 'bromo(phenyl)methyl' (P-29.6.2.1), or trailing-stem
+        # '[(4-methoxyphenyl)methoxy]methyl' — but is not itself fully
+        # wrapped. Such a name is a compound substituent by construction
+        # (regardless of is_complex_substituent, which keys on digits/
+        # hyphens and misses these shapes). Citing it BARE drops structure
+        # (OPSIN parses 'bromo(phenyl)methylbenzene' as bromo + benzyl,
+        # TWO substituents) and plain parens double the mark
+        # ('((...)methyl)', non-PIN). Escalate to the next bracket level.
+        # Fusion/von-Baeyer/ring-assembly brackets remain nesting-IGNORED
+        # inside apply_enclosing_marks (P-16.5.4.1.2), so
+        # 'furo[3,2-b]pyridin-2-yl' still takes plain parentheses.
+        formatted_name = apply_enclosing_marks(name, -1)
     elif (complex or derived_multiplier) and not name.startswith('(') \
             and not name.startswith('['):
         # Complex name (or a simple name taking a derived bis/tris/...kis
         # multiplier, P-16.5.1.10) without existing enclosing marks: wrap.
         formatted_name = f"({name})"
-    elif name.startswith('(') and not _is_fully_enclosed(name):
-        # P-16.5.4.1 (W2E-P1FC Task 8): the name has an INNER enclosing mark but
-        # is not itself fully wrapped — e.g. '(benzylsulfanyl)methyl', where the
-        # trailing 'methyl' lies OUTSIDE the parens. Such a name is a compound
-        # substituent by construction (regardless of is_complex_substituent,
-        # which keys on digits/hyphens and misses this shape); it still needs an
-        # OUTER enclosing mark, escalated to the next bracket level:
-        # '(benzylsulfanyl)methyl' -> '[(benzylsulfanyl)methyl]'.
-        formatted_name = apply_enclosing_marks(name, -1)
     else:
         formatted_name = name
 
