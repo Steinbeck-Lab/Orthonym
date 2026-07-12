@@ -1226,13 +1226,26 @@ def _name_ether_substituted_chain(
     from collections import defaultdict
     from ..data.chain_names import get_chain_prefix
     from .substituent_prefix_forms import get_alkoxy_prefix, get_sulfanyl_prefix
-    from .naming_utils import is_complex_substituent, apply_enclosing_marks
+    from .naming_utils import (
+        is_complex_substituent, apply_enclosing_marks, _is_fully_enclosed,
+    )
     groups: dict = defaultdict(list)
     for bb_c, o_idx, r_side in ether_links:
         if mol.GetAtomWithIdx(o_idx).GetSymbol() == 'O':
             oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
             if not oxy or oxy == "alkoxy":
                 return None  # un-nameable R -> fall through (fail-closed)
+            if ('(' in oxy or '[' in oxy) and not _is_fully_enclosed(oxy):
+                # w2f p1 (P-16.5): a mark-bearing compound oxy prefix whose
+                # STEM lies OUTSIDE the marks ('(4-methoxyphenyl)methoxy') must
+                # be enclosed AS A UNIT before concatenating the backbone stem
+                # -> '[(4-methoxyphenyl)methoxy]methyl' (mirrors the S-branch
+                # convention below). A FULLY-enclosed oxy ('(methoxymethoxy)')
+                # keeps its single marks — the downstream citation layer owns
+                # the outer bracket ('[(methoxymethoxy)methyl]benzene'), never
+                # a double '[(methoxymethoxy)]methyl'. Markless
+                # 'benzyloxy'/'methoxy'/'phenoxy' stay byte-identical.
+                oxy = apply_enclosing_marks(oxy, -1)
         else:  # S -> (R)sulfanyl (P-29.5.2 concatenation)
             # Name the R side with the proper substituent namer so a RING-bearing
             # R (benzyl -> 'benzyl') is not flattened to a carbon count
@@ -2276,6 +2289,37 @@ def _is_plain_phenyl(mol, aromatic_idx: int, central_c_idx: int) -> bool:
     return False
 
 
+def _substituted_aryl_ring_name(mol, aryl_idx: int, central_c_idx: int) -> Optional[str]:
+    """Name the aryl side of a benzylic ether as a ring-system substituent
+    ('4-methoxyphenyl'), or None (fail closed) — w2f p1 Task 7 (P-29.6.1:
+    ring substitution kills retained benzyloxy in PINs).
+
+    BFS the aryl-side fragment from ``aryl_idx`` (never crossing the benzylic
+    carbon) and delegate to rules.ring_substituents.name_ring_system_substituent
+    (the ring-engine producer, which itself fails closed on anything it cannot
+    fully describe). Guards: None / space-bearing output / bare 'phenyl'
+    (a plain ring must have taken the retained-benzyloxy path upstream)."""
+    frag = []
+    seen = {central_c_idx}
+    stack = [aryl_idx]
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        frag.append(cur)
+        for n in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if n.GetIdx() not in seen and n.GetAtomicNum() > 1:
+                stack.append(n.GetIdx())
+    if not frag:
+        return None
+    from ..rules.ring_substituents import name_ring_system_substituent
+    name = name_ring_system_substituent(mol, sorted(frag), aryl_idx)
+    if not name or ' ' in name or name == 'phenyl':
+        return None
+    return name
+
+
 def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optional[str]:
     """Name an ``-O-CH(aryl)ₙ`` ether substituent by counting the central
     carbon's aromatic neighbours (HYG-04, Phase 167).
@@ -2318,6 +2362,20 @@ def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optiona
         _is_plain_phenyl(mol, n.GetIdx(), central_c_idx) for n in arom_nbrs
     ):
         return "diphenylmethoxy"
+    if len(arom_nbrs) == 1:
+        aryl_idx = arom_nbrs[0].GetIdx()
+        if _is_plain_phenyl(mol, aryl_idx, central_c_idx):
+            return "benzyloxy"  # P-29.6.1 retained preferred prefix (bare ring)
+        # w2f p1 (P-29.6.1, BB 16274): ring substitution is not allowed on
+        # retained benzyl(oxy) in PINs -> systematic '(4-methoxyphenyl)methoxy'
+        # (P-35.4.1, BB 18112: '(4-chlorophenyl)methoxy (preferred prefix)').
+        # Fail-closed: None when the decorated ring cannot be fully named
+        # (the old unconditional 'benzyloxy' DROPPED the ring substituent —
+        # a different molecule).
+        ring_name = _substituted_aryl_ring_name(mol, aryl_idx, central_c_idx)
+        if ring_name is None:
+            return None
+        return f"({ring_name})methoxy"
     return "benzyloxy"
 
 
