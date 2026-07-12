@@ -981,6 +981,71 @@ def _try_oxybis_azanylylidenemethanylylidene_bridge(
     return None
 
 
+_CHALCOGEN_BIS_METHYLENE = {
+    # P-15.3.1.2.2.1 (BB 5242): '-CH2-O-CH2- oxybis(methylene) (preferred
+    # prefix)'; S-analog family P-29.5.2 (BB 16256).
+    'O': 'oxybis(methylene)',
+    'S': 'sulfanediylbis(methylene)',
+}
+
+
+def _try_chalcogenbis_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
+    """Composite CH2-X-CH2 central bridge (X = O/S) joining two identical
+    ring parents (w2f p1, P-15.3.1.2.2.1 / P-51.3.1):
+    Oc1ccc(COCc2ccc(O)cc2)cc1 -> 4,4'-[oxybis(methylene)]diphenol.
+    Modeled 1:1 on _try_methylenebis_oxy_bridge (:862) with the O/CH2 roles
+    swapped.
+
+    Fail-closed: central non-ring neutral 0-H chalcogen with exactly two
+    non-ring neutral CH2 carbon neighbours, each CH2 bonded to exactly one
+    ring atom; identical fragments; unit resolution AND the P-51.3.1(3)
+    locant-identity requirement via the shared _resolve_unit_and_assemble
+    (its per-connection locant equality check is what rejects a 3-OH/4-OH
+    pair whose free fragments are canon-identical phenols)."""
+    for atom in mol.GetAtoms():
+        bridge_name = _CHALCOGEN_BIS_METHYLENE.get(atom.GetSymbol())
+        if bridge_name is None or atom.GetTotalNumHs() != 0:
+            continue
+        idx = atom.GetIdx()
+        if idx in ring_atoms or atom.GetFormalCharge() != 0:
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 2:
+            continue
+        if any(n.GetIdx() in ring_atoms or n.GetSymbol() != 'C'
+               or n.GetTotalNumHs() != 2 or n.GetFormalCharge() != 0
+               for n in heavy):
+            continue
+        ring_conns = []
+        ok = True
+        for ch2 in heavy:
+            rn = [n for n in ch2.GetNeighbors() if n.GetAtomicNum() > 1
+                  and n.GetIdx() != idx]
+            if len(rn) != 1 or rn[0].GetIdx() not in ring_atoms:
+                ok = False
+                break
+            ring_conns.append(rn[0].GetIdx())
+        if not ok:
+            continue
+
+        fragments = _split_at_bridge(
+            mol, idx, ring_conns, extra_remove=[c.GetIdx() for c in heavy])
+        if fragments is None:
+            continue
+        smi_a, smi_b, _ca, _cb = fragments
+        canon_a = Chem.CanonSmiles(smi_a)
+        if canon_a != Chem.CanonSmiles(smi_b):
+            continue
+        result = _resolve_unit_and_assemble(
+            mol, [c.GetIdx() for c in heavy], ring_conns, [idx],
+            bridge_name, ring_atoms, canon_a,
+        )
+        if result is not None:
+            return result
+        continue
+    return None
+
+
 def _try_silanediyl_methylene_bridge(mol, ring_atoms: set) -> Optional[str]:
     """Composite CH2-SiH2-CH2 central bridge joining two identical ring
     parents (P-29.4.2): HOOC-C6H4-CH2-SiH2-CH2-C6H4-COOH ->
@@ -1207,6 +1272,11 @@ def name_multiplicative(mol) -> Optional[str]:
 
     # --- Composite =CH-N=O=N-CH= bridge (Wave2 completion C, P-15.3.1.2.2.2) ---
     result = _try_oxybis_azanylylidenemethanylylidene_bridge(mol, ring_atoms)
+    if result is not None:
+        return result
+
+    # --- Composite CH2-O-CH2 / CH2-S-CH2 bridge (w2f p1, P-15.3.1.2.2.1) ---
+    result = _try_chalcogenbis_methylene_bridge(mol, ring_atoms)
     if result is not None:
         return result
 
