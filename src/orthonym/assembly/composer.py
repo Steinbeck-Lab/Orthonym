@@ -2765,6 +2765,11 @@ def _is_complex_ring_system(mol) -> bool:
     if _is_spiroter(mol):
         return True
 
+    # P-24.8.4.2 three DISTINCT named components + one λ spiro atom in 3 rings.
+    from ..rules.spiro import is_spiro_named_components as _is_spiro_named_components
+    if _is_spiro_named_components(mol):
+        return True
+
     # P-24.8.1.3 λ spiro atom in >=3 rings — recognised so the dispatcher can
     # FAIL CLOSED rather than leaking a partial monocyclic name.
     from ..rules.spiro import is_lambda_multiring_spiro as _is_lambda_multiring
@@ -2849,6 +2854,13 @@ def _classify_complex_ring(mol) -> str:
     from ..rules.spiro import is_spiroter as _is_spiroter_classify
     if _is_spiroter_classify(mol):
         return 'spiroter'
+
+    # P-24.8.4.2 three DISTINCT named components + one λ spiro atom in 3 rings
+    # (BB:11250). Must precede the lambda-multiring FAIL-CLOSED guard, which
+    # would otherwise catch this λ-atom-in-3-rings shape and refuse.
+    from ..rules.spiro import is_spiro_named_components as _is_spiro_named_classify
+    if _is_spiro_named_classify(mol):
+        return 'spiro-named-components'
 
     # P-24.8.1.3 λ spiro atom in >=3 monocyclic rings: detection-only, FAIL
     # CLOSED (the λ von-Baeyer build is a follow-on). Refuse rather than leak a
@@ -3197,6 +3209,18 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
             logging.warning("Branched-polyspiro-different unsupported (fail-closed)")
+            return None
+
+        elif ring_type == 'spiro-named-components':
+            # P-24.8.4.2: three distinct named components at one λ spiro atom in
+            # 3 rings (e.g. 2lambda6-spiro[[1,3,2]benzodioxathiole-2,2'-
+            # ([1,2,3]benzoxadithiole)-2,5''-dibenzo[b,d]thiophene]).
+            from ..rules.spiro import name_spiro_named_components
+            result = name_spiro_named_components(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+            logging.warning("Spiro-named-components naming failed for molecule")
             return None
 
         elif ring_type == 'lambda-multiring-spiro':

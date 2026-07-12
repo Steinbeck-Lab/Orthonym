@@ -2442,6 +2442,165 @@ def name_spiroter(
     return (name, all_ring_atoms, combined_locants, False)
 
 
+def _spiro_component_alpha_key(name: str) -> str:
+    """Alphanumerical sort key (P-24.5.3 / P-14.5) for a P-24.8.4.2 spiro
+    ring-component name. Unlike the shared ``_component_alpha_key`` this ALSO
+    removes every bracketed locant/fusion group so the *ring-name* letters drive
+    the order: ``[1,3,2]benzodioxathiole`` -> ``benzodioxathiole`` and
+    ``dibenzo[b,d]thiophene`` -> ``dibenzothiophene``, giving the BB citation
+    order benzodioxathiole < benzoxadithiole < dibenzothiophene (BB:11250).
+    Kept local so the two-component ``_component_alpha_key`` behaviour (which
+    must NOT strip internal brackets) is untouched."""
+    import re
+    s = name.strip().lower()
+    s = re.sub(r'^\d+h-', '', s)      # drop a leading indicated-H descriptor
+    s = re.sub(r'\[[^\]]*\]', '', s)  # drop every bracketed locant/fusion group
+    return s
+
+
+def _name_spiro_named_components_core(mol):
+    """P-24.8.4.2: a monospiro ring system built from THREE ring components (all
+    distinct — two different individual ring systems in the BB example) sharing
+    ONE nonstandard (λ) spiro atom that lies in THREE rings.
+
+    BB P-24.8.4.2 (BlueBookV2.md:11246) / example BB:11250:
+    ``2lambda6-spiro[[1,3,2]benzodioxathiole-2,2'-([1,2,3]benzoxadithiole)-2,5''-dibenzo[b,d]thiophene]``.
+    The components are cited in alphanumerical order (P-24.5.3); the
+    SECOND-cited name is enclosed in parentheses to flag this unusual situation;
+    the λⁿ symbol, preceded by the lowest locant denoting the spiro atom, is
+    placed at the front; spiro-locant pairs are cited between consecutive
+    component names (``2,2'`` then ``2,5''`` — the second pair re-cites the
+    lowest unprimed locant). Prime multiplicity: comp1 unprimed, comp2 ``'``,
+    comp3 ``''``.
+
+    Returns ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed).
+
+    Fail closed unless: exactly one atom in >=3 rings with a nonstandard bonding
+    number; that atom is a cut vertex splitting the ring graph into exactly 3
+    components; all three DISTINCT (distinct name AND distinct capped fragment —
+    an all-identical triple is P-24.8.3 spiroter, a 2-identical triple is
+    P-24.8.4.3 'bis' which OPSIN 2.9 cannot round-trip); each nameable; the
+    system unsubstituted; the lowest spiro locant is the UNPRIMED (comp1) one
+    (so the derived front token + inter-component pairs match the BB example),
+    and no component needs a residual (non-consumed) indicated-H descriptor."""
+    ri = mol.GetRingInfo()
+    all_rings = [set(r) for r in ri.AtomRings()]
+    all_ring_atoms: Set[int] = set()
+    for r in all_rings:
+        all_ring_atoms |= r
+    for atom in mol.GetAtoms():  # unsubstituted only
+        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
+            return None
+
+    # Locate the unique λ spiro atom in >=3 rings (identical to _name_spiroter).
+    spiro_center = None
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if sum(1 for r in all_rings if idx in r) < 3:
+            continue
+        if _nonstandard_bonding_number(mol, idx) is None:
+            continue
+        if spiro_center is not None:
+            return None
+        spiro_center = idx
+    if spiro_center is None:
+        return None
+    lam = _nonstandard_bonding_number(mol, spiro_center)
+
+    _, adj = _ring_atom_graph(mol)
+    comps = _ring_components_excluding(adj, spiro_center)
+    if len(comps) != 3:
+        return None
+
+    named = []  # (name, loc_map, spiro_locant, comp_atoms, frag_canon)
+    for comp in comps:
+        atoms = comp | {spiro_center}
+        nm = _name_spiro_component(mol, atoms, spiro_center)
+        if nm is None:
+            return None
+        ext = _extract_subfragment(mol, atoms)
+        if ext is None:
+            return None
+        loc = _canonical_spiro_locant(ext, nm[1], spiro_center)
+        if loc is None:
+            return None
+        norm = _normalize_hypervalent_ring_heteroatoms(ext[0])
+        frag_canon = (Chem.MolToSmiles(norm) if norm is not None
+                      else Chem.MolToSmiles(ext[0]))
+        named.append((nm[0], nm[1], loc, comp, frag_canon))
+
+    # All three DISTINCT: 3-identical -> spiroter (P-24.8.3); 2-identical ->
+    # 'bis' (P-24.8.4.3), which OPSIN 2.9 cannot round-trip. Decline both.
+    if len({t[0] for t in named}) != 3 or len({t[4] for t in named}) != 3:
+        return None
+
+    # Residual indicated-H (after the spiro atom consumes its own, P-24.3.2) is
+    # not handled by this targeted build -> fail closed rather than misplace it.
+    for nm0, _lmap, loc0, _c, _fc in named:
+        stripped = _strip_consumed_indicated_h(nm0, loc0)
+        residual, _bare = _extract_leading_indicated_h(stripped)
+        if residual:
+            return None
+
+    # Alphanumerical citation order (P-24.5.3 / P-14.5); deterministic tie-break
+    # by capped-fragment canonical SMILES (the three are distinct).
+    named.sort(key=lambda t: (_spiro_component_alpha_key(t[0]), t[4]))
+    c0, c1, c2 = named
+
+    # "Lowest locant denoting the spiro atom" (BB:11246): min over (numeral,
+    # prime-rank). Require it to be the UNPRIMED comp1 locant so the derived
+    # front token and inter-component pairs are the BB-canonical construction;
+    # otherwise fail closed (exotic primed-front variants are out of scope).
+    lowest = min((c0[2], 0), (c1[2], 1), (c2[2], 2))
+    if lowest != (c0[2], 0):
+        return None
+    lo = c0[2]
+    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+
+    n0 = _strip_consumed_indicated_h(c0[0], c0[2])
+    n1 = _strip_consumed_indicated_h(c1[0], c1[2])
+    n2 = _strip_consumed_indicated_h(c2[0], c2[2])
+    # Inter-component spiro-locant pairs: (comp1 unprimed locant, next comp's
+    # primed locant). The second pair re-cites the lowest unprimed locant.
+    name = (
+        f"{lo_tok}-spiro["
+        f"{n0}-{c0[2]},{c1[2]}'-"
+        f"({n1})-"
+        f"{lo},{c2[2]}''-"
+        f"{n2}]"
+    )
+
+    combined: Dict[int, _Locant] = {}
+    for atom_idx, locant in c0[1].items():
+        combined[atom_idx] = locant
+    for prime, entry in (("'", c1), ("''", c2)):
+        for atom_idx, locant in entry[1].items():
+            if atom_idx == spiro_center or atom_idx in combined:
+                continue
+            combined[atom_idx] = (locant, prime)
+    if not (set(combined.keys()) >= all_ring_atoms):
+        return None
+    return name, all_ring_atoms, combined
+
+
+def is_spiro_named_components(mol) -> bool:
+    """P-24.8.4.2: three distinct ring components + one λ spiro atom in 3 rings."""
+    if mol is None:
+        return False
+    return _name_spiro_named_components_core(mol) is not None
+
+
+def name_spiro_named_components(
+    mol,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Build the P-24.8.4.2 three-component monospiro name. Fail-closed."""
+    core = _name_spiro_named_components_core(mol)
+    if core is None:
+        return None
+    name, all_ring_atoms, combined_locants = core
+    return (name, all_ring_atoms, combined_locants, False)
+
+
 def _name_dispiroter_core(mol):
     """P-24.4.1: three IDENTICAL polycyclic components sharing exactly TWO spiro
     atoms -> ``a,a':b',b''-dispiroter[component]`` (e.g.
