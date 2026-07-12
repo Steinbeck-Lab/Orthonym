@@ -58,6 +58,39 @@ _IN_SPLIT_PROBE = threading.local()
 _PROBE_NAME_CACHE: dict = {}
 
 
+# W2F-P2: lazy module-level oracle for the narrow DEFAULT-ON split branch
+# (polyfunctional.py). The per-instance features._split_oracle exists only when
+# the legacy flag is ON; the default-ON class must still be RT-gated. Jar
+# resolution mirrors namer.py; a missing jar leaves OpsinOracle(_jar=None)
+# whose rt_safe is False -> every split is rejected (FAIL-CLOSED, CR-03).
+_DEFAULT_ORACLE = None
+_DEFAULT_ORACLE_LOCK = threading.Lock()
+
+
+def _get_default_oracle():
+    """Singleton OpsinOracle for default-ON per-split RT gating (fail-closed)."""
+    global _DEFAULT_ORACLE
+    if _DEFAULT_ORACLE is None:
+        with _DEFAULT_ORACLE_LOCK:
+            if _DEFAULT_ORACLE is None:
+                from .retained_substitution import OpsinOracle  # Pattern-S3
+                jar = None
+                try:
+                    import sys
+                    from pathlib import Path
+                    _scripts = str(
+                        Path(__file__).resolve().parent.parent.parent.parent / "scripts"
+                    )
+                    if _scripts not in sys.path:
+                        sys.path.insert(0, _scripts)
+                    from validate_retained_names import find_opsin_jar
+                    jar = find_opsin_jar() or None
+                except Exception:
+                    jar = None
+                _DEFAULT_ORACLE = OpsinOracle(opsin_jar=jar)
+    return _DEFAULT_ORACLE
+
+
 @dataclass(frozen=True)
 class SplitComponent:
     """One resolved sub-group prefix of a split composite (TOPOLOGY → STRING).
@@ -104,6 +137,13 @@ def _decompose_carbonyl_ester(
     if mol is None or match is None or len(match) < 4:
         return None
     carbonyl_c, _double_o, linker_x, alkyl_c = match[0], match[1], match[2], match[3]
+
+    # W2F-P2 hardening (P-65.6.3.3.5): the oxo locant of this decomposition is
+    # only meaningful for a CHAIN-MEMBER carbonyl. When the caller provides a
+    # chain, decline off-chain carbonyls; principal_chain=None (unit-level
+    # pure-decomposition mode, TestEsterSplit contract) keeps prior behavior.
+    if principal_chain is not None and carbonyl_c not in set(principal_chain):
+        return None
 
     oxo = _resolve_oxo()
     if not oxo:
@@ -219,4 +259,4 @@ def split_composite_fg(
     return components
 
 
-__all__ = ["split_composite_fg", "SplitComponent", "SplitEvent"]
+__all__ = ["split_composite_fg", "SplitComponent", "SplitEvent", "_get_default_oracle"]

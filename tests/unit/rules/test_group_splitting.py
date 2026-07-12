@@ -107,3 +107,42 @@ class TestStageAInvariants:
         # verify_decomp_byte_identical canary gate).
         out = name_compound(self.DROP23_ESTER_SMILES)  # enable_group_splitting defaults False
         assert out == "pentanoic acid", out
+
+
+@pytest.mark.unit
+class TestDecomposeChainMembershipGuard:
+    """W2F-P2 Task 2 (P-65.6.3.3.5): the decomposition's oxo locant is only
+    meaningful for a CHAIN-MEMBER carbonyl. With a chain provided, off-chain
+    carbonyls decline; principal_chain=None keeps pure-decomposition mode."""
+
+    def test_carbonyl_not_in_provided_chain_declines(self):
+        mol, match = _first_match(ESTER_LOSER_SMILES, _ESTER_SMARTS)
+        off_chain = [a for a in range(mol.GetNumAtoms()) if a != match[0]][:3]
+        assert split_composite_fg("ester", mol, match, off_chain) is None
+
+    def test_carbonyl_in_provided_chain_decomposes(self):
+        mol, match = _first_match(ESTER_LOSER_SMILES, _ESTER_SMARTS)
+        comps = split_composite_fg("ester", mol, match, [match[0]])
+        assert comps is not None and len(comps) == 2
+
+    def test_none_chain_still_decomposes(self):
+        # The documented unit-mode contract (TestEsterSplit above) must hold.
+        mol, match = _first_match(ESTER_LOSER_SMILES, _ESTER_SMARTS)
+        assert split_composite_fg("ester", mol, match, None) is not None
+
+
+@pytest.mark.unit
+class TestDefaultOracle:
+    """W2F-P2 Task 2: lazy module-level OpsinOracle for the narrow default-ON
+    split branch (Task 3). Jar-missing -> rt_safe False -> fail-closed (CR-03)."""
+
+    def test_singleton_identity(self):
+        from orthonym.assembly.group_splitting import _get_default_oracle
+        a = _get_default_oracle()
+        b = _get_default_oracle()
+        assert a is not None and a is b
+
+    def test_rt_safe_fail_closed_without_jar(self):
+        from orthonym.assembly.retained_substitution import OpsinOracle
+        oracle = OpsinOracle(opsin_jar=None)
+        assert oracle.rt_safe("CCO", "ethanol") is False
