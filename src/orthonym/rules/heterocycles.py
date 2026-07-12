@@ -690,6 +690,157 @@ def _mancude_monocycle_parent(mol, ring_atoms):
     return None, None
 
 
+def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
+    """Mancude maximum for a monocyclic ring given in cycle order.
+
+    Returns ``(max_match, eligible)`` where ``max_match`` is the maximum number of
+    noncumulative ring double bonds (= maximum matching on the ring cycle
+    restricted to double-bond-eligible edges) and ``eligible[k]`` is the flag for
+    ``oriented[k]``. Divalent chalcogens (O/S/Se/Te) never carry a mancude ring
+    double bond; every other ring atom (C, N, P, ...) is eligible. Ring size <= 10
+    -> exact brute force over the ring edges; deterministic.
+
+    Factored out of :func:`_monocycle_indicated_h_prefix` so the partial-saturation
+    namer can reuse the exact mancude count for non-aromatizable (4-pi) HW rings.
+    """
+    from itertools import combinations
+    n = len(oriented)
+    _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
+    eligible = [
+        mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT for i in oriented
+    ]
+    ok_edges = [p for p in range(n) if eligible[p] and eligible[(p + 1) % n]]
+    max_match = 0
+    for size in range(min(n // 2, len(ok_edges)), 0, -1):
+        found = False
+        for combo in combinations(ok_edges, size):
+            used: Set[int] = set()
+            good = True
+            for p in combo:
+                a, b = p, (p + 1) % n
+                if a in used or b in used:
+                    good = False
+                    break
+                used.add(a)
+                used.add(b)
+            if good:
+                found = True
+                break
+        if found:
+            max_match = size
+            break
+    return max_match, eligible
+
+
+def _nonaromatizable_hydro_fallback(mol, ring_set: Set[int], mol_unsat: Set[int]) -> Optional[str]:
+    """P-54.4.1 pure-hydro HW name for a NON-aromatizable monocycle (1,2-dihydro-
+    phosphete, 1,2-dihydroazete).
+
+    Runs only when :func:`_mancude_monocycle_parent` declined — a 4-pi ring can
+    never be RDKit-aromatized, so the aromatization-based mancude-parent path
+    silently fails and the plain HW path would emit the bare over-unsaturated
+    mancude stem ('phosphete'). The mancude maximum is computed here by exact
+    matching instead (P-14.7.1 = max noncumulative double bonds).
+
+    v1 scope (fail closed / return None otherwise — never a wrong name, SELF-01
+    safe): a genuine hydro form (``1 <= d < max_match``); the mancude parent needs
+    ZERO indicated hydrogen (``n_eligible - 2*max_match == 0``); a single
+    heteroatom (multi-het parents carry a leading locant -> digit-initial gate
+    declines them); no exocyclic ring double bond (lambda rings are intercepted
+    upstream in ``name_heterocycle`` before this namer runs). BB P-54.4.1:24169.
+    """
+    from .partial_saturation import SATURATION_PREFIXES
+    n = len(ring_set)
+    ordered = _macrocycle_ordered_ring(mol, ring_set)
+    if ordered is None or len(ordered) != n:
+        return None
+
+    # Gate (c): no exocyclic double bond from any ring atom.
+    for i in ring_set:
+        for bond in mol.GetAtomWithIdx(i).GetBonds():
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                if bond.GetOtherAtomIdx(i) not in ring_set:
+                    return None
+
+    max_match, eligible = _mancude_max_matching(mol, ordered)
+    n_eligible = sum(eligible)
+
+    # Actual ring double bonds + the atoms they touch.
+    db_atoms: Set[int] = set()
+    for bond in mol.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a in ring_set and b in ring_set:
+                db_atoms.add(a)
+                db_atoms.add(b)
+    d = sum(
+        1 for bond in mol.GetBonds()
+        if bond.GetBondType() == Chem.BondType.DOUBLE
+        and bond.GetBeginAtomIdx() in ring_set
+        and bond.GetEndAtomIdx() in ring_set
+    )
+
+    # Gate (a): a true hydro form (fewer ring double bonds than the mancude max);
+    # d == max_match is the indicated-H namer's scope (2H-thiete), d == 0 the
+    # saturated stem's.
+    if not (d >= 1 and d < max_match):
+        return None
+    # Gate (b): v1 covers ONLY mancude parents with zero indicated hydrogen. A
+    # non-aromatizable parent that WOULD need indicated H (azepine 7-ring: 7
+    # eligible, max 3 -> 1 IH) stays fail-closed.
+    if n_eligible - 2 * max_match != 0:
+        return None
+
+    hydro = {ordered[k] for k in range(n)
+             if eligible[k] and ordered[k] not in db_atoms}
+    if not hydro:
+        return None
+    prefix = SATURATION_PREFIXES.get(len(hydro))
+    if prefix is None:
+        return None
+
+    het = {i for i in ordered if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
+    if not het:
+        return None
+
+    # Number the ring: heteroatom set lowest -> heteroatom seniority -> hydro set
+    # lowest (P-31.1.4.3.4). The parent carries no indicated H (gate b), so no ih
+    # term participates.
+    best_key = None
+    best_map: Optional[Dict[int, int]] = None
+    for start in range(n):
+        for direction in (1, -1):
+            seq = [ordered[(start + k * direction) % n] for k in range(n)]
+            loc = {a: idx + 1 for idx, a in enumerate(seq)}
+            het_locs = tuple(sorted(loc[a] for a in het))
+            seniority = tuple(sorted(
+                (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
+                for a in het
+            ))
+            hydro_locs = tuple(sorted(loc[a] for a in hydro))
+            key = (het_locs, seniority, hydro_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_map = loc
+    if best_map is None:
+        return None
+
+    het_pairs = sorted(
+        (best_map[a], mol.GetAtomWithIdx(a).GetSymbol()) for a in het
+    )
+    parent_name = build_hw_name(het_pairs, n, is_saturated=False, is_aromatic=False)
+    if not parent_name:
+        return None
+    # v1: only bare (0-IH, single-het) parents. A digit-initial parent means either
+    # an intrinsic indicated H this numbering did not place OR a multi-heteroatom
+    # locant prefix (e.g. '1,2-diazete') -> out of v1 scope, fail closed.
+    if parent_name[:1].isdigit():
+        return None
+
+    locant_str = ','.join(str(loc) for loc in sorted(best_map[a] for a in hydro))
+    return f"{locant_str}-{prefix}{parent_name}"
+
+
 def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
     """Name a partially-saturated monocyclic mancude heterocycle (IUPAC P-31.1.4).
 
@@ -741,7 +892,11 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
 
     parent, old_to_new = _mancude_monocycle_parent(mol, ring_atoms)
     if parent is None:
-        return None
+        # P-54.4.1: a non-aromatizable (4-pi) HW ring can never be RDKit-
+        # aromatized, so the aromatization-based mancude parent above declines.
+        # Recover the pure-hydro PIN via matching-based mancude counting
+        # (1,2-dihydrophosphete). Fail-closed for anything outside its v1 scope.
+        return _nonaromatizable_hydro_fallback(mol, ring_set, mol_unsat)
     parent_ring = parent.GetRingInfo().AtomRings()
     if len(parent_ring) != 1:
         return None
@@ -1090,37 +1245,9 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     if not db_pairs:
         return ""
 
-    # Divalent chalcogens never carry a mancude ring double bond; every other
-    # ring atom (C, N, P, ...) is double-bond-eligible.
-    _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
-    eligible = [
-        mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT for i in oriented
-    ]
-
     # Maximum noncumulative double bonds = maximum matching on the ring cycle
-    # restricted to eligible-eligible edges. Ring size <= 10 -> brute force
-    # (combinations over <= 10 edges) is exact and cheap.
-    from itertools import combinations
-    ok_edges = [p for p in range(n) if eligible[p] and eligible[(p + 1) % n]]
-    max_match = 0
-    for size in range(min(n // 2, len(ok_edges)), 0, -1):
-        found = False
-        for combo in combinations(ok_edges, size):
-            used: Set[int] = set()
-            good = True
-            for p in combo:
-                a, b = p, (p + 1) % n
-                if a in used or b in used:
-                    good = False
-                    break
-                used.add(a)
-                used.add(b)
-            if good:
-                found = True
-                break
-        if found:
-            max_match = size
-            break
+    # (shared helper; divalent chalcogens are double-bond-ineligible).
+    max_match, eligible = _mancude_max_matching(mol, oriented)
     if len(db_pairs) != max_match:
         return ""  # hydro form (or over-perceived) — not this rule's scope
 
