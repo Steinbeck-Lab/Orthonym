@@ -70,4 +70,10 @@ class TestItem8BranchNitro:
         # a bare un-locanted 'thiocyanato'), so the production gate must be active.
         assert _name("OC(=O)CC(CSC#N)CC([N+](=O)[O-])C") == "unknown organic compound"
 
-# (TestItem8PureCBranch is added in Task 2.)
+class TestItem8PureCBranch:
+    # --- Task 2: defect (b)-pure-C heal ---
+    def test_pure_c_branched_isopropyl(self):
+        # -CH(CH3)2 branch must be 'propan-2-yl', not 'propyl' (carbon-count).
+        # Was raw '6-nitro-4-propylheptanoic acid' -> unknown.
+        assert _name("OC(=O)CCC(C(C)C)CC([N+](=O)[O-])C") == \
+            "6-nitro-4-(propan-2-yl)heptanoic acid"

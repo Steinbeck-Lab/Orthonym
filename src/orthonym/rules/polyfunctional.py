@@ -1980,6 +1980,58 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     return name
 
 
+def _is_linear_terminal_pure_c_branch(mol, sub_atoms, chain_set) -> bool:
+    """True iff `sub_atoms` is an all-carbon acyclic branch attached at a terminus
+    (attach has <=1 in-branch carbon neighbour, every branch carbon <=2), so
+    get_alkyl_name(carbon_count) is the correct P-29.2 name. Otherwise the branch is
+    branched / secondarily attached and must go to the Tier-4 enumerator."""
+    sub_set = set(sub_atoms)
+    attach = None
+    for si in sub_set:
+        for nb in mol.GetAtomWithIdx(si).GetNeighbors():
+            if nb.GetIdx() in chain_set:
+                attach = si
+                break
+        if attach is not None:
+            break
+    if attach is None:
+        return False
+    for i in sub_set:
+        deg = sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                  if nb.GetIdx() in sub_set)
+        limit = 1 if i == attach else 2
+        if deg > limit:
+            return False
+    return True
+
+
+def _enumerate_pure_c_branch_name(mol, sub_atoms, features, position):
+    """Name a non-linear pure-C branch via the Tier-4 enumerator (verified:
+    propan-2-yl / butan-2-yl). Mirrors the het-arm enumerator block; fail-closed
+    (None) for ring branches or if the enumerator declines."""
+    ring_info = mol.GetRingInfo()
+    if any(ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms):
+        return None
+    from ..assembly.substituent_enumerator import (
+        SubstituentInfo,
+        classify_and_name_fragment,
+    )
+    from ..assembly.naming_utils import needs_brackets
+    chain = features.principal_chain
+    chain_set = set(chain) if chain else set()
+    frag_info = SubstituentInfo(
+        frag_mol=None,
+        locant=position,
+        attach_mol_idx=(chain[position - 1] if chain and position <= len(chain)
+                        else sub_atoms[0]),
+        frag_atoms=frozenset(sub_atoms),
+    )
+    name = classify_and_name_fragment(mol, frag_info, chain_set, features)
+    if name and needs_brackets(name):
+        name = f"({name})"
+    return name
+
+
 def _generate_alkyl_prefixes_for_polyfunctional(
     features: Any, skip_acyloxy: bool = False,
     exclude_branch_atoms: Optional[Set[int]] = None,
@@ -2220,10 +2272,23 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                     substituent_groups[het_name].append(position)
                 continue
 
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-                substituent_groups[alkyl_name].append(position)
-            except ValueError:
+            # W2F-P3 (defect b-pure-C, P-29.2): get_alkyl_name(carbon_count) is
+            # correct ONLY for a linear terminal branch. A branched / secondary pure-C
+            # branch (propan-2-yl, butan-2-yl) would be mis-named as the straight chain
+            # of its carbon COUNT ('propyl' for propan-2-yl = a different constitution).
+            # Keep get_alkyl_name for linear-terminal (zero change); route non-linear to
+            # the Tier-4 enumerator (verified: propan-2-yl). Fail-closed if it declines.
+            chain_set = set(features.principal_chain) if features.principal_chain else set()
+            if _is_linear_terminal_pure_c_branch(mol, sub_atoms, chain_set):
+                try:
+                    alkyl_name = get_alkyl_name(carbon_count)
+                    substituent_groups[alkyl_name].append(position)
+                except ValueError:
+                    continue
+            else:
+                branch_name = _enumerate_pure_c_branch_name(mol, sub_atoms, features, position)
+                if branch_name:
+                    substituent_groups[branch_name].append(position)
                 continue
 
     # Build formatted prefixes using format_substituent_prefix for proper
