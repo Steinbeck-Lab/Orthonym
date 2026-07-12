@@ -23,6 +23,8 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 
+from .lambda_convention import nonstandard_bonding_number
+
 # ---------------------------------------------------------------------------
 # Element-seniority order for numbering tie-breaks (DD4 / v22 Phase E1).
 #
@@ -442,6 +444,34 @@ def orient_chain(
         if sub_atoms:
             fwd_locants = sorted(fwd_map[a] for a in sub_atoms)
             rev_locants = sorted(rev_map[a] for a in sub_atoms)
+            result = compare_locant_sets(fwd_locants, rev_locants)
+            if result == -1:
+                return forward
+            if result == 1:
+                return reverse
+
+    # --- Criterion (d.5): P-14.4(h) nonstandard-valence atom lower locant ---
+    # When the substituent locant SETS tie, the chain position bearing a
+    # substituent whose attachment atom is in a NONSTANDARD (λ) valence state
+    # takes the lower locant (BB P-14.4(h), BlueBookV2.md:3318,3334:
+    # 'OC(C[PH4])CP' -> '1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol'; the λ5 arm
+    # is given C1). Runs BEFORE the alphanumerical criterion (e). Canonical:
+    # driven by the perceived λ bonding number, not atom order.
+    if substituent_positions:
+        lam_chain_atoms = set()
+        for c_idx in (set(substituent_positions.keys()) & chain_set):
+            sub_atom_idxs: List[int] = []
+            for s in substituent_positions[c_idx]:
+                if isinstance(s, (list, tuple, set, frozenset)):
+                    sub_atom_idxs.extend(s)
+                else:
+                    sub_atom_idxs.append(s)
+            if any(nonstandard_bonding_number(mol, ai) is not None
+                   for ai in sub_atom_idxs):
+                lam_chain_atoms.add(c_idx)
+        if lam_chain_atoms:
+            fwd_locants = sorted(fwd_map[a] for a in lam_chain_atoms)
+            rev_locants = sorted(rev_map[a] for a in lam_chain_atoms)
             result = compare_locant_sets(fwd_locants, rev_locants)
             if result == -1:
                 return forward
