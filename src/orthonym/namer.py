@@ -1602,6 +1602,22 @@ class Orthonym:
                         result = _final_opsin_validity_gate(
                             result, smiles, self._grammar_stats,
                         )
+            # DETERMINISM (w2f p11): abstention must have ONE canonical sentinel.
+            # Some fail-closed paths (a handler that DECLINES without producing a
+            # candidate — e.g. lambda-multiring-spiro unsupported) leave result ==
+            # '' , while paths that produce a candidate the validity gate then
+            # suppresses go through _descriptive_fallback -> 'unknown organic
+            # compound'. For a molecule whose winning path is atom-ordering-
+            # dependent, name() then returns '' on some SMILES spellings and
+            # 'unknown organic compound' on others — both mean "no name", but they
+            # are different strings, so the determinism eval (raw-string compare)
+            # flags it. An empty string is never a valid IUPAC name; normalise it
+            # to the canonical fallback so abstention is a single deterministic
+            # string regardless of which internal path abstained. is_unknown()
+            # already treats '' and the fallback as equivalent, so gold matching
+            # is unchanged.
+            if not (result and result.strip()):
+                result = _descriptive_fallback(smiles)
             # HYG-02: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
