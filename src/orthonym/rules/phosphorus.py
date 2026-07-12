@@ -483,9 +483,13 @@ def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[st
     and left to the oxoacid subsystem. Standard-valence (bonding number 3) only
     in this task; the λ5 hydride branch is added in Task 3.
 
+    Non-standard valence: only the all-H λ-hydride (-PH4) is named here as
+    ``lambda5-phosphanyl`` (P-45.3.1 / P-14.1.3; house ASCII ``lambda5`` with NO
+    internal locant on a mononuclear prefix). Any other non-standard shape
+    (organyl λ5, phosphoryl/phosphonic P=O) fails closed.
+
     Returns None (caller falls through, fail-closed) for any non-P attachment,
-    a P bearing a heteroatom / multiple bond, a non-standard bonding number, or
-    an unrecognised organyl ligand.
+    a P bearing a heteroatom / multiple bond, or an unrecognised organyl ligand.
     """
     if attach_idx is None:
         return None
@@ -505,12 +509,19 @@ def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[st
             continue  # bond to the parent structure
         if nb.GetSymbol() != 'C' or b.GetBondType() != Chem.BondType.SINGLE:
             return None
-    # Standard-valence phosphanyl only (bonding number 3); the non-standard (λ5)
-    # hydride is handled by the Task-3 lambda branch.
-    if nonstandard_bonding_number(mol, attach_idx) is not None:
-        return None
     exclude = set(range(mol.GetNumAtoms())) - frag_set
-    return get_phosphanyl_prefix(mol, attach_idx, exclude_atoms=exclude)
+    base = get_phosphanyl_prefix(mol, attach_idx, exclude_atoms=exclude)
+    if base is None:
+        return None
+    lam = nonstandard_bonding_number(mol, attach_idx)
+    if lam is None:
+        return base  # standard-valence phosphanyl (bonding number 3)
+    # Non-standard bonding number: name ONLY the all-H λ-hydride (-PH4) ->
+    # 'lambda5-phosphanyl' (P-45.3.1 / P-14.1.3). Organyl λ5 / any P=O declines.
+    from ..perception.lambda_hydride import is_lambda_hydride_phosphorus
+    if is_lambda_hydride_phosphorus(mol, attach_idx):
+        return f"lambda{lam}-{base}"
+    return None
 
 
 def get_phosphorus_prefix(fg_name: str) -> Optional[str]:

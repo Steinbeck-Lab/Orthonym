@@ -7297,6 +7297,31 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 if _g14:
                     substituent_groups[_g14].append(sub_info.locant)
                     continue
+        # W2F-P7 (P-68.3 / P-45.3.1): a CARBON-FREE phosphanyl chain substituent
+        # would likewise be lost by Guard 3 (has_carbon False). This is the path a
+        # λ5-hydride -PH4 takes: -PH4 is NOT detected as a functional group, so the
+        # molecule is NOT polyfunctional (OCC[PH4] = mono primary_alcohol) and the
+        # polyfunctional carbon-free namer never runs. The FG-prefix loop cannot
+        # emit 'phosphanyl' / 'lambda5-phosphanyl' (substituent prefixes, not FGs),
+        # so the whole P was dropped ('ethan-1-ol', SELF-01-suppressed to unknown).
+        # Named via the shared phosphorus namer (same one wired into the
+        # polyfunctional path); the all-H/organyl-only guard EXCLUDES a
+        # phosphoryl/phosphonic P=O. Mirrors the Si/Ge D-FOLLOWON item-9 block.
+        if not has_carbon:
+            _p_attach = next(
+                (fi for fi in sub_info.frag_atoms
+                 if any(nb.GetIdx() in chain_set
+                        for nb in mol.GetAtomWithIdx(fi).GetNeighbors())),
+                None,
+            )
+            if (_p_attach is not None
+                    and mol.GetAtomWithIdx(_p_attach).GetSymbol() == 'P'):
+                from ..rules.phosphorus import name_phosphanyl_substituent
+                _ph = name_phosphanyl_substituent(
+                    mol, list(sub_info.frag_atoms), _p_attach)
+                if _ph:
+                    substituent_groups[_ph].append(sub_info.locant)
+                    continue
         if not has_carbon:
             logger.debug(
                 "DROP-01 substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",
