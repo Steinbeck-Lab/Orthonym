@@ -821,6 +821,53 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
     if h_count == 2 and len(neighbors) == 0:
         return {'name': 'amino', 'atoms': [n_idx]}
 
+    # W2F-P6 (P-66.1.6.1.1.3): N-substituted urea substituent on the PAH core.
+    # The PROXIMAL N (-NH-) is bonded to the core + a carbonyl C that bears one
+    # =O and a second (DISTAL) N: core-NH-C(=O)-NR2 -> '(R-carbamoyl)amino'.
+    # Reuse the shared dynamic urea prefix builder; pass the core atoms as the
+    # parent hint so proximal/distal detection is robust (the DISTAL-N
+    # substituents decorate the carbamoyl acyl). Fail closed (None) on any
+    # un-nameable distal substituent -> the group drops and SELF-01 suppresses.
+    if h_count >= 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
+        _cN = neighbors[0]
+        _o_dbl = None
+        _distal_n = None
+        _extra = 0
+        for _nb in _cN.GetNeighbors():
+            if _nb.GetIdx() == n_idx:
+                continue
+            _b = mol.GetBondBetweenAtoms(_cN.GetIdx(), _nb.GetIdx())
+            if (_nb.GetSymbol() == 'O'
+                    and _b.GetBondTypeAsDouble() == 2.0):
+                _o_dbl = _nb.GetIdx()
+            elif _nb.GetSymbol() == 'N':
+                _distal_n = _nb.GetIdx()
+            else:
+                _extra += 1
+        if _o_dbl is not None and _distal_n is not None and _extra == 0:
+            urea_atoms = (n_idx, _cN.GetIdx(), _o_dbl, _distal_n)
+            from ..assembly.substituent_prefix_forms import (
+                get_substituent_prefix_form,
+            )
+            _prefix = get_substituent_prefix_form(
+                'urea', mol, urea_atoms, list(core_atoms)
+            )
+            if _prefix:
+                # Collect every consumed atom (urea core + distal substituents)
+                # so downstream atom-accounting/SELF-01 sees the full fragment.
+                _frag = []
+                _seen = {n_idx}
+                _stack = [n_idx]
+                while _stack:
+                    _a = _stack.pop()
+                    _frag.append(_a)
+                    for _n2 in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if (_n2.GetIdx() not in _seen
+                                and _n2.GetIdx() not in core_atoms):
+                            _seen.add(_n2.GetIdx())
+                            _stack.append(_n2.GetIdx())
+                return {'name': _prefix, 'atoms': _frag}
+
     return None
 
 
