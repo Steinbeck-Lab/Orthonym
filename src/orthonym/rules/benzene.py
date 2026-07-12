@@ -1391,6 +1391,46 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 'is_complex': True,
             }
 
+    # P-45.5 (W2F-P8): -NH-(substituted benzene aryl) -> the decorated aryl ring
+    # is cited as an 'N-(2,4-dibromophenyl)' substituent (via the shared
+    # decorated-ring core namer), promoting the CURRENT benzene ring to the
+    # 'aniline' parent (the parent-vs-N-aryl choice runs through parent selection,
+    # P-45.5.1). Only a carbocyclic benzene N-ring is handled: a BARE phenyl gives
+    # None here (nothing to decorate) and falls through to the 'anilino'/
+    # 'N-phenyl' path below, and a heteroaryl N-ring is left to the parent-
+    # selection pipeline (the heterocycle may be the senior parent, P-44.2.1).
+    # Fail closed when the core cannot be built.
+    if (h_count == 1 and len(neighbors) == 1
+            and neighbors[0].GetSymbol() == 'C'
+            and neighbors[0].GetIsAromatic() and neighbors[0].IsInRing()):
+        _arylc = neighbors[0]
+        _aryl_ring = None
+        for _rng in mol.GetRingInfo().AtomRings():
+            if (_arylc.GetIdx() in _rng and len(_rng) == 6
+                    and not (set(_rng) & ring_atoms)
+                    and all(mol.GetAtomWithIdx(i).GetIsAromatic()
+                            and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                            for i in _rng)):
+                _aryl_ring = _rng
+                break
+        if _aryl_ring is not None:
+            from .ring_substituents import decorated_ring_substituent_name
+            _sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+            _dec = decorated_ring_substituent_name(
+                mol, _aryl_ring, _arylc.GetIdx(),
+                expected_atoms=set(_sub_atoms) - {n_idx},
+            )
+            if _dec is not None and _dec.endswith('phenyl'):
+                from ..assembly.naming_utils import apply_enclosing_marks
+                return {
+                    'name': apply_enclosing_marks(f'({_dec})amino', -1),
+                    'atoms': _sub_atoms,
+                    'is_complex': True,
+                    'amine_candidate': {
+                        'suffix_name': 'amine', 'n_substituents': [f'({_dec})'],
+                    },
+                }
+
     # N-monoalkyl amino (-NHR): 1 H, 1 carbon neighbor
     # IUPAC 2013: N-alkylamino (e.g., N-methylamino, N-ethylamino)
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':

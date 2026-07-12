@@ -1380,7 +1380,9 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
         # multiplicative PINs. Fragments bearing a senior PCG (e.g. the
         # 4,4'-iminodibenzoic acid CO2H rings) make the guard False, so their
         # imino multiplicative name is retained.
-        if bridge_type == 'NH' and _all_fragments_are_simple_carbocycles(mol, idx):
+        if bridge_type == 'NH' and (
+                _all_fragments_are_simple_carbocycles(mol, idx)
+                or _all_fragments_are_prefix_only_carbocycles(mol, idx)):
             continue
 
         # Carbonyl-bridge PIN guard (mirrors the NH guard above): when the
@@ -1894,6 +1896,41 @@ def _all_fragments_are_simple_carbocycles(
             # Extra-ring carbon (e.g., methyl substituent) -> still
             # carbocyclic but has a substituent; out of "simple" scope.
             if not atom.IsInRing() and atom.GetAtomicNum() == 6:
+                return False
+    return True
+
+
+def _all_fragments_are_prefix_only_carbocycles(
+    mol, bridge_idx: int, extra_remove: Optional[List[int]] = None,
+) -> bool:
+    """True when every fragment left after removing the bridge is a CARBOCYCLIC
+    ring system whose only substituents are non-PCG prefixes — every atom is C,
+    H, or a halogen (F/Cl/Br/I). Such a ring carries NO principal characteristic
+    group (halogen and alkyl are always detachable prefixes), so an amine
+    bridging two of them is itself the senior characteristic group and the PIN
+    is the substitutive aniline (P-62.2.1.1 / P-45.5), NOT the azanediyl
+    multiplicative name (e.g. Clc1ccccc1Nc1ccccc1Cl ->
+    2-chloro-N-(2-chlorophenyl)aniline, not 1,1'-azanediylbis(2-chlorobenzene)).
+
+    Broader than `_all_fragments_are_simple_carbocycles` (which rejects a mere
+    chloro/methyl decoration); used ONLY by the NH-bridge guard so a fragment
+    bearing a real O/N/S PCG (phenol, benzoic acid) still keeps its
+    multiplicative name.
+    """
+    emol = RWMol(Chem.RWMol(mol))
+    for ridx in sorted({bridge_idx} | set(extra_remove or []), reverse=True):
+        emol.RemoveAtom(ridx)
+    try:
+        Chem.SanitizeMol(emol)
+    except Exception:
+        return False
+    _HALO = {9, 17, 35, 53}
+    frag_mols = Chem.GetMolFrags(emol.GetMol(), asMols=True, sanitizeFrags=True)
+    for frag in frag_mols:
+        if not any(a.IsInRing() for a in frag.GetAtoms()):
+            return False  # only ring fragments (the diaryl/dicyclo amine class)
+        for atom in frag.GetAtoms():
+            if atom.GetAtomicNum() not in (1, 6) and atom.GetAtomicNum() not in _HALO:
                 return False
     return True
 
