@@ -163,6 +163,22 @@ def _decompose_carbonyl_ester(
     if not linker_prefix:
         return None
 
+    # W2F-P2 v1 conservatism (P-16.5 / P-29.6.2.1): a linker prefix that carries
+    # INNER enclosing marks without being fully wrapped (a substituted-aryl-
+    # methoxy such as '(4-hydroxyphenyl)methoxy') needs NESTED brackets '[...]'
+    # that the split emit path (format_fg_prefix, single-level parens) cannot
+    # render as a PIN. Decline -> fail-closed (the molecule then stays 'unknown'
+    # via the downstream validity gate) rather than emit a non-PIN double-paren
+    # name. Substituted benzyl is out of v1 (P-29.6.2.1). A FULLY-wrapped
+    # compound prefix '(3-hydroxypropoxy)' (single level) and the bare
+    # benzyloxy/methoxy/acyl-sulfanyl prefixes are unaffected.
+    _fully_wrapped = (
+        (linker_prefix.startswith("(") and linker_prefix.endswith(")"))
+        or (linker_prefix.startswith("[") and linker_prefix.endswith("]"))
+    )
+    if ("(" in linker_prefix or "[" in linker_prefix) and not _fully_wrapped:
+        return None
+
     # Both components share the caller's central-carbon (carbonyl) locant (locants=None).
     return [
         SplitComponent(role="chalcogen", prefix_form=oxo, locants=None, count=1),

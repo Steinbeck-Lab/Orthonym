@@ -43,6 +43,13 @@ from ..assembly.substituent_prefix_forms import (
 )
 
 
+# W2F-P2 (P-65.6.3.3.5 method (1)): the composite-FG split runs by DEFAULT for
+# exactly this principal-group class (acid-principal partial (thio)esters whose
+# carbonyl is a chain member). v1 scope; extensible. Every default split is
+# per-candidate OPSIN-RT gated in split_composite_fg (fail-closed).
+_SPLIT_DEFAULT_PGS = frozenset({"carboxylic_acid"})
+
+
 # Functional groups that can be detected but have no seniority
 # These are always named as prefixes (never suffix)
 NO_SENIORITY_GROUPS = {
@@ -1668,12 +1675,33 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             # fires for table-listed composites (ester/thioester) and is OPSIN-RT
             # gated (FAIL-CLOSED, D-05). Lazy import (Pattern-S3) avoids a cycle.
             components = None
-            if getattr(features, "_enable_group_splitting", False):
-                from ..assembly.group_splitting import split_composite_fg
-                components = split_composite_fg(
-                    fg_name, mol, matches[0], principal_chain,
-                    oracle=getattr(features, "_split_oracle", None),
+            _anchored = []
+            _split_default = (
+                principal_group in _SPLIT_DEFAULT_PGS
+                and fg_name in ("ester", "thioester")
+            )
+            if getattr(features, "_enable_group_splitting", False) or _split_default:
+                from ..assembly.group_splitting import (
+                    split_composite_fg,
+                    _get_default_oracle,
                 )
+                # W2F-P2 (P-65.6.3.3.5): split ONLY the match whose carbonyl C
+                # is IN the principal chain (in-chain ester C -> oxo + R-oxy /
+                # R-sulfanyl); acyloxy-orientation matches (carbonyl off-chain)
+                # keep today's continue (composer acyloxy path owns them). The
+                # exactly-one guard keeps multi-(thio)ester acids fail-closed
+                # (v1) and the locant computation single-valued (fixes the
+                # brief item-6 '9,9' defect: locants from anchored ONLY).
+                _anchored = [m for m in matches if m and m[0] in chain_set]
+                if len(_anchored) == 1:
+                    _oracle = (
+                        getattr(features, "_split_oracle", None)
+                        or _get_default_oracle()
+                    )
+                    components = split_composite_fg(
+                        fg_name, mol, _anchored[0], principal_chain,
+                        oracle=_oracle,
+                    )
             if not components:
                 # By-design: FGs using functional class naming (ester→alkoxycarbonyl,
                 # secondary_amide→acylamino, thioether, etc.) are handled by
@@ -1688,7 +1716,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             # pipeline (format_fg_prefix + alpha_sort_key) sharing the central-carbon
             # locant (comp.locants is None -> the caller's locants apply to both).
             split_locants = get_non_principal_fg_locants(
-                mol, matches, principal_chain, atom_to_locant, fg_name
+                mol, _anchored, principal_chain, atom_to_locant, fg_name
             )
             for comp in components:
                 all_prefixes.append(

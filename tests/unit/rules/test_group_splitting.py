@@ -92,21 +92,23 @@ class TestRtReject:
 
 @pytest.mark.unit
 class TestStageAInvariants:
-    """D-05 Stage A: with group-splitting OFF (the production default), the ester
-    stays dropped — the split token must be absent from the flag-OFF output."""
+    """D-05 Stage A: W2F-P2 retired the flag-OFF byte-identity guarantee for the
+    narrow P-65.6.3.3.5 class (PG=carboxylic_acid + ester/thioester) — that class
+    now splits by default, per-candidate OPSIN-RT gated. Non-class FGs stay
+    dropped flag-OFF (covered by TestFunctionalClassNotSplit / TestDenyFunctionalClass)."""
 
     # A REAL DROP-23 ester case (measured): the whole ester+diacid is dropped,
     # leaving just the short acid. (monoethyl succinate is NOT a DROP-23 case —
     # it is named "ethoxycarbonyl" via get_alkoxycarbonyl_prefix; RESEARCH Pitfall 4.)
-    DROP23_ESTER_SMILES = "O=C(O)CCCC(=O)OCCCO"   # -> "pentanoic acid" (ester dropped)
+    DROP23_ESTER_SMILES = "O=C(O)CCCC(=O)OCCCO"   # W2F-P2: now heals by default
 
-    def test_enabled_false_is_noop(self):
-        # Default (flag OFF, production default for Stage A): the ester stays
-        # DROPPED — the status-quo output is preserved (byte-identical Stage-A
-        # invariant at the name_compound level; the corpus-wide proof is the
-        # verify_decomp_byte_identical canary gate).
-        out = name_compound(self.DROP23_ESTER_SMILES)  # enable_group_splitting defaults False
-        assert out == "pentanoic acid", out
+    # W2F-P2: Stage-A flag-OFF byte-identity is intentionally RETIRED for the
+    # narrow P-65.6.3.3.5 class (PG=carboxylic_acid + ester/thioester): the
+    # split now runs by default, per-candidate OPSIN-RT gated. This molecule
+    # was the measured DROP-23 witness ("pentanoic acid"); it now names fully.
+    def test_default_split_heals_measured_drop23_witness(self):
+        out = name_compound(self.DROP23_ESTER_SMILES)  # no flag
+        assert out == "5-(3-hydroxypropoxy)-5-oxopentanoic acid", out
 
 
 @pytest.mark.unit

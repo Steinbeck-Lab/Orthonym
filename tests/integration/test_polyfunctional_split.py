@@ -182,3 +182,48 @@ class TestFunctionalClassNotSplit:
         off = name_compound(smi)
         on = name_compound(smi, enable_group_splitting=True)
         assert off == on, f"functional-class FG was force-split: {off!r} -> {on!r}"
+
+
+@pytest.mark.integration
+class TestNarrowDefaultOnP6563:
+    """W2F-P2 Task 3 (P-65.6.3.3.5 method (1), BB 31958-31962): acid-principal
+    partial esters split by DEFAULT (no flag) — every split is per-candidate
+    OPSIN-RT gated, so a wrong assembly can never be emitted."""
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles,expected", [
+        ("COC(=O)CCC(=O)O", "4-methoxy-4-oxobutanoic acid"),
+        ("O=C(OC)CCCCCCCC(=O)O", "9-methoxy-9-oxononanoic acid"),
+        # curated target, brief items 5+6 (benzyloxy IS the preferred prefix,
+        # P-29.6.2.1/P-35.3.2:18097; alphanumerical benzyloxy < oxo, P-14.5.2)
+        ("O=C(OCc1ccccc1)CCCCCCCC(=O)O", "9-(benzyloxy)-9-oxononanoic acid"),
+        # GS-ON preview verified RT OK at HEAD 2026-07-11 (research item 1 F.3)
+        ("O=C(O)CCCC(=O)OCCCO", "5-(3-hydroxypropoxy)-5-oxopentanoic acid"),
+    ])
+    def test_acid_ester_split_default_on(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    def test_substituted_benzyl_boundary_fail_closed(self, monkeypatch):
+        # P-29.6.2.1: substituted benzyl is out of v1. The split declines the
+        # nested-bracket linker prefix '(4-hydroxyphenyl)methoxy' (it would need
+        # '[...]' escalation the single-level emit path cannot render as a PIN),
+        # so the ester is dropped and the only remaining candidate is a
+        # wrong-structure ester name that the PRODUCTION OPSIN validity gate
+        # (SELF-01) suppresses -> 'unknown'. The autouse test fixture disables
+        # that gate for speed, so re-enable it here to exercise the real
+        # production fail-closed path.
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        out = name_compound("O=C(OCc1ccc(O)cc1)CCCCCCCC(=O)O")
+        assert out == "unknown organic compound"
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
+    def test_acyloxy_orientation_untouched(self):
+        # Gold P3A-P06: acyloxy orientation (ester O on chain, carbonyl off) ->
+        # anchored filter empty -> byte-identical continue; composer acyloxy
+        # path keeps ownership.
+        assert name_compound("OC(=O)CCOC(=O)C") == "3-(acetyloxy)propanoic acid"

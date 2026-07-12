@@ -638,6 +638,27 @@ def needs_brackets(name: str) -> bool:
                 if remainder == s_suffix:
                     return True
 
+    # W2F-P2 (P-16.3.3): ACYL-substituted chalcogen prefixes — an acyl group on
+    # a sulfanyl/selanyl/tellanyl (acetylsulfanyl, formylsulfanyl,
+    # propanoylsulfanyl, benzoylsulfanyl, ...) — are compound substituents and
+    # take enclosing marks: '9-(acetylsulfanyl)-9-oxononanoic acid' (P-35.5.1
+    # BB 18128). The acyl stem is retained 'acetyl'/'formyl' or ends in '-oyl'.
+    for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
+        if name_lower.endswith(s_suffix):
+            acyl = name_lower[: -len(s_suffix)]
+            if acyl and (acyl.endswith("oyl") or acyl in ("acetyl", "formyl")):
+                return True
+
+    # W2F-P2 (P-16.3.3): benzyl-based oxy/chalcogen prefixes (benzyloxy,
+    # benzylsulfanyl, ...) are compound substituents (benzyl = substituted
+    # methyl) and take enclosing marks: '9-(benzyloxy)-9-oxononanoic acid'
+    # (P-35.4.2 / P-35.3.2:18097). Bare 'benzyl' and 'benzyloxymethyl' (remainder
+    # not a bare oxy/chalcogen suffix) are unaffected.
+    if name_lower.startswith("benzyl"):
+        rest = name_lower[len("benzyl"):]
+        if rest == "oxy" or rest in _COMPOUND_S_SUFFIXES_COMPLEX:
+            return True
+
     return False
 
 
