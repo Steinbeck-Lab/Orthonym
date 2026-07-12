@@ -7526,6 +7526,115 @@ def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> 
     return None
 
 
+def _amino_branch_atoms(mol, branch_start: int, n_idx: int, chain_set: set) -> list:
+    """Collect ONE N-branch's heavy atoms by BFS from ``branch_start``,
+    never crossing the amino N (``n_idx``) or the principal chain (w2f p1,
+    P-35.4.1 chain-site support)."""
+    from collections import deque
+    atoms = []
+    seen = {n_idx} | set(chain_set)
+    queue = deque([branch_start])
+    while queue:
+        cur = queue.popleft()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        atoms.append(cur)
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if nbr.GetIdx() not in seen and nbr.GetAtomicNum() > 1:
+                queue.append(nbr.GetIdx())
+    return atoms
+
+
+def _name_decorated_amino_branch(
+    mol, branch_start: int, n_idx: int, chain_set: set
+) -> Optional[str]:
+    """P-35.4.1 (BB 18112 '(chloromethyl)amino (preferred prefix)'): name ONE
+    decorated N-branch of a chain-parent amino substituent via the centralized
+    substituent namer, or None — the caller MUST then fail closed. NEVER
+    carbon-count a decorated branch: '(methylamino)' for -NH-CH2Cl names a
+    DIFFERENT molecule (the w2f p1 root cause).
+
+    Fail-closed guards (mirrors the proven ring-parent path,
+    rules/benzene.py:1430-1475):
+      * ring-bearing branch -> None (parent-hydride seniority competition
+        belongs to parent selection; the sub_has_ring branches at
+        composer.py own ring N-branches);
+      * producer None or space-bearing output -> None (garbled producer,
+        e.g. 'methylboronic acidyl' for -CH2-B(OH)2 — the benzene.py:1448
+        space-guard rationale).
+
+    Returns the RAW branch name WITHOUT enclosing marks ('chloromethyl',
+    '1-chloroethyl', '2-hydroxyethyl'; locants anchored at the free valence);
+    the call sites own P-16.5.1.1/P-16.5.1.3.1 parenthesization via
+    _assemble_decorated_amino_prefix.
+    """
+    branch_atoms = _amino_branch_atoms(mol, branch_start, n_idx, chain_set)
+    if not branch_atoms:
+        return None
+    ring_info = mol.GetRingInfo()
+    if any(ring_info.NumAtomRings(a) > 0 for a in branch_atoms):
+        return None
+    from .substituent_naming import name_substituent_fragment
+    name = name_substituent_fragment(
+        mol, branch_atoms, branch_start, sorted(chain_set) + [n_idx]
+    )
+    if not name or ' ' in name:
+        return None
+    return name
+
+
+def _assemble_decorated_amino_prefix(branch_entries) -> Optional[str]:
+    """Assemble the P-35.4.1 compound amino prefix from named N-branches.
+
+    ``branch_entries``: list of ``(raw_branch_name, decorated: bool)``. At
+    least one entry is decorated — the pure-alkyl fast path never calls this
+    (byte-stability contract for '(methylamino)'/'(dimethylamino)').
+
+    Grammar (Blue-Book-cited in  §1.C/§1.E):
+      * decorated branch names are ALWAYS parenthesized (P-16.5.1.1: parens
+        around ALL compound prefixes): '(chloromethyl)';
+      * k identical decorated branches take bis/tris OUTSIDE the parens
+        (P-16.5.1.10; BB 40703 'bis(chloromethyl)aminoxyl (PIN)');
+      * distinct branches cite in alphanumerical order via alpha_sort_key
+        (letters-only: '2-hydroxyethyl' sorts at 'h' — NEVER raw sorted());
+      * a simple-alkyl branch is bare when FIRST-cited, parenthesized after
+        (P-16.5.1.3.1; BB 26308 '3-[methyl(phenyl)amino]phenol');
+      * the whole prefix takes the outer mark ESCALATED via
+        apply_enclosing_marks(-1) (P-16.5.2.4): '[(chloromethyl)amino]',
+        cited verbatim by the composer prefix-joiner like the legacy
+        '(methylamino)' convention.
+    """
+    from collections import Counter
+    from .naming_utils import (
+        COMPLEX_MULTIPLIERS,
+        SIMPLE_MULTIPLIERS,
+        alpha_sort_key,
+        apply_enclosing_marks,
+    )
+    counts = Counter(branch_entries)
+    cited = []
+    ordered = sorted(counts.items(), key=lambda kv: alpha_sort_key(kv[0][0]))
+    for i, ((bname, decorated), k) in enumerate(ordered):
+        if decorated:
+            if k == 1:
+                cited.append(f"({bname})")
+            else:
+                mult = COMPLEX_MULTIPLIERS.get(k)
+                if mult is None:
+                    return None
+                cited.append(f"{mult}({bname})")
+        else:
+            if k == 1:
+                cited.append(bname if i == 0 else f"({bname})")
+            else:
+                mult = SIMPLE_MULTIPLIERS.get(k)
+                if mult is None:
+                    return None
+                cited.append(f"{mult}{bname}" if i == 0 else f"{mult}({bname})")
+    return apply_enclosing_marks("".join(cited) + "amino", -1)
+
+
 def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
     """
     Check if a substituent is an acylamino group: -NH-C(=O)-R or -N(R)-C(=O)-R.
@@ -7704,25 +7813,48 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                 return "anilino"
                 continue  # Skip non-phenyl ring substituents
 
-            # Count carbons PER N-branch via C-C bonds only.
-            # Phase 167 HYG-04 site#2: previously SUMMED carbons across all
-            # N-branches as one chain, so -N(CH3)2 (two 1-carbon methyls) named
-            # "(ethylamino)" instead of "(dimethylamino)". Name each branch and
-            # apply the principal-amine multiplicity. Single-branch form preserved
-            # byte-identical; only the N,N-dialkyl(+) case changes.
-            _branch_alkyls = []
+            # Count carbons PER N-branch via C-C bonds only (Phase 167
+            # HYG-04 site#2 multiplicity fix preserved). w2f p1 (P-35.4.1):
+            # a branch carrying ANY non-C heavy atom is DECORATED and must
+            # be named by the centralized producer — carbon-counting it
+            # drops the decoration ('(methylamino)' for -NH-CH2Cl = a
+            # DIFFERENT molecule). Pure-carbon branches keep the legacy
+            # _count_carbon_chain + get_alkyl_name path BYTE-IDENTICAL.
+            _branch_entries = []
             _branch_impure = False
+            _decorated_failed = False
             for nbr in atom.GetNeighbors():
                 if nbr.GetIdx() in chain_set:
                     continue
                 if nbr.GetSymbol() == 'C':
+                    _batoms = _amino_branch_atoms(
+                        mol, nbr.GetIdx(), idx, chain_set)
+                    if any(mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)
+                           for a in _batoms):
+                        _bname = _name_decorated_amino_branch(
+                            mol, nbr.GetIdx(), idx, chain_set)
+                        if _bname is None:
+                            _decorated_failed = True
+                        else:
+                            _branch_entries.append((_bname, True))
+                        continue
                     _bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {idx})
                     if _bc <= 0:
                         continue
                     try:
-                        _branch_alkyls.append(get_alkyl_name(_bc))
+                        _branch_entries.append((get_alkyl_name(_bc), False))
                     except (ValueError, KeyError):
                         _branch_impure = True
+            if _decorated_failed:
+                # P-35.4.1 fail-closed: never the truncated alkyl name, never
+                # a branch-dropping 'amino'. (The chain-bonded N is unique per
+                # substituent, so no later iteration can re-emit this amino.)
+                return None
+            if any(_d for _n, _d in _branch_entries):
+                if _branch_impure:
+                    return None
+                return _assemble_decorated_amino_prefix(_branch_entries)
+            _branch_alkyls = [_n for _n, _d in _branch_entries]
             if _branch_alkyls and not _branch_impure:
                 if len(_branch_alkyls) == 1:
                     return f"({_branch_alkyls[0]}amino)"
