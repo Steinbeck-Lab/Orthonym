@@ -1196,14 +1196,25 @@ def name_substituted_polycyclic(
         # return keeps the retained short form ('fluorene').
         _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
         _stem = f"{_ih}-{pah_name}" if _ih else pah_name
-        _sep = '-' if (_ih and prefix_part and not prefix_part.endswith('-')) else ''
+        # A locant (digit) starting the parent stem must be set off from a
+        # letter-ending substituent prefix by a hyphen (P-16.3.3): '9-methyl-9H-
+        # fluorene', '2-methyl-9,10-dihydroanthracene', '1-methyl-12,19:13,18-
+        # di(metheno)dinaphtho[...]pentaphene'. _ih stems always start with the
+        # indicated-H digit, so this generalizes (and fixes) the prior _ih-only
+        # guard for any digit-initial parent name.
+        _sep = '-' if (prefix_part and not prefix_part.endswith('-')
+                       and _stem[:1].isdigit()) else ''
         name = f"{prefix_part}{_sep}{_stem}{suffix_part}"
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     # Build final name (prefix-only, no suffix FGs)
     _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
     _stem = f"{_ih}-{pah_name}" if _ih else pah_name
-    _sep = '-' if (_ih and prefix_part and not prefix_part.endswith('-')) else ''
+    # P-16.3.3: hyphen sets a digit-initial parent stem off from a letter-ending
+    # substituent prefix (same rule as the suffix branch above); _ih stems begin
+    # with the indicated-H digit so this subsumes the prior _ih-only guard.
+    _sep = '-' if (prefix_part and not prefix_part.endswith('-')
+                   and _stem[:1].isdigit()) else ''
     name = f"{prefix_part}{_sep}{_stem}"
     return f"{stereo_prefix}{name}" if stereo_prefix else name
 
