@@ -729,6 +729,137 @@ def _name_carbamoylamino_chain_substituent(
     return f"{loc}-(carbamoylamino){stem}yl"
 
 
+def _longest_carbon_chain(mol, backbone_set, attach):
+    """Longest simple carbon path in `backbone_set` starting at `attach` (a
+    terminus). Deterministic: ties broken by the lowest CanonicalRankAtoms
+    sequence along the path (P-29.2 numbering starts at the free valence)."""
+    from rdkit import Chem
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    best: list = []
+    best_key = None
+
+    def dfs(cur, path, seen):
+        nonlocal best, best_key
+        extended = False
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in backbone_set and ni not in seen:
+                extended = True
+                dfs(ni, path + [ni], seen | {ni})
+        if not extended:
+            key = (-len(path), tuple(ranks[i] for i in path))
+            if best_key is None or key < best_key:
+                best_key = key
+                best = list(path)
+
+    dfs(attach, [attach], {attach})
+    return best
+
+
+def _collect_branch_subtree(mol, seed, chain_set):
+    """All atoms reachable from `seed` without crossing into `chain_set`
+    (branch carbons + their attached FG atoms)."""
+    seen = {seed}
+    stack = [seed]
+    while stack:
+        c = stack.pop()
+        for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in chain_set or ni in seen:
+                continue
+            seen.add(ni)
+            stack.append(ni)
+    return seen
+
+
+def _branch_carbons_unbranched(mol, subtree, seed):
+    """True iff the branch's carbon skeleton is a linear chain rooted at `seed`
+    (so name_substituent yields a clean prefix and never reaches the enumerator's
+    malformed compound-substituent path). v1 fail-closed otherwise."""
+    cset = {i for i in subtree if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
+    for i in cset:
+        deg = sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                  if nb.GetIdx() in cset)
+        limit = 1 if i == seed else 2
+        if deg > limit:
+            return False
+    return True
+
+
+def _name_branched_polyfunctional_substituent(
+    mol, backbone_set, attach_idx, prefix_on,
+):
+    """W2F-P3 (P-59.2.1.8 / P-29.2 / P-16.3.3): name a BRANCHED acyclic saturated
+    carbon substituent bearing detachable FG prefixes, numbered from the free
+    valence (attach = locant 1). Principal chain = the longest carbon path from
+    the (primary-terminus) attachment; FG prefixes on chain carbons are located;
+    off-chain carbons + their FG atoms form simple UNBRANCHED sub-branches named
+    via name_substituent (hydroxymethyl, methyl, ...). Every atom is already
+    validated as a recognised FG / carbon by the caller's Pass-1/Pass-2, so this
+    only partitions + assembles. Fail-closed (None) outside v1: secondary
+    attachment, a sub-branch whose carbon skeleton is itself branched, an off-chain
+    FG host not absorbed by a branch, or a repeated complex branch prefix."""
+    from collections import defaultdict
+    from ..data.chain_names import get_chain_prefix
+    from .substituent_enumerator import name_substituent
+    from .naming_utils import needs_brackets
+
+    if sum(1 for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+           if n.GetIdx() in backbone_set) > 1:
+        return None  # secondary / internal attachment -> follow-on
+    chain = _longest_carbon_chain(mol, backbone_set, attach_idx)
+    if not chain or chain[0] != attach_idx:
+        return None
+    chain_set = set(chain)
+    pos = {idx: i + 1 for i, idx in enumerate(chain)}  # attach = 1
+
+    groups: dict = defaultdict(list)  # located-prefix -> [locant,...]
+    # (1) FG prefixes whose host carbon is ON the principal chain.
+    for c_idx, prefixes in prefix_on.items():
+        if c_idx in chain_set:
+            for pfx in prefixes:
+                groups[pfx].append(pos[c_idx])
+
+    # (2) off-chain backbone carbons = branch subtrees rooted at a chain carbon.
+    offchain = set(backbone_set) - chain_set
+    covered: set = set()
+    for seed in sorted(offchain):
+        if seed in covered:
+            continue
+        root_cs = [n.GetIdx() for n in mol.GetAtomWithIdx(seed).GetNeighbors()
+                   if n.GetIdx() in chain_set]
+        if len(root_cs) != 1:
+            continue  # interior branch atom -> collected via its own root
+        subtree = _collect_branch_subtree(mol, seed, chain_set)
+        if not _branch_carbons_unbranched(mol, subtree, seed):
+            return None  # branched sub-branch -> v1 fail-closed
+        covered |= subtree
+        bname = name_substituent(mol, subtree, seed)
+        if not bname:
+            return None
+        if needs_brackets(bname):
+            bname = f"({bname})"
+        if bname.startswith("(") and groups.get(bname):
+            return None  # repeated complex branch (bis/tris) -> follow-on
+        groups[bname].append(pos[root_cs[0]])
+
+    if offchain - covered:
+        return None  # an off-chain atom is not part of any branch subtree
+    for c_idx in prefix_on:
+        if c_idx not in chain_set and c_idx not in covered:
+            return None  # FG host neither on-chain nor inside a named branch
+
+    _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+    parts = []
+    for prefix in sorted(groups.keys(), key=alpha_sort_key):
+        locs = sorted(groups[prefix])
+        mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+        loc_str = ",".join(str(loc) for loc in locs)
+        parts.append(f"{loc_str}-{mult}{prefix}")
+    stem = get_chain_prefix(len(chain))
+    return f"{''.join(_joined_prefix_parts(parts))}{stem}yl"
+
+
 def _name_polyfunctional_acyclic_substituent(
     mol,
     sub_atoms: List[int],
@@ -979,16 +1110,24 @@ def _name_polyfunctional_acyclic_substituent(
             y in prefix_on.get(attach_idx, []) for y in _YLIDENES):
         return None
 
-    # ---- Backbone must be a single linear chain attached at a terminus. ----
-    for idx in backbone:
-        n_bb = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
-                   if n.GetIdx() in backbone_set)
-        if n_bb > 2:
-            return None  # branched backbone -> follow-on (located polyfunctional)
+    # ---- Backbone: linear (fast path below) or branched (W2F-P3, P-59.2.1.8). ----
+    is_branched = any(
+        sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if n.GetIdx() in backbone_set) > 2
+        for idx in backbone
+    )
+    if is_branched:
+        # Branched acyclic FG-bearing substituent: select a principal chain from
+        # the free valence and name off-chain sub-branches (the "located
+        # polyfunctional" follow-on this guard used to defer). Fail-closed (None)
+        # outside the v1 envelope; every atom is already Pass-2-validated.
+        return _name_branched_polyfunctional_substituent(
+            mol, backbone_set, attach_idx, prefix_on,
+        )
     n_attach_bb = sum(1 for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
                       if n.GetIdx() in backbone_set)
     if n_attach_bb > 1:
-        return None  # internal/secondary attachment -> follow-on
+        return None  # internal/secondary attachment on a linear backbone -> follow-on
 
     # Trace the chain from the attachment terminus (attach = locant 1).
     ordered = [attach_idx]
@@ -1038,11 +1177,16 @@ def _name_polyfunctional_acyclic_substituent(
 
 
 def _joined_prefix_parts(parts: List[str]) -> List[str]:
-    """Join alphabetised prefix parts inserting a hyphen between a letter and a
-    following locant digit (e.g. 'amino' + '2-carboxy' -> 'amino-2-carboxy')."""
+    """Join alphabetised prefix parts inserting a hyphen between a letter (or a
+    closing enclosing mark) and a following locant digit (e.g. 'amino' +
+    '2-carboxy' -> 'amino-2-carboxy'; '2-(hydroxymethyl)' + '5-oxo' ->
+    '2-(hydroxymethyl)-5-oxo'). W2F-P3: the closing-bracket case is needed by the
+    branched-substituent path, whose complex sub-branch parts end in ')'; the
+    linear path never emits bracketed parts, so it is byte-identical."""
     out = []
     for i, p in enumerate(parts):
-        if i > 0 and out and out[-1][-1].isalpha() and p[:1].isdigit():
+        if (i > 0 and out and (out[-1][-1].isalpha() or out[-1][-1] in ")]}")
+                and p[:1].isdigit()):
             out.append("-")
         out.append(p)
     return out

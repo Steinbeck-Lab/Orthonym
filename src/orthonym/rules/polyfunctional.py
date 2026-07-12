@@ -497,6 +497,16 @@ def _name_exocyclic_decoration(
             return None, comp
         if mol.GetAtomWithIdx(a).IsInRing():
             return None, comp
+    # W2F-P3 (P-59.2.1.8, fail-closed): the 'n-hydroxyalkyl' / 'n-oxoalkyl' /
+    # 'formyl' table rows each express EXACTLY ONE oxygen functional group over an
+    # otherwise-plain carbon chain. A branch bearing MORE than one O-FG (e.g. a
+    # hydroxymethyl branch AND a ketone) would be named from the single FG's view
+    # ('6-hydroxyhexyl'), silently DROPPING the others — structure loss, and it
+    # collides with the universal-pipeline substituent name for the same atoms.
+    # Decline so the caller defers the whole branch to the universal pipeline
+    # (Step 6), which names the branched multi-FG substituent faithfully.
+    if sum(1 for a in comp if mol.GetAtomWithIdx(a).GetSymbol() == 'O') != 1:
+        return None, comp
     carbon_count = sum(
         1 for a in comp if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
     )
@@ -988,7 +998,29 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # If the ring is < 40% of heavy atoms, it's likely a
                 # substituent on a chain parent, not the parent itself.
                 # E.g., sphingolipid with cyclohexane ring but 50+ chain atoms.
-                if total_heavy > 0 and ring_size / total_heavy < 0.35:
+                # W2F-P3 (P-44.1.1): EXCEPT when the principal characteristic
+                # group is attached to the ring — then the ring necessarily
+                # holds the PCG and MUST be the parent (the acyclic branch bears
+                # only junior groups), regardless of relative size. Without this
+                # exception a large FG-bearing acyclic substituent (item 15) drops
+                # the ring below the size heuristic and the whole molecule fails
+                # closed even though cyclohexane-1-carboxylic acid is the PIN parent.
+                _pcg_on_ring = False
+                for _match in (getattr(features, 'principal_group_atoms', None) or []):
+                    for _a in _match:
+                        if _a in ring_set:
+                            _pcg_on_ring = True
+                            break
+                        for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                            if _nb.GetIdx() in ring_set:
+                                _pcg_on_ring = True
+                                break
+                        if _pcg_on_ring:
+                            break
+                    if _pcg_on_ring:
+                        break
+                if (total_heavy > 0 and ring_size / total_heavy < 0.35
+                        and not _pcg_on_ring):
                     pass  # Fall through to return None
                 else:
                     # Check ring is fully saturated and non-aromatic

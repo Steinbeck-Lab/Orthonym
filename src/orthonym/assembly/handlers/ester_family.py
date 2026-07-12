@@ -107,9 +107,29 @@ def _is_ester_family(features: Any) -> bool:
             total_heavy = mol.GetNumHeavyAtoms()
             if total_heavy <= 0:
                 return False
-            if len(ring_atoms) / total_heavy < 0.35:
-                return False
             ring_set = set(ring_atoms)
+            # W2F-P3 (P-44.1.1): mirror name_polyfunctional's ring-as-parent
+            # size guard AND its PCG-on-ring exception — when the principal
+            # group is attached to the ring, the ring necessarily holds the PCG
+            # and MUST be the parent regardless of relative size (a large
+            # FG-bearing acyclic substituent otherwise drops the ring below the
+            # heuristic and the predicate never dispatches the handler).
+            _pcg_on_ring = False
+            for _match in (getattr(features, 'principal_group_atoms', None) or []):
+                for _a in _match:
+                    if _a in ring_set:
+                        _pcg_on_ring = True
+                        break
+                    for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if _nb.GetIdx() in ring_set:
+                            _pcg_on_ring = True
+                            break
+                    if _pcg_on_ring:
+                        break
+                if _pcg_on_ring:
+                    break
+            if len(ring_atoms) / total_heavy < 0.35 and not _pcg_on_ring:
+                return False
             for idx in ring_atoms:
                 atom = mol.GetAtomWithIdx(idx)
                 if atom.GetIsAromatic():
