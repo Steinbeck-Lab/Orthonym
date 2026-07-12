@@ -19,6 +19,25 @@ from orthonym.namer import name_compound
 UNKNOWN = "unknown organic compound"
 
 
+@pytest.fixture
+def gated(monkeypatch):
+    """Re-enable the production OPSIN-validity + SELF-01 gate for the
+    end-to-end fail-closed rows (research §1.C/§1.D design the 'unknown'
+    end state via the SELF-01/validity backstop: helper-None on the
+    DECORATED path plus the constitutional gate on the non-decorated
+    fallback paths — which are pre-existing/out-of-scope here). The autouse
+    conftest fixture disables the gate for speed, so those boundary molecules
+    surface their pre-suppression wrong names; re-enabling exercises the true
+    production behavior. Mirrors tests/unit/namer/test_self_consistency_gate.py.
+    Skips if the OPSIN jar is unavailable (portable)."""
+    import orthonym.namer as _nm
+    if not _nm._validity_gate_jar_present():
+        pytest.skip("OPSIN jar unavailable for gate-inclusive fail-closed test")
+    monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    monkeypatch.setattr(_nm, "_SC_MODE", "on", raising=False)
+    yield
+
+
 @pytest.mark.unit
 class TestDecoratedAminoChainParent:
     """Task 1: single decorated N-branch, end-to-end (site 1 emits)."""
@@ -155,3 +174,84 @@ class TestSite2FallbackDirect:
         assert _name_n_attached_substituent_fallback(
             mol, [1, 0, 2], {1, 0, 2}, set(range(3, 11)), 1
         ) == "(dimethylamino)"
+
+
+@pytest.mark.unit
+@pytest.mark.usefixtures("gated")
+class TestFailClosedBoundary:
+    """Task 3: research §1.D fail-closed rows — refuse, never truncate.
+
+    Gate-inclusive: the 'unknown'/'inorganic' end state is produced by the
+    SELF-01/validity backstop (research §1.C/§1.D). Run with the production
+    gate re-enabled (see the ``gated`` fixture) rather than the autouse
+    gate-off default, so these assert TRUE production fail-closed behavior."""
+
+    def test_boronic_branch_stays_unknown(self):
+        assert name_compound("OB(O)CNCCCCCCCC(=O)O") == UNKNOWN
+
+    def test_selanyl_branch_refuses_or_exact_heal(self):
+        # HEAD producer emits structure-corrupt 'hydroxymethaneselenyl'
+        # (no O in the branch!) — must refuse. Heal-optional acceptance:
+        # the OPSIN-verified '8-[(selanylmethyl)amino]octanoic acid'.
+        out = name_compound("[SeH]CNCCCCCCCC(=O)O")
+        assert out in (UNKNOWN, "8-[(selanylmethyl)amino]octanoic acid")
+
+    def test_arsanyl_branch_stays_refused(self):
+        # refused upstream at dispatch (never reaches the new code) — pins
+        # that name_substituent_fragment's atom-dropping 'propynyl' can
+        # never surface (research §1.D row 3).
+        out = name_compound("[AsH2]C#CCNCCCCCCCC(=O)O")
+        assert out in (UNKNOWN, "inorganic compound (not supported)")
+
+
+@pytest.mark.unit
+class TestRegressionGuards:
+    """Task 3: research §1.F gold-exposure rows — all HEAD-OK, must stay."""
+
+    def test_ring_path_gold_w2e_p1fc_10(self):
+        # rules/benzene.py path — file untouched by this plan
+        assert name_compound("ClCNc1ccc(C(=O)O)cc1") == \
+            "4-[(chloromethyl)amino]benzoic acid"
+
+    def test_n_halo_golds_w2_npref(self):
+        # N-halo/N-OH: no C branch -> the edited loops no-op (seniority path)
+        assert name_compound("ClNCCCCCCCC(=O)O") == \
+            "8-(chloroamino)octanoic acid"
+        assert name_compound("FNCCCCCCCC(=O)O") == \
+            "8-(fluoroamino)octanoic acid"
+        assert name_compound("ONCCC(=O)O") == \
+            "3-(hydroxyamino)propanoic acid"
+
+    def test_dimethylamino_gold_w2c_d_am_04(self):
+        # pure N,N-dimethyl path byte-identical (acylamino main path + site 2)
+        assert name_compound("CCN=C(CCC(=O)OC)N(C)C") == \
+            "methyl 4-(dimethylamino)-4-(ethylimino)butanoate"
+
+    def test_carbamoylamino_gold_w2e_p1chainsa_09(self):
+        # acylamino MAIN path (carbonyl found) — untouched by the edits
+        assert name_compound("NC(=O)NCCCNC=O") == \
+            "N-[3-(carbamoylamino)propyl]formamide"
+
+    @pytest.mark.usefixtures("gated")
+    def test_pure_branched_n_branch_stays_out_of_scope(self):
+        # research §1.F latent-wrong adjacency: pure-carbon BRANCHED branch
+        # (isopropyl) stays gated OUT of the helper; assert we did not start
+        # emitting the linearized wrong name. Gate-inclusive: the legacy
+        # pure-carbon path (unchanged by this plan) emits the wrong
+        # '(propylamino)' which the SELF-01 backstop suppresses to 'unknown'
+        # (A/B: byte-identical HEAD vs current — pre-existing, out of scope).
+        out = name_compound("CC(C)NCCCCCCCC(=O)O")
+        assert out != "8-(propylamino)octanoic acid"
+
+
+@pytest.mark.unit
+class TestMixedSimpleDecorated:
+    """Task 3 decision rule (FIRST arm): the mixed simple+decorated surface
+    is OPSIN-RT-verified at implementation time, so the grammar-derived name
+    is kept (decorated always parenthesized; second-cited simple parenthesized
+    per P-16.5.1.3.1). Not added to golds (not in the research's table)."""
+
+    def test_mixed_simple_decorated_verified(self):
+        # OPSIN-RT re-verified at implementation time (diagnose OK)
+        assert name_compound("CN(CCl)CCCCCCCC(=O)O") == \
+            "8-[(chloromethyl)(methyl)amino]octanoic acid"
