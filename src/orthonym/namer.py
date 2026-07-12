@@ -487,12 +487,16 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         if stats is not None:
             stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
         return name  # ship the full stereo name — only the stereo layer is OPSIN-narrow
-    # NOTE (D-06, deferred): a bare radical/substituent name OPSIN rejects as
-    # "not a complete molecule" is intentionally NOT un-suppressed here. Doing so
-    # without the P-71 non-terminal-locant fix (_apply_radical_suffix ships e.g.
-    # `propyl` for the isopropyl radical, should be `propan-2-yl`) would ship a WRONG
-    # name — worse than the honest fallback. Radical un-suppression must land WITH that
-    # locant fix (audit Dim-08 §B); radicals stay suppressed here.
+    # NOTE (D-06, resolved): radical names now ship normally. The validity gate's
+    # primary probe runs the OpsinOracle WITH `-r` (retained_substitution.py), so
+    # a well-formed radical name parses -> SELF-01 constitutional compare -> ships.
+    # The P-71 non-terminal-locant fix landed long ago (single sites:
+    # C[CH]C -> `propan-2-yl` via emit_parent_hydride_cumulative_suffix); multi-site
+    # free valences (P-71.2.3: ethane-1,2-diyl / propane-1,2,3-triyl /
+    # ethan-1-yl-2-ylidene) landed in w2f p5. The suppression below is NOT
+    # radical-specific: it is the general fail-closed backstop for names OPSIN
+    # rejects EVEN WITH `-r` (constitutional defects) — no validity-gate edit is
+    # needed to emit radicals.
     # Definitively unparseable (constitutional defect) -> suppress to the honest fallback.
     if stats is not None:
         stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1

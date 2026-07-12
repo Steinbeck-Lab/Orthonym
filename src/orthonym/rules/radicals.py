@@ -51,30 +51,30 @@ from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 RETAINED_RADICALS = {
     # Monovalent alkyl radicals
     '[CH3]': 'methyl',
-    'C[CH2]': 'ethyl',
-    'CC[CH2]': 'propyl',
-    'CCC[CH2]': 'butyl',
+    '[CH2]C': 'ethyl',
+    '[CH2]CC': 'propyl',
+    '[CH2]CCC': 'butyl',
 
     # Divalent radicals
     '[CH2]': 'methylidene',
-    'C[CH]': 'ethylidene',
+    '[CH]C': 'ethylidene',
 
     # Trivalent radicals
     '[CH]': 'methylidyne',
 
     # Aryl radicals
     '[c]1ccccc1': 'phenyl',
-    'c1ccc([CH2])cc1': 'benzyl',
+    '[CH2]c1ccccc1': 'benzyl',
 
     # Acyl radicals (carbonyl radicals)
     '[CH]=O': 'formyl',
     'C[C]=O': 'acetyl',
     'CC[C]=O': 'propanoyl',
-    'c1ccc([C]=O)cc1': 'benzoyl',
+    'O=[C]c1ccccc1': 'benzoyl',
 
     # Oxyl radicals (oxygen-centered)
-    '[O]C': 'methoxyl',
-    '[O]CC': 'ethoxyl',
+    'C[O]': 'methoxyl',
+    'CC[O]': 'ethoxyl',
     '[O]c1ccccc1': 'phenoxyl',
 }
 

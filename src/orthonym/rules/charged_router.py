@@ -900,8 +900,11 @@ def route_charged(mol, style: str = 'pin') -> str:
             return emit_parent_hydride_polyvalent_suffixes(mol, centers) or ''
         from .radicals import classify_radical
         rinfo = classify_radical(mol, radical_sites[0])
-        if rinfo['subtype'] in ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl'):
+        if rinfo['subtype'] in ('acyl', 'oxyl', 'aryl', 'aminyl', 'thiyl', 'benzylic'):
             return ''  # structured helpers / out of scope -> legacy fallthrough
+        # 'benzylic': bail so _handle_radical falls to name_radical, whose
+        # (now-canonical) RETAINED_RADICALS lookup ships the retained PIN
+        # 'benzyl' (P-57.1.2) instead of the non-PIN 'toluenyl' fallback.
         n_e = radical_sites[0]['n_electrons']
         radical_suffix = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}.get(n_e)
         if radical_suffix is None:

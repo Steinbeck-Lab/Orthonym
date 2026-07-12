@@ -508,3 +508,16 @@ class TestNamingPipeline:
         if mol:
             name = name_radical(mol)
             assert name == expected_name, f"Expected {expected_name} for {smiles}, got {name}"
+
+
+class TestRetainedRadicalCanonicalKeys:
+    def test_all_keys_are_rdkit_canonical(self):
+        from rdkit import Chem
+        from orthonym.rules.radicals import RETAINED_RADICALS
+        for k in RETAINED_RADICALS:
+            assert Chem.MolToSmiles(Chem.MolFromSmiles(k)) == k, f"dead key {k!r}"
+
+    def test_benzyl_pin(self):
+        from orthonym.rules.radicals import name_radical
+        from rdkit import Chem
+        assert name_radical(Chem.MolFromSmiles("[CH2]c1ccccc1"), style="pin") == "benzyl"
