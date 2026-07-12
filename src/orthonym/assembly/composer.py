@@ -8337,26 +8337,40 @@ def _name_n_attached_substituent_fallback(
         )
         return None
 
-    # Count carbons PER N-branch via C-C bonds only.
-    # Phase 167 HYG-04 site#2: previously this SUMMED carbons across all N-branches
-    # as one chain, so -N(CH3)2 (two 1-carbon methyls) named "(ethylamino)" instead
-    # of "(dimethylamino)". Name each branch separately and apply the principal-amine
-    # multiplicity (Counter + SIMPLE_MULTIPLIERS). Single-branch form preserved
-    # byte-identical; only the N,N-dialkyl(+) case changes.
-    branch_alkyls = []
+    # Count carbons PER N-branch via C-C bonds only (Phase 167 HYG-04
+    # multiplicity fix preserved). w2f p1 (P-35.4.1): a branch carrying ANY
+    # non-C heavy atom is DECORATED -> centralized producer or fail-closed
+    # None (never the branch-dropping 'amino', never the carbon-count name).
+    # Pure-carbon branches keep the legacy path BYTE-IDENTICAL.
+    branch_entries = []
     branch_impure = False
     for nbr in atom.GetNeighbors():
         if nbr.GetIdx() in chain_set:
             continue
         if nbr.GetSymbol() == 'C':
+            _batoms = _amino_branch_atoms(
+                mol, nbr.GetIdx(), attach_atom, chain_set)
+            if any(mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)
+                   for a in _batoms):
+                _bname = _name_decorated_amino_branch(
+                    mol, nbr.GetIdx(), attach_atom, chain_set)
+                if _bname is None:
+                    return None  # P-35.4.1 fail-closed
+                branch_entries.append((_bname, True))
+                continue
             bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
             if bc <= 0:
                 continue
             try:
-                branch_alkyls.append(get_alkyl_name(bc))
+                branch_entries.append((get_alkyl_name(bc), False))
             except (ValueError, KeyError):
                 branch_impure = True
 
+    if any(_d for _n, _d in branch_entries):
+        if branch_impure:
+            return None  # decorated + un-nameable sibling -> fail closed
+        return _assemble_decorated_amino_prefix(branch_entries)
+    branch_alkyls = [_n for _n, _d in branch_entries]
     if not branch_alkyls or branch_impure:
         return "amino"
     if len(branch_alkyls) == 1:

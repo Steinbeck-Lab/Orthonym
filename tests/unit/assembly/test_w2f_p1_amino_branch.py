@@ -94,3 +94,64 @@ class TestHelperContracts:
         assert _assemble_decorated_amino_prefix(
             [("2-hydroxyethyl", True), ("chloromethyl", True)]
         ) == "[(chloromethyl)(2-hydroxyethyl)amino]"
+
+
+@pytest.mark.unit
+class TestNNDecoratedAminoEndToEnd:
+    """Task 2: N,N-di decorated branches, end-to-end."""
+
+    def test_bis_identical_decorated(self):
+        assert name_compound("ClCN(CCl)CCCCCCCC(=O)O") == \
+            "8-[bis(chloromethyl)amino]octanoic acid"
+
+    def test_mixed_decorated_alphanumerical(self):
+        # citation c < h by the letters-only key (research §1.D)
+        assert name_compound("ClCN(CCO)CCCCCCCC(=O)O") == \
+            "8-[(chloromethyl)(2-hydroxyethyl)amino]octanoic acid"
+
+
+@pytest.mark.unit
+class TestSite2FallbackDirect:
+    """Task 2: _name_n_attached_substituent_fallback, unit level."""
+
+    def test_site2_decorated_single(self):
+        from orthonym.assembly.composer import (
+            _name_n_attached_substituent_fallback,
+        )
+        mol = Chem.MolFromSmiles("ClCNCCCCCCCC(=O)O")
+        # sub = N(2) + CH2Cl branch {1, 0}; chain = 3..10; attach = the N
+        assert _name_n_attached_substituent_fallback(
+            mol, [2, 1, 0], {2, 1, 0}, set(range(3, 11)), 2
+        ) == "[(chloromethyl)amino]"
+
+    def test_site2_decorated_unnameable_fails_closed(self):
+        from orthonym.assembly.composer import (
+            _name_n_attached_substituent_fallback,
+        )
+        mol = Chem.MolFromSmiles("OB(O)CNCCCCCCCC(=O)O")
+        # sub = N(4) + CH2-B(OH)2 branch {3, 1, 0, 2}; producer output is
+        # garbled ('methylboronic acidyl') -> helper None -> site returns
+        # None, NEVER the branch-dropping 'amino' NOR '(methylamino)'.
+        assert _name_n_attached_substituent_fallback(
+            mol, [4, 3, 1, 0, 2], {4, 3, 1, 0, 2}, set(range(5, 13)), 4
+        ) is None
+
+    def test_site2_pure_alkyl_byte_identical(self):
+        from orthonym.assembly.composer import (
+            _name_n_attached_substituent_fallback,
+        )
+        mol = Chem.MolFromSmiles("CNCCCCCCCC(=O)O")
+        # 0=CH3 1=N 2..9=chain — legacy single-branch form preserved
+        assert _name_n_attached_substituent_fallback(
+            mol, [1, 0], {1, 0}, set(range(2, 10)), 1
+        ) == "(methylamino)"
+
+    def test_site2_nn_dimethyl_byte_identical(self):
+        from orthonym.assembly.composer import (
+            _name_n_attached_substituent_fallback,
+        )
+        mol = Chem.MolFromSmiles("CN(C)CCCCCCCC(=O)O")
+        # 0=CH3 1=N 2=CH3 3..10=chain — legacy HYG-04 form preserved
+        assert _name_n_attached_substituent_fallback(
+            mol, [1, 0, 2], {1, 0, 2}, set(range(3, 11)), 1
+        ) == "(dimethylamino)"
