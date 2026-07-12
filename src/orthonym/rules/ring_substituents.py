@@ -1992,6 +1992,33 @@ def get_ring_attachment_atom(
     return None
 
 
+def _collect_acyclic_branch(mol, start_idx: int, ring_atom_set: Set[int]
+                            ) -> Optional[Set[int]]:
+    """All atom indices of the exocyclic branch rooted at ``start_idx`` (BFS),
+    excluding the parent ring. Returns None if the branch re-enters ANY ring
+    (a nested ring substituent is out of the acyclic-branch scope — the caller
+    must then fail closed rather than emit a partial name). Used to hand a
+    branched/substituted acyclic-carbon substituent (e.g. ``1-chloroethyl``,
+    with an optional CIP stereodescriptor) to the universal substituent namer.
+    """
+    seen: Set[int] = set()
+    stack = [start_idx]
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        atom = mol.GetAtomWithIdx(cur)
+        if atom.IsInRing():
+            return None
+        for nbr in atom.GetNeighbors():
+            j = nbr.GetIdx()
+            if j in ring_atom_set or j in seen:
+                continue
+            stack.append(j)
+    return seen
+
+
 def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                                    ring_atom_set: Set[int],
                                    skip_atoms: Set[int]):
@@ -2140,6 +2167,22 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                 prefixes.append(_ALKYL[chain])
                 covered.update(_chain_atoms(ni, ring_atom_idx))
                 continue
+            # Branched / substituted acyclic-carbon substituent (e.g.
+            # (1S)-1-chloroethyl for P-45.6): the v1 table deliberately excluded
+            # branched alkyl and has no stereodescriptor support. Name the whole
+            # exocyclic branch with the universal acyclic substituent namer (it
+            # renders '(1S)-1-chloroethyl'); the assembly brackets it as a
+            # complex prefix. Fail closed on a ring-bearing or unnameable branch
+            # so no partially-described name can leak.
+            frag = _collect_acyclic_branch(mol, ni, ring_atom_set)
+            if frag is not None:
+                from ..assembly.substituent_naming import name_substituent_fragment
+                cname = name_substituent_fragment(
+                    mol, sorted(frag), ni, list(ring_atom_set))
+                if cname and ' ' not in cname and cname.endswith('yl'):
+                    prefixes.append(cname)
+                    covered.update(frag)
+                    continue
             return None
         # anything else exocyclic -> unsupported
         return None
@@ -2324,13 +2367,41 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         for name in atom_prefixes[i]:
             groups.setdefault(name, []).append(p)
     from ..assembly.naming_utils import get_multiplier_prefix
-    parts = []
-    for name in sorted(groups):  # alphabetical citation order
-        locs = sorted(groups[name])
-        loc_str = ','.join(str(loc) for loc in locs)
-        mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
-        parts.append(f'{loc_str}-{mult}{name}')
-    prefix_str = '-'.join(parts)
+
+    def _is_complex_prefix(nm: str) -> bool:
+        # simple v1-table prefixes are bare lowercase words; a branched/stereo
+        # substituent name carries a locant, hyphen, or enclosing mark.
+        return any(c in nm for c in '-()[]0123456789')
+
+    if not any(_is_complex_prefix(nm) for nm in groups):
+        # byte-identical legacy path — simple-prefix rings are unchanged.
+        parts = []
+        for name in sorted(groups):  # alphabetical citation order
+            locs = sorted(groups[name])
+            loc_str = ','.join(str(loc) for loc in locs)
+            mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
+            parts.append(f'{loc_str}-{mult}{name}')
+        prefix_str = '-'.join(parts)
+    else:
+        # P-16.5.4: a complex (branched/stereo) prefix is enclosed; ordering is
+        # by the alphanumerical key of its stereo-stripped base name (P-14.5.2:
+        # '(1S)-1-chloroethyl' alphabetizes at 'c', descriptor + locant ignored).
+        from ..assembly.naming_utils import (
+            alpha_sort_key as _alpha_sort_key, apply_enclosing_marks,
+        )
+        from .stereochemistry import strip_stereo as _strip_stereo
+
+        def _sort_key(nm: str):
+            return (_alpha_sort_key(_strip_stereo(nm)), nm)
+
+        parts = []
+        for name in sorted(groups, key=_sort_key):
+            locs = sorted(groups[name])
+            loc_str = ','.join(str(loc) for loc in locs)
+            mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
+            rendered = apply_enclosing_marks(name, -1) if _is_complex_prefix(name) else name
+            parts.append(f'{loc_str}-{mult}{rendered}')
+        prefix_str = '-'.join(parts)
 
     if het:
         return f'{prefix_str}{stem}-{attachment_locant}-yl'
