@@ -21,42 +21,44 @@ from orthonym.namer import name_compound
 
 
 class TestAlkoxycarbonylE2E:
-    """End-to-end tests: SMILES -> IUPAC name with alkoxycarbonyl prefix."""
+    """End-to-end tests: acid-principal in-chain partial (di)esters.
+
+    W2F-P2 (P-65.6.3.3.5 method (1)) SUPERSEDED the old ``R-oxycarbonyl``
+    expectations here. For an acid-principal partial ester whose ester
+    carbonyl is a MEMBER of the principal chain, spelling that carbonyl as
+    ``methoxycarbonyl`` double-counts the carbonyl carbon and names a
+    one-carbon-longer HOMOLOG: ``4-methoxycarbonylbutanoic acid`` is methyl
+    hydrogen *glutarate* (C5), not the methyl hydrogen *succinate* (C4) that
+    ``COC(=O)CCC(=O)O`` actually is. The old raw names were RT-MISMATCH leaks
+    suppressed to ``unknown`` by SELF-01 in production; the unit gate (off)
+    let the wrong string through. The PIN is the substitutive ``oxo``+``R-oxy``
+    form, OPSIN-RT-verified (golds W2F-P2-01..04). Alkoxycarbonyl remains
+    correct for RING parents / off-chain carbonyls (Task-1 guard preserves
+    those — see TestAlkoxycarbonylUnit / TestAlkoxycarbonylNegative)."""
 
     def test_methyl_ester_succinate(self):
-        """Methyl hydrogen succinate: ester + acid on C4 chain."""
-        result = name_compound("COC(=O)CCC(=O)O")
-        assert "methoxycarbonyl" in result.lower()
-        assert "butanoic acid" in result.lower()
+        """Methyl hydrogen succinate (C4): in-chain ester -> oxo+methoxy PIN."""
+        assert name_compound("COC(=O)CCC(=O)O") == "4-methoxy-4-oxobutanoic acid"
 
     def test_ethyl_ester_glutarate(self):
-        """Ethyl hydrogen glutarate: ester + acid on C5 chain."""
-        result = name_compound("CCOC(=O)CCCC(=O)O")
-        assert "ethoxycarbonyl" in result.lower()
-        assert "pentanoic acid" in result.lower()
+        """Ethyl hydrogen glutarate (C5): in-chain ester -> oxo+ethoxy PIN."""
+        assert name_compound("CCOC(=O)CCCC(=O)O") == "5-ethoxy-5-oxopentanoic acid"
 
     def test_methyl_ester_adipate(self):
-        """Methyl hydrogen adipate: ester + acid on C6 chain."""
-        result = name_compound("COC(=O)CCCCC(=O)O")
-        assert "methoxycarbonyl" in result.lower()
-        assert "hexanoic acid" in result.lower()
+        """Methyl hydrogen adipate (C6): in-chain ester -> oxo+methoxy PIN."""
+        assert name_compound("COC(=O)CCCCC(=O)O") == "6-methoxy-6-oxohexanoic acid"
 
     def test_ethyl_ester_malonate(self):
-        """Ethyl hydrogen malonate: ester + acid on C3 chain."""
-        result = name_compound("CCOC(=O)CC(=O)O")
-        assert "ethoxycarbonyl" in result.lower()
-        assert "propanoic acid" in result.lower()
+        """Ethyl hydrogen malonate (C3): in-chain ester -> oxo+ethoxy PIN."""
+        assert name_compound("CCOC(=O)CC(=O)O") == "3-ethoxy-3-oxopropanoic acid"
 
     def test_phenyl_ester_succinate(self):
-        """Phenyl hydrogen succinate: aryl ester + acid."""
-        result = name_compound("O=C(Oc1ccccc1)CCC(=O)O")
-        assert "phenoxycarbonyl" in result.lower()
-        assert "butanoic acid" in result.lower()
+        """Phenyl hydrogen succinate (C4): aryl in-chain ester -> oxo+phenoxy PIN."""
+        assert name_compound("O=C(Oc1ccccc1)CCC(=O)O") == "4-oxo-4-phenoxybutanoic acid"
 
     def test_propyl_ester(self):
-        """Propyl ester on pentanoic acid."""
-        result = name_compound("CCCOC(=O)CCCC(=O)O")
-        assert "propoxycarbonyl" in result.lower()
+        """Propyl hydrogen glutarate (C5): in-chain ester -> oxo+propoxy PIN."""
+        assert name_compound("CCCOC(=O)CCCC(=O)O") == "5-oxo-5-propoxypentanoic acid"
 
 
 # ============================================================================
