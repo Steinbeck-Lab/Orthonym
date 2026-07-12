@@ -1354,12 +1354,6 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
             return ''  # multi-fragment -> out of scope
     except Exception:
         return ''
-    # Task 1 scope: HOMOGENEOUS centers only (all n_electrons equal). The mixed
-    # yl/ylidene case is lifted in Task 3 (the suffix synthesis + typed
-    # orientation key below already handle it — only this guard defers it).
-    if len({n for _idx, n in centers}) != 1:
-        return ''
-
     ne_by_idx = {i: n for i, n in centers}
 
     # --- 2. Saturate every centre on ONE index-preserving RWMol --------------

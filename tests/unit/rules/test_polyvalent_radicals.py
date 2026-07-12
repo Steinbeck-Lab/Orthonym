@@ -57,10 +57,10 @@ class TestScopeGuardsFailClosed:
         assert len(centers) == 1
         assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""
 
-    def test_mixed_suffix_deferred_to_task3(self):
-        # ethan-1-yl-2-ylidene (1e+2e) is out of THIS task's homogeneous scope
-        mol, centers = _mol_centers("[CH2][CH]")   # canon [CH][CH2]
-        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""
+    # NOTE: the Task-1-authored ``test_mixed_suffix_deferred_to_task3`` (mixed
+    # 1e+2e -> '') was removed here in Task 3: Task 3 deliberately LIFTS that
+    # homogeneous-only deferral, and the mixed case is now asserted positively in
+    # ``TestMixedSuffix.test_mixed_yl_ylidene`` ([CH2][CH] -> ethan-1-yl-2-ylidene).
 
 
 class TestRouteChargedMultiSite:
@@ -89,3 +89,24 @@ class TestRouteChargedMultiSite:
         from orthonym.rules.charged_router import route_charged
         assert route_charged(Chem.MolFromSmiles("CC[CH]CC"), "pin") == "pentan-3-yl"
         assert route_charged(Chem.MolFromSmiles("C[CH]C"), "pin") == "propan-2-yl"
+
+
+class TestMixedSuffix:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("[CH2][CH]",   "ethan-1-yl-2-ylidene"),   # BB P-71.6 verbatim; yl gets locant 1; 'e' elided before 'y'
+        ("[CH]C[CH2]",  "propan-1-yl-3-ylidene"),   # yl-lowest tie-break picks 1-yl over 3-yl
+    ])
+    def test_mixed_yl_ylidene(self, smiles, expected):
+        mol, centers = _mol_centers(smiles)
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == expected
+
+    def test_citation_order_yl_before_ylidene(self):
+        # even when ylidene holds the lower locant, yl is CITED first (P-29.3.2.2)
+        mol, centers = _mol_centers("[CH2][CH]")
+        out = emit_parent_hydride_polyvalent_suffixes(mol, centers)
+        assert out.index("yl") < out.index("ylidene")
+
+    def test_homogeneous_still_pass(self):
+        # regression: Task 1 golds unaffected by the mixed lift
+        mol, centers = _mol_centers("[CH2][CH2]")
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == "ethane-1,2-diyl"
