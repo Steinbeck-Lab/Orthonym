@@ -1075,8 +1075,30 @@ def _name_polyfunctional_acyclic_substituent(
                                     'Se': 'selanylidene',
                                     'Te': 'tellanylidene'}[sym])
             fg_count += 1
+        elif sym == 'P':
+            # W2F-P7 (P-68.3): a phosphanyl group as a detachable prefix on a
+            # backbone carbon (-CH2-PH2 -> 'phosphanylmethyl'). This roots the
+            # substituent at the free-valence CARBON (correct), whereas the Tier-4
+            # recursive namer names the capped fragment as a FREE molecule
+            # (CH3-PH2 -> 'methylphosphane' -> the wrong 'methylphosphyl'). Only
+            # the STANDARD-valence terminal hydride P is named here (simple prefix,
+            # no enclosing marks); a λ5-hydride / organyl P returns None so the
+            # whole fragment falls through to the recursive tier, which roots it
+            # correctly as '(lambda5-phosphanyl)methyl'. The name_phosphanyl_
+            # substituent guard EXCLUDES a phosphoryl/phosphonic P=O.
+            if len(in_frag_nbrs) != 1 or len(c_host) != 1:
+                return None
+            bond = mol.GetBondBetweenAtoms(idx, c_host[0])
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            from ..rules.phosphorus import name_phosphanyl_substituent
+            _phn = name_phosphanyl_substituent(mol, [idx], idx)
+            if _phn != 'phosphanyl':      # λ5 / dialkyl / P=O -> recursive tier
+                return None
+            _add_prefix(c_host[0], _phn)
+            fg_count += 1
         else:
-            return None                  # P / B / etc. -> decline
+            return None                  # B / etc. -> decline
 
     # A single carbon bearing BOTH oxo and hydroxy is a carboxyl carbon (-C(=O)OH)
     # that Pass-1 did not consume as 'carboxy' (e.g. its only non-O neighbour is the

@@ -9,6 +9,8 @@ from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
+from ..rules.lambda_convention import nonstandard_bonding_number
+
 
 def find_all_carbon_chains(
     mol,
@@ -780,6 +782,33 @@ def find_principal_chain(
         entries.sort()
         return (sorted(sub_locants), tuple(loc for _a, loc in entries))
 
+    def _lambda_direct_key(chain: List[int]) -> tuple:
+        """P-45.3.1 (BB 22172-22182): among chains tying on every P-44 term,
+        the PIN parent bears the substituent group of the HIGHEST bonding number
+        directly connected to it (λ5 > λ3). Score = the multiset of nonstandard
+        (λ) bonding numbers of the DIRECTLY-attached substituent atoms, sorted
+        descending; the chain with the lexicographically-greatest tuple wins.
+
+        For ``OC(=O)C(CP)C[PH4]`` the chain through the -CH2-PH4 arm makes λ5-P a
+        direct substituent (key ``(5,)``); the chain through the -CH2-PH2 arm has
+        no directly-attached λ atom (key ``()``) — so the former is the parent,
+        giving ``3-(λ5-phosphanyl)-2-(phosphanylmethyl)propanoic acid`` (PIN), not
+        the ``[not] 3-phosphanyl-2-(λ5-phosphanylmethyl)…`` alternative.
+        """
+        cset = set(chain)
+        lams = []
+        for atom_idx in chain:
+            for nbr in mol.GetAtomWithIdx(atom_idx).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in cset or ni in combined_exclude or ni in fg_atoms:
+                    continue
+                if nbr.GetSymbol() == 'H':
+                    continue
+                lam = nonstandard_bonding_number(mol, ni)
+                if lam is not None:
+                    lams.append(lam)
+        return tuple(sorted(lams, reverse=True))
+
     # Find chain with highest score; break exact ties deterministically (P-45).
     scored = [(chain_score(c), c) for c in chains]
     best_score = max(s for s, _ in scored)
@@ -787,7 +816,11 @@ def find_principal_chain(
     if len(top) == 1:
         best_chain = top[0]
     else:
-        best_chain = min(top, key=_p45_alpha_key)
+        # P-45.3.1 nonstandard-bonding-number criterion runs BEFORE the
+        # alphanumerical comparator (all P-44 terms already tied within `top`).
+        best_lambda = max(_lambda_direct_key(c) for c in top)
+        top = [c for c in top if _lambda_direct_key(c) == best_lambda]
+        best_chain = top[0] if len(top) == 1 else min(top, key=_p45_alpha_key)
 
     # Determine numbering direction (lowest locants for principal group)
     if principal_group and fg_atoms:
