@@ -2570,6 +2570,27 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     from ..rules.benzene import orient_benzene, name_substituted_benzene
 
     mol = features.mol
+
+    # P-45.5.1 / P-45.6.3 (diaryl-linked-by-heteroatom, W2F-P8): when the
+    # molecule has 2+ benzene rings and NO senior suffix PCG competing for the
+    # parent — a diaryl ether (principal_group None) or a secondary diaryl amine
+    # (principal_group 'secondary_amine', named as the retained aniline via
+    # substituent promotion, P-62.2.1.1) — the parent ring must be chosen by the
+    # alphanumerical order of the complete candidate names (with the R<S
+    # tie-break), which is DETERMINISTIC. The candidate pool otherwise competes a
+    # per-benzene-ring parent pass under 'first_applicable' (first-added wins), so
+    # the choice flipped with the SMILES atom order. Delegate to the single
+    # preferred-parent authority so every pass yields the same, correct name.
+    _pg = getattr(features, 'principal_group', None)
+    if _pg is None or _pg == 'secondary_amine':
+        from ..rules.benzene import is_benzene_ring, _preferred_benzene_parent_ring
+        _bz_rings = [r for r in mol.GetRingInfo().AtomRings()
+                     if is_benzene_ring(mol, r)]
+        if len(_bz_rings) > 1:
+            _pref = _preferred_benzene_parent_ring(mol)
+            if _pref is not None:
+                return _pref[1]
+
     ring_atoms = features.benzene_ring
     substituents = features.benzene_substituents
 
