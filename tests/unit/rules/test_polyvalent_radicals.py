@@ -1,0 +1,63 @@
+"""P-29.2 / P-71.2.3 multi-site free-valence (polyradical) PINs (w2f p5 Tasks 1-3).
+
+Names here are ASSERTED as raw strings straight off the rule functions (no OPSIN
+in the assertion path). Every expected string is OPSIN-2.9-`-r`-verified in
+ §Item-1 §D (radical names need the -r
+OPSIN flag for name->structure round-trip; the phase gate scores by exact string,
+so these gate cleanly — research §E2).
+"""
+import pytest
+from rdkit import Chem
+
+from orthonym.perception.ions import get_radical_sites
+from orthonym.rules.ions import emit_parent_hydride_polyvalent_suffixes
+
+
+def _mol_centers(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    sites = get_radical_sites(mol)
+    return mol, [(s["atom_idx"], s["n_electrons"]) for s in sites]
+
+
+class TestHomogeneousPolyradical:
+    @pytest.mark.parametrize("smiles,expected", [
+        ("[CH2][CH2]",        "ethane-1,2-diyl"),        # BB P-71.2.3 verbatim; 'e' kept before 'd'
+        ("[CH2]C[CH2]",       "propane-1,3-diyl"),       # symmetric
+        ("[CH2]CC[CH2]",      "butane-1,4-diyl"),
+        ("[CH2][CH]C",        "propane-1,2-diyl"),       # asymmetric set -> lowest-set orientation {1,2}
+        ("CC([CH2])[CH2]",    "2-methylpropane-1,3-diyl"),# substituent prefix on the diyl parent
+        ("[CH2][CH][CH2]",    "propane-1,2,3-triyl"),    # BB P-71.2.3 verbatim; three 1e sites
+        ("C[C]C[C]C",         "pentane-2,4-diylidene"),  # BB P-71.2.3 verbatim; two 2e sites
+    ])
+    def test_homogeneous(self, smiles, expected):
+        mol, centers = _mol_centers(smiles)
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == expected
+
+    def test_symmetric_is_orientation_stable(self):
+        # both chain ends equivalent -> identical name (determinism sanity)
+        mol, centers = _mol_centers("[CH2]C[CH2]")
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == "propane-1,3-diyl"
+
+
+class TestScopeGuardsFailClosed:
+    @pytest.mark.parametrize("smiles", [
+        "[CH2][N]",     # hetero center -> not all-C
+        "[O]CC[O]",     # oxygen centers -> not all-C
+        "[CH]1CC[CH]CC1",  # ring centers -> acyclic-only guard
+        "[c]1cc[c]cc1",    # aromatic ring -> out of scope
+    ])
+    def test_out_of_scope_returns_empty(self, smiles):
+        mol, centers = _mol_centers(smiles)
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""
+
+    def test_single_center_returns_empty(self):
+        # single site is the single-center primitive's job, not this one
+        mol, centers = _mol_centers("C[CH]C")
+        assert len(centers) == 1
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""
+
+    def test_mixed_suffix_deferred_to_task3(self):
+        # ethan-1-yl-2-ylidene (1e+2e) is out of THIS task's homogeneous scope
+        mol, centers = _mol_centers("[CH2][CH]")   # canon [CH][CH2]
+        assert emit_parent_hydride_polyvalent_suffixes(mol, centers) == ""

@@ -17,7 +17,7 @@ Key naming patterns:
 """
 
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
@@ -1312,6 +1312,203 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         core = f"{stem}an-{center_locant}-{suffix}"
 
     return f"{prefix_str}{core}"
+
+
+def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]]) -> str:
+    """P-71.2.3 / P-29.3.2.2 multi-site free-valence (polyradical) PIN on ONE
+    acyclic all-carbon parent hydride.
+
+    ``centers`` = ``[(atom_idx, n_electrons)]`` with ``n_electrons in {1, 2, 3}``
+    and >= 2 DISTINCT centers (the single-center case is
+    ``emit_parent_hydride_cumulative_suffix``'s job). Returns the polyradical PIN
+    (``ethane-1,2-diyl``, ``propane-1,2,3-triyl``, ``pentane-2,4-diylidene``,
+    the mixed ``ethan-1-yl-2-ylidene``, …) or ``''`` (fail closed) on anything
+    out of scope.
+
+    Generalizes the single-center primitive above to N carbon free-valence
+    centers: saturate every centre on one index-preserving RWMol, choose the
+    longest carbon chain carrying ALL centers (P-71.7(a): the parent must retain
+    the maximum radical centers — demoting a centre to an off-parent prefix is
+    out of v1 scope, so refuse rather than drop), then number by
+    P-29.3.2.2 — "low locants to the free valences as a SET, then in the order
+    'yl', 'ylidene', 'ylidyne'". Substituents/unsaturation reuse the same
+    machinery as the single-center primitive. '' on any unnameable piece.
+    """
+    # --- 1. Guards (fail closed on anything out of scope) ---------------------
+    if mol is None or not centers or len(centers) < 2:
+        return ''
+    idxs = [c[0] for c in centers]
+    if len(set(idxs)) != len(idxs):
+        return ''  # duplicate centre index
+    try:
+        atoms = [mol.GetAtomWithIdx(i) for i in idxs]
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    for a, (_idx, n_e) in zip(atoms, centers):
+        if a.GetSymbol() != 'C' or a.GetFormalCharge() != 0 or a.IsInRing():
+            return ''
+        if not (1 <= n_e <= 3):
+            return ''
+    try:
+        if len(Chem.GetMolFrags(mol)) != 1:
+            return ''  # multi-fragment -> out of scope
+    except Exception:
+        return ''
+    # Task 1 scope: HOMOGENEOUS centers only (all n_electrons equal). The mixed
+    # yl/ylidene case is lifted in Task 3 (the suffix synthesis + typed
+    # orientation key below already handle it — only this guard defers it).
+    if len({n for _idx, n in centers}) != 1:
+        return ''
+
+    ne_by_idx = {i: n for i, n in centers}
+
+    # --- 2. Saturate every centre on ONE index-preserving RWMol --------------
+    work = Chem.RWMol(mol)
+    try:
+        for idx, n_e in centers:
+            a = work.GetAtomWithIdx(idx)
+            a.SetFormalCharge(0)
+            a.SetNumRadicalElectrons(0)
+            new_h = a.GetTotalNumHs() + n_e
+            if new_h < 0:
+                return ''
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(new_h)
+        work_mol = work.GetMol()
+        Chem.SanitizeMol(work_mol)
+    except (RuntimeError, ValueError):
+        return ''
+
+    # --- 3. Longest carbon chain carrying ALL centers (acyclic-only) ---------
+    from ..perception.chains import (
+        find_all_carbon_chains, get_substituents, classify_substituent,
+    )
+    try:
+        all_chains = find_all_carbon_chains(work_mol, min_length=1)
+    except (RuntimeError, ValueError):
+        return ''
+    idx_set = set(idxs)
+    cand = [
+        c for c in all_chains
+        if idx_set.issubset(c)
+        and not any(work_mol.GetAtomWithIdx(i).IsInRing() for i in c)
+    ]
+    if not cand:
+        return ''  # centers not collinear on one acyclic C chain -> refuse
+    maxlen = max(len(c) for c in cand)
+    cand_longest = [c for c in cand if len(c) == maxlen]
+
+    # --- 4. Orientation + chain choice (P-29.3.2.2 typed free-valence key) ----
+    from .locants import build_atom_to_locant
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, alpha_sort_key, is_complex_substituent,
+    )
+
+    def _typed_key(order):
+        """Tuple key: (free-valence SET, yl locs, ylidene locs, ylidyne locs,
+        substituent locs). first-point-of-difference via plain tuple compare
+        (all tiers have identical lengths across equal-length candidate chains,
+        so tuple '<' == compare_locant_sets here). Total order -> deterministic.
+        """
+        loc = build_atom_to_locant(order)
+        fv_set = tuple(sorted(loc[i] for i in idxs))
+        yl = tuple(sorted(loc[i] for i in idxs if ne_by_idx[i] == 1))
+        ylidene = tuple(sorted(loc[i] for i in idxs if ne_by_idx[i] == 2))
+        ylidyne = tuple(sorted(loc[i] for i in idxs if ne_by_idx[i] == 3))
+        sub_locs = tuple(sorted(get_substituents(work_mol, order).keys()))
+        return (fv_set, yl, ylidene, ylidyne, sub_locs)
+
+    order = min(cand_longest, key=_typed_key)
+    loc_map = build_atom_to_locant(order)
+    chain_len = len(order)
+    try:
+        stem = get_chain_prefix(chain_len)
+    except ValueError:
+        return ''
+
+    # --- 5. Substituent prefixes + unsaturation infixes (reuse) --------------
+    chain_set = set(order)
+    double_bonds: List[tuple] = []
+    triple_bonds: List[tuple] = []
+    for i in range(len(order) - 1):
+        bond = work_mol.GetBondBetweenAtoms(order[i], order[i + 1])
+        if bond is None:
+            continue
+        bt = bond.GetBondType()
+        if bt == Chem.BondType.DOUBLE:
+            double_bonds.append((order[i], order[i + 1]))
+        elif bt == Chem.BondType.TRIPLE:
+            triple_bonds.append((order[i], order[i + 1]))
+
+    subs_by_position = get_substituents(work_mol, order)  # 1-based pos -> [atoms]
+    name_to_locants: Dict[str, list] = {}
+    for position, sub_lists in subs_by_position.items():
+        chain_idx = order[position - 1]
+        for sub_atoms in sub_lists:
+            info = classify_substituent(work_mol, sub_atoms, chain_set)
+            sub_name = info.get('name')
+            if not sub_name:
+                return ''  # unnameable substituent -> out of scope, fail closed
+            name_to_locants.setdefault(sub_name, []).append(loc_map[chain_idx])
+
+    prefix_parts = []  # (sort_key, locant_min, text)
+    for sub_name, locants in name_to_locants.items():
+        locants_sorted = sorted(locants)
+        count = len(locants_sorted)
+        mult = get_multiplier_prefix(count, sub_name)
+        loc_str = ','.join(str(l) for l in locants_sorted)
+        if is_complex_substituent(sub_name) and count > 1:
+            body = f"{mult}({sub_name})"
+        else:
+            body = f"{mult}{sub_name}"
+        prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
+                             f"{loc_str}-{body}"))
+    prefix_parts.sort(key=lambda t: (t[0], t[1]))
+    prefix_str = ''.join(p[2] for p in prefix_parts)
+
+    unsat_endings = ''
+    if double_bonds or triple_bonds:
+        def _bond_locant(pair):
+            return min(loc_map[pair[0]], loc_map[pair[1]])
+        d_locs = sorted(_bond_locant(b) for b in double_bonds)
+        t_locs = sorted(_bond_locant(b) for b in triple_bonds)
+        if d_locs:
+            dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+            joiner = 'a' if dmult else ''
+            unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
+        if t_locs:
+            tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+            joiner = 'a' if tmult else ''
+            unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+
+    # --- 6. Free-valence suffix synthesis (yl -> ylidene -> ylidyne) ---------
+    # Citation order is ALWAYS yl -> ylidene -> ylidyne (P-29.3.2.2), each with
+    # its own locant list; a type present once carries no multiplier, >= 2 gets
+    # di/tri/... (P-71.2.3). Task 1: homogeneous, so exactly one type is present;
+    # Task 3 reuses this loop verbatim for the mixed case.
+    ending = ''
+    for word, ne in (('yl', 1), ('ylidene', 2), ('ylidyne', 3)):
+        locs = sorted(loc_map[i] for i in idxs if ne_by_idx[i] == ne)
+        if not locs:
+            continue
+        mult = get_multiplier_prefix(len(locs), word)  # '' for 1, di/tri for >=2
+        loc_str = ','.join(str(l) for l in locs)
+        ending += f"-{loc_str}-{mult}{word}"
+
+    # --- 7. Base + P-71.2.3 elision + assemble -------------------------------
+    # base ends in 'e' (saturated 'ethane' / unsaturated 'but-2-ene'); elide the
+    # terminal 'e' IFF the first alphabetic char of the ending is 'y'
+    # (ethan-1-yl-2-ylidene) — but NOT before 'd'/'t' (ethane-1,2-diyl,
+    # propane-1,2,3-triyl keep the 'e').
+    if unsat_endings:
+        base = f"{stem}{unsat_endings}e"
+    else:
+        base = f"{stem}ane"
+    first_alpha = next((ch for ch in ending if ch.isalpha()), '')
+    if first_alpha == 'y' and base.endswith('e'):
+        base = base[:-1]
+    return f"{prefix_str}{base}{ending}"
 
 
 def _elide_terminal_e(name: str) -> str:
