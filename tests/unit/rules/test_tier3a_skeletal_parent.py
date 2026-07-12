@@ -153,10 +153,15 @@ class TestConstitutionConservation:
             "OC(=O)c1ccc(C[SiH2]Cc2ccc(C(=O)O)cc2)cc1"
         ) == "4,4'-[silanediylbis(methylene)]dibenzoic acid"
 
-    def test_oxy_bridge_stays_unknown(self):
+    def test_oxy_bridge_names_multiplicative(self):
+        # Was fail-closed 'unknown' (no -CH2-O-CH2- recognizer). w2f p1 then
+        # built the proper P-15.3.1.2.2.1 / P-51.3.1 composite CH2-O-CH2
+        # oxybis(methylene) multiplicative bridge -- the OPSIN-RT-verified PIN
+        # (constitution PRESERVED; gold W2F-P1-07). Exact analog of the
+        # silanediylbis(methylene) heal above (Wave-2 completion B2).
         assert name_compound(
             "Oc1ccc(COCc2ccc(O)cc2)cc1"
-        ) == "unknown organic compound"
+        ) == "4,4'-[oxybis(methylene)]diphenol"
 
     def test_functionalized_chain_guard_rejects_si(self):
         from rdkit import Chem
