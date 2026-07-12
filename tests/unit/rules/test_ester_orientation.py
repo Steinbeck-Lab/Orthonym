@@ -63,3 +63,25 @@ class TestEsterOrientationGuard:
         # never R-oxycarbonyl; it decomposes to oxo + alkoxy. This test was
         # previously assertion-free; it now pins the None contract.
         assert result is None, f"in-chain ester C must return None, got {result!r}"
+
+
+@pytest.mark.integration
+class TestRingAlkoxycarbonylKnownLeak:
+    """DOCUMENTED KNOWN LEAK (W2F-P2 Task 5) — separate defect, OUT of scope.
+
+    HEAD 2026-07-11: COC(=O)c1ccccc1C(=O)O emits 'methyl
+    benzene-1,2-dicarboxylate' (benzene handler + ester wrapper), which OPSIN
+    parses as the mono-ANION -> live RT-MISMATCH. Correct PIN (BB 31950
+    parallel, OPSIN-verified): '2-(methoxycarbonyl)benzoic acid'. The fix
+    belongs to the benzene/ester-wrapper subsystem (ring-FG demotion of a
+    methyl ester next to a free acid), NOT to the W2F-P2 chain-membership
+    class. This xfail flips green when that subsystem is fixed."""
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="known leak: benzene+ester wrapper names the diester/anion; "
+               "ring-parent partial-ester demotion not built (separate defect)",
+    )
+    def test_ring_partial_ester_pin(self):
+        from orthonym.namer import name_compound
+        assert name_compound("COC(=O)c1ccccc1C(=O)O") == "2-(methoxycarbonyl)benzoic acid"
