@@ -32,6 +32,11 @@ from ..name_tree import NameTreeNode, NamingResult
 
 # Map principal-group FG name -> ("X" prefix token, suffix token).
 _CHALCOGEN_ESTER_TOKENS = {
+    # W3-P08 (P-65.6.3.3.7.1): thioester R-C(=O)-S-R' -> "S-alkyl alkanethioate".
+    # Reuses the identical engine as selenoester/telluroester (SMARTS
+    # "[CX3](=O)[SX2][#6]" has the same (C,O,S,C_alkyl) match order). The
+    # thioic-S-acid suppression in functional_groups.py keeps C(=O)SH out.
+    "thioester":     ("S", "thioate"),
     "selenoester":   ("Se", "selenoate"),
     "telluroester":  ("Te", "telluroate"),
 }

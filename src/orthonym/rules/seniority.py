@@ -830,7 +830,7 @@ PREFIX_FORMS = {
     # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5
     "selenoaldehyde": "selenoxo",
     "telluroaldehyde": "telluroxo",
-    "thioester": None,            # Named via decomposition pathway
+    "thioester": None,            # W3-P08: functional-class via chalcogen_ester handler ("S-alkyl alkanethioate"); no prefix form
     # Phase 163 Tier FRN-D + FRN-E: functional-class — no prefix form
     "iminoester": None,
     "selenoester": None,
