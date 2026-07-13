@@ -292,8 +292,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # the Blue-Book-retired `sulfenic_acid` PIN (P-56.2 verbatim, BlueBookV2
     # line ~24326: `CH3-S-OH -> methane-SO-thioperoxol (PIN) (not methanesulfenic
     # acid)`); the collision resolver below suppresses `sulfenic_acid` on its atoms.
-    "so_thioperoxol": "[#6][SX2][OX2H]",   # R-S-OH  -> -SO-thioperoxol (was retired sulfenic acid)
-    "os_thioperoxol": "[#6][OX2][SX2H]",   # R-O-SH  -> -OS-thioperoxol
+    # W3-P03-4 (P-65.1.5.3): the leading [#6] must be a NON-acyl carbon. An acyl
+    # carbon (CH3-CO-S-OH / CH3-CO-O-SH) is a (thioperoxoic) SO-/OS-acid, NOT an
+    # alcohol-class thioperoxol; matching it here emitted a WRONG name
+    # ('ethane-1-OS-thioperoxol' for CC(=O)OS). Excluding acyl/thioacyl carbons
+    # fails those closed (-> 'unknown') until the peroxoic-acid FRN suffix path
+    # gains S/Se-infix + italic OS/SO letter-locants (OPSIN has no oracle for that
+    # word-form). Genuine sp3 R-O-SH / R-S-OH (CCOS / CCSO) still match.
+    "so_thioperoxol": "[#6;!$([CX3]=[OX1]);!$([CX3]=[SX1])][SX2][OX2H]",   # R-S-OH  -> -SO-thioperoxol (was retired sulfenic acid)
+    "os_thioperoxol": "[#6;!$([CX3]=[OX1]);!$([CX3]=[SX1])][OX2][SX2H]",   # R-O-SH  -> -OS-thioperoxol
     "dithioperoxol": "[#6][SX2][SX2H]",    # R-S-SH  -> dithioperoxol (suffix) / disulfanyl (prefix)
 
     # === HYDROXYLAMINES (BBR-PERC/DEF-2, 169.7: P-68.3 class 21) ===
