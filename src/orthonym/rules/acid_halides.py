@@ -19,7 +19,7 @@ The acyl name derives from the corresponding acid:
 Reference: IUPAC 2013 Blue Book, P-65.5.1 (Acyl halides)
 """
 
-from collections import deque
+from collections import deque, defaultdict
 from typing import Optional, Dict, List
 from rdkit import Chem
 
@@ -197,6 +197,15 @@ def name_acid_halide(features) -> Optional[str]:
         if _cc is not None:
             return _cc
 
+    # W3-P06 Task 1 (P-65.5.1): TWO OR MORE acyl halides on the SAME benzene ring
+    # -> 'benzene-{locants}-{mult}carbonyl {mult}{halide}' (benzene-1,2-dicarbonyl
+    # dichloride). Uses the combined cross-type list; same-halide only (mixed ring
+    # halides fail closed -> fall through). Checked before the single-ring path,
+    # which returns only 'benzoyl {halide}' (dropping the 2nd acyl).
+    _bpc = _name_benzene_polycarbonyl_halide(mol, _combined)
+    if _bpc:
+        return _bpc
+
     # Collect all atoms consumed by acid halide groups (C=O, halogen)
     consumed_atoms = set()
     for match in acid_halide_matches:
@@ -288,6 +297,81 @@ def _detect_ring_parent(mol, ring_atom_idx: int) -> Optional[str]:
             if all_carbon:
                 prefix = get_chain_prefix(len(ring))
                 return f"cyclo{prefix}"
+    return None
+
+
+def _is_benzene_ring(mol, ring) -> bool:
+    """True iff ``ring`` is a benzene ring (6 aromatic carbons)."""
+    return len(ring) == 6 and all(
+        mol.GetAtomWithIdx(i).GetIsAromatic() and
+        mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+        for i in ring
+    )
+
+
+def _ring_cycle(mol, ring_set) -> List[int]:
+    """Return the ring atoms in connected cyclic order."""
+    start = next(iter(ring_set))
+    order = [start]
+    prev, cur = None, start
+    while True:
+        nxt = next((n.GetIdx() for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+                    if n.GetIdx() in ring_set and n.GetIdx() != prev
+                    and n.GetIdx() not in order), None)
+        if nxt is None:
+            break
+        order.append(nxt)
+        prev, cur = cur, nxt
+    return order
+
+
+def _lowest_locants(cycle: List[int], attach: List[int]) -> List[int]:
+    """Lowest sorted locant set for ``attach`` atoms over all rotations/directions
+    of the ring ``cycle`` (first-point-of-difference)."""
+    n = len(cycle)
+    attach_set = set(attach)
+    best = None
+    for direction in (cycle, cycle[::-1]):
+        for i in range(n):
+            rot = direction[i:] + direction[:i]
+            locs = sorted(rot.index(a) + 1 for a in attach_set)
+            if best is None or locs < best:
+                best = locs
+    return best
+
+
+def _name_benzene_polycarbonyl_halide(mol, combined) -> Optional[str]:
+    """P-65.5.1: >=2 acyl halides on ONE benzene ring ->
+    'benzene-{locants}-{mult}carbonyl {mult}{halide}' (benzene-1,2-dicarbonyl
+    dichloride). Same-halide only — mixed ring halides fail closed (None)."""
+    if len(combined) < 2:
+        return None
+    ring_info = mol.GetRingInfo()
+    ring_carbonyls = defaultdict(list)   # frozenset(ring) -> [(attach_atom, sym)]
+    for match, sym in combined:
+        carbonyl_c = match[0]
+        atom = mol.GetAtomWithIdx(carbonyl_c)
+        attach = next((n.GetIdx() for n in atom.GetNeighbors()
+                       if n.IsInRing() and n.GetIdx() not in match), None)
+        if attach is None:
+            continue
+        for ring in ring_info.AtomRings():
+            if attach in ring and _is_benzene_ring(mol, ring):
+                ring_carbonyls[frozenset(ring)].append((attach, sym))
+                break
+    for ring_fs, items in ring_carbonyls.items():
+        if len(items) < 2:
+            continue
+        if len({s for _, s in items}) != 1:
+            return None                  # mixed ring halides -> fail closed
+        halide_word = _HALIDE_WORD[items[0][1]]
+        locs = _lowest_locants(_ring_cycle(mol, set(ring_fs)),
+                               [a for a, _ in items])
+        k = len(items)
+        loc_str = ",".join(str(l) for l in locs)
+        mult_c = get_multiplier_prefix(k, "carbonyl")
+        mult_h = get_multiplier_prefix(k, halide_word)
+        return f"benzene-{loc_str}-{mult_c}carbonyl {mult_h}{halide_word}"
     return None
 
 
