@@ -349,8 +349,19 @@ def name_chalcogen_oxide_substitutive(
     if kind_a == 'ring' or kind_b == 'ring':
         ring_stem = stem_a if kind_a == 'ring' else stem_b
         chain_stem = stem_b if kind_a == 'ring' else stem_a
-        # monosubstituted benzene / symmetric saturated ring: no locant
-        return f"({chain_stem}{oxide_kind}){ring_stem}"
+        chain_atoms = atoms_b if kind_a == 'ring' else atoms_a
+        # W3-P04 (P-65.3.2.2.2 / P-14.3.4): the acyl-from-sulfonic substituent is
+        # located on the CHAIN carbon it derives from — 'propane-1-sulfonyl'
+        # (BB @31396 '(propane-1-sulfonyl)benzene (PIN)'). The '-1-' is cited for
+        # C3+ chains and omitted for methane/ethane (BB @302 '(ethanesulfonyl)
+        # ethane', DMSO '(methanesulfinyl)benzene'), exactly like the two-chain
+        # branch below.
+        chain_n = len(chain_atoms)
+        if should_omit_locant_one(
+            context="prefix", chain_length=chain_n, is_monosubstituted=True,
+        ):
+            return f"({chain_stem}{oxide_kind}){ring_stem}"
+        return f"({chain_stem}-1-{oxide_kind}){ring_stem}"
 
     # Two chains: the longer chain is the parent (P-44.3); tie -> either
     # (identical stems for the symmetric case).
