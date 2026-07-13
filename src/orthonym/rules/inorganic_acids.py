@@ -169,6 +169,20 @@ _C1_ACID_C_SUBSTITUTED = {
     "O=C(O)[N+](=O)[O-]": "nitroformic acid",   # P-65.1.8.2  O2N-CO-OH
 }
 
+# --- W3-P05 (P-65.2.1.4): carbonic-acid pseudohalides ---
+# Carbonic acid (HO-CO-OH) with one -OH replaced by a pseudohalide (cyanido,
+# azido) -> the retained ``carbono{pseudohalide}idic acid`` PIN (P-65.2.1.4
+# @30814, cyanido infix; BB 30832 'NC-CO-OH carbonocyanidic acid (PIN)'; BB 30834
+# carbonazidic acid). As with the halides, P-65.1.8.1 (@30670) FORBIDS the
+# substituted-formic-acid name ('1-cyanomethanoic acid'). Exact full-molecule
+# canonical-SMILES keys => zero false positives: cyanoacetic acid (N#CCC(=O)O)
+# has an extra CH2 and never matches, cascading to the general acid path. Every
+# name OPSIN-RT-confirmed.
+_CARBONIC_ACID_PSEUDOHALIDES = {
+    "N#CC(=O)O": "carbonocyanidic acid",        # P-65.2.1.4  NC-CO-OH
+    "[N-]=[N+]=NC(=O)O": "carbonazidic acid",   # P-65.2.1.4  N3-CO-OH
+}
+
 # Merged lookup (no key overlap across the tables — distinct structures).
 _ALL_INORGANIC = {
     **_INORGANIC_OXOACIDS,
@@ -176,6 +190,7 @@ _ALL_INORGANIC = {
     **_CARBONIC_FRN,
     **_CARBONIC_ACID_HALIDES,
     **_C1_ACID_C_SUBSTITUTED,
+    **_CARBONIC_ACID_PSEUDOHALIDES,
 }
 
 
