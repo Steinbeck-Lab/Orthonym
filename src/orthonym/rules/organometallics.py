@@ -172,6 +172,22 @@ _GROUP14_PRINCIPAL_SUFFIX: Dict[Tuple[int, int], str] = {
 # the principal-group diversion and left to cascade to the boronic-acid handler.
 _GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
 
+# Simple contracted alkoxy prefixes (P-29.3.1): named -oxy substituents that are
+# NOT complex and take NO enclosing marks (methoxysilanetriol, not
+# '(methoxy)silanetriol'). Compound -oxy prefixes (acyloxy/aryloxy/cyclyl-oxy such
+# as 'acetyloxy'/'phenoxy'/'oxiranylmethoxy') stay complex -> parenthesized. The
+# ligand namer's older ``name.endswith('oxy')`` blanket-wrapped these simple
+# alkoxy names too; this whitelist restores P-16.3.3 (simple alkoxy = no marks).
+_SIMPLE_ALKOXY_PREFIXES = frozenset({'methoxy', 'ethoxy', 'propoxy', 'butoxy'})
+
+
+def _is_complex_ligand_oxy(name: str) -> bool:
+    """True iff a ligand name is a COMPOUND -oxy prefix that needs enclosing marks
+    (P-16.3.3): ends in 'oxy' but is not one of the simple contracted alkoxy names
+    (methoxy/ethoxy/propoxy/butoxy). 'acetyloxy'/'phenoxy'/'oxiranylmethoxy' ->
+    True; 'methoxy'/'ethoxy' -> False."""
+    return name.endswith('oxy') and name.lower() not in _SIMPLE_ALKOXY_PREFIXES
+
 
 def _principal_suffix_for_ligand(mol: Any, lg: Any) -> Optional[str]:
     """Return the substitutive suffix ('ol'/'amine'/'thiol') if ``lg`` is a bare
@@ -558,11 +574,11 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 if count > 1 and needs_p1634_marks(name):
                     return f'{mult}({name})'
                 complex_name = ('-' in name or '(' in name
-                                or name.endswith('oxy'))
+                                or _is_complex_ligand_oxy(name))
                 if complex_name:
                     inner = f'({name})' if '(' not in name else f'[{name}]'
                     return f'{mult}{inner}' if not mult else f'{mult}{inner}'
-                if mult and any('-' in n or '(' in n or n.endswith('oxy')
+                if mult and any('-' in n or '(' in n or _is_complex_ligand_oxy(n)
                                 for _c, n in sorted_groups):
                     return f'{mult}({name})'
                 return f'{mult}{name}'
