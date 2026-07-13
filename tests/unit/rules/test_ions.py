@@ -723,8 +723,10 @@ class TestSUB01ChargeAwareNaming:
 
     def test_carboxylate_dianion_not_misrouted(self):
         # Regression guard for the CR-02 fix: a pure CARBOXYLATE dianion must
-        # NOT enter the oxoacid branch — succinate stays succinate.
-        assert name_compound("[O-]C(=O)CCC(=O)[O-]") == "succinate"
+        # NOT enter the oxoacid branch. W3-P09 (P-65.6.2.1/P-65.6.1.1): the PIN
+        # is the systematic 'butanedioate' ('succinate' is retained for general
+        # nomenclature only), reached via the now-PIN-aware retained lookup.
+        assert name_compound("[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
 
     def test_wr05_oxoacid_ionize_ignores_bare_ol_amine(self):
         # WR-05 (code review 2026-06-02): when _ionize_acid_name is restricted to

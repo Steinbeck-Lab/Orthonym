@@ -221,7 +221,24 @@ INORGANIC_ANIONS = _canonicalize_anion_table(INORGANIC_ANIONS)
 RETAINED_ANIONS = _canonicalize_anion_table(RETAINED_ANIONS)
 
 
-def get_anion_name(smiles: str) -> Optional[str]:
+# P-65.6.2.1 / P-65.6.1.1: dicarboxylate anion names that are RETAINED FOR GENERAL
+# NOMENCLATURE ONLY — their preferred IUPAC name is the SYSTEMATIC '-dioate'
+# (malonate -> propanedioate, BB:29761 'propanedioic acid (PIN)'; succinate ->
+# butanedioate, BB:29793/31575 'potassium sodium butanedioate (PIN)'). In PIN
+# style get_anion_name(pin=True) returns None for these, so the caller falls
+# through to the systematic neutralize->name path (which yields '-dioate').
+# Retained anions that ARE PINs — acetate/formate/benzoate (retained-PIN acids),
+# oxalate (BB:29723 'oxalic acid (PIN)'), carbonate (BB 'disodium carbonate
+# (PIN)') — are deliberately NOT here and keep their retained name in every style.
+_GENERAL_ONLY_ANIONS = frozenset(
+    Chem.MolToSmiles(Chem.MolFromSmiles(s)) for s in (
+        'O=C([O-])CC(=O)[O-]',    # malonate  -> propanedioate (PIN)
+        'O=C([O-])CCC(=O)[O-]',   # succinate -> butanedioate (PIN)
+    )
+)
+
+
+def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
     """
     Look up retained name for an anion by its SMILES.
 
@@ -246,6 +263,12 @@ def get_anion_name(smiles: str) -> Optional[str]:
         return None
 
     canonical = Chem.MolToSmiles(mol)
+
+    # PIN style: a dicarboxylate anion that is retained FOR GENERAL NOMENCLATURE
+    # ONLY (malonate/succinate) has no retained PIN -> signal fall-through to the
+    # systematic '-dioate' path (P-65.6.1.1). Retained-PIN anions are unaffected.
+    if pin and canonical in _GENERAL_ONLY_ANIONS:
+        return None
 
     # Check organic anions first
     if canonical in RETAINED_ANIONS:

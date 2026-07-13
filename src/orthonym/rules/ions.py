@@ -560,9 +560,11 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     # Get canonical SMILES for lookup
     canonical = Chem.MolToSmiles(mol, canonical=True)
 
-    # Check retained names first (unless systematic requested)
+    # Check retained names first (unless systematic requested). PIN style skips
+    # general-only dicarboxylate retained names (malonate/succinate) so they fall
+    # through to the systematic '-dioate' PIN (P-65.6.2.1 / P-65.6.1.1).
     if style != 'systematic':
-        retained = get_anion_name(canonical)
+        retained = get_anion_name(canonical, pin=(style == 'pin'))
         if retained:
             return retained
 

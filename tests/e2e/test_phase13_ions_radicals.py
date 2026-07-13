@@ -37,14 +37,18 @@ class TestION01CarboxylateAnions:
         assert result == 'oxalate', f'Got: {result}'
 
     def test_dicarboxylate_malonate(self):
-        """Malonate (3-carbon dicarboxylate)."""
+        """Malonate (3-carbon dicarboxylate). PIN is the systematic
+        'propanedioate' (P-65.6.1.1; 'malonate' is retained for general
+        nomenclature only) — W3-P09 made the retained lookup PIN-aware."""
         result = name_compound('O=C([O-])CC(=O)[O-]')
-        assert result == 'malonate', f'Got: {result}'
+        assert result == 'propanedioate', f'Got: {result}'
 
     def test_dicarboxylate_succinate(self):
-        """Succinate (4-carbon dicarboxylate)."""
+        """Succinate (4-carbon dicarboxylate). PIN is the systematic
+        'butanedioate' (P-65.6.2.1 'potassium sodium butanedioate (PIN)';
+        'succinate' is general nomenclature only) — W3-P09 PIN-aware lookup."""
         result = name_compound('O=C([O-])CCC(=O)[O-]')
-        assert result == 'succinate', f'Got: {result}'
+        assert result == 'butanedioate', f'Got: {result}'
 
 
 class TestION01AlkoxideAnions:
