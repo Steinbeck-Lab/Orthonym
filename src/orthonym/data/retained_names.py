@@ -184,6 +184,15 @@ RETAINED_NAMES = {
     # Aromatic: benzoic acid -> benzohydrazide (C6H5-C(=O)-NH-NH2)
     "NNC(=O)c1ccccc1": "benzohydrazide",
 
+    # === CARBONIC / DIAZENE HYDRAZIDES (W3-P01: exact-SMILES retained PINs) ===
+    # These carbonic-acid derivatives have PINs the substitutive engine cannot
+    # derive; the OPSIN-import trivials (is_pin=False) are denied in
+    # iupac_2013_pin_list.json and routed to --trivial. Phosgene model.
+    # W3-P01-4 (P-68.3.1.2.6): H2N-NH-C(=O)-NH-NH2. PIN hydrazinecarbohydrazide
+    # (BB:38697); BB:38695 'the names carbonohydrazide, carbohydrazide, and
+    # carbazide are not recommended'. Canonical key of NNC(=O)NN.
+    "NNC(=O)NN": "hydrazinecarbohydrazide",
+
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",
