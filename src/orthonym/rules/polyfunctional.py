@@ -1483,6 +1483,73 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 _amidine_excluded_n.update(_px_os)
                 continue
 
+        # W3-P03-6 (P-65.1.6.2, BB 30396): a non-principal SECONDARY amide
+        # -CO-NH-R whose carbonyl C terminates an ACYCLIC chain parent (a senior
+        # group present, e.g. COOH) is expressed as 'oxo' (=O) + the amino-side
+        # prefix at that carbon's locant. The N-phenyl anilide's amino side is the
+        # retained 'anilino' -> '5-anilino-5-oxopentanoic acid' (PIN, L30392);
+        # a general N-alkyl gives '({alkyl}amino)'. NOT the 'N-...carbamoyl'
+        # prefix (which mis-places the in-chain carbon; the old generic path even
+        # walked the phenyl ring open to 'hexyl'). Mirrors the primary-amide
+        # oxo+amino split above. The N-ATTACHED orientation (chain-N-CO-R,
+        # acetamido) is UNAFFECTED: its amide C is off-chain so the guard declines.
+        # Fires only when every secondary-amide C is a chain member with exactly
+        # one nameable N-substituent; else falls through (fail closed).
+        # SMARTS [CX3](=O)[NX3H1][#6]: match[0]=C, match[2]=N.
+        if fg_name == 'secondary_amide' and chain_set:
+            from ..assembly.composer import _name_r_group
+            _sa_ok = True
+            _sa_units = {}  # amide C -> (amino-side prefix, N-side branch atoms)
+            for _m in matches:
+                _sac, _san = _m[0], _m[2]
+                if _sac not in chain_set:
+                    _sa_ok = False
+                    break
+                _r_atoms = [
+                    nb.GetIdx()
+                    for nb in mol.GetAtomWithIdx(_san).GetNeighbors()
+                    if nb.GetIdx() != _sac and nb.GetAtomicNum() > 1]
+                if len(_r_atoms) != 1:
+                    _sa_ok = False
+                    break
+                _r_name = _name_r_group(mol, _r_atoms[0], exclude_atoms={_san})
+                if not _r_name:
+                    _sa_ok = False
+                    break
+                # phenyl -> retained 'anilino' (bare); else '({R}amino)' (P-16.3.3)
+                _amino_prefix = (
+                    'anilino' if _r_name == 'phenyl' else f'({_r_name}amino)')
+                # Collect the whole N-side branch (N + R subtree), never crossing
+                # the amide C, to exclude it from the alkyl substituent walk.
+                _seen = {_sac}
+                _stack = [_san]
+                _branch = []
+                while _stack:
+                    _a = _stack.pop()
+                    if _a in _seen:
+                        continue
+                    _seen.add(_a)
+                    _branch.append(_a)
+                    for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if _nb.GetIdx() not in _seen:
+                            _stack.append(_nb.GetIdx())
+                _sa_units[_sac] = (_amino_prefix, _branch)
+            if _sa_ok and _sa_units:
+                _sa_prefixes = []
+                for _sac, (_amino_prefix, _branch) in _sa_units.items():
+                    _loc = atom_to_locant.get(_sac)
+                    if _loc is None:
+                        _sa_ok = False
+                        break
+                    _sa_prefixes.append(format_fg_prefix('oxo', [_loc], 1))
+                    _sa_prefixes.append(
+                        format_fg_prefix(_amino_prefix, [_loc], 1))
+                if _sa_ok:
+                    all_prefixes.extend(_sa_prefixes)
+                    for _sac, (_amino_prefix, _branch) in _sa_units.items():
+                        _amidine_excluded_n.update(_branch)
+                    continue
+
         # AM-6 (P-66.1.1.4.3): a sulfonamide bonded to the chain via its N
         # (R-SO2-NH-chain) is expressed by _check_for_acylamino as the
         # '(...sulfonamido)' prefix, NOT the 'sulfamoyl' FG prefix (which is the
