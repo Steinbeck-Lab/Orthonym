@@ -124,6 +124,7 @@ class StoutClass(_StrEnumBase):
     MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6/7 (P-68 / P-31.1.4.2 λ-convention + Group-15 As/Sb/Bi; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
     CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
     POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
+    FREE_HOMONUCLEAR_G14_HYDRIDE = "free_homonuclear_g14_hydride"  # Wave-3 (P-21.2.3/P-68.2.3 disilane/trisilane/digermene; priority 47.7)
     DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
@@ -1137,6 +1138,23 @@ def _handle_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) ->
     return name_polyazane(mol)
 
 
+def _is_free_homonuclear_g14_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Wave-3 (P-21.2.3 / P-68.2.3); priority 47.7. A free homonuclear Group-14
+    catenated parent hydride (disilane / trisilane / digermene). PURE graph
+    classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.multiplicative import name_free_homonuclear_group14_hydride
+    return name_free_homonuclear_group14_hydride(mol) is not None
+
+
+def _handle_free_homonuclear_g14_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the free homonuclear Group-14 catenated-hydride PIN (P-21.2.3 /
+    P-68.2.3), else None (cascade-continuation per CONTEXT D-02)."""
+    from orthonym.rules.multiplicative import name_free_homonuclear_group14_hydride
+    return name_free_homonuclear_group14_hydride(mol)
+
+
 def _is_dinuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """v23 Phase 10 (P-69.5.3); priority 48. A two-atom Group-14/Group-15 catenated
     parent hydride (germylstibane). PURE graph classifier, fail-closed."""
@@ -1439,6 +1457,23 @@ _register_dispatch(
     description="Alternating Group-14/bridge catenated parent hydride "
                 "(disiloxane / trisiloxane / disilazane / distannoxane); "
                 "graph classifier, fail-closed",
+)
+
+
+# --- Wave-3: FREE_HOMONUCLEAR_G14_HYDRIDE at priority 47.7 (after ---
+# CATENATED_HYDRIDE@47.5, before DINUCLEAR_HYDRIDE@48 / ORGM@50). A free-molecule
+# homonuclear Group-14 catenated parent hydride (P-21.2.3 / P-68.2.3): disilane,
+# trisilane, digermane, and the P-68.2.3 unsaturated digermene / disilene. These
+# reached the terminal 'inorganic compound (not supported)' fallback before
+# (detect_metal_complex declines the multimetal single fragment, ORGM@50 never
+# engages). Graph classifier, fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.FREE_HOMONUCLEAR_G14_HYDRIDE, priority=47.7, tier=1,
+    predicate=_is_free_homonuclear_g14_hydride,
+    handler=_handle_free_homonuclear_g14_hydride,
+    iupac_section="Blue Book P-21.2.3 / P-68.2.3",
+    description="Free homonuclear Group-14 catenated parent hydride "
+                "(disilane / trisilane / digermene); graph classifier, fail-closed",
 )
 
 

@@ -696,6 +696,100 @@ def _group14_hydride_unit_name(canon_smiles: str) -> Optional[str]:
     return f"{_MULT[n]}{_STEMS[sym]}"
 
 
+_G14_HYDRIDE_STEMS = {'Si': 'silane', 'Ge': 'germane',
+                      'Sn': 'stannane', 'Pb': 'plumbane'}
+_G14_CHAIN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
+                   7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
+
+
+def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
+    """Free-molecule homonuclear Group-14 catenated parent hydride (P-21.2.3 /
+    P-68.2.3): n identical Si/Ge/Sn/Pb atoms in an unbranched, fully-H-saturated,
+    standard-valence chain -> di/tri/...+stem, with the P-68.2.3 ene/yne
+    modification for a 2-atom unsaturated chain::
+
+        [SiH3][SiH3]        -> disilane
+        [SiH3][SiH2][SiH3]  -> trisilane
+        [GeH3][GeH3]        -> digermane
+        [GeH2]=[GeH2]       -> digermene       (P-68.2.3, BB 38147)
+        [SiH2]=[SiH2]       -> disilene
+
+    Fail-closed (returns None) for any carbon / halide / stray heteroatom, a
+    branch, a ring, a charge / radical, a non-standard valence, a single hub
+    (bare mononuclear hydride, handled elsewhere), or unsaturation on a chain
+    longer than 2 atoms (locant machinery not built here — never a wrong name).
+    Pure: no mol mutation.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    heavy = [a for a in mol.GetAtoms() if a.GetSymbol() != 'H']
+    if len(heavy) < 2:
+        return None
+    syms = {a.GetSymbol() for a in heavy}
+    if len(syms) != 1:
+        return None
+    stem = _G14_HYDRIDE_STEMS.get(next(iter(syms)))
+    if stem is None:
+        return None
+    n = len(heavy)
+    mult = _G14_CHAIN_MULT.get(n)
+    if mult is None:
+        return None
+
+    from .lambda_convention import nonstandard_bonding_number
+    idxs = {a.GetIdx() for a in heavy}
+    deg = {}
+    for a in heavy:
+        if (a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0
+                or a.IsInRing()):
+            return None
+        if nonstandard_bonding_number(mol, a.GetIdx()) is not None:
+            return None
+        d = sum(1 for nb in a.GetNeighbors() if nb.GetIdx() in idxs)
+        if d > 2:
+            return None  # branch
+        deg[a.GetIdx()] = d
+
+    ends = [i for i, d in deg.items() if d == 1]
+    if len(ends) != 2:
+        return None  # ring (no degree-1 atom) or malformed
+
+    # Walk the chain from one end to order the atoms 1..n.
+    order = [ends[0]]
+    prev, cur = None, ends[0]
+    while True:
+        nxts = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+                if nb.GetIdx() in idxs and nb.GetIdx() != prev]
+        if not nxts:
+            break
+        if len(nxts) != 1:
+            return None
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    if len(order) != n:
+        return None  # defensive: ring / disconnected
+
+    # P-68.2.3 unsaturation along the chain.
+    n_double = n_triple = 0
+    for j in range(n - 1):
+        bt = mol.GetBondBetweenAtoms(order[j], order[j + 1]).GetBondType()
+        if bt == Chem.BondType.DOUBLE:
+            n_double += 1
+        elif bt == Chem.BondType.TRIPLE:
+            n_triple += 1
+        elif bt != Chem.BondType.SINGLE:
+            return None
+    total_unsat = n_double + n_triple
+    if total_unsat == 0:
+        return f"{mult}{stem}"
+    if n != 2 or total_unsat != 1:
+        return None  # only the 2-atom -ene/-yne is built (no locant needed)
+    base = stem[:-3]  # 'sil' / 'germ' / 'stann' / 'plumb'
+    return f"{mult}{base}{'ene' if n_double else 'yne'}"
+
+
 def _try_group14_hydride_bridge(mol) -> Optional[str]:
     """CH2 joining two identical unbranched Group-14 catenated hydrides at
     their TERMINAL atoms (P-15.3.1.1(b), BB verbatim):
