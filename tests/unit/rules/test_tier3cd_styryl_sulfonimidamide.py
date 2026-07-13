@@ -81,7 +81,9 @@ class TestSulfonimidamide:
         ("CS(=O)(=O)N", "methanesulfonamide"),
         ("CCS(N)(=O)=O", "ethanesulfonamide"),
         ("NNC(C)=O", "acetohydrazide"),
-        ("CC(=NN)c1ccccc1", "acetophenone hydrazone"),
+        # Wave-3: substitutive ylidene-hydrazine is PIN (P-68.3.1.2.2);
+        # 'acetophenone hydrazone' is functional-class / general-only.
+        ("CC(=NN)c1ccccc1", "(1-phenylethylidene)hydrazine"),
         ("CC=NO", "N-hydroxyethanimine"),
     ])
     def test_no_perception_regression(self, smiles, expected):
