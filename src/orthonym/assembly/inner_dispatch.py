@@ -1151,6 +1151,25 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- W3-P15: azine handler. Substitutive 'ylidene' derivatives of hydrazine
+#     (P-68.3.1.2.3): R2C=N-N=CR2 -> di(propan-2-ylidene)hydrazine (symmetric) /
+#     (butan-2-ylidene)(cyclohexylidene)hydrazine (unsymmetric). pg=None (no
+#     characteristic group); the predicate perceives the acyclic C=N-N=C motif
+#     on the graph directly (NOT a global-table SMARTS — the motif recurs
+#     ring-internally in kekulised diazines). Fail-closed; reuses the ylidene
+#     BFS + substituent pipeline.
+from .handlers.azine import _is_azine, name_azine  # noqa: E402
+
+_register_inner(
+    handler_id="azine",
+    priority=5240,
+    predicate=_is_azine,
+    handler=name_azine,
+    iupac_section="P-68.3.1.2.3",
+    description="Azine (R2C=N-N=CR2) named substitutively as an 'ylidene' derivative of hydrazine",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-04: ring_ester (Tier-2 mid-tier direct-return; audit
 #     § 1 + § 3). Predicate:
 #       principal_group == 'ester'

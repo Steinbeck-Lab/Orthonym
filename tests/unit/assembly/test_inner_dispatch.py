@@ -1040,8 +1040,15 @@ class TestPhase160_2_Registrations:
         # + nitrile_oxide@975 (W2F p4, P-66.5.4.1 — neutral nitrile-oxide
         # functional-class '<nitrile> oxide' suffix) [42 → 43]
         # + thiocyanate@2965 (W3-P08, P-65.6.3.3.7.2 — thiocyanate-ester
-        # '<organyl> thiocyanate' functional-class) [43 → 44].
-        assert len(INNER_DISPATCH_TABLE) == 44
+        # '<organyl> thiocyanate' functional-class) [43 → 44]
+        # + azine@5240 (W3-P15, P-68.3.1.2.3 — azine R2C=N-N=CR2 named as an
+        # 'ylidene' derivative of hydrazine).
+        # W3-P15 count reconciliation: the tracked narrative above stopped at 44
+        # (W3-P08); four W3 handlers were then added without updating this
+        # assertion (the phase gate does not run unit tests): hydroximic_acid@5211,
+        # sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495, sulfonyl_halide@1150.
+        # Live count 48 + azine = 49.
+        assert len(INNER_DISPATCH_TABLE) == 49
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1076,10 +1083,13 @@ class TestPhase160_2_Registrations:
         # grew 39 → 40 (chain_diamide@1490, P-66.1.1.1.1), phosphinic_acid@2400
         # grew 40 → 41 (P-67.1.2.2), Wave-2 completion D grew 41 → 42
         # (cyanamide@950, AM-1, P-66.1.6.2), W2F p4 grew 42 → 43
-        # (nitrile_oxide@975, P-66.5.4.1), and W3-P08 grew 43 → 44
-        # (thiocyanate@2965, P-65.6.3.3.7.2).
+        # (nitrile_oxide@975, P-66.5.4.1), W3-P08 grew 43 → 44
+        # (thiocyanate@2965, P-65.6.3.3.7.2). Four subsequent W3 handlers
+        # (hydroximic_acid@5211, sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495,
+        # sulfonyl_halide@1150) were added without updating this assertion; W3-P15
+        # reconciles it and adds azine@5240 (P-68.3.1.2.3): 48 + 1 = 49.
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 44
+        assert len(_SORTED_ENTRIES_CACHE) == 49
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)
