@@ -204,6 +204,14 @@ RETAINED_NAMES = {
     # (phosgene model); the trivial 'performic acid' is denied in
     # iupac_2013_pin_list.json (--trivial fallback). Canonical key of O=COO.
     "O=COO": "methaneperoxoic acid",
+    # W3-P01-3 (P-65.5.3.3): carbononitridic chloride IS the PIN for N#C-Cl
+    # (BB:31513 'NC-Cl carbononitridic chloride (PIN) cyanic chloride';
+    # BB:31509 'Method (1) generates preferred IUPAC names'). The substitutive
+    # engine cannot derive the 'carbononitridic' word-form (same rationale as
+    # phosgene->carbonyl dichloride), so exact-SMILES retained PIN. The trivial
+    # 'cyanogen chloride' (OPSIN simpleGroup, is_pin=False) is denied in
+    # iupac_2013_pin_list.json (--trivial fallback). Canonical key of N#CCl.
+    "N#CCl": "carbononitridic chloride",
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",
