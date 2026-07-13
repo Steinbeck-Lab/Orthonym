@@ -48,7 +48,14 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (a hydrazinecarboxylic acid, P-66.3.5.1) is mis-read as carbamic acid and the
     # senior carbamic path DROPS the terminal N (wrong structure). The negated
     # recursive keeps ordinary carbamic acids (NC(=O)O / CNC(=O)O — N has no N-neighbour).
-    "carbamic_acid": "[NX3;!$([NX3][NX3])][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
+    # W3-P05 (P-65.1.8.2): the amino N must be a NEUTRAL amine N with NO oxygen
+    # neighbour — else the nitro N of O2N-C(=O)-OH (nitroformic acid) false-matches
+    # and the senior carbamic path emits a WRONG 'carbamic acid' (structure loss:
+    # the nitro group is dropped). ``+0`` excludes the cationic nitro [N+];
+    # ``!$([NX3]~[OX1])`` excludes any N bearing a terminal =O/[O-] (nitro, N-oxide).
+    # Both constraints are inside atom-1's brackets, so the 4-atom match tuple is
+    # unchanged. Nitroformic acid is named by its own exact-SMILES @40 key.
+    "carbamic_acid": "[NX3;+0;!$([NX3][NX3]);!$([NX3]~[OX1])][CX3](=O)[OX2H1]",  # R2N-C(=O)-OH -> carbamic acid
     # BBR-PERC/DEF-4 (169.7): require a C neighbour on S/P (P-65.3: sulfonic/phosphonic
     # are CARBON acids). Recursive-env `$(...)` adds the constraint WITHOUT changing the
     # match-tuple arity, so inorganic oxoacids (sulfamic NS(=O)(=O)O, phosphoric OP(=O)(O)O)

@@ -155,12 +155,27 @@ _CARBONIC_ACID_HALIDES = {
     "O=C(O)I": "carbonoiodidic acid",      # P-65.1.8.1  I-CO-OH
 }
 
+# --- W3-P05 (P-65.1.8.2): C-substituted formic acids (retained-name base) ---
+# Formic acid (H-CO-OH) whose formyl H is replaced by an approved substituent is
+# named on the retained 'formic acid' parent. The ONLY such PIN is the nitro
+# derivative (P-65.1.8.2; BB 30696: 'O2N-COOH nitroformic acid (PIN)') — this is
+# NOT a general substituted-formic-acid engine (P-65.1.8.1 @30670 forbids that:
+# the halides/pseudohalides are their own retained 'carbono...idic acid' PINs, not
+# 'chloroformic'/'cyanoformic'). Exact full-molecule canonical-SMILES key =>
+# zero false positives. Intercepts @40 before the general acid path; also
+# preempts the (now-tightened) carbamic_acid SMARTS whose old form false-matched
+# the nitro N and emitted a wrong 'carbamic acid'. OPSIN-RT-confirmed.
+_C1_ACID_C_SUBSTITUTED = {
+    "O=C(O)[N+](=O)[O-]": "nitroformic acid",   # P-65.1.8.2  O2N-CO-OH
+}
+
 # Merged lookup (no key overlap across the tables — distinct structures).
 _ALL_INORGANIC = {
     **_INORGANIC_OXOACIDS,
     **_INORGANIC_ACID_DERIVATIVES,
     **_CARBONIC_FRN,
     **_CARBONIC_ACID_HALIDES,
+    **_C1_ACID_C_SUBSTITUTED,
 }
 
 
