@@ -34,7 +34,7 @@ class TestSilaneLigands:
         ("CC(C)(C)[Si](C)(C)OCC1CO1",
          "(tert-butyl)di(methyl)(oxiranylmethoxy)silane"),
         ("[Si](C)(C)(C)OCC1CO1", "tri(methyl)(oxiranylmethoxy)silane"),
-        ("CO[Si](C)(C)C", "(methoxy)tri(methyl)silane"),
+        ("CO[Si](C)(C)C", "methoxytrimethylsilane"),
     ])
     def test_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -174,8 +174,9 @@ class TestMixedDiamines:
     def test_protections(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_complex_polyamine_fails_closed(self, _validity_gate_on):
-        # NC-10 (P-62.2.4.1.3 parent-choice cascade) is deferred — the
-        # jar-armed gate must suppress the raw candidate (never the
-        # double-counted wrong name reaching users).
-        assert "unknown" in name_compound("NCNCCN")
+    def test_complex_polyamine_now_heals(self, _validity_gate_on):
+        # NC-10 (P-62.2.4.1.3 parent-choice cascade) HEALED in Wave-3: the
+        # polyamine parent-selection now emits the exact Blue Book PIN
+        # (BBv2 L26381 'N1-(aminomethyl)ethane-1,2-diamine (PIN)'); OPSIN-RT
+        # clean. Was previously fail-closed (deferred) — no longer.
+        assert name_compound("NCNCCN") == "N1-(aminomethyl)ethane-1,2-diamine"
