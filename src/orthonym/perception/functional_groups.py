@@ -463,6 +463,27 @@ for _fg_name, _smarts in FUNCTIONAL_GROUP_SMARTS.items():
         _COMPILED_FG_SMARTS[_fg_name] = _pat
 
 
+# W3-P06 (P-65.7.1 / P-65.7.3 / P-65.7.4): anhydride BRIDGE variants whose bridge
+# is NOT the carbon/O-only single O of the base ANHYDRIDE_SMARTS
+# ([CX3](=O)[OX2][CX3](=O)). Each match is FOLDED into the 'anhydride'
+# functional-group bucket in detect_functional_groups() (below) so
+# get_principal_group() returns 'anhydride' and rules.anhydrides.name_anhydride
+# (which re-detects the bridge type on the mol) produces the functional-class PIN.
+# Kept SEPARATE from FUNCTIONAL_GROUP_SMARTS so the base-FG count contract and the
+# per-FG collision resolver are untouched; the folded tuples are shape-heterogeneous
+# but every 'anhydride' consumer (get_anhydride_consumed_atoms, _filter_consumed,
+# the resolver) iterates atoms only.
+_ANHYDRIDE_BRIDGE_SMARTS = {
+    # sulfonic anhydride R-SO2-O-SO2-R' (P-65.7.1; BB 32247 'benzenesulfonic anhydride')
+    "sulfonic_anhydride": "[SX4](=O)(=O)[OX2][SX4](=O)(=O)",
+}
+_COMPILED_ANHYDRIDE_BRIDGE = {}
+for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
+    _bpat = Chem.MolFromSmarts(_bsmarts)
+    if _bpat is not None:
+        _COMPILED_ANHYDRIDE_BRIDGE[_bk] = _bpat
+
+
 def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     Detect all functional groups in a molecule.
@@ -509,6 +530,15 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
             results["hydrazone"] = kept
         else:
             del results["hydrazone"]
+
+    # W3-P06 (P-65.7.1/.3/.4): fold anhydride bridge-variant matches into the
+    # 'anhydride' bucket so principal_group -> 'anhydride' (name_anhydride
+    # re-detects the bridge type). Run BEFORE the collision resolver so the
+    # ('anhydride', [...]) suppression rule clears the sub-component reads
+    # (thioester/peroxide/ketone) on the folded atoms.
+    for _bk, _bpat in _COMPILED_ANHYDRIDE_BRIDGE.items():
+        for _bm in mol.GetSubstructMatches(_bpat, uniquify=True):
+            results["anhydride"].append(_bm)
 
     # Post-processing: remove generic FG matches that overlap with more-specific FGs
     results = _resolve_fg_collisions(results)

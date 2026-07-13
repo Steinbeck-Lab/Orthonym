@@ -29,6 +29,16 @@ from ..data.chain_names import get_chain_prefix
 # Anhydride core SMARTS: C(=O)-O-C(=O)
 ANHYDRIDE_SMARTS = "[CX3](=O)[OX2][CX3](=O)"
 
+# W3-P06 bridge-variant cores (re-detected here from the mol; perception folds
+# these into the 'anhydride' bucket so this handler is reached).
+_SULFONIC_ANHYDRIDE_SMARTS = "[SX4](=O)(=O)[OX2][SX4](=O)(=O)"       # P-65.7.1
+_CHALCOGEN_ANHYDRIDE_SMARTS = "[CX3](=O)[SX2,SeX2,TeX2][CX3](=O)"    # P-65.7.3
+_PEROXY_ANHYDRIDE_SMARTS = "[CX3](=O)[OX2][OX2][CX3](=O)"           # P-65.7.4
+
+# Two-word functional-class halide words, alphabetical order bromide<chloride<
+# fluoride<iodide (P-65.5.3.2 / P-65.5.1).
+_HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
+
 
 def name_anhydride(features) -> Optional[str]:
     """
@@ -45,6 +55,20 @@ def name_anhydride(features) -> Optional[str]:
 
     if pg != "anhydride":
         return None
+
+    # W3-P06: bridge-variant anhydrides (perceived + folded into 'anhydride').
+    # Each re-detects its own bridge on the mol; the base carbon/O core below
+    # never matches them, so ordering these first is safe (they return only on a
+    # genuine bridge match).
+    _sn = _name_sulfonic_anhydride(mol)          # P-65.7.1  R-SO2-O-SO2-R'
+    if _sn:
+        return _sn
+    _cn = _name_chalcogen_anhydride(mol)         # P-65.7.3  R-CO-S/Se/Te-CO-R'
+    if _cn:
+        return _cn
+    _pn = _name_peroxy_anhydride(mol)            # P-65.7.4  R-CO-OO-CO-R'
+    if _pn:
+        return _pn
 
     # Detect anhydride core: C(=O)-O-C(=O)
     pattern = Chem.MolFromSmarts(ANHYDRIDE_SMARTS)
@@ -121,6 +145,80 @@ def name_anhydride(features) -> Optional[str]:
         # Mixed/asymmetric anhydride: alphabetical order
         acids = sorted([acid1_name, acid2_name])
         return f"{acids[0]} {acids[1]} anhydride"
+
+
+def _bfs_side_atoms(mol, start: int, blocked: set) -> set:
+    """All heavy-atom indices reachable from ``start`` without crossing any atom
+    in ``blocked`` (the bridge atom(s) / the far side)."""
+    seen = {start}
+    queue = deque([start])
+    while queue:
+        cur = queue.popleft()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            nidx = nb.GetIdx()
+            if nidx in seen or nidx in blocked:
+                continue
+            seen.add(nidx)
+            queue.append(nidx)
+    return seen
+
+
+def _name_sulfonic_anhydride(mol) -> Optional[str]:
+    """P-65.7.1: R-SO2-O-SO2-R' -> '<sulfonic acid stem(s)> anhydride'.
+
+    Each sulfonyl side is capped with -OH into its free sulfonic acid, named via
+    the recursive fragment namer, and the ' acid' word stripped. Symmetric ->
+    '{acid} anhydride' (benzenesulfonic anhydride); mixed -> alphabetical two
+    words; symmetric-substituted (a heteroatom substituent on R) -> bis(...)
+    (P-65.7.8.1). Returns None (fall through) when no S-O-S core is present."""
+    pat = Chem.MolFromSmarts(_SULFONIC_ANHYDRIDE_SMARTS)
+    if pat is None:
+        return None
+    matches = mol.GetSubstructMatches(pat, uniquify=True)
+    if not matches:
+        return None
+    m = matches[0]                       # (S1, =O, =O, O_bridge, S2, =O, =O)
+    s1, bridge_o, s2 = m[0], m[3], m[4]
+
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from .esters import _extract_fragment_smiles
+
+    def _side_acid(s_idx):
+        keep = _bfs_side_atoms(mol, s_idx, {bridge_o})
+        # 'substituted' = any heteroatom (non C/H/S/O-of-sulfonyl) hanging off R.
+        substituted = any(
+            mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6, 8, 16)
+            for a in keep
+        )
+        smi = _extract_fragment_smiles(mol, set(keep), s_idx, cap_element=8)
+        if not smi:
+            return None, False
+        nm = name_fragment_recursively(smi)
+        if not nm or nm == "unknown" or not nm.endswith(" acid"):
+            return None, False
+        return nm[:-5].strip(), substituted
+
+    a1, sub1 = _side_acid(s1)
+    a2, sub2 = _side_acid(s2)
+    if a1 is None or a2 is None:
+        return None
+    if a1 == a2:
+        if sub1:
+            return f"bis({a1}) anhydride"
+        return f"{a1} anhydride"
+    acids = sorted([a1, a2])
+    return f"{acids[0]} {acids[1]} anhydride"
+
+
+def _name_chalcogen_anhydride(mol) -> Optional[str]:
+    """P-65.7.3: R-CO-X-CO-R' (X = S/Se/Te) -> thio/seleno/telluroanhydride.
+    Filled in W3-P06 Task 6."""
+    return None
+
+
+def _name_peroxy_anhydride(mol) -> Optional[str]:
+    """P-65.7.4: R-CO-OO-CO-R' -> peroxyanhydride. Filled in W3-P06 Task 7."""
+    return None
 
 
 def _parse_anhydride_core(mol, match: tuple) -> Optional[dict]:
