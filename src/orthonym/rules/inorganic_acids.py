@@ -188,6 +188,25 @@ _CARBONIC_ACID_PSEUDOHALIDES = {
     "[N-]=[N+]=NC(=O)O": "carbonazidic acid",   # P-65.2.1.4  N3-CO-OH
 }
 
+# --- W3-P15 (P-68.3.1.1.1.4 / P-68.3.1.1.1.6): hydroxylamine functional-parent
+#     PRESELECTED names ---
+# Hydroxylamine (H2N-OH) is, exceptionally, a functional parent to which acid /
+# amide suffixes attach at the OXYGEN atom (locant 'O'), and whose chalcogen
+# analogues take the 'thio' functional-replacement prefix. These have retained /
+# preselected PINs with no constitutional algorithm to run, so the correct PIN is
+# an exact-canonical-SMILES table lookup (the v22 G2 model). Intercepts @40 before
+# the general/skeletal paths that emitted 'unknown'. Exact full-molecule keys =>
+# zero false positives (a substituted / charged derivative simply will not match
+# and cascades onward). Every name OPSIN-RT-confirmed.
+_HYDROXYLAMINE_PRESELECTED = {
+    # P-68.3.1.1.1.4 (BB 38400): H2N-O-SO2-OH -> the -OH acid suffix sits on the
+    # hydroxylamine O with locant 'O' ('not azanyl hydrogen sulfate').
+    "NOS(=O)(=O)O": "hydroxylamine-O-sulfonic acid",
+    # P-68.3.1.1.1.6 (BB 38446): H2N-SH -> chalcogen analogue of hydroxylamine
+    # ('thio' functional-replacement); preselected name.
+    "NS": "thiohydroxylamine",
+}
+
 # Merged lookup (no key overlap across the tables — distinct structures).
 _ALL_INORGANIC = {
     **_INORGANIC_OXOACIDS,
@@ -196,6 +215,7 @@ _ALL_INORGANIC = {
     **_CARBONIC_ACID_HALIDES,
     **_C1_ACID_C_SUBSTITUTED,
     **_CARBONIC_ACID_PSEUDOHALIDES,
+    **_HYDROXYLAMINE_PRESELECTED,
 }
 
 
