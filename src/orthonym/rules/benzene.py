@@ -1656,6 +1656,29 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     },
                 }
 
+    # W3-P15 (P-68.3.1.1.1.5): ring-attached hydroxylamine -NH-OH -> the
+    # 'hydroxyamino' preselected prefix (BB 38428 '4-(hydroxyamino)phenol').
+    # The prefix generator already exists (substituent_prefix_forms.get_prefix
+    # returns 'hydroxyamino' for an unsubstituted -NH-OH); wire it here so the
+    # co-perceived hydroxylamine FG is demoted to its prefix when a senior PCG
+    # (phenol / -ol / acid) owns the ring, instead of falling to the generic
+    # fragment fallback below (which emitted the wrong 'aminohydroxylyl').
+    # Fail-closed to the fallback for N,O-disub / N-acyl forms (their prefix
+    # needs a composed builder not built here): the O must be a bare -OH.
+    if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'O':
+        _o = neighbors[0]
+        _o_others = [x for x in _o.GetNeighbors() if x.GetIdx() != n_idx]
+        if (_o.GetFormalCharge() == 0 and _o.GetTotalNumHs() == 1
+                and not _o_others):
+            from ..assembly.substituent_prefix_forms import (
+                get_substituent_prefix_form,
+            )
+            _hp = get_substituent_prefix_form(
+                'hydroxylamine', mol, (_o.GetIdx(), n_idx))
+            if _hp:
+                return {'name': _hp, 'atoms': [n_idx, _o.GetIdx()],
+                        'is_complex': True}
+
     # Fallback: complex N-substituent (non-alkyl chains, heteroatom-containing
     # groups like guanidino, ureido, etc.).  Collect all atoms via BFS and try
     # recursive naming.
