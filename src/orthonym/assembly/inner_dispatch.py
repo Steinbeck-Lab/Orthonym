@@ -944,6 +944,25 @@ _register_inner(
     side_effect_inventory=(),  # D-07 predicate purity invariant
 )
 
+# --- W3-P08 (P-65.6.3.3.7.2): thiocyanate_ester (<organyl> thiocyanate).
+#     Priority 2965 in the specialty-intercept tier (after nitrite_ester@2960,
+#     before tier_a_ring@4500). Fires only when principal_group is None so a
+#     senior-group molecule (thiocyanate as a plain prefix) is never hijacked.
+#     Distinct from isothiocyanate (C-N=C=S -> substitutive isothiocyanato).
+from .handlers.thiocyanate import (  # noqa: E402
+    _is_thiocyanate, name_thiocyanate,
+)
+
+_register_inner(
+    handler_id="thiocyanate",
+    priority=2965,
+    predicate=_is_thiocyanate,
+    handler=name_thiocyanate,
+    iupac_section="P-65.6.3.3.7.2",
+    description="Thiocyanate ester (<organyl> thiocyanate) functional-class handler (W3-P08)",
+    side_effect_inventory=(),  # D-07 predicate purity invariant
+)
+
 # --- Plan-02 commit 02-26: ion_dispatch (Phase 160 addition; audit § 1 + § 2.1).
 #     Per CONTEXT D-09, ion / salt / zwitterion / radical species use a
 #     PRE-POOL inline bypass at composer.py:751-768 — that call site STAYS
