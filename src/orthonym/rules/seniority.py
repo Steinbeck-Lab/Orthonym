@@ -146,6 +146,10 @@ SENIORITY_ORDER = [
     # Phase 163 Tier FRN-E: chalcogen-esters (P-65.6 extension) — additive per CONTEXT D-08
     "selenoester",
     "telluroester",
+    # W3-P07 (P-65.6.3.1.2 / P-65.6.3.4): pseudoester (R-CO-O-Z, Z a Group-13/14/15
+    # organyl) at the ester tier. Below the carboxylic 'ester' block; only governs
+    # the near-zero-corpus pseudoester-vs-other-ester tie. Functional-class only.
+    "pseudoester",
     "acid_chloride",
     "acid_bromide",
     "acid_fluoride",
@@ -577,6 +581,7 @@ SUFFIX_FORMS = {
     "iminoester": None,          # P-65.1.7: emitted via handlers/imidate.py per CONTEXT D-03
     "selenoester": None,         # P-65.6: functional-class "Se-alkyl alkaneselenoate"
     "telluroester": None,        # P-65.6: functional-class "Te-alkyl alkanetelluroate"
+    "pseudoester": None,         # W3-P07 P-65.6.3.1.2: functional-class "Zyl acylate" (handler-emitted)
     "isocyanide": None,          # IUPAC 2013 P-66.5.3: prefix-only (isocyano)
     "sulfoxide": None,           # IUPAC P-63.6: functional class naming (dialkyl sulfoxide)
     "sulfone": None,             # IUPAC P-63.6: functional class naming (dialkyl sulfone)
@@ -753,6 +758,7 @@ PREFIX_FORMS = {
     "acyl_isocyanate": "isocyanatocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
+    "pseudoester": None,  # W3-P07 P-65.6.3.1.2: functional-class only (no principal-group prefix)
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,  # IUPAC P-63.2: functional class naming (dialkyl sulfide)

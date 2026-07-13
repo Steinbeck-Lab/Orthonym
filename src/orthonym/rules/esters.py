@@ -1229,6 +1229,94 @@ def find_ester_match(mol) -> Optional[tuple]:
     return None
 
 
+def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
+    """Name an ester whose acid OR alcohol component is not the ordinary
+    carbon-on-oxygen carboxylic ester (P-65.6.3.1.2 / P-65.6.3.2.1 / P-65.6.3.4):
+
+      * pseudoester   R-CO-O-Z  (Z a Group-13/14/15 organyl) -> 'Zyl acylate'
+                      (CH3-CO-O-Si(CH3)3 -> 'trimethylsilyl acetate')
+      * sulfonic ester R-SO2-O-R' -> 'R'yl R-sulfonate'
+                      (CH3-SO2-O-CH3 -> 'methyl methanesulfonate')
+      * sulfinic ester R-S(=O)-O-R' -> 'R'yl R-sulfinate'
+
+    Single mechanism (root-cause, not a per-class string surgery): the acid
+    center is ``match[0]`` (a carbonyl C or an S). Locate the ester oxygen and
+    the O-side organyl structurally, sever the ester bond to recover the NEUTRAL
+    free acid, name it through the general pipeline (``name_compound`` — handles
+    retained/systematic, ring, unsaturated, substituted acids), convert the
+    '-ic acid' ending to the '-ate' anion stem (``_acid_name_to_ate``), and name
+    the O-side organyl via ``name_substituent`` (yields 'methyl' / 'trimethylsilyl'
+    / 'ethyl'). Compose '<organyl> <acid>ate'. Fail-closed (return None) on any
+    unnameable component so the caller cascade-continues.
+
+    ``match[0]`` = acid center; the ester oxygen is the single-bonded O on the
+    acid center whose OTHER heavy neighbour is the organyl.
+    """
+    acid_center = match[0]
+    center_atom = mol.GetAtomWithIdx(acid_center)
+
+    ester_o = None
+    organyl = None
+    for nb in center_atom.GetNeighbors():
+        if nb.GetAtomicNum() != 8:
+            continue
+        bond = mol.GetBondBetweenAtoms(acid_center, nb.GetIdx())
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            continue
+        others = [x for x in nb.GetNeighbors()
+                  if x.GetIdx() != acid_center and x.GetAtomicNum() > 1]
+        if len(others) == 1:
+            ester_o = nb.GetIdx()
+            organyl = others[0].GetIdx()
+            break
+    if ester_o is None or organyl is None:
+        return None
+
+    # --- Build the neutral free acid by severing the ester O -> organyl bond. ---
+    try:
+        rw = Chem.RWMol(mol)
+        rw.RemoveBond(ester_o, organyl)
+        m2 = rw.GetMol()
+        Chem.SanitizeMol(m2)
+    except (ValueError, RuntimeError):
+        return None
+    acid_frag = next((f for f in Chem.GetMolFrags(m2) if acid_center in f), None)
+    if acid_frag is None:
+        return None
+    try:
+        acid_smi = Chem.MolFragmentToSmiles(
+            m2, atomsToUse=list(acid_frag), canonical=True, isomericSmiles=True)
+    except (ValueError, RuntimeError):
+        return None
+
+    from orthonym import name_compound  # lazy: re-entrant on the free-acid fragment
+    try:
+        acid_name = name_compound(acid_smi)
+    except Exception:
+        return None
+    if (not acid_name
+            or "unknown" in acid_name.lower()
+            or "not supported" in acid_name.lower()):
+        return None
+    anion = _acid_name_to_ate(acid_name)
+    if anion is None:
+        return None
+
+    # --- Name the O-side organyl as a substituent group. ---
+    from ..assembly.substituent_enumerator import name_substituent
+    organyl_atoms = _bfs_fragment(mol, organyl, exclude_atom=ester_o)
+    if not organyl_atoms:
+        return None
+    try:
+        organyl_name = name_substituent(mol, organyl_atoms, organyl)
+    except Exception:
+        return None
+    if not organyl_name:
+        return None
+
+    return f"{organyl_name} {anion}"
+
+
 # ============================================================================
 # Acyloxy Prefix Naming (IUPAC P-65.6.3.2.2)
 # ============================================================================

@@ -1167,6 +1167,29 @@ _register_inner(
 #     handlers: polyfunctional, multi_ester, ester). Per CONTEXT D-28 +
 #     ADR-19-02 §3.1 Option A composite-handler resolution path. Priority
 #     1500 fires AFTER ring_ester(1450) per inline cascade order.
+# --- W3-P07: non-carbon ester handler (pseudoester / sulfonic ester / sulfinic
+#     ester). Distinct principal_group values ('pseudoester' / 'sulfonic_ester' /
+#     'sulfinic_ester') that never collide with 'ester', so priority 1495 (just
+#     before ester_family@1500) fires them via a disjoint predicate. IUPAC
+#     P-65.6.3.1.2 / P-65.6.3.2.1 / P-65.6.3.4.
+from .handlers.noncarbon_ester import (  # noqa: E402
+    _is_noncarbon_ester, name_noncarbon_ester_handler,
+)
+
+_register_inner(
+    handler_id="noncarbon_ester",
+    priority=1495,
+    predicate=_is_noncarbon_ester,
+    handler=name_noncarbon_ester_handler,
+    iupac_section="P-65.6.3.1.2 / P-65.6.3.2.1 / P-65.6.3.4",
+    description=(
+        "Non-carbon ester: pseudoester (R-CO-O-Z, Z Group-13/14/15) / sulfonic "
+        "ester (R-SO2-O-R') / sulfinic ester (R-S(=O)-O-R'). Names via the shared "
+        "esters.name_noncarbon_ester (neutral-acid -> '-ate' + O-side organyl)."
+    ),
+    side_effect_inventory=(),
+)
+
 from .handlers.ester_family import _is_ester_family, name_ester_family  # noqa: E402
 
 _register_inner(

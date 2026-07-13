@@ -555,6 +555,16 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
     """
     if mol is None:
         return False
+    # W3-P07 (P-65.6.3.1.2 / P-65.6.3.4): a PSEUDOESTER R-CO-O-Z (Z a Group-13/14/15
+    # organyl, e.g. CH3-CO-O-Si(CH3)3) is named as an ESTER ('trimethylsilyl
+    # acetate'), NOT as a P-69 organometallic parent hydride. The ester is the
+    # senior characteristic group; ORGM@50 would otherwise claim the Si FIRST and
+    # emit a garbage silane ('(acetaldehydoxy)tri(methyl)silane', OPSIN-suppressed
+    # to 'unknown'). Decline so the pseudoester principal-group routes to the
+    # noncarbon_ester handler. Read-only (D-12/D-26 purity preserved).
+    from orthonym.perception.functional_groups import detect_functional_groups
+    if detect_functional_groups(mol).get('pseudoester'):
+        return False
     # F-T6 (DD3): a single-anion ion centred on a Group-13/14 metalloid is a
     # charged parent-hydride anion owned by the ANION_SMALL -> route_charged
     # emitter path, NOT the neutral P-69 organometallic handler (priority 50) which

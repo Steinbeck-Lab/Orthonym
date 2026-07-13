@@ -156,6 +156,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
     "telluroester": "[CX3](=O)[TeX2][#6]",        # R-C(=O)-Te-R' (P-65.6; Te-alkyl alkanetelluroate)
+    # W3-P07 (P-65.6.3.1.2 / P-65.6.3.4): PSEUDOESTER — a carboxylic acid whose
+    # ester oxygen carries a Group-13/14/15 organyl (Si/Ge/Sn/Pb/B/Al/Ga/In/Tl/
+    # P/As/Sb/Bi) instead of carbon (CH3-CO-O-Si(CH3)3 -> 'trimethylsilyl
+    # acetate'). The generic 'ester' pattern requires [#6] on the ester O and
+    # never matches these, so without this FG the molecule reads as 'unknown'.
+    # Match tuple: (carbonyl_c, carbonyl_o, ester_o, Z). Named by the shared
+    # non-carbon-ester handler (build the neutral carboxylic acid -> '-ate' +
+    # organyl-Z substituent). Ranked at the ester tier (P-41).
+    "pseudoester": "[CX3](=O)[OX2][Si,Ge,Sn,Pb,B,Al,Ga,In,Tl,P,As,Sb,Bi]",
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
