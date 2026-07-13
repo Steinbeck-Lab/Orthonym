@@ -3771,6 +3771,24 @@ def _group14_neighbour_prefix(mol, idx, exclude_idx, frag_set) -> Optional[str]:
         hp = _GROUP14_TERMINAL_HETERO_PREFIX.get((sym, atom.GetTotalNumHs()))
         if hp is not None:
             return hp
+    # A TERMINAL -O-alkyl (alkoxy) neighbour: the O is bonded ONLY to the
+    # Group-14 centre + one pure-organyl carbon (a silicic/germanic ester O-R),
+    # neutral, no H. Cited via the contracted alkoxy prefix (P-68.2.6.2, BB
+    # 38245: -Ge(OEt)3 -> 'triethoxygermyl'). A -O-R where R is not a pure
+    # organyl (nested ether), or an O bearing extra heavy neighbours, -> None.
+    if (sym == 'O' and atom.GetTotalNumHs() == 0 and len(heavy_in_frag) == 2
+            and any(nb.GetIdx() == exclude_idx for nb in heavy_in_frag)):
+        others = [nb for nb in heavy_in_frag if nb.GetIdx() != exclude_idx]
+        if len(others) == 1 and others[0].GetSymbol() == 'C':
+            from ..rules.substituent_purity import pure_organyl_prefix_name
+            r_c = others[0].GetIdx()
+            if pure_organyl_prefix_name(mol, r_c, idx) is not None:
+                from .substituent_prefix_forms import get_alkoxy_prefix
+                alk = get_alkoxy_prefix(mol, (idx, exclude_idx, r_c),
+                                        principal_chain=[exclude_idx])
+                if alk is not None:
+                    return alk
+        return None
     # Pure unbranched-alkyl / phenyl-naphthyl organyl (reuse the Phase-7 guard).
     from ..rules.substituent_purity import pure_organyl_prefix_name
     return pure_organyl_prefix_name(mol, idx, exclude_idx)
