@@ -209,6 +209,83 @@ def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -
     return f"{parent_name}sulfonic acid"
 
 
+def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
+    """P-67.1.4.4.1 / P-68.5.0 / P-65.3.1: the acid halide of a sulfonic /
+    sulfinic acid, named by the two-word functional-class grammar
+    '{parent-stem}sulfonyl {halide}' / '{parent-stem}sulfinyl {halide}'.
+
+    BB-verbatim targets: 'ethanesulfonyl chloride' (@39650, PIN),
+    'propane-1-sulfonyl chloride', '4-isocyanatobenzene-1-sulfonyl chloride
+    (PIN)' (@26014).
+
+    Implementation (root-cause reuse, not a band-aid): cap the S-bonded halogen
+    with -OH to form the parent sulfonic/sulfinic acid, name that acid with the
+    full engine — reusing ALL chain/ring numbering (yields 'propane-1-sulfonic
+    acid' / 'ethanesulfonic acid' / 'benzenesulfonic acid', substituents and
+    all) — then rewrite the '-onic/-inic acid' suffix to the acyl '-onyl/-inyl
+    {halide}' functional-class word. Fail-closed (None) unless the capped
+    molecule names cleanly as a sulfonic/sulfinic acid, so a wrong name is never
+    emitted.
+    """
+    mol = features.mol
+    pg = features.principal_group
+    if pg not in ("sulfonyl_halide", "sulfinyl_halide"):
+        return None
+    matches = features.functional_groups.get(pg, [])
+    # Poly-sulfonyl-halide (>1) deferred: the two-word grammar would need a
+    # multiplied acyl word — fail closed until that class is built.
+    if len(matches) != 1:
+        return None
+    match = matches[0]
+    # Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X) — S first, X last.
+    halide_idx = match[-1]
+    halide_sym = mol.GetAtomWithIdx(halide_idx).GetSymbol()
+    from .acid_halides import _HALIDE_WORD
+    halide_word = _HALIDE_WORD.get(halide_sym)
+    if halide_word is None:
+        return None
+
+    # Cap the halide -> -OH, forming the parent oxoacid.
+    rw = Chem.RWMol(mol)
+    o_atom = rw.GetAtomWithIdx(halide_idx)
+    o_atom.SetAtomicNum(8)
+    o_atom.SetFormalCharge(0)
+    o_atom.SetNumExplicitHs(0)
+    o_atom.SetNoImplicit(False)
+    try:
+        capped = rw.GetMol()
+        Chem.SanitizeMol(capped)
+        capped_smiles = Chem.MolToSmiles(capped)
+    except Exception:
+        return None
+
+    from ..namer import Orthonym
+    acid_name = Orthonym(style=style, _disable_opsin_validity_gate=True).name(
+        capped_smiles
+    )
+    if not acid_name or not isinstance(acid_name, str):
+        return None
+
+    if acid_name.endswith("sulfonic acid"):
+        acyl = acid_name[: -len("sulfonic acid")] + "sulfonyl"
+    elif acid_name.endswith("sulfinic acid"):
+        acyl = acid_name[: -len("sulfinic acid")] + "sulfinyl"
+    else:
+        # Not a clean sulfonic/sulfinic acid (e.g. retained/complex parent the
+        # rewrite cannot safely handle) -> fail closed.
+        return None
+
+    # The retained benzene stem carries no locant ('benzenesulfonic acid'), but
+    # the PIN sulfonyl-halide form takes the '-1-' locant (BB
+    # '...benzene-1-sulfonyl chloride'). Insert it for the bare-benzene stem.
+    if acyl == "benzenesulfonyl":
+        acyl = "benzene-1-sulfonyl"
+    elif acyl == "benzenesulfinyl":
+        acyl = "benzene-1-sulfinyl"
+
+    return f"{acyl} {halide_word}"
+
+
 def _classify_oxide_side(mol, c_idx: int, sulfur_idx: int):
     """Classify one R side of R-S(=O)x-R' for substitutive P-63.6 naming.
 

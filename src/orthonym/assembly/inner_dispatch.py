@@ -644,6 +644,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- W3-P11 (P-67.1.4.4.1 / P-68.5.0 / P-65.3.1): sulfonyl/sulfinyl halide.
+#     Acid-halide tier, just after the carbon acyl halide (priority 1150), before
+#     anhydride (1200). Distinct principal_group string -> predicate mutex with
+#     acid_halide. Cap-and-rename functional-class name '{stem}sulfonyl {halide}'.
+from .handlers.sulfonyl_halide import (  # noqa: E402
+    _is_sulfonyl_halide, name_sulfonyl_halide,
+)
+
+_register_inner(
+    handler_id="sulfonyl_halide",
+    priority=1150,
+    predicate=_is_sulfonyl_halide,
+    handler=name_sulfonyl_halide,
+    iupac_section="P-67.1.4.4.1",
+    description="Sulfonyl/sulfinyl halide functional class naming (ethanesulfonyl chloride)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-12: anhydride (Tier-1.5 SHIM; audit § 1 + § 2.12).
 from .handlers.anhydride import _is_anhydride, name_anhydride  # noqa: E402
 

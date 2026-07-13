@@ -178,6 +178,18 @@ FUNCTIONAL_GROUP_SMARTS = {
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
     "acid_iodide": "[CX3](=O)[I]",  # DATA-04: IUPAC P-65.5.1
+    # W3-P11 (P-67.1.4.4.1 / P-68.5.0 / P-65.3.1): acid halide of a sulfonic /
+    # sulfinic acid — R-SO2-X / R-S(=O)-X (X = F,Cl,Br,I). Named by the two-word
+    # functional-class grammar '{stem}sulfonyl {halide}' / '{stem}sulfinyl
+    # {halide}' (BB 'ethanesulfonyl chloride' @39650, 'propane-1-sulfonyl
+    # chloride', '4-isocyanatobenzene-1-sulfonyl chloride (PIN)' @26014). The
+    # $([SX4/SX3][#6]) guard requires a CARBON on S (a genuine C-sulfonic/sulfinic
+    # acid halide), so sulfuryl/thionyl halides (no C-S) are excluded. Neither the
+    # sulfone (2 C on S) nor the halogen 'chloro' ([ClX1][#6], halide on C) SMARTS
+    # can claim these atoms, so R-SO2-X was previously perceived as nothing ->
+    # 'unknown'. Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X).
+    "sulfonyl_halide": "[SX4;$([SX4][#6])](=[OX1])(=[OX1])[F,Cl,Br,I]",
+    "sulfinyl_halide": "[SX3;$([SX3][#6])](=[OX1])[F,Cl,Br,I]",
     # Wave2 T6c: acyl PSEUDOhalides (P-65.5.2.1 — functional-class PINs
     # 'butanoyl azide' / 'propanoyl cyanide' / 'acetyl isocyanate'). Without
     # these the bare azido/isocyanate/nitrile SMARTS claim only the tail and

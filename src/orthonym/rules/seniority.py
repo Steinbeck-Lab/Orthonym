@@ -164,6 +164,12 @@ SENIORITY_ORDER = [
     "acyl_azide",
     "acyl_cyanide",
     "acyl_isocyanate",
+    # W3-P11 (P-67.1.4.4.1 / P-68.5.0 / P-65.3.1): acid halides of sulfonic /
+    # sulfinic acids. Acid-halide tier (P-41 class 8), below the carbon acyl
+    # halides (S oxoacid-derivatives named after their C analogues) and above
+    # amides. Functional-class handler-emitted ('ethanesulfonyl chloride').
+    "sulfonyl_halide",
+    "sulfinyl_halide",
 
     # Nitrogen acid derivatives
     "primary_amide",
@@ -490,6 +496,13 @@ SUFFIX_FORMS = {
     "acid_bromide": ("oyl bromide", "carbonyl bromide"),
     "acid_fluoride": ("oyl fluoride", "carbonyl fluoride"),
     # Wave2 T6c: acyl pseudohalides (P-65.5.2.1 functional-class PINs)
+    # W3-P11: sulfonyl/sulfinyl halide are functional-class handler-emitted
+    # (name_sulfonyl_halide builds the two-word name directly); the generic
+    # get_suffix path is never reached, so SUFFIX_FORMS is None (like the FRN
+    # functional-class groups). PREFIX_FORMS is likewise None -> a demoted case
+    # (a senior group co-present) fails closed rather than emit a wrong prefix.
+    "sulfonyl_halide": None,
+    "sulfinyl_halide": None,
     "acyl_azide": ("oyl azide", "carbonyl azide"),
     "acyl_cyanide": ("oyl cyanide", "carbonyl cyanide"),
     "acyl_isocyanate": ("oyl isocyanate", "carbonyl isocyanate"),
@@ -766,6 +779,11 @@ PREFIX_FORMS = {
     "acid_fluoride": "fluorocarbonyl",
     # Wave2 T6c: acyl-pseudohalide prefixes (P-65.5.4, parallel to
     # bromocarbonyl/fluorocarbonyl above)
+    # W3-P11: demoted sulfonyl/sulfinyl halide prefix fails closed (None) — the
+    # -SO2-X substituent prefix ('{halide}sulfonyl') is halide-dependent and the
+    # target compounds are mono-functional (always the principal group).
+    "sulfonyl_halide": None,
+    "sulfinyl_halide": None,
     "acyl_azide": "azidocarbonyl",
     "acyl_cyanide": "cyanocarbonyl",
     "acyl_isocyanate": "isocyanatocarbonyl",
