@@ -22,21 +22,30 @@ class TestAcyloxyBracketFormat:
     """Verify acyloxy prefixes have correct bracket format for OPSIN."""
 
     def test_acyloxy_brackets_on_benzene(self):
-        """Acyloxy prefix on benzene ring is bracketed: 4-(Xoyloxy)benzoic acid."""
-        # 4-(acetyloxy)benzoic acid (aspirin-like systematic name)
+        """Acyloxy prefix on benzene ring is bracketed: 4-(acetyloxy)benzoic acid.
+
+        Wave-3: the acyl group is 'acetyl' (PIN, P-65.6.3.2.3); 'ethanoyl' is
+        general-only, so the bracketed prefix is '(acetyloxy)'.
+        """
         name = name_compound("CC(=O)Oc1ccc(C(=O)O)cc1")
-        # Should contain a bracketed acyloxy prefix
-        # Accept either "(ethanoyloxy)" or "(acetyloxy)" -- both are valid
-        assert re.search(r"\(\w+oyloxy\)", name), (
+        assert name == "4-(acetyloxy)benzoic acid", (
+            f"Expected '4-(acetyloxy)benzoic acid', got '{name}'"
+        )
+        assert re.search(r"\(\w+yloxy\)", name), (
             f"Expected bracketed acyloxy prefix in '{name}'"
         )
 
     def test_acyloxy_brackets_on_chain(self):
-        """Acyloxy prefix on acyclic chain is bracketed: 2-(Xoyloxy)ethanoic acid."""
-        # 2-(acetyloxy)acetic acid
+        """Acyloxy prefix on acyclic chain is bracketed: 2-(acetyloxy)ethanoic acid.
+
+        Wave-3: acetyl is the PIN acyl group, so the bracketed prefix is
+        '(acetyloxy)' (ethanoyloxy is general-only).
+        """
         name = name_compound("CC(=O)OCC(=O)O")
-        # Must contain bracketed acyloxy
-        assert re.search(r"\(\w+oyloxy\)", name), (
+        assert name == "2-(acetyloxy)ethanoic acid", (
+            f"Expected '2-(acetyloxy)ethanoic acid', got '{name}'"
+        )
+        assert re.search(r"\(\w+yloxy\)", name), (
             f"Expected bracketed acyloxy prefix in '{name}'"
         )
 
