@@ -101,6 +101,10 @@ SENIORITY_ORDER = [
     # exactly as peroxy_acid sits directly below carboxylic_acid. (Governs only
     # near-zero-corpus S-vs-S polyfunctional ties; additive insert.)
     "sulfonoperoxoic_acid",
+    # W3-P04 (P-65.3.1.3 @31198): FRN -S- (=S/-SH) modification of the sulfonic
+    # acid suffix. BB @31178 orders 'unmodified > -OO- > S > Se > Te', so it
+    # ranks below sulfonoperoxoic_acid (-OO-) and above the =NH imidic block.
+    "sulfonothioic_S_acid",
     "sulfinic_acid",
     "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
     # v23 Phase 9 (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
@@ -438,6 +442,11 @@ SUFFIX_FORMS = {
     # W3-P04 (P-65.3.1.2 @31184): FRN peroxy-modified sulfonic acid suffix; chain
     # stem + 'sulfonoperoxoic acid' (methanesulfonoperoxoic acid, PIN @31190).
     "sulfonoperoxoic_acid": ("sulfonoperoxoic acid", "sulfonoperoxoic acid"),
+    # W3-P04 (P-65.3.1.3 @31198): FRN -SH modified sulfonic acid. The tautomer
+    # symbol italic 'S' sits before 'acid' in the suffix (BB '-SO2-SH
+    # sulfonothioic S-acid'); chain stem + 'sulfonothioic S-acid'
+    # (ethanesulfonothioic S-acid, PIN).
+    "sulfonothioic_S_acid": ("sulfonothioic S-acid", "sulfonothioic S-acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     # v23 Phase 9 (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
     # ethaneselenonic acid), parallel to sulfonic.
@@ -619,6 +628,7 @@ PREFIX_FORMS = {
     # closed (None), exactly like imidic_acid — these are in-scope only as the
     # principal group; a wrong prefix would be worse than fail-closed abstention.
     "sulfonoperoxoic_acid": None,
+    "sulfonothioic_S_acid": None,  # W3-P04 (P-65.3.1.3): demoted-prefix fails closed
     "sulfinic_acid": "sulfino",
     # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
     "selenonic_acid": "selenono",

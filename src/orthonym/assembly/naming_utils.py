@@ -282,7 +282,7 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # attach to a chain carbon exactly like sulfonic/sulfinic, so their locant
     # elides on the symmetric 2-carbon (ethane) parent (ethanesulfonothioic
     # S-acid, PIN); methane is covered by Rule 1; C3+ keeps the locant.
-    "sulfonoperoxoic_acid",
+    "sulfonoperoxoic_acid", "sulfonothioic_S_acid",
     "selenonic_acid", "seleninic_acid", "telluronic_acid", "tellurinic_acid",
     # C1 (P-14.3.4.4 / P-65.3.1): sulfonohydrazide is the N-analogue of sulfonic
     # acid and attaches to a chain carbon exactly the same way, so it elides its

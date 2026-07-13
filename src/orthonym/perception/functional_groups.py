@@ -64,6 +64,10 @@ FUNCTIONAL_GROUP_SMARTS = {
     # (S, =O, =O, inner-O, hydroperoxy-OH). The inner O is on S (not C), so the
     # hydroperoxide SMARTS [OX2H][OX2][#6] cannot claim the -OOH either.
     "sulfonoperoxoic_acid": "[SX4;$([SX4][#6])](=O)(=O)[OX2][OX2H1]",
+    # -SO2-SH sulfonothioic S-acid (P-65.3.1.3; BB @31198, preselected suffix).
+    # The -OH of sulfonic acid is replaced by -SH. Match tuple (S, =O, =O, S-H).
+    # The thiol SMARTS [SX2H][#6] cannot claim the -SH (its S is on S, not C).
+    "sulfonothioic_S_acid": "[SX4;$([SX4][#6])](=O)(=O)[SX2H1]",
     "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
     # v23 Phase 9 (P-65.3 / Table 6.2): selenium & tellurium analogues of the
@@ -793,6 +797,11 @@ def _resolve_fg_collisions(results):
         # the group or double-name the -OOH as a hydroperoxy prefix.
         ('sulfonoperoxoic_acid', ['sulfonic_acid', 'sulfuric_acid', 'sulfone',
                                   'hydroperoxide', 'peroxide']),
+        # W3-P04 (P-65.3.1.3): the -SH-modified sulfonic acid owns its whole
+        # R-SO2-SH unit. Generics cannot match (the -SH S is on S not C; the
+        # sulfonyl S bears one C) but suppress defensively.
+        ('sulfonothioic_S_acid', ['sulfonic_acid', 'sulfuric_acid', 'sulfone',
+                                  'thiol', 'thioether', 'disulfide']),
         ('nitric_acid', ['nitro', 'nitroso']),
         # WSD-05 (PERC-03): a nitrite ester (R-O-N=O) suppresses any residual
         # `nitroso` on its atoms — makes the O-vs-C precedence explicit/robust on
