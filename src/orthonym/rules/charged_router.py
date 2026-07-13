@@ -151,6 +151,11 @@ _ANION_ALLOWED_SUFFIXES = {
     'phosphonate': frozenset({'phosphonic acid', 'phosphinic acid',
                               'phosphoric acid'}),
     'carboxylate': frozenset({'oic acid', 'carboxylic acid'}),
+    # P-65.6.1: the carbo(di)thioate acid anion (R-C(=S)-S- / R-C(=O)-S-). Its
+    # neutral form is a (di)thioic acid ending '-oic acid' (propanedithioic acid),
+    # so it takes the -oate seam -> propanedithioate. Restricting to {'oic acid'}
+    # keeps GUARD-1 tight (a stem must genuinely end in the acid suffix).
+    'carbodithioate': frozenset({'oic acid'}),
     'alkoxide': frozenset({'ol'}),
     'phenolate': frozenset({'ol'}),
     'thiolate': frozenset({'thiol'}),

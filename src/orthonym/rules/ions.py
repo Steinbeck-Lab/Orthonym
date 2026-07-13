@@ -181,6 +181,25 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         return 'carbanion'
 
     elif element == 'S':
+        # P-65.6.1 (dithioate anion): an [S-] bonded to a carbon that itself bears
+        # a DOUBLE-bonded chalcogen (=O/=S/=Se) — a carbo(di)thioate acid carbon
+        # R-C(=S)-S(-) / R-C(=O)-S(-) — is the CARBOXYLATE-ANALOG acid anion, NOT a
+        # thiolate (R-S(-)). Its neutral form is a (di)thioic acid ending in
+        # '-oic acid' ("propanedithioic acid"), so it must take the acid-anion
+        # -oate seam ("propanedithioate"), not the thiol->thiolate seam (which
+        # would restrict allowed_suffixes to {'thiol'} and block the dithioate).
+        # Discriminator = an adjacent carbon bearing a double-bonded chalcogen; a
+        # genuine thiolate CH3-S(-) / CH3CH2-S(-) has none and stays 'thiolate'.
+        for neighbor in atom.GetNeighbors():
+            if neighbor.GetSymbol() == 'C':
+                for second_neighbor in neighbor.GetNeighbors():
+                    if second_neighbor.GetIdx() == atom_idx:
+                        continue
+                    if second_neighbor.GetSymbol() in ('O', 'S', 'Se'):
+                        bond = mol.GetBondBetweenAtoms(
+                            neighbor.GetIdx(), second_neighbor.GetIdx())
+                        if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                            return 'carbodithioate'
         # Sulfur anion (thiolate)
         return 'thiolate'
 
